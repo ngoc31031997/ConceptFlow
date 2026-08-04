@@ -1,0 +1,100 @@
+# Services (Orchestration Layer)
+
+**Cập nhật theo ADR-0007**: Orchestration Service (mới) là Saga coordinator duy nhất, giao tiếp với các service nghiệp vụ qua RabbitMQ (command/event, bất đồng bộ). API Gateway chỉ còn routing + khởi tạo Saga qua REST.
+
+## Saga: Render Pipeline (Story A1 → D1)
+
+```mermaid
+sequenceDiagram
+    participant GUI
+    participant GW as API Gateway
+    participant ORCH as Orchestrator Service
+    participant MQ as RabbitMQ
+    participant SP as Script Processing
+    participant CP as Content Plugin
+    participant RD as Rendering Service
+    participant TTS as TTS Service
+    participant VA as Video Assembly
+
+    GUI->>GW: POST /projects/{id}/script
+    GW->>ORCH: POST /sagas/render
+    ORCH->>MQ: command parse_script
+    MQ->>SP: (deliver) parse_script
+    SP-->>MQ: event script_parsed
+    MQ-->>ORCH: (deliver) script_parsed
+    ORCH-->>GW: SSE progress (status=script_parsed)
+    GW-->>GUI: SSE progress
+
+    ORCH->>MQ: command classify_scenes
+    MQ->>CP: (deliver) classify_scenes
+    CP-->>MQ: event scenes_classified
+    MQ-->>ORCH: (deliver) scenes_classified
+
+    ORCH->>MQ: command render_scenes
+    MQ->>RD: (deliver) render_scenes
+    activate RD
+    RD->>TTS: POST /tts/synthesize (per scene, REST đồng bộ)
+    TTS-->>RD: audio_path, duration
+    RD-->>MQ: event scene_rendered (per scene, tiến trình)
+    MQ-->>ORCH: (deliver) scene_rendered
+    ORCH-->>GW: SSE progress
+    RD-->>MQ: event rendering_completed
+    deactivate RD
+    MQ-->>ORCH: (deliver) rendering_completed
+
+    ORCH->>MQ: command assemble_video
+    MQ->>VA: (deliver) assemble_video
+    VA-->>MQ: event video_assembled
+    MQ-->>ORCH: (deliver) video_assembled
+    ORCH-->>GW: SSE done (status=ready_to_publish)
+    GW-->>GUI: SSE done
+```
+
+## Saga: Publish (Story E1 → E3)
+
+```mermaid
+sequenceDiagram
+    participant GUI
+    participant GW as API Gateway
+    participant ORCH as Orchestrator Service
+    participant MQ as RabbitMQ
+    participant PB as Publisher Service
+    participant YT as YouTube API
+
+    GUI->>GW: GET /auth/youtube/start (nếu chưa xác thực)
+    GW->>PB: GET /auth/youtube/start (REST trực tiếp, ngoài Saga)
+    PB-->>GUI: redirect OAuth
+    GUI->>PB: (browser) OAuth callback
+    PB-->>GW: authenticated=true
+
+    GUI->>GW: POST /projects/{id}/publish
+    GW->>ORCH: POST /sagas/publish
+    ORCH->>MQ: command publish_video
+    MQ->>PB: (deliver) publish_video
+    PB->>YT: upload video + metadata
+    YT-->>PB: youtube_video_url
+    PB-->>MQ: event video_published
+    MQ-->>ORCH: (deliver) video_published
+    ORCH-->>GW: SSE done (status=published, youtube_video_url)
+    GW-->>GUI: SSE done
+```
+
+## Saga Step Definitions
+
+| # | Step | Command | Service | Success Event | Failure Event |
+|---|---|---|---|---|---|
+| 1 | Parse Script | `parse_script` | Script Processing | `script_parsed` | `parse_failed` |
+| 2 | Classify Scenes | `classify_scenes` | Content Plugin | `scenes_classified` | `classification_failed` |
+| 3 | Render Scenes | `render_scenes` | Rendering (+ TTS nội bộ) | `rendering_completed` | `rendering_failed` |
+| 4 | Assemble Video | `assemble_video` | Video Assembly | `video_assembled` | `assembly_failed` |
+| 5 | Publish Video | `publish_video` | Publisher | `video_published` | `publish_failed` |
+
+## Error Handling & Compensating Actions (Saga Orchestration, ADR-0007)
+- Khi Orchestrator nhận event `*_failed`, đặt trạng thái project = `failed_at_<step>`, giữ nguyên kết quả các bước trước (artifact đã tạo trong shared volume không bị xóa).
+- **Compensating action** cụ thể theo bước:
+  - `parse_failed`/`classification_failed`: không có artifact cần dọn — cho phép Creator sửa script và retry từ bước 1
+  - `rendering_failed`: giữ scene đã render thành công (idempotent theo `project_id`+`scene_index`), retry chỉ scene lỗi
+  - `assembly_failed`: giữ animation/audio clip, retry chỉ bước Assembly
+  - `publish_failed`: không có gì cần rollback ở phía YouTube (chưa tạo gì), retry bước Publish
+- GUI hiển thị lỗi cụ thể (Story C6) và nút retry tương ứng bước lỗi — Orchestrator chỉ gửi lại command của bước đó, không chạy lại toàn bộ Saga.
+- **Idempotency**: mọi command mang `saga_id` + `project_id`; consumer kiểm tra artifact đã tồn tại trước khi tạo lại (tránh xử lý trùng khi message được deliver lại do requeue).
