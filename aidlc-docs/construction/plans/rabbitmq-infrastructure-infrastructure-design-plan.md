@@ -22,7 +22,7 @@ A) Docker container trong docker-compose, chạy trên máy cá nhân (macOS, m�
 
 B) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ### Question 2: Storage/Persistence
 Data của RabbitMQ (queue, message durable) cần lưu ở đâu để không mất khi container bị xóa/tạo lại (không chỉ restart)?
@@ -37,7 +37,7 @@ B) Bind mount tới thư mục cụ thể trên host (vd. `./data/rabbitmq`)
 
 C) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ### Question 3: Networking
 Port nào cần expose ra host, port nào chỉ nội bộ docker-compose network?
@@ -50,7 +50,7 @@ B) Expose cả 2 port ra host
 
 C) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ### Question 4: Scaling Configuration
 Xác nhận: không cần auto-scaling cho RabbitMQ (1 instance cố định), đúng theo NFR Requirements (không yêu cầu scale)?
@@ -59,7 +59,7 @@ A) Đúng — 1 instance cố định, không auto-scaling
 
 B) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
 
 ### Question 5: Health Check
 docker-compose có cần health check để các service khác biết RabbitMQ đã sẵn sàng trước khi kết nối không?
@@ -72,4 +72,4 @@ B) Không cần, để service tự retry kết nối
 
 C) Other (please describe after [Answer]: tag below)
 
-[Answer]: 
+[Answer]: A
