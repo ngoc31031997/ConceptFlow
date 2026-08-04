@@ -272,3 +272,11 @@
 **Context**: CONSTRUCTION - Unit 1 - NFR Design
 
 ---
+
+## Construction - Unit 1 - NFR Design Approved, Infrastructure Design Questions Presented
+**Timestamp**: 2026-08-04T02:50:00Z
+**User Input**: "ok" (approved NFR Design); also requested: auto-commit after every step/phase going forward
+**AI Response**: "Ran git init (previous manual attempt left a broken nested .git inside aidlc-docs, fixed). Committed Inception phase + Unit 1 NFR work. Will auto-commit after every stage from now on without asking. Created rabbitmq-infrastructure-infrastructure-design-plan.md with 5 questions (deployment env, storage/persistence, networking, scaling, health check); marked Load Balancer, DB read/write splitting/sharding, API Gateway as N/A with justification."
+**Context**: CONSTRUCTION - Unit 1 - Infrastructure Design - Planning
+
+---
