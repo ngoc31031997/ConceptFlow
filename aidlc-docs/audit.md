@@ -470,3 +470,27 @@
 **Context**: CONSTRUCTION - Unit 3 - Functional Design -> NFR Requirements
 
 ---
+
+## Construction - Unit 3 - NFR Requirements Questions Presented
+**Timestamp**: 2026-08-05T12:20:00Z
+**User Input**: N/A
+**AI Response**: "Created tts-service-nfr-requirements-plan.md with 8 questions: tech stack consistency (Python/FastAPI), CPU-bound handling (threadpool), synthesis timeout, availability, security, messaging participation (N/A), Saga participation (indirect participant), caching (in-memory voice model). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 3 - NFR Requirements - Planning
+
+---
+
+## Construction - Unit 3 - NFR Requirements Generated
+**Timestamp**: 2026-08-05T12:30:00Z
+**User Input**: "ok (Q1:A, Q2:A, Q3: 60s instead of 30s, Q4:A, Q5:A, Q6:A, Q7:A, Q8:A)"
+**AI Response**: "No ambiguities. Generated nfr-requirements.md (performance/threadpool+60s timeout, availability, security, messaging N/A, Saga indirect participant, caching in-memory voice model) and tech-stack-decisions.md (Python 3.12 + FastAPI, Piper per ADR-0010). Presented completion message requesting approval to proceed to NFR Design."
+**Context**: CONSTRUCTION - Unit 3 - NFR Requirements
+
+---
+
+## Construction - Unit 3 - NFR Requirements Approved
+**Timestamp**: 2026-08-05T12:35:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Requirements for Unit 3. Proceeding to NFR Design."
+**Context**: CONSTRUCTION - Unit 3 - NFR Requirements -> NFR Design
+
+---
