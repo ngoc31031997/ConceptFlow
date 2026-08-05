@@ -446,3 +446,27 @@
 **Context**: CONSTRUCTION - Unit 3 - Low-Level Design -> Functional Design
 
 ---
+
+## Construction - Unit 3 - Functional Design Questions Presented
+**Timestamp**: 2026-08-05T12:00:00Z
+**User Input**: N/A
+**AI Response**: "Created tts-service-functional-design-plan.md with 5 questions: text preprocessing before synthesize, narration_text validation, duration_seconds measurement method, short/edge-case text handling, domain entity field completeness. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 3 - Functional Design - Planning
+
+---
+
+## Construction - Unit 3 - Functional Design Generated
+**Timestamp**: 2026-08-05T12:10:00Z
+**User Input**: "ok" (Q1-Q5 all A)"
+**AI Response**: "No ambiguities. Generated domain-entities.md, business-rules.md (6 rules + error classification table), business-logic-model.md (synthesize speech process with flowchart, scope boundary vs FR4.3/Unit 5). Presented completion message requesting approval to proceed to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 3 - Functional Design
+
+---
+
+## Construction - Unit 3 - Functional Design Approved
+**Timestamp**: 2026-08-05T12:15:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Functional Design for Unit 3. Proceeding to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 3 - Functional Design -> NFR Requirements
+
+---
