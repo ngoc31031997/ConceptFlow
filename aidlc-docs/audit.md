@@ -518,3 +518,27 @@
 **Context**: CONSTRUCTION - Unit 3 - NFR Design -> Infrastructure Design
 
 ---
+
+## Construction - Unit 3 - Infrastructure Design Questions Presented
+**Timestamp**: 2026-08-05T12:55:00Z
+**User Input**: N/A
+**AI Response**: "Created tts-service-infrastructure-design-plan.md with 8 questions: deployment environment (Docker, python:3.12-slim + system deps for Piper), shared volume (named volume 'shared_artifacts' mounted at /shared — first unit to use it), voice model bundling in Dockerfile build stage, networking (port 8000 internal), health check (ready only after model loaded), LB/Gateway/DB splitting (all N/A), scaling (1 instance), monitoring (structured stdout logging). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 3 - Infrastructure Design - Planning
+
+---
+
+## Construction - Unit 3 - Infrastructure Design Generated
+**Timestamp**: 2026-08-05T13:00:00Z
+**User Input**: "ok (Q1-Q8 all A)"
+**AI Response**: "No ambiguities. Generated infrastructure-design.md and deployment-architecture.md (Dockerfile with system deps + voice model bundling at build stage, docker-compose entry with new shared_artifacts named volume, health check gated on model load, port 8000 internal, 1 fixed instance). Presented completion message requesting approval to proceed to Code Generation."
+**Context**: CONSTRUCTION - Unit 3 - Infrastructure Design
+
+---
+
+## Construction - Unit 3 - Infrastructure Design Approved
+**Timestamp**: 2026-08-05T13:05:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Infrastructure Design for Unit 3. Proceeding to Code Generation."
+**Context**: CONSTRUCTION - Unit 3 - Infrastructure Design -> Code Generation
+
+---
