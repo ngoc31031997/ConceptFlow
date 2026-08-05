@@ -494,3 +494,27 @@
 **Context**: CONSTRUCTION - Unit 3 - NFR Requirements -> NFR Design
 
 ---
+
+## Construction - Unit 3 - NFR Design Questions Presented
+**Timestamp**: 2026-08-05T12:40:00Z
+**User Input**: N/A
+**AI Response**: "Created tts-service-nfr-design-plan.md with 6 questions: CRUD/CQRS (N/A), resilience/no internal retry, in-memory voice model caching detail, idempotency race-condition handling, security pattern, event-driven/Saga/Inbox-Outbox (N/A). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 3 - NFR Design - Planning
+
+---
+
+## Construction - Unit 3 - NFR Design Generated
+**Timestamp**: 2026-08-05T12:45:00Z
+**User Input**: "ok (Q1-Q6 all A)"
+**AI Response**: "No ambiguities. Generated nfr-design-patterns.md (CRUD/CQRS N/A, no internal retry, in-process voice model cache, idempotency without lock, Saga participant, event-driven N/A, security) and logical-components.md (diagram: FastAPI + PiperTTSAdapter + in-memory cache + shared volume). Presented completion message requesting approval to proceed to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 3 - NFR Design
+
+---
+
+## Construction - Unit 3 - NFR Design Approved
+**Timestamp**: 2026-08-05T12:50:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Design for Unit 3. Proceeding to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 3 - NFR Design -> Infrastructure Design
+
+---
