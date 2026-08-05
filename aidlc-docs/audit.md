@@ -372,3 +372,17 @@
 **Context**: CONSTRUCTION - Unit 2 - NFR Requirements -> NFR Design
 
 ---
+
+## Construction - Unit 2 - NFR Design Generated
+**Timestamp**: 2026-08-05T10:25:00Z
+**User Input**: "Q1:A (CQRS N/A), Q2:A (in-memory idempotency set, TTL 24h), Q3:A (aio-pika built-in reconnect, no custom circuit breaker)"
+**AI Response**: "No ambiguities. Generated nfr-design-patterns.md, logical-components.md (diagram), messaging-design.md. Presented completion message requesting approval to proceed to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 2 - NFR Design
+
+## Construction - Unit 2 - NFR Design Approved
+**Timestamp**: 2026-08-05T10:30:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Design for Unit 2. Proceeding to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 2 - NFR Design -> Infrastructure Design
+
+---
