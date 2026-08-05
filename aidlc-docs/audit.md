@@ -358,3 +358,17 @@
 **Context**: CONSTRUCTION - Unit 2 - Functional Design -> NFR Requirements
 
 ---
+
+## Construction - Unit 2 - NFR Requirements Generated + System-wide Polyglot Decision
+**Timestamp**: 2026-08-05T10:10:00Z
+**User Input**: "tôi đang muốn làm theo hướng có thể mở rộng sau này và mục đích của dự án này là để tôi có thể hiểu hơn về micro service nữa" ; AskUserQuestion answer: "Polyglot có chọn lọc (Recommended)"
+**AI Response**: "Saved project memory about learning goal. Created ADR-0009 (selective polyglot: Go for Orchestrator Service, Node.js for API Gateway, Python for all other backend units including Content Plugin, Script Processing, Rendering, TTS, Video Assembly, Publisher). Updated technology-direction.md (HLD). Confirmed Unit 2 stays Python/FastAPI (already approved in LLD). Generated nfr-requirements.md and tech-stack-decisions.md for Unit 2. Presented completion message requesting approval to proceed to NFR Design."
+**Context**: CONSTRUCTION - Unit 2 - NFR Requirements
+
+## Construction - Unit 2 - NFR Requirements Approved
+**Timestamp**: 2026-08-05T10:15:00Z
+**User Input**: "ok go"
+**AI Response**: "User approved NFR Requirements for Unit 2 and ADR-0009 (selective polyglot). Proceeding to NFR Design."
+**Context**: CONSTRUCTION - Unit 2 - NFR Requirements -> NFR Design
+
+---
