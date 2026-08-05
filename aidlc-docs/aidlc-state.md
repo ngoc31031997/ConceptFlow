@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION PHASE - Unit 1 COMPLETE. Starting Unit 2 (Content Plugin Service)
+- **Current Stage**: CONSTRUCTION PHASE - Unit 2 COMPLETE. Starting Unit 3 (TTS Service)
 
 ## Extension Configuration
 | Extension | Enabled | Decided At |

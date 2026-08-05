@@ -28,9 +28,16 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 docker compose up -d
 ```
 - RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
+- Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra
 
 ## Running Tests
-Chưa có test tự động ở giai đoạn này (Unit 1 là hạ tầng messaging thuần túy, không có business logic). Hướng dẫn test đầy đủ sẽ được bổ sung khi tới giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
+Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
+```bash
+cd services/content-plugin
+pip install -r requirements-dev.txt
+pytest -q
+```
+Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
 ## Project Structure
 ```
@@ -39,7 +46,9 @@ Chưa có test tự động ở giai đoạn này (Unit 1 là hạ tầng messag
 ├── .env.example              # Mẫu biến môi trường
 ├── infra/
 │   └── rabbitmq/              # Cấu hình topology RabbitMQ (exchange/queue/DLQ)
-├── services/                  # Các microservice backend (sẽ bổ sung theo unit-of-work.md)
+├── services/
+│   └── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
+│                                 # domain/ → application/ → adapters/{api,messaging,plugins}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

@@ -14,17 +14,17 @@
 
 ## Steps
 
-- [ ] **Step 1 — Project Structure Setup**: Tạo `services/content-plugin/` theo `module-structure.md` (domain/, application/, adapters/, main.py, tests/), `requirements.txt`, `Dockerfile`
-- [ ] **Step 2 — Business Logic Generation (domain/)**: `ports.py` (ContentPluginPort), `models.py` (Scene, ClassificationResult), `errors.py` (PluginNotFoundError, InvalidCategoryError, InvalidSceneError)
-- [ ] **Step 3 — Business Logic Generation (application/)**: `list_plugins.py` (ListPluginsUseCase), `classify_scene.py` (ClassifySceneUseCase) — theo `business-logic-model.md`
-- [ ] **Step 4 — Business Logic Unit Testing**: `tests/domain/`, `tests/application/` — dùng `FakeContentPluginRegistry`, cover mọi business rule (Rule 1-5)
-- [ ] **Step 5 — Plugin Adapter Generation**: `adapters/plugins/registry.py` (ContentPluginRegistry, dynamic discovery), `adapters/plugins/programming/plugin.py` (ProgrammingPlugin)
-- [ ] **Step 6 — API Layer Generation**: `adapters/api/router.py` (`GET /v1/plugins`, `GET /health`), `adapters/api/schemas.py` (Pydantic models)
-- [ ] **Step 7 — API Layer Unit Testing**: `tests/adapters/test_api.py` — dùng FastAPI `TestClient`
-- [ ] **Step 8 — Messaging Layer Generation**: `adapters/messaging/consumer.py`, `adapters/messaging/producer.py`, `adapters/messaging/idempotency.py` (IdempotencyStore)
-- [ ] **Step 9 — Messaging Layer Unit Testing**: `tests/adapters/test_messaging.py` — mock AMQP channel
-- [ ] **Step 10 — Composition Root**: `main.py` — wiring toàn bộ (theo `dependency-injection.md`)
-- [ ] **Step 11 — Documentation Generation**: Cập nhật `README.md` gốc (thêm mục cho Content Plugin Service), tạo `aidlc-docs/construction/content-plugin-service/code/README.md`
-- [ ] **Step 12 — Deployment Artifacts**: Thêm service `content-plugin` vào `docker-compose.yml` gốc (theo `deployment-architecture.md`)
+- [x] **Step 1 — Project Structure Setup**: Tạo `services/content-plugin/` theo `module-structure.md` (domain/, application/, adapters/, main.py, tests/), `requirements.txt`, `Dockerfile`
+- [x] **Step 2 — Business Logic Generation (domain/)**: `ports.py` (ContentPluginPort), `models.py` (Scene, ClassificationResult), `errors.py` (PluginNotFoundError, InvalidCategoryError, InvalidSceneError)
+- [x] **Step 3 — Business Logic Generation (application/)**: `list_plugins.py` (ListPluginsUseCase), `classify_scene.py` (ClassifySceneUseCase) — theo `business-logic-model.md`
+- [x] **Step 4 — Business Logic Unit Testing**: `tests/domain/`, `tests/application/` — dùng `FakeContentPluginRegistry`, cover mọi business rule (Rule 1-5)
+- [x] **Step 5 — Plugin Adapter Generation**: `adapters/plugins/registry.py` (ContentPluginRegistry, dynamic discovery), `adapters/plugins/programming/plugin.py` (ProgrammingPlugin)
+- [x] **Step 6 — API Layer Generation**: `adapters/api/router.py` (`GET /v1/plugins`, `GET /health`), `adapters/api/schemas.py` (Pydantic models)
+- [x] **Step 7 — API Layer Unit Testing**: `tests/adapters/test_api.py` — dùng FastAPI `TestClient`
+- [x] **Step 8 — Messaging Layer Generation**: `adapters/messaging/consumer.py`, `adapters/messaging/producer.py`, `adapters/messaging/idempotency.py` (IdempotencyStore)
+- [x] **Step 9 — Messaging Layer Unit Testing**: `tests/adapters/test_messaging.py` — mock AMQP channel
+- [x] **Step 10 — Composition Root**: `main.py` — wiring toàn bộ (theo `dependency-injection.md`)
+- [x] **Step 11 — Documentation Generation**: Cập nhật `README.md` gốc (thêm mục cho Content Plugin Service), tạo `aidlc-docs/construction/content-plugin-service/code/README.md`
+- [x] **Step 12 — Deployment Artifacts**: Thêm service `content-plugin` vào `docker-compose.yml` gốc (theo `deployment-architecture.md`)
 
 **Không áp dụng**: Repository Layer (không có database), Frontend Components, Database Migration Scripts.

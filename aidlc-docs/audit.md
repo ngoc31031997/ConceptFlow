@@ -408,3 +408,17 @@
 **Context**: CONSTRUCTION - Unit 2 - Code Generation - Planning -> Generation
 
 ---
+
+## Construction - Unit 2 - Code Generation Executed (awaiting approval)
+**Timestamp**: 2026-08-05T11:30:00Z
+**User Input**: N/A
+**AI Response**: "Generated full Content Plugin Service under services/content-plugin/ (domain, application, adapters/{api,messaging,plugins}, main.py). 17 unit tests written and passing (verified under real Python 3.12 via Docker, since local dev machine runs 3.9). ruff lint clean. Added service to root docker-compose.yml (validated via `docker compose config`). Updated root README.md and unit code README. All 12 plan steps marked [x]. Presented completion message; per git policy, changes remain uncommitted until explicit approval."
+**Context**: CONSTRUCTION - Unit 2 - Code Generation
+
+## Construction - Unit 2 - Code Generation Approved (Unit 2 COMPLETE)
+**Timestamp**: 2026-08-05T11:35:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Code Generation for Unit 2 (Content Plugin Service). Unit 2 fully complete. Proceeding to Unit 3: TTS Service."
+**Context**: CONSTRUCTION - Unit 2 COMPLETE -> Unit 3
+
+---
