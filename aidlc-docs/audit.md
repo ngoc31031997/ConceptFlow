@@ -310,3 +310,17 @@
 **Context**: CONSTRUCTION - Unit 1 - Code Generation - Planning -> Generation
 
 ---
+
+## Construction - Unit 1 - Code Generation Executed (awaiting approval, not yet committed)
+**Timestamp**: 2026-08-04T03:30:00Z
+**User Input**: N/A
+**AI Response**: "Generated docker-compose.yml, infra/rabbitmq/definitions.json, infra/rabbitmq/rabbitmq.conf, .env.example, README.md (root), aidlc-docs/construction/rabbitmq-infrastructure/code/README.md. Validated docker compose config and JSON syntax successfully. All 6 plan steps marked [x]. Presented completion message; per user's git policy, changes remain uncommitted until explicit approval."
+**Context**: CONSTRUCTION - Unit 1 - Code Generation
+
+## Construction - Unit 1 - Code Generation Approved (Unit 1 COMPLETE)
+**Timestamp**: 2026-08-05T09:00:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Code Generation for Unit 1 (RabbitMQ Infrastructure). Unit 1 fully complete (NFR Requirements, NFR Design, Infrastructure Design, Code Generation all approved). Proceeding to Unit 2: Content Plugin Service."
+**Context**: CONSTRUCTION - Unit 1 COMPLETE -> Unit 2
+
+---
