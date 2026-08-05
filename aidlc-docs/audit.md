@@ -422,3 +422,27 @@
 **Context**: CONSTRUCTION - Unit 2 COMPLETE -> Unit 3
 
 ---
+
+## Construction - Unit 3 (TTS Service) - Low-Level Design Questions Presented
+**Timestamp**: 2026-08-05T11:40:00Z
+**User Input**: "tiếp tục dự án"
+**AI Response**: "Reviewed aidlc-state.md, confirmed Unit 3 (TTS Service) is next. Created tts-service-low-level-design-plan.md with 9 LLD questions: layering/dependency direction, DI mechanism, TTS engine selection (Piper for MVP), voice model mapping, artifact storage path convention (shared volume), API versioning, correlation ID propagation, state management, error handling. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 3 - Low-Level Design - Planning
+
+---
+
+## Construction - Unit 3 - Low-Level Design Answers Received & Generated
+**Timestamp**: 2026-08-05T11:50:00Z
+**User Input**: "go" (Q1-Q9 all A, with follow-up clarification on Q4 resolved via AskUserQuestion: 'Language là input, mapping vẫn tĩnh (xác nhận A)')"
+**AI Response**: "Created ADR-0010 (TTS Engine Selection — Piper only for MVP, port ready for Coqui later). Generated module-structure.md, dependency-injection.md, interface-contracts.md (with /v1/ prefix, extended contract to include project_id+scene_index for shared-volume idempotency), sequence-flows.md (2 flows: new synthesis, idempotent retry). Updated decisions/README.md. Presented completion message requesting approval to proceed to Functional Design."
+**Context**: CONSTRUCTION - Unit 3 - Low-Level Design
+
+---
+
+## Construction - Unit 3 - Low-Level Design Approved
+**Timestamp**: 2026-08-05T11:55:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Low-Level Design for Unit 3. Proceeding to Functional Design."
+**Context**: CONSTRUCTION - Unit 3 - Low-Level Design -> Functional Design
+
+---
