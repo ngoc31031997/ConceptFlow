@@ -386,3 +386,17 @@
 **Context**: CONSTRUCTION - Unit 2 - NFR Design -> Infrastructure Design
 
 ---
+
+## Construction - Unit 2 - Infrastructure Design Generated
+**Timestamp**: 2026-08-05T10:40:00Z
+**User Input**: "Q1-Q4 all A (python:3.12-slim, internal-only port 8000, /health healthcheck, fixed 1 instance)"
+**AI Response**: "Generated infrastructure-design.md and deployment-architecture.md (Dockerfile + docker-compose service entry reference). Presented completion message requesting approval to proceed to Code Generation."
+**Context**: CONSTRUCTION - Unit 2 - Infrastructure Design
+
+## Construction - Unit 2 - Infrastructure Design Approved
+**Timestamp**: 2026-08-05T10:45:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Infrastructure Design for Unit 2. Proceeding to Code Generation."
+**Context**: CONSTRUCTION - Unit 2 - Infrastructure Design -> Code Generation
+
+---
