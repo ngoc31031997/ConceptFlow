@@ -5,8 +5,17 @@
 FROM python:3.12-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libsndfile1 \
+    tar \
     && rm -rf /var/lib/apt/lists/*
+
+# Install the standalone Piper CLI binary (Code Generation revision: piper-tts's
+# PyPI package depends on piper-phonemize, which has no prebuilt wheel for several
+# platforms — the adapter shells out to this binary instead, per module-structure.md's
+# "Piper CLI/binding" option)
+RUN curl -L -o /tmp/piper.tar.gz <piper-release-tarball-url> && \
+    tar -xzf /tmp/piper.tar.gz -C /usr/local/bin --strip-components=1 && \
+    rm /tmp/piper.tar.gz
+
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -23,7 +32,7 @@ EXPOSE 8000
 CMD ["uvicorn", "main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
 ```
 
-**Note**: URL model cụ thể (Piper voice model repository, ví dụ Hugging Face `rhasspy/piper-voices`) sẽ được xác định và điền chính xác ở Code Generation, khi lựa chọn voice cụ thể (giọng nam/nữ, chất lượng) cho tiếng Việt và tiếng Anh.
+**Note**: URL binary/model cụ thể (Piper release trên GitHub, voice model trên Hugging Face `rhasspy/piper-voices`) sẽ được điền chính xác khi build image thật — cần network access lúc build, không lúc runtime (đúng NFR Requirements).
 
 ## docker-compose Service Entry (reference for Code Generation)
 ```yaml

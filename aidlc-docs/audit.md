@@ -542,3 +542,35 @@
 **Context**: CONSTRUCTION - Unit 3 - Infrastructure Design -> Code Generation
 
 ---
+
+## Construction - Unit 3 - Code Generation Plan Presented
+**Timestamp**: 2026-08-05T13:10:00Z
+**User Input**: N/A
+**AI Response**: "Created tts-service-code-generation-plan.md with 12 steps (project structure, domain, application, business logic tests, storage adapter, TTS engine adapter with Piper, logging/correlation, API layer, API tests, composition root, documentation, deployment artifacts). Coding standards (naming, SOLID, docstrings, ruff) proposed matching Unit 2, awaiting approval."
+**Context**: CONSTRUCTION - Unit 3 - Code Generation - Planning
+
+---
+
+## Construction - Unit 3 - Code Generation Plan Approved
+**Timestamp**: 2026-08-05T13:15:00Z
+**User Input**: "ok"
+**AI Response**: "User approved code generation plan for Unit 3. Proceeding to Part 2: Generation."
+**Context**: CONSTRUCTION - Unit 3 - Code Generation - Planning -> Generation
+
+---
+
+## Construction - Unit 3 - Code Generation Executed (awaiting approval)
+**Timestamp**: 2026-08-05T13:45:00Z
+**User Input**: N/A
+**AI Response**: "Generated full TTS Service under services/tts/ (domain, application, adapters/{api,tts_engines,storage,logging}, main.py). 14 unit tests written and passing (verified under real Python 3.12 via Docker). ruff lint clean. Design revision during generation: piper-tts PyPI package's piper-phonemize dependency had no installable wheel in the build environment, so PiperTTSAdapter shells out to the standalone Piper CLI binary instead (module-structure.md already anticipated 'Piper CLI/binding' as an option) — no change to TTSEnginePort, API contract, or any other approved design; documented in code/README.md and deployment-architecture.md/Dockerfile updated accordingly. Added tts service + new shared_artifacts named volume to root docker-compose.yml (validated via `docker compose config`). Updated root README.md and unit code README. All 12 plan steps marked [x]. Presented completion message; per git policy, changes remain uncommitted until explicit approval."
+**Context**: CONSTRUCTION - Unit 3 - Code Generation
+
+---
+
+## Construction - Unit 3 - Code Generation Approved (Unit 3 COMPLETE)
+**Timestamp**: 2026-08-06T09:00:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Code Generation for Unit 3 (TTS Service). Unit 3 fully complete (Low-Level Design, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation all approved). Proceeding to Unit 4: Script Processing Service."
+**Context**: CONSTRUCTION - Unit 3 COMPLETE -> Unit 4
+
+---

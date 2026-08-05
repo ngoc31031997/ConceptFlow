@@ -29,11 +29,18 @@ docker compose up -d
 ```
 - RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
 - Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra
+- TTS Service: nội bộ (`tts:8000` trong docker network), không expose ra host — dùng `docker compose logs tts` hoặc `docker exec` để kiểm tra
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
 ```bash
 cd services/content-plugin
+pip install -r requirements-dev.txt
+pytest -q
+```
+Tương tự cho TTS Service:
+```bash
+cd services/tts
 pip install -r requirements-dev.txt
 pytest -q
 ```
@@ -47,8 +54,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 ├── infra/
 │   └── rabbitmq/              # Cấu hình topology RabbitMQ (exchange/queue/DLQ)
 ├── services/
-│   └── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
-│                                 # domain/ → application/ → adapters/{api,messaging,plugins}/
+│   ├── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
+│   │                             # domain/ → application/ → adapters/{api,messaging,plugins}/
+│   └── tts/                     # TTS Service (Python/FastAPI, Hexagonal, Piper engine)
+│                                 # domain/ → application/ → adapters/{api,tts_engines,storage,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)
