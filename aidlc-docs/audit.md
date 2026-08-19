@@ -852,3 +852,19 @@
 **Context**: CONSTRUCTION - Unit 5 - NFR Design
 
 ---
+
+## Construction - Unit 5 - Infrastructure Design Questions Presented
+**Timestamp**: 2026-08-07T15:35:00Z
+**User Input**: "ok"
+**AI Response**: "Created rendering-service-infrastructure-design-plan.md with 8 questions: Manim system dependencies (ffmpeg, cairo, pango; no LaTeX at MVP to keep image size down), rendering-db Postgres container, reuse of shared_artifacts volume, no networking/sentinel health check, no hard resource limits at Compose level, LB/Gateway/DB-splitting N/A, scaling, monitoring. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 5 - Infrastructure Design - Planning
+
+---
+
+## Construction - Unit 5 - Infrastructure Design Generated
+**Timestamp**: 2026-08-07T15:40:00Z
+**User Input**: "ok (Q1-Q8 all A)"
+**AI Response**: "No ambiguities. Generated infrastructure-design.md and deployment-architecture.md (Dockerfile with ffmpeg/cairo/pango, no LaTeX; docker-compose entry with new rendering-db Postgres container, reused shared_artifacts volume, RENDER_TIMEOUT_SECONDS env var, sentinel-file health check). Presented completion message requesting approval to proceed to Code Generation."
+**Context**: CONSTRUCTION - Unit 5 - Infrastructure Design
+
+---
