@@ -687,6 +687,30 @@
 
 ---
 
+## Construction - Unit 4 - Infrastructure Design Questions Presented
+**Timestamp**: 2026-08-07T13:00:00Z
+**User Input**: "ok go"
+**AI Response**: "Created script-processing-service-infrastructure-design-plan.md with 7 questions: deployment environment, PostgreSQL container (script-processing-db, mirrors Unit 2/3), no networking/port (no REST), sentinel-file health check (mirrors Unit 3), LB/Gateway/DB-splitting N/A, scaling (1 instance), monitoring. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 4 - Infrastructure Design - Planning
+
+---
+
+## Construction - Unit 4 - Infrastructure Design Generated
+**Timestamp**: 2026-08-07T13:10:00Z
+**User Input**: "ok (Q1-Q7 all A)"
+**AI Response**: "No ambiguities. Generated infrastructure-design.md and deployment-architecture.md (Dockerfile with plain python main.py entrypoint, docker-compose entry with new script-processing-db Postgres container, sentinel-file health check, no HTTP port). Presented completion message requesting approval to proceed to Code Generation."
+**Context**: CONSTRUCTION - Unit 4 - Infrastructure Design
+
+---
+
+## Construction - Unit 4 - Infrastructure Design Approved
+**Timestamp**: 2026-08-07T13:15:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Infrastructure Design for Unit 4. Proceeding to Code Generation."
+**Context**: CONSTRUCTION - Unit 4 - Infrastructure Design -> Code Generation
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
