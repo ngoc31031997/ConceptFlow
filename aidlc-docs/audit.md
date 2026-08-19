@@ -812,3 +812,27 @@
 **Context**: CONSTRUCTION - Unit 5 - Functional Design -> NFR Requirements
 
 ---
+
+## Construction - Unit 5 - NFR Requirements Questions Presented
+**Timestamp**: 2026-08-07T15:10:00Z
+**User Input**: N/A
+**AI Response**: "Created rendering-service-nfr-requirements-plan.md with 7 questions: tech stack (Python + manim library), performance (threadpool + configurable timeout, template registry cached at startup), resource constraints (sequential scene processing, no hard memory limits at app layer), availability, security (zero-trust validation as primary defense), messaging/Saga participation, caching. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 5 - NFR Requirements - Planning
+
+---
+
+## Construction - Unit 5 - NFR Requirements Generated
+**Timestamp**: 2026-08-07T15:15:00Z
+**User Input**: "ok (Q1-Q7 all A)"
+**AI Response**: "No ambiguities. Generated nfr-requirements.md and tech-stack-decisions.md (Python 3.12 + Manim Community Edition, sequential scene processing, aio-pika + asyncpg, no FastAPI). Presented completion message requesting approval to proceed to NFR Design."
+**Context**: CONSTRUCTION - Unit 5 - NFR Requirements
+
+---
+
+## Construction - Unit 5 - NFR Requirements Approved
+**Timestamp**: 2026-08-07T15:20:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Requirements for Unit 5. Proceeding to NFR Design."
+**Context**: CONSTRUCTION - Unit 5 - NFR Requirements -> NFR Design
+
+---
