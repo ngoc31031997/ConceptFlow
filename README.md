@@ -33,6 +33,7 @@ docker compose up -d
 - Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra. DB riêng: `content-plugin-db` (Postgres, Inbox/Outbox — ADR-0013)
 - TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
 - Script Processing Service: message-driven qua RabbitMQ (queue `script_processing.commands`), không có port HTTP nào — dùng `docker compose logs script-processing`. DB riêng: `script-processing-db` (Postgres, Inbox/Outbox — ADR-0013)
+- Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -41,11 +42,13 @@ cd services/content-plugin
 pip install -r requirements-dev.txt
 pytest -q
 ```
-Tương tự cho TTS Service và Script Processing Service:
+Tương tự cho TTS Service, Script Processing Service, và Rendering Service:
 ```bash
 cd services/tts && pip install -r requirements-dev.txt && pytest -q
 cd services/script-processing && pip install -r requirements-dev.txt && pytest -q
+cd services/rendering && pip install -r requirements-dev.txt && pytest -q
 ```
+Rendering Service's `requirements.txt` bao gồm `manim` (native dependencies: ffmpeg, cairo, pango) — nếu chỉ chạy unit test (không cần render Manim thật), có thể bỏ qua `manim` khi cài cục bộ vì test suite dùng fake/mock cho toàn bộ tương tác Manim thật (`_render_to_file` được monkeypatch trong test, không import `manim` khi chạy `pytest`).
 Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
 ## Project Structure
@@ -60,8 +63,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
 │   ├── tts/                     # TTS Service (Python, Hexagonal, Piper engine, message-driven — ADR-0014)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
-│   └── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
-│                                 # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
+│   ├── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
+│   │                             # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
+│   └── rendering/                # Rendering Service (Python, Hexagonal, Manim engine, dynamic templates — ADR-0015)
+│                                 # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

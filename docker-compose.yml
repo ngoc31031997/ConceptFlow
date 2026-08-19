@@ -129,12 +129,52 @@ services:
     networks:
       - backend
 
+  rendering-db:
+    image: postgres:16-alpine
+    container_name: rendering-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: rendering
+    volumes:
+      - rendering_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d rendering"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  rendering:
+    build: ./services/rendering
+    container_name: rendering
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@rendering-db:5432/rendering
+      RENDER_TIMEOUT_SECONDS: "300"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      rendering-db:
+        condition: service_healthy
+    volumes:
+      - shared_artifacts:/shared
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:
   content_plugin_db_data:
   tts_db_data:
   script_processing_db_data:
+  rendering_db_data:
 
 networks:
   backend:

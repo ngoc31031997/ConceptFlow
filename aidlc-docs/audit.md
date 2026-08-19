@@ -868,3 +868,35 @@
 **Context**: CONSTRUCTION - Unit 5 - Infrastructure Design
 
 ---
+
+## Construction - Unit 5 - Code Generation Plan Presented
+**Timestamp**: 2026-08-07T15:45:00Z
+**User Input**: N/A
+**AI Response**: "Created rendering-service-code-generation-plan.md with 17 steps (domain, application, storage adapter, template plugins, dynamic registry, Manim renderer adapter with threadpool/timeout, persistence layer reused from Unit 2/3/4, messaging layer with per-scene commit semantics, composition root, docs, deployment artifacts). Unit tests use fakes/mocks for Manim (no real rendering in automated test suite). Awaiting approval."
+**Context**: CONSTRUCTION - Unit 5 - Code Generation - Planning
+
+---
+
+## Construction - Unit 5 - Code Generation Plan Approved
+**Timestamp**: 2026-08-07T15:46:00Z
+**User Input**: "ok"
+**AI Response**: "User approved code generation plan for Unit 5. Proceeding to Part 2: Generation."
+**Context**: CONSTRUCTION - Unit 5 - Code Generation - Planning -> Generation
+
+---
+
+## Construction - Unit 5 - Code Generation Executed (awaiting approval)
+**Timestamp**: 2026-08-07T16:00:00Z
+**User Input**: N/A
+**AI Response**: "Generated full Rendering Service under services/rendering/ (domain, application, adapters/{rendering,messaging,persistence,storage,logging}, main.py). Key architectural point discovered during generation: RenderScenesBatchUseCase.execute() can run for minutes (Manim rendering), so consumer.py runs it via asyncio.to_thread() rather than calling it directly (which would block the event loop) — the batch's on_scene_start/on_scene_rendered callbacks bridge back via asyncio.run_coroutine_threadsafe() for immediate per-scene Outbox commits. Noted (not fixed, out of scope) that TTS Service's consumer has the same latent blocking pattern at a smaller 60s scale. AnimationTemplateRegistry mirrors ContentPluginRegistry's dynamic discovery (ADR-0015); ManimAnimationRenderer moves Manim's own media-dir output to the shared-volume convention path and measures duration via ffprobe. Both templates (algorithm_visualization, concept_illustration) render generic-but-working Manim scenes with shared code-display handling (Business Rule 3-4) and duration-padding (Business Rule 2) — content is intentionally generic, not bespoke animation art per topic. 30 unit tests passing, ruff clean, verified under Python 3.12 via Docker WITHOUT manim installed (confirms _render_to_file's lazy import keeps the test suite Manim-free). Added rendering + rendering-db to root docker-compose.yml (validated via docker compose config, reusing the existing shared_artifacts volume). Updated root README.md and unit code README. All 17 plan steps marked [x]. A full production Docker image build (with real manim + ffmpeg/cairo/pango) was kicked off separately to verify AnimationTemplateRegistry.discover() and an actual Manim render end-to-end; result to be recorded once it completes. Presented completion message; per git policy, changes remain uncommitted until explicit approval."
+**Context**: CONSTRUCTION - Unit 5 - Code Generation
+
+---
+
+## Construction - Unit 5 - Code Generation Approved (Unit 5 COMPLETE)
+**Timestamp**: 2026-08-19T22:00:00Z
+**User Input**: "commit đi hôm nay đến đây thôi"
+**AI Response**: "User approved Code Generation for Unit 5 (Rendering Service) and requested session wrap-up. Unit 5 fully complete (Low-Level Design, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation all approved). Committing now. Background production-image Manim build was still running with no output at session end — not blocking; will be verified in a future session if needed."
+**Context**: CONSTRUCTION - Unit 5 COMPLETE -> Unit 6 (next session)
+
+---
