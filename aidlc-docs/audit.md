@@ -597,6 +597,14 @@
 **AI Response**: "Amended Unit 4's already-approved Low-Level Design artifacts: module-structure.md (idempotency.py replaced with adapters/persistence/{db,inbox,outbox,relay}.py), dependency-injection.md (InboxRepository/OutboxRepository constructed directly, OutboxRelay as background task), interface-contracts.md (Inbox/Outbox delivery guarantee note, eventual publish via polling relay), sequence-flows.md (all 3 flows updated to show Outbox-first-then-relay-publishes pattern, added Flow 4: restart recovery). No change to script syntax, domain models, or business rules — only the messaging/persistence adapter layer. Unit 4 has not yet proceeded past Low-Level Design (Functional Design not yet started), so this amendment did not require reopening any later stage."
 **Context**: CROSS-CUTTING RETROFIT - Unit 4 LLD Amended
 
+---
+
+## Cross-Cutting Retrofit: Unit 2 (Content Plugin Service) Code Retrofitted
+**Timestamp**: 2026-08-07T10:45:00Z
+**User Input**: "commit rồi sửa lại source code đã implement trước đó trước khi code tiếp"
+**AI Response**: "Retrofitted services/content-plugin/ with PostgreSQL-backed Inbox/Outbox (ADR-0013): added adapters/persistence/{db,inbox,outbox,relay}.py, rewrote consumer.py (transactional inbox-check + outbox-enqueue instead of in-memory IdempotencyStore + direct publish), simplified producer.py to envelope-builders only, updated main.py composition root (Postgres pool + OutboxRelay startup), removed idempotency.py, added asyncpg to requirements.txt. Added tests/adapters/{fake_postgres,test_persistence,test_relay}.py and rewrote test_messaging.py — 24 tests passing, ruff clean (verified via Docker python:3.12-slim). Updated docker-compose.yml (new content-plugin-db Postgres container + content_plugin_db_data volume, DATABASE_URL env var, depends_on), .env.example (POSTGRES_USER/PASS), and Unit 2's nfr-design-patterns.md, deployment-architecture.md, code/README.md with revision notes. docker compose config validated."
+**Context**: CROSS-CUTTING RETROFIT - Unit 2 Retrofitted -> Unit 3 Retrofit
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"

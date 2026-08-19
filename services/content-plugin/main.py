@@ -3,6 +3,9 @@
 Wires domain/application/adapters together (constructor injection,
 per dependency-injection.md) and exposes both the FastAPI app (REST)
 and the AMQP consumer (messaging) from one process.
+
+Revision (ADR-0013): also owns the PostgreSQL pool and starts
+OutboxRelay as a background task alongside the AMQP consumer.
 """
 
 from __future__ import annotations
@@ -16,8 +19,11 @@ from fastapi import FastAPI
 
 from adapters.api.router import create_health_router, create_v1_router
 from adapters.messaging.consumer import ClassifySceneCommandHandler
-from adapters.messaging.idempotency import IdempotencyStore
-from adapters.messaging.producer import EVENTS_EXCHANGE, ScenesClassifiedEventPublisher
+from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.persistence.db import create_pool
+from adapters.persistence.inbox import InboxRepository
+from adapters.persistence.outbox import OutboxRepository
+from adapters.persistence.relay import OutboxRelay
 from adapters.plugins.registry import ContentPluginRegistry
 from application.classify_scene import ClassifyScenesBatchUseCase, ClassifySceneUseCase
 from application.list_plugins import ListPluginsUseCase
@@ -48,6 +54,10 @@ def create_app() -> FastAPI:
         registry = ContentPluginRegistry.discover()
         state.plugins_discovered = True
 
+        pool = await create_pool()
+        inbox = InboxRepository(pool)
+        outbox = OutboxRepository()
+
         connection = await aio_pika.connect_robust(RABBITMQ_URL)
         channel = await connection.channel()
         exchange = await channel.get_exchange(EVENTS_EXCHANGE)
@@ -57,8 +67,10 @@ def create_app() -> FastAPI:
             return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
         batch_use_case = ClassifyScenesBatchUseCase(ClassifySceneUseCase(registry))
-        publisher = ScenesClassifiedEventPublisher(exchange, make_message=make_persistent_message)
-        command_handler = ClassifySceneCommandHandler(batch_use_case, publisher, IdempotencyStore())
+        command_handler = ClassifySceneCommandHandler(batch_use_case, pool, inbox, outbox)
+
+        relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
+        relay.start()
 
         consumer_tag = await queue.consume(command_handler.handle)
         logger.info("Content Plugin Service ready — consuming '%s'", COMMANDS_QUEUE)
@@ -68,7 +80,9 @@ def create_app() -> FastAPI:
         yield
 
         await queue.cancel(consumer_tag)
+        await relay.stop()
         await connection.close()
+        await pool.close()
 
     app = FastAPI(title="Content Plugin Service", lifespan=lifespan)
     app.include_router(create_health_router(state.is_ready))

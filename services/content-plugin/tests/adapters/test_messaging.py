@@ -1,7 +1,8 @@
-"""Unit tests for the messaging adapter: consumer + producer + idempotency.
+"""Unit tests for the messaging adapter: consumer + Inbox/Outbox (ADR-0013).
 
-Uses fakes for the AMQP surface (AckableMessage / PublishableExchange)
-so no real RabbitMQ connection is needed.
+Uses fakes for the AMQP surface (AckableMessage) and a FakePool standing
+in for asyncpg (tests/adapters/fake_postgres.py) so no real RabbitMQ or
+PostgreSQL connection is needed.
 """
 
 import json
@@ -9,11 +10,12 @@ import json
 import pytest
 
 from adapters.messaging.consumer import ClassifySceneCommandHandler
-from adapters.messaging.idempotency import IdempotencyStore
-from adapters.messaging.producer import ScenesClassifiedEventPublisher
+from adapters.persistence.inbox import InboxRepository
+from adapters.persistence.outbox import OutboxRepository
 from application.classify_scene import ClassifyScenesBatchUseCase, ClassifySceneUseCase
 from domain.models import ClassificationResult, Scene
 from domain.ports import ContentPluginPort, ContentPluginRegistryPort
+from tests.adapters.fake_postgres import FakePool
 
 
 class FakeProgrammingPlugin(ContentPluginPort):
@@ -39,14 +41,6 @@ class FakeRegistry(ContentPluginRegistryPort):
 
     def list_all(self):
         return [FakeProgrammingPlugin()]
-
-
-class FakeExchange:
-    def __init__(self) -> None:
-        self.published: list[tuple[bytes, str]] = []
-
-    async def publish(self, message, routing_key: str) -> None:
-        self.published.append((message, routing_key))
 
 
 class FakeMessage:
@@ -76,50 +70,60 @@ def make_envelope(
 
 
 @pytest.fixture
-def handler() -> tuple[ClassifySceneCommandHandler, FakeExchange, IdempotencyStore]:
+def handler() -> tuple[ClassifySceneCommandHandler, FakePool]:
     registry = FakeRegistry()
     batch_use_case = ClassifyScenesBatchUseCase(ClassifySceneUseCase(registry))
-    exchange = FakeExchange()
-    publisher = ScenesClassifiedEventPublisher(exchange, make_message=lambda body: body)
-    idempotency_store = IdempotencyStore()
-    command_handler = ClassifySceneCommandHandler(batch_use_case, publisher, idempotency_store)
-    return command_handler, exchange, idempotency_store
+    pool = FakePool()
+    inbox = InboxRepository(pool)
+    outbox = OutboxRepository()
+    command_handler = ClassifySceneCommandHandler(batch_use_case, pool, inbox, outbox)
+    return command_handler, pool
 
 
 @pytest.mark.asyncio
-async def test_publishes_success_event_and_acks(handler) -> None:
-    command_handler, exchange, _ = handler
+async def test_enqueues_success_event_to_outbox_and_acks(handler) -> None:
+    command_handler, pool = handler
     message = FakeMessage(make_envelope())
 
     await command_handler.handle(message)
 
     assert message.acked is True
-    assert len(exchange.published) == 1
-    body, routing_key = exchange.published[0]
-    event = json.loads(body)
-    assert routing_key == "orchestrator"
-    assert event["payload"]["event_type"] == "scenes_classified"
+    assert len(pool.store.outbox_events) == 1
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "scenes_classified"
+    assert event["payload"]["payload"]["event_type"] == "scenes_classified"
+    assert event["published_at"] is None  # OutboxRelay hasn't run yet
 
 
 @pytest.mark.asyncio
-async def test_publishes_failure_event_for_unknown_plugin(handler) -> None:
-    command_handler, exchange, _ = handler
+async def test_enqueues_failure_event_for_unknown_plugin(handler) -> None:
+    command_handler, pool = handler
     message = FakeMessage(make_envelope(plugin_id="unknown_plugin"))
 
     await command_handler.handle(message)
 
     assert message.acked is True
-    event = json.loads(exchange.published[0][0])
-    assert event["payload"]["event_type"] == "classification_failed"
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "classification_failed"
+
+
+@pytest.mark.asyncio
+async def test_marks_message_processed_in_inbox(handler) -> None:
+    command_handler, pool = handler
+    message = FakeMessage(make_envelope(message_id="msg-1"))
+
+    await command_handler.handle(message)
+
+    assert "msg-1" in pool.store.processed_message_ids
 
 
 @pytest.mark.asyncio
 async def test_skips_reprocessing_duplicate_message_id(handler) -> None:
-    command_handler, exchange, idempotency_store = handler
-    idempotency_store.mark_processed("msg-1")
+    command_handler, pool = handler
+    pool.store.processed_message_ids.add("msg-1")
     message = FakeMessage(make_envelope(message_id="msg-1"))
 
     await command_handler.handle(message)
 
     assert message.acked is True
-    assert len(exchange.published) == 0  # no event re-published
+    assert len(pool.store.outbox_events) == 0  # no event re-enqueued
