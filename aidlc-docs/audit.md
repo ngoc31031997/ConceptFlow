@@ -663,6 +663,30 @@
 
 ---
 
+## Construction - Unit 4 - NFR Design Questions Presented
+**Timestamp**: 2026-08-07T12:40:00Z
+**User Input**: N/A
+**AI Response**: "Created script-processing-service-nfr-design-plan.md with 5 questions: CRUD/CQRS, resilience (no internal retry, permanent syntax errors), idempotency (message-level only, no artifact-level), Saga/event-driven/Inbox-Outbox confirmation, security. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 4 - NFR Design - Planning
+
+---
+
+## Construction - Unit 4 - NFR Design Generated
+**Timestamp**: 2026-08-07T12:50:00Z
+**User Input**: "ok go (Q1-Q5 all A)"
+**AI Response**: "No ambiguities. Generated nfr-design-patterns.md and logical-components.md (diagram: AMQP consumer + parser + Inbox/Outbox/Relay + script-processing-db). Presented completion message requesting approval to proceed to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 4 - NFR Design
+
+---
+
+## Construction - Unit 4 - NFR Design Approved
+**Timestamp**: 2026-08-07T12:55:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Design for Unit 4. Proceeding to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 4 - NFR Design -> Infrastructure Design
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
