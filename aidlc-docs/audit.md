@@ -751,6 +751,30 @@
 
 ---
 
+## Construction - Unit 5 (Rendering Service) - Low-Level Design Questions Presented
+**Timestamp**: 2026-08-07T14:10:00Z
+**User Input**: N/A
+**AI Response**: "Created rendering-service-low-level-design-plan.md with 11 questions: layering, DI, animation template selection (static mapping vs dynamic plugin loading — new decision), render_scenes payload assembly (Orchestrator merges 3 prior steps' data — constraint for future Unit 8), audio-timing sync (FR4.3), execution model (threadpool + 300s timeout, heavier than TTS), artifact-level idempotency, batch fail-fast semantics, per-scene progress events (scene_rendered published per scene, not just per batch — differs from Unit 2/3/4 pattern), correlation/error handling, state management. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 5 - Low-Level Design - Planning
+
+---
+
+## Construction - Unit 5 - Low-Level Design Answers Received & Generated
+**Timestamp**: 2026-08-07T14:30:00Z
+**User Input**: "Q1-Q2:A, Q3:B (dynamic plugin loading), Q4-Q5:A, Q6: configurable timeout + follow-up requesting scene_render_started progress event, Q7-Q11:A"
+**AI Response**: "Clarified Q6 via AskUserQuestion (scene_render_started event vs periodic heartbeat) — user chose the event. Created ADR-0015 (dynamic plugin loading for animation templates, mirrors ADR-0006). Generated module-structure.md, dependency-injection.md, interface-contracts.md (render_scenes payload, 4 event types incl. new scene_render_started, RENDER_TIMEOUT_SECONDS env var), sequence-flows.md (success, fail-fast, artifact-level idempotent retry, message-level idempotent redelivery). Also updated component-methods.md's Rendering Service section to match. Presented completion message requesting approval to proceed to Functional Design."
+**Context**: CONSTRUCTION - Unit 5 - Low-Level Design
+
+---
+
+## Construction - Unit 5 - Low-Level Design Approved
+**Timestamp**: 2026-08-07T14:35:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Low-Level Design for Unit 5. Proceeding to Functional Design."
+**Context**: CONSTRUCTION - Unit 5 - Low-Level Design -> Functional Design
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"

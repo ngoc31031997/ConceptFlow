@@ -102,7 +102,9 @@ Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, v�
 ## Rendering Service
 
 ### Consumer: command `render_scenes` (từ `rendering.commands`)
-- **Purpose**: Render animation cho toàn bộ scene của 1 project, đồng bộ timing với audio đã có sẵn (audio được sinh ở bước Saga "Synthesize Speech" riêng trước đó, ADR-0014 — Rendering Service không còn gọi TTS Service); publish `scene_rendered` (per scene) và `rendering_completed`/`rendering_failed` khi xong.
+- **Purpose**: Render animation cho toàn bộ scene của 1 project, đồng bộ timing với audio đã có sẵn (audio được sinh ở bước Saga "Synthesize Speech" riêng trước đó, ADR-0014 — Rendering Service không còn gọi TTS Service); publish `scene_render_started`+`scene_rendered` (per scene, tiến trình) và `rendering_completed`/`rendering_failed` khi xong batch (Low-Level Design Question 6/9).
+- **Input** (payload lệnh, Orchestrator gộp từ `script_parsed`+`scenes_classified`+`speech_synthesized`): `{ scenes: [{ scene_index, narration_text, illustration_hint, code_snippet, animation_template_id, audio_path, duration_seconds }] }`
+- **Animation template selection**: dynamic plugin loading theo `animation_template_id` (ADR-0015, mirror ADR-0006).
 
 ## TTS Service
 

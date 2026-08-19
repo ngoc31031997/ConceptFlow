@@ -16,3 +16,4 @@
 | [ADR-0012](ADR-0012-content-plugin-integration-via-orchestrator.md) | Content Plugin Integration via Orchestrator (Not Direct REST) | Accepted | Low-Level Design (Unit 4) | 2026-08-07 |
 | [ADR-0013](ADR-0013-postgresql-per-service-inbox-outbox.md) | PostgreSQL Per Service for Inbox/Outbox Pattern | Accepted | Cross-cutting retrofit | 2026-08-07 |
 | [ADR-0014](ADR-0014-tts-service-message-driven.md) | TTS Service Becomes Message-Driven (Own Saga Step) | Accepted | Cross-cutting retrofit | 2026-08-07 |
+| [ADR-0015](ADR-0015-rendering-dynamic-template-loading.md) | Dynamic Plugin Loading for Rendering Service Animation Templates | Accepted | Low-Level Design (Unit 5) | 2026-08-07 |
