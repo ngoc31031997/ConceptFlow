@@ -574,3 +574,33 @@
 **Context**: CONSTRUCTION - Unit 3 COMPLETE -> Unit 4
 
 ---
+
+## Construction - Unit 4 (Script Processing Service) - Low-Level Design Questions Presented
+**Timestamp**: 2026-08-07T09:00:00Z
+**User Input**: "ok"
+**AI Response**: "Created script-processing-service-low-level-design-plan.md with 9 questions: layering (Hexagonal), DI, script syntax/grammar (Markdown with scene delimiters vs YAML/JSON — new design decision, no prior grammar defined), Content Plugin integration mechanism (REST direct vs via Orchestrator/AMQP — explicitly left open by component-methods.md, has implications for revisiting Unit 2), idempotency, versioning, correlation ID, syntax error handling (per Story A2 AC), state management. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 4 - Low-Level Design - Planning
+
+---
+
+## Cross-Cutting Retrofit: Inbox/Outbox + TTS Message-Driven — Plan Approved
+**Timestamp**: 2026-08-07T10:00:00Z
+**User Input**: "ok theo plan đó cũng được" (approving retrofit plan for: Inbox/Outbox system-wide including Units 1-3, PostgreSQL per service, TTS Service converted to message-driven/own Saga step)
+**AI Response**: "Plan approved via ExitPlanMode. Created ADR-0013 (PostgreSQL per service for Inbox/Outbox) and ADR-0014 (TTS Service becomes message-driven, own Saga step, supersedes original REST-only design). Revised Application Design: services.md (new 'Synthesize Speech' Saga step, updated sequence diagram and compensating actions), component-methods.md (TTS interface AMQP consumer/producer, Script Processing no longer calls Content Plugin directly per ADR-0012, Rendering no longer calls TTS), unit-of-work.md (Unit 3 now depends on Unit 1, new tts.commands queue, simplified Unit 4/5 dependencies), unit-of-work-dependency.md (dependency matrix and diagram updated — all business services now only depend on Unit 1), unit-of-work-story-map.md (C2 story mapping note updated). Proceeding to Unit 4 LLD amendment to bake in Postgres Inbox/Outbox from the start."
+**Context**: CROSS-CUTTING RETROFIT - Application Design Revised -> Unit 4 LLD Amendment
+
+---
+
+## Cross-Cutting Retrofit: Unit 4 LLD Amended for Inbox/Outbox
+**Timestamp**: 2026-08-07T10:15:00Z
+**User Input**: N/A (continuing approved retrofit plan)
+**AI Response**: "Amended Unit 4's already-approved Low-Level Design artifacts: module-structure.md (idempotency.py replaced with adapters/persistence/{db,inbox,outbox,relay}.py), dependency-injection.md (InboxRepository/OutboxRepository constructed directly, OutboxRelay as background task), interface-contracts.md (Inbox/Outbox delivery guarantee note, eventual publish via polling relay), sequence-flows.md (all 3 flows updated to show Outbox-first-then-relay-publishes pattern, added Flow 4: restart recovery). No change to script syntax, domain models, or business rules — only the messaging/persistence adapter layer. Unit 4 has not yet proceeded past Low-Level Design (Functional Design not yet started), so this amendment did not require reopening any later stage."
+**Context**: CROSS-CUTTING RETROFIT - Unit 4 LLD Amended
+
+## Construction - Unit 4 - Low-Level Design Answers Received & Generated
+**Timestamp**: 2026-08-07T09:20:00Z
+**User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
+**AI Response**: "No ambiguities in the 9 LLD answers. Saved project memory for Unit 8 (Orchestrator) persistence requirement. Created ADR-0011 (Markdown script syntax) and ADR-0012 (Content Plugin integration via Orchestrator, not direct REST). Generated module-structure.md, dependency-injection.md, interface-contracts.md (script syntax grammar, AMQP contracts, no REST endpoint), sequence-flows.md (success, syntax error, idempotent redelivery). Presented completion message requesting approval to proceed to Functional Design."
+**Context**: CONSTRUCTION - Unit 4 - Low-Level Design
+
+---

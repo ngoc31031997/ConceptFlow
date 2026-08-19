@@ -26,7 +26,8 @@ Mỗi thư mục trong `services/` là 1 unit độc lập, có Dockerfile riên
 
 ### Unit 1: RabbitMQ Infrastructure
 - **Type**: Infrastructure unit (không phải business service)
-- **Scope**: Cấu hình exchange/queue topology cho RabbitMQ (`infra/rabbitmq/`), định nghĩa các queue: `script_processing.commands`, `content_plugin.commands`, `rendering.commands`, `video_assembly.commands`, `publisher.commands`, `orchestrator.events`
+- **Scope**: Cấu hình exchange/queue topology cho RabbitMQ (`infra/rabbitmq/`), định nghĩa các queue: `script_processing.commands`, `content_plugin.commands`, `tts.commands`, `rendering.commands`, `video_assembly.commands`, `publisher.commands`, `orchestrator.events`
+  - **Revision (2026-08-07, ADR-0014)**: thêm queue `tts.commands` — TTS Service (Unit 3) nay là message-driven, không còn REST-only
 - **Depends on**: Không có
 
 ### Unit 2: Content Plugin Service
@@ -35,15 +36,15 @@ Mỗi thư mục trong `services/` là 1 unit độc lập, có Dockerfile riên
 
 ### Unit 3: TTS Service
 - **Scope**: FR4.1, FR4.2 — sinh giọng đọc offline song ngữ Việt/Anh
-- **Depends on**: Không (không tham gia RabbitMQ, chỉ REST — có thể phát triển độc lập)
+- **Depends on**: Unit 1 (RabbitMQ) — **Revision (2026-08-07, ADR-0014)**: trước đây "Không có (không tham gia RabbitMQ, chỉ REST)"; nay message-driven, bước Saga độc lập ("Synthesize Speech"), không còn được gọi trực tiếp bởi Rendering Service
 
 ### Unit 4: Script Processing Service
-- **Scope**: FR2.1, FR2.2 — parse script thành scene, gọi Content Plugin Service để classify
-- **Depends on**: Unit 1 (RabbitMQ), Unit 2 (Content Plugin Service)
+- **Scope**: FR2.1, FR2.2 — parse script thành scene (KHÔNG tự gọi Content Plugin Service — Orchestrator điều phối bước classify riêng, ADR-0012)
+- **Depends on**: Unit 1 (RabbitMQ) — không còn phụ thuộc trực tiếp Unit 2 (không gọi Content Plugin Service)
 
 ### Unit 5: Rendering Service
-- **Scope**: FR3.1, FR3.2, FR4.3 — render animation Manim, đồng bộ timing với TTS
-- **Depends on**: Unit 1 (RabbitMQ), Unit 3 (TTS Service)
+- **Scope**: FR3.1, FR3.2, FR4.3 — render animation Manim, đồng bộ timing với audio đã sinh sẵn từ bước Saga "Synthesize Speech" (không tự gọi TTS Service, ADR-0014)
+- **Depends on**: Unit 1 (RabbitMQ) — không còn phụ thuộc trực tiếp Unit 3 (không gọi TTS Service)
 
 ### Unit 6: Video Assembly Service
 - **Scope**: FR5.1, FR5.2 — ghép animation + audio + nhạc nền thành .mp4

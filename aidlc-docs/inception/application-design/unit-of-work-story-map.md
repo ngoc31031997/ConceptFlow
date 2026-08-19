@@ -11,7 +11,7 @@
 | B3 — Sử dụng scene minh họa code có syntax highlight | Plugin & Configuration | Unit 5 (Rendering) |
 | B4 — Chọn ngôn ngữ giọng đọc cho video | Plugin & Configuration | Unit 10, Unit 8 (state), Unit 3 (TTS) |
 | C1 — Khởi chạy render video từ GUI | Rendering | Unit 10, Unit 9, Unit 8 (Orchestrator) |
-| C2 — Sinh giọng đọc tự động từ script | Rendering | Unit 3 (TTS), Unit 5 (Rendering — caller) |
+| C2 — Sinh giọng đọc tự động từ script | Rendering | Unit 3 (TTS — bước Saga độc lập từ ADR-0014, không còn "caller" là Unit 5) |
 | C3 — Đồng bộ animation với thời lượng giọng đọc | Rendering | Unit 5 (Rendering) |
 | C4 — Ghép animation và audio thành video hoàn chỉnh | Rendering | Unit 6 (Video Assembly) |
 | C5 — Thêm nhạc nền tùy chọn cho video | Rendering | Unit 6 (Video Assembly), Unit 10 (cấu hình) |

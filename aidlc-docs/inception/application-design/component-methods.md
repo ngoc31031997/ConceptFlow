@@ -96,20 +96,22 @@ Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, v�
 ## Script Processing Service
 
 ### Consumer: command `parse_script` (từ `script_processing.commands`)
-- **Purpose**: Phân tích script thô thành danh sách scene chuẩn hóa; gọi Content Plugin Service (REST nội bộ hoặc qua Orchestrator, xác định ở Low-Level Design) để gắn category; publish `script_parsed`/`parse_failed`.
+- **Purpose**: Phân tích script thô thành danh sách scene chuẩn hóa; publish `script_parsed` (scene CHƯA có category) /`parse_failed`. Việc gắn category do Orchestrator điều phối như bước Saga riêng tiếp theo (`classify_scenes` tới Content Plugin Service) — Script Processing Service không gọi Content Plugin Service trực tiếp (ADR-0012).
 - **Scene schema**: `{ scene_index, narration_text, illustration_hint, code_snippet? }`
 
 ## Rendering Service
 
 ### Consumer: command `render_scenes` (từ `rendering.commands`)
-- **Purpose**: Render toàn bộ scene của 1 project (gọi TTS Service qua REST nội bộ cho từng scene, đồng bộ timing); publish `scene_rendered` (per scene) và `rendering_completed`/`rendering_failed` khi xong.
+- **Purpose**: Render animation cho toàn bộ scene của 1 project, đồng bộ timing với audio đã có sẵn (audio được sinh ở bước Saga "Synthesize Speech" riêng trước đó, ADR-0014 — Rendering Service không còn gọi TTS Service); publish `scene_rendered` (per scene) và `rendering_completed`/`rendering_failed` khi xong.
 
 ## TTS Service
 
-### `POST /tts/synthesize` (REST, gọi trực tiếp bởi Rendering Service)
-- **Purpose**: Sinh audio giọng đọc cho một đoạn lời thoại.
-- **Input**: `{ text: string, language: "vi" | "en" }`
-- **Output**: `{ audio_path: string, duration_seconds: number }`
+**Revision (2026-08-07, ADR-0014)**: Đổi từ REST đồng bộ (gọi bởi Rendering Service) sang message-driven, bước Saga độc lập.
+
+### Consumer: command `synthesize_speech` (từ `tts.commands`)
+- **Purpose**: Sinh audio giọng đọc cho toàn bộ scene của 1 project (batch, tương tự cách `classify_scenes` xử lý theo batch ở Content Plugin Service); publish `speech_synthesized`/`synthesis_failed`.
+- **Input** (payload lệnh): `{ scenes: [{ scene_index, narration_text, language }] }`
+- **Output** (`speech_synthesized`): `{ scenes: [{ scene_index, audio_path, duration_seconds }] }`
 
 ## Video Assembly Service
 
