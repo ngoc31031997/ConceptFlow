@@ -783,10 +783,32 @@
 
 ---
 
+## Construction - Unit 5 - Functional Design Questions Presented
+**Timestamp**: 2026-08-07T14:45:00Z
+**User Input**: N/A
+**AI Response**: "Created rendering-service-functional-design-plan.md with 5 questions: input validation scope, animation-audio duration matching tolerance (±0.5s, prefer longer animation over cutting content), code snippet display placement (fixed corner, persistent throughout scene), unknown code_language fallback (plain text, no error), domain entity scope. Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 5 - Functional Design - Planning
+
+---
+
+## Construction - Unit 5 - Functional Design Generated
+**Timestamp**: 2026-08-07T15:00:00Z
+**User Input**: "Q1: zero-trust full validation (via follow-up); Q2:A; Q3:A; Q4: plain-text fallback (clarified via AskUserQuestion after explaining Pygments/lexer); Q5:A"
+**AI Response**: "Clarified Pygments/lexer terminology for Q4 before finalizing. No remaining ambiguity. Generated domain-entities.md, business-rules.md (5 rules incl. zero-trust validation, duration matching with ±0.5s tolerance preferring longer animation over cut content, code snippet fixed-corner placement, unknown-language plain-text fallback, artifact idempotency + error classification table), business-logic-model.md (render process + flowchart). Added InvalidDurationError to the already-approved LLD's domain/errors.py (small, backward-compatible addition). Presented completion message requesting approval to proceed to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 5 - Functional Design
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
 **AI Response**: "No ambiguities in the 9 LLD answers. Saved project memory for Unit 8 (Orchestrator) persistence requirement. Created ADR-0011 (Markdown script syntax) and ADR-0012 (Content Plugin integration via Orchestrator, not direct REST). Generated module-structure.md, dependency-injection.md, interface-contracts.md (script syntax grammar, AMQP contracts, no REST endpoint), sequence-flows.md (success, syntax error, idempotent redelivery). Presented completion message requesting approval to proceed to Functional Design."
 **Context**: CONSTRUCTION - Unit 4 - Low-Level Design
+
+---
+
+## Construction - Unit 5 - Functional Design Approved
+**Timestamp**: 2026-08-07T15:05:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Functional Design for Unit 5. Proceeding to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 5 - Functional Design -> NFR Requirements
 
 ---
