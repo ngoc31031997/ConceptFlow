@@ -54,5 +54,5 @@ services/rendering/
 | `adapters/rendering/templates/algorithm_visualization.py` | `AlgorithmVisualizationTemplate` — `template_id = "algorithm_visualization"`, build Manim `Scene` minh họa thuật toán từng bước; nếu `code_snippet` có, chèn Manim `Code` mobject (Pygments syntax highlight, Story B3) |
 | `adapters/rendering/templates/concept_illustration.py` | `ConceptIllustrationTemplate` — `template_id = "concept_illustration"`, build Manim `Scene` minh họa khái niệm; cũng chèn `Code` mobject nếu có `code_snippet` |
 | `adapters/storage/artifact_paths.py` | Đường dẫn quy ước `/shared/{project_id}/animations/{scene_index}.mp4`, kiểm tra tồn tại (idempotency) |
-| `adapters/messaging/consumer.py` | Consume `render_scenes`, publish `scene_render_started` trước mỗi scene + `scene_rendered` sau mỗi scene (nhiều Outbox row/command) + `rendering_completed`/`rendering_failed` cuối cùng |
+| `adapters/messaging/consumer.py` | Consume `render_scenes`; ghi `scene_render_started`/`scene_rendered` vào Outbox với COMMIT RIÊNG NGAY LẬP TỨC cho mỗi scene (không gộp transaction — NFR Design); event cuối (`rendering_completed`/`rendering_failed`) ghi CÙNG transaction với Inbox mark |
 | `adapters/logging/correlation.py` | Gắn `saga_id` vào log context |

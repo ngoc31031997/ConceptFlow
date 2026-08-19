@@ -836,3 +836,19 @@
 **Context**: CONSTRUCTION - Unit 5 - NFR Requirements -> NFR Design
 
 ---
+
+## Construction - Unit 5 - NFR Design Questions Presented
+**Timestamp**: 2026-08-07T15:25:00Z
+**User Input**: N/A
+**AI Response**: "Created rendering-service-nfr-design-plan.md with 5 questions: CRUD/CQRS, resilience (no internal retry), idempotency (2-tier, mirrors TTS), Saga/event-driven/Inbox-Outbox confirmation (highlighting the multi-row-per-command difference vs Unit 2/3/4), security (zero-trust). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 5 - NFR Design - Planning
+
+---
+
+## Construction - Unit 5 - NFR Design Generated
+**Timestamp**: 2026-08-07T15:30:00Z
+**User Input**: "ok (Q1-Q5 all A)"
+**AI Response**: "No ambiguities. Generated nfr-design-patterns.md and logical-components.md. Key refinement discovered while writing: per-scene events (scene_render_started/scene_rendered) must each commit immediately (not batched into one final transaction) so OutboxRelay can publish them promptly for real-time GUI progress — only the final event (rendering_completed/rendering_failed) is committed together with the Inbox mark. Updated the already-approved LLD's module-structure.md consumer.py description to match. Presented completion message requesting approval to proceed to Infrastructure Design."
+**Context**: CONSTRUCTION - Unit 5 - NFR Design
+
+---
