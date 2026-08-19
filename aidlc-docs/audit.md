@@ -613,6 +613,32 @@
 **AI Response**: "Full retrofit of Unit 3 per ADR-0014 (message-driven, own Saga step) and ADR-0013 (Inbox/Outbox). Docs: rewrote module-structure.md, interface-contracts.md, sequence-flows.md, dependency-injection.md (LLD); added revision notes to business-logic-model.md (Functional Design), nfr-requirements.md, nfr-design-patterns.md, logical-components.md, infrastructure-design.md, deployment-architecture.md, code/README.md. Code: removed adapters/api/ (FastAPI) entirely; added adapters/messaging/{consumer,producer}.py (synthesize_speech command, batch per project mirroring Unit 2's classify_scenes), application/synthesize_speech_batch.py (fail-fast batch use case), adapters/persistence/{db,inbox,outbox,relay}.py (identical shape to Unit 2), rewrote main.py (plain asyncio entrypoint, /tmp/ready sentinel instead of FastAPI /health), updated correlation.py (saga_id from envelope not HTTP header), Dockerfile (no uvicorn/EXPOSE), requirements.txt (dropped fastapi/uvicorn/pydantic, added aio-pika/asyncpg). domain/, application/synthesize_speech.py, adapters/tts_engines/, adapters/storage/ unchanged (business logic transport-agnostic). Tests: removed test_api.py, added test_synthesize_speech_batch.py, test_messaging.py, test_persistence.py, test_relay.py — 22 tests passing, ruff clean, main.py import-sanity-checked (verified via Docker python:3.12-slim). Infra: added tts-db Postgres container + tts_db_data volume to root docker-compose.yml, added tts.commands queue (+ DLQ + binding) to infra/rabbitmq/definitions.json (Unit 1 revisit), updated rabbitmq-infrastructure's messaging-design.md and root README.md. docker compose config validated; both content-plugin and tts test suites re-verified passing together."
 **Context**: CROSS-CUTTING RETROFIT - Unit 1/2/3 Retrofit Complete -> Resume Unit 4
 
+---
+
+## Construction - Unit 4 - Functional Design Questions Presented
+**Timestamp**: 2026-08-07T12:00:00Z
+**User Input**: "ok qua unit 4"
+**AI Response**: "Created script-processing-service-functional-design-plan.md with 5 questions: scene_index assignment (position-based, heading number is display-only), illustration_hint optionality, multiple code fences per scene (first only), pre-first-heading content handling, domain entity scope (no raw_script retention). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 4 - Functional Design - Planning
+
+---
+
+## Construction - Unit 4 - Functional Design Generated
+**Timestamp**: 2026-08-07T12:15:00Z
+**User Input**: "Q1: sequential numbering required (via follow-up); Q2:A; Q3: raise error on ≥2 code fences (via follow-up AskUserQuestion); Q4:A; Q5:A"
+**AI Response**: "Clarified code fence/code_snippet terminology for user before finalizing Q3. No remaining ambiguity. Generated domain-entities.md, business-rules.md (7 rules incl. sequential scene numbering, single code fence per scene, optional illustration_hint, fail-fast), business-logic-model.md (parser algorithm + flowchart). Also updated LLD interface-contracts.md's Script Syntax section to reference the finalized business rules. Presented completion message requesting approval to proceed to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 4 - Functional Design
+
+---
+
+## Construction - Unit 4 - Functional Design Approved
+**Timestamp**: 2026-08-07T12:20:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Functional Design for Unit 4. Proceeding to NFR Requirements."
+**Context**: CONSTRUCTION - Unit 4 - Functional Design -> NFR Requirements
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"

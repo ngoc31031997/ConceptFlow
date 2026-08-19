@@ -1,12 +1,14 @@
 # Interface Contracts — Unit 4: Script Processing Service
 
 ## Script Syntax (Markdown, Question 3)
+**Revision (2026-08-07, Functional Design)**: chi tiết ràng buộc đầy đủ (numbering liên tục bắt buộc, tối đa 1 code fence/scene, ...) nay ở `functional-design/business-rules.md` — đây chỉ là tóm tắt cú pháp.
+
 `raw_script` phải theo cú pháp Markdown sau:
-- Mỗi scene bắt đầu bằng heading `## Scene N` (N là số thứ tự, dùng để validate nhưng `scene_index` thực tế trong output là 0-based theo thứ tự xuất hiện, không phải giá trị N)
-- Dòng bắt đầu bằng `> ` (blockquote) ngay dưới heading là `illustration_hint`
-- Đoạn text thường (không phải blockquote, không phải code fence) là `narration_text`
-- Code fence (```` ``` ````, ngôn ngữ tùy chọn) nếu có là `code_snippet`
-- Script phải có ít nhất 1 scene; mỗi scene phải có `narration_text` không rỗng (khớp Content Plugin Service's domain rule cho `Scene.narration_text`)
+- Mỗi scene bắt đầu bằng heading `## Scene N` — N BẮT BUỘC tăng dần liên tục từ 1 (Business Rule 2); `scene_index` output = N - 1
+- Dòng bắt đầu bằng `> ` (blockquote) ngay dưới heading là `illustration_hint` — optional (Business Rule 4)
+- Đoạn text thường (không phải blockquote, không phải code fence) là `narration_text` — bắt buộc không rỗng (Business Rule 3)
+- Tối đa 1 code fence (```` ``` ````, ngôn ngữ tùy chọn) mỗi scene → `code_snippet` — ≥ 2 code fence là lỗi cú pháp (Business Rule 5)
+- Script phải có ít nhất 1 scene (Business Rule 1); nội dung trước heading đầu tiên bị bỏ qua (Business Rule 6)
 
 **Ví dụ hợp lệ**:
 ```markdown
