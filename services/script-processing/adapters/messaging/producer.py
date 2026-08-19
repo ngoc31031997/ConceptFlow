@@ -40,6 +40,7 @@ def success_envelope(saga_id: str, project_id: str, scenes: list[Scene]) -> dict
                     "narration_text": s.narration_text,
                     "illustration_hint": s.illustration_hint,
                     "code_snippet": s.code_snippet,
+                    "code_language": s.code_language,
                 }
                 for s in scenes
             ],

@@ -775,6 +775,14 @@
 
 ---
 
+## Cross-Unit Fix: Scene.code_language Gap (Discovered During Unit 5 Design)
+**Timestamp**: 2026-08-07T14:40:00Z
+**User Input**: Confirmed via AskUserQuestion — add code_language to Scene schema and revise Unit 4, rather than auto-detecting language in Rendering Service
+**AI Response**: "Story B3 requires the code snippet's language for syntax highlight, but Scene schema only had code_snippet, no language field — the Markdown code fence already carries this (```` ```python ````) but MarkdownScriptParser discarded it. Fixed services/script-processing/: domain/models.py (Scene.code_language), markdown_parser.py (captures fence language annotation), producer.py (includes it in script_parsed payload). Updated tests (28 passing, up from 24) and all affected docs: Unit 4's domain-entities.md, business-rules.md (new Rule 8), business-logic-model.md, module-structure.md, interface-contracts.md, code/README.md; Application Design's component-methods.md (Scene schema + render_scenes payload); Unit 5's already-approved interface-contracts.md and module-structure.md (SceneRenderRequest gains code_language)."
+**Context**: CONSTRUCTION - Cross-Unit Fix Complete -> Unit 5 Functional Design
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"

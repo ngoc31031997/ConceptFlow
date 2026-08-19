@@ -1,5 +1,11 @@
 # Script Processing Service — Code Summary
 
+**Revision (2026-08-07)**: added `Scene.code_language` — discovered missing while designing Unit 5 (Rendering
+Service): Story B3 requires the code snippet's programming language for correct syntax highlight, and the
+Markdown code fence (```` ```python ````) already carries it, but the parser was discarding it. Fixed in
+`markdown_parser.py` (captures the fence's language annotation) and `producer.py` (includes it in the
+`script_parsed` event payload).
+
 ## Structure
 Implements the module structure from `low-level-design/module-structure.md` (Hexagonal / Ports & Adapters), following the exact shape established by Content Plugin Service and TTS Service (post-retrofit):
 
@@ -41,5 +47,5 @@ Per ADR-0012, this service does not call Content Plugin Service directly and has
 - `tests/adapters/test_messaging.py` — consumer + Inbox/Outbox via `FakePool`.
 - `tests/adapters/test_persistence.py`, `test_relay.py` — copied verbatim from Unit 2/3 (identical shape).
 
-24 tests passing, `ruff check` clean — verified under Python 3.12 via Docker. `main.py` import-sanity-checked
+28 tests passing, `ruff check` clean — verified under Python 3.12 via Docker. `main.py` import-sanity-checked
 with `DATABASE_URL`/`RABBITMQ_URL` env vars set.

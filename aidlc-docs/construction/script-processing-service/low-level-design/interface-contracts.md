@@ -7,7 +7,7 @@
 - Mỗi scene bắt đầu bằng heading `## Scene N` — N BẮT BUỘC tăng dần liên tục từ 1 (Business Rule 2); `scene_index` output = N - 1
 - Dòng bắt đầu bằng `> ` (blockquote) ngay dưới heading là `illustration_hint` — optional (Business Rule 4)
 - Đoạn text thường (không phải blockquote, không phải code fence) là `narration_text` — bắt buộc không rỗng (Business Rule 3)
-- Tối đa 1 code fence (```` ``` ````, ngôn ngữ tùy chọn) mỗi scene → `code_snippet` — ≥ 2 code fence là lỗi cú pháp (Business Rule 5)
+- Tối đa 1 code fence (```` ``` ````, ngôn ngữ tùy chọn) mỗi scene → `code_snippet` + `code_language` (Business Rule 8, thêm 2026-08-07 cho Story B3) — ≥ 2 code fence là lỗi cú pháp (Business Rule 5)
 - Script phải có ít nhất 1 scene (Business Rule 1); nội dung trước heading đầu tiên bị bỏ qua (Business Rule 6)
 
 **Ví dụ hợp lệ**:
@@ -57,7 +57,8 @@ Publish tới `orchestrator.events`.
         "scene_index": 0,
         "narration_text": "string",
         "illustration_hint": "string",
-        "code_snippet": "string | null"
+        "code_snippet": "string | null",
+        "code_language": "string | null"
       }
     ]
   }

@@ -18,6 +18,7 @@ Queue: `rendering.commands`. Dispatched bởi Orchestrator sau khi nhận đủ 
         "narration_text": "string",
         "illustration_hint": "string | null",
         "code_snippet": "string | null",
+        "code_language": "string | null",
         "animation_template_id": "algorithm_visualization | concept_illustration",
         "audio_path": "string",
         "duration_seconds": 12.5

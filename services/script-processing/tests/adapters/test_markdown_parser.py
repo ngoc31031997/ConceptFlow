@@ -32,6 +32,16 @@ def test_parses_single_scene_with_all_fields(parser):
     assert scene.narration_text == "Day la loi thoai giai thich vong lap for."
     assert scene.illustration_hint == "minh hoa vong lap for"
     assert scene.code_snippet == "for i in range(10):\n    print(i)"
+    assert scene.code_language == "python"
+
+
+def test_code_fence_without_language_annotation(parser):
+    script = "## Scene 1\nnarration\n```\nplain code\n```\n"
+
+    result = parser.parse(script)
+
+    assert result.scenes[0].code_snippet == "plain code"
+    assert result.scenes[0].code_language is None
 
 
 def test_parses_multiple_scenes_sequential(parser):

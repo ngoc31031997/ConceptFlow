@@ -97,13 +97,13 @@ Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, v�
 
 ### Consumer: command `parse_script` (từ `script_processing.commands`)
 - **Purpose**: Phân tích script thô thành danh sách scene chuẩn hóa; publish `script_parsed` (scene CHƯA có category) /`parse_failed`. Việc gắn category do Orchestrator điều phối như bước Saga riêng tiếp theo (`classify_scenes` tới Content Plugin Service) — Script Processing Service không gọi Content Plugin Service trực tiếp (ADR-0012).
-- **Scene schema**: `{ scene_index, narration_text, illustration_hint, code_snippet? }`
+- **Scene schema**: `{ scene_index, narration_text, illustration_hint, code_snippet?, code_language? }` — **Revision (2026-08-07)**: thêm `code_language` (phát hiện thiếu lúc thiết kế Unit 5, cần cho syntax highlight đúng ngôn ngữ, Story B3)
 
 ## Rendering Service
 
 ### Consumer: command `render_scenes` (từ `rendering.commands`)
 - **Purpose**: Render animation cho toàn bộ scene của 1 project, đồng bộ timing với audio đã có sẵn (audio được sinh ở bước Saga "Synthesize Speech" riêng trước đó, ADR-0014 — Rendering Service không còn gọi TTS Service); publish `scene_render_started`+`scene_rendered` (per scene, tiến trình) và `rendering_completed`/`rendering_failed` khi xong batch (Low-Level Design Question 6/9).
-- **Input** (payload lệnh, Orchestrator gộp từ `script_parsed`+`scenes_classified`+`speech_synthesized`): `{ scenes: [{ scene_index, narration_text, illustration_hint, code_snippet, animation_template_id, audio_path, duration_seconds }] }`
+- **Input** (payload lệnh, Orchestrator gộp từ `script_parsed`+`scenes_classified`+`speech_synthesized`): `{ scenes: [{ scene_index, narration_text, illustration_hint, code_snippet, code_language, animation_template_id, audio_path, duration_seconds }] }`
 - **Animation template selection**: dynamic plugin loading theo `animation_template_id` (ADR-0015, mirror ADR-0006).
 
 ## TTS Service

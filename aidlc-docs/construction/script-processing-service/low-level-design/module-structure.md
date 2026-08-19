@@ -39,11 +39,11 @@ services/script-processing/
 
 | Module | Responsibility |
 |---|---|
-| `domain/models.py` | `Scene` (`scene_index`, `narration_text`, `illustration_hint`, `code_snippet?`), `ParsedScript` (`scenes: list[Scene]`) |
+| `domain/models.py` | `Scene` (`scene_index`, `narration_text`, `illustration_hint`, `code_snippet?`, `code_language?` — added 2026-08-07, Story B3), `ParsedScript` (`scenes: list[Scene]`) |
 | `domain/errors.py` | `ScriptSyntaxError(line_number, reason)` — lỗi cú pháp có vị trí cụ thể (Business Rule, Question 8) |
 | `domain/ports.py` | `ScriptParserPort` (abstract: `parse(raw_script: str) -> ParsedScript`, raise `ScriptSyntaxError`) |
 | `application/parse_script.py` | `ParseScriptUseCase(parser: ScriptParserPort)` — gọi parser, trả `ParsedScript` hoặc để lỗi propagate lên consumer |
-| `adapters/parsing/markdown_parser.py` | `MarkdownScriptParser` — parse cú pháp Markdown với scene delimiter (`## Scene N`, blockquote `>` cho illustration hint, code fence cho code_snippet) |
+| `adapters/parsing/markdown_parser.py` | `MarkdownScriptParser` — parse cú pháp Markdown với scene delimiter (`## Scene N`, blockquote `>` cho illustration hint, code fence cho code_snippet + code_language) |
 | `adapters/messaging/consumer.py` | Consume `parse_script` (queue `script_processing.commands`); trong 1 DB transaction: kiểm tra `InboxRepository` (đã xử lý `message_id` chưa), gọi `ParseScriptUseCase`, ghi kết quả vào `OutboxRepository` (event `script_parsed`/`parse_failed`), ghi `message_id` vào Inbox — commit transaction, ack message |
 | `adapters/messaging/producer.py` | Publish thực tế lên RabbitMQ — chỉ được gọi bởi `OutboxRelay`, KHÔNG gọi trực tiếp từ `consumer.py` (đảm bảo atomicity giữa xử lý + ghi outbox) |
 | `adapters/persistence/db.py` | Kết nối PostgreSQL (`script-processing-db`, ADR-0013), bootstrap bảng `outbox_events`/`processed_messages` lúc khởi động |

@@ -6,7 +6,9 @@ Grammar (business-logic-model.md / business-rules.md):
 - A `> ` blockquote line right after the heading becomes illustration_hint
   (optional, first one wins — Rule 4).
 - Plain text lines become narration_text (mandatory, non-empty — Rule 3).
-- At most one fenced code block per scene becomes code_snippet (Rule 5).
+- At most one fenced code block per scene becomes code_snippet; the
+  fence's language annotation (```` ```python ````) becomes code_language
+  (Rule 5, revised for Story B3's syntax-highlight requirement).
 - Content before the first heading is ignored (Rule 6).
 - The parser fails fast on the first violation (Rule 7).
 """
@@ -20,7 +22,7 @@ from domain.models import ParsedScript, Scene
 from domain.ports import ScriptParserPort
 
 SCENE_HEADING_RE = re.compile(r"^##\s*Scene\s+(\d+)\s*$")
-CODE_FENCE_RE = re.compile(r"^```")
+CODE_FENCE_RE = re.compile(r"^```(\w*)\s*$")
 BLOCKQUOTE_RE = re.compile(r"^>\s?(.*)$")
 
 
@@ -69,6 +71,7 @@ class MarkdownScriptParser(ScriptParserPort):
         narration_lines: list[str] = []
         illustration_hint: str | None = None
         code_snippet: str | None = None
+        code_language: str | None = None
         in_fence = False
         fence_lines: list[str] = []
         fence_start_line: int | None = None
@@ -76,7 +79,8 @@ class MarkdownScriptParser(ScriptParserPort):
         for offset, line in enumerate(body_lines):
             line_number = body_start_line + offset
 
-            if CODE_FENCE_RE.match(line.strip()):
+            fence_match = CODE_FENCE_RE.match(line.strip())
+            if fence_match:
                 if in_fence:
                     in_fence = False
                     code_snippet = "\n".join(fence_lines)
@@ -88,6 +92,7 @@ class MarkdownScriptParser(ScriptParserPort):
                         )
                     in_fence = True
                     fence_start_line = line_number
+                    code_language = fence_match.group(1) or None
                 continue
 
             if in_fence:
@@ -115,4 +120,5 @@ class MarkdownScriptParser(ScriptParserPort):
             narration_text=narration_text,
             illustration_hint=illustration_hint,
             code_snippet=code_snippet,
+            code_language=code_language,
         )

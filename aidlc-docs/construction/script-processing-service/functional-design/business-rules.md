@@ -21,6 +21,10 @@ Dòng blockquote `> ...` không bắt buộc phải có trong mỗi scene. Nếu
 Nếu 1 scene có ≥ 2 code fence (```` ``` ````), raise `ScriptSyntaxError(line_number, reason="a scene may contain at most one code block")` tại code fence thứ 2.
 - **Rationale**: `Scene.code_snippet` chỉ chứa được 1 chuỗi (không phải list) — người dùng xác nhận chọn raise lỗi rõ ràng thay vì âm thầm bỏ qua hoặc gộp code lại (Question 3).
 
+## Rule 8: Code Fence Language Annotation → `code_language` (Revision, 2026-08-07)
+Ngôn ngữ khai báo ngay sau dấu mở code fence (vd. `python` trong ```` ```python ````) được gán vào `Scene.code_language`. Nếu code fence không khai báo ngôn ngữ (```` ``` ```` trần) → `code_language = None`. Không validate ngôn ngữ khai báo có hợp lệ/được hỗ trợ hay không (trách nhiệm đó thuộc Rendering Service khi chọn syntax highlighter, Unit 5).
+- **Rationale**: Story B3 yêu cầu Creator tự chỉ định ngôn ngữ lập trình để syntax highlight đúng — phát hiện thiếu field này khi thiết kế Unit 5 (Rendering Service); Markdown code fence vốn đã mang thông tin này, chỉ cần không bỏ qua khi parse.
+
 ## Rule 6: Content Before the First Heading Is Ignored
 Nội dung TRƯỚC heading `## Scene 1` đầu tiên (vd. tiêu đề, ghi chú tự do) bị bỏ qua hoàn toàn — không map vào bất kỳ scene nào, không phải lỗi cú pháp (trừ khi không có heading nào — xem Rule 1).
 - **Rationale**: Cho phép Creator viết ghi chú tự do ở đầu file mà không lo lỗi cú pháp (Question 4).

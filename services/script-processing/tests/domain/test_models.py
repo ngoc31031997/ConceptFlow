@@ -6,20 +6,30 @@ from domain.models import ParsedScript, Scene
 
 
 def test_scene_fields():
-    scene = Scene(scene_index=0, narration_text="hello", illustration_hint="hint", code_snippet="code")
+    scene = Scene(
+        scene_index=0,
+        narration_text="hello",
+        illustration_hint="hint",
+        code_snippet="code",
+        code_language="python",
+    )
     assert scene.scene_index == 0
     assert scene.narration_text == "hello"
     assert scene.illustration_hint == "hint"
     assert scene.code_snippet == "code"
+    assert scene.code_language == "python"
 
 
 def test_scene_optional_fields_can_be_none():
-    scene = Scene(scene_index=0, narration_text="hello", illustration_hint=None, code_snippet=None)
+    scene = Scene(
+        scene_index=0, narration_text="hello", illustration_hint=None, code_snippet=None, code_language=None
+    )
     assert scene.illustration_hint is None
     assert scene.code_snippet is None
+    assert scene.code_language is None
 
 
 def test_parsed_script_holds_scenes():
-    scenes = [Scene(0, "a", None, None), Scene(1, "b", None, None)]
+    scenes = [Scene(0, "a", None, None, None), Scene(1, "b", None, None, None)]
     parsed = ParsedScript(scenes=scenes)
     assert parsed.scenes == scenes

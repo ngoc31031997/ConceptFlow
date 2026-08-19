@@ -44,7 +44,7 @@ services/rendering/
 
 | Module | Responsibility |
 |---|---|
-| `domain/models.py` | `SceneRenderRequest` (`project_id`, `scene_index`, `narration_text`, `illustration_hint`, `code_snippet`, `animation_template_id`, `duration_seconds` — target từ audio), `SceneRenderResult` (`animation_path`, `duration_seconds` — thực tế) |
+| `domain/models.py` | `SceneRenderRequest` (`project_id`, `scene_index`, `narration_text`, `illustration_hint`, `code_snippet`, `code_language`, `animation_template_id`, `duration_seconds` — target từ audio), `SceneRenderResult` (`animation_path`, `duration_seconds` — thực tế) |
 | `domain/errors.py` | `UnsupportedTemplateError` (không tìm thấy `animation_template_id` trong registry), `AnimationEngineError` (Manim crash/timeout) |
 | `domain/ports.py` | `AnimationRendererPort` (abstract: `render(request, output_path) -> float`), `AnimationTemplatePort` (abstract: `template_id` property, `build_scene(request) -> manim.Scene`) |
 | `application/render_scene.py` | `RenderSceneUseCase(renderer: AnimationRendererPort)` — tính đường dẫn artifact, kiểm tra idempotency (file tồn tại), gọi `renderer.render(...)` nếu chưa có |

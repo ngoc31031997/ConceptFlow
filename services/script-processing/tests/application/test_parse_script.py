@@ -24,7 +24,7 @@ class FakeScriptParser(ScriptParserPort):
 
 
 def test_parse_delegates_to_parser_and_returns_result():
-    expected = ParsedScript(scenes=[Scene(0, "hello", None, None)])
+    expected = ParsedScript(scenes=[Scene(0, "hello", None, None, None)])
     parser = FakeScriptParser(result=expected)
     use_case = ParseScriptUseCase(parser)
 
