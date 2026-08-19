@@ -1,50 +1,76 @@
 """Composition root for the TTS Service.
 
-Wires domain/application/adapters together (constructor injection, per
-dependency-injection.md) and exposes the FastAPI app. Voice models are
-loaded once at startup (FastAPI lifespan) and kept in memory for the
-lifetime of the process (NFR Design — in-process voice model cache).
+Revision (ADR-0014, ADR-0013): TTS Service is no longer a FastAPI/REST
+app — it's a plain AMQP consumer (command synthesize_speech, queue
+tts.commands) with a PostgreSQL-backed Outbox/Inbox, mirroring Content
+Plugin Service's composition root shape.
+
+Voice models are still loaded once at startup (PiperTTSAdapter
+construction) and kept in memory for the lifetime of the process.
+Readiness is signaled via a sentinel file (Infrastructure Design) since
+there's no HTTP endpoint left to serve a /health check.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+import os
 
-from fastapi import FastAPI
+import aio_pika
 
-from adapters.api.router import create_health_router, create_v1_router
+from adapters.messaging.consumer import SynthesizeSpeechCommandHandler
+from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.persistence.db import create_pool
+from adapters.persistence.inbox import InboxRepository
+from adapters.persistence.outbox import OutboxRepository
+from adapters.persistence.relay import OutboxRelay
 from adapters.tts_engines.piper_adapter import PiperTTSAdapter
 from application.synthesize_speech import SUPPORTED_LANGUAGES, SynthesizeSpeechUseCase
+from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-class ServiceState:
-    """Tracks readiness for the /health endpoint (Infrastructure Design,
-    Question 5): ready only after voice models have finished loading."""
-
-    def __init__(self) -> None:
-        self.models_loaded = False
-
-    def is_ready(self) -> bool:
-        return self.models_loaded
+COMMANDS_QUEUE = "tts.commands"
+RABBITMQ_URL = os.environ["RABBITMQ_URL"]
+READY_SENTINEL_PATH = "/tmp/ready"
 
 
-def create_app() -> FastAPI:
-    state = ServiceState()
+async def run() -> None:
+    engine = PiperTTSAdapter(languages=list(SUPPORTED_LANGUAGES))
+    batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
 
-    @asynccontextmanager
-    async def lifespan(app: FastAPI):
-        engine = PiperTTSAdapter(languages=list(SUPPORTED_LANGUAGES))
-        state.models_loaded = True
-        logger.info("TTS Service ready — voice models loaded for %s", SUPPORTED_LANGUAGES)
+    pool = await create_pool()
+    inbox = InboxRepository(pool)
+    outbox = OutboxRepository()
 
-        app.include_router(create_v1_router(SynthesizeSpeechUseCase(engine)))
+    connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    channel = await connection.channel()
+    exchange = await channel.get_exchange(EVENTS_EXCHANGE)
+    queue = await channel.get_queue(COMMANDS_QUEUE)
 
-        yield
+    def make_persistent_message(body: bytes) -> aio_pika.Message:
+        return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    app = FastAPI(title="TTS Service", lifespan=lifespan)
-    app.include_router(create_health_router(state.is_ready))
-    return app
+    command_handler = SynthesizeSpeechCommandHandler(batch_use_case, pool, inbox, outbox)
+    relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
+    relay.start()
+
+    consumer_tag = await queue.consume(command_handler.handle)
+
+    with open(READY_SENTINEL_PATH, "w") as f:
+        f.write("ready")
+    logger.info("TTS Service ready — consuming '%s'", COMMANDS_QUEUE)
+
+    try:
+        await asyncio.Future()  # run forever
+    finally:
+        await queue.cancel(consumer_tag)
+        await relay.stop()
+        await connection.close()
+        await pool.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(run())

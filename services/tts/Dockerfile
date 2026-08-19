@@ -28,5 +28,4 @@ RUN mkdir -p /app/voices && \
     curl -L -o /app/voices/en.onnx.json "$PIPER_EN_MODEL_CONFIG_URL"
 
 COPY . .
-EXPOSE 8000
-CMD ["uvicorn", "main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "main.py"]

@@ -1,48 +1,60 @@
 # Interface Contracts — Unit 3: TTS Service
 
-## External REST API
+**Revision (2026-08-07, ADR-0014)**: `POST /v1/tts/synthesize` (REST) is replaced with an AMQP consumer/producer pair — TTS Service is now its own Saga step, no longer called synchronously by Rendering Service. The old REST section is kept below, struck through in spirit (removed), replaced by the AMQP contract.
 
-### `POST /v1/tts/synthesize`
-API versioning theo ADR-0008 (URI versioning, system-wide). Gọi trực tiếp (đồng bộ) bởi Rendering Service — không qua RabbitMQ.
+## AMQP Consumer: command `synthesize_speech`
+Queue: `tts.commands` (theo `unit-of-work.md`, thêm ở ADR-0014). Dispatched bởi Orchestrator như bước Saga độc lập ("Synthesize Speech", `services.md`), batch theo project (mirror cách `classify_scenes` xử lý ở Unit 2).
 
-**Headers**:
-| Header | Required | Description |
-|---|---|---|
-| `X-Saga-ID` | Yes | Correlation ID của Saga hiện tại (Rendering Service luôn có sẵn trong context `render_scenes`), đưa vào mọi log line |
-
-**Request body**:
+**Command payload** (envelope chuẩn, theo `messaging-design.md` Unit 1):
 ```json
 {
+  "message_id": "uuid",
+  "saga_id": "uuid",
   "project_id": "string",
-  "scene_index": 0,
-  "text": "string",
-  "language": "vi"
+  "schema_version": "1.0",
+  "timestamp": "ISO-8601",
+  "payload": {
+    "scenes": [
+      { "scene_index": 0, "narration_text": "string", "language": "vi" }
+    ]
+  }
 }
 ```
-- `language`: enum `"vi" | "en"` (mở rộng contract gốc trong `component-methods.md` với `project_id`, `scene_index` để hỗ trợ quy ước đường dẫn shared volume — xem Note dưới)
 
-**Response body (200 OK)**:
+## AMQP Producer: event `speech_synthesized` / `synthesis_failed`
+Publish tới `orchestrator.events` (qua Outbox + `OutboxRelay`, ADR-0013 — không publish trực tiếp từ consumer).
+
+**`speech_synthesized`** (thành công — fail-fast batch, mirror `ClassifyScenesBatchUseCase`):
 ```json
 {
-  "audio_path": "/shared/{project_id}/audio/{scene_index}_{language}.wav",
-  "duration_seconds": 12.5
+  "payload": {
+    "event_type": "speech_synthesized",
+    "scenes": [
+      { "scene_index": 0, "audio_path": "/shared/{project_id}/audio/0_vi.wav", "duration_seconds": 12.5 }
+    ]
+  }
 }
 ```
 
-**Error responses**:
-| Status | Body | Khi nào |
-|---|---|---|
-| 400 | `{"error": "unsupported_language", "supported": ["vi", "en"]}` | `language` không hợp lệ (permanent error, Rendering Service không nên retry) |
-| 502 | `{"error": "tts_engine_failure", "detail": "<message>"}` | Engine TTS lỗi lúc synthesize — crash/timeout (transient error, Rendering Service có thể retry theo compensating action đã thiết kế ở `services.md`) |
+**`synthesis_failed`**:
+```json
+{
+  "payload": {
+    "event_type": "synthesis_failed",
+    "error_message": "string"
+  }
+}
+```
+`error_message` phân biệt permanent (`empty_text`/`unsupported_language` — lỗi input, không nên retry) vs transient (`tts_engine_failure` — Piper lỗi/timeout, Rendering/Orchestrator có thể retry) qua tiền tố trong message, theo đúng phân loại lỗi đã có ở `business-rules.md` (Functional Design) — HTTP status code 400/502 không còn áp dụng (không còn REST), nhưng phân loại permanent/transient vẫn giữ nguyên ý nghĩa cho compensating action ở `services.md`.
 
-## Deprecation Policy
-Theo ADR-0008: version cũ (`/v1/`) được giữ tối thiểu 1 chu kỳ phát triển sau khi version mới (`/v2/`, nếu có) ra mắt. Thông báo qua changelog nội bộ (chỉ 1 client nội bộ — Rendering Service).
+## Delivery Guarantee & Idempotency (ADR-0013)
+At-least-once (kế thừa Unit 1). Inbox (`processed_messages`) dedupe `message_id` bền vững; Outbox (`outbox_events`) ghi event trong cùng transaction với Inbox mark; `OutboxRelay` publish bất đồng bộ (poll ~1s). Idempotency bổ sung ở tầng business logic: `SynthesizeSpeechUseCase` vẫn kiểm tra file `.wav` đã tồn tại trước khi synthesize lại (Business Rule 4, Functional Design — không đổi) — 2 tầng idempotency độc lập (message-level qua Inbox, artifact-level qua file check).
 
-## Correlation/Trace ID Propagation
-- **Inbound**: `router.py` đọc header `X-Saga-ID` từ request, truyền vào `correlation.py` để gắn vào structured logging context cho toàn bộ vòng đời request.
-- **Outbound**: Không có — TTS Service không gọi service nào khác (leaf node, không tham gia RabbitMQ).
+## Correlation ID
+`saga_id` từ envelope AMQP được gắn vào mọi log line qua `adapters/logging/correlation.py`. Không còn header `X-Saga-ID` (không còn REST).
 
 ## Internal Port Contract — `TTSEnginePort` (domain/ports.py)
+**Không đổi**:
 ```python
 class TTSEnginePort(ABC):
     @abstractmethod
@@ -50,5 +62,5 @@ class TTSEnginePort(ABC):
         """Sinh audio tại output_path, trả về duration_seconds."""
 ```
 
-## Note — Contract Extension vs `component-methods.md`
-Contract gốc trong `component-methods.md` (Application Design) là `{ text, language } -> { audio_path, duration_seconds }`. Low-Level Design mở rộng input thành `{ project_id, scene_index, text, language }` để hỗ trợ quy ước đường dẫn shared volume xác định tại Question 5 (idempotency theo `project_id`+`scene_index`, nhất quán với nguyên tắc idempotency toàn hệ thống ở `services.md`). `component-methods.md` cần được cập nhật để phản ánh thay đổi này sau khi Low-Level Design được duyệt.
+## Note — Contract History
+Contract gốc `component-methods.md` (Application Design): `{ text, language } -> { audio_path, duration_seconds }` REST. Sau đó mở rộng thành REST với `{ project_id, scene_index, text, language }` (Low-Level Design ban đầu). Nay (ADR-0014) đổi hẳn sang AMQP batch theo project như mô tả ở trên — `component-methods.md` đã cập nhật theo revision này.

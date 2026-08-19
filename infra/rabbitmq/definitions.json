@@ -18,6 +18,10 @@
       "arguments": { "x-message-ttl": 86400000, "x-dead-letter-exchange": "dlx.direct", "x-dead-letter-routing-key": "content_plugin.commands.dlq" }
     },
     {
+      "name": "tts.commands", "vhost": "/", "durable": true, "auto_delete": false,
+      "arguments": { "x-message-ttl": 86400000, "x-dead-letter-exchange": "dlx.direct", "x-dead-letter-routing-key": "tts.commands.dlq" }
+    },
+    {
       "name": "rendering.commands", "vhost": "/", "durable": true, "auto_delete": false,
       "arguments": { "x-message-ttl": 86400000, "x-dead-letter-exchange": "dlx.direct", "x-dead-letter-routing-key": "rendering.commands.dlq" }
     },
@@ -35,6 +39,7 @@
     },
     { "name": "script_processing.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
     { "name": "content_plugin.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
+    { "name": "tts.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
     { "name": "rendering.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
     { "name": "video_assembly.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} },
     { "name": "publisher.commands.dlq", "vhost": "/", "durable": true, "auto_delete": false, "arguments": {} }
@@ -42,12 +47,14 @@
   "bindings": [
     { "source": "commands.direct", "vhost": "/", "destination": "script_processing.commands", "destination_type": "queue", "routing_key": "script_processing", "arguments": {} },
     { "source": "commands.direct", "vhost": "/", "destination": "content_plugin.commands", "destination_type": "queue", "routing_key": "content_plugin", "arguments": {} },
+    { "source": "commands.direct", "vhost": "/", "destination": "tts.commands", "destination_type": "queue", "routing_key": "tts", "arguments": {} },
     { "source": "commands.direct", "vhost": "/", "destination": "rendering.commands", "destination_type": "queue", "routing_key": "rendering", "arguments": {} },
     { "source": "commands.direct", "vhost": "/", "destination": "video_assembly.commands", "destination_type": "queue", "routing_key": "video_assembly", "arguments": {} },
     { "source": "commands.direct", "vhost": "/", "destination": "publisher.commands", "destination_type": "queue", "routing_key": "publisher", "arguments": {} },
     { "source": "events.direct", "vhost": "/", "destination": "orchestrator.events", "destination_type": "queue", "routing_key": "orchestrator", "arguments": {} },
     { "source": "dlx.direct", "vhost": "/", "destination": "script_processing.commands.dlq", "destination_type": "queue", "routing_key": "script_processing.commands.dlq", "arguments": {} },
     { "source": "dlx.direct", "vhost": "/", "destination": "content_plugin.commands.dlq", "destination_type": "queue", "routing_key": "content_plugin.commands.dlq", "arguments": {} },
+    { "source": "dlx.direct", "vhost": "/", "destination": "tts.commands.dlq", "destination_type": "queue", "routing_key": "tts.commands.dlq", "arguments": {} },
     { "source": "dlx.direct", "vhost": "/", "destination": "rendering.commands.dlq", "destination_type": "queue", "routing_key": "rendering.commands.dlq", "arguments": {} },
     { "source": "dlx.direct", "vhost": "/", "destination": "video_assembly.commands.dlq", "destination_type": "queue", "routing_key": "video_assembly.commands.dlq", "arguments": {} },
     { "source": "dlx.direct", "vhost": "/", "destination": "publisher.commands.dlq", "destination_type": "queue", "routing_key": "publisher.commands.dlq", "arguments": {} }

@@ -1,27 +1,35 @@
 # Module Structure — Unit 3: TTS Service
 
+**Revision (2026-08-07, ADR-0014, ADR-0013)**: `adapters/api/` (FastAPI, REST) thay bằng `adapters/messaging/` (AMQP consumer/producer) — TTS Service không còn REST-only, nay là bước Saga độc lập (ADR-0014). Đồng thời thêm `adapters/persistence/` cho Inbox/Outbox pattern (ADR-0013), theo đúng khuôn mẫu đã dùng ở Unit 2/Unit 4. `domain/`, `application/synthesize_speech.py`, `adapters/tts_engines/`, `adapters/storage/` **không đổi** — business logic (validate, idempotency-by-file, đo duration) độc lập với transport.
+
 ## Layering (Hexagonal / Ports & Adapters — ADR-0002)
 
 ```
 services/tts/
 ├── domain/
-│   ├── ports.py               # TTSEnginePort (abstract interface)
-│   ├── models.py               # SpeechRequest, SpeechResult (value objects, pure Python)
-│   └── errors.py               # Domain-specific exceptions (UnsupportedLanguageError, TTSEngineError)
+│   ├── ports.py               # TTSEnginePort (abstract interface) — không đổi
+│   ├── models.py               # SpeechRequest, SpeechResult (value objects) — không đổi
+│   └── errors.py               # EmptyTextError, UnsupportedLanguageError, TTSEngineError — không đổi
 ├── application/
-│   └── synthesize_speech.py    # SynthesizeSpeechUseCase
+│   └── synthesize_speech.py    # SynthesizeSpeechUseCase — không đổi
+│   └── synthesize_speech_batch.py  # MỚI: SynthesizeSpeechBatchUseCase (fail-fast, mirror Unit 2's ClassifyScenesBatchUseCase)
 ├── adapters/
-│   ├── api/
-│   │   ├── router.py            # FastAPI router, POST /v1/tts/synthesize (ADR-0008)
-│   │   └── schemas.py           # Pydantic request/response models
+│   ├── messaging/               # MỚI — thay adapters/api/
+│   │   ├── consumer.py           # AMQP consumer cho command synthesize_speech (queue tts.commands)
+│   │   └── producer.py           # Envelope builders cho speech_synthesized/synthesis_failed (không publish trực tiếp)
+│   ├── persistence/              # MỚI (ADR-0013, mirror Unit 2/Unit 4)
+│   │   ├── db.py                  # PostgreSQL pool + schema bootstrap
+│   │   ├── inbox.py               # InboxRepository — durable dedupe
+│   │   ├── outbox.py              # OutboxRepository — transactional event enqueue
+│   │   └── relay.py               # OutboxRelay — polling publisher
 │   ├── tts_engines/
-│   │   ├── voice_registry.py    # Static language -> voice model path mapping
-│   │   └── piper_adapter.py     # PiperTTSAdapter implements TTSEnginePort (ADR-0010)
+│   │   ├── voice_registry.py    # Static language -> voice model path mapping — không đổi
+│   │   └── piper_adapter.py     # PiperTTSAdapter implements TTSEnginePort (ADR-0010) — không đổi
 │   ├── storage/
-│   │   └── artifact_paths.py    # Shared-volume path convention helper (project_id/scene_index -> path)
+│   │   └── artifact_paths.py    # Shared-volume path convention helper — không đổi
 │   └── logging/
-│       └── correlation.py       # Correlation ID (X-Saga-ID) injection into log context
-├── main.py                      # Composition root — wiring, FastAPI app
+│       └── correlation.py       # saga_id injection vào log context (từ envelope AMQP, không còn header HTTP)
+├── main.py                      # Composition root — wiring AMQP consumer + OutboxRelay (không còn FastAPI app, trừ health check tối thiểu — xem Infrastructure Design)
 └── tests/
     ├── domain/
     ├── application/
@@ -29,18 +37,14 @@ services/tts/
 ```
 
 ## Dependency Direction
-`adapters/` → `application/` → `domain/`. `domain/` không import bất kỳ thứ gì từ `adapters/` hay `application/`, không import FastAPI/Piper. `application/` chỉ phụ thuộc `domain/` (qua port interface `TTSEnginePort`), không biết chi tiết FastAPI/Piper cụ thể nào. `adapters/tts_engines/piper_adapter.py` implement `domain/ports.py::TTSEnginePort` — cơ chế pluggable cho phép thêm engine khác (Coqui, …) sau này mà không sửa `domain/`/`application/` (ADR-0010).
+Không đổi: `adapters/` → `application/` → `domain/`. `adapters/messaging/consumer.py` gọi `SynthesizeSpeechBatchUseCase` (application layer, phụ thuộc `TTSEnginePort` abstraction) — không biết chi tiết Piper/RabbitMQ/Postgres cụ thể nào.
 
-## Module Responsibilities
+## Module Responsibilities (chỉ liệt kê phần thay đổi/mới — phần còn lại giữ nguyên như trước)
 
 | Module | Responsibility |
 |---|---|
-| `domain/ports.py` | Định nghĩa `TTSEnginePort` (abstract: `synthesize(text: str, language: str, output_path: str) -> float` — trả về `duration_seconds`) |
-| `domain/models.py` | `SpeechRequest` (value object: `project_id`, `scene_index`, `text`, `language`), `SpeechResult` (`audio_path`, `duration_seconds`) |
-| `domain/errors.py` | `UnsupportedLanguageError` (map sang HTTP 400), `TTSEngineError` (map sang HTTP 502) |
-| `application/synthesize_speech.py` | `SynthesizeSpeechUseCase(engine: TTSEnginePort)` — tính đường dẫn artifact (qua `artifact_paths.py`), kiểm tra idempotency (file đã tồn tại → trả kết quả có sẵn), gọi `engine.synthesize(...)` nếu chưa có, trả về `SpeechResult` |
-| `adapters/api/router.py` | FastAPI route `POST /v1/tts/synthesize` — validate input, đọc header `X-Saga-ID`, gọi `SynthesizeSpeechUseCase`, map domain error → HTTP status |
-| `adapters/tts_engines/voice_registry.py` | Static mapping `{"vi": "<piper-vi-model-path>", "en": "<piper-en-model-path>"}`, raise `UnsupportedLanguageError` nếu language không có trong mapping |
-| `adapters/tts_engines/piper_adapter.py` | `PiperTTSAdapter` — implement `TTSEnginePort`, gọi Piper CLI/binding với voice model từ `voice_registry.py`, đo thời lượng file audio sinh ra |
-| `adapters/storage/artifact_paths.py` | Sinh đường dẫn quy ước `/shared/{project_id}/audio/{scene_index}_{language}.wav`, kiểm tra file tồn tại (idempotency) |
-| `adapters/logging/correlation.py` | Đọc header `X-Saga-ID`, đưa vào log context (structured logging) cho mọi log line trong request |
+| `application/synthesize_speech_batch.py` | `SynthesizeSpeechBatchUseCase(single: SynthesizeSpeechUseCase)` — xử lý toàn bộ scene trong 1 project, fail-fast ở scene lỗi đầu tiên (mirror `ClassifyScenesBatchUseCase`, Unit 2) |
+| `adapters/messaging/consumer.py` | Consume `synthesize_speech` (queue `tts.commands`); trong 1 DB transaction: kiểm tra Inbox, gọi `SynthesizeSpeechBatchUseCase`, ghi kết quả vào Outbox (`speech_synthesized`/`synthesis_failed`), mark Inbox — commit, ack |
+| `adapters/messaging/producer.py` | Envelope builders `success_envelope`/`failure_envelope` — publish thực tế do `OutboxRelay` đảm nhiệm |
+| `adapters/persistence/*` | Giống hệt Unit 2/Unit 4 (ADR-0013) — schema `outbox_events`/`processed_messages` |
+| `adapters/logging/correlation.py` | Đọc `saga_id` từ envelope AMQP (không còn header `X-Saga-ID` vì không còn REST) |

@@ -55,14 +55,39 @@ services:
     networks:
       - backend
 
+  tts-db:
+    image: postgres:16-alpine
+    container_name: tts-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: tts
+    volumes:
+      - tts_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d tts"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
   tts:
     build: ./services/tts
     container_name: tts
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@tts-db:5432/tts
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      tts-db:
+        condition: service_healthy
     volumes:
       - shared_artifacts:/shared
     networks:
@@ -72,6 +97,7 @@ volumes:
   rabbitmq_data:
   shared_artifacts:
   content_plugin_db_data:
+  tts_db_data:
 
 networks:
   backend:

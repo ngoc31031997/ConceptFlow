@@ -22,14 +22,16 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 |---|---|
 | `RABBITMQ_USER` | Username đăng nhập RabbitMQ (thay thế `guest` mặc định) |
 | `RABBITMQ_PASS` | Password RabbitMQ |
+| `POSTGRES_USER` | Username cho mọi PostgreSQL instance (database-per-service, ADR-0013) |
+| `POSTGRES_PASS` | Password PostgreSQL |
 
 ## Running the Project
 ```bash
 docker compose up -d
 ```
 - RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
-- Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra
-- TTS Service: nội bộ (`tts:8000` trong docker network), không expose ra host — dùng `docker compose logs tts` hoặc `docker exec` để kiểm tra
+- Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra. DB riêng: `content-plugin-db` (Postgres, Inbox/Outbox — ADR-0013)
+- TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -55,9 +57,9 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   └── rabbitmq/              # Cấu hình topology RabbitMQ (exchange/queue/DLQ)
 ├── services/
 │   ├── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
-│   │                             # domain/ → application/ → adapters/{api,messaging,plugins}/
-│   └── tts/                     # TTS Service (Python/FastAPI, Hexagonal, Piper engine)
-│                                 # domain/ → application/ → adapters/{api,tts_engines,storage,logging}/
+│   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
+│   └── tts/                     # TTS Service (Python, Hexagonal, Piper engine, message-driven — ADR-0014)
+│                                 # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

@@ -1,29 +1,31 @@
 # NFR Design Patterns — Unit 3: TTS Service
 
+**Revision (2026-08-07, ADR-0014, ADR-0013)**: Saga Pattern, Event-Driven Design, and Inbox/Outbox Pattern below are superseded — TTS Service is now message-driven with its own Saga step and PostgreSQL-backed Inbox/Outbox. Resilience/Caching/Idempotency(-by-file) patterns carry over unchanged.
+
 ## CRUD vs CQRS
-**N/A** — Không có database, không có data model nghiệp vụ cần persist ngoài file audio (blob, không phải structured data cần query). Unit hoàn toàn stateless.
+**Revised**: Simple CRUD on `outbox_events`/`processed_messages` (messaging-plumbing tables only, not business data — same as Unit 2/Unit 4, ADR-0013). Audio files remain outside the DB (blob on shared volume, unchanged).
 
 ## Resilience Pattern
-Không retry nội bộ trong TTS Service. Một lần gọi Piper thất bại (crash/timeout sau 60s, theo NFR Requirements) → trả lỗi ngay (`TTSEngineError` → HTTP 502), để Rendering Service (qua Saga compensating action ở `services.md`) quyết định có retry toàn bộ request hay không. Tránh 2 tầng retry chồng lên nhau gây khó đoán tổng thời gian chờ.
+Không retry nội bộ trong TTS Service — không đổi về ý tưởng, chỉ đổi kết quả lỗi: 1 lần gọi Piper thất bại (timeout 60s) → `TTSEngineError` → event `synthesis_failed` (không còn HTTP 502), để Orchestrator (qua Saga compensating action) quyết định retry command `synthesize_speech`.
 
 ## Caching Pattern
-In-process cache (không phải Redis/distributed) cho Piper voice model:
-- **Placement**: biến module-level trong `adapters/tts_engines/piper_adapter.py`, load 1 lần lúc composition root (`main.py`) khởi tạo `PiperTTSAdapter`.
-- **Key design**: `language` (`"vi"`/`"en"`) → voice model instance đã load.
-- **TTL/Invalidation**: Không có — model không đổi trong vòng đời process; đổi model yêu cầu restart service.
-- **Strategy**: Không phải cache-aside/write-through — load eager 1 lần tại startup, không load lazy theo request.
+Không đổi — in-process cache cho Piper voice model, load eager lúc startup.
 
 ## Idempotency Pattern
-Idempotency dựa trên kiểm tra tồn tại file tại đường dẫn shared volume quy ước (`/shared/{project_id}/audio/{scene_index}_{language}.wav`, Functional Design Rule 4). Không cần lock/race-condition handling ở MVP — Rendering Service gọi tuần tự từng scene (không có 2 request trùng `project_id`+`scene_index` đồng thời trong luồng bình thường); nếu race condition hiếm gặp xảy ra, rủi ro tối đa là ghi đè file với nội dung giống hệt (vô hại).
+**Bổ sung 2 tầng** (trước đây chỉ có artifact-level):
+- **Artifact-level** (không đổi): kiểm tra file `.wav` tồn tại tại đường dẫn shared volume trước khi synthesize lại (Business Rule 4).
+- **Message-level** (MỚI, ADR-0013): `InboxRepository` — dedupe `message_id` bền vững qua bảng `processed_messages`, thay cho việc trước đây TTS Service hoàn toàn không cần dedupe message nào (vì không tham gia RabbitMQ).
 
 ## Saga Pattern
-Participant gián tiếp trong bước `render_scenes` (không phải coordinator, không tự publish/consume AMQP event). Không có compensating action — stateless, side-effect duy nhất (ghi file audio) đã idempotent.
+**Superseded — see Revision above.** Participant TRỰC TIẾP cho bước Saga độc lập "Synthesize Speech" (ADR-0014) — publish `speech_synthesized`/`synthesis_failed`. Không có compensating action (không đổi — stateless, side-effect ghi file audio đã idempotent).
 
 ## Event-Driven Design
-**N/A** — Unit 3 không publish/consume event nào (không tham gia RabbitMQ theo `unit-of-work.md`).
+**Superseded.** TTS Service nay consume command `synthesize_speech` (queue `tts.commands`) và publish event `speech_synthesized`/`synthesis_failed` (→ `orchestrator.events`) — là integration event, theo cùng envelope/versioning convention của toàn hệ thống (`messaging-design.md`, Unit 1).
 
 ## Inbox/Outbox Pattern
-**N/A** — Không có database transaction cần đồng bộ với việc publish event (không publish event nào).
+**Superseded.** PostgreSQL-backed (`tts-db`, ADR-0013), giống hệt kiến trúc ở Unit 2/Unit 4:
+- **Outbox**: consumer ghi `speech_synthesized`/`synthesis_failed` vào `outbox_events` trong CÙNG transaction với việc mark Inbox — atomicity giữa "đã xử lý command" và "đã ghi nhận event kết quả."
+- **Relay**: `OutboxRelay` polling task publish event chưa gửi.
 
 ## Security Pattern
-Input validation qua Pydantic schema (FastAPI) cho `project_id`, `scene_index`, `text`, `language`. Không auth/rate-limit riêng — chỉ Rendering Service gọi nội bộ, cùng Docker network (Security Baseline extension tắt).
+**Revised**: Validate input trong domain layer (`SynthesizeSpeechUseCase`, đã có sẵn — không phải Pydantic/FastAPI validation nữa, vì không còn REST). Không auth/rate-limit riêng — chỉ Orchestrator gửi command qua RabbitMQ nội bộ.

@@ -1,24 +1,26 @@
 # NFR Requirements — Unit 3: TTS Service
 
+**Revision (2026-08-07, ADR-0014, ADR-0013)**: Messaging & Saga Participation and Tech Stack sections updated below — TTS is now message-driven with its own Saga step. Performance/Availability/Security/Caching sections carry over unchanged (threadpool + 60s timeout logic lives inside the same `PiperTTSAdapter`, just invoked from an AMQP consumer instead of a FastAPI route handler).
+
 ## Performance
-- Piper synthesis chạy trong threadpool (không block FastAPI async event loop) — route handler định nghĩa `def` thường hoặc dùng `run_in_threadpool` tường minh.
-- Timeout nội bộ cho mỗi lần synthesize: **60 giây**. Nếu vượt timeout → raise `TTSEngineError` → HTTP 502 (theo Business Rule đã thiết kế ở Functional Design), không dựa vào timeout mặc định của HTTP client phía Rendering Service.
-- Piper voice model (`vi`, `en`) được load 1 lần lúc service khởi động, giữ trong memory suốt vòng đời process (xem Caching bên dưới) để giảm latency mỗi request.
+- Piper synthesis chạy trong threadpool (không block asyncio event loop) — không đổi.
+- Timeout nội bộ cho mỗi lần synthesize: **60 giây**. Nếu vượt timeout → raise `TTSEngineError` → mapped thành `synthesis_failed` event (không còn HTTP 502, không còn REST).
+- Piper voice model (`vi`, `en`) được load 1 lần lúc service khởi động — không đổi.
 
 ## Availability
-Chấp nhận unavailability tạm thời — không cần multi-instance/failover (nhất quán toàn hệ thống, local Docker single-machine). Nếu TTS Service down khi Rendering Service gọi, lỗi connection propagate thành `rendering_failed` → Orchestrator cho phép retry theo compensating action đã thiết kế (`services.md`).
+Chấp nhận unavailability tạm thời — không cần multi-instance/failover (không đổi). Nếu TTS Service down khi Orchestrator gửi command, message ở lại queue `tts.commands` (RabbitMQ durability) cho tới khi service khởi động lại — khác với REST trước đây (nơi lỗi connection ngay lập tức propagate thành `rendering_failed`); nay Orchestrator có thể set timeout riêng cho bước Saga để phát hiện TTS Service không phản hồi.
 
 ## Security
-Validate input qua Pydantic schema (FastAPI mặc định). Không cần auth/rate-limit riêng — chỉ Rendering Service (nội bộ, cùng Docker network) gọi tới, không expose ra ngoài (Security Baseline extension đã tắt theo `aidlc-state.md`).
+Validate input trong `SynthesizeSpeechUseCase` (không đổi — domain error, không phải Pydantic/FastAPI validation nữa). Không cần auth/rate-limit — chỉ Orchestrator (nội bộ, qua RabbitMQ) gửi command.
 
 ## Messaging & Event Participation
-N/A — Unit 3 không tham gia RabbitMQ (xác nhận từ `unit-of-work.md`), chỉ REST.
+**Revised**: Consumer của `synthesize_speech` (queue `tts.commands`), producer của `speech_synthesized`/`synthesis_failed` (→ `orchestrator.events`, qua Outbox). Kế thừa delivery guarantee at-least-once từ Unit 1; idempotency 2 tầng — message-level (Inbox, ADR-0013) + artifact-level (file check, Business Rule 4, không đổi).
 
 ## Distributed Transaction Participation (Saga)
-**Vai trò**: Participant gián tiếp trong bước `render_scenes` — không phải Saga coordinator, không tự publish/consume AMQP event; chỉ là 1 REST call bên trong logic của Rendering Service. **Compensating action**: Không cần — stateless, side-effect duy nhất (ghi file audio) đã idempotent (Business Rule 4, Functional Design), nên retry bước `render_scenes` không cần rollback gì ở TTS Service.
+**Revised — vai trò**: **Participant trực tiếp** cho bước Saga độc lập "Synthesize Speech" (ADR-0014) — không còn "gián tiếp bên trong render_scenes". **Compensating action**: Vẫn không cần rollback (stateless, side-effect ghi file audio đã idempotent) — nhưng nay Orchestrator TỰ retry command `synthesize_speech` (thay vì Rendering Service tự quyết định retry REST call như trước).
 
 ## Caching Requirements
-Piper voice model (`vi`, `en`) load 1 lần lúc khởi động (composition root `main.py`), giữ in-memory suốt vòng đời process. Không cần cache tầng nào khác — idempotency qua file audio đã có (Functional Design) đủ để tránh tính toán lại.
+Không đổi — Piper voice model in-memory, load 1 lần lúc khởi động.
 
 ## Tech Stack Consistency
-Xác nhận Python 3.12 + FastAPI, khớp `technology-direction.md` và ADR-0009 (ràng buộc thư viện TTS Python-first). Không lệch hướng cho unit này.
+**Revised**: Python 3.12 (không đổi, ADR-0009). FastAPI KHÔNG còn cần thiết cho luồng chính (không còn REST) — có thể giữ lại tối thiểu cho `/health` endpoint (quyết định cụ thể ở Infrastructure Design) hoặc bỏ hẳn, dùng health check kiểu khác (vd. script kiểm tra kết nối RabbitMQ/Postgres). `aio-pika` + `asyncpg` thêm vào tech stack (mirror Unit 2/Unit 4).
