@@ -1,6 +1,8 @@
 # Component Dependency
 
-**Cập nhật theo ADR-0007**: Orchestrator Service + RabbitMQ thêm vào graph; các service nghiệp vụ nay phụ thuộc RabbitMQ thay vì gọi trực tiếp REST tới Gateway/nhau (trừ Rendering↔TTS và các luồng REST ngoài Saga).
+**Cập nhật theo ADR-0007**: Orchestrator Service + RabbitMQ thêm vào graph; các service nghiệp vụ nay phụ thuộc RabbitMQ thay vì gọi trực tiếp REST tới Gateway/nhau (trừ các luồng REST ngoài Saga).
+
+**Revision (2026-08-07, ADR-0014)**: Rendering↔TTS REST (dòng/edge dưới đây) đã bị loại bỏ — TTS Service nay message-driven hoàn toàn qua RabbitMQ, không còn ngoại lệ REST nào trong phạm vi Saga.
 
 ## Dependency Matrix
 
@@ -16,7 +18,7 @@
 | Rendering Service | RabbitMQ | AMQP (consume command / publish event) |
 | Video Assembly Service | RabbitMQ | AMQP (consume command / publish event) |
 | Publisher Service | RabbitMQ | AMQP (consume command / publish event) |
-| Rendering Service | TTS Service | REST (sync, nội bộ trong phạm vi bước Saga "Render") |
+| TTS Service | RabbitMQ | AMQP (consume command / publish event) — ADR-0014 |
 | Rendering Service | Shared Docker Volume | File I/O (ghi animation clip) |
 | TTS Service | Shared Docker Volume | File I/O (ghi audio clip) |
 | Video Assembly Service | Shared Docker Volume | File I/O (đọc clip, ghi video hoàn chỉnh) |
@@ -49,10 +51,10 @@ flowchart TB
     MQ <-->|AMQP| SP
     MQ <-->|AMQP| CP
     MQ <-->|AMQP| RD
+    MQ <-->|AMQP| TTS
     MQ <-->|AMQP| VA
     MQ <-->|AMQP| PB
 
-    RD -->|REST| TTS
     RD -.->|write| VOL
     TTS -.->|write| VOL
     VA -.->|read/write| VOL
@@ -68,5 +70,4 @@ flowchart TB
 - Không có dependency vòng (circular dependency) giữa các service.
 - **RabbitMQ là điểm phụ thuộc chung** của Orchestrator và mọi service nghiệp vụ trong Saga — đây là điểm hạ tầng quan trọng nhất cần đảm bảo hoạt động ổn định (single point of failure tiềm ẩn dù chạy local; cần cấu hình restart policy trong docker-compose).
 - Content Plugin Service có 2 kiểu giao tiếp khác nhau: REST trực tiếp từ Gateway (`GET /plugins`, ngoài Saga) và AMQP command từ Orchestrator (`classify_scenes`, trong Saga) — cần lưu ý khi thiết kế service này để tách rõ 2 luồng.
-- Rendering Service ↔ TTS Service vẫn giữ REST đồng bộ (không qua MQ) vì đây là tương tác nội bộ trong phạm vi thực thi 1 bước Saga, không phải ranh giới giữa các bước.
 - Shared Docker Volume là "dependency ngầm" giữa Rendering/TTS/Video Assembly/Publisher — có thể thay bằng object storage (S3/MinIO) sau này (theo Application Design Q1) mà không ảnh hưởng domain core (Hexagonal).

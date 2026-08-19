@@ -2,6 +2,8 @@
 
 **Cập nhật theo ADR-0007**: Orchestration được tách khỏi API Gateway sang Orchestrator Service riêng, giao tiếp với service nghiệp vụ qua Message Queue (RabbitMQ) theo mô hình Saga orchestration-based.
 
+**Revision (2026-08-07, ADR-0014)**: Rendering ↔ TTS REST đồng bộ (dòng dưới đây) đã bị loại bỏ — TTS Service nay là bước Saga độc lập ("Synthesize Speech"), message-driven hoàn toàn qua RabbitMQ, không còn bất kỳ tương tác trực tiếp nào giữa Rendering Service và TTS Service.
+
 ## Integration Points
 
 | From | To | Style | Protocol | Purpose |
@@ -10,21 +12,19 @@
 | GUI | API Gateway | Asynchronous (server push) | SSE | Cập nhật tiến trình render/publish real-time |
 | API Gateway | Orchestrator Service | Synchronous (khởi tạo) | REST/HTTP+JSON | Khởi chạy 1 Saga (render pipeline hoặc publish) |
 | API Gateway | Content Plugin Service | Synchronous | REST/HTTP+JSON | Truy vấn danh sách plugin (không thuộc luồng Saga) |
-| Orchestrator Service | Content Plugin Service, Script Processing Service, Rendering Service, TTS Service (qua Rendering), Video Assembly Service, Publisher Service | Asynchronous | Message Queue (RabbitMQ) — command message | Gửi lệnh thực hiện từng bước Saga |
-| Content Plugin Service, Script Processing Service, Rendering Service, Video Assembly Service, Publisher Service | Orchestrator Service | Asynchronous | Message Queue (RabbitMQ) — event message | Xác nhận hoàn tất/lỗi từng bước, dùng để Orchestrator quyết định bước tiếp theo hoặc kích hoạt compensating action |
-| Rendering Service | TTS Service | Synchronous | REST/HTTP+JSON | Yêu cầu sinh audio giọng đọc cho từng scene (nội bộ trong phạm vi 1 bước Saga "Render") |
+| Orchestrator Service | Content Plugin Service, Script Processing Service, Rendering Service, TTS Service, Video Assembly Service, Publisher Service | Asynchronous | Message Queue (RabbitMQ) — command message | Gửi lệnh thực hiện từng bước Saga |
+| Content Plugin Service, Script Processing Service, Rendering Service, TTS Service, Video Assembly Service, Publisher Service | Orchestrator Service | Asynchronous | Message Queue (RabbitMQ) — event message | Xác nhận hoàn tất/lỗi từng bước, dùng để Orchestrator quyết định bước tiếp theo hoặc kích hoạt compensating action |
 | Publisher Service | YouTube Data API | Synchronous | HTTPS/OAuth 2.0 | Xác thực và upload video |
 
 ## Communication Style Rationale
 - **GUI ↔ Gateway**: đồng bộ REST cho thao tác cấu hình; SSE một chiều cho tiến trình.
 - **Gateway ↔ Orchestrator**: đồng bộ REST chỉ để khởi tạo Saga (nhận `saga_id`/`project_id` ngay lập tức); tiến trình sau đó được theo dõi qua event.
-- **Orchestrator ↔ Service nghiệp vụ**: **bất đồng bộ qua Message Queue** — quyết định thay đổi so với thiết kế ban đầu (ADR-0005, đã bị supersede) theo yêu cầu người dùng, nhằm: (1) không chặn Orchestrator khi Rendering Service xử lý lâu, (2) đảm bảo command không mất khi 1 service tạm thời down, (3) hỗ trợ retry tự nhiên qua cơ chế requeue/dead-letter của RabbitMQ.
-- **Rendering ↔ TTS**: vẫn giữ đồng bộ REST vì đây là tương tác nội bộ trong phạm vi thực thi 1 bước Saga (Rendering Service chủ động cần audio ngay để đồng bộ timing animation), không phải ranh giới giữa các bước Saga.
+- **Orchestrator ↔ Service nghiệp vụ**: **bất đồng bộ qua Message Queue** cho MỌI service nghiệp vụ, kể cả TTS Service (ADR-0014) — quyết định thay đổi so với thiết kế ban đầu (ADR-0005, đã bị supersede), nhằm: (1) không chặn Orchestrator khi 1 bước xử lý lâu, (2) đảm bảo command không mất khi 1 service tạm thời down, (3) hỗ trợ retry tự nhiên qua cơ chế requeue/dead-letter của RabbitMQ, (4) mỗi bước là 1 sự kiện độc lập, quan sát/lưu trữ được (hỗ trợ mục tiêu Orchestrator persist kết quả từng bước).
 
 ## Orchestration Pattern: Saga (Orchestration-based)
 Xem ADR-0007 cho phân tích đầy đủ. Tóm tắt:
 - **Orchestrator Service** là Saga coordinator duy nhất — biết toàn bộ định nghĩa các bước và thứ tự.
-- **Saga Steps** (luồng Render): `ParseScript → ClassifyScenes (Content Plugin) → RenderScenes (Rendering + TTS nội bộ) → AssembleVideo → (kết thúc: ready_to_publish)`
+- **Saga Steps** (luồng Render, ADR-0014): `ParseScript → ClassifyScenes (Content Plugin) → SynthesizeSpeech (TTS) → RenderScenes (Rendering, animation-only) → AssembleVideo → (kết thúc: ready_to_publish)`
 - **Saga Steps** (luồng Publish): `AuthenticateYouTube (nếu chưa) → UploadVideo (Publisher) → (kết thúc: published)`
 - **Compensating Actions** (ví dụ, chi tiết hóa ở Low-Level Design):
   - Nếu `RenderScenes` thất bại giữa chừng → giữ scene đã render thành công, đánh dấu scene lỗi, cho phép retry chỉ scene đó (không cần compensating xóa dữ liệu vì animation clip hợp lệ không cần rollback)

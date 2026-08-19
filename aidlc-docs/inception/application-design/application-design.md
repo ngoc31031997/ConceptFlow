@@ -8,7 +8,7 @@
 → Chi tiết: `components.md`
 
 ## 2. Component Methods (API Contracts & Message Schemas)
-GUI↔Gateway và Gateway↔Orchestrator dùng REST; Orchestrator↔Service nghiệp vụ dùng **RabbitMQ command/event message**; Rendering↔TTS vẫn REST nội bộ.
+GUI↔Gateway và Gateway↔Orchestrator dùng REST; Orchestrator↔Service nghiệp vụ dùng **RabbitMQ command/event message** cho mọi service, kể cả TTS (ADR-0014 — không còn ngoại lệ Rendering↔TTS REST).
 → Chi tiết: `component-methods.md`
 
 ## 3. Services (Orchestration)

@@ -11,8 +11,7 @@
 | GUI ↔ Backend (tiến trình render) | Server-Sent Events (SSE) | Phù hợp luồng cập nhật một chiều (server → client) cho tiến trình render dài hạn, đơn giản hơn WebSocket cho use case một chiều này |
 | TTS Engine | Mã nguồn mở/offline (vd. Coqui TTS, Piper) | Theo quyết định tại requirements.md (NFR: không dùng TTS cloud trả phí) |
 | Video Assembly | ffmpeg (qua Python binding) | Công cụ chuẩn để ghép video/audio, tương thích tốt với output Manim |
-| Inter-service Communication (Orchestrator ↔ Services) | Message Queue — RabbitMQ | Theo ADR-0007 (thay thế quyết định REST đồng bộ ban đầu tại ADR-0005, đã supersede): hỗ trợ Saga orchestration-based, command/event message durable, retry qua requeue/dead-letter |
-| Inter-service Communication (nội bộ 1 bước Saga, vd. Rendering↔TTS) | REST (HTTP/JSON) đồng bộ | Tương tác trong phạm vi thực thi 1 bước, không phải ranh giới giữa các bước Saga |
+| Inter-service Communication (Orchestrator ↔ Services) | Message Queue — RabbitMQ | Theo ADR-0007 (thay thế quyết định REST đồng bộ ban đầu tại ADR-0005, đã supersede): hỗ trợ Saga orchestration-based, command/event message durable, retry qua requeue/dead-letter. **Revision (ADR-0014)**: áp dụng cho MỌI service nghiệp vụ, kể cả TTS Service — không còn ngoại lệ REST nội bộ nào giữa Rendering↔TTS |
 | API Gateway | Reverse proxy/gateway nhẹ (vd. FastAPI gateway service hoặc Traefik) | Định tuyến request từ GUI đến đúng backend service/Orchestrator, gộp luồng SSE tiến trình render |
 | Orchestration | Orchestrator Service riêng biệt (Python/FastAPI + Saga coordinator logic) | Theo ADR-0007: tách trách nhiệm điều phối Saga khỏi API Gateway |
 | Containerization | Docker + docker-compose | Yêu cầu bắt buộc (FR8.1) — toàn bộ hệ thống chạy qua 1 lệnh trên máy cá nhân |

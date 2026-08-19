@@ -743,6 +743,14 @@
 
 ---
 
+## Cross-Cutting Retrofit: Missed Documentation Cleanup (ADR-0014)
+**Timestamp**: 2026-08-07T14:00:00Z
+**User Input**: "ok" (continuing to Unit 5)
+**AI Response**: "Before starting Unit 5, discovered the ADR-0014 retrofit (TTS Service message-driven) had missed several Inception documents still describing the old Rendering↔TTS synchronous REST design: components.md, integration-boundaries.md, technology-direction.md, application-design.md, component-dependency.md (including its dependency table and mermaid diagram). Updated all five with revision notes and corrected diagrams/tables to reflect TTS Service as a fully message-driven Saga step with no direct Rendering coupling."
+**Context**: CONSTRUCTION - Documentation Cleanup -> Unit 5 Low-Level Design
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"

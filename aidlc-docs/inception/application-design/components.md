@@ -36,8 +36,8 @@ Mỗi component dưới đây tương ứng 1 microservice độc lập (đóng 
 
 ## 7. Rendering Service
 - **Purpose**: Sinh animation Manim từ cấu trúc scene.
-- **Responsibilities**: Nhận command `render_scenes` từ Orchestrator qua RabbitMQ; render animation cho từng scene (code highlight, thuật toán, khái niệm lập trình); gọi TTS Service qua REST (đồng bộ, nội bộ trong phạm vi bước Saga này) để lấy audio, đồng bộ thời lượng animation với audio; ghi animation clip vào shared volume; publish event tiến trình theo từng scene (`scene_rendered`) và event hoàn tất/lỗi (`rendering_completed`/`rendering_failed`).
-- **Interface**: Consumer/Producer trên RabbitMQ; REST client của TTS Service.
+- **Responsibilities**: Nhận command `render_scenes` từ Orchestrator qua RabbitMQ; render animation cho từng scene (code highlight, thuật toán, khái niệm lập trình); đồng bộ thời lượng animation với audio đã sinh sẵn (từ bước Saga "Synthesize Speech" riêng — ADR-0014, KHÔNG còn tự gọi TTS Service); ghi animation clip vào shared volume; publish event tiến trình theo từng scene (`scene_rendered`) và event hoàn tất/lỗi (`rendering_completed`/`rendering_failed`).
+- **Interface**: Consumer/Producer trên RabbitMQ. **Revision (2026-08-07, ADR-0014)**: không còn REST client của TTS Service — audio đã có sẵn từ bước Saga trước, truyền vào qua payload của `render_scenes`.
 
 ## 8. TTS Service
 - **Purpose**: Sinh giọng đọc từ lời thoại.
