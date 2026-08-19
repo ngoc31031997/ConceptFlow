@@ -93,11 +93,48 @@ services:
     networks:
       - backend
 
+  script-processing-db:
+    image: postgres:16-alpine
+    container_name: script-processing-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: script_processing
+    volumes:
+      - script_processing_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d script_processing"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  script-processing:
+    build: ./services/script-processing
+    container_name: script-processing
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@script-processing-db:5432/script_processing
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      script-processing-db:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:
   content_plugin_db_data:
   tts_db_data:
+  script_processing_db_data:
 
 networks:
   backend:

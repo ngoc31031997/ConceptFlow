@@ -32,6 +32,7 @@ docker compose up -d
 - RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
 - Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra. DB riêng: `content-plugin-db` (Postgres, Inbox/Outbox — ADR-0013)
 - TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
+- Script Processing Service: message-driven qua RabbitMQ (queue `script_processing.commands`), không có port HTTP nào — dùng `docker compose logs script-processing`. DB riêng: `script-processing-db` (Postgres, Inbox/Outbox — ADR-0013)
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -40,11 +41,10 @@ cd services/content-plugin
 pip install -r requirements-dev.txt
 pytest -q
 ```
-Tương tự cho TTS Service:
+Tương tự cho TTS Service và Script Processing Service:
 ```bash
-cd services/tts
-pip install -r requirements-dev.txt
-pytest -q
+cd services/tts && pip install -r requirements-dev.txt && pytest -q
+cd services/script-processing && pip install -r requirements-dev.txt && pytest -q
 ```
 Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
@@ -58,8 +58,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 ├── services/
 │   ├── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
 │   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
-│   └── tts/                     # TTS Service (Python, Hexagonal, Piper engine, message-driven — ADR-0014)
-│                                 # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
+│   ├── tts/                     # TTS Service (Python, Hexagonal, Piper engine, message-driven — ADR-0014)
+│   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
+│   └── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
+│                                 # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

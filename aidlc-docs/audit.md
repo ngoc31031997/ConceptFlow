@@ -711,6 +711,38 @@
 
 ---
 
+## Construction - Unit 4 - Code Generation Plan Presented
+**Timestamp**: 2026-08-07T13:20:00Z
+**User Input**: N/A
+**AI Response**: "Created script-processing-service-code-generation-plan.md with 14 steps (domain, application, business logic tests, Markdown parser + tests, persistence layer reused from Unit 2/3, logging, messaging layer + tests, composition root, docs, deployment artifacts). Coding standards matching Unit 2/3, awaiting approval."
+**Context**: CONSTRUCTION - Unit 4 - Code Generation - Planning
+
+---
+
+## Construction - Unit 4 - Code Generation Plan Approved
+**Timestamp**: 2026-08-07T13:22:00Z
+**User Input**: "ok"
+**AI Response**: "User approved code generation plan for Unit 4. Proceeding to Part 2: Generation."
+**Context**: CONSTRUCTION - Unit 4 - Code Generation - Planning -> Generation
+
+---
+
+## Construction - Unit 4 - Code Generation Executed (awaiting approval)
+**Timestamp**: 2026-08-07T13:45:00Z
+**User Input**: N/A
+**AI Response**: "Generated full Script Processing Service under services/script-processing/ (domain, application, adapters/{parsing,messaging,persistence,logging}, main.py). MarkdownScriptParser implements the full grammar from business-rules.md (sequential numbering, optional illustration_hint, single code fence, fail-fast). Persistence layer (db/inbox/outbox/relay) copied verbatim from Unit 2/3 (ADR-0013, no service-specific differences). 27 unit tests written and passing; re-verified alongside content-plugin (24) and tts (22) — 73 tests total across all three services, all passing under Python 3.12 via Docker, ruff clean. Added script-processing + script-processing-db to root docker-compose.yml (validated via docker compose config). Updated root README.md and unit code README. All 14 plan steps marked [x]. Presented completion message; per git policy, changes remain uncommitted until explicit approval."
+**Context**: CONSTRUCTION - Unit 4 - Code Generation
+
+---
+
+## Construction - Unit 4 - Code Generation Approved (Unit 4 COMPLETE)
+**Timestamp**: 2026-08-07T13:50:00Z
+**User Input**: "ok"
+**AI Response**: "User approved Code Generation for Unit 4 (Script Processing Service). Unit 4 fully complete (Low-Level Design, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation all approved). Proceeding to Unit 5: Rendering Service."
+**Context**: CONSTRUCTION - Unit 4 COMPLETE -> Unit 5
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
