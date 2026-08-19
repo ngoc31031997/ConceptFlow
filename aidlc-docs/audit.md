@@ -639,6 +639,30 @@
 
 ---
 
+## Construction - Unit 4 - NFR Requirements Questions Presented
+**Timestamp**: 2026-08-07T12:25:00Z
+**User Input**: N/A
+**AI Response**: "Created script-processing-service-nfr-requirements-plan.md with 6 questions: tech stack (Python, no FastAPI, mirrors Unit 3 post-retrofit), performance (no threadpool needed, parsing is lightweight), availability, security, messaging/Saga participation (direct participant, first Saga step), caching (N/A). Awaiting user answers."
+**Context**: CONSTRUCTION - Unit 4 - NFR Requirements - Planning
+
+---
+
+## Construction - Unit 4 - NFR Requirements Generated
+**Timestamp**: 2026-08-07T12:30:00Z
+**User Input**: "ok fo (Q1-Q6 all A)"
+**AI Response**: "No ambiguities. Generated nfr-requirements.md and tech-stack-decisions.md (Python 3.12, no FastAPI, aio-pika + asyncpg, mirrors Unit 2/3 post-retrofit). Presented completion message requesting approval to proceed to NFR Design."
+**Context**: CONSTRUCTION - Unit 4 - NFR Requirements
+
+---
+
+## Construction - Unit 4 - NFR Requirements Approved
+**Timestamp**: 2026-08-07T12:35:00Z
+**User Input**: "ok"
+**AI Response**: "User approved NFR Requirements for Unit 4. Proceeding to NFR Design."
+**Context**: CONSTRUCTION - Unit 4 - NFR Requirements -> NFR Design
+
+---
+
 ## Construction - Unit 4 - Low-Level Design Answers Received & Generated
 **Timestamp**: 2026-08-07T09:20:00Z
 **User Input**: "Q1-Q3:A, Q4:B, Q5-Q9:A; plus cross-cutting request: persist all pipeline step data to a DB, reusable across retries, visible in GUI"
