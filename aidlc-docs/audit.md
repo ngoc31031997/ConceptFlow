@@ -922,3 +922,27 @@
 **Context**: Construction Phase, Unit 6, Low-Level Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 6 (Video Assembly Service): Functional Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of Low-Level Design)
+**AI Response**: Logged LLD approval, committed (da3a0dd). Created functional design plan at aidlc-docs/construction/plans/video-assembly-service-functional-design-plan.md with 6 clarifying questions (input validation strategy, scene ordering guarantee, codec assumptions, background music volume rules, VideoAssemblyResult fields, single-scene edge case).
+**Context**: Construction Phase, Unit 6, Functional Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 6 (Video Assembly Service): Functional Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: Q1=A (zero trust), Q2="zero trust giúp tôi" -> follow-up AskUserQuestion -> "Thêm scene_index tường minh (Recommended)", Q3="còn cách nào an toàn hiệu quả hơn ko" -> follow-up AskUserQuestion -> "Pre-check bằng ffprobe (Recommended)", Q4=A, Q5=A, Q6=A
+**AI Response**: Resolved ambiguous answers to Q2/Q3 via AskUserQuestion follow-up. This changed the already-approved Low-Level Design: payload changed from parallel scene_clip_paths/scene_audio_paths arrays to scenes: list[{scene_index, clip_path, audio_path}]; added InvalidSceneIndexError and InconsistentMediaFormatError; added MediaFormatInspector (ffprobe pre-check) module. Updated interface-contracts.md, module-structure.md, sequence-flows.md under video-assembly-service/low-level-design/ with Revision notes (mirrors prior mid-stream revision pattern, e.g. Scene.code_language gap fix during Unit 5). Generated business-logic-model.md, business-rules.md, domain-entities.md under video-assembly-service/functional-design/.
+**Context**: Construction Phase, Unit 6, Functional Design stage, Steps 5-6 (ambiguity resolution + artifact generation)
+
+---
+
+## Unit 6 (Video Assembly Service): Functional Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design approved. Proceeding to NFR Requirements stage.
+**Context**: Construction Phase, Unit 6, Functional Design stage, Step 8-9 (approval)
+
+---

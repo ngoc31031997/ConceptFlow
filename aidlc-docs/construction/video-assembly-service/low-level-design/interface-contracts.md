@@ -3,7 +3,7 @@
 ## AMQP Consumer: command `assemble_video`
 Queue: `video_assembly.commands`. Dispatched bởi Orchestrator sau khi nhận `rendering_completed` (cung cấp `scene_clip_paths`) — background music path, nếu Creator chọn, đến từ dữ liệu project (ngoài phạm vi Unit 6, ghi nhận như input có sẵn).
 
-**Command payload**:
+**Command payload** (**Revision, Functional Design Question 2**: đổi từ 2 mảng path song song sang 1 mảng object có `scene_index` tường minh — zero trust, không tin tưởng thứ tự mảng đến từ Orchestrator):
 ```json
 {
   "message_id": "uuid",
@@ -12,13 +12,15 @@ Queue: `video_assembly.commands`. Dispatched bởi Orchestrator sau khi nhận `
   "schema_version": "1.0",
   "timestamp": "ISO-8601",
   "payload": {
-    "scene_clip_paths": ["/shared/{project_id}/animations/0.mp4", "/shared/{project_id}/animations/1.mp4"],
-    "scene_audio_paths": ["/shared/{project_id}/audio/0.wav", "/shared/{project_id}/audio/1.wav"],
+    "scenes": [
+      { "scene_index": 0, "clip_path": "/shared/{project_id}/animations/0.mp4", "audio_path": "/shared/{project_id}/audio/0.wav" },
+      { "scene_index": 1, "clip_path": "/shared/{project_id}/animations/1.mp4", "audio_path": "/shared/{project_id}/audio/1.wav" }
+    ],
     "background_music_path": "/shared/{project_id}/music/bg.mp3 | null"
   }
 }
 ```
-`scene_clip_paths`/`scene_audio_paths` được sắp theo `scene_index` tăng dần (đảm bảo bởi Orchestrator, khớp thứ tự scene gốc).
+`FfmpegVideoAssembler` tự sort `scenes` theo `scene_index` tăng dần trước khi mux/concat (không tin tưởng thứ tự mảng đến sẵn từ Orchestrator) — validate không thiếu/trùng `scene_index` (dãy liên tục từ 0), xem `business-rules.md` (Functional Design).
 
 ## AMQP Producer: events
 Publish tới `orchestrator.events` (qua Outbox + `OutboxRelay`, ADR-0013).
@@ -65,6 +67,8 @@ class VideoAssemblerPort(ABC):
 Đọc từ biến môi trường `ASSEMBLY_TIMEOUT_SECONDS` (mặc định 180s = 3 phút, áp dụng cho toàn bộ chuỗi mux+concat+overlay). Vượt timeout → `AssemblyEngineError` → `assembly_failed`.
 
 ## Error Classification (Question 8)
-- `MissingArtifactError` (1 trong `scene_clip_paths`/`scene_audio_paths` không tồn tại trên shared volume khi bắt đầu xử lý) → `assembly_failed` với `error_message` mô tả file thiếu.
+- `MissingArtifactError` (1 trong `clip_path`/`audio_path`/`background_music_path` không tồn tại trên shared volume khi bắt đầu xử lý) → `assembly_failed` với `error_message` mô tả file thiếu.
+- `InvalidSceneIndexError` (**Revision, Functional Design Question 2**: `scene_index` bị thiếu/trùng trong dãy liên tục từ 0) → `assembly_failed` với `error_message` mô tả index sai.
+- `InconsistentMediaFormatError` (**Revision, Functional Design Question 3**: ffprobe pre-check phát hiện codec/resolution/framerate không đồng nhất giữa các animation clip) → `assembly_failed` với `error_message` liệt kê scene lệch chuẩn.
 - `AssemblyEngineError` (ffmpeg exit code khác 0, hoặc timeout) → `assembly_failed` với `error_message` chứa stderr ffmpeg rút gọn (dòng cuối cùng, đủ để chẩn đoán).
 - Toàn bộ lỗi coi là transient — Orchestrator retry theo compensating action đã duyệt ở `services.md`: "giữ animation/audio clip, retry chỉ bước Assembly" (input không bị xoá dù `assemble_video` lỗi).

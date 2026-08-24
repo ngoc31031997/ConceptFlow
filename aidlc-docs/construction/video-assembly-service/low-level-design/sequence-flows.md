@@ -1,5 +1,7 @@
 # Sequence Flows — Unit 6: Video Assembly Service
 
+**Revision (Functional Design Question 2/3)**: payload đổi từ 2 mảng path song song sang `scenes: list[{scene_index, clip_path, audio_path}]`; `FfmpegVideoAssembler` sort theo `scene_index` + ffprobe pre-check TRƯỚC bước mux (xem Flow 1, bước "sort + ffprobe pre-check").
+
 ## Flow 1: Successful Assembly, No Background Music (2 scenes)
 
 ```mermaid
@@ -24,6 +26,8 @@ sequenceDiagram
     FS-->>UC: not found
     UC->>ASM: assemble(request, output_path) — trong ThreadPoolExecutor
 
+    ASM->>ASM: sort scenes theo scene_index + validate dãy liên tục (InvalidSceneIndexError nếu sai)
+    ASM->>FS: ffprobe pre-check codec/resolution/framerate mỗi clip (InconsistentMediaFormatError nếu lệch)
     ASM->>FS: mux scene 0 (animation+audio) -> _tmp/scene_0_muxed.mp4
     ASM->>FS: mux scene 1 (animation+audio) -> _tmp/scene_1_muxed.mp4
     ASM->>FS: concat demuxer (scene_0_muxed, scene_1_muxed) -c copy -> final.mp4
