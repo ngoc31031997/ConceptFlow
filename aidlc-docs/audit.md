@@ -946,3 +946,27 @@
 **Context**: Construction Phase, Unit 6, Functional Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 6 (Video Assembly Service): NFR Requirements Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of Functional Design)
+**AI Response**: Logged Functional Design approval, committed (195506a). Created NFR requirements plan at aidlc-docs/construction/plans/video-assembly-service-nfr-requirements-plan.md with 7 clarifying questions (tech stack, performance/timeout, disk I/O, availability, security, messaging/saga participation, caching).
+**Context**: Construction Phase, Unit 6, NFR Requirements stage, Step 4 (Store Plan)
+
+---
+
+## Unit 6 (Video Assembly Service): NFR Requirements
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: Q1="A nhưng cũng cần inbox outbox pattern", Q2-Q7=A
+**AI Response**: Generated nfr-requirements.md and tech-stack-decisions.md under video-assembly-service/nfr-requirements/. Tech stack: Python 3.12 + ffmpeg/ffprobe (subprocess) + asyncpg (Postgres Inbox/Outbox, ADR-0013, explicitly confirmed per user) + aio-pika. No new ADR needed (ffmpeg/asyncpg/aio-pika are direct consequences of existing ADR-0009/ADR-0013/technology-direction.md, not new competing trade-offs).
+**Context**: Construction Phase, Unit 6, NFR Requirements stage, Step 6 (artifact generation)
+
+---
+
+## Unit 6 (Video Assembly Service): NFR Requirements Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design stage.
+**Context**: Construction Phase, Unit 6, NFR Requirements stage, Step 8-9 (approval)
+
+---
