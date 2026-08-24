@@ -900,3 +900,25 @@
 **Context**: CONSTRUCTION - Unit 5 COMPLETE -> Unit 6 (next session)
 
 ---
+
+## Unit 6 (Video Assembly Service): Low-Level Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Created low-level design plan at aidlc-docs/construction/plans/video-assembly-service-low-level-design-plan.md with 10 clarifying questions (layering, DI, ffmpeg invocation, per-scene merge+concat strategy, music ducking, execution model, idempotency, error handling, state management, batch semantics), embedding suggested defaults consistent with Units 2-5 patterns.
+**Context**: Construction Phase, Unit 6, Low-Level Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 6 (Video Assembly Service): Low-Level Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "go"
+**AI Response**: All 10 plan questions answered "A" (defaults accepted). Generated module-structure.md, dependency-injection.md, interface-contracts.md, sequence-flows.md under aidlc-docs/construction/video-assembly-service/low-level-design/. Key decisions: Hexagonal layering with single VideoAssemblerPort (no plugin registry, unlike Unit 5); ffmpeg via subprocess CLI; 2-step mux-then-concat strategy with -c copy to avoid re-encoding video; background music ducking at fixed 20% volume; ThreadPoolExecutor + 180s default timeout (ASSEMBLY_TIMEOUT_SECONDS env var); artifact-level idempotency on final.mp4; single event per command (no per-scene progress, unlike Unit 5).
+**Context**: Construction Phase, Unit 6, Low-Level Design stage, Steps 6-9
+
+## Unit 6 (Video Assembly Service): Low-Level Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Low-Level Design approved. Proceeding to Functional Design stage.
+**Context**: Construction Phase, Unit 6, Low-Level Design stage, Step 8-9 (approval)
+
+---
