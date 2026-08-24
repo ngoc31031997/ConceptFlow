@@ -970,3 +970,27 @@
 **Context**: Construction Phase, Unit 6, NFR Requirements stage, Step 8-9 (approval)
 
 ---
+
+## Unit 6 (Video Assembly Service): NFR Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of NFR Requirements)
+**AI Response**: Logged NFR Requirements approval, committed (61319cb). Created NFR design plan at aidlc-docs/construction/plans/video-assembly-service-nfr-design-plan.md with 5 clarifying questions (CRUD vs CQRS, resilience pattern, idempotency pattern, saga/event-driven/inbox-outbox, security pattern).
+**Context**: Construction Phase, Unit 6, NFR Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 6 (Video Assembly Service): NFR Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "go" (all 5 questions answered A)
+**AI Response**: Generated nfr-design-patterns.md and logical-components.md under video-assembly-service/nfr-design/ (no separate messaging-design.md, mirrors Unit 3/4/5 pattern of folding messaging/saga/inbox-outbox into nfr-design-patterns.md). Key decisions: CRUD (no CQRS), no internal retry, 2-tier idempotency (Inbox message-level + artifact-level final.mp4), single Outbox row/command with same-transaction Inbox mark (differs from Unit 5's per-scene multi-row/split-transaction pattern), zero-trust security validation. No new ADR needed (direct application of existing ADR-0007/ADR-0013).
+**Context**: Construction Phase, Unit 6, NFR Design stage, Step 6 (artifact generation)
+
+---
+
+## Unit 6 (Video Assembly Service): NFR Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: NFR Design approved. Proceeding to Infrastructure Design stage.
+**Context**: Construction Phase, Unit 6, NFR Design stage, Step 8-9 (approval)
+
+---
