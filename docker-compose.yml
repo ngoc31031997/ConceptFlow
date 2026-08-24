@@ -168,6 +168,45 @@ services:
     networks:
       - backend
 
+  video-assembly-db:
+    image: postgres:16-alpine
+    container_name: video-assembly-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: video_assembly
+    volumes:
+      - video_assembly_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d video_assembly"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  video-assembly:
+    build: ./services/video-assembly
+    container_name: video-assembly
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@video-assembly-db:5432/video_assembly
+      ASSEMBLY_TIMEOUT_SECONDS: "180"
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      video-assembly-db:
+        condition: service_healthy
+    volumes:
+      - shared_artifacts:/shared
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:
@@ -175,6 +214,7 @@ volumes:
   tts_db_data:
   script_processing_db_data:
   rendering_db_data:
+  video_assembly_db_data:
 
 networks:
   backend:

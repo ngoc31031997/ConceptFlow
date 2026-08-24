@@ -34,6 +34,7 @@ docker compose up -d
 - TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
 - Script Processing Service: message-driven qua RabbitMQ (queue `script_processing.commands`), không có port HTTP nào — dùng `docker compose logs script-processing`. DB riêng: `script-processing-db` (Postgres, Inbox/Outbox — ADR-0013)
 - Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
+- Video Assembly Service: message-driven qua RabbitMQ (queue `video_assembly.commands`), ghép animation + audio + nhạc nền (ffmpeg), không có port HTTP nào — dùng `docker compose logs video-assembly`. DB riêng: `video-assembly-db` (Postgres, Inbox/Outbox — ADR-0013). Đọc animation/audio clip và ghi video hoàn chỉnh vào volume `shared_artifacts` (dùng chung với TTS/Rendering Service)
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -47,8 +48,11 @@ Tương tự cho TTS Service, Script Processing Service, và Rendering Service:
 cd services/tts && pip install -r requirements-dev.txt && pytest -q
 cd services/script-processing && pip install -r requirements-dev.txt && pytest -q
 cd services/rendering && pip install -r requirements-dev.txt && pytest -q
+cd services/video-assembly && pip install -r requirements-dev.txt && pytest -q
 ```
 Rendering Service's `requirements.txt` bao gồm `manim` (native dependencies: ffmpeg, cairo, pango) — nếu chỉ chạy unit test (không cần render Manim thật), có thể bỏ qua `manim` khi cài cục bộ vì test suite dùng fake/mock cho toàn bộ tương tác Manim thật (`_render_to_file` được monkeypatch trong test, không import `manim` khi chạy `pytest`).
+Video Assembly Service's test suite tương tự không cần cài `ffmpeg` cục bộ — mọi tương tác `subprocess.run`/ffmpeg/ffprobe được mock trong test.
+Toàn bộ service yêu cầu Python 3.12 (dùng `from datetime import UTC` và union type `X | Y` không cần `from __future__ import annotations` cho runtime — chạy test suite trên Python < 3.12 sẽ lỗi import).
 Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
 ## Project Structure
@@ -65,8 +69,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
 │   ├── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
-│   └── rendering/                # Rendering Service (Python, Hexagonal, Manim engine, dynamic templates — ADR-0015)
-│                                 # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/
+│   ├── rendering/                # Rendering Service (Python, Hexagonal, Manim engine, dynamic templates — ADR-0015)
+│   │                             # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/
+│   └── video-assembly/           # Video Assembly Service (Python, Hexagonal, ffmpeg/ffprobe)
+│                                 # domain/ → application/ → adapters/{messaging,persistence,assembly,storage,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

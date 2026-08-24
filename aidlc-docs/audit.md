@@ -1018,3 +1018,31 @@
 **Context**: Construction Phase, Unit 6, Infrastructure Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 6 (Video Assembly Service): Code Generation Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of Infrastructure Design)
+**AI Response**: Logged Infrastructure Design approval, committed (1508c6a). Created code generation plan at aidlc-docs/construction/plans/video-assembly-service-code-generation-plan.md with 16 steps, mirroring Unit 2/3/4/5's structure (Hexagonal layers, Inbox/Outbox copied verbatim, ffmpeg/ffprobe adapters new). Coding standards (naming, SOLID, docstrings, ruff) confirmed consistent with prior units per Low-Level Design.
+**Context**: Construction Phase, Unit 6, Code Generation stage, Part 1 (Planning), Steps 1-5
+
+---
+
+## Unit 6 (Video Assembly Service): Code Generation Plan Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Code generation plan approved. Proceeding to Part 2 (Generation).
+**Context**: Construction Phase, Unit 6, Code Generation stage, Step 8-9 (approval)
+
+## Unit 6 (Video Assembly Service): Code Generation
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of code generation plan)
+**AI Response**: Executed all 16 code generation steps. Created services/video-assembly/ (Hexagonal layers: domain/, application/, adapters/{assembly,messaging,persistence,storage,logging}/, main.py, tests/, Dockerfile, requirements.txt/-dev.txt, pyproject.toml). Verified with `ruff check` (all passed) and `ast.parse` syntax check on every file (all passed) — full pytest run not possible in this sandbox (only Python 3.9 available, code targets 3.12 per ADR-0009/`from datetime import UTC`; confirmed this is a pre-existing environment limitation by reproducing the same import error against the already-shipped Rendering Service, not something introduced by this unit's code). Updated root README.md (service description, test command, project structure) and docker-compose.yml (video-assembly + video-assembly-db services, video_assembly_db_data volume) — validated via `docker compose config -q` (no errors, only expected missing-.env warnings). Created aidlc-docs/construction/video-assembly-service/code/README.md. Marked all 16 steps [x] in the code generation plan.
+**Context**: Construction Phase, Unit 6, Code Generation stage, Part 2 (Generation), Steps 10-13
+
+## Unit 6 (Video Assembly Service): Code Generation Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "commit đã"
+**AI Response**: Code generation approved. Unit 6 (Video Assembly Service) complete. Committing.
+**Context**: Construction Phase, Unit 6, Code Generation stage, Step 15-16 (approval); Unit 6 complete
+
+---
