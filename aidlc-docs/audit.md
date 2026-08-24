@@ -994,3 +994,27 @@
 **Context**: Construction Phase, Unit 6, NFR Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 6 (Video Assembly Service): Infrastructure Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of NFR Design)
+**AI Response**: Logged NFR Design approval, committed (5b0ec40). Created infrastructure design plan at aidlc-docs/construction/plans/video-assembly-service-infrastructure-design-plan.md with 8 clarifying questions (ffmpeg system dependencies, PostgreSQL container, shared volume reuse, networking/health check, resource limits, load balancer/gateway/sharding N/A, scaling, monitoring).
+**Context**: Construction Phase, Unit 6, Infrastructure Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 6 (Video Assembly Service): Infrastructure Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (all 8 questions answered A)
+**AI Response**: Generated infrastructure-design.md and deployment-architecture.md under video-assembly-service/infrastructure-design/. Key decisions: Docker python:3.12-slim + ffmpeg only (no Manim-heavy deps), dedicated video-assembly-db (Postgres 16), reuse shared_artifacts volume, no exposed port (sentinel-file health check), no resource limits/load balancer/gateway/sharding/auto-scaling (single fixed instance), stdout structured logging. No new ADR needed (direct application of existing database-per-service and ADR-0013 patterns).
+**Context**: Construction Phase, Unit 6, Infrastructure Design stage, Step 6 (artifact generation)
+
+---
+
+## Unit 6 (Video Assembly Service): Infrastructure Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Infrastructure Design approved. Proceeding to Code Generation stage.
+**Context**: Construction Phase, Unit 6, Infrastructure Design stage, Step 8-9 (approval)
+
+---
