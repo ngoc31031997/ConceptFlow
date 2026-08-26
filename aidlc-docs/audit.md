@@ -1092,3 +1092,27 @@
 **Context**: Construction Phase, Unit 7, Functional Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 7 (Publisher Service): NFR Requirements Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of Functional Design)
+**AI Response**: Logged Functional Design approval, committed (9512f85). Created NFR requirements plan at aidlc-docs/construction/plans/publisher-service-nfr-requirements-plan.md with 7 clarifying questions (tech stack, performance/timeout, network bandwidth, availability, security, messaging/saga participation, caching).
+**Context**: Construction Phase, Unit 7, NFR Requirements stage, Step 4 (Store Plan)
+
+---
+
+## Unit 7 (Publisher Service): NFR Requirements
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: Q1-Q7=A
+**AI Response**: Generated nfr-requirements.md and tech-stack-decisions.md under publisher-service/nfr-requirements/. Tech stack: Python 3.12 + FastAPI + google-api-python-client/google-auth-oauthlib + asyncpg (Postgres Inbox/Outbox + oauth_credentials, ADR-0013/ADR-0016) + aio-pika. No new ADR needed.
+**Context**: Construction Phase, Unit 7, NFR Requirements stage, Step 6 (artifact generation)
+
+---
+
+## Unit 7 (Publisher Service): NFR Requirements Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: NFR Requirements approved. Proceeding to NFR Design stage.
+**Context**: Construction Phase, Unit 7, NFR Requirements stage, Step 8-9 (approval)
+
+---
