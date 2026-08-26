@@ -1046,3 +1046,25 @@
 **Context**: Construction Phase, Unit 6, Code Generation stage, Step 15-16 (approval); Unit 6 complete
 
 ---
+
+## Unit 7 (Publisher Service): Low-Level Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (starting Unit 7 after Unit 6 completion)
+**AI Response**: Created low-level design plan at aidlc-docs/construction/plans/publisher-service-low-level-design-plan.md with 11 clarifying questions (layering, DI, OAuth flow/credential storage, credential encryption at rest, YouTube upload mechanism, execution model, idempotency/retry semantics, API versioning, correlation ID, error classification, state management). First hybrid unit since Unit 2 (REST + AMQP), and first unit designed with Inbox/Outbox from the start rather than retrofitted.
+**Context**: Construction Phase, Unit 7, Low-Level Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 7 (Publisher Service): Low-Level Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "go" (all 11 questions answered A)
+**AI Response**: Generated module-structure.md, dependency-injection.md, interface-contracts.md, sequence-flows.md under aidlc-docs/construction/publisher-service/low-level-design/. Key decisions: hybrid REST (OAuth flow, /v1/auth/youtube/{start,callback}, /health) + AMQP (publish_video command) unit, first with Inbox/Outbox designed from the start; single-user oauth_credentials table; YouTube resumable upload via google-api-python-client in ThreadPoolExecutor (UPLOAD_TIMEOUT_SECONDS, default 600s); no artifact-level idempotency (each successful publish creates a new YouTube video); retry-with-preserved-metadata is GUI/Orchestrator's responsibility, not Publisher Service's. Created ADR-0016 (OAuth credential storage: plaintext for MVP, single-user local threat model) since Question 4 presented genuinely competing viable options.
+**Context**: Construction Phase, Unit 7, Low-Level Design stage, Steps 6-9
+
+## Unit 7 (Publisher Service): Low-Level Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "commit and go"
+**AI Response**: Low-Level Design approved. Committing, then proceeding to Functional Design stage.
+**Context**: Construction Phase, Unit 7, Low-Level Design stage, Step 8-9 (approval)
+
+---
