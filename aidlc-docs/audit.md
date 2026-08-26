@@ -1140,3 +1140,27 @@
 **Context**: Construction Phase, Unit 7, NFR Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 7 (Publisher Service): Infrastructure Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of NFR Design)
+**AI Response**: Logged NFR Design approval, committed (85fe799). Created infrastructure design plan at aidlc-docs/construction/plans/publisher-service-infrastructure-design-plan.md with 9 clarifying questions (deployment env, PostgreSQL container, shared volume read-only mount, networking/health check, OAuth client credentials configuration, resource limits, load balancer/gateway/sharding, scaling, monitoring).
+**Context**: Construction Phase, Unit 7, Infrastructure Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 7 (Publisher Service): Infrastructure Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "go" (all 9 questions answered A)
+**AI Response**: Generated infrastructure-design.md and deployment-architecture.md under publisher-service/infrastructure-design/. Key decisions: Docker python:3.12-slim, dedicated publisher-db (Postgres 16, includes oauth_credentials table), shared_artifacts mounted read-only, port 8000 internal-only (proxied by API Gateway Unit 9, not exposed to host), GOOGLE_OAUTH_CLIENT_ID/SECRET/REDIRECT_URI via env vars (Creator self-registers OAuth Client on Google Cloud Console), no resource limits/load balancer/sharding/auto-scaling, stdout structured logging. No new ADR needed.
+**Context**: Construction Phase, Unit 7, Infrastructure Design stage, Step 6 (artifact generation)
+
+---
+
+## Unit 7 (Publisher Service): Infrastructure Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Infrastructure Design approved. Proceeding to Code Generation stage.
+**Context**: Construction Phase, Unit 7, Infrastructure Design stage, Step 8-9 (approval)
+
+---
