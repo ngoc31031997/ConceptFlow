@@ -1164,3 +1164,29 @@
 **Context**: Construction Phase, Unit 7, Infrastructure Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 7 (Publisher Service): Code Generation Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of Infrastructure Design)
+**AI Response**: Logged Infrastructure Design approval, committed (77f0f11). Created code generation plan at aidlc-docs/construction/plans/publisher-service-code-generation-plan.md with 17 steps, mirroring Unit 2's hybrid REST+AMQP structure plus Unit 3-6's Inbox/Outbox pattern.
+**Context**: Construction Phase, Unit 7, Code Generation stage, Part 1 (Planning), Steps 1-5
+
+## Unit 7 (Publisher Service): Code Generation Plan Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Code generation plan approved. Proceeding to Part 2 (Generation).
+**Context**: Construction Phase, Unit 7, Code Generation stage, Step 8-9 (approval)
+
+## Unit 7 (Publisher Service): Code Generation
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of code generation plan)
+**AI Response**: Executed all 17 code generation steps. Created services/publisher/ (Hexagonal layers: domain/, application/, adapters/{api,youtube,messaging,persistence,logging}/, main.py, tests/, Dockerfile, requirements.txt/-dev.txt, pyproject.toml). Resolved a sync/async design gap during implementation: CredentialStorePort is synchronous (matches PublishVideoUseCase/HandleOAuthCallbackUseCase being called via asyncio.to_thread, mirroring Unit 6), so PostgresCredentialStore uses psycopg2 (blocking driver) rather than asyncpg for the single oauth_credentials table, since a worker thread has no event loop to await the asyncpg pool on — documented in credential_store.py's docstring and code README. Verified with `ruff check` (all passed), `ast.parse` syntax check on every file (all passed), and actually ran the subset of tests unaffected by the sandbox's Python 3.9 (test_persistence.py, test_relay.py — 6/6 passed); the rest are blocked by the same confirmed pre-existing `datetime.UTC`/PEP 604 environment limitation as prior units. Updated root README.md, .env.example (GOOGLE_OAUTH_* vars with setup instructions), and docker-compose.yml (publisher + publisher-db services, publisher_db_data volume, shared_artifacts mounted :ro) — validated via `docker compose config -q` (no errors). Created aidlc-docs/construction/publisher-service/code/README.md. Marked all 17 steps [x].
+**Context**: Construction Phase, Unit 7, Code Generation stage, Part 2 (Generation), Steps 10-13
+
+## Unit 7 (Publisher Service): Code Generation Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Code generation approved. Unit 7 (Publisher Service) complete. Committing.
+**Context**: Construction Phase, Unit 7, Code Generation stage, Step 15-16 (approval); Unit 7 complete
+
+---
