@@ -1116,3 +1116,27 @@
 **Context**: Construction Phase, Unit 7, NFR Requirements stage, Step 8-9 (approval)
 
 ---
+
+## Unit 7 (Publisher Service): NFR Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok" (approval of NFR Requirements)
+**AI Response**: Logged NFR Requirements approval, committed (e341eed). Created NFR design plan at aidlc-docs/construction/plans/publisher-service-nfr-design-plan.md with 5 clarifying questions (CRUD vs CQRS, resilience pattern, idempotency pattern, saga/event-driven/inbox-outbox, security pattern).
+**Context**: Construction Phase, Unit 7, NFR Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 7 (Publisher Service): NFR Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok go" (all 5 questions answered A)
+**AI Response**: Generated nfr-design-patterns.md and logical-components.md under publisher-service/nfr-design/. Key decisions: CRUD (no CQRS), no internal retry, message-level-only idempotency (no artifact-level, unlike Unit 3/5/6 — each publish creates a new YouTube video), Saga participant as final step with no compensating action, same-transaction Outbox+Inbox writes, zero-trust + OAuth state CSRF protection + ADR-0016 plaintext credentials. No new ADR needed.
+**Context**: Construction Phase, Unit 7, NFR Design stage, Step 6 (artifact generation)
+
+---
+
+## Unit 7 (Publisher Service): NFR Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: NFR Design approved. Proceeding to Infrastructure Design stage.
+**Context**: Construction Phase, Unit 7, NFR Design stage, Step 8-9 (approval)
+
+---
