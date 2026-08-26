@@ -6,7 +6,7 @@
 services/publisher/
 ├── domain/
 │   ├── models.py                  # OAuthCredential, PublishRequest, PublishResult (value objects)
-│   ├── errors.py                   # MissingCredentialError, UploadError
+│   ├── errors.py                   # MissingCredentialError, UploadError, InvalidPublishRequestError (added at Functional Design, Rule 1/2/4)
 │   └── ports.py                    # VideoPublisherPort, CredentialStorePort
 ├── application/
 │   ├── publish_video.py            # PublishVideoUseCase

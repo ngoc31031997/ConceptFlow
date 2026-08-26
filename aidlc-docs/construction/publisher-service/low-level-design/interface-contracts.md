@@ -70,6 +70,8 @@ At-least-once (kế thừa Unit 1). Inbox (`processed_messages`) dedupe `message
 `saga_id` từ AMQP envelope cho luồng `publish_video` (thuộc Saga Publish). `X-Request-ID` cho luồng OAuth REST (ngoài Saga, tương tác trực tiếp Creator ↔ Google).
 
 ## Internal Port Contracts (domain/ports.py)
+**Revision (Functional Design Rule 1/2/4)**: added `InvalidPublishRequestError` (domain/errors.py) for zero-trust validation failures (missing/nonexistent `video_path`, empty `title`, invalid `visibility`) — also maps to `publish_failed`.
+
 ```python
 class VideoPublisherPort(ABC):
     @abstractmethod

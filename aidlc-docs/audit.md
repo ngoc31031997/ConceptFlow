@@ -1068,3 +1068,27 @@
 **Context**: Construction Phase, Unit 7, Low-Level Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 7 (Publisher Service): Functional Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "commit and go" (LLD approved, committed fe168e8)
+**AI Response**: Created functional design plan at aidlc-docs/construction/plans/publisher-service-functional-design-plan.md with 6 clarifying questions (input validation strategy, missing title defense-in-depth, OAuth token refresh timing, visibility no-default rule, PublishResult fields, OAuth callback error handling).
+**Context**: Construction Phase, Unit 7, Functional Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 7 (Publisher Service): Functional Design
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok go" (all 6 questions answered A)
+**AI Response**: Generated business-logic-model.md, business-rules.md, domain-entities.md under publisher-service/functional-design/. Added InvalidPublishRequestError to domain/errors.py (revision to approved LLD's module-structure.md and interface-contracts.md) for zero-trust validation failures (missing video_path, empty title, invalid visibility). Key rules: proactive OAuth token refresh with 60s buffer; no default for visibility (privacy risk); minimal PublishResult; OAuth callback errors return REST 400, never an AMQP event (outside the Saga).
+**Context**: Construction Phase, Unit 7, Functional Design stage, Steps 5-6 (ambiguity resolution + artifact generation)
+
+---
+
+## Unit 7 (Publisher Service): Functional Design Approved
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design approved. Proceeding to NFR Requirements stage.
+**Context**: Construction Phase, Unit 7, Functional Design stage, Step 8-9 (approval)
+
+---
