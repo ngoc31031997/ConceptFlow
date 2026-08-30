@@ -16,7 +16,10 @@
 |---|---|---|
 | `orchestrator` | `orchestrator.events` | Orchestrator Service (Unit 8) |
 
-Tất cả 5 service nghiệp vụ đều publish event (`script_parsed`, `scenes_classified`, `rendering_completed`, `scene_rendered`, `video_assembled`, `video_published`, và các `*_failed` tương ứng) vào `events.direct` với routing key `orchestrator` — event type nằm trong message payload (không phải routing key), vì chỉ có 1 consumer (Orchestrator).
+Tất cả 6 service nghiệp vụ (bao gồm TTS Service, ADR-0014) đều publish event vào `events.direct` với routing key `orchestrator` — event type nằm trong message payload (không phải routing key), vì chỉ có 1 consumer (Orchestrator).
+
+### Progress Exchange: `progress.fanout` (MỚI — Revision, Unit 8 Low-Level Design Question 4, ADR-0017)
+Type `fanout`, không pre-declare queue nào (Gateway, Unit 9, sẽ tự khai báo + bind queue riêng khi khởi động). Orchestrator Service (Unit 8) publish progress message (project_id, step, status, scene_index?, scene_total?, error_message?) vào exchange này sau mỗi lần xử lý event Saga — Gateway subscribe để forward qua SSE cho GUI (Story C6). Dùng fanout (không phải direct/topic) vì chỉ có 1 consumer thực tế (Gateway) và không cần routing key phân biệt — Gateway tự lọc theo `project_id` trong payload để định tuyến tới đúng SSE client.
 
 ## Dead-Letter Topology
 Mỗi queue command có DLQ riêng, cấu hình qua `x-dead-letter-exchange` + `x-dead-letter-routing-key`:
