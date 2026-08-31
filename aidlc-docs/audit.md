@@ -1310,3 +1310,28 @@
 **Context**: Construction Phase, Unit 8, Code Generation stage, Step 16 (Record Approval) — stage complete, unit complete
 
 ---
+
+## Build and Test Stage
+**Timestamp**: 2026-08-31T01:00:00Z
+**Build Status**: Success
+**Test Status**: Pass (152/152 Python unit tests across 6 services; all Go tests pass for orchestrator; rabbitmq infra reviewed manually — sound)
+**Scope Note**: Covers the 8 units with completed Code Generation (rabbitmq, content-plugin, script-processing, tts, rendering, video-assembly, publisher, orchestrator), run by explicit user request ahead of the normal "all units complete" prerequisite. API Gateway and Web GUI are NOT yet designed/built and remain out of scope.
+**Environment fixes applied (tooling only, no application code changed)**: installed Python 3.12 via Homebrew (system Python 3.9 is incompatible with this codebase's syntax); installed cairo/pango/pkg-config/ffmpeg via Homebrew for the rendering service's Manim dependency.
+**Files Generated**:
+- build-instructions.md
+- unit-test-instructions.md
+- integration-test-instructions.md
+- ci-cd-integration-instructions.md
+- build-and-test-summary.md
+
+(performance-test-instructions.md, security-test-instructions.md, e2e-test-instructions.md intentionally skipped — see build-and-test-summary.md for rationale)
+
+---
+
+## Build and Test Stage: Approved
+**Timestamp**: 2026-08-31T01:05:00Z
+**User Input**: "ok go"
+**AI Response**: Build and Test results approved for the 8 completed units. Operations phase remains SKIP (project decision, docker-local-first, no cloud/production deployment target). Proceeding next to Unit 9 (API Gateway) construction.
+**Context**: Construction Phase, Build and Test stage — approved; Construction Phase continues with remaining units (API Gateway, Web GUI)
+
+---
