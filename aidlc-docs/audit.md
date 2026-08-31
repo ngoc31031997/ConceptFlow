@@ -1335,3 +1335,19 @@
 **Context**: Construction Phase, Build and Test stage — approved; Construction Phase continues with remaining units (API Gateway, Web GUI)
 
 ---
+
+## Unit 9 (API Gateway): Low-Level Design Generated
+**Timestamp**: 2026-08-31T01:10:00Z
+**User Input**: "ok go" (continuing established auto-accept pattern)
+**AI Response**: Created api-gateway-low-level-design-plan.md with 8 questions, all filled with suggested option A. Generated module-structure.md, dependency-injection.md, interface-contracts.md, sequence-flows.md at aidlc-docs/construction/api-gateway/low-level-design/. Key decisions: simple Layered architecture (routes→handlers→clients, not Hexagonal — Gateway has no domain logic to protect), manual constructor injection via factory functions, full routing table confirmed (7 passthrough endpoints to Orchestrator/Content Plugin/Publisher + 1 Gateway-owned SSE endpoint + health), SSE fan-out via in-memory Map<project_id, Response[]> fed by an exclusive AMQP queue bound to progress.fanout, Gateway generates X-Request-ID at the system entry point, stateless (no DB). Tech stack per ADR-0009: Node.js.
+**Context**: Construction Phase, Unit 9, Low-Level Design stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 9 (API Gateway): Low-Level Design Approved
+**Timestamp**: 2026-08-31T01:15:00Z
+**User Input**: "oke"
+**AI Response**: Low-Level Design stage approved. Evaluating Functional Design applicability per core-workflow.md's conditional criteria (Execute IF: new data models/complex business logic/business rules needing detailed design; Skip IF: simple logic changes/no new business logic) — API Gateway is a pure routing/proxy layer with no domain logic (confirmed in Question 1 of the LLD plan: no ports/adapters because there is no domain to protect). Recommending SKIP of Functional Design for this unit, proceeding directly to NFR Requirements.
+**Context**: Construction Phase, Unit 9, Low-Level Design stage, Step 9 (Record Approval) — stage complete; Functional Design stage evaluation
+
+---
