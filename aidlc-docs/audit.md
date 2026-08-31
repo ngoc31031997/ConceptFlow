@@ -1254,3 +1254,19 @@
 **Context**: Construction Phase, Unit 8, NFR Requirements stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 8 (Orchestrator Service): NFR Design Generated
+**Timestamp**: 2026-08-31T00:20:00Z
+**User Input**: continuing established auto-accept pattern for this unit
+**AI Response**: Created orchestrator-service-nfr-design-plan.md with 6 questions, all filled with suggested option A. Generated nfr-design-patterns.md, logical-components.md, messaging-design.md at aidlc-docs/construction/orchestrator-service/nfr-design/. Key decisions: CRUD (not CQRS); no automatic retry (explicit retry-by-step only); 2-tier idempotency (Inbox message-level + SagaStep-status step-level); Orchestrator confirmed as Saga central coordinator; ADR-0019 created to formally document that this unit's Outbox pattern carries commands (not events, unlike Units 2-7) while Inbox dedupes incoming events — same technical mechanism, inverted semantic role.
+**Context**: Construction Phase, Unit 8, NFR Design stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 8 (Orchestrator Service): NFR Design Approved
+**Timestamp**: 2026-08-31T00:25:00Z
+**User Input**: "ok"
+**AI Response**: NFR Design stage approved. Proceeding to Construction Phase, Unit 8, Infrastructure Design stage.
+**Context**: Construction Phase, Unit 8, NFR Design stage, Step 9 (Record Approval) — stage complete
+
+---
