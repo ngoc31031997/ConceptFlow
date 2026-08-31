@@ -1447,3 +1447,19 @@
 **Context**: Construction Phase, Unit 10, Low-Level Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 10 (Web GUI): Functional Design Generated
+**Timestamp**: 2026-08-31T02:00:00Z
+**User Input**: continuing established auto-accept pattern
+**AI Response**: Created web-gui-functional-design-plan.md with 6 questions, all filled with suggested option A. Generated business-logic-model.md, business-rules.md, domain-entities.md, frontend-components.md at aidlc-docs/construction/web-gui/functional-design/. Key decisions: New Project form requires non-empty script + selected plugin (submit button disabled otherwise); Publish form requires non-empty title (max 100 chars) with visibility defaulting to "private"; GUI auto-navigates purely off Project.Status (no manual "Next" button); ProjectDraft local state matches RenderInput 1:1; GUI validation is UX-only, backend remains source of truth; data-testid convention {component}-{element-role}; no external UI library (plain CSS modules) given the linear single-flow scope.
+**Context**: Construction Phase, Unit 10, Functional Design stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 10 (Web GUI): Functional Design Approved
+**Timestamp**: 2026-08-31T02:05:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design stage approved. Proceeding to Construction Phase, Unit 10, NFR Requirements stage.
+**Context**: Construction Phase, Unit 10, Functional Design stage, Step 9 (Record Approval) — stage complete
+
+---
