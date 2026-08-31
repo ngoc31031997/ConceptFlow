@@ -1214,3 +1214,27 @@
 **Context**: Construction Phase, Unit 8, Low-Level Design stage, Step 8-9 (approval)
 
 ---
+
+## Unit 8 (Orchestrator Service): Functional Design Planning
+**Timestamp**: 2026-08-24T00:00:00Z
+**User Input**: "ok go to function design" / "ok let go" (LLD approved, committed c60a06a)
+**AI Response**: Created functional design plan at aidlc-docs/construction/plans/orchestrator-service-functional-design-plan.md with 7 clarifying questions (render_scenes data aggregation, assemble_video data aggregation/audio_path source, background_music_path source — resolves an open question left by Unit 6's LLD, state transition validity, retry payload reconstruction, concurrent projects, progress message content for scene_rendered).
+**Context**: Construction Phase, Unit 8, Functional Design stage, Step 4 (Store Plan)
+
+---
+
+## Unit 8 (Orchestrator Service): Functional Design Artifacts Generated
+**Timestamp**: 2026-08-31T00:00:00Z
+**User Input**: "tiếp tục cho toi" (continue for me — accept all 7 suggested answers, option A, and proceed)
+**AI Response**: Filled all 7 [Answer]: tags in orchestrator-service-functional-design-plan.md with option A (suggested answers). Generated business-logic-model.md, business-rules.md, domain-entities.md at aidlc-docs/construction/orchestrator-service/functional-design/. Key decisions: render_scenes aggregation validates matching scene_index across 3 upstream events (raises failed_at_render_scenes on mismatch); audio_path sourced only from speech_synthesized (not rendering_completed); background_music_path is a static optional input field on POST /v1/sagas/render (Question 3, resolving Unit 6's open question — noted as a Revision needed to interface-contracts.md); strict state-transition validation from-predecessor-only; Project as single source of truth for retry payload reconstruction; no concurrency limit at business-logic layer; ProgressMessage format unchanged for scene_rendered mapping.
+**Context**: Construction Phase, Unit 8, Functional Design stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 8 (Orchestrator Service): Functional Design Approved
+**Timestamp**: 2026-08-31T00:05:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design stage approved. Proceeding to Construction Phase, Unit 8, NFR Requirements stage.
+**Context**: Construction Phase, Unit 8, Functional Design stage, Step 9 (Record Approval) — stage complete
+
+---
