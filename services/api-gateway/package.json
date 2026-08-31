@@ -1,0 +1,27 @@
+{
+  "name": "api-gateway",
+  "version": "1.0.0",
+  "description": "ConceptFlow API Gateway — reverse-proxy + AMQP-to-SSE bridge (Unit 9)",
+  "private": true,
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "amqplib": "^0.10.4",
+    "pino": "^9.3.2",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.3"
+  }
+}

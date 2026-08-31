@@ -1407,3 +1407,27 @@
 **Context**: Construction Phase, Unit 9, Infrastructure Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 9 (API Gateway): Code Generation Plan Created
+**Timestamp**: 2026-08-31T01:40:00Z
+**User Input**: continuing established pattern for this unit
+**AI Response**: Created api-gateway-code-generation-plan.md (13 steps: project structure, config/correlation middleware, HTTP+AMQP client layer + tests, proxy/progress handler layer + tests, route layer + tests, composition root, README, Dockerfile + docker-compose entry). Coding standards confirmed (no new questions needed): JavaScript camelCase, factory-function DI (no container), JSDoc, ESLint+Prettier defaults (first Node.js unit — no existing config to follow). Presenting plan for approval before generation begins.
+**Context**: Construction Phase, Unit 9, Code Generation stage, Steps 4-7 (Plan created, Summary, Log Approval Prompt) — awaiting user approval to begin generation
+
+---
+
+## Unit 9 (API Gateway): Code Generation Plan Approved — Generation Executed
+**Timestamp**: 2026-08-31T01:45:00Z
+**User Input**: "oke go"
+**AI Response**: Executed all 13 steps of the code generation plan via delegated implementation. Created services/api-gateway/ (Node.js/Express: src/config, src/middleware/correlation.js, src/clients/{httpClient,amqpClient}.js, src/handlers/{proxyHandler,progressHandler}.js, src/routes/{plugins,sagas,projects,auth,progress,health}.js, src/server.js composition root, full test suite under tests/). Added api-gateway service (port 8080:8080, the only app-service host port mapping in the system) to root docker-compose.yml, merged API Gateway into root README.md. Created 2 doc summaries at aidlc-docs/construction/api-gateway/code/. Verified: npm install, eslint, npm test all pass (10 suites, 28 tests, Node 20.20.2). Noted deviations: fetch() called with redirect:'manual' to satisfy verbatim-302-forwarding requirement; proxyHandler strips inbound host/content-length headers before forwarding (they describe the inbound socket, not the outbound request) while still forwarding X-Request-ID and all other headers as specified; a test-only fix for a Jest fake-timers/amqp-reconnect-test hang (no production code affected). All 13 plan checkboxes marked [x].
+**Context**: Construction Phase, Unit 9, Code Generation stage, Steps 10-14 (Generation, Progress Update) — awaiting user review/approval of generated code
+
+---
+
+## Unit 9 (API Gateway): Code Generation Approved — Unit 9 COMPLETE
+**Timestamp**: 2026-08-31T01:48:00Z
+**User Input**: "commit trươcs đã" (approve and commit before continuing)
+**AI Response**: Code Generation stage approved. Unit 9 (API Gateway) construction complete — all applicable stages done (Low-Level Design, Functional Design SKIPPED, NFR Requirements, NFR Design, Infrastructure Design, Code Generation). 9 of 10 planned units now fully complete through Code Generation. Only Web GUI (Unit 10) remains unstarted.
+**Context**: Construction Phase, Unit 9, Code Generation stage, Step 16 (Record Approval) — stage complete, unit complete
+
+---

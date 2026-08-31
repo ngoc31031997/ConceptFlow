@@ -287,6 +287,34 @@ services:
     networks:
       - backend
 
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: api-gateway
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      ORCHESTRATOR_URL: http://orchestrator:8000
+      CONTENT_PLUGIN_URL: http://content-plugin:8000
+      PUBLISHER_URL: http://publisher:8000
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      orchestrator:
+        condition: service_healthy
+      content-plugin:
+        condition: service_healthy
+      publisher:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:

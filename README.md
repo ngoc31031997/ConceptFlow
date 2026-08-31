@@ -39,7 +39,8 @@ docker compose up -d
 - Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
 - Video Assembly Service: message-driven qua RabbitMQ (queue `video_assembly.commands`), ghép animation + audio + nhạc nền (ffmpeg), không có port HTTP nào — dùng `docker compose logs video-assembly`. DB riêng: `video-assembly-db` (Postgres, Inbox/Outbox — ADR-0013). Đọc animation/audio clip và ghi video hoàn chỉnh vào volume `shared_artifacts` (dùng chung với TTS/Rendering Service)
 - Publisher Service: REST (`/v1/auth/youtube/{start,callback}`, OAuth flow) + message-driven qua RabbitMQ (queue `publisher.commands`), đăng video lên YouTube — nội bộ (`publisher:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs publisher`. DB riêng: `publisher-db` (Postgres, Inbox/Outbox + `oauth_credentials` — ADR-0013, ADR-0016). Đọc video hoàn chỉnh (read-only) từ volume `shared_artifacts`. **Yêu cầu**: đăng ký Google OAuth Client trước khi dùng tính năng đăng video (xem `GOOGLE_OAUTH_*` ở mục Configuration)
-- Orchestrator Service: Saga orchestrator (Go, không phải Python — ADR-0018) điều phối Render Saga (5 bước) + Publish Saga (1 bước) qua REST (`POST /v1/sagas/render`, `POST /v1/sagas/publish`, `GET /v1/projects/{id}`, `POST /v1/projects/{id}/retry`) + message-driven qua RabbitMQ (`orchestrator.events` + 6 `*.commands.dlq`) — nội bộ (`orchestrator:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs orchestrator`. DB riêng: `orchestrator-db` (Postgres, Inbox cho event nhận vào + Outbox cho command gửi đi — ADR-0013, ADR-0019)
+- Orchestrator Service: Saga orchestrator (Go, không phải Python — ADR-0018) điều phối Render Saga (5 bước) + Publish Saga (1 bước) qua REST (`POST /v1/sagas/render`, `POST /v1/sagas/publish`, `GET /v1/projects/{id}`, `POST /v1/projects/{id}/retry`) + message-driven qua RabbitMQ (`orchestrator.events` + 6 `*.commands.dlq`) — nội bộ (`orchestrator:8000`), không expose ra host, được API Gateway proxy tới — dùng `docker compose logs orchestrator`. DB riêng: `orchestrator-db` (Postgres, Inbox cho event nhận vào + Outbox cho command gửi đi — ADR-0013, ADR-0019)
+- API Gateway (Unit 9): reverse-proxy + AMQP-to-SSE bridge (Node.js/Express — ADR-0020), stateless, entry point duy nhất cho Web GUI. Proxy nguyên trạng REST tới Content Plugin/Orchestrator/Publisher (`/v1/plugins`, `/v1/sagas/render`, `/v1/sagas/publish`, `/v1/projects/{id}`, `/v1/projects/{id}/retry`, `/v1/auth/youtube/{start,callback}`), tự xử lý `GET /v1/progress/{id}` (SSE, consume `progress.fanout` từ RabbitMQ) và `GET /health` (không phụ thuộc downstream). Service DUY NHẤT (ngoài RabbitMQ Management UI) publish port ra host: `8080:8080` — dùng `docker compose logs api-gateway`. Không có database riêng (hoàn toàn stateless ngoại trừ in-memory SSE connection registry).
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -70,6 +71,14 @@ go vet ./...
 go test ./...
 ```
 
+API Gateway (Node.js, không dùng pytest):
+```bash
+cd services/api-gateway
+npm install
+npx eslint .
+npm test
+```
+
 Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
 ## Project Structure
@@ -92,8 +101,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,assembly,storage,logging}/
 │   ├── publisher/                # Publisher Service (Python/FastAPI, Hexagonal, YouTube Data API — ADR-0016)
 │   │                             # domain/ → application/ → adapters/{api,messaging,persistence,youtube,logging}/
-│   └── orchestrator/             # Orchestrator Service (Go, Hexagonal, Saga coordinator — ADR-0018)
-│                                 # cmd/orchestrator/ (composition root) + internal/domain → application → adapters/{http,amqp,postgres,logging}/
+│   ├── orchestrator/             # Orchestrator Service (Go, Hexagonal, Saga coordinator — ADR-0018)
+│   │                             # cmd/orchestrator/ (composition root) + internal/domain → application → adapters/{http,amqp,postgres,logging}/
+│   └── api-gateway/              # API Gateway (Node.js/Express, layered — ADR-0020)
+│                                 # src/{routes,handlers,clients,middleware,config}/ — reverse-proxy + AMQP-to-SSE bridge, không có domain logic riêng
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)
