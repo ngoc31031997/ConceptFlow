@@ -1238,3 +1238,19 @@
 **Context**: Construction Phase, Unit 8, Functional Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 8 (Orchestrator Service): NFR Requirements Generated
+**Timestamp**: 2026-08-31T00:10:00Z
+**User Input**: "ok" (continuing the "tiếp tục cho tôi" auto-accept pattern established for this unit's clarifying questions)
+**AI Response**: Created orchestrator-service-nfr-requirements-plan.md with 8 questions, all filled with suggested option A. Generated nfr-requirements.md and tech-stack-decisions.md at aidlc-docs/construction/orchestrator-service/nfr-requirements/. Confirmed Go 1.22+ + chi + pgx + amqp091-go (already used throughout approved Low-Level Design) via new ADR-0018. Key NFR decisions: no hard concurrency limits (business-scale appropriate), 500ms Outbox poll interval, at-least-once delivery (Inbox/Outbox), no internal service auth (local single-user scope, Security Baseline extension disabled), JSON structured logging via log/slog, Orchestrator confirmed as sole Saga Orchestrator (not participant).
+**Context**: Construction Phase, Unit 8, NFR Requirements stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 8 (Orchestrator Service): NFR Requirements Approved
+**Timestamp**: 2026-08-31T00:15:00Z
+**User Input**: "oke"
+**AI Response**: NFR Requirements stage approved. Proceeding to Construction Phase, Unit 8, NFR Design stage.
+**Context**: Construction Phase, Unit 8, NFR Requirements stage, Step 9 (Record Approval) — stage complete
+
+---
