@@ -39,6 +39,7 @@ docker compose up -d
 - Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
 - Video Assembly Service: message-driven qua RabbitMQ (queue `video_assembly.commands`), ghép animation + audio + nhạc nền (ffmpeg), không có port HTTP nào — dùng `docker compose logs video-assembly`. DB riêng: `video-assembly-db` (Postgres, Inbox/Outbox — ADR-0013). Đọc animation/audio clip và ghi video hoàn chỉnh vào volume `shared_artifacts` (dùng chung với TTS/Rendering Service)
 - Publisher Service: REST (`/v1/auth/youtube/{start,callback}`, OAuth flow) + message-driven qua RabbitMQ (queue `publisher.commands`), đăng video lên YouTube — nội bộ (`publisher:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs publisher`. DB riêng: `publisher-db` (Postgres, Inbox/Outbox + `oauth_credentials` — ADR-0013, ADR-0016). Đọc video hoàn chỉnh (read-only) từ volume `shared_artifacts`. **Yêu cầu**: đăng ký Google OAuth Client trước khi dùng tính năng đăng video (xem `GOOGLE_OAUTH_*` ở mục Configuration)
+- Orchestrator Service: Saga orchestrator (Go, không phải Python — ADR-0018) điều phối Render Saga (5 bước) + Publish Saga (1 bước) qua REST (`POST /v1/sagas/render`, `POST /v1/sagas/publish`, `GET /v1/projects/{id}`, `POST /v1/projects/{id}/retry`) + message-driven qua RabbitMQ (`orchestrator.events` + 6 `*.commands.dlq`) — nội bộ (`orchestrator:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs orchestrator`. DB riêng: `orchestrator-db` (Postgres, Inbox cho event nhận vào + Outbox cho command gửi đi — ADR-0013, ADR-0019)
 
 ## Running Tests
 Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
@@ -58,7 +59,17 @@ cd services/publisher && pip install -r requirements-dev.txt && pytest -q
 Rendering Service's `requirements.txt` bao gồm `manim` (native dependencies: ffmpeg, cairo, pango) — nếu chỉ chạy unit test (không cần render Manim thật), có thể bỏ qua `manim` khi cài cục bộ vì test suite dùng fake/mock cho toàn bộ tương tác Manim thật (`_render_to_file` được monkeypatch trong test, không import `manim` khi chạy `pytest`).
 Video Assembly Service's test suite tương tự không cần cài `ffmpeg` cục bộ — mọi tương tác `subprocess.run`/ffmpeg/ffprobe được mock trong test.
 Publisher Service's test suite không cần Google OAuth Client thật hay kết nối mạng — mọi tương tác `google-api-python-client`/`google-auth-oauthlib`/`psycopg2` được mock trong test.
-Toàn bộ service yêu cầu Python 3.12 (dùng `from datetime import UTC` và union type `X | Y` không cần `from __future__ import annotations` cho runtime — chạy test suite trên Python < 3.12 sẽ lỗi import).
+Toàn bộ service Python yêu cầu Python 3.12 (dùng `from datetime import UTC` và union type `X | Y` không cần `from __future__ import annotations` cho runtime — chạy test suite trên Python < 3.12 sẽ lỗi import).
+
+Orchestrator Service (Go, không dùng pytest):
+```bash
+cd services/orchestrator
+go mod tidy
+go build ./...
+go vet ./...
+go test ./...
+```
+
 Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
 
 ## Project Structure
@@ -79,8 +90,10 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/
 │   ├── video-assembly/           # Video Assembly Service (Python, Hexagonal, ffmpeg/ffprobe)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,assembly,storage,logging}/
-│   └── publisher/                # Publisher Service (Python/FastAPI, Hexagonal, YouTube Data API — ADR-0016)
-│                                 # domain/ → application/ → adapters/{api,messaging,persistence,youtube,logging}/
+│   ├── publisher/                # Publisher Service (Python/FastAPI, Hexagonal, YouTube Data API — ADR-0016)
+│   │                             # domain/ → application/ → adapters/{api,messaging,persistence,youtube,logging}/
+│   └── orchestrator/             # Orchestrator Service (Go, Hexagonal, Saga coordinator — ADR-0018)
+│                                 # cmd/orchestrator/ (composition root) + internal/domain → application → adapters/{http,amqp,postgres,logging}/
 ├── frontend/                  # Web GUI (React) — sẽ bổ sung ở Unit 10
 ├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
 └── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)

@@ -1286,3 +1286,27 @@
 **Context**: Construction Phase, Unit 8, Infrastructure Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 8 (Orchestrator Service): Code Generation Plan Created
+**Timestamp**: 2026-08-31T00:40:00Z
+**User Input**: continuing established pattern for this unit
+**AI Response**: Created orchestrator-service-code-generation-plan.md (18 steps: project structure, domain layer, application/business logic + tests, HTTP API layer + tests, AMQP messaging layer + tests, Postgres repository layer + tests, supporting adapters, composition root, schema bootstrap, README, Dockerfile + docker-compose entries). Coding standards confirmed from Low-Level Design (no new questions needed): Go idiomatic naming, mandatory SOLID (DIP already via ports.go), Go doc comments, gofmt/go vet, manual constructor injection. Presenting plan for approval before generation begins (Part 1 complete, awaiting approval to start Part 2).
+**Context**: Construction Phase, Unit 8, Code Generation stage, Steps 4-7 (Plan created, Summary, Log Approval Prompt) — awaiting user approval to begin generation
+
+---
+
+## Unit 8 (Orchestrator Service): Code Generation Plan Approved — Generation Executed
+**Timestamp**: 2026-08-31T00:45:00Z
+**User Input**: "ok"
+**AI Response**: Executed all 18 steps of the code generation plan via delegated implementation. Created services/orchestrator/ (Go module: cmd/orchestrator/main.go composition root; internal/domain/{project,errors,ports}.go; internal/application/ 4 use cases + tests + fakes; internal/adapters/http/ chi router + dto + tests; internal/adapters/amqp/ envelope+consumer+publisher + tests; internal/adapters/postgres/ db+project_repository+inbox+outbox+relay + tests; internal/adapters/logging/correlation.go; internal/config/config.go; Dockerfile; README.md). Added orchestrator-db + orchestrator services to root docker-compose.yml, merged Orchestrator Service into root README.md. Created 3 doc summaries at aidlc-docs/construction/orchestrator-service/code/. Verified: go mod tidy, go build ./..., go vet ./..., gofmt, go test ./... all pass (Go 1.27 toolchain installed for verification). Noted deviations: two CommandPublisherPort implementations (OutboxRepository for use-case-facing writes, amqp.Publisher for the relay's actual send) to reconcile module-structure.md wording with sequence-flows.md and dependency-injection.md; command envelope EventType set to step name for DLQ step-recovery; fixed a bug found during test-writing where a spurious "completed" progress message could follow a Rule-1 aggregation-mismatch "failed" message (added errAggregationFailed sentinel); local UUIDv4 generation instead of adding a dependency. All 18 plan checkboxes marked [x].
+**Context**: Construction Phase, Unit 8, Code Generation stage, Steps 10-14 (Generation, Progress Update) — awaiting user review/approval of generated code
+
+---
+
+## Unit 8 (Orchestrator Service): Code Generation Approved — Unit 8 COMPLETE
+**Timestamp**: 2026-08-31T00:50:00Z
+**User Input**: "ok"
+**AI Response**: Code Generation stage approved. Unit 8 (Orchestrator Service) construction complete — all 6 stages done (Low-Level Design, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation). 7 of 8 started units now fully complete through Code Generation (all except none remaining — Orchestrator was the last in-progress unit). Remaining units not yet started: API Gateway, Web GUI.
+**Context**: Construction Phase, Unit 8, Code Generation stage, Step 16 (Record Approval) — stage complete, unit complete
+
+---

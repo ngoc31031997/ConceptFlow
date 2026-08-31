@@ -249,6 +249,44 @@ services:
     networks:
       - backend
 
+  orchestrator-db:
+    image: postgres:16-alpine
+    container_name: orchestrator-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: orchestrator
+    volumes:
+      - orchestrator_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  orchestrator:
+    build: ./services/orchestrator
+    container_name: orchestrator
+    environment:
+      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@orchestrator-db:5432/orchestrator
+      OUTBOX_POLL_INTERVAL_MS: "500"
+      DATABASE_MAX_CONNS: "10"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      orchestrator-db:
+        condition: service_healthy
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:
@@ -258,6 +296,7 @@ volumes:
   rendering_db_data:
   video_assembly_db_data:
   publisher_db_data:
+  orchestrator_db_data:
 
 networks:
   backend:
