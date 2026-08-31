@@ -1270,3 +1270,19 @@
 **Context**: Construction Phase, Unit 8, NFR Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 8 (Orchestrator Service): Infrastructure Design Generated
+**Timestamp**: 2026-08-31T00:30:00Z
+**User Input**: continuing established auto-accept pattern for this unit
+**AI Response**: Created orchestrator-service-infrastructure-design-plan.md with 10 questions, all filled with suggested option A. Generated infrastructure-design.md and deployment-architecture.md at aidlc-docs/construction/orchestrator-service/infrastructure-design/. Key decisions: multi-stage golang:1.22-alpine Docker build, orchestrator-db (Postgres 16, database-per-service), no shared_artifacts mount (Orchestrator doesn't touch artifact files directly), port 8000 internal-only behind future API Gateway (Unit 9), no read replica/sharding/load balancer (single-user local scale), reuses Unit 1's RabbitMQ topology unchanged, no dedicated monitoring stack. No new ADR — all decisions mirror already-established patterns (ADR-0013, ADR-0009).
+**Context**: Construction Phase, Unit 8, Infrastructure Design stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 8 (Orchestrator Service): Infrastructure Design Approved
+**Timestamp**: 2026-08-31T00:35:00Z
+**User Input**: "ok"
+**AI Response**: Infrastructure Design stage approved. Proceeding to Construction Phase, Unit 8, Code Generation stage.
+**Context**: Construction Phase, Unit 8, Infrastructure Design stage, Step 9 (Record Approval) — stage complete
+
+---
