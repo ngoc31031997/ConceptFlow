@@ -1351,3 +1351,27 @@
 **Context**: Construction Phase, Unit 9, Low-Level Design stage, Step 9 (Record Approval) — stage complete; Functional Design stage evaluation
 
 ---
+
+## Unit 9 (API Gateway): Functional Design Stage SKIPPED
+**Timestamp**: 2026-08-31T01:18:00Z
+**User Input**: Confirmed via AskUserQuestion — "Có, bỏ qua" (skip Functional Design, proceed to NFR Requirements)
+**AI Response**: Functional Design stage skipped for Unit 9 per core-workflow.md's conditional criteria (no new business logic/domain model — pure routing/proxy layer). Proceeding to NFR Requirements.
+**Context**: Construction Phase, Unit 9, Functional Design stage — SKIP (logged per Extension/stage-skip logging convention)
+
+---
+
+## Unit 9 (API Gateway): NFR Requirements Generated
+**Timestamp**: 2026-08-31T01:22:00Z
+**User Input**: continuing established auto-accept pattern
+**AI Response**: Created api-gateway-nfr-requirements-plan.md with 8 questions, all filled with suggested option A. Generated nfr-requirements.md and tech-stack-decisions.md at aidlc-docs/construction/api-gateway/nfr-requirements/. Confirmed Express 4.x (Node.js LTS 20.x) via new ADR-0020. Key decisions: 30s fixed proxy timeout, no auto-retry, unlimited SSE connections (event-loop appropriate at this scale), AMQP consumer auto-reconnect with 5s fixed backoff, no auth/rate-limit (CORS deferred to Unit 10's serving architecture decision), pino structured logging, at-most-once delivery acceptable for progress (Project.Status via GET remains source of truth), no Saga participation.
+**Context**: Construction Phase, Unit 9, NFR Requirements stage, Steps 5-7 (Collect Answers, Generate Artifacts, Present Completion) — awaiting user approval
+
+---
+
+## Unit 9 (API Gateway): NFR Requirements Approved
+**Timestamp**: 2026-08-31T01:25:00Z
+**User Input**: "ok"
+**AI Response**: NFR Requirements stage approved. Proceeding to Construction Phase, Unit 9, NFR Design stage.
+**Context**: Construction Phase, Unit 9, NFR Requirements stage, Step 9 (Record Approval) — stage complete
+
+---
