@@ -327,6 +327,45 @@ services:
     networks:
       - backend
 
+  loki:
+    image: grafana/loki:3.1.1
+    container_name: loki
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki_data:/loki
+    networks:
+      - backend
+
+  promtail:
+    image: grafana/promtail:3.1.1
+    container_name: promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./infra/observability/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    depends_on:
+      - loki
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASS}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "3001:3000"
+    depends_on:
+      - loki
+    networks:
+      - backend
+
 volumes:
   rabbitmq_data:
   shared_artifacts:
@@ -337,6 +376,8 @@ volumes:
   video_assembly_db_data:
   publisher_db_data:
   orchestrator_db_data:
+  loki_data:
+  grafana_data:
 
 networks:
   backend:

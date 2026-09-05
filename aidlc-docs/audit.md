@@ -1608,3 +1608,17 @@ Verified via a real triggered saga against the rebuilt Docker stack: it progress
 
 Verified: `go build/vet/test` clean (Orchestrator, 4 new/updated tests); Web GUI `tsc -b`/`vitest run` (18/18)/`eslint`/`vite build` all clean.
 **Context**: Post-Construction bug-fix pass — root cause of all hangs fixed (event_type envelope location), rendering_completed contract fixed, category_hint scope gap closed with user-approved MVP scope (project-level, not per-scene); TTS's Piper/Rosetta failure is a separate known environment limitation, not addressed in this pass
+
+## New Infra Unit: Centralized Logging (Grafana + Loki + Promtail)
+**Timestamp**: 2026-09-05T04:30:00Z
+**User Input**: "commit trước. approve dùng grafana" (approving Grafana for the earlier centralized-logging request), then approved "Promtail đọc trực tiếp Docker log driver" over having each service push logs directly
+**AI Response**: "Added a Loki + Promtail + Grafana stack to docker-compose.yml — infra-only, same treatment as Unit 1 (RabbitMQ Infrastructure), added directly during this bug-fix session rather than a full fresh per-unit AI-DLC loop. Promtail auto-discovers every container via the Docker socket (docker_sd_configs) and ships logs to Loki with zero code changes to any of the 8 existing services; relabel_configs filters to only com.docker.compose.project=conceptflow-labeled containers, since the dev machine runs other unrelated Docker Compose projects that must not leak in. Grafana (port 3001, GRAFANA_USER/GRAFANA_PASS from .env) has the Loki datasource auto-provisioned. Loki itself has no host port (Grafana-only access). Added infra/observability/{promtail-config.yml, grafana/provisioning/datasources/loki.yml}, GRAFANA_USER/PASS to .env.example, a doc summary at aidlc-docs/construction/observability/code/README.md, and a README.md section.
+
+Verification hit a red herring worth recording: Loki's /label/*/values and Promtail's own /targets HTML page both continued showing containers from an unrelated Docker Compose project on the same machine even after the relabel filter was confirmed loaded — a live LogQL query_range with an explicit recent time window (the reliable check) confirmed only conceptflow-labeled containers actually had log entries flowing; the other two endpoints reflect historical/informational state, not live filtering, which is a known Loki/Promtail UI quirk rather than a bug in this config.
+**Context**: New infra unit added directly (Grafana/Loki/Promtail) — awaiting approval to commit
+
+## Centralized Logging Approved
+**Timestamp**: 2026-09-05T04:35:00Z
+**User Input**: "ok"
+**AI Response**: "User approved the Grafana/Loki/Promtail centralized logging addition. Committing."
+**Context**: New infra unit — Record Approval, committing
