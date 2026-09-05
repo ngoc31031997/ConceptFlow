@@ -11,6 +11,7 @@ type startRenderSagaRequest struct {
 	ProjectID           string  `json:"project_id"`
 	ScriptContent       string  `json:"script_content"`
 	PluginID            string  `json:"plugin_id"`
+	CategoryHint        string  `json:"category_hint"`
 	VoiceLanguage       string  `json:"voice_language"`
 	BackgroundMusicPath *string `json:"background_music_path,omitempty"`
 }
@@ -59,6 +60,7 @@ type projectResponse struct {
 	VideoPath       *string         `json:"video_path,omitempty"`
 	Scenes          []sceneResponse `json:"scenes"`
 	PluginID        string          `json:"plugin_id"`
+	CategoryHint    string          `json:"category_hint"`
 	VoiceLanguage   string          `json:"voice_language"`
 	YoutubeVideoURL *string         `json:"youtube_video_url,omitempty"`
 	ErrorMessage    *string         `json:"error_message,omitempty"`
@@ -91,6 +93,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		VideoPath:       p.VideoPath,
 		Scenes:          scenes,
 		PluginID:        p.PluginID,
+		CategoryHint:    p.CategoryHint,
 		VoiceLanguage:   string(p.VoiceLanguage),
 		YoutubeVideoURL: p.YoutubeVideoURL,
 		ErrorMessage:    p.ErrorMessage,

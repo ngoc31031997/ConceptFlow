@@ -13,6 +13,7 @@ type StartRenderSagaInput struct {
 	ProjectID           string
 	ScriptContent       string
 	PluginID            string
+	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
 	VoiceLanguage       domain.VoiceLanguage
 	BackgroundMusicPath *string // optional, business-rules.md Rule 3
 }
@@ -50,6 +51,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		SagaID:              sagaID,
 		ScriptContent:       input.ScriptContent,
 		PluginID:            input.PluginID,
+		CategoryHint:        input.CategoryHint,
 		VoiceLanguage:       input.VoiceLanguage,
 		BackgroundMusicPath: input.BackgroundMusicPath,
 	}

@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS projects (
     status TEXT NOT NULL,
     script_content TEXT NOT NULL DEFAULT '',
     plugin_id TEXT NOT NULL DEFAULT '',
+    category_hint TEXT NOT NULL DEFAULT '',
     voice_language TEXT NOT NULL DEFAULT '',
     background_music_path TEXT,
     scenes JSONB NOT NULL DEFAULT '[]',

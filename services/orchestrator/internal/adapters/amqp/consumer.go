@@ -101,6 +101,23 @@ func (c *Consumer) consumeDLQ(ctx context.Context, queue string) error {
 	return nil
 }
 
+// resolveEventType extracts the event type from an inbound event envelope.
+// The 6 upstream Python services publish events per Unit 1's approved
+// envelope standard (messaging-design.md), which carries "event_type"
+// INSIDE payload, not as a top-level envelope field — unlike the commands
+// Orchestrator itself publishes (application/dispatch), which use a
+// top-level EventType (a Go-only convention no other service reads, since
+// each command queue is already dedicated to one command type). Found via
+// live E2E testing: reading envelope.EventType for an inbound event always
+// came back empty, so every single event was silently dropped as "unknown
+// event_type" and every Saga hung forever.
+func resolveEventType(envelope domain.Envelope) string {
+	if et, ok := envelope.Payload["event_type"].(string); ok && et != "" {
+		return et
+	}
+	return envelope.EventType
+}
+
 func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 	envelope, err := DecodeEnvelope(d.Body)
 	if err != nil {
@@ -121,15 +138,17 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 		return
 	}
 
+	eventType := resolveEventType(envelope)
+
 	err = c.handler.Execute(ctx, application.StepEvent{
 		MessageID: envelope.MessageID,
 		SagaID:    envelope.SagaID,
 		ProjectID: envelope.ProjectID,
-		EventType: envelope.EventType,
+		EventType: eventType,
 		Payload:   envelope.Payload,
 	})
 	if err != nil {
-		c.logger.ErrorContext(ctx, "event processing failed, nacking for redelivery", "error", err, "event_type", envelope.EventType)
+		c.logger.ErrorContext(ctx, "event processing failed, nacking for redelivery", "error", err, "event_type", eventType)
 		_ = d.Nack(false, true)
 		return
 	}

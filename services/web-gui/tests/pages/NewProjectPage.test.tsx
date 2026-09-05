@@ -9,10 +9,12 @@ describe("NewProjectPage", () => {
     vi.restoreAllMocks();
   });
 
-  it("disables submit until script and plugin are set", async () => {
+  it("disables submit until script, plugin and category are set", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ plugins: [{ plugin_id: "coding", name: "Lập trình" }] }),
+      json: async () => ({
+        plugins: [{ plugin_id: "coding", name: "Lập trình", supported_categories: ["algorithm", "concept"] }],
+      }),
     }) as unknown as typeof fetch;
 
     render(
@@ -35,6 +37,11 @@ describe("NewProjectPage", () => {
     fireEvent.change(screen.getByTestId("new-project-plugin-select"), {
       target: { value: "coding" },
     });
+
+    expect(screen.getByTestId("new-project-submit-button")).toBeDisabled();
+
+    await waitFor(() => expect(screen.getByText("Thuật toán")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Thuật toán"));
 
     expect(screen.getByTestId("new-project-submit-button")).not.toBeDisabled();
   });

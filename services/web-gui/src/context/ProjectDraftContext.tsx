@@ -3,6 +3,7 @@ import { createContext, useReducer, type Dispatch, type ReactNode } from "react"
 export interface ProjectDraft {
   scriptContent: string;
   pluginId: string | null;
+  categoryHint: string | null;
   voiceLanguage: "vi" | "en";
   backgroundMusicPath: string | null;
 }
@@ -10,6 +11,7 @@ export interface ProjectDraft {
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
   | { type: "SET_PLUGIN"; payload: string }
+  | { type: "SET_CATEGORY"; payload: string }
   | { type: "SET_VOICE_LANGUAGE"; payload: "vi" | "en" }
   | { type: "SET_BACKGROUND_MUSIC"; payload: string | null }
   | { type: "RESET" };
@@ -17,6 +19,7 @@ export type ProjectDraftAction =
 const initialDraft: ProjectDraft = {
   scriptContent: "",
   pluginId: null,
+  categoryHint: null,
   voiceLanguage: "vi",
   backgroundMusicPath: null,
 };
@@ -26,7 +29,9 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
     case "SET_SCRIPT":
       return { ...state, scriptContent: action.payload };
     case "SET_PLUGIN":
-      return { ...state, pluginId: action.payload };
+      return { ...state, pluginId: action.payload, categoryHint: null };
+    case "SET_CATEGORY":
+      return { ...state, categoryHint: action.payload };
     case "SET_VOICE_LANGUAGE":
       return { ...state, voiceLanguage: action.payload };
     case "SET_BACKGROUND_MUSIC":

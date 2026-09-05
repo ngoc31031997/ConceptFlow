@@ -120,6 +120,7 @@ type Project struct {
 
 	ScriptContent       string
 	PluginID            string
+	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
 	VoiceLanguage       VoiceLanguage
 	BackgroundMusicPath *string // optional static input, set at Saga start, reused unchanged at assemble_video (Rule 3)
 

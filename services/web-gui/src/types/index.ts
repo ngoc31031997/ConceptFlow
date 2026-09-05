@@ -2,6 +2,7 @@ export interface RenderInput {
   project_id: string;
   script_content: string;
   plugin_id: string;
+  category_hint: string;
   voice_language: "vi" | "en";
   background_music_path?: string;
 }
@@ -17,6 +18,7 @@ export interface Project {
   video_path?: string;
   scenes: Scene[];
   plugin_id: string;
+  category_hint: string;
   voice_language: string;
   youtube_video_url?: string;
   error_message?: string;
@@ -34,6 +36,7 @@ export interface ProgressMessage {
 export interface Plugin {
   plugin_id: string;
   name: string;
+  supported_categories: string[];
 }
 
 export interface PublishMetadata {

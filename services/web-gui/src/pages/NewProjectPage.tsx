@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { PluginSelector } from "../components/PluginSelector";
+import { CategorySelector } from "../components/CategorySelector";
 import { VoiceLanguageSelector } from "../components/VoiceLanguageSelector";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { AppShell } from "../components/AppShell";
@@ -16,10 +17,11 @@ export function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = draft.scriptContent.trim().length > 0 && draft.pluginId !== null;
+  const canSubmit =
+    draft.scriptContent.trim().length > 0 && draft.pluginId !== null && draft.categoryHint !== null;
 
   async function handleSubmit() {
-    if (!canSubmit || draft.pluginId === null) return;
+    if (!canSubmit || draft.pluginId === null || draft.categoryHint === null) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -28,6 +30,7 @@ export function NewProjectPage() {
         project_id: projectId,
         script_content: draft.scriptContent,
         plugin_id: draft.pluginId,
+        category_hint: draft.categoryHint,
         voice_language: draft.voiceLanguage,
         background_music_path: draft.backgroundMusicPath ?? undefined,
       });
@@ -62,6 +65,12 @@ export function NewProjectPage() {
           />
         </div>
 
+        <CategorySelector
+          pluginId={draft.pluginId}
+          value={draft.categoryHint}
+          onChange={(category) => dispatch({ type: "SET_CATEGORY", payload: category })}
+        />
+
         <BackgroundMusicPicker
           value={draft.backgroundMusicPath}
           onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
@@ -73,7 +82,9 @@ export function NewProjectPage() {
               {error}
             </p>
           )}
-          {!error && !canSubmit && <p className={glass.helperText}>Nhập script và chọn plugin để tiếp tục</p>}
+          {!error && !canSubmit && (
+            <p className={glass.helperText}>Nhập script, chọn plugin và danh mục để tiếp tục</p>
+          )}
           <button
             type="button"
             data-testid="new-project-submit-button"

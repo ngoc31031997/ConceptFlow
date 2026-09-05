@@ -217,6 +217,13 @@ func TestHandleStepEventUseCase_SceneRenderedProgressOnly(t *testing.T) {
 	}
 }
 
+// TestHandleStepEventUseCase_Rule2_AudioPathFromStep3NotOverwritten also
+// guards a real cross-service contract bug found via live E2E testing:
+// Rendering Service's approved interface-contracts.md carries each scene's
+// rendered clip path as "animation_path" on its own scene_rendered event —
+// rendering_completed carries only "scene_count", no per-scene data. So the
+// clip path must already be merged (by handleSceneRenderedProgress, as each
+// scene_rendered event arrives) by the time rendering_completed fires.
 func TestHandleStepEventUseCase_Rule2_AudioPathFromStep3NotOverwritten(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -228,13 +235,23 @@ func TestHandleStepEventUseCase_Rule2_AudioPathFromStep3NotOverwritten(t *testin
 	}
 	repo.steps[stepKey("saga-1", domain.StepRenderScenes)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress}
 
+	// Rendering Service reports the clip path per-scene, via scene_rendered's
+	// "animation_path" — not in the later rendering_completed event.
 	err := uc.Execute(context.Background(), StepEvent{
-		SagaID: "saga-1", ProjectID: "proj-1", EventType: "rendering_completed",
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "scene_rendered",
 		Payload: map[string]interface{}{
-			"scene_clip_paths": []interface{}{
-				map[string]interface{}{"scene_index": float64(0), "clip_path": "clip0.mp4"},
-			},
+			"scene_index":    float64(0),
+			"scene_total":    float64(1),
+			"animation_path": "clip0.mp4",
 		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error on scene_rendered: %v", err)
+	}
+
+	err = uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "rendering_completed",
+		Payload: map[string]interface{}{"scene_count": float64(1)},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

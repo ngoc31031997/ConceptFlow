@@ -40,6 +40,8 @@ Header `X-Request-ID` — Orchestrator không tự sinh REST correlation (Gatewa
 ### Events Consumed (12 loại, từ `orchestrator.events`)
 6 success (`script_parsed`, `scenes_classified`, `speech_synthesized`, `rendering_completed`, `video_assembled`, `video_published`) + 6 failure (`parse_failed`, `classification_failed`, `synthesis_failed`, `rendering_failed`, `assembly_failed`, `publish_failed`). Progress event `scene_rendered` (Rendering Service, per-scene) cũng consume để forward qua `progress.fanout` (không advance state machine).
 
+**Revision (2026-09-05)**: `scene_rendered` không chỉ forward progress — nó là nguồn DUY NHẤT của `clip_path` mỗi scene (field `animation_path` trong payload, theo Rendering Service's đã-duyệt `interface-contracts.md`). `rendering_completed` chỉ mang `scene_count`, KHÔNG có `scene_clip_paths` như thiết kế ban đầu giả định — 2 đặc tả trôi lệch nhau vì duyệt độc lập, phát hiện qua kiểm thử E2E thật (saga bị treo). `HandleStepEventUseCase` giờ merge `ClipPath` ngay khi mỗi `scene_rendered` đến (`Scene.ClipPath` từ `payload.animation_path`), thay vì đợi `rendering_completed`.
+
 ### Progress Messages Published (ADR-0017, tới `progress.fanout`)
 ```json
 {

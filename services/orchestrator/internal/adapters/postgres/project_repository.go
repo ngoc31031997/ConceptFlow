@@ -25,7 +25,7 @@ func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 // Get loads a Project by project_id, or domain.ErrProjectNotFound.
 func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT project_id, saga_id, status, script_content, plugin_id, voice_language,
+		SELECT project_id, saga_id, status, script_content, plugin_id, category_hint, voice_language,
 		       background_music_path, scenes, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_video_url, error_message
 		FROM projects WHERE project_id = $1`, projectID)
@@ -37,7 +37,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		tagsJSON              []byte
 		youtubeVisibility     *string
 	)
-	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.PluginID, &voiceLanguage,
+	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.PluginID, &p.CategoryHint, &voiceLanguage,
 		&p.BackgroundMusicPath, &scenesJSON, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubeVideoURL, &p.ErrorMessage)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -83,20 +83,20 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	}
 
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO projects (project_id, saga_id, status, script_content, plugin_id, voice_language,
+		INSERT INTO projects (project_id, saga_id, status, script_content, plugin_id, category_hint, voice_language,
 		                       background_music_path, scenes, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_video_url, error_message, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, now())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
-		    plugin_id = EXCLUDED.plugin_id, voice_language = EXCLUDED.voice_language,
+		    plugin_id = EXCLUDED.plugin_id, category_hint = EXCLUDED.category_hint, voice_language = EXCLUDED.voice_language,
 		    background_music_path = EXCLUDED.background_music_path, scenes = EXCLUDED.scenes,
 		    video_path = EXCLUDED.video_path, youtube_title = EXCLUDED.youtube_title,
 		    youtube_description = EXCLUDED.youtube_description, youtube_tags = EXCLUDED.youtube_tags,
 		    youtube_visibility = EXCLUDED.youtube_visibility, youtube_video_url = EXCLUDED.youtube_video_url,
 		    error_message = EXCLUDED.error_message, updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.PluginID,
-		string(project.VoiceLanguage), project.BackgroundMusicPath, scenesJSON, project.VideoPath,
+		project.CategoryHint, string(project.VoiceLanguage), project.BackgroundMusicPath, scenesJSON, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility,
 		project.YoutubeVideoURL, project.ErrorMessage)
 	return err

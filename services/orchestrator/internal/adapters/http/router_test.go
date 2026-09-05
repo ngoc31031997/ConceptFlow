@@ -54,7 +54,7 @@ func TestHandleStartRenderSaga_Created(t *testing.T) {
 	)
 
 	body, _ := json.Marshal(map[string]interface{}{
-		"project_id": "p1", "script_content": "s", "plugin_id": "plugin", "voice_language": "en",
+		"project_id": "p1", "script_content": "s", "plugin_id": "plugin", "category_hint": "concept", "voice_language": "en",
 	})
 	req := httptest.NewRequest("POST", "/v1/sagas/render", bytes.NewReader(body))
 	rec := httptest.NewRecorder()

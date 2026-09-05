@@ -84,21 +84,6 @@ func parseSynthesizedScenes(payload map[string]interface{}) map[int]synthesizedS
 	return out
 }
 
-// parseClipPaths decodes the rendering_completed payload's
-// scene_clip_paths array into a scene_index-keyed map of clip_path.
-func parseClipPaths(payload map[string]interface{}) map[int]string {
-	raw, _ := payload["scene_clip_paths"].([]interface{})
-	out := make(map[int]string, len(raw))
-	for _, item := range raw {
-		m, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		out[intFromMap(m, "scene_index")] = stringFromMap(m, "clip_path")
-	}
-	return out
-}
-
 // scenesToPayload serializes accumulated Scene values into the
 // []map[string]interface{} shape used by outbound command payloads.
 func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
@@ -128,6 +113,20 @@ func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
 			m["duration_seconds"] = s.DurationSeconds
 		}
 		out = append(out, m)
+	}
+	return out
+}
+
+// scenesToPayloadForClassification is scenesToPayload plus a per-scene
+// "category_hint" — Content Plugin Service's approved business-rules.md
+// Rule 1 requires the Creator-chosen category on every scene (it is the
+// sole source of truth; the service never infers it). The current GUI
+// collects one category per project rather than per scene, so the same
+// value is applied to every scene of the project (a known MVP tradeoff).
+func scenesToPayloadForClassification(scenes []domain.Scene, categoryHint string) []map[string]interface{} {
+	out := scenesToPayload(scenes)
+	for _, m := range out {
+		m["category_hint"] = categoryHint
 	}
 	return out
 }

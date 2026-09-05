@@ -69,8 +69,8 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ProjectID == "" || req.ScriptContent == "" || req.PluginID == "" {
-		writeError(w, http.StatusBadRequest, "project_id, script_content and plugin_id are required")
+	if req.ProjectID == "" || req.ScriptContent == "" || req.PluginID == "" || req.CategoryHint == "" {
+		writeError(w, http.StatusBadRequest, "project_id, script_content, plugin_id and category_hint are required")
 		return
 	}
 	lang := domain.VoiceLanguage(req.VoiceLanguage)
@@ -83,6 +83,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		ProjectID:           req.ProjectID,
 		ScriptContent:       req.ScriptContent,
 		PluginID:            req.PluginID,
+		CategoryHint:        req.CategoryHint,
 		VoiceLanguage:       lang,
 		BackgroundMusicPath: req.BackgroundMusicPath,
 	})

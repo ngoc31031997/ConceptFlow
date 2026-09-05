@@ -55,6 +55,7 @@ describe("api/client", () => {
       project_id: "p1",
       script_content: "script",
       plugin_id: "coding",
+      category_hint: "concept",
       voice_language: "vi",
     });
 

@@ -102,9 +102,33 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 	return uc.handleSuccess(ctx, event, stepName)
 }
 
+// handleSceneRenderedProgress does double duty: it publishes the live
+// progress ping (Rule 7) AND is the only place a scene's ClipPath is ever
+// stored — Rendering Service's approved interface-contracts.md carries the
+// rendered clip's path as "animation_path" on each per-scene scene_rendered
+// event, not in the batch-level rendering_completed event (which only
+// carries "scene_count"). onRenderingCompleted (below) relies on ClipPath
+// already being populated by the time it runs.
 func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Context, event StepEvent) error {
 	sceneIndex := intFromPayload(event.Payload, "scene_index")
 	sceneTotal := intFromPayload(event.Payload, "scene_total")
+	clipPath := stringFromPayload(event.Payload, "animation_path")
+
+	if clipPath != "" && sceneIndex != nil {
+		project, err := uc.repo.Get(ctx, event.ProjectID)
+		if err != nil {
+			return err
+		}
+		for i := range project.Scenes {
+			if project.Scenes[i].SceneIndex == *sceneIndex {
+				project.Scenes[i].ClipPath = clipPath
+			}
+		}
+		if err := uc.repo.Save(ctx, project); err != nil {
+			return err
+		}
+	}
+
 	msg := domain.ProgressMessage{
 		ProjectID:  event.ProjectID,
 		Step:       string(domain.StepRenderScenes),
@@ -200,7 +224,7 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 	}
 	payload := map[string]interface{}{
 		"plugin_id": project.PluginID,
-		"scenes":    scenesToPayload(scenes),
+		"scenes":    scenesToPayloadForClassification(scenes, project.CategoryHint),
 	}
 	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "content_plugin", string(domain.StepClassifyScenes), payload); err != nil {
 		return err
@@ -285,22 +309,12 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRendering)
 }
 
-// onRenderingCompleted merges clip_path by scene_index and dispatches
-// assemble_video, reusing audio_path stored from step 3 — never re-reading
-// it from this event (Rule 2, Rendering Service does not return audio_path).
+// onRenderingCompleted dispatches assemble_video, reusing ClipPath (already
+// merged per-scene by handleSceneRenderedProgress as each scene finished —
+// rendering_completed itself carries only "scene_count", no per-scene data)
+// and audio_path stored from step 3 — never re-reading it from this event
+// (Rule 2, Rendering Service does not return audio_path).
 func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
-	clipPaths := parseClipPaths(event.Payload)
-	for idx, clipPath := range clipPaths {
-		for i := range project.Scenes {
-			if project.Scenes[i].SceneIndex == idx {
-				project.Scenes[i].ClipPath = clipPath
-			}
-		}
-	}
-	if err := uc.repo.Save(ctx, project); err != nil {
-		return err
-	}
-
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
