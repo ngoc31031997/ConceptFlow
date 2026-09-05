@@ -1,17 +1,17 @@
 # Integration Test Instructions
 
 ## Status: NOT executed in this pass
-This pass validated `docker compose config` (syntax/topology) and built 2 of 8 service images, but did **not** run `docker compose up` for the full stack and did **not** execute any cross-service integration test. Reasons:
+This pass (and the original 2026-08-31 pass) validated `docker compose config` (full 16-container topology, now including api-gateway and web-gui) but did **not** run `docker compose up` for the full stack and did **not** execute any cross-service integration test. Reasons:
 1. Full stack startup requires real secrets (`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`/`REDIRECT_URI` for the `publisher` service's YouTube upload flow) that are not available in this environment.
-2. Starting the full stack would leave 15 containers (8 app services + rabbitmq + 6 postgres sidecars — content-plugin, script-processing, tts, rendering, video-assembly, publisher each have their own DB) running, which the Build and Test task scope explicitly asked to avoid.
-3. API Gateway and Web GUI — which normally originate the sagas below via their REST/SSE calls into the orchestrator — are not yet built, so an end-to-end trigger path doesn't fully exist yet.
+2. Starting the full stack would leave 16 containers (9 app services + rabbitmq + 6 postgres sidecars — content-plugin, script-processing, tts, rendering, video-assembly, publisher each have their own DB) running, which the Build and Test task scope explicitly asked to avoid.
+3. Docker Desktop was not running on the verification machine during this pass.
 
-The scenarios below are written from the Saga message flow documented in `aidlc-docs/construction/orchestrator-service/low-level-design/sequence-flows.md`, as **instructions for a future integration-test run**, not results of an actual run.
+All 10 units are now built, so a true end-to-end browser-driven path (Web GUI → API Gateway → Orchestrator) exists for the first time. The scenarios below are written from the Saga message flow documented in `aidlc-docs/construction/orchestrator-service/low-level-design/sequence-flows.md` and the Web GUI's `sequence-flows.md`, as **instructions for a future integration-test run**, not results of an actual run.
 
 ## Prerequisites (for when this is actually run)
 - `.env` populated with real `RABBITMQ_USER`/`PASS`, `POSTGRES_USER`/`PASS`, and Google OAuth credentials (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`) — a real Google Cloud project with the YouTube Data API enabled and an OAuth consent screen configured is needed to actually exercise the publisher's upload step.
-- Docker Desktop running with enough resources for 15 containers (8 services + rabbitmq + 6 Postgres instances).
-- Since API Gateway doesn't exist yet, sagas must be triggered directly against `orchestrator`'s REST API (e.g. `POST /v1/sagas/render`) with `curl`/Postman rather than through a UI.
+- Docker Desktop running with enough resources for 16 containers (9 services + rabbitmq + 6 Postgres instances).
+- Sagas can now be triggered either directly against `orchestrator`'s REST API (via API Gateway's `/v1/sagas/render` proxy route, e.g. `curl`/Postman) or end-to-end through the browser at `http://localhost:3000` (Web GUI) — the latter is the more representative real-user path and should be preferred once available.
 
 ## Test Scenarios (derived from sequence-flows.md)
 
@@ -47,6 +47,18 @@ The scenarios below are written from the Saga message flow documented in `aidlc-
 - **Test Steps**: Run a complete render saga to completion, then `POST` a publish saga; confirm publisher calls the YouTube Data API and the Project reaches a terminal `published` status.
 - **Expected Results**: Video appears on the configured YouTube channel (private/unlisted recommended for test runs).
 - **Note**: This is the only scenario that truly requires external network access and real secrets; the others can run against a fully local Docker Compose stack with RabbitMQ/Postgres only.
+
+### Scenario 6: End-to-End via Web GUI (browser-driven, new — Web GUI's sequence-flows.md Flows 1-4)
+- **Description**: A Creator opens `http://localhost:3000`, composes a script, selects a plugin, submits render, watches live progress via SSE, previews the resulting video, connects YouTube, and publishes — with zero direct API calls from the tester.
+- **Setup**: Full stack up (`docker compose up -d`), all services healthy, real Google OAuth credentials configured.
+- **Test Steps**:
+  1. Open `http://localhost:3000`, fill in script + plugin + language, submit.
+  2. Confirm navigation to `/projects/:id/render` and that `ProgressTracker` updates live as steps complete (verifies API Gateway's SSE fanout end-to-end, not just at the orchestrator level).
+  3. Confirm auto-navigation to `/projects/:id/result` once `ready_to_publish`.
+  4. Play the video via `VideoPlayer`, click "Kết nối YouTube", complete the OAuth consent flow, fill in `PublishForm`, submit.
+  5. Confirm the page shows the final `youtube_video_url`.
+- **Expected Results**: The full user journey (Epics A-E in `stories.md`) completes without needing curl/Postman — this is the first scenario that validates the **entire system as a real user would experience it**, not just service-to-service messaging.
+- **Note**: This scenario was not possible before Unit 10 (Web GUI) completed Code Generation; it is the primary reason to prioritize this pass before proceeding to Operations.
 
 ## Setup Integration Test Environment
 ```bash

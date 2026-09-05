@@ -8,7 +8,7 @@
 - **Pipeline config file location**: `.github/workflows/ci.yml` (does not exist yet — to be created).
 
 ## 2. Proposed Workflow Structure
-Given this is a polyglot monorepo (6 Python/FastAPI services + 1 Go service + 1 infra-only service), use a matrix job for the Python services plus a dedicated Go job, both gated behind path filters so unrelated service changes don't retrigger unrelated builds:
+Given this is a polyglot monorepo (6 Python/FastAPI services + 1 Go service + 2 Node.js services + 1 infra-only service), use a matrix job for the Python services, a dedicated Go job, and a matrix job for the Node.js services, all gated behind path filters so unrelated service changes don't retrigger unrelated builds:
 
 ```yaml
 name: CI
@@ -48,6 +48,23 @@ jobs:
       - run: go test ./... -v
         working-directory: services/orchestrator
 
+  node-services:
+    strategy:
+      matrix:
+        service: [api-gateway, web-gui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+        working-directory: services/${{ matrix.service }}
+      - run: npx eslint .
+        working-directory: services/${{ matrix.service }}
+      - run: npm test
+        working-directory: services/${{ matrix.service }}
+
   compose-validate:
     runs-on: ubuntu-latest
     steps:
@@ -57,7 +74,7 @@ jobs:
       - run: docker compose build
 
   sonarqube:
-    needs: [python-services, orchestrator]
+    needs: [python-services, orchestrator, node-services]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,11 +109,12 @@ jobs:
   sonar.sources=services
   sonar.tests=services
   sonar.test.inclusions=**/tests/**,**/*_test.go
-  sonar.exclusions=**/.venv/**,**/__pycache__/**
+  sonar.exclusions=**/.venv/**,**/__pycache__/**,**/node_modules/**,**/dist/**
   sonar.python.coverage.reportPaths=reports/coverage-*.xml
   sonar.go.coverage.reportPaths=services/orchestrator/coverage.out
+  sonar.javascript.lcov.reportPaths=services/api-gateway/coverage/lcov.info,services/web-gui/coverage/lcov.info
   ```
-  Note: Python coverage reports don't currently exist (no `pytest-cov` configured — see unit-test-instructions.md); add `pytest-cov` and `--cov --cov-report=xml:reports/coverage-<service>.xml` to the pytest invocation before wiring coverage into Sonar. For Go, add `go test ./... -coverprofile=coverage.out`.
+  Note: no coverage reports currently exist for any language (no `pytest-cov`/Jest `--coverage`/Vitest `--coverage` configured — see unit-test-instructions.md); add coverage tooling per language before wiring coverage into Sonar. For Go, add `go test ./... -coverprofile=coverage.out`.
 - **Quality Gate**: Configure the pipeline to fail the build if the SonarQube Quality Gate fails (block merge on new bugs/vulnerabilities/coverage regression).
 
 ## 4. OWASP Security Scanning
@@ -140,6 +158,9 @@ cd services/<service> && source .venv/bin/activate && pytest tests/ -q
 
 # Go service
 cd services/orchestrator && go build ./... && go vet ./... && go test ./...
+
+# Node services
+cd services/<api-gateway|web-gui> && npm install && npx eslint . && npm test
 
 # Compose validation
 docker compose config && docker compose build

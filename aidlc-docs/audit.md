@@ -1527,3 +1527,19 @@
 **Context**: Construction Phase, Unit 10 COMPLETE -> CONSTRUCTION PHASE COMPLETE (10/10 units)
 
 ---
+
+## Build and Test — Extended to Full 10/10 Scope (api-gateway + web-gui)
+**Timestamp**: 2026-09-05T01:00:00Z
+**User Input**: "ok go" (continuing to Build and Test now that Construction Phase is complete)
+**AI Response**: "Extended the 2026-08-31 Build and Test pass (which covered 8/10 units) to add api-gateway and web-gui. Re-verified: api-gateway (npx eslint clean, npm test 28/28 pass via Jest) and web-gui (npx eslint clean — 0 errors/2 acceptable warnings, npm test 18/18 pass via Vitest, npx tsc -b clean, npx vite build clean). docker compose config validated the full 16-container topology (9 buildable services + rabbitmq + 6 Postgres sidecars). Full docker compose build across all 9 services was not re-run (Docker Desktop not running on the verification machine) — documented as a gap in build-and-test-summary.md's Next Steps. Updated build-and-test-summary.md, build-instructions.md, unit-test-instructions.md, ci-cd-integration-instructions.md (added Node.js CI matrix job), and integration-test-instructions.md (added Scenario 6: full browser-driven E2E via Web GUI, now possible for the first time). Total: 198/198 unit tests pass across all 8 application units, 0 failures. No bugs found in application logic."
+**Context**: CONSTRUCTION PHASE COMPLETE -> Build and Test (extended to 10/10 units) — presented for approval
+
+---
+
+## Build and Test — Approved (10/10 units)
+**Timestamp**: 2026-09-05T01:05:00Z
+**User Input**: "ok"
+**AI Response**: "User approved the extended Build and Test pass covering all 10 units. Proceeding to commit."
+**Context**: Build and Test stage, Record Approval — stage complete
+
+---
