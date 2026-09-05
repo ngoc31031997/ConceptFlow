@@ -1563,3 +1563,34 @@ Rebuilt and redeployed `api-gateway` and `web-gui` Docker images, confirmed via 
 **Context**: Post-Build-and-Test — Record Approval, committing
 
 ---
+
+## Web GUI: Add "Dùng mẫu" Script Template Button
+**Timestamp**: 2026-09-05T02:20:00Z
+**User Input**: "Nội dung script chỗ này cho tôi 1 template sẵn được ko"
+**AI Response**: "Added a 'Dùng mẫu' (Use template) ghost button next to 'Nhập từ file' in ScriptEditor. Clicking it fills the textarea with a 2-scene sample script that correctly demonstrates the Script Processing Service's syntax rules (business-rules.md): sequential '## Scene N' headings, non-empty narration, an optional '>' illustration hint (shown on Scene 1, omitted on Scene 2 to demonstrate it's optional), and one language-annotated code fence per scene. Verified: npx tsc -b clean, npx vitest run 18/18 pass, npx eslint . clean, rebuilt web-gui Docker image, confirmed via Playwright screenshot against the running container that the button fills the textarea with the exact template text."
+**Context**: Post-Construction UX addition — presented for approval
+
+---
+
+## Web GUI: Script Template Changed to Java for-loop Example
+**Timestamp**: 2026-09-05T02:25:00Z
+**User Input**: "bạn hãy tạo 1 scirpt mẫu giải thích for loop bằng java rồi dùng nó cho button dùng mẫu"
+**AI Response**: "Replaced ScriptEditor's SCRIPT_TEMPLATE constant with a Java for-loop example (Scene 1: basic for-loop syntax with a print statement + illustration hint; Scene 2: summing an array's elements, code_language 'java', no illustration hint to keep demonstrating it's optional). Verified: tsc/vitest/eslint clean, rebuilt web-gui Docker image, confirmed via script against the running container that the button fills the exact new Java template text."
+**Context**: Post-Construction UX tweak — presented for approval
+
+---
+
+## Post-Construction: Fixed 2 Cross-Service Contract Bugs + Approved Grafana for Centralized Logging
+**Timestamp**: 2026-09-05T03:00:00Z
+**User Input**: "hình như có lỗi rồi, và có thể thêm 1 con server log tập trung mọi service dc ko nhỉ" then "commit trước. approve dùng grafana"
+**AI Response**: "Investigated via `docker compose logs`, found the render saga was hanging at parse_script forever — RabbitMQ showed `KeyError: 'raw_script'` on every redelivery. Root cause: two independently-approved units' contracts drifted apart because integration testing between them was never actually run (flagged as a known gap in build-and-test/integration-test-instructions.md). Found and fixed 2 such bugs by systematically diffing every Orchestrator dispatch payload against every downstream consumer's actual field reads:
+1. `parse_script`: Orchestrator sends `script_content` (per its own approved interface-contracts.md), Script Processing's consumer read `raw_script` (per ITS approved interface-contracts.md) — the two Unit LLDs simply disagreed. Fixed Script Processing's consumer.py to read `script_content` (the more system-wide-consistent name, matching RenderInput/GUI/Project entity); updated its interface-contracts.md with a revision note and its test's envelope key.
+2. `synthesize_speech`: TTS Service's approved contract requires each scene to carry its own `language` key; Orchestrator sent a single top-level `voice_language` instead. Fixed by adding `scenesToPayloadForSynthesis()` in Orchestrator (event_payload.go) that injects `language` per scene, used in both the normal dispatch (handle_step_event.go) and the retry-rebuild path (retry_step.go) — the TTS-side unit needed no change since it already matched its own approved contract. Added a regression test (`TestHandleStepEventUseCase_ScenesClassified_DispatchesSynthesizeSpeechWithPerSceneLanguage`) asserting the payload shape.
+A third suspected mismatch was identified but NOT yet fixed: Orchestrator's `onRenderingCompleted` expects a `scene_clip_paths` array on the `rendering_completed` event, but Rendering Service's approved contract only sends `scene_count` there — the actual clip path arrives per-scene via `animation_path` on each `scene_rendered` event, which Orchestrator currently treats as a progress-only ping and discards. Flagged for a follow-up fix; not committed in this pass.
+
+User approved: commit the completed fixes now (this pass), and use Grafana (with Loki, most likely) for the requested centralized logging server — to be scoped as a new construction unit in a follow-up.
+
+Verified: `go build ./... && go vet ./... && go test ./...` clean (Orchestrator, including the new regression test); script-processing's 28/28 pytest pass (verified via Docker python:3.12-slim, consistent with the project's established verification method for this service).
+**Context**: Post-Construction bug-fix pass — 2 of 3 identified contract bugs fixed and approved for commit; 1 remains open; centralized logging (Grafana) approved as a new follow-up unit, not yet scoped
+
+---

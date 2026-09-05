@@ -228,8 +228,7 @@ func (uc *HandleStepEventUseCase) onScenesClassified(ctx context.Context, event 
 		return err
 	}
 	payload := map[string]interface{}{
-		"scenes":         scenesToPayload(project.Scenes),
-		"voice_language": string(project.VoiceLanguage),
+		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage)),
 	}
 	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
 		return err

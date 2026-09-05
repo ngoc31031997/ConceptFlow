@@ -35,7 +35,7 @@ def make_envelope(message_id: str = "msg-1", raw_script: str = "## Scene 1\nhell
         "project_id": "project-1",
         "schema_version": "1.0",
         "timestamp": "2026-08-07T00:00:00Z",
-        "payload": {"raw_script": raw_script},
+        "payload": {"script_content": raw_script},
     }
     return json.dumps(envelope).encode("utf-8")
 

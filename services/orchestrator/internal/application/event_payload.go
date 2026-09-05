@@ -132,6 +132,19 @@ func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
 	return out
 }
 
+// scenesToPayloadForSynthesis is scenesToPayload plus a per-scene "language"
+// key — the TTS Service's approved interface-contracts.md requires
+// synthesize_speech's scenes to each carry "language" (mirroring the
+// synchronous TTSEnginePort.synthesize(text, language, ...) signature this
+// command replaced), not a single top-level voice_language field.
+func scenesToPayloadForSynthesis(scenes []domain.Scene, language string) []map[string]interface{} {
+	out := scenesToPayload(scenes)
+	for _, m := range out {
+		m["language"] = language
+	}
+	return out
+}
+
 func stringFromPayload(payload map[string]interface{}, key string) string {
 	return stringFromMap(payload, key)
 }

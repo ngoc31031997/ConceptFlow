@@ -59,7 +59,7 @@ class ParseScriptCommandHandler:
             await message.ack()
             return
 
-        raw_script = envelope["payload"]["raw_script"]
+        raw_script = envelope["payload"]["script_content"]
 
         try:
             parsed = self._use_case.parse(raw_script)

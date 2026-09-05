@@ -50,6 +50,56 @@ func TestHandleStepEventUseCase_ScriptParsed_DispatchesClassifyScenes(t *testing
 	}
 }
 
+// TestHandleStepEventUseCase_ScenesClassified_DispatchesSynthesizeSpeechWithPerSceneLanguage
+// guards against a real cross-service contract bug found via live E2E testing:
+// TTS Service's approved interface-contracts.md requires each scene in the
+// synthesize_speech payload to carry its own "language" key — a top-level
+// "voice_language" field (which this Use Case used to send instead) causes
+// TTS's consumer to crash with KeyError on every real render.
+func TestHandleStepEventUseCase_ScenesClassified_DispatchesSynthesizeSpeechWithPerSceneLanguage(t *testing.T) {
+	uc, repo, pub, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID:     "proj-1",
+		Status:        domain.StatusClassifyingScenes,
+		VoiceLanguage: domain.LanguageVietnamese,
+		Scenes: []domain.Scene{
+			{SceneIndex: 0, NarrationText: "n0"},
+			{SceneIndex: 1, NarrationText: "n1"},
+		},
+	}
+	repo.steps[stepKey("saga-1", domain.StepClassifyScenes)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepClassifyScenes, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "scenes_classified",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "category": "concept", "animation_template_id": "t1"},
+				map[string]interface{}{"scene_index": float64(1), "category": "concept", "animation_template_id": "t1"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	last := pub.last()
+	if last == nil || last.routingKey != "tts" {
+		t.Fatalf("expected synthesize_speech command dispatched to tts, got %+v", last)
+	}
+	if _, hasTopLevel := last.envelope.Payload["voice_language"]; hasTopLevel {
+		t.Fatalf("expected no top-level voice_language key (TTS reads per-scene language instead)")
+	}
+	scenes, _ := last.envelope.Payload["scenes"].([]map[string]interface{})
+	if len(scenes) != 2 {
+		t.Fatalf("expected 2 scenes in payload, got %d", len(scenes))
+	}
+	for _, s := range scenes {
+		if s["language"] != "vi" {
+			t.Fatalf("expected each scene to carry language=vi, got %+v", s)
+		}
+	}
+}
+
 func TestHandleStepEventUseCase_Rule1_SceneIndexMismatch(t *testing.T) {
 	uc, repo, pub, prog := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{

@@ -35,10 +35,12 @@ Queue: `script_processing.commands` (theo `unit-of-work.md`/`component-methods.m
   "schema_version": 1,
   "timestamp": "ISO-8601",
   "payload": {
-    "raw_script": "string (Markdown, xem script-syntax.md)"
+    "script_content": "string (Markdown, xem script-syntax.md)"
   }
 }
 ```
+
+**Revision (2026-09-05)**: field đổi tên từ `raw_script` sang `script_content` để khớp với Orchestrator Service (Unit 8)'s đã-duyệt `interface-contracts.md` (`parse_script` → `{ script_content }`) — 2 đặc tả trôi lệch nhau vì được duyệt độc lập và integration test giữa 2 unit chưa từng chạy thật (xem `build-and-test/integration-test-instructions.md`). Phát hiện qua kiểm thử E2E thật (RabbitMQ log: `KeyError: 'raw_script'`, saga treo vô hạn ở bước `parse_script`). Không đổi tên biến `raw_script` nội bộ (domain/application/parsing layer) — chỉ đổi key đọc từ envelope ở `adapters/messaging/consumer.py`.
 
 ## AMQP Producer: event `script_parsed` / `parse_failed`
 Publish tới `orchestrator.events`.
