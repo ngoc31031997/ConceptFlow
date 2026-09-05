@@ -9,10 +9,10 @@ describe("api/client", () => {
     vi.restoreAllMocks();
   });
 
-  it("getPlugins returns parsed JSON on success", async () => {
+  it("getPlugins unwraps the {plugins} envelope on success", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [{ plugin_id: "p1", name: "Coding" }],
+      json: async () => ({ plugins: [{ plugin_id: "p1", name: "Coding" }] }),
     }) as unknown as typeof fetch;
 
     const plugins = await client.getPlugins();

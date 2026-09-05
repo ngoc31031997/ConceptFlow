@@ -1,0 +1,17 @@
+.wrap {
+  position: relative;
+}
+
+.select {
+  appearance: none;
+  padding-right: 40px;
+}
+
+.chevron {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: rgba(22, 34, 46, 0.4);
+}

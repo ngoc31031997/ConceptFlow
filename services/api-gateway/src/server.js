@@ -5,6 +5,7 @@ const pino = require('pino');
 
 const { loadConfig } = require('./config/config');
 const { correlationMiddleware } = require('./middleware/correlation');
+const { corsMiddleware } = require('./middleware/cors');
 const { createHttpClient } = require('./clients/httpClient');
 const { createAmqpClient } = require('./clients/amqpClient');
 const { progressHandler } = require('./handlers/progressHandler');
@@ -40,6 +41,7 @@ function main() {
 
   // 4. Initialize Express app, register correlation middleware.
   const app = express();
+  app.use(corsMiddleware(config.webGuiOrigin));
   app.use(express.json());
   app.use(correlationMiddleware());
 

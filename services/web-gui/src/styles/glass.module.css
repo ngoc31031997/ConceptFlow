@@ -1,0 +1,95 @@
+.card {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: 26px;
+  padding: 26px;
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  box-shadow: var(--glass-shadow);
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgba(16, 28, 40, 0.85);
+}
+.cardHint {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin-top: 4px;
+}
+
+.ghostBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: rgba(16, 28, 40, 0.75);
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.ghostBtn:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.ctaRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+.helperText {
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  margin-right: auto;
+}
+
+.btnPrimary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 26px;
+  border-radius: 16px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 10px 26px rgba(47, 143, 224, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+.btnPrimary:disabled {
+  background: rgba(22, 34, 46, 0.08);
+  box-shadow: none;
+  color: rgba(22, 34, 46, 0.35);
+  border-color: rgba(22, 34, 46, 0.08);
+  cursor: not-allowed;
+}
+
+.textInput,
+.textArea,
+.select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 13px;
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  color: rgba(16, 28, 40, 0.85);
+  font-size: 14px;
+}
+.textInput::placeholder,
+.textArea::placeholder {
+  color: rgba(22, 34, 46, 0.35);
+}
+.textArea {
+  resize: vertical;
+  font: 13.5px/1.7 "SF Mono", ui-monospace, Menlo, monospace;
+}

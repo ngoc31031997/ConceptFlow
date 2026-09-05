@@ -12,7 +12,7 @@ describe("NewProjectPage", () => {
   it("disables submit until script and plugin are set", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [{ plugin_id: "coding", name: "Lập trình" }],
+      json: async () => ({ plugins: [{ plugin_id: "coding", name: "Lập trình" }] }),
     }) as unknown as typeof fetch;
 
     render(

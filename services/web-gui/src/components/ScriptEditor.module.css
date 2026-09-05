@@ -1,11 +1,11 @@
-.container {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+.textarea {
+  min-height: 230px;
 }
 
-.textarea {
-  font-family: monospace;
-  padding: 0.5rem;
-  resize: vertical;
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
 }

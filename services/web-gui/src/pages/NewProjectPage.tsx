@@ -4,8 +4,10 @@ import { ScriptEditor } from "../components/ScriptEditor";
 import { PluginSelector } from "../components/PluginSelector";
 import { VoiceLanguageSelector } from "../components/VoiceLanguageSelector";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
+import { AppShell } from "../components/AppShell";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { startRenderSaga, ApiError } from "../api/client";
+import glass from "../styles/glass.module.css";
 
 export function NewProjectPage() {
   const draft = useContext(ProjectDraftContext);
@@ -39,32 +41,53 @@ export function NewProjectPage() {
 
   return (
     <div data-testid="new-project-page">
-      <h1>Tạo Video Mới</h1>
-      <ScriptEditor
-        value={draft.scriptContent}
-        onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
-      />
-      <PluginSelector
-        value={draft.pluginId}
-        onChange={(pluginId) => dispatch({ type: "SET_PLUGIN", payload: pluginId })}
-      />
-      <VoiceLanguageSelector
-        value={draft.voiceLanguage}
-        onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
-      />
-      <BackgroundMusicPicker
-        value={draft.backgroundMusicPath}
-        onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
-      />
-      {error && <p role="alert">{error}</p>}
-      <button
-        type="button"
-        data-testid="new-project-submit-button"
-        disabled={!canSubmit || isSubmitting}
-        onClick={handleSubmit}
+      <AppShell
+        currentStep={1}
+        title="Tạo video mới"
+        subtitle="Soạn nội dung script, chọn plugin và ngôn ngữ giọng đọc, rồi bắt đầu render tự động."
       >
-        Bắt đầu render
-      </button>
+        <ScriptEditor
+          value={draft.scriptContent}
+          onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
+        />
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 20 }}>
+          <PluginSelector
+            value={draft.pluginId}
+            onChange={(pluginId) => dispatch({ type: "SET_PLUGIN", payload: pluginId })}
+          />
+          <VoiceLanguageSelector
+            value={draft.voiceLanguage}
+            onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+          />
+        </div>
+
+        <BackgroundMusicPicker
+          value={draft.backgroundMusicPath}
+          onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
+        />
+
+        <div className={glass.ctaRow}>
+          {error && (
+            <p role="alert" className={glass.helperText}>
+              {error}
+            </p>
+          )}
+          {!error && !canSubmit && <p className={glass.helperText}>Nhập script và chọn plugin để tiếp tục</p>}
+          <button
+            type="button"
+            data-testid="new-project-submit-button"
+            className={glass.btnPrimary}
+            disabled={!canSubmit || isSubmitting}
+            onClick={handleSubmit}
+          >
+            Bắt đầu render
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      </AppShell>
     </div>
   );
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
@@ -39,16 +40,25 @@ export function RenderPage() {
 
   return (
     <div data-testid="render-page">
-      <h1>Đang Xử Lý Video</h1>
-      {isFailed ? (
-        <ErrorBanner
-          errorMessage={retryError ?? errorMessage}
-          onRetry={handleRetry}
-          isRetrying={isRetrying}
-        />
-      ) : (
-        <ProgressTracker progressState={progressState} />
-      )}
+      <AppShell
+        currentStep={2}
+        title={isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
+        subtitle={
+          isFailed
+            ? "Một bước trong quá trình xử lý không hoàn tất."
+            : "Hệ thống đang tạo hoạt hình, giọng đọc và ghép video cho bạn."
+        }
+      >
+        {isFailed ? (
+          <ErrorBanner
+            errorMessage={retryError ?? errorMessage}
+            onRetry={handleRetry}
+            isRetrying={isRetrying}
+          />
+        ) : (
+          <ProgressTracker progressState={progressState} />
+        )}
+      </AppShell>
     </div>
   );
 }

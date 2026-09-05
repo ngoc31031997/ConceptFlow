@@ -35,8 +35,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function getPlugins(): Promise<Plugin[]> {
-  return apiFetch<Plugin[]>("/v1/plugins");
+export async function getPlugins(): Promise<Plugin[]> {
+  const result = await apiFetch<{ plugins: Plugin[] }>("/v1/plugins");
+  return result.plugins;
 }
 
 export function startRenderSaga(input: RenderInput): Promise<SagaStartedResponse> {

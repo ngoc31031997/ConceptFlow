@@ -10,7 +10,7 @@ describe("PluginSelector", () => {
   it("loads plugins on mount and renders options", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => [{ plugin_id: "coding", name: "Lập trình" }],
+      json: async () => ({ plugins: [{ plugin_id: "coding", name: "Lập trình" }] }),
     }) as unknown as typeof fetch;
 
     render(<PluginSelector value={null} onChange={vi.fn()} />);

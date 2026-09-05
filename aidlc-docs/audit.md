@@ -1543,3 +1543,23 @@
 **Context**: Build and Test stage, Record Approval — stage complete
 
 ---
+
+## Post-Build-and-Test: Web GUI Visual Redesign (Liquid Glass) + Real Browser Bug Fixes
+**Timestamp**: 2026-09-05T02:00:00Z
+**User Input**: "màu sáng hơn, xanh da trời + trắng hay be đều dc" then "ok hơn rồi đấy. implment lại giúp tôi nhé" (approving a Claude Design canvas mockup of a light sky-blue/white "liquid glass" redesign of the 3-page Creator flow, then asking to implement it for real)
+**AI Response**: "Reworked services/web-gui/ to match the approved design canvas: added src/styles/theme.css (CSS variable tokens) and src/styles/glass.module.css (shared glass-card/button/input utility classes), added src/components/AppShell.tsx (topbar logo + 3-step pill navigation, reused across all 3 pages), restyled all 9 leaf components (ScriptEditor, PluginSelector, VoiceLanguageSelector as segmented control, BackgroundMusicPicker with custom toggle, ProgressTracker, ErrorBanner, VideoPlayer, YoutubeConnectButton, PublishForm with visibility segmented control) and all 3 pages with the glassmorphism aesthetic (translucent cards, blurred color blobs, blue-cyan gradient accent, no external UI library — CSS Modules only, per approved NFR Design). Verified via `npx tsc -b` (clean), `npx vitest run` (18/18 pass after updating 3 tests' mock plugin response shape), `npx eslint .` (clean), `npx vite build` (clean).
+
+During real-browser verification (Playwright, installed on demand — the repo had none), found and fixed 2 pre-existing production bugs invisible to mocked unit tests: (1) API Gateway (Unit 9) had no CORS headers, so every browser fetch/EventSource from Web GUI's actual origin (port 3000) to the Gateway (port 8080) was blocked outright by the browser — added `src/middleware/cors.js` + `WEB_GUI_ORIGIN` config (default `http://localhost:3000`), wired into `server.js`, added `tests/middleware/cors.test.js` (2 tests), added `WEB_GUI_ORIGIN` to docker-compose.yml's api-gateway service. (2) Web GUI's `api/client.ts` `getPlugins()` assumed Content Plugin Service (Unit 2) returns a bare `Plugin[]` array (per Web GUI's own interface-contracts.md), but Unit 2's actual FastAPI response is `{plugins: [...]}` (per its own approved schemas.py) — the Gateway proxies this unchanged (by design), so the GUI crashed on `n.map is not a function` the first time it ran against a live backend. Fixed `getPlugins()` to unwrap the envelope; updated 3 test mocks that had self-consistently assumed the wrong shape.
+
+Rebuilt and redeployed `api-gateway` and `web-gui` Docker images, confirmed via `docker compose ps` (all healthy) and an actual Playwright run against `http://localhost:3000` (real browser, real backend, zero console errors) — screenshotted the New Project page (script filled, plugin loaded live from content-plugin, music toggle on) and the Render page (post-submit navigation, step indicator advanced) to confirm the new visual design renders correctly end-to-end, not just in isolated component tests. API Gateway: 30/30 tests pass (was 28, +2 new). Web GUI: 18/18 tests pass.
+**Context**: Post-Construction, Post-Build-and-Test — visual redesign + 2 latent cross-service contract/CORS bugs found and fixed via real E2E browser verification, not yet committed (awaiting approval per git policy)
+
+---
+
+## Post-Build-and-Test: Web GUI Redesign + Bug Fixes Approved
+**Timestamp**: 2026-09-05T02:10:00Z
+**User Input**: "ok"
+**AI Response**: "User approved the Web GUI liquid-glass redesign and the two real-browser bug fixes (API Gateway CORS, plugins response envelope). Proceeding to commit."
+**Context**: Post-Build-and-Test — Record Approval, committing
+
+---

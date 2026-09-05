@@ -296,6 +296,7 @@ services:
       CONTENT_PLUGIN_URL: http://content-plugin:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
+      WEB_GUI_ORIGIN: http://localhost:3000
     ports:
       - "8080:8080"
     healthcheck:
