@@ -1511,3 +1511,19 @@
 **Context**: Construction Phase, Unit 10, Infrastructure Design stage, Step 9 (Record Approval) — stage complete
 
 ---
+
+## Unit 10 (Web GUI): Code Generation Plan Approved & Executed
+**Timestamp**: 2026-09-05T00:30:00Z
+**User Input**: "ok go"
+**AI Response**: "Created web-gui-code-generation-plan.md (11 steps) and executed all of them. Generated services/web-gui/ (React 18 + TypeScript SPA, Vite): src/{types,api,context,hooks,components,pages}, App.tsx/main.tsx composition root, Dockerfile (multi-stage node:20-alpine build -> nginx:alpine serve), nginx.conf (SPA fallback routing). Added web-gui service to root docker-compose.yml (port 3000:80) and updated root README.md. Verified: npx vitest run (18/18 tests pass), npx eslint . (0 errors, 2 acceptable Fast-Refresh warnings), npx tsc -b (clean), npx vite build (170KB JS, gzip 55.5KB), docker compose config (valid). One deviation documented in code/README.md: project_id is client-generated via crypto.randomUUID() before calling startRenderSaga (LLD did not specify the ID source), used for navigation and SSE subscription instead of saga_id — no approved contract changed. Presented completion message; per git policy, changes remain uncommitted until explicit approval."
+**Context**: Construction Phase, Unit 10, Code Generation stage, Steps 5-14 (Plan, Generation, Progress Update) — awaiting user approval
+
+---
+
+## Unit 10 (Web GUI): Code Generation Approved (Unit 10 COMPLETE — Construction Phase COMPLETE)
+**Timestamp**: 2026-09-05T00:35:00Z
+**User Input**: "ok commit đi nhưng nhớ ignore các file ko cần thiết"
+**AI Response**: "User approved Code Generation for Unit 10 (Web GUI). Added node_modules/, dist/, .env to root .gitignore before staging (services/web-gui/node_modules was untracked, ~134MB, correctly excluded). Unit 10 fully complete (Low-Level Design, Functional Design, NFR Requirements, NFR Design, Infrastructure Design, Code Generation all approved). All 10 units now complete through Code Generation — Construction Phase's per-unit loop is done."
+**Context**: Construction Phase, Unit 10 COMPLETE -> CONSTRUCTION PHASE COMPLETE (10/10 units)
+
+---

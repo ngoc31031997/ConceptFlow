@@ -1,0 +1,11 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.textarea {
+  font-family: monospace;
+  padding: 0.5rem;
+  resize: vertical;
+}
