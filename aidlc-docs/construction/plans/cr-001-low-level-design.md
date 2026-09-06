@@ -84,6 +84,27 @@ Voice (danh mục tĩnh, TTS Service /v1/voices):
 2. **Subtitle timing khi tắt TTS**: ước lượng theo tốc độ đọc trung bình có thể lệch với animation thực tế nếu Manim scene có khoảng dừng dài — chấp nhận cho MVP (đã ghi trong CR-001), không block.
 3. **`.ass` subtitle style**: cần xác nhận ffmpeg trong Video Assembly Docker image đã có `libass` (thường có sẵn trong ffmpeg full build) trước khi code — kiểm tra `Dockerfile` hiện tại của Unit 7.
 
+## Sai lệch so với thiết kế trên, phát hiện khi implement (2026-09-06)
+
+1. **Hàm ước lượng thời lượng nằm ở Orchestrator (Go), không phải Script Processing (Python)** — mục 5 ở trên giả định sai. Chính Orchestrator mới là nơi dựng payload `render_scenes`, nên đặt ở Script Processing sẽ phải share code cross-language một cách vô ích. → `internal/domain/narration.go::EstimateNarrationDuration`. Script Processing **không đổi gì**.
+2. **Catalog giọng đọc do API Gateway phục vụ từ shared volume, không phải REST endpoint mới ở TTS Service** — mục 4 định thêm `GET /v1/voices` vào TTS Service, nhưng ADR-0014 đã cố ý bỏ REST khỏi service này; thêm lại web framework chỉ để liệt kê 4 giọng tĩnh là không đáng. → TTS Service ghi `catalog.json` + file `.wav` mẫu vào `/shared/voice_samples/` lúc khởi động; Gateway đọc và phục vụ qua `GET /v1/voices` và `GET /v1/voices/:voiceId/sample` (cùng cách nó đã phục vụ video/thumbnail từ shared volume).
+3. **`assemble_video` mang `subtitle_cues` đã tính sẵn, không phải `narration_text` thô** — Orchestrator đã có đủ `duration_seconds` mỗi scene nên tính luôn mốc thời gian; Video Assembly không phải cộng dồn lại.
+4. **Rendering Service không đổi dòng code nào** — đúng như dự đoán ở mục 7, nhờ Orchestrator chuẩn hoá `duration_seconds` ở cả 2 nhánh.
+5. **Cần thêm `fonts-dejavu-core` vào image Video Assembly** — rủi ro #3 ở trên chỉ nghĩ tới `libass` (Debian ffmpeg đã có sẵn), nhưng `python:3.12-slim` không có **font** nào, libass sẽ render ô vuông rỗng, đặc biệt với dấu tiếng Việt.
+6. **`audio_path` giờ đặt tên theo `voice_id` thay vì `language`** (`{scene_index}_{voice_id}.wav`) — nếu vẫn khoá theo language, việc kiểm tra idempotency sẽ tái dùng nhầm file audio cũ khi người dùng render lại cùng project với giọng khác.
+7. **Bỏ ràng buộc `audio_segments` không được rỗng** ở `AssembleVideoUseCase._validate` — trước đây rỗng là lỗi thiếu artifact, giờ là trạng thái hợp lệ (video câm).
+
+## Kết quả test sau khi implement
+| Service | Kết quả |
+|---|---|
+| tts | 29 passed (+7) |
+| video-assembly | 23 passed (+3) |
+| orchestrator | build/vet OK, tất cả package `ok` (+3 test mới, gồm 2 test cho nhánh tắt TTS) |
+| api-gateway | 38 passed (+10, trong đó 4 cho route voices) |
+| web-gui | 35 passed (+6), lint sạch, build OK |
+
+**Chưa kiểm thử**: chưa chạy thật trên trình duyệt hay dựng Docker end-to-end — cần `docker compose up` để xác nhận (a) 4 model Piper tải được và sinh audio mẫu, (b) phụ đề burn-in hiển thị đúng dấu tiếng Việt, (c) luồng tắt TTS chạy trọn saga.
+
 ## Phạm vi KHÔNG làm trong CR-001
 - Không thêm engine TTS khác (viXTTS/Coqui) — C2 trong CR-001.
 - Không cho chỉnh tốc độ đọc ước lượng.
