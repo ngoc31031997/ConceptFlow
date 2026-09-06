@@ -12,12 +12,14 @@ forever.
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
+from adapters.assembly.subtitle_file import write_subtitle_file
 from domain.errors import AssemblyEngineError
-from domain.models import VideoAssemblyRequest
+from domain.models import SubtitleStyle, VideoAssemblyRequest
 from domain.ports import VideoAssemblerPort
 
 logger = logging.getLogger(__name__)
@@ -52,34 +54,60 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             cmd += ["-i", audio_path]
 
         filter_parts = []
-        narration_inputs = "".join(f"[{i + 1}:a]" for i in range(n))
-        filter_parts.append(f"{narration_inputs}concat=n={n}:v=0:a=1[narration]")
+        audio_map = None
+
+        if n > 0:
+            narration_inputs = "".join(f"[{i + 1}:a]" for i in range(n))
+            filter_parts.append(f"{narration_inputs}concat=n={n}:v=0:a=1[narration]")
+            audio_map = "[narration]"
 
         if request.background_music_path is not None:
             bg_index = n + 1
             cmd += ["-stream_loop", "-1", "-i", request.background_music_path]
             filter_parts.append(f"[{bg_index}:a]volume={BACKGROUND_MUSIC_VOLUME}[bg]")
-            filter_parts.append("[narration][bg]amix=inputs=2:duration=first[aout]")
-            audio_map = "[aout]"
-        else:
-            audio_map = "[narration]"
+            if audio_map is None:
+                # Narration is disabled: background music is the only track, so
+                # it must stop with the video rather than loop forever.
+                audio_map = "[bg]"
+            else:
+                filter_parts.append("[narration][bg]amix=inputs=2:duration=first[aout]")
+                audio_map = "[aout]"
 
-        cmd += [
-            "-filter_complex",
-            ";".join(filter_parts),
-            "-map",
-            "0:v",
-            "-map",
-            audio_map,
-            "-c:v",
-            "copy",
-            "-shortest",
-            output_path,
-        ]
+        video_map = "0:v"
+        video_codec = ["-c:v", "copy"]
+        if request.subtitle_cues:
+            subtitle_path = self._write_subtitles(request, output_path)
+            filter_parts.append(f"[0:v]subtitles={_escape_filter_path(subtitle_path)}[vout]")
+            video_map = "[vout]"
+            # Burning subtitles paints new pixels, so the video stream has to be
+            # re-encoded — it can no longer be stream-copied.
+            video_codec = ["-c:v", "libx264", "-preset", "medium", "-crf", "23"]
+
+        cmd += ["-filter_complex", ";".join(filter_parts)] if filter_parts else []
+        cmd += ["-map", video_map]
+        if audio_map is not None:
+            cmd += ["-map", audio_map]
+        else:
+            cmd += ["-an"]
+        cmd += [*video_codec, "-shortest", output_path]
         self._run_ffmpeg(cmd)
+
+    @staticmethod
+    def _write_subtitles(request: VideoAssemblyRequest, output_path: str) -> str:
+        style = request.subtitle_style or SubtitleStyle()
+        subtitle_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.ass")
+        write_subtitle_file(request.subtitle_cues or [], style, subtitle_path)
+        return subtitle_path
 
     @staticmethod
     def _run_ffmpeg(args: list[str]) -> None:
         result = subprocess.run([FFMPEG_BINARY, *args], capture_output=True, text=True)
         if result.returncode != 0:
             raise AssemblyEngineError(f"ffmpeg exited with code {result.returncode}: {result.stderr}")
+
+
+def _escape_filter_path(path: str) -> str:
+    """Inside a filtergraph, ffmpeg reads ':' as an option separator and '\\' as
+    an escape, so a bare path breaks the `subtitles=` filter."""
+    escaped = path.replace("\\", "\\\\").replace(":", "\\:").replace("'", "\\'")
+    return f"'{escaped}'"

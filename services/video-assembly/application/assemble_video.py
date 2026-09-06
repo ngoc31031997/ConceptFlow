@@ -47,8 +47,9 @@ class AssembleVideoUseCase:
         if not file_exists(request.video_path):
             raise MissingArtifactError(f"missing video {request.video_path}")
 
-        if not request.audio_segments:
-            raise MissingArtifactError("no audio_segments provided")
+        # An empty audio_segments list is valid since CR-001: the Creator can
+        # disable narration, producing a silent video (or one with background
+        # music only).
         for audio_path in request.audio_segments:
             if not audio_path:
                 raise MissingArtifactError("empty audio_path in audio_segments")

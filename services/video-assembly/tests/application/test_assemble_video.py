@@ -66,14 +66,19 @@ def test_idempotent_call_does_not_reassemble(shared_volume_root):
     assert second.video_path == first.video_path
 
 
-def test_empty_audio_segments_raises_missing_artifact_error(shared_volume_root):
+def test_empty_audio_segments_assembles_a_silent_video(shared_volume_root):
+    # CR-001: narration is optional, so no audio segments is a valid request
+    # rather than a missing artifact.
     video_path = str(shared_volume_root / "rendered.mp4")
     _touch(video_path)
-    use_case = AssembleVideoUseCase(FakeVideoAssembler())
+    assembler = FakeVideoAssembler()
+    use_case = AssembleVideoUseCase(assembler)
     request = VideoAssemblyRequest(project_id="proj-1", video_path=video_path, audio_segments=[])
 
-    with pytest.raises(MissingArtifactError):
-        use_case.assemble(request)
+    result = use_case.assemble(request)
+
+    assert len(assembler.calls) == 1
+    assert result.video_path.endswith(".mp4")
 
 
 def test_missing_video_file_raises_missing_artifact_error(shared_volume_root):

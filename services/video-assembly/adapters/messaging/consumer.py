@@ -27,9 +27,35 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.assemble_video import AssembleVideoUseCase
 from domain.errors import AssemblyEngineError, MissingArtifactError
-from domain.models import VideoAssemblyRequest
+from domain.models import SubtitleCue, SubtitleStyle, VideoAssemblyRequest
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_subtitle_cues(raw: list[dict] | None) -> list[SubtitleCue] | None:
+    """Absent when the Creator disabled subtitles (CR-001 FR9.1)."""
+    if not raw:
+        return None
+    return [
+        SubtitleCue(
+            scene_index=cue["scene_index"],
+            text=cue["text"],
+            start_time=cue["start_time"],
+            end_time=cue["end_time"],
+        )
+        for cue in raw
+    ]
+
+
+def _parse_subtitle_style(raw: dict | None) -> SubtitleStyle | None:
+    if not raw:
+        return None
+    return SubtitleStyle(
+        font_size=raw.get("font_size", "medium"),
+        text_color=raw.get("text_color", "#FFFFFF"),
+        background_opacity=raw.get("background_opacity", 0.6),
+        position=raw.get("position", "bottom"),
+    )
 
 
 class AckableMessage(Protocol):
@@ -71,6 +97,8 @@ class AssembleVideoCommandHandler:
             video_path=payload["video_path"],
             audio_segments=payload["audio_segments"],
             background_music_path=payload.get("background_music_path"),
+            subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
+            subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
         )
 
         try:

@@ -12,7 +12,7 @@ import pytest
 
 from adapters.assembly.ffmpeg_assembler import FfmpegVideoAssembler
 from domain.errors import AssemblyEngineError
-from domain.models import VideoAssemblyRequest
+from domain.models import SubtitleCue, SubtitleStyle, VideoAssemblyRequest
 
 
 class FakeCompletedProcess:
@@ -81,3 +81,62 @@ def test_assemble_wraps_timeout_as_assembly_engine_error(tmp_path):
     with patch("subprocess.run", side_effect=slow_run):
         with pytest.raises(AssemblyEngineError, match="timed out"):
             assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+
+def test_assemble_without_narration_produces_a_silent_video(tmp_path):
+    # CR-001: no audio_segments means nothing to mux — the output must be
+    # explicitly silent rather than inheriting a stray stream.
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(project_id="proj-1", video_path="video.mp4", audio_segments=[])
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", return_value=FakeCompletedProcess()) as mock_run:
+        assembler.assemble(request, output_path)
+
+    args = mock_run.call_args[0][0]
+    assert "-an" in args
+    assert "concat" not in " ".join(args)
+
+
+def test_assemble_without_narration_keeps_background_music(tmp_path):
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        audio_segments=[],
+        background_music_path="bg.mp3",
+    )
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", return_value=FakeCompletedProcess()) as mock_run:
+        assembler.assemble(request, output_path)
+
+    args = mock_run.call_args[0][0]
+    assert "-an" not in args
+    maps = [args[i + 1] for i, a in enumerate(args) if a == "-map"]
+    assert maps[-1] == "[bg]"
+    # With no narration there is nothing to mix the music against.
+    assert "amix" not in " ".join(args)
+
+
+def test_assemble_with_subtitles_burns_them_in_and_reencodes(tmp_path):
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        audio_segments=["a0.wav"],
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        subtitle_style=SubtitleStyle(font_size="large", position="top"),
+    )
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", return_value=FakeCompletedProcess()) as mock_run:
+        assembler.assemble(request, output_path)
+
+    args = mock_run.call_args[0][0]
+    joined = " ".join(args)
+    assert "subtitles=" in joined
+    # Burned-in text means the video stream cannot be stream-copied.
+    assert "copy" not in args
+    assert "libx264" in args
+    assert (tmp_path / "proj-1.ass").exists()

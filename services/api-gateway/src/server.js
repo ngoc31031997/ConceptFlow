@@ -10,6 +10,7 @@ const { createHttpClient } = require('./clients/httpClient');
 const { createAmqpClient } = require('./clients/amqpClient');
 const { progressHandler } = require('./handlers/progressHandler');
 const { pluginsRouter } = require('./routes/plugins');
+const { voicesRouter } = require('./routes/voices');
 const { sagasRouter } = require('./routes/sagas');
 const { projectsRouter } = require('./routes/projects');
 const { authRouter } = require('./routes/auth');
@@ -50,6 +51,7 @@ function main() {
 
   // 5. Register routes.
   app.use(pluginsRouter(contentPluginClient));
+  app.use(voicesRouter(config.sharedDir));
   app.use(sagasRouter(orchestratorClient));
   app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient));
   app.use(authRouter(publisherClient));
