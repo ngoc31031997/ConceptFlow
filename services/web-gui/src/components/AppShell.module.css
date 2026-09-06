@@ -52,6 +52,10 @@
   align-items: center;
   gap: 10px;
   width: 180px;
+  color: var(--ink);
+}
+.logo:hover {
+  color: var(--ink);
 }
 .logoMark {
   width: 34px;

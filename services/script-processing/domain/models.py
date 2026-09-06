@@ -7,11 +7,11 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Scene:
-    """narration_text is mandatory (Business Rule 3); illustration_hint and
-    code_snippet are optional (Business Rules 4-5). code_language is the
-    fence's language annotation (e.g. ```python) — present only when
-    code_snippet is present (Story B3, Rendering Service needs it for
-    syntax highlight)."""
+    """narration_text is mandatory. illustration_hint/code_snippet/code_language
+    are retained only for backward compatibility with the event schema and
+    the Orchestrator's Project.Scenes shape — the Manim-script input mode
+    (ADR pending) never populates them, since there is no separate template
+    to feed a code panel to."""
 
     scene_index: int
     narration_text: str
@@ -22,6 +22,10 @@ class Scene:
 
 @dataclass(frozen=True)
 class ParsedScript:
-    """No raw_script retained — the service is stateless (Question 5)."""
+    """No raw_script retained — the service is stateless (Question 5).
+
+    scene_class_name is the Manim `Scene` subclass the Rendering Service
+    must execute (the first one found in the script)."""
 
     scenes: list[Scene]
+    scene_class_name: str

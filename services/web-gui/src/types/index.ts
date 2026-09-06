@@ -44,6 +44,7 @@ export interface PublishMetadata {
   description?: string;
   tags?: string[];
   visibility: "public" | "unlisted" | "private";
+  publish_at?: string;
 }
 
 export interface SagaStartedResponse {

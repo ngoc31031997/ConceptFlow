@@ -91,7 +91,7 @@ def create_app() -> FastAPI:
         state.ready = True
         logger.info("Publisher Service ready — consuming '%s'", COMMANDS_QUEUE)
 
-        app.include_router(create_v1_router(oauth_flow, handle_callback_use_case))
+        app.include_router(create_v1_router(oauth_flow, handle_callback_use_case, credential_store))
 
         yield
 

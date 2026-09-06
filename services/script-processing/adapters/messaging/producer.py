@@ -28,12 +28,15 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def success_envelope(saga_id: str, project_id: str, scenes: list[Scene]) -> dict:
+def success_envelope(
+    saga_id: str, project_id: str, scenes: list[Scene], scene_class_name: str
+) -> dict:
     return build_envelope(
         saga_id,
         project_id,
         {
             "event_type": "script_parsed",
+            "scene_class_name": scene_class_name,
             "scenes": [
                 {
                     "scene_index": s.scene_index,

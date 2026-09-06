@@ -24,14 +24,16 @@ class FakeScriptParser(ScriptParserPort):
 
 
 def test_parse_delegates_to_parser_and_returns_result():
-    expected = ParsedScript(scenes=[Scene(0, "hello", None, None, None)])
+    expected = ParsedScript(
+        scenes=[Scene(0, "hello", None, None, None)], scene_class_name="DemoScene"
+    )
     parser = FakeScriptParser(result=expected)
     use_case = ParseScriptUseCase(parser)
 
-    result = use_case.parse("## Scene 1\nhello")
+    result = use_case.parse("class DemoScene(Scene): ...")
 
     assert result is expected
-    assert parser.received_raw_script == "## Scene 1\nhello"
+    assert parser.received_raw_script == "class DemoScene(Scene): ..."
 
 
 def test_parse_propagates_syntax_error():

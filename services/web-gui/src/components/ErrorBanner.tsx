@@ -5,6 +5,7 @@ interface ErrorBannerProps {
   errorMessage: string;
   onRetry: () => void;
   isRetrying: boolean;
+  onBack?: () => void;
 }
 
 function AlertIcon() {
@@ -25,7 +26,15 @@ function RetryIcon() {
   );
 }
 
-export function ErrorBanner({ errorMessage, onRetry, isRetrying }: ErrorBannerProps) {
+function BackIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7" />
+    </svg>
+  );
+}
+
+export function ErrorBanner({ errorMessage, onRetry, isRetrying, onBack }: ErrorBannerProps) {
   return (
     <div className={glass.card} role="alert">
       <div className={styles.wrap}>
@@ -36,16 +45,30 @@ export function ErrorBanner({ errorMessage, onRetry, isRetrying }: ErrorBannerPr
           <p className={styles.message} data-testid="error-banner-message">
             {errorMessage}
           </p>
-          <button
-            type="button"
-            data-testid="error-banner-retry-button"
-            className={styles.retryBtn}
-            onClick={onRetry}
-            disabled={isRetrying}
-          >
-            <RetryIcon />
-            Thử lại
-          </button>
+          <div className={styles.actions}>
+            {onBack && (
+              <button
+                type="button"
+                data-testid="error-banner-back-button"
+                className={styles.backBtn}
+                onClick={onBack}
+                disabled={isRetrying}
+              >
+                <BackIcon />
+                Quay lại chỉnh sửa
+              </button>
+            )}
+            <button
+              type="button"
+              data-testid="error-banner-retry-button"
+              className={styles.retryBtn}
+              onClick={onRetry}
+              disabled={isRetrying}
+            >
+              <RetryIcon />
+              Thử lại
+            </button>
+          </div>
         </div>
       </div>
     </div>

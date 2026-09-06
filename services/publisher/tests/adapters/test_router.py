@@ -6,18 +6,21 @@ call needed.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from adapters.api.router import create_health_router, create_v1_router
 from application.handle_oauth_callback import HandleOAuthCallbackUseCase
+from domain.models import OAuthCredential
 
 
 class FakeOAuthFlow:
     def __init__(self, authorization_url: str = "https://accounts.google.com/o/oauth2/auth?fake=1") -> None:
         self._authorization_url = authorization_url
 
-    def build_authorization_url(self) -> str:
+    def build_authorization_url(self, state: str | None = None) -> str:
         return self._authorization_url
 
     def exchange_code(self, code: str):
@@ -33,19 +36,23 @@ class FakeOAuthFlow:
 
 
 class FakeCredentialStore:
+    def __init__(self) -> None:
+        self._credential = None
+
     def get(self):
-        return None
+        return self._credential
 
     def save(self, credential) -> None:
-        pass
+        self._credential = credential
 
 
-def _build_client() -> TestClient:
+def _build_client(credential_store=None) -> TestClient:
     oauth_flow = FakeOAuthFlow()
-    handle_callback_use_case = HandleOAuthCallbackUseCase(oauth_flow, FakeCredentialStore())
+    credential_store = credential_store or FakeCredentialStore()
+    handle_callback_use_case = HandleOAuthCallbackUseCase(oauth_flow, credential_store)
 
     app = FastAPI()
-    app.include_router(create_v1_router(oauth_flow, handle_callback_use_case))
+    app.include_router(create_v1_router(oauth_flow, handle_callback_use_case, credential_store))
     app.include_router(create_health_router(lambda: True))
     return TestClient(app)
 
@@ -71,10 +78,10 @@ def test_start_redirects_to_google_authorization_url():
 def test_callback_success_returns_connected_true():
     client = _build_client()
 
-    response = client.get("/v1/auth/youtube/callback", params={"code": "good-code"})
+    response = client.get("/v1/auth/youtube/callback", params={"code": "good-code", "state": "project-1"})
 
     assert response.status_code == 200
-    assert response.json() == {"connected": True, "error": None}
+    assert response.json() == {"connected": True, "error": None, "state": "project-1"}
 
 
 def test_callback_failure_returns_400():
@@ -84,3 +91,24 @@ def test_callback_failure_returns_400():
 
     assert response.status_code == 400
     assert response.json()["connected"] is False
+
+
+def test_status_returns_not_connected_when_no_credential():
+    client = _build_client()
+
+    response = client.get("/v1/auth/youtube/status")
+
+    assert response.status_code == 200
+    assert response.json() == {"connected": False}
+
+
+def test_status_returns_connected_when_credential_saved():
+    store = FakeCredentialStore()
+    store.save(
+        OAuthCredential(access_token="t", refresh_token="r", expires_at=datetime.now(UTC), channel_id="UC1")
+    )
+    client = _build_client(credential_store=store)
+
+    response = client.get("/v1/auth/youtube/status")
+
+    assert response.json() == {"connected": True}

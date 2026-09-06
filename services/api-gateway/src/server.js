@@ -29,8 +29,11 @@ function main() {
   // 1. Load config from env vars.
   const config = loadConfig();
 
-  // 2. Initialize httpClient for the 3 targets.
+  // 2. Initialize httpClient for the 3 targets, plus a longer-timeout
+  // variant of the orchestrator client for the AI metadata-suggestion route
+  // (local LLM generation can take up to ~2 minutes).
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
+  const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 130_000 });
   const contentPluginClient = createHttpClient(config.contentPluginUrl);
   const publisherClient = createHttpClient(config.publisherUrl);
 
@@ -48,7 +51,7 @@ function main() {
   // 5. Register routes.
   app.use(pluginsRouter(contentPluginClient));
   app.use(sagasRouter(orchestratorClient));
-  app.use(projectsRouter(orchestratorClient, config.sharedDir));
+  app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient));
   app.use(authRouter(publisherClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());

@@ -274,6 +274,9 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@orchestrator-db:5432/orchestrator
       OUTBOX_POLL_INTERVAL_MS: "500"
       DATABASE_MAX_CONNS: "10"
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_TIMEOUT_SECONDS: "120"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
       interval: 10s
@@ -284,6 +287,35 @@ services:
         condition: service_healthy
       orchestrator-db:
         condition: service_healthy
+    networks:
+      - backend
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  # One-shot: pulls the model into the ollama_data volume on first startup
+  # (idempotent — Ollama skips the download if it's already present).
+  ollama-pull:
+    image: curlimages/curl:8.10.1
+    container_name: ollama-pull
+    depends_on:
+      ollama:
+        condition: service_healthy
+    entrypoint:
+      - sh
+      - -c
+      - "curl -s http://ollama:11434/api/pull -d '{\"name\":\"${OLLAMA_MODEL:-llama3.2}\"}'"
+    restart: "no"
     networks:
       - backend
 
@@ -381,6 +413,7 @@ volumes:
   orchestrator_db_data:
   loki_data:
   grafana_data:
+  ollama_data:
 
 networks:
   backend:

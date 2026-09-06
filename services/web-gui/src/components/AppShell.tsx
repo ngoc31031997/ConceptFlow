@@ -28,14 +28,14 @@ export function AppShell({ currentStep, title, subtitle, children }: AppShellPro
 
       <div className={styles.content}>
         <div className={styles.topbar}>
-          <div className={styles.logo}>
+          <Link to="/" className={styles.logo} style={{ textDecoration: "none" }}>
             <div className={styles.logoMark}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <path d="M5 4L20 12L5 20V4Z" fill="white" />
               </svg>
             </div>
             <div className={styles.logoName}>ConceptFlow</div>
-          </div>
+          </Link>
 
           {currentStep && (
             <div className={styles.stepsPill}>

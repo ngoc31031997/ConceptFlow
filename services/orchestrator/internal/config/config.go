@@ -19,6 +19,9 @@ type Config struct {
 	HTTPPort                      string
 	RabbitMQReconnectInitialDelay time.Duration
 	RabbitMQReconnectMaxDelay     time.Duration
+	OllamaURL                     string
+	OllamaModel                   string
+	OllamaTimeout                 time.Duration
 }
 
 // Load reads Config from the environment, applying the defaults documented
@@ -56,6 +59,19 @@ func Load() (*Config, error) {
 		httpPort = "8000"
 	}
 
+	ollamaURL := os.Getenv("OLLAMA_URL")
+	if ollamaURL == "" {
+		ollamaURL = "http://ollama:11434"
+	}
+	ollamaModel := os.Getenv("OLLAMA_MODEL")
+	if ollamaModel == "" {
+		ollamaModel = "llama3.2"
+	}
+	ollamaTimeoutSeconds, err := intEnvOrDefault("OLLAMA_TIMEOUT_SECONDS", 120)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		RabbitMQURL:                   rabbitMQURL,
 		DatabaseURL:                   databaseURL,
@@ -64,6 +80,9 @@ func Load() (*Config, error) {
 		HTTPPort:                      httpPort,
 		RabbitMQReconnectInitialDelay: time.Duration(reconnectInitialMS) * time.Millisecond,
 		RabbitMQReconnectMaxDelay:     time.Duration(reconnectMaxMS) * time.Millisecond,
+		OllamaURL:                     ollamaURL,
+		OllamaModel:                   ollamaModel,
+		OllamaTimeout:                 time.Duration(ollamaTimeoutSeconds) * time.Second,
 	}, nil
 }
 

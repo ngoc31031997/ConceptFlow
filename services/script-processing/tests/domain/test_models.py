@@ -31,5 +31,6 @@ def test_scene_optional_fields_can_be_none():
 
 def test_parsed_script_holds_scenes():
     scenes = [Scene(0, "a", None, None, None), Scene(1, "b", None, None, None)]
-    parsed = ParsedScript(scenes=scenes)
+    parsed = ParsedScript(scenes=scenes, scene_class_name="DemoScene")
     assert parsed.scenes == scenes
+    assert parsed.scene_class_name == "DemoScene"

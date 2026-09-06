@@ -40,6 +40,54 @@
 .ghostBtn:hover {
   background: rgba(255, 255, 255, 0.85);
 }
+.ghostBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerGhostBtn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(224, 67, 47, 0.25);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.dangerGhostBtn:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: rgba(224, 67, 47, 0.45);
+}
+.dangerGhostBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--danger), #ff6b52);
+  box-shadow: 0 8px 20px rgba(224, 67, 47, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: opacity 0.15s ease;
+}
+.dangerBtn:disabled {
+  background: rgba(22, 34, 46, 0.08);
+  box-shadow: none;
+  color: rgba(22, 34, 46, 0.35);
+  border-color: rgba(22, 34, 46, 0.08);
+  cursor: not-allowed;
+}
 
 .ctaRow {
   display: flex;

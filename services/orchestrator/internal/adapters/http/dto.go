@@ -27,6 +27,7 @@ type startPublishSagaRequest struct {
 	Description  *string  `json:"description,omitempty"`
 	Tags         []string `json:"tags,omitempty"`
 	Visibility   string   `json:"visibility"`
+	PublishAt    *string  `json:"publish_at,omitempty"`
 }
 
 // sagaStartedResponse is the 201 response shape shared by both saga-start
@@ -82,6 +83,14 @@ type projectSummaryResponse struct {
 // projectListResponse is the GET /v1/projects response body.
 type projectListResponse struct {
 	Projects []projectSummaryResponse `json:"projects"`
+}
+
+// suggestMetadataResponse is the 200 response of
+// POST /v1/projects/{project_id}/suggest-metadata.
+type suggestMetadataResponse struct {
+	Title       string   `json:"title"`
+	Description string   `json:"description"`
+	Tags        []string `json:"tags"`
 }
 
 // errorResponse is the JSON body for non-2xx responses.

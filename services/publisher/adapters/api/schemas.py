@@ -7,3 +7,7 @@ class OAuthCallbackResponse(BaseModel):
     connected: bool
     error: str | None = None
     state: str | None = None
+
+
+class OAuthStatusResponse(BaseModel):
+    connected: bool

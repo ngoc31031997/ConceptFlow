@@ -29,6 +29,20 @@
   font-weight: 600;
 }
 
+.statusBadge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: rgba(16, 28, 40, 0.7);
+  background: rgba(16, 28, 40, 0.08);
+}
+
+.statusBadge[data-connected="true"] {
+  color: #1a7f4b;
+  background: rgba(26, 127, 75, 0.12);
+}
+
 .connectBtn {
   display: flex;
   align-items: center;

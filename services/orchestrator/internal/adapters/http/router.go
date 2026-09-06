@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -28,6 +29,10 @@ type retryStepUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.RetryStepOutput, error)
 }
 
+type suggestPublishMetadataUseCase interface {
+	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
+}
+
 // projectStore is the read/delete capability the project-list and
 // project-detail/delete endpoints need; satisfied directly by
 // domain.ProjectRepositoryPort.
@@ -39,15 +44,16 @@ type projectStore interface {
 
 // Router holds the REST handlers' use case dependencies.
 type Router struct {
-	startRenderSaga  startRenderSagaUseCase
-	startPublishSaga startPublishSagaUseCase
-	retryStep        retryStepUseCase
-	projects         projectStore
+	startRenderSaga        startRenderSagaUseCase
+	startPublishSaga       startPublishSagaUseCase
+	retryStep              retryStepUseCase
+	projects               projectStore
+	suggestPublishMetadata suggestPublishMetadataUseCase
 }
 
-// NewRouter constructs the Router with its 4 dependencies (module-structure.md).
-func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore) *Router {
-	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects}
+// NewRouter constructs the Router with its dependencies (module-structure.md).
+func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, suggestPublishMetadata suggestPublishMetadataUseCase) *Router {
+	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, suggestPublishMetadata: suggestPublishMetadata}
 }
 
 // Handler builds the chi.Router with all routes (health + REST endpoints).
@@ -60,6 +66,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
+	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	return r
 }
 
@@ -116,6 +123,10 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusBadRequest, "visibility must be 'public', 'unlisted' or 'private'")
 		return
 	}
+	if req.PublishAt != nil && visibility != domain.VisibilityPrivate {
+		writeError(w, http.StatusBadRequest, "publish_at requires visibility 'private' (YouTube schedules it public at that time)")
+		return
+	}
 
 	out, err := rt.startPublishSaga.Execute(r.Context(), application.StartPublishSagaInput{
 		ProjectID:   req.ProjectID,
@@ -123,12 +134,28 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 		Description: req.Description,
 		Tags:        req.Tags,
 		Visibility:  visibility,
+		PublishAt:   req.PublishAt,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, sagaStartedResponse{SagaID: out.SagaID, Status: string(out.Status)})
+}
+
+func (rt *Router) handleSuggestMetadata(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	out, err := rt.suggestPublishMetadata.Execute(r.Context(), projectID)
+	if err != nil {
+		slog.Error("suggest-metadata failed", "project_id", projectID, "error", err.Error())
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, suggestMetadataResponse{
+		Title:       out.Title,
+		Description: out.Description,
+		Tags:        out.Tags,
+	})
 }
 
 func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {

@@ -17,6 +17,7 @@ import (
 
 	"orchestrator/internal/adapters/amqp"
 	httpadapter "orchestrator/internal/adapters/http"
+	"orchestrator/internal/adapters/llm"
 	"orchestrator/internal/adapters/postgres"
 	"orchestrator/internal/application"
 	"orchestrator/internal/config"
@@ -68,6 +69,8 @@ func main() {
 	startPublishSaga := application.NewStartPublishSagaUseCase(projectRepo, outboxRepo)
 	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, logger)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
+	ollamaClient := llm.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
+	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
@@ -88,7 +91,7 @@ func main() {
 	go relay.Run(ctx)
 
 	// 9. Construct chi router, wire the 4 REST handlers to their use cases.
-	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo)
+	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

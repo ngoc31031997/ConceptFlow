@@ -30,10 +30,18 @@ CREATE TABLE IF NOT EXISTS projects (
     youtube_description TEXT,
     youtube_tags JSONB,
     youtube_visibility TEXT,
+    youtube_publish_at TEXT,
+    youtube_thumbnail_path TEXT,
     youtube_video_url TEXT,
     error_message TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Added after the initial CREATE TABLE shipped without it — CREATE TABLE IF
+-- NOT EXISTS above is a no-op against an already-bootstrapped database, so
+-- existing deployments need this explicit ALTER to pick up the column.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

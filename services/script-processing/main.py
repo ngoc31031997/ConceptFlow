@@ -16,7 +16,7 @@ import aio_pika
 
 from adapters.messaging.consumer import ParseScriptCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
-from adapters.parsing.markdown_parser import MarkdownScriptParser
+from adapters.parsing.manim_script_parser import ManimScriptParser
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
@@ -32,7 +32,7 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 async def run() -> None:
-    use_case = ParseScriptUseCase(MarkdownScriptParser())
+    use_case = ParseScriptUseCase(ManimScriptParser())
 
     pool = await create_pool()
     inbox = InboxRepository(pool)

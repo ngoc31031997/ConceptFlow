@@ -13,18 +13,26 @@ import logging
 from fastapi import APIRouter, Request, Response
 from fastapi.responses import RedirectResponse
 
-from adapters.api.schemas import OAuthCallbackResponse
+from adapters.api.schemas import OAuthCallbackResponse, OAuthStatusResponse
 from adapters.logging.correlation import set_correlation_id
 from adapters.youtube.oauth_flow import GoogleOAuthFlow
 from application.handle_oauth_callback import HandleOAuthCallbackUseCase
+from domain.ports import CredentialStorePort
 
 logger = logging.getLogger(__name__)
 
 
 def create_v1_router(
-    oauth_flow: GoogleOAuthFlow, handle_callback_use_case: HandleOAuthCallbackUseCase
+    oauth_flow: GoogleOAuthFlow,
+    handle_callback_use_case: HandleOAuthCallbackUseCase,
+    credential_store: CredentialStorePort,
 ) -> APIRouter:
     router = APIRouter(prefix="/v1")
+
+    @router.get("/auth/youtube/status", response_model=OAuthStatusResponse)
+    async def status() -> OAuthStatusResponse:
+        credential = await asyncio.to_thread(credential_store.get)
+        return OAuthStatusResponse(connected=credential is not None)
 
     @router.get("/auth/youtube/start")
     async def start(request: Request, response: Response, state: str | None = None) -> RedirectResponse:

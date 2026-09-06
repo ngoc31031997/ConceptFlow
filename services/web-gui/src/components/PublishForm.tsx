@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from "react";
+import { suggestPublishMetadata, ApiError } from "../api/client";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishForm.module.css";
 
 interface PublishFormProps {
+  projectId: string;
   onSubmit: (metadata: PublishMetadata) => void;
   isSubmitting: boolean;
 }
@@ -43,31 +45,70 @@ const VISIBILITY_OPTIONS: { value: PublishMetadata["visibility"]; label: string;
   },
 ];
 
-export function PublishForm({ onSubmit, isSubmitting }: PublishFormProps) {
+export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [tags, setTags] = useState("");
   const [visibility, setVisibility] = useState<PublishMetadata["visibility"]>("private");
+  const [publishAt, setPublishAt] = useState("");
+  const [isSuggesting, setIsSuggesting] = useState(false);
+  const [suggestError, setSuggestError] = useState<string | null>(null);
+
+  async function handleSuggestAI() {
+    setIsSuggesting(true);
+    setSuggestError(null);
+    try {
+      const suggestion = await suggestPublishMetadata(projectId);
+      setTitle(suggestion.title.slice(0, TITLE_MAX_LENGTH));
+      setDescription(suggestion.description);
+      setTags(suggestion.tags.join(", "));
+    } catch (err) {
+      setSuggestError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      setIsSuggesting(false);
+    }
+  }
 
   const isTitleValid = title.trim().length > 0 && title.length <= TITLE_MAX_LENGTH;
   const tagList = tags
     .split(",")
     .map((tag) => tag.trim())
     .filter(Boolean);
+  const isPublishAtValid = !publishAt || new Date(publishAt).getTime() > Date.now();
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
     if (!isTitleValid) return;
+    if (visibility === "private" && publishAt && !isPublishAtValid) return;
     onSubmit({
       youtube_title: title,
       description: description || undefined,
       tags: tagList.length > 0 ? tagList : undefined,
       visibility,
+      publish_at:
+        visibility === "private" && publishAt ? new Date(publishAt).toISOString() : undefined,
     });
   }
 
   return (
     <form onSubmit={handleSubmit} className={`${glass.card} ${styles.form}`}>
+      <div className={styles.ctaRow}>
+        <button
+          type="button"
+          data-testid="publish-form-suggest-ai-button"
+          className={styles.suggestBtn}
+          disabled={isSuggesting}
+          onClick={handleSuggestAI}
+        >
+          {isSuggesting ? "Đang tạo gợi ý..." : "✨ Gợi ý AI (tiêu đề, mô tả, tags)"}
+        </button>
+      </div>
+      {suggestError && (
+        <p role="alert" className={glass.helperText}>
+          {suggestError}
+        </p>
+      )}
+
       <div className={styles.field}>
         <div className={styles.labelRow}>
           <label className={styles.label} htmlFor="publish-title">
@@ -143,12 +184,38 @@ export function PublishForm({ onSubmit, isSubmitting }: PublishFormProps) {
         </div>
       </div>
 
+      {visibility === "private" && (
+        <div className={styles.field}>
+          <label className={styles.label} htmlFor="publish-at">
+            Tự động công khai lúc (tùy chọn)
+          </label>
+          <input
+            id="publish-at"
+            type="datetime-local"
+            data-testid="publish-form-publish-at-input"
+            className={glass.textInput}
+            value={publishAt}
+            onChange={(event) => setPublishAt(event.target.value)}
+          />
+          {publishAt && !isPublishAtValid && (
+            <p role="alert" className={glass.helperText}>
+              Thời gian phải ở tương lai
+            </p>
+          )}
+          {publishAt && isPublishAtValid && (
+            <p className={glass.helperText}>
+              Video sẽ ở chế độ riêng tư, sau đó YouTube tự chuyển sang công khai đúng giờ đã chọn.
+            </p>
+          )}
+        </div>
+      )}
+
       <div className={styles.ctaRow}>
         <button
           type="submit"
           data-testid="publish-form-submit-button"
           className={glass.btnPrimary}
-          disabled={!isTitleValid || isSubmitting}
+          disabled={!isTitleValid || isSubmitting || (visibility === "private" && !!publishAt && !isPublishAtValid)}
         >
           Đăng lên YouTube
         </button>

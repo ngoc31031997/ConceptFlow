@@ -7,6 +7,12 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 
+// Steps whose input comes straight from the "Soạn nội dung" screen
+// (script/plugin/category) — a failure here is most likely a bad input,
+// so the user should go back and fix it rather than blindly retry the
+// same input against the same failing step.
+const INPUT_RELATED_STEPS = new Set(["parse_script", "classify_scenes"]);
+
 export function RenderPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
@@ -19,6 +25,8 @@ export function RenderPage() {
   const isFailed =
     progressState.status === "failed" || Boolean(project?.status.startsWith("failed_at_"));
   const errorMessage = progressState.errorMessage ?? project?.error_message ?? "";
+  const failedStep = progressState.currentStep ?? project?.status.replace("failed_at_", "") ?? null;
+  const isInputError = isFailed && failedStep !== null && INPUT_RELATED_STEPS.has(failedStep);
 
   useEffect(() => {
     if (project?.status === "ready_to_publish") {
@@ -54,6 +62,7 @@ export function RenderPage() {
             errorMessage={retryError ?? errorMessage}
             onRetry={handleRetry}
             isRetrying={isRetrying}
+            onBack={isInputError ? () => navigate("/") : undefined}
           />
         ) : (
           <ProgressTracker progressState={progressState} />

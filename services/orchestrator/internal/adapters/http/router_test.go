@@ -58,11 +58,19 @@ func (f *fakeProjectReader) Delete(_ context.Context, _ string) error {
 	return f.deleteErr
 }
 
+type fakeSuggestMetadata struct {
+	out *application.SuggestPublishMetadataOutput
+	err error
+}
+
+func (f *fakeSuggestMetadata) Execute(_ context.Context, _ string) (*application.SuggestPublishMetadataOutput, error) {
+	return f.out, f.err
+}
+
 func TestHandleStartRenderSaga_Created(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{out: &application.StartRenderSagaOutput{SagaID: "saga-1", Status: domain.StatusParsingScript}},
-		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{},
-	)
+		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"project_id": "p1", "script_content": "s", "plugin_id": "plugin", "category_hint": "concept", "voice_language": "en",
@@ -82,7 +90,7 @@ func TestHandleStartRenderSaga_Created(t *testing.T) {
 }
 
 func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{})
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("POST", "/v1/sagas/render", bytes.NewReader([]byte(`{"project_id":""}`)))
 	rec := httptest.NewRecorder()
@@ -95,8 +103,7 @@ func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
 
 func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{},
-	)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	body, _ := json.Marshal(map[string]interface{}{"project_id": "p1", "youtube_title": "t", "visibility": "public"})
 	req := httptest.NewRequest("POST", "/v1/sagas/publish", bytes.NewReader(body))
@@ -111,8 +118,7 @@ func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 func TestHandleGetProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{err: domain.ErrProjectNotFound},
-	)
+		&fakeProjectReader{err: domain.ErrProjectNotFound}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("GET", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -126,8 +132,7 @@ func TestHandleGetProject_NotFound(t *testing.T) {
 func TestHandleGetProject_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}},
-	)
+		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("GET", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -142,8 +147,7 @@ func TestHandleRetry_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{},
 		&fakeRetryStep{out: &application.RetryStepOutput{SagaID: "saga-1", Status: domain.StatusRendering}},
-		&fakeProjectReader{},
-	)
+		&fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("POST", "/v1/projects/p1/retry", nil)
 	rec := httptest.NewRecorder()
@@ -157,8 +161,7 @@ func TestHandleRetry_OK(t *testing.T) {
 func TestHandleListProjects_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}},
-	)
+		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("GET", "/v1/projects", nil)
 	rec := httptest.NewRecorder()
@@ -176,8 +179,7 @@ func TestHandleListProjects_OK(t *testing.T) {
 
 func TestHandleDeleteProject_NoContent(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{},
-	)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -191,8 +193,7 @@ func TestHandleDeleteProject_NoContent(t *testing.T) {
 func TestHandleDeleteProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound},
-	)
+		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -204,7 +205,7 @@ func TestHandleDeleteProject_NotFound(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{})
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{})
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()

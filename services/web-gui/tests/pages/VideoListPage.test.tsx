@@ -68,4 +68,76 @@ describe("VideoListPage", () => {
     expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
+
+  it("selects multiple videos via checkboxes and bulk-deletes them", async () => {
+    const deleteCalls: string[] = [];
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") {
+        deleteCalls.push(url);
+        return Promise.resolve({ ok: true, status: 204 });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          projects: [
+            { project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" },
+            { project_id: "p2", status: "published", updated_at: "2026-01-02T00:00:00Z" },
+            { project_id: "p3", status: "failed_at_render_scenes", updated_at: "2026-01-03T00:00:00Z" },
+          ],
+        }),
+      });
+    }) as unknown as typeof fetch;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(
+      <MemoryRouter>
+        <VideoListPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
+
+    const bulkDeleteButton = screen.getByTestId("bulk-delete-button");
+    expect(bulkDeleteButton).toBeDisabled();
+
+    fireEvent.click(screen.getByLabelText("Chọn video p1"));
+    fireEvent.click(screen.getByLabelText("Chọn video p2"));
+
+    expect(bulkDeleteButton).not.toBeDisabled();
+    fireEvent.click(bulkDeleteButton);
+
+    await waitFor(() => expect(screen.queryByTestId("video-row-p1")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("video-row-p2")).not.toBeInTheDocument();
+    expect(screen.getByTestId("video-row-p3")).toBeInTheDocument();
+    expect(deleteCalls).toEqual([
+      expect.stringContaining("/v1/projects/p1"),
+      expect.stringContaining("/v1/projects/p2"),
+    ]);
+  });
+
+  it("selects all videos via the header checkbox", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        projects: [
+          { project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" },
+          { project_id: "p2", status: "published", updated_at: "2026-01-02T00:00:00Z" },
+        ],
+      }),
+    }) as unknown as typeof fetch;
+
+    render(
+      <MemoryRouter>
+        <VideoListPage />
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("Chọn tất cả"));
+
+    expect(screen.getByText("Đã chọn 2 video")).toBeInTheDocument();
+    expect(screen.getByTestId("bulk-delete-button")).not.toBeDisabled();
+  });
 });

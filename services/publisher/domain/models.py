@@ -26,6 +26,7 @@ class PublishRequest:
     description: str | None = None
     tags: list[str] = field(default_factory=list)
     visibility: str = ""
+    publish_at: str | None = None  # RFC3339 — only valid alongside visibility == "private"
 
 
 @dataclass(frozen=True)

@@ -21,6 +21,7 @@ export function getProjectVideoUrl(projectId: string): string {
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const body = await response.json();
+    if (typeof body?.error === "string") return body.error;
     return body?.error?.message ?? body?.error_message ?? GENERIC_CONNECTION_ERROR;
   } catch {
     return GENERIC_CONNECTION_ERROR;
@@ -84,8 +85,23 @@ export function startPublishSaga(
   });
 }
 
+export interface SuggestedMetadata {
+  title: string;
+  description: string;
+  tags: string[];
+}
+
+export function suggestPublishMetadata(id: string): Promise<SuggestedMetadata> {
+  return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, { method: "POST" });
+}
+
 export function getYoutubeAuthStartUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/auth/youtube/start?state=${encodeURIComponent(projectId)}`;
+}
+
+export async function getYoutubeConnectionStatus(): Promise<boolean> {
+  const result = await apiFetch<{ connected: boolean }>("/v1/auth/youtube/status");
+  return result.connected;
 }
 
 export interface YoutubeAuthCallbackResult {

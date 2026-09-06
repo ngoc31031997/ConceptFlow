@@ -12,7 +12,7 @@ import json
 import pytest
 
 from adapters.messaging.consumer import ParseScriptCommandHandler
-from adapters.parsing.markdown_parser import MarkdownScriptParser
+from adapters.parsing.manim_script_parser import ManimScriptParser
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.parse_script import ParseScriptUseCase
@@ -28,7 +28,16 @@ class FakeMessage:
         self.acked = True
 
 
-def make_envelope(message_id: str = "msg-1", raw_script: str = "## Scene 1\nhello") -> bytes:
+VALID_SCRIPT = (
+    "from manim import *\n\n"
+    "class DemoScene(Scene):\n"
+    "    def construct(self):\n"
+    '        # NARRATION: "hello"\n'
+    "        self.wait(AUTO)\n"
+)
+
+
+def make_envelope(message_id: str = "msg-1", raw_script: str = VALID_SCRIPT) -> bytes:
     envelope = {
         "message_id": message_id,
         "saga_id": "saga-1",
@@ -42,7 +51,7 @@ def make_envelope(message_id: str = "msg-1", raw_script: str = "## Scene 1\nhell
 
 @pytest.fixture
 def handler() -> tuple[ParseScriptCommandHandler, FakePool]:
-    use_case = ParseScriptUseCase(MarkdownScriptParser())
+    use_case = ParseScriptUseCase(ManimScriptParser())
     pool = FakePool()
     inbox = InboxRepository(pool)
     outbox = OutboxRepository()
@@ -67,14 +76,14 @@ async def test_enqueues_success_event_to_outbox_and_acks(handler) -> None:
 @pytest.mark.asyncio
 async def test_enqueues_failure_event_on_syntax_error(handler) -> None:
     command_handler, pool = handler
-    message = FakeMessage(make_envelope(raw_script="no headings here"))
+    message = FakeMessage(make_envelope(raw_script="not a manim script"))
 
     await command_handler.handle(message)
 
     assert message.acked is True
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "parse_failed"
-    assert event["payload"]["payload"]["reason"] == "no scenes found"
+    assert "Scene subclass" in event["payload"]["payload"]["reason"]
 
 
 @pytest.mark.asyncio

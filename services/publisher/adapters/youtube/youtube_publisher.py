@@ -97,6 +97,8 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             },
             "status": {"privacyStatus": request.visibility},
         }
+        if request.publish_at:
+            body["status"]["publishAt"] = request.publish_at
         media = MediaFileUpload(request.video_path, chunksize=-1, resumable=True)
         response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
         return response["id"]

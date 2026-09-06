@@ -41,3 +41,7 @@ class PublishVideoUseCase:
             raise InvalidPublishRequestError(
                 f"visibility must be one of {VALID_VISIBILITIES}, got {request.visibility!r}"
             )
+        if request.publish_at and request.visibility != "private":
+            raise InvalidPublishRequestError(
+                "publish_at requires visibility 'private' (YouTube schedules it public at that time)"
+            )

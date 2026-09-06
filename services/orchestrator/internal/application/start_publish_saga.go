@@ -15,6 +15,7 @@ type StartPublishSagaInput struct {
 	Description *string
 	Tags        []string
 	Visibility  domain.Visibility
+	PublishAt   *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
 }
 
 // StartPublishSagaOutput is returned to the HTTP layer for the 201 response.
@@ -58,6 +59,7 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 	project.YoutubeTags = input.Tags
 	visibility := input.Visibility
 	project.YoutubeVisibility = &visibility
+	project.YoutubePublishAt = input.PublishAt
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err
 	}
@@ -104,6 +106,9 @@ func publishVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	if project.YoutubeVisibility != nil {
 		payload["visibility"] = string(*project.YoutubeVisibility)
+	}
+	if project.YoutubePublishAt != nil {
+		payload["publish_at"] = *project.YoutubePublishAt
 	}
 	return payload
 }
