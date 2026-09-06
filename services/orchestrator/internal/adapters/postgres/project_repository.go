@@ -27,7 +27,8 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	row := r.pool.QueryRow(ctx, `
 		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
-		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message
+		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
+		       tts_enabled, voice_id, subtitles_enabled, subtitle_style
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -36,10 +37,12 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		scenesJSON            []byte
 		tagsJSON              []byte
 		youtubeVisibility     *string
+		subtitleStyleJSON     []byte
 	)
 	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
-		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeVideoURL, &p.ErrorMessage)
+		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeVideoURL, &p.ErrorMessage,
+		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -62,6 +65,13 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		if err := json.Unmarshal(tagsJSON, &p.YoutubeTags); err != nil {
 			return nil, err
 		}
+	}
+	if len(subtitleStyleJSON) > 0 {
+		var style domain.SubtitleStyle
+		if err := json.Unmarshal(subtitleStyleJSON, &style); err != nil {
+			return nil, err
+		}
+		p.SubtitleStyle = &style
 	}
 	return &p, nil
 }
@@ -137,12 +147,19 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		v := string(*project.YoutubeVisibility)
 		youtubeVisibility = &v
 	}
+	var subtitleStyleJSON []byte
+	if project.SubtitleStyle != nil {
+		if subtitleStyleJSON, err = json.Marshal(project.SubtitleStyle); err != nil {
+			return err
+		}
+	}
 
 	_, err = r.pool.Exec(ctx, `
 		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
-		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20, now())
+		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
+		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
@@ -154,11 +171,15 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    youtube_visibility = EXCLUDED.youtube_visibility, youtube_publish_at = EXCLUDED.youtube_publish_at,
 		    youtube_thumbnail_path = EXCLUDED.youtube_thumbnail_path,
 		    youtube_video_url = EXCLUDED.youtube_video_url,
-		    error_message = EXCLUDED.error_message, updated_at = now()`,
+		    error_message = EXCLUDED.error_message,
+		    tts_enabled = EXCLUDED.tts_enabled, voice_id = EXCLUDED.voice_id,
+		    subtitles_enabled = EXCLUDED.subtitles_enabled, subtitle_style = EXCLUDED.subtitle_style,
+		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
 		project.CategoryHint, string(project.VoiceLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility, project.YoutubePublishAt,
-		project.YoutubeThumbnailPath, project.YoutubeVideoURL, project.ErrorMessage)
+		project.YoutubeThumbnailPath, project.YoutubeVideoURL, project.ErrorMessage,
+		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON)
 	return err
 }
 

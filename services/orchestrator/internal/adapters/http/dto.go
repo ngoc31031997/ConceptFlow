@@ -18,6 +18,13 @@ type startRenderSagaRequest struct {
 	CategoryHint        string  `json:"category_hint"`
 	VoiceLanguage       string  `json:"voice_language"`
 	BackgroundMusicPath *string `json:"background_music_path,omitempty"`
+
+	// CR-001. TTSEnabled is a pointer so an omitted field keeps the pre-CR-001
+	// default (narration on) instead of decoding to false.
+	TTSEnabled       *bool                 `json:"tts_enabled,omitempty"`
+	VoiceID          string                `json:"voice_id,omitempty"`
+	SubtitlesEnabled bool                  `json:"subtitles_enabled,omitempty"`
+	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 }
 
 // startPublishSagaRequest is the body of POST /v1/sagas/publish.
@@ -61,15 +68,19 @@ type sceneResponse struct {
 // projectResponse is the GET /v1/projects/{project_id} response
 // (interface-contracts.md).
 type projectResponse struct {
-	ProjectID       string          `json:"project_id"`
-	Status          string          `json:"status"`
-	VideoPath       *string         `json:"video_path,omitempty"`
-	Scenes          []sceneResponse `json:"scenes"`
-	PluginID        string          `json:"plugin_id"`
-	CategoryHint    string          `json:"category_hint"`
-	VoiceLanguage   string          `json:"voice_language"`
-	YoutubeVideoURL *string         `json:"youtube_video_url,omitempty"`
-	ErrorMessage    *string         `json:"error_message,omitempty"`
+	ProjectID        string                `json:"project_id"`
+	Status           string                `json:"status"`
+	VideoPath        *string               `json:"video_path,omitempty"`
+	Scenes           []sceneResponse       `json:"scenes"`
+	PluginID         string                `json:"plugin_id"`
+	CategoryHint     string                `json:"category_hint"`
+	VoiceLanguage    string                `json:"voice_language"`
+	TTSEnabled       bool                  `json:"tts_enabled"`
+	VoiceID          string                `json:"voice_id,omitempty"`
+	SubtitlesEnabled bool                  `json:"subtitles_enabled"`
+	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	YoutubeVideoURL  *string               `json:"youtube_video_url,omitempty"`
+	ErrorMessage     *string               `json:"error_message,omitempty"`
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -130,14 +141,18 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		})
 	}
 	return projectResponse{
-		ProjectID:       p.ProjectID,
-		Status:          string(p.Status),
-		VideoPath:       p.VideoPath,
-		Scenes:          scenes,
-		PluginID:        p.PluginID,
-		CategoryHint:    p.CategoryHint,
-		VoiceLanguage:   string(p.VoiceLanguage),
-		YoutubeVideoURL: p.YoutubeVideoURL,
-		ErrorMessage:    p.ErrorMessage,
+		ProjectID:        p.ProjectID,
+		Status:           string(p.Status),
+		VideoPath:        p.VideoPath,
+		Scenes:           scenes,
+		PluginID:         p.PluginID,
+		CategoryHint:     p.CategoryHint,
+		VoiceLanguage:    string(p.VoiceLanguage),
+		TTSEnabled:       p.TTSEnabled,
+		VoiceID:          p.VoiceID,
+		SubtitlesEnabled: p.SubtitlesEnabled,
+		SubtitleStyle:    p.SubtitleStyle,
+		YoutubeVideoURL:  p.YoutubeVideoURL,
+		ErrorMessage:     p.ErrorMessage,
 	}
 }

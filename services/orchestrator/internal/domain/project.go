@@ -127,6 +127,14 @@ type Project struct {
 	VoiceLanguage       VoiceLanguage
 	BackgroundMusicPath *string // optional static input, set at Saga start, reused unchanged at assemble_video (Rule 3)
 
+	// CR-001 — narration and subtitles are independently switchable per project.
+	// When TTSEnabled is false the synthesize_speech step is skipped entirely and
+	// Scene.DurationSeconds is filled from EstimateNarrationDuration instead.
+	TTSEnabled       bool
+	VoiceID          string
+	SubtitlesEnabled bool
+	SubtitleStyle    *SubtitleStyle
+
 	Scenes []Scene
 
 	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)

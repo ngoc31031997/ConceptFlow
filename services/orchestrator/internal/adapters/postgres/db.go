@@ -46,6 +46,13 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS manim_scene_class_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;
+-- CR-001: narration and subtitles are switchable per project. tts_enabled
+-- defaults to true so projects created before this column existed keep the
+-- narrated behaviour they were rendered with.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS tts_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS voice_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitles_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

@@ -30,8 +30,8 @@ class FakeTTSEngine(TTSEnginePort):
         self.calls: list[tuple[str, str, str]] = []
         self._duration_seconds = duration_seconds
 
-    def synthesize(self, text: str, language: str, output_path: str) -> float:
-        self.calls.append((text, language, output_path))
+    def synthesize(self, text: str, voice_id: str, output_path: str) -> float:
+        self.calls.append((text, voice_id, output_path))
         _write_silent_wav(output_path, self._duration_seconds)
         return self._duration_seconds
 
@@ -49,8 +49,10 @@ def test_synthesize_calls_engine_and_returns_result(shared_volume_root):
     result = use_case.synthesize(SpeechRequest("proj-1", 0, "Xin chao", "vi"))
 
     assert result.duration_seconds == 4.5
-    assert result.audio_path == str(shared_volume_root / "proj-1" / "audio" / "0_vi.wav")
-    assert engine.calls == [("Xin chao", "vi", result.audio_path)]
+    assert result.audio_path == str(
+        shared_volume_root / "proj-1" / "audio" / "0_vi_VN-vais1000-medium.wav"
+    )
+    assert engine.calls == [("Xin chao", "vi_VN-vais1000-medium", result.audio_path)]
 
 
 def test_synthesize_passes_text_verbatim_no_preprocessing(shared_volume_root):

@@ -20,6 +20,7 @@ class SpeechRequest:
     scene_index: int
     text: str
     language: str
+    voice_id: str | None = None
 
 
 @dataclass(frozen=True)

@@ -14,8 +14,8 @@ class TTSEnginePort(ABC):
     """Synthesizes speech audio to a file and reports its duration."""
 
     @abstractmethod
-    def synthesize(self, text: str, language: str, output_path: str) -> float:
-        """Write synthesized audio for `text` (in `language`) to `output_path`.
+    def synthesize(self, text: str, voice_id: str, output_path: str) -> float:
+        """Write synthesized audio for `text` (using `voice_id`) to `output_path`.
 
         Returns:
             The resulting audio duration in seconds.

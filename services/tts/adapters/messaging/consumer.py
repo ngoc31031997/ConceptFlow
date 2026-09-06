@@ -70,6 +70,7 @@ class SynthesizeSpeechCommandHandler:
                 scene_index=s["scene_index"],
                 narration_text=s["narration_text"],
                 language=s["language"],
+                voice_id=s.get("voice_id"),
             )
             for s in payload["scenes"]
         ]

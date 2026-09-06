@@ -20,6 +20,7 @@ class SceneSpeechRequest:
     scene_index: int
     narration_text: str
     language: str
+    voice_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -54,6 +55,7 @@ class SynthesizeSpeechBatchUseCase:
                 scene_index=scene.scene_index,
                 text=scene.narration_text,
                 language=scene.language,
+                voice_id=scene.voice_id,
             )
             try:
                 result: SpeechResult = self._synthesize_speech.synthesize(request)

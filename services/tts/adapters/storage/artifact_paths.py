@@ -12,9 +12,13 @@ import wave
 SHARED_VOLUME_ROOT = "/shared"
 
 
-def compute_audio_path(project_id: str, scene_index: int, language: str) -> str:
-    """Conventional path: /shared/{project_id}/audio/{scene_index}_{language}.wav"""
-    return os.path.join(SHARED_VOLUME_ROOT, project_id, "audio", f"{scene_index}_{language}.wav")
+def compute_audio_path(project_id: str, scene_index: int, voice_id: str) -> str:
+    """Conventional path: /shared/{project_id}/audio/{scene_index}_{voice_id}.wav
+
+    Keying on voice_id (not language, as before CR-001) keeps the idempotency
+    check correct when a project is re-rendered with a different voice.
+    """
+    return os.path.join(SHARED_VOLUME_ROOT, project_id, "audio", f"{scene_index}_{voice_id}.wav")
 
 
 def audio_exists(audio_path: str) -> bool:

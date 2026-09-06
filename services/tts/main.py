@@ -26,7 +26,9 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.tts_engines.piper_adapter import PiperTTSAdapter
-from application.synthesize_speech import SUPPORTED_LANGUAGES, SynthesizeSpeechUseCase
+from adapters.tts_engines.voice_registry import VOICES
+from adapters.tts_engines.voice_samples import generate_missing_samples
+from application.synthesize_speech import SynthesizeSpeechUseCase
 from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
 
 logging.basicConfig(level=logging.WARNING)
@@ -38,8 +40,9 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 async def run() -> None:
-    engine = PiperTTSAdapter(languages=list(SUPPORTED_LANGUAGES))
+    engine = PiperTTSAdapter(voice_ids=[voice.voice_id for voice in VOICES])
     batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
+    generate_missing_samples(engine)
 
     pool = await create_pool()
     inbox = InboxRepository(pool)

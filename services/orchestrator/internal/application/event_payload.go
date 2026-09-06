@@ -93,15 +93,20 @@ func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
 	return out
 }
 
-// scenesToPayloadForSynthesis is scenesToPayload plus a per-scene "language"
-// key — the TTS Service's approved interface-contracts.md requires
-// synthesize_speech's scenes to each carry "language" (mirroring the
+// scenesToPayloadForSynthesis is scenesToPayload plus per-scene "language"
+// and "voice_id" keys — the TTS Service's approved interface-contracts.md
+// requires synthesize_speech's scenes to each carry "language" (mirroring the
 // synchronous TTSEnginePort.synthesize(text, language, ...) signature this
-// command replaced), not a single top-level voice_language field.
-func scenesToPayloadForSynthesis(scenes []domain.Scene, language string) []map[string]interface{} {
+// command replaced), not a single top-level voice_language field. voice_id
+// (CR-001) selects which bundled Piper voice reads the line; an empty value
+// lets the TTS Service fall back to that language's default voice.
+func scenesToPayloadForSynthesis(scenes []domain.Scene, language, voiceID string) []map[string]interface{} {
 	out := scenesToPayload(scenes)
 	for _, m := range out {
 		m["language"] = language
+		if voiceID != "" {
+			m["voice_id"] = voiceID
+		}
 	}
 	return out
 }

@@ -21,7 +21,7 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 // synthesize_speech directly — not wait for a scenes_classified event.
 func TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech(t *testing.T) {
 	uc, repo, pub, prog := newTestUseCase()
-	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, VoiceLanguage: domain.LanguageVietnamese}
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, VoiceLanguage: domain.LanguageVietnamese, TTSEnabled: true}
 	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
@@ -233,5 +233,96 @@ func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithVi
 	project, _ := repo.Get(context.Background(), "proj-1")
 	if project.RenderedVideoPath == nil || *project.RenderedVideoPath != "rendered.mp4" {
 		t.Fatalf("expected RenderedVideoPath persisted, got %v", project.RenderedVideoPath)
+	}
+}
+
+// TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstimatesDurations
+// guards CR-001's branch: with narration off, no synthesize_speech command may
+// reach the TTS Service, yet render_scenes must still carry a duration per
+// scene so `self.wait(AUTO)` substitution keeps working.
+func TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstimatesDurations(t *testing.T) {
+	uc, repo, pub, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusParsingScript,
+		VoiceLanguage: domain.LanguageEnglish, TTSEnabled: false,
+	}
+	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_parsed",
+		Payload: map[string]interface{}{
+			"scene_class_name": "DemoScene",
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": "the first narration line"},
+				map[string]interface{}{"scene_index": float64(1), "narration_text": "the second narration line"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, cmd := range pub.published {
+		if cmd.routingKey == "tts" {
+			t.Fatalf("expected no tts command when narration is disabled, got %+v", cmd)
+		}
+	}
+
+	last := pub.last()
+	if last == nil || last.routingKey != "rendering" {
+		t.Fatalf("expected render_scenes dispatched to rendering, got %+v", last)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusRendering {
+		t.Fatalf("expected rendering, got %s", project.Status)
+	}
+	for _, scene := range project.Scenes {
+		if scene.DurationSeconds <= 0 {
+			t.Fatalf("scene %d has no estimated duration", scene.SceneIndex)
+		}
+		if scene.AudioPath != "" {
+			t.Fatalf("scene %d must have no audio when narration is disabled, got %q", scene.SceneIndex, scene.AudioPath)
+		}
+	}
+
+	synthStep, _ := repo.GetStep(context.Background(), "saga-1", domain.StepSynthesizeSpeech)
+	if synthStep.Status != domain.SagaStepCompleted {
+		t.Fatalf("expected synthesize_speech closed as completed without dispatch, got %s", synthStep.Status)
+	}
+}
+
+// TestAssembleVideoPayload_SubtitlesAndSilentVideo covers the assemble_video
+// contract for a subtitled, narration-free project: no audio segments to mux,
+// and one cue per scene laid end to end.
+func TestAssembleVideoPayload_SubtitlesAndSilentVideo(t *testing.T) {
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", RenderedVideoPath: &rendered,
+		TTSEnabled: false, SubtitlesEnabled: true,
+		Scenes: []domain.Scene{
+			{SceneIndex: 1, NarrationText: "second", DurationSeconds: 3},
+			{SceneIndex: 0, NarrationText: "first", DurationSeconds: 2},
+		},
+	}
+
+	payload := assembleVideoPayload(project)
+
+	if segments := payload["audio_segments"].([]string); len(segments) != 0 {
+		t.Fatalf("expected no audio segments for a silent video, got %v", segments)
+	}
+	if _, ok := payload["subtitle_style"]; !ok {
+		t.Fatal("expected subtitle_style to fall back to the default style")
+	}
+
+	cues := payload["subtitle_cues"].([]map[string]interface{})
+	if len(cues) != 2 {
+		t.Fatalf("expected 2 cues, got %d", len(cues))
+	}
+	if cues[0]["text"] != "first" || cues[0]["start_time"].(float64) != 0 || cues[0]["end_time"].(float64) != 2 {
+		t.Fatalf("unexpected first cue: %+v", cues[0])
+	}
+	if cues[1]["start_time"].(float64) != 2 || cues[1]["end_time"].(float64) != 5 {
+		t.Fatalf("expected second cue to follow the first, got %+v", cues[1])
 	}
 }

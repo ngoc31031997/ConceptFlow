@@ -32,18 +32,18 @@ PIPER_BINARY = "piper"
 class PiperTTSAdapter(TTSEnginePort):
     """Voice model paths are resolved once at construction (NFR Design —
     in-process voice model cache: the .onnx files are memory-mapped by Piper
-    on first use per language and stay warm in the OS page cache for the
+    on first use per voice and stay warm in the OS page cache for the
     lifetime of the process).
     """
 
-    def __init__(self, languages: list[str]) -> None:
+    def __init__(self, voice_ids: list[str]) -> None:
         self._model_paths: dict[str, str] = {
-            language: get_voice_model_path(language) for language in languages
+            voice_id: get_voice_model_path(voice_id) for voice_id in voice_ids
         }
         self._executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix="piper-synthesis")
 
-    def synthesize(self, text: str, language: str, output_path: str) -> float:
-        model_path = self._model_paths[language]
+    def synthesize(self, text: str, voice_id: str, output_path: str) -> float:
+        model_path = self._model_paths[voice_id]
 
         future = self._executor.submit(self._run_piper, model_path, text, output_path)
         try:

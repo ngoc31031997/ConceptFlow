@@ -24,17 +24,22 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Bundle Piper voice models at build time (Low-Level Design Question 4) —
-# avoids any network dependency at runtime.
-ARG PIPER_VI_MODEL_URL=https://huggingface.co/rhasspy/piper-voices/resolve/main/vi/vi_VN/vais1000/medium/vi_VN-vais1000-medium.onnx
-ARG PIPER_VI_MODEL_CONFIG_URL=https://huggingface.co/rhasspy/piper-voices/resolve/main/vi/vi_VN/vais1000/medium/vi_VN-vais1000-medium.onnx.json
-ARG PIPER_EN_MODEL_URL=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx
-ARG PIPER_EN_MODEL_CONFIG_URL=https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json
+# Bundle Piper voice models at build time — avoids any network dependency at
+# runtime. Files are named by voice_id to match adapters/tts_engines/voice_registry.py.
+# The 4 voices (vi/en × female/male) are CR-001's chosen set; vi_VN-vivos-x_low is
+# the only male Vietnamese voice Piper publishes, hence its lower quality tier.
+ARG PIPER_VOICES_BASE=https://huggingface.co/rhasspy/piper-voices/resolve/main
 RUN mkdir -p /app/voices && \
-    curl -L -o /app/voices/vi.onnx "$PIPER_VI_MODEL_URL" && \
-    curl -L -o /app/voices/vi.onnx.json "$PIPER_VI_MODEL_CONFIG_URL" && \
-    curl -L -o /app/voices/en.onnx "$PIPER_EN_MODEL_URL" && \
-    curl -L -o /app/voices/en.onnx.json "$PIPER_EN_MODEL_CONFIG_URL"
+    for spec in \
+      "vi/vi_VN/vais1000/medium/vi_VN-vais1000-medium" \
+      "vi/vi_VN/vivos/x_low/vi_VN-vivos-x_low" \
+      "en/en_US/lessac/medium/en_US-lessac-medium" \
+      "en/en_US/ryan/high/en_US-ryan-high" \
+    ; do \
+      name="$(basename "$spec")" && \
+      curl -fL -o "/app/voices/${name}.onnx" "${PIPER_VOICES_BASE}/${spec}.onnx" && \
+      curl -fL -o "/app/voices/${name}.onnx.json" "${PIPER_VOICES_BASE}/${spec}.onnx.json" ; \
+    done
 
 COPY . .
 CMD ["python", "main.py"]

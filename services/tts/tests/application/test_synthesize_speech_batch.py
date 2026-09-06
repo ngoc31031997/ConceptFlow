@@ -30,14 +30,14 @@ def _write_silent_wav(path: str, duration_seconds: float = 2.0, framerate: int =
 
 
 class FakeTTSEngine(TTSEnginePort):
-    def __init__(self, fail_at_language: str | None = None) -> None:
+    def __init__(self, fail_at_voice_id: str | None = None) -> None:
         self.calls: list[tuple[str, str, str]] = []
-        self._fail_at_language = fail_at_language
+        self._fail_at_voice_id = fail_at_voice_id
 
-    def synthesize(self, text: str, language: str, output_path: str) -> float:
-        if language == self._fail_at_language:
+    def synthesize(self, text: str, voice_id: str, output_path: str) -> float:
+        if voice_id == self._fail_at_voice_id:
             raise TTSEngineError("engine crashed")
-        self.calls.append((text, language, output_path))
+        self.calls.append((text, voice_id, output_path))
         _write_silent_wav(output_path, duration_seconds=3.0)
         return 3.0
 
@@ -64,7 +64,7 @@ def test_batch_synthesizes_every_scene(shared_volume_root):
 
 
 def test_batch_fails_fast_on_first_error(shared_volume_root):
-    engine = FakeTTSEngine(fail_at_language="vi")
+    engine = FakeTTSEngine(fail_at_voice_id="vi_VN-vais1000-medium")
     batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
     scenes = [
         SceneSpeechRequest(scene_index=0, narration_text="hello", language="en"),

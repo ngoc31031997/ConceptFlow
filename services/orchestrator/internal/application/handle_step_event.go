@@ -211,7 +211,38 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 		return err
 	}
 
+	if !project.TTSEnabled {
+		return uc.skipSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
+	}
 	return uc.startSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
+}
+
+// skipSynthesizeSpeech is the TTS-disabled branch (CR-001 FR4.6): no audio is
+// synthesized, so the step is closed as completed without ever being
+// dispatched, each scene's duration is estimated from its narration text, and
+// render_scenes is dispatched directly. Rendering and Video Assembly stay
+// unaware of the toggle — they only ever see a populated DurationSeconds.
+func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
+	for i := range project.Scenes {
+		project.Scenes[i].DurationSeconds = domain.EstimateNarrationDuration(
+			project.Scenes[i].NarrationText, project.VoiceLanguage,
+		)
+		project.Scenes[i].AudioPath = ""
+	}
+	if err := uc.repo.Save(ctx, project); err != nil {
+		return err
+	}
+
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: domain.StepSynthesizeSpeech, Status: domain.SagaStepCompleted}); err != nil {
+		return err
+	}
+	if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
+		ProjectID: projectID, Step: string(domain.StepSynthesizeSpeech), Status: "completed",
+	}); err != nil {
+		return err
+	}
+
+	return uc.startRenderScenes(ctx, sagaID, projectID, project)
 }
 
 // startSynthesizeSpeech dispatches synthesize_speech (Bước 3) — shared by
@@ -222,7 +253,7 @@ func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sag
 		return err
 	}
 	payload := map[string]interface{}{
-		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage)),
+		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage), project.VoiceID),
 	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
 		return err
@@ -269,7 +300,14 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 		return err
 	}
 
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress}); err != nil {
+	return uc.startRenderScenes(ctx, event.SagaID, event.ProjectID, project)
+}
+
+// startRenderScenes dispatches render_scenes (Bước 4) — shared by both the
+// TTS-enabled path (after speech_synthesized merges real audio durations) and
+// the TTS-disabled path (after estimated durations are filled in).
+func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
 	payload := map[string]interface{}{
@@ -277,10 +315,10 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 		"script_content":   project.ScriptContent,
 		"scene_class_name": project.ManimSceneClassName,
 	}
-	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
+	if err := uc.dispatch(ctx, sagaID, projectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err
 	}
-	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRendering)
+	return uc.repo.UpdateStatus(ctx, projectID, domain.StatusRendering)
 }
 
 // onRenderingCompleted stores the single rendered video path (rendering_completed
@@ -346,10 +384,18 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 // the static background_music_path (Rule 3). Video Assembly concatenates
 // audio_segments into one narration track and muxes it onto video_path —
 // there are no more per-scene clips to stitch (Manim-script input mode).
+// When narration is disabled (CR-001) audio_segments comes back empty and the
+// video is assembled silent (or with background music only); subtitle_cues are
+// sent whenever the Creator enabled subtitles, timed by the same per-scene
+// durations that paced the animation.
 func assembleVideoPayload(project *domain.Project) map[string]interface{} {
-	audioSegments := make([]string, 0, len(project.Scenes))
-	for _, s := range sortedScenes(project.Scenes) {
-		audioSegments = append(audioSegments, s.AudioPath)
+	scenes := sortedScenes(project.Scenes)
+
+	audioSegments := make([]string, 0, len(scenes))
+	for _, s := range scenes {
+		if s.AudioPath != "" {
+			audioSegments = append(audioSegments, s.AudioPath)
+		}
 	}
 	var videoPath string
 	if project.RenderedVideoPath != nil {
@@ -362,7 +408,32 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 	if project.BackgroundMusicPath != nil {
 		payload["background_music_path"] = *project.BackgroundMusicPath
 	}
+	if project.SubtitlesEnabled {
+		style := domain.DefaultSubtitleStyle()
+		if project.SubtitleStyle != nil {
+			style = *project.SubtitleStyle
+		}
+		payload["subtitle_style"] = style
+		payload["subtitle_cues"] = subtitleCues(scenes)
+	}
 	return payload
+}
+
+// subtitleCues lays the narration lines end to end, each shown for its own
+// duration — real audio length when TTS ran, estimated reading time otherwise.
+func subtitleCues(scenes []domain.Scene) []map[string]interface{} {
+	cues := make([]map[string]interface{}, 0, len(scenes))
+	elapsed := 0.0
+	for _, s := range scenes {
+		cues = append(cues, map[string]interface{}{
+			"scene_index": s.SceneIndex,
+			"text":        s.NarrationText,
+			"start_time":  elapsed,
+			"end_time":    elapsed + s.DurationSeconds,
+		})
+		elapsed += s.DurationSeconds
+	}
+	return cues
 }
 
 // validateSceneIndexSets enforces Rule 1: the scene_index set already

@@ -16,6 +16,12 @@ type StartRenderSagaInput struct {
 	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
 	VoiceLanguage       domain.VoiceLanguage
 	BackgroundMusicPath *string // optional, business-rules.md Rule 3
+
+	// CR-001 — narration/subtitle switches chosen by the Creator at submit time.
+	TTSEnabled       bool
+	VoiceID          string
+	SubtitlesEnabled bool
+	SubtitleStyle    *domain.SubtitleStyle
 }
 
 // StartRenderSagaOutput is returned to the HTTP layer for the 201 response.
@@ -54,6 +60,10 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		CategoryHint:        input.CategoryHint,
 		VoiceLanguage:       input.VoiceLanguage,
 		BackgroundMusicPath: input.BackgroundMusicPath,
+		TTSEnabled:          input.TTSEnabled,
+		VoiceID:             input.VoiceID,
+		SubtitlesEnabled:    input.SubtitlesEnabled,
+		SubtitleStyle:       input.SubtitleStyle,
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err

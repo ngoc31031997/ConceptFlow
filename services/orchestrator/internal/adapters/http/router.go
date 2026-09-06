@@ -91,6 +91,11 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	ttsEnabled := true
+	if req.TTSEnabled != nil {
+		ttsEnabled = *req.TTSEnabled
+	}
+
 	out, err := rt.startRenderSaga.Execute(r.Context(), application.StartRenderSagaInput{
 		ProjectID:           req.ProjectID,
 		ScriptContent:       req.ScriptContent,
@@ -98,6 +103,10 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		CategoryHint:        req.CategoryHint,
 		VoiceLanguage:       lang,
 		BackgroundMusicPath: req.BackgroundMusicPath,
+		TTSEnabled:          ttsEnabled,
+		VoiceID:             req.VoiceID,
+		SubtitlesEnabled:    req.SubtitlesEnabled,
+		SubtitleStyle:       req.SubtitleStyle,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)
