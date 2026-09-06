@@ -14,6 +14,7 @@
  *   rabbitmqUrl: string,
  *   port: number,
  *   webGuiOrigin: string,
+ *   sharedDir: string,
  * }}
  */
 function loadConfig(env = process.env) {
@@ -24,6 +25,7 @@ function loadConfig(env = process.env) {
     rabbitmqUrl: env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672/',
     port: Number(env.PORT) || 8080,
     webGuiOrigin: env.WEB_GUI_ORIGIN || 'http://localhost:3000',
+    sharedDir: env.SHARED_DIR || '/shared',
   };
 }
 

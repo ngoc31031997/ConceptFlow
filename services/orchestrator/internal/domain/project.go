@@ -4,6 +4,8 @@
 // or chi — adapters depend on domain, never the reverse.
 package domain
 
+import "time"
+
 // ProjectStatus is the state machine driving both the Render Saga (5 steps)
 // and the Publish Saga (1 step). It has 9 happy-path values plus 6
 // failed_at_<step> values, one per step that can fail (business-rules.md
@@ -135,6 +137,17 @@ type Project struct {
 	YoutubeVideoURL    *string
 
 	ErrorMessage *string
+}
+
+// ProjectSummary is the lightweight projection returned by GET /v1/projects
+// (list view) — deliberately excludes Scenes/ScriptContent so listing every
+// project never pulls their (potentially large) JSONB payload into memory.
+type ProjectSummary struct {
+	ProjectID    string
+	Status       ProjectStatus
+	VideoPath    *string
+	ErrorMessage *string
+	UpdatedAt    time.Time
 }
 
 // SagaStep tracks the processing state of a single step within one Saga

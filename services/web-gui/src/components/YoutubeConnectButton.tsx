@@ -11,9 +11,9 @@ function YoutubeIcon() {
   );
 }
 
-export function YoutubeConnectButton() {
+export function YoutubeConnectButton({ projectId }: { projectId: string }) {
   function handleClick() {
-    window.location.href = getYoutubeAuthStartUrl();
+    window.location.href = getYoutubeAuthStartUrl(projectId);
   }
 
   return (

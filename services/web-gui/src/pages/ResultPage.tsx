@@ -5,7 +5,7 @@ import { YoutubeConnectButton } from "../components/YoutubeConnectButton";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
 import { useProject } from "../hooks/useProject";
-import { startPublishSaga, ApiError } from "../api/client";
+import { startPublishSaga, getProjectVideoUrl, ApiError } from "../api/client";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
 
@@ -38,7 +38,7 @@ export function ResultPage() {
         title="Xem kết quả & đăng video"
         subtitle="Xem trước video, kết nối YouTube và điền thông tin để xuất bản."
       >
-        {project.video_path && <VideoPlayer videoSrc={project.video_path} />}
+        {project.video_path && <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />}
 
         {project.youtube_video_url ? (
           <div className={glass.card} style={{ textAlign: "center", padding: "44px 32px" }}>
@@ -47,7 +47,7 @@ export function ResultPage() {
           </div>
         ) : (
           <>
-            <YoutubeConnectButton />
+            <YoutubeConnectButton projectId={projectId} />
             {error && (
               <p role="alert" className={glass.helperText}>
                 {error}

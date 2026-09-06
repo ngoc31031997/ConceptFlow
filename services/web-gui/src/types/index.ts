@@ -50,3 +50,11 @@ export interface SagaStartedResponse {
   saga_id: string;
   status: string;
 }
+
+export interface ProjectSummary {
+  project_id: string;
+  status: string;
+  video_path?: string;
+  error_message?: string;
+  updated_at: string;
+}

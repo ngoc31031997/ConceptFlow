@@ -66,8 +66,29 @@ describe("api/client", () => {
     );
   });
 
+  it("listProjects unwraps the {projects} envelope on success", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ projects: [{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }] }),
+    }) as unknown as typeof fetch;
+
+    const projects = await client.listProjects();
+    expect(projects).toEqual([{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }]);
+  });
+
+  it("deleteProject sends a DELETE request and resolves on 204", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204 }) as unknown as typeof fetch;
+
+    await expect(client.deleteProject("p1")).resolves.toBeUndefined();
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/v1/projects/p1"),
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+
   it("getYoutubeAuthStartUrl returns a URL string without fetching", () => {
-    const url = client.getYoutubeAuthStartUrl();
+    const url = client.getYoutubeAuthStartUrl("project-1");
     expect(url).toContain("/v1/auth/youtube/start");
+    expect(url).toContain("state=project-1");
   });
 });

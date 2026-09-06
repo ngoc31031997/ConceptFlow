@@ -39,12 +39,23 @@ func (f *fakeRetryStep) Execute(_ context.Context, _ string) (*application.Retry
 }
 
 type fakeProjectReader struct {
-	project *domain.Project
-	err     error
+	project   *domain.Project
+	err       error
+	listOut   []domain.ProjectSummary
+	listErr   error
+	deleteErr error
 }
 
 func (f *fakeProjectReader) Get(_ context.Context, _ string) (*domain.Project, error) {
 	return f.project, f.err
+}
+
+func (f *fakeProjectReader) List(_ context.Context) ([]domain.ProjectSummary, error) {
+	return f.listOut, f.listErr
+}
+
+func (f *fakeProjectReader) Delete(_ context.Context, _ string) error {
+	return f.deleteErr
 }
 
 func TestHandleStartRenderSaga_Created(t *testing.T) {
@@ -140,6 +151,55 @@ func TestHandleRetry_OK(t *testing.T) {
 
 	if rec.Code != 200 {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleListProjects_OK(t *testing.T) {
+	router := NewRouter(
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}},
+	)
+
+	req := httptest.NewRequest("GET", "/v1/projects", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp projectListResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if len(resp.Projects) != 1 || resp.Projects[0].ProjectID != "p1" {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestHandleDeleteProject_NoContent(t *testing.T) {
+	router := NewRouter(
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{},
+	)
+
+	req := httptest.NewRequest("DELETE", "/v1/projects/p1", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 204 {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleDeleteProject_NotFound(t *testing.T) {
+	router := NewRouter(
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound},
+	)
+
+	req := httptest.NewRequest("DELETE", "/v1/projects/unknown", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 404 {
+		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
 

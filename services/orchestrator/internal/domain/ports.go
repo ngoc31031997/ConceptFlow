@@ -33,8 +33,10 @@ type ProgressPublisherPort interface {
 // Dependency Direction).
 type ProjectRepositoryPort interface {
 	Get(ctx context.Context, projectID string) (*Project, error)
+	List(ctx context.Context) ([]ProjectSummary, error)
 	Save(ctx context.Context, project *Project) error
 	UpdateStatus(ctx context.Context, projectID string, status ProjectStatus) error
+	Delete(ctx context.Context, projectID string) error
 	GetStep(ctx context.Context, sagaID string, stepName StepName) (*SagaStep, error)
 	UpdateStep(ctx context.Context, step *SagaStep) error
 }

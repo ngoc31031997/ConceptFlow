@@ -48,7 +48,7 @@ function main() {
   // 5. Register routes.
   app.use(pluginsRouter(contentPluginClient));
   app.use(sagasRouter(orchestratorClient));
-  app.use(projectsRouter(orchestratorClient));
+  app.use(projectsRouter(orchestratorClient, config.sharedDir));
   app.use(authRouter(publisherClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());

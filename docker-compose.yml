@@ -297,6 +297,7 @@ services:
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000
+      SHARED_DIR: /shared
     ports:
       - "8080:8080"
     healthcheck:
@@ -313,6 +314,8 @@ services:
         condition: service_healthy
       publisher:
         condition: service_healthy
+    volumes:
+      - shared_artifacts:/shared
     networks:
       - backend
 

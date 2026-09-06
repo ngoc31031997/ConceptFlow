@@ -4,7 +4,11 @@
 // input/output types.
 package http
 
-import "orchestrator/internal/domain"
+import (
+	"time"
+
+	"orchestrator/internal/domain"
+)
 
 // startRenderSagaRequest is the body of POST /v1/sagas/render.
 type startRenderSagaRequest struct {
@@ -66,9 +70,37 @@ type projectResponse struct {
 	ErrorMessage    *string         `json:"error_message,omitempty"`
 }
 
+// projectSummaryResponse is one entry of the GET /v1/projects (list) response.
+type projectSummaryResponse struct {
+	ProjectID    string  `json:"project_id"`
+	Status       string  `json:"status"`
+	VideoPath    *string `json:"video_path,omitempty"`
+	ErrorMessage *string `json:"error_message,omitempty"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+// projectListResponse is the GET /v1/projects response body.
+type projectListResponse struct {
+	Projects []projectSummaryResponse `json:"projects"`
+}
+
 // errorResponse is the JSON body for non-2xx responses.
 type errorResponse struct {
 	Error string `json:"error"`
+}
+
+func toProjectListResponse(summaries []domain.ProjectSummary) projectListResponse {
+	projects := make([]projectSummaryResponse, 0, len(summaries))
+	for _, s := range summaries {
+		projects = append(projects, projectSummaryResponse{
+			ProjectID:    s.ProjectID,
+			Status:       string(s.Status),
+			VideoPath:    s.VideoPath,
+			ErrorMessage: s.ErrorMessage,
+			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
+		})
+	}
+	return projectListResponse{Projects: projects}
 }
 
 func toProjectResponse(p *domain.Project) projectResponse {

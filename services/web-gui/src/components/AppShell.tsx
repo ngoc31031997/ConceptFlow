@@ -1,10 +1,11 @@
 import type { ReactNode } from "react";
+import { Link } from "react-router-dom";
 import styles from "./AppShell.module.css";
 
 const STEP_LABELS = ["Soạn nội dung", "Xử lý", "Xuất bản"] as const;
 
 interface AppShellProps {
-  currentStep: 1 | 2 | 3;
+  currentStep?: 1 | 2 | 3;
   title: string;
   subtitle: string;
   children: ReactNode;
@@ -36,24 +37,30 @@ export function AppShell({ currentStep, title, subtitle, children }: AppShellPro
             <div className={styles.logoName}>ConceptFlow</div>
           </div>
 
-          <div className={styles.stepsPill}>
-            {STEP_LABELS.map((label, index) => {
-              const stepNumber = index + 1;
-              const isActive = stepNumber === currentStep;
-              const isDone = stepNumber < currentStep;
-              const className = [styles.stepItem, isActive ? styles.active : "", isDone ? styles.done : ""]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <div key={label} className={className}>
-                  <span className={styles.stepNum}>{isDone ? <CheckIcon /> : stepNumber}</span>
-                  {label}
-                </div>
-              );
-            })}
-          </div>
+          {currentStep && (
+            <div className={styles.stepsPill}>
+              {STEP_LABELS.map((label, index) => {
+                const stepNumber = index + 1;
+                const isActive = stepNumber === currentStep;
+                const isDone = stepNumber < currentStep;
+                const className = [styles.stepItem, isActive ? styles.active : "", isDone ? styles.done : ""]
+                  .filter(Boolean)
+                  .join(" ");
+                return (
+                  <div key={label} className={className}>
+                    <span className={styles.stepNum}>{isDone ? <CheckIcon /> : stepNumber}</span>
+                    {label}
+                  </div>
+                );
+              })}
+            </div>
+          )}
 
           <div className={styles.spacer} />
+
+          <Link to="/videos" className={styles.logoName} style={{ fontSize: 12.5, fontWeight: 500 }}>
+            Danh sách video
+          </Link>
         </div>
 
         <div className={styles.mainCol}>

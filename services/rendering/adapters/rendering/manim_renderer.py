@@ -13,6 +13,8 @@ afterward.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import logging
 import os
 import shutil
@@ -65,24 +67,35 @@ class ManimAnimationRenderer(AnimationRendererPort):
     ) -> None:
         from manim import config
 
-        scene = template.build_scene(request)
-
         media_dir = tempfile.mkdtemp(prefix="manim-media-")
+        captured = io.StringIO()
         try:
             config.media_dir = media_dir
             config.disable_caching = True
             config.output_file = "scene"
-            scene.render()
 
-            rendered_path = ManimAnimationRenderer._find_rendered_file(media_dir)
+            scene = template.build_scene(request)
+            with contextlib.redirect_stdout(captured), contextlib.redirect_stderr(captured):
+                scene.render()
+
+            rendered_path = ManimAnimationRenderer._find_rendered_file(media_dir, captured.getvalue())
             shutil.move(rendered_path, output_path)
+        except AnimationEngineError:
+            raise
+        except Exception as exc:
+            raise AnimationEngineError(
+                f"Manim render failed: {exc}\n--- manim output ---\n{captured.getvalue()}"
+            ) from exc
         finally:
             shutil.rmtree(media_dir, ignore_errors=True)
 
     @staticmethod
-    def _find_rendered_file(media_dir: str) -> str:
+    def _find_rendered_file(media_dir: str, manim_output: str) -> str:
         for root, _dirs, files in os.walk(media_dir):
             for name in files:
                 if name.endswith(".mp4"):
                     return os.path.join(root, name)
-        raise AnimationEngineError(f"Manim did not produce an .mp4 file under {media_dir}")
+        raise AnimationEngineError(
+            f"Manim did not produce an .mp4 file under {media_dir}\n"
+            f"--- manim output ---\n{manim_output}"
+        )

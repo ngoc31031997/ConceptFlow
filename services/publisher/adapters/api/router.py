@@ -27,15 +27,17 @@ def create_v1_router(
     router = APIRouter(prefix="/v1")
 
     @router.get("/auth/youtube/start")
-    async def start(request: Request, response: Response) -> RedirectResponse:
+    async def start(request: Request, response: Response, state: str | None = None) -> RedirectResponse:
         correlation_id = set_correlation_id(request.headers.get("X-Request-ID"))
-        authorization_url = await asyncio.to_thread(oauth_flow.build_authorization_url)
+        authorization_url = await asyncio.to_thread(oauth_flow.build_authorization_url, state)
         redirect = RedirectResponse(authorization_url, status_code=302)
         redirect.headers["X-Request-ID"] = correlation_id
         return redirect
 
     @router.get("/auth/youtube/callback", response_model=OAuthCallbackResponse)
-    async def callback(request: Request, response: Response, code: str) -> OAuthCallbackResponse:
+    async def callback(
+        request: Request, response: Response, code: str, state: str | None = None
+    ) -> OAuthCallbackResponse:
         correlation_id = set_correlation_id(request.headers.get("X-Request-ID"))
         response.headers["X-Request-ID"] = correlation_id
 
@@ -44,9 +46,9 @@ def create_v1_router(
         except Exception as exc:  # noqa: BLE001 — any exchange failure becomes a 400 (Business Rule 6)
             logger.warning("OAuth callback failed: %s", exc)
             response.status_code = 400
-            return OAuthCallbackResponse(connected=False, error=str(exc))
+            return OAuthCallbackResponse(connected=False, error=str(exc), state=state)
 
-        return OAuthCallbackResponse(connected=True)
+        return OAuthCallbackResponse(connected=True, state=state)
 
     return router
 

@@ -37,9 +37,11 @@ class GoogleOAuthFlow:
         flow.redirect_uri = self._redirect_uri
         return flow
 
-    def build_authorization_url(self) -> str:
+    def build_authorization_url(self, state: str | None = None) -> str:
         flow = self._new_flow()
-        authorization_url, _state = flow.authorization_url(access_type="offline", prompt="consent")
+        authorization_url, _state = flow.authorization_url(
+            access_type="offline", prompt="consent", state=state
+        )
         return authorization_url
 
     def exchange_code(self, code: str) -> OAuthCredential:

@@ -28,10 +28,13 @@ type retryStepUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.RetryStepOutput, error)
 }
 
-// projectReader is the minimal read capability GET /v1/projects/{id} needs;
-// satisfied directly by domain.ProjectRepositoryPort.
-type projectReader interface {
+// projectStore is the read/delete capability the project-list and
+// project-detail/delete endpoints need; satisfied directly by
+// domain.ProjectRepositoryPort.
+type projectStore interface {
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
+	List(ctx context.Context) ([]domain.ProjectSummary, error)
+	Delete(ctx context.Context, projectID string) error
 }
 
 // Router holds the REST handlers' use case dependencies.
@@ -39,22 +42,24 @@ type Router struct {
 	startRenderSaga  startRenderSagaUseCase
 	startPublishSaga startPublishSagaUseCase
 	retryStep        retryStepUseCase
-	projects         projectReader
+	projects         projectStore
 }
 
 // NewRouter constructs the Router with its 4 dependencies (module-structure.md).
-func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectReader) *Router {
+func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore) *Router {
 	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects}
 }
 
-// Handler builds the chi.Router with all 5 routes (4 REST endpoints + health).
+// Handler builds the chi.Router with all routes (health + REST endpoints).
 func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/health", rt.handleHealth)
 	r.Post("/v1/sagas/render", rt.handleStartRenderSaga)
 	r.Post("/v1/sagas/publish", rt.handleStartPublishSaga)
+	r.Get("/v1/projects", rt.handleListProjects)
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
+	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
 	return r
 }
 
@@ -134,6 +139,24 @@ func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, toProjectResponse(project))
+}
+
+func (rt *Router) handleListProjects(w http.ResponseWriter, r *http.Request) {
+	summaries, err := rt.projects.List(r.Context())
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toProjectListResponse(summaries))
+}
+
+func (rt *Router) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	if err := rt.projects.Delete(r.Context(), projectID); err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (rt *Router) handleRetry(w http.ResponseWriter, r *http.Request) {

@@ -38,6 +38,27 @@ func (f *fakeRepo) Save(_ context.Context, project *domain.Project) error {
 	return nil
 }
 
+func (f *fakeRepo) List(_ context.Context) ([]domain.ProjectSummary, error) {
+	summaries := make([]domain.ProjectSummary, 0, len(f.projects))
+	for _, p := range f.projects {
+		summaries = append(summaries, domain.ProjectSummary{
+			ProjectID:    p.ProjectID,
+			Status:       p.Status,
+			VideoPath:    p.VideoPath,
+			ErrorMessage: p.ErrorMessage,
+		})
+	}
+	return summaries, nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, projectID string) error {
+	if _, ok := f.projects[projectID]; !ok {
+		return domain.ErrProjectNotFound
+	}
+	delete(f.projects, projectID)
+	return nil
+}
+
 func (f *fakeRepo) UpdateStatus(_ context.Context, projectID string, status domain.ProjectStatus) error {
 	p, ok := f.projects[projectID]
 	if !ok {

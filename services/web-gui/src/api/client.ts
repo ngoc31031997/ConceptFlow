@@ -2,6 +2,7 @@ import type {
   Plugin,
   Project,
   ProgressMessage,
+  ProjectSummary,
   PublishMetadata,
   RenderInput,
   SagaStartedResponse,
@@ -12,6 +13,10 @@ const GATEWAY_URL = import.meta.env.VITE_API_BASE_URL;
 export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, thử lại sau";
 
 export class ApiError extends Error {}
+
+export function getProjectVideoUrl(projectId: string): string {
+  return `${GATEWAY_URL}/v1/projects/${projectId}/video`;
+}
 
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
@@ -31,6 +36,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!response.ok) {
     throw new ApiError(await parseErrorMessage(response));
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json() as Promise<T>;
 }
@@ -56,6 +64,15 @@ export function retryProject(id: string): Promise<SagaStartedResponse> {
   return apiFetch<SagaStartedResponse>(`/v1/projects/${id}/retry`, { method: "POST" });
 }
 
+export async function listProjects(): Promise<ProjectSummary[]> {
+  const result = await apiFetch<{ projects: ProjectSummary[] }>("/v1/projects");
+  return result.projects;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${id}`, { method: "DELETE" });
+}
+
 export function startPublishSaga(
   id: string,
   metadata: PublishMetadata,
@@ -67,8 +84,29 @@ export function startPublishSaga(
   });
 }
 
-export function getYoutubeAuthStartUrl(): string {
-  return `${GATEWAY_URL}/v1/auth/youtube/start`;
+export function getYoutubeAuthStartUrl(projectId: string): string {
+  return `${GATEWAY_URL}/v1/auth/youtube/start?state=${encodeURIComponent(projectId)}`;
+}
+
+export interface YoutubeAuthCallbackResult {
+  connected: boolean;
+  error: string | null;
+  state: string | null;
+}
+
+export async function completeYoutubeAuthCallback(
+  code: string,
+  state: string | null,
+): Promise<YoutubeAuthCallbackResult> {
+  const params = new URLSearchParams({ code });
+  if (state) params.set("state", state);
+  let response: Response;
+  try {
+    response = await fetch(`${GATEWAY_URL}/v1/auth/youtube/callback?${params.toString()}`);
+  } catch {
+    throw new ApiError(GENERIC_CONNECTION_ERROR);
+  }
+  return response.json() as Promise<YoutubeAuthCallbackResult>;
 }
 
 export function subscribeProgress(

@@ -66,6 +66,62 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	return &p, nil
 }
 
+// List returns every project as a lightweight ProjectSummary (no
+// scenes/script_content), newest-updated first, for GET /v1/projects.
+func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT project_id, status, video_path, error_message, updated_at
+		FROM projects ORDER BY updated_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	summaries := make([]domain.ProjectSummary, 0)
+	for rows.Next() {
+		var s domain.ProjectSummary
+		var status string
+		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt); err != nil {
+			return nil, err
+		}
+		s.Status = domain.ProjectStatus(status)
+		summaries = append(summaries, s)
+	}
+	return summaries, rows.Err()
+}
+
+// Delete removes a project and everything derived from it — the projects
+// row itself, its saga_steps (matched by saga_id), and any outbox_events
+// still queued for it (matched by the project_id embedded in the command
+// payload) — so a deleted video leaves no residual rows behind to bloat the
+// database. File cleanup on the shared volume is the caller's (Gateway's)
+// responsibility, not the Orchestrator's (it has no mount of that volume).
+func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var sagaID string
+	err = tx.QueryRow(ctx, `DELETE FROM projects WHERE project_id = $1 RETURNING saga_id`, projectID).Scan(&sagaID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM saga_steps WHERE saga_id = $1`, sagaID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM outbox_events WHERE payload->>'project_id' = $1`, projectID); err != nil {
+		return err
+	}
+
+	return tx.Commit(ctx)
+}
+
 // Save upserts a Project (CRUD — module-structure.md).
 func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) error {
 	scenesJSON, err := json.Marshal(project.Scenes)
