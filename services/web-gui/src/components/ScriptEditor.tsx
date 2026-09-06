@@ -25,9 +25,9 @@ function TemplateIcon() {
   );
 }
 
-const SCRIPT_TEMPLATE = `## Scene 1: Giới thiệu vòng lặp for trong Java
+const SCRIPT_TEMPLATE = `## Scene 1
 
-Vòng lặp for trong Java gồm 3 phần: khởi tạo biến đếm, điều kiện lặp, và bước tăng/giảm — cả ba được viết gọn trên cùng một dòng.
+Giới thiệu vòng lặp for trong Java. Vòng lặp for gồm 3 phần: khởi tạo biến đếm, điều kiện lặp, và bước tăng/giảm — cả ba được viết gọn trên cùng một dòng.
 
 > Hoạt hình hiển thị biến i tăng dần từ 0 đến 4, mỗi vòng lặp in ra một giá trị
 
@@ -37,9 +37,9 @@ for (int i = 0; i < 5; i++) {
 }
 \`\`\`
 
-## Scene 2: Ứng dụng thực tế — tính tổng một mảng
+## Scene 2
 
-Chúng ta có thể dùng vòng lặp for để duyệt qua từng phần tử của một mảng và cộng dồn giá trị.
+Ứng dụng thực tế: dùng vòng lặp for để duyệt qua từng phần tử của một mảng và cộng dồn giá trị.
 
 \`\`\`java
 int[] numbers = {1, 2, 3, 4, 5};
@@ -82,7 +82,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
         data-testid="new-project-script-textarea"
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={"## Scene 1: Giới thiệu vòng lặp for\n\nMột vòng lặp for cho phép lặp qua từng phần tử...\n\n```python\nfor i in range(5):\n    print(i)\n```"}
+        placeholder={"## Scene 1\n\nMột vòng lặp for cho phép lặp qua từng phần tử...\n\n```python\nfor i in range(5):\n    print(i)\n```"}
         rows={12}
       />
     </div>
