@@ -6,16 +6,19 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"time"
 )
 
 // Config holds all environment-derived settings for main.go's composition
 // root.
 type Config struct {
-	RabbitMQURL          string
-	DatabaseURL          string
-	OutboxPollIntervalMS int
-	DatabaseMaxConns     int32
-	HTTPPort             string
+	RabbitMQURL                   string
+	DatabaseURL                   string
+	OutboxPollIntervalMS          int
+	DatabaseMaxConns              int32
+	HTTPPort                      string
+	RabbitMQReconnectInitialDelay time.Duration
+	RabbitMQReconnectMaxDelay     time.Duration
 }
 
 // Load reads Config from the environment, applying the defaults documented
@@ -39,6 +42,14 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	reconnectInitialMS, err := intEnvOrDefault("RABBITMQ_RECONNECT_INITIAL_DELAY_MS", 1000)
+	if err != nil {
+		return nil, err
+	}
+	reconnectMaxMS, err := intEnvOrDefault("RABBITMQ_RECONNECT_MAX_DELAY_MS", 30000)
+	if err != nil {
+		return nil, err
+	}
 
 	httpPort := os.Getenv("HTTP_PORT")
 	if httpPort == "" {
@@ -46,11 +57,13 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		RabbitMQURL:          rabbitMQURL,
-		DatabaseURL:          databaseURL,
-		OutboxPollIntervalMS: pollInterval,
-		DatabaseMaxConns:     int32(maxConns),
-		HTTPPort:             httpPort,
+		RabbitMQURL:                   rabbitMQURL,
+		DatabaseURL:                   databaseURL,
+		OutboxPollIntervalMS:          pollInterval,
+		DatabaseMaxConns:              int32(maxConns),
+		HTTPPort:                      httpPort,
+		RabbitMQReconnectInitialDelay: time.Duration(reconnectInitialMS) * time.Millisecond,
+		RabbitMQReconnectMaxDelay:     time.Duration(reconnectMaxMS) * time.Millisecond,
 	}, nil
 }
 

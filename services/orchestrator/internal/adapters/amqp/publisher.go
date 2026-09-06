@@ -22,14 +22,18 @@ const (
 // to the Outbox-backed CommandPublisherPort implementation
 // (postgres.OutboxRepository), not this struct directly, so a command
 // dispatch survives a crash between the state update and the network call.
+//
+// It asks ConnectionManager for the live channel on every publish rather
+// than caching one, so it keeps working across broker reconnects
+// (ADR-0022).
 type Publisher struct {
-	channel *amqp.Channel
+	chans *ConnectionManager
 }
 
-// NewPublisher wraps an already-open amqp091-go channel (constructed once in
-// main.go — dependency-injection.md "Constructed directly").
-func NewPublisher(channel *amqp.Channel) *Publisher {
-	return &Publisher{channel: channel}
+// NewPublisher wraps a ConnectionManager (constructed once in main.go —
+// dependency-injection.md "Constructed directly").
+func NewPublisher(chans *ConnectionManager) *Publisher {
+	return &Publisher{chans: chans}
 }
 
 // PublishCommand publishes envelope to commands.direct with the given
@@ -39,7 +43,7 @@ func (p *Publisher) PublishCommand(ctx context.Context, routingKey string, envel
 	if err != nil {
 		return err
 	}
-	return p.channel.PublishWithContext(ctx, commandsExchange, routingKey, false, false, amqp.Publishing{
+	return p.chans.Channel().PublishWithContext(ctx, commandsExchange, routingKey, false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})
@@ -54,7 +58,7 @@ func (p *Publisher) PublishProgress(ctx context.Context, msg domain.ProgressMess
 	if err != nil {
 		return err
 	}
-	return p.channel.PublishWithContext(ctx, progressExchange, "", false, false, amqp.Publishing{
+	return p.chans.Channel().PublishWithContext(ctx, progressExchange, "", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})

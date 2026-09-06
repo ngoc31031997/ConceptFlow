@@ -61,3 +61,12 @@ Polling publisher (không phải CDC/Debezium) — `OutboxRelay` chạy như 1 g
 
 ## Idempotency Summary
 Xem `nfr-design-patterns.md` — 2 tầng (message-level Inbox + step-level `SagaStep.status` guard).
+
+## Connection Resilience (Revision 2026-09-06, ADR-0022)
+Trước đây `amqp.Publisher`/`amqp.Consumer` giữ thẳng 1 `*amqp.Channel` mở lúc startup, không có cơ chế phục hồi — khi broker đóng channel (restart RabbitMQ, network blip), mọi publish sau đó fail vĩnh viễn với `channel/connection is not open`, khiến `OutboxRelay` kẹt vô hạn ở command đang publish dở và toàn bộ consumer (`orchestrator.events` + 6 DLQ) ngừng nhận message — chỉ khôi phục được bằng cách restart thủ công container.
+
+Nay `amqp.ConnectionManager` sở hữu vòng đời Connection/Channel:
+- `Publisher`/`Consumer` gọi `ConnectionManager.Channel()` mỗi lần dùng thay vì cache 1 lần — không bao giờ dùng phải channel cũ đã chết.
+- Watchdog goroutine nền lắng nghe `conn.NotifyClose`/`channel.NotifyClose`, tự redial với exponential backoff (mặc định 1s → cap 30s, cấu hình qua `RABBITMQ_RECONNECT_INITIAL_DELAY_MS`/`RABBITMQ_RECONNECT_MAX_DELAY_MS`).
+- Sau reconnect thành công, `ConnectionManager` gọi các callback đăng ký qua `OnReconnect(...)` — `Consumer` dùng để gọi lại `Start(ctx)`, đăng ký lại subscription trên `orchestrator.events` + 6 DLQ queue (broker tự huỷ mọi consumer khi channel đóng).
+- Không cần khai báo lại exchange/queue khi reconnect — topology đã durable, do Unit 1 (RabbitMQ Infrastructure) khai báo 1 lần.

@@ -42,20 +42,14 @@ func main() {
 	}
 	defer pool.Close()
 
-	// 3. Connect RabbitMQ (amqp091-go), declare channel.
-	conn, err := amqplib.Dial(cfg.RabbitMQURL)
-	if err != nil {
+	// 3. Connect RabbitMQ (amqp091-go) via ConnectionManager, which owns
+	// reconnect-with-backoff for the lifetime of the process (ADR-0022) —
+	// a bare channel does not recover on its own once the broker closes it.
+	connMgr := amqp.NewConnectionManager(cfg.RabbitMQURL, cfg.RabbitMQReconnectInitialDelay, cfg.RabbitMQReconnectMaxDelay, logger)
+	if err := connMgr.Connect(ctx); err != nil {
 		logger.Error("failed to connect to rabbitmq", "error", err)
 		os.Exit(1)
 	}
-	defer conn.Close()
-
-	channel, err := conn.Channel()
-	if err != nil {
-		logger.Error("failed to open amqp channel", "error", err)
-		os.Exit(1)
-	}
-	defer channel.Close()
 
 	// 4. Construct postgres.ProjectRepository, InboxRepository, OutboxRepository.
 	projectRepo := postgres.NewProjectRepository(pool)
@@ -63,7 +57,7 @@ func main() {
 	outboxRepo := postgres.NewOutboxRepository(pool)
 
 	// 5. Construct amqp.Publisher (implements CommandPublisherPort + ProgressPublisherPort).
-	realPublisher := amqp.NewPublisher(channel)
+	realPublisher := amqp.NewPublisher(connMgr)
 
 	// 6. Construct the 4 use cases. Use cases that dispatch commands are
 	// injected with outboxRepo (Outbox-backed CommandPublisherPort — writes
@@ -76,12 +70,18 @@ func main() {
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
-	// wire HandleStepEventUseCase.
-	consumer := amqp.NewConsumer(channel, inboxRepo, handleStepEvent, projectRepo, logger)
+	// wire HandleStepEventUseCase. Re-run Start after every reconnect
+	// (ADR-0022) — a broker reconnect implicitly drops all consumers, and
+	// Consumer.Start is safe to call again (its old delivery loops already
+	// exited on their own when the previous channel closed).
+	consumer := amqp.NewConsumer(connMgr, inboxRepo, handleStepEvent, projectRepo, logger)
 	if err := consumer.Start(ctx); err != nil {
 		logger.Error("failed to start amqp consumer", "error", err)
 		os.Exit(1)
 	}
+	connMgr.OnReconnect(func(ch *amqplib.Channel) error {
+		return consumer.Start(ctx)
+	})
 
 	// 8. Start postgres.OutboxRelay as a background goroutine.
 	relay := postgres.NewOutboxRelay(outboxRepo, realPublisher, time.Duration(cfg.OutboxPollIntervalMS)*time.Millisecond, logger)

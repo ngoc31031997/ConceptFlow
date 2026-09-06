@@ -42,8 +42,15 @@ type inboxPort interface {
 // Consumer wires RabbitMQ deliveries to HandleStepEventUseCase, deduping via
 // the Inbox and spawning one goroutine per message
 // (dependency-injection.md "Concurrency Model").
+//
+// It re-issues its Consume registrations against ConnectionManager after
+// every reconnect (see Start and main.go's OnReconnect wiring) — a broker
+// reconnect implicitly drops all consumers, and the old delivery loops
+// below already exit on their own when their Go channel closes with the
+// dead AMQP channel, so Start is safe to call again with no explicit
+// teardown (ADR-0022).
 type Consumer struct {
-	channel *amqp.Channel
+	chans   *ConnectionManager
 	inbox   inboxPort
 	handler eventHandler
 	repo    domain.ProjectRepositoryPort
@@ -51,16 +58,17 @@ type Consumer struct {
 }
 
 // NewConsumer constructs the Consumer.
-func NewConsumer(channel *amqp.Channel, inbox inboxPort, handler eventHandler, repo domain.ProjectRepositoryPort, logger *slog.Logger) *Consumer {
+func NewConsumer(chans *ConnectionManager, inbox inboxPort, handler eventHandler, repo domain.ProjectRepositoryPort, logger *slog.Logger) *Consumer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &Consumer{channel: channel, inbox: inbox, handler: handler, repo: repo, logger: logger}
+	return &Consumer{chans: chans, inbox: inbox, handler: handler, repo: repo, logger: logger}
 }
 
 // Start begins consuming orchestrator.events and all 6 DLQ queues. It
 // returns once all consumers are registered; delivery handling happens in
-// background goroutines for the lifetime of the channel.
+// background goroutines for the lifetime of the channel. Safe to call again
+// after a reconnect (see type doc).
 func (c *Consumer) Start(ctx context.Context) error {
 	if err := c.consumeEvents(ctx, eventsQueue); err != nil {
 		return err
@@ -74,7 +82,7 @@ func (c *Consumer) Start(ctx context.Context) error {
 }
 
 func (c *Consumer) consumeEvents(ctx context.Context, queue string) error {
-	deliveries, err := c.channel.Consume(queue, "", false, false, false, false, nil)
+	deliveries, err := c.chans.Channel().Consume(queue, "", false, false, false, false, nil)
 	if err != nil {
 		return err
 	}
@@ -88,7 +96,7 @@ func (c *Consumer) consumeEvents(ctx context.Context, queue string) error {
 }
 
 func (c *Consumer) consumeDLQ(ctx context.Context, queue string) error {
-	deliveries, err := c.channel.Consume(queue, "", false, false, false, false, nil)
+	deliveries, err := c.chans.Channel().Consume(queue, "", false, false, false, false, nil)
 	if err != nil {
 		return err
 	}
