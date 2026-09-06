@@ -27,6 +27,7 @@ class PublishRequest:
     tags: list[str] = field(default_factory=list)
     visibility: str = ""
     publish_at: str | None = None  # RFC3339 — only valid alongside visibility == "private"
+    thumbnail_path: str | None = None  # absolute path on shared_artifacts, from a manual upload
 
 
 @dataclass(frozen=True)

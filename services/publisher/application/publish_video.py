@@ -45,3 +45,5 @@ class PublishVideoUseCase:
             raise InvalidPublishRequestError(
                 "publish_at requires visibility 'private' (YouTube schedules it public at that time)"
             )
+        if request.thumbnail_path and not os.path.isfile(request.thumbnail_path):
+            raise InvalidPublishRequestError(f"missing thumbnail file: {request.thumbnail_path}")

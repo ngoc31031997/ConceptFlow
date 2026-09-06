@@ -73,6 +73,7 @@ class PublishVideoCommandHandler:
             tags=payload.get("tags") or [],
             visibility=payload.get("visibility", ""),
             publish_at=payload.get("publish_at"),
+            thumbnail_path=payload.get("thumbnail_path"),
         )
 
         try:

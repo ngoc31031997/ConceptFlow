@@ -9,29 +9,19 @@ describe("api/client", () => {
     vi.restoreAllMocks();
   });
 
-  it("getPlugins unwraps the {plugins} envelope on success", async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ plugins: [{ plugin_id: "p1", name: "Coding" }] }),
-    }) as unknown as typeof fetch;
-
-    const plugins = await client.getPlugins();
-    expect(plugins).toEqual([{ plugin_id: "p1", name: "Coding" }]);
-  });
-
   it("throws generic message on network error", async () => {
     global.fetch = vi.fn().mockRejectedValue(new TypeError("network down"));
 
-    await expect(client.getPlugins()).rejects.toThrow(client.GENERIC_CONNECTION_ERROR);
+    await expect(client.listProjects()).rejects.toThrow(client.GENERIC_CONNECTION_ERROR);
   });
 
   it("throws backend error message on non-ok response", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: false,
-      json: async () => ({ error: { message: "Plugin không tồn tại" } }),
+      json: async () => ({ error: { message: "Project không tồn tại" } }),
     }) as unknown as typeof fetch;
 
-    await expect(client.getPlugins()).rejects.toThrow("Plugin không tồn tại");
+    await expect(client.listProjects()).rejects.toThrow("Project không tồn tại");
   });
 
   it("throws generic message when error body is unparsable", async () => {
@@ -42,7 +32,7 @@ describe("api/client", () => {
       },
     }) as unknown as typeof fetch;
 
-    await expect(client.getPlugins()).rejects.toThrow(client.GENERIC_CONNECTION_ERROR);
+    await expect(client.listProjects()).rejects.toThrow(client.GENERIC_CONNECTION_ERROR);
   });
 
   it("startRenderSaga posts input and returns saga response", async () => {
@@ -54,8 +44,6 @@ describe("api/client", () => {
     const result = await client.startRenderSaga({
       project_id: "p1",
       script_content: "script",
-      plugin_id: "coding",
-      category_hint: "concept",
       voice_language: "vi",
     });
 

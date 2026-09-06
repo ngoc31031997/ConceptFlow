@@ -84,4 +84,34 @@ function thumbnailServeHandler(sharedDir) {
   };
 }
 
-module.exports = { thumbnailUploadHandler, thumbnailServeHandler };
+/**
+ * Reports whether a thumbnail already exists for this project and its
+ * absolute path (needed by the frontend to include `thumbnail_path` in the
+ * publish payload after a page reload, when it only has the project id).
+ *
+ * @param {string} sharedDir
+ */
+function thumbnailInfoHandler(sharedDir) {
+  return (req, res) => {
+    const projectId = req.params.id;
+    const dir = path.join(path.resolve(sharedDir), projectId, 'thumbnail');
+    const candidates = Object.values(ALLOWED_MIME_TO_EXT).map((ext) => path.join(dir, `thumbnail${ext}`));
+
+    const tryNext = (index) => {
+      if (index >= candidates.length) {
+        res.status(200).json({ exists: false, thumbnail_path: null });
+        return;
+      }
+      fs.stat(candidates[index], (err, stat) => {
+        if (err || !stat.isFile()) {
+          tryNext(index + 1);
+          return;
+        }
+        res.status(200).json({ exists: true, thumbnail_path: candidates[index] });
+      });
+    };
+    tryNext(0);
+  };
+}
+
+module.exports = { thumbnailUploadHandler, thumbnailServeHandler, thumbnailInfoHandler };

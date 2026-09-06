@@ -35,6 +35,7 @@ export interface PublishMetadata {
   tags?: string[];
   visibility: "public" | "unlisted" | "private";
   publish_at?: string;
+  thumbnail_path?: string;
 }
 
 export interface SagaStartedResponse {

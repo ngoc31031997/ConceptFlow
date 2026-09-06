@@ -5,7 +5,11 @@ const multer = require('multer');
 const { proxyHandler } = require('../handlers/proxyHandler');
 const { videoHandler } = require('../handlers/videoHandler');
 const { deleteProjectHandler } = require('../handlers/deleteProjectHandler');
-const { thumbnailUploadHandler, thumbnailServeHandler } = require('../handlers/thumbnailUploadHandler');
+const {
+  thumbnailUploadHandler,
+  thumbnailServeHandler,
+  thumbnailInfoHandler,
+} = require('../handlers/thumbnailUploadHandler');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
 
@@ -34,6 +38,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
   );
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
+  router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));
   router.delete('/v1/projects/:id', deleteProjectHandler(orchestratorClient, sharedDir));
   return router;

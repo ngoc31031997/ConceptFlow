@@ -1,0 +1,72 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 24px;
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(16, 28, 40, 0.85);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.preview {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.placeholder {
+  width: 120px;
+  height: 68px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: rgba(16, 28, 40, 0.05);
+  border: 1px dashed rgba(16, 28, 40, 0.2);
+  font-size: 11px;
+  color: var(--ink-faint);
+  text-align: center;
+  padding: 4px;
+}
+
+.uploadBtn {
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.successBadge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a7f4b;
+}
+
+.errorBadge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger);
+}

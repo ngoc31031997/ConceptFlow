@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { YoutubeConnectButton } from "../components/YoutubeConnectButton";
+import { ThumbnailUpload } from "../components/ThumbnailUpload";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
 import { useProject } from "../hooks/useProject";
@@ -17,12 +18,16 @@ export function ResultPage() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
 
   async function handlePublish(metadata: PublishMetadata) {
     setIsPublishing(true);
     setError(null);
     try {
-      await startPublishSaga(projectId, metadata);
+      await startPublishSaga(projectId, {
+        ...metadata,
+        thumbnail_path: thumbnailPath ?? undefined,
+      });
       await refetch();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -77,6 +82,7 @@ export function ResultPage() {
         ) : (
           <>
             <YoutubeConnectButton projectId={projectId} />
+            <ThumbnailUpload projectId={projectId} onThumbnailPathChange={setThumbnailPath} />
             {error && (
               <p role="alert" className={glass.helperText}>
                 {error}

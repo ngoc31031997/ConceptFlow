@@ -1,5 +1,4 @@
 import type {
-  Plugin,
   Project,
   ProgressMessage,
   ProjectSummary,
@@ -16,6 +15,32 @@ export class ApiError extends Error {}
 
 export function getProjectVideoUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/video`;
+}
+
+export function getProjectThumbnailUrl(projectId: string): string {
+  return `${GATEWAY_URL}/v1/projects/${projectId}/thumbnail`;
+}
+
+export interface ThumbnailInfo {
+  exists: boolean;
+  thumbnail_path: string | null;
+}
+
+export function getThumbnailInfo(projectId: string): Promise<ThumbnailInfo> {
+  return apiFetch<ThumbnailInfo>(`/v1/projects/${projectId}/thumbnail/info`);
+}
+
+export interface ThumbnailUploadResult {
+  thumbnail_path: string;
+}
+
+export async function uploadThumbnail(projectId: string, file: File): Promise<ThumbnailUploadResult> {
+  const formData = new FormData();
+  formData.append("thumbnail", file);
+  return apiFetch<ThumbnailUploadResult>(`/v1/projects/${projectId}/thumbnail`, {
+    method: "POST",
+    body: formData,
+  });
 }
 
 async function parseErrorMessage(response: Response): Promise<string> {
@@ -42,11 +67,6 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
   return response.json() as Promise<T>;
-}
-
-export async function getPlugins(): Promise<Plugin[]> {
-  const result = await apiFetch<{ plugins: Plugin[] }>("/v1/plugins");
-  return result.plugins;
 }
 
 export function startRenderSaga(input: RenderInput): Promise<SagaStartedResponse> {

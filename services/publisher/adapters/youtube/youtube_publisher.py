@@ -101,4 +101,17 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             body["status"]["publishAt"] = request.publish_at
         media = MediaFileUpload(request.video_path, chunksize=-1, resumable=True)
         response = youtube.videos().insert(part="snippet,status", body=body, media_body=media).execute()
-        return response["id"]
+        video_id = response["id"]
+
+        if request.thumbnail_path:
+            # A thumbnail failure (quota, transient network error) shouldn't
+            # fail the whole publish — the video itself already uploaded
+            # successfully — so it's logged rather than raised.
+            try:
+                youtube.thumbnails().set(
+                    videoId=video_id, media_body=MediaFileUpload(request.thumbnail_path)
+                ).execute()
+            except Exception:
+                logger.exception("Failed to set custom thumbnail for video_id=%s", video_id)
+
+        return video_id
