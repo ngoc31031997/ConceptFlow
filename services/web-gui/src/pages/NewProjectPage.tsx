@@ -7,6 +7,8 @@ import { AppShell } from "../components/AppShell";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { startRenderSaga, ApiError } from "../api/client";
 import glass from "../styles/glass.module.css";
+import styles from "./NewProjectPage.module.css";
+import { validateScript } from "../utils/scriptValidation";
 
 export function NewProjectPage() {
   const draft = useContext(ProjectDraftContext);
@@ -15,7 +17,8 @@ export function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = draft.scriptContent.trim().length > 0;
+  const scriptValidation = validateScript(draft.scriptContent);
+  const canSubmit = draft.scriptContent.trim().length > 0 && scriptValidation.isValid;
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -41,43 +44,57 @@ export function NewProjectPage() {
     <div data-testid="new-project-page">
       <AppShell
         currentStep={1}
+        wide
         title="Tạo video mới"
         subtitle="Dán script Manim của bạn (đánh dấu lời thoại bằng # NARRATION), chọn ngôn ngữ giọng đọc, rồi bắt đầu render tự động."
       >
-        <ScriptEditor
-          value={draft.scriptContent}
-          onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
-        />
+        <div className={styles.layout}>
+          <ScriptEditor
+            value={draft.scriptContent}
+            onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
+          />
 
-        <VoiceLanguageSelector
-          value={draft.voiceLanguage}
-          onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
-        />
+          <div className={styles.sidebar}>
+            <VoiceLanguageSelector
+              value={draft.voiceLanguage}
+              onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+            />
 
-        <BackgroundMusicPicker
-          value={draft.backgroundMusicPath}
-          onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
-        />
+            <BackgroundMusicPicker
+              value={draft.backgroundMusicPath}
+              onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
+            />
 
-        <div className={glass.ctaRow}>
-          {error && (
-            <p role="alert" className={glass.helperText}>
-              {error}
-            </p>
-          )}
-          {!error && !canSubmit && <p className={glass.helperText}>Dán script Manim để tiếp tục</p>}
-          <button
-            type="button"
-            data-testid="new-project-submit-button"
-            className={glass.btnPrimary}
-            disabled={!canSubmit || isSubmitting}
-            onClick={handleSubmit}
-          >
-            Bắt đầu render
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M5 12h14M13 6l6 6-6 6" />
-            </svg>
-          </button>
+            <div className={`${glass.card} ${styles.ctaCard}`}>
+              {error && (
+                <p role="alert" className={glass.helperText} style={{ marginRight: 0 }}>
+                  {error}
+                </p>
+              )}
+              {!error && !canSubmit && draft.scriptContent.trim().length === 0 && (
+                <p className={glass.helperText} style={{ marginRight: 0 }}>
+                  Dán script Manim để tiếp tục
+                </p>
+              )}
+              {!error && !canSubmit && draft.scriptContent.trim().length > 0 && (
+                <p className={glass.helperText} style={{ marginRight: 0 }}>
+                  Sửa lỗi định dạng script (xem cảnh báo phía trên) trước khi render
+                </p>
+              )}
+              <button
+                type="button"
+                data-testid="new-project-submit-button"
+                className={`${glass.btnPrimary} ${styles.btnPrimaryFull}`}
+                disabled={!canSubmit || isSubmitting}
+                onClick={handleSubmit}
+              >
+                Bắt đầu render
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </AppShell>
     </div>

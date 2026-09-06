@@ -8,6 +8,7 @@ interface AppShellProps {
   currentStep?: 1 | 2 | 3;
   title: string;
   subtitle: string;
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -19,7 +20,7 @@ function CheckIcon() {
   );
 }
 
-export function AppShell({ currentStep, title, subtitle, children }: AppShellProps) {
+export function AppShell({ currentStep, title, subtitle, wide, children }: AppShellProps) {
   return (
     <div className={styles.stage}>
       <div className={`${styles.blob} ${styles.blob1}`} />
@@ -63,7 +64,7 @@ export function AppShell({ currentStep, title, subtitle, children }: AppShellPro
           </Link>
         </div>
 
-        <div className={styles.mainCol}>
+        <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>
           <div className={styles.heading}>
             <h1>{title}</h1>
             <p>{subtitle}</p>

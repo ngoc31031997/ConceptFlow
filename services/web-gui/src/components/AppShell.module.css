@@ -137,6 +137,10 @@
   gap: 22px;
 }
 
+.mainColWide {
+  max-width: 1120px;
+}
+
 .heading h1 {
   margin: 0 0 8px;
   font-size: 32px;
