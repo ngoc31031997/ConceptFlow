@@ -6,8 +6,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install the standalone Piper CLI binary (see adapters/tts_engines/piper_adapter.py
 # for why this shells out to the binary instead of using the piper-tts PyPI package).
-ARG PIPER_RELEASE_URL=https://github.com/rhasspy/piper/releases/latest/download/piper_linux_x86_64.tar.gz
-RUN curl -L -o /tmp/piper.tar.gz "$PIPER_RELEASE_URL" && \
+# TARGETARCH is set automatically by BuildKit (amd64/arm64) — picking the matching
+# Piper release avoids running an x86_64 binary under Rosetta emulation inside the
+# Linux container, which fails with "failed to open elf at /lib64/ld-linux-x86-64.so.2"
+# on Apple Silicon hosts.
+ARG TARGETARCH
+RUN case "$TARGETARCH" in \
+      amd64) PIPER_ARCH=x86_64 ;; \
+      arm64) PIPER_ARCH=aarch64 ;; \
+      *) echo "Unsupported TARGETARCH: $TARGETARCH" >&2; exit 1 ;; \
+    esac && \
+    curl -L -o /tmp/piper.tar.gz "https://github.com/rhasspy/piper/releases/latest/download/piper_linux_${PIPER_ARCH}.tar.gz" && \
     tar -xzf /tmp/piper.tar.gz -C /usr/local/bin --strip-components=1 && \
     rm /tmp/piper.tar.gz
 
