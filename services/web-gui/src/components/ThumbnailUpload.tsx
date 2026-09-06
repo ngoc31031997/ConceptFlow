@@ -15,10 +15,54 @@ interface ThumbnailUploadProps {
 
 type UploadState = "idle" | "uploading" | "success" | "error";
 
+function WandIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8L19 13M17.8 6.2L19 5M12.2 6.2L11 5M12.2 11.8L11 13" />
+      <path d="M3 21l9-9M12.2 15.8l4-4" />
+    </svg>
+  );
+}
+
+function CopyIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="9" width="12" height="12" rx="2" />
+      <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+    </svg>
+  );
+}
+
+const THUMBNAIL_SYSTEM_PROMPT = `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
+
+======================================================
+CHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]
+Ví dụ: "Phân biệt động từ thêm -ed và -ing trong tiếng Anh, khi nào dùng cái nào, kèm ví dụ."
+======================================================
+
+## VAI TRÒ CỦA BẠN
+
+Với chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).
+
+## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH
+
+1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.
+2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).
+3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).
+4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.
+5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục "chừa chỗ trống cho tiêu đề" thay vì yêu cầu AI viết chữ).
+6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.
+
+## OUTPUT
+
+Chỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: "16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text".`;
+
 export function ThumbnailUpload({ projectId, onThumbnailPathChange }: ThumbnailUploadProps) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [promptPanelOpen, setPromptPanelOpen] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -57,9 +101,49 @@ export function ThumbnailUpload({ projectId, onThumbnailPathChange }: ThumbnailU
     }
   }
 
+  async function handleCopyPrompt() {
+    try {
+      await navigator.clipboard.writeText(THUMBNAIL_SYSTEM_PROMPT);
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2000);
+    } catch {
+      setPromptCopied(false);
+    }
+  }
+
   return (
     <div className={`${glass.card} ${styles.wrapper}`}>
-      <div className={styles.label}>Thumbnail</div>
+      <div className={styles.header}>
+        <div className={styles.label}>Thumbnail</div>
+        <button
+          type="button"
+          data-testid="thumbnail-system-prompt-toggle"
+          className={glass.ghostBtn}
+          onClick={() => setPromptPanelOpen((open) => !open)}
+        >
+          <WandIcon />
+          System Prompt (tạo ảnh)
+        </button>
+      </div>
+
+      {promptPanelOpen && (
+        <div className={styles.promptPanel} data-testid="thumbnail-system-prompt-panel">
+          <div className={styles.promptPanelHeader}>
+            <span>System prompt để nhờ AI sinh ảnh (Midjourney/DALL-E/...) tạo thumbnail cho video</span>
+            <button type="button" className={glass.ghostBtn} onClick={handleCopyPrompt}>
+              <CopyIcon />
+              {promptCopied ? "Đã copy!" : "Copy"}
+            </button>
+          </div>
+          <textarea
+            className={`${glass.textArea} ${styles.promptTextarea}`}
+            data-testid="thumbnail-system-prompt-textarea"
+            value={THUMBNAIL_SYSTEM_PROMPT}
+            readOnly
+            rows={10}
+          />
+        </div>
+      )}
 
       <div className={styles.row}>
         {previewUrl ? (
