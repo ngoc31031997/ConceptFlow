@@ -14,16 +14,14 @@ import os
 
 import aio_pika
 
-from adapters.messaging.consumer import RenderScenesCommandHandler
+from adapters.messaging.consumer import RenderScriptCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
-from adapters.rendering.manim_renderer import DEFAULT_RENDER_TIMEOUT_SECONDS, ManimAnimationRenderer
-from adapters.rendering.registry import AnimationTemplateRegistry
-from application.render_scene import RenderSceneUseCase
-from application.render_scenes_batch import RenderScenesBatchUseCase
+from adapters.rendering.manim_renderer import DEFAULT_RENDER_TIMEOUT_SECONDS, ManimScriptRenderer
+from application.render_script import RenderScriptUseCase
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -34,10 +32,9 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 async def run() -> None:
-    template_registry = AnimationTemplateRegistry.discover()
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
-    renderer = ManimAnimationRenderer(template_registry, timeout_seconds=timeout_seconds)
-    batch_use_case = RenderScenesBatchUseCase(RenderSceneUseCase(renderer))
+    renderer = ManimScriptRenderer(timeout_seconds=timeout_seconds)
+    use_case = RenderScriptUseCase(renderer)
 
     pool = await create_pool()
     inbox = InboxRepository(pool)
@@ -51,7 +48,7 @@ async def run() -> None:
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    command_handler = RenderScenesCommandHandler(batch_use_case, pool, inbox, outbox)
+    command_handler = RenderScriptCommandHandler(use_case, pool, inbox, outbox)
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 

@@ -1,5 +1,5 @@
-"""Event envelope builders for the 4 Rendering Service event types
-(interface-contracts.md).
+"""Event envelope builders for the Rendering Service's 2 event types
+(rendering_completed / rendering_failed — Manim-script input mode).
 
 Only builds envelope dicts — the consumer writes them to the Outbox, and
 OutboxRelay (adapters/persistence/relay.py) is the only place that
@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-
-from domain.models import SceneRenderResult
 
 EVENTS_EXCHANGE = "events.direct"
 EVENTS_ROUTING_KEY = "orchestrator"
@@ -29,36 +27,13 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def scene_render_started_envelope(saga_id: str, project_id: str, scene_index: int) -> dict:
+def rendering_completed_envelope(saga_id: str, project_id: str, video_path: str) -> dict:
     return build_envelope(
-        saga_id, project_id, {"event_type": "scene_render_started", "scene_index": scene_index}
+        saga_id, project_id, {"event_type": "rendering_completed", "video_path": video_path}
     )
 
 
-def scene_rendered_envelope(
-    saga_id: str, project_id: str, scene_index: int, result: SceneRenderResult
-) -> dict:
+def rendering_failed_envelope(saga_id: str, project_id: str, error_message: str) -> dict:
     return build_envelope(
-        saga_id,
-        project_id,
-        {
-            "event_type": "scene_rendered",
-            "scene_index": scene_index,
-            "animation_path": result.animation_path,
-            "duration_seconds": result.duration_seconds,
-        },
-    )
-
-
-def rendering_completed_envelope(saga_id: str, project_id: str, scene_count: int) -> dict:
-    return build_envelope(
-        saga_id, project_id, {"event_type": "rendering_completed", "scene_count": scene_count}
-    )
-
-
-def rendering_failed_envelope(saga_id: str, project_id: str, scene_index: int, error_message: str) -> dict:
-    return build_envelope(
-        saga_id,
-        project_id,
-        {"event_type": "rendering_failed", "scene_index": scene_index, "error_message": error_message},
+        saga_id, project_id, {"event_type": "rendering_failed", "error_message": error_message}
     )

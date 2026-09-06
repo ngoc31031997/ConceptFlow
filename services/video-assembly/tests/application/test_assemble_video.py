@@ -8,7 +8,7 @@ import pytest
 
 from application.assemble_video import AssembleVideoUseCase
 from domain.errors import MissingArtifactError
-from domain.models import SceneAssemblyInput, VideoAssemblyRequest
+from domain.models import VideoAssemblyRequest
 from domain.ports import VideoAssemblerPort
 
 
@@ -35,18 +35,14 @@ def shared_volume_root(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _scene(index: int, clip: str, audio: str) -> SceneAssemblyInput:
-    return SceneAssemblyInput(scene_index=index, clip_path=clip, audio_path=audio)
-
-
 def test_assembles_video_and_returns_result(shared_volume_root):
-    clip_path = str(shared_volume_root / "clip0.mp4")
+    video_path = str(shared_volume_root / "rendered.mp4")
     audio_path = str(shared_volume_root / "audio0.wav")
-    _touch(clip_path)
+    _touch(video_path)
     _touch(audio_path)
     assembler = FakeVideoAssembler()
     use_case = AssembleVideoUseCase(assembler)
-    request = VideoAssemblyRequest(project_id="proj-1", scenes=[_scene(0, clip_path, audio_path)])
+    request = VideoAssemblyRequest(project_id="proj-1", video_path=video_path, audio_segments=[audio_path])
 
     result = use_case.assemble(request)
 
@@ -55,13 +51,13 @@ def test_assembles_video_and_returns_result(shared_volume_root):
 
 
 def test_idempotent_call_does_not_reassemble(shared_volume_root):
-    clip_path = str(shared_volume_root / "clip0.mp4")
+    video_path = str(shared_volume_root / "rendered.mp4")
     audio_path = str(shared_volume_root / "audio0.wav")
-    _touch(clip_path)
+    _touch(video_path)
     _touch(audio_path)
     assembler = FakeVideoAssembler()
     use_case = AssembleVideoUseCase(assembler)
-    request = VideoAssemblyRequest(project_id="proj-1", scenes=[_scene(0, clip_path, audio_path)])
+    request = VideoAssemblyRequest(project_id="proj-1", video_path=video_path, audio_segments=[audio_path])
 
     first = use_case.assemble(request)
     second = use_case.assemble(request)
@@ -70,20 +66,34 @@ def test_idempotent_call_does_not_reassemble(shared_volume_root):
     assert second.video_path == first.video_path
 
 
-def test_empty_scenes_raises_missing_artifact_error(shared_volume_root):
+def test_empty_audio_segments_raises_missing_artifact_error(shared_volume_root):
+    video_path = str(shared_volume_root / "rendered.mp4")
+    _touch(video_path)
     use_case = AssembleVideoUseCase(FakeVideoAssembler())
-    request = VideoAssemblyRequest(project_id="proj-1", scenes=[])
+    request = VideoAssemblyRequest(project_id="proj-1", video_path=video_path, audio_segments=[])
 
     with pytest.raises(MissingArtifactError):
         use_case.assemble(request)
 
 
-def test_missing_clip_file_raises_missing_artifact_error(shared_volume_root):
+def test_missing_video_file_raises_missing_artifact_error(shared_volume_root):
     audio_path = str(shared_volume_root / "audio0.wav")
     _touch(audio_path)
     use_case = AssembleVideoUseCase(FakeVideoAssembler())
     request = VideoAssemblyRequest(
-        project_id="proj-1", scenes=[_scene(0, str(shared_volume_root / "missing.mp4"), audio_path)]
+        project_id="proj-1", video_path=str(shared_volume_root / "missing.mp4"), audio_segments=[audio_path]
+    )
+
+    with pytest.raises(MissingArtifactError):
+        use_case.assemble(request)
+
+
+def test_missing_audio_segment_raises_missing_artifact_error(shared_volume_root):
+    video_path = str(shared_volume_root / "rendered.mp4")
+    _touch(video_path)
+    use_case = AssembleVideoUseCase(FakeVideoAssembler())
+    request = VideoAssemblyRequest(
+        project_id="proj-1", video_path=video_path, audio_segments=[str(shared_volume_root / "missing.wav")]
     )
 
     with pytest.raises(MissingArtifactError):
@@ -91,14 +101,15 @@ def test_missing_clip_file_raises_missing_artifact_error(shared_volume_root):
 
 
 def test_missing_background_music_raises_missing_artifact_error(shared_volume_root):
-    clip_path = str(shared_volume_root / "clip0.mp4")
+    video_path = str(shared_volume_root / "rendered.mp4")
     audio_path = str(shared_volume_root / "audio0.wav")
-    _touch(clip_path)
+    _touch(video_path)
     _touch(audio_path)
     use_case = AssembleVideoUseCase(FakeVideoAssembler())
     request = VideoAssemblyRequest(
         project_id="proj-1",
-        scenes=[_scene(0, clip_path, audio_path)],
+        video_path=video_path,
+        audio_segments=[audio_path],
         background_music_path=str(shared_volume_root / "missing_bg.mp3"),
     )
 

@@ -1,8 +1,8 @@
 """AssembleVideoUseCase — business-logic-model.md.
 
 Unlike Unit 2/3/4/5, there is no separate "batch" wrapper — assemble_video
-is already a single operation over an entire project's scenes (Low-Level
-Design Question 10), so this one use case is the whole application layer.
+is already a single operation over an entire project (Low-Level Design
+Question 10), so this one use case is the whole application layer.
 """
 
 from __future__ import annotations
@@ -42,18 +42,18 @@ class AssembleVideoUseCase:
     def _validate(request: VideoAssemblyRequest) -> None:
         """Zero-trust validation (Business Rule 1): does not trust that
         upstream steps already validated this data."""
-        if not request.scenes:
-            raise MissingArtifactError("no scenes provided")
+        if not request.video_path:
+            raise MissingArtifactError("video_path must not be empty")
+        if not file_exists(request.video_path):
+            raise MissingArtifactError(f"missing video {request.video_path}")
 
-        for scene in request.scenes:
-            if not scene.clip_path or not scene.audio_path:
-                raise MissingArtifactError(f"scene_index={scene.scene_index}: empty clip_path/audio_path")
-            if not file_exists(scene.clip_path):
-                raise MissingArtifactError(f"scene_index={scene.scene_index}: missing clip {scene.clip_path}")
-            if not file_exists(scene.audio_path):
-                raise MissingArtifactError(
-                    f"scene_index={scene.scene_index}: missing audio {scene.audio_path}"
-                )
+        if not request.audio_segments:
+            raise MissingArtifactError("no audio_segments provided")
+        for audio_path in request.audio_segments:
+            if not audio_path:
+                raise MissingArtifactError("empty audio_path in audio_segments")
+            if not file_exists(audio_path):
+                raise MissingArtifactError(f"missing audio {audio_path}")
 
         if request.background_music_path and not file_exists(request.background_music_path):
             raise MissingArtifactError(f"missing background music {request.background_music_path}")

@@ -15,7 +15,6 @@ import os
 import aio_pika
 
 from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS, FfmpegVideoAssembler
-from adapters.assembly.ffprobe_inspector import MediaFormatInspector
 from adapters.messaging.consumer import AssembleVideoCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.persistence.db import create_pool
@@ -33,9 +32,8 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 async def run() -> None:
-    inspector = MediaFormatInspector()
     timeout_seconds = int(os.environ.get("ASSEMBLY_TIMEOUT_SECONDS", DEFAULT_ASSEMBLY_TIMEOUT_SECONDS))
-    assembler = FfmpegVideoAssembler(inspector, timeout_seconds=timeout_seconds)
+    assembler = FfmpegVideoAssembler(timeout_seconds=timeout_seconds)
     use_case = AssembleVideoUseCase(assembler)
 
     pool = await create_pool()

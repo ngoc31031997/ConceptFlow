@@ -47,20 +47,18 @@ class FakeMessage:
         self.acked = True
 
 
-def make_envelope(message_id: str = "msg-1", scenes: list | None = None, shared_volume_root=None) -> bytes:
-    if scenes is None:
-        clip_path = str(shared_volume_root / "clip0.mp4")
-        audio_path = str(shared_volume_root / "audio0.wav")
-        _touch(clip_path)
-        _touch(audio_path)
-        scenes = [{"scene_index": 0, "clip_path": clip_path, "audio_path": audio_path}]
+def make_envelope(message_id: str = "msg-1", shared_volume_root=None) -> bytes:
+    video_path = str(shared_volume_root / "rendered.mp4")
+    audio_path = str(shared_volume_root / "audio0.wav")
+    _touch(video_path)
+    _touch(audio_path)
     envelope = {
         "message_id": message_id,
         "saga_id": "saga-1",
         "project_id": "project-1",
         "schema_version": "1.0",
         "timestamp": "2026-08-24T00:00:00Z",
-        "payload": {"scenes": scenes},
+        "payload": {"video_path": video_path, "audio_segments": [audio_path]},
     }
     return json.dumps(envelope).encode("utf-8")
 

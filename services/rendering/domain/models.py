@@ -1,4 +1,11 @@
-"""Domain value objects for the Rendering Service (domain-entities.md)."""
+"""Domain value objects for the Rendering Service (Manim-script input mode).
+
+Rendering no longer renders one pre-built template per narration scene — it
+executes the Creator's own Manim script once for the whole project,
+substituting each `self.wait(AUTO)` call (in order) with the real TTS
+audio duration for the corresponding "# NARRATION: ..." marker, so the
+animation's pacing stays in lockstep with the voiceover.
+"""
 
 from __future__ import annotations
 
@@ -6,29 +13,27 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class SceneRenderRequest:
-    """Input to scene rendering. Every field is zero-trust validated by
-    RenderSceneUseCase (Functional Design Business Rule 1) — the service
-    never trusts upstream data, even though it already passed through
-    Script Processing / Content Plugin / TTS Service."""
+class NarrationSegment:
+    """One "# NARRATION: ..." marker's synthesized audio, in scene_index
+    (i.e. script order) — the i-th segment's duration_seconds replaces the
+    i-th `self.wait(AUTO)` call in the script."""
 
-    project_id: str
     scene_index: int
-    narration_text: str
-    illustration_hint: str | None
-    code_snippet: str | None
-    code_language: str | None
-    animation_template_id: str
     audio_path: str
     duration_seconds: float
 
 
 @dataclass(frozen=True)
-class SceneRenderResult:
-    """Output of scene rendering. duration_seconds is the ACTUAL clip
-    duration, which may exceed the requested duration_seconds when the
-    animation content is naturally longer (Business Rule 2 — never cut
-    content short to force an exact match)."""
+class ScriptRenderRequest:
+    """Input to whole-script rendering. Zero-trust validated by
+    RenderScriptUseCase — the service never trusts upstream data."""
 
-    animation_path: str
-    duration_seconds: float
+    project_id: str
+    script_content: str
+    scene_class_name: str
+    narration_segments: list[NarrationSegment]
+
+
+@dataclass(frozen=True)
+class ScriptRenderResult:
+    video_path: str

@@ -1,8 +1,6 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScriptEditor } from "../components/ScriptEditor";
-import { PluginSelector } from "../components/PluginSelector";
-import { CategorySelector } from "../components/CategorySelector";
 import { VoiceLanguageSelector } from "../components/VoiceLanguageSelector";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { AppShell } from "../components/AppShell";
@@ -17,11 +15,10 @@ export function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit =
-    draft.scriptContent.trim().length > 0 && draft.pluginId !== null && draft.categoryHint !== null;
+  const canSubmit = draft.scriptContent.trim().length > 0;
 
   async function handleSubmit() {
-    if (!canSubmit || draft.pluginId === null || draft.categoryHint === null) return;
+    if (!canSubmit) return;
     setIsSubmitting(true);
     setError(null);
     try {
@@ -29,8 +26,6 @@ export function NewProjectPage() {
       await startRenderSaga({
         project_id: projectId,
         script_content: draft.scriptContent,
-        plugin_id: draft.pluginId,
-        category_hint: draft.categoryHint,
         voice_language: draft.voiceLanguage,
         background_music_path: draft.backgroundMusicPath ?? undefined,
       });
@@ -47,28 +42,16 @@ export function NewProjectPage() {
       <AppShell
         currentStep={1}
         title="Tạo video mới"
-        subtitle="Soạn nội dung script, chọn plugin và ngôn ngữ giọng đọc, rồi bắt đầu render tự động."
+        subtitle="Dán script Manim của bạn (đánh dấu lời thoại bằng # NARRATION), chọn ngôn ngữ giọng đọc, rồi bắt đầu render tự động."
       >
         <ScriptEditor
           value={draft.scriptContent}
           onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
         />
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 20 }}>
-          <PluginSelector
-            value={draft.pluginId}
-            onChange={(pluginId) => dispatch({ type: "SET_PLUGIN", payload: pluginId })}
-          />
-          <VoiceLanguageSelector
-            value={draft.voiceLanguage}
-            onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
-          />
-        </div>
-
-        <CategorySelector
-          pluginId={draft.pluginId}
-          value={draft.categoryHint}
-          onChange={(category) => dispatch({ type: "SET_CATEGORY", payload: category })}
+        <VoiceLanguageSelector
+          value={draft.voiceLanguage}
+          onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
         />
 
         <BackgroundMusicPicker
@@ -82,9 +65,7 @@ export function NewProjectPage() {
               {error}
             </p>
           )}
-          {!error && !canSubmit && (
-            <p className={glass.helperText}>Nhập script, chọn plugin và danh mục để tiếp tục</p>
-          )}
+          {!error && !canSubmit && <p className={glass.helperText}>Dán script Manim để tiếp tục</p>}
           <button
             type="button"
             data-testid="new-project-submit-button"

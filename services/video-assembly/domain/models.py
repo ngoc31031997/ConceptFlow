@@ -1,8 +1,11 @@
-"""Domain value objects for the Video Assembly Service (module-structure.md).
+"""Domain value objects for the Video Assembly Service.
 
-Revision (Functional Design Question 2): scenes carry an explicit
-scene_index instead of relying on parallel-array position, so the
-service never has to trust the order Orchestrator happened to send them in.
+Manim-script input mode: Rendering produces one silent video for the whole
+project (not per-scene clips), so assembly's job is simpler than before —
+concatenate the ordered narration audio_segments into one track, mux it
+onto that single video, and optionally overlay background music. There is
+no per-scene clip:audio pairing or format-consistency check anymore (only
+one video, no clips to compare).
 """
 
 from __future__ import annotations
@@ -11,20 +14,13 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class SceneAssemblyInput:
-    """One scene's animation clip + audio clip, identified by scene_index."""
-
-    scene_index: int
-    clip_path: str
-    audio_path: str
-
-
-@dataclass(frozen=True)
 class VideoAssemblyRequest:
-    """Input to video assembly — one project's scenes plus optional background music."""
+    """Input to video assembly: one project's rendered (silent) video, its
+    ordered narration audio segments, plus optional background music."""
 
     project_id: str
-    scenes: list[SceneAssemblyInput]
+    video_path: str
+    audio_segments: list[str]
     background_music_path: str | None = None
 
 

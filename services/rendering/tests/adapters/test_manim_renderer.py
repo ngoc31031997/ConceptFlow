@@ -1,93 +1,94 @@
-"""Unit tests for ManimAnimationRenderer.
+"""Unit tests for ManimScriptRenderer.
 
-_render_to_file (the only place that actually touches Manim) is
-monkeypatched in every test, so these tests never import the real manim
-package — they verify template lookup, threadpool/timeout behavior, and
-error mapping only.
+subprocess.run is monkeypatched in every test — these tests never actually
+invoke the real `manim` CLI, only verify AUTO-wait substitution, subprocess
+error mapping, and output-file discovery.
 """
 
 from __future__ import annotations
 
-import time
+import subprocess
 
 import pytest
 
-from adapters.rendering.manim_renderer import ManimAnimationRenderer
-from adapters.rendering.registry import AnimationTemplateRegistry
-from domain.errors import AnimationEngineError, UnsupportedTemplateError
-from domain.models import SceneRenderRequest
-from domain.ports import AnimationTemplatePort
+from adapters.rendering.manim_renderer import ManimScriptRenderer
+from domain.errors import AnimationEngineError
+from domain.models import NarrationSegment, ScriptRenderRequest
+
+VALID_SCRIPT = (
+    "from manim import *\n\n"
+    "class DemoScene(Scene):\n"
+    "    def construct(self):\n"
+    "        self.wait(AUTO)\n"
+    "        self.wait(AUTO)\n"
+)
 
 
-class FakeTemplate(AnimationTemplatePort):
-    @property
-    def template_id(self) -> str:
-        return "concept_illustration"
-
-    def build_scene(self, request: SceneRenderRequest):
-        return object()
-
-
-def make_request() -> SceneRenderRequest:
-    return SceneRenderRequest(
+def make_request(script: str = VALID_SCRIPT) -> ScriptRenderRequest:
+    return ScriptRenderRequest(
         project_id="proj-1",
-        scene_index=0,
-        narration_text="hello",
-        illustration_hint=None,
-        code_snippet=None,
-        code_language=None,
-        animation_template_id="concept_illustration",
-        audio_path="/shared/proj-1/audio/0_en.wav",
-        duration_seconds=5.0,
+        script_content=script,
+        scene_class_name="DemoScene",
+        narration_segments=[
+            NarrationSegment(scene_index=0, audio_path="/shared/proj-1/audio/0.wav", duration_seconds=2.5),
+            NarrationSegment(scene_index=1, audio_path="/shared/proj-1/audio/1.wav", duration_seconds=3.0),
+        ],
     )
 
 
-def test_unsupported_template_raises_immediately(tmp_path):
-    registry = AnimationTemplateRegistry([])
-    renderer = ManimAnimationRenderer(registry)
+def test_patch_auto_waits_substitutes_in_order():
+    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
+    assert "self.wait(2.5)" in patched
+    assert "self.wait(3.0)" in patched
+    assert "AUTO" not in patched
 
-    with pytest.raises(UnsupportedTemplateError):
-        renderer.render(make_request(), str(tmp_path / "out.mp4"))
+
+def test_patch_auto_waits_raises_on_count_mismatch():
+    with pytest.raises(AnimationEngineError, match="self.wait\\(AUTO\\)"):
+        ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5])
 
 
-def test_successful_render_returns_measured_duration(tmp_path, monkeypatch):
-    registry = AnimationTemplateRegistry([FakeTemplate()])
-    renderer = ManimAnimationRenderer(registry)
+def test_render_invokes_manim_and_moves_output(tmp_path, monkeypatch):
+    renderer = ManimScriptRenderer()
     output_path = str(tmp_path / "out.mp4")
 
-    def fake_render_to_file(template, request, output_path):
-        with open(output_path, "wb") as f:
+    def fake_run(cmd, **kwargs):
+        media_dir = kwargs["cwd"]
+        import os
+
+        nested = os.path.join(media_dir, "videos")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub-mp4-bytes")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
-    monkeypatch.setattr(ManimAnimationRenderer, "_render_to_file", staticmethod(fake_render_to_file))
-    monkeypatch.setattr("adapters.rendering.manim_renderer.read_duration_seconds", lambda path: 5.0)
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.run", fake_run)
 
-    duration = renderer.render(make_request(), output_path)
+    renderer.render(make_request(), output_path)
 
-    assert duration == 5.0
+    with open(output_path, "rb") as f:
+        assert f.read() == b"stub-mp4-bytes"
 
 
-def test_engine_exception_becomes_animation_engine_error(tmp_path, monkeypatch):
-    registry = AnimationTemplateRegistry([FakeTemplate()])
-    renderer = ManimAnimationRenderer(registry)
+def test_render_raises_on_nonzero_exit(tmp_path, monkeypatch):
+    renderer = ManimScriptRenderer()
 
-    def fake_render_to_file(template, request, output_path):
-        raise RuntimeError("manim crashed")
+    def fake_run(cmd, **kwargs):
+        return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="Traceback: boom")
 
-    monkeypatch.setattr(ManimAnimationRenderer, "_render_to_file", staticmethod(fake_render_to_file))
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.run", fake_run)
 
-    with pytest.raises(AnimationEngineError):
+    with pytest.raises(AnimationEngineError, match="Manim render failed"):
         renderer.render(make_request(), str(tmp_path / "out.mp4"))
 
 
-def test_timeout_becomes_animation_engine_error(tmp_path, monkeypatch):
-    registry = AnimationTemplateRegistry([FakeTemplate()])
-    renderer = ManimAnimationRenderer(registry, timeout_seconds=0)
+def test_render_raises_on_timeout(tmp_path, monkeypatch):
+    renderer = ManimScriptRenderer(timeout_seconds=1)
 
-    def slow_render_to_file(template, request, output_path):
-        time.sleep(0.5)
+    def fake_run(cmd, **kwargs):
+        raise subprocess.TimeoutExpired(cmd, kwargs.get("timeout", 1))
 
-    monkeypatch.setattr(ManimAnimationRenderer, "_render_to_file", staticmethod(slow_render_to_file))
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.run", fake_run)
 
     with pytest.raises(AnimationEngineError, match="timed out"):
         renderer.render(make_request(), str(tmp_path / "out.mp4"))
@@ -96,13 +97,13 @@ def test_timeout_becomes_animation_engine_error(tmp_path, monkeypatch):
 def test_find_rendered_file_locates_mp4(tmp_path):
     nested = tmp_path / "videos" / "1080p60"
     nested.mkdir(parents=True)
-    (nested / "scene.mp4").write_bytes(b"stub")
+    (nested / "DemoScene.mp4").write_bytes(b"stub")
 
-    found = ManimAnimationRenderer._find_rendered_file(str(tmp_path))
+    found = ManimScriptRenderer._find_rendered_file(str(tmp_path))
 
-    assert found == str(nested / "scene.mp4")
+    assert found == str(nested / "DemoScene.mp4")
 
 
 def test_find_rendered_file_raises_when_missing(tmp_path):
     with pytest.raises(AnimationEngineError):
-        ManimAnimationRenderer._find_rendered_file(str(tmp_path))
+        ManimScriptRenderer._find_rendered_file(str(tmp_path))
