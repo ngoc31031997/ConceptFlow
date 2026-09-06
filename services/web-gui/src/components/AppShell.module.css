@@ -44,6 +44,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 36px 64px 0;
 }
 
@@ -146,4 +148,23 @@
   font-size: 15px;
   color: var(--ink-soft);
   line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    padding: 20px 20px 0;
+  }
+  .spacer {
+    display: none;
+  }
+  .stepsPill {
+    order: 1;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .stepItem {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
 }
