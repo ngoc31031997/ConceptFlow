@@ -45,6 +45,8 @@ describe("api/client", () => {
       project_id: "p1",
       script_content: "script",
       voice_language: "vi",
+      tts_enabled: true,
+      subtitles_enabled: false,
     });
 
     expect(result).toEqual({ saga_id: "s1", status: "started" });

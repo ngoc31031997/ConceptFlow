@@ -1,7 +1,8 @@
 import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScriptEditor } from "../components/ScriptEditor";
-import { VoiceLanguageSelector } from "../components/VoiceLanguageSelector";
+import { NarrationPanel } from "../components/NarrationPanel";
+import { SubtitleStylePanel } from "../components/SubtitleStylePanel";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { AppShell } from "../components/AppShell";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
@@ -31,6 +32,17 @@ export function NewProjectPage() {
         script_content: draft.scriptContent,
         voice_language: draft.voiceLanguage,
         background_music_path: draft.backgroundMusicPath ?? undefined,
+        tts_enabled: draft.ttsEnabled,
+        voice_id: draft.ttsEnabled ? (draft.voiceId ?? undefined) : undefined,
+        subtitles_enabled: draft.subtitlesEnabled,
+        subtitle_style: draft.subtitlesEnabled
+          ? {
+              font_size: draft.subtitleStyle.fontSize,
+              text_color: draft.subtitleStyle.textColor,
+              background_opacity: draft.subtitleStyle.backgroundOpacity,
+              position: draft.subtitleStyle.position,
+            }
+          : undefined,
       });
       navigate(`/projects/${projectId}/render`);
     } catch (err) {
@@ -46,7 +58,7 @@ export function NewProjectPage() {
         currentStep={1}
         wide
         title="Tạo video mới"
-        subtitle="Dán script Manim của bạn (đánh dấu lời thoại bằng # NARRATION), chọn ngôn ngữ giọng đọc, rồi bắt đầu render tự động."
+        subtitle="Dán script Manim của bạn (đánh dấu lời thoại bằng # NARRATION), chọn giọng đọc và phụ đề, rồi bắt đầu render tự động."
       >
         <div className={styles.layout}>
           <ScriptEditor
@@ -55,10 +67,25 @@ export function NewProjectPage() {
           />
 
           <div className={styles.sidebar}>
-            <VoiceLanguageSelector
-              value={draft.voiceLanguage}
-              onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+            <NarrationPanel
+              voiceLanguage={draft.voiceLanguage}
+              onVoiceLanguageChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+              ttsEnabled={draft.ttsEnabled}
+              onTtsEnabledChange={(enabled) => dispatch({ type: "SET_TTS_ENABLED", payload: enabled })}
+              voiceId={draft.voiceId}
+              onVoiceIdChange={(voiceId) => dispatch({ type: "SET_VOICE_ID", payload: voiceId })}
+              subtitlesEnabled={draft.subtitlesEnabled}
+              onSubtitlesEnabledChange={(enabled) =>
+                dispatch({ type: "SET_SUBTITLES_ENABLED", payload: enabled })
+              }
             />
+
+            {draft.subtitlesEnabled && (
+              <SubtitleStylePanel
+                value={draft.subtitleStyle}
+                onChange={(patch) => dispatch({ type: "SET_SUBTITLE_STYLE", payload: patch })}
+              />
+            )}
 
             <BackgroundMusicPicker
               value={draft.backgroundMusicPath}

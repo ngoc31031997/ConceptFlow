@@ -5,6 +5,7 @@ import type {
   PublishMetadata,
   RenderInput,
   SagaStartedResponse,
+  Voice,
 } from "../types";
 
 const GATEWAY_URL = import.meta.env.VITE_API_BASE_URL;
@@ -75,6 +76,10 @@ export function startRenderSaga(input: RenderInput): Promise<SagaStartedResponse
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export function listVoices(): Promise<Voice[]> {
+  return apiFetch<Voice[]>("/v1/voices");
 }
 
 export function getProject(id: string): Promise<Project> {

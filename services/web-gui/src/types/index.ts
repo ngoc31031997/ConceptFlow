@@ -3,6 +3,26 @@ export interface RenderInput {
   script_content: string;
   voice_language: "vi" | "en";
   background_music_path?: string;
+  tts_enabled: boolean;
+  voice_id?: string;
+  subtitles_enabled: boolean;
+  subtitle_style?: SubtitleStylePayload;
+}
+
+export interface SubtitleStylePayload {
+  font_size: "small" | "medium" | "large";
+  text_color: string;
+  background_opacity: number;
+  position: "bottom" | "top";
+}
+
+export interface Voice {
+  voice_id: string;
+  language: "vi" | "en";
+  gender: "female" | "male";
+  quality: string;
+  label: string;
+  sample_audio_url: string;
 }
 
 export interface Scene {
