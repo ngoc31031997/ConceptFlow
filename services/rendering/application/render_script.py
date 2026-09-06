@@ -45,7 +45,8 @@ class RenderScriptUseCase:
         if not request.narration_segments:
             raise ValueError("narration_segments must not be empty")
         for segment in request.narration_segments:
-            if not segment.audio_path:
-                raise ValueError("audio_path must not be empty")
+            # audio_path may legitimately be absent (CR-001: narration
+            # disabled) — duration_seconds is the only field Rendering
+            # actually needs, to substitute into self.wait(AUTO).
             if segment.duration_seconds <= 0:
                 raise InvalidDurationError(segment.duration_seconds)

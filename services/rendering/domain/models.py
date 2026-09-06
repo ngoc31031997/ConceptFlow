@@ -14,13 +14,19 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class NarrationSegment:
-    """One "# NARRATION: ..." marker's synthesized audio, in scene_index
-    (i.e. script order) — the i-th segment's duration_seconds replaces the
-    i-th `self.wait(AUTO)` call in the script."""
+    """One "# NARRATION: ..." marker's timing, in scene_index (i.e. script
+    order) — the i-th segment's duration_seconds replaces the i-th
+    `self.wait(AUTO)` call in the script.
+
+    audio_path is None when the Creator disabled narration (CR-001):
+    duration_seconds is then an estimate from the narration text rather than
+    a real audio file's length, but Rendering never reads the audio itself
+    either way — only Video Assembly does.
+    """
 
     scene_index: int
-    audio_path: str
     duration_seconds: float
+    audio_path: str | None = None
 
 
 @dataclass(frozen=True)

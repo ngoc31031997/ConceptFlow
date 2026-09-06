@@ -96,3 +96,21 @@ def test_render_rejects_empty_narration_segments():
     )
     with pytest.raises(ValueError):
         use_case.render(request)
+
+
+def test_renders_when_audio_path_is_absent():
+    # CR-001: narration disabled means no audio file exists at all — only the
+    # estimated duration_seconds is used to substitute self.wait(AUTO).
+    renderer = FakeRenderer()
+    use_case = RenderScriptUseCase(renderer)
+    request = ScriptRenderRequest(
+        project_id="proj-1",
+        script_content="class DemoScene(Scene):\n    def construct(self):\n        self.wait(AUTO)\n",
+        scene_class_name="DemoScene",
+        narration_segments=[NarrationSegment(scene_index=0, duration_seconds=2.0)],
+    )
+
+    result = use_case.render(request)
+
+    assert isinstance(result, ScriptRenderResult)
+    assert len(renderer.calls) == 1

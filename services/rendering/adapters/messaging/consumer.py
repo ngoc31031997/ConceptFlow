@@ -69,7 +69,7 @@ class RenderScriptCommandHandler:
             narration_segments=[
                 NarrationSegment(
                     scene_index=s["scene_index"],
-                    audio_path=s["audio_path"],
+                    audio_path=s.get("audio_path"),
                     duration_seconds=s["duration_seconds"],
                 )
                 for s in payload["scenes"]
