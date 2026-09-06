@@ -27,7 +27,7 @@ from adapters.youtube.youtube_publisher import DEFAULT_UPLOAD_TIMEOUT_SECONDS, Y
 from application.handle_oauth_callback import HandleOAuthCallbackUseCase
 from application.publish_video import PublishVideoUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "publisher.commands"

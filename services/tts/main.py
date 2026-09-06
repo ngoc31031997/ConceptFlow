@@ -29,7 +29,7 @@ from adapters.tts_engines.piper_adapter import PiperTTSAdapter
 from application.synthesize_speech import SUPPORTED_LANGUAGES, SynthesizeSpeechUseCase
 from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "tts.commands"

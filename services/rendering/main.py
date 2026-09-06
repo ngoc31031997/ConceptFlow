@@ -25,7 +25,7 @@ from adapters.rendering.registry import AnimationTemplateRegistry
 from application.render_scene import RenderSceneUseCase
 from application.render_scenes_batch import RenderScenesBatchUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "rendering.commands"

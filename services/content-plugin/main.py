@@ -28,7 +28,7 @@ from adapters.plugins.registry import ContentPluginRegistry
 from application.classify_scene import ClassifyScenesBatchUseCase, ClassifySceneUseCase
 from application.list_plugins import ListPluginsUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "content_plugin.commands"

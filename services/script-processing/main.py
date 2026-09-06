@@ -23,7 +23,7 @@ from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from application.parse_script import ParseScriptUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "script_processing.commands"

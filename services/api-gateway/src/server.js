@@ -16,7 +16,7 @@ const { authRouter } = require('./routes/auth');
 const { progressRouter } = require('./routes/progress');
 const { healthRouter } = require('./routes/health');
 
-const logger = pino();
+const logger = pino({ level: 'warn' });
 
 /**
  * Composition root — wires config, clients, Express app, and the AMQP

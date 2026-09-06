@@ -24,7 +24,7 @@ from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from application.assemble_video import AssembleVideoUseCase
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "video_assembly.commands"
