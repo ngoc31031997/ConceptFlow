@@ -109,12 +109,14 @@ func rebuildPayload(stepName domain.StepName, project *domain.Project) map[strin
 	switch stepName {
 	case domain.StepParseScript:
 		return map[string]interface{}{"script_content": project.ScriptContent}
-	case domain.StepClassifyScenes:
-		return map[string]interface{}{"plugin_id": project.PluginID, "scenes": scenesToPayloadForClassification(project.Scenes, project.CategoryHint)}
 	case domain.StepSynthesizeSpeech:
 		return map[string]interface{}{"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage))}
 	case domain.StepRenderScenes:
-		return map[string]interface{}{"scenes": scenesToPayload(project.Scenes)}
+		return map[string]interface{}{
+			"scenes":           scenesToPayload(project.Scenes),
+			"script_content":   project.ScriptContent,
+			"scene_class_name": project.ManimSceneClassName,
+		}
 	case domain.StepAssembleVideo:
 		return assembleVideoPayload(project)
 	case domain.StepPublishVideo:

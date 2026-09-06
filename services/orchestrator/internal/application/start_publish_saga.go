@@ -10,12 +10,13 @@ import (
 // StartPublishSagaInput is the parsed body of POST /v1/sagas/publish
 // (interface-contracts.md).
 type StartPublishSagaInput struct {
-	ProjectID   string
-	Title       string
-	Description *string
-	Tags        []string
-	Visibility  domain.Visibility
-	PublishAt   *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
+	ProjectID     string
+	Title         string
+	Description   *string
+	Tags          []string
+	Visibility    domain.Visibility
+	PublishAt     *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
+	ThumbnailPath *string // absolute path on shared_artifacts, from a prior POST /v1/projects/{id}/thumbnail upload
 }
 
 // StartPublishSagaOutput is returned to the HTTP layer for the 201 response.
@@ -60,6 +61,7 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 	visibility := input.Visibility
 	project.YoutubeVisibility = &visibility
 	project.YoutubePublishAt = input.PublishAt
+	project.YoutubeThumbnailPath = input.ThumbnailPath
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err
 	}
@@ -109,6 +111,9 @@ func publishVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	if project.YoutubePublishAt != nil {
 		payload["publish_at"] = *project.YoutubePublishAt
+	}
+	if project.YoutubeThumbnailPath != nil {
+		payload["thumbnail_path"] = *project.YoutubeThumbnailPath
 	}
 	return payload
 }

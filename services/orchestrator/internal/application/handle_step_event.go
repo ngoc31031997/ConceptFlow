@@ -27,22 +27,20 @@ type StepEvent struct {
 // progress-only event handled separately (Rule 7) and never advances the
 // state machine.
 var eventStepMap = map[string]domain.StepName{
-	"script_parsed":         domain.StepParseScript,
-	"parse_failed":          domain.StepParseScript,
-	"scenes_classified":     domain.StepClassifyScenes,
-	"classification_failed": domain.StepClassifyScenes,
-	"speech_synthesized":    domain.StepSynthesizeSpeech,
-	"synthesis_failed":      domain.StepSynthesizeSpeech,
-	"rendering_completed":   domain.StepRenderScenes,
-	"rendering_failed":      domain.StepRenderScenes,
-	"video_assembled":       domain.StepAssembleVideo,
-	"assembly_failed":       domain.StepAssembleVideo,
-	"video_published":       domain.StepPublishVideo,
-	"publish_failed":        domain.StepPublishVideo,
+	"script_parsed":       domain.StepParseScript,
+	"parse_failed":        domain.StepParseScript,
+	"speech_synthesized":  domain.StepSynthesizeSpeech,
+	"synthesis_failed":    domain.StepSynthesizeSpeech,
+	"rendering_completed": domain.StepRenderScenes,
+	"rendering_failed":    domain.StepRenderScenes,
+	"video_assembled":     domain.StepAssembleVideo,
+	"assembly_failed":     domain.StepAssembleVideo,
+	"video_published":     domain.StepPublishVideo,
+	"publish_failed":      domain.StepPublishVideo,
 }
 
 var failureEvents = map[string]bool{
-	"parse_failed": true, "classification_failed": true, "synthesis_failed": true,
+	"parse_failed": true, "synthesis_failed": true,
 	"rendering_failed": true, "assembly_failed": true, "publish_failed": true,
 }
 
@@ -102,32 +100,14 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 	return uc.handleSuccess(ctx, event, stepName)
 }
 
-// handleSceneRenderedProgress does double duty: it publishes the live
-// progress ping (Rule 7) AND is the only place a scene's ClipPath is ever
-// stored — Rendering Service's approved interface-contracts.md carries the
-// rendered clip's path as "animation_path" on each per-scene scene_rendered
-// event, not in the batch-level rendering_completed event (which only
-// carries "scene_count"). onRenderingCompleted (below) relies on ClipPath
-// already being populated by the time it runs.
+// handleSceneRenderedProgress publishes the live progress ping (Rule 7) for
+// a narration segment as Rendering substitutes its `self.wait(AUTO)` and
+// works through the script. There is no per-scene clip to persist anymore
+// (Manim-script input mode renders the whole script into one video) — this
+// is a progress-only event.
 func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Context, event StepEvent) error {
 	sceneIndex := intFromPayload(event.Payload, "scene_index")
 	sceneTotal := intFromPayload(event.Payload, "scene_total")
-	clipPath := stringFromPayload(event.Payload, "animation_path")
-
-	if clipPath != "" && sceneIndex != nil {
-		project, err := uc.repo.Get(ctx, event.ProjectID)
-		if err != nil {
-			return err
-		}
-		for i := range project.Scenes {
-			if project.Scenes[i].SceneIndex == *sceneIndex {
-				project.Scenes[i].ClipPath = clipPath
-			}
-		}
-		if err := uc.repo.Save(ctx, project); err != nil {
-			return err
-		}
-	}
 
 	msg := domain.ProgressMessage{
 		ProjectID:  event.ProjectID,
@@ -173,8 +153,6 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 	switch stepName {
 	case domain.StepParseScript:
 		nextErr = uc.onScriptParsed(ctx, event, project)
-	case domain.StepClassifyScenes:
-		nextErr = uc.onScenesClassified(ctx, event, project)
 	case domain.StepSynthesizeSpeech:
 		nextErr = uc.onSpeechSynthesized(ctx, event, project)
 	case domain.StepRenderScenes:
@@ -209,55 +187,47 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 // synthesize_speech (a "failed" one for render_scenes was already sent).
 var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
 
-// onScriptParsed stores the initial scene set and dispatches classify_scenes
-// (business-logic-model.md Bước 2).
+// onScriptParsed stores the initial scene set (one per "# NARRATION: ..."
+// marker) and the Manim scene class name, then dispatches synthesize_speech
+// directly. classify_scenes is a no-op pass-through in the Manim-script
+// input mode — there is no per-scene template/category to classify since
+// Rendering now executes the Creator's own script rather than choosing a
+// pre-built template, so it is marked completed without ever being
+// dispatched to Content Plugin.
 func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event StepEvent, project *domain.Project) error {
 	scenes := parseInitialScenes(event.Payload)
 	project.Scenes = scenes
+	project.ManimSceneClassName = stringFromPayload(event.Payload, "scene_class_name")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
 
-	nextSagaID := event.SagaID
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: nextSagaID, StepName: domain.StepClassifyScenes, Status: domain.SagaStepInProgress}); err != nil {
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepClassifyScenes, Status: domain.SagaStepCompleted}); err != nil {
 		return err
 	}
-	payload := map[string]interface{}{
-		"plugin_id": project.PluginID,
-		"scenes":    scenesToPayloadForClassification(scenes, project.CategoryHint),
-	}
-	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "content_plugin", string(domain.StepClassifyScenes), payload); err != nil {
+	if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
+		ProjectID: event.ProjectID, Step: string(domain.StepClassifyScenes), Status: "completed",
+	}); err != nil {
 		return err
 	}
-	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusClassifyingScenes)
+
+	return uc.startSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
 }
 
-// onScenesClassified merges category/animation_template_id by scene_index
-// and dispatches synthesize_speech (Bước 3).
-func (uc *HandleStepEventUseCase) onScenesClassified(ctx context.Context, event StepEvent, project *domain.Project) error {
-	incoming := parseClassifiedScenes(event.Payload)
-	for idx, data := range incoming {
-		for i := range project.Scenes {
-			if project.Scenes[i].SceneIndex == idx {
-				project.Scenes[i].Category = data.category
-				project.Scenes[i].AnimationTemplateID = data.templateID
-			}
-		}
-	}
-	if err := uc.repo.Save(ctx, project); err != nil {
-		return err
-	}
-
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepSynthesizeSpeech, Status: domain.SagaStepInProgress}); err != nil {
+// startSynthesizeSpeech dispatches synthesize_speech (Bước 3) — shared by
+// onScriptParsed since classify_scenes no longer runs as a separate
+// dispatched step.
+func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: domain.StepSynthesizeSpeech, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
 	payload := map[string]interface{}{
 		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage)),
 	}
-	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
+	if err := uc.dispatch(ctx, sagaID, projectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
 		return err
 	}
-	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusSynthesizingSpeech)
+	return uc.repo.UpdateStatus(ctx, projectID, domain.StatusSynthesizingSpeech)
 }
 
 // onSpeechSynthesized merges audio_path/duration_seconds by scene_index,
@@ -302,19 +272,29 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
-	payload := map[string]interface{}{"scenes": scenesToPayload(project.Scenes)}
+	payload := map[string]interface{}{
+		"scenes":           scenesToPayload(project.Scenes),
+		"script_content":   project.ScriptContent,
+		"scene_class_name": project.ManimSceneClassName,
+	}
 	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err
 	}
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRendering)
 }
 
-// onRenderingCompleted dispatches assemble_video, reusing ClipPath (already
-// merged per-scene by handleSceneRenderedProgress as each scene finished —
-// rendering_completed itself carries only "scene_count", no per-scene data)
-// and audio_path stored from step 3 — never re-reading it from this event
-// (Rule 2, Rendering Service does not return audio_path).
+// onRenderingCompleted stores the single rendered video path (rendering_completed
+// now carries one "video_path" for the whole script, not per-scene clips —
+// the Manim-script input mode renders one script into one video) and
+// dispatches assemble_video with that video plus the ordered narration
+// audio_paths from step 3.
 func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
+	videoPath := stringFromPayload(event.Payload, "video_path")
+	project.RenderedVideoPath = &videoPath
+	if err := uc.repo.Save(ctx, project); err != nil {
+		return err
+	}
+
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
@@ -360,19 +340,25 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 	return uc.publisher.PublishCommand(ctx, routingKey, envelope)
 }
 
-// assembleVideoPayload builds the assemble_video command payload: clip_path
-// (from rendering_completed) + audio_path (stored from step 3, Rule 2) per
-// scene, plus the static background_music_path (Rule 3).
+// assembleVideoPayload builds the assemble_video command payload: the single
+// rendered video_path (from rendering_completed) plus the narration
+// audio_segments in scene_index order (stored from step 3, Rule 2), plus
+// the static background_music_path (Rule 3). Video Assembly concatenates
+// audio_segments into one narration track and muxes it onto video_path —
+// there are no more per-scene clips to stitch (Manim-script input mode).
 func assembleVideoPayload(project *domain.Project) map[string]interface{} {
-	scenes := make([]map[string]interface{}, 0, len(project.Scenes))
+	audioSegments := make([]string, 0, len(project.Scenes))
 	for _, s := range sortedScenes(project.Scenes) {
-		scenes = append(scenes, map[string]interface{}{
-			"scene_index": s.SceneIndex,
-			"clip_path":   s.ClipPath,
-			"audio_path":  s.AudioPath,
-		})
+		audioSegments = append(audioSegments, s.AudioPath)
 	}
-	payload := map[string]interface{}{"scenes": scenes}
+	var videoPath string
+	if project.RenderedVideoPath != nil {
+		videoPath = *project.RenderedVideoPath
+	}
+	payload := map[string]interface{}{
+		"video_path":     videoPath,
+		"audio_segments": audioSegments,
+	}
 	if project.BackgroundMusicPath != nil {
 		payload["background_music_path"] = *project.BackgroundMusicPath
 	}

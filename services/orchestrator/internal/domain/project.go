@@ -121,6 +121,7 @@ type Project struct {
 	SagaID    string // current/most-recent saga_id (Render or Publish — a new one is generated per Saga, interface-contracts.md Question 9)
 
 	ScriptContent       string
+	ManimSceneClassName string // the Manim `Scene` subclass Rendering must execute — set from script_parsed (Manim-script input mode)
 	PluginID            string
 	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
 	VoiceLanguage       VoiceLanguage
@@ -128,15 +129,16 @@ type Project struct {
 
 	Scenes []Scene
 
-	VideoPath *string
+	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
+	VideoPath         *string
 
-	YoutubeTitle       *string
-	YoutubeDescription *string
-	YoutubeTags        []string
-	YoutubeVisibility  *Visibility
-	YoutubePublishAt   *string // RFC3339 — schedules the video to auto-go-public at this time (only valid alongside YoutubeVisibility == private, per YouTube Data API)
+	YoutubeTitle         *string
+	YoutubeDescription   *string
+	YoutubeTags          []string
+	YoutubeVisibility    *Visibility
+	YoutubePublishAt     *string // RFC3339 — schedules the video to auto-go-public at this time (only valid alongside YoutubeVisibility == private, per YouTube Data API)
 	YoutubeThumbnailPath *string // absolute path on shared_artifacts, set by a manual upload before Publish Saga starts
-	YoutubeVideoURL    *string
+	YoutubeVideoURL      *string
 
 	ErrorMessage *string
 }

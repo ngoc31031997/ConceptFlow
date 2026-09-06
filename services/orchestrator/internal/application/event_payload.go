@@ -10,11 +10,6 @@ import "orchestrator/internal/domain"
 // simplicity over exhaustive validation: a missing/malformed field yields
 // its zero value rather than an error.
 
-type classifiedSceneData struct {
-	category   string
-	templateID string
-}
-
 type synthesizedSceneData struct {
 	audioPath       string
 	durationSeconds float64
@@ -44,25 +39,6 @@ func parseInitialScenes(payload map[string]interface{}) []domain.Scene {
 		scenes = append(scenes, scene)
 	}
 	return scenes
-}
-
-// parseClassifiedScenes decodes the scenes_classified payload into a
-// scene_index-keyed map of category/animation_template_id.
-func parseClassifiedScenes(payload map[string]interface{}) map[int]classifiedSceneData {
-	raw, _ := payload["scenes"].([]interface{})
-	out := make(map[int]classifiedSceneData, len(raw))
-	for _, item := range raw {
-		m, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		idx := intFromMap(m, "scene_index")
-		out[idx] = classifiedSceneData{
-			category:   stringFromMap(m, "category"),
-			templateID: stringFromMap(m, "animation_template_id"),
-		}
-	}
-	return out
 }
 
 // parseSynthesizedScenes decodes the speech_synthesized payload into a
@@ -113,20 +89,6 @@ func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
 			m["duration_seconds"] = s.DurationSeconds
 		}
 		out = append(out, m)
-	}
-	return out
-}
-
-// scenesToPayloadForClassification is scenesToPayload plus a per-scene
-// "category_hint" — Content Plugin Service's approved business-rules.md
-// Rule 1 requires the Creator-chosen category on every scene (it is the
-// sole source of truth; the service never infers it). The current GUI
-// collects one category per project rather than per scene, so the same
-// value is applied to every scene of the project (a known MVP tradeoff).
-func scenesToPayloadForClassification(scenes []domain.Scene, categoryHint string) []map[string]interface{} {
-	out := scenesToPayload(scenes)
-	for _, m := range out {
-		m["category_hint"] = categoryHint
 	}
 	return out
 }

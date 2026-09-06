@@ -81,8 +81,8 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.ProjectID == "" || req.ScriptContent == "" || req.PluginID == "" || req.CategoryHint == "" {
-		writeError(w, http.StatusBadRequest, "project_id, script_content, plugin_id and category_hint are required")
+	if req.ProjectID == "" || req.ScriptContent == "" {
+		writeError(w, http.StatusBadRequest, "project_id and script_content are required")
 		return
 	}
 	lang := domain.VoiceLanguage(req.VoiceLanguage)
@@ -129,12 +129,13 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 	}
 
 	out, err := rt.startPublishSaga.Execute(r.Context(), application.StartPublishSagaInput{
-		ProjectID:   req.ProjectID,
-		Title:       req.YoutubeTitle,
-		Description: req.Description,
-		Tags:        req.Tags,
-		Visibility:  visibility,
-		PublishAt:   req.PublishAt,
+		ProjectID:     req.ProjectID,
+		Title:         req.YoutubeTitle,
+		Description:   req.Description,
+		Tags:          req.Tags,
+		Visibility:    visibility,
+		PublishAt:     req.PublishAt,
+		ThumbnailPath: req.ThumbnailPath,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)

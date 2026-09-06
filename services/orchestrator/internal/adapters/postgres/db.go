@@ -20,11 +20,13 @@ CREATE TABLE IF NOT EXISTS projects (
     saga_id TEXT NOT NULL,
     status TEXT NOT NULL,
     script_content TEXT NOT NULL DEFAULT '',
+    manim_scene_class_name TEXT NOT NULL DEFAULT '',
     plugin_id TEXT NOT NULL DEFAULT '',
     category_hint TEXT NOT NULL DEFAULT '',
     voice_language TEXT NOT NULL DEFAULT '',
     background_music_path TEXT,
     scenes JSONB NOT NULL DEFAULT '[]',
+    rendered_video_path TEXT,
     video_path TEXT,
     youtube_title TEXT,
     youtube_description TEXT,
@@ -42,6 +44,8 @@ CREATE TABLE IF NOT EXISTS projects (
 -- existing deployments need this explicit ALTER to pick up the column.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS manim_scene_class_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

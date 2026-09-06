@@ -22,12 +22,13 @@ type startRenderSagaRequest struct {
 
 // startPublishSagaRequest is the body of POST /v1/sagas/publish.
 type startPublishSagaRequest struct {
-	ProjectID    string   `json:"project_id"`
-	YoutubeTitle string   `json:"youtube_title"`
-	Description  *string  `json:"description,omitempty"`
-	Tags         []string `json:"tags,omitempty"`
-	Visibility   string   `json:"visibility"`
-	PublishAt    *string  `json:"publish_at,omitempty"`
+	ProjectID     string   `json:"project_id"`
+	YoutubeTitle  string   `json:"youtube_title"`
+	Description   *string  `json:"description,omitempty"`
+	Tags          []string `json:"tags,omitempty"`
+	Visibility    string   `json:"visibility"`
+	PublishAt     *string  `json:"publish_at,omitempty"`
+	ThumbnailPath *string  `json:"thumbnail_path,omitempty"`
 }
 
 // sagaStartedResponse is the 201 response shape shared by both saga-start
