@@ -56,6 +56,11 @@ def build_code_mobject(request: SceneRenderRequest) -> Code | None:
             )
         language = "text"
 
-    code = Code(code=request.code_snippet, language=language)
+    # style="monokai" (not manim's default "vim") — Pygments emits shorthand
+    # 3-digit hex colors (e.g. "#CCC") for several tokens in "vim", and
+    # manim 0.18's HTML color parser hardcodes a 7-char slice assuming
+    # "#RRGGBB", corrupting those into invalid colors like '#CCC">'.
+    # monokai only emits 6-digit hex, sidestepping the bug.
+    code = Code(code=request.code_snippet, language=language, style="monokai")
     code.to_edge(LEFT)
     return code
