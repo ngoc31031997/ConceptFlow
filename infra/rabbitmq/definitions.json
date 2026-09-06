@@ -1,5 +1,16 @@
 {
   "rabbit_version": "3.13.0",
+  "users": [
+    {
+      "name": "concertflow",
+      "password_hash": "guyKLzL7ndqU2FSrnBKjcNmJ/2PfGWUGXaiXCUWAH6aPsBgT",
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "tags": ["administrator"]
+    }
+  ],
+  "permissions": [
+    { "user": "concertflow", "vhost": "/", "configure": ".*", "write": ".*", "read": ".*" }
+  ],
   "vhosts": [
     { "name": "/" }
   ],
