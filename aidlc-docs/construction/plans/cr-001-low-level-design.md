@@ -93,6 +93,7 @@ Voice (danh mục tĩnh, TTS Service /v1/voices):
 5. **Cần thêm `fonts-dejavu-core` vào image Video Assembly** — rủi ro #3 ở trên chỉ nghĩ tới `libass` (Debian ffmpeg đã có sẵn), nhưng `python:3.12-slim` không có **font** nào, libass sẽ render ô vuông rỗng, đặc biệt với dấu tiếng Việt.
 6. **`audio_path` giờ đặt tên theo `voice_id` thay vì `language`** (`{scene_index}_{voice_id}.wav`) — nếu vẫn khoá theo language, việc kiểm tra idempotency sẽ tái dùng nhầm file audio cũ khi người dùng render lại cùng project với giọng khác.
 7. **Bỏ ràng buộc `audio_segments` không được rỗng** ở `AssembleVideoUseCase._validate` — trước đây rỗng là lỗi thiếu artifact, giờ là trạng thái hợp lệ (video câm).
+8. **Bug thật phát hiện khi chạy `docker compose` end-to-end** (không lộ ra qua unit test vì mock/fake luôn set đủ field): mục 7 giả định "Rendering Service không cần sửa gì" chỉ đúng ở tầng nghiệp vụ — code thực tế của Rendering's consumer đọc `s["audio_path"]` không kiểm tra tồn tại, mà Orchestrator's `scenesToPayload` **bỏ hẳn key `audio_path`** khi rỗng (không gửi `null`, không gửi key). Kết quả: mọi message `render_scenes` khi tắt TTS làm consumer crash `KeyError`, saga treo mãi ở `rendering`. Đã sửa: `NarrationSegment.audio_path` thành `str | None = None`, consumer dùng `.get("audio_path")`, và bỏ validate "audio_path không được rỗng" (Rendering chưa từng dùng giá trị này để làm gì ngoài validate — chỉ Video Assembly đọc audio thật).
 
 ## Kết quả test sau khi implement
 | Service | Kết quả |
@@ -103,7 +104,12 @@ Voice (danh mục tĩnh, TTS Service /v1/voices):
 | api-gateway | 38 passed (+10, trong đó 4 cho route voices) |
 | web-gui | 35 passed (+6), lint sạch, build OK |
 
-**Chưa kiểm thử**: chưa chạy thật trên trình duyệt hay dựng Docker end-to-end — cần `docker compose up` để xác nhận (a) 4 model Piper tải được và sinh audio mẫu, (b) phụ đề burn-in hiển thị đúng dấu tiếng Việt, (c) luồng tắt TTS chạy trọn saga.
+**Đã kiểm thử qua `docker compose up` (2026-09-06)**:
+- 4 model Piper tải đúng, TTS Service sinh 4 file audio mẫu + `catalog.json` vào shared volume lúc khởi động; Gateway phục vụ `GET /v1/voices` và `/sample` đúng.
+- Saga tắt TTS + bật phụ đề chạy trọn từ `draft` → `ready_to_publish`, không dừng ở bước nào — sau khi sửa bug ở mục 8 trên.
+- Video xuất ra: không có audio track (video câm đúng thiết kế), phụ đề burn-in đúng màu/cỡ/vị trí đã chọn, và **dấu tiếng Việt hiển thị đúng** nhờ font DejaVu.
+
+**Chưa kiểm thử**: chưa mở UI thật trên trình duyệt (session không có công cụ điều khiển browser) — chỉ xác nhận qua unit test + `tsc`/`eslint`/build. Chưa test trường hợp bật TTS thật (nhánh có giọng đọc) qua docker compose, chỉ test qua unit/integration test của TTS Service.
 
 ## Phạm vi KHÔNG làm trong CR-001
 - Không thêm engine TTS khác (viXTTS/Coqui) — C2 trong CR-001.
