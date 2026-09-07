@@ -64,7 +64,7 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status
 - **Lifecycle Phase**: POST-CONSTRUCTION (10/10 unit đã build; CR-001 đã giao)
-- **Current Stage**: Requirements Analysis cho CR-002 … CR-007 (đánh giá pipeline cho video dài 5–10 phút, mục tiêu monetization)
+- **Current Stage**: CR-002/CR-003 — Pha 0 (benchmark) ✅ và bước 1A (nới giới hạn tài nguyên) ✅ đã xong; tiếp theo là 1B (đồng bộ timeline, CR-002)
 - **Scope đã chốt**: chỉ Pha 1 (CR-002 + CR-003) trong đợt này; CR-004…007 là backlog đã phân tích
-- **Next Stage**: Chờ Creator duyệt bộ CR + plan → Pha 0 (benchmark) → Low-Level Design cho CR-002
-- **Status**: Awaiting approval
+- **Next Stage**: Low-Level Design cho CR-002 → bước 1B → bước 1C
+- **Status**: Đang triển khai Pha 1

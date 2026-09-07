@@ -7,11 +7,16 @@ error mapping, and output-file discovery.
 
 from __future__ import annotations
 
+import resource
 import subprocess
 
 import pytest
 
-from adapters.rendering.manim_renderer import ManimScriptRenderer
+from adapters.rendering.manim_renderer import (
+    DEFAULT_RENDER_MEMORY_LIMIT_GB,
+    DEFAULT_RENDER_TIMEOUT_SECONDS,
+    ManimScriptRenderer,
+)
 from domain.errors import AnimationEngineError
 from domain.models import NarrationSegment, ScriptRenderRequest
 
@@ -107,3 +112,47 @@ def test_find_rendered_file_locates_mp4(tmp_path):
 def test_find_rendered_file_raises_when_missing(tmp_path):
     with pytest.raises(AnimationEngineError):
         ManimScriptRenderer._find_rendered_file(str(tmp_path))
+
+
+def test_child_resource_limits_cap_memory_but_not_cpu_time(monkeypatch):
+    """CR-003 FR11.3 regression.
+
+    RLIMIT_CPU used to be set equal to the wall-clock timeout. That is wrong:
+    Phase 0 benchmarking measured Manim burning CPU-time at 2.21x wall-clock
+    (it renders on several cores), so the limit fired at roughly 45% of the
+    configured timeout and killed legitimate long renders with SIGXCPU. Only
+    the address-space cap may be set here.
+    """
+    renderer = ManimScriptRenderer(timeout_seconds=1800, memory_limit_gb=4)
+    applied: dict[int, tuple[int, int]] = {}
+
+    monkeypatch.setattr(
+        "adapters.rendering.manim_renderer.resource.setrlimit",
+        lambda which, limits: applied.__setitem__(which, limits),
+    )
+
+    renderer._limit_child_resources()
+
+    assert resource.RLIMIT_CPU not in applied
+    assert applied == {resource.RLIMIT_AS: (4 * 1024**3, 4 * 1024**3)}
+
+
+def test_memory_limit_is_configurable(monkeypatch):
+    renderer = ManimScriptRenderer(memory_limit_gb=2)
+    applied: dict[int, tuple[int, int]] = {}
+
+    monkeypatch.setattr(
+        "adapters.rendering.manim_renderer.resource.setrlimit",
+        lambda which, limits: applied.__setitem__(which, limits),
+    )
+
+    renderer._limit_child_resources()
+
+    assert applied[resource.RLIMIT_AS] == (2 * 1024**3, 2 * 1024**3)
+
+
+def test_defaults_are_sized_for_long_form_video():
+    """Guards the Phase 0 numbers against being silently reverted to the
+    demo-sized values (300s / 2 GiB) that could not render a 10-minute video."""
+    assert DEFAULT_RENDER_TIMEOUT_SECONDS == 1800
+    assert DEFAULT_RENDER_MEMORY_LIMIT_GB == 4

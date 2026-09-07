@@ -18,7 +18,7 @@ Video hiện xuất ra ở **720p30** với profile encode mặc định của f
    - `-c:a aac -b:a 192k -ar 48000` (đang để ffmpeg tự chọn codec/bitrate audio)
    - `-profile:v high -bf 2 -g <2×fps>` (khuyến nghị của YouTube)
 3. **Luôn re-encode khi bật phụ đề** — nhánh `if request.subtitle_cues:` bỏ hoàn toàn `-c:v copy`, gây (a) chậm, (b) mất chất lượng thế hệ 2 trước khi YouTube re-encode lần nữa.
-4. **`crf 23 / preset medium` quá thấp cho bản upload** — YouTube sẽ transcode lại, nên file nguồn cần dư chất lượng.
+4. **`crf 23 / preset medium` quá thấp cho bản upload** — YouTube sẽ transcode lại, nên file nguồn cần dư chất lượng. (Pha 0 đo được: nâng lên `slow`/`crf 18` chỉ tốn thêm 4% thời gian.)
 5. **Phụ đề cố định PlayRes 1920×1080** — `subtitle_file.py` (`PLAY_RES_X/Y`) đúng cho 16:9 1080p nhưng sẽ sai tỉ lệ nếu đổi độ phân giải/khung hình (liên quan CR-007).
 
 ## Functional Requirements
@@ -32,8 +32,9 @@ Video hiện xuất ra ở **720p30** với profile encode mặc định của f
 - **FR12.6**: Creator PHẢI chọn được preset chất lượng ở GUI (Nháp nhanh 720p30 / Chuẩn 1080p60 / Cao 4K60) — bản nháp để duyệt nội dung, bản cao để upload.
 
 ## Ràng buộc
-- **C1**: 1080p60 làm thời gian render tăng ~3–4× so với 720p30 ⇒ **phụ thuộc CR-003** (timeout/RAM) phải xong trước.
-- **C2**: `preset slow -crf 18` làm khâu assembly chậm hơn nhiều ⇒ cũng phụ thuộc CR-003.
+- **C1 (đo được, Pha 0)**: 1080p60 làm render chậm **3.6×** so với 720p30 (98.9s vs 27.2s cho cùng video 215s) và RAM tăng 2.1× (764 MB vs 370 MB) ⇒ **phụ thuộc CR-003** (timeout/RAM) phải xong trước.
+- **C2 (đo được, Pha 0 — RẺ HƠN NHIỀU so với dự đoán)**: `slow`/`crf 18` chỉ chậm hơn `medium`/`crf 23` **4%** (25.9s vs 24.8s), đổi lấy +28% dung lượng. Nâng chất lượng encode gần như **miễn phí về thời gian** — FR12.2 là thay đổi lợi nhiều hại ít nhất trong CR này.
+- **C2b (đo được, Pha 0)**: `-c:v copy` nhanh hơn re-encode **~250×** (0.1s vs 24.8s) ⇒ FR12.3 (tránh re-encode thừa) có giá trị rất cao, nên ưu tiên.
 - **C3**: 4K60 với Manim rất nặng, để tuỳ chọn nhưng không khuyến nghị mặc định.
 - **C4**: FR12.4 (burn phụ đề trong Manim) đụng vào script của Creator — cần cân nhắc kỹ vì Manim script là do người dùng viết. Phương án an toàn hơn: giữ burn ở ffmpeg nhưng dùng profile FR12.2.
 

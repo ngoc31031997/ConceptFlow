@@ -51,12 +51,15 @@ Quy tắc: **CR-002 và CR-003 phải xong trước mọi CR khác.** Trước k
 
 Mục đích: có số liệu thật trên máy của Creator để chốt các giá trị timeout/RAM của CR-003, thay vì đoán.
 
-- [ ] 0.1 — Viết 1 script Manim tham chiếu ~5 phút (≥15 narration, xen kẽ `self.play` dài) làm **fixture test chung cho tất cả CR**.
-- [ ] 0.2 — Chạy render script này với cấu hình hiện tại, đo: thời gian render, RAM đỉnh, dung lượng đĩa, ở cả `-qm` và `-qh`.
-- [ ] 0.3 — Ghi lại độ lệch audio/hình thực tế ở narration cuối (bằng chứng số cho CR-002).
-- [ ] 0.4 — Chốt giá trị `RENDER_TIMEOUT_SECONDS`, `RENDER_MEMORY_LIMIT_GB`, `ASSEMBLY_TIMEOUT_SECONDS` từ số đo (× hệ số an toàn 2).
+- [x] 0.1 — Fixture `tests/fixtures/long_form_reference.py` (20 narration, animation xen kẽ, video 215s).
+- [x] 0.2 — Đo render ở `-qm` và `-qh`: thời gian, RAM, CPU/wall, dung lượng. Harness `tests/benchmark_render.py`.
+- [x] 0.3 — Đo độ lệch đồng bộ thật: **61.6s** trên video 3.6 phút (bằng chứng số cho CR-002).
+- [x] 0.4 — Chốt giá trị timeout/RAM từ số đo.
+- [x] 0.5 — **Spike 1B.1 làm sớm**: xác minh `scene.renderer.time` trên Manim 0.18.1 — ✅ hoạt động đúng.
 
-**Đầu ra**: `aidlc-docs/construction/build-and-test/long-form-baseline.md` + fixture script.
+**Đầu ra**: `aidlc-docs/construction/build-and-test/long-form-baseline.md`, `tests/fixtures/long_form_reference.py`, `tests/benchmark_render.py`.
+
+⚠️ **Pha 0 đã bác bỏ 3 ước lượng trong bản CR-003 đầu tiên** (render chậm hơn ~10×, assembly chậm hơn ~6×, đề xuất RAM 8 GiB bất khả thi) và **nâng mức nghiêm trọng của lỗi `RLIMIT_CPU`** từ rủi ro lý thuyết thành bug đang hoạt động. CR-003 và CR-004 đã được hiệu chỉnh. Xem mục "Đính chính" trong baseline.
 
 ---
 
@@ -65,14 +68,14 @@ Mục đích: có số liệu thật trên máy của Creator để chốt các 
 Làm CR-003 trước vì nếu không nới giới hạn thì **không thể test được CR-002** trên video dài.
 
 ### 1A — CR-003 phần "nới giới hạn" (nhanh, ít rủi ro)
-- [ ] 1A.1 — `docker-compose.yml`: `RENDER_TIMEOUT_SECONDS`, `ASSEMBLY_TIMEOUT_SECONDS`, `RENDER_MEMORY_LIMIT_GB` theo Pha 0.4.
-- [ ] 1A.2 — `services/rendering/adapters/rendering/manim_renderer.py`: đọc memory limit từ env; sửa `_limit_child_resources` (bỏ `RLIMIT_CPU` hoặc tách khỏi wall-clock) — FR11.2/FR11.3.
-- [ ] 1A.3 — `infra/rabbitmq/rabbitmq.conf`: đặt `consumer_timeout` đủ lớn (mặc định RabbitMQ là 30 phút và **sẽ giết consumer giữa lúc render** — CR-003 §C2). Đây là bug tiềm ẩn chưa từng lộ ra.
+- [ ] 1A.1 — `docker-compose.yml`: `RENDER_TIMEOUT_SECONDS=1800`, `ASSEMBLY_TIMEOUT_SECONDS=900`, `RENDER_MEMORY_LIMIT_GB=4` (giá trị chốt ở Pha 0.4).
+- [ ] 1A.2 — `services/rendering/adapters/rendering/manim_renderer.py`: đọc memory limit từ env; **bỏ hẳn `RLIMIT_CPU`** (Pha 0: CPU/wall = 2.21× nên nó luôn cắt render ở 45% thời gian cho phép) — FR11.2/FR11.3. **Đây là sửa lỗi cấp bách nhất của 1A.**
+- [ ] 1A.3 — `infra/rabbitmq/rabbitmq.conf`: đặt `consumer_timeout = 3600000` tường minh. **Mức ưu tiên đã hạ** sau Pha 0 (render thật ~4.6 phút cho video 10 phút, chưa chạm ngưỡng 30 phút) — làm để có biên, không phải để chữa cháy.
 - [ ] 1A.4 — `docker-compose.yml`: `deploy.resources.limits` cho `rendering` + `video-assembly` — FR11.6.
 - [ ] 1A.5 — **Verify**: render fixture Pha 0 ở `-qm` chạy hết không timeout, RabbitMQ không redeliver.
 
 ### 1B — CR-002 (lõi, rủi ro cao nhất)
-- [ ] 1B.1 — **Spike kỹ thuật trước**: xác nhận `scene.renderer.time` cho đúng offset trên đúng version Manim đang pin (CR-002 §C2). Nếu không, tìm cơ chế khác trước khi thiết kế tiếp.
+- [x] 1B.1 — ~~Spike `scene.renderer.time`~~ → **ĐÃ XONG ở Pha 0.5**: hoạt động đúng trên Manim 0.18.1; cơ chế `(_cf_mark(self, i), self.wait(D))` + `marks.jsonl` đã chạy thật. Rủi ro lớn nhất của CR-002 đã gỡ.
 - [ ] 1B.2 — `manim_renderer.py`: chèn preamble `_cf_mark` + đổi substitution thành `(_cf_mark(self, i), self.wait(D))`; đọc `marks.jsonl`; `ffprobe` lấy thời lượng thật — FR10.1.
 - [ ] 1B.3 — `rendering/domain/models.py` + `application/render_script.py`: `ScriptRenderResult` mang `wait_offsets` + `video_duration_seconds` — FR3.5.
 - [ ] 1B.4 — `rendering/adapters/messaging/producer.py`: `rendering_completed_envelope` mang 2 trường mới — FR10.2. **Cập nhật `interface-contracts.md` của Unit 5** (bài học từ đợt sửa bug 2026-09-05: contract drift giữa unit là nguồn bug nghiêm trọng nhất của dự án này).
@@ -85,7 +88,7 @@ Làm CR-003 trước vì nếu không nới giới hạn thì **không thể tes
 - [ ] 1C.2 — Bật Manim cache tuỳ chọn + cache dir bền trên volume — FR11.5.
 - [ ] 1C.3 — Web GUI hiển thị % render.
 - [ ] 1C.4 — Dọn artifact tạm (CR-003 §C3).
-- [ ] 1C.5 — (Hoãn) FR11.7 render per-scene — đánh giá lại sau Pha 1; chỉ làm nếu thời gian render vẫn là nút thắt.
+- [ ] 1C.5 — **FR11.7 render per-scene: đề xuất HOÃN HẲN.** Pha 0 cho thấy render video 10 phút chỉ ~4.6 phút, nên lợi ích checkpoint không bù được chi phí thay đổi kiến trúc. Quyết cuối với Creator.
 
 **Mốc hoàn thành Pha 1**: render được video 8 phút, tiếng/hình khớp, không timeout. Đây là điểm đầu tiên hệ thống thực sự dùng được cho mục tiêu đề ra.
 

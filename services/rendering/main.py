@@ -20,7 +20,11 @@ from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
-from adapters.rendering.manim_renderer import DEFAULT_RENDER_TIMEOUT_SECONDS, ManimScriptRenderer
+from adapters.rendering.manim_renderer import (
+    DEFAULT_RENDER_MEMORY_LIMIT_GB,
+    DEFAULT_RENDER_TIMEOUT_SECONDS,
+    ManimScriptRenderer,
+)
 from application.render_script import RenderScriptUseCase
 
 logging.basicConfig(level=logging.WARNING)
@@ -33,7 +37,8 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 async def run() -> None:
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
-    renderer = ManimScriptRenderer(timeout_seconds=timeout_seconds)
+    memory_limit_gb = int(os.environ.get("RENDER_MEMORY_LIMIT_GB", DEFAULT_RENDER_MEMORY_LIMIT_GB))
+    renderer = ManimScriptRenderer(timeout_seconds=timeout_seconds, memory_limit_gb=memory_limit_gb)
     use_case = RenderScriptUseCase(renderer)
 
     pool = await create_pool()

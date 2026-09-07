@@ -24,7 +24,12 @@ from domain.ports import VideoAssemblerPort
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_ASSEMBLY_TIMEOUT_SECONDS = 180
+# Sized from the Phase 0 benchmark (long-form-baseline.md): burning subtitles
+# into a 215s 1080p60 video took 24.8s, i.e. roughly 0.115x the video's
+# duration, so a 10-minute video lands near 70s. 900s leaves ~12x headroom —
+# a timeout only matters when something has already gone wrong, so it is cheap
+# to set it generously.
+DEFAULT_ASSEMBLY_TIMEOUT_SECONDS = 900
 FFMPEG_BINARY = "ffmpeg"
 BACKGROUND_MUSIC_VOLUME = 0.2
 

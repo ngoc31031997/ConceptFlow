@@ -1660,3 +1660,25 @@ No code changed in this pass — documentation only."
 **Impact Assessment**: Narrows this round's implementation to Units 5, 6, 8 (CR-002) and Units 1, 5, 6, 8, 10 + docker-compose (CR-003). ADR-0023 (cloud TTS engine) is now anticipated but not yet needed.
 **User Confirmation**: PENDING — awaiting approval of the CR set and plan before committing.
 **Artifacts Affected**: updated cr-005-audio-quality.md, cr-007-vertical-shorts-tiktok.md, cr-002-007-execution-plan.md, aidlc-state.md, audit.md.
+
+## Phase 0 (benchmark) + Step 1A (resource limits) — CR-003
+**Timestamp**: 2026-09-07T02:00:00Z
+**User Input**: "vâỵ cứ giũ nguyên như kế hoạch và implemtn tiếp giúp tôi nhé"
+**AI Response**: "Approved the CR set, committed it, then executed Phase 0 and step 1A of the execution plan.
+
+PHASE 0 (benchmark) produced tests/fixtures/long_form_reference.py (20 narration markers, 215s video) and tests/benchmark_render.py, plus aidlc-docs/construction/build-and-test/long-form-baseline.md. Measured on the Creator's machine (10 vCPU, 7 GiB Docker VM, Manim 0.18.1):
+- Render 215s video: 27.2s at -qm, 98.9s at -qh (1080p60), peak RSS 370 MB / 764 MB, CPU-to-wall-clock ratio 2.21x.
+- Subtitle burn on the 1080p60 output: 24.8s at medium/crf23, 25.9s at slow/crf18, 0.1s with -c:v copy.
+
+The measurements REFUTED three estimates I had written into the CRs before benchmarking, and I corrected the CRs rather than leaving them: (1) 'Manim render 10 minutes @1080p takes 20-60+ min' was wrong by ~10x — real ratio is 0.46x video duration, so a 10-minute video renders in ~4.6 min; (2) 'subtitle burn takes 5-15 min' was wrong by ~6x — real ratio is 0.115x, so ~70s for a 10-minute video, meaning the existing 180s timeout was actually adequate, just without headroom; (3) the proposed 8 GiB memory limit was impossible, since the Docker VM only has 7 GiB total. RabbitMQ's consumer_timeout was downgraded from 'will kill the consumer' to headroom-only, since a 4.6-minute render never approaches the 30-minute default.
+
+Conversely two findings were confirmed and are worse than first described. The RLIMIT_CPU issue is an ACTIVE bug, not a theoretical risk: at a measured 2.21x CPU-to-wall ratio, RLIMIT_CPU set equal to the wall-clock timeout kills the render at ~45% of the configured time (300s config -> SIGXCPU at ~136s wall). And CR-002's desync was measured at 61.6s on a 3.6-minute video — the final narration plays over a minute ahead of its animation.
+
+Also ran spike 1B.1 early (it was cheap once the harness existed): scene.renderer.time returns exactly the right offsets on Manim 0.18.1, and the proposed substitution `(_cf_mark(self, i), self.wait(D))` works, with the tuple's left-to-right evaluation making the mark the START of the wait — exactly the value adelay needs. CR-002's largest technical risk is retired.
+
+STEP 1A applied the Phase-0-derived values: RENDER_TIMEOUT_SECONDS 300->1800, ASSEMBLY_TIMEOUT_SECONDS 180->900, RLIMIT_AS now configurable via RENDER_MEMORY_LIMIT_GB (default 4, was a hardcoded 2 GiB), RLIMIT_CPU removed entirely, rabbitmq.conf consumer_timeout set explicitly to 3600000, and deploy.resources.limits added for rendering (6 CPU / 5G) and video-assembly (6 CPU / 3G).
+
+Verified: rendering pytest 26/26 pass (3 new regression tests, including one asserting RLIMIT_CPU is never applied and one pinning the Phase 0 defaults against silent reversion); video-assembly pytest 23/23 pass; ruff reports the same 2 pre-existing E501 errors before and after the change (confirmed by stashing), so no new lint debt. Rebuilt both images and verified against the live stack: env vars present, RLIMIT_AS = 4 GiB with RLIMIT_CPU absent, container NanoCpus/Memory limits applied, and `rabbitmqctl environment` showing consumer_timeout 3600000."
+**Impact Assessment**: CR-003 steps 1A.1-1A.4 complete. 1C (progress/caching) and 1B (CR-002 sync) still open. No contract between services changed yet.
+**User Confirmation**: Approved in advance ("cứ giữ nguyên như kế hoạch và implement tiếp").
+**Artifacts Affected**: created tests/fixtures/long_form_reference.py, tests/benchmark_render.py, aidlc-docs/construction/build-and-test/long-form-baseline.md; updated cr-003, cr-004, execution plan, manim_renderer.py, rendering/main.py, ffmpeg_assembler.py, rabbitmq.conf, docker-compose.yml, test_manim_renderer.py.

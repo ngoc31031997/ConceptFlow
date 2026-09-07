@@ -7,9 +7,16 @@ holds RabbitMQ/Postgres credentials in its environment). Guardrails applied
 to the subprocess:
 
 - A stripped environment (no RABBITMQ_URL/DATABASE_URL/etc. — only PATH/HOME).
-- A wall-clock timeout (RENDER_TIMEOUT_SECONDS, default 300s).
-- CPU-time and address-space (memory) resource limits via `resource.setrlimit`,
-  applied in the child before exec via `preexec_fn`.
+- A wall-clock timeout (RENDER_TIMEOUT_SECONDS, default 1800s).
+- An address-space (memory) resource limit via `resource.setrlimit`, applied in
+  the child before exec via `preexec_fn`.
+
+There is deliberately **no** RLIMIT_CPU (CR-003 FR11.3). It used to be set equal
+to the wall-clock timeout, which was wrong: benchmarking measured Manim burning
+CPU-time at 2.21x wall-clock (it renders on multiple cores), so that limit fired
+at roughly 45% of the time the config claimed to allow and killed legitimate
+renders with SIGXCPU well before the timeout. The wall-clock timeout on
+`subprocess.run` is the correct and sufficient bound.
 
 This is deliberate, bounded hardening for a single-Creator tool — not a full
 sandbox (no seccomp/container-per-render/network isolation). It assumes
@@ -39,15 +46,27 @@ from domain.ports import ManimScriptRendererPort
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_RENDER_TIMEOUT_SECONDS = 300
-RENDER_MEMORY_LIMIT_BYTES = 2 * 1024 * 1024 * 1024  # 2 GiB address-space cap
+# Sized from the Phase 0 benchmark (long-form-baseline.md): a 215s 1080p60
+# render took 98.9s wall-clock and peaked at 764 MB, i.e. roughly 0.46x the
+# video's duration. A 10-minute video therefore lands near 276s; 1800s leaves
+# ~6.5x headroom for scripts far heavier than the reference fixture.
+DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
+
+# 4 GiB, not 8: the Docker VM this runs on has only 7 GiB total, so a larger cap
+# could not actually be honoured. Measured peak was 764 MB.
+DEFAULT_RENDER_MEMORY_LIMIT_GB = 4
 
 AUTO_WAIT_RE = re.compile(r"self\.wait\(\s*AUTO\s*\)")
 
 
 class ManimScriptRenderer(ManimScriptRendererPort):
-    def __init__(self, timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS,
+        memory_limit_gb: int = DEFAULT_RENDER_MEMORY_LIMIT_GB,
+    ) -> None:
         self._timeout_seconds = timeout_seconds
+        self._memory_limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
 
     def render(self, request: ScriptRenderRequest, output_path: str) -> None:
         durations = [seg.duration_seconds for seg in sorted(request.narration_segments, key=lambda s: s.scene_index)]
@@ -109,8 +128,11 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             raise AnimationEngineError(f"Manim render failed:\n{result.stderr}")
 
     def _limit_child_resources(self) -> None:
-        resource.setrlimit(resource.RLIMIT_AS, (RENDER_MEMORY_LIMIT_BYTES, RENDER_MEMORY_LIMIT_BYTES))
-        resource.setrlimit(resource.RLIMIT_CPU, (self._timeout_seconds, self._timeout_seconds))
+        """Address space only — see the module docstring for why RLIMIT_CPU is
+        deliberately absent."""
+        resource.setrlimit(
+            resource.RLIMIT_AS, (self._memory_limit_bytes, self._memory_limit_bytes)
+        )
 
     @staticmethod
     def _find_rendered_file(media_dir: str) -> str:
