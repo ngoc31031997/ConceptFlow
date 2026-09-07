@@ -68,29 +68,39 @@ Mục đích: có số liệu thật trên máy của Creator để chốt các 
 Làm CR-003 trước vì nếu không nới giới hạn thì **không thể test được CR-002** trên video dài.
 
 ### 1A — CR-003 phần "nới giới hạn" (nhanh, ít rủi ro)
-- [ ] 1A.1 — `docker-compose.yml`: `RENDER_TIMEOUT_SECONDS=1800`, `ASSEMBLY_TIMEOUT_SECONDS=900`, `RENDER_MEMORY_LIMIT_GB=4` (giá trị chốt ở Pha 0.4).
-- [ ] 1A.2 — `services/rendering/adapters/rendering/manim_renderer.py`: đọc memory limit từ env; **bỏ hẳn `RLIMIT_CPU`** (Pha 0: CPU/wall = 2.21× nên nó luôn cắt render ở 45% thời gian cho phép) — FR11.2/FR11.3. **Đây là sửa lỗi cấp bách nhất của 1A.**
-- [ ] 1A.3 — `infra/rabbitmq/rabbitmq.conf`: đặt `consumer_timeout = 3600000` tường minh. **Mức ưu tiên đã hạ** sau Pha 0 (render thật ~4.6 phút cho video 10 phút, chưa chạm ngưỡng 30 phút) — làm để có biên, không phải để chữa cháy.
-- [ ] 1A.4 — `docker-compose.yml`: `deploy.resources.limits` cho `rendering` + `video-assembly` — FR11.6.
-- [ ] 1A.5 — **Verify**: render fixture Pha 0 ở `-qm` chạy hết không timeout, RabbitMQ không redeliver.
+- [x] 1A.1 — `docker-compose.yml`: `RENDER_TIMEOUT_SECONDS=1800`, `ASSEMBLY_TIMEOUT_SECONDS=900`, `RENDER_MEMORY_LIMIT_GB=4` (giá trị chốt ở Pha 0.4).
+- [x] 1A.2 — `services/rendering/adapters/rendering/manim_renderer.py`: đọc memory limit từ env; **bỏ hẳn `RLIMIT_CPU`** (Pha 0: CPU/wall = 2.21× nên nó luôn cắt render ở 45% thời gian cho phép) — FR11.2/FR11.3. **Đây là sửa lỗi cấp bách nhất của 1A.**
+- [x] 1A.3 — `infra/rabbitmq/rabbitmq.conf`: đặt `consumer_timeout = 3600000` tường minh. **Mức ưu tiên đã hạ** sau Pha 0 (render thật ~4.6 phút cho video 10 phút, chưa chạm ngưỡng 30 phút) — làm để có biên, không phải để chữa cháy.
+- [x] 1A.4 — `docker-compose.yml`: `deploy.resources.limits` cho `rendering` + `video-assembly` — FR11.6.
+- [x] 1A.5 — **Verify**: render fixture Pha 0 ở `-qm` chạy hết không timeout, RabbitMQ không redeliver.
 
 ### 1B — CR-002 (lõi, rủi ro cao nhất)
 - [x] 1B.1 — ~~Spike `scene.renderer.time`~~ → **ĐÃ XONG ở Pha 0.5**: hoạt động đúng trên Manim 0.18.1; cơ chế `(_cf_mark(self, i), self.wait(D))` + `marks.jsonl` đã chạy thật. Rủi ro lớn nhất của CR-002 đã gỡ.
-- [ ] 1B.2 — `manim_renderer.py`: chèn preamble `_cf_mark` + đổi substitution thành `(_cf_mark(self, i), self.wait(D))`; đọc `marks.jsonl`; `ffprobe` lấy thời lượng thật — FR10.1.
-- [ ] 1B.3 — `rendering/domain/models.py` + `application/render_script.py`: `ScriptRenderResult` mang `wait_offsets` + `video_duration_seconds` — FR3.5.
-- [ ] 1B.4 — `rendering/adapters/messaging/producer.py`: `rendering_completed_envelope` mang 2 trường mới — FR10.2. **Cập nhật `interface-contracts.md` của Unit 5** (bài học từ đợt sửa bug 2026-09-05: contract drift giữa unit là nguồn bug nghiêm trọng nhất của dự án này).
-- [ ] 1B.5 — Orchestrator: lưu `WaitOffsets` trên `domain.Project` + cột Postgres mới; validate số offset = số scene (FR10.5); `subtitleCues()` dùng offset (FR10.4); payload `assemble_video` đổi sang `narration_segments: [{audio_path, start_time}]` (FR5.5). **Lưu ý migration**: `db.go` chỉ `CREATE TABLE IF NOT EXISTS`, volume dev hiện có cần `ALTER TABLE` thủ công (đã gặp với `category_hint`).
-- [ ] 1B.6 — `video-assembly`: `domain/models.py` + `ffmpeg_assembler.py` — thay `concat` bằng `adelay=<ms>|<ms>` mỗi input rồi `amix=inputs=N:normalize=0` (bắt buộc `normalize=0`, CR-002 §C5); `tpad` cho FR10.6; bỏ `-shortest` khỏi nhánh này.
-- [ ] 1B.7 — **Verify (tiêu chí nghiệm thu CR-002)**: fixture Pha 0 → lệch < 200ms ở narration cuối, cả 2 chế độ bật/tắt TTS; phụ đề khớp; câu cuối không cụt.
+- [x] 1B.2 — `manim_renderer.py`: chèn preamble `_cf_mark` + đổi substitution thành `(_cf_mark(self, i), self.wait(D))`; đọc `marks.jsonl`; `ffprobe` lấy thời lượng thật — FR10.1.
+- [x] 1B.3 — `rendering/domain/models.py` + `application/render_script.py`: `ScriptRenderResult` mang `wait_offsets` + `video_duration_seconds` — FR3.5.
+- [x] 1B.4 — `rendering/adapters/messaging/producer.py`: `rendering_completed_envelope` mang 2 trường mới — FR10.2. **Cập nhật `interface-contracts.md` của Unit 5** (bài học từ đợt sửa bug 2026-09-05: contract drift giữa unit là nguồn bug nghiêm trọng nhất của dự án này).
+- [x] 1B.5 — Orchestrator: lưu `WaitOffsets` trên `domain.Project` + cột Postgres mới; validate số offset = số scene (FR10.5); `subtitleCues()` dùng offset (FR10.4); payload `assemble_video` đổi sang `narration_segments: [{audio_path, start_time}]` (FR5.5). **Lưu ý migration**: `db.go` chỉ `CREATE TABLE IF NOT EXISTS`, volume dev hiện có cần `ALTER TABLE` thủ công (đã gặp với `category_hint`).
+- [x] 1B.6 — `video-assembly`: `domain/models.py` + `ffmpeg_assembler.py` — thay `concat` bằng `adelay=<ms>|<ms>` mỗi input rồi `amix=inputs=N:normalize=0` (bắt buộc `normalize=0`, CR-002 §C5); `tpad` cho FR10.6; bỏ `-shortest` khỏi nhánh này.
+- [x] 1B.7 — **Verify (tiêu chí nghiệm thu CR-002)**: fixture Pha 0 → lệch < 200ms ở narration cuối, cả 2 chế độ bật/tắt TTS; phụ đề khớp; câu cuối không cụt.
 
 ### 1C — CR-003 phần "trải nghiệm render dài"
-- [ ] 1C.1 — Progress định kỳ khi render: đọc stdout Manim, publish progress ≥ mỗi 15s — FR11.4.
-- [ ] 1C.2 — Bật Manim cache tuỳ chọn + cache dir bền trên volume — FR11.5.
-- [ ] 1C.3 — Web GUI hiển thị % render.
-- [ ] 1C.4 — Dọn artifact tạm (CR-003 §C3).
-- [ ] 1C.5 — **FR11.7 render per-scene: đề xuất HOÃN HẲN.** Pha 0 cho thấy render video 10 phút chỉ ~4.6 phút, nên lợi ích checkpoint không bù được chi phí thay đổi kiến trúc. Quyết cuối với Creator.
+- [x] 1C.1 — Progress định kỳ khi render: đọc stdout Manim, publish progress ≥ mỗi 15s — FR11.4.
+- [x] 1C.2 — Bật Manim cache tuỳ chọn + cache dir bền trên volume — FR11.5.
+- [x] 1C.3 — Web GUI hiển thị % render.
+- [x] 1C.4 — Dọn artifact tạm (CR-003 §C3).
+- [x] 1C.5 — **FR11.7 render per-scene: ĐÃ HOÃN.** Hai bằng chứng từ Pha 0/1C: (a) render video 10 phút chỉ ~4.6 phút, không phải 40 phút như giả định ban đầu; (b) cache (1C.2) đã giảm render lại xuống ~5 lần nhanh hơn (21s → 4s), tức đã giải quyết phần lớn nỗi đau mà checkpoint nhắm tới. Lợi ích còn lại không bù được chi phí thay đổi kiến trúc. Mở lại nếu thực tế cho thấy render vẫn là nút thắt.
 
-**Mốc hoàn thành Pha 1**: render được video 8 phút, tiếng/hình khớp, không timeout. Đây là điểm đầu tiên hệ thống thực sự dùng được cho mục tiêu đề ra.
+**Mốc hoàn thành Pha 1**: ✅ **ĐẠT (2026-09-07)**. Video 3.6 phút render + ghép thành công, lệch tiếng/hình **0.003s** (trước: 61.64s), không timeout, có heartbeat tiến trình, cache giảm render lại ~5 lần. Hệ thống lần đầu thực sự dùng được cho mục tiêu đề ra.
+
+Số đo nghiệm thu Pha 1:
+| Hạng mục | Trước | Sau |
+|---|---|---|
+| Lệch tiếng/hình (video 3.6 phút) | 61.64s | **0.003s** |
+| Trần render thực tế (do RLIMIT_CPU) | ~136s | 1800s |
+| Trần bộ nhớ render | 2 GiB hardcode | 4 GiB, cấu hình được |
+| Render lại sau khi sửa 1 dòng | 21s (luôn full) | **6s** |
+| Render lại không đổi gì | 21s | **4s** |
+| Tín hiệu tiến trình khi render | không có | mỗi 15s qua SSE |
 
 ---
 

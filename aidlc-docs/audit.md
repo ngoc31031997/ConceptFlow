@@ -1704,3 +1704,23 @@ Verified: rendering 34/34 pytest (ruff down from 2 pre-existing errors to 1, one
 **Impact Assessment**: CR-002 complete. Changes the assemble_video and rendering_completed contracts. Projects rendered before this need re-rendering, not just re-assembling — both services detect and handle that case explicitly.
 **User Confirmation**: Approved in advance ("cứ giữ nguyên như kế hoạch và implement tiếp").
 **Artifacts Affected**: rendering (manim_renderer, artifact_paths, render_script, producer, consumer, models, ports + tests), video-assembly (ffmpeg_assembler, models, assemble_video, consumer + tests), orchestrator (project.go, handle_step_event.go, event_payload.go, db.go, project_repository.go + tests), 3 interface-contracts.md.
+
+## Step 1C — CR-003: render progress, caching, cache budget; FR11.7 deferred
+**Timestamp**: 2026-09-07T04:30:00Z
+**User Input**: continuing the approved Phase 1 implementation
+**AI Response**: "Completed Phase 1 with step 1C.
+
+CACHING (1C.2) turned out to need more than a flag. Manim 0.18 has no configurable cache location — there is no --cache_dir option and no config.cache_dir attribute (I checked both against the running container after my first attempt failed) — it keeps cached segments in partial_movie_files/ INSIDE media_dir. Rendering was handing it a fresh tempdir and deleting it afterwards, so the cache could never survive a run and --disable_caching was the honest setting. The fix is a persistent per-project media_dir on the shared volume. That in turn made _find_rendered_file dangerous: it walked for the first .mp4, and a reused media_dir is full of cached segment .mp4s, so it could have shipped a fraction of a second of animation as the whole video. It now skips partial_movie_files and takes the newest match. Measured on the reference fixture: 21s cold, 4s warm, 6s after editing one narration line, for 2.5 MB of cache.
+
+CACHE BUDGET (1C.4): a persistent cache needs a ceiling, so an LRU eviction keeps the tree under 5 GB, never evicting the project about to render, and swallowing its own errors — a cache that cannot be trimmed is a disk problem, not a reason to fail a Creator's render.
+
+PROGRESS (1C.1/1C.3): Rendering now streams Manim's stderr via Popen instead of blocking on subprocess.run, and publishes a heartbeat to progress.fanout every 15s. Two deliberate choices. First, no percentage: Manim gives no reliable total animation count (animations inside loops make a static count of self.play calls wrong), and a fabricated percentage that stalls or jumps backwards is worse than an honest elapsed time — so the message carries elapsed_seconds plus the animation index parsed from Manim's own log. Second, not routed through the Outbox: the Outbox makes state transitions durable and exactly-once, but a heartbeat is only useful live and replaying a stale one after a restart would mislead. The callback fires on the render thread and hops back to the event loop via run_coroutine_threadsafe, since aio-pika is not thread-safe. Heartbeat failures are caught and logged — progress is UX-only. Switching to Popen also meant handling what subprocess.run did for free: stderr is still collected in full so failure messages survive, and the child is explicitly killed on timeout.
+
+1C.5 — FR11.7 (per-scene rendering with checkpoints) is DEFERRED, with the reasoning recorded in the plan. Two measurements undercut it: a 10-minute video renders in ~4.6 minutes rather than the 40 assumed when the CR was written, and caching now makes re-renders ~5x faster, which addresses most of the pain checkpointing targeted. The remaining benefit does not justify the architectural change.
+
+Verified end to end on the live stack: an SSE subscriber received {\"step\":\"render_scenes\",\"status\":\"in_progress\",\"elapsed_seconds\":15,\"animation_index\":28} mid-render, and a full saga with 54 cached segment files present still produced the correct 214.9s video with offsets matching the Phase 0 baseline exactly.
+
+Verified: rendering 42/42 pytest (ruff at 1 pre-existing error, down from 2), video-assembly 29/29, orchestrator go test all 5 packages ok, web-gui tsc clean + 35/35 vitest (eslint's 1 error is pre-existing in BackgroundMusicPicker.tsx, unrelated)."
+**Impact Assessment**: Phase 1 (CR-002 + CR-003) complete. CR-004..CR-007 remain analyzed backlog, unstarted.
+**User Confirmation**: Approved in advance ("cứ giữ nguyên như kế hoạch và implement tiếp").
+**Artifacts Affected**: rendering (manim_renderer, main, consumer, render_script, new adapters/messaging/progress.py + tests), web-gui (types, useSSE, ProgressTracker), docker-compose.yml, README.md, execution plan.

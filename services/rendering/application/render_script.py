@@ -27,6 +27,17 @@ class RenderScriptUseCase:
     def __init__(self, renderer: ManimScriptRendererPort) -> None:
         self._renderer = renderer
 
+    def set_heartbeat(self, callback) -> None:
+        """Wires per-command progress reporting into the renderer.
+
+        Set per command rather than at construction because the callback closes
+        over the project_id being rendered, which is only known once a command
+        arrives. A renderer with no such hook simply ignores this.
+        """
+        setter = getattr(self._renderer, "set_heartbeat", None)
+        if setter is not None:
+            setter(callback)
+
     def render(self, request: ScriptRenderRequest) -> ScriptRenderResult:
         self._validate(request)
 

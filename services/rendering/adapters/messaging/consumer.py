@@ -19,6 +19,7 @@ import asyncpg
 
 from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.producer import rendering_completed_envelope, rendering_failed_envelope
+from adapters.messaging.progress import ProgressPublisher
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.render_script import RenderScriptUseCase
@@ -43,11 +44,13 @@ class RenderScriptCommandHandler:
         pool: asyncpg.Pool,
         inbox: InboxRepository,
         outbox: OutboxRepository,
+        progress: ProgressPublisher | None = None,
     ) -> None:
         self._use_case = use_case
         self._pool = pool
         self._inbox = inbox
         self._outbox = outbox
+        self._progress = progress
 
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)
@@ -77,6 +80,19 @@ class RenderScriptCommandHandler:
         )
 
         try:
+            # The renderer's heartbeat fires on the render thread, but aio-pika
+            # is only safe to touch from the event loop — hence the hop back.
+            loop = asyncio.get_running_loop()
+
+            def emit_heartbeat(elapsed: float, animation_index: int | None) -> None:
+                if self._progress is None:
+                    return
+                asyncio.run_coroutine_threadsafe(
+                    self._progress.publish_render_heartbeat(project_id, elapsed, animation_index),
+                    loop,
+                )
+
+            self._use_case.set_heartbeat(emit_heartbeat)
             result = await asyncio.to_thread(self._use_case.render, request)
         except (ValueError, InvalidDurationError, AnimationEngineError) as exc:
             logger.warning("render_scenes failed for project_id=%s: %s", project_id, exc)

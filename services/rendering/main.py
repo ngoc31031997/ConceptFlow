@@ -16,11 +16,13 @@ import aio_pika
 
 from adapters.messaging.consumer import RenderScriptCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.manim_renderer import (
+    CACHE_ROOT,
     DEFAULT_RENDER_MEMORY_LIMIT_GB,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
     ManimScriptRenderer,
@@ -38,7 +40,14 @@ READY_SENTINEL_PATH = "/tmp/ready"
 async def run() -> None:
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
     memory_limit_gb = int(os.environ.get("RENDER_MEMORY_LIMIT_GB", DEFAULT_RENDER_MEMORY_LIMIT_GB))
-    renderer = ManimScriptRenderer(timeout_seconds=timeout_seconds, memory_limit_gb=memory_limit_gb)
+    # RENDER_CACHE_ROOT="" turns caching off, restoring the old
+    # tempdir + --disable_caching behaviour without a code change.
+    cache_root = os.environ.get("RENDER_CACHE_ROOT", CACHE_ROOT) or None
+    renderer = ManimScriptRenderer(
+        timeout_seconds=timeout_seconds,
+        memory_limit_gb=memory_limit_gb,
+        cache_root=cache_root,
+    )
     use_case = RenderScriptUseCase(renderer)
 
     pool = await create_pool()
@@ -48,12 +57,15 @@ async def run() -> None:
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
+    progress_exchange = await channel.get_exchange(PROGRESS_EXCHANGE)
     queue = await channel.get_queue(COMMANDS_QUEUE)
 
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    command_handler = RenderScriptCommandHandler(use_case, pool, inbox, outbox)
+    command_handler = RenderScriptCommandHandler(
+        use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
+    )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 

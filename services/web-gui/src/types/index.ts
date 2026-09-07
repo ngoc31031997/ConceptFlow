@@ -46,6 +46,13 @@ export interface ProgressMessage {
   status: "in_progress" | "completed" | "failed";
   scene_index?: number;
   scene_total?: number;
+  /**
+   * Heartbeat from a long render (CR-003 FR11.4). Carries no percentage on
+   * purpose: Manim gives no reliable total animation count, and a fabricated
+   * percentage that stalls or jumps backwards is worse than an honest clock.
+   */
+  elapsed_seconds?: number;
+  animation_index?: number;
   error_message?: string;
 }
 

@@ -6,6 +6,8 @@ export interface ProgressState {
   currentStep: string | null;
   sceneIndex: number | null;
   sceneTotal: number | null;
+  elapsedSeconds: number | null;
+  animationIndex: number | null;
   status: "in_progress" | "completed" | "failed" | null;
   errorMessage: string | null;
 }
@@ -14,6 +16,8 @@ const initialState: ProgressState = {
   currentStep: null,
   sceneIndex: null,
   sceneTotal: null,
+  elapsedSeconds: null,
+  animationIndex: null,
   status: null,
   errorMessage: null,
 };
@@ -27,6 +31,8 @@ export function useSSE(projectId: string): ProgressState {
         currentStep: msg.step,
         sceneIndex: msg.scene_index ?? null,
         sceneTotal: msg.scene_total ?? null,
+        elapsedSeconds: msg.elapsed_seconds ?? null,
+        animationIndex: msg.animation_index ?? null,
         status: msg.status,
         errorMessage: msg.status === "failed" ? (msg.error_message ?? null) : null,
       });

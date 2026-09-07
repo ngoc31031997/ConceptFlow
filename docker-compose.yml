@@ -154,6 +154,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@rendering-db:5432/rendering
       RENDER_TIMEOUT_SECONDS: "1800"
       RENDER_MEMORY_LIMIT_GB: "4"
+      # Manim 0.18 keeps its cache inside media_dir, so this directory is
+      # reused per project rather than being a throwaway tempdir. Set it to an
+      # empty string to disable caching. Measured 21s -> 4s on an unchanged
+      # re-render, 21s -> 6s after editing one narration line.
+      RENDER_CACHE_ROOT: "/shared/.manim-media"
     # Manim renders on every core it can get (Phase 0 measured CPU-time at
     # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
     # the Postgres instances on the same host. 5G sits just above the 4 GiB
