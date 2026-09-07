@@ -21,7 +21,7 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 // synthesize_speech directly — not wait for a scenes_classified event.
 func TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech(t *testing.T) {
 	uc, repo, pub, prog := newTestUseCase()
-	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, VoiceLanguage: domain.LanguageVietnamese, TTSEnabled: true}
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true}
 	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
@@ -251,7 +251,7 @@ func TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstima
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1", Status: domain.StatusParsingScript,
-		VoiceLanguage: domain.LanguageEnglish, TTSEnabled: false,
+		ContentLanguage: domain.LanguageEnglish, TTSEnabled: false,
 	}
 	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
 

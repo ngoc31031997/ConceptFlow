@@ -137,28 +137,39 @@ export function NarrationPanel({
         </p>
       )}
 
+      {/*
+        The language picker sits OUTSIDE the TTS block (CR-008). It used to be
+        nested inside it, so a Creator with narration turned off could not pick
+        a language at all — and this is no longer just the voice's language: it
+        decides the subtitles, the YouTube title/description/tags and the
+        thumbnail prompt too.
+      */}
+      <div className={glass.cardHint} style={{ marginTop: 18, marginBottom: 8 }}>
+        Ngôn ngữ nội dung
+      </div>
+      <div className={styles.toggleRow} style={{ padding: 0, borderTop: "none" }}>
+        <div style={{ display: "flex", gap: 8, width: "100%" }}>
+          {LANGUAGES.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={`${styles.voiceCard} ${voiceLanguage === option.value ? styles.selected : ""}`}
+              aria-pressed={voiceLanguage === option.value}
+              style={{ justifyContent: "center", flex: 1 }}
+              onClick={() => onVoiceLanguageChange(option.value)}
+              data-testid={`content-language-${option.value}`}
+            >
+              <span className={styles.voiceName}>{option.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <p className={glass.helperText} style={{ marginRight: 0, marginTop: 8 }}>
+        Quyết định giọng đọc, phụ đề, và ngôn ngữ tiêu đề/mô tả/tag khi đăng YouTube. Giao diện vẫn giữ tiếng Việt.
+      </p>
+
       {ttsEnabled && (
         <>
-          <div className={glass.cardHint} style={{ marginTop: 18, marginBottom: 8 }}>
-            Ngôn ngữ giọng đọc
-          </div>
-          <div className={styles.toggleRow} style={{ padding: 0, borderTop: "none" }}>
-            <div style={{ display: "flex", gap: 8, width: "100%" }}>
-              {LANGUAGES.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`${styles.voiceCard} ${voiceLanguage === option.value ? styles.selected : ""}`}
-                  aria-pressed={voiceLanguage === option.value}
-                  style={{ justifyContent: "center", flex: 1 }}
-                  onClick={() => onVoiceLanguageChange(option.value)}
-                >
-                  <span className={styles.voiceName}>{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className={styles.voiceList} data-testid="narration-voice-list">
             {available.map((voice) => (
               <div

@@ -16,7 +16,7 @@ type startRenderSagaRequest struct {
 	ScriptContent       string  `json:"script_content"`
 	PluginID            string  `json:"plugin_id"`
 	CategoryHint        string  `json:"category_hint"`
-	VoiceLanguage       string  `json:"voice_language"`
+	ContentLanguage     string  `json:"voice_language"`
 	BackgroundMusicPath *string `json:"background_music_path,omitempty"`
 
 	// CR-001. TTSEnabled is a pointer so an omitted field keeps the pre-CR-001
@@ -74,7 +74,7 @@ type projectResponse struct {
 	Scenes           []sceneResponse       `json:"scenes"`
 	PluginID         string                `json:"plugin_id"`
 	CategoryHint     string                `json:"category_hint"`
-	VoiceLanguage    string                `json:"voice_language"`
+	ContentLanguage  string                `json:"voice_language"`
 	TTSEnabled       bool                  `json:"tts_enabled"`
 	VoiceID          string                `json:"voice_id,omitempty"`
 	SubtitlesEnabled bool                  `json:"subtitles_enabled"`
@@ -147,7 +147,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		Scenes:           scenes,
 		PluginID:         p.PluginID,
 		CategoryHint:     p.CategoryHint,
-		VoiceLanguage:    string(p.VoiceLanguage),
+		ContentLanguage:  string(p.ContentLanguage),
 		TTSEnabled:       p.TTSEnabled,
 		VoiceID:          p.VoiceID,
 		SubtitlesEnabled: p.SubtitlesEnabled,

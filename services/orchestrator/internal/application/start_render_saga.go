@@ -14,7 +14,7 @@ type StartRenderSagaInput struct {
 	ScriptContent       string
 	PluginID            string
 	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
-	VoiceLanguage       domain.VoiceLanguage
+	ContentLanguage     domain.ContentLanguage
 	BackgroundMusicPath *string // optional, business-rules.md Rule 3
 
 	// CR-001 — narration/subtitle switches chosen by the Creator at submit time.
@@ -58,7 +58,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		ScriptContent:       input.ScriptContent,
 		PluginID:            input.PluginID,
 		CategoryHint:        input.CategoryHint,
-		VoiceLanguage:       input.VoiceLanguage,
+		ContentLanguage:     input.ContentLanguage,
 		BackgroundMusicPath: input.BackgroundMusicPath,
 		TTSEnabled:          input.TTSEnabled,
 		VoiceID:             input.VoiceID,

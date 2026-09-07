@@ -11,7 +11,10 @@ import (
 // (not "OllamaPort") so a different local/self-hosted model can be swapped
 // in later without touching this use case.
 type MetadataSuggesterPort interface {
-	Suggest(ctx context.Context, scriptContent, categoryHint string) (title, description string, tags []string, err error)
+	// language is the project's ContentLanguage (CR-008 FR21.3) — the metadata
+	// must come back in the language the audience speaks, not the one the
+	// prompt happens to be written in.
+	Suggest(ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage) (title, description string, tags []string, err error)
 }
 
 // SuggestPublishMetadataOutput carries the AI-drafted YouTube metadata back
@@ -44,7 +47,9 @@ func (uc *SuggestPublishMetadataUseCase) Execute(ctx context.Context, projectID 
 		return nil, fmt.Errorf("project has no script content to summarize")
 	}
 
-	title, description, tags, err := uc.suggester.Suggest(ctx, project.ScriptContent, project.CategoryHint)
+	title, description, tags, err := uc.suggester.Suggest(
+		ctx, project.ScriptContent, project.CategoryHint, project.ContentLanguage,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("suggest metadata: %w", err)
 	}

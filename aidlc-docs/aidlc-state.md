@@ -59,7 +59,7 @@
 | CR-005 | Giọng đọc chất lượng cao, ducking, loudnorm | P1 | Requirements Analysis | Backlog — engine đã chốt: Google Cloud TTS |
 | CR-006 | Chapters, thumbnail, hook, metadata SEO | P2 | Requirements Analysis | Backlog (Pha 3) |
 | CR-007 | Clip dọc 9:16 cho Shorts/TikTok | P1 | Requirements Analysis | Backlog — đã chốt: 2 preset short + long |
-| CR-008 | Ngôn ngữ nội dung áp dụng toàn pipeline | P1 | Requirements Analysis | Chờ duyệt — độc lập, rẻ nhất trong số còn lại |
+| CR-008 | Ngôn ngữ nội dung áp dụng toàn pipeline | P1 | **Code Generation ✅** | **HOÀN THÀNH** — chờ verify E2E (Docker đang tắt) |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 

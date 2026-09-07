@@ -59,7 +59,7 @@ func TestSagaStepStatusStringConversion(t *testing.T) {
 }
 
 func TestVoiceLanguageAndVisibilityRoundTrip(t *testing.T) {
-	if domain.VoiceLanguage(string(domain.LanguageVietnamese)) != domain.LanguageVietnamese {
+	if domain.ContentLanguage(string(domain.LanguageVietnamese)) != domain.LanguageVietnamese {
 		t.Fatal("voice_language round-trip mismatch")
 	}
 	if domain.Visibility(string(domain.VisibilityUnlisted)) != domain.VisibilityUnlisted {

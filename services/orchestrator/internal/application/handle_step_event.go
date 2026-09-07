@@ -225,7 +225,7 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
 	for i := range project.Scenes {
 		project.Scenes[i].DurationSeconds = domain.EstimateNarrationDuration(
-			project.Scenes[i].NarrationText, project.VoiceLanguage,
+			project.Scenes[i].NarrationText, project.ContentLanguage,
 		)
 		project.Scenes[i].AudioPath = ""
 	}
@@ -253,7 +253,7 @@ func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sag
 		return err
 	}
 	payload := map[string]interface{}{
-		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.VoiceLanguage), project.VoiceID),
+		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID),
 	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
 		return err

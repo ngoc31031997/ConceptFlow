@@ -33,9 +33,13 @@ export interface Scene {
 export interface Project {
   project_id: string;
   status: string;
+  /**
+   * The project's content language. The wire name is historical (CR-008 §C2):
+   * it now drives subtitles, metadata and prompts, not just the TTS voice.
+   */
+  voice_language: "vi" | "en";
   video_path?: string;
   scenes: Scene[];
-  voice_language: string;
   youtube_video_url?: string;
   error_message?: string;
 }

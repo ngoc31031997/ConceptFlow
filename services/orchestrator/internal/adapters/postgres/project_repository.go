@@ -52,7 +52,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	}
 
 	p.Status = domain.ProjectStatus(status)
-	p.VoiceLanguage = domain.VoiceLanguage(voiceLanguage)
+	p.ContentLanguage = domain.ContentLanguage(voiceLanguage)
 	if youtubeVisibility != nil {
 		v := domain.Visibility(*youtubeVisibility)
 		p.YoutubeVisibility = &v
@@ -190,7 +190,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    wait_offsets = EXCLUDED.wait_offsets, rendered_video_seconds = EXCLUDED.rendered_video_seconds,
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
-		project.CategoryHint, string(project.VoiceLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
+		project.CategoryHint, string(project.ContentLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility, project.YoutubePublishAt,
 		project.YoutubeThumbnailPath, project.YoutubeVideoURL, project.ErrorMessage,
 		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON,

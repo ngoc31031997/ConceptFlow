@@ -82,7 +82,11 @@ export function ResultPage() {
         ) : (
           <>
             <YoutubeConnectButton projectId={projectId} />
-            <ThumbnailUpload projectId={projectId} onThumbnailPathChange={setThumbnailPath} />
+            <ThumbnailUpload
+              projectId={projectId}
+              onThumbnailPathChange={setThumbnailPath}
+              contentLanguage={project.voice_language}
+            />
             {error && (
               <p role="alert" className={glass.helperText}>
                 {error}

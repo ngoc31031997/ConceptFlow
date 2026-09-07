@@ -64,6 +64,7 @@ export function NewProjectPage() {
           <ScriptEditor
             value={draft.scriptContent}
             onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
+            contentLanguage={draft.voiceLanguage}
           />
 
           <div className={styles.sidebar}>

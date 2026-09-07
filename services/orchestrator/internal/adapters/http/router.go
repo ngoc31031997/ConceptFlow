@@ -85,7 +85,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusBadRequest, "project_id and script_content are required")
 		return
 	}
-	lang := domain.VoiceLanguage(req.VoiceLanguage)
+	lang := domain.ContentLanguage(req.ContentLanguage)
 	if lang != domain.LanguageVietnamese && lang != domain.LanguageEnglish {
 		writeError(w, http.StatusBadRequest, "voice_language must be 'vi' or 'en'")
 		return
@@ -101,7 +101,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		ScriptContent:       req.ScriptContent,
 		PluginID:            req.PluginID,
 		CategoryHint:        req.CategoryHint,
-		VoiceLanguage:       lang,
+		ContentLanguage:     lang,
 		BackgroundMusicPath: req.BackgroundMusicPath,
 		TTSEnabled:          ttsEnabled,
 		VoiceID:             req.VoiceID,

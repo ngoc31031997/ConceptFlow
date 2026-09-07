@@ -1746,3 +1746,27 @@ Added Phase 4 to the execution plan (8 steps). CR-008 depends on nothing and is 
 **Impact Assessment**: Affects Orchestrator (domain, LLM adapter, prompt, rune fix, wpm table), Web GUI (language picker, template, thumbnail prompt), API Gateway (field forwarding). TTS needs no logic change.
 **User Confirmation**: PENDING — CR written, awaiting approval before implementation.
 **Artifacts Affected**: created cr-008-content-language.md; updated cr-002-007-execution-plan.md, aidlc-state.md, audit.md.
+
+## CR-008 implemented — content language across the pipeline
+**Timestamp**: 2026-09-08T00:00:00Z
+**User Input**: "implement tiêpw các cr còn lại"
+**AI Response**: "Implemented CR-008 (Phase 4) first, since it is independent of the others and unblocks the English-channel goal.
+
+BACKEND: domain.VoiceLanguage renamed to domain.ContentLanguage across 10 Go files (the JSON field and DB column stay `voice_language` — renaming them would break every pre-CR-008 project for no functional gain, §C2). The two loose wpm constants and their `if` became a languageProfiles table with a ProfileFor() accessor that falls back to a default rather than returning a zero WordsPerMinute, which would divide by zero and stall every wait in the script (FR21.6). MetadataSuggesterPort.Suggest now takes the language, and buildSuggestPrompt names it — the prompt used to hardcode 'tiếng Việt' three times while Suggest took no language at all. The prompt itself is written in English regardless of target, since instruction-following is more reliable that way and it keeps one prompt to maintain.
+
+Fixed FR18.3: title[:maxTitleLength] sliced BYTES, so a Vietnamese title (2-3 bytes per accented char) was cut mid-character and invalid UTF-8 went to the YouTube API. Extracted as truncateTitle() operating on runes, with a test proving a 150-accented-character title comes back as exactly 100 runes and valid UTF-8.
+
+GUI: found and fixed a gap the CR had not recorded — the language picker was nested inside the {ttsEnabled && ...} block, so a Creator with narration off could not choose a language at all. It now sits outside, relabelled 'Ngôn ngữ nội dung' with a hint saying it drives subtitles and YouTube metadata while the interface stays Vietnamese.
+
+Found two more hardcoded-Vietnamese system prompts the CR had only partly anticipated, both in ScriptEditor: AI_PROMPT_TEMPLATE (retrofit an existing script) and GENERATION_SYSTEM_PROMPT (author a new one). These are the prompts the Creator copies into an external AI, so they are the ones that actually decide what language the narration gets written in. Both are now functions of contentLanguage. The instructions stay Vietnamese — the Creator reads Vietnamese — and only the narration they ask for switches, which is the whole point of keeping the two axes apart.
+
+While in that prompt, found two stale facts: it told the AI the render timeout was 300s (raised to 1800s by CR-003) and to target 2-4 minute videos, both nudging it to write shorter videos than the 5-10 minute monetization goal wants. Corrected to 1800s / 4 GiB and 5-10 minutes with 20-40 narration markers.
+
+Also split the starter script into scriptTemplates.ts with a Vietnamese and an English version, and threaded contentLanguage into ThumbnailUpload so its audience note matches (its English OUTPUT stays English deliberately — image models do better with English prompts).
+
+Verified: orchestrator go build/vet clean, all 5 packages' tests pass including 5 new LLM tests; web-gui tsc clean, 41/41 vitest (6 new), eslint's 1 error is the pre-existing one in BackgroundMusicPicker.tsx. Two of the new GUI tests assert the starter templates keep NARRATION markers and wait(AUTO) calls one-to-one, since CR-002 FR10.5 rejects a script where they drift.
+
+NOT yet verified end to end: the Docker daemon stopped partway through, so the live-stack check that an English project produces English metadata is still outstanding."
+**Impact Assessment**: CR-008 complete pending E2E verification. CR-004..CR-007 still outstanding.
+**User Confirmation**: Approved in advance ("implement tiếp các cr còn lại").
+**Artifacts Affected**: orchestrator (project.go, narration.go, ollama_client.go + new test, suggest_publish_metadata.go, 10 files renamed); web-gui (NarrationPanel, ScriptEditor, new scriptTemplates.ts, ThumbnailUpload, ResultPage, types, NewProjectPage, 2 test files).

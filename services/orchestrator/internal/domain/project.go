@@ -75,12 +75,23 @@ const (
 	SagaStepFailed     SagaStepStatus = "failed"
 )
 
-// VoiceLanguage restricts Project.VoiceLanguage to the two supported values.
-type VoiceLanguage string
+// ContentLanguage is the language a project's *content* is produced in
+// (CR-008 FR21.1). It drives the TTS voice, the narration-pacing estimate,
+// the subtitles, and the language the SEO metadata and thumbnail prompt are
+// generated in — everything the audience sees or hears.
+//
+// It is deliberately NOT the Creator's interface language. Someone Vietnamese
+// running an English channel wants a Vietnamese UI producing English content,
+// so the two are separate axes and only this one lives on the Project.
+//
+// The JSON field and database column are still named `voice_language`: renaming
+// them would break every project created before CR-008 for no functional gain
+// (CR-008 §C2). The name is historical, the meaning is now broader.
+type ContentLanguage string
 
 const (
-	LanguageVietnamese VoiceLanguage = "vi"
-	LanguageEnglish    VoiceLanguage = "en"
+	LanguageVietnamese ContentLanguage = "vi"
+	LanguageEnglish    ContentLanguage = "en"
 )
 
 // Visibility restricts youtube visibility to the three values accepted by
@@ -124,7 +135,7 @@ type Project struct {
 	ManimSceneClassName string // the Manim `Scene` subclass Rendering must execute — set from script_parsed (Manim-script input mode)
 	PluginID            string
 	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
-	VoiceLanguage       VoiceLanguage
+	ContentLanguage     ContentLanguage
 	BackgroundMusicPath *string // optional static input, set at Saga start, reused unchanged at assemble_video (Rule 3)
 
 	// CR-001 — narration and subtitles are independently switchable per project.

@@ -17,7 +17,7 @@ func TestStartRenderSagaUseCase_Execute(t *testing.T) {
 		ProjectID:           "proj-1",
 		ScriptContent:       "some script",
 		PluginID:            "plugin-a",
-		VoiceLanguage:       domain.LanguageVietnamese,
+		ContentLanguage:     domain.LanguageVietnamese,
 		BackgroundMusicPath: &musicPath,
 	})
 	if err != nil {
@@ -67,10 +67,10 @@ func TestStartRenderSagaUseCase_PublishFailure(t *testing.T) {
 	uc := NewStartRenderSagaUseCase(repo, pub)
 
 	_, err := uc.Execute(context.Background(), StartRenderSagaInput{
-		ProjectID:     "proj-err",
-		ScriptContent: "x",
-		PluginID:      "p",
-		VoiceLanguage: domain.LanguageEnglish,
+		ProjectID:       "proj-err",
+		ScriptContent:   "x",
+		PluginID:        "p",
+		ContentLanguage: domain.LanguageEnglish,
 	})
 	if err == nil {
 		t.Fatal("expected error when publish fails")

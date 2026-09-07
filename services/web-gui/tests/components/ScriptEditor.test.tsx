@@ -9,7 +9,7 @@ describe("ScriptEditor", () => {
 
   it("calls onChange when typing", () => {
     const onChange = vi.fn();
-    render(<ScriptEditor value="" onChange={onChange} />);
+    render(<ScriptEditor value="" onChange={onChange} contentLanguage="vi" />);
     fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
       target: { value: "# Scene 1" },
     });
@@ -20,7 +20,7 @@ describe("ScriptEditor", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
 
-    render(<ScriptEditor value="" onChange={vi.fn()} />);
+    render(<ScriptEditor value="" onChange={vi.fn()} contentLanguage="vi" />);
 
     expect(screen.queryByTestId("script-editor-ai-prompt-panel")).not.toBeInTheDocument();
 

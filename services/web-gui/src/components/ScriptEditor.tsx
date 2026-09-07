@@ -1,4 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
+import { SCRIPT_TEMPLATES } from "./scriptTemplates";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { validateScript } from "../utils/scriptValidation";
@@ -6,6 +7,8 @@ import { validateScript } from "../utils/scriptValidation";
 interface ScriptEditorProps {
   value: string;
   onChange: (value: string) => void;
+  /** Picks which starter script "Dùng script mẫu" inserts (CR-008 FR21.4). */
+  contentLanguage: "vi" | "en";
 }
 
 function UploadIcon() {
@@ -70,7 +73,28 @@ function CopyIcon() {
   );
 }
 
-const AI_PROMPT_TEMPLATE = `Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.
+/**
+ * How each prompt tells the AI which language to write the narration in
+ * (CR-008 FR21.3).
+ *
+ * The instructions themselves stay Vietnamese: they are read by the Creator,
+ * whose interface language is Vietnamese. Only the *narration the AI produces*
+ * follows the project's content language — that is the whole point of keeping
+ * the two axes separate. Before this, an English channel got a prompt that
+ * silently produced Vietnamese narration, because the prompt was Vietnamese
+ * throughout and never said otherwise.
+ */
+const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
+  vi: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG VIỆT.",
+  en: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
+};
+
+const NARRATION_PLACEHOLDER: Record<"vi" | "en", string> = {
+  vi: "Nội dung lời thoại tiếng Việt cho đoạn này",
+  en: "The English narration line for this beat",
+};
+
+const buildAiPromptTemplate = (language: "vi" | "en") => `Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.
 Hãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,
 theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:
 
@@ -80,7 +104,7 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 
 2. Trước MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), thêm một
    dòng comment ngay phía trên đúng định dạng:
-       # NARRATION: "Nội dung lời thoại tiếng Việt cho đoạn này"
+       # NARRATION: "${NARRATION_PLACEHOLDER[language]}"
    (chỉ dùng dấu ngoặc kép thẳng ", không xuống dòng, không chứa dấu ngoặc
    kép bên trong).
 
@@ -106,10 +130,12 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 
 6. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.
 
+7. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
+
 Script gốc:
 <dán script Manim của bạn vào đây>`;
 
-const GENERATION_SYSTEM_PROMPT = `Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục kiêm đạo diễn hoạt hình, chuyên viết video giải thích ngắn (2-4 phút) bằng Manim (Community Edition v0.18). Bạn không chỉ viết code — bạn TỰ NGHĨ RA kịch bản, cách ví von, thứ tự trình bày và hình ảnh minh họa sao cho người xem hiểu nhanh nhất, giống như một video trên kênh YouTube giáo dục chất lượng cao (kiểu 3Blue1Brown/ đơn giản dễ hiểu).
+const buildGenerationSystemPrompt = (language: "vi" | "en") => `Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục kiêm đạo diễn hoạt hình, chuyên viết video giải thích bằng Manim (Community Edition v0.18). Bạn không chỉ viết code — bạn TỰ NGHĨ RA kịch bản, cách ví von, thứ tự trình bày và hình ảnh minh họa sao cho người xem hiểu nhanh nhất, giống như một video trên kênh YouTube giáo dục chất lượng cao (kiểu 3Blue1Brown/ đơn giản dễ hiểu).
 
 ======================================================
 CHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]
@@ -123,6 +149,11 @@ Với chủ đề trên, hãy TỰ MÌNH:
 2. Nghĩ ra hình ảnh/hoạt cảnh trực quan phù hợp với TỪNG ý (không cần người dùng mô tả animation nào — bạn tự sáng tạo): dùng Text, MathTex, Table, VGroup, mũi tên, đổi màu, Transform, so sánh song song hai bên trái/phải, timeline, icon minh họa, v.v.
 3. Viết lời thoại (narration) tự nhiên, ngắn gọn, như đang giảng cho người mới học — không viết lại nguyên văn định nghĩa sách vở.
 4. Tự chia video thành các "cảnh nhỏ" (mỗi cảnh = một ý), đảm bảo nhịp độ hợp lý, không dồn quá nhiều chữ vào một khung hình.
+5. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
+
+## ĐỘ DÀI MỤC TIÊU
+
+Video dài 5-10 phút (khoảng 20-40 marker NARRATION). Đây là độ dài phù hợp để bật kiếm tiền trên YouTube — đủ dài để chèn quảng cáo giữa video, đủ sâu để giữ chân người xem. Đừng viết quá ngắn.
 
 Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ thể, màu sắc, bố cục, thứ tự trình bày. Chỉ cần đúng chủ đề và đúng ràng buộc kỹ thuật bên dưới.
 
@@ -153,7 +184,7 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 ## RÀNG BUỘC KỸ THUẬT
 
 - Chỉ dùng API có sẵn của \`manim\` v0.18.x (Text, MathTex, Tex, Table, Code, VGroup, các animation Create/Write/FadeIn/FadeOut/Transform/Indicate...). Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.
-- Script chạy trong subprocess giới hạn tài nguyên, timeout 300s — tránh vòng lặp/animation quá nặng.
+- Script chạy trong subprocess giới hạn tài nguyên (timeout 1800s, RAM 4 GiB) — tránh vòng lặp/animation quá nặng, nhưng không cần cắt ngắn nội dung vì lo timeout.
 - Output cuối là video .mp4 khi render bằng: manim -qm <file> <TênScene>.
 - Nền tối mặc định của Manim, chọn màu chữ/hình có độ tương phản tốt, bố cục nằm gọn trong khung an toàn 16:9, không để chữ/hình tràn hoặc chồng lấp.
 
@@ -169,118 +200,17 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 
 Chỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\\`\\\`\\\`python ... \\\`\\\`\\\`), không giải thích thêm ở ngoài code.`;
 
-const SCRIPT_TEMPLATE = `"""
-Video minh họa vòng lặp \`for\` trong Java bằng Manim (Community Edition).
-"""
-
-from manim import *
-
-# Bảng màu dùng chung, gợi cảm giác theme editor tối
-BG_DARK = "#1e1e2e"
-CODE_BLUE = "#89b4fa"
-CODE_GREEN = "#a6e3a1"
-CODE_YELLOW = "#f9e2af"
-CODE_RED = "#f38ba8"
-CODE_TEXT = "#cdd6f4"
-CONSOLE_BG = "#11111b"
-
-
-class ForLoopIntroScene(Scene):
-    def construct(self):
-        self.camera.background_color = BG_DARK
-
-        # ---------- Tiêu đề ----------
-        title = Text("Vòng lặp for trong Java", font_size=44, color=CODE_TEXT, weight=BOLD)
-        subtitle = Text(
-            "Khởi tạo • Điều kiện • Bước tăng/giảm",
-            font_size=26, color=CODE_YELLOW
-        ).next_to(title, DOWN, buff=0.3)
-
-        self.play(Write(title))
-        self.play(FadeIn(subtitle, shift=UP * 0.2))
-        # NARRATION: "Giới thiệu vòng lặp for trong Java. Vòng lặp for gồm ba phần: khởi tạo biến đếm, điều kiện lặp, và bước tăng giảm."
-        self.wait(AUTO)
-        self.play(FadeOut(title), FadeOut(subtitle))
-
-        # ---------- Hiển thị đoạn code ----------
-        code_str = (
-            "for (int i = 0; i < 5; i++) {\\n"
-            "    System.out.println(i);\\n"
-            "}"
-        )
-        code = Code(
-            code=code_str,
-            language="java",
-            style="monokai",
-            background="rectangle",
-            background_stroke_color=CODE_BLUE,
-            corner_radius=0.15,
-        ).scale(0.9)
-        code.to_edge(UP, buff=1.0)
-
-        self.play(FadeIn(code, shift=UP * 0.3))
-        # NARRATION: "Đây là cú pháp vòng lặp for: khởi tạo, điều kiện, và bước nhảy được viết gọn trên cùng một dòng."
-        self.wait(AUTO)
-
-        # ---------- Chú thích 3 phần của for ----------
-        labels = VGroup(
-            Text("① Khởi tạo: int i = 0", font_size=24, color=CODE_GREEN),
-            Text("② Điều kiện: i < 5", font_size=24, color=CODE_BLUE),
-            Text("③ Bước nhảy: i++", font_size=24, color=CODE_RED),
-        ).arrange(DOWN, aligned_edge=LEFT, buff=0.25)
-        labels.next_to(code, DOWN, buff=0.6)
-
-        for line in labels:
-            self.play(FadeIn(line, shift=RIGHT * 0.3), run_time=0.5)
-        # NARRATION: "Ba phần của vòng lặp for là khởi tạo, điều kiện, và bước nhảy."
-        self.wait(AUTO)
-        self.play(FadeOut(labels))
-
-        # ---------- Hoạt hình biến i chạy 0 -> 4 + in ra console ----------
-        i_label = Text("i =", font_size=32, color=CODE_TEXT)
-        i_value = Integer(0, font_size=36, color=CODE_YELLOW)
-        i_group = VGroup(i_label, i_value).arrange(RIGHT, buff=0.2)
-        i_group.next_to(code, DOWN, buff=0.8).shift(LEFT * 3)
-
-        console_box = RoundedRectangle(
-            width=4.5, height=3.2, corner_radius=0.15,
-            color=GRAY, fill_color=CONSOLE_BG, fill_opacity=1
-        ).next_to(code, DOWN, buff=0.8).shift(RIGHT * 3)
-        console_title = Text("Console", font_size=20, color=GRAY).next_to(
-            console_box, UP, buff=0.15
-        ).align_to(console_box, LEFT)
-
-        self.play(FadeIn(i_group), Create(console_box), FadeIn(console_title))
-
-        printed_lines = VGroup()
-        for value in range(5):
-            self.play(i_value.animate.set_value(value), run_time=0.4)
-            self.play(Indicate(code.code[1], color=CODE_YELLOW, scale_factor=1.05), run_time=0.4)
-
-            line = Text(str(value), font_size=28, color=CODE_GREEN)
-            printed_lines.add(line)
-            printed_lines.arrange(DOWN, aligned_edge=LEFT, buff=0.15)
-            printed_lines.move_to(console_box.get_top() + DOWN * 0.5, aligned_edge=UP).align_to(
-                console_box, LEFT
-            ).shift(RIGHT * 0.3)
-
-            self.play(FadeIn(line, shift=UP * 0.15), run_time=0.4)
-
-        # NARRATION: "Biến i chạy từ 0 đến 4, mỗi vòng lặp in ra một giá trị ra console."
-        self.wait(AUTO)
-        end_text = Text(
-            "i = 5 → điều kiện sai → vòng lặp dừng",
-            font_size=26, color=CODE_RED
-        ).to_edge(DOWN, buff=0.5)
-        self.play(FadeIn(end_text))
-        # NARRATION: "Khi i bằng 5, điều kiện sai, vòng lặp dừng lại."
-        self.wait(AUTO)
-        self.play(*[FadeOut(m) for m in self.mobjects])
-`;
 
 type PromptPanel = "system" | "adjust" | null;
 
-export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
+export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorProps) {
+  // Rebuilt when the Creator switches content language, so the prompt they copy
+  // always asks for narration in the language the video is actually for.
+  const aiPromptTemplate = useMemo(() => buildAiPromptTemplate(contentLanguage), [contentLanguage]);
+  const generationSystemPrompt = useMemo(
+    () => buildGenerationSystemPrompt(contentLanguage),
+    [contentLanguage],
+  );
   const [activePanel, setActivePanel] = useState<PromptPanel>(null);
   const [copied, setCopied] = useState(false);
   const [systemPromptCopied, setSystemPromptCopied] = useState(false);
@@ -302,7 +232,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
 
   async function handleCopyPrompt() {
     try {
-      await navigator.clipboard.writeText(AI_PROMPT_TEMPLATE);
+      await navigator.clipboard.writeText(aiPromptTemplate);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
@@ -312,7 +242,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
 
   async function handleCopySystemPrompt() {
     try {
-      await navigator.clipboard.writeText(GENERATION_SYSTEM_PROMPT);
+      await navigator.clipboard.writeText(generationSystemPrompt);
       setSystemPromptCopied(true);
       setTimeout(() => setSystemPromptCopied(false), 2000);
     } catch {
@@ -349,7 +279,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
                 <SparkleIcon />
                 Prompt điều chỉnh script
               </button>
-              <button type="button" className={styles.toolsDropdownItem} onClick={() => onChange(SCRIPT_TEMPLATE)}>
+              <button type="button" className={styles.toolsDropdownItem} onClick={() => onChange(SCRIPT_TEMPLATES[contentLanguage])}>
                 <TemplateIcon />
                 Dùng script mẫu
               </button>
@@ -375,7 +305,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
           <textarea
             className={`${glass.textArea} ${styles.promptTextarea}`}
             data-testid="script-editor-system-prompt-textarea"
-            value={GENERATION_SYSTEM_PROMPT}
+            value={generationSystemPrompt}
             readOnly
             rows={10}
           />
@@ -394,7 +324,7 @@ export function ScriptEditor({ value, onChange }: ScriptEditorProps) {
           <textarea
             className={`${glass.textArea} ${styles.promptTextarea}`}
             data-testid="script-editor-ai-prompt-textarea"
-            value={AI_PROMPT_TEMPLATE}
+            value={aiPromptTemplate}
             readOnly
             rows={10}
           />

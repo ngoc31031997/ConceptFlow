@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ApiError,
   getProjectThumbnailUrl,
@@ -11,6 +11,12 @@ import styles from "./ThumbnailUpload.module.css";
 interface ThumbnailUploadProps {
   projectId: string;
   onThumbnailPathChange: (thumbnailPath: string | null) => void;
+  /**
+   * The project's content language (CR-008 FR21.5). It steers the *topic*
+   * wording the prompt is built around; the image prompt itself stays English
+   * either way — see THUMBNAIL_SYSTEM_PROMPT's OUTPUT section for why.
+   */
+  contentLanguage: "vi" | "en";
 }
 
 type UploadState = "idle" | "uploading" | "success" | "error";
@@ -33,7 +39,7 @@ function CopyIcon() {
   );
 }
 
-const THUMBNAIL_SYSTEM_PROMPT = `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
+const buildThumbnailSystemPrompt = (language: "vi" | "en") => `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
 
 ======================================================
 CHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]
@@ -55,9 +61,25 @@ Với chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbn
 
 ## OUTPUT
 
-Chỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: "16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text".`;
+Chỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: "16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text".
 
-export function ThumbnailUpload({ projectId, onThumbnailPathChange }: ThumbnailUploadProps) {
+## KHÁN GIẢ
+
+${
+  language === "en"
+    ? "Video này hướng tới khán giả NÓI TIẾNG ANH. Nếu mô tả có yếu tố văn hoá/bối cảnh, chọn yếu tố trung tính hoặc phương Tây, đừng dùng yếu tố đặc thù Việt Nam."
+    : "Video này hướng tới khán giả NÓI TIẾNG VIỆT. Có thể dùng yếu tố văn hoá/bối cảnh gần gũi với người Việt nếu phù hợp chủ đề."
+}`;
+
+export function ThumbnailUpload({
+  projectId,
+  onThumbnailPathChange,
+  contentLanguage,
+}: ThumbnailUploadProps) {
+  const thumbnailSystemPrompt = useMemo(
+    () => buildThumbnailSystemPrompt(contentLanguage),
+    [contentLanguage],
+  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -103,7 +125,7 @@ export function ThumbnailUpload({ projectId, onThumbnailPathChange }: ThumbnailU
 
   async function handleCopyPrompt() {
     try {
-      await navigator.clipboard.writeText(THUMBNAIL_SYSTEM_PROMPT);
+      await navigator.clipboard.writeText(thumbnailSystemPrompt);
       setPromptCopied(true);
       setTimeout(() => setPromptCopied(false), 2000);
     } catch {
@@ -138,7 +160,7 @@ export function ThumbnailUpload({ projectId, onThumbnailPathChange }: ThumbnailU
           <textarea
             className={`${glass.textArea} ${styles.promptTextarea}`}
             data-testid="thumbnail-system-prompt-textarea"
-            value={THUMBNAIL_SYSTEM_PROMPT}
+            value={thumbnailSystemPrompt}
             readOnly
             rows={10}
           />
