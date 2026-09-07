@@ -27,9 +27,37 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.assemble_video import AssembleVideoUseCase
 from domain.errors import AssemblyEngineError, MissingArtifactError
-from domain.models import SubtitleCue, SubtitleStyle, VideoAssemblyRequest
+from domain.models import NarrationSegment, SubtitleCue, SubtitleStyle, VideoAssemblyRequest
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_narration_segments(payload: dict) -> list[NarrationSegment]:
+    """Reads CR-002's `narration_segments`, falling back to the pre-CR-002
+    `audio_segments` shape.
+
+    The fallback exists for commands already sitting in the queue when this
+    ships. It reproduces the old, wrong end-to-end placement, so it is logged:
+    such a project needs re-rendering to get correct timing, and silently
+    producing a desynchronised video is exactly what CR-002 set out to stop.
+    """
+    raw = payload.get("narration_segments")
+    if raw is not None:
+        return [
+            NarrationSegment(
+                audio_path=item["audio_path"], start_time=float(item["start_time"])
+            )
+            for item in raw
+        ]
+
+    legacy = payload.get("audio_segments") or []
+    if legacy:
+        logger.warning(
+            "assemble_video command carries the pre-CR-002 audio_segments shape; "
+            "narration will be laid end to end and WILL drift out of sync with "
+            "the animation — re-render this project to fix it"
+        )
+    return [NarrationSegment(audio_path=path, start_time=0.0) for path in legacy]
 
 
 def _parse_subtitle_cues(raw: list[dict] | None) -> list[SubtitleCue] | None:
@@ -95,7 +123,8 @@ class AssembleVideoCommandHandler:
         request = VideoAssemblyRequest(
             project_id=project_id,
             video_path=payload["video_path"],
-            audio_segments=payload["audio_segments"],
+            narration_segments=_parse_narration_segments(payload),
+            video_duration_seconds=float(payload.get("video_duration_seconds") or 0.0),
             background_music_path=payload.get("background_music_path"),
             subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
             subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),

@@ -47,14 +47,18 @@ class AssembleVideoUseCase:
         if not file_exists(request.video_path):
             raise MissingArtifactError(f"missing video {request.video_path}")
 
-        # An empty audio_segments list is valid since CR-001: the Creator can
-        # disable narration, producing a silent video (or one with background
-        # music only).
-        for audio_path in request.audio_segments:
-            if not audio_path:
-                raise MissingArtifactError("empty audio_path in audio_segments")
-            if not file_exists(audio_path):
-                raise MissingArtifactError(f"missing audio {audio_path}")
+        # An empty narration_segments list is valid since CR-001: the Creator
+        # can disable narration, producing a silent video (or one with
+        # background music only).
+        for segment in request.narration_segments:
+            if not segment.audio_path:
+                raise MissingArtifactError("empty audio_path in narration_segments")
+            if not file_exists(segment.audio_path):
+                raise MissingArtifactError(f"missing audio {segment.audio_path}")
+            if segment.start_time < 0:
+                raise MissingArtifactError(
+                    f"negative start_time {segment.start_time} for {segment.audio_path}"
+                )
 
         if request.background_music_path and not file_exists(request.background_music_path):
             raise MissingArtifactError(f"missing background music {request.background_music_path}")

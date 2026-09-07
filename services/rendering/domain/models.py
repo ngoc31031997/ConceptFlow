@@ -9,7 +9,7 @@ animation's pacing stays in lockstep with the voiceover.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -42,4 +42,15 @@ class ScriptRenderRequest:
 
 @dataclass(frozen=True)
 class ScriptRenderResult:
+    """Where the silent video landed, plus the timing Video Assembly needs to
+    line narration up with it (CR-002 FR3.5).
+
+    wait_offsets[i] is the second, measured from the start of the video, at
+    which the i-th `self.wait(AUTO)` begins — i.e. where narration segment i
+    must start playing. It is NOT the running sum of narration durations: the
+    animation between narrations pushes every later segment further out.
+    """
+
     video_path: str
+    wait_offsets: list[float] = field(default_factory=list)
+    video_duration_seconds: float = 0.0

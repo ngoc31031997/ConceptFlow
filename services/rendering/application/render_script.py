@@ -7,7 +7,14 @@ per project, so there is nothing left to batch over.
 
 from __future__ import annotations
 
-from adapters.storage.artifact_paths import compute_video_path, ensure_parent_dir, video_exists
+from adapters.storage.artifact_paths import (
+    compute_timing_path,
+    compute_video_path,
+    ensure_parent_dir,
+    read_timing,
+    video_exists,
+    write_timing,
+)
 from domain.errors import InvalidDurationError
 from domain.models import ScriptRenderRequest, ScriptRenderResult
 from domain.ports import ManimScriptRendererPort
@@ -24,15 +31,26 @@ class RenderScriptUseCase:
         self._validate(request)
 
         video_path = compute_video_path(request.project_id)
+        timing_path = compute_timing_path(request.project_id)
 
         if video_exists(video_path):
             # Idempotency: reuse the artifact from a prior call instead of
-            # re-rendering.
-            return ScriptRenderResult(video_path=video_path)
+            # re-rendering — but only when its timing sidecar is there too.
+            # Reporting a video without offsets would desynchronise the whole
+            # downstream assembly (CR-002), so a video whose timing is missing
+            # (e.g. rendered before CR-002 shipped) is re-rendered instead.
+            timing = read_timing(timing_path)
+            if timing is not None:
+                return ScriptRenderResult(
+                    video_path=video_path,
+                    wait_offsets=timing["wait_offsets"],
+                    video_duration_seconds=timing.get("video_duration_seconds", 0.0),
+                )
 
         ensure_parent_dir(video_path)
-        self._renderer.render(request, video_path)
-        return ScriptRenderResult(video_path=video_path)
+        result = self._renderer.render(request, video_path)
+        write_timing(timing_path, result.wait_offsets, result.video_duration_seconds)
+        return result
 
     @staticmethod
     def _validate(request: ScriptRenderRequest) -> None:

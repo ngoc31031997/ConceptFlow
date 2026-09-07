@@ -48,6 +48,29 @@ def test_patch_auto_waits_substitutes_in_order():
     assert "AUTO" not in patched
 
 
+def test_patch_auto_waits_marks_each_wait_with_its_index():
+    """CR-002: each wait is wrapped so the render reports where it begins."""
+    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
+
+    assert "(_cf_mark(self, 0), self.wait(2.5))" in patched
+    assert "(_cf_mark(self, 1), self.wait(3.0))" in patched
+
+
+def test_patch_auto_waits_puts_preamble_after_the_manim_import():
+    """A `from manim import *` after the helper would shadow it."""
+    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
+    lines = patched.splitlines()
+
+    import_line = next(i for i, ln in enumerate(lines) if ln.startswith("from manim import"))
+    helper_line = next(i for i, ln in enumerate(lines) if "def _cf_mark" in ln)
+
+    assert helper_line > import_line
+
+
+def test_patch_auto_waits_output_is_valid_python():
+    compile(ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0]), "<patched>", "exec")
+
+
 def test_patch_auto_waits_raises_on_count_mismatch():
     with pytest.raises(AnimationEngineError, match="self.wait\\(AUTO\\)"):
         ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5])
@@ -58,21 +81,32 @@ def test_render_invokes_manim_and_moves_output(tmp_path, monkeypatch):
     output_path = str(tmp_path / "out.mp4")
 
     def fake_run(cmd, **kwargs):
-        media_dir = kwargs["cwd"]
+        import json
         import os
 
+        # ffprobe, standing in for the duration probe.
+        if cmd[0] == "ffprobe":
+            return subprocess.CompletedProcess(cmd, 0, stdout="21.5\n", stderr="")
+
+        media_dir = kwargs["cwd"]
         nested = os.path.join(media_dir, "videos")
         os.makedirs(nested, exist_ok=True)
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub-mp4-bytes")
+        # Stand in for what the patched script's _cf_mark would have written.
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
+            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"index": 1, "t": 7.25}) + "\n")
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.run", fake_run)
 
-    renderer.render(make_request(), output_path)
+    result = renderer.render(make_request(), output_path)
 
     with open(output_path, "rb") as f:
         assert f.read() == b"stub-mp4-bytes"
+    assert result.wait_offsets == [0.0, 7.25]
+    assert result.video_duration_seconds == 21.5
 
 
 def test_render_raises_on_nonzero_exit(tmp_path, monkeypatch):
@@ -156,3 +190,36 @@ def test_defaults_are_sized_for_long_form_video():
     demo-sized values (300s / 2 GiB) that could not render a 10-minute video."""
     assert DEFAULT_RENDER_TIMEOUT_SECONDS == 1800
     assert DEFAULT_RENDER_MEMORY_LIMIT_GB == 4
+
+
+def test_read_wait_offsets_returns_marks_in_scene_order(tmp_path):
+    marks = tmp_path / "cf_marks.jsonl"
+    # Written in whatever order the render happened to flush them.
+    marks.write_text('{"index": 1, "t": 9.5}\n{"index": 0, "t": 0.0}\n')
+
+    assert ManimScriptRenderer._read_wait_offsets(str(marks), expected=2) == [0.0, 9.5]
+
+
+def test_read_wait_offsets_rejects_a_missing_mark(tmp_path):
+    """A wait inside a loop or an `if` fires a different number of times than
+    there are narration segments. Returning a partial list would put every
+    later narration on the wrong offset — the exact bug CR-002 removes — so
+    this has to fail loudly."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text('{"index": 0, "t": 0.0}\n')
+
+    with pytest.raises(AnimationEngineError, match="exactly once"):
+        ManimScriptRenderer._read_wait_offsets(str(marks), expected=2)
+
+
+def test_read_wait_offsets_rejects_a_duplicated_mark(tmp_path):
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text('{"index": 0, "t": 0.0}\n{"index": 0, "t": 4.0}\n')
+
+    with pytest.raises(AnimationEngineError):
+        ManimScriptRenderer._read_wait_offsets(str(marks), expected=2)
+
+
+def test_read_wait_offsets_raises_when_file_absent(tmp_path):
+    with pytest.raises(AnimationEngineError, match="no timing marks"):
+        ManimScriptRenderer._read_wait_offsets(str(tmp_path / "nope.jsonl"), expected=1)

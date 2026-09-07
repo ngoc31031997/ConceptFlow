@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from domain.models import ScriptRenderRequest
+from domain.models import ScriptRenderRequest, ScriptRenderResult
 
 
 class ManimScriptRendererPort(ABC):
@@ -17,13 +17,18 @@ class ManimScriptRendererPort(ABC):
     (ManimScriptRenderer) lives under adapters/rendering/."""
 
     @abstractmethod
-    def render(self, request: ScriptRenderRequest, output_path: str) -> None:
+    def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:
         """Renders request.scene_class_name from request.script_content
         (after substituting `self.wait(AUTO)` calls with the ordered
         narration_segments' durations) to output_path.
 
+        Returns the result carrying output_path plus wait_offsets — where each
+        narration segment actually begins in the finished video (CR-002
+        FR10.1) — and the video's real duration.
+
         Raises:
             domain.errors.AnimationEngineError: if the engine fails, times
-                out, or the script's `self.wait(AUTO)` count doesn't match
-                the number of narration_segments.
+                out, the script's `self.wait(AUTO)` count doesn't match the
+                number of narration_segments, or the recorded timing marks
+                don't line up one-to-one with them.
         """

@@ -14,13 +14,19 @@ class FakeRenderer(ManimScriptRendererPort):
     def __init__(self) -> None:
         self.calls: list[tuple[ScriptRenderRequest, str]] = []
 
-    def render(self, request: ScriptRenderRequest, output_path: str) -> None:
+    def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:
         self.calls.append((request, output_path))
         import os
 
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             f.write(b"stub")
+        offsets = [float(i) * 5.0 for i in range(len(request.narration_segments))]
+        return ScriptRenderResult(
+            video_path=output_path,
+            wait_offsets=offsets,
+            video_duration_seconds=offsets[-1] + 10.0 if offsets else 0.0,
+        )
 
 
 def make_request(project_id: str = "proj-1") -> ScriptRenderRequest:
@@ -46,6 +52,8 @@ def test_render_delegates_and_returns_video_path():
 
     assert isinstance(result, ScriptRenderResult)
     assert result.video_path.endswith("rendered.mp4")
+    assert result.wait_offsets == [0.0]
+    assert result.video_duration_seconds == 10.0
     assert len(renderer.calls) == 1
 
 
@@ -53,10 +61,31 @@ def test_render_is_idempotent_when_video_already_exists():
     renderer = FakeRenderer()
     use_case = RenderScriptUseCase(renderer)
 
-    use_case.render(make_request())
-    use_case.render(make_request())
+    first = use_case.render(make_request())
+    second = use_case.render(make_request())
 
     assert len(renderer.calls) == 1
+    # CR-002: the fast path must reproduce the timing too, not just the path —
+    # an offset-less "completed" event would desynchronise assembly.
+    assert second.wait_offsets == first.wait_offsets
+    assert second.video_duration_seconds == first.video_duration_seconds
+
+
+def test_render_redoes_work_when_timing_sidecar_is_missing(shared_volume_root):
+    """A video rendered before CR-002 has no timing.json. Reusing it would
+    emit an event with no offsets, so the use case must re-render instead."""
+    import os
+
+    renderer = FakeRenderer()
+    use_case = RenderScriptUseCase(renderer)
+
+    use_case.render(make_request())
+    os.remove(os.path.join(str(shared_volume_root), "proj-1", "video", "timing.json"))
+
+    result = use_case.render(make_request())
+
+    assert len(renderer.calls) == 2
+    assert result.wait_offsets == [0.0]
 
 
 def test_render_rejects_empty_project_id():

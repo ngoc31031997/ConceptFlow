@@ -190,12 +190,12 @@ func TestHandleStepEventUseCase_SceneRenderedProgressOnly(t *testing.T) {
 	}
 }
 
-// TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithVideoAndAudioSegments
+// TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNarrationSegments
 // guards the Manim-script input mode's assemble_video contract: rendering
 // produces one video_path for the whole script (not per-scene clips), and
-// Video Assembly needs the ordered narration audio_segments from step 3
-// (Rule 2) to build the narration track it muxes onto that video.
-func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithVideoAndAudioSegments(t *testing.T) {
+// Video Assembly needs the narration audio from step 3 (Rule 2), each paired
+// with the offset Rendering measured for it (CR-002).
+func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNarrationSegments(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1",
@@ -209,7 +209,11 @@ func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithVi
 
 	err := uc.Execute(context.Background(), StepEvent{
 		SagaID: "saga-1", ProjectID: "proj-1", EventType: "rendering_completed",
-		Payload: map[string]interface{}{"video_path": "rendered.mp4"},
+		Payload: map[string]interface{}{
+			"video_path":             "rendered.mp4",
+			"wait_offsets":           []interface{}{0.0, 8.5},
+			"video_duration_seconds": 15.0,
+		},
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -222,12 +226,15 @@ func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithVi
 	if last.envelope.Payload["video_path"] != "rendered.mp4" {
 		t.Fatalf("expected video_path from rendering_completed, got %v", last.envelope.Payload["video_path"])
 	}
-	audioSegments, ok := last.envelope.Payload["audio_segments"].([]string)
-	if !ok || len(audioSegments) != 2 {
-		t.Fatalf("expected 2 audio_segments in assemble_video payload, got %v", last.envelope.Payload["audio_segments"])
+	segments, ok := last.envelope.Payload["narration_segments"].([]map[string]interface{})
+	if !ok || len(segments) != 2 {
+		t.Fatalf("expected 2 narration_segments in assemble_video payload, got %v", last.envelope.Payload["narration_segments"])
 	}
-	if audioSegments[0] != "from-step3-0.wav" || audioSegments[1] != "from-step3-1.wav" {
-		t.Fatalf("expected audio_segments sourced from step 3 in scene_index order, got %v", audioSegments)
+	if segments[0]["audio_path"] != "from-step3-0.wav" || segments[1]["audio_path"] != "from-step3-1.wav" {
+		t.Fatalf("expected narration audio sourced from step 3 in scene_index order, got %v", segments)
+	}
+	if segments[0]["start_time"].(float64) != 0 || segments[1]["start_time"].(float64) != 8.5 {
+		t.Fatalf("expected the measured offsets to be forwarded, got %v", segments)
 	}
 
 	project, _ := repo.Get(context.Background(), "proj-1")
@@ -293,8 +300,8 @@ func TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstima
 }
 
 // TestAssembleVideoPayload_SubtitlesAndSilentVideo covers the assemble_video
-// contract for a subtitled, narration-free project: no audio segments to mux,
-// and one cue per scene laid end to end.
+// contract for a subtitled, narration-free project: no narration segments to
+// mux, and one cue per scene placed at the offset Rendering measured.
 func TestAssembleVideoPayload_SubtitlesAndSilentVideo(t *testing.T) {
 	rendered := "/shared/proj-1/video.mp4"
 	project := &domain.Project{
@@ -304,12 +311,16 @@ func TestAssembleVideoPayload_SubtitlesAndSilentVideo(t *testing.T) {
 			{SceneIndex: 1, NarrationText: "second", DurationSeconds: 3},
 			{SceneIndex: 0, NarrationText: "first", DurationSeconds: 2},
 		},
+		// 9s of animation runs between the two narrations, so the second cue
+		// starts at 11s, not at 2s.
+		WaitOffsets:          []float64{0, 11},
+		RenderedVideoSeconds: 20,
 	}
 
 	payload := assembleVideoPayload(project)
 
-	if segments := payload["audio_segments"].([]string); len(segments) != 0 {
-		t.Fatalf("expected no audio segments for a silent video, got %v", segments)
+	if segments := payload["narration_segments"].([]map[string]interface{}); len(segments) != 0 {
+		t.Fatalf("expected no narration segments for a silent video, got %v", segments)
 	}
 	if _, ok := payload["subtitle_style"]; !ok {
 		t.Fatal("expected subtitle_style to fall back to the default style")
@@ -322,7 +333,86 @@ func TestAssembleVideoPayload_SubtitlesAndSilentVideo(t *testing.T) {
 	if cues[0]["text"] != "first" || cues[0]["start_time"].(float64) != 0 || cues[0]["end_time"].(float64) != 2 {
 		t.Fatalf("unexpected first cue: %+v", cues[0])
 	}
-	if cues[1]["start_time"].(float64) != 2 || cues[1]["end_time"].(float64) != 5 {
-		t.Fatalf("expected second cue to follow the first, got %+v", cues[1])
+	if cues[1]["start_time"].(float64) != 11 || cues[1]["end_time"].(float64) != 14 {
+		t.Fatalf("expected second cue at its measured offset, got %+v", cues[1])
+	}
+}
+
+// TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets is the CR-002
+// regression on the Orchestrator side: each narration segment must go out with
+// the offset Rendering measured, never the running total of durations that the
+// old audio_segments payload implied.
+func TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets(t *testing.T) {
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", RenderedVideoPath: &rendered,
+		TTSEnabled: true,
+		Scenes: []domain.Scene{
+			{SceneIndex: 0, NarrationText: "first", DurationSeconds: 2, AudioPath: "/shared/a0.wav"},
+			{SceneIndex: 1, NarrationText: "second", DurationSeconds: 3, AudioPath: "/shared/a1.wav"},
+			{SceneIndex: 2, NarrationText: "third", DurationSeconds: 4, AudioPath: "/shared/a2.wav"},
+		},
+		WaitOffsets:          []float64{0, 11.5, 30.25},
+		RenderedVideoSeconds: 48,
+	}
+
+	payload := assembleVideoPayload(project)
+
+	segments := payload["narration_segments"].([]map[string]interface{})
+	if len(segments) != 3 {
+		t.Fatalf("expected 3 narration segments, got %d", len(segments))
+	}
+	wantStarts := []float64{0, 11.5, 30.25}
+	for i, seg := range segments {
+		if got := seg["start_time"].(float64); got != wantStarts[i] {
+			// Summing durations would have produced 0, 2, 5 here.
+			t.Fatalf("segment %d: expected start_time %v, got %v", i, wantStarts[i], got)
+		}
+	}
+	if payload["video_duration_seconds"].(float64) != 48 {
+		t.Fatalf("expected the rendered duration to be forwarded, got %v", payload["video_duration_seconds"])
+	}
+	if _, ok := payload["audio_segments"]; ok {
+		t.Fatal("the pre-CR-002 audio_segments key must not be sent anymore")
+	}
+}
+
+// TestOnRenderingCompleted_RejectsMismatchedOffsetCount covers CR-002 FR10.5:
+// a wait_offsets list that does not line up with the scenes must fail the saga
+// rather than silently assembling a video whose audio drifts.
+func TestOnRenderingCompleted_RejectsMismatchedOffsetCount(t *testing.T) {
+	uc, repo, publisher, _ := newTestUseCase()
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", SagaID: "saga-1", RenderedVideoPath: &rendered,
+		Scenes: []domain.Scene{
+			{SceneIndex: 0, NarrationText: "first", DurationSeconds: 2},
+			{SceneIndex: 1, NarrationText: "second", DurationSeconds: 3},
+		},
+	}
+	_ = repo.Save(context.Background(), project)
+	_ = repo.UpdateStep(context.Background(), &domain.SagaStep{
+		SagaID: "saga-1", StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress,
+	})
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "rendering_completed",
+		Payload: map[string]interface{}{
+			"video_path":   rendered,
+			"wait_offsets": []interface{}{0.0}, // only one, but there are two scenes
+		},
+	})
+	if err != nil {
+		t.Fatalf("expected the mismatch to be handled, not returned: %v", err)
+	}
+
+	step, _ := repo.GetStep(context.Background(), "saga-1", domain.StepRenderScenes)
+	if step.Status != domain.SagaStepFailed {
+		t.Fatalf("expected render_scenes to be marked failed, got %s", step.Status)
+	}
+	for _, cmd := range publisher.published {
+		if cmd.envelope.EventType == string(domain.StepAssembleVideo) {
+			t.Fatal("assemble_video must not be dispatched with mismatched offsets")
+		}
 	}
 }

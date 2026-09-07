@@ -53,8 +53,8 @@
 | CR | Tên | Ưu tiên | Stage | Trạng thái |
 |---|---|---|---|---|
 | CR-001 | Tuỳ chọn TTS/phụ đề, chọn giọng | — | Delivered | Đã hoàn thành |
-| CR-002 | Đồng bộ narration/phụ đề theo timeline thật | P0 blocker | Requirements Analysis | **TRONG PHẠM VI đợt này (Pha 1)** |
-| CR-003 | Năng lực render video dài 5–10 phút | P0 blocker | Requirements Analysis | **TRONG PHẠM VI đợt này (Pha 1)** |
+| CR-002 | Đồng bộ narration/phụ đề theo timeline thật | P0 blocker | **Code Generation ✅** | **HOÀN THÀNH** — verify E2E 0.003s |
+| CR-003 | Năng lực render video dài 5–10 phút | P0 blocker | Code Generation | 1A ✅ xong, 1C còn lại |
 | CR-004 | 1080p60 + profile encode chuẩn YouTube | P1 | Requirements Analysis | Backlog (Pha 2) |
 | CR-005 | Giọng đọc chất lượng cao, ducking, loudnorm | P1 | Requirements Analysis | Backlog — engine đã chốt: Google Cloud TTS |
 | CR-006 | Chapters, thumbnail, hook, metadata SEO | P2 | Requirements Analysis | Backlog (Pha 3) |
@@ -64,7 +64,7 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status
 - **Lifecycle Phase**: POST-CONSTRUCTION (10/10 unit đã build; CR-001 đã giao)
-- **Current Stage**: CR-002/CR-003 — Pha 0 (benchmark) ✅ và bước 1A (nới giới hạn tài nguyên) ✅ đã xong; tiếp theo là 1B (đồng bộ timeline, CR-002)
+- **Current Stage**: Pha 0 ✅, 1A (giới hạn tài nguyên) ✅, 1B (đồng bộ timeline CR-002) ✅ — đã verify E2E, lệch 0.003s (trước: 61.64s). Còn lại 1C (progress + cache).
 - **Scope đã chốt**: chỉ Pha 1 (CR-002 + CR-003) trong đợt này; CR-004…007 là backlog đã phân tích
-- **Next Stage**: Low-Level Design cho CR-002 → bước 1B → bước 1C
+- **Next Stage**: Bước 1C (progress định kỳ khi render, bật Manim cache, dọn artifact tạm)
 - **Status**: Đang triển khai Pha 1

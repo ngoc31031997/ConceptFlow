@@ -328,7 +328,41 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 // audio_paths from step 3.
 func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
 	videoPath := stringFromPayload(event.Payload, "video_path")
+
+	// CR-002 FR10.5: the offsets must line up one-to-one with the scenes, in
+	// order. A short or mismatched list would silently put every later
+	// narration on the wrong offset, which is precisely the desynchronisation
+	// this CR removes — so fail the saga loudly instead of assembling a video
+	// whose audio drifts away from its animation.
+	waitOffsets := floatSliceFromPayload(event.Payload, "wait_offsets")
+	if len(waitOffsets) != len(project.Scenes) {
+		errMsg := fmt.Sprintf(
+			"rendering_completed carried %d wait_offsets but the project has %d scenes — "+
+				"each `self.wait(AUTO)` must run exactly once, so it cannot sit inside a loop or a conditional",
+			len(waitOffsets), len(project.Scenes),
+		)
+		if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{
+			SagaID: event.SagaID, StepName: domain.StepRenderScenes, Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
+		}); err != nil {
+			return err
+		}
+		if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusFailedRenderScenes); err != nil {
+			return err
+		}
+		if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
+			ProjectID:    event.ProjectID,
+			Step:         string(domain.StepRenderScenes),
+			Status:       "failed",
+			ErrorMessage: &errMsg,
+		}); err != nil {
+			return err
+		}
+		return errAggregationFailed
+	}
+
 	project.RenderedVideoPath = &videoPath
+	project.WaitOffsets = waitOffsets
+	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -379,31 +413,45 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 }
 
 // assembleVideoPayload builds the assemble_video command payload: the single
-// rendered video_path (from rendering_completed) plus the narration
-// audio_segments in scene_index order (stored from step 3, Rule 2), plus
-// the static background_music_path (Rule 3). Video Assembly concatenates
-// audio_segments into one narration track and muxes it onto video_path —
-// there are no more per-scene clips to stitch (Manim-script input mode).
-// When narration is disabled (CR-001) audio_segments comes back empty and the
-// video is assembled silent (or with background music only); subtitle_cues are
-// sent whenever the Creator enabled subtitles, timed by the same per-scene
-// durations that paced the animation.
+// rendered video_path (from rendering_completed) plus the narration segments,
+// each carrying the offset in that video where it belongs (CR-002), plus the
+// static background_music_path (Rule 3).
+//
+// The offsets come from Rendering, not from adding up durations here. A Manim
+// video is animation time plus narration time, so narration i starts after all
+// the animation before it too — the old audio_segments payload, which Video
+// Assembly laid end to end, drifted by the accumulated animation time (61.6s
+// by the end of a 3.6-minute reference video).
+//
+// When narration is disabled (CR-001) narration_segments comes back empty and
+// the video is assembled silent (or with background music only); subtitle_cues
+// are sent whenever the Creator enabled subtitles, timed by the same offsets.
 func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 	scenes := sortedScenes(project.Scenes)
+	offsets := project.WaitOffsets
 
-	audioSegments := make([]string, 0, len(scenes))
-	for _, s := range scenes {
-		if s.AudioPath != "" {
-			audioSegments = append(audioSegments, s.AudioPath)
+	narrationSegments := make([]map[string]interface{}, 0, len(scenes))
+	for i, s := range scenes {
+		if s.AudioPath == "" {
+			continue
 		}
+		startTime := 0.0
+		if i < len(offsets) {
+			startTime = offsets[i]
+		}
+		narrationSegments = append(narrationSegments, map[string]interface{}{
+			"audio_path": s.AudioPath,
+			"start_time": startTime,
+		})
 	}
 	var videoPath string
 	if project.RenderedVideoPath != nil {
 		videoPath = *project.RenderedVideoPath
 	}
 	payload := map[string]interface{}{
-		"video_path":     videoPath,
-		"audio_segments": audioSegments,
+		"video_path":             videoPath,
+		"narration_segments":     narrationSegments,
+		"video_duration_seconds": project.RenderedVideoSeconds,
 	}
 	if project.BackgroundMusicPath != nil {
 		payload["background_music_path"] = *project.BackgroundMusicPath
@@ -414,24 +462,31 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 			style = *project.SubtitleStyle
 		}
 		payload["subtitle_style"] = style
-		payload["subtitle_cues"] = subtitleCues(scenes)
+		payload["subtitle_cues"] = subtitleCues(scenes, offsets)
 	}
 	return payload
 }
 
-// subtitleCues lays the narration lines end to end, each shown for its own
-// duration — real audio length when TTS ran, estimated reading time otherwise.
-func subtitleCues(scenes []domain.Scene) []map[string]interface{} {
+// subtitleCues shows each narration line from the offset Rendering measured
+// for it, for its own duration — real audio length when TTS ran, estimated
+// reading time otherwise.
+//
+// The offsets are essential here for the same reason as the audio: cueing
+// subtitles off a running total of durations would drift them away from the
+// picture exactly as far as the narration used to drift.
+func subtitleCues(scenes []domain.Scene, offsets []float64) []map[string]interface{} {
 	cues := make([]map[string]interface{}, 0, len(scenes))
-	elapsed := 0.0
-	for _, s := range scenes {
+	for i, s := range scenes {
+		start := 0.0
+		if i < len(offsets) {
+			start = offsets[i]
+		}
 		cues = append(cues, map[string]interface{}{
 			"scene_index": s.SceneIndex,
 			"text":        s.NarrationText,
-			"start_time":  elapsed,
-			"end_time":    elapsed + s.DurationSeconds,
+			"start_time":  start,
+			"end_time":    start + s.DurationSeconds,
 		})
-		elapsed += s.DurationSeconds
 	}
 	return cues
 }

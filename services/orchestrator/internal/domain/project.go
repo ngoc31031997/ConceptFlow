@@ -140,6 +140,15 @@ type Project struct {
 	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
 	VideoPath         *string
 
+	// CR-002 — where each narration segment actually begins in RenderedVideoPath,
+	// measured by Rendering. WaitOffsets[i] belongs to Scenes[i] in scene_index
+	// order. It is NOT the running sum of Scene.DurationSeconds: the animation
+	// between narrations pushes every later segment further out, and assuming
+	// otherwise desynchronised audio, subtitles and video by the accumulated
+	// animation time.
+	WaitOffsets          []float64
+	RenderedVideoSeconds float64 // Rendering's measured length of RenderedVideoPath
+
 	YoutubeTitle         *string
 	YoutubeDescription   *string
 	YoutubeTags          []string

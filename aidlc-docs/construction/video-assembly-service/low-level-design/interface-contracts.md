@@ -72,3 +72,49 @@ class VideoAssemblerPort(ABC):
 - `InconsistentMediaFormatError` (**Revision, Functional Design Question 3**: ffprobe pre-check phát hiện codec/resolution/framerate không đồng nhất giữa các animation clip) → `assembly_failed` với `error_message` liệt kê scene lệch chuẩn.
 - `AssemblyEngineError` (ffmpeg exit code khác 0, hoặc timeout) → `assembly_failed` với `error_message` chứa stderr ffmpeg rút gọn (dòng cuối cùng, đủ để chẩn đoán).
 - Toàn bộ lỗi coi là transient — Orchestrator retry theo compensating action đã duyệt ở `services.md`: "giữ animation/audio clip, retry chỉ bước Assembly" (input không bị xoá dù `assemble_video` lỗi).
+
+---
+
+## Revision 2026-09-07 — CR-002: timeline offsets thay cho ghép nối liền
+
+**Vấn đề**: timeline của video Manim là `Σ(self.play) + Σ(self.wait)`. Hợp đồng cũ chỉ chuyển danh sách audio path, và Video Assembly nối chúng liền nhau — tức ngầm giả định video **chỉ gồm narration**. Không phải vậy: mỗi đoạn narration từ đoạn thứ 2 trở đi bị phát sớm đúng bằng thời gian animation đã chạy trước nó, và sai số **cộng dồn**. Đo được **61.6s lệch** ở cuối một video 3.6 phút (xem `aidlc-docs/construction/build-and-test/long-form-baseline.md`).
+
+### `rendering_completed` (Unit 5 → Orchestrator) — payload mở rộng
+```json
+{
+  "payload": {
+    "event_type": "rendering_completed",
+    "video_path": "/shared/{project_id}/video/rendered.mp4",
+    "wait_offsets": [0.0, 9.57, 20.47],
+    "video_duration_seconds": 214.9
+  }
+}
+```
+- `wait_offsets[i]` = giây (tính từ đầu video) mà `self.wait(AUTO)` thứ i **bắt đầu** — tức nơi narration thứ i phải phát. **Không phải** tổng dồn thời lượng narration.
+- Đo bằng cách thay `self.wait(AUTO)` → `(_cf_mark(self, i), self.wait(D))` + preamble ghi `scene.renderer.time` vào `cf_marks.jsonl`. Vẫn là thay thế văn bản thuần — Rendering không bao giờ tự execute script của Creator ngoài subprocess đã cô lập.
+- `video_duration_seconds` lấy từ `ffprobe` trên file thật, không tính bằng số học (Manim làm tròn theo frame nên số học lệch nhẹ).
+- Sidecar `/shared/{project_id}/video/timing.json` lưu cùng dữ liệu này, để đường đi idempotent (video đã tồn tại) vẫn báo cáo được offset. Video thiếu sidecar sẽ được **render lại**, không tái sử dụng.
+
+### `assemble_video` (Orchestrator → Unit 6) — payload đổi
+```json
+{
+  "payload": {
+    "video_path": "/shared/{project_id}/video/rendered.mp4",
+    "narration_segments": [
+      { "audio_path": "/shared/{project_id}/audio/0.wav", "start_time": 0.0 },
+      { "audio_path": "/shared/{project_id}/audio/1.wav", "start_time": 9.57 }
+    ],
+    "video_duration_seconds": 214.9,
+    "background_music_path": "... | null",
+    "subtitle_cues": [ { "scene_index": 0, "text": "...", "start_time": 0.0, "end_time": 2.5 } ],
+    "subtitle_style": { }
+  }
+}
+```
+- **`audio_segments` (mảng string) đã bị thay bằng `narration_segments`**. Consumer của Unit 6 vẫn đọc được shape cũ để xử lý command còn tồn trong queue lúc deploy, nhưng ghi log cảnh báo — project đó cần render lại.
+- `subtitle_cues[i].start_time` cũng lấy từ `wait_offsets[i]`, vì cùng lý do.
+- Unit 6 dựng filtergraph `adelay=<ms>:all=1` cho từng đoạn rồi `amix=inputs=N:normalize=0` (bắt buộc `normalize=0`, nếu không amix chia volume cho N).
+- `-shortest` được thay bằng `-t <target>` với `target = max(video_duration, kết thúc narration cuối)`, kèm `tpad=stop_mode=clone` để giữ frame cuối — không bao giờ cắt cụt câu kết (FR10.6).
+
+### Ràng buộc bắt buộc (FR10.5)
+Số phần tử `wait_offsets` PHẢI bằng số scene. Orchestrator validate và **fail saga** khi lệch, thay vì dựng video lệch tiếng. Nguyên nhân thường gặp: `self.wait(AUTO)` nằm trong vòng lặp hoặc `if` nên chạy số lần khác với số marker `# NARRATION:`.

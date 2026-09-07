@@ -84,7 +84,13 @@ class RenderScriptCommandHandler:
             final_envelope = rendering_failed_envelope(saga_id, project_id, str(exc))
         else:
             event_type = "rendering_completed"
-            final_envelope = rendering_completed_envelope(saga_id, project_id, result.video_path)
+            final_envelope = rendering_completed_envelope(
+                saga_id,
+                project_id,
+                result.video_path,
+                result.wait_offsets,
+                result.video_duration_seconds,
+            )
 
         async with self._pool.acquire() as conn, conn.transaction():
             await self._outbox.enqueue(

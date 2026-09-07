@@ -27,9 +27,28 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def rendering_completed_envelope(saga_id: str, project_id: str, video_path: str) -> dict:
+def rendering_completed_envelope(
+    saga_id: str,
+    project_id: str,
+    video_path: str,
+    wait_offsets: list[float],
+    video_duration_seconds: float,
+) -> dict:
+    """wait_offsets / video_duration_seconds added by CR-002 (FR10.2).
+
+    wait_offsets[i] is where narration segment i actually starts in the
+    rendered video. The Orchestrator validates it against its own scene count
+    before passing it to Video Assembly.
+    """
     return build_envelope(
-        saga_id, project_id, {"event_type": "rendering_completed", "video_path": video_path}
+        saga_id,
+        project_id,
+        {
+            "event_type": "rendering_completed",
+            "video_path": video_path,
+            "wait_offsets": wait_offsets,
+            "video_duration_seconds": video_duration_seconds,
+        },
     )
 
 

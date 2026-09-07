@@ -115,6 +115,43 @@ func stringFromPayload(payload map[string]interface{}, key string) string {
 	return stringFromMap(payload, key)
 }
 
+// floatFromPayload reads a JSON number; absent or malformed yields 0.
+func floatFromPayload(payload map[string]interface{}, key string) float64 {
+	switch v := payload[key].(type) {
+	case float64:
+		return v
+	case int:
+		return float64(v)
+	default:
+		return 0
+	}
+}
+
+// floatSliceFromPayload reads a JSON array of numbers. A nil result is
+// indistinguishable from an empty array here on purpose: the caller checks the
+// length against its own scene count either way.
+func floatSliceFromPayload(payload map[string]interface{}, key string) []float64 {
+	raw, ok := payload[key].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]float64, 0, len(raw))
+	for _, item := range raw {
+		switch v := item.(type) {
+		case float64:
+			out = append(out, v)
+		case int:
+			out = append(out, float64(v))
+		default:
+			// A non-numeric entry means the payload is not what we think it is;
+			// returning a short slice makes the caller's length check fail,
+			// which is the outcome we want.
+			return out
+		}
+	}
+	return out
+}
+
 func intFromPayload(payload map[string]interface{}, key string) *int {
 	if _, ok := payload[key]; !ok {
 		return nil

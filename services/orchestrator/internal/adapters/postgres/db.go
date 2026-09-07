@@ -53,6 +53,13 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS tts_enabled BOOLEAN NOT NULL DEFAU
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS voice_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitles_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
+-- CR-002: where each narration segment actually begins in the rendered video,
+-- as measured by Rendering. Projects rendered before this column existed have
+-- NULL here; assemble_video then falls back to offset 0 for every segment,
+-- which reproduces the old (desynchronised) behaviour, so such a project needs
+-- re-rendering rather than re-assembling.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS wait_offsets JSONB;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

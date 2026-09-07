@@ -19,14 +19,22 @@ class FakeManimScriptRenderer(ManimScriptRendererPort):
     def __init__(self, should_fail: bool = False) -> None:
         self._should_fail = should_fail
 
-    def render(self, request, output_path: str) -> None:
+    def render(self, request, output_path: str):
         if self._should_fail:
             raise AnimationEngineError("engine crashed")
         import os
 
+        from domain.models import ScriptRenderResult
+
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "wb") as f:
             f.write(b"stub-mp4-bytes")
+        offsets = [float(i) * 5.0 for i in range(len(request.narration_segments))]
+        return ScriptRenderResult(
+            video_path=output_path,
+            wait_offsets=offsets,
+            video_duration_seconds=(offsets[-1] + 10.0) if offsets else 0.0,
+        )
 
 
 class FakeMessage:
@@ -85,6 +93,9 @@ async def test_success_enqueues_rendering_completed_with_video_path(shared_volum
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "rendering_completed"
     assert event["payload"]["payload"]["video_path"].endswith("rendered.mp4")
+    # CR-002 FR10.2: the event must carry where each narration actually starts.
+    assert event["payload"]["payload"]["wait_offsets"] == [0.0]
+    assert event["payload"]["payload"]["video_duration_seconds"] == 10.0
 
 
 @pytest.mark.asyncio
