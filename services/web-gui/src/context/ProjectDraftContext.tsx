@@ -8,6 +8,7 @@ export interface SubtitleStyle {
 }
 
 export interface ProjectDraft {
+  projectId: string;
   scriptContent: string;
   voiceLanguage: "vi" | "en";
   backgroundMusicPath: string | null;
@@ -35,6 +36,7 @@ export const defaultSubtitleStyle: SubtitleStyle = {
 };
 
 const initialDraft: ProjectDraft = {
+  projectId: "",
   scriptContent: "",
   voiceLanguage: "vi",
   backgroundMusicPath: null,
@@ -61,7 +63,7 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
     case "SET_SUBTITLE_STYLE":
       return { ...state, subtitleStyle: { ...state.subtitleStyle, ...action.payload } };
     case "RESET":
-      return initialDraft;
+      return { ...initialDraft, projectId: crypto.randomUUID() };
   }
 }
 
@@ -69,7 +71,11 @@ export const ProjectDraftContext = createContext<ProjectDraft>(initialDraft);
 export const ProjectDraftDispatchContext = createContext<Dispatch<ProjectDraftAction>>(() => {});
 
 export function ProjectDraftProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(projectDraftReducer, initialDraft);
+  const [state, dispatch] = useReducer(
+    projectDraftReducer,
+    initialDraft,
+    (draft) => ({ ...draft, projectId: crypto.randomUUID() }),
+  );
   return (
     <ProjectDraftContext.Provider value={state}>
       <ProjectDraftDispatchContext.Provider value={dispatch}>

@@ -10,8 +10,10 @@ const {
   thumbnailServeHandler,
   thumbnailInfoHandler,
 } = require('../handlers/thumbnailUploadHandler');
+const { musicUploadHandler, musicServeHandler, musicInfoHandler } = require('../handlers/musicUploadHandler');
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 * 1024 * 1024 } });
+const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 /**
  * `GET /v1/projects`, `GET /v1/projects/:id` and `POST /v1/projects/:id/retry` → Orchestrator Service.
@@ -22,6 +24,11 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 *
  * `POST /v1/projects/:id/thumbnail` (multipart, field "thumbnail", max 2MB,
  * jpeg/png) saves a manually-uploaded thumbnail to the shared volume;
  * `GET /v1/projects/:id/thumbnail` serves it back for preview.
+ * `POST /v1/projects/:id/music` (multipart, field "music", max 20MB,
+ * mp3/wav/ogg/m4a) saves a manually-uploaded background-music file to the
+ * shared volume, keyed by a client-generated project id (uploaded before the
+ * render saga starts, same id later sent as `project_id`); `GET
+ * /v1/projects/:id/music` serves it back for preview.
  * `DELETE /v1/projects/:id` removes the project's DB rows (Orchestrator) and its files (shared volume).
  * @param {import('../clients/httpClient').HttpClient} orchestratorClient
  * @param {string} sharedDir
@@ -40,6 +47,9 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));
+  router.post('/v1/projects/:id/music', musicUpload.single('music'), musicUploadHandler(sharedDir));
+  router.get('/v1/projects/:id/music/info', musicInfoHandler(sharedDir));
+  router.get('/v1/projects/:id/music', musicServeHandler(sharedDir));
   router.delete('/v1/projects/:id', deleteProjectHandler(orchestratorClient, sharedDir));
   return router;
 }

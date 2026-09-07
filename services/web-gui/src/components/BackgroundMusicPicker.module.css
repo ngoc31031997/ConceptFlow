@@ -54,6 +54,46 @@
   left: 3px;
 }
 
-.input {
+.uploadArea {
   margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.uploadBtn {
+  padding: 9px 16px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+}
+
+.uploadBtn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.player {
+  width: 100%;
+  height: 36px;
+}
+
+.successBadge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #1a7f4b;
+}
+
+.errorBadge {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger);
 }

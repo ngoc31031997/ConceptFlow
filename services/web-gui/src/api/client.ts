@@ -44,6 +44,32 @@ export async function uploadThumbnail(projectId: string, file: File): Promise<Th
   });
 }
 
+export function getProjectMusicUrl(projectId: string): string {
+  return `${GATEWAY_URL}/v1/projects/${projectId}/music`;
+}
+
+export interface MusicInfo {
+  exists: boolean;
+  background_music_path: string | null;
+}
+
+export function getMusicInfo(projectId: string): Promise<MusicInfo> {
+  return apiFetch<MusicInfo>(`/v1/projects/${projectId}/music/info`);
+}
+
+export interface MusicUploadResult {
+  background_music_path: string;
+}
+
+export async function uploadMusic(projectId: string, file: File): Promise<MusicUploadResult> {
+  const formData = new FormData();
+  formData.append("music", file);
+  return apiFetch<MusicUploadResult>(`/v1/projects/${projectId}/music`, {
+    method: "POST",
+    body: formData,
+  });
+}
+
 async function parseErrorMessage(response: Response): Promise<string> {
   try {
     const body = await response.json();

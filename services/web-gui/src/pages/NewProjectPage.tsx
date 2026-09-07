@@ -26,7 +26,7 @@ export function NewProjectPage() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const projectId = crypto.randomUUID();
+      const projectId = draft.projectId;
       await startRenderSaga({
         project_id: projectId,
         script_content: draft.scriptContent,
@@ -88,6 +88,7 @@ export function NewProjectPage() {
             )}
 
             <BackgroundMusicPicker
+              projectId={draft.projectId}
               value={draft.backgroundMusicPath}
               onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
             />
