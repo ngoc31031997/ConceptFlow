@@ -1622,3 +1622,41 @@ Verification hit a red herring worth recording: Loki's /label/*/values and Promt
 **User Input**: "ok"
 **AI Response**: "User approved the Grafana/Loki/Promtail centralized logging addition. Committing."
 **Context**: New infra unit — Record Approval, committing
+
+---
+
+## Pipeline Review for Long-Form Monetizable Video → CR-002 … CR-007
+**Timestamp**: 2026-09-07T00:00:00Z
+**User Input**: "tôi cần bạn reivew và đánh giá toàn bộ quy trình sản xuất video nếu muốn đăng video dài khoảng 5-10p mục đích là đăng video youtube tiktok bật kiếm tiền thì cần phải tối ưu chỗ nào. làm sao để tăng chất lượng video." then "có đầu tiên tôi cần bạn note toàn bộ review thành các CR hoàn chỉnh và plan để thực hiện các CR này"
+**Current State**: Post-Construction. All 10 units built; CR-001 (TTS/subtitle options) delivered; several post-construction bug-fix passes done.
+**AI Response**: "Reviewed the full media-production path (script-processing → tts → rendering → video-assembly → publisher) against the goal of 5–10 minute videos for YouTube/TikTok monetization. Architecture (saga, hexagonal, inbox/outbox) needs no change; every problem found is in the media-producing adapter layer, where limits were sized for ~30-second demos.
+
+Findings recorded as 6 Change Requests under aidlc-docs/inception/requirements/:
+- CR-002 (P0, blocker) — narration/subtitle timeline desync. Rendering substitutes each self.wait(AUTO) with its narration duration, so narration i must play inside wait i; but ffmpeg_assembler concatenates audio back-to-back (concat=n=N) and orchestrator's subtitleCues() sums durations — neither accounts for self.play() time. Drift is cumulative and equals total animation time; invisible on 2-scene demos, fatal on 10-minute videos.
+- CR-003 (P0, blocker) — long-form render capacity. RENDER_TIMEOUT_SECONDS=300 vs 20–60min real renders; RLIMIT_AS=2GiB; RLIMIT_CPU wrongly set equal to wall-clock timeout (multithreaded Manim burns CPU-time faster, killed early); ASSEMBLY_TIMEOUT_SECONDS=180 vs 5–15min subtitle re-encode; --disable_caching always on; no checkpointing; no per-container resource limits. Also identified a latent bug never yet triggered: RabbitMQ's default consumer_timeout (30 min) is not overridden in infra/rabbitmq/rabbitmq.conf and would kill the consumer mid-render on long jobs.
+- CR-004 (P1) — output quality: hardcoded -qm (720p30), missing -pix_fmt yuv420p / -movflags +faststart / explicit aac settings / upload-grade crf; subtitles force a full re-encode; subtitle_file.py hardcodes 1920x1080 PlayRes.
+- CR-005 (P1) — audio: Piper voices (incl. vi_VN-vivos-x_low) are a monetization risk under YouTube's inauthentic-content policy; background music at a flat hardcoded 0.2 with no ducking; no loudnorm; -shortest can truncate the closing narration once CR-002 lands.
+- CR-006 (P2) — retention/SEO: no chapters (despite offsets being available for free), thumbnail is fully manual, no hook/end-screen templates, metadata model not configurable.
+- CR-007 (P1 for the stated multi-platform goal) — no 9:16 output and no TikTok publisher exist at all; proposed strategy is derivative vertical clips from the 16:9 master rather than separate vertical long-form.
+
+Also wrote aidlc-docs/construction/plans/cr-002-007-execution-plan.md: dependency graph (CR-002/003 gate everything else), Phase 0 benchmark to set the CR-003 numbers from real measurements instead of guesses, then phases 1A/1B/1C → 2A∥2B → 3A/3B, with per-CR AI-DLC stage requirements (CR-003 needs no LLD; CR-005 needs a new ADR if a cloud TTS engine is chosen) and a standing requirement to update each unit's interface-contracts.md, since 4 of the project's 5 serious bugs so far were contract drift between separately-approved units.
+
+Five decisions flagged as blocking and put to the Creator: TTS engine (cloud vs local-only), platform priority (Shorts <=60s vs TikTok Rewards >60s), whether to scope all 6 CRs now or just Phase 1, whether per-scene rendering (FR11.7) is in scope now, and where subtitles get burned in (FR12.4)."
+**Impact Assessment**: No architectural change. Affects Units 3 (TTS), 4 (Script Processing), 5 (Rendering), 6 (Video Assembly), 8 (Orchestrator), 9 (API Gateway), 10 (Web GUI), Unit 1 (RabbitMQ config) and docker-compose.yml. One new ADR likely (TTS engine). Orchestrator Postgres needs a manual ALTER TABLE on existing dev volumes (db.go is CREATE TABLE IF NOT EXISTS only).
+**User Confirmation**: PENDING — CRs and plan generated, awaiting approval before any implementation or commit.
+**Artifacts Affected**: created aidlc-docs/inception/requirements/cr-00{2,3,4,5,6,7}-*.md, aidlc-docs/construction/plans/cr-002-007-execution-plan.md; updated aidlc-docs/aidlc-state.md, aidlc-docs/audit.md.
+
+## CR-002 … CR-007: Creator Decisions Recorded (scope, TTS engine, clip presets)
+**Timestamp**: 2026-09-07T01:00:00Z
+**User Input**: Answered the three blocking questions — scope: "Chỉ Pha 1 (CR-002 + CR-003) trước"; TTS engine: "dùng gg cloud free"; platform: "cho tuỳ chọn 2 chế độ video dài và short."
+**AI Response**: "Folded all three decisions into the CR set and the execution plan:
+1. SCOPE — only Phase 1 (CR-002 + CR-003) is in scope this round; CR-004…CR-007 stay as fully-analyzed backlog. Recorded in the plan's new 'Phạm vi đã chốt' section and in aidlc-state.md's CR table.
+2. CR-005 TTS ENGINE — Google Cloud Text-to-Speech within its monthly free tier, Piper retained as fallback. C1 rewritten as decided; added C5-C10 covering the consequences that follow from choosing a metered cloud engine: free-tier limits differ per voice tier and must be verified against Google's pricing page at implementation time rather than hardcoded into the design; ~8,000 characters per 10-minute video as the sizing figure; two new requirements FR13.5 (monthly character counter + quota warning in the GUI, so cost cannot creep up silently) and FR13.6 (cache synthesis by hash of (text, voice_id, engine) so a re-render after editing a few lines does not re-synthesize the whole narration — this also serves CR-003 FR11.5); voice list to be fetched from voices.list rather than hardcoded, avoiding a repeat of CR-001 §C1; GOOGLE_APPLICATION_CREDENTIALS as a second, separate Google credential from Publisher's OAuth. Two open questions deferred to LLD: which voice tier, and whether exceeding quota blocks or silently falls back to Piper (recommended: block and ask).
+3. CR-007 PLATFORM — both presets rather than a priority: FR19.5 now defines `short` (<=60s, YouTube Shorts) and `long` (60-180s, TikTok Creator Rewards), plus FR19.6 (validate clip length against the chosen preset and fail loudly rather than silently truncating) and FR19.7 (export one segment to both presets in a single run). C2 rewritten as decided; added C2b noting both platforms' length thresholds are third-party rules that have changed before, so the limits must be config rather than hardcoded. Acceptance criteria updated to cover both presets.
+
+Also added a 'Bước tiếp theo ngay' section to the plan: run Phase 0 benchmark to derive the CR-003 timeout/RAM values from real measurements, then write CR-002's Low-Level Design starting with the 1B.1 spike that verifies scene.renderer.time on the pinned Manim version. CR-003 needs no LLD.
+
+No code changed in this pass — documentation only."
+**Impact Assessment**: Narrows this round's implementation to Units 5, 6, 8 (CR-002) and Units 1, 5, 6, 8, 10 + docker-compose (CR-003). ADR-0023 (cloud TTS engine) is now anticipated but not yet needed.
+**User Confirmation**: PENDING — awaiting approval of the CR set and plan before committing.
+**Artifacts Affected**: updated cr-005-audio-quality.md, cr-007-vertical-shorts-tiktok.md, cr-002-007-execution-plan.md, aidlc-state.md, audit.md.
