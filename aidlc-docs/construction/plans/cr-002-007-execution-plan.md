@@ -26,6 +26,12 @@ Kết quả đánh giá được ghi thành 6 Change Request:
 | [CR-005](../../inception/requirements/cr-005-audio-quality.md) | Giọng đọc chất lượng cao, ducking, loudnorm | P1 | Chờ duyệt — engine **đã chốt: Google Cloud TTS (free tier)** |
 | [CR-006](../../inception/requirements/cr-006-retention-and-seo.md) | Chapters, thumbnail, hook, metadata | P2 | Chờ duyệt |
 | [CR-007](../../inception/requirements/cr-007-vertical-shorts-tiktok.md) | Clip dọc 9:16 cho Shorts/TikTok | P1 | Chờ duyệt — **đã chốt: 2 preset (short ≤60s + long 60–180s)** |
+| [CR-008](../../inception/requirements/cr-008-content-language.md) | Ngôn ngữ nội dung áp dụng toàn pipeline | P1 | Chờ duyệt (thêm 2026-09-07) |
+
+### CR-008 (thêm sau, 2026-09-07)
+Creator muốn làm kênh tiếng Anh. Khảo sát cho thấy `voice_language` hiện chỉ điều khiển **2 thứ** (chọn model giọng + tốc độ đọc ước lượng); system prompt SEO hardcode "tiếng Việt" 3 lần và `Suggest()` thậm chí không nhận tham số ngôn ngữ. Nghĩa là chọn giọng tiếng Anh vẫn cho ra tiêu đề/mô tả/tags **tiếng Việt** — chặn hoàn toàn use case kênh tiếng Anh.
+
+**CR-008 độc lập với CR-004…007**, không phụ thuộc gì, và là CR **rẻ nhất** trong số còn lại. Nếu mục tiêu trước mắt là kênh tiếng Anh thì nên làm trước CR-004.
 
 ## Phụ thuộc giữa các CR
 
@@ -180,10 +186,25 @@ Theo tinh thần Adaptive Workflow và tiền lệ CR-001 (1 file LLD chung thay
 | 7 | CR-006 — cách gom chapter (marker `# CHAPTER:` vs LLM tự gom) | Low-Level Design của CR-006 |
 | 8 | CR-007 — có làm adapter TikTok API không? | Low-Level Design của CR-007 |
 
+## Pha 4 — CR-008: ngôn ngữ nội dung
+
+Không phụ thuộc CR nào; có thể chen vào bất kỳ lúc nào sau Pha 1.
+
+- [ ] 4.1 — `domain.Project.ContentLanguage` (nâng cấp từ `VoiceLanguage`) + cột Postgres, mặc định = giá trị cũ — FR21.1/C2.
+- [ ] 4.2 — `LLMSuggesterPort.Suggest` nhận thêm `language`; prompt SEO dựng động thay cho hardcode "tiếng Việt" ×3 — FR21.3. **Đây là thay đổi mở khoá toàn bộ use case kênh tiếng Anh.**
+- [ ] 4.3 — Sửa lỗi cắt tiêu đề theo byte → theo rune — FR18.3.
+- [ ] 4.4 — Bảng wpm theo ngôn ngữ thay cho 2 hằng số rời + nhánh `if` — FR21.6.
+- [ ] 4.5 — Script mẫu theo ngôn ngữ — FR21.4.
+- [ ] 4.6 — Prompt thumbnail dựng động (giữ nguyên việc **xuất prompt ảnh bằng tiếng Anh** — đó là chủ ý) — FR21.5.
+- [ ] 4.7 — GUI: chọn ngôn ngữ nội dung; giao diện **vẫn tiếng Việt** (2 trục độc lập).
+- [ ] 4.8 — **Verify**: project `content_language=en` cho ra tiêu đề/mô tả/tags tiếng Anh, giọng tiếng Anh, phụ đề tiếng Anh, trong khi giao diện vẫn tiếng Việt.
+
 ## Thứ tự thực hiện
 
-**Đợt này**: Pha 0 → 1A → 1B → 1C.
-**Sau đó, đánh giá lại rồi mới quyết**: 2A ∥ 2B → 3A → 3B.
+**Đợt này**: Pha 0 → 1A → 1B → 1C. ✅ **XONG**
+**Sau đó, đánh giá lại rồi mới quyết**: 2A ∥ 2B → 3A → 3B, và Pha 4 chen vào bất kỳ lúc nào.
+
+Nếu mục tiêu trước mắt là **kênh tiếng Anh**: làm **Pha 4 trước Pha 2**.
 
 Trong Pha 1, nếu chỉ làm được một việc: **1B (CR-002)** — không sửa nó thì mọi thứ khác vô nghĩa vì video dài luôn lệch tiếng.
 

@@ -1724,3 +1724,25 @@ Verified: rendering 42/42 pytest (ruff at 1 pre-existing error, down from 2), vi
 **Impact Assessment**: Phase 1 (CR-002 + CR-003) complete. CR-004..CR-007 remain analyzed backlog, unstarted.
 **User Confirmation**: Approved in advance ("cứ giữ nguyên như kế hoạch và implement tiếp").
 **Artifacts Affected**: rendering (manim_renderer, main, consumer, render_script, new adapters/messaging/progress.py + tests), web-gui (types, useSSE, ProgressTracker), docker-compose.yml, README.md, execution plan.
+
+## CR-008 — Content language across the pipeline
+**Timestamp**: 2026-09-07T05:00:00Z
+**User Input**: "system promt hiện tại còn dùng được không nhỉ. nếu muốn chỉnh lại system promt để tuỳ chỉnh nội dung, ngôn ngữ. thêm 1 CR liên quan đến ngôn ngữ vì ví dụ tôi muốn làm kenh tiếng anh hướng đến đói tuợng nước ngoài thì tôi chỉ cần chọn ngôn ngữ từ đầu thì tất cả system promt tiêu đeef nội dung v,v, liene quan sẽ render tiếng anh hết"
+**AI Response**: "Surveyed every place language is decided in the pipeline, then recorded CR-008.
+
+Answer to the question: the SEO system prompt is NOT usable for an English channel. ollama_client.go::Suggest hardcodes 'tiếng Việt' three times, and its signature is Suggest(ctx, scriptContent, categoryHint) — it takes no language parameter at all, even though SuggestPublishMetadataUseCase.Execute already holds the full project. So picking an English voice yields English narration and English subtitles but Vietnamese title, description and tags. That single missing parameter is what blocks the English-channel use case.
+
+Found the real scope of voice_language: it drives exactly two things — Piper voice selection and the wpm used by EstimateNarrationDuration. Nothing else.
+
+Found a latent bug while reading that file: `title = title[:maxTitleLength]` slices BYTES in Go, not runes. Vietnamese diacritics are 2-3 UTF-8 bytes, so a title over the limit gets cut mid-character and invalid UTF-8 goes to the YouTube API. It has not surfaced because titles rarely exceed 100 chars and pure-ASCII English is unaffected — but len() is also measuring the wrong quantity, since YouTube limits by characters. Recorded as FR18.3.
+
+Also catalogued: the thumbnail prompt's instructions are Vietnamese (though its English OUTPUT is deliberate and correct — image models do better with English prompts, as the file itself notes), SCRIPT_TEMPLATE is Vietnamese-only, and 17 GUI files carry hardcoded Vietnamese with no i18n layer.
+
+The key design call recorded in the CR is separating content_language (per project: voice, subtitles, metadata, prompts) from ui_language (per Creator: buttons, errors). A Vietnamese creator running an English channel needs ui_language=vi with content_language=en; conflating them would force a Vietnamese speaker into an English interface just to publish English content. CR-008 scopes to content_language only — GUI i18n is a much larger, separate job that does not block the goal.
+
+Noted in C1 that English is already the better-served language for voice quality: Piper offers en_US-ryan-high while the best Vietnamese voice is only medium (CR-001 §C1), so an English channel starts with less CR-005 monetization risk. And C5 records that the system must NOT machine-translate narration — mismatched language should warn, not translate, since machine-translated narration would lower quality and raise monetization risk.
+
+Added Phase 4 to the execution plan (8 steps). CR-008 depends on nothing and is the cheapest of the remaining CRs, so if the English channel is the near-term goal it should be done before Phase 2."
+**Impact Assessment**: Affects Orchestrator (domain, LLM adapter, prompt, rune fix, wpm table), Web GUI (language picker, template, thumbnail prompt), API Gateway (field forwarding). TTS needs no logic change.
+**User Confirmation**: PENDING — CR written, awaiting approval before implementation.
+**Artifacts Affected**: created cr-008-content-language.md; updated cr-002-007-execution-plan.md, aidlc-state.md, audit.md.
