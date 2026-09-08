@@ -47,6 +47,6 @@ Video hiện xuất ra ở **720p30** với profile encode mặc định của f
 3. Video không bật phụ đề: khâu assembly KHÔNG re-encode video stream (kiểm chứng bằng thời gian chạy + `ffprobe` bitrate không đổi).
 4. Upload thử lên YouTube ở chế độ private, YouTube nhận diện đúng 1080p60.
 
-## Câu hỏi còn mở
-1. Chốt FR12.4: burn phụ đề trong Manim, giữ ở ffmpeg, hay soft-sub?
-2. `crf 18` hay `crf 16`? Phụ thuộc dung lượng file Creator chấp nhận được.
+## Quyết định đã chốt khi implement (2026-09-08)
+1. **FR12.4 — giữ burn phụ đề ở ffmpeg.** Lý do: burn trong Manim đòi phải sửa script do Creator viết, phá vỡ ranh giới zero-trust mà Rendering đang giữ (script chạy trong subprocess cô lập, service không bao giờ can thiệp nội dung). Soft-sub thì mất kiểm soát style mà CR-001 FR9.4 đã hứa với Creator. Chi phí re-encode được bù bằng FR12.3: khi không có phụ đề thì stream-copy, nhanh hơn ~250 lần.
+2. **`crf 18`**, đo được chỉ chậm hơn `crf 23` 4% và tăng 28% dung lượng — đánh đổi tốt cho bản upload.

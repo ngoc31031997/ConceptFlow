@@ -27,14 +27,23 @@ class FakeCompletedProcess:
         self.stderr = stderr
 
 
-def fake_run_factory(audio_duration: str = "5.0"):
-    """subprocess.run stand-in that answers ffprobe with a duration and every
-    other call (i.e. ffmpeg) with success."""
+def fake_run_factory(audio_duration: str = "5.0", width=1920, height=1080, fps="60/1"):
+    """subprocess.run stand-in answering each ffprobe query and letting every
+    ffmpeg call succeed.
+
+    The queries are told apart by what they select, since the assembler asks
+    ffprobe for a duration, a resolution and a frame rate.
+    """
 
     def fake_run(cmd, *_args, **_kwargs):
-        if cmd and cmd[0] == "ffprobe":
-            return FakeCompletedProcess(stdout=f"{audio_duration}\n")
-        return FakeCompletedProcess()
+        if not cmd or cmd[0] != "ffprobe":
+            return FakeCompletedProcess()
+        entries = cmd[cmd.index("-show_entries") + 1]
+        if "width" in entries:
+            return FakeCompletedProcess(stdout=f"{width},{height}\n")
+        if "r_frame_rate" in entries:
+            return FakeCompletedProcess(stdout=f"{fps}\n")
+        return FakeCompletedProcess(stdout=f"{audio_duration}\n")
 
     return fake_run
 
@@ -287,3 +296,81 @@ def test_assemble_with_subtitles_burns_them_in_and_reencodes(tmp_path):
     assert "copy" not in args
     assert "libx264" in args
     assert (tmp_path / "proj-1.ass").exists()
+
+
+def test_encoded_output_uses_upload_grade_settings(tmp_path):
+    """CR-004 FR12.2. YouTube transcodes whatever it receives, so the source has
+    to carry spare quality into that second encode — and yuv420p/+faststart are
+    correctness, not polish: without them some players reject the file or must
+    download it whole before playing."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hi", start_time=0.0, end_time=2.0)],
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    for expected in ["libx264", "slow", "18", "yuv420p", "high", "+faststart", "aac", "192k", "48000"]:
+        assert expected in args, f"{expected} missing from {args}"
+    # Keyframe every 2s at the probed 60fps.
+    assert args[args.index("-g") + 1] == "120"
+
+
+def test_keyframe_interval_follows_the_videos_frame_rate(tmp_path):
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hi", start_time=0.0, end_time=2.0)],
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory(fps="30/1")) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    assert args[args.index("-g") + 1] == "60"
+
+
+def test_stream_copy_skips_the_encode_settings_entirely(tmp_path):
+    """FR12.3. Phase 0 measured -c:v copy at 0.1s against 24.8s for a
+    re-encode, so not re-encoding when nothing repaints the picture is the
+    single highest-value change here."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=60.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    assert "copy" in args
+    assert "libx264" not in args
+    assert "-g" not in args
+    # The container flag still applies — faststart is layout, not codec.
+    assert "+faststart" in args
+
+
+def test_silent_video_gets_no_audio_encode_args(tmp_path):
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1", video_path="video.mp4", narration_segments=[]
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    assert "-an" in args
+    assert "aac" not in args

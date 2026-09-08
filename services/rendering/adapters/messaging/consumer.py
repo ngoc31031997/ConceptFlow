@@ -77,6 +77,7 @@ class RenderScriptCommandHandler:
                 )
                 for s in payload["scenes"]
             ],
+            render_quality=payload.get("render_quality"),
         )
 
         try:

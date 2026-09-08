@@ -55,7 +55,7 @@
 | CR-001 | Tuỳ chọn TTS/phụ đề, chọn giọng | — | Delivered | Đã hoàn thành |
 | CR-002 | Đồng bộ narration/phụ đề theo timeline thật | P0 blocker | **Code Generation ✅** | **HOÀN THÀNH** — verify E2E 0.003s |
 | CR-003 | Năng lực render video dài 5–10 phút | P0 blocker | **Code Generation ✅** | **HOÀN THÀNH** (FR11.7 hoãn có lý do) |
-| CR-004 | 1080p60 + profile encode chuẩn YouTube | P1 | Requirements Analysis | Backlog (Pha 2) |
+| CR-004 | 1080p60 + profile encode chuẩn YouTube | P1 | **Code Generation ✅** | **HOÀN THÀNH** — chờ verify E2E |
 | CR-005 | Giọng đọc chất lượng cao, ducking, loudnorm | P1 | Requirements Analysis | Backlog — engine đã chốt: Google Cloud TTS |
 | CR-006 | Chapters, thumbnail, hook, metadata SEO | P2 | Requirements Analysis | Backlog (Pha 3) |
 | CR-007 | Clip dọc 9:16 cho Shorts/TikTok | P1 | Requirements Analysis | Backlog — đã chốt: 2 preset short + long |

@@ -28,6 +28,7 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth Client Secret tương ứng |
 | `RENDER_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần render Manim (mặc định 1800). Đo được: video 10 phút @1080p60 mất ~276s, nên đây là ~6.5× biên an toàn |
 | `RENDER_MEMORY_LIMIT_GB` | Trần address-space của tiến trình render (mặc định 4). KHÔNG đặt vượt RAM của Docker VM |
+| `RENDER_QUALITY` | Chất lượng render mặc định khi project không chỉ định: `720p30` \| `1080p60` \| `4k60` (mặc định `1080p60`). Creator chọn theo từng project trên GUI |
 | `RENDER_CACHE_ROOT` | Nơi giữ `media_dir` theo từng project để Manim tái dùng cache (mặc định `/shared/.manim-media`). Đặt rỗng để tắt cache. Đo được: render lại nhanh gấp ~5 lần |
 | `ASSEMBLY_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần ghép video bằng ffmpeg (mặc định 900) |
 | `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI đã đăng ký cho OAuth Client (vd. `http://localhost:8080/v1/auth/youtube/callback`) — phải khớp chính xác với giá trị cấu hình trên Google Cloud Console |

@@ -28,7 +28,8 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
-		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds
+		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
+		       render_quality
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -39,11 +40,13 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		youtubeVisibility     *string
 		subtitleStyleJSON     []byte
 		waitOffsetsJSON       []byte
+		renderQuality         string
 	)
 	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeVideoURL, &p.ErrorMessage,
-		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds)
+		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
+		&renderQuality)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -52,6 +55,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	}
 
 	p.Status = domain.ProjectStatus(status)
+	p.RenderQuality = domain.RenderQuality(renderQuality)
 	p.ContentLanguage = domain.ContentLanguage(voiceLanguage)
 	if youtubeVisibility != nil {
 		v := domain.Visibility(*youtubeVisibility)
@@ -171,8 +175,9 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
-		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26, now())
+		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
+		                       render_quality, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
@@ -188,13 +193,14 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    tts_enabled = EXCLUDED.tts_enabled, voice_id = EXCLUDED.voice_id,
 		    subtitles_enabled = EXCLUDED.subtitles_enabled, subtitle_style = EXCLUDED.subtitle_style,
 		    wait_offsets = EXCLUDED.wait_offsets, rendered_video_seconds = EXCLUDED.rendered_video_seconds,
+		    render_quality = EXCLUDED.render_quality,
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
 		project.CategoryHint, string(project.ContentLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility, project.YoutubePublishAt,
 		project.YoutubeThumbnailPath, project.YoutubeVideoURL, project.ErrorMessage,
 		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON,
-		waitOffsetsJSON, project.RenderedVideoSeconds)
+		waitOffsetsJSON, project.RenderedVideoSeconds, string(project.RenderQuality))
 	return err
 }
 

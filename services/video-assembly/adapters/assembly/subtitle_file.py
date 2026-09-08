@@ -12,10 +12,12 @@ import os
 
 from domain.models import SubtitleCue, SubtitleStyle
 
-# ASS renders at a fixed reference resolution and scales to the real frame, so
-# these font sizes stay proportional regardless of the rendered video size.
-PLAY_RES_X = 1920
-PLAY_RES_Y = 1080
+# ASS scales its layout from a declared reference resolution to the real frame.
+# Declaring the video's actual resolution keeps that mapping 1:1, so font sizes
+# and margins mean what they say (CR-004 FR12.5). These are the fallback when
+# the resolution cannot be read, and match the 1080p default.
+DEFAULT_PLAY_RES_X = 1920
+DEFAULT_PLAY_RES_Y = 1080
 
 FONT_SIZES = {"small": 42, "medium": 56, "large": 72}
 
@@ -25,14 +27,22 @@ ALIGNMENT = {"bottom": 2, "top": 8}
 MARGIN_VERTICAL = 60
 
 
-def write_subtitle_file(cues: list[SubtitleCue], style: SubtitleStyle, path: str) -> None:
+def write_subtitle_file(
+    cues: list[SubtitleCue],
+    style: SubtitleStyle,
+    path: str,
+    play_res: tuple[int, int] = (DEFAULT_PLAY_RES_X, DEFAULT_PLAY_RES_Y),
+) -> None:
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        f.write(_render(cues, style))
+        f.write(_render(cues, style, play_res))
 
 
-def _render(cues: list[SubtitleCue], style: SubtitleStyle) -> str:
-    font_size = FONT_SIZES.get(style.font_size, FONT_SIZES["medium"])
+def _render(cues: list[SubtitleCue], style: SubtitleStyle, play_res: tuple[int, int]) -> str:
+    # FONT_SIZES are expressed against a 1080-tall frame; scale them so a
+    # "large" subtitle is the same fraction of the picture at any resolution.
+    scale = play_res[1] / DEFAULT_PLAY_RES_Y
+    font_size = round(FONT_SIZES.get(style.font_size, FONT_SIZES["medium"]) * scale)
     alignment = ALIGNMENT.get(style.position, ALIGNMENT["bottom"])
     primary = _to_ass_colour(style.text_color, opacity=1.0)
     back = _to_ass_colour("#000000", opacity=style.background_opacity)
@@ -40,15 +50,16 @@ def _render(cues: list[SubtitleCue], style: SubtitleStyle) -> str:
     # transparent background colour it renders as plain text on the video.
     border_style = 3 if style.background_opacity > 0 else 1
 
+    play_res_x, play_res_y = play_res
     header = f"""[Script Info]
 ScriptType: v4.00+
-PlayResX: {PLAY_RES_X}
-PlayResY: {PLAY_RES_Y}
+PlayResX: {play_res_x}
+PlayResY: {play_res_y}
 WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,DejaVu Sans,{font_size},{primary},&H00000000,{back},0,{border_style},2,0,{alignment},80,80,{MARGIN_VERTICAL},1
+Style: Default,DejaVu Sans,{font_size},{primary},&H00000000,{back},0,{border_style},{round(2 * scale)},0,{alignment},{round(80 * scale)},{round(80 * scale)},{round(MARGIN_VERTICAL * scale)},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

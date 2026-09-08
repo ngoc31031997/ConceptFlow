@@ -7,6 +7,7 @@ export interface RenderInput {
   voice_id?: string;
   subtitles_enabled: boolean;
   subtitle_style?: SubtitleStylePayload;
+  render_quality?: "720p30" | "1080p60" | "4k60";
 }
 
 export interface SubtitleStylePayload {

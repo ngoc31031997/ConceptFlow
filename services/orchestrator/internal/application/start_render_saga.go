@@ -22,6 +22,9 @@ type StartRenderSagaInput struct {
 	VoiceID          string
 	SubtitlesEnabled bool
 	SubtitleStyle    *domain.SubtitleStyle
+
+	// CR-004 — empty means DefaultRenderQuality.
+	RenderQuality domain.RenderQuality
 }
 
 // StartRenderSagaOutput is returned to the HTTP layer for the 201 response.
@@ -51,6 +54,11 @@ func NewStartRenderSagaUseCase(repo domain.ProjectRepositoryPort, publisher doma
 func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRenderSagaInput) (*StartRenderSagaOutput, error) {
 	sagaID := newUUID()
 
+	quality := input.RenderQuality
+	if !quality.IsValid() {
+		quality = domain.DefaultRenderQuality
+	}
+
 	project := &domain.Project{
 		ProjectID:           input.ProjectID,
 		Status:              domain.StatusDraft,
@@ -64,6 +72,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		VoiceID:             input.VoiceID,
 		SubtitlesEnabled:    input.SubtitlesEnabled,
 		SubtitleStyle:       input.SubtitleStyle,
+		RenderQuality:       quality,
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err

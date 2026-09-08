@@ -19,7 +19,9 @@ import pytest
 
 from adapters.rendering.manim_renderer import (
     DEFAULT_RENDER_MEMORY_LIMIT_GB,
+    DEFAULT_RENDER_QUALITY,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
+    QUALITY_FLAGS,
     ManimScriptRenderer,
 )
 from domain.errors import AnimationEngineError
@@ -427,3 +429,121 @@ def test_cache_prune_never_evicts_the_running_project(tmp_path):
     media_dir, _ = renderer._media_dir_for("proj-1")
 
     assert os.path.isdir(media_dir)
+
+
+def test_default_quality_is_1080p60(tmp_path, monkeypatch):
+    """CR-004 FR12.1. 720p30 was hardcoded, which is below what a monetized
+    channel should publish and throws away Manim's main strength — smooth
+    motion."""
+    assert DEFAULT_RENDER_QUALITY == "1080p60"
+
+    renderer = ManimScriptRenderer(cache_root=None)
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        import json
+        import os
+
+        captured["cmd"] = cmd
+        media_dir = kwargs["cwd"]
+        nested = os.path.join(media_dir, "videos")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
+            f.write(b"stub")
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
+            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+    stub_ffprobe(monkeypatch)
+
+    renderer.render(make_request(), str(tmp_path / "out.mp4"))
+
+    assert "-qh" in captured["cmd"]
+    assert "-qm" not in captured["cmd"]
+
+
+def test_quality_is_configurable(tmp_path, monkeypatch):
+    renderer = ManimScriptRenderer(cache_root=None, quality="720p30")
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        import json
+        import os
+
+        captured["cmd"] = cmd
+        media_dir = kwargs["cwd"]
+        nested = os.path.join(media_dir, "videos")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
+            f.write(b"stub")
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
+            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+    stub_ffprobe(monkeypatch)
+
+    renderer.render(make_request(), str(tmp_path / "out.mp4"))
+
+    assert "-qm" in captured["cmd"]
+
+
+def test_unknown_quality_is_rejected_at_construction():
+    """Better to fail on startup than to silently render at the wrong quality
+    for every video until someone notices."""
+    with pytest.raises(ValueError, match="unknown render quality"):
+        ManimScriptRenderer(quality="8k120")
+
+
+def test_quality_flags_cover_the_documented_presets():
+    assert set(QUALITY_FLAGS) == {"720p30", "1080p60", "4k60"}
+
+
+def test_per_project_quality_overrides_the_service_default(tmp_path, monkeypatch):
+    """CR-004 FR12.6: a Creator checks content with a fast 720p30 draft, then
+    renders the upload pass at 1080p60 — same project, different pass."""
+    renderer = ManimScriptRenderer(cache_root=None, quality="1080p60")
+    captured = {}
+
+    def fake_popen(cmd, **kwargs):
+        import json
+        import os
+
+        captured["cmd"] = cmd
+        media_dir = kwargs["cwd"]
+        nested = os.path.join(media_dir, "videos")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
+            f.write(b"stub")
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
+            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+    stub_ffprobe(monkeypatch)
+
+    request = make_request()
+    request = ScriptRenderRequest(
+        project_id=request.project_id,
+        script_content=request.script_content,
+        scene_class_name=request.scene_class_name,
+        narration_segments=request.narration_segments,
+        render_quality="720p30",
+    )
+    renderer.render(request, str(tmp_path / "out.mp4"))
+
+    assert "-qm" in captured["cmd"]
+
+
+def test_unknown_per_project_quality_falls_back_to_the_default():
+    """A bad value from an old or hand-edited payload should cost the Creator
+    the wrong resolution, not the whole render."""
+    renderer = ManimScriptRenderer(cache_root=None, quality="1080p60")
+
+    assert renderer._resolve_quality("nonsense") == "1080p60"
+    assert renderer._resolve_quality(None) == "1080p60"
+    assert renderer._resolve_quality("4k60") == "4k60"

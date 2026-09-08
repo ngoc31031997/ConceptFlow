@@ -16,7 +16,14 @@ export interface ProjectDraft {
   voiceId: string | null;
   subtitlesEnabled: boolean;
   subtitleStyle: SubtitleStyle;
+  renderQuality: RenderQuality;
 }
+
+/**
+ * Resolution/framerate for the render (CR-004 FR12.6). A 720p30 draft is for
+ * checking the content quickly; anything published should be 1080p60 or better.
+ */
+export type RenderQuality = "720p30" | "1080p60" | "4k60";
 
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
@@ -26,6 +33,7 @@ export type ProjectDraftAction =
   | { type: "SET_VOICE_ID"; payload: string | null }
   | { type: "SET_SUBTITLES_ENABLED"; payload: boolean }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
+  | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
   | { type: "RESET" };
 
 export const defaultSubtitleStyle: SubtitleStyle = {
@@ -44,6 +52,7 @@ const initialDraft: ProjectDraft = {
   voiceId: null,
   subtitlesEnabled: false,
   subtitleStyle: defaultSubtitleStyle,
+  renderQuality: "1080p60",
 };
 
 function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): ProjectDraft {
@@ -60,6 +69,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, voiceId: action.payload };
     case "SET_SUBTITLES_ENABLED":
       return { ...state, subtitlesEnabled: action.payload };
+    case "SET_RENDER_QUALITY":
+      return { ...state, renderQuality: action.payload };
     case "SET_SUBTITLE_STYLE":
       return { ...state, subtitleStyle: { ...state.subtitleStyle, ...action.payload } };
     case "RESET":

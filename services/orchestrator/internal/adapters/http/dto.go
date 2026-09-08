@@ -25,6 +25,7 @@ type startRenderSagaRequest struct {
 	VoiceID          string                `json:"voice_id,omitempty"`
 	SubtitlesEnabled bool                  `json:"subtitles_enabled,omitempty"`
 	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality    string                `json:"render_quality,omitempty"`
 }
 
 // startPublishSagaRequest is the body of POST /v1/sagas/publish.
@@ -79,6 +80,7 @@ type projectResponse struct {
 	VoiceID          string                `json:"voice_id,omitempty"`
 	SubtitlesEnabled bool                  `json:"subtitles_enabled"`
 	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality    string                `json:"render_quality"`
 	YoutubeVideoURL  *string               `json:"youtube_video_url,omitempty"`
 	ErrorMessage     *string               `json:"error_message,omitempty"`
 }
@@ -152,6 +154,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		VoiceID:          p.VoiceID,
 		SubtitlesEnabled: p.SubtitlesEnabled,
 		SubtitleStyle:    p.SubtitleStyle,
+		RenderQuality:    string(p.RenderQuality),
 		YoutubeVideoURL:  p.YoutubeVideoURL,
 		ErrorMessage:     p.ErrorMessage,
 	}

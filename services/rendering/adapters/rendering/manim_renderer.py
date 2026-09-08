@@ -106,6 +106,18 @@ ANIMATION_LINE_RE = re.compile(r"Animation (\d+)\s*:")
 
 AUTO_WAIT_RE = re.compile(r"self\.wait\(\s*AUTO\s*\)")
 
+# Manim's quality flags. 720p30 was hardcoded, which is below what a monetized
+# channel should publish and throws away Manim's main strength — smooth motion
+# (CR-004 FR12.1). 1080p60 is the default; the Phase 0 benchmark measured it at
+# 3.6x the render time of 720p30 and 2.1x the peak memory, both well inside the
+# limits CR-003 raised.
+QUALITY_FLAGS = {
+    "720p30": "-qm",
+    "1080p60": "-qh",
+    "4k60": "-qk",
+}
+DEFAULT_RENDER_QUALITY = "1080p60"
+
 MARKS_FILENAME = "cf_marks.jsonl"
 
 # Prepended to the patched script. Names are `_cf_`-prefixed so they cannot
@@ -129,6 +141,7 @@ class ManimScriptRenderer(ManimScriptRendererPort):
         cache_root: str | None = CACHE_ROOT,
         cache_budget_bytes: int = DEFAULT_CACHE_BUDGET_BYTES,
         on_heartbeat: Callable[[float, int | None], None] | None = None,
+        quality: str = DEFAULT_RENDER_QUALITY,
     ) -> None:
         self._timeout_seconds = timeout_seconds
         self._memory_limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
@@ -138,6 +151,11 @@ class ManimScriptRenderer(ManimScriptRendererPort):
         # (elapsed_seconds, latest_animation_index). Optional so tests and the
         # use case can ignore progress entirely.
         self._on_heartbeat = on_heartbeat
+        if quality not in QUALITY_FLAGS:
+            raise ValueError(
+                f"unknown render quality {quality!r}; expected one of {sorted(QUALITY_FLAGS)}"
+            )
+        self._quality = quality
 
     def set_heartbeat(self, callback: Callable[[float, int | None], None] | None) -> None:
         """Swapped per command, since the callback carries the project_id."""
@@ -161,7 +179,13 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             with open(script_path, "w") as f:
                 f.write(patched_script)
 
-            self._run_manim(script_path, request.scene_class_name, media_dir, marks_path)
+            self._run_manim(
+                script_path,
+                request.scene_class_name,
+                media_dir,
+                marks_path,
+                self._resolve_quality(request.render_quality),
+            )
 
             rendered_path = self._find_rendered_file(media_dir)
             wait_offsets = self._read_wait_offsets(marks_path, expected=len(durations))
@@ -199,10 +223,27 @@ class ManimScriptRenderer(ManimScriptRendererPort):
         patched = AUTO_WAIT_RE.sub(substitute, script_content)
         return _insert_preamble(patched)
 
+    def _resolve_quality(self, requested: str | None) -> str:
+        """Per-project quality wins; an unknown or absent one falls back to the
+        service default rather than failing, since a render at the wrong
+        resolution still gives the Creator something to look at."""
+        if requested in QUALITY_FLAGS:
+            return requested
+        if requested:
+            logger.warning(
+                "unknown render_quality %r, falling back to %s", requested, self._quality
+            )
+        return self._quality
+
     def _run_manim(
-        self, script_path: str, scene_class_name: str, media_dir: str, marks_path: str
+        self,
+        script_path: str,
+        scene_class_name: str,
+        media_dir: str,
+        marks_path: str,
+        quality: str,
     ) -> None:
-        cmd = ["manim", "-qm", "--media_dir", media_dir]
+        cmd = ["manim", QUALITY_FLAGS[quality], "--media_dir", media_dir]
         if self._cache_root is None:
             cmd.append("--disable_caching")
         cmd += [script_path, scene_class_name]

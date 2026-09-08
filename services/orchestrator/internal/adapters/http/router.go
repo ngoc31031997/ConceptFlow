@@ -107,6 +107,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		VoiceID:             req.VoiceID,
 		SubtitlesEnabled:    req.SubtitlesEnabled,
 		SubtitleStyle:       req.SubtitleStyle,
+		RenderQuality:       domain.RenderQuality(req.RenderQuality),
 	})
 	if err != nil {
 		writeUseCaseError(w, err)

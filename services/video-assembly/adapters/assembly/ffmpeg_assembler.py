@@ -25,7 +25,11 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
-from adapters.assembly.subtitle_file import write_subtitle_file
+from adapters.assembly.subtitle_file import (
+    DEFAULT_PLAY_RES_X,
+    DEFAULT_PLAY_RES_Y,
+    write_subtitle_file,
+)
 from domain.errors import AssemblyEngineError
 from domain.models import NarrationSegment, SubtitleStyle, VideoAssemblyRequest
 from domain.ports import VideoAssemblerPort
@@ -43,6 +47,28 @@ BACKGROUND_MUSIC_VOLUME = 0.2
 
 # Below this, padding the video is not worth re-encoding it for.
 VIDEO_PAD_EPSILON_SECONDS = 0.05
+
+# Upload-grade x264 settings (CR-004 FR12.2). YouTube transcodes whatever it is
+# given, so the source has to carry spare quality into that second encode.
+#
+# The Phase 0 benchmark makes this nearly free: slow/crf18 measured 25.9s
+# against medium/crf23's 24.8s on the same 215s 1080p60 clip — 4% slower for
+# 28% more bitrate.
+#
+# yuv420p and +faststart are not optional extras: without the first some
+# players and platforms refuse the file outright, and without the second the
+# moov atom sits at the end, so every player must fetch the whole file before
+# it can start.
+VIDEO_ENCODE_ARGS = [
+    "-c:v", "libx264",
+    "-preset", "slow",
+    "-crf", "18",
+    "-pix_fmt", "yuv420p",
+    "-profile:v", "high",
+    "-bf", "2",
+]
+AUDIO_ENCODE_ARGS = ["-c:a", "aac", "-b:a", "192k", "-ar", "48000"]
+CONTAINER_ARGS = ["-movflags", "+faststart"]
 
 
 class FfmpegVideoAssembler(VideoAssemblerPort):
@@ -127,13 +153,13 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             video_filters.append(f"subtitles={_escape_filter_path(subtitle_path)}")
             # Burning subtitles paints new pixels, so the video stream has to be
             # re-encoded — it can no longer be stream-copied.
-            video_codec = ["-c:v", "libx264", "-preset", "medium", "-crf", "23"]
+            video_codec = list(VIDEO_ENCODE_ARGS)
 
         if video_filters:
             if video_codec == ["-c:v", "copy"]:
                 # tpad also paints frames, so a stream copy is impossible here
                 # too. (Without subtitles this is the only reason to re-encode.)
-                video_codec = ["-c:v", "libx264", "-preset", "medium", "-crf", "23"]
+                video_codec = list(VIDEO_ENCODE_ARGS)
             filter_parts.append(f"[0:v]{','.join(video_filters)}[vout]")
             video_map = "[vout]"
 
@@ -144,6 +170,13 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         else:
             cmd += ["-an"]
         cmd += video_codec
+        if video_codec != ["-c:v", "copy"]:
+            # Keyframe every 2 seconds, which is what YouTube's ingestion
+            # guidance asks for. Only meaningful when actually encoding.
+            cmd += ["-g", str(int(round(_probe_frame_rate(request.video_path) * 2)))]
+        if audio_map is not None:
+            cmd += AUDIO_ENCODE_ARGS
+        cmd += CONTAINER_ARGS
         if target_duration is not None:
             # An explicit cap replaces the old `-shortest`, which would have cut
             # the closing narration off whenever it outlasted the animation.
@@ -177,7 +210,12 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
     def _write_subtitles(request: VideoAssemblyRequest, output_path: str) -> str:
         style = request.subtitle_style or SubtitleStyle()
         subtitle_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.ass")
-        write_subtitle_file(request.subtitle_cues or [], style, subtitle_path)
+        write_subtitle_file(
+            request.subtitle_cues or [],
+            style,
+            subtitle_path,
+            play_res=_probe_resolution(request.video_path),
+        )
         return subtitle_path
 
     @staticmethod
@@ -216,3 +254,63 @@ def _probe_audio_duration(audio_path: str) -> float:
     except ValueError:
         logger.warning("ffprobe returned an unreadable duration for %s", audio_path)
         return 0.0
+
+
+def _probe_frame_rate(video_path: str) -> float:
+    """Frame rate of the rendered video, for sizing the keyframe interval.
+
+    Falls back to 30 rather than raising: a missing frame rate should cost a
+    slightly off keyframe interval, not the whole assembly.
+    """
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=r_frame_rate",
+            "-of", "csv=p=0",
+            video_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    raw = result.stdout.strip()
+    if result.returncode != 0 or not raw:
+        logger.warning("ffprobe could not read the frame rate of %s", video_path)
+        return 30.0
+    try:
+        # ffprobe reports it as a rational, e.g. "60/1".
+        numerator, _, denominator = raw.partition("/")
+        rate = float(numerator) / float(denominator or 1)
+        return rate if rate > 0 else 30.0
+    except (ValueError, ZeroDivisionError):
+        logger.warning("unreadable frame rate %r for %s", raw, video_path)
+        return 30.0
+
+
+def _probe_resolution(video_path: str) -> tuple[int, int]:
+    """Frame size of the rendered video, so ASS can declare a matching PlayRes.
+
+    Falls back to 1080p rather than raising: a wrong subtitle scale is a
+    cosmetic problem, an aborted assembly is not.
+    """
+    result = subprocess.run(
+        [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height",
+            "-of", "csv=p=0",
+            video_path,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    raw = result.stdout.strip()
+    if result.returncode != 0 or not raw:
+        logger.warning("ffprobe could not read the resolution of %s", video_path)
+        return (DEFAULT_PLAY_RES_X, DEFAULT_PLAY_RES_Y)
+    try:
+        width, height = (int(part) for part in raw.split(",")[:2])
+        return (width, height) if width > 0 and height > 0 else (DEFAULT_PLAY_RES_X, DEFAULT_PLAY_RES_Y)
+    except ValueError:
+        logger.warning("unreadable resolution %r for %s", raw, video_path)
+        return (DEFAULT_PLAY_RES_X, DEFAULT_PLAY_RES_Y)

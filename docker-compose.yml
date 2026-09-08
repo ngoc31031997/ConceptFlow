@@ -159,6 +159,10 @@ services:
       # empty string to disable caching. Measured 21s -> 4s on an unchanged
       # re-render, 21s -> 6s after editing one narration line.
       RENDER_CACHE_ROOT: "/shared/.manim-media"
+      # Fallback quality when a project does not specify one (CR-004). The
+      # Creator picks per project in the GUI; this covers projects created
+      # before that field existed.
+      RENDER_QUALITY: "1080p60"
     # Manim renders on every core it can get (Phase 0 measured CPU-time at
     # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
     # the Postgres instances on the same host. 5G sits just above the 4 GiB

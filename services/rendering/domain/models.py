@@ -38,6 +38,10 @@ class ScriptRenderRequest:
     script_content: str
     scene_class_name: str
     narration_segments: list[NarrationSegment]
+    # CR-004 FR12.6: the Creator picks this per project (a fast 720p30 draft to
+    # check the content, then a 1080p60 pass for upload). None means "use the
+    # service default", which covers projects created before the field existed.
+    render_quality: str | None = None
 
 
 @dataclass(frozen=True)

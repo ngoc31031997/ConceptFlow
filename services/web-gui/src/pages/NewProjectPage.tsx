@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { NarrationPanel } from "../components/NarrationPanel";
+import { RenderQualityPicker } from "../components/RenderQualityPicker";
 import { SubtitleStylePanel } from "../components/SubtitleStylePanel";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { AppShell } from "../components/AppShell";
@@ -43,6 +44,7 @@ export function NewProjectPage() {
               position: draft.subtitleStyle.position,
             }
           : undefined,
+        render_quality: draft.renderQuality,
       });
       navigate(`/projects/${projectId}/render`);
     } catch (err) {
@@ -79,6 +81,11 @@ export function NewProjectPage() {
               onSubtitlesEnabledChange={(enabled) =>
                 dispatch({ type: "SET_SUBTITLES_ENABLED", payload: enabled })
               }
+            />
+
+            <RenderQualityPicker
+              value={draft.renderQuality}
+              onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
             />
 
             {draft.subtitlesEnabled && (

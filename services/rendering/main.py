@@ -24,6 +24,7 @@ from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.manim_renderer import (
     CACHE_ROOT,
     DEFAULT_RENDER_MEMORY_LIMIT_GB,
+    DEFAULT_RENDER_QUALITY,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
     ManimScriptRenderer,
 )
@@ -47,6 +48,7 @@ async def run() -> None:
         timeout_seconds=timeout_seconds,
         memory_limit_gb=memory_limit_gb,
         cache_root=cache_root,
+        quality=os.environ.get("RENDER_QUALITY", DEFAULT_RENDER_QUALITY),
     )
     use_case = RenderScriptUseCase(renderer)
 

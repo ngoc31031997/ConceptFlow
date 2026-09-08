@@ -310,10 +310,16 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: domain.StepRenderScenes, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
+	quality := project.RenderQuality
+	if !quality.IsValid() {
+		// Covers projects created before CR-004 added the field.
+		quality = domain.DefaultRenderQuality
+	}
 	payload := map[string]interface{}{
 		"scenes":           scenesToPayload(project.Scenes),
 		"script_content":   project.ScriptContent,
 		"scene_class_name": project.ManimSceneClassName,
+		"render_quality":   string(quality),
 	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err

@@ -1770,3 +1770,25 @@ NOT yet verified end to end: the Docker daemon stopped partway through, so the l
 **Impact Assessment**: CR-008 complete pending E2E verification. CR-004..CR-007 still outstanding.
 **User Confirmation**: Approved in advance ("implement tiếp các cr còn lại").
 **Artifacts Affected**: orchestrator (project.go, narration.go, ollama_client.go + new test, suggest_publish_metadata.go, 10 files renamed); web-gui (NarrationPanel, ScriptEditor, new scriptTemplates.ts, ThumbnailUpload, ResultPage, types, NewProjectPage, 2 test files).
+
+## CR-004 implemented — output video quality
+**Timestamp**: 2026-09-08T01:00:00Z
+**User Input**: "implement tiếp các cr còn lại"
+**AI Response**: "Implemented CR-004.
+
+Decided the two open questions rather than blocking. FR12.4: subtitles stay burned in by ffmpeg. Burning them inside Manim would mean editing the Creator's own script, which breaks the zero-trust boundary Rendering deliberately keeps (their code runs in an isolated subprocess and the service never rewrites its content); soft-subs would give up the styling control CR-001 FR9.4 promised. The re-encode cost is paid back by FR12.3 instead. And crf 18 over crf 16, since Phase 0 measured slow/crf18 at only 4% slower than medium/crf23 for 28% more bitrate.
+
+RENDERING: the hardcoded -qm became a QUALITY_FLAGS table with 1080p60 as default, configurable by env AND per project through the render_scenes payload — a Creator wants a fast 720p30 draft to check the content, then a 1080p60 pass to upload. An unknown per-project value logs and falls back rather than failing, since the wrong resolution still gives them something to look at; an unknown *service* default raises at construction instead, because that would silently mis-render every video until someone noticed.
+
+VIDEO ASSEMBLY: the encode args became a named constant set — slow/crf18/yuv420p/high/bf2 plus aac 192k 48kHz and +faststart. yuv420p and +faststart are correctness rather than polish: without the first some players reject the file, without the second the moov atom sits at the end so players must fetch the whole file before starting. Keyframe interval is now derived from the video's actual frame rate (2 seconds' worth, per YouTube's guidance) rather than assumed. Both new ffprobe helpers fall back rather than raising — a wrong keyframe interval or subtitle scale is cosmetic, an aborted assembly is not.
+
+FR12.5: subtitle_file.py took PlayRes as a parameter probed from the real video instead of hardcoding 1920x1080, and font size, outline and margins now scale with frame height. Scaling by height rather than width matters for CR-007's 9:16 clips, which are narrower but taller than 1080p — scaling by width would shrink the text on exactly the format that needs it biggest. Added a test for that case now, since the CR-007 work will depend on it.
+
+ORCHESTRATOR: domain.RenderQuality with an IsValid() guard, a render_quality column defaulting to '1080p60' (so pre-CR-004 projects are upgraded rather than pinned to the old 720p30), threaded through StartRenderSagaInput, the HTTP DTOs and the render_scenes payload.
+
+GUI: a RenderQualityPicker framed around intent rather than numbers (Nháp nhanh / Chuẩn / Cao), warning that a draft is not for publishing and that 4K is rarely worth its cost.
+
+Verified: rendering 48/48 pytest, video-assembly 38/38 (9 new across two files), orchestrator go build/vet/test clean, web-gui tsc clean and 46/46 vitest (5 new), eslint unchanged at its 1 pre-existing error. Docker is still down, so E2E verification of the actual encoded output remains outstanding alongside CR-008's."
+**Impact Assessment**: CR-004 complete pending E2E. CR-005/006/007 outstanding.
+**User Confirmation**: Approved in advance.
+**Artifacts Affected**: rendering (manim_renderer, main, models, consumer + tests), video-assembly (ffmpeg_assembler, subtitle_file + tests, new test_subtitle_file.py), orchestrator (project.go, start_render_saga, handle_step_event, dto, router, db, repository), web-gui (new RenderQualityPicker + test, ProjectDraftContext, types, NewProjectPage), docker-compose.yml, README.md, cr-004 doc.

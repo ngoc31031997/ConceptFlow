@@ -94,6 +94,31 @@ const (
 	LanguageEnglish    ContentLanguage = "en"
 )
 
+// RenderQuality is the resolution/framerate the Creator chose for a project
+// (CR-004 FR12.6). A draft pass at 720p30 is for checking the content; the
+// upload pass should be 1080p60 or better, since anything less is below what a
+// monetized channel should publish and wastes Manim's smooth motion.
+type RenderQuality string
+
+const (
+	Quality720p30  RenderQuality = "720p30"
+	Quality1080p60 RenderQuality = "1080p60"
+	Quality4k60    RenderQuality = "4k60"
+)
+
+// DefaultRenderQuality is what a project gets when the Creator did not choose —
+// including every project created before this field existed.
+const DefaultRenderQuality = Quality1080p60
+
+// IsValid reports whether q is a quality the Rendering Service can honour.
+func (q RenderQuality) IsValid() bool {
+	switch q {
+	case Quality720p30, Quality1080p60, Quality4k60:
+		return true
+	}
+	return false
+}
+
 // Visibility restricts youtube visibility to the three values accepted by
 // the Publish Saga input (interface-contracts.md POST /v1/sagas/publish).
 type Visibility string
@@ -145,6 +170,9 @@ type Project struct {
 	VoiceID          string
 	SubtitlesEnabled bool
 	SubtitleStyle    *SubtitleStyle
+
+	// CR-004 — resolution/framerate for this project's render.
+	RenderQuality RenderQuality
 
 	Scenes []Scene
 
