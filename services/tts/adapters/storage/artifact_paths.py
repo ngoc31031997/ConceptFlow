@@ -6,19 +6,33 @@ the application layer rather than injected (dependency-injection.md).
 
 from __future__ import annotations
 
+import hashlib
 import os
 import wave
 
 SHARED_VOLUME_ROOT = "/shared"
 
 
-def compute_audio_path(project_id: str, scene_index: int, voice_id: str) -> str:
-    """Conventional path: /shared/{project_id}/audio/{scene_index}_{voice_id}.wav
+def compute_audio_path(project_id: str, scene_index: int, voice_id: str, text: str = "") -> str:
+    """Conventional path:
+    /shared/{project_id}/audio/{scene_index}_{voice_id}_{text_hash}.wav
 
-    Keying on voice_id (not language, as before CR-001) keeps the idempotency
-    check correct when a project is re-rendered with a different voice.
+    The text hash is not an optimisation — it is a correctness fix (CR-005
+    FR13.6). The path used to be keyed on (project_id, scene_index, voice_id)
+    alone, so editing a narration line and re-rendering the same project hit
+    the idempotency check and reused the OLD audio: the video said the previous
+    sentence while the subtitle showed the new one.
+
+    Hashing also means a re-render only pays for the lines that actually
+    changed, which matters once synthesis is metered (ADR-0023).
+
+    text defaults to "" so a caller that only needs to locate an existing file
+    keeps working; callers that synthesize must pass it.
     """
-    return os.path.join(SHARED_VOLUME_ROOT, project_id, "audio", f"{scene_index}_{voice_id}.wav")
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
+    return os.path.join(
+        SHARED_VOLUME_ROOT, project_id, "audio", f"{scene_index}_{voice_id}_{digest}.wav"
+    )
 
 
 def audio_exists(audio_path: str) -> bool:

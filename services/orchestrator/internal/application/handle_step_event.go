@@ -461,6 +461,11 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	if project.BackgroundMusicPath != nil {
 		payload["background_music_path"] = *project.BackgroundMusicPath
+		volume := project.BackgroundMusicVolume
+		if volume <= 0 || volume > 1 {
+			volume = domain.DefaultBackgroundMusicVolume
+		}
+		payload["background_music_volume"] = volume
 	}
 	if project.SubtitlesEnabled {
 		style := domain.DefaultSubtitleStyle()

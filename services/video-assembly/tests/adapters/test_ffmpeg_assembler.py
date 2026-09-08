@@ -268,10 +268,14 @@ def test_assemble_without_narration_keeps_background_music(tmp_path):
 
     args = ffmpeg_args(mock_run)
     assert "-an" not in args
+    joined = " ".join(args)
+    # With no narration there is nothing to mix or duck the music against...
+    assert "amix" not in joined
+    assert "sidechaincompress" not in joined
+    # ...but a music-only track still gets normalised to YouTube's target.
     maps = [args[i + 1] for i, a in enumerate(args) if a == "-map"]
-    assert maps[-1] == "[bg]"
-    # With no narration there is nothing to mix the music against.
-    assert "amix" not in " ".join(args)
+    assert maps[-1] == "[anorm]"
+    assert "[bg]loudnorm" in joined
 
 
 def test_assemble_with_subtitles_burns_them_in_and_reencodes(tmp_path):
@@ -374,3 +378,123 @@ def test_silent_video_gets_no_audio_encode_args(tmp_path):
     args = ffmpeg_args(mock_run)
     assert "-an" in args
     assert "aac" not in args
+
+
+def test_background_music_is_ducked_against_the_narration(tmp_path):
+    """CR-005 FR14.1. A flat mix leaves music fighting the voice when it is
+    loud and leaves silence when it is not."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        background_music_path="bg.mp3",
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    filter_complex = ffmpeg_args(mock_run)[ffmpeg_args(mock_run).index("-filter_complex") + 1]
+    assert "sidechaincompress" in filter_complex
+    # The narration is the sidechain input, so the music ducks under the voice.
+    assert "[bg][narration]sidechaincompress" in filter_complex
+
+
+def test_music_volume_is_configurable(tmp_path):
+    """FR14.2 — 0.2 was hardcoded."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[],
+        background_music_path="bg.mp3",
+        background_music_volume=0.35,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    filter_complex = ffmpeg_args(mock_run)[ffmpeg_args(mock_run).index("-filter_complex") + 1]
+    assert "volume=0.35" in filter_complex
+
+
+def test_audio_is_normalised_to_youtubes_target(tmp_path):
+    """FR14.3. YouTube normalizes to about -14 LUFS, so a quieter master is not
+    left quiet — it is turned up along with its noise floor."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    filter_complex = ffmpeg_args(mock_run)[ffmpeg_args(mock_run).index("-filter_complex") + 1]
+    assert "loudnorm=I=-14" in filter_complex
+
+
+def test_silent_video_is_not_normalised(tmp_path):
+    """There is no audio stream to normalise, and asking ffmpeg to build one
+    would just add an empty track."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1", video_path="video.mp4", narration_segments=[]
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    assert "loudnorm" not in " ".join(ffmpeg_args(mock_run))
+
+
+def test_padding_is_off_by_default_so_stream_copy_survives(tmp_path):
+    """FR14.5's trade-off, asserted so it is not silently reversed: padding
+    either end means tpad, tpad repaints frames, and that rules out -c:v copy —
+    measured at 250x faster in Phase 0."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=1.0)],
+        video_duration_seconds=60.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    assert "tpad" not in " ".join(args)
+    assert "copy" in args
+
+
+def test_lead_in_shifts_picture_audio_and_subtitles_together(tmp_path):
+    """The lead-in must not reintroduce CR-002's desync: narration i still has
+    to land on wait i, just later in the file. Shifting only the audio would
+    put every line ahead of its animation by the lead-in."""
+    assembler = FfmpegVideoAssembler(lead_in_seconds=0.5, tail_seconds=1.0)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=10.0)],
+        video_duration_seconds=60.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hi", start_time=10.0, end_time=12.0)],
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    joined = " ".join(args)
+    # Audio delayed by 10.0 + 0.5.
+    assert "adelay=10500:all=1" in joined
+    # Picture delayed by the same 0.5 at the head.
+    assert "tpad=start_mode=clone:start_duration=0.500" in joined
+    # And the subtitle moved with them.
+    with open(tmp_path / "proj-1.ass", encoding="utf-8") as f:
+        assert "0:00:10.50" in f.read()
+    # 60s video + 0.5 lead-in + 1.0 tail.
+    assert args[args.index("-t") + 1] == "61.500"

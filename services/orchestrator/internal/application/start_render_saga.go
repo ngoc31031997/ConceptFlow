@@ -25,6 +25,8 @@ type StartRenderSagaInput struct {
 
 	// CR-004 — empty means DefaultRenderQuality.
 	RenderQuality domain.RenderQuality
+	// CR-005 FR14.2 — 0 means DefaultBackgroundMusicVolume.
+	BackgroundMusicVolume float64
 }
 
 // StartRenderSagaOutput is returned to the HTTP layer for the 201 response.
@@ -60,19 +62,20 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 	}
 
 	project := &domain.Project{
-		ProjectID:           input.ProjectID,
-		Status:              domain.StatusDraft,
-		SagaID:              sagaID,
-		ScriptContent:       input.ScriptContent,
-		PluginID:            input.PluginID,
-		CategoryHint:        input.CategoryHint,
-		ContentLanguage:     input.ContentLanguage,
-		BackgroundMusicPath: input.BackgroundMusicPath,
-		TTSEnabled:          input.TTSEnabled,
-		VoiceID:             input.VoiceID,
-		SubtitlesEnabled:    input.SubtitlesEnabled,
-		SubtitleStyle:       input.SubtitleStyle,
-		RenderQuality:       quality,
+		ProjectID:             input.ProjectID,
+		Status:                domain.StatusDraft,
+		SagaID:                sagaID,
+		ScriptContent:         input.ScriptContent,
+		PluginID:              input.PluginID,
+		CategoryHint:          input.CategoryHint,
+		ContentLanguage:       input.ContentLanguage,
+		BackgroundMusicPath:   input.BackgroundMusicPath,
+		TTSEnabled:            input.TTSEnabled,
+		VoiceID:               input.VoiceID,
+		SubtitlesEnabled:      input.SubtitlesEnabled,
+		SubtitleStyle:         input.SubtitleStyle,
+		RenderQuality:         quality,
+		BackgroundMusicVolume: input.BackgroundMusicVolume,
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err

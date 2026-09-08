@@ -64,6 +64,9 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_seconds DOUBLE PREC
 -- so projects created before this column existed are upgraded rather than
 -- pinned to the old hardcoded 720p30.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_quality TEXT NOT NULL DEFAULT '1080p60';
+-- CR-005: Creator-chosen background music level. 0 means unset, which assembly
+-- reads as the 0.2 the level was fixed at before this was adjustable.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS background_music_volume DOUBLE PRECISION NOT NULL DEFAULT 0;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

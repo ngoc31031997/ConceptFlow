@@ -126,6 +126,7 @@ class AssembleVideoCommandHandler:
             narration_segments=_parse_narration_segments(payload),
             video_duration_seconds=float(payload.get("video_duration_seconds") or 0.0),
             background_music_path=payload.get("background_music_path"),
+            background_music_volume=float(payload.get("background_music_volume") or 0.2),
             subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
             subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
         )

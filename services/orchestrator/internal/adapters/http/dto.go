@@ -21,11 +21,12 @@ type startRenderSagaRequest struct {
 
 	// CR-001. TTSEnabled is a pointer so an omitted field keeps the pre-CR-001
 	// default (narration on) instead of decoding to false.
-	TTSEnabled       *bool                 `json:"tts_enabled,omitempty"`
-	VoiceID          string                `json:"voice_id,omitempty"`
-	SubtitlesEnabled bool                  `json:"subtitles_enabled,omitempty"`
-	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
-	RenderQuality    string                `json:"render_quality,omitempty"`
+	TTSEnabled            *bool                 `json:"tts_enabled,omitempty"`
+	VoiceID               string                `json:"voice_id,omitempty"`
+	SubtitlesEnabled      bool                  `json:"subtitles_enabled,omitempty"`
+	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality         string                `json:"render_quality,omitempty"`
+	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
 }
 
 // startPublishSagaRequest is the body of POST /v1/sagas/publish.

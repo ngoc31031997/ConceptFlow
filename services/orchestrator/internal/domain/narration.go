@@ -29,6 +29,10 @@ var languageProfiles = map[ContentLanguage]LanguageProfile{
 // not know — a forward-compatibility guard, not an expected path.
 const defaultLanguage = LanguageEnglish
 
+// DefaultBackgroundMusicVolume is the level used when the Creator has not
+// chosen one — the value music was fixed at before CR-005 made it adjustable.
+const DefaultBackgroundMusicVolume = 0.2
+
 // minNarrationSeconds keeps a very short line on screen long enough to
 // read — without it, a two-word narration would flash by in under a second.
 const minNarrationSeconds = 1.5

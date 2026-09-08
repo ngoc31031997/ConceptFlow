@@ -28,6 +28,8 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth Client Secret tương ứng |
 | `RENDER_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần render Manim (mặc định 1800). Đo được: video 10 phút @1080p60 mất ~276s, nên đây là ~6.5× biên an toàn |
 | `RENDER_MEMORY_LIMIT_GB` | Trần address-space của tiến trình render (mặc định 4). KHÔNG đặt vượt RAM của Docker VM |
+| `GOOGLE_TTS_CREDENTIALS_FILE` | Đường dẫn **trên máy host** tới service-account JSON của Google Cloud TTS (ADR-0023). Bỏ trống → chạy hoàn toàn offline bằng giọng Piper (chất lượng thấp hơn rõ rệt). Free tier WaveNet: 4 triệu ký tự/tháng ≈ 500 video 10 phút |
+| `ASSEMBLY_LEAD_IN_SECONDS` / `ASSEMBLY_TAIL_SECONDS` | Khoảng lặng đầu/cuối video (mặc định 0). Bật lên sẽ ép re-encode toàn bộ video — đo được chậm hơn ~250 lần so với stream-copy |
 | `RENDER_QUALITY` | Chất lượng render mặc định khi project không chỉ định: `720p30` \| `1080p60` \| `4k60` (mặc định `1080p60`). Creator chọn theo từng project trên GUI |
 | `RENDER_CACHE_ROOT` | Nơi giữ `media_dir` theo từng project để Manim tái dùng cache (mặc định `/shared/.manim-media`). Đặt rỗng để tắt cache. Đo được: render lại nhanh gấp ~5 lần |
 | `ASSEMBLY_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần ghép video bằng ffmpeg (mặc định 900) |

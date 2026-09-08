@@ -1792,3 +1792,25 @@ Verified: rendering 48/48 pytest, video-assembly 38/38 (9 new across two files),
 **Impact Assessment**: CR-004 complete pending E2E. CR-005/006/007 outstanding.
 **User Confirmation**: Approved in advance.
 **Artifacts Affected**: rendering (manim_renderer, main, models, consumer + tests), video-assembly (ffmpeg_assembler, subtitle_file + tests, new test_subtitle_file.py), orchestrator (project.go, start_render_saga, handle_step_event, dto, router, db, repository), web-gui (new RenderQualityPicker + test, ProjectDraftContext, types, NewProjectPage), docker-compose.yml, README.md, cr-004 doc.
+
+## CR-005 implemented — audio quality and cloud TTS (ADR-0023)
+**Timestamp**: 2026-09-08T02:00:00Z
+**User Input**: "implement tiếp các cr còn lại"
+**AI Response**: "Wrote ADR-0023 and implemented CR-005.
+
+Found a real bug while reading the TTS service, independent of the quota concern FR13.6 was written for: compute_audio_path keyed on (project_id, scene_index, voice_id) with no reference to the text. Editing a narration line and re-rendering the same project therefore hit the idempotency check and returned the PREVIOUS audio — the video said the old sentence while the subtitle showed the new one. Now keyed on a hash of the text too, with tests for both directions (edited line re-synthesizes, unchanged line still reuses).
+
+ENGINE: added GoogleTTSAdapter and RoutingTTSEngine behind the existing TTSEnginePort, so neither the domain nor the use case learned that a second engine exists — which is what ADR-0010 designed the port for. Routing picks the engine from the voice and falls back to Piper on any failure, always within the same language so a Vietnamese project does not suddenly speak English. The Google client is built lazily and its library import is optional, so the service still boots and runs with no credentials at all. Every fallback logs a warning: silently shipping worse narration is more harmful than the failure, because the Creator would only find out after publishing.
+
+Character metering (FR13.5) writes a per-month total and warns at 80% of the 4M free allowance. It is best-effort — an unwritable usage file is a reporting gap, not a reason to fail a render someone is waiting on.
+
+AUDIO MIX: sidechain ducking so music drops only while someone is speaking, configurable music volume replacing the hardcoded 0.2, and loudnorm to YouTube's -14 LUFS as the last link in the chain. Placing loudnorm required moving it above where the filtergraph string is assembled — my first attempt appended to filter_parts after the list had already been joined, which the tests caught.
+
+FR14.5 (lead-in/tail silence) is implemented but defaults to OFF, and I want to flag that as a judgement call rather than an omission. Padding either end means tpad, tpad repaints frames, and that rules out -c:v copy — which Phase 0 measured at 0.1s against 24.8s. Paying 250x the assembly time for half a second of silence is a bad default, particularly since the Creator already controls how their animation opens and closes. It is available via ASSEMBLY_LEAD_IN_SECONDS / ASSEMBLY_TAIL_SECONDS. When enabled, the lead-in shifts picture, narration AND subtitles by the same amount — shifting only the audio would have reintroduced exactly the desync CR-002 existed to remove, and there is a test asserting all three move together.
+
+Verified: tts 41/41 pytest (10 new for routing/fallback/metering, plus 2 for the stale-audio bug), video-assembly 44/44 (6 new), orchestrator go build/vet/test clean, web-gui tsc clean and 46/46 vitest. docker compose config validates with and without a credentials path.
+
+Still outstanding: E2E remains unverified since Docker is down, and the Google path specifically cannot be verified at all without the Creator supplying a service-account key."
+**Impact Assessment**: CR-005 complete. Requires GOOGLE_TTS_CREDENTIALS_FILE from the Creator to use the better voices; runs on Piper without it. CR-006/007 outstanding.
+**User Confirmation**: Approved in advance.
+**Artifacts Affected**: new ADR-0023, new google_adapter.py + routing_engine.py + test_routing_engine.py; tts (voice_registry, artifact_paths, synthesize_speech, main, requirements, 3 test files); video-assembly (ffmpeg_assembler, models, consumer, main, tests); orchestrator (domain, start_render_saga, handle_step_event, dto, router, db, repository); web-gui (BackgroundMusicPicker + css, ProjectDraftContext, types, NewProjectPage); docker-compose.yml, .env.example, README.md.

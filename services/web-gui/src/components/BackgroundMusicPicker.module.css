@@ -97,3 +97,16 @@
   font-weight: 600;
   color: var(--danger);
 }
+
+.volumeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.volumeHint {
+  opacity: 0.65;
+  font-size: 12px;
+}

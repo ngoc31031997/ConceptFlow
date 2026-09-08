@@ -33,7 +33,11 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 async def run() -> None:
     timeout_seconds = int(os.environ.get("ASSEMBLY_TIMEOUT_SECONDS", DEFAULT_ASSEMBLY_TIMEOUT_SECONDS))
-    assembler = FfmpegVideoAssembler(timeout_seconds=timeout_seconds)
+    assembler = FfmpegVideoAssembler(
+        timeout_seconds=timeout_seconds,
+        lead_in_seconds=float(os.environ.get("ASSEMBLY_LEAD_IN_SECONDS", 0.0)),
+        tail_seconds=float(os.environ.get("ASSEMBLY_TAIL_SECONDS", 0.0)),
+    )
     use_case = AssembleVideoUseCase(assembler)
 
     pool = await create_pool()

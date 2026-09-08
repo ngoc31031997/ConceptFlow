@@ -49,10 +49,10 @@ def test_synthesize_calls_engine_and_returns_result(shared_volume_root):
     result = use_case.synthesize(SpeechRequest("proj-1", 0, "Xin chao", "vi"))
 
     assert result.duration_seconds == 4.5
-    assert result.audio_path == str(
-        shared_volume_root / "proj-1" / "audio" / "0_vi_VN-vais1000-medium.wav"
-    )
-    assert engine.calls == [("Xin chao", "vi_VN-vais1000-medium", result.audio_path)]
+    audio_dir = shared_volume_root / "proj-1" / "audio"
+    assert result.audio_path.startswith(str(audio_dir / "0_vi-VN-Wavenet-A_"))
+    assert result.audio_path.endswith(".wav")
+    assert engine.calls == [("Xin chao", "vi-VN-Wavenet-A", result.audio_path)]
 
 
 def test_synthesize_passes_text_verbatim_no_preprocessing(shared_volume_root):
@@ -102,3 +102,36 @@ def test_duration_is_measured_from_wav_file_not_estimated(shared_volume_root):
     result = use_case.synthesize(SpeechRequest("proj-1", 0, "a very long narration text " * 5, "en"))
 
     assert result.duration_seconds == 7.25
+
+
+def test_editing_the_narration_resynthesizes_instead_of_reusing_old_audio(shared_volume_root):
+    """CR-005 FR13.6 regression, and a correctness bug in its own right.
+
+    The audio path used to be keyed on (project_id, scene_index, voice_id)
+    alone. Editing a line and re-rendering the same project therefore hit the
+    idempotency check and returned the PREVIOUS audio — the video said the old
+    sentence while the subtitle showed the new one.
+    """
+    engine = FakeTTSEngine(duration_seconds=2.0)
+    use_case = SynthesizeSpeechUseCase(engine)
+
+    first = use_case.synthesize(SpeechRequest("proj-1", 0, "Cau noi ban dau", "vi"))
+    second = use_case.synthesize(SpeechRequest("proj-1", 0, "Cau noi da sua", "vi"))
+
+    assert first.audio_path != second.audio_path
+    assert len(engine.calls) == 2
+    assert engine.calls[1][0] == "Cau noi da sua"
+
+
+def test_unchanged_narration_still_reuses_its_audio(shared_volume_root):
+    """The idempotency the hash replaced must still hold: re-rendering a project
+    without touching a line should not re-synthesize it, which is what keeps a
+    metered engine cheap (ADR-0023)."""
+    engine = FakeTTSEngine(duration_seconds=2.0)
+    use_case = SynthesizeSpeechUseCase(engine)
+
+    first = use_case.synthesize(SpeechRequest("proj-1", 0, "Cau khong doi", "vi"))
+    second = use_case.synthesize(SpeechRequest("proj-1", 0, "Cau khong doi", "vi"))
+
+    assert first.audio_path == second.audio_path
+    assert len(engine.calls) == 1

@@ -162,6 +162,9 @@ type Project struct {
 	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
 	ContentLanguage     ContentLanguage
 	BackgroundMusicPath *string // optional static input, set at Saga start, reused unchanged at assemble_video (Rule 3)
+	// CR-005 FR14.2 — music level, 0.0-1.0. Zero means "unset"; assembly
+	// substitutes its own default so an old project keeps the previous 0.2.
+	BackgroundMusicVolume float64
 
 	// CR-001 — narration and subtitles are independently switchable per project.
 	// When TTSEnabled is false the synthesize_speech step is skipped entirely and

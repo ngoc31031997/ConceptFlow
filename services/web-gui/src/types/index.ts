@@ -8,6 +8,7 @@ export interface RenderInput {
   subtitles_enabled: boolean;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "720p30" | "1080p60" | "4k60";
+  background_music_volume?: number;
 }
 
 export interface SubtitleStylePayload {

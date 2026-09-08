@@ -97,17 +97,18 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 	}
 
 	out, err := rt.startRenderSaga.Execute(r.Context(), application.StartRenderSagaInput{
-		ProjectID:           req.ProjectID,
-		ScriptContent:       req.ScriptContent,
-		PluginID:            req.PluginID,
-		CategoryHint:        req.CategoryHint,
-		ContentLanguage:     lang,
-		BackgroundMusicPath: req.BackgroundMusicPath,
-		TTSEnabled:          ttsEnabled,
-		VoiceID:             req.VoiceID,
-		SubtitlesEnabled:    req.SubtitlesEnabled,
-		SubtitleStyle:       req.SubtitleStyle,
-		RenderQuality:       domain.RenderQuality(req.RenderQuality),
+		ProjectID:             req.ProjectID,
+		ScriptContent:         req.ScriptContent,
+		PluginID:              req.PluginID,
+		CategoryHint:          req.CategoryHint,
+		ContentLanguage:       lang,
+		BackgroundMusicPath:   req.BackgroundMusicPath,
+		TTSEnabled:            ttsEnabled,
+		VoiceID:               req.VoiceID,
+		SubtitlesEnabled:      req.SubtitlesEnabled,
+		SubtitleStyle:         req.SubtitleStyle,
+		RenderQuality:         domain.RenderQuality(req.RenderQuality),
+		BackgroundMusicVolume: req.BackgroundMusicVolume,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)

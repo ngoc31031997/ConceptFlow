@@ -17,3 +17,4 @@
 | [ADR-0013](ADR-0013-postgresql-per-service-inbox-outbox.md) | PostgreSQL Per Service for Inbox/Outbox Pattern | Accepted | Cross-cutting retrofit | 2026-08-07 |
 | [ADR-0014](ADR-0014-tts-service-message-driven.md) | TTS Service Becomes Message-Driven (Own Saga Step) | Accepted | Cross-cutting retrofit | 2026-08-07 |
 | [ADR-0015](ADR-0015-rendering-dynamic-template-loading.md) | Dynamic Plugin Loading for Rendering Service Animation Templates | Accepted | Low-Level Design (Unit 5) | 2026-08-07 |
+- [ADR-0023](ADR-0023-cloud-tts-engine.md) — Google Cloud TTS làm engine giọng đọc chính, Piper làm fallback

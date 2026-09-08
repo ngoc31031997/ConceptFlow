@@ -31,7 +31,12 @@ from adapters.assembly.subtitle_file import (
     write_subtitle_file,
 )
 from domain.errors import AssemblyEngineError
-from domain.models import NarrationSegment, SubtitleStyle, VideoAssemblyRequest
+from domain.models import (
+    NarrationSegment,
+    SubtitleCue,
+    SubtitleStyle,
+    VideoAssemblyRequest,
+)
 from domain.ports import VideoAssemblerPort
 
 logger = logging.getLogger(__name__)
@@ -43,7 +48,33 @@ logger = logging.getLogger(__name__)
 # to set it generously.
 DEFAULT_ASSEMBLY_TIMEOUT_SECONDS = 900
 FFMPEG_BINARY = "ffmpeg"
-BACKGROUND_MUSIC_VOLUME = 0.2
+DEFAULT_BACKGROUND_MUSIC_VOLUME = 0.2
+
+# Sidechain ducking (CR-005 FR14.1). A flat mix leaves music competing with the
+# narration when it is loud and leaves silence when it is not; ducking pulls the
+# music down only while someone is speaking, which is what every produced video
+# does. threshold/ratio/attack/release are conventional voice-over values.
+DUCKING_FILTER = "sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400"
+
+# YouTube normalizes everything it serves to about -14 LUFS. A quieter master
+# does not get left quiet — it gets turned up, along with its noise floor — so
+# matching the target here is what keeps the channel from sounding weaker than
+# everyone else's (CR-005 FR14.3).
+LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
+
+# Optional silence before the first line and after the last (CR-005 FR14.5).
+#
+# Both default to OFF, which is a deliberate trade rather than an oversight.
+# Padding either end means tpad, tpad repaints frames, and repainting frames
+# rules out `-c:v copy` — which Phase 0 measured at 0.1s against 24.8s for a
+# re-encode of the same clip. Paying 250x the assembly time for half a second
+# of silence is a bad default, especially since the Creator already controls
+# how their animation opens and closes.
+#
+# A Creator who wants that polish can turn it on with ASSEMBLY_LEAD_IN_SECONDS
+# / ASSEMBLY_TAIL_SECONDS and accept the re-encode.
+DEFAULT_LEAD_IN_SECONDS = 0.0
+DEFAULT_TAIL_SECONDS = 0.0
 
 # Below this, padding the video is not worth re-encoding it for.
 VIDEO_PAD_EPSILON_SECONDS = 0.05
@@ -72,8 +103,15 @@ CONTAINER_ARGS = ["-movflags", "+faststart"]
 
 
 class FfmpegVideoAssembler(VideoAssemblerPort):
-    def __init__(self, timeout_seconds: int = DEFAULT_ASSEMBLY_TIMEOUT_SECONDS) -> None:
+    def __init__(
+        self,
+        timeout_seconds: int = DEFAULT_ASSEMBLY_TIMEOUT_SECONDS,
+        lead_in_seconds: float = DEFAULT_LEAD_IN_SECONDS,
+        tail_seconds: float = DEFAULT_TAIL_SECONDS,
+    ) -> None:
         self._timeout_seconds = timeout_seconds
+        self._lead_in_seconds = lead_in_seconds
+        self._tail_seconds = tail_seconds
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ffmpeg-assembly")
 
     def assemble(self, request: VideoAssemblyRequest, output_path: str) -> None:
@@ -92,11 +130,22 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         segments = sorted(request.narration_segments, key=lambda s: s.start_time)
         n = len(segments)
 
+        # Lead-in shifts the video, the narration and the subtitles by the SAME
+        # amount, so the alignment CR-002 established is untouched — narration i
+        # still lands exactly on wait i, just half a second later in the file.
+        # Shifting only the audio here would reintroduce the very desync that
+        # CR-002 existed to remove.
+        lead_in = self._lead_in_seconds if request.video_duration_seconds > 0 else 0.0
+
         cmd = ["-y", "-i", request.video_path]
         for segment in segments:
             cmd += ["-i", segment.audio_path]
 
         target_duration = self._target_duration(request, segments)
+        if target_duration is not None:
+            # Lead-in pushes everything later; the tail leaves the closing frame
+            # up briefly instead of cutting hard (FR14.5).
+            target_duration += lead_in + self._tail_seconds
 
         filter_parts: list[str] = []
         audio_map = None
@@ -108,7 +157,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             # volume by the number of inputs, which would make a 20-segment
             # narration 20x too quiet.
             for i, segment in enumerate(segments):
-                delay_ms = int(round(segment.start_time * 1000))
+                delay_ms = int(round((segment.start_time + lead_in) * 1000))
                 filter_parts.append(f"[{i + 1}:a]adelay={delay_ms}:all=1[na{i}]")
             mix_inputs = "".join(f"[na{i}]" for i in range(n))
             if n == 1:
@@ -119,17 +168,20 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
 
         if request.background_music_path is not None:
             bg_index = n + 1
+            volume = request.background_music_volume
             cmd += ["-stream_loop", "-1", "-i", request.background_music_path]
-            filter_parts.append(f"[{bg_index}:a]volume={BACKGROUND_MUSIC_VOLUME}[bg]")
+            filter_parts.append(f"[{bg_index}:a]volume={volume}[bg]")
             if audio_map is None:
                 # Narration is disabled: background music is the only track. It
                 # loops forever, so the output duration cap below is what stops
-                # it.
+                # it. Nothing to duck against either.
                 audio_map = "[bg]"
             else:
-                # duration=first keeps the mix as long as the narration track,
-                # which apad has already stretched to the full target.
-                filter_parts.append("[narration][bg]amix=inputs=2:duration=first[aout]")
+                # Duck the music against the narration before mixing, so the
+                # voice stays intelligible without the music dropping out
+                # entirely between lines.
+                filter_parts.append(f"[bg][narration]{DUCKING_FILTER}[ducked]")
+                filter_parts.append("[narration][ducked]amix=inputs=2:duration=first[aout]")
                 audio_map = "[aout]"
 
         video_map = "0:v"
@@ -139,7 +191,11 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         if target_duration is not None:
             # CR-002 FR10.6: hold the last frame rather than truncating a final
             # narration that runs past the end of the animation.
-            pad_seconds = target_duration - request.video_duration_seconds
+            pad_seconds = target_duration - request.video_duration_seconds - lead_in
+            if lead_in > VIDEO_PAD_EPSILON_SECONDS:
+                video_filters.append(
+                    f"tpad=start_mode=clone:start_duration={lead_in:.3f}"
+                )
             if pad_seconds > VIDEO_PAD_EPSILON_SECONDS:
                 video_filters.append(f"tpad=stop_mode=clone:stop_duration={pad_seconds:.3f}")
             if audio_map is not None:
@@ -149,7 +205,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
                 audio_map = "[apadded]"
 
         if request.subtitle_cues:
-            subtitle_path = self._write_subtitles(request, output_path)
+            subtitle_path = self._write_subtitles(request, output_path, lead_in)
             video_filters.append(f"subtitles={_escape_filter_path(subtitle_path)}")
             # Burning subtitles paints new pixels, so the video stream has to be
             # re-encoded — it can no longer be stream-copied.
@@ -163,12 +219,19 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             filter_parts.append(f"[0:v]{','.join(video_filters)}[vout]")
             video_map = "[vout]"
 
+        if audio_map is not None:
+            # Last link in the audio chain, so it normalises whatever the mix
+            # ended up being — narration alone, or narration plus ducked music.
+            filter_parts.append(f"{audio_map}{LOUDNORM_FILTER}[anorm]")
+            audio_map = "[anorm]"
+
         cmd += ["-filter_complex", ";".join(filter_parts)] if filter_parts else []
         cmd += ["-map", video_map]
         if audio_map is not None:
             cmd += ["-map", audio_map]
         else:
             cmd += ["-an"]
+
         cmd += video_codec
         if video_codec != ["-c:v", "copy"]:
             # Keyframe every 2 seconds, which is what YouTube's ingestion
@@ -207,11 +270,26 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         return max(request.video_duration_seconds, last_narration_end)
 
     @staticmethod
-    def _write_subtitles(request: VideoAssemblyRequest, output_path: str) -> str:
+    def _write_subtitles(
+        request: VideoAssemblyRequest, output_path: str, lead_in: float = 0.0
+    ) -> str:
         style = request.subtitle_style or SubtitleStyle()
         subtitle_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.ass")
+        cues = request.subtitle_cues or []
+        if lead_in:
+            # Shifted by the same lead-in as the picture and the audio, or the
+            # captions would run ahead of the voice by exactly that much.
+            cues = [
+                SubtitleCue(
+                    scene_index=cue.scene_index,
+                    text=cue.text,
+                    start_time=cue.start_time + lead_in,
+                    end_time=cue.end_time + lead_in,
+                )
+                for cue in cues
+            ]
         write_subtitle_file(
-            request.subtitle_cues or [],
+            cues,
             style,
             subtitle_path,
             play_res=_probe_resolution(request.video_path),

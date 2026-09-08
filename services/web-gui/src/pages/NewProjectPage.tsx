@@ -45,6 +45,9 @@ export function NewProjectPage() {
             }
           : undefined,
         render_quality: draft.renderQuality,
+        background_music_volume: draft.backgroundMusicPath
+          ? draft.backgroundMusicVolume
+          : undefined,
       });
       navigate(`/projects/${projectId}/render`);
     } catch (err) {
@@ -98,6 +101,8 @@ export function NewProjectPage() {
             <BackgroundMusicPicker
               projectId={draft.projectId}
               value={draft.backgroundMusicPath}
+              volume={draft.backgroundMusicVolume}
+              onVolumeChange={(v) => dispatch({ type: "SET_BACKGROUND_MUSIC_VOLUME", payload: v })}
               onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
             />
 

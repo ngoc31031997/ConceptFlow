@@ -33,8 +33,8 @@ def test_unknown_voice_id_raises():
     ("voice_id", "language", "expected"),
     [
         ("en_US-ryan-high", "en", "en_US-ryan-high"),
-        (None, "vi", "vi_VN-vais1000-medium"),
-        ("retired-voice", "en", "en_US-lessac-medium"),
+        (None, "vi", "vi-VN-Wavenet-A"),
+        ("retired-voice", "en", "en-US-Wavenet-F"),
     ],
 )
 def test_resolve_voice_id_falls_back_to_language_default(voice_id, language, expected):

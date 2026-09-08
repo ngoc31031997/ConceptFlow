@@ -77,6 +77,8 @@ class VideoAssemblyRequest:
     narration_segments: list[NarrationSegment]
     video_duration_seconds: float = 0.0
     background_music_path: str | None = None
+    # CR-005 FR14.2 — Creator-chosen music level, 0.0-1.0.
+    background_music_volume: float = 0.2
     subtitle_cues: list[SubtitleCue] | None = None
     subtitle_style: SubtitleStyle | None = None
 

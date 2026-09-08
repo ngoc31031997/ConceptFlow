@@ -26,7 +26,8 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.tts_engines.piper_adapter import PiperTTSAdapter
-from adapters.tts_engines.voice_registry import VOICES
+from adapters.tts_engines.routing_engine import RoutingTTSEngine
+from adapters.tts_engines.voice_registry import ENGINE_PIPER, VOICES, voices_for_engine
 from adapters.tts_engines.voice_samples import generate_missing_samples
 from application.synthesize_speech import SynthesizeSpeechUseCase
 from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
@@ -39,8 +40,41 @@ RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 READY_SENTINEL_PATH = "/tmp/ready"
 
 
+def build_engine() -> RoutingTTSEngine:
+    """Google when credentials are present, Piper otherwise (ADR-0023).
+
+    Piper is always constructed: it is the fallback path, so the service must
+    be able to speak even with no network or credentials at all.
+    """
+    piper = PiperTTSAdapter(
+        voice_ids=[voice.voice_id for voice in voices_for_engine(ENGINE_PIPER)]
+    )
+
+    google = None
+    if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+        try:
+            from adapters.tts_engines.google_adapter import GoogleTTSAdapter
+
+            google = GoogleTTSAdapter()
+        except ImportError:
+            # The library is optional so the image still builds and runs
+            # offline-only. Warn rather than fail — Piper covers it.
+            logger.warning(
+                "GOOGLE_APPLICATION_CREDENTIALS is set but google-cloud-texttospeech "
+                "is not installed; every voice will use the offline engine."
+            )
+    else:
+        logger.warning(
+            "GOOGLE_APPLICATION_CREDENTIALS is not set — narration will use the "
+            "offline Piper voices, which are noticeably lower quality and are the "
+            "largest monetization risk in this pipeline (ADR-0023)."
+        )
+
+    return RoutingTTSEngine(piper=piper, google=google)
+
+
 async def run() -> None:
-    engine = PiperTTSAdapter(voice_ids=[voice.voice_id for voice in VOICES])
+    engine = build_engine()
     batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
     generate_missing_samples(engine)
 

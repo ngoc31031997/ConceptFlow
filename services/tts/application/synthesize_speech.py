@@ -31,7 +31,9 @@ class SynthesizeSpeechUseCase:
             raise UnsupportedLanguageError(request.language, list(SUPPORTED_LANGUAGES))
 
         voice_id = resolve_voice_id(request.voice_id, request.language)
-        audio_path = compute_audio_path(request.project_id, request.scene_index, voice_id)
+        # The text is part of the key: without it, editing a narration line and
+        # re-rendering silently reused the previous line's audio (CR-005 FR13.6).
+        audio_path = compute_audio_path(request.project_id, request.scene_index, voice_id, text)
 
         if audio_exists(audio_path):
             # Idempotency (Business Rule 4): reuse the artifact from a prior call

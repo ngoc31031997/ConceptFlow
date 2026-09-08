@@ -7,6 +7,9 @@ interface BackgroundMusicPickerProps {
   projectId: string;
   value: string | null;
   onChange: (path: string | null) => void;
+  /** CR-005 FR14.2 — music level, 0.0-1.0. Was fixed at 0.2. */
+  volume: number;
+  onVolumeChange: (volume: number) => void;
 }
 
 type UploadState = "idle" | "uploading" | "success" | "error";
@@ -21,7 +24,13 @@ function MusicIcon() {
   );
 }
 
-export function BackgroundMusicPicker({ projectId, value, onChange }: BackgroundMusicPickerProps) {
+export function BackgroundMusicPicker({
+  projectId,
+  value,
+  onChange,
+  volume,
+  onVolumeChange,
+}: BackgroundMusicPickerProps) {
   const [enabled, setEnabled] = useState(value !== null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
@@ -119,6 +128,24 @@ export function BackgroundMusicPicker({ projectId, value, onChange }: Background
           {previewUrl && (
             /* eslint-disable-next-line jsx-a11y/media-has-caption */
             <audio controls src={previewUrl} className={styles.player} data-testid="music-preview-player" />
+          )}
+
+          {value && (
+            <label className={styles.volumeRow} data-testid="music-volume-row">
+              <span>Âm lượng nhạc nền: {Math.round(volume * 100)}%</span>
+              <input
+                type="range"
+                min={0}
+                max={0.6}
+                step={0.05}
+                value={volume}
+                data-testid="music-volume-slider"
+                onChange={(event) => onVolumeChange(Number(event.target.value))}
+              />
+              <span className={styles.volumeHint}>
+                Nhạc tự động hạ xuống khi có giọng đọc, nên không cần để quá nhỏ.
+              </span>
+            </label>
           )}
 
           {uploadState === "success" && (

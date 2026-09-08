@@ -17,6 +17,7 @@ export interface ProjectDraft {
   subtitlesEnabled: boolean;
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
+  backgroundMusicVolume: number;
 }
 
 /**
@@ -34,6 +35,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLES_ENABLED"; payload: boolean }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
+  | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
   | { type: "RESET" };
 
 export const defaultSubtitleStyle: SubtitleStyle = {
@@ -53,6 +55,7 @@ const initialDraft: ProjectDraft = {
   subtitlesEnabled: false,
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
+  backgroundMusicVolume: 0.2,
 };
 
 function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): ProjectDraft {
@@ -69,6 +72,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, voiceId: action.payload };
     case "SET_SUBTITLES_ENABLED":
       return { ...state, subtitlesEnabled: action.payload };
+    case "SET_BACKGROUND_MUSIC_VOLUME":
+      return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
     case "SET_SUBTITLE_STYLE":
