@@ -32,3 +32,35 @@ describe("NewProjectPage", () => {
     expect(screen.getByTestId("new-project-submit-button")).not.toBeDisabled();
   });
 });
+
+describe("NewProjectPage draft lifecycle", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  it("starts a fresh draft when the stored one already began a render", () => {
+    // Without this, going back to "/" after a render reused the same
+    // project_id and the next submit overwrote the previous video.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ connected: false }),
+    }) as unknown as typeof fetch;
+
+    window.localStorage.setItem(
+      "conceptflow.draft.v1",
+      JSON.stringify({ projectId: "spent-project", scriptContent: "old script", hasSubmitted: true }),
+    );
+
+    render(
+      <MemoryRouter>
+        <ProjectDraftProvider>
+          <NewProjectPage />
+        </ProjectDraftProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId("new-project-script-textarea")).toHaveValue("");
+    expect(screen.getByTestId("new-project-submit-button")).toBeDisabled();
+  });
+});

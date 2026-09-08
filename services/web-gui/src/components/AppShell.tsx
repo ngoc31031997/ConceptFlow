@@ -2,13 +2,20 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import styles from "./AppShell.module.css";
 
-const STEP_LABELS = ["Soạn nội dung", "Xử lý", "Xuất bản"] as const;
+/*
+  Only step 1 is work the Creator does; steps 2 and 3 are the pipeline running
+  and the upload. The labels say so, so the stepper reads as progress through
+  the project rather than three screens of forms to fill in.
+*/
+const STEP_LABELS = ["Soạn nội dung", "Xử lý tự động", "Đăng YouTube"] as const;
 
 interface AppShellProps {
   currentStep?: 1 | 2 | 3;
   title: string;
   subtitle: string;
   wide?: boolean;
+  /** Page-specific action rendered at the right of the top bar. */
+  headerAction?: ReactNode;
   children: ReactNode;
 }
 
@@ -20,7 +27,7 @@ function CheckIcon() {
   );
 }
 
-export function AppShell({ currentStep, title, subtitle, wide, children }: AppShellProps) {
+export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
   return (
     <div className={styles.stage}>
       <div className={`${styles.blob} ${styles.blob1}`} />
@@ -57,11 +64,12 @@ export function AppShell({ currentStep, title, subtitle, wide, children }: AppSh
             </div>
           )}
 
-          <div className={styles.spacer} />
-
-          <Link to="/videos" className={styles.logoName} style={{ fontSize: 12.5, fontWeight: 500 }}>
-            Danh sách video
-          </Link>
+          <div className={styles.headerActions}>
+            {headerAction}
+            <Link to="/videos" className={styles.headerLink}>
+              Danh sách video
+            </Link>
+          </div>
         </div>
 
         <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>

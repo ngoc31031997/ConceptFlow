@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NarrationPanel } from "../../src/components/NarrationPanel";
+import { defaultSubtitleStyle } from "../../src/context/ProjectDraftContext";
 import * as client from "../../src/api/client";
 
 const VOICES = [
@@ -33,13 +34,14 @@ const VOICES = [
 function renderPanel(overrides: Partial<React.ComponentProps<typeof NarrationPanel>> = {}) {
   const props = {
     voiceLanguage: "vi" as const,
-    onVoiceLanguageChange: vi.fn(),
     ttsEnabled: true,
     onTtsEnabledChange: vi.fn(),
     voiceId: "vi_VN-vais1000-medium",
     onVoiceIdChange: vi.fn(),
     subtitlesEnabled: false,
     onSubtitlesEnabledChange: vi.fn(),
+    subtitleStyle: defaultSubtitleStyle,
+    onSubtitleStyleChange: vi.fn(),
     ...overrides,
   };
   render(<NarrationPanel {...props} />);

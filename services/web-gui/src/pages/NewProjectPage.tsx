@@ -1,9 +1,9 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { NarrationPanel } from "../components/NarrationPanel";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
-import { SubtitleStylePanel } from "../components/SubtitleStylePanel";
+import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { AppShell } from "../components/AppShell";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
@@ -19,8 +19,29 @@ export function NewProjectPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // A draft that already started a saga belongs to an existing project.
+  // Reusing it here would re-run the saga against the same project_id and
+  // overwrite the video that draft produced.
+  useEffect(() => {
+    if (draft.hasSubmitted) dispatch({ type: "RESET" });
+  }, [draft.hasSubmitted, dispatch]);
+
   const scriptValidation = validateScript(draft.scriptContent);
-  const canSubmit = draft.scriptContent.trim().length > 0 && scriptValidation.isValid;
+  const isScriptEmpty = draft.scriptContent.trim().length === 0;
+  const canSubmit = !isScriptEmpty && scriptValidation.isValid;
+
+  const submitHint = error
+    ? error
+    : isScriptEmpty
+      ? "Dán hoặc tạo script Manim để bắt đầu"
+      : !scriptValidation.isValid
+        ? scriptValidation.message
+        : `Sẵn sàng render — ${scriptValidation.narrationCount} đoạn lời thoại`;
+
+  function scrollToScript() {
+    document.getElementById("script-validation")?.scrollIntoView({ behavior: "smooth", block: "center" });
+    document.getElementById("script-editor")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -49,6 +70,7 @@ export function NewProjectPage() {
           ? draft.backgroundMusicVolume
           : undefined,
       });
+      dispatch({ type: "MARK_SUBMITTED" });
       navigate(`/projects/${projectId}/render`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -65,6 +87,12 @@ export function NewProjectPage() {
         title="Tạo video mới"
         subtitle="Dán script Manim của bạn (đánh dấu lời thoại bằng # NARRATION), chọn giọng đọc và phụ đề, rồi bắt đầu render tự động."
       >
+        {/* The project's first decision — it drives everything below it. */}
+        <ContentLanguagePicker
+          value={draft.voiceLanguage}
+          onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+        />
+
         <div className={styles.layout}>
           <ScriptEditor
             value={draft.scriptContent}
@@ -75,7 +103,6 @@ export function NewProjectPage() {
           <div className={styles.sidebar}>
             <NarrationPanel
               voiceLanguage={draft.voiceLanguage}
-              onVoiceLanguageChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
               ttsEnabled={draft.ttsEnabled}
               onTtsEnabledChange={(enabled) => dispatch({ type: "SET_TTS_ENABLED", payload: enabled })}
               voiceId={draft.voiceId}
@@ -84,60 +111,72 @@ export function NewProjectPage() {
               onSubtitlesEnabledChange={(enabled) =>
                 dispatch({ type: "SET_SUBTITLES_ENABLED", payload: enabled })
               }
+              subtitleStyle={draft.subtitleStyle}
+              onSubtitleStyleChange={(patch) => dispatch({ type: "SET_SUBTITLE_STYLE", payload: patch })}
             />
 
-            <RenderQualityPicker
-              value={draft.renderQuality}
-              onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
-            />
+            {/*
+              Quality already defaults to what a published video needs, and
+              music is optional — neither is worth the vertical space that used
+              to push the submit button off screen.
+            */}
+            <details className={`${glass.card} ${styles.advanced}`} data-testid="advanced-settings">
+              <summary className={styles.advancedSummary}>
+                <span className={glass.cardTitle}>Tuỳ chọn nâng cao</span>
+                <span className={styles.advancedHint}>Chất lượng video, nhạc nền</span>
+              </summary>
+              <div className={styles.advancedBody}>
+                <RenderQualityPicker
+                  value={draft.renderQuality}
+                  onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
+                />
 
-            {draft.subtitlesEnabled && (
-              <SubtitleStylePanel
-                value={draft.subtitleStyle}
-                onChange={(patch) => dispatch({ type: "SET_SUBTITLE_STYLE", payload: patch })}
-              />
-            )}
-
-            <BackgroundMusicPicker
-              projectId={draft.projectId}
-              value={draft.backgroundMusicPath}
-              volume={draft.backgroundMusicVolume}
-              onVolumeChange={(v) => dispatch({ type: "SET_BACKGROUND_MUSIC_VOLUME", payload: v })}
-              onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
-            />
-
-            <div className={`${glass.card} ${styles.ctaCard}`}>
-              {error && (
-                <p role="alert" className={glass.helperText} style={{ marginRight: 0 }}>
-                  {error}
-                </p>
-              )}
-              {!error && !canSubmit && draft.scriptContent.trim().length === 0 && (
-                <p className={glass.helperText} style={{ marginRight: 0 }}>
-                  Dán script Manim để tiếp tục
-                </p>
-              )}
-              {!error && !canSubmit && draft.scriptContent.trim().length > 0 && (
-                <p className={glass.helperText} style={{ marginRight: 0 }}>
-                  Sửa lỗi định dạng script (xem cảnh báo phía trên) trước khi render
-                </p>
-              )}
-              <button
-                type="button"
-                data-testid="new-project-submit-button"
-                className={`${glass.btnPrimary} ${styles.btnPrimaryFull}`}
-                disabled={!canSubmit || isSubmitting}
-                onClick={handleSubmit}
-              >
-                Bắt đầu render
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M5 12h14M13 6l6 6-6 6" />
-                </svg>
-              </button>
-            </div>
+                <BackgroundMusicPicker
+                  projectId={draft.projectId}
+                  value={draft.backgroundMusicPath}
+                  volume={draft.backgroundMusicVolume}
+                  onVolumeChange={(v) => dispatch({ type: "SET_BACKGROUND_MUSIC_VOLUME", payload: v })}
+                  onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
+                />
+              </div>
+            </details>
           </div>
         </div>
       </AppShell>
+
+      {/*
+        The submit button used to be the last card in a sidebar taller than the
+        viewport — its sticky positioning could never engage, so the primary
+        action of the page was permanently below the fold. It now rides a bar
+        pinned to the bottom of the window.
+      */}
+      <div className={styles.submitBar}>
+        <div className={styles.submitBarInner}>
+          <p
+            className={`${styles.submitHint} ${error || (!canSubmit && !isScriptEmpty) ? styles.submitHintError : ""}`}
+            role={error ? "alert" : "status"}
+          >
+            {submitHint}
+          </p>
+          {!canSubmit && !isScriptEmpty && (
+            <button type="button" className={glass.ghostBtn} onClick={scrollToScript}>
+              Xem lỗi
+            </button>
+          )}
+          <button
+            type="button"
+            data-testid="new-project-submit-button"
+            className={glass.btnPrimary}
+            disabled={!canSubmit || isSubmitting}
+            onClick={handleSubmit}
+          >
+            {isSubmitting ? "Đang gửi..." : "Bắt đầu render"}
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

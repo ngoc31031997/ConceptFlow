@@ -3,22 +3,21 @@ import { listVoices } from "../api/client";
 import type { Voice } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./NarrationPanel.module.css";
+import { SubtitleStyleFields } from "./SubtitleStylePanel";
+import type { SubtitleStyle } from "../context/ProjectDraftContext";
 
 interface NarrationPanelProps {
+  /** Set on the content-language picker; this panel only reads it. */
   voiceLanguage: "vi" | "en";
-  onVoiceLanguageChange: (lang: "vi" | "en") => void;
   ttsEnabled: boolean;
   onTtsEnabledChange: (enabled: boolean) => void;
   voiceId: string | null;
   onVoiceIdChange: (voiceId: string | null) => void;
   subtitlesEnabled: boolean;
   onSubtitlesEnabledChange: (enabled: boolean) => void;
+  subtitleStyle: SubtitleStyle;
+  onSubtitleStyleChange: (patch: Partial<SubtitleStyle>) => void;
 }
-
-const LANGUAGES: { value: "vi" | "en"; label: string }[] = [
-  { value: "vi", label: "Tiếng Việt" },
-  { value: "en", label: "English" },
-];
 
 const GENDER_LABEL: Record<string, string> = { female: "Nữ", male: "Nam" };
 
@@ -56,15 +55,26 @@ function Toggle({
   );
 }
 
+/**
+ * Narration and subtitles, each toggle followed immediately by its own
+ * settings.
+ *
+ * Both used to live elsewhere: the subtitle style was a sibling card that
+ * appeared and disappeared from the sidebar — shifting everything below it,
+ * including the submit button — and the content language sat between the two
+ * toggles even though it drives the whole project (it is now its own card at
+ * the top of the page).
+ */
 export function NarrationPanel({
   voiceLanguage,
-  onVoiceLanguageChange,
   ttsEnabled,
   onTtsEnabledChange,
   voiceId,
   onVoiceIdChange,
   subtitlesEnabled,
   onSubtitlesEnabledChange,
+  subtitleStyle,
+  onSubtitleStyleChange,
 }: NarrationPanelProps) {
   const [voices, setVoices] = useState<Voice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -123,53 +133,9 @@ export function NarrationPanel({
         onChange={onTtsEnabledChange}
         testId="narration-tts-toggle"
       />
-      <Toggle
-        label="Phụ đề"
-        hint={subtitlesEnabled ? "Hiển thị lời thoại trên khung hình" : "Không hiển thị phụ đề"}
-        checked={subtitlesEnabled}
-        onChange={onSubtitlesEnabledChange}
-        testId="narration-subtitles-toggle"
-      />
-
-      {!ttsEnabled && !subtitlesEnabled && (
-        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Video sẽ không có lời thoại lẫn phụ đề — người xem chỉ thấy hình ảnh.
-        </p>
-      )}
-
-      {/*
-        The language picker sits OUTSIDE the TTS block (CR-008). It used to be
-        nested inside it, so a Creator with narration turned off could not pick
-        a language at all — and this is no longer just the voice's language: it
-        decides the subtitles, the YouTube title/description/tags and the
-        thumbnail prompt too.
-      */}
-      <div className={glass.cardHint} style={{ marginTop: 18, marginBottom: 8 }}>
-        Ngôn ngữ nội dung
-      </div>
-      <div className={styles.toggleRow} style={{ padding: 0, borderTop: "none" }}>
-        <div style={{ display: "flex", gap: 8, width: "100%" }}>
-          {LANGUAGES.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`${styles.voiceCard} ${voiceLanguage === option.value ? styles.selected : ""}`}
-              aria-pressed={voiceLanguage === option.value}
-              style={{ justifyContent: "center", flex: 1 }}
-              onClick={() => onVoiceLanguageChange(option.value)}
-              data-testid={`content-language-${option.value}`}
-            >
-              <span className={styles.voiceName}>{option.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-      <p className={glass.helperText} style={{ marginRight: 0, marginTop: 8 }}>
-        Quyết định giọng đọc, phụ đề, và ngôn ngữ tiêu đề/mô tả/tag khi đăng YouTube. Giao diện vẫn giữ tiếng Việt.
-      </p>
 
       {ttsEnabled && (
-        <>
+        <div className={styles.nested}>
           <div className={styles.voiceList} data-testid="narration-voice-list">
             {available.map((voice) => (
               <div
@@ -218,7 +184,27 @@ export function NarrationPanel({
           {voices !== null && available.length === 0 && (
             <p className={styles.status}>Chưa có giọng đọc nào cho ngôn ngữ này.</p>
           )}
-        </>
+        </div>
+      )}
+
+      <Toggle
+        label="Phụ đề"
+        hint={subtitlesEnabled ? "Hiển thị lời thoại trên khung hình" : "Không hiển thị phụ đề"}
+        checked={subtitlesEnabled}
+        onChange={onSubtitlesEnabledChange}
+        testId="narration-subtitles-toggle"
+      />
+
+      {subtitlesEnabled && (
+        <div className={styles.nested} data-testid="subtitle-style-panel">
+          <SubtitleStyleFields value={subtitleStyle} onChange={onSubtitleStyleChange} />
+        </div>
+      )}
+
+      {!ttsEnabled && !subtitlesEnabled && (
+        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
+          Video sẽ không có lời thoại lẫn phụ đề — người xem chỉ thấy hình ảnh.
+        </p>
       )}
     </div>
   );

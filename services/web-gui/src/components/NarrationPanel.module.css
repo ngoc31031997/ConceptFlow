@@ -118,3 +118,14 @@
   color: var(--ink-faint);
   margin-top: 12px;
 }
+
+/*
+  Settings that belong to the toggle right above them. Indenting and boxing
+  them makes the ownership visible, so a toggle and its options no longer read
+  as two unrelated blocks.
+*/
+.nested {
+  margin: 2px 0 6px 12px;
+  padding: 12px 0 12px 14px;
+  border-left: 2px solid rgba(47, 143, 224, 0.25);
+}

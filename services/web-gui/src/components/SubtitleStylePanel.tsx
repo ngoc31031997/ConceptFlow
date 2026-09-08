@@ -1,8 +1,7 @@
 import type { SubtitleStyle } from "../context/ProjectDraftContext";
-import glass from "../styles/glass.module.css";
 import styles from "./SubtitleStylePanel.module.css";
 
-interface SubtitleStylePanelProps {
+interface SubtitleStyleFieldsProps {
   value: SubtitleStyle;
   onChange: (patch: Partial<SubtitleStyle>) => void;
 }
@@ -28,13 +27,14 @@ const POSITIONS: { value: SubtitleStyle["position"]; label: string }[] = [
   { value: "top", label: "Trên" },
 ];
 
-export function SubtitleStylePanel({ value, onChange }: SubtitleStylePanelProps) {
+/**
+ * The subtitle style controls, without a card of their own: they now render
+ * nested under the subtitle toggle in NarrationPanel rather than as a sibling
+ * card that popped in and out of the sidebar.
+ */
+export function SubtitleStyleFields({ value, onChange }: SubtitleStyleFieldsProps) {
   return (
-    <div className={glass.card} style={{ padding: 22 }} data-testid="subtitle-style-panel">
-      <div className={glass.cardTitle} style={{ marginBottom: 14 }}>
-        Kiểu phụ đề
-      </div>
-
+    <>
       <div className={styles.preview} data-position={value.position} data-testid="subtitle-preview">
         <span
           className={styles.previewText}
@@ -116,6 +116,6 @@ export function SubtitleStylePanel({ value, onChange }: SubtitleStylePanelProps)
           ))}
         </div>
       </div>
-    </div>
+    </>
   );
 }

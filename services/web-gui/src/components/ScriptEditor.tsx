@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useRef, useState, type ChangeEvent } from "react";
 import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS, SCRIPT_TEMPLATES } from "./scriptTemplates";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
@@ -214,6 +214,8 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
   const [activePanel, setActivePanel] = useState<PromptPanel>(null);
   const [copied, setCopied] = useState(false);
   const [systemPromptCopied, setSystemPromptCopied] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const isEmpty = value.trim().length === 0;
 
   function togglePanel(panel: PromptPanel) {
     setActivePanel((current) => (current === panel ? null : panel));
@@ -251,7 +253,7 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
   }
 
   return (
-    <div className={glass.card}>
+    <div className={glass.card} id="script-editor">
       <div className={glass.cardHeader}>
         <div className={glass.cardTitle}>Script Manim (.py)</div>
         <div className={styles.headerActions}>
@@ -349,7 +351,51 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
         </div>
       )}
 
+      {/*
+        An empty editor used to be a bare code placeholder, with everything
+        that helps you fill it — the AI prompts, the starter script — hidden
+        inside a dropdown. The first screen now states the three ways in.
+      */}
+      {isEmpty && activePanel === null && (
+        <div className={styles.emptyState} data-testid="script-editor-empty-state">
+          <p className={styles.emptyStateTitle}>Bắt đầu bằng cách nào?</p>
+          <div className={styles.emptyStateOptions}>
+            <button
+              type="button"
+              className={styles.emptyStateOption}
+              data-testid="script-editor-empty-paste"
+              onClick={() => textareaRef.current?.focus()}
+            >
+              <WandIcon />
+              <span className={styles.emptyStateLabel}>Đã có script</span>
+              <span className={styles.emptyStateHint}>Dán trực tiếp vào ô bên dưới</span>
+            </button>
+            <button
+              type="button"
+              className={styles.emptyStateOption}
+              data-testid="script-editor-empty-ai"
+              onClick={() => setActivePanel("system")}
+            >
+              <SparkleIcon />
+              <span className={styles.emptyStateLabel}>Nhờ AI viết</span>
+              <span className={styles.emptyStateHint}>Copy prompt sang ChatGPT/Claude</span>
+            </button>
+            <button
+              type="button"
+              className={styles.emptyStateOption}
+              data-testid="script-editor-empty-template"
+              onClick={() => onChange(SCRIPT_TEMPLATES[contentLanguage])}
+            >
+              <TemplateIcon />
+              <span className={styles.emptyStateLabel}>Dùng script mẫu</span>
+              <span className={styles.emptyStateHint}>Xem một ví dụ chạy được ngay</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       <textarea
+        ref={textareaRef}
         className={`${glass.textArea} ${styles.textarea}`}
         data-testid="new-project-script-textarea"
         value={value}
@@ -362,6 +408,7 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
 
       {value.trim().length > 0 && (
         <div
+          id="script-validation"
           className={validation.isValid ? styles.validationOk : styles.validationError}
           data-testid="script-editor-validation"
         >

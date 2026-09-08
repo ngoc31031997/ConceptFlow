@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
+import glass from "../styles/glass.module.css";
 
 // Steps whose input comes straight from the "Soạn nội dung" screen
 // (script/plugin/category) — a failure here is most likely a bad input,
@@ -50,6 +51,11 @@ export function RenderPage() {
     <div data-testid="render-page">
       <AppShell
         currentStep={2}
+        headerAction={
+          <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
+            Tạo video mới
+          </Link>
+        }
         title={isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
         subtitle={
           isFailed
@@ -57,16 +63,23 @@ export function RenderPage() {
             : "Hệ thống đang tạo hoạt hình, giọng đọc và ghép video cho bạn."
         }
       >
-        {isFailed ? (
+        {/*
+          The tracker stays visible after a failure. Replacing it outright hid
+          how far the pipeline actually got, which is the first thing you want
+          to know when deciding between retrying and going back to the script.
+        */}
+        {isFailed && (
           <ErrorBanner
             errorMessage={retryError ?? errorMessage}
             onRetry={handleRetry}
             isRetrying={isRetrying}
             onBack={isInputError ? () => navigate("/") : undefined}
           />
-        ) : (
-          <ProgressTracker progressState={progressState} />
         )}
+        <ProgressTracker
+          progressState={failedStep ? { ...progressState, currentStep: failedStep } : progressState}
+          isFailed={isFailed}
+        />
       </AppShell>
     </div>
   );

@@ -1,4 +1,4 @@
-import { createContext, useReducer, type Dispatch, type ReactNode } from "react";
+import { createContext, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
 
 export interface SubtitleStyle {
   fontSize: "small" | "medium" | "large";
@@ -18,6 +18,13 @@ export interface ProjectDraft {
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
   backgroundMusicVolume: number;
+  /**
+   * True once this draft has been handed to the render saga. The draft then
+   * belongs to a project that already exists, so reusing it would start a
+   * second saga against the same project_id and overwrite the first video.
+   * NewProjectPage resets on mount when it sees this.
+   */
+  hasSubmitted: boolean;
 }
 
 /**
@@ -36,6 +43,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
+  | { type: "MARK_SUBMITTED" }
   | { type: "RESET" };
 
 export const defaultSubtitleStyle: SubtitleStyle = {
@@ -56,7 +64,38 @@ const initialDraft: ProjectDraft = {
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
   backgroundMusicVolume: 0.2,
+  hasSubmitted: false,
 };
+
+const STORAGE_KEY = "conceptflow.draft.v1";
+
+/**
+ * A draft only lived in memory, so a reload mid-edit threw away a script the
+ * Creator may have spent a while getting right. Persisting is best-effort:
+ * private browsing and a full quota both throw, and neither is worth failing
+ * the render over.
+ */
+function loadDraft(): ProjectDraft {
+  const fresh = { ...initialDraft, projectId: crypto.randomUUID() };
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return fresh;
+    const stored = JSON.parse(raw) as Partial<ProjectDraft>;
+    // A submitted draft is spent — never restore it onto a new session.
+    if (stored.hasSubmitted) return fresh;
+    return { ...fresh, ...stored, projectId: stored.projectId ?? fresh.projectId };
+  } catch {
+    return fresh;
+  }
+}
+
+function saveDraft(draft: ProjectDraft): void {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    /* storage unavailable or full — the draft simply will not survive a reload */
+  }
+}
 
 function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): ProjectDraft {
   switch (action.type) {
@@ -76,6 +115,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
+    case "MARK_SUBMITTED":
+      return { ...state, hasSubmitted: true };
     case "SET_SUBTITLE_STYLE":
       return { ...state, subtitleStyle: { ...state.subtitleStyle, ...action.payload } };
     case "RESET":
@@ -87,11 +128,12 @@ export const ProjectDraftContext = createContext<ProjectDraft>(initialDraft);
 export const ProjectDraftDispatchContext = createContext<Dispatch<ProjectDraftAction>>(() => {});
 
 export function ProjectDraftProvider({ children }: { children: ReactNode }) {
-  const [state, dispatch] = useReducer(
-    projectDraftReducer,
-    initialDraft,
-    (draft) => ({ ...draft, projectId: crypto.randomUUID() }),
-  );
+  const [state, dispatch] = useReducer(projectDraftReducer, initialDraft, loadDraft);
+
+  useEffect(() => {
+    saveDraft(state);
+  }, [state]);
+
   return (
     <ProjectDraftContext.Provider value={state}>
       <ProjectDraftDispatchContext.Provider value={dispatch}>

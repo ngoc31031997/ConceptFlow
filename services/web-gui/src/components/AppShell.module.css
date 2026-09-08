@@ -53,7 +53,8 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 180px;
+  flex: 1 1 0;
+  min-width: 180px;
   color: var(--ink);
 }
 .logo:hover {
@@ -124,8 +125,35 @@
   border-color: transparent;
 }
 
-.spacer {
-  width: 180px;
+/* Both sides flex so the step pill stays centred no matter how wide the
+   page-specific action is; nowrap keeps that action on one line. */
+.headerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 1 1 0;
+  min-width: 180px;
+}
+
+.headerActions > * {
+  white-space: nowrap;
+}
+
+.headerLink {
+  padding: 8px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: var(--ink-soft);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.headerLink:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
 }
 
 .mainCol {
@@ -158,8 +186,8 @@
   .topbar {
     padding: 20px 20px 0;
   }
-  .spacer {
-    display: none;
+  .headerActions {
+    min-width: 0;
   }
   .stepsPill {
     order: 1;

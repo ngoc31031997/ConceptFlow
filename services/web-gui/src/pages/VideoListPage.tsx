@@ -5,23 +5,7 @@ import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../ap
 import type { ProjectSummary } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
-
-const STATUS_LABELS: Record<string, string> = {
-  draft: "Nháp",
-  parsing_script: "Đang xử lý kịch bản",
-  classifying_scenes: "Đang phân loại cảnh",
-  synthesizing_speech: "Đang tổng hợp giọng đọc",
-  rendering: "Đang render",
-  assembling_video: "Đang ghép video",
-  ready_to_publish: "Sẵn sàng đăng",
-  publishing: "Đang đăng",
-  published: "Đã đăng",
-};
-
-function statusLabel(status: string): string {
-  if (status.startsWith("failed_at_")) return "Thất bại";
-  return STATUS_LABELS[status] ?? status;
-}
+import { statusLabel } from "../utils/pipelineLabels";
 
 function statusBadgeClass(status: string): string {
   if (status.startsWith("failed_at_")) return styles.badgeFailed;
@@ -124,7 +108,15 @@ export function VideoListPage() {
 
   return (
     <div data-testid="video-list-page">
-      <AppShell title="Danh sách video" subtitle="Tất cả video đã tạo, kể cả những video render thất bại. Xoá video không dùng nữa để giảm dung lượng.">
+      <AppShell
+        title="Danh sách video"
+        subtitle="Tất cả video đã tạo, kể cả những video render thất bại. Xoá video không dùng nữa để giảm dung lượng."
+        headerAction={
+          <Link to="/" className={glass.btnPrimary} style={{ textDecoration: "none", padding: "9px 16px", fontSize: 13 }}>
+            Tạo video mới
+          </Link>
+        }
+      >
         {error && (
           <p role="alert" className={glass.helperText}>
             {error}
