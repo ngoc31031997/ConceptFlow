@@ -67,6 +67,9 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_quality TEXT NOT NULL DEFAU
 -- CR-005: Creator-chosen background music level. 0 means unset, which assembly
 -- reads as the 0.2 the level was fixed at before this was adjustable.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS background_music_volume DOUBLE PRECISION NOT NULL DEFAULT 0;
+-- CR-006: chapter markers from the script. Timestamps are not stored — they are
+-- derived from wait_offsets, so a re-render moves the chapters with the video.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS chapters JSONB;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,

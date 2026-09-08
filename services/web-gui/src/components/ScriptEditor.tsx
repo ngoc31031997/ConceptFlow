@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
-import { SCRIPT_TEMPLATES } from "./scriptTemplates";
+import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS, SCRIPT_TEMPLATES } from "./scriptTemplates";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { validateScript } from "../utils/scriptValidation";
@@ -282,6 +282,24 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
               <button type="button" className={styles.toolsDropdownItem} onClick={() => onChange(SCRIPT_TEMPLATES[contentLanguage])}>
                 <TemplateIcon />
                 Dùng script mẫu
+              </button>
+              <button
+                type="button"
+                className={styles.toolsDropdownItem}
+                data-testid="script-editor-insert-hook"
+                onClick={() => onChange(`${value}\n${HOOK_SNIPPETS[contentLanguage]}`)}
+              >
+                <TemplateIcon />
+                Chèn hook mở đầu
+              </button>
+              <button
+                type="button"
+                className={styles.toolsDropdownItem}
+                data-testid="script-editor-insert-end-screen"
+                onClick={() => onChange(`${value}\n${END_SCREEN_SNIPPETS[contentLanguage]}`)}
+              >
+                <TemplateIcon />
+                Chèn end screen
               </button>
             </div>
           </details>

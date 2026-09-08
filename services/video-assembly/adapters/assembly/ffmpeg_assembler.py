@@ -76,6 +76,18 @@ LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
 DEFAULT_LEAD_IN_SECONDS = 0.0
 DEFAULT_TAIL_SECONDS = 0.0
 
+# Auto-generated thumbnail candidate (CR-006 FR16). YouTube wants 1280x720 and
+# under 2MB; q=3 lands comfortably inside that for a Manim frame, which is flat
+# colour and text rather than photographic detail.
+THUMBNAIL_WIDTH = 1280
+THUMBNAIL_HEIGHT = 720
+THUMBNAIL_QUALITY = 3
+
+# Grabbed a quarter of the way in rather than at the start: the opening frames
+# of a Manim video are usually a title card or an empty stage, which makes a
+# poor thumbnail. A quarter in is reliably inside the actual content.
+THUMBNAIL_POSITION_FRACTION = 0.25
+
 # Below this, padding the video is not worth re-encoding it for.
 VIDEO_PAD_EPSILON_SECONDS = 0.05
 
@@ -248,6 +260,43 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             cmd += ["-shortest"]
         cmd += [output_path]
         self._run_ffmpeg(cmd)
+
+        self._write_thumbnail_candidate(output_path, target_duration)
+
+    def _write_thumbnail_candidate(self, video_path: str, duration: float | None) -> None:
+        """Extracts a still the Creator can use as a thumbnail (CR-006 FR16.1).
+
+        Deliberately no text overlay. The title does not exist yet at assembly
+        time — it is drafted later, at publish — so anything burned in here
+        would be guesswork. The Creator gets a usable frame and can replace it
+        with their own image, which the existing upload path already supports.
+
+        Best-effort: a missing thumbnail is a small inconvenience, while
+        failing an assembled video over one would not be.
+        """
+        if not duration or duration <= 0:
+            return
+
+        thumbnail_dir = os.path.join(os.path.dirname(video_path), "..", "thumbnail")
+        thumbnail_dir = os.path.normpath(thumbnail_dir)
+        thumbnail_path = os.path.join(thumbnail_dir, "auto.jpg")
+        if os.path.exists(thumbnail_path):
+            return
+
+        try:
+            os.makedirs(thumbnail_dir, exist_ok=True)
+            self._run_ffmpeg([
+                "-y",
+                "-ss", f"{duration * THUMBNAIL_POSITION_FRACTION:.3f}",
+                "-i", video_path,
+                "-frames:v", "1",
+                "-vf", f"scale={THUMBNAIL_WIDTH}:{THUMBNAIL_HEIGHT}:force_original_aspect_ratio=increase,"
+                       f"crop={THUMBNAIL_WIDTH}:{THUMBNAIL_HEIGHT}",
+                "-q:v", str(THUMBNAIL_QUALITY),
+                thumbnail_path,
+            ])
+        except AssemblyEngineError:
+            logger.warning("Could not generate a thumbnail candidate for %s", video_path)
 
     @staticmethod
     def _target_duration(

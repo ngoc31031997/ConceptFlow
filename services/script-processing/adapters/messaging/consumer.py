@@ -75,7 +75,7 @@ class ParseScriptCommandHandler:
         else:
             event_type = "script_parsed"
             out_envelope = success_envelope(
-                saga_id, project_id, parsed.scenes, parsed.scene_class_name
+                saga_id, project_id, parsed.scenes, parsed.scene_class_name, parsed.chapters
             )
 
         async with self._pool.acquire() as conn, conn.transaction():

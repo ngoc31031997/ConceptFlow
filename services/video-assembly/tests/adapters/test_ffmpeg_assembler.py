@@ -498,3 +498,77 @@ def test_lead_in_shifts_picture_audio_and_subtitles_together(tmp_path):
         assert "0:00:10.50" in f.read()
     # 60s video + 0.5 lead-in + 1.0 tail.
     assert args[args.index("-t") + 1] == "61.500"
+
+
+def ffmpeg_calls(mock_run):
+    return [c[0][0] for c in mock_run.call_args_list if c[0][0] and c[0][0][0] == "ffmpeg"]
+
+
+def test_a_thumbnail_candidate_is_extracted(tmp_path):
+    """CR-006 FR16.1. No text is burned in: the title does not exist yet at
+    assembly time, so anything overlaid here would be guesswork."""
+    assembler = FfmpegVideoAssembler()
+    video_dir = tmp_path / "proj-1" / "video"
+    video_dir.mkdir(parents=True)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=200.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(video_dir / "final.mp4"))
+
+    thumbnail_call = ffmpeg_calls(mock_run)[-1]
+    joined = " ".join(thumbnail_call)
+    assert "1280:720" in joined
+    assert "-frames:v" in thumbnail_call
+    # A quarter of the way in — the opening frames of a Manim video are a title
+    # card or an empty stage.
+    assert thumbnail_call[thumbnail_call.index("-ss") + 1] == "50.000"
+    assert thumbnail_call[-1].endswith("thumbnail/auto.jpg")
+
+
+def test_thumbnail_failure_does_not_fail_the_assembly(tmp_path):
+    """A missing thumbnail is a small inconvenience; losing an assembled video
+    over one would not be."""
+    assembler = FfmpegVideoAssembler()
+    video_dir = tmp_path / "proj-1" / "video"
+    video_dir.mkdir(parents=True)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=200.0,
+    )
+
+    calls = {"n": 0}
+
+    def fail_on_thumbnail(cmd, *args, **kwargs):
+        if cmd and cmd[0] == "ffmpeg":
+            calls["n"] += 1
+            if calls["n"] > 1:  # the thumbnail pass
+                return FakeCompletedProcess(returncode=1, stderr="boom")
+        return fake_run_factory()(cmd, *args, **kwargs)
+
+    with patch("subprocess.run", side_effect=fail_on_thumbnail):
+        assembler.assemble(request, str(video_dir / "final.mp4"))
+
+
+def test_no_thumbnail_without_a_known_duration(tmp_path):
+    """Without a duration there is no sensible frame to pick."""
+    assembler = FfmpegVideoAssembler()
+    video_dir = tmp_path / "proj-1" / "video"
+    video_dir.mkdir(parents=True)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=0.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(video_dir / "final.mp4"))
+
+    assert len(ffmpeg_calls(mock_run)) == 1

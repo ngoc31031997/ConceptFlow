@@ -186,6 +186,10 @@ Theo tinh thần Adaptive Workflow và tiền lệ CR-001 (1 file LLD chung thay
 | 7 | CR-006 — cách gom chapter (marker `# CHAPTER:` vs LLM tự gom) | Low-Level Design của CR-006 |
 | 8 | CR-007 — có làm adapter TikTok API không? | Low-Level Design của CR-007 |
 
+## Quyết định 2026-09-08: hoãn CR-007
+
+Creator yêu cầu đưa CR-007 (clip dọc 9:16 cho Shorts/TikTok) vào backlog, làm sau khi các CR còn lại (002–006, 008) đã ổn định và verify được trên stack thật. CR-007 vẫn giữ nguyên toàn bộ phân tích, tiêu chí nghiệm thu và 2 preset đã chốt (`short` ≤60s / `long` 60–180s) trong `cr-007-vertical-shorts-tiktok.md` — không cần viết lại khi quay lại làm, chỉ cần bắt đầu từ bước 3B.
+
 ## Pha 4 — CR-008: ngôn ngữ nội dung
 
 Không phụ thuộc CR nào; có thể chen vào bất kỳ lúc nào sau Pha 1.

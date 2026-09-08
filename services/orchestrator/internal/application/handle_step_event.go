@@ -197,6 +197,7 @@ var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
 func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event StepEvent, project *domain.Project) error {
 	scenes := parseInitialScenes(event.Payload)
 	project.Scenes = scenes
+	project.Chapters = parseChapters(event.Payload)
 	project.ManimSceneClassName = stringFromPayload(event.Payload, "scene_class_name")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err

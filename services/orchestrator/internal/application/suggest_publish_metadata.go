@@ -47,12 +47,33 @@ func (uc *SuggestPublishMetadataUseCase) Execute(ctx context.Context, projectID 
 		return nil, fmt.Errorf("project has no script content to summarize")
 	}
 
-	title, description, tags, err := uc.suggester.Suggest(
+	title, summary, tags, err := uc.suggester.Suggest(
 		ctx, project.ScriptContent, project.CategoryHint, project.ContentLanguage,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("suggest metadata: %w", err)
 	}
 
+	// CR-006 FR15.2/FR18.2 — chapters come from the Creator's own markers,
+	// timed by the offsets Rendering measured, so they land on the same frame
+	// as the narration that introduces them. The model is never asked to guess
+	// timestamps; it could not know them.
+	chapterLines := domain.BuildChapterTimestamps(
+		project.Chapters, project.WaitOffsets, project.RenderedVideoSeconds,
+	)
+	description := domain.ComposeDescription(
+		summary, chapterLines, callToActionFor(project.ContentLanguage), tags,
+	)
+
 	return &SuggestPublishMetadataOutput{Title: title, Description: description, Tags: tags}, nil
+}
+
+// callToActionFor is written per language rather than generated, since it is
+// fixed boilerplate — spending model tokens and risking a bad translation on
+// one unchanging sentence would be worse than writing it once.
+func callToActionFor(language domain.ContentLanguage) string {
+	if language == domain.LanguageVietnamese {
+		return "Nếu video hữu ích, hãy đăng ký kênh để không bỏ lỡ những bài tiếp theo."
+	}
+	return "If this helped, subscribe so you don't miss the next one."
 }

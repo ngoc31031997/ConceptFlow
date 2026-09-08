@@ -17,6 +17,29 @@ type synthesizedSceneData struct {
 
 // parseInitialScenes decodes the script_parsed payload's scenes array into
 // domain.Scene values (business-logic-model.md Bước 1/2).
+// parseChapters reads the optional `# CHAPTER:` markers (CR-006 FR15.1).
+// Absent or malformed entries yield no chapters rather than an error: a video
+// without chapters is fine, a saga that fails over a description detail is not.
+func parseChapters(payload map[string]interface{}) []domain.Chapter {
+	raw, _ := payload["chapters"].([]interface{})
+	chapters := make([]domain.Chapter, 0, len(raw))
+	for _, item := range raw {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		title := stringFromMap(m, "title")
+		if title == "" {
+			continue
+		}
+		chapters = append(chapters, domain.Chapter{
+			SceneIndex: intFromMap(m, "scene_index"),
+			Title:      title,
+		})
+	}
+	return chapters
+}
+
 func parseInitialScenes(payload map[string]interface{}) []domain.Scene {
 	raw, _ := payload["scenes"].([]interface{})
 	scenes := make([]domain.Scene, 0, len(raw))

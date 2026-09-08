@@ -179,6 +179,10 @@ type Project struct {
 
 	Scenes []Scene
 
+	// CR-006 — chapter markers from the script, resolved to timestamps only
+	// once Rendering reports where each narration actually starts.
+	Chapters []Chapter
+
 	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
 	VideoPath         *string
 

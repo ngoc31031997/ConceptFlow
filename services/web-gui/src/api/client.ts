@@ -25,6 +25,9 @@ export function getProjectThumbnailUrl(projectId: string): string {
 export interface ThumbnailInfo {
   exists: boolean;
   thumbnail_path: string | null;
+  /** True when the image is the frame Video Assembly extracted, not the
+   * Creator's own upload (CR-006 FR16). */
+  auto_generated?: boolean;
 }
 
 export function getThumbnailInfo(projectId: string): Promise<ThumbnailInfo> {

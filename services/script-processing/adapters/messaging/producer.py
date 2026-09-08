@@ -10,7 +10,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from domain.models import Scene
+from domain.models import Chapter, Scene
 
 EVENTS_EXCHANGE = "events.direct"
 EVENTS_ROUTING_KEY = "orchestrator"
@@ -29,7 +29,11 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
 
 
 def success_envelope(
-    saga_id: str, project_id: str, scenes: list[Scene], scene_class_name: str
+    saga_id: str,
+    project_id: str,
+    scenes: list[Scene],
+    scene_class_name: str,
+    chapters: list[Chapter] | None = None,
 ) -> dict:
     return build_envelope(
         saga_id,
@@ -46,6 +50,11 @@ def success_envelope(
                     "code_language": s.code_language,
                 }
                 for s in scenes
+            ],
+            # CR-006 FR15.1 — the Orchestrator turns these into timestamps
+            # using the offsets Rendering measures.
+            "chapters": [
+                {"scene_index": c.scene_index, "title": c.title} for c in (chapters or [])
             ],
         },
     )

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { ScriptEditor } from "../../src/components/ScriptEditor";
-import { SCRIPT_TEMPLATES } from "../../src/components/scriptTemplates";
+import {
+  END_SCREEN_SNIPPETS,
+  HOOK_SNIPPETS,
+  SCRIPT_TEMPLATES,
+} from "../../src/components/scriptTemplates";
 
 /**
  * CR-008 regressions. Choosing English used to change only the TTS voice: the
@@ -64,5 +68,44 @@ describe("content language drives the script editor", () => {
     expect(prompt.value).toContain("1800s");
     expect(prompt.value).not.toContain("timeout 300s");
     expect(prompt.value).toContain("5-10 phút");
+  });
+});
+
+describe("hook and end-screen snippets (CR-006 FR17)", () => {
+  it("keeps every snippet's NARRATION and wait(AUTO) balanced", () => {
+    // The renderer rejects a script where these drift (CR-002 FR10.5), and
+    // pasting a snippet must never be what breaks it.
+    const snippets = [
+      HOOK_SNIPPETS.vi,
+      HOOK_SNIPPETS.en,
+      END_SCREEN_SNIPPETS.vi,
+      END_SCREEN_SNIPPETS.en,
+    ];
+    for (const snippet of snippets) {
+      const markers = snippet.match(/# NARRATION: "/g) ?? [];
+      const autoWaits = snippet.match(/self\.wait\(AUTO\)/g) ?? [];
+      expect(markers.length).toBe(1);
+      expect(autoWaits.length).toBe(1);
+    }
+  });
+
+  it("does not put a wait(AUTO) inside a loop in any snippet", () => {
+    // A wait(AUTO) in a loop fires more often than its single marker, which is
+    // the most common way scripts break the count.
+    for (const snippet of [HOOK_SNIPPETS.vi, END_SCREEN_SNIPPETS.en]) {
+      expect(snippet).not.toMatch(/for .*:\s*[\s\S]*self\.wait\(AUTO\)/);
+    }
+  });
+
+  it("leaves a trailing hold for YouTube's end-screen elements", () => {
+    // A fixed wait, not AUTO — there is no narration over it.
+    expect(END_SCREEN_SNIPPETS.vi).toContain("self.wait(8)");
+    expect(END_SCREEN_SNIPPETS.en).toContain("self.wait(8)");
+  });
+
+  it("writes each snippet's narration in its own language", () => {
+    expect(HOOK_SNIPPETS.en).toMatch(/# NARRATION: "[A-Za-z]/);
+    expect(END_SCREEN_SNIPPETS.en).toContain("Subscribe");
+    expect(END_SCREEN_SNIPPETS.vi).toContain("đăng ký kênh");
   });
 });

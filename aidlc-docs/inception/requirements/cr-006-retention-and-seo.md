@@ -55,5 +55,7 @@ Requirements Analysis (Change Request)
 2. Thumbnail tự động sinh ra dùng được ngay (không bắt buộc phải sửa).
 3. Mô tả có đủ 4 phần theo FR18.2.
 
-## Câu hỏi còn mở
-1. Cách gom narration thành chapter: theo LLM, theo số scene cố định, hay Creator tự đánh dấu trong script (vd. `# CHAPTER: "..."`)? → đề xuất marker trong script, nhất quán với `# NARRATION:`.
+## Quyết định đã chốt khi implement (2026-09-08)
+1. **Gom chapter bằng marker `# CHAPTER: "..."` trong script**, không dùng LLM đoán ranh giới. Lý do: Creator đã quyết định cấu trúc khi viết script; để model đoán sẽ tạo chapter lệch khỏi nội dung thật. Marker gắn vào narration marker kế tiếp, nên timestamp luôn là offset thật Rendering đo được (CR-002) — không bao giờ là ước lượng.
+2. **FR17 (hook/end-screen) triển khai dưới dạng snippet Creator tự chèn**, không phải scene do hệ thống tự động thêm vào script. Lý do: renderer bắt buộc số `# NARRATION:` khớp tuyệt đối số `self.wait(AUTO)` (CR-002 FR10.5); tự động chèn scene vào script Creator đang soạn dở là cách dễ nhất phá vỡ bất biến này (đúng như CR-006 §C2 đã cảnh báo). Snippet tự mang theo đúng 1 cặp marker/wait nên giữ đúng số đếm theo cấu trúc.
+3. **Thumbnail tự động không burn chữ**, chỉ trích 1 frame đại diện (25% thời lượng video, tránh frame mở đầu thường là title card/màn hình trống). Lý do: tiêu đề chưa tồn tại ở bước assembly — nó được soạn sau, lúc publish — nên overlay chữ ở đây sẽ là đoán mò. Creator vẫn dùng được luồng upload thumbnail riêng sẵn có, và biết rõ ảnh nào là gợi ý tự động (đánh dấu `auto_generated` ở GUI).

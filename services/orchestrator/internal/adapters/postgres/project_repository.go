@@ -29,7 +29,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
-		       render_quality, background_music_volume
+		       render_quality, background_music_volume, chapters
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -41,12 +41,13 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		subtitleStyleJSON     []byte
 		waitOffsetsJSON       []byte
 		renderQuality         string
+		chaptersJSON          []byte
 	)
 	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeVideoURL, &p.ErrorMessage,
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
-		&renderQuality, &p.BackgroundMusicVolume)
+		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -60,6 +61,11 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	if youtubeVisibility != nil {
 		v := domain.Visibility(*youtubeVisibility)
 		p.YoutubeVisibility = &v
+	}
+	if len(chaptersJSON) > 0 {
+		if err := json.Unmarshal(chaptersJSON, &p.Chapters); err != nil {
+			return nil, err
+		}
 	}
 	if len(waitOffsetsJSON) > 0 {
 		if err := json.Unmarshal(waitOffsetsJSON, &p.WaitOffsets); err != nil {
@@ -164,6 +170,13 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		}
 	}
 
+	var chaptersJSON []byte
+	if project.Chapters != nil {
+		if chaptersJSON, err = json.Marshal(project.Chapters); err != nil {
+			return err
+		}
+	}
+
 	var waitOffsetsJSON []byte
 	if project.WaitOffsets != nil {
 		if waitOffsetsJSON, err = json.Marshal(project.WaitOffsets); err != nil {
@@ -176,8 +189,8 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_video_url, error_message,
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
-		                       render_quality, background_music_volume, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28, now())
+		                       render_quality, background_music_volume, chapters, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
@@ -195,6 +208,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    wait_offsets = EXCLUDED.wait_offsets, rendered_video_seconds = EXCLUDED.rendered_video_seconds,
 		    render_quality = EXCLUDED.render_quality,
 		    background_music_volume = EXCLUDED.background_music_volume,
+		    chapters = EXCLUDED.chapters,
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
 		project.CategoryHint, string(project.ContentLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
@@ -202,7 +216,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		project.YoutubeThumbnailPath, project.YoutubeVideoURL, project.ErrorMessage,
 		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON,
 		waitOffsetsJSON, project.RenderedVideoSeconds, string(project.RenderQuality),
-		project.BackgroundMusicVolume)
+		project.BackgroundMusicVolume, chaptersJSON)
 	return err
 }
 

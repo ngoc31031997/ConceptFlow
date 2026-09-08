@@ -230,3 +230,60 @@ export const SCRIPT_TEMPLATES: Record<"vi" | "en", string> = {
   vi: VIETNAMESE_TEMPLATE,
   en: ENGLISH_TEMPLATE,
 };
+
+/**
+ * Hook and end-screen snippets (CR-006 FR17).
+ *
+ * These are snippets the Creator inserts, not scenes the system injects. The
+ * renderer requires the number of `# NARRATION:` markers to match the number of
+ * `self.wait(AUTO)` calls exactly (CR-002 FR10.5), and injecting scenes around
+ * a script the Creator is still editing is the easiest way to break that
+ * invariant — CR-006 §C2 flagged it. A snippet carries its own matched pair, so
+ * pasting it keeps the count correct by construction.
+ *
+ * The hook exists because roughly 70% of viewers leave in the first 15 seconds;
+ * the end screen leaves the ~20 seconds YouTube's end-screen elements need.
+ */
+const HOOK_VI = `        # ---------- HOOK (5 giây đầu — giữ chân người xem) ----------
+        hook = Text("Câu hỏi khiến 90% người mới sai", font_size=44, weight=BOLD)
+        self.play(Write(hook), run_time=1.5)
+        # NARRATION: "Chỉ một chi tiết nhỏ ở đây thôi, mà rất nhiều người vẫn làm sai."
+        self.wait(AUTO)
+        self.play(FadeOut(hook), run_time=0.8)
+`;
+
+const HOOK_EN = `        # ---------- HOOK (first 5 seconds — earn the watch) ----------
+        hook = Text("The mistake almost everyone makes", font_size=44, weight=BOLD)
+        self.play(Write(hook), run_time=1.5)
+        # NARRATION: "There is one small detail here that a surprising number of people get wrong."
+        self.wait(AUTO)
+        self.play(FadeOut(hook), run_time=0.8)
+`;
+
+const END_SCREEN_VI = `        # ---------- END SCREEN (~20s cuối, chừa chỗ cho element của YouTube) ----------
+        outro = Text("Cảm ơn bạn đã xem!", font_size=44)
+        cta = Text("Đăng ký kênh để xem tiếp phần sau", font_size=28, color=GREY_B)
+        cta.next_to(outro, DOWN, buff=0.4)
+        self.play(Write(outro), FadeIn(cta, shift=UP * 0.2), run_time=2.0)
+        # NARRATION: "Nếu video hữu ích, hãy đăng ký kênh để không bỏ lỡ phần tiếp theo."
+        self.wait(AUTO)
+        # Khoảng lặng cuối để YouTube hiển thị end-screen element.
+        self.wait(8)
+`;
+
+const END_SCREEN_EN = `        # ---------- END SCREEN (last ~20s, leaving room for YouTube elements) ----------
+        outro = Text("Thanks for watching!", font_size=44)
+        cta = Text("Subscribe for the next one", font_size=28, color=GREY_B)
+        cta.next_to(outro, DOWN, buff=0.4)
+        self.play(Write(outro), FadeIn(cta, shift=UP * 0.2), run_time=2.0)
+        # NARRATION: "If this was useful, subscribe so you don't miss the next one."
+        self.wait(AUTO)
+        # Trailing hold so YouTube's end-screen elements have somewhere to sit.
+        self.wait(8)
+`;
+
+export const HOOK_SNIPPETS: Record<"vi" | "en", string> = { vi: HOOK_VI, en: HOOK_EN };
+export const END_SCREEN_SNIPPETS: Record<"vi" | "en", string> = {
+  vi: END_SCREEN_VI,
+  en: END_SCREEN_EN,
+};

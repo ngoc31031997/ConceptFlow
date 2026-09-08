@@ -9,6 +9,16 @@ const ALLOWED_MIME_TO_EXT = {
 };
 
 /**
+ * Thumbnails to look for, most-preferred first.
+ *
+ * A Creator's own upload always wins over `auto.jpg`, the candidate Video
+ * Assembly extracts from the finished video (CR-006 FR16). The auto one exists
+ * so a project is never publishable without any thumbnail at all — YouTube
+ * otherwise picks a frame itself, and its choice is rarely a good one.
+ */
+const THUMBNAIL_FILENAMES = ['thumbnail.jpg', 'thumbnail.png', 'auto.jpg'];
+
+/**
  * Saves an uploaded thumbnail image (multer memory buffer, field name
  * "thumbnail") to `<sharedDir>/<project_id>/thumbnail/thumbnail<ext>` — the
  * same shared_artifacts volume the rendering/assembly/publisher services
@@ -62,11 +72,11 @@ function thumbnailServeHandler(sharedDir) {
     const projectId = req.params.id;
     const dir = path.join(path.resolve(sharedDir), projectId, 'thumbnail');
 
-    const candidates = Object.values(ALLOWED_MIME_TO_EXT).map((ext) => path.join(dir, `thumbnail${ext}`));
+    const candidates = THUMBNAIL_FILENAMES.map((name) => path.join(dir, name));
 
     const tryNext = (index) => {
       if (index >= candidates.length) {
-        res.status(404).json({ error: 'no thumbnail uploaded for this project' });
+        res.status(404).json({ error: 'no thumbnail available for this project' });
         return;
       }
       const candidate = candidates[index];
@@ -95,11 +105,11 @@ function thumbnailInfoHandler(sharedDir) {
   return (req, res) => {
     const projectId = req.params.id;
     const dir = path.join(path.resolve(sharedDir), projectId, 'thumbnail');
-    const candidates = Object.values(ALLOWED_MIME_TO_EXT).map((ext) => path.join(dir, `thumbnail${ext}`));
+    const candidates = THUMBNAIL_FILENAMES.map((name) => path.join(dir, name));
 
     const tryNext = (index) => {
       if (index >= candidates.length) {
-        res.status(200).json({ exists: false, thumbnail_path: null });
+        res.status(200).json({ exists: false, thumbnail_path: null, auto_generated: false });
         return;
       }
       fs.stat(candidates[index], (err, stat) => {
@@ -107,7 +117,13 @@ function thumbnailInfoHandler(sharedDir) {
           tryNext(index + 1);
           return;
         }
-        res.status(200).json({ exists: true, thumbnail_path: candidates[index] });
+        res.status(200).json({
+          exists: true,
+          thumbnail_path: candidates[index],
+          // Lets the GUI say the image is a suggestion rather than the
+          // Creator's own choice, so they know they can replace it.
+          auto_generated: path.basename(candidates[index]) === 'auto.jpg',
+        });
       });
     };
     tryNext(0);
