@@ -67,6 +67,7 @@
 | CR-012 | Nhiều tài khoản YouTube trên nhiều OAuth client | P1 | **Code Generation ✅** | **Chờ Creator verify với Google thật** — 72/72 test publisher, 42/42 gateway, 68/68 web-gui, Go xanh. ADR-0026. Sửa luôn bug ghi đè credential khi nối kênh thứ hai |
 
 | CR-013 | Retry có backoff cho AzureTTSAdapter | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 87/87 test tts (19 cho azure_adapter). Đo thực tế trước khi sửa: 16/20 request 401 rải rác; sau khi sửa burst 8 scene đạt 8/8. Azure đã tự ổn định nên retry chưa bị kích hoạt thật — vẫn giữ làm bảo hiểm |
+| CR-014 | Sửa lỗi Gợi ý AI (tags null, title rỗng, prompt tràn context) | P0 bug | **Code Generation ✅** | **HOÀN THÀNH** — 3 lỗi chồng nhau; gốc rễ là script 17.5k ký tự vượt num_ctx=2048 của Ollama. Verify: project luôn lỗi nay trả 200 |
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status

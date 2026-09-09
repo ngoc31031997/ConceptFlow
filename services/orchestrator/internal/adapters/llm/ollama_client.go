@@ -53,9 +53,12 @@ type suggestedMetadata struct {
 	Tags        json.RawMessage `json:"tags"`
 }
 
+// normalizeTags never returns nil: a nil slice marshals to JSON `null`, and
+// the API contract says tags is an array. Returning null made the GUI crash on
+// `tags.join(", ")` the moment a model omitted the key.
 func normalizeTags(raw json.RawMessage) []string {
 	var asArray []string
-	if err := json.Unmarshal(raw, &asArray); err == nil {
+	if err := json.Unmarshal(raw, &asArray); err == nil && asArray != nil {
 		return asArray
 	}
 	var asString string
@@ -69,7 +72,7 @@ func normalizeTags(raw json.RawMessage) []string {
 		}
 		return tags
 	}
-	return nil
+	return []string{}
 }
 
 // YouTube limits titles to 100 *characters*.
@@ -97,7 +100,30 @@ func truncateTitle(title string) string {
 	return title
 }
 
+// maxScriptChars caps how much of the script reaches the model.
+//
+// Ollama defaults num_ctx to 2048 tokens. A full ten-minute script runs to
+// ~17,000 characters, which overflows that window and makes the model return a
+// well-formed but empty JSON object — measured: a 17.5k-character project
+// produced no title on every attempt, while a 12.7k one was already marginal.
+// Raising num_ctx instead would cost memory and latency on every request to fix
+// a problem the model does not actually need the whole script to avoid: a title
+// and a 2-4 sentence description are drawn from the opening, which is where the
+// topic is stated.
+const maxScriptChars = 4000
+
+// truncateScript cuts by runes, not bytes — Vietnamese is multibyte, and
+// slicing mid-rune would hand the model invalid UTF-8 (same reason as
+// truncateTitle).
+func truncateScript(script string) string {
+	if runes := []rune(script); len(runes) > maxScriptChars {
+		return string(runes[:maxScriptChars])
+	}
+	return script
+}
+
 func buildSuggestPrompt(scriptContent, categoryHint string, language domain.ContentLanguage) string {
+	scriptContent = truncateScript(scriptContent)
 	languageName := domain.ProfileFor(language).EnglishName
 	return fmt.Sprintf(`You are a YouTube SEO expert. Based on the video script below (topic: %q), produce:
 - "title": a compelling, SEO-friendly title, at most %d characters, written in %s.
@@ -115,6 +141,32 @@ Script:
 // Suggest asks the model for an SEO-oriented YouTube title, description and
 // tag list derived from the project's script content and category.
 func (c *OllamaClient) Suggest(
+	ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage,
+) (string, string, []string, error) {
+	// A small local model asked only for "valid JSON" sometimes returns a
+	// well-formed object with an empty title and no usable tags. That parses
+	// fine, so nothing used to catch it and the Creator got blank fields.
+	// One retry costs a few seconds and recovers most of those; two attempts
+	// rather than four because each call is slow and a browser is waiting.
+	var lastErr error
+	for attempt := 1; attempt <= suggestMaxAttempts; attempt++ {
+		title, description, tags, err := c.suggestOnce(ctx, scriptContent, categoryHint, language)
+		if err == nil {
+			return title, description, tags, nil
+		}
+		lastErr = err
+		// Stop immediately if the caller gave up: retrying into a dead context
+		// only delays the error the Creator is already waiting for.
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return "", "", nil, lastErr
+}
+
+const suggestMaxAttempts = 2
+
+func (c *OllamaClient) suggestOnce(
 	ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage,
 ) (string, string, []string, error) {
 	prompt := buildSuggestPrompt(scriptContent, categoryHint, language)
@@ -154,7 +206,12 @@ func (c *OllamaClient) Suggest(
 		return "", "", nil, fmt.Errorf("parse model output as JSON: %w", err)
 	}
 
-	title := strings.TrimSpace(suggestion.Title)
-	title = truncateTitle(title)
+	title := truncateTitle(strings.TrimSpace(suggestion.Title))
+	if title == "" {
+		// Valid JSON, useless content. Reported as an error so the Creator sees
+		// "gợi ý thất bại" and can retry, instead of a silently blank title
+		// field they might publish as-is.
+		return "", "", nil, fmt.Errorf("model returned no title")
+	}
 	return title, strings.TrimSpace(suggestion.Description), normalizeTags(suggestion.Tags), nil
 }

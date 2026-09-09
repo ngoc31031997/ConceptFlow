@@ -1,8 +1,14 @@
 package llm
 
 import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+	"unicode/utf8"
 
 	"orchestrator/internal/domain"
 )
@@ -83,4 +89,176 @@ func isValidUTF8(s string) bool {
 		}
 	}
 	return true
+}
+
+// --- normalizeTags: a nil slice marshals to JSON `null`, which broke the GUI ---
+
+func TestNormalizeTags_NeverReturnsNil(t *testing.T) {
+	// Each of these is a shape a small model actually emits. None may produce
+	// nil, because nil serialises to `null` and the GUI does tags.join(", ").
+	cases := map[string]string{
+		"missing key":   `null`,
+		"empty string":  `""`,
+		"a number":      `42`,
+		"an object":     `{"a":1}`,
+		"nested arrays": `[[1,2],[3]]`,
+	}
+	for name, raw := range cases {
+		t.Run(name, func(t *testing.T) {
+			got := normalizeTags([]byte(raw))
+			if got == nil {
+				t.Fatal("normalizeTags returned nil; it must return an empty slice so the JSON stays []")
+			}
+		})
+	}
+}
+
+func TestNormalizeTags_ParsesAnArray(t *testing.T) {
+	got := normalizeTags([]byte(`["thuật toán","sắp xếp"]`))
+
+	if len(got) != 2 || got[0] != "thuật toán" || got[1] != "sắp xếp" {
+		t.Fatalf("expected the two tags back, got %#v", got)
+	}
+}
+
+func TestNormalizeTags_ParsesACommaSeparatedString(t *testing.T) {
+	got := normalizeTags([]byte(`"thuật toán, sắp xếp , "`))
+
+	if len(got) != 2 || got[0] != "thuật toán" || got[1] != "sắp xếp" {
+		t.Fatalf("expected trimmed tags with the empty one dropped, got %#v", got)
+	}
+}
+
+func TestNormalizeTags_EmptyArrayStaysEmptyNotNil(t *testing.T) {
+	got := normalizeTags([]byte(`[]`))
+
+	if got == nil {
+		t.Fatal("an explicitly empty array must stay an empty slice, not become nil")
+	}
+	if len(got) != 0 {
+		t.Fatalf("expected no tags, got %#v", got)
+	}
+}
+
+// --- Suggest: valid JSON with useless content must not pass silently ---
+
+func newTestClient(t *testing.T, handler http.HandlerFunc) (*OllamaClient, *int) {
+	t.Helper()
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		handler(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	return NewOllamaClient(srv.URL, "test-model", 10*time.Second), &calls
+}
+
+func modelReplying(payload string) http.HandlerFunc {
+	return func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]string{"response": payload})
+	}
+}
+
+func TestSuggest_RetriesWhenTheModelReturnsNoTitle(t *testing.T) {
+	// The failure seen in production: well-formed JSON, empty title, null tags.
+	attempt := 0
+	client, calls := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempt++
+		if attempt == 1 {
+			modelReplying(`{"title":"","description":"d","tags":null}`)(w, r)
+			return
+		}
+		modelReplying(`{"title":"Sắp xếp nổi bọt","description":"d","tags":["a"]}`)(w, r)
+	})
+
+	title, _, tags, err := client.Suggest(context.Background(), "script", "topic", domain.LanguageVietnamese)
+	if err != nil {
+		t.Fatalf("expected the retry to recover, got %v", err)
+	}
+	if title != "Sắp xếp nổi bọt" {
+		t.Fatalf("expected the second attempt's title, got %q", title)
+	}
+	if tags == nil {
+		t.Fatal("tags must never be nil")
+	}
+	if *calls != 2 {
+		t.Fatalf("expected exactly 2 attempts, got %d", *calls)
+	}
+}
+
+func TestSuggest_FailsLoudlyWhenEveryAttemptIsUnusable(t *testing.T) {
+	client, calls := newTestClient(t, modelReplying(`{"title":"   ","description":"d","tags":null}`))
+
+	_, _, _, err := client.Suggest(context.Background(), "script", "topic", domain.LanguageVietnamese)
+
+	if err == nil {
+		t.Fatal("an empty title must surface as an error, not as blank fields the Creator might publish")
+	}
+	if *calls != suggestMaxAttempts {
+		t.Fatalf("expected %d attempts, got %d", suggestMaxAttempts, *calls)
+	}
+}
+
+func TestSuggest_DoesNotRetryIntoACancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	client, calls := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		cancel() // caller gave up while the first attempt was in flight
+		modelReplying(`{"title":"","description":"d","tags":null}`)(w, r)
+	})
+
+	if _, _, _, err := client.Suggest(ctx, "script", "topic", domain.LanguageVietnamese); err == nil {
+		t.Fatal("expected an error")
+	}
+	if *calls != 1 {
+		t.Fatalf("expected to stop after 1 attempt once the context died, got %d", *calls)
+	}
+}
+
+func TestSuggest_ReturnsAnEmptyTagArrayWhenTheModelOmitsTags(t *testing.T) {
+	client, _ := newTestClient(t, modelReplying(`{"title":"Có tiêu đề","description":"d"}`))
+
+	_, _, tags, err := client.Suggest(context.Background(), "script", "topic", domain.LanguageVietnamese)
+	if err != nil {
+		t.Fatalf("a missing tags key is not fatal, got %v", err)
+	}
+	if tags == nil {
+		t.Fatal("tags must be an empty slice so the JSON stays [] and the GUI can call join()")
+	}
+}
+
+// --- prompt size: the measured cause of the empty-title failures ---
+
+func TestBuildSuggestPrompt_CapsTheScriptItSendsToTheModel(t *testing.T) {
+	// A real ten-minute project's script is ~17k characters, which overflows
+	// Ollama's default 2048-token context and made the model return an empty
+	// object every time.
+	huge := strings.Repeat("Đây là một câu trong kịch bản. ", 2000)
+
+	prompt := buildSuggestPrompt(huge, "topic", domain.LanguageVietnamese)
+
+	if len([]rune(prompt)) > maxScriptChars+2000 {
+		t.Fatalf("prompt is %d runes; the script should have been capped near %d",
+			len([]rune(prompt)), maxScriptChars)
+	}
+}
+
+func TestTruncateScript_CutsByRunesNotBytes(t *testing.T) {
+	script := strings.Repeat("ế", maxScriptChars+500)
+
+	got := truncateScript(script)
+
+	if len([]rune(got)) != maxScriptChars {
+		t.Fatalf("expected %d runes, got %d", maxScriptChars, len([]rune(got)))
+	}
+	if !utf8.ValidString(got) {
+		t.Fatal("truncation produced invalid UTF-8; the model would receive broken text")
+	}
+}
+
+func TestTruncateScript_LeavesShortScriptsAlone(t *testing.T) {
+	script := "Kịch bản ngắn."
+
+	if got := truncateScript(script); got != script {
+		t.Fatalf("expected the script unchanged, got %q", got)
+	}
 }
