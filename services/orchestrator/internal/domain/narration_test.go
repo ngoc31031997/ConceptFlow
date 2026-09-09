@@ -28,3 +28,38 @@ func TestEstimateNarrationDuration_ShortAndEmptyTextGetMinimumOnScreenTime(t *te
 		}
 	}
 }
+
+func TestSubtitleModeIsValid(t *testing.T) {
+	valid := []SubtitleMode{SubtitleModeOff, SubtitleModeTrack, SubtitleModeBurnIn, SubtitleModeBoth}
+	for _, m := range valid {
+		if !m.IsValid() {
+			t.Fatalf("expected %q to be valid", m)
+		}
+	}
+	if SubtitleMode("bogus").IsValid() {
+		t.Fatal("expected an unknown mode to be invalid")
+	}
+	if SubtitleMode("").IsValid() {
+		t.Fatal("expected the zero value to be invalid, not silently treated as a real mode")
+	}
+}
+
+func TestSubtitleModeNeedsCues(t *testing.T) {
+	if SubtitleModeOff.NeedsCues() {
+		t.Fatal("expected off to need no cues")
+	}
+	for _, m := range []SubtitleMode{SubtitleModeTrack, SubtitleModeBurnIn, SubtitleModeBoth} {
+		if !m.NeedsCues() {
+			t.Fatalf("expected %q to need cues", m)
+		}
+	}
+}
+
+func TestSubtitleModeFromLegacy(t *testing.T) {
+	if got := SubtitleModeFromLegacy(true); got != SubtitleModeBurnIn {
+		t.Fatalf("expected legacy true to map to burn_in, got %q", got)
+	}
+	if got := SubtitleModeFromLegacy(false); got != SubtitleModeOff {
+		t.Fatalf("expected legacy false to map to off, got %q", got)
+	}
+}

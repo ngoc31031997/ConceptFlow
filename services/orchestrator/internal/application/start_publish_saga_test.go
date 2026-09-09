@@ -86,6 +86,69 @@ func TestStartPublishSagaUseCase_CarriesChannelIDIntoPayload(t *testing.T) {
 	}
 }
 
+// CR-015 FR38.4/FR39.3: caption_path and its language have to reach the
+// Publisher the same way thumbnail_path does — through this payload — since
+// that's the only thing the Publisher sees.
+func TestStartPublishSagaUseCase_CarriesCaptionPathAndLanguageIntoPayload(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	uc := NewStartPublishSagaUseCase(repo, pub)
+
+	videoPath := "video.mp4"
+	captionPath := "/shared/proj-1/video/final.srt"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID:       "proj-1",
+		Status:          domain.StatusReadyToPublish,
+		VideoPath:       &videoPath,
+		CaptionPath:     &captionPath,
+		ContentLanguage: domain.LanguageVietnamese,
+	}
+
+	if _, err := uc.Execute(context.Background(), StartPublishSagaInput{
+		ProjectID: "proj-1", Title: "My Video", Visibility: domain.VisibilityPublic,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	payload := pub.last().envelope.Payload
+	if payload["caption_path"] != captionPath {
+		t.Fatalf("expected caption_path %q in payload, got %v", captionPath, payload["caption_path"])
+	}
+	if payload["caption_language"] != "vi" {
+		t.Fatalf("expected caption_language vi in payload, got %v", payload["caption_language"])
+	}
+}
+
+// A project with no caption track (subtitles off, or burn-in only) must not
+// send either key — a Publisher reading a present-but-empty caption_path
+// would attempt to upload a caption track from a path that does not exist.
+func TestStartPublishSagaUseCase_OmitsCaptionFieldsWhenUnset(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	uc := NewStartPublishSagaUseCase(repo, pub)
+
+	videoPath := "video.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1",
+		Status:    domain.StatusReadyToPublish,
+		VideoPath: &videoPath,
+	}
+
+	if _, err := uc.Execute(context.Background(), StartPublishSagaInput{
+		ProjectID: "proj-1", Title: "My Video", Visibility: domain.VisibilityPublic,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	payload := pub.last().envelope.Payload
+	if _, ok := payload["caption_path"]; ok {
+		t.Fatalf("expected no caption_path key, got %v", payload["caption_path"])
+	}
+	if _, ok := payload["caption_language"]; ok {
+		t.Fatalf("expected no caption_language key, got %v", payload["caption_language"])
+	}
+}
+
 // Projects created before CR-012 carry no channel. The key must be absent
 // rather than present-and-null, because the Publisher reads a missing key as
 // "use the default channel".

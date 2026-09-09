@@ -90,3 +90,55 @@ func DefaultSubtitleStyle() SubtitleStyle {
 		Position:          "bottom",
 	}
 }
+
+// SubtitleMode is how subtitle_cues get delivered to the viewer (CR-015,
+// ADR-0027) — a dimension of its own rather than a bolt-on to the CR-001
+// on/off toggle, because which delivery is correct depends on the publishing
+// surface, not on whether the Creator "wants subtitles":
+//
+//   - Off:    no subtitles.
+//   - Track:  a .srt YouTube caption track (FR38) — searchable,
+//     auto-translatable, dismissable by the viewer, never painted
+//     over Manim's edge content. The GUI default for new projects
+//     (FR41.2).
+//   - BurnIn: painted into the video frames — CR-001's original (and, until
+//     this CR, only) behaviour. Still required for platforms with
+//     no caption-track upload path (Shorts/TikTok, CR-007).
+//   - Both:   both at once. Valid (e.g. a repost target with no track
+//     upload path) but doubles the text for a viewer with CC on
+//     (FR41.3) — the GUI warns rather than blocking it.
+type SubtitleMode string
+
+const (
+	SubtitleModeOff    SubtitleMode = "off"
+	SubtitleModeTrack  SubtitleMode = "track"
+	SubtitleModeBurnIn SubtitleMode = "burn_in"
+	SubtitleModeBoth   SubtitleMode = "both"
+)
+
+// IsValid reports whether m is a mode Video Assembly understands.
+func (m SubtitleMode) IsValid() bool {
+	switch m {
+	case SubtitleModeOff, SubtitleModeTrack, SubtitleModeBurnIn, SubtitleModeBoth:
+		return true
+	}
+	return false
+}
+
+// NeedsCues reports whether this mode requires subtitle_cues/subtitle_style
+// in the assemble_video payload at all.
+func (m SubtitleMode) NeedsCues() bool {
+	return m != SubtitleModeOff
+}
+
+// SubtitleModeFromLegacy derives a mode from the pre-CR-015 boolean, for a
+// project row that predates the subtitle_mode column (project_repository.go)
+// or a caller that still only sends subtitles_enabled. It reproduces exactly
+// the one behaviour that boolean ever meant: enabled meant burned-in text,
+// there being no other kind before this CR.
+func SubtitleModeFromLegacy(subtitlesEnabled bool) SubtitleMode {
+	if subtitlesEnabled {
+		return SubtitleModeBurnIn
+	}
+	return SubtitleModeOff
+}

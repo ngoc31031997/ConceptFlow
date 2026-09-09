@@ -21,9 +21,12 @@ type startRenderSagaRequest struct {
 
 	// CR-001. TTSEnabled is a pointer so an omitted field keeps the pre-CR-001
 	// default (narration on) instead of decoding to false.
-	TTSEnabled            *bool                 `json:"tts_enabled,omitempty"`
-	VoiceID               string                `json:"voice_id,omitempty"`
-	SubtitlesEnabled      bool                  `json:"subtitles_enabled,omitempty"`
+	TTSEnabled       *bool  `json:"tts_enabled,omitempty"`
+	VoiceID          string `json:"voice_id,omitempty"`
+	SubtitlesEnabled bool   `json:"subtitles_enabled,omitempty"`
+	// CR-015 FR41 — "off" | "track" | "burn_in" | "both". Wins over
+	// SubtitlesEnabled when both are present (start_render_saga.go).
+	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
 	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality         string                `json:"render_quality,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
@@ -81,10 +84,14 @@ type projectResponse struct {
 	TTSEnabled       bool                  `json:"tts_enabled"`
 	VoiceID          string                `json:"voice_id,omitempty"`
 	SubtitlesEnabled bool                  `json:"subtitles_enabled"`
+	SubtitleMode     string                `json:"subtitle_mode"`
 	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality    string                `json:"render_quality"`
 	YoutubeVideoURL  *string               `json:"youtube_video_url,omitempty"`
-	ErrorMessage     *string               `json:"error_message,omitempty"`
+	// CR-015 FR39.4 — absent when no caption was requested, otherwise
+	// "uploaded" | "skipped_no_scope" | "failed".
+	CaptionStatus *string `json:"caption_status,omitempty"`
+	ErrorMessage  *string `json:"error_message,omitempty"`
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -155,9 +162,11 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		TTSEnabled:       p.TTSEnabled,
 		VoiceID:          p.VoiceID,
 		SubtitlesEnabled: p.SubtitlesEnabled,
+		SubtitleMode:     string(p.SubtitleMode),
 		SubtitleStyle:    p.SubtitleStyle,
 		RenderQuality:    string(p.RenderQuality),
 		YoutubeVideoURL:  p.YoutubeVideoURL,
+		CaptionStatus:    p.CaptionStatus,
 		ErrorMessage:     p.ErrorMessage,
 	}
 }

@@ -117,6 +117,16 @@ func publishVideoPayload(project *domain.Project) map[string]interface{} {
 	if project.YoutubeThumbnailPath != nil {
 		payload["thumbnail_path"] = *project.YoutubeThumbnailPath
 	}
+	if project.CaptionPath != nil {
+		payload["caption_path"] = *project.CaptionPath
+		// CR-015 FR39.3: YouTube's captions.insert needs a BCP-47 language
+		// code to attach the track under. ContentLanguage's values ("vi",
+		// "en" — CR-008) are already valid BCP-47 primary subtags, so no
+		// translation table is needed. Wrong here means auto-translate
+		// dubs from the wrong source language — exactly what CR-015 set
+		// out to fix, not reintroduce.
+		payload["caption_language"] = string(project.ContentLanguage)
+	}
 	// Omitted rather than sent as null when unset, so the Publisher's
 	// payload.get("channel_id") keeps meaning "use the default channel"
 	// for projects created before CR-012.

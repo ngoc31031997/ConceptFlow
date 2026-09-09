@@ -18,9 +18,13 @@ type StartRenderSagaInput struct {
 	BackgroundMusicPath *string // optional, business-rules.md Rule 3
 
 	// CR-001 — narration/subtitle switches chosen by the Creator at submit time.
-	TTSEnabled       bool
-	VoiceID          string
+	TTSEnabled bool
+	VoiceID    string
+	// SubtitlesEnabled is the pre-CR-015 shape, still accepted from a caller
+	// that has not adopted SubtitleMode; SubtitleMode wins when both are
+	// sent (a client migrating one field at a time should not regress).
 	SubtitlesEnabled bool
+	SubtitleMode     domain.SubtitleMode
 	SubtitleStyle    *domain.SubtitleStyle
 
 	// CR-004 — empty means DefaultRenderQuality.
@@ -61,18 +65,31 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		quality = domain.DefaultRenderQuality
 	}
 
+	// CR-015: SubtitleMode is authoritative when valid; otherwise fall back
+	// to the legacy boolean, which reproduces exactly the one behaviour it
+	// ever meant (burn-in) rather than guessing at a new one.
+	subtitleMode := input.SubtitleMode
+	if !subtitleMode.IsValid() {
+		subtitleMode = domain.SubtitleModeFromLegacy(input.SubtitlesEnabled)
+	}
+
 	project := &domain.Project{
-		ProjectID:             input.ProjectID,
-		Status:                domain.StatusDraft,
-		SagaID:                sagaID,
-		ScriptContent:         input.ScriptContent,
-		PluginID:              input.PluginID,
-		CategoryHint:          input.CategoryHint,
-		ContentLanguage:       input.ContentLanguage,
-		BackgroundMusicPath:   input.BackgroundMusicPath,
-		TTSEnabled:            input.TTSEnabled,
-		VoiceID:               input.VoiceID,
-		SubtitlesEnabled:      input.SubtitlesEnabled,
+		ProjectID:           input.ProjectID,
+		Status:              domain.StatusDraft,
+		SagaID:              sagaID,
+		ScriptContent:       input.ScriptContent,
+		PluginID:            input.PluginID,
+		CategoryHint:        input.CategoryHint,
+		ContentLanguage:     input.ContentLanguage,
+		BackgroundMusicPath: input.BackgroundMusicPath,
+		TTSEnabled:          input.TTSEnabled,
+		VoiceID:             input.VoiceID,
+		// Kept in lockstep with SubtitleMode rather than taken verbatim from
+		// input, so anything still reading the legacy field (an older
+		// client of GET /v1/projects/{id}) sees a value consistent with
+		// what actually got rendered.
+		SubtitlesEnabled:      subtitleMode.NeedsCues(),
+		SubtitleMode:          subtitleMode,
 		SubtitleStyle:         input.SubtitleStyle,
 		RenderQuality:         quality,
 		BackgroundMusicVolume: input.BackgroundMusicVolume,

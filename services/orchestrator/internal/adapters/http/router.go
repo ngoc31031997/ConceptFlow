@@ -106,6 +106,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		TTSEnabled:            ttsEnabled,
 		VoiceID:               req.VoiceID,
 		SubtitlesEnabled:      req.SubtitlesEnabled,
+		SubtitleMode:          domain.SubtitleMode(req.SubtitleMode),
 		SubtitleStyle:         req.SubtitleStyle,
 		RenderQuality:         domain.RenderQuality(req.RenderQuality),
 		BackgroundMusicVolume: req.BackgroundMusicVolume,

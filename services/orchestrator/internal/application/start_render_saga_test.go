@@ -61,6 +61,79 @@ func TestStartRenderSagaUseCase_Execute(t *testing.T) {
 	}
 }
 
+// TestStartRenderSagaUseCase_SubtitleModeIsPersisted is CR-015 FR41: the
+// Creator's explicit choice among the four delivery modes must survive into
+// the saved Project, for handle_step_event.go's assembleVideoPayload to
+// pick up later.
+func TestStartRenderSagaUseCase_SubtitleModeIsPersisted(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:       "proj-1",
+		ScriptContent:   "script",
+		ContentLanguage: domain.LanguageVietnamese,
+		SubtitleMode:    domain.SubtitleModeTrack,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.SubtitleMode != domain.SubtitleModeTrack {
+		t.Fatalf("expected SubtitleMode track, got %q", project.SubtitleMode)
+	}
+	if !project.SubtitlesEnabled {
+		t.Fatal("expected legacy SubtitlesEnabled to mirror NeedsCues() for a non-off mode")
+	}
+}
+
+// TestStartRenderSagaUseCase_FallsBackToLegacySubtitlesEnabled covers a
+// caller that has not adopted subtitle_mode yet (an older client, or a
+// direct API integration) — it must reproduce exactly the one behaviour
+// SubtitlesEnabled ever meant (burn-in), not silently default to track.
+func TestStartRenderSagaUseCase_FallsBackToLegacySubtitlesEnabled(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:        "proj-1",
+		ScriptContent:    "script",
+		ContentLanguage:  domain.LanguageVietnamese,
+		SubtitlesEnabled: true,
+		// SubtitleMode deliberately left unset.
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.SubtitleMode != domain.SubtitleModeBurnIn {
+		t.Fatalf("expected SubtitleMode burn_in from the legacy boolean, got %q", project.SubtitleMode)
+	}
+}
+
+// TestStartRenderSagaUseCase_SubtitleModeOffClearsLegacyFlag guards the
+// other direction: an explicit "off" must not leave SubtitlesEnabled true
+// from some stale caller-supplied value.
+func TestStartRenderSagaUseCase_SubtitleModeOffClearsLegacyFlag(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:        "proj-1",
+		ScriptContent:    "script",
+		ContentLanguage:  domain.LanguageVietnamese,
+		SubtitlesEnabled: true,
+		SubtitleMode:     domain.SubtitleModeOff,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.SubtitlesEnabled {
+		t.Fatal("expected SubtitlesEnabled false when the explicit mode is off")
+	}
+}
+
 func TestStartRenderSagaUseCase_PublishFailure(t *testing.T) {
 	repo := newFakeRepo()
 	pub := &fakePublisher{failNext: true}

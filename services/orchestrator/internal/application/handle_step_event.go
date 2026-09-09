@@ -389,6 +389,13 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event StepEvent, project *domain.Project) error {
 	videoPath := stringFromPayload(event.Payload, "video_path")
 	project.VideoPath = &videoPath
+	// CR-015 FR38.4: present only when subtitle_mode produced a caption
+	// track. Absent (not null) for every other case — see producer.py's
+	// video_assembled_envelope — so an empty string here would wrongly
+	// overwrite a caption_path a previous, idempotent call already stored.
+	if captionPath := stringFromPayload(event.Payload, "caption_path"); captionPath != "" {
+		project.CaptionPath = &captionPath
+	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -399,6 +406,12 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 func (uc *HandleStepEventUseCase) onVideoPublished(ctx context.Context, event StepEvent, project *domain.Project) error {
 	url := stringFromPayload(event.Payload, "youtube_video_url")
 	project.YoutubeVideoURL = &url
+	// CR-015 FR39.4: absent when no caption was requested, otherwise
+	// "uploaded" | "skipped_no_scope" | "failed" — surfaced on the project
+	// so a silently skipped or failed caption is not invisible.
+	if captionStatus := stringFromPayload(event.Payload, "caption_status"); captionStatus != "" {
+		project.CaptionStatus = &captionStatus
+	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -468,13 +481,27 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 		}
 		payload["background_music_volume"] = volume
 	}
-	if project.SubtitlesEnabled {
+	// SubtitleMode is normally already resolved by the time a Project
+	// reaches here (start_render_saga.go at creation, project_repository.go's
+	// Get for a pre-CR-015 row) — this fallback exists only so an invalid or
+	// zero-value mode (a Project built by hand, e.g. in a test) degrades to
+	// the one behaviour SubtitlesEnabled ever meant, rather than treating ""
+	// as if it needed cues.
+	mode := project.SubtitleMode
+	if !mode.IsValid() {
+		mode = domain.SubtitleModeFromLegacy(project.SubtitlesEnabled)
+	}
+	if mode.NeedsCues() {
 		style := domain.DefaultSubtitleStyle()
 		if project.SubtitleStyle != nil {
 			style = *project.SubtitleStyle
 		}
 		payload["subtitle_style"] = style
 		payload["subtitle_cues"] = subtitleCues(scenes, offsets)
+		// Sent explicitly rather than relying on Video Assembly's own
+		// default, so the wire contract does not depend on a default that
+		// a future change there could alter out from under it.
+		payload["subtitle_mode"] = string(mode)
 	}
 	return payload
 }

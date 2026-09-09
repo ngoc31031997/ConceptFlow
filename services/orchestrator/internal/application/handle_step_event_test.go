@@ -243,6 +243,141 @@ func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNa
 	}
 }
 
+// TestHandleStepEventUseCase_VideoAssembled_StoresCaptionPath is CR-015
+// FR38.4: a video_assembled event carrying caption_path must persist it on
+// the project so the Publish Saga can pick it up later.
+func TestHandleStepEventUseCase_VideoAssembled_StoresCaptionPath(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusAssemblingVideo}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{
+			"video_path":   "/shared/proj-1/video/final.mp4",
+			"caption_path": "/shared/proj-1/video/final.srt",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.CaptionPath == nil || *project.CaptionPath != "/shared/proj-1/video/final.srt" {
+		t.Fatalf("expected CaptionPath persisted, got %v", project.CaptionPath)
+	}
+}
+
+// TestHandleStepEventUseCase_VideoAssembled_NoCaptionPathLeavesItNil mirrors
+// the burn-in-only / subtitles-off case: no caption_path key in the event
+// must not fabricate one.
+func TestHandleStepEventUseCase_VideoAssembled_NoCaptionPathLeavesItNil(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusAssemblingVideo}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{"video_path": "/shared/proj-1/video/final.mp4"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.CaptionPath != nil {
+		t.Fatalf("expected no CaptionPath, got %v", *project.CaptionPath)
+	}
+}
+
+// TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode is CR-015:
+// the assemble_video command must say subtitle_mode explicitly rather than
+// leaning on Video Assembly's own default, so the wire contract does not
+// depend on a default that a future change could alter out from under it.
+func TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode(t *testing.T) {
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", RenderedVideoPath: &rendered,
+		TTSEnabled: false, SubtitlesEnabled: true,
+	}
+
+	payload := assembleVideoPayload(project)
+
+	if payload["subtitle_mode"] != "burn_in" {
+		t.Fatalf("expected explicit subtitle_mode=burn_in, got %v", payload["subtitle_mode"])
+	}
+}
+
+// TestAssembleVideoPayload_TrackModeSendsCuesWithoutForcingBurnIn is CR-015:
+// "track" needs subtitle_cues (Video Assembly writes them to .srt) but the
+// mode string itself must say "track", not the "burn_in" the earlier,
+// pre-GUI-wiring version of this code hardcoded.
+func TestAssembleVideoPayload_TrackModeSendsCuesWithoutForcingBurnIn(t *testing.T) {
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", RenderedVideoPath: &rendered,
+		TTSEnabled: false, SubtitleMode: domain.SubtitleModeTrack,
+		Scenes: []domain.Scene{{SceneIndex: 0, NarrationText: "hi", DurationSeconds: 2}},
+	}
+
+	payload := assembleVideoPayload(project)
+
+	if payload["subtitle_mode"] != "track" {
+		t.Fatalf("expected subtitle_mode track, got %v", payload["subtitle_mode"])
+	}
+	if _, ok := payload["subtitle_cues"]; !ok {
+		t.Fatal("expected subtitle_cues even for track mode — Video Assembly needs them to write the .srt")
+	}
+}
+
+// TestAssembleVideoPayload_OffModeSendsNoCues guards the opposite: an
+// explicit "off" must not leak cues into the payload even if SubtitleStyle
+// happens to be set from an earlier UI state.
+func TestAssembleVideoPayload_OffModeSendsNoCues(t *testing.T) {
+	rendered := "/shared/proj-1/video.mp4"
+	project := &domain.Project{
+		ProjectID: "proj-1", RenderedVideoPath: &rendered,
+		SubtitleMode: domain.SubtitleModeOff,
+		Scenes:       []domain.Scene{{SceneIndex: 0, NarrationText: "hi", DurationSeconds: 2}},
+	}
+
+	payload := assembleVideoPayload(project)
+
+	if _, ok := payload["subtitle_cues"]; ok {
+		t.Fatal("expected no subtitle_cues when subtitle_mode is off")
+	}
+	if _, ok := payload["subtitle_mode"]; ok {
+		t.Fatal("expected no subtitle_mode key at all when off")
+	}
+}
+
+// TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus is CR-015
+// FR39.4: a caption_status carried on video_published must persist onto the
+// project so the GUI can show a silently skipped or failed caption.
+func TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusPublishing}
+	repo.steps[stepKey("saga-1", domain.StepPublishVideo)] = &domain.SagaStep{
+		SagaID: "saga-1", StepName: domain.StepPublishVideo, Status: domain.SagaStepInProgress,
+	}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_published",
+		Payload: map[string]interface{}{
+			"youtube_video_url": "https://youtu.be/abc",
+			"caption_status":    "skipped_no_scope",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.CaptionStatus == nil || *project.CaptionStatus != "skipped_no_scope" {
+		t.Fatalf("expected CaptionStatus persisted, got %v", project.CaptionStatus)
+	}
+}
+
 // TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstimatesDurations
 // guards CR-001's branch: with narration off, no synthesize_speech command may
 // reach the TTS Service, yet render_scenes must still carry a duration per

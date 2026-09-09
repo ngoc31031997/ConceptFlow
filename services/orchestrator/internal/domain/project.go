@@ -169,9 +169,14 @@ type Project struct {
 	// CR-001 — narration and subtitles are independently switchable per project.
 	// When TTSEnabled is false the synthesize_speech step is skipped entirely and
 	// Scene.DurationSeconds is filled from EstimateNarrationDuration instead.
-	TTSEnabled       bool
-	VoiceID          string
+	TTSEnabled bool
+	VoiceID    string
+	// SubtitlesEnabled is kept for wire/schema backward compatibility (a
+	// caller that never adopts subtitle_mode) but SubtitleMode is the
+	// source of truth from CR-015 on — see project_repository.go's Get for
+	// how a row from before that column existed gets one anyway.
 	SubtitlesEnabled bool
+	SubtitleMode     SubtitleMode
 	SubtitleStyle    *SubtitleStyle
 
 	// CR-004 — resolution/framerate for this project's render.
@@ -185,6 +190,16 @@ type Project struct {
 
 	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
 	VideoPath         *string
+	// CR-015 FR38.4 — the .srt caption track Video Assembly wrote alongside
+	// VideoPath, or nil when subtitle_mode didn't produce one (off/burn_in
+	// only, or subtitles disabled). Flows to the Publish Saga the same way
+	// YoutubeThumbnailPath does.
+	CaptionPath *string
+	// CaptionStatus mirrors the Publisher's PublishResult.caption_status
+	// (CR-015 FR39.4) — nil when no caption was requested; otherwise
+	// "uploaded" | "skipped_no_scope" | "failed". Surfaced to the GUI so a
+	// silently skipped or failed caption is not invisible.
+	CaptionStatus *string
 
 	// CR-002 — where each narration segment actually begins in RenderedVideoPath,
 	// measured by Rendering. WaitOffsets[i] belongs to Scenes[i] in scene_index

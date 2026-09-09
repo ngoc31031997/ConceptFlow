@@ -36,6 +36,7 @@ CREATE TABLE IF NOT EXISTS projects (
     youtube_thumbnail_path TEXT,
     youtube_channel_id TEXT,
     youtube_video_url TEXT,
+    caption_path TEXT,
     error_message TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -75,6 +76,20 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS background_music_volume DOUBLE PRE
 -- CR-006: chapter markers from the script. Timestamps are not stored — they are
 -- derived from wait_offsets, so a re-render moves the chapters with the video.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS chapters JSONB;
+-- CR-015: the .srt caption track Video Assembly wrote alongside video_path,
+-- when subtitle_mode asked for one. NULL for every project rendered before
+-- this column existed, and for one where subtitles were off or burn-in only —
+-- Publisher already treats a NULL/absent caption_path as "nothing to upload"
+-- the same way it does youtube_thumbnail_path.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_path TEXT;
+-- CR-015 FR41: which of the four delivery modes this project renders
+-- subtitles with. Empty string for every row predating this column —
+-- project_repository.go's Get() derives it from subtitles_enabled in that
+-- case (domain.SubtitleModeFromLegacy), never left blank downstream.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_mode TEXT NOT NULL DEFAULT '';
+-- CR-015 FR39.4: mirrors the Publisher's PublishResult.caption_status, so a
+-- silently skipped or failed caption upload is visible on the project.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_status TEXT;
 
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,
