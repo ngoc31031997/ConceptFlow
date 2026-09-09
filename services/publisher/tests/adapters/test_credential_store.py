@@ -26,7 +26,7 @@ def _mock_connect(fetchone_return=None, fetchall_return=()):
     return mock_conn, mock_cursor
 
 
-def _row(channel_id="UC1", is_default=True, expires_at=None):
+def _row(channel_id="UC1", is_default=True, expires_at=None, scopes=""):
     return (
         channel_id,
         f"Channel {channel_id}",
@@ -35,6 +35,7 @@ def _row(channel_id="UC1", is_default=True, expires_at=None):
         "refresh",
         expires_at or datetime.now(UTC),
         is_default,
+        scopes,
     )
 
 
@@ -131,6 +132,51 @@ def test_save_keeps_the_stored_refresh_token_when_google_returns_none():
     sql = mock_cursor.execute.call_args[0][0]
     assert "COALESCE" in sql
     assert "youtube_accounts.refresh_token" in sql
+
+
+def test_get_parses_stored_scopes():
+    mock_conn, _ = _mock_connect(
+        fetchone_return=_row(scopes="https://www.googleapis.com/auth/youtube.upload "
+        "https://www.googleapis.com/auth/youtube.force-ssl")
+    )
+    with patch("adapters.persistence.credential_store.psycopg2.connect", return_value=mock_conn):
+        credential = PostgresCredentialStore("postgresql://fake").get()
+
+    assert credential.scopes == (
+        "https://www.googleapis.com/auth/youtube.upload",
+        "https://www.googleapis.com/auth/youtube.force-ssl",
+    )
+
+
+def test_get_empty_scopes_column_reads_as_no_scopes():
+    """A row written before CR-015 has scopes='' (the column default) — this
+    must read back as (), which OAuthCredential treats as 'upload only', not
+    as None or a crash (ADR-0028)."""
+    mock_conn, _ = _mock_connect(fetchone_return=_row(scopes=""))
+    with patch("adapters.persistence.credential_store.psycopg2.connect", return_value=mock_conn):
+        credential = PostgresCredentialStore("postgresql://fake").get()
+
+    assert credential.scopes == ()
+
+
+def test_save_serializes_scopes_as_space_joined_string():
+    mock_conn, mock_cursor = _mock_connect()
+    with patch("adapters.persistence.credential_store.psycopg2.connect", return_value=mock_conn):
+        PostgresCredentialStore("postgresql://fake").save(
+            OAuthCredential(
+                access_token="token",
+                refresh_token="refresh",
+                expires_at=datetime.now(UTC),
+                channel_id="UC1",
+                client_id="client-a",
+                scopes=("scope-a", "scope-b"),
+            )
+        )
+
+    params = mock_cursor.execute.call_args[0][1]
+    assert "scope-a scope-b" in params
+    sql = mock_cursor.execute.call_args[0][0]
+    assert "scopes = EXCLUDED.scopes" in sql
 
 
 def test_delete_promotes_another_channel_when_the_default_goes():

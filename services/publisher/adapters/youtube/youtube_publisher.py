@@ -19,6 +19,7 @@ from google.oauth2.credentials import Credentials as GoogleCredentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+from adapters.youtube.oauth_flow import YOUTUBE_FORCE_SSL_SCOPE
 from domain.errors import UploadError
 from domain.models import OAuthCredential, PublishRequest, PublishResult
 from domain.ports import CredentialStorePort, OAuthAppRegistryPort, VideoPublisherPort
@@ -50,14 +51,17 @@ class YouTubeVideoPublisher(VideoPublisherPort):
 
         future = self._executor.submit(self._upload, request, credential)
         try:
-            video_id = future.result(timeout=self._timeout_seconds)
+            video_id, caption_status = future.result(timeout=self._timeout_seconds)
         except FutureTimeoutError as exc:
             raise UploadError(f"YouTube upload timed out after {self._timeout_seconds}s") from exc
         except Exception as exc:  # noqa: BLE001 — any upload failure becomes a domain error
             logger.exception("YouTube upload failed")
             raise UploadError(str(exc)) from exc
 
-        return PublishResult(youtube_video_url=f"https://www.youtube.com/watch?v={video_id}")
+        return PublishResult(
+            youtube_video_url=f"https://www.youtube.com/watch?v={video_id}",
+            caption_status=caption_status,
+        )
 
     def _refresh_if_needed(self, credential: OAuthCredential) -> OAuthCredential:
         """Proactive refresh (Business Rule 3): checks expires_at before
@@ -79,6 +83,10 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             client_id=credential.client_id,
             channel_title=credential.channel_title,
             is_default=credential.is_default,
+            # A token refresh does not re-run consent, so it cannot grant a
+            # scope the Creator has not already agreed to — carried over
+            # unchanged, not re-derived (CR-015).
+            scopes=credential.scopes,
         )
         self._credential_store.save(refreshed)
         return refreshed
@@ -101,7 +109,7 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             client_secret=app.client_secret,
         )
 
-    def _upload(self, request: PublishRequest, credential: OAuthCredential) -> str:
+    def _upload(self, request: PublishRequest, credential: OAuthCredential) -> tuple[str, str | None]:
         youtube = build("youtube", "v3", credentials=self._to_google_credentials(credential))
         body = {
             "snippet": {
@@ -135,4 +143,54 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             except Exception:
                 logger.exception("Failed to set custom thumbnail for video_id=%s", video_id)
 
-        return video_id
+        caption_status = self._upload_caption(youtube, video_id, request, credential)
+
+        return video_id, caption_status
+
+    def _upload_caption(
+        self,
+        youtube,
+        video_id: str,
+        request: PublishRequest,
+        credential: OAuthCredential,
+    ) -> str | None:
+        """Best-effort, like the thumbnail above — but unlike a bad
+        thumbnail, a missing caption track is invisible to the Creator on
+        YouTube itself (CR-015 FR39.4), so the outcome is returned rather
+        than only logged."""
+        if not request.caption_path:
+            return None
+
+        # FR40.2: checked BEFORE calling the API, not learned from a 403
+        # after the fact. A credential from before CR-015 shipped has
+        # scopes == () and is read as "youtube.upload only" (ADR-0028) —
+        # never assumed to carry force-ssl just because upload succeeded.
+        if YOUTUBE_FORCE_SSL_SCOPE not in credential.scopes:
+            logger.warning(
+                "Skipping caption upload for video_id=%s: channel %r was connected "
+                "before force-ssl was requested — reconnect it to enable captions",
+                video_id,
+                credential.channel_title or credential.channel_id,
+            )
+            return "skipped_no_scope"
+
+        try:
+            youtube.captions().insert(
+                part="snippet",
+                body={
+                    "snippet": {
+                        "videoId": video_id,
+                        # FR39.3: BCP-47, sourced from the project's content
+                        # language — never hardcoded, or YouTube auto-translates
+                        # from the wrong source language.
+                        "language": request.caption_language or "en",
+                        "name": "",  # default track, no alternate-language label
+                        "isDraft": False,
+                    }
+                },
+                media_body=MediaFileUpload(request.caption_path),
+            ).execute()
+        except Exception:
+            logger.exception("Failed to upload caption track for video_id=%s", video_id)
+            return "failed"
+        return "uploaded"

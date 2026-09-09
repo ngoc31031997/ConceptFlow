@@ -20,6 +20,12 @@ from domain.models import OAuthApp, OAuthCredential
 
 YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
+# CR-015 FR40.1 — captions.insert has no narrower scope than this one, which
+# also grants far more than captions (edit/delete video, playlists, comments).
+# Accepted deliberately (ADR-0028): the OAuth app is in Testing, so adding it
+# needs no Google re-verification, but every channel connected before this
+# shipped has to be re-consented to actually receive it (FR40.2/40.3).
+YOUTUBE_FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
 
 class RedirectUriNotRegisteredError(Exception):
@@ -52,7 +58,8 @@ class GoogleOAuthFlow:
             }
         }
         flow = Flow.from_client_config(
-            client_config, scopes=[YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE]
+            client_config,
+            scopes=[YOUTUBE_UPLOAD_SCOPE, YOUTUBE_READONLY_SCOPE, YOUTUBE_FORCE_SSL_SCOPE],
         )
         flow.redirect_uri = self._redirect_uri
         return flow
@@ -97,6 +104,13 @@ class GoogleOAuthFlow:
             channel_id=channel_id,
             client_id=app.client_id,
             channel_title=channel_title,
+            # CR-015 FR40.1: granted_scopes is what Google actually handed
+            # back, which can be a strict subset of what _new_flow asked for
+            # — the Creator can untick a scope on the consent screen. Storing
+            # what was requested instead would make the FR40.2 pre-upload
+            # check always pass, silently reintroducing the late-403 failure
+            # that check exists to prevent.
+            scopes=tuple(creds.granted_scopes or creds.scopes or ()),
         )
 
     @staticmethod

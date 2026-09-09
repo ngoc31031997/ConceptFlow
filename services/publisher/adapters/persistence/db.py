@@ -68,6 +68,13 @@ CREATE TABLE IF NOT EXISTS youtube_accounts (
 -- publishes (CR-012 FR31.2).
 CREATE UNIQUE INDEX IF NOT EXISTS idx_youtube_accounts_single_default
     ON youtube_accounts (is_default) WHERE is_default;
+
+-- CR-015 FR40: space-separated OAuth scopes Google actually granted at
+-- consent. Added after the initial CREATE TABLE shipped without it — the
+-- default '' means "channel connected before force-ssl existed", which
+-- OAuthCredential.scopes (adapters/persistence/credential_store.py) reads
+-- as "youtube.upload only", never as "has force-ssl too" (ADR-0028).
+ALTER TABLE youtube_accounts ADD COLUMN IF NOT EXISTS scopes TEXT NOT NULL DEFAULT '';
 """
 
 # One-shot data migration (CR-012 FR31.3). Guarded by NOT EXISTS rather

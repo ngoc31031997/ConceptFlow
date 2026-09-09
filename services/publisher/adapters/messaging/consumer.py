@@ -77,6 +77,10 @@ class PublishVideoCommandHandler:
             # Absent for projects created before CR-012 — None means the
             # default channel, preserving the old single-channel behaviour.
             channel_id=payload.get("channel_id"),
+            # CR-015 — absent whenever subtitle_mode didn't produce a
+            # caption track (off/burn-in, or a pre-CR-015 project).
+            caption_path=payload.get("caption_path"),
+            caption_language=payload.get("caption_language"),
         )
 
         try:
@@ -87,7 +91,9 @@ class PublishVideoCommandHandler:
             out_envelope = publish_failed_envelope(saga_id, project_id, str(exc))
         else:
             event_type = "video_published"
-            out_envelope = video_published_envelope(saga_id, project_id, result.youtube_video_url)
+            out_envelope = video_published_envelope(
+                saga_id, project_id, result.youtube_video_url, result.caption_status
+            )
 
         async with self._pool.acquire() as conn, conn.transaction():
             await self._outbox.enqueue(

@@ -229,6 +229,26 @@ def test_accounts_endpoint_labels_a_channel_whose_client_is_gone():
     assert "không còn cấu hình" in body[0]["app_label"]
 
 
+def test_accounts_endpoint_flags_caption_scope(monkeypatch):
+    """CR-015 FR40.2: the Creator learns a channel needs reconnecting from
+    the channel picker, not from a video that quietly has no CC."""
+    from adapters.youtube.oauth_flow import YOUTUBE_FORCE_SSL_SCOPE
+
+    store = InMemoryCredentialStore(
+        [
+            make_credential(channel_id="UC_new", scopes=(YOUTUBE_FORCE_SSL_SCOPE,)),
+            make_credential(channel_id="UC_old", scopes=()),
+        ]
+    )
+    client, _, _ = _build_client(credential_store=store)
+
+    body = client.get("/v1/auth/youtube/accounts").json()
+
+    by_id = {a["channel_id"]: a for a in body}
+    assert by_id["UC_new"]["has_caption_scope"] is True
+    assert by_id["UC_old"]["has_caption_scope"] is False
+
+
 def test_delete_account_disconnects_the_channel():
     store = InMemoryCredentialStore([make_credential(channel_id="UC1", is_default=True)])
     client, _, _ = _build_client(credential_store=store)

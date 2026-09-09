@@ -20,7 +20,11 @@ from adapters.api.schemas import (
     YouTubeAccountResponse,
 )
 from adapters.logging.correlation import set_correlation_id
-from adapters.youtube.oauth_flow import GoogleOAuthFlow, RedirectUriNotRegisteredError
+from adapters.youtube.oauth_flow import (
+    YOUTUBE_FORCE_SSL_SCOPE,
+    GoogleOAuthFlow,
+    RedirectUriNotRegisteredError,
+)
 from adapters.youtube.oauth_state import NonceStore, decode_state, encode_state
 from application.handle_oauth_callback import HandleOAuthCallbackUseCase
 from domain.models import OAuthCredential
@@ -48,6 +52,7 @@ def create_v1_router(
             # pointing at it; say so rather than showing a blank cell.
             app_label=app.label if app is not None else "(client không còn cấu hình)",
             is_default=credential.is_default,
+            has_caption_scope=YOUTUBE_FORCE_SSL_SCOPE in credential.scopes,
         )
 
     @router.get("/auth/youtube/apps", response_model=list[OAuthAppResponse])

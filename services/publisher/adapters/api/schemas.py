@@ -26,6 +26,10 @@ class YouTubeAccountResponse(BaseModel):
     client_id: str
     app_label: str
     is_default: bool
+    # CR-015 FR40.2 — a channel connected before force-ssl was requested
+    # cannot receive a caption track; surfaced here so the Creator learns
+    # that from the channel picker, not from a video that quietly has no CC.
+    has_caption_scope: bool = False
 
 
 class OAuthCallbackResponse(BaseModel):

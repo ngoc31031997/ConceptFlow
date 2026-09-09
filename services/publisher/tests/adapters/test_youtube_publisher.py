@@ -12,6 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from google.oauth2.credentials import Credentials as GoogleCredentials
 
+from adapters.youtube.oauth_flow import YOUTUBE_FORCE_SSL_SCOPE
 from adapters.youtube.youtube_publisher import YouTubeVideoPublisher
 from domain.errors import UploadError
 from domain.models import OAuthCredential, PublishRequest
@@ -23,9 +24,9 @@ from tests.fakes import (
 )
 
 
-def _credential(expires_in_seconds: int = 3600) -> OAuthCredential:
+def _credential(expires_in_seconds: int = 3600, **overrides) -> OAuthCredential:
     return make_credential(
-        channel_id="UC123", expires_in=timedelta(seconds=expires_in_seconds)
+        channel_id="UC123", expires_in=timedelta(seconds=expires_in_seconds), **overrides
     )
 
 
@@ -163,3 +164,90 @@ def test_publish_declares_the_video_as_not_made_for_kids():
 
     body = mock_youtube.videos.return_value.insert.call_args.kwargs["body"]
     assert body["status"]["selfDeclaredMadeForKids"] is False
+
+
+def test_publish_with_no_caption_path_reports_no_caption_status():
+    """A request without a caption track (subtitles off, or burn-in only)
+    must not attempt an upload at all — caption_status stays None, not
+    'skipped_no_scope' or any other value implying one was tried."""
+    mock_youtube = MagicMock()
+    mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
+
+    with (
+        patch("adapters.youtube.youtube_publisher.build", return_value=mock_youtube),
+        patch("adapters.youtube.youtube_publisher.MediaFileUpload"),
+    ):
+        publisher = YouTubeVideoPublisher(FakeOAuthAppRegistry(), InMemoryCredentialStore())
+        result = publisher.publish(_request(), _credential(scopes=(YOUTUBE_FORCE_SSL_SCOPE,)))
+
+    mock_youtube.captions.assert_not_called()
+    assert result.caption_status is None
+
+
+def test_publish_uploads_caption_when_scope_is_present():
+    mock_youtube = MagicMock()
+    mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
+
+    with (
+        patch("adapters.youtube.youtube_publisher.build", return_value=mock_youtube),
+        patch("adapters.youtube.youtube_publisher.MediaFileUpload"),
+    ):
+        publisher = YouTubeVideoPublisher(FakeOAuthAppRegistry(), InMemoryCredentialStore())
+        request = _request()
+        request = PublishRequest(
+            **{**request.__dict__, "caption_path": "captions.srt", "caption_language": "vi"}
+        )
+        result = publisher.publish(request, _credential(scopes=(YOUTUBE_FORCE_SSL_SCOPE,)))
+
+    call = mock_youtube.captions.return_value.insert.call_args
+    assert call.kwargs["body"]["snippet"]["videoId"] == "abc123"
+    assert call.kwargs["body"]["snippet"]["language"] == "vi"
+    assert result.caption_status == "uploaded"
+
+
+def test_publish_skips_caption_when_credential_lacks_force_ssl_scope():
+    """FR40.2/FR40.3: a channel connected before CR-015 shipped must still
+    publish — just without the caption — rather than 403ing mid-upload or
+    blocking the publish entirely."""
+    mock_youtube = MagicMock()
+    mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
+
+    with (
+        patch("adapters.youtube.youtube_publisher.build", return_value=mock_youtube),
+        patch("adapters.youtube.youtube_publisher.MediaFileUpload"),
+    ):
+        publisher = YouTubeVideoPublisher(FakeOAuthAppRegistry(), InMemoryCredentialStore())
+        request = _request()
+        request = PublishRequest(
+            **{**request.__dict__, "caption_path": "captions.srt", "caption_language": "vi"}
+        )
+        # scopes=() — a credential from before force-ssl was requested.
+        result = publisher.publish(request, _credential(scopes=()))
+
+    mock_youtube.captions.return_value.insert.assert_not_called()
+    assert result.caption_status == "skipped_no_scope"
+    # And the video itself still published.
+    assert result.youtube_video_url == "https://www.youtube.com/watch?v=abc123"
+
+
+def test_publish_reports_failed_caption_status_without_failing_the_publish():
+    """FR39.4: a caption upload error is logged, not raised — the video is
+    already up — but unlike the thumbnail, the outcome must be visible
+    somewhere other than a log line."""
+    mock_youtube = MagicMock()
+    mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
+    mock_youtube.captions.return_value.insert.return_value.execute.side_effect = RuntimeError("quota")
+
+    with (
+        patch("adapters.youtube.youtube_publisher.build", return_value=mock_youtube),
+        patch("adapters.youtube.youtube_publisher.MediaFileUpload"),
+    ):
+        publisher = YouTubeVideoPublisher(FakeOAuthAppRegistry(), InMemoryCredentialStore())
+        request = _request()
+        request = PublishRequest(
+            **{**request.__dict__, "caption_path": "captions.srt", "caption_language": "vi"}
+        )
+        result = publisher.publish(request, _credential(scopes=(YOUTUBE_FORCE_SSL_SCOPE,)))
+
+    assert result.caption_status == "failed"
+    assert result.youtube_video_url == "https://www.youtube.com/watch?v=abc123"

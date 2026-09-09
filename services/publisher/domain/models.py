@@ -61,6 +61,13 @@ class OAuthCredential:
     client_id: str = ""
     channel_title: str = ""
     is_default: bool = False
+    # CR-015 FR40 — the scopes Google actually granted at consent, not the
+    # scopes the app asked for (a Creator can decline one on Google's
+    # consent screen). Empty tuple means "granted before CR-015 shipped",
+    # which is read as "youtube.upload only" — never as "has force-ssl too"
+    # (ADR-0028). Deliberately not Optional: "no scopes recorded" and "we
+    # checked and there are none" would otherwise be indistinguishable.
+    scopes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -76,6 +83,13 @@ class PublishRequest:
     publish_at: str | None = None  # RFC3339 — only valid alongside visibility == "private"
     thumbnail_path: str | None = None  # absolute path on shared_artifacts, from a manual upload
     channel_id: str | None = None  # None => the default channel (projects predating CR-012)
+    # CR-015 FR39 — the .srt Video Assembly wrote when subtitle_mode asked
+    # for a caption track. None when subtitles are off or burn-in only.
+    caption_path: str | None = None
+    # BCP-47 language the caption track is in (CR-015 FR39.3) — required
+    # by captions.insert, and needed to tell YouTube what to auto-translate
+    # FROM. Only meaningful alongside caption_path.
+    caption_language: str | None = None
 
 
 @dataclass(frozen=True)
@@ -87,3 +101,12 @@ class PublishResult:
     """
 
     youtube_video_url: str
+    # CR-015 FR39.4 — unlike a failed thumbnail (visible the moment the
+    # Creator opens YouTube), a failed or skipped caption upload is
+    # otherwise silent, so it has to travel back through the result rather
+    # than live only in a log line:
+    #   None             — no caption_path was requested
+    #   "uploaded"       — captions.insert succeeded
+    #   "skipped_no_scope" — credential predates force-ssl re-consent (FR40.2)
+    #   "failed"         — captions.insert was attempted and raised
+    caption_status: str | None = None

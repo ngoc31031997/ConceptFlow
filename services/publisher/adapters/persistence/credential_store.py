@@ -21,7 +21,7 @@ from domain.models import OAuthCredential
 from domain.ports import CredentialStorePort
 
 _COLUMNS = (
-    "channel_id, channel_title, client_id, access_token, refresh_token, expires_at, is_default"
+    "channel_id, channel_title, client_id, access_token, refresh_token, expires_at, is_default, scopes"
 )
 
 
@@ -75,6 +75,7 @@ class PostgresCredentialStore(CredentialStorePort):
             VALUES (
                 %s, %s, %s, %s, %s, %s,
                 NOT EXISTS (SELECT 1 FROM youtube_accounts),
+                %s,
                 now()
             )
             ON CONFLICT (channel_id) DO UPDATE SET
@@ -85,6 +86,7 @@ class PostgresCredentialStore(CredentialStorePort):
                     NULLIF(EXCLUDED.refresh_token, ''), youtube_accounts.refresh_token
                 ),
                 expires_at = EXCLUDED.expires_at,
+                scopes = EXCLUDED.scopes,
                 updated_at = now()
         """
         params = (
@@ -94,6 +96,7 @@ class PostgresCredentialStore(CredentialStorePort):
             credential.access_token,
             credential.refresh_token,
             credential.expires_at,
+            " ".join(credential.scopes),
         )
         with psycopg2.connect(self._database_url) as conn, conn.cursor() as cur:
             cur.execute(query, params)
@@ -138,7 +141,7 @@ class PostgresCredentialStore(CredentialStorePort):
 
 
 def _to_credential(row: tuple) -> OAuthCredential:
-    channel_id, channel_title, client_id, access_token, refresh_token, expires_at, is_default = row
+    channel_id, channel_title, client_id, access_token, refresh_token, expires_at, is_default, scopes = row
     return OAuthCredential(
         access_token=access_token,
         refresh_token=refresh_token,
@@ -147,4 +150,7 @@ def _to_credential(row: tuple) -> OAuthCredential:
         client_id=client_id,
         channel_title=channel_title,
         is_default=is_default,
+        # '' for a row written before CR-015 (column default) splits to [],
+        # which OAuthCredential already treats as "youtube.upload only".
+        scopes=tuple((scopes or "").split()),
     )

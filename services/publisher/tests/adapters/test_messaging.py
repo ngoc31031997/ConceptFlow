@@ -24,8 +24,10 @@ class FakePublishVideoUseCase:
     def __init__(self, result: PublishResult | None = None, fail_with: Exception | None = None) -> None:
         self._result = result
         self._fail_with = fail_with
+        self.last_request = None
 
     def publish(self, request):
+        self.last_request = request
         if self._fail_with is not None:
             raise self._fail_with
         return self._result
@@ -79,6 +81,64 @@ async def test_enqueues_success_event_to_outbox_and_acks() -> None:
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "video_published"
     assert event["payload"]["payload"]["youtube_video_url"] == "https://youtu.be/abc"
+
+
+@pytest.mark.asyncio
+async def test_caption_status_is_carried_into_the_video_published_event() -> None:
+    """CR-015 FR39.4: caption_status travels through the outbox event the
+    same way youtube_video_url does, so the Orchestrator/GUI can surface a
+    silently failed or skipped caption upload."""
+    use_case = FakePublishVideoUseCase(
+        result=PublishResult(youtube_video_url="https://youtu.be/abc", caption_status="uploaded")
+    )
+    handler, pool = _build_handler(use_case)
+    message = FakeMessage(make_envelope())
+
+    await handler.handle(message)
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["payload"]["payload"]["caption_status"] == "uploaded"
+
+
+@pytest.mark.asyncio
+async def test_no_caption_status_key_when_no_caption_was_requested() -> None:
+    use_case = FakePublishVideoUseCase(
+        result=PublishResult(youtube_video_url="https://youtu.be/abc", caption_status=None)
+    )
+    handler, pool = _build_handler(use_case)
+    message = FakeMessage(make_envelope())
+
+    await handler.handle(message)
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert "caption_status" not in event["payload"]["payload"]
+
+
+@pytest.mark.asyncio
+async def test_caption_path_and_language_are_parsed_from_the_payload() -> None:
+    use_case = FakePublishVideoUseCase(result=PublishResult(youtube_video_url="https://youtu.be/abc"))
+    handler, _ = _build_handler(use_case)
+    envelope = json.loads(make_envelope())
+    envelope["payload"]["caption_path"] = "/shared/project-1/video/final.srt"
+    envelope["payload"]["caption_language"] = "vi"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert use_case.last_request.caption_path == "/shared/project-1/video/final.srt"
+    assert use_case.last_request.caption_language == "vi"
+
+
+@pytest.mark.asyncio
+async def test_missing_caption_fields_in_payload_default_to_none() -> None:
+    use_case = FakePublishVideoUseCase(result=PublishResult(youtube_video_url="https://youtu.be/abc"))
+    handler, _ = _build_handler(use_case)
+    message = FakeMessage(make_envelope())
+
+    await handler.handle(message)
+
+    assert use_case.last_request.caption_path is None
+    assert use_case.last_request.caption_language is None
 
 
 @pytest.mark.asyncio

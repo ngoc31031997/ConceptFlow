@@ -27,10 +27,16 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def video_published_envelope(saga_id: str, project_id: str, youtube_video_url: str) -> dict:
-    return build_envelope(
-        saga_id, project_id, {"event_type": "video_published", "youtube_video_url": youtube_video_url}
-    )
+def video_published_envelope(
+    saga_id: str, project_id: str, youtube_video_url: str, caption_status: str | None = None
+) -> dict:
+    payload = {"event_type": "video_published", "youtube_video_url": youtube_video_url}
+    if caption_status is not None:
+        # Absent rather than null when no caption was requested (CR-015
+        # FR39.4) — mirrors video_assembled's caption_path already flowing
+        # this way (Video Assembly's producer.py).
+        payload["caption_status"] = caption_status
+    return build_envelope(saga_id, project_id, payload)
 
 
 def publish_failed_envelope(saga_id: str, project_id: str, error_message: str) -> dict:
