@@ -7,8 +7,10 @@ describe("RenderQualityPicker", () => {
     // CR-004 FR12.1: 720p30 is below what a monetized channel should publish.
     render(<RenderQualityPicker value="1080p60" onChange={vi.fn()} />);
 
-    expect(screen.getByTestId("render-quality-1080p60")).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByTestId("render-quality-720p30")).toHaveAttribute("aria-pressed", "false");
+    // aria-checked, not aria-pressed: these are radios, and the option used to
+    // carry both, announcing itself as a toggle button as well.
+    expect(screen.getByTestId("render-quality-1080p60")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("render-quality-720p30")).toHaveAttribute("aria-checked", "false");
   });
 
   it("reports the chosen preset", () => {

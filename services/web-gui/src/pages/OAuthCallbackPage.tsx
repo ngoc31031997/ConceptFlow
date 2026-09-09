@@ -32,7 +32,10 @@ export function OAuthCallbackPage() {
   }, [searchParams, navigate]);
 
   return (
-    <AppShell currentStep={3} title="Đang kết nối YouTube..." subtitle="Vui lòng chờ trong giây lát.">
+    // Connecting YouTube happens from the result screen, so this is step 5
+    // ("Đăng"). It read 3 — the last step of the wizard back when creation
+    // was three screens — which lit up "Xem lại" mid-publish.
+    <AppShell currentStep={5} title="Đang kết nối YouTube..." subtitle="Vui lòng chờ trong giây lát.">
       {error && (
         <p role="alert" className={glass.helperText}>
           {error}

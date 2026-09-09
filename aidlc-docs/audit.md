@@ -1916,3 +1916,23 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 
 ---
 
+## Sửa nốt tồn đọng review: bước OAuth, ESLint a11y, và làm lại aidlc-state.md
+**Timestamp**: 2026-09-09T13:00:00Z
+**User Input**: "cứ comit trước đi chỗ thiếu key azure cứ note lại sau khi có key sẽ bổ sung sau" → sau khi commit `9e35da5` và được hỏi có làm tiếp 3 việc còn lại không: "có"
+**AI Response**: Đã xử lý cả ba nhóm tồn đọng từ bản review 2026-09-09:
+
+1. **OAuthCallbackPage `currentStep`**: 3 → 5. Số 3 là di sản từ thời wizard chỉ có 3 màn; sau khi AppShell chuyển sang 5 pill thì màn kết nối YouTube (đi từ trang kết quả, thuộc bước "Đăng") lại làm sáng pill "Xem lại".
+
+2. **`npm run lint` fail**: `BackgroundMusicPicker` mang comment `eslint-disable-next-line jsx-a11y/media-has-caption` nhưng `eslint-plugin-jsx-a11y` không có trong devDependencies lẫn `.eslintrc.cjs` — ESLint thoát mã 1 vì "rule not found" mà thực chất chưa kiểm tra gì. Cân nhắc hai hướng: xoá comment mồ côi (nhỏ nhất) hay cài plugin thật. Chạy thử `plugin:jsx-a11y/recommended` trên toàn bộ `src/` chỉ ra đúng 2 vi phạm thật, nên chọn cài plugin vì nó phát hiện được lỗi thật:
+   - `SelectableOption` đặt đồng thời `role="radio"`, `aria-checked` **và** `aria-pressed` — screen reader nhận hai ngữ nghĩa mâu thuẫn (radio lẫn nút bật/tắt). Đã bỏ `aria-pressed`; `aria-checked` mới là thuộc tính của radio. Test `RenderQualityPicker` đang assert qua `aria-pressed` nên đã sửa sang `aria-checked` — assert cũ vẫn "xanh" trên một thuộc tính sai ngữ nghĩa.
+   - `VideoPlayer` có `<video>` không kèm `<track>`. Đây là ngoại lệ có lý do thật: phụ đề được nung thẳng vào khung hình bởi Rendering (CR-002) nên không có file caption riêng để trỏ tới. Đã disable kèm giải thích.
+   - `PublishForm` dùng `aria-pressed` trên `<button>` thường (không có `role="radio"`) — hợp lệ, giữ nguyên.
+
+3. **`aidlc-state.md`**: sửa 4 điểm lệch. (a) Header `Current Stage` còn ghi "Unit 5 COMPLETE. Starting Unit 6" trong khi phần dưới đã ghi POST-CONSTRUCTION 10/10 — file tự mâu thuẫn. (b) `Workspace Root` trỏ `/Users/.../AI-DLC-main`, sai repo. (c) Toàn bộ 7 checkbox CONSTRUCTION còn `[ ]` dù artefact đủ. Đã kiểm từng unit trước khi tick thay vì tick khống: Low-Level Design 9/10 và Functional Design 8/10, phần thiếu là CONDITIONAL SKIP hợp lệ (`rabbitmq-infrastructure` không có module nội bộ; `api-gateway` là proxy không sinh business rule) — ghi rõ lý do cạnh mỗi dòng. (d) `Current Status` còn dừng ở cuối Pha 1 và ghi "chờ quyết định làm Pha 2" trong khi Pha 2 đã xong từ 08/09; viết lại theo trạng thái thật, tách rõ "đã verify E2E" với "đã giao nhưng chưa verify". Thêm bảng **Nợ kỹ thuật đã biết** gom 4 khoản đang nằm rải rác trong các ADR.
+
+**Impact Assessment**: `npm run lint` nay thoát 0 (còn 3 warning `react-refresh` có sẵn từ trước, không phải lỗi). web-gui 61/61 test pass, tsc sạch. Không đổi hành vi runtime ngoài thanh tiến trình ở màn OAuth và thuộc tính ARIA. Đã rebuild image `web-gui`.
+**User Confirmation**: "có" — đồng ý làm tiếp cả ba.
+**Artifacts Affected**: `services/web-gui/src/pages/OAuthCallbackPage.tsx`, `components/SelectableOption.tsx`, `components/VideoPlayer.tsx`, `.eslintrc.cjs`, `package.json`, `package-lock.json`, `tests/components/RenderQualityPicker.test.tsx`; `aidlc-docs/aidlc-state.md`.
+
+---
+

@@ -8,3 +8,8 @@ dist/
 .env
 *.tsbuildinfo
 .venv/
+
+# Google OAuth client secrets. The YouTube credential is read from .env
+# (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET); the JSON Google Cloud hands you on
+# download must never reach the remote — this repo has a public origin.
+client_secret_*.json

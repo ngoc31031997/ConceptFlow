@@ -3,7 +3,7 @@
 ## Project Information
 - **Project Type**: Greenfield
 - **Start Date**: 2026-08-04T00:00:00Z
-- **Current Stage**: CONSTRUCTION PHASE - Unit 5 COMPLETE. Starting Unit 6 (Video Assembly Service)
+- **Current Stage**: POST-CONSTRUCTION — cả 10/10 unit đã qua Code Generation và Build and Test. Công việc hiện tại là các Change Request trên hệ đã chạy, không còn theo vòng lặp per-unit.
 
 ## Extension Configuration
 | Extension | Enabled | Decided At |
@@ -14,7 +14,7 @@
 ## Workspace State
 - **Existing Code**: No
 - **Reverse Engineering Needed**: No
-- **Workspace Root**: /Users/hoangbaminhngoc/Documents/Project/AI-DLC-main
+- **Workspace Root**: /Users/hoangbaminhngoc/Documents/Project/ConcertFlow/ConceptFlow
 
 ## Code Location Rules
 - **Application Code**: Workspace root (NEVER in aidlc-docs/)
@@ -38,13 +38,14 @@
 - [x] Units Generation - EXECUTE (10 units: RabbitMQ Infra, Content Plugin, TTS, Script Processing, Rendering, Video Assembly, Publisher, Orchestrator, API Gateway, Web GUI)
 
 ### 🟢 CONSTRUCTION PHASE
-- [ ] Low-Level Design (per-unit) - EXECUTE
-- [ ] Functional Design (per-unit) - EXECUTE
-- [ ] NFR Requirements (per-unit) - EXECUTE
-- [ ] NFR Design (per-unit) - EXECUTE
-- [ ] Infrastructure Design (per-unit) - EXECUTE
-- [ ] Code Generation (per-unit) - EXECUTE
-- [ ] Build and Test - EXECUTE
+Đã chạy đủ cho cả 10 unit; artefact nằm dưới `aidlc-docs/construction/{unit}/`.
+- [x] Low-Level Design (per-unit) - EXECUTE — 9/10 unit. SKIP có lý do: `rabbitmq-infrastructure` (không có module/class nội bộ, chỉ là definitions.json khai báo).
+- [x] Functional Design (per-unit) - EXECUTE — 8/10 unit. SKIP có lý do: `rabbitmq-infrastructure` và `api-gateway` (proxy/định tuyến, không sinh business rule nào của riêng nó).
+- [x] NFR Requirements (per-unit) - EXECUTE — 10/10
+- [x] NFR Design (per-unit) - EXECUTE — 10/10
+- [x] Infrastructure Design (per-unit) - EXECUTE — 10/10
+- [x] Code Generation (per-unit) - EXECUTE — 10/10
+- [x] Build and Test - EXECUTE — `aidlc-docs/construction/build-and-test/`
 
 ### 🟡 OPERATIONS PHASE
 - [ ] Operations - SKIP
@@ -67,8 +68,18 @@
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status
-- **Lifecycle Phase**: POST-CONSTRUCTION (10/10 unit đã build; CR-001 đã giao)
-- **Current Stage**: **PHA 1 HOÀN THÀNH** — Pha 0 ✅, 1A ✅, 1B ✅, 1C ✅. Lệch tiếng/hình 0.003s (trước 61.64s); render lại nhanh gấp ~5 lần nhờ cache; có heartbeat tiến trình qua SSE.
-- **Scope đã chốt**: chỉ Pha 1 (CR-002 + CR-003) trong đợt này; CR-004…007 là backlog đã phân tích
-- **Next Stage**: Chờ Creator quyết có làm tiếp Pha 2 (CR-004 chất lượng hình + CR-005 giọng đọc Google TTS) hay không
-- **Status**: Pha 1 xong, chờ quyết định phạm vi tiếp theo
+*Cập nhật 2026-09-09. Trước đó mục này còn dừng ở thời điểm kết thúc Pha 1 và ghi "chờ quyết định làm Pha 2" trong khi Pha 2 đã xong từ 08/09.*
+
+- **Lifecycle Phase**: POST-CONSTRUCTION — 10/10 unit đã build và chạy; công việc đi theo từng Change Request.
+- **Đã giao và verify E2E trên stack thật**: CR-001 → CR-006, CR-008. Lệch tiếng/hình 0.003s (trước 61.64s); 1080p60 + faststart; chapters/thumbnail/metadata SEO; ngôn ngữ nội dung thông suốt cả pipeline.
+- **Đã giao, chưa verify E2E**: CR-010 (Edge TTS thay Piper — đã đo burst 8/8 scene nhưng chưa render project đầy đủ), CR-011 (Azure engine thứ ba — chưa có key thật; việc tồn đọng liệt kê trong `cr-011-azure-tts-engine.md`).
+- **Backlog**: CR-007 (clip dọc 9:16) — hoãn theo quyết định của Creator ngày 2026-09-08.
+- **Next Stage**: chờ Creator chọn — (a) CR-007, (b) verify Azure khi có key, hoặc (c) Change Request mới.
+
+## Nợ kỹ thuật đã biết
+| Mục | Ghi nhận | Trạng thái |
+|---|---|---|
+| Không còn engine TTS chạy offline sau khi xoá Piper | ADR-0024 | Chấp nhận có ý thức; Azure (CR-011) vá phần fallback nhưng vẫn cần mạng |
+| Dùng edge-tts cho mục đích thương mại vi phạm ToS Microsoft, không SLA | ADR-0024 | Chưa xử lý — Azure là đường thoát khi Creator sẵn sàng trả phí |
+| Key Azure sai (có nhưng không hợp lệ) vẫn suy giảm âm thầm về Edge | Review 2026-09-09 | Đã note trong `cr-011-azure-tts-engine.md`, làm khi có key thật |
+| Nhánh Google TTS chưa từng chạy thật | CR-005 / ADR-0023 | Ngủ đông — Google đã bỏ free tier (CR-010) |

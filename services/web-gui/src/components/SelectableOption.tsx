@@ -51,8 +51,9 @@ export function SelectableOption({
     <button
       type="button"
       role="radio"
+      // aria-checked is the one a radio takes; aria-pressed alongside it made
+      // the same element announce as both a radio and a toggle button.
       aria-checked={selected}
-      aria-pressed={selected}
       aria-label={ariaLabel}
       data-testid={testId}
       className={className}
