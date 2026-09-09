@@ -23,6 +23,20 @@ body,
   height: 100%;
 }
 
+/*
+  The decorative background blobs sit partly outside the viewport (negative
+  top/left offsets), so something has to clip them horizontally. That used to
+  be an inner wrapper div's overflow-x: hidden — but overflow-x set without
+  overflow-y forces the used value of overflow-y to "auto" per the CSS
+  Overflow spec, turning that wrapper into its own vertical scroll container
+  nested inside the page's own scrollbar (two scrollbars, one barely
+  noticeable, fighting each other). Clipping at the actual scroll root
+  instead means only the one, real page scrollbar ever exists.
+*/
+html {
+  overflow-x: hidden;
+}
+
 body {
   margin: 0;
   font-family:

@@ -1,7 +1,11 @@
 .stage {
   position: relative;
   min-height: 100vh;
-  overflow-x: hidden;
+  /*
+    No overflow here on purpose — see the comment on html's overflow-x in
+    theme.css for why clipping the decorative blobs at this level nested a
+    second scrollbar inside the page's own one.
+  */
 }
 
 .blob {
