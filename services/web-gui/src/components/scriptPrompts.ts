@@ -121,6 +121,12 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 - Output cuối là video .mp4 khi render bằng: manim -qm <file> <TênScene>.
 - Nền tối mặc định của Manim, chọn màu chữ/hình có độ tương phản tốt, bố cục nằm gọn trong khung an toàn 16:9, không để chữ/hình tràn hoặc chồng lấp.
 
+## LỖI API MANIM THƯỜNG GẶP — TUYỆT ĐỐI TRÁNH (mỗi lỗi này làm render fail toàn bộ video)
+
+- \`Rectangle(...)\` và \`Square(...)\` KHÔNG có tham số \`corner_radius\`. Muốn bo góc, dùng \`RoundedRectangle(width=..., height=..., corner_radius=...)\` thay vì \`Rectangle\`.
+- \`Text(...)\` nhận nội dung là đối số vị trí đầu tiên — viết \`Text("Nội dung")\`, KHÔNG viết \`Text(text="Nội dung")\`.
+- Trước khi dùng bất kỳ tham số nào ngoài các tham số phổ biến (width, height, color, fill_opacity, fill_color, stroke_width, font_size, ...), tự hỏi: tham số này có thực sự thuộc đúng class đang gọi không, hay chỉ thuộc một class "họ hàng" gần đó (ví dụ corner_radius thuộc RoundedRectangle chứ không thuộc Rectangle)? Nếu không chắc chắn, KHÔNG dùng — chọn cách viết đơn giản hơn, chắc chắn đúng API.
+
 ## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua)
 
 1. Đếm thủ công: đánh số thứ tự 1, 2, 3... cho từng \`# NARRATION:\` xuất hiện trong script, sau đó đếm riêng số lệnh \`self.wait(AUTO)\`. Hai con số này PHẢI bằng nhau. Nếu lệch, tìm và sửa (thường do wait(AUTO) bị đặt trong vòng lặp, hoặc marker/wait bị mồ côi).
@@ -128,6 +134,7 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 3. Kịch bản có mạch lạc, đúng trọng tâm chủ đề, không lan man không?
 4. Mỗi cảnh có hình ảnh minh họa RIÊNG, không lặp lại animation nhàm chán?
 5. Class Scene có đúng hậu tố "Scene"? Không còn self.wait(số cụ thể) ở chỗ có lời thoại?
+6. Rà lại mọi lệnh khởi tạo mobject (Rectangle, Square, Circle, Text, ...) trong script: từng tham số truyền vào có chắc chắn thuộc đúng class đó không (đặc biệt corner_radius chỉ dùng với RoundedRectangle, không dùng với Rectangle/Square)?
 
 ## OUTPUT
 

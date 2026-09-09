@@ -15,9 +15,10 @@ from adapters.storage.artifact_paths import (
     video_exists,
     write_timing,
 )
-from domain.errors import InvalidDurationError
+from domain.errors import InvalidDurationError, InvalidManimApiUsageError
 from domain.models import ScriptRenderRequest, ScriptRenderResult
 from domain.ports import ManimScriptRendererPort
+from domain.script_lint import lint_manim_script
 
 
 class RenderScriptUseCase:
@@ -71,6 +72,9 @@ class RenderScriptUseCase:
             raise ValueError("scene_class_name must not be empty")
         if not request.script_content.strip():
             raise ValueError("script_content must not be empty")
+        issues = lint_manim_script(request.script_content)
+        if issues:
+            raise InvalidManimApiUsageError(issues)
         if not request.narration_segments:
             raise ValueError("narration_segments must not be empty")
         for segment in request.narration_segments:
