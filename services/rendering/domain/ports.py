@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from domain.models import ScriptRenderRequest, ScriptRenderResult
+from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
 
 
 class ManimScriptRendererPort(ABC):
@@ -17,10 +17,24 @@ class ManimScriptRendererPort(ABC):
     (ManimScriptRenderer) lives under adapters/rendering/."""
 
     @abstractmethod
+    def dry_run(self, request: ScriptRenderRequest) -> DryRunResult:
+        """Executes the script without producing a video, to learn which
+        narration lines it produces and in what order (CR-018 FR49.1).
+
+        Runs before TTS, so a script that fails here costs no voice quota
+        (CR-020 FR56). request.narration_segments is ignored — the dry pass is
+        what determines them.
+
+        Raises:
+            domain.errors.AnimationEngineError: if the script fails to run, times
+                out, or produces no narration at all.
+        """
+
+    @abstractmethod
     def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:
-        """Renders request.scene_class_name from request.script_content
-        (after substituting `self.wait(AUTO)` calls with the ordered
-        narration_segments' durations) to output_path.
+        """Renders request.scene_class_name from request.script_content to
+        output_path, holding each `self.narrate(...)` for the matching
+        narration_segments duration.
 
         Returns the result carrying output_path plus wait_offsets — where each
         narration segment actually begins in the finished video (CR-002
@@ -28,7 +42,7 @@ class ManimScriptRendererPort(ABC):
 
         Raises:
             domain.errors.AnimationEngineError: if the engine fails, times
-                out, the script's `self.wait(AUTO)` count doesn't match the
-                number of narration_segments, or the recorded timing marks
-                don't line up one-to-one with them.
+                out, or the recorded timing marks don't line up one-to-one with
+                narration_segments — which means the script is not deterministic
+                between the two passes.
         """

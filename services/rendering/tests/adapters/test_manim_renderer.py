@@ -1,8 +1,8 @@
 """Unit tests for ManimScriptRenderer.
 
 The subprocess layer is monkeypatched in every test — these tests never
-actually invoke the real `manim` CLI, only verify AUTO-wait substitution,
-timing-mark handling, subprocess error mapping, cache behaviour, and
+actually invoke the real `manim` CLI, only verify the two-pass contract
+(CR-018), timing-mark handling, subprocess error mapping, cache behaviour, and
 output-file discovery.
 
 Manim is launched with Popen (so a long render can stream heartbeats), while
@@ -28,11 +28,11 @@ from domain.errors import AnimationEngineError
 from domain.models import NarrationSegment, ScriptRenderRequest
 
 VALID_SCRIPT = (
-    "from manim import *\n\n"
-    "class DemoScene(Scene):\n"
+    "from conceptflow import *\n\n"
+    "class DemoScene(ConceptFlowScene):\n"
     "    def construct(self):\n"
-    "        self.wait(AUTO)\n"
-    "        self.wait(AUTO)\n"
+    '        self.narrate("dòng một")\n'
+    '        self.narrate("dòng hai")\n'
 )
 
 
@@ -46,41 +46,6 @@ def make_request(script: str = VALID_SCRIPT) -> ScriptRenderRequest:
             NarrationSegment(scene_index=1, audio_path="/shared/proj-1/audio/1.wav", duration_seconds=3.0),
         ],
     )
-
-
-def test_patch_auto_waits_substitutes_in_order():
-    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
-    assert "self.wait(2.5)" in patched
-    assert "self.wait(3.0)" in patched
-    assert "AUTO" not in patched
-
-
-def test_patch_auto_waits_marks_each_wait_with_its_index():
-    """CR-002: each wait is wrapped so the render reports where it begins."""
-    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
-
-    assert "(_cf_mark(self, 0), self.wait(2.5))" in patched
-    assert "(_cf_mark(self, 1), self.wait(3.0))" in patched
-
-
-def test_patch_auto_waits_puts_preamble_after_the_manim_import():
-    """A `from manim import *` after the helper would shadow it."""
-    patched = ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0])
-    lines = patched.splitlines()
-
-    import_line = next(i for i, ln in enumerate(lines) if ln.startswith("from manim import"))
-    helper_line = next(i for i, ln in enumerate(lines) if "def _cf_mark" in ln)
-
-    assert helper_line > import_line
-
-
-def test_patch_auto_waits_output_is_valid_python():
-    compile(ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5, 3.0]), "<patched>", "exec")
-
-
-def test_patch_auto_waits_raises_on_count_mismatch():
-    with pytest.raises(AnimationEngineError, match="self.wait\\(AUTO\\)"):
-        ManimScriptRenderer._patch_auto_waits(VALID_SCRIPT, [2.5])
 
 
 class FakePopen:
@@ -127,8 +92,8 @@ def test_render_invokes_manim_and_moves_output(tmp_path, monkeypatch):
             f.write(b"stub-mp4-bytes")
         # Stand in for what the patched script's _cf_mark would have written.
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 7.25}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 7.25}) + "\n")
         return FakePopen()
 
     monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
@@ -204,8 +169,8 @@ def test_heartbeat_reports_elapsed_time_and_animation_index(tmp_path, monkeypatc
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub")
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 1.0}) + "\n")
 
         class SlowPopen(FakePopen):
             def wait(self, timeout=None):
@@ -245,8 +210,8 @@ def test_heartbeat_failure_does_not_fail_the_render(tmp_path, monkeypatch):
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub")
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 1.0}) + "\n")
 
         class SlowPopen(FakePopen):
             def wait(self, timeout=None):
@@ -363,26 +328,29 @@ def test_defaults_are_sized_for_long_form_video():
 def test_read_wait_offsets_returns_marks_in_scene_order(tmp_path):
     marks = tmp_path / "cf_marks.jsonl"
     # Written in whatever order the render happened to flush them.
-    marks.write_text('{"index": 1, "t": 9.5}\n{"index": 0, "t": 0.0}\n')
+    marks.write_text('{"kind": "mark", "index": 1, "t": 9.5}\n{"kind": "mark", "index": 0, "t": 0.0}\n')
 
     assert ManimScriptRenderer._read_wait_offsets(str(marks), expected=2) == [0.0, 9.5]
 
 
 def test_read_wait_offsets_rejects_a_missing_mark(tmp_path):
-    """A wait inside a loop or an `if` fires a different number of times than
-    there are narration segments. Returning a partial list would put every
-    later narration on the wrong offset — the exact bug CR-002 removes — so
-    this has to fail loudly."""
-    marks = tmp_path / "cf_marks.jsonl"
-    marks.write_text('{"index": 0, "t": 0.0}\n')
+    """The two passes disagreed about how many narration lines the script has.
 
-    with pytest.raises(AnimationEngineError, match="exactly once"):
+    After CR-018 a loop or an `if` around narration is perfectly legal — both
+    passes run the same code, so both see the same count. A mismatch therefore
+    means something genuinely worse: the script is non-deterministic. Returning
+    a partial list would put every later narration on the wrong offset, the
+    exact bug CR-002 removes, so this has to fail loudly."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n')
+
+    with pytest.raises(AnimationEngineError, match="not deterministic"):
         ManimScriptRenderer._read_wait_offsets(str(marks), expected=2)
 
 
 def test_read_wait_offsets_rejects_a_duplicated_mark(tmp_path):
     marks = tmp_path / "cf_marks.jsonl"
-    marks.write_text('{"index": 0, "t": 0.0}\n{"index": 0, "t": 4.0}\n')
+    marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n{"kind": "mark", "index": 0, "t": 4.0}\n')
 
     with pytest.raises(AnimationEngineError):
         ManimScriptRenderer._read_wait_offsets(str(marks), expected=2)
@@ -451,8 +419,8 @@ def test_default_quality_is_1080p60(tmp_path, monkeypatch):
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub")
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 1.0}) + "\n")
         return FakePopen()
 
     monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
@@ -479,8 +447,8 @@ def test_quality_is_configurable(tmp_path, monkeypatch):
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub")
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 1.0}) + "\n")
         return FakePopen()
 
     monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
@@ -519,8 +487,8 @@ def test_per_project_quality_overrides_the_service_default(tmp_path, monkeypatch
         with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
             f.write(b"stub")
         with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
-            f.write(json.dumps({"index": 0, "t": 0.0}) + "\n")
-            f.write(json.dumps({"index": 1, "t": 1.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 1.0}) + "\n")
         return FakePopen()
 
     monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
@@ -547,3 +515,102 @@ def test_unknown_per_project_quality_falls_back_to_the_default():
     assert renderer._resolve_quality("nonsense") == "1080p60"
     assert renderer._resolve_quality(None) == "1080p60"
     assert renderer._resolve_quality("4k60") == "4k60"
+
+
+# --- CR-018: hai lượt render ---------------------------------------------------
+
+
+def test_rounds_durations_onto_frame_boundaries():
+    """Manim băm cache theo nội dung từng segment, nên thời lượng lẻ tới
+    micro-giây làm đổi hash của mọi segment phía sau một chỉnh sửa nhỏ và ném
+    đi đúng cái cache mà RENDER_CACHE_ROOT sinh ra để có (đo được: nhanh ~5 lần
+    khi render lại)."""
+    from adapters.rendering.manim_renderer import _round_to_frames
+
+    assert _round_to_frames([2.5133333, 3.0016666], 60) == [2.516667, 3.0]
+    assert _round_to_frames([1.0], 30) == [1.0]
+
+
+def test_dry_run_collects_narration_beats_and_chapters(tmp_path, monkeypatch):
+    import json
+    import os
+
+    renderer = ManimScriptRenderer(cache_root=None)
+    captured: dict = {}
+
+    def fake_popen(cmd, **kwargs):
+        captured["cmd"] = cmd
+        captured["env"] = kwargs["env"]
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w", encoding="utf-8") as f:
+            for record in [
+                {"kind": "beat", "index": 0, "id": "hook"},
+                {"kind": "narration", "index": 0, "text": "dòng một"},
+                {"kind": "chapter", "index": 1, "title": "Phần hai"},
+                {"kind": "narration", "index": 1, "text": "dòng hai"},
+            ]:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+
+    result = renderer.dry_run(make_request())
+
+    assert result.narrations == ["dòng một", "dòng hai"]
+    assert result.beats == [(0, "hook")]
+    assert result.chapters == [(1, "Phần hai")]
+    # Lượt dry không được ghi video ra đĩa, và phải chạy ở chất lượng thấp nhất.
+    assert "--dry_run" in captured["cmd"]
+    assert "-ql" in captured["cmd"]
+    assert captured["env"]["CF_MODE"] == "dry"
+    # Cùng mức cách ly như lượt thật (FR49.3): không rò credential nào.
+    assert set(captured["env"]) == {
+        "PATH", "HOME", "CF_MARKS_PATH", "PYTHONPATH", "CF_MODE",
+    }
+    assert not os.path.exists(os.path.join(str(tmp_path), "out.mp4"))
+
+
+def test_dry_run_fails_when_script_produces_no_narration(monkeypatch):
+    renderer = ManimScriptRenderer(cache_root=None)
+
+    def fake_popen(cmd, **kwargs):
+        open(kwargs["env"]["CF_MARKS_PATH"], "w").close()
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+
+    with pytest.raises(AnimationEngineError, match="no narration"):
+        renderer.dry_run(make_request())
+
+
+def test_render_hands_durations_to_the_script_and_writes_it_unmodified(tmp_path, monkeypatch):
+    """Trước CR-018 script bị viết lại trước khi chạy, nên thứ chạy không bao
+    giờ đúng là thứ Creator viết — và thứ được lưu thậm chí không phải Python
+    hợp lệ."""
+    import json
+    import os
+
+    renderer = ManimScriptRenderer(cache_root=None)
+    seen: dict = {}
+
+    def fake_popen(cmd, **kwargs):
+        media_dir = kwargs["cwd"]
+        seen["script"] = open(os.path.join(media_dir, "script.py")).read()
+        seen["durations"] = json.load(open(kwargs["env"]["CF_DURATIONS_PATH"]))
+        seen["mode"] = kwargs["env"]["CF_MODE"]
+        nested = os.path.join(media_dir, "videos")
+        os.makedirs(nested, exist_ok=True)
+        with open(os.path.join(nested, "DemoScene.mp4"), "wb") as f:
+            f.write(b"stub")
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w") as f:
+            f.write(json.dumps({"kind": "mark", "index": 0, "t": 0.0}) + "\n")
+            f.write(json.dumps({"kind": "mark", "index": 1, "t": 7.25}) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+    stub_ffprobe(monkeypatch)
+
+    renderer.render(make_request(), str(tmp_path / "out.mp4"))
+
+    assert seen["script"] == VALID_SCRIPT
+    assert seen["durations"] == [2.5, 3.0]
+    assert seen["mode"] == "render"

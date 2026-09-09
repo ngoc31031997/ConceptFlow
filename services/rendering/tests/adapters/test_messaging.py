@@ -19,6 +19,11 @@ class FakeManimScriptRenderer(ManimScriptRendererPort):
     def __init__(self, should_fail: bool = False) -> None:
         self._should_fail = should_fail
 
+    def dry_run(self, request):
+        from domain.models import DryRunResult
+
+        return DryRunResult(narrations=["dòng một", "dòng hai"])
+
     def render(self, request, output_path: str):
         if self._should_fail:
             raise AnimationEngineError("engine crashed")

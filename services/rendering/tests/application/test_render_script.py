@@ -13,6 +13,13 @@ from domain.ports import ManimScriptRendererPort
 class FakeRenderer(ManimScriptRendererPort):
     def __init__(self) -> None:
         self.calls: list[tuple[ScriptRenderRequest, str]] = []
+        self.dry_runs: list[ScriptRenderRequest] = []
+
+    def dry_run(self, request: ScriptRenderRequest):
+        from domain.models import DryRunResult
+
+        self.dry_runs.append(request)
+        return DryRunResult(narrations=["dòng một", "dòng hai"])
 
     def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:
         self.calls.append((request, output_path))

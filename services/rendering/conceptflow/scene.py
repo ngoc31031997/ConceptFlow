@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from manim import DOWN, RIGHT, Code, MathTex, Mobject, Scene, Text, VGroup
 
+from . import narration as narration_runtime
 from . import theme as theme_module
 from .layout import Box, fit_scale
 from .theme import Theme
@@ -98,6 +99,25 @@ class ConceptFlowScene(Scene):
         if factor < 1.0:
             mobject.scale(factor)
         return mobject
+
+    # --- Lời thoại (CR-018) ---------------------------------------------------
+
+    def narrate(self, text: str) -> None:
+        """Phát một đoạn lời thoại ngay tại đây.
+
+        Dùng được bên trong vòng lặp, nhánh điều kiện và hàm helper — đó là
+        điểm khác biệt với `# NARRATION` + `self.wait(AUTO)` mà nó thay thế, và
+        là thứ cho phép hook/CTA trở thành component thật (CR-019).
+        """
+        narration_runtime.narrate(self, text)
+
+    def beat(self, beat_id: str) -> None:
+        """Mở một beat của beat sheet (CR-019). Gắn vào lời thoại kế tiếp."""
+        narration_runtime.beat(self, beat_id)
+
+    def chapter(self, title: str) -> None:
+        """Mở một chapter YouTube (CR-006 FR15). Gắn vào lời thoại kế tiếp."""
+        narration_runtime.chapter(self, title)
 
     # --- Chuyển cảnh ----------------------------------------------------------
 
