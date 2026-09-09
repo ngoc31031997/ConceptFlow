@@ -18,23 +18,26 @@ cp .env.example .env
 ## Configuration
 Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh sách đầy đủ và giá trị mẫu — không commit giá trị thật vào git).
 
+**Cách lấy từng credential**: xem [`docs/setup/`](docs/setup/) — hướng dẫn từng bước cho OAuth client YouTube, key Azure Speech và key Google Cloud TTS, kèm cách kiểm tra và cách xoay key khi lộ.
+
 | Biến | Mô tả |
 |---|---|
 | `RABBITMQ_USER` | Username đăng nhập RabbitMQ (thay thế `guest` mặc định) |
 | `RABBITMQ_PASS` | Password RabbitMQ |
 | `POSTGRES_USER` | Username cho mọi PostgreSQL instance (database-per-service, ADR-0013) |
 | `POSTGRES_PASS` | Password PostgreSQL |
-| `GOOGLE_OAUTH_CLIENT_ID` | Google OAuth Client ID (Unit 7: Publisher Service) — đăng ký trên [Google Cloud Console](https://console.cloud.google.com/apis/credentials), type "Web application", bật YouTube Data API v3 |
-| `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth Client Secret tương ứng |
+| *(thư mục `secrets/`)* | Từ CR-012, OAuth client YouTube **không** khai trong `.env` nữa: thả file `client_secret*.json` tải từ Google Cloud Console vào `secrets/`. 1 file = 1 GCP project = 1 rổ quota (~6 video/ngày). Xem [`docs/setup/youtube-oauth-client.md`](docs/setup/youtube-oauth-client.md) |
+| `GOOGLE_OAUTH_CLIENT_ID` | Fallback cho cấu hình cũ trước CR-012, chỉ dùng khi `secrets/` không có file nào. Để trống khi đã dùng `secrets/` |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Fallback tương ứng |
 | `RENDER_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần render Manim (mặc định 1800). Đo được: video 10 phút @1080p60 mất ~276s, nên đây là ~6.5× biên an toàn |
 | `RENDER_MEMORY_LIMIT_GB` | Trần address-space của tiến trình render (mặc định 4). KHÔNG đặt vượt RAM của Docker VM |
-| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | Key + region của Azure Speech resource (CR-011). Bỏ trống → các giọng `(Azure)` trong danh mục tự rơi về giọng Edge y hệt. Tier F0: 500.000 ký tự neural/tháng, miễn phí, không hết hạn |
-| `GOOGLE_TTS_CREDENTIALS_FILE` | Đường dẫn **trên máy host** tới service-account JSON của Google Cloud TTS (ADR-0023). Không bắt buộc: bỏ trống thì mọi giọng dùng engine Edge (ADR-0024), vốn không cần tài khoản. Google đã bỏ free tier nên nhánh này hiện để không (CR-010) |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | Key + region của Azure Speech resource (CR-011) — xem [`docs/setup/azure-speech-key.md`](docs/setup/azure-speech-key.md). Region viết dạng mã (`southeastasia`), không phải tên hiển thị. Bỏ trống → các giọng `(Azure)` trong danh mục tự rơi về giọng Edge y hệt. Tier F0: 500.000 ký tự neural/tháng, miễn phí, không hết hạn |
+| `GOOGLE_TTS_CREDENTIALS_FILE` | Đường dẫn **trên máy host** tới service-account JSON của Google Cloud TTS (ADR-0023) — xem [`docs/setup/google-cloud-tts-key.md`](docs/setup/google-cloud-tts-key.md). Không bắt buộc: bỏ trống thì mọi giọng dùng engine Edge (ADR-0024), vốn không cần tài khoản. Google đã bỏ free tier nên nhánh này hiện để không (CR-010) |
 | `ASSEMBLY_LEAD_IN_SECONDS` / `ASSEMBLY_TAIL_SECONDS` | Khoảng lặng đầu/cuối video (mặc định 0). Bật lên sẽ ép re-encode toàn bộ video — đo được chậm hơn ~250 lần so với stream-copy |
 | `RENDER_QUALITY` | Chất lượng render mặc định khi project không chỉ định: `720p30` \| `1080p60` \| `4k60` (mặc định `1080p60`). Creator chọn theo từng project trên GUI |
 | `RENDER_CACHE_ROOT` | Nơi giữ `media_dir` theo từng project để Manim tái dùng cache (mặc định `/shared/.manim-media`). Đặt rỗng để tắt cache. Đo được: render lại nhanh gấp ~5 lần |
 | `ASSEMBLY_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần ghép video bằng ffmpeg (mặc định 900) |
-| `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI đã đăng ký cho OAuth Client (vd. `http://localhost:8080/v1/auth/youtube/callback`) — phải khớp chính xác với giá trị cấu hình trên Google Cloud Console |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Redirect URI dùng chung cho **mọi** OAuth client: `http://localhost:3000/oauth/youtube/callback`. Mọi client trong `secrets/` phải khai đúng chuỗi này trong Authorized redirect URIs, Google so khớp từng ký tự |
 
 ## Running the Project
 ```bash

@@ -3,6 +3,10 @@
 Thư mục chứa file `client_secret*.json` tải từ Google Cloud Console.
 File README này được commit; **mọi file `.json` trong đây thì không** (xem `.gitignore`).
 
+> Hướng dẫn đầy đủ từng bước (bật API, consent screen, test users, lỗi thường
+> gặp): [`docs/setup/youtube-oauth-client.md`](../docs/setup/youtube-oauth-client.md).
+> Tóm tắt bên dưới.
+
 ## Thêm một OAuth app (= thêm một rổ quota)
 
 1. Google Cloud Console → tạo (hoặc chọn) một **GCP project**
