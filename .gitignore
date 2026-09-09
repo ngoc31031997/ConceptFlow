@@ -16,3 +16,6 @@ client_secret_*.json
 
 # Google OAuth client_secret files (CR-012) — never commit these
 secrets/*.json
+
+# Manim ghi cache/output vào ./media khi chạy ngoài container
+media/

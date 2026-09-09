@@ -7,6 +7,8 @@ per project, so there is nothing left to batch over.
 
 from __future__ import annotations
 
+import logging
+
 from adapters.storage.artifact_paths import (
     compute_timing_path,
     compute_video_path,
@@ -18,7 +20,9 @@ from adapters.storage.artifact_paths import (
 from domain.errors import InvalidDurationError, InvalidManimApiUsageError
 from domain.models import ScriptRenderRequest, ScriptRenderResult
 from domain.ports import ManimScriptRendererPort
-from domain.script_lint import lint_manim_script
+from domain.script_lint import blocking_issues, lint_manim_script
+
+logger = logging.getLogger(__name__)
 
 
 class RenderScriptUseCase:
@@ -73,8 +77,14 @@ class RenderScriptUseCase:
         if not request.script_content.strip():
             raise ValueError("script_content must not be empty")
         issues = lint_manim_script(request.script_content)
-        if issues:
-            raise InvalidManimApiUsageError(issues)
+        blocking = blocking_issues(issues)
+        if blocking:
+            raise InvalidManimApiUsageError(blocking)
+        for issue in issues:
+            # Cảnh báo không chặn render (CR-017 FR46.3): đường thoát hiểm ra
+            # API thô của Manim là hợp lệ, chỉ là phần đó không được theme và
+            # QC bảo vệ. Chặn nó lại sẽ chặn đúng những video tham vọng nhất.
+            logger.warning("lint script (%s): %s", request.project_id, issue)
         if not request.narration_segments:
             raise ValueError("narration_segments must not be empty")
         for segment in request.narration_segments:

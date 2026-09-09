@@ -31,6 +31,15 @@ export const buildAiPromptTemplate = (language: "vi" | "en") => `Tôi có một 
 Hãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,
 theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:
 
+0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng \`from conceptflow import *\` và
+   class kế thừa \`ConceptFlowScene\` thay vì \`Scene\`. Thay các mobject thô bằng
+   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có
+   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so
+   sánh hai cột), Recap (tóm tắt). Bỏ mọi khai báo màu hex, font_size và
+   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import
+   đích danh từ manim (ví dụ \`from manim import Arrow\`), KHÔNG dùng
+   \`from manim import *\`.
+
 1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script
    có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class
    đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.
@@ -92,13 +101,15 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 
 ## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)
 
-1. Dòng đầu tiên luôn là:
-   from manim import *
+1. Dòng import luôn là:
+   from conceptflow import *
+   (KHÔNG dùng \`from manim import *\` — nó che khuất API của conceptflow và script sẽ bị từ chối.)
 
-2. Định nghĩa đúng MỘT class Scene chính, kế thừa Scene (hoặc subclass như MovingCameraScene), tên mô tả đúng chủ đề, hậu tố "Scene":
-   class <TênMôTảChủĐề>Scene(Scene):
+2. Định nghĩa đúng MỘT class Scene chính, kế thừa \`ConceptFlowScene\`, tên mô tả đúng chủ đề, hậu tố "Scene":
+   class <TênMôTảChủĐề>Scene(ConceptFlowScene):
        def construct(self):
            ...
+   Bảng màu, font, cỡ chữ và nhịp chuyển cảnh do ConceptFlowScene lo — KHÔNG khai báo màu, KHÔNG đặt font_size, KHÔNG set background.
 
 3. Với MỖI câu narration, chèn comment marker ngay TRƯỚC animation tương ứng rồi self.wait(AUTO) ngay sau, không có gì chen giữa:
    # NARRATION: "Câu lời thoại tự nhiên, đúng ý cảnh này"
@@ -114,18 +125,31 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 
 4. Animation minh họa đặt TRƯỚC narration/wait(AUTO) tương ứng để hình xuất hiện đúng lúc lời thoại nhắc đến nó.
 
-## RÀNG BUỘC KỸ THUẬT
+## API ĐƯỢC PHÉP DÙNG (chỉ những thứ dưới đây — thứ khác sẽ bị lint từ chối)
 
-- Chỉ dùng API có sẵn của \`manim\` v0.18.x (Text, MathTex, Tex, Table, Code, VGroup, các animation Create/Write/FadeIn/FadeOut/Transform/Indicate...). Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.
+### Component dựng cảnh
+- \`TitleCard(tiêu_đề, phụ_đề=None)\` — thẻ tiêu đề mở đầu một phân đoạn.
+- \`Callout(nội_dung, tone="accent"|"success"|"warning"|"danger")\` — chú thích nhấn mạnh, có khung.
+- \`CodePanel(mã_nguồn, "python"|"java"|...)\` — khối code kèm nhãn ngôn ngữ.
+- \`StepList([...])\` — danh sách bước, mỗi bước có số trong vòng tròn.
+- \`ComparisonSplit(tiêu_đề_trái, nội_dung_trái, tiêu_đề_phải, nội_dung_phải)\` — so sánh hai cột.
+- \`Recap([...])\` — màn tóm tắt cuối video.
+
+Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
+
+### Method của scene (gọi qua \`self.\`)
+- Chữ: \`self.title(...)\`, \`self.heading(...)\`, \`self.body(...)\`, \`self.caption(...)\`, \`self.formula("x^2")\`, \`self.code(src, "python")\`
+- Bố cục: \`self.stack(a, b, c)\` (xếp dọc), \`self.row(a, b)\` (xếp ngang), \`self.fit(obj)\` (co cho vừa khung)
+- Chuyển cảnh: \`self.reveal(obj)\`, \`self.dismiss(obj)\`, \`self.swap(cũ, mới)\`, \`self.emphasize(obj)\`, \`self.clear_stage()\`
+  (mỗi cái nhận \`speed="fast"|"normal"|"slow"\`; KHÔNG đặt run_time bằng tay)
+- Gom nhóm và chỉ hướng: \`VGroup\`, \`UP\`, \`DOWN\`, \`LEFT\`, \`RIGHT\`, \`ORIGIN\`
+- Đặt vị trí tương đối: \`obj.next_to(khác, DOWN, buff=0.5)\`, \`obj.shift(UP * 0.5)\`
+
+### Ràng buộc thi hành
+- Cần một hình mà component không diễn đạt được? Import đích danh từ Manim (ví dụ \`from manim import Arrow\`). Được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
+- MỖI phân đoạn nên có ít nhất một hình ảnh/hình học, không chỉ toàn chữ. Video toàn chữ là thứ kênh này muốn tránh.
 - Script chạy trong subprocess giới hạn tài nguyên (timeout 1800s, RAM 4 GiB) — tránh vòng lặp/animation quá nặng, nhưng không cần cắt ngắn nội dung vì lo timeout.
-- Output cuối là video .mp4 khi render bằng: manim -qm <file> <TênScene>.
-- Nền tối mặc định của Manim, chọn màu chữ/hình có độ tương phản tốt, bố cục nằm gọn trong khung an toàn 16:9, không để chữ/hình tràn hoặc chồng lấp.
-
-## LỖI API MANIM THƯỜNG GẶP — TUYỆT ĐỐI TRÁNH (mỗi lỗi này làm render fail toàn bộ video)
-
-- \`Rectangle(...)\` và \`Square(...)\` KHÔNG có tham số \`corner_radius\`. Muốn bo góc, dùng \`RoundedRectangle(width=..., height=..., corner_radius=...)\` thay vì \`Rectangle\`.
-- \`Text(...)\` nhận nội dung là đối số vị trí đầu tiên — viết \`Text("Nội dung")\`, KHÔNG viết \`Text(text="Nội dung")\`.
-- Trước khi dùng bất kỳ tham số nào ngoài các tham số phổ biến (width, height, color, fill_opacity, fill_color, stroke_width, font_size, ...), tự hỏi: tham số này có thực sự thuộc đúng class đang gọi không, hay chỉ thuộc một class "họ hàng" gần đó (ví dụ corner_radius thuộc RoundedRectangle chứ không thuộc Rectangle)? Nếu không chắc chắn, KHÔNG dùng — chọn cách viết đơn giản hơn, chắc chắn đúng API.
+- Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.
 
 ## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua)
 
@@ -134,7 +158,7 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 3. Kịch bản có mạch lạc, đúng trọng tâm chủ đề, không lan man không?
 4. Mỗi cảnh có hình ảnh minh họa RIÊNG, không lặp lại animation nhàm chán?
 5. Class Scene có đúng hậu tố "Scene"? Không còn self.wait(số cụ thể) ở chỗ có lời thoại?
-6. Rà lại mọi lệnh khởi tạo mobject (Rectangle, Square, Circle, Text, ...) trong script: từng tham số truyền vào có chắc chắn thuộc đúng class đó không (đặc biệt corner_radius chỉ dùng với RoundedRectangle, không dùng với Rectangle/Square)?
+6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có \`from manim import *\`?
 
 ## OUTPUT
 

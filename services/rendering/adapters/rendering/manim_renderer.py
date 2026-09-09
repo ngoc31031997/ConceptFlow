@@ -120,6 +120,14 @@ DEFAULT_RENDER_QUALITY = "1080p60"
 
 MARKS_FILENAME = "cf_marks.jsonl"
 
+# Directory that must be on the child's PYTHONPATH for `import conceptflow` to
+# resolve (CR-017). Derived from this file's own location rather than hardcoded,
+# so it stays correct whether the service runs from /app inside the image or
+# from a checkout during development.
+_CONCEPTFLOW_PARENT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+
 # Prepended to the patched script. Names are `_cf_`-prefixed so they cannot
 # collide with anything the Creator wrote.
 MARK_PREAMBLE = """
@@ -253,6 +261,12 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             # The only channel by which the patched script reports timing back.
             # It stays inside media_dir, which is torn down after every render.
             "CF_MARKS_PATH": marks_path,
+            # The design system the script imports (CR-017). The subprocess runs
+            # with a stripped environment, so without this `from conceptflow
+            # import *` cannot resolve and every script fails on its first line.
+            # This is the only variable added — no new channel *out* of the
+            # subprocess is opened.
+            "PYTHONPATH": _CONCEPTFLOW_PARENT,
         }
 
         returncode, stderr = self._run_with_heartbeat(cmd, media_dir, safe_env)
