@@ -190,6 +190,16 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
                   {account.channel_title || account.channel_id}
                 </span>
                 {account.is_default && <span className={styles.defaultBadge}>mặc định</span>}
+                {!account.has_caption_scope && (
+                  // CR-015 FR40.2: learned here, before publish, rather than
+                  // from a video that quietly has no CC afterward.
+                  <span
+                    className={styles.captionBadge}
+                    title="Kênh này được nối trước khi tính năng phụ đề YouTube ra mắt — video vẫn đăng bình thường, chỉ không có phụ đề. Ngắt kết nối rồi nối lại để bật."
+                  >
+                    thiếu quyền phụ đề
+                  </span>
+                )}
                 <span className={styles.appTag}>{account.app_label}</span>
               </label>
               <div className={styles.itemActions}>

@@ -121,6 +121,18 @@ export function ResultPage() {
           <div className={glass.card} style={{ textAlign: "center", padding: "44px 32px" }}>
             <p style={{ margin: "0 0 12px", fontSize: 19, fontWeight: 700 }}>Đã đăng thành công!</p>
             <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
+            {project.caption_status === "skipped_no_scope" && (
+              <p role="alert" className={glass.helperText} style={{ marginTop: 12 }}>
+                Video không có phụ đề YouTube: kênh này cần được nối lại để cấp thêm quyền. Vào mục
+                Kênh YouTube ở lần đăng sau, ngắt rồi nối lại kênh này.
+              </p>
+            )}
+            {project.caption_status === "failed" && (
+              <p role="alert" className={glass.helperText} style={{ marginTop: 12 }}>
+                Video đã đăng nhưng tải phụ đề lên YouTube thất bại — thử đăng lại, hoặc tải phụ đề
+                lên thủ công trong YouTube Studio.
+              </p>
+            )}
             {project.video_path && (
               <div style={{ marginTop: 24 }}>
                 <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />

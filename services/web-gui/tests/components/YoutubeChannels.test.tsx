@@ -18,6 +18,7 @@ const CHANNEL_ONE: YoutubeAccount = {
   client_id: "client-a",
   app_label: "concer-508105",
   is_default: true,
+  has_caption_scope: true,
 };
 
 const CHANNEL_TWO: YoutubeAccount = {
@@ -26,6 +27,7 @@ const CHANNEL_TWO: YoutubeAccount = {
   client_id: "client-a",
   app_label: "concer-508105",
   is_default: false,
+  has_caption_scope: true,
 };
 
 function mockFetch(accounts: YoutubeAccount[], apps: YoutubeApp[]) {
@@ -119,5 +121,22 @@ describe("YoutubeChannels", () => {
 
     expect(await screen.findByTestId("youtube-app-picker")).toBeInTheDocument();
     expect(screen.getByText("second-project")).toBeInTheDocument();
+  });
+
+  it("flags a channel connected before force-ssl was requested (CR-015 FR40.2)", async () => {
+    const unScoped: YoutubeAccount = { ...CHANNEL_ONE, has_caption_scope: false };
+    global.fetch = mockFetch([unScoped, CHANNEL_TWO], [APP]);
+    renderChannels();
+
+    await waitFor(() => expect(screen.getByTestId("youtube-channel-list")).toBeInTheDocument());
+    expect(screen.getByText("thiếu quyền phụ đề")).toBeInTheDocument();
+  });
+
+  it("does not flag a channel that already has the caption scope", async () => {
+    global.fetch = mockFetch([CHANNEL_ONE, CHANNEL_TWO], [APP]);
+    renderChannels();
+
+    await waitFor(() => expect(screen.getByTestId("youtube-channel-list")).toBeInTheDocument());
+    expect(screen.queryByText("thiếu quyền phụ đề")).not.toBeInTheDocument();
   });
 });

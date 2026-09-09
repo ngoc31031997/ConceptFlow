@@ -46,7 +46,7 @@ describe("api/client", () => {
       script_content: "script",
       voice_language: "vi",
       tts_enabled: true,
-      subtitles_enabled: false,
+      subtitle_mode: "off",
     });
 
     expect(result).toEqual({ saga_id: "s1", status: "started" });

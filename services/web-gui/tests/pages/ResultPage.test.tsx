@@ -152,4 +152,41 @@ describe("ResultPage publish state", () => {
 
     await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
   });
+
+  it("warns when the caption track was skipped for lacking scope", async () => {
+    global.fetch = mockProjectFetch({
+      status: "published",
+      youtube_video_url: "https://youtu.be/abc",
+      caption_status: "skipped_no_scope",
+    });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("cần được nối lại"));
+  });
+
+  it("warns when the caption upload failed", async () => {
+    global.fetch = mockProjectFetch({
+      status: "published",
+      youtube_video_url: "https://youtu.be/abc",
+      caption_status: "failed",
+    });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("tải phụ đề lên YouTube thất bại"));
+  });
+
+  it("shows no caption warning when the caption uploaded successfully", async () => {
+    global.fetch = mockProjectFetch({
+      status: "published",
+      youtube_video_url: "https://youtu.be/abc",
+      caption_status: "uploaded",
+    });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 });

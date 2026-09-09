@@ -5,7 +5,8 @@ export interface RenderInput {
   background_music_path?: string;
   tts_enabled: boolean;
   voice_id?: string;
-  subtitles_enabled: boolean;
+  /** CR-015 — "off" | "track" | "burn_in" | "both" (ADR-0027). */
+  subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "720p30" | "1080p60" | "4k60";
   background_music_volume?: number;
@@ -51,6 +52,12 @@ export interface Project {
   scenes: Scene[];
   youtube_video_url?: string;
   error_message?: string;
+  /**
+   * CR-015 FR39.4 — absent when no caption track was requested; otherwise
+   * "uploaded" | "skipped_no_scope" | "failed". A skipped/failed caption
+   * would otherwise be invisible (the video itself published fine).
+   */
+  caption_status?: string;
 }
 
 export interface ProgressMessage {
@@ -102,6 +109,11 @@ export interface YoutubeAccount {
   client_id: string;
   app_label: string;
   is_default: boolean;
+  /**
+   * CR-015 FR40.2 — false for a channel connected before force-ssl was
+   * requested. Publishing still works; only the caption track is skipped.
+   */
+  has_caption_scope: boolean;
 }
 
 export interface SagaStartedResponse {
