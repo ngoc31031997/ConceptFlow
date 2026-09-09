@@ -28,7 +28,8 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google OAuth Client Secret tương ứng |
 | `RENDER_TIMEOUT_SECONDS` | Trần wall-clock cho 1 lần render Manim (mặc định 1800). Đo được: video 10 phút @1080p60 mất ~276s, nên đây là ~6.5× biên an toàn |
 | `RENDER_MEMORY_LIMIT_GB` | Trần address-space của tiến trình render (mặc định 4). KHÔNG đặt vượt RAM của Docker VM |
-| `GOOGLE_TTS_CREDENTIALS_FILE` | Đường dẫn **trên máy host** tới service-account JSON của Google Cloud TTS (ADR-0023). Bỏ trống → chạy hoàn toàn offline bằng giọng Piper (chất lượng thấp hơn rõ rệt). Free tier WaveNet: 4 triệu ký tự/tháng ≈ 500 video 10 phút |
+| `AZURE_SPEECH_KEY` / `AZURE_SPEECH_REGION` | Key + region của Azure Speech resource (CR-011). Bỏ trống → các giọng `(Azure)` trong danh mục tự rơi về giọng Edge y hệt. Tier F0: 500.000 ký tự neural/tháng, miễn phí, không hết hạn |
+| `GOOGLE_TTS_CREDENTIALS_FILE` | Đường dẫn **trên máy host** tới service-account JSON của Google Cloud TTS (ADR-0023). Không bắt buộc: bỏ trống thì mọi giọng dùng engine Edge (ADR-0024), vốn không cần tài khoản. Google đã bỏ free tier nên nhánh này hiện để không (CR-010) |
 | `ASSEMBLY_LEAD_IN_SECONDS` / `ASSEMBLY_TAIL_SECONDS` | Khoảng lặng đầu/cuối video (mặc định 0). Bật lên sẽ ép re-encode toàn bộ video — đo được chậm hơn ~250 lần so với stream-copy |
 | `RENDER_QUALITY` | Chất lượng render mặc định khi project không chỉ định: `720p30` \| `1080p60` \| `4k60` (mặc định `1080p60`). Creator chọn theo từng project trên GUI |
 | `RENDER_CACHE_ROOT` | Nơi giữ `media_dir` theo từng project để Manim tái dùng cache (mặc định `/shared/.manim-media`). Đặt rỗng để tắt cache. Đo được: render lại nhanh gấp ~5 lần |
@@ -108,7 +109,7 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 ├── services/
 │   ├── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
 │   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
-│   ├── tts/                     # TTS Service (Python, Hexagonal, Piper engine, message-driven — ADR-0014)
+│   ├── tts/                     # TTS Service (Python, Hexagonal, Edge TTS engine, message-driven — ADR-0014)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
 │   ├── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/

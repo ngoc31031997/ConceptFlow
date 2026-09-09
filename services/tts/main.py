@@ -5,8 +5,6 @@ app — it's a plain AMQP consumer (command synthesize_speech, queue
 tts.commands) with a PostgreSQL-backed Outbox/Inbox, mirroring Content
 Plugin Service's composition root shape.
 
-Voice models are still loaded once at startup (PiperTTSAdapter
-construction) and kept in memory for the lifetime of the process.
 Readiness is signaled via a sentinel file (Infrastructure Design) since
 there's no HTTP endpoint left to serve a /health check.
 """
@@ -25,12 +23,14 @@ from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
-from adapters.tts_engines.piper_adapter import PiperTTSAdapter
+from adapters.tts_engines import azure_adapter
+from adapters.tts_engines.edge_adapter import EdgeTTSAdapter
 from adapters.tts_engines.routing_engine import RoutingTTSEngine
-from adapters.tts_engines.voice_registry import ENGINE_PIPER, VOICES, voices_for_engine
+from adapters.tts_engines.voice_registry import ENGINE_AZURE, ENGINE_GOOGLE
 from adapters.tts_engines.voice_samples import generate_missing_samples
 from application.synthesize_speech import SynthesizeSpeechUseCase
 from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
+from domain.ports import TTSEnginePort
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -41,36 +41,39 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 def build_engine() -> RoutingTTSEngine:
-    """Google when credentials are present, Piper otherwise (ADR-0023).
+    """Edge for every voice; Azure and Google only when their credentials are
+    present (ADR-0024, CR-011, ADR-0023).
 
-    Piper is always constructed: it is the fallback path, so the service must
-    be able to speak even with no network or credentials at all.
+    Edge is always constructed: it owns the default voices and is also where a
+    failed metered call degrades to.
     """
-    piper = PiperTTSAdapter(
-        voice_ids=[voice.voice_id for voice in voices_for_engine(ENGINE_PIPER)]
-    )
+    edge = EdgeTTSAdapter()
+    metered: dict[str, TTSEnginePort] = {}
 
-    google = None
+    if azure_adapter.is_configured():
+        metered[ENGINE_AZURE] = azure_adapter.AzureTTSAdapter()
+    else:
+        logger.warning(
+            "%s/%s are not set — the Azure voices in the catalogue will fall back "
+            "to the equivalent Edge voice (CR-011).",
+            azure_adapter.KEY_ENV_VAR,
+            azure_adapter.REGION_ENV_VAR,
+        )
+
     if os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
         try:
             from adapters.tts_engines.google_adapter import GoogleTTSAdapter
 
-            google = GoogleTTSAdapter()
+            metered[ENGINE_GOOGLE] = GoogleTTSAdapter()
         except ImportError:
-            # The library is optional so the image still builds and runs
-            # offline-only. Warn rather than fail — Piper covers it.
+            # The library is optional so the image still builds without it.
+            # Warn rather than fail — Edge covers every voice.
             logger.warning(
                 "GOOGLE_APPLICATION_CREDENTIALS is set but google-cloud-texttospeech "
-                "is not installed; every voice will use the offline engine."
+                "is not installed; the Google voices will use the Edge engine."
             )
-    else:
-        logger.warning(
-            "GOOGLE_APPLICATION_CREDENTIALS is not set — narration will use the "
-            "offline Piper voices, which are noticeably lower quality and are the "
-            "largest monetization risk in this pipeline (ADR-0023)."
-        )
 
-    return RoutingTTSEngine(piper=piper, google=google)
+    return RoutingTTSEngine(edge=edge, metered=metered)
 
 
 async def run() -> None:

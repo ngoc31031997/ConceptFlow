@@ -1854,3 +1854,43 @@ Cleaned up both test projects via DELETE afterward. Updated aidlc-state.md to ma
 **Impact Assessment**: All of CR-002 through CR-006 and CR-008 are now verified end-to-end on the live stack. Only CR-005's Google TTS branch (needs a real credential) and CR-007 (deferred) remain unverified/unbuilt.
 **User Confirmation**: Implicit via the rebuild request; no issues found requiring a decision.
 **Artifacts Affected**: aidlc-state.md only (verification, no code changes this pass). Two ephemeral test projects created and deleted.
+
+---
+
+## CR-009 — Requirements Analysis
+**Timestamp**: 2026-09-08T15:30:00Z
+**User Input**: "không còn free tier. tôi muốn dùng vibe voice asr streaming thì sao nhỉ , nghe nói vừa được public bởi microsoft" → sau khi khảo sát VibeVoice, ElevenLabs, edge-tts, TTS Trung Quốc, Creator quay lại Azure Neural TTS, tự đăng ký, test `curl` thành công (200 OK, voice `vi-VN-NamMinhNeural`), rồi nói: "không cần dùng của azure đi" (chốt dùng Azure).
+**AI Response**: Xác nhận Google Cloud TTS đã mất free tier (Creator xác minh trực tiếp trên Console). Khảo sát các phương án thay thế (VibeVoice, Azure Neural, Amazon Polly, ElevenLabs, edge-tts, TTS Trung Quốc) — khuyến nghị Azure Neural TTS (F0 free tier 500K ký tự/tháng, không hết hạn, đủ nhu cầu ~240K ký tự/tháng). Hướng dẫn Creator tạo Azure account, xử lý lỗi AADSTS50020, tạo Speech resource F0, lấy key, test curl → 200 OK. Hỏi 2 câu hỏi thiết kế (giữ/xoá GoogleTTSAdapter; voice mặc định) qua AskUserQuestion. Creator chọn: giữ cả Google lẫn Azure song song; voice registry cho chọn cả nam/nữ, cả Việt/Anh. Tạo `aidlc-docs/inception/requirements/cr-009-azure-tts-engine.md`.
+**Context**: Requirements Analysis stage cho CR-009, kế thừa/sửa đổi CR-005 + ADR-0023. Depth: Standard (có quyết định vendor thật, có trade-off, cần ADR).
+
+---
+
+## CR-009 — Requirements Analysis Approval
+**Timestamp**: 2026-09-08T15:35:00Z
+**User Input**: "ok"
+**AI Response**: Requirements approved. Proceeding to write ADR-0024 (supersedes ADR-0023).
+**Context**: Gate passed — requirements.md for CR-009 approved as-is, no changes requested.
+
+---
+
+## CR-010 — Edge TTS thay Piper (Requirements → Code Generation)
+**Timestamp**: 2026-09-09T00:00:00Z
+**User Input**: "tạm thời bỏ qua gg và azure dã. implment edge tts thay cho piper đi" — và khi được hỏi edge-tts thay Piper theo kiểu nào, Creator chọn "Thay hoàn toàn, xoá Piper".
+**AI Response**: Cảnh báo trước rằng Piper là engine offline duy nhất nên xoá nó là mất lớp fallback cuối; Creator vẫn chọn thay hoàn toàn. Đã: (1) thêm `EdgeTTSAdapter` (edge-tts 7.2.*, transcode MP3→WAV 24kHz mono bằng ffmpeg); (2) xoá `PiperTTSAdapter`, binary Piper và 4 model .onnx khỏi Dockerfile, thêm ffmpeg vào image; (3) `voice_registry` thay 4 voice Piper bằng 4 voice Edge (vi/en × nam/nữ), giữ voice Google ngủ đông; (4) `RoutingTTSEngine` đổi engine nền Piper→Edge; (5) cập nhật README, docker-compose, docstring `google_adapter`/`ports`; (6) viết ADR-0024 (thay ADR-0010), CR-010, đánh dấu CR-009 Superseded.
+**Impact Assessment**: Đo thực tế phát hiện edge-tts bị từ chối rất nặng khi gọi liên tiếp — **1/8 scene thành công**, giãn cách 3s cũng chỉ 2/5. Vì không còn Piper để degrade sang, đã thêm retry có backoff (4 lần, 1.5s×n) vào adapter → **8/8 scene, 17.3s**. Rủi ro còn lại đã ghi rõ trong ADR-0024: mất hoàn toàn khả năng chạy offline, vi phạm ToS Microsoft khi dùng thương mại, không SLA, và nếu deploy lên VPS thì dải IP datacenter là thứ Microsoft chặn trước tiên.
+**User Confirmation**: Đã chốt qua AskUserQuestion (thay hoàn toàn, xoá Piper) sau khi được cảnh báo trade-off.
+**Artifacts Affected**: `services/tts/adapters/tts_engines/edge_adapter.py` (mới), `piper_adapter.py` (xoá), `voice_registry.py`, `routing_engine.py`, `google_adapter.py`, `main.py`, `domain/ports.py`, `Dockerfile`, `requirements.txt`, tests (49 pass), `README.md`, `docker-compose.yml`, `ADR-0024`, `cr-010-edge-tts-engine.md`, `cr-009-azure-tts-engine.md` (Superseded), `decisions/README.md`, `aidlc-state.md`.
+
+---
+
+## CR-011 — Azure AI Speech (Requirements → Code Generation)
+**Timestamp**: 2026-09-09T00:00:00Z
+**User Input**: "chưa cần, implment thêm azure tts" — và khi được hỏi Azure nên nằm ở đâu khi nó dùng chung bộ giọng với edge-tts, Creator trả lời "chia ra 2 option azure và edge tts".
+**AI Response**: Phát hiện voice ID Azure và edge-tts trùng nhau hoàn toàn (cùng model neural) nên `voice_registry._BY_ID` không đăng ký trùng được — đã nêu 3 phương án cho Creator chọn. Theo lựa chọn của Creator: (1) thêm `AzureTTSAdapter` (REST + SSML, output `riff-24khz-16bit-mono-pcm` nên không cần ffmpeg, XML-escape lời dẫn); (2) `voice_registry` thêm `ENGINE_AZURE` + 4 voice tiền tố `azure:` nhãn `(Azure)`; (3) `RoutingTTSEngine` bỏ slot `google` hard-code, chuyển sang map engine→adapter, metering tách ngưỡng riêng (Azure 500k, Google 4M); (4) wiring `AZURE_SPEECH_KEY`/`AZURE_SPEECH_REGION` qua docker-compose/.env.example/README; (5) viết ADR-0025 và CR-011.
+**Impact Assessment**: Vá được lỗ hổng "không còn engine nào để degrade sang" mà ADR-0024 ghi nhận — nhánh Azure giờ rơi về Edge khi thiếu credential hoặc khi lỗi, đúng ngôn ngữ của project. 69/69 test pass (thêm 9 test Azure adapter, 5 test routing Azure, 3 test registry). `build_engine()` verify cả hai nhánh có/không credential.
+**User Confirmation**: Đã chốt qua AskUserQuestion ("chia ra 2 option azure và edge tts").
+**Artifacts Affected**: `azure_adapter.py` (mới), `test_azure_adapter.py` (mới), `voice_registry.py`, `routing_engine.py`, `main.py`, `tests/adapters/test_routing_engine.py`, `test_voice_registry.py`, `docker-compose.yml`, `.env.example`, `README.md`, `ADR-0025` (mới), `cr-011-azure-tts-engine.md` (mới), `decisions/README.md`, `aidlc-state.md`.
+**Chưa kiểm chứng**: chưa chạy với key Azure thật (key cố ý không đưa vào phiên làm việc); chưa build Docker image; chưa E2E.
+
+---
+

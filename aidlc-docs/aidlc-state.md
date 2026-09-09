@@ -60,6 +60,9 @@
 | CR-006 | Chapters, thumbnail, hook, metadata SEO | P2 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** |
 | CR-007 | Clip dọc 9:16 cho Shorts/TikTok | P1 | Requirements Analysis | **HOÃN theo yêu cầu Creator (2026-09-08)** — làm sau, sau khi các CR còn lại đã ổn định |
 | CR-008 | Ngôn ngữ nội dung áp dụng toàn pipeline | P1 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** |
+| CR-009 | Azure Neural TTS song song Google (Google mất free tier) | P1 | Requirements Analysis | **SUPERSEDED (2026-09-09)** — không triển khai; cả Google lẫn Azure tắc ở tầng tài khoản |
+| CR-010 | Edge TTS thay Piper làm engine giọng đọc nền | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 49/49 unit test pass; burst 8 scene 8/8 sau khi thêm retry (trước: 1/8). ADR-0024 |
+| CR-011 | Azure AI Speech làm engine thứ ba, song song Edge | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 69/69 unit test pass. ADR-0025. Chưa verify với key Azure thật |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 

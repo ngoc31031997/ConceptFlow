@@ -50,9 +50,9 @@ def test_synthesize_calls_engine_and_returns_result(shared_volume_root):
 
     assert result.duration_seconds == 4.5
     audio_dir = shared_volume_root / "proj-1" / "audio"
-    assert result.audio_path.startswith(str(audio_dir / "0_vi-VN-Wavenet-A_"))
+    assert result.audio_path.startswith(str(audio_dir / "0_vi-VN-HoaiMyNeural_"))
     assert result.audio_path.endswith(".wav")
-    assert engine.calls == [("Xin chao", "vi-VN-Wavenet-A", result.audio_path)]
+    assert engine.calls == [("Xin chao", "vi-VN-HoaiMyNeural", result.audio_path)]
 
 
 def test_synthesize_passes_text_verbatim_no_preprocessing(shared_volume_root):

@@ -1,6 +1,8 @@
 aio-pika==9.4.*
 asyncpg==0.30.*
-# ADR-0023 — Google Cloud TTS is the default voice engine. Optional at
-# runtime: with no credentials the service falls back to Piper, so the
-# pipeline still runs fully offline.
+# ADR-0024 — Edge Read Aloud voices are the default engine. No account or key,
+# but it does need the network: nothing here runs offline any more.
+edge-tts==7.2.*
+# ADR-0023 — Google Cloud TTS. Dormant since Google withdrew its free tier
+# (CR-010); only used when GOOGLE_APPLICATION_CREDENTIALS is set.
 google-cloud-texttospeech==2.*

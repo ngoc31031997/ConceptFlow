@@ -79,10 +79,13 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@tts-db:5432/tts
       # ADR-0023 — path to a Google service-account key INSIDE the container.
-      # Leave GOOGLE_TTS_CREDENTIALS_FILE unset in .env and the service falls
-      # back to the offline Piper voices, so the stack still runs with no
-      # cloud account at all.
+      # Leave GOOGLE_TTS_CREDENTIALS_FILE unset in .env and every voice uses the
+      # Edge engine (ADR-0024), which needs no cloud account at all.
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_TTS_CREDENTIALS_FILE:+/run/secrets/google-tts.json}
+      # CR-011 — Azure AI Speech. Leave unset and the Azure voices in the
+      # catalogue fall back to the identical Edge voice.
+      AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
+      AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s

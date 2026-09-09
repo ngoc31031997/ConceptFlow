@@ -64,7 +64,7 @@ def test_batch_synthesizes_every_scene(shared_volume_root):
 
 
 def test_batch_fails_fast_on_first_error(shared_volume_root):
-    engine = FakeTTSEngine(fail_at_voice_id="vi-VN-Wavenet-A")
+    engine = FakeTTSEngine(fail_at_voice_id="vi-VN-HoaiMyNeural")
     batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
     scenes = [
         SceneSpeechRequest(scene_index=0, narration_text="hello", language="en"),
