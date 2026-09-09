@@ -65,10 +65,10 @@
 | CR-010 | Edge TTS thay Piper làm engine giọng đọc nền | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 49/49 unit test pass; burst 8 scene 8/8 sau khi thêm retry (trước: 1/8). ADR-0024 |
 | CR-011 | Azure AI Speech làm engine thứ ba, song song Edge | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 78/78 unit test pass. ADR-0025. Chưa verify với key Azure thật — việc tồn đọng ghi ở mục "Việc tồn đọng" trong `cr-011-azure-tts-engine.md` |
 | CR-012 | Nhiều tài khoản YouTube trên nhiều OAuth client | P1 | **Code Generation ✅** | **Chờ Creator verify với Google thật** — 72/72 test publisher, 42/42 gateway, 68/68 web-gui, Go xanh. ADR-0026. Sửa luôn bug ghi đè credential khi nối kênh thứ hai |
-
 | CR-013 | Retry có backoff cho AzureTTSAdapter | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 87/87 test tts (19 cho azure_adapter). Đo thực tế trước khi sửa: 16/20 request 401 rải rác; sau khi sửa burst 8 scene đạt 8/8. Azure đã tự ổn định nên retry chưa bị kích hoạt thật — vẫn giữ làm bảo hiểm |
 | CR-014 | Sửa lỗi Gợi ý AI (tags null, title rỗng, prompt tràn context) | P0 bug | **Code Generation ✅** | **HOÀN THÀNH** — 3 lỗi chồng nhau; gốc rễ là script 17.5k ký tự vượt num_ctx=2048 của Ollama. Verify: project luôn lỗi nay trả 200 |
-| CR-015 | Caption track YouTube + burn-in theo format | P1 | Requirements Analysis | **Chờ Creator duyệt** — đổi mặc định long-form sang caption track; cần thêm scope `youtube.force-ssl` ⇒ re-consent mọi kênh đã nối |
+| CR-015 | Caption track YouTube + burn-in theo format | P1 | **Code Generation** | Thiết kế đã duyệt (2026-09-09) — ADR-0027, ADR-0028. Ở lại Testing, chấp nhận nối lại kênh hàng tuần; verification hoãn sang CR riêng |
+
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status
@@ -87,3 +87,5 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 | Dùng edge-tts cho mục đích thương mại vi phạm ToS Microsoft, không SLA | ADR-0024 | Chưa xử lý — Azure là đường thoát khi Creator sẵn sàng trả phí |
 | Key Azure sai (có nhưng không hợp lệ) vẫn suy giảm âm thầm về Edge | Review 2026-09-09 | Đã note trong `cr-011-azure-tts-engine.md`, làm khi có key thật |
 | Nhánh Google TTS chưa từng chạy thật | CR-005 / ADR-0023 | Ngủ đông — Google đã bỏ free tier (CR-010) |
+| OAuth app External + Testing ⇒ refresh token hết hạn sau 7 ngày, phải nối lại mọi kênh hàng tuần | CR-015 / ADR-0028 | **Chấp nhận tạm thời (Creator, 2026-09-09)** — lên production đòi Google verification vì `force-ssl` là sensitive scope; hoãn tới một CR riêng để chỉ nộp hồ sơ đúng một lần với bộ scope cuối |
+| Scope `force-ssl` rộng hơn mức cần (cấp cả quyền xoá video), nhưng YouTube không có scope hẹp hơn cho `captions.insert` | ADR-0028 / ADR-0016 | Chấp nhận có ý thức; giảm nhẹ bởi mô hình đe doạ local-only |
