@@ -58,6 +58,21 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS tts_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS voice_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitles_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- CR-016 FR43: what each voice was actually measured reading at.
+--
+-- The words-per-minute constants in the domain are a guess that had never been
+-- checked. Every synthesis run is a free chance to check it: the Orchestrator
+-- knows both the text it sent and the real audio duration that came back.
+-- Kept per voice, not per language — two Vietnamese voices read at visibly
+-- different speeds, and averaging them cancels out what is being measured.
+CREATE TABLE IF NOT EXISTS voice_calibration (
+    voice_id TEXT PRIMARY KEY,
+    sample_count INTEGER NOT NULL DEFAULT 0,
+    total_words BIGINT NOT NULL DEFAULT 0,
+    total_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
 -- CR-002: where each narration segment actually begins in the rendered video,
 -- as measured by Rendering. Projects rendered before this column existed have

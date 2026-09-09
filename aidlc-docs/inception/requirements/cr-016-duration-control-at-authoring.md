@@ -105,6 +105,17 @@ thị kèm khoảng tin cậy.
    là service duy nhất biết cả text lẫn duration thật, nên đo tại chỗ tránh phải
    chuyển số liệu thô qua message chỉ để ghi lại.
 
+   **Điều chỉnh khi triển khai (2026-09-10): bảng nằm ở `orchestrator`, không ở
+   `tts`.** Lập luận trên sai ở một điểm kiểm chứng được: `orchestrator` cũng
+   biết cả hai nửa của phép đo — nó gửi đi văn bản trong lệnh `synthesize_speech`
+   và nhận lại `duration_seconds` trong event `speech_synthesized`. Đặt ở `tts`
+   thì lại phải mở một đường dữ liệu mới để đưa WPM ngược về nơi ước lượng được
+   dùng (`EstimateNarrationDuration` ở orchestrator, và GUI qua API Gateway),
+   trong khi `tts` không có API HTTP nào (ADR-0014). Đo ngay tại nơi tiêu thụ là
+   rẻ hơn và không thêm đường dẫn nào.
+
+   Hệ quả: `tts` **không đổi một dòng nào** cho CR này.
+
 ## Kiểm chứng
 - Unit test: công thức TS và Go cho cùng kết quả trên cùng bộ input (bảng test
   dùng chung).

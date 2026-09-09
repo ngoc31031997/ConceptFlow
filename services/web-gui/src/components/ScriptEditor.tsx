@@ -2,6 +2,7 @@ import { useMemo, useState, type ChangeEvent } from "react";
 import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS } from "./scriptTemplates";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
+import { formatDuration } from "../utils/durationEstimate";
 import { validateScript } from "../utils/scriptValidation";
 
 interface ScriptEditorProps {
@@ -9,6 +10,8 @@ interface ScriptEditorProps {
   onChange: (value: string) => void;
   /** Picks the language of the snippets this inserts (CR-008 FR21.4). */
   contentLanguage: "vi" | "en";
+  /** WPM đo được của giọng đang chọn; bỏ trống thì dùng hằng số theo ngôn ngữ (CR-016 FR43). */
+  wordsPerMinute?: number;
 }
 
 function UploadIcon() {
@@ -55,8 +58,11 @@ function WarningIcon() {
  * script part of the job now belongs to ScriptAssistant, which explains the
  * round trip instead of hiding it in a menu.
  */
-export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorProps) {
-  const validation = useMemo(() => validateScript(value), [value]);
+export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute }: ScriptEditorProps) {
+  const validation = useMemo(
+    () => validateScript(value, contentLanguage, wordsPerMinute),
+    [value, contentLanguage, wordsPerMinute],
+  );
   const [importError, setImportError] = useState<string | null>(null);
   const hasScript = value.trim().length > 0;
 
@@ -137,7 +143,7 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
           {validation.isValid ? (
             <>
               <CheckCircleIcon />
-              Hợp lệ: {validation.narrationCount} đoạn NARRATION khớp {validation.autoWaitCount} self.wait(AUTO).
+              Hợp lệ: {validation.narrationCount} đoạn lời thoại, {validation.totalWords} từ.
             </>
           ) : (
             <>
@@ -148,9 +154,34 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
         </div>
       )}
 
+      {hasScript && validation.narrationCount > 0 && (
+        <div className={styles.durationEstimate} data-testid="script-duration-estimate">
+          <div className={styles.durationHeadline}>
+            ≈ {formatDuration(validation.estimatedNarrationSeconds)} lời thoại
+          </div>
+          <div className={styles.durationCaveat}>
+            Chưa tính thời gian animation, nên video thật sẽ dài hơn con số này.{" "}
+            {wordsPerMinute
+              ? "Tốc độ đọc lấy từ số đo thật của giọng bạn đang chọn."
+              : "Tốc độ đọc là mức trung bình; sau vài video hệ thống sẽ hiệu chỉnh theo giọng bạn chọn."}
+          </div>
+          <ol className={styles.durationBreakdown}>
+            {validation.narrations.map((narration, index) => (
+              <li key={index}>
+                <span className={styles.durationBreakdownTime}>
+                  {formatDuration(narration.seconds)}
+                </span>
+                <span className={styles.durationBreakdownText}>{narration.text}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       <div className={glass.cardHint}>
-        Đặt <code>{'# NARRATION: "..."'}</code> ngay trước mỗi <code>self.wait(AUTO)</code> — hệ thống tạo
-        giọng đọc cho từng đoạn và thay <code>AUTO</code> bằng thời lượng thật trước khi render.
+        Mỗi câu lời thoại là một lời gọi <code>{'self.narrate("...")'}</code> — hệ thống tạo giọng
+        đọc cho từng câu và giữ animation đúng bằng thời lượng audio thật. Lời gọi này dùng được
+        cả trong vòng lặp và trong hàm.
       </div>
     </div>
   );

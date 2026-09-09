@@ -16,7 +16,8 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 2 *
 const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 /**
- * `GET /v1/projects`, `GET /v1/projects/:id` and `POST /v1/projects/:id/retry` → Orchestrator Service.
+ * `GET /v1/projects`, `GET /v1/projects/:id`, `GET /v1/voice-calibration` and
+ * `POST /v1/projects/:id/retry` → Orchestrator Service.
  * `GET /v1/projects/:id/video` streams the assembled video from the shared volume.
  * `POST /v1/projects/:id/suggest-metadata` drafts SEO title/description/tags via Ollama —
  * proxied through `orchestratorAiClient` (a longer timeout than the default
@@ -37,6 +38,9 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   const router = express.Router();
   router.get('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
+  // lúc soạn khớp với giọng Creator thực sự dùng.
+  router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/video', videoHandler(orchestratorClient, sharedDir));
   router.post('/v1/projects/:id/retry', proxyHandler(orchestratorClient, 'orchestrator'));

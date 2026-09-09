@@ -275,3 +275,62 @@ func (r *ProjectRepository) UpdateStep(ctx context.Context, step *domain.SagaSte
 		step.SagaID, string(step.StepName), string(step.Status), step.ErrorMessage)
 	return err
 }
+
+// RecordVoiceSamples folds one project's measurement into the voice's running
+// totals (CR-016 FR43.1).
+//
+// The upsert adds rather than replaces: a voice's measured rate should settle
+// as evidence accumulates, not swing to whatever the last project happened to
+// contain.
+func (r *ProjectRepository) RecordVoiceSamples(ctx context.Context, voiceID string, words int, seconds float64) error {
+	if voiceID == "" || words <= 0 || seconds <= 0 {
+		// Nothing measurable — a project with narration disabled, or one whose
+		// voice was never recorded. Silently skipping beats storing a row that
+		// would drag the average toward zero.
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO voice_calibration (voice_id, sample_count, total_words, total_seconds, updated_at)
+		VALUES ($1, 1, $2, $3, now())
+		ON CONFLICT (voice_id) DO UPDATE SET
+		    sample_count = voice_calibration.sample_count + 1,
+		    total_words = voice_calibration.total_words + EXCLUDED.total_words,
+		    total_seconds = voice_calibration.total_seconds + EXCLUDED.total_seconds,
+		    updated_at = now()
+	`, voiceID, words, seconds)
+	return err
+}
+
+func (r *ProjectRepository) GetVoiceCalibration(ctx context.Context, voiceID string) (domain.VoiceCalibration, error) {
+	var c domain.VoiceCalibration
+	c.VoiceID = voiceID
+	err := r.pool.QueryRow(ctx, `
+		SELECT sample_count, total_words, total_seconds FROM voice_calibration WHERE voice_id = $1
+	`, voiceID).Scan(&c.SampleCount, &c.TotalWords, &c.TotalSecond)
+	if err != nil {
+		// An unmeasured voice is the normal starting state, not an error: the
+		// caller falls back to the language default.
+		return domain.VoiceCalibration{VoiceID: voiceID}, nil
+	}
+	return c, nil
+}
+
+func (r *ProjectRepository) ListVoiceCalibrations(ctx context.Context) ([]domain.VoiceCalibration, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT voice_id, sample_count, total_words, total_seconds FROM voice_calibration ORDER BY voice_id
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.VoiceCalibration, 0)
+	for rows.Next() {
+		var c domain.VoiceCalibration
+		if err := rows.Scan(&c.VoiceID, &c.SampleCount, &c.TotalWords, &c.TotalSecond); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}

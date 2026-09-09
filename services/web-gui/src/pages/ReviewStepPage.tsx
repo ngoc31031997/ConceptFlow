@@ -56,7 +56,7 @@ export function ReviewStepPage() {
 
   if (!hasScript) return null;
 
-  const validation = validateScript(draft.scriptContent);
+  const validation = validateScript(draft.scriptContent, draft.voiceLanguage);
   const quality = QUALITY_LABELS[draft.renderQuality] ?? { label: draft.renderQuality, hint: "" };
 
   // With narration on but no voice resolved — the catalog failed to load, or

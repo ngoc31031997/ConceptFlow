@@ -567,3 +567,69 @@ func TestOnRenderingCompleted_RejectsMismatchedOffsetCount(t *testing.T) {
 		}
 	}
 }
+
+func TestHandleStepEventUseCase_SpeechSynthesized_RecordsVoiceCalibration(t *testing.T) {
+	// CR-016 FR43.1: đây là thời điểm duy nhất có đủ cả hai nửa của phép đo —
+	// văn bản đã gửi đi, và thời lượng thật đọc ra.
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusSynthesizingSpeech,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, VoiceID: "vi-NamMinh",
+		Scenes: []domain.Scene{
+			{SceneIndex: 0, NarrationText: "một hai ba bốn năm"},
+			{SceneIndex: 1, NarrationText: "sáu bảy tám chín mười"},
+		},
+	}
+	repo.steps[stepKey("saga-1", domain.StepSynthesizeSpeech)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepSynthesizeSpeech, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "speech_synthesized",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "audio_path": "/a/0.wav", "duration_seconds": float64(2.0)},
+				map[string]interface{}{"scene_index": float64(1), "audio_path": "/a/1.wav", "duration_seconds": float64(3.0)},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	c, _ := repo.GetVoiceCalibration(context.Background(), "vi-NamMinh")
+	if c.SampleCount != 1 || c.TotalWords != 10 || c.TotalSecond != 5.0 {
+		t.Fatalf("số đo sai: %+v", c)
+	}
+}
+
+func TestHandleStepEventUseCase_TTSDisabled_UsesCalibratedRateWhenAvailable(t *testing.T) {
+	// FR43.2: đủ mẫu thì dùng số đo thật thay cho hằng số theo ngôn ngữ.
+	uc, repo, _, _ := newTestUseCase()
+	for i := 0; i < domain.MinCalibrationSamples; i++ {
+		// 300 wpm — nhanh gấp đôi hằng số tiếng Việt (140).
+		_ = repo.RecordVoiceSamples(context.Background(), "vi-Fast", 1000, 200)
+	}
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: false, VoiceID: "vi-Fast",
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	narration := "một hai ba bốn năm sáu bảy tám chín mười"
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": narration},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	got := project.Scenes[0].DurationSeconds
+	if plain := domain.EstimateNarrationDuration(narration, domain.LanguageVietnamese); got >= plain {
+		t.Fatalf("phải dùng số đo thật (%v) thay hằng số (%v)", got, plain)
+	}
+}

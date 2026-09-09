@@ -26,7 +26,10 @@ describe("ScriptStepPage", () => {
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
 
     fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
-      target: { value: 'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "hi"\n        self.wait(AUTO)' },
+      target: {
+        value:
+          'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("xin chào")',
+      },
     });
 
     expect(screen.getByTestId("script-step-next")).not.toBeDisabled();

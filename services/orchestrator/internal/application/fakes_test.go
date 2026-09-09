@@ -11,12 +11,45 @@ import (
 // domain.ProjectRepositoryPort for unit-testing use cases without a real
 // Postgres instance (dependency-injection.md "Testability").
 type fakeRepo struct {
-	projects map[string]*domain.Project
-	steps    map[string]*domain.SagaStep // key: sagaID+"/"+stepName
+	projects    map[string]*domain.Project
+	steps       map[string]*domain.SagaStep // key: sagaID+"/"+stepName
+	calibration map[string]domain.VoiceCalibration
 }
 
 func newFakeRepo() *fakeRepo {
-	return &fakeRepo{projects: map[string]*domain.Project{}, steps: map[string]*domain.SagaStep{}}
+	return &fakeRepo{
+		projects:    map[string]*domain.Project{},
+		steps:       map[string]*domain.SagaStep{},
+		calibration: map[string]domain.VoiceCalibration{},
+	}
+}
+
+func (r *fakeRepo) RecordVoiceSamples(_ context.Context, voiceID string, words int, seconds float64) error {
+	if voiceID == "" || words <= 0 || seconds <= 0 {
+		return nil
+	}
+	c := r.calibration[voiceID]
+	c.VoiceID = voiceID
+	c.SampleCount++
+	c.TotalWords += words
+	c.TotalSecond += seconds
+	r.calibration[voiceID] = c
+	return nil
+}
+
+func (r *fakeRepo) GetVoiceCalibration(_ context.Context, voiceID string) (domain.VoiceCalibration, error) {
+	if c, ok := r.calibration[voiceID]; ok {
+		return c, nil
+	}
+	return domain.VoiceCalibration{VoiceID: voiceID}, nil
+}
+
+func (r *fakeRepo) ListVoiceCalibrations(_ context.Context) ([]domain.VoiceCalibration, error) {
+	out := make([]domain.VoiceCalibration, 0, len(r.calibration))
+	for _, c := range r.calibration {
+		out = append(out, c)
+	}
+	return out, nil
 }
 
 func stepKey(sagaID string, stepName domain.StepName) string {

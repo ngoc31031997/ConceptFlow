@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { ScriptAssistant } from "../components/ScriptAssistant";
 import { ScriptEditor } from "../components/ScriptEditor";
+import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
@@ -28,7 +29,12 @@ export function ScriptStepPage() {
     if (draft.hasSubmitted) dispatch({ type: "RESET" });
   }, [draft.hasSubmitted, dispatch]);
 
-  const validation = validateScript(draft.scriptContent);
+  const calibration = useVoiceCalibration();
+  const validation = validateScript(
+    draft.scriptContent,
+    draft.voiceLanguage,
+    wordsPerMinuteFor(calibration, draft.voiceId),
+  );
   const isEmpty = draft.scriptContent.trim().length === 0;
   const canContinue = !isEmpty && validation.isValid;
 
@@ -67,6 +73,7 @@ export function ScriptStepPage() {
             value={draft.scriptContent}
             onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
             contentLanguage={draft.voiceLanguage}
+            wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
           />
         </div>
       </AppShell>

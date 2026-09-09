@@ -171,3 +171,55 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Ước lượng thời lượng lúc soạn (CR-016 FR42). Con số này vốn chỉ lộ ra ở bước
+   3 của Saga, sau khi TTS đã chạy — đưa nó lên đây là cả mục đích của CR. */
+.durationEstimate {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 10px;
+  background: rgba(143, 199, 239, 0.08);
+  border: 1px solid rgba(143, 199, 239, 0.22);
+}
+
+.durationHeadline {
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.durationCaveat {
+  margin-top: 0.25rem;
+  font-size: 0.8rem;
+  opacity: 0.72;
+  line-height: 1.45;
+}
+
+.durationBreakdown {
+  margin: 0.6rem 0 0;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.82rem;
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
+.durationBreakdown li {
+  display: flex;
+  gap: 0.6rem;
+  align-items: baseline;
+}
+
+.durationBreakdownTime {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.durationBreakdownText {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

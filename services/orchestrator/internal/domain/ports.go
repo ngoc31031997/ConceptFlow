@@ -39,4 +39,12 @@ type ProjectRepositoryPort interface {
 	Delete(ctx context.Context, projectID string) error
 	GetStep(ctx context.Context, sagaID string, stepName StepName) (*SagaStep, error)
 	UpdateStep(ctx context.Context, step *SagaStep) error
+
+	// RecordVoiceSamples folds one project's measurement into a voice's
+	// running totals (CR-016 FR43.1). Additive rather than replacing, so a
+	// voice's estimate keeps improving instead of swinging with the last
+	// project rendered.
+	RecordVoiceSamples(ctx context.Context, voiceID string, words int, seconds float64) error
+	GetVoiceCalibration(ctx context.Context, voiceID string) (VoiceCalibration, error)
+	ListVoiceCalibrations(ctx context.Context) ([]VoiceCalibration, error)
 }

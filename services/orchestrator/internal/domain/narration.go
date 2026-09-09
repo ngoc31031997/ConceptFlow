@@ -58,7 +58,7 @@ func SupportedLanguages() []ContentLanguage {
 // Video Assembly uses it to time subtitle cues, so both stay in lockstep with
 // each other exactly as they would with synthesized audio.
 func EstimateNarrationDuration(text string, language ContentLanguage) float64 {
-	words := len(strings.Fields(text))
+	words := countWords(text)
 	if words == 0 {
 		return minNarrationSeconds
 	}
@@ -68,6 +68,13 @@ func EstimateNarrationDuration(text string, language ContentLanguage) float64 {
 		return minNarrationSeconds
 	}
 	return seconds
+}
+
+// countWords is the single definition of "a word" shared by the plain and the
+// calibrated estimate, and mirrored by countWords() in the Web GUI
+// (tests/fixtures/narration-duration-vectors.json locks the two together).
+func countWords(text string) int {
+	return len(strings.Fields(text))
 }
 
 // SubtitleStyle is the Creator-chosen appearance of burned-in subtitles

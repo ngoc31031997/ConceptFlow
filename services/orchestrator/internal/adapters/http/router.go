@@ -37,6 +37,7 @@ type suggestPublishMetadataUseCase interface {
 // project-detail/delete endpoints need; satisfied directly by
 // domain.ProjectRepositoryPort.
 type projectStore interface {
+	ListVoiceCalibrations(ctx context.Context) ([]domain.VoiceCalibration, error)
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 	List(ctx context.Context) ([]domain.ProjectSummary, error)
 	Delete(ctx context.Context, projectID string) error
@@ -63,6 +64,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/sagas/render", rt.handleStartRenderSaga)
 	r.Post("/v1/sagas/publish", rt.handleStartPublishSaga)
 	r.Get("/v1/projects", rt.handleListProjects)
+	r.Get("/v1/voice-calibration", rt.handleVoiceCalibration)
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
@@ -232,4 +234,28 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)
+}
+
+// handleVoiceCalibration serves the measured reading rate of every voice that
+// has enough samples (CR-016 FR43.2).
+//
+// The Web GUI uses it to make the authoring-time estimate match what the
+// Creator's own voice actually does, instead of a constant that was never
+// checked against anything. Voices below the sample threshold are omitted
+// rather than reported with a low-confidence number — the GUI falls back to the
+// language default for those, which is the honest answer.
+func (rt *Router) handleVoiceCalibration(w http.ResponseWriter, r *http.Request) {
+	rows, err := rt.projects.ListVoiceCalibrations(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read voice calibration")
+		return
+	}
+
+	out := make(map[string]float64, len(rows))
+	for _, row := range rows {
+		if wpm, ok := row.WordsPerMinute(); ok {
+			out[row.VoiceID] = wpm
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"words_per_minute": out})
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"math"
 	"net/http/httptest"
 	"testing"
 
@@ -39,11 +40,16 @@ func (f *fakeRetryStep) Execute(_ context.Context, _ string) (*application.Retry
 }
 
 type fakeProjectReader struct {
-	project   *domain.Project
-	err       error
-	listOut   []domain.ProjectSummary
-	listErr   error
-	deleteErr error
+	project      *domain.Project
+	err          error
+	listOut      []domain.ProjectSummary
+	listErr      error
+	deleteErr    error
+	calibrations []domain.VoiceCalibration
+}
+
+func (f *fakeProjectReader) ListVoiceCalibrations(_ context.Context) ([]domain.VoiceCalibration, error) {
+	return f.calibrations, nil
 }
 
 func (f *fakeProjectReader) Get(_ context.Context, _ string) (*domain.Project, error) {
@@ -213,5 +219,36 @@ func TestHandleHealth(t *testing.T) {
 
 	if rec.Code != 200 {
 		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+}
+
+func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
+	// Giọng chưa đủ mẫu bị bỏ hẳn khỏi kết quả chứ không trả về một con số
+	// độ tin cậy thấp: GUI rơi về hằng số theo ngôn ngữ, và đó là câu trả lời
+	// trung thực hơn (CR-016 FR43.2).
+	reader := &fakeProjectReader{calibrations: []domain.VoiceCalibration{
+		{VoiceID: "vi-Enough", SampleCount: domain.MinCalibrationSamples, TotalWords: 900, TotalSecond: 360},
+		{VoiceID: "vi-TooFew", SampleCount: 1, TotalWords: 300, TotalSecond: 120},
+	}}
+	router := NewRouter(nil, nil, nil, reader, nil)
+
+	req := httptest.NewRequest("GET", "/v1/voice-calibration", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body struct {
+		WordsPerMinute map[string]float64 `json:"words_per_minute"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body không phải JSON: %v", err)
+	}
+	if _, ok := body.WordsPerMinute["vi-TooFew"]; ok {
+		t.Error("giọng chưa đủ mẫu không được xuất hiện")
+	}
+	if got := body.WordsPerMinute["vi-Enough"]; math.Abs(got-150) > 1e-9 {
+		t.Errorf("WPM = %v, muốn 150", got)
 	}
 }

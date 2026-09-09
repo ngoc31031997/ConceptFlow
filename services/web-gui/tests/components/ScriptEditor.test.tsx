@@ -3,7 +3,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { ScriptEditor } from "../../src/components/ScriptEditor";
 import { HOOK_SNIPPETS } from "../../src/components/scriptTemplates";
 
-const VALID = 'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "hi"\n        self.wait(AUTO)';
+const VALID =
+  'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("xin chào các bạn")';
 
 describe("ScriptEditor", () => {
   it("calls onChange when typing", () => {
@@ -15,18 +16,36 @@ describe("ScriptEditor", () => {
     expect(onChange).toHaveBeenCalledWith("# Scene 1");
   });
 
-  it("reports whether the script's markers and waits line up", () => {
+  it("reports the narration count instead of a marker/wait tally", () => {
+    // Sau CR-018 không còn gì để đếm khớp: self.narrate() gộp marker và điểm
+    // chờ làm một, nên lớp lỗi "lệch số lượng" biến mất theo cấu trúc.
     const { rerender } = render(<ScriptEditor value={VALID} onChange={vi.fn()} contentLanguage="vi" />);
     expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
 
     rerender(
+      <ScriptEditor value={"x = 1"} onChange={vi.fn()} contentLanguage="vi" />,
+    );
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("class Scene");
+  });
+
+  it("warns when the script still uses the pre-CR-018 markers", () => {
+    render(
       <ScriptEditor
-        value={'class A(Scene):\n    def construct(self):\n        # NARRATION: "x"\n        self.wait(1)'}
+        value={'class A(Scene):\n    def construct(self):\n        # NARRATION: "x"\n        self.wait(AUTO)'}
         onChange={vi.fn()}
         contentLanguage="vi"
       />,
     );
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Lệch số lượng");
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("chuẩn cũ");
+  });
+
+  it("shows the estimated narration length before anything is rendered", () => {
+    // Con số này vốn chỉ lộ ra ở bước 3 của Saga, sau khi TTS đã chạy (CR-016).
+    render(<ScriptEditor value={VALID} onChange={vi.fn()} contentLanguage="vi" />);
+    const estimate = screen.getByTestId("script-duration-estimate");
+    expect(estimate).toHaveTextContent("giây");
+    // Phải nói rõ chưa tính animation, thay vì im lặng báo thiếu (FR42.3).
+    expect(estimate).toHaveTextContent("Chưa tính thời gian animation");
   });
 
   it("offers the snippets only once there is a script to append them to", () => {

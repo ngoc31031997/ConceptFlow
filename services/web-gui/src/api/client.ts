@@ -16,6 +16,21 @@ export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, th
 
 export class ApiError extends Error {}
 
+/**
+ * Tốc độ đọc **đo được** của từng giọng (CR-016 FR43.2).
+ *
+ * Giọng chưa đủ mẫu không có mặt trong map — bên gọi rơi về hằng số theo ngôn
+ * ngữ, và đó là câu trả lời trung thực hơn một con số độ tin cậy thấp.
+ */
+export async function fetchVoiceCalibration(): Promise<Record<string, number>> {
+  const response = await fetch(`${GATEWAY_URL}/v1/voice-calibration`);
+  if (!response.ok) return {};
+  const body = await response.json();
+  return typeof body?.words_per_minute === "object" && body.words_per_minute !== null
+    ? (body.words_per_minute as Record<string, number>)
+    : {};
+}
+
 export function getProjectVideoUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/video`;
 }

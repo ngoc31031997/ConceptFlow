@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sort"
+	"strings"
 	"time"
 
 	"orchestrator/internal/domain"
@@ -191,12 +192,6 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 // synthesize_speech (a "failed" one for render_scenes was already sent).
 var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
 
-// onScriptParsed stores the initial scene set (one per "# NARRATION: ..."
-// marker) and the Manim scene class name, then dispatches synthesize_speech
-// directly. classify_scenes is a no-op pass-through in the Manim-script
-// input mode — there is no per-scene template/category to classify since
-// Rendering now executes the Creator's own script rather than choosing a
-// pre-built template, so it is marked completed without ever being
 // onScriptParsed dispatches the validation pass (CR-020 FR56.1).
 //
 // Before CR-018 this step also carried the narration lines, which Script
@@ -247,15 +242,34 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	return uc.startSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
 }
 
+// recordVoiceCalibration folds this project's totals into its voice's running
+// average (CR-016 FR43).
+func (uc *HandleStepEventUseCase) recordVoiceCalibration(ctx context.Context, project *domain.Project) error {
+	words := 0
+	seconds := 0.0
+	for _, scene := range project.Scenes {
+		words += len(strings.Fields(scene.NarrationText))
+		seconds += scene.DurationSeconds
+	}
+	return uc.repo.RecordVoiceSamples(ctx, project.VoiceID, words, seconds)
+}
+
 // skipSynthesizeSpeech is the TTS-disabled branch (CR-001 FR4.6): no audio is
 // synthesized, so the step is closed as completed without ever being
 // dispatched, each scene's duration is estimated from its narration text, and
 // render_scenes is dispatched directly. Rendering and Video Assembly stay
 // unaware of the toggle — they only ever see a populated DurationSeconds.
 func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
+	// Use whatever this voice has actually been measured at, when there is
+	// enough of it (CR-016 FR43.2). Falls back to the language constant on its
+	// own, so an unmeasured voice behaves exactly as before.
+	calibration, err := uc.repo.GetVoiceCalibration(ctx, project.VoiceID)
+	if err != nil {
+		calibration = domain.VoiceCalibration{VoiceID: project.VoiceID}
+	}
 	for i := range project.Scenes {
-		project.Scenes[i].DurationSeconds = domain.EstimateNarrationDuration(
-			project.Scenes[i].NarrationText, project.ContentLanguage,
+		project.Scenes[i].DurationSeconds = domain.EstimateNarrationDurationCalibrated(
+			project.Scenes[i].NarrationText, project.ContentLanguage, calibration,
 		)
 		project.Scenes[i].AudioPath = ""
 	}
@@ -328,6 +342,18 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
+	}
+
+	// CR-016 FR43.1: this is the only moment where both halves of the
+	// measurement exist together — the text we sent, and how long it really
+	// took to read. Recording it costs nothing and is what eventually replaces
+	// the guessed words-per-minute constants with something measured.
+	//
+	// Best-effort: a calibration row that fails to write is a slightly worse
+	// estimate next time, not a reason to fail a project whose audio is done.
+	if err := uc.recordVoiceCalibration(ctx, project); err != nil {
+		uc.logger.Warn("could not record voice calibration",
+			"project_id", project.ProjectID, "voice_id", project.VoiceID, "error", err)
 	}
 
 	return uc.startRenderScenes(ctx, event.SagaID, event.ProjectID, project)

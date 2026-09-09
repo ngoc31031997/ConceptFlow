@@ -1,0 +1,64 @@
+{
+  "_comment": "Bộ dữ liệu dùng chung khoá hai bản cài đặt của cùng một công thức: services/orchestrator/internal/domain/narration.go (EstimateNarrationDuration) và services/web-gui/src/utils/durationEstimate.ts (estimateNarrationDuration). Cùng một con số được dùng ở hai nơi — ở GUI để Creator thấy trước lúc soạn (CR-016 FR42), và ở Orchestrator để định thời lượng thật khi tắt TTS (CR-001). Lệch nhau thì con số hiển thị khác con số hệ thống dùng, và không ai truy ra được.",
+  "words_per_minute": {
+    "vi": 140,
+    "en": 150
+  },
+  "min_narration_seconds": 1.5,
+  "vectors": [
+    {
+      "text": "",
+      "language": "vi",
+      "expected_seconds": 1.5,
+      "why": "chuỗi rỗng rơi về sàn"
+    },
+    {
+      "text": "   \n\t ",
+      "language": "en",
+      "expected_seconds": 1.5,
+      "why": "chỉ khoảng trắng cũng là 0 từ"
+    },
+    {
+      "text": "một",
+      "language": "vi",
+      "expected_seconds": 1.5,
+      "why": "một từ vẫn được giữ đủ lâu để đọc"
+    },
+    {
+      "text": "hello world",
+      "language": "en",
+      "expected_seconds": 1.5,
+      "why": "hai từ vẫn dưới sàn 1.5 giây"
+    },
+    {
+      "text": "Vòng lặp for gồm ba phần chính",
+      "language": "vi",
+      "expected_seconds": 3.0,
+      "why": "câu ngắn bình thường"
+    },
+    {
+      "text": "The for loop has three distinct parts you need to remember",
+      "language": "en",
+      "expected_seconds": 4.4,
+      "why": "câu tiếng Anh"
+    },
+    {
+      "text": "  nhiều    khoảng   trắng   liên tiếp  ",
+      "language": "vi",
+      "expected_seconds": 2.142857142857143,
+      "why": "gộp khoảng trắng như strings.Fields"
+    },
+    {
+      "text": "một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười một hai ba bốn năm sáu bảy tám chín mười ",
+      "language": "vi",
+      "expected_seconds": 21.42857142857143,
+      "why": "đoạn dài 50 từ"
+    },
+    {
+      "text": "word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word word ",
+      "language": "en",
+      "expected_seconds": 60.0,
+      "why": "đoạn rất dài 150 từ"
+    }
+  ]
+}
