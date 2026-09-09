@@ -51,6 +51,10 @@ This is the only application service (besides RabbitMQ's dev-only management UI)
 | `POST` | `/v1/projects/{project_id}/retry` | Orchestrator Service |
 | `GET` | `/v1/auth/youtube/start` | Publisher Service (forwards `302` verbatim) |
 | `GET` | `/v1/auth/youtube/callback` | Publisher Service |
+| `GET` | `/v1/auth/youtube/apps` | Publisher Service (configured OAuth clients — CR-012) |
+| `GET` | `/v1/auth/youtube/accounts` | Publisher Service (connected channels) |
+| `DELETE` | `/v1/auth/youtube/accounts/{channel_id}` | Publisher Service |
+| `POST` | `/v1/auth/youtube/accounts/{channel_id}/default` | Publisher Service |
 | `GET` | `/v1/progress/{project_id}` | Gateway itself (SSE, AMQP-to-SSE bridge — not proxied) |
 | `GET` | `/health` | Gateway itself — always `200 {status: "ok"}`, does not check downstream health |
 

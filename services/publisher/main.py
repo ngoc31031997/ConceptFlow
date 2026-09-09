@@ -15,6 +15,7 @@ import aio_pika
 from fastapi import FastAPI
 
 from adapters.api.router import create_health_router, create_v1_router
+from adapters.config.oauth_app_registry import FileOAuthAppRegistry
 from adapters.messaging.consumer import PublishVideoCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.persistence.credential_store import PostgresCredentialStore
@@ -23,6 +24,7 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.youtube.oauth_flow import GoogleOAuthFlow
+from adapters.youtube.oauth_state import NonceStore
 from adapters.youtube.youtube_publisher import DEFAULT_UPLOAD_TIMEOUT_SECONDS, YouTubeVideoPublisher
 from application.handle_oauth_callback import HandleOAuthCallbackUseCase
 from application.publish_video import PublishVideoUseCase
@@ -53,19 +55,27 @@ def create_app() -> FastAPI:
     async def lifespan(app: FastAPI):
         credential_store = PostgresCredentialStore(DATABASE_URL)
 
-        oauth_flow = GoogleOAuthFlow(
-            client_id=os.environ["GOOGLE_OAUTH_CLIENT_ID"],
-            client_secret=os.environ["GOOGLE_OAUTH_CLIENT_SECRET"],
-            redirect_uri=os.environ["GOOGLE_OAUTH_REDIRECT_URI"],
+        # Scanned once at startup — adding a client_secret file takes a
+        # restart, which is the right trade for not stat-ing the filesystem
+        # on every request (ADR-0026).
+        app_registry = FileOAuthAppRegistry.from_environment()
+        logger.info(
+            "Loaded %d OAuth app(s): %s",
+            len(app_registry.list()),
+            ", ".join(app.label for app in app_registry.list()) or "none",
         )
-        handle_callback_use_case = HandleOAuthCallbackUseCase(oauth_flow, credential_store)
+
+        oauth_flow = GoogleOAuthFlow(redirect_uri=os.environ["GOOGLE_OAUTH_REDIRECT_URI"])
+        nonce_store = NonceStore()
+        handle_callback_use_case = HandleOAuthCallbackUseCase(
+            oauth_flow, credential_store, app_registry
+        )
 
         upload_timeout_seconds = int(
             os.environ.get("UPLOAD_TIMEOUT_SECONDS", DEFAULT_UPLOAD_TIMEOUT_SECONDS)
         )
         publisher = YouTubeVideoPublisher(
-            client_id=os.environ["GOOGLE_OAUTH_CLIENT_ID"],
-            client_secret=os.environ["GOOGLE_OAUTH_CLIENT_SECRET"],
+            app_registry=app_registry,
             credential_store=credential_store,
             timeout_seconds=upload_timeout_seconds,
         )
@@ -91,7 +101,15 @@ def create_app() -> FastAPI:
         state.ready = True
         logger.info("Publisher Service ready — consuming '%s'", COMMANDS_QUEUE)
 
-        app.include_router(create_v1_router(oauth_flow, handle_callback_use_case, credential_store))
+        app.include_router(
+            create_v1_router(
+                oauth_flow,
+                handle_callback_use_case,
+                credential_store,
+                app_registry,
+                nonce_store,
+            )
+        )
 
         yield
 

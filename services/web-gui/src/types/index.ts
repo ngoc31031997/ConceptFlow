@@ -76,6 +76,32 @@ export interface PublishMetadata {
   visibility: "public" | "unlisted" | "private";
   publish_at?: string;
   thumbnail_path?: string;
+  /** Which connected channel to publish to. Omitted => the default channel. */
+  channel_id?: string;
+}
+
+/**
+ * One configured OAuth client = one GCP project = one quota bucket
+ * (~6 uploads/day). Adding a client_secret file raises that ceiling;
+ * connecting more channels to the same client does not (CR-012, ADR-0026).
+ */
+export interface YoutubeApp {
+  client_id: string;
+  label: string;
+  project_id: string;
+  source_file: string;
+  redirect_ok: boolean;
+  /** The exact URI to register in Cloud Console, when redirect_ok is false. */
+  redirect_uri_hint: string | null;
+}
+
+/** One connected YouTube channel. */
+export interface YoutubeAccount {
+  channel_id: string;
+  channel_title: string;
+  client_id: string;
+  app_label: string;
+  is_default: boolean;
 }
 
 export interface SagaStartedResponse {

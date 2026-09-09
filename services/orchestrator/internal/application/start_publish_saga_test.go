@@ -53,3 +53,63 @@ func TestStartPublishSagaUseCase_RejectsWrongStatus(t *testing.T) {
 		t.Fatalf("expected ErrInvalidStatus, got %v", err)
 	}
 }
+
+// CR-012: the chosen channel has to survive all the way into the AMQP
+// payload, since that is the only thing the Publisher sees.
+func TestStartPublishSagaUseCase_CarriesChannelIDIntoPayload(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	uc := NewStartPublishSagaUseCase(repo, pub)
+
+	videoPath := "video.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1",
+		Status:    domain.StatusReadyToPublish,
+		VideoPath: &videoPath,
+	}
+
+	channelID := "UC_channel_two"
+	if _, err := uc.Execute(context.Background(), StartPublishSagaInput{
+		ProjectID:  "proj-1",
+		Title:      "My Video",
+		Visibility: domain.VisibilityPublic,
+		ChannelID:  &channelID,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := pub.last().envelope.Payload["channel_id"]; got != channelID {
+		t.Fatalf("expected channel_id %q in payload, got %v", channelID, got)
+	}
+	if stored := repo.projects["proj-1"].YoutubeChannelID; stored == nil || *stored != channelID {
+		t.Fatalf("expected channel_id persisted on the project, got %v", stored)
+	}
+}
+
+// Projects created before CR-012 carry no channel. The key must be absent
+// rather than present-and-null, because the Publisher reads a missing key as
+// "use the default channel".
+func TestStartPublishSagaUseCase_OmitsChannelIDWhenUnset(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	uc := NewStartPublishSagaUseCase(repo, pub)
+
+	videoPath := "video.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1",
+		Status:    domain.StatusReadyToPublish,
+		VideoPath: &videoPath,
+	}
+
+	if _, err := uc.Execute(context.Background(), StartPublishSagaInput{
+		ProjectID:  "proj-1",
+		Title:      "My Video",
+		Visibility: domain.VisibilityPublic,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if _, present := pub.last().envelope.Payload["channel_id"]; present {
+		t.Fatal("expected channel_id to be absent from the payload when no channel was chosen")
+	}
+}

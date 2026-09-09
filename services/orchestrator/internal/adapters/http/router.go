@@ -147,6 +147,7 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 		Visibility:    visibility,
 		PublishAt:     req.PublishAt,
 		ThumbnailPath: req.ThumbnailPath,
+		ChannelID:     req.ChannelID,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)

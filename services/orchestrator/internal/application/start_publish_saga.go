@@ -17,6 +17,7 @@ type StartPublishSagaInput struct {
 	Visibility    domain.Visibility
 	PublishAt     *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
 	ThumbnailPath *string // absolute path on shared_artifacts, from a prior POST /v1/projects/{id}/thumbnail upload
+	ChannelID     *string // connected YouTube channel to publish to; nil leaves the choice to the Publisher's default (CR-012)
 }
 
 // StartPublishSagaOutput is returned to the HTTP layer for the 201 response.
@@ -62,6 +63,7 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 	project.YoutubeVisibility = &visibility
 	project.YoutubePublishAt = input.PublishAt
 	project.YoutubeThumbnailPath = input.ThumbnailPath
+	project.YoutubeChannelID = input.ChannelID
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err
 	}
@@ -114,6 +116,12 @@ func publishVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	if project.YoutubeThumbnailPath != nil {
 		payload["thumbnail_path"] = *project.YoutubeThumbnailPath
+	}
+	// Omitted rather than sent as null when unset, so the Publisher's
+	// payload.get("channel_id") keeps meaning "use the default channel"
+	// for projects created before CR-012.
+	if project.YoutubeChannelID != nil {
+		payload["channel_id"] = *project.YoutubeChannelID
 	}
 	return payload
 }

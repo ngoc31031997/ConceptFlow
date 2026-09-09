@@ -23,8 +23,16 @@ class PublishVideoUseCase:
     def publish(self, request: PublishRequest) -> PublishResult:
         self._validate(request)
 
-        credential = self._credential_store.get()
+        credential = self._credential_store.get(request.channel_id)
         if credential is None:
+            if request.channel_id:
+                # Deliberately not falling back to the default channel:
+                # publishing to a channel the Creator did not choose is
+                # publicly visible and cannot be taken back (CR-012 FR32.3).
+                raise MissingCredentialError(
+                    f"YouTube channel {request.channel_id!r} is not connected — "
+                    "connect it again, or pick a different channel"
+                )
             raise MissingCredentialError("not authenticated — complete YouTube OAuth first (Story E1)")
 
         return self._publisher.publish(request, credential)

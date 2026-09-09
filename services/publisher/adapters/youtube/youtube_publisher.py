@@ -21,7 +21,7 @@ from googleapiclient.http import MediaFileUpload
 
 from domain.errors import UploadError
 from domain.models import OAuthCredential, PublishRequest, PublishResult
-from domain.ports import CredentialStorePort, VideoPublisherPort
+from domain.ports import CredentialStorePort, OAuthAppRegistryPort, VideoPublisherPort
 
 logger = logging.getLogger(__name__)
 
@@ -32,13 +32,15 @@ REFRESH_BUFFER_SECONDS = 60
 class YouTubeVideoPublisher(VideoPublisherPort):
     def __init__(
         self,
-        client_id: str,
-        client_secret: str,
+        app_registry: OAuthAppRegistryPort,
         credential_store: CredentialStorePort,
         timeout_seconds: int = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
     ) -> None:
-        self._client_id = client_id
-        self._client_secret = client_secret
+        # A registry rather than one client_id/secret pair: a refresh token
+        # can only be refreshed with the exact credentials that issued it,
+        # so with several apps configured a single global pair would fail
+        # with invalid_client for every channel but one (CR-012 FR32.4).
+        self._app_registry = app_registry
         self._credential_store = credential_store
         self._timeout_seconds = timeout_seconds
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="youtube-upload")
@@ -74,17 +76,29 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             refresh_token=credential.refresh_token,
             expires_at=google_creds.expiry or datetime.now(UTC) + timedelta(hours=1),
             channel_id=credential.channel_id,
+            client_id=credential.client_id,
+            channel_title=credential.channel_title,
+            is_default=credential.is_default,
         )
         self._credential_store.save(refreshed)
         return refreshed
 
     def _to_google_credentials(self, credential: OAuthCredential) -> GoogleCredentials:
+        app = self._app_registry.get(credential.client_id)
+        if app is None:
+            raise UploadError(
+                f"channel {credential.channel_title or credential.channel_id!r} was connected "
+                f"with OAuth client {credential.client_id!r}, which is no longer configured — "
+                "restore its client_secret file in the secrets directory, or reconnect the "
+                "channel with one of the configured clients"
+            )
+
         return GoogleCredentials(
             token=credential.access_token,
             refresh_token=credential.refresh_token,
             token_uri="https://oauth2.googleapis.com/token",
-            client_id=self._client_id,
-            client_secret=self._client_secret,
+            client_id=app.client_id,
+            client_secret=app.client_secret,
         )
 
     def _upload(self, request: PublishRequest, credential: OAuthCredential) -> str:

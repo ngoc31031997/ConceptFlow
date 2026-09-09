@@ -13,3 +13,6 @@ dist/
 # (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET); the JSON Google Cloud hands you on
 # download must never reach the remote — this repo has a public origin.
 client_secret_*.json
+
+# Google OAuth client_secret files (CR-012) — never commit these
+secrets/*.json

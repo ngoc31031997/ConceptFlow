@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { VideoPlayer } from "../components/VideoPlayer";
-import { YoutubeConnectButton } from "../components/YoutubeConnectButton";
+import { YoutubeChannels } from "../components/YoutubeChannels";
 import { ThumbnailUpload } from "../components/ThumbnailUpload";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
@@ -20,6 +20,7 @@ export function ResultPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
+  const [channelId, setChannelId] = useState<string | null>(null);
 
   async function handlePublish(metadata: PublishMetadata) {
     setIsPublishing(true);
@@ -28,6 +29,9 @@ export function ResultPage() {
       await startPublishSaga(projectId, {
         ...metadata,
         thumbnail_path: thumbnailPath ?? undefined,
+        // Left out when no channel is connected yet, so the Publisher
+        // reports "not authenticated" rather than "channel '' not found".
+        channel_id: channelId ?? undefined,
       });
       await refetch();
     } catch (err) {
@@ -92,7 +96,7 @@ export function ResultPage() {
             </div>
 
             <div className={styles.publishColumn}>
-              <YoutubeConnectButton projectId={projectId} />
+              <YoutubeChannels projectId={projectId} onSelectedChannelChange={setChannelId} />
               <ThumbnailUpload
                 projectId={projectId}
                 onThumbnailPathChange={setThumbnailPath}

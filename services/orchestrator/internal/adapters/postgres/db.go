@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS projects (
     youtube_visibility TEXT,
     youtube_publish_at TEXT,
     youtube_thumbnail_path TEXT,
+    youtube_channel_id TEXT,
     youtube_video_url TEXT,
     error_message TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -43,6 +44,10 @@ CREATE TABLE IF NOT EXISTS projects (
 -- NOT EXISTS above is a no-op against an already-bootstrapped database, so
 -- existing deployments need this explicit ALTER to pick up the column.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
+
+-- CR-012: which connected channel a project publishes to. Same reason as
+-- above — an already-bootstrapped database never re-runs CREATE TABLE.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS manim_scene_class_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;

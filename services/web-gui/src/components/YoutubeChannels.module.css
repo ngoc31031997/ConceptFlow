@@ -1,0 +1,205 @@
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 24px;
+}
+
+.left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(16, 28, 40, 0.7);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.connectBtn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 8px 20px rgba(47, 143, 224, 0.3);
+  border: none;
+}
+
+.empty {
+  padding: 0 24px 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(16, 28, 40, 0.62);
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 12px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.item:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.itemMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.channelName {
+  font-size: 13px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.defaultBadge,
+.appTag {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+
+.defaultBadge {
+  color: #1a7f4b;
+  background: rgba(26, 127, 75, 0.12);
+}
+
+.appTag {
+  color: rgba(16, 28, 40, 0.62);
+  background: rgba(16, 28, 40, 0.07);
+}
+
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.linkBtn,
+.dangerLink {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.linkBtn {
+  color: var(--accent);
+}
+
+.dangerLink {
+  color: #b4342c;
+}
+
+.linkBtn:hover,
+.dangerLink:hover {
+  background: rgba(16, 28, 40, 0.06);
+}
+
+.appPicker {
+  padding: 0 24px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.appPickerHint {
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(16, 28, 40, 0.62);
+  margin: 0 0 4px;
+}
+
+.appOption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(16, 28, 40, 0.12);
+  background: rgba(255, 255, 255, 0.55);
+  text-align: left;
+  cursor: pointer;
+}
+
+.appOption:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.appLabel {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.appFile {
+  font-size: 11px;
+  color: rgba(16, 28, 40, 0.5);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.warning {
+  margin: 0 24px 18px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(196, 132, 16, 0.1);
+  border: 1px solid rgba(196, 132, 16, 0.28);
+}
+
+.warning p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: rgba(120, 78, 8, 0.95);
+}
+
+.warning code {
+  font-size: 11px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: rgba(16, 28, 40, 0.09);
+  word-break: break-all;
+}

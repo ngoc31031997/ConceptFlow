@@ -74,6 +74,9 @@ class PublishVideoCommandHandler:
             visibility=payload.get("visibility", ""),
             publish_at=payload.get("publish_at"),
             thumbnail_path=payload.get("thumbnail_path"),
+            # Absent for projects created before CR-012 — None means the
+            # default channel, preserving the old single-channel behaviour.
+            channel_id=payload.get("channel_id"),
         )
 
         try:

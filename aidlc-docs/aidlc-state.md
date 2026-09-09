@@ -64,6 +64,7 @@
 | CR-009 | Azure Neural TTS song song Google (Google mất free tier) | P1 | Requirements Analysis | **SUPERSEDED (2026-09-09)** — không triển khai; cả Google lẫn Azure tắc ở tầng tài khoản |
 | CR-010 | Edge TTS thay Piper làm engine giọng đọc nền | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 49/49 unit test pass; burst 8 scene 8/8 sau khi thêm retry (trước: 1/8). ADR-0024 |
 | CR-011 | Azure AI Speech làm engine thứ ba, song song Edge | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 78/78 unit test pass. ADR-0025. Chưa verify với key Azure thật — việc tồn đọng ghi ở mục "Việc tồn đọng" trong `cr-011-azure-tts-engine.md` |
+| CR-012 | Nhiều tài khoản YouTube trên nhiều OAuth client | P1 | **Code Generation ✅** | **Chờ Creator verify với Google thật** — 72/72 test publisher, 42/42 gateway, 68/68 web-gui, Go xanh. ADR-0026. Sửa luôn bug ghi đè credential khi nối kênh thứ hai |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 

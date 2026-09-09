@@ -3,6 +3,8 @@ import type {
   ProgressMessage,
   ProjectSummary,
   PublishMetadata,
+  YoutubeAccount,
+  YoutubeApp,
   RenderInput,
   SagaStartedResponse,
   Voice,
@@ -149,8 +151,12 @@ export function suggestPublishMetadata(id: string): Promise<SuggestedMetadata> {
   return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, { method: "POST" });
 }
 
-export function getYoutubeAuthStartUrl(projectId: string): string {
-  return `${GATEWAY_URL}/v1/auth/youtube/start?state=${encodeURIComponent(projectId)}`;
+export function getYoutubeAuthStartUrl(projectId: string, clientId?: string): string {
+  const params = new URLSearchParams({ state: projectId });
+  // Omitted when there is only one configured client — the Publisher picks
+  // it, so the Creator never sees a one-option chooser (CR-012 FR34.2).
+  if (clientId) params.set("app", clientId);
+  return `${GATEWAY_URL}/v1/auth/youtube/start?${params.toString()}`;
 }
 
 export async function getYoutubeConnectionStatus(): Promise<boolean> {
@@ -158,10 +164,33 @@ export async function getYoutubeConnectionStatus(): Promise<boolean> {
   return result.connected;
 }
 
+export function listYoutubeApps(): Promise<YoutubeApp[]> {
+  return apiFetch<YoutubeApp[]>("/v1/auth/youtube/apps");
+}
+
+export function listYoutubeAccounts(): Promise<YoutubeAccount[]> {
+  return apiFetch<YoutubeAccount[]>("/v1/auth/youtube/accounts");
+}
+
+export async function disconnectYoutubeAccount(channelId: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/auth/youtube/accounts/${encodeURIComponent(channelId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function makeYoutubeAccountDefault(channelId: string): Promise<YoutubeAccount> {
+  return apiFetch<YoutubeAccount>(
+    `/v1/auth/youtube/accounts/${encodeURIComponent(channelId)}/default`,
+    { method: "POST" },
+  );
+}
+
 export interface YoutubeAuthCallbackResult {
   connected: boolean;
   error: string | null;
   state: string | null;
+  channel_id: string | null;
+  channel_title: string | null;
 }
 
 export async function completeYoutubeAuthCallback(

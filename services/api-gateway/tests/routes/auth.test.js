@@ -40,4 +40,22 @@ describe('routes/auth', () => {
       expect.objectContaining({ method: 'GET', path: '/v1/auth/youtube/callback' }),
     );
   });
+
+  // CR-012: the multi-channel surface.
+  test.each([
+    ['get', '/v1/auth/youtube/apps', 'GET'],
+    ['get', '/v1/auth/youtube/accounts', 'GET'],
+    ['delete', '/v1/auth/youtube/accounts/UC1', 'DELETE'],
+    ['post', '/v1/auth/youtube/accounts/UC1/default', 'POST'],
+  ])('%s %s proxies to the publisher client', async (verb, path, method) => {
+    const fakeClient = {
+      request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: [] }),
+    };
+    const app = buildApp(fakeClient);
+
+    const res = await request(app)[verb](path);
+
+    expect(res.status).toBe(200);
+    expect(fakeClient.request).toHaveBeenCalledWith(expect.objectContaining({ method, path }));
+  });
 });

@@ -8,6 +8,7 @@ export function OAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [connectedChannel, setConnectedChannel] = useState<string | null>(null);
 
   useEffect(() => {
     const code = searchParams.get("code");
@@ -24,6 +25,11 @@ export function OAuthCallbackPage() {
           setError(result.error ?? "Kết nối YouTube thất bại");
           return;
         }
+        // Which channel was actually consented is decided on Google's
+        // chooser, not here, so it is worth confirming on the way back.
+        if (result.channel_title) {
+          setConnectedChannel(result.channel_title);
+        }
         navigate(result.state ? `/projects/${result.state}/result` : "/", { replace: true });
       })
       .catch((err) => {
@@ -35,7 +41,11 @@ export function OAuthCallbackPage() {
     // Connecting YouTube happens from the result screen, so this is step 5
     // ("Đăng"). It read 3 — the last step of the wizard back when creation
     // was three screens — which lit up "Xem lại" mid-publish.
-    <AppShell currentStep={5} title="Đang kết nối YouTube..." subtitle="Vui lòng chờ trong giây lát.">
+    <AppShell
+      currentStep={5}
+      title={connectedChannel ? `Đã nối kênh ${connectedChannel}` : "Đang kết nối YouTube..."}
+      subtitle="Vui lòng chờ trong giây lát."
+    >
       {error && (
         <p role="alert" className={glass.helperText}>
           {error}

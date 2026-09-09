@@ -201,6 +201,7 @@ type Project struct {
 	YoutubeVisibility    *Visibility
 	YoutubePublishAt     *string // RFC3339 — schedules the video to auto-go-public at this time (only valid alongside YoutubeVisibility == private, per YouTube Data API)
 	YoutubeThumbnailPath *string // absolute path on shared_artifacts, set by a manual upload before Publish Saga starts
+	YoutubeChannelID     *string // which connected YouTube channel to publish to; nil means the Publisher's default channel (CR-012)
 	YoutubeVideoURL      *string
 
 	ErrorMessage *string

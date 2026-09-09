@@ -20,7 +20,11 @@ function mockFetch(overrides: { onDelete?: () => { ok: boolean; status: number }
       return Promise.resolve(overrides.onDelete ? overrides.onDelete() : { ok: true, status: 204 });
     }
     if (url.includes("/v1/auth/youtube/status")) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false }) });
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false, accounts: [] }) });
+    }
+    // CR-012: the channel list and the OAuth app catalogue both return arrays.
+    if (url.includes("/v1/auth/youtube/accounts") || url.includes("/v1/auth/youtube/apps")) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] });
     }
     return Promise.resolve({
       ok: true,

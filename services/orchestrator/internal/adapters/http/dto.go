@@ -38,6 +38,7 @@ type startPublishSagaRequest struct {
 	Visibility    string   `json:"visibility"`
 	PublishAt     *string  `json:"publish_at,omitempty"`
 	ThumbnailPath *string  `json:"thumbnail_path,omitempty"`
+	ChannelID     *string  `json:"channel_id,omitempty"`
 }
 
 // sagaStartedResponse is the 201 response shape shared by both saga-start
