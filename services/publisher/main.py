@@ -31,6 +31,12 @@ from application.publish_video import PublishVideoUseCase
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
+# Root stays at WARNING so third-party libraries keep quiet, but this module's
+# startup lines (which OAuth apps were found, consumer ready) are the first
+# thing anyone checks when connecting a channel misbehaves — and a record that
+# passes its own logger's level still reaches the root handler regardless of
+# the root logger's level.
+logger.setLevel(logging.INFO)
 
 COMMANDS_QUEUE = "publisher.commands"
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
