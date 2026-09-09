@@ -38,11 +38,15 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       <div className={styles.content}>
         <div className={styles.topbar}>
           <Link to="/" className={styles.logo} style={{ textDecoration: "none" }}>
-            <div className={styles.logoMark}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M5 4L20 12L5 20V4Z" fill="white" />
-              </svg>
-            </div>
+            <img
+              className={styles.logoMark}
+              src="/icon-192.png"
+              alt=""
+              width={34}
+              height={34}
+              /* Trang trí thuần tuý: tên kênh đã nằm ngay cạnh ở logoName,
+                 nên alt rỗng để trình đọc màn hình không đọc lặp hai lần. */
+            />
             <div className={styles.logoName}>ConceptFlow</div>
           </Link>
 

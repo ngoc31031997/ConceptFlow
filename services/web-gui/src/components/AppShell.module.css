@@ -64,10 +64,9 @@
   width: 34px;
   height: 34px;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* Ảnh tự mang nền xanh đen của nó, nên không còn gradient giả phía sau.
+     object-fit: cover phòng khi ảnh không vuông tuyệt đối. */
+  object-fit: cover;
   box-shadow: 0 4px 16px rgba(47, 143, 224, 0.35);
   flex-shrink: 0;
 }
