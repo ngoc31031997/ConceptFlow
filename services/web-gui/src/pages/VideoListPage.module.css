@@ -32,7 +32,8 @@
 .row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px 16px;
   padding: 14px 4px;
   border-bottom: 1px solid var(--surface-border);
   transition: background 0.15s ease;
@@ -66,7 +67,8 @@
 .meta {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 6px 8px;
   margin-top: 4px;
 }
 
@@ -109,4 +111,19 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+}
+
+/*
+  rowMain's badge/hint text and the three action buttons both refused to
+  shrink on a narrow phone, so they overflowed past each other instead of
+  wrapping. Full-width lines for each keep every label readable.
+*/
+@media (max-width: 560px) {
+  .rowMain {
+    flex-basis: 100%;
+  }
+  .actions {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
 }

@@ -109,6 +109,7 @@ export function VideoListPage() {
   return (
     <div data-testid="video-list-page">
       <AppShell
+        wide
         title="Danh sách video"
         subtitle="Tất cả video đã tạo, kể cả những video render thất bại. Xoá video không dùng nữa để giảm dung lượng."
         headerAction={

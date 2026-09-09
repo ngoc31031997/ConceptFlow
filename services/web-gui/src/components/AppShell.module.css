@@ -45,12 +45,15 @@
 }
 
 .topbar {
+  box-sizing: border-box;
+  width: min(98vw, 1680px);
+  margin: 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  padding: 36px 64px 0;
+  padding: 30px 16px 0;
 }
 
 .logo {
@@ -160,40 +163,55 @@
 }
 
 .mainCol {
-  max-width: 700px;
+  box-sizing: border-box;
+  width: min(96vw, 860px);
   margin: 0 auto;
-  padding: 44px 24px 80px;
+  padding: 24px 16px 24px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 16px;
 }
 
 .mainColWide {
-  max-width: 1120px;
+  width: min(98vw, 1680px);
 }
 
 .heading h1 {
-  margin: 0 0 8px;
-  font-size: 32px;
+  margin: 0 0 6px;
+  font-size: 26px;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 .heading p {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   color: var(--ink-soft);
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 @media (max-width: 640px) {
   .topbar {
-    padding: 20px 20px 0;
+    padding: 20px 16px 0;
   }
-  .headerActions {
+  .logo {
+    flex: 1 1 auto;
     min-width: 0;
   }
+  /*
+    Two nowrap buttons plus the logo never fit on one 390px-wide line — they
+    used to spill left over the logo text instead of wrapping. Forcing this
+    onto its own full-width line (flex-basis: 100% breaks the flex line)
+    keeps every button legible instead of overlapping.
+  */
+  .headerActions {
+    flex: 1 1 100%;
+    min-width: 0;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    order: 3;
+  }
   .stepsPill {
-    order: 1;
+    order: 2;
     width: 100%;
     justify-content: center;
     flex-wrap: wrap;

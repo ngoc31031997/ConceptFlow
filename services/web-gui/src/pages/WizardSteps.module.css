@@ -1,7 +1,13 @@
-/* Step 1: guidance on the left, the script itself on the right. */
+/*
+  Step 1: guidance on the left, the script itself on the right. The
+  assistant column used to cap at 400px regardless of how wide the page got,
+  so its numbered steps (topic input, copy prompt) stayed cramped even on a
+  1680px-wide screen. A flexible ratio instead of a hard cap lets it actually
+  use the extra room.
+*/
 .scriptLayout {
   display: grid;
-  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  grid-template-columns: minmax(380px, 1fr) minmax(0, 1.4fr);
   gap: 22px;
   align-items: start;
 }
@@ -14,20 +20,42 @@
   min-width: 0;
 }
 
-/* Step 2: settings in one readable column, not a sidebar. */
+/*
+  Step 2: narration is easily twice as tall as render quality and background
+  music combined (voice list, subtitle preview, subtitle fields all live in
+  one card). Splitting the page into two side-by-side columns left the short
+  column with a slab of empty space beside narration's overflow. Full width
+  for narration, then the two short cards side by side below, uses the wide
+  column without that imbalance.
+*/
 .settingsLayout {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  max-width: 720px;
-  margin: 0 auto;
+  gap: 20px;
   width: 100%;
+}
+
+.settingsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  align-items: start;
+}
+
+/* Step 3: single wide card, not squeezed into the settings grid. */
+.reviewLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
 }
 
 /* Step 3: the summary of everything about to be rendered. */
 .summary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   background: var(--surface-border);
   border-radius: 18px;
@@ -67,8 +95,17 @@
   margin-top: 14px;
 }
 
+@media (max-width: 1100px) {
+  .summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
   .scriptLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .settingsRow {
     grid-template-columns: minmax(0, 1fr);
   }
   .summary {

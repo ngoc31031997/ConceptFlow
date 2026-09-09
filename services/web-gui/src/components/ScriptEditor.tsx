@@ -118,7 +118,7 @@ export function ScriptEditor({ value, onChange, contentLanguage }: ScriptEditorP
         placeholder={
           'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "Loi thoai cho canh nay"\n        self.wait(AUTO)'
         }
-        rows={16}
+        rows={11}
       />
 
       {importError && (
