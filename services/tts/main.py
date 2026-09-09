@@ -79,7 +79,7 @@ def build_engine() -> RoutingTTSEngine:
 async def run() -> None:
     engine = build_engine()
     batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
-    generate_missing_samples(engine)
+    generate_missing_samples(engine, engine.available_engines)
 
     pool = await create_pool()
     inbox = InboxRepository(pool)

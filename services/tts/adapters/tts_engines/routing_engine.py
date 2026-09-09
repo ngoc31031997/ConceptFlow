@@ -62,6 +62,14 @@ class RoutingTTSEngine(TTSEnginePort):
         self._metered = metered or {}
         self._usage_path = usage_path
 
+    @property
+    def available_engines(self) -> set[str]:
+        """The engines that can actually synthesize here. Edge is always in the
+        set — it needs no account, which is why everything degrades to it. The
+        catalogue is filtered by this so the GUI never offers a voice that would
+        quietly come back in a different engine's voice."""
+        return {ENGINE_EDGE, *self._metered}
+
     def synthesize(self, text: str, voice_id: str, output_path: str) -> float:
         engine_name = engine_for(voice_id)
         engine = self._metered.get(engine_name)

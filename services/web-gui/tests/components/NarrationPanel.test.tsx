@@ -6,28 +6,41 @@ import * as client from "../../src/api/client";
 
 const VOICES = [
   {
-    voice_id: "vi_VN-vais1000-medium",
+    voice_id: "vi-VN-HoaiMyNeural",
     language: "vi" as const,
     gender: "female" as const,
-    quality: "medium",
-    label: "Tiếng Việt — Nữ (VAIS)",
-    sample_audio_url: "/v1/voices/vi_VN-vais1000-medium/sample",
+    quality: "neural",
+    label: "Tiếng Việt — Nữ",
+    engine: "edge",
+    sample_audio_url: "/v1/voices/vi-VN-HoaiMyNeural/sample",
   },
   {
-    voice_id: "vi_VN-vivos-x_low",
+    // Same label as the Edge voice above — only the badge tells them apart.
+    voice_id: "azure:vi-VN-HoaiMyNeural",
+    language: "vi" as const,
+    gender: "female" as const,
+    quality: "neural",
+    label: "Tiếng Việt — Nữ",
+    engine: "azure",
+    sample_audio_url: "/v1/voices/azure%3Avi-VN-HoaiMyNeural/sample",
+  },
+  {
+    voice_id: "vi-VN-NamMinhNeural",
     language: "vi" as const,
     gender: "male" as const,
-    quality: "x_low",
-    label: "Tiếng Việt — Nam (VIVOS)",
-    sample_audio_url: "/v1/voices/vi_VN-vivos-x_low/sample",
+    quality: "neural",
+    label: "Tiếng Việt — Nam",
+    engine: "edge",
+    sample_audio_url: "/v1/voices/vi-VN-NamMinhNeural/sample",
   },
   {
-    voice_id: "en_US-ryan-high",
+    voice_id: "en-US-GuyNeural",
     language: "en" as const,
     gender: "male" as const,
-    quality: "high",
-    label: "English — Male (Ryan)",
-    sample_audio_url: "/v1/voices/en_US-ryan-high/sample",
+    quality: "neural",
+    label: "English — Male",
+    engine: "edge",
+    sample_audio_url: "/v1/voices/en-US-GuyNeural/sample",
   },
 ];
 
@@ -36,7 +49,7 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof NarrationPan
     voiceLanguage: "vi" as const,
     ttsEnabled: true,
     onTtsEnabledChange: vi.fn(),
-    voiceId: "vi_VN-vais1000-medium",
+    voiceId: "vi-VN-HoaiMyNeural",
     onVoiceIdChange: vi.fn(),
     subtitlesEnabled: false,
     onSubtitlesEnabledChange: vi.fn(),
@@ -56,9 +69,9 @@ describe("NarrationPanel", () => {
   it("lists only the voices for the selected language", async () => {
     renderPanel();
 
-    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nữ (VAIS)")).toBeInTheDocument());
-    expect(screen.getByText("Tiếng Việt — Nam (VIVOS)")).toBeInTheDocument();
-    expect(screen.queryByText("English — Male (Ryan)")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nam")).toBeInTheDocument());
+    expect(screen.getAllByText("Tiếng Việt — Nữ")).toHaveLength(2);
+    expect(screen.queryByText("English — Male")).not.toBeInTheDocument();
   });
 
   it("hides voice selection entirely when narration is disabled", async () => {
@@ -69,11 +82,11 @@ describe("NarrationPanel", () => {
 
   it("selects a voice when its card is clicked", async () => {
     const props = renderPanel();
-    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nam (VIVOS)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nam")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByText("Tiếng Việt — Nam (VIVOS)"));
+    fireEvent.click(screen.getByText("Tiếng Việt — Nam"));
 
-    expect(props.onVoiceIdChange).toHaveBeenCalledWith("vi_VN-vivos-x_low");
+    expect(props.onVoiceIdChange).toHaveBeenCalledWith("vi-VN-NamMinhNeural");
   });
 
   it("plays the sample clip without changing the selection", async () => {
@@ -83,20 +96,30 @@ describe("NarrationPanel", () => {
       vi.fn(() => ({ play, pause: vi.fn() })),
     );
     const props = renderPanel();
-    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nam (VIVOS)")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Tiếng Việt — Nam")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByLabelText("Nghe thử Tiếng Việt — Nam (VIVOS)"));
+    fireEvent.click(screen.getByLabelText("Nghe thử Tiếng Việt — Nam"));
 
     expect(play).toHaveBeenCalled();
-    expect(props.onVoiceIdChange).not.toHaveBeenCalledWith("vi_VN-vivos-x_low");
+    expect(props.onVoiceIdChange).not.toHaveBeenCalledWith("vi-VN-NamMinhNeural");
   });
 
   it("falls back to a voice of the newly chosen language", async () => {
     // A Vietnamese voice must not survive a switch to English — the TTS
     // Service would have no matching model for the script.
-    const props = renderPanel({ voiceLanguage: "en", voiceId: "vi_VN-vais1000-medium" });
+    const props = renderPanel({ voiceLanguage: "en", voiceId: "vi-VN-HoaiMyNeural" });
 
-    await waitFor(() => expect(props.onVoiceIdChange).toHaveBeenCalledWith("en_US-ryan-high"));
+    await waitFor(() => expect(props.onVoiceIdChange).toHaveBeenCalledWith("en-US-GuyNeural"));
+  });
+
+  it("badges each voice with the engine that will actually produce it", async () => {
+    // Edge and Azure publish the same voice under the same label, so the badge
+    // is the only signal telling the Creator which engine their audio comes
+    // from — and which one spends their Azure quota.
+    renderPanel();
+
+    await waitFor(() => expect(screen.getByText("Azure")).toBeInTheDocument());
+    expect(screen.getAllByText("Edge")).toHaveLength(2);
   });
 
   it("warns when the video would have neither narration nor subtitles", () => {

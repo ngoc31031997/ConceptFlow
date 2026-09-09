@@ -61,6 +61,45 @@ def test_export_catalog_writes_every_voice(tmp_path, monkeypatch):
     assert [entry["voice_id"] for entry in written] == [voice.voice_id for voice in VOICES]
 
 
+def test_export_catalog_omits_voices_whose_engine_has_no_credential(tmp_path, monkeypatch):
+    """The stack this ships on configures neither metered engine, and offering
+    an Azure voice there promised audio the Creator would never hear: routing
+    substitutes the Edge voice and only says so in a container log."""
+    from adapters.tts_engines.voice_registry import ENGINE_AZURE
+
+    monkeypatch.setattr(voice_registry, "SHARED_VOLUME_ROOT", str(tmp_path))
+
+    export_catalog({ENGINE_EDGE, ENGINE_AZURE})
+
+    written = json.loads((tmp_path / "voice_samples" / "catalog.json").read_text(encoding="utf-8"))
+    engines = {entry["engine"] for entry in written}
+    assert engines == {ENGINE_EDGE, ENGINE_AZURE}
+    assert len(written) == 8
+
+
+def test_edge_only_deployment_offers_exactly_the_four_edge_voices():
+    offered = voice_registry.offered_voices({ENGINE_EDGE})
+
+    assert [voice.voice_id for voice in offered] == [
+        "vi-VN-HoaiMyNeural",
+        "vi-VN-NamMinhNeural",
+        "en-US-JennyNeural",
+        "en-US-GuyNeural",
+    ]
+
+
+def test_azure_and_edge_labels_are_identical_so_the_gui_must_badge_the_engine():
+    """CR-011 used to disambiguate the two in the label text itself. The GUI
+    now renders the engine field as its own badge, so the suffix would be a
+    second, hand-maintained copy of the same fact."""
+    from adapters.tts_engines.voice_registry import ENGINE_AZURE
+
+    assert all("(" not in voice.label for voice in VOICES)
+    edge_labels = {v.label for v in voices_for_engine(ENGINE_EDGE)}
+    azure_labels = {v.label for v in voices_for_engine(ENGINE_AZURE)}
+    assert edge_labels == azure_labels
+
+
 def test_azure_and_edge_offer_the_same_voices_under_distinct_keys():
     """CR-011 lists both because they differ in guarantees, not in sound. The
     prefix is what keeps the identical voice names from colliding here."""

@@ -24,6 +24,13 @@ export interface Voice {
   gender: "female" | "male";
   quality: string;
   label: string;
+  /**
+   * Which TTS engine produces this voice — "edge", "azure" or "google".
+   * Azure and Edge publish the same voice names, so the label alone cannot
+   * tell them apart; this is what the GUI badges. Left as a plain string so a
+   * catalogue that gains an engine does not fail to parse here.
+   */
+  engine: string;
   sample_audio_url: string;
 }
 

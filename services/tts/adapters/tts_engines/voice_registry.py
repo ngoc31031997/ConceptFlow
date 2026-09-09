@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections.abc import Collection
 from dataclasses import asdict, dataclass
 
 SHARED_VOLUME_ROOT = "/shared"
@@ -55,27 +56,27 @@ VOICES: tuple[Voice, ...] = (
     # Selectable only when AZURE_SPEECH_KEY/REGION are configured.
     Voice(
         f"{AZURE_VOICE_PREFIX}vi-VN-HoaiMyNeural", "vi", "female", "neural",
-        "Tiếng Việt — Nữ (Azure)", ENGINE_AZURE,
+        "Tiếng Việt — Nữ", ENGINE_AZURE,
     ),
     Voice(
         f"{AZURE_VOICE_PREFIX}vi-VN-NamMinhNeural", "vi", "male", "neural",
-        "Tiếng Việt — Nam (Azure)", ENGINE_AZURE,
+        "Tiếng Việt — Nam", ENGINE_AZURE,
     ),
     Voice(
         f"{AZURE_VOICE_PREFIX}en-US-JennyNeural", "en", "female", "neural",
-        "English — Female (Azure)", ENGINE_AZURE,
+        "English — Female", ENGINE_AZURE,
     ),
     Voice(
         f"{AZURE_VOICE_PREFIX}en-US-GuyNeural", "en", "male", "neural",
-        "English — Male (Azure)", ENGINE_AZURE,
+        "English — Male", ENGINE_AZURE,
     ),
     # Google WaveNet (ADR-0023) — dormant since Google withdrew its free tier
     # (CR-010). Selectable only if GOOGLE_APPLICATION_CREDENTIALS is set.
-    Voice("vi-VN-Wavenet-A", "vi", "female", "wavenet", "Tiếng Việt — Nữ (Google)", ENGINE_GOOGLE),
-    Voice("vi-VN-Wavenet-B", "vi", "male", "wavenet", "Tiếng Việt — Nam (Google)", ENGINE_GOOGLE),
-    Voice("vi-VN-Wavenet-C", "vi", "female", "wavenet", "Tiếng Việt — Nữ 2 (Google)", ENGINE_GOOGLE),
-    Voice("en-US-Wavenet-F", "en", "female", "wavenet", "English — Female (Google)", ENGINE_GOOGLE),
-    Voice("en-US-Wavenet-D", "en", "male", "wavenet", "English — Male (Google)", ENGINE_GOOGLE),
+    Voice("vi-VN-Wavenet-A", "vi", "female", "wavenet", "Tiếng Việt — Nữ", ENGINE_GOOGLE),
+    Voice("vi-VN-Wavenet-B", "vi", "male", "wavenet", "Tiếng Việt — Nam", ENGINE_GOOGLE),
+    Voice("vi-VN-Wavenet-C", "vi", "female", "wavenet", "Tiếng Việt — Nữ 2", ENGINE_GOOGLE),
+    Voice("en-US-Wavenet-F", "en", "female", "wavenet", "English — Female", ENGINE_GOOGLE),
+    Voice("en-US-Wavenet-D", "en", "male", "wavenet", "English — Male", ENGINE_GOOGLE),
 )
 
 DEFAULT_VOICE_BY_LANGUAGE: dict[str, str] = {
@@ -131,17 +132,44 @@ def resolve_voice_id(voice_id: str | None, language: str) -> str:
     return DEFAULT_VOICE_BY_LANGUAGE[language]
 
 
+def samples_dir() -> str:
+    return os.path.join(SHARED_VOLUME_ROOT, VOICE_SAMPLES_DIRNAME)
+
+
 def sample_path(voice_id: str) -> str:
-    return os.path.join(SHARED_VOLUME_ROOT, VOICE_SAMPLES_DIRNAME, f"{voice_id}.wav")
+    return os.path.join(samples_dir(), f"{voice_id}.wav")
 
 
 def catalog_path() -> str:
-    return os.path.join(SHARED_VOLUME_ROOT, VOICE_SAMPLES_DIRNAME, CATALOG_FILENAME)
+    return os.path.join(samples_dir(), CATALOG_FILENAME)
 
 
-def export_catalog() -> None:
+def offered_voices(available_engines: Collection[str] | None = None) -> list[Voice]:
+    """The voices this deployment can actually deliver.
+
+    A voice whose engine has no credential is not an option — RoutingTTSEngine
+    silently substitutes the equivalent Edge voice for it, so offering it means
+    promising a voice the Creator will never hear. Before this filter the
+    catalogue advertised all thirteen voices on a stack configured for none of
+    the metered engines, and the only trace of the substitution was a log line
+    inside the container.
+
+    `None` means "no filtering" — kept so the full catalogue stays inspectable.
+    """
+    if available_engines is None:
+        return list(VOICES)
+    allowed = set(available_engines)
+    return [voice for voice in VOICES if voice.engine in allowed]
+
+
+def export_catalog(available_engines: Collection[str] | None = None) -> None:
     """Write the catalog to the shared volume for the API Gateway to serve."""
     path = catalog_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
-        json.dump([asdict(voice) for voice in VOICES], f, ensure_ascii=False, indent=2)
+        json.dump(
+            [asdict(voice) for voice in offered_voices(available_engines)],
+            f,
+            ensure_ascii=False,
+            indent=2,
+        )

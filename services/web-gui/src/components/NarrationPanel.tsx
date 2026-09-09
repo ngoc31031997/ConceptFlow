@@ -22,6 +22,19 @@ interface NarrationPanelProps {
 
 const GENDER_LABEL: Record<string, string> = { female: "Nữ", male: "Nam" };
 
+/*
+  Azure and Edge serve the identical neural voices under identical names, so
+  the row's label cannot distinguish them — the badge is the only thing that
+  says where the audio will come from. The catalogue only lists engines this
+  deployment has credentials for, so every badge here is a voice that really
+  will be used, not one that would quietly fall back.
+*/
+const ENGINE_BADGE: Record<string, { text: string; title: string }> = {
+  edge: { text: "Edge", title: "Microsoft Edge Read Aloud — miễn phí, không cần tài khoản" },
+  azure: { text: "Azure", title: "Azure AI Speech — dùng key của bạn, có SLA và quyền thương mại" },
+  google: { text: "Google", title: "Google Cloud WaveNet — dùng credential của bạn, tính phí" },
+};
+
 function Toggle({
   checked,
   onChange,
@@ -163,7 +176,16 @@ export function NarrationPanel({
                     )}
                   </span>
                   <span className={selectable.body}>
-                    <span className={selectable.label}>{voice.label}</span>
+                    <span className={styles.voiceLabelRow}>
+                      <span className={selectable.label}>{voice.label}</span>
+                      <span
+                        className={styles.engineBadge}
+                        data-engine={voice.engine}
+                        title={ENGINE_BADGE[voice.engine]?.title}
+                      >
+                        {ENGINE_BADGE[voice.engine]?.text ?? voice.engine}
+                      </span>
+                    </span>
                     <span className={selectable.hint}>
                       {GENDER_LABEL[voice.gender] ?? voice.gender} · chất lượng {voice.quality}
                     </span>

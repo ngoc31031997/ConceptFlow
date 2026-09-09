@@ -1894,3 +1894,25 @@ Cleaned up both test projects via DELETE afterward. Updated aidlc-state.md to ma
 
 ---
 
+## Review tiến độ + sửa lỗi catalog giọng đọc quảng cáo engine chưa cấu hình
+**Timestamp**: 2026-09-09T12:00:00Z
+**User Input**: "kiểm tra tiến độ và review lại 1 lần nữa xem quy trình và giao diện dự án ổn chưa" → sau khi nhận báo cáo review: "sửa cái 1 trước đi, trên UI có biết được là giọng dc chọn thuộc nguồn edge tts hay azure"
+**AI Response**: Review toàn bộ: 10/10 unit đã build, stack 20+ container healthy, web-gui tsc sạch + 60/60 test pass. Phát hiện 4 điểm lệch trong `aidlc-state.md` (header còn "Unit 5 COMPLETE" trong khi phần dưới ghi POST-CONSTRUCTION; checkbox CONSTRUCTION còn trống; Workspace Root sai đường dẫn; Next Stage đã cũ) và 4 vấn đề UI. Creator chọn sửa vấn đề #1 trước.
+
+Vấn đề #1 (hồi quy từ CR-011): `export_catalog()` xuất toàn bộ 13 giọng bất kể credential. Verify trên gateway đang chạy: `GET /v1/voices` trả 13 giọng, riêng tiếng Việt 7 giọng, trong đó 5 (Azure ×2, Google ×3) không dùng được vì `AZURE_SPEECH_KEY`/`GOOGLE_APPLICATION_CREDENTIALS` đều rỗng. Chọn phải → RoutingTTSEngine âm thầm thay bằng giọng Edge, dấu vết duy nhất là một dòng log trong container. Tệ hơn: file mẫu `azure:*.wav` cũng do Edge fallback tạo ra nên bấm "nghe thử" cũng không phát hiện được.
+
+Trả lời câu hỏi của Creator: trước thay đổi này UI **không** biết engine — `Voice` trong web-gui không có trường `engine`, catalog có gửi nhưng frontend bỏ qua; phân biệt duy nhất là hậu tố "(Azure)" viết tay trong `label`.
+
+Đã sửa:
+1. `voice_registry`: thêm `offered_voices(available_engines)` và `export_catalog(available_engines)` — chỉ xuất giọng của engine thực sự có credential. Thêm `samples_dir()`.
+2. `RoutingTTSEngine.available_engines` — engine sở hữu tri thức này vì nó đã giữ `_metered`; cố ý KHÔNG đưa vào `TTSEnginePort` để không bắt mọi adapter phải biết.
+3. `voice_samples._prune_stale_samples()` — xoá .wav không còn trong catalog. Đây là vấn đề đúng đắn chứ không phải dọn dẹp: mẫu Azure hiện tại do Edge tạo, nếu sau này thêm key thật thì `generate_missing_samples` sẽ bỏ qua vì file đã tồn tại → mẫu Azure phát giọng Edge vĩnh viễn. Cùng lúc dọn 4 file Piper mồ côi từ ADR-0024.
+4. Bỏ hậu tố "(Azure)"/"(Google)" trong `label` — badge engine ở GUI thay thế, tránh giữ hai bản sao thủ công của cùng một dữ kiện.
+5. web-gui: thêm `engine` vào `Voice`; NarrationPanel hiện badge Edge/Azure/Google (có `title` giải thích, Edge xám trung tính, engine tính phí được tô màu); ReviewStepPage ghi kèm engine vì label không còn phân biệt được.
+
+**Impact Assessment**: `GET /v1/voices` trên stack thật: 13 → 4 giọng, đều dùng được thật. 13 file .wav giả bị dọn, còn đúng 4 file. Verify chiều ngược lại bằng container tạm có `AZURE_SPEECH_KEY`: `available_engines = ['azure','edge']`, catalog trở lại 8 giọng. TTS 78/78 test pass (thêm 9 test mới), ruff sạch; web-gui 61/61 test pass, tsc sạch, eslint sạch trên file đã sửa. Đã rebuild image `tts` và `web-gui`.
+**Còn tồn đọng (chưa sửa, chờ Creator quyết)**: OAuthCallbackPage dùng `currentStep={3}` lẽ ra là 5; `npm run lint` fail vì `jsx-a11y/media-has-caption` không có plugin; 4 điểm lệch trong `aidlc-state.md`. Trường hợp key Azure sai (có credential nhưng không hợp lệ) vẫn quay lại kiểu suy giảm âm thầm ở mức nhẹ hơn — có log, chưa xử lý riêng.
+**Artifacts Affected**: `services/tts/adapters/tts_engines/voice_registry.py`, `voice_samples.py`, `routing_engine.py`, `main.py`, `tests/adapters/test_voice_registry.py`, `test_routing_engine.py`, `test_voice_samples.py` (mới); `services/web-gui/src/types/index.ts`, `components/NarrationPanel.tsx`, `NarrationPanel.module.css`, `pages/ReviewStepPage.tsx`, `tests/components/NarrationPanel.test.tsx`.
+
+---
+

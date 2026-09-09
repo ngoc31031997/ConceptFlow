@@ -32,12 +32,12 @@ Creator vẫn còn Azure Speech resource F0 đã tạo và test thành công ở
 
 ### FR27 — Voice registry hai lựa chọn
 - **FR27.1**: Thêm `ENGINE_AZURE` và 4 voice Azure với tiền tố `azure:` để không đụng khóa với voice Edge trùng tên. ✅
-- **FR27.2**: Nhãn phân biệt rõ cho Creator: `Tiếng Việt — Nam (Azure)` vs `Tiếng Việt — Nam`. ✅
+- **FR27.2**: Nhãn phân biệt rõ cho Creator. ✅ — **sửa 2026-09-09**: bỏ hậu tố `(Azure)` trong `label`; GUI hiện engine bằng badge riêng đọc từ trường `engine` của catalog. Hậu tố viết tay là bản sao thủ công thứ hai của cùng dữ kiện, và web-gui khi đó chưa hề đọc trường `engine`.
 - **FR27.3**: Adapter PHẢI strip tiền tố trước khi gửi lên Azure — tiền tố là chuyện nội bộ của danh mục. ✅
 
 ### FR28 — Routing đa engine
 - **FR28.1**: `RoutingTTSEngine` bỏ slot `google` hard-code, chuyển sang map `engine -> adapter` (đúng FR21.1 của CR-009 cũ). ✅
-- **FR28.2**: Chọn voice Azure mà không có credential ⇒ rơi về voice Edge **cùng ngôn ngữ**, kèm cảnh báo nêu đúng biến env cần đặt — không im lặng. ✅
+- **FR28.2**: Chọn voice Azure mà không có credential ⇒ rơi về voice Edge **cùng ngôn ngữ**, kèm cảnh báo nêu đúng biến env cần đặt — không im lặng. ✅ — **sửa 2026-09-09**: cảnh báo chỉ nằm trong log container nên Creator không thấy. Nay catalog không liệt kê giọng của engine thiếu credential, nên tình huống này chỉ còn xảy ra với project cũ đã lưu voice_id Azure.
 - **FR28.3**: Azure lỗi giữa chừng ⇒ rơi về Edge, kèm cảnh báo. Đây chính là lớp fallback mà ADR-0024 ghi nhận là đã mất. ✅
 - **FR28.4**: Metering PHẢI tách theo từng engine với ngưỡng riêng: Azure 500.000 ký tự/tháng (free tier F0 thật), Google 4.000.000 (nay chỉ là mốc cảnh báo tiêu tiền). Dùng chung một bộ đếm sẽ cảnh báo sai thời điểm cho cả hai. ✅
 
@@ -50,6 +50,27 @@ Creator vẫn còn Azure Speech resource F0 đã tạo và test thành công ở
 - 69/69 unit test pass, gồm 9 test riêng cho `AzureTTSAdapter` (strip tiền tố, header/format gửi đi, XML-escape, 401/429/503 → `TTSEngineError`, locale suy từ tên voice) và 5 test cho nhánh Azure trong routing.
 - `build_engine()` xác minh cả hai nhánh: không có credential → `metered: (none)` kèm cảnh báo; có credential → `metered: ['azure']`.
 - **Chưa test với credential Azure thật** — key chưa từng được chia sẻ vào phiên làm việc (cố ý, để không lộ). Cần Creator tự chạy một lần với key thật.
+
+## Việc tồn đọng — làm khi có key Azure thật
+
+Ghi lại ngày 2026-09-09 theo yêu cầu của Creator ("chỗ thiếu key azure cứ note lại, sau khi có key sẽ bổ sung sau").
+
+**1. Credential sai vẫn suy giảm âm thầm.** Bộ lọc catalog thêm ngày 2026-09-09 chỉ kiểm tra credential **có tồn tại** (`AZURE_SPEECH_KEY` khác rỗng), không kiểm tra nó **hợp lệ**. Nếu key hết hạn hoặc gõ nhầm thì:
+   - catalog vẫn liệt kê 4 giọng Azure như bình thường;
+   - `generate_missing_samples` gọi Azure thất bại ⇒ không có file mẫu ⇒ bấm "nghe thử" trả 404;
+   - lúc render, `RoutingTTSEngine` rơi về Edge kèm cảnh báo trong log — Creator nghe ra giọng Edge mà không hiểu vì sao.
+
+   Muốn chặn triệt để phải gọi thử Azure một lần lúc khởi động (một câu ngắn, vài chục ký tự) rồi mới đưa Azure vào `available_engines`. Đánh đổi: TTS Service khởi động chậm hơn và phụ thuộc mạng ngay lúc boot — nên chỉ làm sau khi đã xác nhận nhánh Azure chạy đúng với key thật, để không debug hai thứ cùng lúc.
+
+**2. Những thứ cần verify E2E ngay lần đầu cắm key** (chưa từng chạy):
+   - `AzureTTSAdapter` gọi thật ra 200 và trả WAV `riff-24khz-16bit-mono-pcm` đúng như FR26.3 giả định (đến giờ mới chỉ test bằng mock);
+   - tiền tố `azure:` được strip đúng trước khi gửi (FR27.3) — sai chỗ này Azure trả 400;
+   - file mẫu `azure:*.wav` sinh ra nghe **khác** file Edge cùng tên giọng — nếu giống hệt nghĩa là vẫn đang fallback;
+   - bộ đếm trong `/shared/tts_usage.json` nhảy đúng ở khoá `azure` với ngưỡng 500k (FR28.4);
+   - render một project hoàn chỉnh bằng giọng Azure, đối chiếu `wait_offsets` như CR-002 đã làm với Edge.
+
+**3. Lưu ý vận hành**: mẫu nghe thử được giữ lại qua các lần khởi động. `_prune_stale_samples` chỉ xoá mẫu của giọng **không còn trong catalog**, nên nếu Azure đã từng chạy với key sai và tạo ra file lỗi, hãy xoá tay `/shared/voice_samples/azure:*.wav` một lần sau khi cắm key đúng.
+
 
 ## Liên quan
 - **ADR-0025** — quyết định "hai lựa chọn riêng" thay vì Azure-thay-thế-ngầm.

@@ -18,6 +18,9 @@ const QUALITY_LABELS: Record<string, { label: string; hint: string }> = {
 
 const SUBTITLE_SIZE_LABELS: Record<string, string> = { small: "Nhỏ", medium: "Vừa", large: "Lớn" };
 
+/** Edge and Azure share voice names, so the summary has to name the engine too. */
+const ENGINE_NAMES: Record<string, string> = { edge: "Edge", azure: "Azure", google: "Google" };
+
 /**
  * Step 3 of 3 — everything that is about to be rendered, in one place.
  *
@@ -54,7 +57,10 @@ export function ReviewStepPage() {
   // here read as "nothing to see"; it is the one thing on this page worth
   // stopping for.
   const isLoadingVoices = voices === null;
-  const resolvedVoice = voices?.find((v) => v.voice_id === draft.voiceId)?.label ?? null;
+  const selectedVoice = voices?.find((v) => v.voice_id === draft.voiceId) ?? null;
+  const resolvedVoice = selectedVoice
+    ? `${selectedVoice.label} (${ENGINE_NAMES[selectedVoice.engine] ?? selectedVoice.engine})`
+    : null;
   const isVoiceMissing = draft.ttsEnabled && !isLoadingVoices && !resolvedVoice;
   const voiceValue = !draft.ttsEnabled
     ? "Tắt — video không có giọng đọc"

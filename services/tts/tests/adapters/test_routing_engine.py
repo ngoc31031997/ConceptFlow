@@ -226,3 +226,16 @@ def test_azure_warns_at_its_own_free_tier_not_googles(tmp_path, caplog):
         engine.synthesize("x" * over_azure_but_under_google, "azure:en-US-GuyNeural", "/tmp/a.wav")
 
     assert any("free allowance" in record.message for record in caplog.records)
+
+
+def test_available_engines_reports_edge_plus_whatever_is_configured():
+    """What the catalogue is filtered by — a voice belonging to any engine not
+    in this set would silently come back in an Edge voice instead."""
+    from adapters.tts_engines.voice_registry import ENGINE_AZURE, ENGINE_EDGE
+
+    edge = RecordingEngine()
+    assert RoutingTTSEngine(edge=edge).available_engines == {ENGINE_EDGE}
+    assert RoutingTTSEngine(edge=edge, metered={ENGINE_AZURE: RecordingEngine()}).available_engines == {
+        ENGINE_EDGE,
+        ENGINE_AZURE,
+    }
