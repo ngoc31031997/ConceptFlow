@@ -4,8 +4,9 @@ import type { Voice } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./NarrationPanel.module.css";
 import selectable from "../styles/selectable.module.css";
+import { SelectableOption } from "./SelectableOption";
 import { SubtitleStyleFields } from "./SubtitleStylePanel";
-import type { SubtitleStyle } from "../context/ProjectDraftContext";
+import type { SubtitleMode, SubtitleStyle } from "../context/ProjectDraftContext";
 
 interface NarrationPanelProps {
   /** Set on the content-language picker; this panel only reads it. */
@@ -14,11 +15,36 @@ interface NarrationPanelProps {
   onTtsEnabledChange: (enabled: boolean) => void;
   voiceId: string | null;
   onVoiceIdChange: (voiceId: string | null) => void;
-  subtitlesEnabled: boolean;
-  onSubtitlesEnabledChange: (enabled: boolean) => void;
+  subtitleMode: SubtitleMode;
+  onSubtitleModeChange: (mode: SubtitleMode) => void;
   subtitleStyle: SubtitleStyle;
   onSubtitleStyleChange: (patch: Partial<SubtitleStyle>) => void;
 }
+
+/**
+ * CR-015 FR41.1: replaces the old on/off toggle. Which delivery is right
+ * depends on where the video will be watched (ADR-0027) — YouTube reads a
+ * caption track, a short-form platform needs burned-in text — so the choice
+ * is spelled out rather than collapsed back into a boolean.
+ */
+const SUBTITLE_MODE_OPTIONS: { value: SubtitleMode; label: string; hint: string }[] = [
+  { value: "off", label: "Tắt", hint: "Không có phụ đề" },
+  {
+    value: "track",
+    label: "Phụ đề YouTube (khuyên dùng)",
+    hint: "Track CC riêng — người xem tự bật/tắt, YouTube lập chỉ mục và tự dịch được, không che hình",
+  },
+  {
+    value: "burn_in",
+    label: "Ghi cứng vào hình",
+    hint: "Chữ vẽ thẳng lên khung hình — hợp khi đăng lại lên nền tảng không nhận track CC",
+  },
+  {
+    value: "both",
+    label: "Cả hai",
+    hint: "Vừa có track CC vừa ghi cứng — người bật CC sẽ thấy chữ trùng hai lớp",
+  },
+];
 
 const GENDER_LABEL: Record<string, string> = { female: "Nữ", male: "Nam" };
 
@@ -85,8 +111,8 @@ export function NarrationPanel({
   onTtsEnabledChange,
   voiceId,
   onVoiceIdChange,
-  subtitlesEnabled,
-  onSubtitlesEnabledChange,
+  subtitleMode,
+  onSubtitleModeChange,
   subtitleStyle,
   onSubtitleStyleChange,
 }: NarrationPanelProps) {
@@ -220,21 +246,37 @@ export function NarrationPanel({
         </div>
       )}
 
-      <Toggle
-        label="Phụ đề"
-        hint={subtitlesEnabled ? "Hiển thị lời thoại trên khung hình" : "Không hiển thị phụ đề"}
-        checked={subtitlesEnabled}
-        onChange={onSubtitlesEnabledChange}
-        testId="narration-subtitles-toggle"
-      />
+      <div className={styles.toggleLabel} style={{ marginTop: 18, marginBottom: 4 }}>
+        Phụ đề
+      </div>
+      <div className={selectable.stack} role="radiogroup" aria-label="Phụ đề" data-testid="narration-subtitle-mode">
+        {SUBTITLE_MODE_OPTIONS.map((option) => (
+          <SelectableOption
+            key={option.value}
+            selected={subtitleMode === option.value}
+            onSelect={() => onSubtitleModeChange(option.value)}
+            label={option.label}
+            hint={option.hint}
+            testId={`narration-subtitle-mode-${option.value}`}
+          />
+        ))}
+      </div>
 
-      {subtitlesEnabled && (
+      {subtitleMode === "both" && (
+        // FR41.3: "both" is a valid choice (e.g. repost target without a
+        // caption-track upload path) — flagged, not blocked.
+        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
+          Người xem bật CC sẽ thấy chữ phụ đề trùng lên chữ ghi cứng trong hình.
+        </p>
+      )}
+
+      {(subtitleMode === "burn_in" || subtitleMode === "both") && (
         <div className={styles.nested} data-testid="subtitle-style-panel">
           <SubtitleStyleFields value={subtitleStyle} onChange={onSubtitleStyleChange} />
         </div>
       )}
 
-      {!ttsEnabled && !subtitlesEnabled && (
+      {!ttsEnabled && subtitleMode === "off" && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
           Video sẽ không có lời thoại lẫn phụ đề — người xem chỉ thấy hình ảnh.
         </p>

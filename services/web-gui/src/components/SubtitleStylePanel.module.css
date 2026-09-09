@@ -1,5 +1,7 @@
 .preview {
   position: relative;
+  width: 100%;
+  max-width: 360px;
   aspect-ratio: 16 / 9;
   border-radius: 12px;
   border: 1px solid var(--surface-border);
@@ -26,6 +28,12 @@
   padding: 3px 8px;
   border-radius: 3px;
   line-height: 1.35;
+}
+
+.fieldsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 20px;
 }
 
 .field {
@@ -65,17 +73,43 @@
 .inlineRow {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .colorInput {
-  width: 42px;
-  height: 32px;
-  padding: 2px;
-  border-radius: 8px;
-  border: 1px solid var(--surface-border);
-  background: var(--surface);
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(22, 34, 46, 0.18);
+  background: #ffffff;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.colorPresets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(22, 34, 46, 0.15);
+  cursor: pointer;
+  padding: 0;
+}
+
+.colorSwatch:hover {
+  border-color: rgba(22, 34, 46, 0.3);
+}
+
+.colorSwatch[data-active="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(47, 143, 224, 0.25);
 }
 
 .slider {

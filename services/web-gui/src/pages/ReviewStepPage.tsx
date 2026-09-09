@@ -18,6 +18,13 @@ const QUALITY_LABELS: Record<string, { label: string; hint: string }> = {
 
 const SUBTITLE_SIZE_LABELS: Record<string, string> = { small: "Nhỏ", medium: "Vừa", large: "Lớn" };
 
+const SUBTITLE_MODE_LABELS: Record<string, string> = {
+  off: "Tắt",
+  track: "Track CC (YouTube)",
+  burn_in: "Ghi cứng vào hình",
+  both: "Cả hai",
+};
+
 /** Edge and Azure share voice names, so the summary has to name the engine too. */
 const ENGINE_NAMES: Record<string, string> = { edge: "Edge", azure: "Azure", google: "Google" };
 
@@ -78,15 +85,16 @@ export function ReviewStepPage() {
         background_music_path: draft.backgroundMusicPath ?? undefined,
         tts_enabled: draft.ttsEnabled,
         voice_id: draft.ttsEnabled ? (draft.voiceId ?? undefined) : undefined,
-        subtitles_enabled: draft.subtitlesEnabled,
-        subtitle_style: draft.subtitlesEnabled
-          ? {
-              font_size: draft.subtitleStyle.fontSize,
-              text_color: draft.subtitleStyle.textColor,
-              background_opacity: draft.subtitleStyle.backgroundOpacity,
-              position: draft.subtitleStyle.position,
-            }
-          : undefined,
+        subtitle_mode: draft.subtitleMode,
+        subtitle_style:
+          draft.subtitleMode === "burn_in" || draft.subtitleMode === "both"
+            ? {
+                font_size: draft.subtitleStyle.fontSize,
+                text_color: draft.subtitleStyle.textColor,
+                background_opacity: draft.subtitleStyle.backgroundOpacity,
+                position: draft.subtitleStyle.position,
+              }
+            : undefined,
         render_quality: draft.renderQuality,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,
       });
@@ -119,10 +127,11 @@ export function ReviewStepPage() {
     },
     {
       label: "Phụ đề",
-      value: draft.subtitlesEnabled ? "Bật" : "Tắt",
-      hint: draft.subtitlesEnabled
-        ? `Cỡ ${SUBTITLE_SIZE_LABELS[draft.subtitleStyle.fontSize] ?? draft.subtitleStyle.fontSize}, ${draft.subtitleStyle.position === "bottom" ? "dưới" : "trên"} khung hình`
-        : undefined,
+      value: SUBTITLE_MODE_LABELS[draft.subtitleMode],
+      hint:
+        draft.subtitleMode === "burn_in" || draft.subtitleMode === "both"
+          ? `Cỡ ${SUBTITLE_SIZE_LABELS[draft.subtitleStyle.fontSize] ?? draft.subtitleStyle.fontSize}, ${draft.subtitleStyle.position === "bottom" ? "dưới" : "trên"} khung hình`
+          : undefined,
     },
     { label: "Chất lượng", value: quality.label, hint: quality.hint },
     {
@@ -137,11 +146,12 @@ export function ReviewStepPage() {
   return (
     <div data-testid="review-step-page">
       <AppShell
+        wide
         currentStep={3}
         title="Bước 3 — Xem lại trước khi render"
         subtitle="Render mất vài phút và không dừng giữa chừng được. Kiểm tra nhanh những lựa chọn dưới đây."
       >
-        <div className={styles.settingsLayout}>
+        <div className={styles.reviewLayout}>
           <div className={glass.card}>
             <div className={glass.cardTitle} style={{ marginBottom: 14 }}>
               Video sắp render

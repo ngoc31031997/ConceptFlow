@@ -24,6 +24,7 @@ export function SettingsStepPage() {
   return (
     <div data-testid="settings-step-page">
       <AppShell
+        wide
         currentStep={2}
         title="Bước 2 — Giọng đọc & hình ảnh"
         subtitle="Mọi mục ở đây đều đã có sẵn lựa chọn hợp lý. Bạn có thể bấm Tiếp tục ngay nếu không cần đổi gì."
@@ -35,26 +36,26 @@ export function SettingsStepPage() {
             onTtsEnabledChange={(enabled) => dispatch({ type: "SET_TTS_ENABLED", payload: enabled })}
             voiceId={draft.voiceId}
             onVoiceIdChange={(voiceId) => dispatch({ type: "SET_VOICE_ID", payload: voiceId })}
-            subtitlesEnabled={draft.subtitlesEnabled}
-            onSubtitlesEnabledChange={(enabled) =>
-              dispatch({ type: "SET_SUBTITLES_ENABLED", payload: enabled })
-            }
+            subtitleMode={draft.subtitleMode}
+            onSubtitleModeChange={(mode) => dispatch({ type: "SET_SUBTITLE_MODE", payload: mode })}
             subtitleStyle={draft.subtitleStyle}
             onSubtitleStyleChange={(patch) => dispatch({ type: "SET_SUBTITLE_STYLE", payload: patch })}
           />
 
-          <RenderQualityPicker
-            value={draft.renderQuality}
-            onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
-          />
+          <div className={styles.settingsRow}>
+            <RenderQualityPicker
+              value={draft.renderQuality}
+              onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
+            />
 
-          <BackgroundMusicPicker
-            projectId={draft.projectId}
-            value={draft.backgroundMusicPath}
-            volume={draft.backgroundMusicVolume}
-            onVolumeChange={(v) => dispatch({ type: "SET_BACKGROUND_MUSIC_VOLUME", payload: v })}
-            onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
-          />
+            <BackgroundMusicPicker
+              projectId={draft.projectId}
+              value={draft.backgroundMusicPath}
+              volume={draft.backgroundMusicVolume}
+              onVolumeChange={(v) => dispatch({ type: "SET_BACKGROUND_MUSIC_VOLUME", payload: v })}
+              onChange={(path) => dispatch({ type: "SET_BACKGROUND_MUSIC", payload: path })}
+            />
+          </div>
         </div>
       </AppShell>
 

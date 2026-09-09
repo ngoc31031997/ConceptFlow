@@ -95,14 +95,24 @@
 /* A row of equal-width choices (language, quality, font size, position). */
 .row {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .row > .option {
   flex: 1;
+  min-width: 0;
   justify-content: center;
   text-align: center;
   white-space: nowrap;
+}
+
+/* Compact segmented pickers (subtitle size/position) sit in narrower cells
+   than a full settings column — nowrap text there overflowed into the next
+   field instead of shrinking, reading as options overlapping each other. */
+.row > .option.compact {
+  flex: 1 1 auto;
+  white-space: normal;
 }
 
 /* A vertical stack of choices with hints (script source, voices). */

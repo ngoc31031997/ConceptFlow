@@ -7,6 +7,16 @@ export interface SubtitleStyle {
   position: "bottom" | "top";
 }
 
+/**
+ * How subtitle_cues get delivered to YouTube (CR-015, ADR-0027):
+ *   off     — no subtitles
+ *   track   — a caption track the viewer can toggle with CC — searchable,
+ *             auto-translatable, and it never paints over Manim's edge content
+ *   burn_in — painted into the video frames (the only option before CR-015)
+ *   both    — both at once, which means a viewer with CC on sees the text twice
+ */
+export type SubtitleMode = "off" | "track" | "burn_in" | "both";
+
 /** Which of the three script situations the Creator picked in step 1. */
 export type ScriptSource = "blank" | "draft" | "ready";
 
@@ -18,7 +28,7 @@ export interface ProjectDraft {
   backgroundMusicPath: string | null;
   ttsEnabled: boolean;
   voiceId: string | null;
-  subtitlesEnabled: boolean;
+  subtitleMode: SubtitleMode;
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
   backgroundMusicVolume: number;
@@ -44,7 +54,7 @@ export type ProjectDraftAction =
   | { type: "SET_BACKGROUND_MUSIC"; payload: string | null }
   | { type: "SET_TTS_ENABLED"; payload: boolean }
   | { type: "SET_VOICE_ID"; payload: string | null }
-  | { type: "SET_SUBTITLES_ENABLED"; payload: boolean }
+  | { type: "SET_SUBTITLE_MODE"; payload: SubtitleMode }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
@@ -66,7 +76,10 @@ const initialDraft: ProjectDraft = {
   backgroundMusicPath: null,
   ttsEnabled: true,
   voiceId: null,
-  subtitlesEnabled: false,
+  // CR-015 FR41.2: caption track is the default for long-form YouTube —
+  // searchable, auto-translatable, and never painted over the frame.
+  // Burn-in remains available as an explicit Creator choice.
+  subtitleMode: "track",
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
   backgroundMusicVolume: 0.2,
@@ -117,8 +130,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, ttsEnabled: action.payload };
     case "SET_VOICE_ID":
       return { ...state, voiceId: action.payload };
-    case "SET_SUBTITLES_ENABLED":
-      return { ...state, subtitlesEnabled: action.payload };
+    case "SET_SUBTITLE_MODE":
+      return { ...state, subtitleMode: action.payload };
     case "SET_BACKGROUND_MUSIC_VOLUME":
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":

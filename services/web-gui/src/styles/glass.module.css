@@ -126,16 +126,23 @@
 .textArea,
 .select {
   width: 100%;
-  padding: 12px 14px;
+  padding: 13px 15px;
   border-radius: 13px;
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  color: rgba(16, 28, 40, 0.85);
-  font-size: 14px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1.5px solid rgba(22, 34, 46, 0.16);
+  color: rgba(16, 28, 40, 0.9);
+  font-size: 14.5px;
+}
+.textInput:focus,
+.textArea:focus,
+.select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 143, 224, 0.15);
 }
 .textInput::placeholder,
 .textArea::placeholder {
-  color: rgba(22, 34, 46, 0.35);
+  color: rgba(22, 34, 46, 0.4);
 }
 .textArea {
   resize: vertical;
