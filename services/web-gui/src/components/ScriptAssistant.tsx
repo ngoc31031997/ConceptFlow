@@ -158,14 +158,15 @@ export function ScriptAssistant({
               <div className={styles.copyRow}>
                 <button
                   type="button"
-                  className={glass.btnPrimary}
+                  className={styles.copyButton}
                   data-testid="script-assistant-copy"
                   onClick={handleCopy}
                 >
                   <CopyIcon />
                   {copied ? "Đã copy!" : "Copy prompt"}
                 </button>
-                <span className={isFilled ? selectable.statusOn : selectable.statusOff}>
+                <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
+                  <span className={styles.copyStatusDot} aria-hidden="true" />
                   {isFilled
                     ? source === "blank"
                       ? "Đã gắn chủ đề của bạn"

@@ -78,9 +78,51 @@
 
 .copyRow {
   display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+/*
+  Reusing the page-level primary button (btnPrimary) here made a mid-step
+  action outweigh "Bắt đầu render" itself, and the tiny status pill next to
+  it looked like an afterthought bolted onto a much bigger control. A
+  medium action button with the status written underneath, at normal text
+  size, reads as one coherent step instead of a mismatched pair.
+*/
+.copyButton {
+  display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 13px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  box-shadow: 0 8px 20px rgba(47, 143, 224, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.copyStatus {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-faint);
+}
+
+.copyStatusDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 auto;
+}
+
+.copyStatusOn {
+  color: #1c6cb0;
 }
 
 .preview {
