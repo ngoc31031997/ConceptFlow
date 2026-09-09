@@ -14,12 +14,21 @@ the `wave` module.
 Credentials come from AZURE_SPEECH_KEY and AZURE_SPEECH_REGION, kept separate
 from the Publisher's YouTube OAuth (different scope, different lifecycle — the
 same principle ADR-0023 applied to Google).
+
+Synthesis retries with backoff (CR-013). Measured 16/20 successes calling the
+endpoint with a valid key: the four failures were bare HTTP 401s with no JSON
+body and an istio-envoy server header, scattered rather than clustered — Azure
+gateway instances disagreeing about subscription state, not a bad key. Without
+retries roughly one scene in five would fall back to Edge, inaudibly (both play
+the same neural voices) but silently costing the commercial rights and SLA that
+are the entire reason to choose Azure over Edge (ADR-0025).
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import time
 import urllib.error
 import urllib.request
 import wave
@@ -33,9 +42,32 @@ from domain.ports import TTSEnginePort
 
 logger = logging.getLogger(__name__)
 
-SYNTHESIS_TIMEOUT_SECONDS = 60
 SAMPLE_RATE_HZ = 24000
 OUTPUT_FORMAT = "riff-24khz-16bit-mono-pcm"
+
+MAX_ATTEMPTS = 4
+RETRY_BACKOFF_SECONDS = 1.5
+
+# Cap on one HTTP attempt. Separate from the ceiling below because a single
+# stalled request must not consume the budget the retries need — the trap
+# EdgeTTSAdapter's comment warns about, and what the old flat 60s (used as both
+# per-request and outer timeout) would have caused once retries existed.
+ATTEMPT_TIMEOUT_SECONDS = 30
+
+# Must outlast every attempt plus its backoff, or it would cut the retry loop
+# short.
+SYNTHESIS_TIMEOUT_SECONDS = (
+    MAX_ATTEMPTS * ATTEMPT_TIMEOUT_SECONDS
+    + int(RETRY_BACKOFF_SECONDS * sum(range(1, MAX_ATTEMPTS)))
+    + 10  # file I/O
+)
+
+# Retrying a deterministic rejection is pure waste, so the split is explicit
+# rather than "retry every failure". 401/403 are here because of the measured
+# transient 401s above; a genuinely wrong key still fails every attempt, just
+# a few seconds later, and RoutingTTSEngine falls back exactly as before.
+RETRYABLE_STATUS_CODES = frozenset({401, 403, 408, 429, 500, 502, 503, 504})
+MAX_RETRY_AFTER_SECONDS = 30  # ignore an absurd Retry-After rather than stalling a render
 
 KEY_ENV_VAR = "AZURE_SPEECH_KEY"
 REGION_ENV_VAR = "AZURE_SPEECH_REGION"
@@ -80,6 +112,51 @@ class AzureTTSAdapter(TTSEnginePort):
 
     def _synthesize(self, text: str, voice_id: str, output_path: str) -> None:
         voice_name = azure_voice_name(voice_id)
+        audio = self._fetch_audio(text, voice_name)
+        with open(output_path, "wb") as f:
+            f.write(audio)
+
+    def _fetch_audio(self, text: str, voice_name: str) -> bytes:
+        """Retries transient rejections (CR-013). A permanent one — bad SSML, an
+        unknown voice — is raised on the first attempt, since retrying a
+        deterministic answer only delays the fallback."""
+        for attempt in range(1, MAX_ATTEMPTS + 1):
+            try:
+                return self._attempt_fetch(text, voice_name)
+            except urllib.error.HTTPError as exc:
+                if exc.code not in RETRYABLE_STATUS_CODES:
+                    raise TTSEngineError(
+                        f"Azure TTS returned HTTP {exc.code} for voice {voice_name}: "
+                        f"{exc.reason}"
+                    ) from exc
+                last_error: Exception = exc
+                retry_after = _retry_after_seconds(exc)
+            except (urllib.error.URLError, TimeoutError, OSError) as exc:
+                # No response at all — nothing to conclude from, so treat it as
+                # transient like EdgeTTSAdapter does.
+                last_error = exc
+                retry_after = None
+
+            if attempt == MAX_ATTEMPTS:
+                raise TTSEngineError(
+                    f"Azure TTS failed {MAX_ATTEMPTS} attempts for voice "
+                    f"{voice_name}: {last_error}"
+                ) from last_error
+
+            delay = retry_after if retry_after is not None else RETRY_BACKOFF_SECONDS * attempt
+            logger.warning(
+                "Azure TTS attempt %d/%d failed for voice %s (%s); retrying in %.1fs.",
+                attempt,
+                MAX_ATTEMPTS,
+                voice_name,
+                last_error,
+                delay,
+            )
+            time.sleep(delay)
+
+        raise AssertionError("unreachable — the loop either returns or raises")
+
+    def _attempt_fetch(self, text: str, voice_name: str) -> bytes:
         request = urllib.request.Request(
             f"https://{self._region}.tts.speech.microsoft.com/cognitiveservices/v1",
             data=_build_ssml(text, voice_name).encode("utf-8"),
@@ -91,21 +168,21 @@ class AzureTTSAdapter(TTSEnginePort):
             },
             method="POST",
         )
+        with urllib.request.urlopen(request, timeout=ATTEMPT_TIMEOUT_SECONDS) as response:
+            return response.read()
 
-        try:
-            with urllib.request.urlopen(request, timeout=self._timeout_seconds) as response:
-                audio = response.read()
-        except urllib.error.HTTPError as exc:
-            # 401/403 means the key or region is wrong, 429 means the free tier
-            # is spent — both have to reach the Creator as a real error rather
-            # than a silently different voice.
-            raise TTSEngineError(
-                f"Azure TTS returned HTTP {exc.code} for voice {voice_name}: "
-                f"{exc.reason}"
-            ) from exc
 
-        with open(output_path, "wb") as f:
-            f.write(audio)
+def _retry_after_seconds(exc: urllib.error.HTTPError) -> float | None:
+    """Azure sends Retry-After on 429. Honouring it beats guessing, but it is
+    clamped: an outsized value would stall a whole render behind one scene."""
+    raw = exc.headers.get("Retry-After") if exc.headers else None
+    if not raw:
+        return None
+    try:
+        seconds = float(raw)
+    except (TypeError, ValueError):
+        return None  # HTTP-date form — fall back to the normal backoff
+    return max(0.0, min(seconds, MAX_RETRY_AFTER_SECONDS))
 
 
 def _build_ssml(text: str, voice_name: str) -> str:

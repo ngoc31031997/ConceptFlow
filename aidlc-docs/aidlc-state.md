@@ -66,6 +66,7 @@
 | CR-011 | Azure AI Speech làm engine thứ ba, song song Edge | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 78/78 unit test pass. ADR-0025. Chưa verify với key Azure thật — việc tồn đọng ghi ở mục "Việc tồn đọng" trong `cr-011-azure-tts-engine.md` |
 | CR-012 | Nhiều tài khoản YouTube trên nhiều OAuth client | P1 | **Code Generation ✅** | **Chờ Creator verify với Google thật** — 72/72 test publisher, 42/42 gateway, 68/68 web-gui, Go xanh. ADR-0026. Sửa luôn bug ghi đè credential khi nối kênh thứ hai |
 
+| CR-013 | Retry có backoff cho AzureTTSAdapter | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 87/87 test tts (19 cho azure_adapter). Đo thực tế trước khi sửa: 16/20 request 401 rải rác; sau khi sửa burst 8 scene đạt 8/8. Azure đã tự ổn định nên retry chưa bị kích hoạt thật — vẫn giữ làm bảo hiểm |
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 
 ## Current Status
