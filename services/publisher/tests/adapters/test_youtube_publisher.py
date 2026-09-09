@@ -148,3 +148,18 @@ def test_upload_error_names_the_missing_client_when_its_secret_file_is_gone():
         publisher.publish(_request(), make_credential(client_id="client-gone"))
 
     assert "client-gone" in str(exc_info.value)
+
+
+def test_publish_declares_the_video_as_not_made_for_kids():
+    mock_youtube = MagicMock()
+    mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
+
+    with (
+        patch("adapters.youtube.youtube_publisher.build", return_value=mock_youtube),
+        patch("adapters.youtube.youtube_publisher.MediaFileUpload"),
+    ):
+        publisher = YouTubeVideoPublisher(FakeOAuthAppRegistry(), InMemoryCredentialStore())
+        publisher.publish(_request(), _credential())
+
+    body = mock_youtube.videos.return_value.insert.call_args.kwargs["body"]
+    assert body["status"]["selfDeclaredMadeForKids"] is False

@@ -109,7 +109,14 @@ class YouTubeVideoPublisher(VideoPublisherPort):
                 "description": request.description or "",
                 "tags": request.tags,
             },
-            "status": {"privacyStatus": request.visibility},
+            # Always declared explicitly: when the field is omitted YouTube falls
+            # back to the channel's default audience setting, and a channel set to
+            # "made for kids" silently strips comments and notifications from every
+            # upload.
+            "status": {
+                "privacyStatus": request.visibility,
+                "selfDeclaredMadeForKids": False,
+            },
         }
         if request.publish_at:
             body["status"]["publishAt"] = request.publish_at
