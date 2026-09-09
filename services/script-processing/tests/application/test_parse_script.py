@@ -6,7 +6,7 @@ import pytest
 
 from application.parse_script import ParseScriptUseCase
 from domain.errors import ScriptSyntaxError
-from domain.models import ParsedScript, Scene
+from domain.models import ParsedScript
 from domain.ports import ScriptParserPort
 
 
@@ -24,9 +24,7 @@ class FakeScriptParser(ScriptParserPort):
 
 
 def test_parse_delegates_to_parser_and_returns_result():
-    expected = ParsedScript(
-        scenes=[Scene(0, "hello", None, None, None)], scene_class_name="DemoScene"
-    )
+    expected = ParsedScript(scene_class_name="DemoScene")
     parser = FakeScriptParser(result=expected)
     use_case = ParseScriptUseCase(parser)
 

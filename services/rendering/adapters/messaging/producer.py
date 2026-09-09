@@ -56,3 +56,49 @@ def rendering_failed_envelope(saga_id: str, project_id: str, error_message: str)
     return build_envelope(
         saga_id, project_id, {"event_type": "rendering_failed", "error_message": error_message}
     )
+
+
+def script_validated_envelope(
+    saga_id: str,
+    project_id: str,
+    narrations: list[str],
+    beats: list[tuple[int, str]],
+    chapters: list[tuple[int, str]],
+    warnings: list[str],
+) -> dict:
+    """CR-020 FR56 — kết quả cổng kiểm tra, chạy trước TTS.
+
+    `scenes` mang đúng hình dạng mà `script_parsed` từng mang, để Orchestrator
+    và các bước phía sau không phải đổi cách đọc. Khác biệt nằm ở nguồn: danh
+    sách này đến từ việc **chạy** script (thứ tự runtime), không phải từ việc
+    quét comment (thứ tự dòng).
+    """
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "script_validated",
+            "scenes": [
+                {
+                    "scene_index": index,
+                    "narration_text": text,
+                    "illustration_hint": None,
+                    "code_snippet": None,
+                    "code_language": None,
+                }
+                for index, text in enumerate(narrations)
+            ],
+            "beats": [{"scene_index": i, "id": value} for i, value in beats],
+            "chapters": [{"scene_index": i, "title": value} for i, value in chapters],
+            # Cảnh báo không chặn Saga; Orchestrator chuyển tiếp để GUI hiện ra.
+            "warnings": warnings,
+        },
+    )
+
+
+def validation_failed_envelope(saga_id: str, project_id: str, reason: str) -> dict:
+    return build_envelope(
+        saga_id,
+        project_id,
+        {"event_type": "validation_failed", "error_message": reason, "reason": reason},
+    )

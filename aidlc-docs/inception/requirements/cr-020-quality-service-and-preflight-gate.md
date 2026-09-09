@@ -129,6 +129,35 @@ phí. Đó là lý do hai CR nên làm chung một đợt.
    — nó nằm trên cùng một trục quyết định với 720p30/1080p60/4k60.
 3. **Ngưỡng "câu narration quá dài": 20 giây** ước lượng.
 
+## Điều chỉnh khi triển khai (2026-09-10)
+
+**`validate_script` sống trong `rendering`, không trong `quality-service`.**
+
+CR này giả định cổng kiểm tra chạy trong service mới. Khi triển khai thì lộ ra
+điều đó không khả thi: lượt dry phải chạy script **qua Manim**, và image
+`rendering` nặng vì kéo theo cả bộ texlive (cần cho `MathTex`). Dựng image thứ
+hai nặng như vậy chỉ để chạy một lệnh là cái giá không đáng trả.
+
+Phân chia sau điều chỉnh:
+
+| Bước | Service | Vì sao |
+|---|---|---|
+| `validate_script` | `rendering` | Cần Manim. Bản thân nó là một lượt render |
+| `qc_video` (CR-021) | `quality-service` | Chỉ cần ffmpeg và file JSONL — không cần Manim |
+
+Hệ quả: `quality-service` **chưa được tạo ở CR này**. `content-plugin` bị gỡ hẳn
+(container, database, queue, endpoint `/v1/plugins`, panel Grafana) thay vì đổi
+vai, và `quality-service` sẽ được dựng mới ở CR-021 khi thực sự có việc cho nó.
+Đổi vai một service để nó tiếp tục không làm gì thì không hơn gì việc gỡ đi.
+
+`rendering.commands` giờ mang hai lệnh, phân biệt bằng `event_type`. Dùng chung
+một queue thay vì mở queue thứ hai vì cả hai lệnh cùng cần Manim và cùng phải
+xếp hàng sau nhau — hai queue chỉ tạo khả năng chúng chạy song song và tranh CPU
+của cùng một container.
+
+Cột `plugin_id` trong bảng `projects` **được giữ lại**: bỏ nó cần một migration,
+trong khi để lại chỉ tốn vài byte và không còn đường code nào đọc tới.
+
 ## Câu hỏi cần Creator chốt
 1. Có project nào đang dùng plugin phân loại scene mà tôi chưa thấy không, hay
    gỡ thẳng là an toàn?

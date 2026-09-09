@@ -2,31 +2,63 @@
   "id": null,
   "uid": "concertflow-pipeline",
   "title": "ConceptFlow Pipeline",
-  "tags": ["concertflow"],
+  "tags": [
+    "concertflow"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
   "version": 1,
   "refresh": "10s",
-  "time": { "from": "now-1h", "to": "now" },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "service",
         "type": "custom",
         "label": "Service",
-        "current": { "text": "rendering", "value": "rendering" },
+        "current": {
+          "text": "rendering",
+          "value": "rendering"
+        },
         "options": [
-          { "text": "api-gateway", "value": "api-gateway" },
-          { "text": "orchestrator", "value": "orchestrator" },
-          { "text": "content-plugin", "value": "content-plugin" },
-          { "text": "script-processing", "value": "script-processing" },
-          { "text": "tts", "value": "tts" },
-          { "text": "rendering", "value": "rendering", "selected": true },
-          { "text": "video-assembly", "value": "video-assembly" },
-          { "text": "publisher", "value": "publisher" },
-          { "text": "web-gui", "value": "web-gui" }
+          {
+            "text": "api-gateway",
+            "value": "api-gateway"
+          },
+          {
+            "text": "orchestrator",
+            "value": "orchestrator"
+          },
+          {
+            "text": "script-processing",
+            "value": "script-processing"
+          },
+          {
+            "text": "tts",
+            "value": "tts"
+          },
+          {
+            "text": "rendering",
+            "value": "rendering",
+            "selected": true
+          },
+          {
+            "text": "video-assembly",
+            "value": "video-assembly"
+          },
+          {
+            "text": "publisher",
+            "value": "publisher"
+          },
+          {
+            "text": "web-gui",
+            "value": "web-gui"
+          }
         ],
-        "query": "api-gateway,orchestrator,content-plugin,script-processing,tts,rendering,video-assembly,publisher,web-gui",
+        "query": "api-gateway,orchestrator,script-processing,tts,rendering,video-assembly,publisher,web-gui",
         "includeAll": false,
         "multi": false
       }
@@ -37,119 +69,380 @@
       "id": 1,
       "type": "row",
       "title": "Pipeline error rate (last 15m per service)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "id": 10,
       "type": "stat",
       "title": "api-gateway",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"api-gateway\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"api-gateway\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 11,
       "type": "stat",
       "title": "orchestrator",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 3, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"orchestrator\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
-    },
-    {
-      "id": 12,
-      "type": "stat",
-      "title": "content-plugin",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 6, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"content-plugin\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 3,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"orchestrator\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 13,
       "type": "stat",
       "title": "script-processing",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 9, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"script-processing\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 9,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"script-processing\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 14,
       "type": "stat",
       "title": "tts",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 12, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"tts\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 12,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"tts\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 15,
       "type": "stat",
       "title": "rendering",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 15, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"rendering\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 15,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"rendering\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 16,
       "type": "stat",
       "title": "video-assembly",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 18, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"video-assembly\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 18,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"video-assembly\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 17,
       "type": "stat",
       "title": "publisher",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 4, "w": 3, "x": 21, "y": 1 },
-      "targets": [{ "expr": "sum(count_over_time({container=\"publisher\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))", "refId": "A" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "red", "value": 1 }] } }, "overrides": [] }
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 21,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"publisher\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
     },
     {
       "id": 2,
       "type": "row",
       "title": "Error rate over time (all services)",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      }
     },
     {
       "id": 20,
       "type": "timeseries",
       "title": "Errors per service",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 6 },
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 6
+      },
       "targets": [
-        { "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|content-plugin|script-processing|tts|rendering|video-assembly|publisher|web-gui\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))", "refId": "A" }
+        {
+          "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|script-processing|tts|rendering|video-assembly|publisher|web-gui\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))",
+          "refId": "A"
+        }
       ]
     },
     {
       "id": 3,
       "type": "row",
-      "title": "Logs — $service",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }
+      "title": "Logs \u2014 $service",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      }
     },
     {
       "id": 30,
       "type": "logs",
-      "title": "All logs — $service",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 15 },
-      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
-      "targets": [{ "expr": "{container=\"$service\"}", "refId": "A" }]
+      "title": "All logs \u2014 $service",
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 15
+      },
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{container=\"$service\"}",
+          "refId": "A"
+        }
+      ]
     },
     {
       "id": 31,
       "type": "logs",
-      "title": "Errors only — $service",
-      "datasource": { "type": "loki", "uid": "Loki" },
-      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 15 },
-      "options": { "showTime": true, "sortOrder": "Descending", "wrapLogMessage": true },
-      "targets": [{ "expr": "{container=\"$service\"} |~ `(?i)error|exception|traceback|panic|fatal`", "refId": "A" }]
+      "title": "Errors only \u2014 $service",
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 15
+      },
+      "options": {
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{container=\"$service\"} |~ `(?i)error|exception|traceback|panic|fatal`",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }

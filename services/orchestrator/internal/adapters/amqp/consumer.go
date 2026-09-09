@@ -19,7 +19,6 @@ const eventsQueue = "orchestrator.events"
 // dead-lettered command means a downstream service never picked it up.
 var dlqQueues = []string{
 	"script_processing.commands.dlq",
-	"content_plugin.commands.dlq",
 	"tts.commands.dlq",
 	"rendering.commands.dlq",
 	"video_assembly.commands.dlq",

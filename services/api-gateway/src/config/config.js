@@ -9,7 +9,6 @@
  *
  * @returns {{
  *   orchestratorUrl: string,
- *   contentPluginUrl: string,
  *   publisherUrl: string,
  *   rabbitmqUrl: string,
  *   port: number,
@@ -20,7 +19,6 @@
 function loadConfig(env = process.env) {
   return {
     orchestratorUrl: env.ORCHESTRATOR_URL || 'http://orchestrator:8000',
-    contentPluginUrl: env.CONTENT_PLUGIN_URL || 'http://content-plugin:8000',
     publisherUrl: env.PUBLISHER_URL || 'http://publisher:8000',
     rabbitmqUrl: env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672/',
     port: Number(env.PORT) || 8080,

@@ -29,6 +29,8 @@ type StepEvent struct {
 var eventStepMap = map[string]domain.StepName{
 	"script_parsed":       domain.StepParseScript,
 	"parse_failed":        domain.StepParseScript,
+	"script_validated":    domain.StepValidateScript,
+	"validation_failed":   domain.StepValidateScript,
 	"speech_synthesized":  domain.StepSynthesizeSpeech,
 	"synthesis_failed":    domain.StepSynthesizeSpeech,
 	"rendering_completed": domain.StepRenderScenes,
@@ -153,6 +155,8 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 	switch stepName {
 	case domain.StepParseScript:
 		nextErr = uc.onScriptParsed(ctx, event, project)
+	case domain.StepValidateScript:
+		nextErr = uc.onScriptValidated(ctx, event, project)
 	case domain.StepSynthesizeSpeech:
 		nextErr = uc.onSpeechSynthesized(ctx, event, project)
 	case domain.StepRenderScenes:
@@ -193,22 +197,47 @@ var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
 // input mode — there is no per-scene template/category to classify since
 // Rendering now executes the Creator's own script rather than choosing a
 // pre-built template, so it is marked completed without ever being
-// dispatched to Content Plugin.
+// onScriptParsed dispatches the validation pass (CR-020 FR56.1).
+//
+// Before CR-018 this step also carried the narration lines, which Script
+// Processing had scraped out of the source with a regex over `# NARRATION:`
+// comments. It cannot: narration now lives inside `self.narrate(...)` calls
+// that may sit in a loop, a branch or a helper, so the only way to know what a
+// script says is to run it. `script_parsed` therefore carries just the scene
+// class name, and validate_script — a dry pass in Rendering — produces the rest.
+//
+// Putting the gate here, before synthesize_speech, is the point: a script that
+// fails costs no TTS quota.
 func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event StepEvent, project *domain.Project) error {
-	scenes := parseInitialScenes(event.Payload)
-	project.Scenes = scenes
-	project.Chapters = parseChapters(event.Payload)
 	project.ManimSceneClassName = stringFromPayload(event.Payload, "scene_class_name")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
 
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepClassifyScenes, Status: domain.SagaStepCompleted}); err != nil {
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
-	if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
-		ProjectID: event.ProjectID, Step: string(domain.StepClassifyScenes), Status: "completed",
-	}); err != nil {
+	if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusValidatingScript); err != nil {
+		return err
+	}
+
+	payload := map[string]interface{}{
+		"script_content":   project.ScriptContent,
+		"scene_class_name": project.ManimSceneClassName,
+		"render_quality":   string(project.RenderQuality),
+	}
+	return uc.dispatch(ctx, event.SagaID, event.ProjectID, "rendering", string(domain.StepValidateScript), payload)
+}
+
+// onScriptValidated stores what the dry pass learned and moves on to speech.
+//
+// The scenes it stores come from *running* the script, so their order is the
+// order the viewer will hear them — including narration produced inside loops,
+// which no amount of reading the source text could have counted correctly.
+func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event StepEvent, project *domain.Project) error {
+	project.Scenes = parseInitialScenes(event.Payload)
+	project.Chapters = parseChapters(event.Payload)
+	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
 

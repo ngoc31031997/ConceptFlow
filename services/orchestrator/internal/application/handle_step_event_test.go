@@ -19,15 +19,51 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 // external round-trip anymore (no per-scene template to classify), so
 // script_parsed must mark it completed synchronously and dispatch
 // synthesize_speech directly — not wait for a scenes_classified event.
-func TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech(t *testing.T) {
-	uc, repo, pub, prog := newTestUseCase()
-	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true}
+func TestHandleStepEventUseCase_ScriptParsed_DispatchesValidateScript(t *testing.T) {
+	// CR-020: script_parsed giờ chỉ mang tên class Scene, và mở ra bước
+	// validate_script — cổng chạy TRƯỚC TTS, nên script sai không tiêu quota giọng đọc.
+	uc, repo, pub, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ScriptContent: "from conceptflow import *", RenderQuality: domain.Quality1080p60}
 	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
 		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_parsed",
+		Payload: map[string]interface{}{"scene_class_name": "DemoScene"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusValidatingScript {
+		t.Fatalf("expected validating_script, got %s", project.Status)
+	}
+	if project.ManimSceneClassName != "DemoScene" {
+		t.Fatalf("expected scene_class_name stored, got %q", project.ManimSceneClassName)
+	}
+
+	last := pub.last()
+	if last == nil || last.routingKey != "rendering" {
+		t.Fatalf("expected validate_script dispatched to rendering, got %+v", last)
+	}
+	if last.envelope.EventType != string(domain.StepValidateScript) {
+		t.Fatalf("expected validate_script command, got %q", last.envelope.EventType)
+	}
+	if last.envelope.Payload["script_content"] != "from conceptflow import *" {
+		t.Fatalf("validate_script must carry the script, got %+v", last.envelope.Payload)
+	}
+}
+
+func TestHandleStepEventUseCase_ScriptValidated_StoresScenesAndDispatchesSynthesizeSpeech(t *testing.T) {
+	// Lời thoại đến từ việc CHẠY script (thứ tự runtime), nên bước này là nơi
+	// Project.Scenes được điền, chứ không phải bước parse nữa.
+	uc, repo, pub, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusValidatingScript, ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
 		Payload: map[string]interface{}{
-			"scene_class_name": "DemoScene",
 			"scenes": []interface{}{
 				map[string]interface{}{"scene_index": float64(0), "narration_text": "n0"},
 				map[string]interface{}{"scene_index": float64(1), "narration_text": "n1"},
@@ -45,31 +81,10 @@ func TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesiz
 	if len(project.Scenes) != 2 {
 		t.Fatalf("expected 2 scenes stored, got %d", len(project.Scenes))
 	}
-	if project.ManimSceneClassName != "DemoScene" {
-		t.Fatalf("expected scene_class_name stored, got %q", project.ManimSceneClassName)
-	}
-
-	classifyStep, _ := repo.GetStep(context.Background(), "saga-1", domain.StepClassifyScenes)
-	if classifyStep.Status != domain.SagaStepCompleted {
-		t.Fatalf("expected classify_scenes marked completed without dispatch, got %s", classifyStep.Status)
-	}
 
 	last := pub.last()
 	if last == nil || last.routingKey != "tts" {
-		t.Fatalf("expected synthesize_speech command dispatched to tts, got %+v", last)
-	}
-	scenes, _ := last.envelope.Payload["scenes"].([]map[string]interface{})
-	if len(scenes) != 2 {
-		t.Fatalf("expected 2 scenes in payload, got %d", len(scenes))
-	}
-	for _, s := range scenes {
-		if s["language"] != "vi" {
-			t.Fatalf("expected each scene to carry language=vi, got %+v", s)
-		}
-	}
-
-	if prog.last() == nil || prog.last().Status != "completed" {
-		t.Fatalf("expected a completed progress message, got %+v", prog.last())
+		t.Fatalf("expected synthesize_speech dispatched to tts, got %+v", last)
 	}
 }
 
@@ -378,20 +393,21 @@ func TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus(t *testing.T)
 	}
 }
 
-// TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstimatesDurations
 // guards CR-001's branch: with narration off, no synthesize_speech command may
 // reach the TTS Service, yet render_scenes must still carry a duration per
-// scene so `self.wait(AUTO)` substitution keeps working.
-func TestHandleStepEventUseCase_ScriptParsed_TTSDisabled_SkipsSynthesisAndEstimatesDurations(t *testing.T) {
+// scene so each `self.narrate(...)` still holds the animation for the right
+// length. The branch now hangs off script_validated, since that is where the
+// narration lines arrive (CR-018).
+func TestHandleStepEventUseCase_ScriptValidated_TTSDisabled_SkipsSynthesisAndEstimatesDurations(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
-		ProjectID: "proj-1", Status: domain.StatusParsingScript,
+		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
 		ContentLanguage: domain.LanguageEnglish, TTSEnabled: false,
 	}
-	repo.steps[stepKey("saga-1", domain.StepParseScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepParseScript, Status: domain.SagaStepInProgress}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
-		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_parsed",
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
 		Payload: map[string]interface{}{
 			"scene_class_name": "DemoScene",
 			"scenes": []interface{}{

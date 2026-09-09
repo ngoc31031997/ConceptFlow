@@ -19,7 +19,7 @@ type RetryStepOutput struct {
 // reused here so retry re-enters the same state the original dispatch did.
 var stepRoutingKey = map[domain.StepName]string{
 	domain.StepParseScript:      "script_processing",
-	domain.StepClassifyScenes:   "content_plugin",
+	domain.StepValidateScript:   "rendering",
 	domain.StepSynthesizeSpeech: "tts",
 	domain.StepRenderScenes:     "rendering",
 	domain.StepAssembleVideo:    "video_assembly",
@@ -28,7 +28,7 @@ var stepRoutingKey = map[domain.StepName]string{
 
 var stepInProgressStatus = map[domain.StepName]domain.ProjectStatus{
 	domain.StepParseScript:      domain.StatusParsingScript,
-	domain.StepClassifyScenes:   domain.StatusClassifyingScenes,
+	domain.StepValidateScript:   domain.StatusValidatingScript,
 	domain.StepSynthesizeSpeech: domain.StatusSynthesizingSpeech,
 	domain.StepRenderScenes:     domain.StatusRendering,
 	domain.StepAssembleVideo:    domain.StatusAssemblingVideo,
@@ -39,7 +39,7 @@ var stepInProgressStatus = map[domain.StepName]domain.ProjectStatus{
 // recover which step a failed_at_<step> status refers to.
 var failedStatusToStep = map[domain.ProjectStatus]domain.StepName{
 	domain.StatusFailedParseScript:      domain.StepParseScript,
-	domain.StatusFailedClassifyScenes:   domain.StepClassifyScenes,
+	domain.StatusFailedValidateScript:   domain.StepValidateScript,
 	domain.StatusFailedSynthesizeSpeech: domain.StepSynthesizeSpeech,
 	domain.StatusFailedRenderScenes:     domain.StepRenderScenes,
 	domain.StatusFailedAssembleVideo:    domain.StepAssembleVideo,

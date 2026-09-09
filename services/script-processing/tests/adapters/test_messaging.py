@@ -29,11 +29,10 @@ class FakeMessage:
 
 
 VALID_SCRIPT = (
-    "from manim import *\n\n"
-    "class DemoScene(Scene):\n"
+    "from conceptflow import *\n\n"
+    "class DemoScene(ConceptFlowScene):\n"
     "    def construct(self):\n"
-    '        # NARRATION: "hello"\n'
-    "        self.wait(AUTO)\n"
+    '        self.narrate("hello")\n'
 )
 
 
@@ -70,7 +69,11 @@ async def test_enqueues_success_event_to_outbox_and_acks(handler) -> None:
     assert len(pool.store.outbox_events) == 1
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "script_parsed"
-    assert event["payload"]["payload"]["scenes"][0]["narration_text"] == "hello"
+    # Sau CR-018 event này chỉ mang tên class Scene: lời thoại đến từ
+    # `script_validated` của Rendering, vì chỉ lượt dry mới biết chúng theo
+    # đúng thứ tự chạy thật.
+    assert event["payload"]["payload"]["scene_class_name"] == "DemoScene"
+    assert "scenes" not in event["payload"]["payload"]
 
 
 @pytest.mark.asyncio
@@ -83,7 +86,9 @@ async def test_enqueues_failure_event_on_syntax_error(handler) -> None:
     assert message.acked is True
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "parse_failed"
-    assert "Scene subclass" in event["payload"]["payload"]["reason"]
+    # Thông báo này hiện thẳng lên GUI cho Creator đọc, nên nó viết tiếng Việt —
+    # cùng nguyên tắc với thông báo của lint (CR-017). Log nội bộ vẫn tiếng Anh.
+    assert "class Scene" in event["payload"]["payload"]["reason"]
 
 
 @pytest.mark.asyncio

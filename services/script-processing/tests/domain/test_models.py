@@ -1,36 +1,14 @@
-"""Sanity tests for domain value objects (domain-entities.md)."""
+"""Sanity tests for domain value objects.
+
+Sau CR-018 service này chỉ còn `ParsedScript`. `Scene` và `Chapter` đã rời khỏi
+đây: lời thoại và chapter do lượt dry của Rendering sinh ra theo thứ tự chạy
+thật, không còn đọc được từ text script.
+"""
 
 from __future__ import annotations
 
-from domain.models import ParsedScript, Scene
+from domain.models import ParsedScript
 
 
-def test_scene_fields():
-    scene = Scene(
-        scene_index=0,
-        narration_text="hello",
-        illustration_hint="hint",
-        code_snippet="code",
-        code_language="python",
-    )
-    assert scene.scene_index == 0
-    assert scene.narration_text == "hello"
-    assert scene.illustration_hint == "hint"
-    assert scene.code_snippet == "code"
-    assert scene.code_language == "python"
-
-
-def test_scene_optional_fields_can_be_none():
-    scene = Scene(
-        scene_index=0, narration_text="hello", illustration_hint=None, code_snippet=None, code_language=None
-    )
-    assert scene.illustration_hint is None
-    assert scene.code_snippet is None
-    assert scene.code_language is None
-
-
-def test_parsed_script_holds_scenes():
-    scenes = [Scene(0, "a", None, None, None), Scene(1, "b", None, None, None)]
-    parsed = ParsedScript(scenes=scenes, scene_class_name="DemoScene")
-    assert parsed.scenes == scenes
-    assert parsed.scene_class_name == "DemoScene"
+def test_parsed_script_holds_scene_class_name():
+    assert ParsedScript(scene_class_name="DemoScene").scene_class_name == "DemoScene"

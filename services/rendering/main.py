@@ -14,7 +14,11 @@ import os
 
 import aio_pika
 
-from adapters.messaging.consumer import RenderScriptCommandHandler
+from adapters.messaging.consumer import (
+    RenderingCommandDispatcher,
+    RenderScriptCommandHandler,
+    ValidateScriptCommandHandler,
+)
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
@@ -29,6 +33,7 @@ from adapters.rendering.manim_renderer import (
     ManimScriptRenderer,
 )
 from application.render_script import RenderScriptUseCase
+from application.validate_script import ValidateScriptUseCase
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -65,8 +70,13 @@ async def run() -> None:
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    command_handler = RenderScriptCommandHandler(
-        use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
+    command_handler = RenderingCommandDispatcher(
+        # Cổng kiểm tra chạy trước TTS (CR-020): script sai bị chặn trước khi
+        # tiêu quota giọng đọc.
+        ValidateScriptCommandHandler(ValidateScriptUseCase(renderer), pool, inbox, outbox),
+        RenderScriptCommandHandler(
+            use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
+        ),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()

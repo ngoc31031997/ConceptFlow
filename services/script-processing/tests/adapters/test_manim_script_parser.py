@@ -1,4 +1,9 @@
-"""Unit tests for ManimScriptParser."""
+"""ManimScriptParser — sau CR-018 chỉ còn tìm tên class Scene.
+
+Các test cũ về thứ tự `# NARRATION:` và gom `# CHAPTER:` đã bỏ: hai thứ đó
+không đọc từ text nữa, chúng do lượt dry của Rendering thu theo thứ tự chạy
+thật. Xem `services/rendering/tests/conceptflow/test_narration.py`.
+"""
 
 from __future__ import annotations
 
@@ -7,45 +12,38 @@ import pytest
 from adapters.parsing.manim_script_parser import ManimScriptParser
 from domain.errors import ScriptSyntaxError
 
-VALID_SCRIPT = """from manim import *
+SCRIPT = (
+    "from conceptflow import *\n\n"
+    "class ForLoopScene(ConceptFlowScene):\n"
+    "    def construct(self):\n"
+    '        self.narrate("một")\n'
+)
 
 
-class ForLoopIntroScene(Scene):
-    def construct(self):
-        # NARRATION: "Gioi thieu vong lap for trong Java"
-        self.wait(AUTO)
-
-        # NARRATION: "Bien i chay tu 0 den 4"
-        self.wait(AUTO)
-"""
+def test_tim_ten_class_scene():
+    assert ManimScriptParser().parse(SCRIPT).scene_class_name == "ForLoopScene"
 
 
-def test_parses_scene_class_name_and_narration_order():
-    parsed = ManimScriptParser().parse(VALID_SCRIPT)
-
-    assert parsed.scene_class_name == "ForLoopIntroScene"
-    assert [s.narration_text for s in parsed.scenes] == [
-        "Gioi thieu vong lap for trong Java",
-        "Bien i chay tu 0 den 4",
-    ]
-    assert [s.scene_index for s in parsed.scenes] == [0, 1]
+def test_lay_class_dau_tien_khi_co_nhieu_class():
+    """Rendering chỉ chạy một class; class đầu tiên trong file là class đó."""
+    script = SCRIPT + "\n\nclass PhuScene(ConceptFlowScene):\n    pass\n"
+    assert ManimScriptParser().parse(script).scene_class_name == "ForLoopScene"
 
 
-def test_finds_scene_subclass_with_extra_base_classes():
-    script = (
-        "class MyScene(MovingCameraScene):\n"
-        "    def construct(self):\n"
-        '        # NARRATION: "hi"\n'
-    )
-    parsed = ManimScriptParser().parse(script)
-    assert parsed.scene_class_name == "MyScene"
+@pytest.mark.parametrize("base", ["Scene", "ConceptFlowScene", "MovingCameraScene", "ThreeDScene"])
+def test_nhan_moi_base_class_co_chu_scene(base):
+    script = f"class DemoScene({base}):\n    pass\n"
+    assert ManimScriptParser().parse(script).scene_class_name == "DemoScene"
 
 
-def test_raises_when_no_scene_class_found():
-    with pytest.raises(ScriptSyntaxError, match="Scene subclass"):
-        ManimScriptParser().parse('# NARRATION: "hi"\nprint("no scene here")')
+def test_bao_loi_khi_khong_co_class_scene():
+    with pytest.raises(ScriptSyntaxError):
+        ManimScriptParser().parse("x = 1\n")
 
 
-def test_raises_when_no_narration_markers_found():
-    with pytest.raises(ScriptSyntaxError, match="narration markers"):
-        ManimScriptParser().parse("class DemoScene(Scene):\n    def construct(self):\n        pass\n")
+def test_khong_con_bat_buoc_co_narration_trong_text():
+    """Một script không có chữ 'narrate' nào trong nguồn vẫn hợp lệ ở bước này:
+    lời thoại có thể nằm trong hàm helper của thư viện, và chỉ lượt dry mới
+    biết. Bắt lỗi ở đây sẽ chặn nhầm đúng loại script mà CR-018 mở ra."""
+    script = "class DemoScene(ConceptFlowScene):\n    def construct(self):\n        pass\n"
+    assert ManimScriptParser().parse(script).scene_class_name == "DemoScene"

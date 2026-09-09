@@ -10,8 +10,6 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
-from domain.models import Chapter, Scene
-
 EVENTS_EXCHANGE = "events.direct"
 EVENTS_ROUTING_KEY = "orchestrator"
 SCHEMA_VERSION = "1.0"
@@ -28,34 +26,19 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def success_envelope(
-    saga_id: str,
-    project_id: str,
-    scenes: list[Scene],
-    scene_class_name: str,
-    chapters: list[Chapter] | None = None,
-) -> dict:
+def success_envelope(saga_id: str, project_id: str, scene_class_name: str) -> dict:
+    """Sau CR-018 event này chỉ mang tên class Scene.
+
+    Lời thoại và chapter trước đây đi kèm ở đây; giờ chúng đến từ event
+    `script_validated` của Rendering, vì chỉ lượt dry mới biết chúng theo đúng
+    thứ tự chạy thật.
+    """
     return build_envelope(
         saga_id,
         project_id,
         {
             "event_type": "script_parsed",
             "scene_class_name": scene_class_name,
-            "scenes": [
-                {
-                    "scene_index": s.scene_index,
-                    "narration_text": s.narration_text,
-                    "illustration_hint": s.illustration_hint,
-                    "code_snippet": s.code_snippet,
-                    "code_language": s.code_language,
-                }
-                for s in scenes
-            ],
-            # CR-006 FR15.1 — the Orchestrator turns these into timestamps
-            # using the offsets Rendering measures.
-            "chapters": [
-                {"scene_index": c.scene_index, "title": c.title} for c in (chapters or [])
-            ],
         },
     )
 

@@ -19,42 +19,6 @@ services:
     networks:
       - backend
 
-  content-plugin-db:
-    image: postgres:16-alpine
-    container_name: content-plugin-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASS}
-      POSTGRES_DB: content_plugin
-    volumes:
-      - content_plugin_db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d content_plugin"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - backend
-
-  content-plugin:
-    build: ./services/content-plugin
-    container_name: content-plugin
-    environment:
-      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@content-plugin-db:5432/content_plugin
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      content-plugin-db:
-        condition: service_healthy
-    networks:
-      - backend
-
   tts-db:
     image: postgres:16-alpine
     container_name: tts-db
@@ -374,7 +338,6 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       ORCHESTRATOR_URL: http://orchestrator:8000
-      CONTENT_PLUGIN_URL: http://content-plugin:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000
@@ -390,8 +353,6 @@ services:
       rabbitmq:
         condition: service_healthy
       orchestrator:
-        condition: service_healthy
-      content-plugin:
         condition: service_healthy
       publisher:
         condition: service_healthy
@@ -453,7 +414,6 @@ services:
 volumes:
   rabbitmq_data:
   shared_artifacts:
-  content_plugin_db_data:
   tts_db_data:
   script_processing_db_data:
   rendering_db_data:

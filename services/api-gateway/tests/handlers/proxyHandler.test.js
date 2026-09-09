@@ -37,7 +37,7 @@ function makeRes() {
 describe('proxyHandler', () => {
   test('forwards status + body verbatim on success', async () => {
     const client = { request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: [{ id: 1 }] }) };
-    const handler = proxyHandler(client, 'content-plugin');
+    const handler = proxyHandler(client, 'orchestrator');
     const req = makeReq();
     const res = makeRes();
 

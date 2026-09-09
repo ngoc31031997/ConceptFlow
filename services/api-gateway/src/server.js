@@ -9,7 +9,6 @@ const { corsMiddleware } = require('./middleware/cors');
 const { createHttpClient } = require('./clients/httpClient');
 const { createAmqpClient } = require('./clients/amqpClient');
 const { progressHandler } = require('./handlers/progressHandler');
-const { pluginsRouter } = require('./routes/plugins');
 const { voicesRouter } = require('./routes/voices');
 const { sagasRouter } = require('./routes/sagas');
 const { projectsRouter } = require('./routes/projects');
@@ -35,7 +34,6 @@ function main() {
   // (local LLM generation can take up to ~2 minutes).
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
   const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 130_000 });
-  const contentPluginClient = createHttpClient(config.contentPluginUrl);
   const publisherClient = createHttpClient(config.publisherUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.
@@ -50,7 +48,6 @@ function main() {
   app.use(correlationMiddleware());
 
   // 5. Register routes.
-  app.use(pluginsRouter(contentPluginClient));
   app.use(voicesRouter(config.sharedDir));
   app.use(sagasRouter(orchestratorClient));
   app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient));

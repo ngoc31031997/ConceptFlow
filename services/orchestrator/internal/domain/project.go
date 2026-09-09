@@ -15,7 +15,7 @@ type ProjectStatus string
 const (
 	StatusDraft                  ProjectStatus = "draft"
 	StatusParsingScript          ProjectStatus = "parsing_script"
-	StatusClassifyingScenes      ProjectStatus = "classifying_scenes"
+	StatusValidatingScript       ProjectStatus = "validating_script"
 	StatusSynthesizingSpeech     ProjectStatus = "synthesizing_speech"
 	StatusRendering              ProjectStatus = "rendering"
 	StatusAssemblingVideo        ProjectStatus = "assembling_video"
@@ -23,7 +23,7 @@ const (
 	StatusPublishing             ProjectStatus = "publishing"
 	StatusPublished              ProjectStatus = "published"
 	StatusFailedParseScript      ProjectStatus = "failed_at_parse_script"
-	StatusFailedClassifyScenes   ProjectStatus = "failed_at_classify_scenes"
+	StatusFailedValidateScript   ProjectStatus = "failed_at_validate_script"
 	StatusFailedSynthesizeSpeech ProjectStatus = "failed_at_synthesize_speech"
 	StatusFailedRenderScenes     ProjectStatus = "failed_at_render_scenes"
 	StatusFailedAssembleVideo    ProjectStatus = "failed_at_assemble_video"
@@ -37,7 +37,7 @@ type StepName string
 
 const (
 	StepParseScript      StepName = "parse_script"
-	StepClassifyScenes   StepName = "classify_scenes"
+	StepValidateScript   StepName = "validate_script"
 	StepSynthesizeSpeech StepName = "synthesize_speech"
 	StepRenderScenes     StepName = "render_scenes"
 	StepAssembleVideo    StepName = "assemble_video"
@@ -50,8 +50,8 @@ func FailedStatusForStep(step StepName) ProjectStatus {
 	switch step {
 	case StepParseScript:
 		return StatusFailedParseScript
-	case StepClassifyScenes:
-		return StatusFailedClassifyScenes
+	case StepValidateScript:
+		return StatusFailedValidateScript
 	case StepSynthesizeSpeech:
 		return StatusFailedSynthesizeSpeech
 	case StepRenderScenes:

@@ -1,28 +1,16 @@
 """ManimScriptParser — implements ScriptParserPort.
 
-Replaces the Markdown-scene grammar: `script_content` is now a full,
-hand-written Manim Python script (a `from manim import *` file defining one
-or more `Scene` subclasses). This parser never executes the script — it
-only scans the source text for two markers, in file order:
+Sau CR-018, service này chỉ còn tìm **tên class Scene**. Lời thoại, beat và
+chapter không đọc được từ text nữa: chúng do lượt dry của Rendering thu thập
+theo thứ tự chạy thật (`self.narrate(...)` có thể nằm trong vòng lặp, trong
+nhánh điều kiện, trong hàm helper — những chỗ mà quét comment không bao giờ
+đếm đúng).
 
-- `class XxxScene(Scene):` (or any base class containing "Scene", e.g.
-  `MovingCameraScene`) — the first one found is the scene the Rendering
-  Service will execute.
-- `# NARRATION: "..."` comments — each becomes one narration segment for
-  TTS. The Rendering Service later substitutes each corresponding
-  `self.wait(AUTO)` call (matched by ordinal position) with the real
-  synthesized-audio duration, so the animation's pacing stays in lockstep
-  with the voiceover without this service ever running the script.
-- `# CHAPTER: "..."` comments (CR-006 FR15.1) — each marks where a YouTube
-  chapter begins. It attaches to the NEXT narration marker, so the chapter
-  timestamp is the real offset Rendering measured for that line rather than
-  an estimate. Chapters are optional; a script with none simply gets no
-  chapter list.
+Tên class thì ngược lại: nó là một khai báo tĩnh trong mã nguồn, đọc bằng regex
+là đúng và đủ. Và nó phải được biết **trước** lượt dry, vì `manim` cần biết chạy
+class nào.
 
-The Creator writes chapters explicitly rather than having an LLM infer them,
-because they already decide the structure when writing the script, and a model
-guessing at section boundaries produces chapters that drift from what the video
-actually does.
+Service này vẫn không bao giờ thực thi script.
 """
 
 from __future__ import annotations
@@ -30,34 +18,24 @@ from __future__ import annotations
 import re
 
 from domain.errors import ScriptSyntaxError
-from domain.models import Chapter, ParsedScript, Scene
+from domain.models import ParsedScript
 from domain.ports import ScriptParserPort
 
+#: Khớp cả `Scene`, `ConceptFlowScene` và các subclass khác của Manim
+#: (`MovingCameraScene`...). Class đầu tiên tìm thấy là class được render.
 SCENE_CLASS_RE = re.compile(r"^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:")
-NARRATION_RE = re.compile(r'^\s*#\s*NARRATION:\s*"(.*)"\s*$')
-CHAPTER_RE = re.compile(r'^\s*#\s*CHAPTER:\s*"(.*)"\s*$')
 
 
 class ManimScriptParser(ScriptParserPort):
     def parse(self, raw_script: str) -> ParsedScript:
-        lines = raw_script.splitlines()
-
-        scene_class_name = self._find_scene_class(lines)
+        scene_class_name = self._find_scene_class(raw_script.splitlines())
         if scene_class_name is None:
             raise ScriptSyntaxError(
-                None, "no Manim Scene subclass found (expected `class XxxScene(Scene):`)"
-            )
-
-        scenes, chapters = self._find_narration_and_chapters(lines)
-        if not scenes:
-            raise ScriptSyntaxError(
                 None,
-                'no narration markers found (expected `# NARRATION: "..."` comments)',
+                "không tìm thấy class Scene nào "
+                "(cần dạng `class TenScene(ConceptFlowScene):`)",
             )
-
-        return ParsedScript(
-            scenes=scenes, scene_class_name=scene_class_name, chapters=chapters
-        )
+        return ParsedScript(scene_class_name=scene_class_name)
 
     @staticmethod
     def _find_scene_class(lines: list[str]) -> str | None:
@@ -66,45 +44,3 @@ class ManimScriptParser(ScriptParserPort):
             if match:
                 return match.group(1)
         return None
-
-    @staticmethod
-    def _find_narration_and_chapters(
-        lines: list[str],
-    ) -> tuple[list[Scene], list[Chapter]]:
-        scenes: list[Scene] = []
-        chapters: list[Chapter] = []
-        pending_chapter: str | None = None
-
-        for line in lines:
-            chapter_match = CHAPTER_RE.match(line)
-            if chapter_match:
-                title = chapter_match.group(1).strip()
-                if title:
-                    # Held until the next narration marker: a chapter's
-                    # timestamp is the offset of the line that opens it.
-                    pending_chapter = title
-                continue
-
-            match = NARRATION_RE.match(line)
-            if not match:
-                continue
-            narration_text = match.group(1).strip()
-            if not narration_text:
-                continue
-
-            if pending_chapter is not None:
-                chapters.append(Chapter(scene_index=len(scenes), title=pending_chapter))
-                pending_chapter = None
-
-            scenes.append(
-                Scene(
-                    scene_index=len(scenes),
-                    narration_text=narration_text,
-                    illustration_hint=None,
-                    code_snippet=None,
-                    code_language=None,
-                )
-            )
-        # A trailing chapter with no narration after it is dropped: there is no
-        # timestamp to give it.
-        return scenes, chapters
