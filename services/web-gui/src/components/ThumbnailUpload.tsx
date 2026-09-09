@@ -3,6 +3,7 @@ import {
   ApiError,
   getProjectThumbnailUrl,
   getThumbnailInfo,
+  suggestPublishMetadata,
   uploadThumbnail,
 } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -39,11 +40,16 @@ function CopyIcon() {
   );
 }
 
-const buildThumbnailSystemPrompt = (language: "vi" | "en") => `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
+/**
+ * `topic` comes from the same AI-suggested title/description the publish
+ * form uses (suggestPublishMetadata) — filled in automatically so the
+ * copied prompt is already specific to this video, not a template the
+ * Creator has to hand-edit before it's usable.
+ */
+const buildThumbnailSystemPrompt = (language: "vi" | "en", topic: string | null) => `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
 
 ======================================================
-CHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]
-Ví dụ: "Phân biệt động từ thêm -ed và -ing trong tiếng Anh, khi nào dùng cái nào, kèm ví dụ."
+CHỦ ĐỀ VIDEO: ${topic ?? "[DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]"}
 ======================================================
 
 ## VAI TRÒ CỦA BẠN
@@ -76,9 +82,11 @@ export function ThumbnailUpload({
   onThumbnailPathChange,
   contentLanguage,
 }: ThumbnailUploadProps) {
+  const [topic, setTopic] = useState<string | null>(null);
+  const [topicState, setTopicState] = useState<"idle" | "loading" | "error">("idle");
   const thumbnailSystemPrompt = useMemo(
-    () => buildThumbnailSystemPrompt(contentLanguage),
-    [contentLanguage],
+    () => buildThumbnailSystemPrompt(contentLanguage, topic),
+    [contentLanguage, topic],
   );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
@@ -90,6 +98,28 @@ export function ThumbnailUpload({
   const [promptPanelOpen, setPromptPanelOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Fetched lazily on first open, not on mount — this hits the same
+    // AI-suggestion call the publish form's "Gợi ý AI" button makes, so it
+    // shouldn't fire before the Creator actually wants a prompt.
+    if (!promptPanelOpen || topic !== null || topicState === "loading") return;
+    let cancelled = false;
+    setTopicState("loading");
+    suggestPublishMetadata(projectId)
+      .then((suggestion) => {
+        if (cancelled) return;
+        setTopic(suggestion.title ?? null);
+        setTopicState("idle");
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setTopicState("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [promptPanelOpen, projectId, topic, topicState]);
 
   useEffect(() => {
     let cancelled = false;
@@ -158,11 +188,26 @@ export function ThumbnailUpload({
         <div className={styles.promptPanel} data-testid="thumbnail-system-prompt-panel">
           <div className={styles.promptPanelHeader}>
             <span>System prompt để nhờ AI sinh ảnh (Midjourney/DALL-E/...) tạo thumbnail cho video</span>
-            <button type="button" className={glass.ghostBtn} onClick={handleCopyPrompt}>
+            <button
+              type="button"
+              className={glass.ghostBtn}
+              disabled={topicState === "loading"}
+              onClick={handleCopyPrompt}
+            >
               <CopyIcon />
               {promptCopied ? "Đã copy!" : "Copy"}
             </button>
           </div>
+          {topicState === "loading" && (
+            <p className={glass.helperText} style={{ marginTop: 0, fontSize: 12 }}>
+              Đang lấy chủ đề video từ AI để điền sẵn vào prompt...
+            </p>
+          )}
+          {topicState === "error" && (
+            <p role="alert" className={glass.helperText} style={{ marginTop: 0, fontSize: 12 }}>
+              Không lấy được chủ đề video tự động — dán chủ đề vào prompt bên dưới trước khi dùng.
+            </p>
+          )}
           <textarea
             className={`${glass.textArea} ${styles.promptTextarea}`}
             data-testid="thumbnail-system-prompt-textarea"
