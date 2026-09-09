@@ -25,6 +25,7 @@ import subprocess
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
+from adapters.assembly.srt_file import write_srt_file
 from adapters.assembly.subtitle_file import (
     DEFAULT_PLAY_RES_X,
     DEFAULT_PLAY_RES_Y,
@@ -126,10 +127,10 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         self._tail_seconds = tail_seconds
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ffmpeg-assembly")
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
         future = self._executor.submit(self._run_pipeline, request, output_path)
         try:
-            future.result(timeout=self._timeout_seconds)
+            return future.result(timeout=self._timeout_seconds)
         except FutureTimeoutError as exc:
             raise AssemblyEngineError(f"ffmpeg assembly timed out after {self._timeout_seconds}s") from exc
         except AssemblyEngineError:
@@ -138,7 +139,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             logger.exception("ffmpeg assembly failed")
             raise AssemblyEngineError(str(exc)) from exc
 
-    def _run_pipeline(self, request: VideoAssemblyRequest, output_path: str) -> None:
+    def _run_pipeline(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
         segments = sorted(request.narration_segments, key=lambda s: s.start_time)
         n = len(segments)
 
@@ -222,12 +223,22 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
                 filter_parts.append(f"{audio_map}apad=whole_dur={target_duration:.3f}[apadded]")
                 audio_map = "[apadded]"
 
-        if request.subtitle_cues:
-            subtitle_path = self._write_subtitles(request, output_path, lead_in)
+        # Shifted exactly once, here, regardless of which serializer(s) below
+        # end up using the result — two serializers each applying lead_in
+        # themselves is how one of them quietly ends up wrong (ADR-0027).
+        cues = request.subtitle_cues or []
+        if cues and lead_in:
+            cues = [cue.shifted_by(lead_in) for cue in cues]
+
+        caption_path: str | None = None
+        if cues and request.subtitle_mode in ("burn_in", "both"):
+            subtitle_path = self._write_ass(request, cues, output_path)
             video_filters.append(f"subtitles={_escape_filter_path(subtitle_path)}")
             # Burning subtitles paints new pixels, so the video stream has to be
             # re-encoded — it can no longer be stream-copied.
             video_codec = list(VIDEO_ENCODE_ARGS)
+        if cues and request.subtitle_mode in ("track", "both"):
+            caption_path = self._write_srt(request, cues, output_path)
 
         if video_filters:
             if video_codec == ["-c:v", "copy"]:
@@ -268,6 +279,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         self._run_ffmpeg(cmd)
 
         self._write_thumbnail_candidate(output_path, target_duration)
+        return caption_path
 
     def _write_thumbnail_candidate(self, video_path: str, duration: float | None) -> None:
         """Extracts a still the Creator can use as a thumbnail (CR-006 FR16.1).
@@ -325,24 +337,11 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         return max(request.video_duration_seconds, last_narration_end)
 
     @staticmethod
-    def _write_subtitles(
-        request: VideoAssemblyRequest, output_path: str, lead_in: float = 0.0
-    ) -> str:
+    def _write_ass(request: VideoAssemblyRequest, cues: list[SubtitleCue], output_path: str) -> str:
+        """Burn-in track. `cues` are expected already shifted by any lead-in
+        (see _run_pipeline) — this method does not touch timestamps."""
         style = request.subtitle_style or SubtitleStyle()
         subtitle_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.ass")
-        cues = request.subtitle_cues or []
-        if lead_in:
-            # Shifted by the same lead-in as the picture and the audio, or the
-            # captions would run ahead of the voice by exactly that much.
-            cues = [
-                SubtitleCue(
-                    scene_index=cue.scene_index,
-                    text=cue.text,
-                    start_time=cue.start_time + lead_in,
-                    end_time=cue.end_time + lead_in,
-                )
-                for cue in cues
-            ]
         write_subtitle_file(
             cues,
             style,
@@ -350,6 +349,15 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             play_res=_probe_resolution(request.video_path),
         )
         return subtitle_path
+
+    @staticmethod
+    def _write_srt(request: VideoAssemblyRequest, cues: list[SubtitleCue], output_path: str) -> str:
+        """Caption-track file for Publisher to upload (CR-015 FR38). `cues`
+        are expected already shifted, same as _write_ass — no `SubtitleStyle`
+        here, SRT has no styling fields (FR38.3)."""
+        caption_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.srt")
+        write_srt_file(cues, caption_path)
+        return caption_path
 
     @staticmethod
     def _run_ffmpeg(args: list[str]) -> None:

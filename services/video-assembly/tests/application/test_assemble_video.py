@@ -21,12 +21,16 @@ def _touch(path: str) -> None:
 class FakeVideoAssembler(VideoAssemblerPort):
     """Records assemble() calls and writes a placeholder output file."""
 
-    def __init__(self) -> None:
+    def __init__(self, caption_path: str | None = None) -> None:
         self.calls: list[VideoAssemblyRequest] = []
+        self._caption_path = caption_path
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
         self.calls.append(request)
         _touch(output_path)
+        if self._caption_path:
+            _touch(self._caption_path)
+        return self._caption_path
 
 
 @pytest.fixture
@@ -133,6 +137,86 @@ def test_missing_background_music_raises_missing_artifact_error(shared_volume_ro
     )
 
     with pytest.raises(MissingArtifactError):
+        use_case.assemble(request)
+
+
+def test_caption_path_flows_from_assembler_into_the_result(shared_volume_root):
+    """CR-015 FR38.4: caption_path travels the same way thumbnail_path does —
+    through the result, not rediscovered by the caller."""
+    video_path = str(shared_volume_root / "rendered.mp4")
+    audio_path = str(shared_volume_root / "audio0.wav")
+    _touch(video_path)
+    _touch(audio_path)
+    expected_caption_path = str(shared_volume_root / "proj-1" / "video" / "final.srt")
+    assembler = FakeVideoAssembler(caption_path=expected_caption_path)
+    use_case = AssembleVideoUseCase(assembler)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path=video_path,
+        narration_segments=[NarrationSegment(audio_path=audio_path, start_time=0.0)],
+        subtitle_mode="track",
+    )
+
+    result = use_case.assemble(request)
+
+    assert result.caption_path == expected_caption_path
+
+
+def test_no_caption_path_when_the_assembler_produced_none(shared_volume_root):
+    video_path = str(shared_volume_root / "rendered.mp4")
+    audio_path = str(shared_volume_root / "audio0.wav")
+    _touch(video_path)
+    _touch(audio_path)
+    use_case = AssembleVideoUseCase(FakeVideoAssembler(caption_path=None))
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path=video_path,
+        narration_segments=[NarrationSegment(audio_path=audio_path, start_time=0.0)],
+    )
+
+    result = use_case.assemble(request)
+
+    assert result.caption_path is None
+
+
+def test_idempotent_call_reuses_caption_file_already_on_disk(shared_volume_root):
+    """Mirrors the video-file idempotency check (Business Rule 8): a caption
+    file left over from a prior call is reused rather than silently dropped,
+    and its absence is not silently invented either."""
+    video_path = str(shared_volume_root / "rendered.mp4")
+    audio_path = str(shared_volume_root / "audio0.wav")
+    _touch(video_path)
+    _touch(audio_path)
+    assembler = FakeVideoAssembler(caption_path=str(shared_volume_root / "proj-1" / "video" / "final.srt"))
+    use_case = AssembleVideoUseCase(assembler)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path=video_path,
+        narration_segments=[NarrationSegment(audio_path=audio_path, start_time=0.0)],
+        subtitle_mode="track",
+    )
+    first = use_case.assemble(request)
+
+    second = use_case.assemble(request)
+
+    assert len(assembler.calls) == 1
+    assert second.caption_path == first.caption_path
+
+
+def test_unknown_subtitle_mode_raises_missing_artifact_error(shared_volume_root):
+    video_path = str(shared_volume_root / "rendered.mp4")
+    audio_path = str(shared_volume_root / "audio0.wav")
+    _touch(video_path)
+    _touch(audio_path)
+    use_case = AssembleVideoUseCase(FakeVideoAssembler())
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path=video_path,
+        narration_segments=[NarrationSegment(audio_path=audio_path, start_time=0.0)],
+        subtitle_mode="bogus",
+    )
+
+    with pytest.raises(MissingArtifactError, match="subtitle_mode"):
         use_case.assemble(request)
 
 

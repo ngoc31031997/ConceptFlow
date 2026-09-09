@@ -33,6 +33,25 @@ class SubtitleCue:
     start_time: float
     end_time: float
 
+    def shifted_by(self, seconds: float) -> "SubtitleCue":
+        """Returns a copy moved later in the timeline by `seconds` (ADR-0027).
+
+        This is the ONLY place a subtitle timestamp gets shifted. The .ass and
+        .srt serializers both receive already-shifted cues and never see a
+        raw offset themselves — two serializers each doing their own shift
+        arithmetic is how one of them ends up silently wrong; the burn-in
+        track would still look right while the caption track drifted by
+        exactly the offset, with no test positioned to catch it.
+        """
+        if not seconds:
+            return self
+        return SubtitleCue(
+            scene_index=self.scene_index,
+            text=self.text,
+            start_time=self.start_time + seconds,
+            end_time=self.end_time + seconds,
+        )
+
 
 @dataclass(frozen=True)
 class SubtitleStyle:
@@ -81,6 +100,16 @@ class VideoAssemblyRequest:
     background_music_volume: float = 0.2
     subtitle_cues: list[SubtitleCue] | None = None
     subtitle_style: SubtitleStyle | None = None
+    # How subtitle_cues get delivered (CR-015, ADR-0027):
+    #   off      — no subtitles at all
+    #   track    — .srt only, for upload as a YouTube caption track
+    #   burn_in  — .ass only, painted into the video frames (CR-001 behaviour)
+    #   both     — both, with the risk of doubled text a Creator who picks
+    #              this has been warned about (CR-015 FR41.3)
+    # Defaults to "burn_in" rather than the GUI's new "track" default
+    # (CR-015 FR41.2) so a command already sitting in the queue when this
+    # ships keeps producing exactly what it produced before.
+    subtitle_mode: str = "burn_in"
 
 
 @dataclass(frozen=True)
@@ -93,3 +122,7 @@ class VideoAssemblyResult:
     """
 
     video_path: str
+    # Set only when subtitle_mode produced a .srt (CR-015 FR38.4) — None when
+    # subtitles are off or burn-in only. Flows to Publisher the same way
+    # thumbnail_path does.
+    caption_path: str | None = None

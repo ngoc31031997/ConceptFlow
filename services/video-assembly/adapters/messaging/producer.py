@@ -27,10 +27,15 @@ def build_envelope(saga_id: str, project_id: str, payload: dict) -> dict:
     }
 
 
-def video_assembled_envelope(saga_id: str, project_id: str, video_path: str) -> dict:
-    return build_envelope(
-        saga_id, project_id, {"event_type": "video_assembled", "video_path": video_path}
-    )
+def video_assembled_envelope(
+    saga_id: str, project_id: str, video_path: str, caption_path: str | None = None
+) -> dict:
+    payload = {"event_type": "video_assembled", "video_path": video_path}
+    if caption_path:
+        # Absent rather than null when there is no caption track (CR-015
+        # FR38.4) — mirrors how thumbnail_path already flows downstream.
+        payload["caption_path"] = caption_path
+    return build_envelope(saga_id, project_id, payload)
 
 
 def assembly_failed_envelope(saga_id: str, project_id: str, error_message: str) -> dict:

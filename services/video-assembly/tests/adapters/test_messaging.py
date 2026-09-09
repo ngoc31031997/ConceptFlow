@@ -29,13 +29,17 @@ def _touch(path: str) -> None:
 
 
 class FakeVideoAssembler(VideoAssemblerPort):
-    def __init__(self, fail_with: Exception | None = None) -> None:
+    def __init__(self, fail_with: Exception | None = None, caption_path: str | None = None) -> None:
         self._fail_with = fail_with
+        self._caption_path = caption_path
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
         if self._fail_with is not None:
             raise self._fail_with
         _touch(output_path)
+        if self._caption_path:
+            _touch(self._caption_path)
+        return self._caption_path
 
 
 class FakeMessage:
@@ -93,6 +97,34 @@ async def test_enqueues_success_event_to_outbox_and_acks(shared_volume_root) -> 
 
 
 @pytest.mark.asyncio
+async def test_caption_path_is_carried_into_the_video_assembled_event(shared_volume_root) -> None:
+    """CR-015 FR38.4: caption_path travels through the outbox event the same
+    way video_path does, so the Orchestrator can pick it up downstream."""
+    caption_path = str(shared_volume_root / "project-1" / "video" / "final.srt")
+    handler, pool = _build_handler(FakeVideoAssembler(caption_path=caption_path))
+    message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
+
+    await handler.handle(message)
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["payload"]["payload"]["caption_path"] == caption_path
+
+
+@pytest.mark.asyncio
+async def test_no_caption_path_key_when_assembler_produced_none(shared_volume_root) -> None:
+    """Absent rather than null (mirrors thumbnail_path already flowing this
+    way) — a downstream reader distinguishing "no caption" from a bug that
+    forgot to set the field should not have to treat null as valid data."""
+    handler, pool = _build_handler(FakeVideoAssembler())
+    message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
+
+    await handler.handle(message)
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert "caption_path" not in event["payload"]["payload"]
+
+
+@pytest.mark.asyncio
 async def test_enqueues_failure_event_on_engine_error(shared_volume_root) -> None:
     handler, pool = _build_handler(FakeVideoAssembler(fail_with=AssemblyEngineError("boom")))
     message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
@@ -113,6 +145,46 @@ async def test_marks_message_processed_in_inbox(shared_volume_root) -> None:
     await handler.handle(message)
 
     assert "msg-1" in pool.store.processed_message_ids
+
+
+class RecordingVideoAssembler(VideoAssemblerPort):
+    """Captures the request it was called with, for asserting on how the
+    consumer parsed the envelope payload."""
+
+    def __init__(self) -> None:
+        self.last_request: VideoAssemblyRequest | None = None
+
+    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+        self.last_request = request
+        _touch(output_path)
+        return None
+
+
+@pytest.mark.asyncio
+async def test_missing_subtitle_mode_in_payload_defaults_to_burn_in(shared_volume_root) -> None:
+    """A command already sitting in the queue when CR-015 ships carries no
+    subtitle_mode key at all — it must keep producing exactly what it
+    produced before (burn-in), not silently switch to a caption track."""
+    assembler = RecordingVideoAssembler()
+    handler, _ = _build_handler(assembler)
+    message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
+
+    await handler.handle(message)
+
+    assert assembler.last_request.subtitle_mode == "burn_in"
+
+
+@pytest.mark.asyncio
+async def test_subtitle_mode_in_payload_is_passed_through(shared_volume_root) -> None:
+    assembler = RecordingVideoAssembler()
+    handler, _ = _build_handler(assembler)
+    envelope = json.loads(make_envelope(shared_volume_root=shared_volume_root))
+    envelope["payload"]["subtitle_mode"] = "track"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert assembler.last_request.subtitle_mode == "track"
 
 
 @pytest.mark.asyncio

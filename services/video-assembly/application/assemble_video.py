@@ -8,6 +8,7 @@ Question 10), so this one use case is the whole application layer.
 from __future__ import annotations
 
 from adapters.storage.artifact_paths import (
+    caption_output_path,
     ensure_parent_dir,
     file_exists,
     video_exists,
@@ -16,6 +17,8 @@ from adapters.storage.artifact_paths import (
 from domain.errors import MissingArtifactError
 from domain.models import VideoAssemblyRequest, VideoAssemblyResult
 from domain.ports import VideoAssemblerPort
+
+VALID_SUBTITLE_MODES = frozenset({"off", "track", "burn_in", "both"})
 
 
 class AssembleVideoUseCase:
@@ -26,17 +29,22 @@ class AssembleVideoUseCase:
 
     def assemble(self, request: VideoAssemblyRequest) -> VideoAssemblyResult:
         output_path = video_output_path(request.project_id)
+        caption_path = caption_output_path(request.project_id)
 
         if video_exists(output_path):
             # Idempotency (Business Rule 8): reuse the artifact from a prior call
-            # instead of re-assembling.
-            return VideoAssemblyResult(video_path=output_path)
+            # instead of re-assembling. The caption file follows the same rule —
+            # present on disk from that prior call, or not produced at all.
+            return VideoAssemblyResult(
+                video_path=output_path,
+                caption_path=caption_path if file_exists(caption_path) else None,
+            )
 
         self._validate(request)
 
         ensure_parent_dir(output_path)
-        self._assembler.assemble(request, output_path)
-        return VideoAssemblyResult(video_path=output_path)
+        produced_caption_path = self._assembler.assemble(request, output_path)
+        return VideoAssemblyResult(video_path=output_path, caption_path=produced_caption_path)
 
     @staticmethod
     def _validate(request: VideoAssemblyRequest) -> None:
@@ -62,3 +70,9 @@ class AssembleVideoUseCase:
 
         if request.background_music_path and not file_exists(request.background_music_path):
             raise MissingArtifactError(f"missing background music {request.background_music_path}")
+
+        if request.subtitle_mode not in VALID_SUBTITLE_MODES:
+            raise MissingArtifactError(
+                f"unknown subtitle_mode {request.subtitle_mode!r} — expected one of "
+                f"{sorted(VALID_SUBTITLE_MODES)}"
+            )

@@ -129,6 +129,11 @@ class AssembleVideoCommandHandler:
             background_music_volume=float(payload.get("background_music_volume") or 0.2),
             subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
             subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
+            # Default matches VideoAssemblyRequest's own default: a command
+            # already in the queue when CR-015 ships carries no subtitle_mode
+            # at all, and must keep producing exactly what it produced before
+            # (burn-in), not silently switch to a caption track.
+            subtitle_mode=payload.get("subtitle_mode") or "burn_in",
         )
 
         try:
@@ -139,7 +144,9 @@ class AssembleVideoCommandHandler:
             out_envelope = assembly_failed_envelope(saga_id, project_id, str(exc))
         else:
             event_type = "video_assembled"
-            out_envelope = video_assembled_envelope(saga_id, project_id, result.video_path)
+            out_envelope = video_assembled_envelope(
+                saga_id, project_id, result.video_path, result.caption_path
+            )
 
         async with self._pool.acquire() as conn, conn.transaction():
             await self._outbox.enqueue(

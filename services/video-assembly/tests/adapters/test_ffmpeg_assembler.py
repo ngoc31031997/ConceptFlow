@@ -301,6 +301,101 @@ def test_assemble_with_subtitles_burns_them_in_and_reencodes(tmp_path):
     assert "copy" not in args
     assert "libx264" in args
     assert (tmp_path / "proj-1.ass").exists()
+    assert not (tmp_path / "proj-1.srt").exists()
+
+
+def test_subtitle_mode_track_writes_only_srt_and_stream_copies(tmp_path):
+    """CR-015 FR38 / ADR-0027: 'track' delivers a caption file for Publisher
+    to upload, and does NOT paint anything into the video — so, unlike
+    burn-in, the video stream stays stream-copyable."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        subtitle_mode="track",
+    )
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        caption_path = assembler.assemble(request, output_path)
+
+    args = ffmpeg_args(mock_run)
+    joined = " ".join(args)
+    assert "subtitles=" not in joined
+    assert "copy" in args
+    assert not (tmp_path / "proj-1.ass").exists()
+    assert (tmp_path / "proj-1.srt").exists()
+    assert caption_path == str(tmp_path / "proj-1.srt")
+
+
+def test_subtitle_mode_both_writes_both_files(tmp_path):
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        subtitle_mode="both",
+    )
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        caption_path = assembler.assemble(request, output_path)
+
+    args = ffmpeg_args(mock_run)
+    assert "subtitles=" in " ".join(args)
+    assert (tmp_path / "proj-1.ass").exists()
+    assert (tmp_path / "proj-1.srt").exists()
+    assert caption_path == str(tmp_path / "proj-1.srt")
+
+
+def test_subtitle_mode_off_ignores_cues_entirely(tmp_path):
+    """A cue list left over from before the Creator turned subtitles off
+    must not produce either file (CR-001 FR9.1 still holds)."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        subtitle_mode="off",
+    )
+    output_path = str(tmp_path / "final.mp4")
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        caption_path = assembler.assemble(request, output_path)
+
+    args = ffmpeg_args(mock_run)
+    assert "subtitles=" not in " ".join(args)
+    assert caption_path is None
+    assert not (tmp_path / "proj-1.ass").exists()
+    assert not (tmp_path / "proj-1.srt").exists()
+
+
+def test_lead_in_shifts_the_caption_track_too(tmp_path):
+    """Same guarantee as the .ass case (test_lead_in_shifts_picture_audio_and_
+    subtitles_together below), but for the .srt path: both serializers must
+    receive the same already-shifted cues (ADR-0027)."""
+    assembler = FfmpegVideoAssembler(lead_in_seconds=0.5, tail_seconds=1.0)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=10.0)],
+        video_duration_seconds=60.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hi", start_time=10.0, end_time=12.0)],
+        subtitle_mode="track",
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()):
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    with open(tmp_path / "proj-1.srt", encoding="utf-8") as f:
+        assert "00:00:10,500" in f.read()
 
 
 def test_encoded_output_uses_upload_grade_settings(tmp_path):

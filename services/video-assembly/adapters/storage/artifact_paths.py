@@ -16,6 +16,13 @@ def video_output_path(project_id: str) -> str:
     return os.path.join(SHARED_VOLUME_ROOT, project_id, "video", "final.mp4")
 
 
+def caption_output_path(project_id: str) -> str:
+    """Conventional path for the CR-015 caption track: same directory and
+    stem as the video, .srt extension — mirrors video_output_path so the two
+    artifacts are found the same way."""
+    return os.path.join(SHARED_VOLUME_ROOT, project_id, "video", "final.srt")
+
+
 def video_exists(video_path: str) -> bool:
     return os.path.isfile(video_path)
 

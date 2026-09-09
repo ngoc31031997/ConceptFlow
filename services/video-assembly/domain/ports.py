@@ -18,9 +18,13 @@ class VideoAssemblerPort(ABC):
     and writes the result to output_path."""
 
     @abstractmethod
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
         """Assembles request.video_path + request.audio_segments (+
         optional background music) into a single video file at output_path.
+
+        Returns the path to a .srt caption-track file when request.subtitle_mode
+        produced one (CR-015 FR38.4) — "track" or "both" with cues present —
+        or None otherwise.
 
         Raises:
             domain.errors.AssemblyEngineError: ffmpeg fails or times out.
