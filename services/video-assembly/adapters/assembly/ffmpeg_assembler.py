@@ -192,8 +192,14 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
                 # Duck the music against the narration before mixing, so the
                 # voice stays intelligible without the music dropping out
                 # entirely between lines.
-                filter_parts.append(f"[bg][narration]{DUCKING_FILTER}[ducked]")
-                filter_parts.append("[narration][ducked]amix=inputs=2:duration=first[aout]")
+                # ffmpeg consumes a filtergraph label exactly once, and the
+                # narration is needed twice here: as the sidechain key and as a
+                # voice in the final mix. `asplit` hands out the two copies --
+                # reusing [narration] instead makes ffmpeg read the second use
+                # as an input stream specifier and abort.
+                filter_parts.append("[narration]asplit=2[navoice][nakey]")
+                filter_parts.append(f"[bg][nakey]{DUCKING_FILTER}[ducked]")
+                filter_parts.append("[navoice][ducked]amix=inputs=2:duration=first[aout]")
                 audio_map = "[aout]"
 
         video_map = "0:v"

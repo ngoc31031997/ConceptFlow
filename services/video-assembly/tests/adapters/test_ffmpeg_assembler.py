@@ -6,6 +6,7 @@ suite.
 
 from __future__ import annotations
 
+import re
 from unittest.mock import patch
 
 import pytest
@@ -398,7 +399,47 @@ def test_background_music_is_ducked_against_the_narration(tmp_path):
     filter_complex = ffmpeg_args(mock_run)[ffmpeg_args(mock_run).index("-filter_complex") + 1]
     assert "sidechaincompress" in filter_complex
     # The narration is the sidechain input, so the music ducks under the voice.
-    assert "[bg][narration]sidechaincompress" in filter_complex
+    # It reaches the compressor through asplit, because the same narration also
+    # has to reach the final mix and ffmpeg consumes each label only once.
+    assert "[narration]asplit=2[navoice][nakey]" in filter_complex
+    assert "[bg][nakey]sidechaincompress" in filter_complex
+    assert "[navoice][ducked]amix=inputs=2" in filter_complex
+
+
+def test_every_filtergraph_label_is_consumed_exactly_once(tmp_path):
+    """ffmpeg reads a second use of a label as an input stream specifier and
+    aborts with "matches no streams", so reusing one breaks assembly outright."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[
+            NarrationSegment(audio_path="a0.wav", start_time=0.0),
+            NarrationSegment(audio_path="a1.wav", start_time=12.5),
+        ],
+        video_duration_seconds=30.0,
+        background_music_path="bg.mp3",
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    filter_complex = ffmpeg_args(mock_run)[ffmpeg_args(mock_run).index("-filter_complex") + 1]
+    produced: list[str] = []
+    consumed: list[str] = []
+    label = r"\[([A-Za-z_][A-Za-z0-9_]*)\]"
+    for step in filter_complex.split(";"):
+        head = re.match(r"^((?:\[[^\]]+\])*)", step).group(1)
+        tail = re.search(r"((?:\[[^\]]+\])*)$", step).group(1)
+        # "[0:v]" and friends name real input streams, not graph labels; the
+        # pattern skips them, so only named links are counted.
+        consumed += re.findall(label, head)
+        produced += re.findall(label, tail)
+
+    assert sorted(produced) == sorted(set(produced)), "a label is produced twice"
+    for label in consumed:
+        assert consumed.count(label) == 1, f"label [{label}] is consumed twice"
+        assert label in produced, f"label [{label}] is consumed but never produced"
 
 
 def test_music_volume_is_configurable(tmp_path):
