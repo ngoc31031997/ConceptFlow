@@ -1,4 +1,6 @@
+import { SelectableOption } from "./SelectableOption";
 import glass from "../styles/glass.module.css";
+import selectable from "../styles/selectable.module.css";
 import styles from "./ContentLanguagePicker.module.css";
 
 interface ContentLanguagePickerProps {
@@ -13,10 +15,8 @@ const LANGUAGES: { value: "vi" | "en"; label: string; flag: string }[] = [
 
 /**
  * Content language is the project's first decision, not a narration setting:
- * it drives the starter script, the AI prompts, the voice, the subtitles, the
- * thumbnail prompt and the YouTube metadata (CR-008). It used to sit buried
- * halfway down the narration card, below two unrelated toggles, which read as
- * if it only picked a voice.
+ * it drives the AI prompt, the starter script, the voice, the subtitles, the
+ * thumbnail prompt and the YouTube metadata (CR-008).
  */
 export function ContentLanguagePicker({ value, onChange }: ContentLanguagePickerProps) {
   return (
@@ -24,26 +24,22 @@ export function ContentLanguagePicker({ value, onChange }: ContentLanguagePicker
       <div className={styles.text}>
         <div className={glass.cardTitle}>Ngôn ngữ nội dung</div>
         <p className={styles.hint}>
-          Quyết định giọng đọc, phụ đề, script mẫu và tiêu đề/mô tả khi đăng YouTube. Giao diện vẫn giữ
-          tiếng Việt.
+          Quyết định ngôn ngữ AI viết lời thoại, giọng đọc, phụ đề và tiêu đề/mô tả khi đăng YouTube.
+          Giao diện vẫn giữ tiếng Việt.
         </p>
       </div>
 
-      <div className={styles.options} role="radiogroup" aria-label="Ngôn ngữ nội dung">
+      <div className={selectable.row} role="radiogroup" aria-label="Ngôn ngữ nội dung">
         {LANGUAGES.map((option) => (
-          <button
+          <SelectableOption
             key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={value === option.value}
-            aria-pressed={value === option.value}
-            className={`${styles.option} ${value === option.value ? styles.selected : ""}`}
-            onClick={() => onChange(option.value)}
-            data-testid={`content-language-${option.value}`}
-          >
-            <span aria-hidden="true">{option.flag}</span>
-            {option.label}
-          </button>
+            selected={value === option.value}
+            onSelect={() => onChange(option.value)}
+            label={option.label}
+            leading={<span aria-hidden="true">{option.flag}</span>}
+            inline
+            testId={`content-language-${option.value}`}
+          />
         ))}
       </div>
     </div>

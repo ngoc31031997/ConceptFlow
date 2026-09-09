@@ -1,6 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
-import { ScriptEditor } from "../../src/components/ScriptEditor";
+import { describe, it, expect } from "vitest";
+import { buildGenerationSystemPrompt } from "../../src/components/scriptPrompts";
 import {
   END_SCREEN_SNIPPETS,
   HOOK_SNIPPETS,
@@ -12,14 +11,13 @@ import {
  * starter script, the AI prompts and the narration they asked for all stayed
  * Vietnamese.
  */
-function openSystemPrompt(contentLanguage: "vi" | "en"): HTMLTextAreaElement {
-  render(<ScriptEditor value="" onChange={vi.fn()} contentLanguage={contentLanguage} />);
-  // The prompt panel starts collapsed.
-  fireEvent.click(screen.getByTestId("script-editor-system-prompt-toggle"));
-  return screen.getByTestId("script-editor-system-prompt-textarea") as HTMLTextAreaElement;
+// The prompts are pure builders now, so the language rules are asserted on the
+// text itself rather than through whichever screen happens to display it.
+function openSystemPrompt(contentLanguage: "vi" | "en"): { value: string } {
+  return { value: buildGenerationSystemPrompt(contentLanguage) };
 }
 
-describe("content language drives the script editor", () => {
+describe("content language drives the AI prompts", () => {
   it("offers a starter script per language", () => {
     expect(SCRIPT_TEMPLATES.vi).toContain("# NARRATION:");
     expect(SCRIPT_TEMPLATES.en).toContain("# NARRATION:");

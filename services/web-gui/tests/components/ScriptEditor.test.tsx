@@ -1,12 +1,11 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import { ScriptEditor } from "../../src/components/ScriptEditor";
+import { HOOK_SNIPPETS } from "../../src/components/scriptTemplates";
+
+const VALID = 'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "hi"\n        self.wait(AUTO)';
 
 describe("ScriptEditor", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("calls onChange when typing", () => {
     const onChange = vi.fn();
     render(<ScriptEditor value="" onChange={onChange} contentLanguage="vi" />);
@@ -16,21 +15,27 @@ describe("ScriptEditor", () => {
     expect(onChange).toHaveBeenCalledWith("# Scene 1");
   });
 
-  it("toggles the AI prompt panel and copies the prompt to the clipboard", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
+  it("reports whether the script's markers and waits line up", () => {
+    const { rerender } = render(<ScriptEditor value={VALID} onChange={vi.fn()} contentLanguage="vi" />);
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
 
-    render(<ScriptEditor value="" onChange={vi.fn()} contentLanguage="vi" />);
+    rerender(
+      <ScriptEditor
+        value={'class A(Scene):\n    def construct(self):\n        # NARRATION: "x"\n        self.wait(1)'}
+        onChange={vi.fn()}
+        contentLanguage="vi"
+      />,
+    );
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Lệch số lượng");
+  });
 
-    expect(screen.queryByTestId("script-editor-ai-prompt-panel")).not.toBeInTheDocument();
+  it("offers the snippets only once there is a script to append them to", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<ScriptEditor value="" onChange={onChange} contentLanguage="vi" />);
+    expect(screen.queryByTestId("script-editor-insert-hook")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByTestId("script-editor-ai-prompt-toggle"));
-    expect(screen.getByTestId("script-editor-ai-prompt-panel")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByText("Copy"));
-
-    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0][0]).toContain("NARRATION");
-    expect(await screen.findByText("Đã copy!")).toBeInTheDocument();
+    rerender(<ScriptEditor value={VALID} onChange={onChange} contentLanguage="vi" />);
+    fireEvent.click(screen.getByTestId("script-editor-insert-hook"));
+    expect(onChange).toHaveBeenCalledWith(`${VALID}\n${HOOK_SNIPPETS.vi}`);
   });
 });

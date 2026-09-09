@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProjectDraftProvider } from "./context/ProjectDraftContext";
-import { NewProjectPage } from "./pages/NewProjectPage";
+import { ScriptStepPage } from "./pages/ScriptStepPage";
+import { SettingsStepPage } from "./pages/SettingsStepPage";
+import { ReviewStepPage } from "./pages/ReviewStepPage";
 import { RenderPage } from "./pages/RenderPage";
 import { ResultPage } from "./pages/ResultPage";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
@@ -11,7 +13,11 @@ export function App() {
     <ProjectDraftProvider>
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<NewProjectPage />} />
+          {/* The three creation steps, each its own URL so Back works. */}
+          <Route path="/" element={<ScriptStepPage />} />
+          <Route path="/create/settings" element={<SettingsStepPage />} />
+          <Route path="/create/review" element={<ReviewStepPage />} />
+
           <Route path="/projects/:id/render" element={<RenderPage />} />
           <Route path="/projects/:id/result" element={<ResultPage />} />
           <Route path="/oauth/youtube/callback" element={<OAuthCallbackPage />} />

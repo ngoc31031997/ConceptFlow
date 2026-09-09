@@ -1,5 +1,7 @@
 import type { SubtitleStyle } from "../context/ProjectDraftContext";
 import styles from "./SubtitleStylePanel.module.css";
+import { SelectableOption } from "./SelectableOption";
+import selectable from "../styles/selectable.module.css";
 
 interface SubtitleStyleFieldsProps {
   value: SubtitleStyle;
@@ -50,17 +52,16 @@ export function SubtitleStyleFields({ value, onChange }: SubtitleStyleFieldsProp
 
       <div className={styles.field}>
         <span className={styles.fieldLabel}>Cỡ chữ</span>
-        <div className={styles.segmented}>
+        <div className={selectable.row} role="radiogroup" aria-label="Cỡ chữ">
           {FONT_SIZES.map((option) => (
-            <button
+            <SelectableOption
               key={option.value}
-              type="button"
-              className={`${styles.segment} ${value.fontSize === option.value ? styles.active : ""}`}
-              aria-pressed={value.fontSize === option.value}
-              onClick={() => onChange({ fontSize: option.value })}
-            >
-              {option.label}
-            </button>
+              selected={value.fontSize === option.value}
+              onSelect={() => onChange({ fontSize: option.value })}
+              label={option.label}
+              inline
+              compact
+            />
           ))}
         </div>
       </div>
@@ -102,17 +103,16 @@ export function SubtitleStyleFields({ value, onChange }: SubtitleStyleFieldsProp
 
       <div className={styles.field} style={{ marginBottom: 0 }}>
         <span className={styles.fieldLabel}>Vị trí</span>
-        <div className={styles.segmented}>
+        <div className={selectable.row} role="radiogroup" aria-label="Vị trí">
           {POSITIONS.map((option) => (
-            <button
+            <SelectableOption
               key={option.value}
-              type="button"
-              className={`${styles.segment} ${value.position === option.value ? styles.active : ""}`}
-              aria-pressed={value.position === option.value}
-              onClick={() => onChange({ position: option.value })}
-            >
-              {option.label}
-            </button>
+              selected={value.position === option.value}
+              onSelect={() => onChange({ position: option.value })}
+              label={option.label}
+              inline
+              compact
+            />
           ))}
         </div>
       </div>

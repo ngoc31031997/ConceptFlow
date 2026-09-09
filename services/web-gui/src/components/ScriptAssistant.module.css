@@ -1,0 +1,107 @@
+.lead {
+  margin: 4px 0 14px;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.panel {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--surface-border);
+}
+
+.panelLead {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+
+.panelLead code {
+  font-size: 12px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(22, 34, 46, 0.07);
+}
+
+/* A numbered trail, so the round trip out to an AI and back reads as three
+   things to do rather than one button with no follow-up. */
+.step {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 18px;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+}
+
+.stepNum {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+
+.stepBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.stepLabel {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.stepHint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.sourceTextarea {
+  min-height: 110px;
+  font-size: 12.5px;
+}
+
+.copyRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.preview {
+  margin-top: 12px;
+}
+
+.previewSummary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.previewSummary:hover {
+  color: var(--accent);
+}
+
+.previewTextarea {
+  margin-top: 10px;
+  min-height: 150px;
+  max-height: 260px;
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  resize: none;
+}

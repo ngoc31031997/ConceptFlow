@@ -59,7 +59,7 @@ export function ResultPage() {
   return (
     <div data-testid="result-page">
       <AppShell
-        currentStep={3}
+        currentStep={5}
         wide
         title="Xem kết quả & đăng video"
         subtitle="Xem trước video, kết nối YouTube và điền thông tin để xuất bản."

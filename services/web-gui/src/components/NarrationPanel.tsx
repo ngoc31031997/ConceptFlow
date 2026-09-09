@@ -3,6 +3,7 @@ import { listVoices } from "../api/client";
 import type { Voice } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./NarrationPanel.module.css";
+import selectable from "../styles/selectable.module.css";
 import { SubtitleStyleFields } from "./SubtitleStylePanel";
 import type { SubtitleStyle } from "../context/ProjectDraftContext";
 
@@ -137,42 +138,52 @@ export function NarrationPanel({
       {ttsEnabled && (
         <div className={styles.nested}>
           <div className={styles.voiceList} data-testid="narration-voice-list">
-            {available.map((voice) => (
-              <div
-                key={voice.voice_id}
-                className={`${styles.voiceCard} ${voice.voice_id === voiceId ? styles.selected : ""}`}
-                role="radio"
-                aria-checked={voice.voice_id === voiceId}
-                tabIndex={0}
-                onClick={() => onVoiceIdChange(voice.voice_id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onVoiceIdChange(voice.voice_id);
-                  }
-                }}
-              >
-                <div className={styles.voiceInfo}>
-                  <div className={styles.voiceName}>{voice.label}</div>
-                  <div className={styles.voiceMeta}>
-                    {GENDER_LABEL[voice.gender] ?? voice.gender} · chất lượng {voice.quality}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className={styles.previewBtn}
-                  aria-label={`Nghe thử ${voice.label}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    playSample(voice);
+            {available.map((voice) => {
+              const isSelected = voice.voice_id === voiceId;
+              return (
+                <div
+                  key={voice.voice_id}
+                  className={`${selectable.option} ${isSelected ? selectable.selected : ""}`}
+                  role="radio"
+                  aria-checked={isSelected}
+                  tabIndex={0}
+                  onClick={() => onVoiceIdChange(voice.voice_id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onVoiceIdChange(voice.voice_id);
+                    }
                   }}
                 >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
-                </button>
-              </div>
-            ))}
+                  <span className={selectable.check} aria-hidden="true">
+                    {isSelected && (
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className={selectable.body}>
+                    <span className={selectable.label}>{voice.label}</span>
+                    <span className={selectable.hint}>
+                      {GENDER_LABEL[voice.gender] ?? voice.gender} · chất lượng {voice.quality}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.previewBtn}
+                    aria-label={`Nghe thử ${voice.label}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      playSample(voice);
+                    }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                </div>
+              );
+            })}
           </div>
 
           {voices === null && !loadError && <p className={styles.status}>Đang tải giọng đọc...</p>}

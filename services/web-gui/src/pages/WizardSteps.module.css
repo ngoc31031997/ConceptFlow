@@ -1,0 +1,77 @@
+/* Step 1: guidance on the left, the script itself on the right. */
+.scriptLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 400px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+/*
+  Not sticky: the assistant is taller than the viewport, and pinning it meant
+  its last step sat permanently under the navigation bar.
+*/
+.assistantColumn {
+  min-width: 0;
+}
+
+/* Step 2: settings in one readable column, not a sidebar. */
+.settingsLayout {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Step 3: the summary of everything about to be rendered. */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--surface-border);
+  border-radius: 18px;
+  overflow: hidden;
+}
+
+.summaryItem {
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.summaryLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.summaryValue {
+  margin-top: 5px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.summaryHint {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-faint);
+}
+
+.summaryActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .scriptLayout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,15 +1,15 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { NewProjectPage } from "../../src/pages/NewProjectPage";
+import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 
-describe("NewProjectPage", () => {
+describe("ScriptStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("disables submit until a script is entered", async () => {
+  it("blocks the step until the script is valid", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ connected: false }),
@@ -18,22 +18,22 @@ describe("NewProjectPage", () => {
     render(
       <MemoryRouter>
         <ProjectDraftProvider>
-          <NewProjectPage />
+          <ScriptStepPage />
         </ProjectDraftProvider>
       </MemoryRouter>,
     );
 
-    expect(screen.getByTestId("new-project-submit-button")).toBeDisabled();
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
 
     fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
       target: { value: 'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "hi"\n        self.wait(AUTO)' },
     });
 
-    expect(screen.getByTestId("new-project-submit-button")).not.toBeDisabled();
+    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
   });
 });
 
-describe("NewProjectPage draft lifecycle", () => {
+describe("ScriptStepPage draft lifecycle", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
@@ -55,12 +55,12 @@ describe("NewProjectPage draft lifecycle", () => {
     render(
       <MemoryRouter>
         <ProjectDraftProvider>
-          <NewProjectPage />
+          <ScriptStepPage />
         </ProjectDraftProvider>
       </MemoryRouter>,
     );
 
     expect(screen.getByTestId("new-project-script-textarea")).toHaveValue("");
-    expect(screen.getByTestId("new-project-submit-button")).toBeDisabled();
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 });

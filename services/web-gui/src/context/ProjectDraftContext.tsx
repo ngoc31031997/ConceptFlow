@@ -7,9 +7,13 @@ export interface SubtitleStyle {
   position: "bottom" | "top";
 }
 
+/** Which of the three script situations the Creator picked in step 1. */
+export type ScriptSource = "blank" | "draft" | "ready";
+
 export interface ProjectDraft {
   projectId: string;
   scriptContent: string;
+  scriptSource: ScriptSource;
   voiceLanguage: "vi" | "en";
   backgroundMusicPath: string | null;
   ttsEnabled: boolean;
@@ -35,6 +39,7 @@ export type RenderQuality = "720p30" | "1080p60" | "4k60";
 
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
+  | { type: "SET_SCRIPT_SOURCE"; payload: ScriptSource }
   | { type: "SET_VOICE_LANGUAGE"; payload: "vi" | "en" }
   | { type: "SET_BACKGROUND_MUSIC"; payload: string | null }
   | { type: "SET_TTS_ENABLED"; payload: boolean }
@@ -56,6 +61,7 @@ export const defaultSubtitleStyle: SubtitleStyle = {
 const initialDraft: ProjectDraft = {
   projectId: "",
   scriptContent: "",
+  scriptSource: "blank",
   voiceLanguage: "vi",
   backgroundMusicPath: null,
   ttsEnabled: true,
@@ -101,6 +107,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
   switch (action.type) {
     case "SET_SCRIPT":
       return { ...state, scriptContent: action.payload };
+    case "SET_SCRIPT_SOURCE":
+      return { ...state, scriptSource: action.payload };
     case "SET_VOICE_LANGUAGE":
       return { ...state, voiceLanguage: action.payload };
     case "SET_BACKGROUND_MUSIC":
