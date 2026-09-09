@@ -59,9 +59,12 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
     setSuggestError(null);
     try {
       const suggestion = await suggestPublishMetadata(projectId);
-      setTitle(suggestion.title.slice(0, TITLE_MAX_LENGTH));
-      setDescription(suggestion.description);
-      setTags(suggestion.tags.join(", "));
+      // Normalised rather than trusted: this is a model-generated payload
+      // crossing a service boundary, and a missing tags array used to throw
+      // "Cannot read properties of null" instead of showing an error.
+      setTitle((suggestion.title ?? "").slice(0, TITLE_MAX_LENGTH));
+      setDescription(suggestion.description ?? "");
+      setTags(Array.isArray(suggestion.tags) ? suggestion.tags.join(", ") : "");
     } catch (err) {
       setSuggestError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -78,6 +81,8 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    // A form submits on Enter too, where the button's disabled state is no guard.
+    if (isSubmitting) return;
     if (!isTitleValid) return;
     if (visibility === "private" && publishAt && !isPublishAtValid) return;
     onSubmit({
@@ -217,7 +222,7 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           className={glass.btnPrimary}
           disabled={!isTitleValid || isSubmitting || (visibility === "private" && !!publishAt && !isPublishAtValid)}
         >
-          Đăng lên YouTube
+          {isSubmitting ? "Đang gửi yêu cầu..." : "Đăng lên YouTube"}
         </button>
       </div>
     </form>

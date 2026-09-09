@@ -71,3 +71,85 @@ describe("ResultPage delete button", () => {
     );
   });
 });
+
+/*
+  The publish button used to re-enable as soon as POST /v1/sagas/publish
+  returned, even though the upload had only just been queued — so a second
+  click hit a 409 and the page showed nothing in between.
+*/
+describe("ResultPage publish state", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function mockProjectFetch(project: Record<string, unknown>, onPublish?: () => unknown) {
+    return vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/v1/auth/youtube/status")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false, accounts: [] }) });
+      }
+      if (url.includes("/v1/auth/youtube/accounts") || url.includes("/v1/auth/youtube/apps")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+      if (url.includes("/v1/sagas/publish") || url.includes("/retry")) {
+        onPublish?.();
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ saga_id: "s1", status: "publishing" }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ project_id: "p1", scenes: [], video_path: "/shared/p1/video/final.mp4", ...project }),
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  it("shows an in-progress card and hides the form while the project is publishing", async () => {
+    global.fetch = mockProjectFetch({ status: "publishing" });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByTestId("result-publishing-status")).toBeInTheDocument());
+    expect(screen.queryByTestId("publish-form-submit-button")).not.toBeInTheDocument();
+  });
+
+  it("sends only one publish request when the button is clicked twice in a row", async () => {
+    let publishCalls = 0;
+    global.fetch = mockProjectFetch({ status: "ready_to_publish" }, () => {
+      publishCalls += 1;
+    });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByTestId("publish-form-title-input")).toBeInTheDocument());
+    fireEvent.change(screen.getByTestId("publish-form-title-input"), { target: { value: "Video" } });
+    const button = screen.getByTestId("publish-form-submit-button");
+    fireEvent.click(button);
+    fireEvent.click(button);
+
+    await waitFor(() => expect(publishCalls).toBe(1));
+    expect(publishCalls).toBe(1);
+  });
+
+  it("offers a retry after a failed publish instead of the publish form", async () => {
+    let retried = false;
+    global.fetch = mockProjectFetch({ status: "failed_at_publish_video", error_message: "quota exceeded" }, () => {
+      retried = true;
+    });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByTestId("result-publish-failed")).toBeInTheDocument());
+    expect(screen.getByText(/quota exceeded/)).toBeInTheDocument();
+    expect(screen.queryByTestId("publish-form-submit-button")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("result-retry-publish-button"));
+    await waitFor(() => expect(retried).toBe(true));
+  });
+
+  it("shows the success card when the project reports published", async () => {
+    global.fetch = mockProjectFetch({ status: "published", youtube_video_url: "https://youtu.be/abc" });
+
+    renderResultPage();
+
+    await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
+  });
+});
