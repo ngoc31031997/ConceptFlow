@@ -120,7 +120,15 @@ def narrate(scene, text: str) -> None:
     index = _recorder.next_index()
 
     if _recorder.mode == MODE_DRY:
-        _recorder.write({"kind": "narration", "index": index, "text": cleaned})
+        _recorder.write({
+            "kind": "narration",
+            "index": index,
+            "text": cleaned,
+            # CR-024 FR68.5: cái gì đang trên màn hình lúc câu này được nói.
+            # Với một kênh đặt trọng tâm vào ví dụ trực quan, duyệt dàn ý mà chỉ
+            # đọc được lời thoại là duyệt đúng nửa ít quan trọng hơn.
+            "visual": _describe_stage(scene),
+        })
         return
 
     durations = _recorder.durations()
@@ -150,3 +158,28 @@ def chapter(scene, title: str) -> None:
         _recorder.write(
             {"kind": "chapter", "index": _recorder.upcoming_index, "title": cleaned}
         )
+
+
+def _describe_stage(scene) -> str:
+    """Tóm tắt khung hình hiện tại thành một chuỗi đọc được.
+
+    Đếm theo tên class chứ không mô tả nội dung: mô tả nội dung nghĩa là đoán
+    xem hình đang nói gì, và đoán sai còn tệ hơn không nói. "Text×2, Arrow" là
+    thứ kiểm chứng được và đủ để Creator nhận ra một beat chỉ toàn chữ.
+
+    Best-effort tuyệt đối: đây là dữ liệu cho màn duyệt, không phải sản phẩm,
+    nên mọi lỗi ở đây phải im lặng thay vì làm hỏng lượt dry.
+    """
+    try:
+        counts: dict[str, int] = {}
+        for mobject in getattr(scene, "mobjects", []):
+            name = type(mobject).__name__
+            counts[name] = counts.get(name, 0) + 1
+        if not counts:
+            return "khung trống"
+        return ", ".join(
+            name if count == 1 else f"{name}×{count}"
+            for name, count in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+        )
+    except Exception:  # noqa: BLE001 — xem docstring
+        return ""

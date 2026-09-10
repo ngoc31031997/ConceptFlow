@@ -38,6 +38,12 @@ export interface Voice {
 
 export interface Scene {
   scene_index: number;
+  narration_text: string;
+  /** CR-024 FR68.5 — khung hình lúc câu này được nói, dạng "Text×2, Arrow". */
+  visual?: string;
+  duration_seconds?: number;
+  audio_path?: string;
+  /** Các trường khác của scene vẫn đi qua nguyên trạng. */
   [key: string]: unknown;
 }
 
@@ -59,6 +65,16 @@ export interface Project {
    * would otherwise be invisible (the video itself published fine).
    */
   caption_status?: string;
+  /** CR-024 — dữ liệu dựng màn duyệt dàn ý; chỉ có mặt khi cổng duyệt bật. */
+  review_enabled?: boolean;
+  beats?: BeatOccurrence[];
+  validation_warnings?: string[];
+}
+
+/** Một beat lượt dry quan sát được, gắn vào câu lời thoại mở đầu nó. */
+export interface BeatOccurrence {
+  scene_index: number;
+  id: string;
 }
 
 export interface ProgressMessage {

@@ -171,3 +171,29 @@ def test_hook_recap_cta_tu_mang_beat_va_loi_thoai(dry):
     narrations = [r["text"] for r in records if r["kind"] == "narration"]
     assert len(narrations) == 3
     assert narrations[0].startswith("Vì sao")
+
+
+def test_ghi_lai_khung_hinh_tai_moi_loi_thoai(dry):
+    """CR-024 FR68.5: duyệt dàn ý mà chỉ đọc lời thoại là duyệt nửa ít quan
+    trọng hơn, với một kênh đặt trọng tâm vào ví dụ trực quan."""
+    from manim import Square, Text
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.add(Text("a"), Text("b"), Square())
+            self.narrate("có hình")
+
+    record = next(r for r in dry(S) if r["kind"] == "narration")
+    assert "Text×2" in record["visual"]
+    assert "Square" in record["visual"]
+
+
+def test_khung_trong_duoc_noi_ro(dry):
+    """Một beat không có gì trên màn hình là thứ Creator cần thấy ngay."""
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.narrate("chỉ có tiếng, không có hình")
+
+    record = next(r for r in dry(S) if r["kind"] == "narration")
+    assert record["visual"] == "khung trống"

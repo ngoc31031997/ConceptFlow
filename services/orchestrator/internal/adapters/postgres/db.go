@@ -94,6 +94,12 @@ CREATE TABLE IF NOT EXISTS video_formats (
 -- Format Creator chọn cho project, và phiên bản format tại thời điểm chạy.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_version INTEGER NOT NULL DEFAULT 0;
+
+-- CR-024: cổng duyệt dàn ý. review_enabled mặc định TRUE — project tạo trước
+-- khi cột này tồn tại cũng đi qua cổng, vì đó là hành vi CR muốn.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS beats JSONB;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS validation_warnings JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
 -- CR-002: where each narration segment actually begins in the rendered video,
 -- as measured by Rendering. Projects rendered before this column existed have

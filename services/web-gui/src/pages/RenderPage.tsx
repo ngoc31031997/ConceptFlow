@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
+import { OutlineReview } from "../components/OutlineReview";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
@@ -19,9 +20,14 @@ export function RenderPage() {
   const projectId = id ?? "";
   const navigate = useNavigate();
   const progressState = useSSE(projectId);
-  const { project } = useProject(projectId);
+  const { project, refetch } = useProject(projectId);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
+
+  // CR-024: Saga đang dừng chờ người, không phải đang chạy. Phân biệt hai thứ
+  // này là cả điểm của FR69.5 — nếu không Creator sẽ ngồi đợi một tiến trình
+  // đã dừng từ lâu.
+  const isAwaitingReview = project?.status === "awaiting_review";
 
   const isFailed =
     progressState.status === "failed" || Boolean(project?.status.startsWith("failed_at_"));
@@ -76,6 +82,10 @@ export function RenderPage() {
             onBack={isInputError ? () => navigate("/") : undefined}
           />
         )}
+        {isAwaitingReview && project && (
+          <OutlineReview project={project} onDecided={refetch} />
+        )}
+
         <ProgressTracker
           progressState={failedStep ? { ...progressState, currentStep: failedStep } : progressState}
           isFailed={isFailed}

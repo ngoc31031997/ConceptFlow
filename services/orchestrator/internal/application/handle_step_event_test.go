@@ -710,3 +710,72 @@ func TestHandleStepEventUseCase_ScriptValidated_DerivesChaptersFromBeats(t *test
 		t.Error("phải chốt phiên bản format")
 	}
 }
+
+func TestHandleStepEventUseCase_ScriptValidated_StopsAtTheReviewGate(t *testing.T) {
+	// CR-024 FR69.1: điểm dừng đặt đúng ranh giới giữa phần rẻ và phần đắt —
+	// lượt dry vừa xong nên đã đủ dữ liệu dựng dàn ý, mà TTS thì chưa chạy.
+	uc, repo, pub, prog := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", SagaID: "saga-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ReviewEnabled: true,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": "n0", "visual": "Text×2"},
+			},
+			"warnings": []interface{}{"dùng API thô của Manim"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusAwaitingReview {
+		t.Fatalf("muốn awaiting_review, có %s", project.Status)
+	}
+	if last := pub.last(); last != nil && last.routingKey == "tts" {
+		t.Fatal("không được gọi TTS trước khi Creator duyệt")
+	}
+	// FR69.5: giao diện phải phân biệt "đang chờ bạn" với "đang xử lý".
+	if got := prog.last(); got == nil || got.Status != "awaiting_review" {
+		t.Fatalf("muốn progress awaiting_review, có %+v", got)
+	}
+	// FR68.3/68.5: cảnh báo và mô tả khung hình đi kèm dàn ý.
+	// Hai cảnh báo: một từ lint của Rendering, một vì script chưa khai báo beat
+	// nào — cả hai phải tới được màn duyệt, vì cảnh báo không ai thấy thì bằng
+	// không có cảnh báo.
+	if len(project.ValidationWarnings) != 2 {
+		t.Errorf("phải giữ đủ cảnh báo: %+v", project.ValidationWarnings)
+	}
+	if project.Scenes[0].Visual != "Text×2" {
+		t.Errorf("phải giữ mô tả khung hình: %q", project.Scenes[0].Visual)
+	}
+}
+
+func TestHandleStepEventUseCase_ScriptValidated_SkipsTheGateWhenDisabled(t *testing.T) {
+	// FR69.7: một cổng không bỏ qua được sẽ biến thành thao tác bấm cho xong.
+	uc, repo, pub, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", SagaID: "saga-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ReviewEnabled: false,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	if err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{map[string]interface{}{"scene_index": float64(0), "narration_text": "n0"}},
+		},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if last := pub.last(); last == nil || last.routingKey != "tts" {
+		t.Fatalf("tắt cổng thì phải chạy thẳng sang TTS, có %+v", last)
+	}
+}

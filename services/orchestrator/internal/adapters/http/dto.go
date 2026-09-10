@@ -30,6 +30,7 @@ type startRenderSagaRequest struct {
 	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality         string                `json:"render_quality,omitempty"`
 	VideoFormatID         string                `json:"video_format_id,omitempty"`
+	ReviewEnabled         *bool                 `json:"review_enabled,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
 }
 
@@ -75,22 +76,25 @@ type sceneResponse struct {
 // projectResponse is the GET /v1/projects/{project_id} response
 // (interface-contracts.md).
 type projectResponse struct {
-	ProjectID        string                `json:"project_id"`
-	Status           string                `json:"status"`
-	VideoPath        *string               `json:"video_path,omitempty"`
-	Scenes           []sceneResponse       `json:"scenes"`
-	PluginID         string                `json:"plugin_id"`
-	CategoryHint     string                `json:"category_hint"`
-	ContentLanguage  string                `json:"voice_language"`
-	TTSEnabled       bool                  `json:"tts_enabled"`
-	VoiceID          string                `json:"voice_id,omitempty"`
-	SubtitlesEnabled bool                  `json:"subtitles_enabled"`
-	SubtitleMode     string                `json:"subtitle_mode"`
-	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
-	RenderQuality    string                `json:"render_quality"`
-	VideoFormatID    string                `json:"video_format_id"`
-	VideoFormatVer   int                   `json:"video_format_version"`
-	YoutubeVideoURL  *string               `json:"youtube_video_url,omitempty"`
+	ProjectID        string                  `json:"project_id"`
+	Status           string                  `json:"status"`
+	VideoPath        *string                 `json:"video_path,omitempty"`
+	Scenes           []sceneResponse         `json:"scenes"`
+	PluginID         string                  `json:"plugin_id"`
+	CategoryHint     string                  `json:"category_hint"`
+	ContentLanguage  string                  `json:"voice_language"`
+	TTSEnabled       bool                    `json:"tts_enabled"`
+	VoiceID          string                  `json:"voice_id,omitempty"`
+	SubtitlesEnabled bool                    `json:"subtitles_enabled"`
+	SubtitleMode     string                  `json:"subtitle_mode"`
+	SubtitleStyle    *domain.SubtitleStyle   `json:"subtitle_style,omitempty"`
+	RenderQuality    string                  `json:"render_quality"`
+	VideoFormatID    string                  `json:"video_format_id"`
+	ReviewEnabled    bool                    `json:"review_enabled"`
+	Beats            []domain.BeatOccurrence `json:"beats"`
+	Warnings         []string                `json:"validation_warnings"`
+	VideoFormatVer   int                     `json:"video_format_version"`
+	YoutubeVideoURL  *string                 `json:"youtube_video_url,omitempty"`
 	// CR-015 FR39.4 — absent when no caption was requested, otherwise
 	// "uploaded" | "skipped_no_scope" | "failed".
 	CaptionStatus *string `json:"caption_status,omitempty"`
@@ -169,6 +173,9 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		SubtitleStyle:    p.SubtitleStyle,
 		RenderQuality:    string(p.RenderQuality),
 		VideoFormatID:    p.VideoFormatID,
+		ReviewEnabled:    p.ReviewEnabled,
+		Beats:            p.Beats,
+		Warnings:         p.ValidationWarnings,
 		VideoFormatVer:   p.VideoFormatVersion,
 		YoutubeVideoURL:  p.YoutubeVideoURL,
 		CaptionStatus:    p.CaptionStatus,

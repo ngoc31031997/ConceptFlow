@@ -58,6 +58,9 @@ class DryRunResult:
     """
 
     narrations: list[str]
+    #: CR-024 FR68.5 — mô tả ngắn khung hình tại mỗi lời thoại, cùng thứ tự với
+    #: `narrations`. Dùng cho màn duyệt dàn ý, không ảnh hưởng gì tới render.
+    visuals: list[str] = field(default_factory=list)
     beats: list[tuple[int, str]] = field(default_factory=list)
     chapters: list[tuple[int, str]] = field(default_factory=list)
 

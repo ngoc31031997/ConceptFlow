@@ -25,6 +25,12 @@ type startPublishSagaUseCase interface {
 	Execute(ctx context.Context, input application.StartPublishSagaInput) (*application.StartPublishSagaOutput, error)
 }
 
+type reviewOutlineUseCase interface {
+	Approve(ctx context.Context, projectID string) error
+	Reject(ctx context.Context, projectID string) error
+	EditNarration(ctx context.Context, projectID string, sceneIndex int, newText string) error
+}
+
 type retryStepUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.RetryStepOutput, error)
 }
@@ -50,13 +56,14 @@ type Router struct {
 	startRenderSaga        startRenderSagaUseCase
 	startPublishSaga       startPublishSagaUseCase
 	retryStep              retryStepUseCase
+	reviewOutline          reviewOutlineUseCase
 	projects               projectStore
 	suggestPublishMetadata suggestPublishMetadataUseCase
 }
 
 // NewRouter constructs the Router with its dependencies (module-structure.md).
-func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, suggestPublishMetadata suggestPublishMetadataUseCase) *Router {
-	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, suggestPublishMetadata: suggestPublishMetadata}
+func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, suggestPublishMetadata suggestPublishMetadataUseCase, reviewOutline reviewOutlineUseCase) *Router {
+	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, suggestPublishMetadata: suggestPublishMetadata, reviewOutline: reviewOutline}
 }
 
 // Handler builds the chi.Router with all routes (health + REST endpoints).
@@ -71,6 +78,9 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/formats", rt.handleSaveFormat)
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
+	r.Post("/v1/projects/{project_id}/approve", rt.handleApproveOutline)
+	r.Post("/v1/projects/{project_id}/reject", rt.handleRejectOutline)
+	r.Post("/v1/projects/{project_id}/narration", rt.handleEditNarration)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	return r
@@ -107,6 +117,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		ScriptContent:         req.ScriptContent,
 		PluginID:              req.PluginID,
 		VideoFormatID:         req.VideoFormatID,
+		ReviewEnabled:         req.ReviewEnabled,
 		CategoryHint:          req.CategoryHint,
 		ContentLanguage:       lang,
 		BackgroundMusicPath:   req.BackgroundMusicPath,
@@ -307,4 +318,68 @@ func (rt *Router) handleSaveFormat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusCreated, saved)
+}
+
+// handleApproveOutline releases a saga waiting at the review gate (CR-024 FR69.2).
+func (rt *Router) handleApproveOutline(w http.ResponseWriter, r *http.Request) {
+	rt.handleReviewDecision(w, r, rt.reviewOutline.Approve)
+}
+
+// handleRejectOutline ends the saga so the Creator can go and edit (FR69.3).
+func (rt *Router) handleRejectOutline(w http.ResponseWriter, r *http.Request) {
+	rt.handleReviewDecision(w, r, rt.reviewOutline.Reject)
+}
+
+func (rt *Router) handleReviewDecision(w http.ResponseWriter, r *http.Request, decide func(context.Context, string) error) {
+	projectID := chi.URLParam(r, "project_id")
+	if rt.reviewOutline == nil {
+		writeError(w, http.StatusNotFound, "review gate is not enabled")
+		return
+	}
+
+	switch err := decide(r.Context(), projectID); {
+	case err == nil:
+		writeJSON(w, http.StatusOK, map[string]string{"project_id": projectID})
+	case errors.Is(err, application.ErrNotAwaitingReview):
+		// 409 rather than 400: nothing about the request is malformed, the
+		// project has simply moved on. Approving twice lands here, which is
+		// what makes the second press harmless (FR69.4).
+		writeError(w, http.StatusConflict, "project is not awaiting review")
+	default:
+		writeError(w, http.StatusInternalServerError, "could not record the decision")
+	}
+}
+
+// handleEditNarration rewrites one narration line while the project waits at
+// the review gate (CR-024 FR70).
+func (rt *Router) handleEditNarration(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	if rt.reviewOutline == nil {
+		writeError(w, http.StatusNotFound, "review gate is not enabled")
+		return
+	}
+
+	var req struct {
+		SceneIndex int    `json:"scene_index"`
+		Text       string `json:"narration_text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	switch err := rt.reviewOutline.EditNarration(r.Context(), projectID, req.SceneIndex, req.Text); {
+	case err == nil:
+		writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
+	case errors.Is(err, application.ErrNotAwaitingReview):
+		writeError(w, http.StatusConflict, "project is not awaiting review")
+	case errors.Is(err, domain.ErrNarrationNotEditable):
+		// 422 rather than 400: the request is well formed, but this particular
+		// line cannot be traced back to one place in the source — a loop or an
+		// f-string produced it. The message says which, so the GUI can explain
+		// instead of just refusing.
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
+	default:
+		writeError(w, http.StatusInternalServerError, "could not edit the narration")
+	}
 }

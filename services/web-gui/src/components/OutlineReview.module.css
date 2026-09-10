@@ -1,0 +1,85 @@
+.lines {
+  margin: 1rem 0 0;
+  padding-left: 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.line {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+/* Nhãn beat đứng riêng bên trái để đọc lướt thấy ngay cấu trúc video. */
+.beat {
+  flex: 0 0 5.5rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.6;
+  padding-top: 0.2rem;
+}
+
+.lineBody {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.text {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: text;
+  line-height: 1.5;
+}
+
+.text:hover {
+  text-decoration: underline dotted;
+}
+
+.meta {
+  font-size: 0.76rem;
+  opacity: 0.62;
+  margin-top: 0.15rem;
+}
+
+.editor {
+  width: 100%;
+  min-height: 4.5rem;
+  font: inherit;
+  padding: 0.5rem;
+  border-radius: 8px;
+}
+
+.editActions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.warnings {
+  margin: 0.8rem 0 0;
+  padding-left: 1.2rem;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.error {
+  margin-top: 0.8rem;
+  font-size: 0.86rem;
+  color: #f38ba8;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+}

@@ -17,6 +17,47 @@ export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, th
 
 export class ApiError extends Error {}
 
+/** Duyệt dàn ý, cho Saga chạy tiếp (CR-024 FR69.2). */
+export async function approveOutline(projectId: string): Promise<void> {
+  await postDecision(`${GATEWAY_URL}/v1/projects/${projectId}/approve`);
+}
+
+/** Từ chối dàn ý — Saga kết thúc để Creator quay lại sửa script (FR69.3). */
+export async function rejectOutline(projectId: string): Promise<void> {
+  await postDecision(`${GATEWAY_URL}/v1/projects/${projectId}/reject`);
+}
+
+/**
+ * Sửa một câu lời thoại ngay tại màn duyệt (FR70).
+ *
+ * Server có thể từ chối với 422 khi câu này không truy ngược được về đúng một
+ * chỗ trong script — lời thoại sinh trong vòng lặp hoặc bằng f-string. Thông
+ * báo kèm theo nói rõ lý do, nên hiển thị nguyên văn thay vì nuốt đi.
+ */
+export async function editNarration(
+  projectId: string,
+  sceneIndex: number,
+  narrationText: string,
+): Promise<void> {
+  const response = await fetch(`${GATEWAY_URL}/v1/projects/${projectId}/narration`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scene_index: sceneIndex, narration_text: narrationText }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.error ?? "Không sửa được lời thoại");
+  }
+}
+
+async function postDecision(url: string): Promise<void> {
+  const response = await fetch(url, { method: "POST" });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new ApiError(body?.error ?? GENERIC_CONNECTION_ERROR);
+  }
+}
+
 /** Các hình dạng video Creator chọn được (CR-019 FR51.3). */
 export async function fetchVideoFormats(): Promise<VideoFormat[]> {
   const response = await fetch(`${GATEWAY_URL}/v1/formats`);

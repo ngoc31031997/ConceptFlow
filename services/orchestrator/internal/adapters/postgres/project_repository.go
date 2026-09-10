@@ -25,7 +25,7 @@ func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 // Get loads a Project by project_id, or domain.ErrProjectNotFound.
 func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version,
+		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
@@ -43,8 +43,10 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		renderQuality         string
 		chaptersJSON          []byte
 		subtitleMode          string
+		beatsJSON             []byte
+		warningsJSON          []byte
 	)
-	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion,
+	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion, &p.ReviewEnabled, &beatsJSON, &warningsJSON,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeChannelID, &p.YoutubeVideoURL, &p.ErrorMessage,
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
@@ -74,6 +76,16 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	}
 	if len(chaptersJSON) > 0 {
 		if err := json.Unmarshal(chaptersJSON, &p.Chapters); err != nil {
+			return nil, err
+		}
+	}
+	if len(beatsJSON) > 0 {
+		if err := json.Unmarshal(beatsJSON, &p.Beats); err != nil {
+			return nil, err
+		}
+	}
+	if len(warningsJSON) > 0 {
+		if err := json.Unmarshal(warningsJSON, &p.ValidationWarnings); err != nil {
 			return nil, err
 		}
 	}
@@ -160,9 +172,25 @@ func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error 
 
 // Save upserts a Project (CRUD — module-structure.md).
 func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) error {
+	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý (CR-024), nên NULL khi rỗng
+	// thay vì một mảng JSON rỗng — dễ đọc hơn khi soi database.
 	scenesJSON, err := json.Marshal(project.Scenes)
 	if err != nil {
 		return err
+	}
+
+	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý (CR-024), nên để NULL khi rỗng
+	// thay vì một mảng JSON rỗng — dễ đọc hơn khi soi database.
+	var beatsJSON, warningsJSON []byte
+	if len(project.Beats) > 0 {
+		if beatsJSON, err = json.Marshal(project.Beats); err != nil {
+			return err
+		}
+	}
+	if len(project.ValidationWarnings) > 0 {
+		if warningsJSON, err = json.Marshal(project.ValidationWarnings); err != nil {
+			return err
+		}
 	}
 	tagsJSON, err := json.Marshal(project.YoutubeTags)
 	if err != nil {
@@ -195,17 +223,19 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	}
 
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version,
+		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		                       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35, now())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
 		    plugin_id = EXCLUDED.plugin_id, category_hint = EXCLUDED.category_hint, voice_language = EXCLUDED.voice_language,
 		    video_format_id = EXCLUDED.video_format_id, video_format_version = EXCLUDED.video_format_version,
+		    review_enabled = EXCLUDED.review_enabled, beats = EXCLUDED.beats,
+		    validation_warnings = EXCLUDED.validation_warnings,
 		    background_music_path = EXCLUDED.background_music_path, scenes = EXCLUDED.scenes,
 		    rendered_video_path = EXCLUDED.rendered_video_path,
 		    video_path = EXCLUDED.video_path, youtube_title = EXCLUDED.youtube_title,
@@ -227,7 +257,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
 		project.CategoryHint, string(project.ContentLanguage),
-		project.VideoFormatID, project.VideoFormatVersion,
+		project.VideoFormatID, project.VideoFormatVersion, project.ReviewEnabled, beatsJSON, warningsJSON,
 		project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility, project.YoutubePublishAt,
 		project.YoutubeThumbnailPath, project.YoutubeChannelID, project.YoutubeVideoURL, project.ErrorMessage,

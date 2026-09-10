@@ -23,6 +23,11 @@ type StartRenderSagaInput struct {
 
 	// CR-019 — empty means DefaultVideoFormatID.
 	VideoFormatID string
+
+	// CR-024 FR69.7 — nil means "on". A pointer rather than a bool because the
+	// zero value of a bool is false, and defaulting this to off would silently
+	// remove the gate for every caller that does not know about it yet.
+	ReviewEnabled *bool
 	// SubtitlesEnabled is the pre-CR-015 shape, still accepted from a caller
 	// that has not adopted SubtitleMode; SubtitleMode wins when both are
 	// sent (a client migrating one field at a time should not regress).
@@ -88,6 +93,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		TTSEnabled:          input.TTSEnabled,
 		VoiceID:             input.VoiceID,
 		VideoFormatID:       formatOrDefault(input.VideoFormatID),
+		ReviewEnabled:       input.ReviewEnabled == nil || *input.ReviewEnabled,
 		// Kept in lockstep with SubtitleMode rather than taken verbatim from
 		// input, so anything still reading the legacy field (an older
 		// client of GET /v1/projects/{id}) sees a value consistent with

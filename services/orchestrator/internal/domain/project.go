@@ -13,9 +13,13 @@ import "time"
 type ProjectStatus string
 
 const (
-	StatusDraft                  ProjectStatus = "draft"
-	StatusParsingScript          ProjectStatus = "parsing_script"
-	StatusValidatingScript       ProjectStatus = "validating_script"
+	StatusDraft            ProjectStatus = "draft"
+	StatusParsingScript    ProjectStatus = "parsing_script"
+	StatusValidatingScript ProjectStatus = "validating_script"
+	// CR-024: Saga dừng lại chờ Creator duyệt dàn ý. Đây là đường đi bình
+	// thường, KHÔNG phải một trạng thái lỗi — nó cố ý không nằm trong nhóm
+	// failed_at_* (FR69.1).
+	StatusAwaitingReview         ProjectStatus = "awaiting_review"
 	StatusSynthesizingSpeech     ProjectStatus = "synthesizing_speech"
 	StatusRendering              ProjectStatus = "rendering"
 	StatusAssemblingVideo        ProjectStatus = "assembling_video"
@@ -135,8 +139,11 @@ const (
 // step 3 (the single source of truth for AudioPath — business-rules.md Rule
 // 2), ClipPath at step 4.
 type Scene struct {
-	SceneIndex          int     `json:"scene_index"`
-	NarrationText       string  `json:"narration_text"`
+	SceneIndex    int    `json:"scene_index"`
+	NarrationText string `json:"narration_text"`
+	// CR-024 FR68.5: khung hình lúc câu này được nói, dạng "Text×2, Arrow".
+	// Chỉ dùng cho màn duyệt dàn ý; không ảnh hưởng gì tới render.
+	Visual              string  `json:"visual,omitempty"`
 	IllustrationHint    string  `json:"illustration_hint"`
 	CodeSnippet         *string `json:"code_snippet,omitempty"`
 	CodeLanguage        *string `json:"code_language,omitempty"`
@@ -177,6 +184,16 @@ type Project struct {
 	// chapter của video cũ (FR51.6).
 	VideoFormatID      string
 	VideoFormatVersion int
+
+	// CR-024: các beat lượt dry quan sát được, và cảnh báo từ bước validate.
+	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý.
+	Beats              []BeatOccurrence
+	ValidationWarnings []string
+
+	// ReviewEnabled bật cổng duyệt dàn ý (FR69.7). Mặc định bật; tắt được cho
+	// những lần chạy mà Creator đã biết rõ mình muốn gì — một cổng không bỏ qua
+	// được sẽ biến thành thao tác bấm cho xong và mất hết giá trị.
+	ReviewEnabled bool
 	// SubtitlesEnabled is kept for wire/schema backward compatibility (a
 	// caller that never adopts subtitle_mode) but SubtitleMode is the
 	// source of truth from CR-015 on — see project_repository.go's Get for

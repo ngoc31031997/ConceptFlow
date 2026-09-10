@@ -62,6 +62,7 @@ def script_validated_envelope(
     saga_id: str,
     project_id: str,
     narrations: list[str],
+    visuals: list[str],
     beats: list[tuple[int, str]],
     chapters: list[tuple[int, str]],
     warnings: list[str],
@@ -82,6 +83,8 @@ def script_validated_envelope(
                 {
                     "scene_index": index,
                     "narration_text": text,
+                    # CR-024 FR68.5 — cái gì trên khung hình lúc câu này được nói.
+                    "visual": visuals[index] if index < len(visuals) else "",
                     "illustration_hint": None,
                     "code_snippet": None,
                     "code_language": None,

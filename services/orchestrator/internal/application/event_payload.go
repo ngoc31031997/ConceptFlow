@@ -51,6 +51,7 @@ func parseInitialScenes(payload map[string]interface{}) []domain.Scene {
 		scene := domain.Scene{
 			SceneIndex:       intFromMap(m, "scene_index"),
 			NarrationText:    stringFromMap(m, "narration_text"),
+			Visual:           stringFromMap(m, "visual"),
 			IllustrationHint: stringFromMap(m, "illustration_hint"),
 		}
 		if v, ok := m["code_snippet"].(string); ok {
@@ -257,4 +258,31 @@ func chaptersFromBeats(beats []domain.BeatOccurrence) []domain.Chapter {
 		chapters = append(chapters, domain.Chapter{SceneIndex: beat.SceneIndex, Title: beat.ID})
 	}
 	return chapters
+}
+
+// warningsFromPayload reads the non-blocking lint messages Rendering reported
+// (CR-020 FR56.3). They ride along to the review screen rather than only to a
+// log, because a warning nobody sees is the same as no warning.
+func warningsFromPayload(payload map[string]interface{}) []string {
+	raw, ok := payload["warnings"].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if message, ok := item.(string); ok && message != "" {
+			out = append(out, message)
+		}
+	}
+	return out
+}
+
+func beatIssueMessages(issues []domain.BeatIssue) []string {
+	out := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		if !issue.Blocking {
+			out = append(out, issue.Message)
+		}
+	}
+	return out
 }

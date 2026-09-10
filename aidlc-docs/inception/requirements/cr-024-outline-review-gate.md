@@ -137,6 +137,36 @@ ra, cùng cảnh báo từ validate.
    hành vi sai.
 4. **Dàn ý phải chi tiết**, gồm cả mô tả hình ảnh từng beat (FR68.5).
 
+## Điều chỉnh khi triển khai (2026-09-10)
+
+**FR70.2 (ghi ngược lời thoại vào script) từ chối khi câu đó không truy được về
+đúng một chỗ trong mã nguồn.**
+
+CR giả định mỗi dòng dàn ý ứng với một literal trong script. Không phải lúc nào
+cũng vậy, và chính CR-018 là lý do: lời thoại giờ được phép nằm trong vòng lặp
+và trong hàm, nên **một literal có thể sinh ra ba dòng dàn ý**, còn lời thoại
+dựng bằng f-string thì không xuất hiện nguyên văn ở đâu trong mã nguồn cả.
+
+Cách xử lý: chỉ ghi ngược khi câu cũ xuất hiện **đúng một lần** trong script.
+Không thì trả 422 kèm lý do cụ thể, và GUI hiện nguyên văn lý do đó. Đoán xem
+Creator muốn sửa lần xuất hiện nào rồi ghi nhầm chỗ là làm hỏng script của họ —
+không sửa được tại chỗ chỉ là bất tiện nhỏ.
+
+Chuỗi thay thế cũng bị từ chối nếu chứa dấu nháy, xuống dòng hay dấu chéo ngược:
+nó được ghép thẳng vào một string literal Python, nên những ký tự đó sẽ đóng
+literal sớm và làm script không còn parse được.
+
+**Điểm dừng dùng sentinel `errAwaitingReview`.** `handleSuccess` phát một
+progress "completed" sau mỗi bước thành công, và nó ghi đè lên "awaiting_review"
+vừa phát. Dùng lại đúng cơ chế sentinel mà `errAggregationFailed` đã có sẵn
+trong cùng file, thay vì thêm một nhánh điều kiện thứ hai.
+
+**FR68.5 lấy dữ liệu từ lượt dry, không chờ CR-021.** CR ghi rằng mô tả hình ảnh
+lấy từ dữ liệu bố cục của CR-021 FR58. Thực tế lượt dry đã chạy scene rồi, nên
+đếm tên class của các mobject đang hiển thị là đủ cho màn duyệt (`Text×2, Arrow`)
+và không phải chờ CR-021. Đếm tên class chứ không mô tả nội dung: mô tả nội dung
+nghĩa là đoán hình đang nói gì, và đoán sai còn tệ hơn không nói.
+
 ## Câu hỏi cần Creator chốt
 1. Cổng duyệt nên **mặc định bật** cho mọi project, hay là một lựa chọn khi tạo
    project?

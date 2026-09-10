@@ -97,7 +97,10 @@ func main() {
 	go relay.Run(ctx)
 
 	// 9. Construct chi router, wire the 4 REST handlers to their use cases.
-	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata)
+	// CR-024: cổng duyệt dàn ý dùng lại đúng nhánh chọn TTS mà handleStepEvent
+	// đã sở hữu, thay vì dựng một bản thứ hai của cùng quyết định.
+	reviewOutline := application.NewReviewOutlineUseCase(projectRepo, handleStepEvent, realPublisher, outboxRepo, logger)
+	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

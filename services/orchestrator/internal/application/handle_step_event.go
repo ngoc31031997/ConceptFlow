@@ -167,6 +167,9 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 	case domain.StepPublishVideo:
 		nextErr = uc.onVideoPublished(ctx, event, project)
 	}
+	if nextErr == errAwaitingReview {
+		return nil
+	}
 	if nextErr == errAggregationFailed {
 		// Rule 1 mismatch already transitioned the project to
 		// failed_at_render_scenes and published its own "failed" progress
@@ -191,6 +194,13 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 // intercepts it to skip the "completed" progress message for
 // synthesize_speech (a "failed" one for render_scenes was already sent).
 var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
+
+// errAwaitingReview is the same trick for CR-024's pause: validate_script did
+// finish, but the saga is now parked at the review gate, so the trailing
+// "completed" progress message must not overwrite the "awaiting_review" one
+// the handler already sent. Reporting the step completed here would tell the
+// GUI the pipeline is moving when it is waiting for a human.
+var errAwaitingReview = fmt.Errorf("saga is parked awaiting review")
 
 // onScriptParsed dispatches the validation pass (CR-020 FR56.1).
 //
@@ -252,8 +262,40 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	// FR52.3/FR52.5: thiếu beat bắt buộc là dữ kiện chắc chắn nên chặn được;
 	// mọi thứ còn lại (beat lạ, lặp quá, sai thứ tự) chỉ cảnh báo, vì chặn
 	// render vì một con số mềm sẽ dạy Creator bỏ qua cả cơ chế.
-	if issues := format.ValidateBeats(beats); len(domain.BlockingBeatIssues(issues)) > 0 {
+	issues := format.ValidateBeats(beats)
+	if len(domain.BlockingBeatIssues(issues)) > 0 {
 		return uc.failValidationForBeats(ctx, event, domain.BlockingBeatIssues(issues))
+	}
+
+	// Mọi thứ còn lại đi kèm dàn ý để Creator duyệt cùng một lúc (CR-024 FR68.3):
+	// duyệt nội dung và duyệt cảnh báo tách làm hai lần nhìn thì lần thứ hai sẽ
+	// bị bỏ qua.
+	project.Beats = beats
+	project.ValidationWarnings = append(
+		warningsFromPayload(event.Payload), beatIssueMessages(issues)...,
+	)
+	if err := uc.repo.Save(ctx, project); err != nil {
+		return err
+	}
+
+	// CR-024 FR69.1 — điểm dừng, đặt ở đúng ranh giới giữa phần rẻ và phần đắt:
+	// lượt dry vừa xong nên đã có đủ dữ liệu để dựng dàn ý, mà TTS thì chưa chạy
+	// nên chưa tốn gì.
+	if project.ReviewEnabled {
+		if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusAwaitingReview); err != nil {
+			return err
+		}
+		if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
+			ProjectID: event.ProjectID,
+			Step:      string(domain.StepValidateScript),
+			// "awaiting_review" chứ không phải "completed": một Saga đang dừng
+			// mà giao diện trông như đang chạy là cách chắc chắn để Creator ngồi
+			// đợi vô ích (FR69.5).
+			Status: "awaiting_review",
+		}); err != nil {
+			return err
+		}
+		return errAwaitingReview
 	}
 
 	if !project.TTSEnabled {
@@ -289,6 +331,20 @@ func (uc *HandleStepEventUseCase) failValidationForBeats(ctx context.Context, ev
 		return err
 	}
 	return errAggregationFailed
+}
+
+// ResumeAfterReview restarts the saga once the Creator has approved the outline
+// (CR-024 FR69.2).
+//
+// Exported because the approve use case needs exactly the branch this type
+// already owns — with narration on, dispatch to TTS; with it off, estimate the
+// durations and go straight to rendering. Duplicating that choice in a second
+// place is how the two quietly stop agreeing.
+func (uc *HandleStepEventUseCase) ResumeAfterReview(ctx context.Context, project *domain.Project) error {
+	if !project.TTSEnabled {
+		return uc.skipSynthesizeSpeech(ctx, project.SagaID, project.ProjectID, project)
+	}
+	return uc.startSynthesizeSpeech(ctx, project.SagaID, project.ProjectID, project)
 }
 
 // recordVoiceCalibration folds this project's totals into its voice's running

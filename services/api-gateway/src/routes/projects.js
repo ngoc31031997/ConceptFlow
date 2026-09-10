@@ -48,6 +48,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.get('/v1/projects/:id', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/video', videoHandler(orchestratorClient, sharedDir));
   router.post('/v1/projects/:id/retry', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-024 FR69.2/69.3 — hai lối ra khỏi cổng duyệt dàn ý.
+  router.post('/v1/projects/:id/approve', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/reject', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/narration', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post(
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),

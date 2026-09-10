@@ -211,7 +211,9 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             if ephemeral:
                 shutil.rmtree(media_dir, ignore_errors=True)
 
-        narrations = [r["text"] for r in records if r.get("kind") == "narration"]
+        narration_records = [r for r in records if r.get("kind") == "narration"]
+        narrations = [r["text"] for r in narration_records]
+        visuals = [r.get("visual", "") for r in narration_records]
         if not narrations:
             raise AnimationEngineError(
                 "the script produced no narration — it needs at least one "
@@ -219,6 +221,7 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             )
         return DryRunResult(
             narrations=narrations,
+            visuals=visuals,
             beats=[(int(r["index"]), r["id"]) for r in records if r.get("kind") == "beat"],
             chapters=[
                 (int(r["index"]), r["title"]) for r in records if r.get("kind") == "chapter"

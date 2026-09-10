@@ -178,6 +178,7 @@ class ValidateScriptCommandHandler:
                 saga_id,
                 project_id,
                 result.dry_run.narrations,
+                result.dry_run.visuals,
                 result.dry_run.beats,
                 result.dry_run.chapters,
                 [str(issue) for issue in result.warnings],
