@@ -22,6 +22,11 @@ type Config struct {
 	OllamaURL                     string
 	OllamaModel                   string
 	OllamaTimeout                 time.Duration
+	// CR-023 D2: base URL of the video-assembly service, whose own database
+	// owns channel_assets — Orchestrator reads it synchronously to attach the
+	// channel intro/outro to assemble_video.
+	VideoAssemblyURL     string
+	VideoAssemblyTimeout time.Duration
 }
 
 // Load reads Config from the environment, applying the defaults documented
@@ -72,6 +77,15 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	videoAssemblyURL := os.Getenv("VIDEO_ASSEMBLY_URL")
+	if videoAssemblyURL == "" {
+		videoAssemblyURL = "http://video-assembly:8000"
+	}
+	videoAssemblyTimeoutSeconds, err := intEnvOrDefault("VIDEO_ASSEMBLY_TIMEOUT_SECONDS", 5)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
 		RabbitMQURL:                   rabbitMQURL,
 		DatabaseURL:                   databaseURL,
@@ -83,6 +97,8 @@ func Load() (*Config, error) {
 		OllamaURL:                     ollamaURL,
 		OllamaModel:                   ollamaModel,
 		OllamaTimeout:                 time.Duration(ollamaTimeoutSeconds) * time.Second,
+		VideoAssemblyURL:              videoAssemblyURL,
+		VideoAssemblyTimeout:          time.Duration(videoAssemblyTimeoutSeconds) * time.Second,
 	}, nil
 }
 

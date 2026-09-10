@@ -58,8 +58,13 @@ func (uc *SuggestPublishMetadataUseCase) Execute(ctx context.Context, projectID 
 	// timed by the offsets Rendering measured, so they land on the same frame
 	// as the narration that introduces them. The model is never asked to guess
 	// timestamps; it could not know them.
+	// CR-023 D6: chapter timestamps must land after the channel intro, when
+	// this project actually has one attached — intro duration is not plumbed
+	// through to metadata suggestion yet (it is resolved at assemble_video
+	// time from channel_assets, which this use case never touches), so 0.0
+	// preserves the exact pre-CR-023 behaviour here.
 	chapterLines := domain.BuildChapterTimestamps(
-		project.Chapters, project.WaitOffsets, project.RenderedVideoSeconds,
+		project.Chapters, project.WaitOffsets, project.RenderedVideoSeconds, 0.0,
 	)
 	description := domain.ComposeDescription(
 		summary, chapterLines, callToActionFor(project.ContentLanguage), tags,

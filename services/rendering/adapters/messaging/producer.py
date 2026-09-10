@@ -105,3 +105,46 @@ def validation_failed_envelope(saga_id: str, project_id: str, reason: str) -> di
         project_id,
         {"event_type": "validation_failed", "error_message": reason, "reason": reason},
     )
+
+
+def channel_asset_rendered_envelope(
+    saga_id: str,
+    project_id: str,
+    kind: str,
+    video_path: str,
+    video_duration_seconds: float,
+    render_quality: str,
+) -> dict:
+    """CR-023 D3 — kết quả dựng intro/outro cố định.
+
+    `project_id` ở đây không phải một project thật: intro/outro thuộc về kênh
+    (D1), không thuộc project nào, nên đây là id của lượt gọi admin flow, giữ
+    lại để khớp hình dạng envelope chung và cho `inbox`/`outbox` có khoá.
+    """
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "channel_asset_rendered",
+            "kind": kind,
+            "video_path": video_path,
+            "video_duration_seconds": video_duration_seconds,
+            # FR65.5: one asset per quality, so the consumer must not have to
+            # guess which quality this file was rendered at.
+            "render_quality": render_quality,
+        },
+    )
+
+
+def channel_asset_render_failed_envelope(
+    saga_id: str, project_id: str, kind: str, error_message: str
+) -> dict:
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "channel_asset_render_failed",
+            "kind": kind,
+            "error_message": error_message,
+        },
+    )

@@ -39,6 +39,14 @@ type suggestPublishMetadataUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
 }
 
+// channelAssetsUseCase backs the two CR-023 correction endpoints. Normalize
+// only publishes an AMQP command (no HTTP call to video-assembly); Preview
+// only reads Orchestrator's own channel_asset_pointers projection.
+type channelAssetsUseCase interface {
+	Normalize(ctx context.Context, in application.NormalizeChannelAssetInput) error
+	Preview(ctx context.Context) ([]domain.ChannelAssetPointer, error)
+}
+
 // projectStore is the read/delete capability the project-list and
 // project-detail/delete endpoints need; satisfied directly by
 // domain.ProjectRepositoryPort.
@@ -59,11 +67,13 @@ type Router struct {
 	reviewOutline          reviewOutlineUseCase
 	projects               projectStore
 	suggestPublishMetadata suggestPublishMetadataUseCase
+	channelAssets          channelAssetsUseCase
 }
 
 // NewRouter constructs the Router with its dependencies (module-structure.md).
-func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, suggestPublishMetadata suggestPublishMetadataUseCase, reviewOutline reviewOutlineUseCase) *Router {
-	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, suggestPublishMetadata: suggestPublishMetadata, reviewOutline: reviewOutline}
+// channelAssets may be nil in tests that do not exercise CR-023's routes.
+func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, suggestPublishMetadata suggestPublishMetadataUseCase, reviewOutline reviewOutlineUseCase, channelAssets channelAssetsUseCase) *Router {
+	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, suggestPublishMetadata: suggestPublishMetadata, reviewOutline: reviewOutline, channelAssets: channelAssets}
 }
 
 // Handler builds the chi.Router with all routes (health + REST endpoints).
@@ -83,6 +93,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/narration", rt.handleEditNarration)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
+	r.Post("/v1/channel-assets/{kind}", rt.handleNormalizeChannelAsset)
+	r.Get("/v1/channel-assets/preview", rt.handleChannelAssetPreview)
 	return r
 }
 
@@ -226,6 +238,92 @@ func (rt *Router) handleRetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, retryResponse{SagaID: out.SagaID, Status: string(out.Status)})
+}
+
+// handleNormalizeChannelAsset triggers video-assembly to normalize a
+// Creator-uploaded intro/outro file (CR-023 correction, FR65.1). api-gateway
+// has already written the file to the shared volume and computed its hash;
+// this handler only publishes the normalize_channel_asset AMQP command — it
+// never calls video-assembly over HTTP (no such server exists).
+func (rt *Router) handleNormalizeChannelAsset(w http.ResponseWriter, r *http.Request) {
+	if rt.channelAssets == nil {
+		writeError(w, http.StatusNotFound, "channel assets are not enabled")
+		return
+	}
+	kind := chi.URLParam(r, "kind")
+	if kind != "intro" && kind != "outro" {
+		writeError(w, http.StatusBadRequest, "kind must be 'intro' or 'outro'")
+		return
+	}
+
+	var req struct {
+		FilePath      string `json:"file_path"`
+		SourceHash    string `json:"source_hash"`
+		RenderQuality string `json:"render_quality"`
+		AssetRole     string `json:"asset_role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.FilePath == "" {
+		writeError(w, http.StatusBadRequest, "file_path is required")
+		return
+	}
+	// asset_role tells video-assembly whether file_path is the sting clip or
+	// its music bed (FR66.5). Absent means "video", the only thing this
+	// endpoint used to accept.
+	role := req.AssetRole
+	if role == "" {
+		role = application.AssetRoleVideo
+	}
+	if role != application.AssetRoleVideo && role != application.AssetRoleMusic {
+		writeError(w, http.StatusBadRequest, "asset_role must be 'video' or 'music'")
+		return
+	}
+	quality := domain.RenderQuality(req.RenderQuality)
+	if req.RenderQuality == "" {
+		quality = domain.DefaultRenderQuality
+	}
+
+	err := rt.channelAssets.Normalize(r.Context(), application.NormalizeChannelAssetInput{
+		Kind:          kind,
+		FilePath:      req.FilePath,
+		SourceHash:    req.SourceHash,
+		RenderQuality: quality,
+		AssetRole:     role,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not queue normalize")
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"kind": kind, "status": "queued"})
+}
+
+// handleChannelAssetPreview serves Orchestrator's own channel_asset_pointers
+// projection (CR-023 correction, FR67.4's data half — no HTTP call to
+// video-assembly, whose full channel_assets table Orchestrator never sees).
+func (rt *Router) handleChannelAssetPreview(w http.ResponseWriter, r *http.Request) {
+	if rt.channelAssets == nil {
+		writeError(w, http.StatusNotFound, "channel assets are not enabled")
+		return
+	}
+	pointers, err := rt.channelAssets.Preview(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read channel assets")
+		return
+	}
+	type pointerResponse struct {
+		Kind          string `json:"kind"`
+		RenderQuality string `json:"render_quality"`
+		AssetID       string `json:"asset_id"`
+		Version       int    `json:"version"`
+	}
+	out := make([]pointerResponse, 0, len(pointers))
+	for _, p := range pointers {
+		out = append(out, pointerResponse{Kind: p.Kind, RenderQuality: string(p.RenderQuality), AssetID: p.AssetID, Version: p.Version})
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": out})
 }
 
 // writeUseCaseError maps domain sentinel errors to the HTTP status codes

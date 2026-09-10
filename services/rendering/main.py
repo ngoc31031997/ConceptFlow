@@ -15,6 +15,7 @@ import os
 import aio_pika
 
 from adapters.messaging.consumer import (
+    RenderChannelAssetCommandHandler,
     RenderingCommandDispatcher,
     RenderScriptCommandHandler,
     ValidateScriptCommandHandler,
@@ -32,6 +33,7 @@ from adapters.rendering.manim_renderer import (
     DEFAULT_RENDER_TIMEOUT_SECONDS,
     ManimScriptRenderer,
 )
+from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
 
@@ -76,6 +78,11 @@ async def run() -> None:
         ValidateScriptCommandHandler(ValidateScriptUseCase(renderer), pool, inbox, outbox),
         RenderScriptCommandHandler(
             use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
+        ),
+        # Dựng intro/outro cố định của kênh (CR-023 D3) — cùng renderer, khác
+        # use case: không có script Creator, không có lượt dry/narration.
+        RenderChannelAssetCommandHandler(
+            RenderChannelAssetUseCase(renderer), pool, inbox, outbox
         ),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

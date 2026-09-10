@@ -148,7 +148,15 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         # still lands exactly on wait i, just half a second later in the file.
         # Shifting only the audio here would reintroduce the very desync that
         # CR-002 existed to remove.
-        lead_in = self._lead_in_seconds if request.video_duration_seconds > 0 else 0.0
+        #
+        # CR-023: effective_lead_in folds the channel intro's own duration into
+        # that same single shift (D5) — a project with an intro spliced in
+        # front needs narration/subtitles pushed later by the intro's length
+        # too, on top of whatever ASSEMBLY_LEAD_IN_SECONDS already added. This
+        # is the only source-of-truth change; every consumer below is
+        # unchanged from when it read `lead_in`.
+        base_lead_in = self._lead_in_seconds if request.video_duration_seconds > 0 else 0.0
+        effective_lead_in = base_lead_in + (request.intro_duration_seconds or 0.0)
 
         cmd = ["-y", "-i", request.video_path]
         for segment in segments:
@@ -158,7 +166,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         if target_duration is not None:
             # Lead-in pushes everything later; the tail leaves the closing frame
             # up briefly instead of cutting hard (FR14.5).
-            target_duration += lead_in + self._tail_seconds
+            target_duration += effective_lead_in + self._tail_seconds
 
         filter_parts: list[str] = []
         audio_map = None
@@ -170,7 +178,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             # volume by the number of inputs, which would make a 20-segment
             # narration 20x too quiet.
             for i, segment in enumerate(segments):
-                delay_ms = int(round((segment.start_time + lead_in) * 1000))
+                delay_ms = int(round((segment.start_time + effective_lead_in) * 1000))
                 filter_parts.append(f"[{i + 1}:a]adelay={delay_ms}:all=1[na{i}]")
             mix_inputs = "".join(f"[na{i}]" for i in range(n))
             if n == 1:
@@ -210,10 +218,10 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         if target_duration is not None:
             # CR-002 FR10.6: hold the last frame rather than truncating a final
             # narration that runs past the end of the animation.
-            pad_seconds = target_duration - request.video_duration_seconds - lead_in
-            if lead_in > VIDEO_PAD_EPSILON_SECONDS:
+            pad_seconds = target_duration - request.video_duration_seconds - effective_lead_in
+            if effective_lead_in > VIDEO_PAD_EPSILON_SECONDS:
                 video_filters.append(
-                    f"tpad=start_mode=clone:start_duration={lead_in:.3f}"
+                    f"tpad=start_mode=clone:start_duration={effective_lead_in:.3f}"
                 )
             if pad_seconds > VIDEO_PAD_EPSILON_SECONDS:
                 video_filters.append(f"tpad=stop_mode=clone:stop_duration={pad_seconds:.3f}")
@@ -227,8 +235,8 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         # end up using the result — two serializers each applying lead_in
         # themselves is how one of them quietly ends up wrong (ADR-0027).
         cues = request.subtitle_cues or []
-        if cues and lead_in:
-            cues = [cue.shifted_by(lead_in) for cue in cues]
+        if cues and effective_lead_in:
+            cues = [cue.shifted_by(effective_lead_in) for cue in cues]
 
         caption_path: str | None = None
         if cues and request.subtitle_mode in ("burn_in", "both"):
@@ -275,11 +283,57 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             cmd += ["-t", f"{target_duration:.3f}"]
         else:
             cmd += ["-shortest"]
-        cmd += [output_path]
+
+        has_channel_assets = bool(request.intro_video_path or request.outro_video_path)
+        # CR-023 D5: with an intro/outro to splice in, this pass produces only
+        # the main segment, to a temp path — _concat_channel_assets below
+        # joins it with the real intro/outro files afterward. Without either,
+        # this pass's output IS the final file, exactly as before this CR.
+        main_target = _main_segment_path(output_path) if has_channel_assets else output_path
+        cmd += [main_target]
         self._run_ffmpeg(cmd)
+
+        if has_channel_assets:
+            self._concat_channel_assets(request, main_target, output_path)
 
         self._write_thumbnail_candidate(output_path, target_duration)
         return caption_path
+
+    @staticmethod
+    def _concat_channel_assets(request: VideoAssemblyRequest, main_path: str, output_path: str) -> None:
+        """Splices the channel's real intro/outro files around the just-built
+        main segment (CR-023 D5) via the concat demuxer, in one re-encode
+        pass — accepted cost (LLD's "Rủi ro" section): the main segment may
+        already have lost `-c:v copy` to tpad/subtitles, and concat forces a
+        matching re-encode of the intro/outro anyway since nothing here tries
+        to keep them byte-identical to the main segment's codec profile.
+        """
+        segments = [p for p in (request.intro_video_path, main_path, request.outro_video_path) if p]
+        concat_list_path = f"{output_path}.concat.txt"
+        with open(concat_list_path, "w", encoding="utf-8") as f:
+            for segment_path in segments:
+                f.write(f"file {_escape_concat_path(segment_path)}\n")
+
+        try:
+            FfmpegVideoAssembler._run_ffmpeg(
+                [
+                    "-y",
+                    "-f", "concat",
+                    "-safe", "0",
+                    "-i", concat_list_path,
+                    *VIDEO_ENCODE_ARGS,
+                    *AUDIO_ENCODE_ARGS,
+                    *CONTAINER_ARGS,
+                    output_path,
+                ]
+            )
+        finally:
+            # Best-effort cleanup: in production ffmpeg always wrote main_path,
+            # but nothing here should fail the whole assembly over a missing
+            # temp file (mirrors _write_thumbnail_candidate's best-effort
+            # stance elsewhere in this class).
+            _remove_if_exists(concat_list_path)
+            _remove_if_exists(main_path)
 
     def _write_thumbnail_candidate(self, video_path: str, duration: float | None) -> None:
         """Extracts a still the Creator can use as a thumbnail (CR-006 FR16.1).
@@ -364,6 +418,28 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         result = subprocess.run([FFMPEG_BINARY, *args], capture_output=True, text=True)
         if result.returncode != 0:
             raise AssemblyEngineError(f"ffmpeg exited with code {result.returncode}: {result.stderr}")
+
+
+def _remove_if_exists(path: str) -> None:
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
+
+
+def _main_segment_path(output_path: str) -> str:
+    """Temp path for the main-only segment when an intro/outro will be
+    concatenated around it (CR-023 D5) — sits next to output_path so it is
+    on the same filesystem/volume as the concat demuxer's other inputs."""
+    return f"{output_path}.main.mp4"
+
+
+def _escape_concat_path(path: str) -> str:
+    """The concat demuxer reads each `file` line like a mini shell string —
+    a literal single quote in the path has to be closed out and re-opened
+    (ffmpeg's own documented idiom for this) or the list file is invalid."""
+    escaped = path.replace("'", "'\\''")
+    return f"'{escaped}'"
 
 
 def _escape_filter_path(path: str) -> str:

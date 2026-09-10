@@ -8,7 +8,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
+from domain.models import (
+    ChannelAssetRenderRequest,
+    ChannelAssetRenderResult,
+    DryRunResult,
+    ScriptRenderRequest,
+    ScriptRenderResult,
+)
 
 
 class ManimScriptRendererPort(ABC):
@@ -45,4 +51,41 @@ class ManimScriptRendererPort(ABC):
                 out, or the recorded timing marks don't line up one-to-one with
                 narration_segments — which means the script is not deterministic
                 between the two passes.
+        """
+
+
+class ChannelAssetRendererPort(ABC):
+    """Renders one of the two fixed channel-identity scenes
+    (`conceptflow.channel_idents.DefaultIntroSting` / `.ChannelOutro`) —
+    CR-023 FR65, D3/D4.
+
+    Deliberately a **separate** port from `ManimScriptRendererPort` rather
+    than a new abstract method on it: adding a method there would force every
+    existing implementer (including CR-018/020's test fakes) to grow a stub
+    they have no use for, just to keep satisfying `ABC`. `ManimScriptRenderer`
+    implements both ports — one adapter, two narrow interfaces.
+    """
+
+    @abstractmethod
+    def render_channel_asset(
+        self, request: ChannelAssetRenderRequest, output_path: str
+    ) -> ChannelAssetRenderResult:
+        """Renders `request.kind`'s scene to `output_path`.
+
+        Unlike `ManimScriptRendererPort.render()`, there is no narration-timing
+        contract to honour — neither scene calls `self.narrate(...)`, so this
+        is a single Manim pass with no marks file to reconcile.
+
+        Raises:
+            domain.errors.AnimationEngineError: if the engine fails or times out.
+        """
+
+    @abstractmethod
+    def resolve_render_quality(self, requested: str | None) -> str:
+        """The quality this renderer would actually use for `requested`.
+
+        Exposed because the caller has to name the output path before the
+        render runs, and FR65.5 keys that path by quality — an absent or
+        unknown `requested` falls back to the service default, and the caller
+        cannot guess which one that is.
         """

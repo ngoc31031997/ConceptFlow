@@ -55,16 +55,22 @@ type HandleStepEventUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
 	progress  domain.ProgressPublisherPort
-	logger    *slog.Logger
+	// channelAssets resolves the active intro/outro asset (CR-023 D1/D2).
+	// Optional (nil-checked at the one call site) so existing callers/tests
+	// built before CR-023 keep compiling and behaving exactly as before —
+	// intro/outro simply stay unattached without one.
+	channelAssets domain.ChannelAssetPort
+	logger        *slog.Logger
 }
 
-// NewHandleStepEventUseCase constructs the use case with its three port
-// dependencies.
-func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher domain.CommandPublisherPort, progress domain.ProgressPublisherPort, logger *slog.Logger) *HandleStepEventUseCase {
+// NewHandleStepEventUseCase constructs the use case with its port
+// dependencies. channelAssets may be nil (CR-023's intro/outro lookup is then
+// skipped entirely, same as if both toggles were off).
+func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher domain.CommandPublisherPort, progress domain.ProgressPublisherPort, channelAssets domain.ChannelAssetPort, logger *slog.Logger) *HandleStepEventUseCase {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, logger: logger}
+	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, channelAssets: channelAssets, logger: logger}
 }
 
 // Execute handles a single StepEvent. It never returns an error for a valid
@@ -76,6 +82,15 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) error {
 	if event.EventType == "scene_rendered" {
 		return uc.handleSceneRenderedProgress(ctx, event)
+	}
+
+	// CR-023 correction: channel_asset_rendered/channel_asset_normalized are
+	// not saga-step events for any project — intro/outro belong to the
+	// channel, not a project (see rendering/producer.py's
+	// channel_asset_rendered_envelope docstring). They update Orchestrator's
+	// own channel_asset_pointers projection instead of eventStepMap.
+	if event.EventType == "channel_asset_rendered" || event.EventType == "channel_asset_normalized" {
+		return uc.handleChannelAssetProjection(ctx, event)
 	}
 
 	stepName, known := eventStepMap[event.EventType]
@@ -120,6 +135,35 @@ func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Contex
 		SceneTotal: sceneTotal,
 	}
 	return uc.progress.PublishProgress(ctx, msg)
+}
+
+// handleChannelAssetProjection upserts channel_asset_pointers from a
+// channel_asset_normalized event (video-assembly's authoritative record of a
+// newly-registered intro/outro, carrying asset_id + render_quality + version).
+//
+// channel_asset_rendered (rendering's raw output, video_path only, no
+// asset_id/render_quality yet — see rendering/producer.py) is intentionally a
+// no-op here: video-assembly is the one that ingests it, transcodes per
+// RENDER_QUALITY and assigns an asset_id, and it re-announces the result as
+// channel_asset_normalized — the only event shaped enough for this
+// projection. Still explicitly matched (rather than falling into "unknown
+// event_type") so it is not logged as a warning on every render.
+func (uc *HandleStepEventUseCase) handleChannelAssetProjection(ctx context.Context, event StepEvent) error {
+	if uc.channelAssets == nil || event.EventType != "channel_asset_normalized" {
+		return nil
+	}
+	kind := stringFromPayload(event.Payload, "kind")
+	quality := domain.RenderQuality(stringFromPayload(event.Payload, "render_quality"))
+	assetID := stringFromPayload(event.Payload, "asset_id")
+	version := 0
+	if v := intFromPayload(event.Payload, "version"); v != nil {
+		version = *v
+	}
+	if kind == "" || assetID == "" {
+		uc.logger.WarnContext(ctx, "channel_asset_normalized missing kind/asset_id, ignoring", "saga_id", event.SagaID)
+		return nil
+	}
+	return uc.channelAssets.UpsertChannelAssetPointer(ctx, kind, quality, assetID, version)
 }
 
 func (uc *HandleStepEventUseCase) handleFailure(ctx context.Context, event StepEvent, stepName domain.StepName) error {
@@ -530,6 +574,14 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 	project.RenderedVideoPath = &videoPath
 	project.WaitOffsets = waitOffsets
 	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
+
+	// CR-023 D2: resolve the channel intro/outro before publishing
+	// assemble_video, and persist the resolved id on Project rather than
+	// re-resolving on retry (RetryStepUseCase's Rule 5 rebuilds purely from
+	// Project). A toggle off or no active asset both simply leave the field
+	// nil — this never fails the saga.
+	uc.resolveChannelAssets(ctx, project)
+
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -542,6 +594,38 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 		return err
 	}
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusAssemblingVideo)
+}
+
+// resolveChannelAssets looks up the active intro/outro asset for each toggle
+// the project has enabled (CR-023 FR67.1/67.2 default true) and sets
+// IntroAssetID/OutroAssetID on project. Best-effort: a lookup failure or a
+// missing asset is logged and leaves the field nil, never fails the saga —
+// video-assembly is asked to attach an asset if one is there, not required to
+// have one.
+func (uc *HandleStepEventUseCase) resolveChannelAssets(ctx context.Context, project *domain.Project) {
+	if uc.channelAssets == nil {
+		return
+	}
+	quality := project.RenderQuality
+	if !quality.IsValid() {
+		quality = domain.DefaultRenderQuality
+	}
+	if project.IntroEnabled {
+		if id, err := uc.channelAssets.LatestChannelAsset(ctx, "intro", quality); err != nil {
+			uc.logger.Warn("could not resolve channel intro asset, proceeding without one",
+				"project_id", project.ProjectID, "error", err)
+		} else if id != "" {
+			project.IntroAssetID = &id
+		}
+	}
+	if project.OutroEnabled {
+		if id, err := uc.channelAssets.LatestChannelAsset(ctx, "outro", quality); err != nil {
+			uc.logger.Warn("could not resolve channel outro asset, proceeding without one",
+				"project_id", project.ProjectID, "error", err)
+		} else if id != "" {
+			project.OutroAssetID = &id
+		}
+	}
 }
 
 // onVideoAssembled stores video_path and ends the Render Saga implicitly
@@ -632,6 +716,15 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 		"video_path":             videoPath,
 		"narration_segments":     narrationSegments,
 		"video_duration_seconds": project.RenderedVideoSeconds,
+	}
+	// CR-023 D2: optional, nullable — nil (omitted) when the toggle is off or
+	// no active channel_assets row was found, in which case video-assembly
+	// assembles without an intro/outro exactly as it did before this CR.
+	if project.IntroAssetID != nil {
+		payload["intro_asset_id"] = *project.IntroAssetID
+	}
+	if project.OutroAssetID != nil {
+		payload["outro_asset_id"] = *project.OutroAssetID
 	}
 	if project.BackgroundMusicPath != nil {
 		payload["background_music_path"] = *project.BackgroundMusicPath

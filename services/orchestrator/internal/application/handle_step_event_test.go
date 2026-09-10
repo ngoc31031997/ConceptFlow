@@ -11,7 +11,7 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 	repo := newFakeRepo()
 	pub := &fakePublisher{}
 	prog := &fakeProgress{}
-	return NewHandleStepEventUseCase(repo, pub, prog, nil), repo, pub, prog
+	return NewHandleStepEventUseCase(repo, pub, prog, nil, nil), repo, pub, prog
 }
 
 // TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech
@@ -777,5 +777,66 @@ func TestHandleStepEventUseCase_ScriptValidated_SkipsTheGateWhenDisabled(t *test
 
 	if last := pub.last(); last == nil || last.routingKey != "tts" {
 		t.Fatalf("tắt cổng thì phải chạy thẳng sang TTS, có %+v", last)
+	}
+}
+
+// CR-023 correction: channel_asset_normalized upserts Orchestrator's local
+// projection instead of any HTTP round trip.
+func TestHandleStepEvent_ChannelAssetNormalized_UpsertsPointer(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	prog := &fakeProgress{}
+	pointers := newFakeChannelAssetPointers()
+	uc := NewHandleStepEventUseCase(repo, pub, prog, pointers, nil)
+
+	err := uc.Execute(context.Background(), StepEvent{
+		MessageID: "m1",
+		SagaID:    "s1",
+		EventType: "channel_asset_normalized",
+		Payload: map[string]interface{}{
+			"kind":           "intro",
+			"render_quality": "1080p60",
+			"asset_id":       "asset-42",
+			"version":        float64(2),
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	assetID, err := pointers.LatestChannelAsset(context.Background(), "intro", domain.Quality1080p60)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if assetID != "asset-42" {
+		t.Fatalf("assetID = %q, want asset-42", assetID)
+	}
+}
+
+// channel_asset_rendered carries no asset_id/render_quality yet (rendering's
+// raw output, before video-assembly ingests and registers it) — it must be a
+// no-op, not an "unknown event_type" warning or a panic on missing fields.
+func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	prog := &fakeProgress{}
+	pointers := newFakeChannelAssetPointers()
+	uc := NewHandleStepEventUseCase(repo, pub, prog, pointers, nil)
+
+	err := uc.Execute(context.Background(), StepEvent{
+		MessageID: "m2",
+		SagaID:    "s2",
+		EventType: "channel_asset_rendered",
+		Payload: map[string]interface{}{
+			"kind":                   "outro",
+			"video_path":             "/data/renders/outro.mp4",
+			"video_duration_seconds": 3.0,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(pointers.pointers) != 0 {
+		t.Fatalf("channel_asset_rendered must not populate the projection, got %+v", pointers.pointers)
 	}
 }

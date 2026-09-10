@@ -110,6 +110,47 @@ class VideoAssemblyRequest:
     # (CR-015 FR41.2) so a command already sitting in the queue when this
     # ships keeps producing exactly what it produced before.
     subtitle_mode: str = "burn_in"
+    # CR-023 FR65/FR67 — the channel's fixed intro/outro, resolved by
+    # application/assemble_video.py from the command's intro_asset_id/
+    # outro_asset_id (opaque ids Orchestrator read from its own
+    # channel_asset_pointers projection) via ChannelAssetsRepository.
+    # None/0.0 when the Creator toggled the intro/outro off, or Orchestrator
+    # found no active asset for the project's render_quality — in which case
+    # assembly proceeds exactly as it did before this CR.
+    intro_video_path: str | None = None
+    # Real duration of intro_video_path (ffprobe'd when the asset was
+    # registered — see adapters/persistence/channel_assets.py). Only this
+    # field feeds FfmpegVideoAssembler's effective_lead_in; outro needs no
+    # equivalent because it is appended at the end, not spliced before the
+    # narration timeline.
+    intro_duration_seconds: float = 0.0
+    outro_video_path: str | None = None
+
+
+@dataclass(frozen=True)
+class ChannelAsset:
+    """One row of `channel_assets` (CR-023 D1) — the channel-wide intro/outro
+    currently (or formerly, when superseded) active for one (kind,
+    render_quality) pair.
+
+    Lives at video-assembly because this is the service that already owns
+    `lead_in`/ghép (assembly), and is the one Creator-uploaded files get
+    ffmpeg-normalized by (adapters/messaging/consumer.py's
+    NormalizeChannelAssetCommandHandler).
+    """
+
+    id: str
+    kind: str
+    render_quality: str
+    source_hash: str
+    video_path: str
+    music_path: str | None
+    version: int
+    duration_seconds: float
+    # Hash of the music file baked into video_path, when one has been
+    # uploaded (FR66.5). Kept apart from source_hash — which always describes
+    # the VIDEO source — so each upload path caches against its own input.
+    music_source_hash: str | None = None
 
 
 @dataclass(frozen=True)

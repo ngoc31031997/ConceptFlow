@@ -58,3 +58,17 @@ def write_timing(timing_path: str, wait_offsets: list[float], video_duration_sec
 
 def ensure_parent_dir(video_path: str) -> None:
     os.makedirs(os.path.dirname(video_path), exist_ok=True)
+
+
+def compute_channel_asset_path(kind: str, render_quality: str) -> str:
+    """Conventional path for a channel-wide asset (CR-023 D1/D3):
+    /shared/channel-assets/{kind}/{render_quality}/rendered.mp4
+
+    Not keyed by project_id — intro/outro belong to the channel, not to any
+    one project (D1). Keyed by render_quality because FR65.5 caches one asset
+    per quality: splicing a 1080p60 intro onto a 4k60 body is not a concat the
+    demuxer can do, so the two cannot share a file. video-assembly is the one
+    that copies this into its own `channel_assets` table (with
+    `source_hash`/`version`); Rendering only ever produces the file.
+    """
+    return os.path.join(SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, "rendered.mp4")

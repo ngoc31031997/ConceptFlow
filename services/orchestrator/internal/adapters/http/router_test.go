@@ -39,6 +39,22 @@ func (f *fakeRetryStep) Execute(_ context.Context, _ string) (*application.Retry
 	return f.out, f.err
 }
 
+type fakeChannelAssets struct {
+	normalizeErr error
+	normalizedIn application.NormalizeChannelAssetInput
+	pointers     []domain.ChannelAssetPointer
+	previewErr   error
+}
+
+func (f *fakeChannelAssets) Normalize(_ context.Context, in application.NormalizeChannelAssetInput) error {
+	f.normalizedIn = in
+	return f.normalizeErr
+}
+
+func (f *fakeChannelAssets) Preview(_ context.Context) ([]domain.ChannelAssetPointer, error) {
+	return f.pointers, f.previewErr
+}
+
 type fakeProjectReader struct {
 	project      *domain.Project
 	err          error
@@ -87,7 +103,7 @@ func (f *fakeSuggestMetadata) Execute(_ context.Context, _ string) (*application
 func TestHandleStartRenderSaga_Created(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{out: &application.StartRenderSagaOutput{SagaID: "saga-1", Status: domain.StatusParsingScript}},
-		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"project_id": "p1", "script_content": "s", "plugin_id": "plugin", "category_hint": "concept", "voice_language": "en",
@@ -107,7 +123,7 @@ func TestHandleStartRenderSaga_Created(t *testing.T) {
 }
 
 func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/sagas/render", bytes.NewReader([]byte(`{"project_id":""}`)))
 	rec := httptest.NewRecorder()
@@ -120,7 +136,7 @@ func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
 
 func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]interface{}{"project_id": "p1", "youtube_title": "t", "visibility": "public"})
 	req := httptest.NewRequest("POST", "/v1/sagas/publish", bytes.NewReader(body))
@@ -135,7 +151,7 @@ func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 func TestHandleGetProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{err: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil)
+		&fakeProjectReader{err: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -149,7 +165,7 @@ func TestHandleGetProject_NotFound(t *testing.T) {
 func TestHandleGetProject_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}}, &fakeSuggestMetadata{}, nil)
+		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -164,7 +180,7 @@ func TestHandleRetry_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{},
 		&fakeRetryStep{out: &application.RetryStepOutput{SagaID: "saga-1", Status: domain.StatusRendering}},
-		&fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+		&fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/projects/p1/retry", nil)
 	rec := httptest.NewRecorder()
@@ -178,7 +194,7 @@ func TestHandleRetry_OK(t *testing.T) {
 func TestHandleListProjects_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}}, &fakeSuggestMetadata{}, nil)
+		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects", nil)
 	rec := httptest.NewRecorder()
@@ -196,7 +212,7 @@ func TestHandleListProjects_OK(t *testing.T) {
 
 func TestHandleDeleteProject_NoContent(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -210,7 +226,7 @@ func TestHandleDeleteProject_NoContent(t *testing.T) {
 func TestHandleDeleteProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil)
+		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -222,7 +238,7 @@ func TestHandleDeleteProject_NotFound(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil)
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()
@@ -241,7 +257,7 @@ func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 		{VoiceID: "vi-Enough", SampleCount: domain.MinCalibrationSamples, TotalWords: 900, TotalSecond: 360},
 		{VoiceID: "vi-TooFew", SampleCount: 1, TotalWords: 300, TotalSecond: 120},
 	}}
-	router := NewRouter(nil, nil, nil, reader, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/voice-calibration", nil)
 	rec := httptest.NewRecorder()
@@ -266,7 +282,7 @@ func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 
 func TestHandleSaveFormat_RejectsAFormatWithNoBeats(t *testing.T) {
 	reader := &fakeProjectReader{}
-	router := NewRouter(nil, nil, nil, reader, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
 
 	body := []byte(`{"id":"x","name":"X","min_seconds":60,"max_seconds":120,"beats":[]}`)
 	req := httptest.NewRequest("POST", "/v1/formats", bytes.NewReader(body))
@@ -285,7 +301,7 @@ func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
 	// FR51.6: không bao giờ ghi đè — project dựng theo version 3 phải tiếp tục
 	// báo đúng beat của version 3.
 	reader := &fakeProjectReader{}
-	router := NewRouter(nil, nil, nil, reader, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
 
 	body := []byte(`{"id":"visual_first_7min","name":"Của tôi","min_seconds":300,"max_seconds":480,
 	                 "beats":[{"id":"hook","role":"hook","min_seconds":5,"max_seconds":12,"required":true,"max_repeat":1}]}`)
@@ -306,7 +322,7 @@ func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
 }
 
 func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil)
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil)
 	req := httptest.NewRequest("GET", "/v1/formats", nil)
 	rec := httptest.NewRecorder()
 	router.Handler().ServeHTTP(rec, req)
@@ -322,5 +338,99 @@ func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
 	}
 	if len(body.Formats) < 2 {
 		t.Fatalf("muốn ít nhất 2 format, có %d", len(body.Formats))
+	}
+}
+
+// CR-023 correction: normalize only publishes an AMQP command, never an HTTP
+// call to video-assembly.
+func TestHandleNormalizeChannelAsset_QueuesAndReturnsAccepted(t *testing.T) {
+	fake := &fakeChannelAssets{}
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+
+	body := []byte(`{"file_path":"/data/uploads/intro.mp4","source_hash":"abc123"}`)
+	req := httptest.NewRequest("POST", "/v1/channel-assets/intro", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 202 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if fake.normalizedIn.Kind != "intro" || fake.normalizedIn.FilePath != "/data/uploads/intro.mp4" {
+		t.Fatalf("unexpected normalize input: %+v", fake.normalizedIn)
+	}
+	// A body without asset_role keeps meaning "this is the sting clip".
+	if fake.normalizedIn.AssetRole != application.AssetRoleVideo {
+		t.Fatalf("asset_role = %q, muốn %q", fake.normalizedIn.AssetRole, application.AssetRoleVideo)
+	}
+}
+
+// FR66.5: the music bed is uploaded through the same endpoint, distinguished
+// only by asset_role.
+func TestHandleNormalizeChannelAsset_PassesMusicAssetRoleThrough(t *testing.T) {
+	fake := &fakeChannelAssets{}
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+
+	body := []byte(`{"file_path":"/data/uploads/music.mp3","source_hash":"m1","asset_role":"music"}`)
+	req := httptest.NewRequest("POST", "/v1/channel-assets/outro", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 202 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	if fake.normalizedIn.AssetRole != application.AssetRoleMusic {
+		t.Fatalf("asset_role = %q, muốn %q", fake.normalizedIn.AssetRole, application.AssetRoleMusic)
+	}
+}
+
+func TestHandleNormalizeChannelAsset_RejectsUnknownAssetRole(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, &fakeChannelAssets{})
+
+	body := []byte(`{"file_path":"/data/uploads/x.mp4","asset_role":"subtitle"}`)
+	req := httptest.NewRequest("POST", "/v1/channel-assets/intro", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestHandleNormalizeChannelAsset_RejectsUnknownKind(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, &fakeChannelAssets{})
+
+	req := httptest.NewRequest("POST", "/v1/channel-assets/bogus", bytes.NewReader([]byte(`{"file_path":"x"}`)))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("status = %d", rec.Code)
+	}
+}
+
+func TestHandleChannelAssetPreview_ServesPointers(t *testing.T) {
+	fake := &fakeChannelAssets{pointers: []domain.ChannelAssetPointer{
+		{Kind: "intro", RenderQuality: domain.Quality1080p60, AssetID: "asset-1", Version: 3},
+	}}
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+
+	req := httptest.NewRequest("GET", "/v1/channel-assets/preview", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Assets []struct {
+			Kind    string `json:"kind"`
+			AssetID string `json:"asset_id"`
+		} `json:"assets"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body không phải JSON: %v", err)
+	}
+	if len(body.Assets) != 1 || body.Assets[0].AssetID != "asset-1" {
+		t.Fatalf("unexpected response: %+v", body)
 	}
 }

@@ -23,6 +23,35 @@ def caption_output_path(project_id: str) -> str:
     return os.path.join(SHARED_VOLUME_ROOT, project_id, "video", "final.srt")
 
 
+def normalized_channel_asset_path(kind: str, render_quality: str) -> str:
+    """Conventional path for a Creator-uploaded intro/outro after
+    NormalizeChannelAssetCommandHandler transcodes it (CR-023 D8):
+    /shared/channel-assets/{kind}/{render_quality}/normalized.mp4
+
+    Deliberately keyed by render_quality too (unlike rendering's
+    compute_channel_asset_path for the Manim-rendered default, which is a
+    single file shared across qualities) — an uploaded file gets a real,
+    quality-specific transcode here, one per render_quality.
+    """
+    return os.path.join(SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, "normalized.mp4")
+
+
+def channel_asset_with_music_path(kind: str, render_quality: str, version: int) -> str:
+    """Where NormalizeChannelAssetCommandHandler writes the intro/outro clip
+    after muxing the Creator's music bed into it (CR-023 D5 — the music is
+    baked in at asset-build time, so per-project assembly never has to know
+    about it):
+    /shared/channel-assets/{kind}/{render_quality}/with_music_v{version}.mp4
+
+    Versioned because the input of that mux is the currently active asset's
+    own file — an unversioned name would have ffmpeg read and write the same
+    path on the second music upload.
+    """
+    return os.path.join(
+        SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, f"with_music_v{version}.mp4"
+    )
+
+
 def video_exists(video_path: str) -> bool:
     return os.path.isfile(video_path)
 

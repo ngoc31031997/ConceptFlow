@@ -39,6 +39,13 @@ type StartRenderSagaInput struct {
 	RenderQuality domain.RenderQuality
 	// CR-005 FR14.2 — 0 means DefaultBackgroundMusicVolume.
 	BackgroundMusicVolume float64
+
+	// CR-023 FR67.1/FR67.2 — nil means "on", same reasoning as ReviewEnabled
+	// above: the zero value of a bool is false, and defaulting the channel
+	// identity off would silently drop it for every caller unaware of these
+	// fields yet.
+	IntroEnabled *bool
+	OutroEnabled *bool
 }
 
 // StartRenderSagaOutput is returned to the HTTP layer for the 201 response.
@@ -103,6 +110,8 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		SubtitleStyle:         input.SubtitleStyle,
 		RenderQuality:         quality,
 		BackgroundMusicVolume: input.BackgroundMusicVolume,
+		IntroEnabled:          input.IntroEnabled == nil || *input.IntroEnabled,
+		OutroEnabled:          input.OutroEnabled == nil || *input.OutroEnabled,
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err

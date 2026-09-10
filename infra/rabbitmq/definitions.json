@@ -161,6 +161,15 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
+    },
+    {
+      "name": "video_assembly.channel_asset_events",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-message-ttl": 86400000
+      }
     }
   ],
   "bindings": [
@@ -250,6 +259,14 @@
       "destination": "publisher.commands.dlq",
       "destination_type": "queue",
       "routing_key": "publisher.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "events.direct",
+      "vhost": "/",
+      "destination": "video_assembly.channel_asset_events",
+      "destination_type": "queue",
+      "routing_key": "orchestrator",
       "arguments": {}
     }
   ]

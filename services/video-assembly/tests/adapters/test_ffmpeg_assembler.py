@@ -6,6 +6,7 @@ suite.
 
 from __future__ import annotations
 
+import os
 import re
 from unittest.mock import patch
 
@@ -690,6 +691,146 @@ def test_thumbnail_failure_does_not_fail_the_assembly(tmp_path):
 
     with patch("subprocess.run", side_effect=fail_on_thumbnail):
         assembler.assemble(request, str(video_dir / "final.mp4"))
+
+
+def test_intro_duration_shifts_narration_offset_and_subtitle_cues(tmp_path):
+    """CR-023 D5: effective_lead_in folds intro_duration_seconds into the
+    same single shift as ASSEMBLY_LEAD_IN_SECONDS — narration i must still
+    land on wait i, just intro_duration seconds later in the concatenated
+    output, and the burned-in subtitle cue must move by exactly that much."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=10.0)],
+        video_duration_seconds=60.0,
+        subtitle_cues=[SubtitleCue(scene_index=0, text="hi", start_time=10.0, end_time=12.0)],
+        intro_video_path="intro.mp4",
+        intro_duration_seconds=3.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    main_calls = [c[0][0] for c in mock_run.call_args_list if c[0][0] and c[0][0][0] == "ffmpeg"]
+    main_args = main_calls[0]
+    joined = " ".join(main_args)
+    # Narration delayed by 10.0 + 3.0 intro duration (no separate ASSEMBLY_LEAD_IN_SECONDS here).
+    assert "adelay=13000:all=1" in joined
+    assert "tpad=start_mode=clone:start_duration=3.000" in joined
+    with open(tmp_path / "proj-1.ass", encoding="utf-8") as f:
+        assert "0:00:13.00" in f.read()
+    # 60s video + 3.0 intro shift.
+    assert main_args[main_args.index("-t") + 1] == "63.000"
+
+
+def test_intro_and_lead_in_seconds_combine_into_effective_lead_in(tmp_path):
+    """The pre-existing ASSEMBLY_LEAD_IN_SECONDS feature and the new intro
+    duration are additive, not exclusive — a Creator can have both."""
+    assembler = FfmpegVideoAssembler(lead_in_seconds=0.5)
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        intro_video_path="intro.mp4",
+        intro_duration_seconds=2.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    main_args = ffmpeg_calls(mock_run)[0]
+    assert "adelay=2500:all=1" in " ".join(main_args)
+
+
+def test_no_intro_duration_leaves_lead_in_behaviour_unchanged(tmp_path):
+    """Without intro_video_path (the default), effective_lead_in must reduce
+    to exactly the old lead_in — this is the regression guard for CR-023
+    not touching any existing project's assembly."""
+    assembler = FfmpegVideoAssembler()
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=10.0)],
+        video_duration_seconds=60.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, str(tmp_path / "final.mp4"))
+
+    args = ffmpeg_args(mock_run)
+    assert "adelay=10000:all=1" in " ".join(args)
+    assert "tpad" not in " ".join(args)
+
+
+def test_intro_and_outro_are_concatenated_around_the_main_segment(tmp_path):
+    """CR-023 D5: with intro_video_path/outro_video_path set, assembly must
+    run a second ffmpeg pass concatenating [intro, main, outro] via the
+    concat demuxer, using the same upload-grade encode settings, and the
+    temp main-segment file must not be left behind."""
+    assembler = FfmpegVideoAssembler()
+    output_path = str(tmp_path / "final.mp4")
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+        intro_video_path="intro.mp4",
+        intro_duration_seconds=3.0,
+        outro_video_path="outro.mp4",
+    )
+
+    written_concat_lists: list[str] = []
+    real_open = open
+
+    def spy_open(path, *args, **kwargs):
+        mode = args[0] if args else kwargs.get("mode", "r")
+        if isinstance(path, str) and path.endswith(".concat.txt") and "w" in mode:
+            handle = real_open(path, *args, **kwargs)
+            written_concat_lists.append(path)
+            return handle
+        return real_open(path, *args, **kwargs)
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run, patch(
+        "builtins.open", side_effect=spy_open
+    ):
+        assembler.assemble(request, output_path)
+
+    calls = ffmpeg_calls(mock_run)
+    # First call is the main-only segment (a temp path, not output_path itself).
+    assert output_path not in calls[0]
+    assert f"{output_path}.main.mp4" in calls[0]
+    # Second call is the concat pass, ending on the real output_path.
+    concat_call = calls[1]
+    assert "-f" in concat_call and concat_call[concat_call.index("-f") + 1] == "concat"
+    assert concat_call[-1] == output_path
+    assert "libx264" in concat_call
+    # The temp main segment and the concat list are cleaned up afterward.
+    assert not os.path.exists(f"{output_path}.main.mp4")
+    assert not os.path.exists(f"{output_path}.concat.txt")
+    assert len(written_concat_lists) == 1
+
+
+def test_without_intro_or_outro_no_concat_pass_runs(tmp_path):
+    """Regression guard: the plain (no channel assets) path must still write
+    directly to output_path in one ffmpeg pass, exactly as before this CR."""
+    assembler = FfmpegVideoAssembler()
+    output_path = str(tmp_path / "final.mp4")
+    request = VideoAssemblyRequest(
+        project_id="proj-1",
+        video_path="video.mp4",
+        narration_segments=[NarrationSegment(audio_path="a0.wav", start_time=0.0)],
+        video_duration_seconds=30.0,
+    )
+
+    with patch("subprocess.run", side_effect=fake_run_factory()) as mock_run:
+        assembler.assemble(request, output_path)
+
+    calls = ffmpeg_calls(mock_run)
+    # The main pass plus the thumbnail-candidate pass — no third, concat pass.
+    assert len(calls) == 2
+    assert calls[0][-1] == output_path
 
 
 def test_no_thumbnail_without_a_known_duration(tmp_path):

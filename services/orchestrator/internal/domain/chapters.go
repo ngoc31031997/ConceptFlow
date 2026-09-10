@@ -29,17 +29,28 @@ const (
 // BuildChapterTimestamps turns chapter markers into the "0:00 Title" lines that
 // go at the top of a YouTube description (FR15.2).
 //
-// offsets are the real per-narration start times from Rendering. Returns nil
-// when the result would not satisfy YouTube's rules, so the caller can leave
-// the description without a chapter block rather than shipping one that will be
-// ignored.
-func BuildChapterTimestamps(chapters []Chapter, offsets []float64, videoSeconds float64) []string {
+// offsets are the real per-narration start times from Rendering. videoSeconds
+// must already include intro/outro (CR-023 D6) — the caller adds those before
+// calling in, since only it knows whether they were attached at assembly.
+//
+// introDuration is the length of the channel intro sting prepended ahead of
+// the rendered video (CR-023 D2/D6), or 0 when this project has no intro.
+//   - introDuration == 0: unchanged from before CR-023 — chapter[0] is pulled
+//     to 0:00 because it genuinely is the start of the video.
+//   - introDuration > 0: a synthetic "Intro" chapter is inserted at 0:00, and
+//     every other chapter's start is pushed out by introDuration (not forced
+//     to 0 — only the true first frame is 0:00).
+//
+// Returns nil when the result would not satisfy YouTube's rules, so the
+// caller can leave the description without a chapter block rather than
+// shipping one that will be ignored.
+func BuildChapterTimestamps(chapters []Chapter, offsets []float64, videoSeconds float64, introDuration float64) []string {
 	if len(chapters) < MinChaptersForYouTube {
 		return nil
 	}
 
-	times := make([]float64, 0, len(chapters))
-	titles := make([]string, 0, len(chapters))
+	times := make([]float64, 0, len(chapters)+1)
+	titles := make([]string, 0, len(chapters)+1)
 	for _, chapter := range chapters {
 		if chapter.SceneIndex < 0 || chapter.SceneIndex >= len(offsets) {
 			return nil
@@ -48,14 +59,26 @@ func BuildChapterTimestamps(chapters []Chapter, offsets []float64, videoSeconds 
 		if title == "" {
 			return nil
 		}
-		times = append(times, offsets[chapter.SceneIndex])
+		start := offsets[chapter.SceneIndex]
+		if introDuration > 0 {
+			start += introDuration
+		}
+		times = append(times, start)
 		titles = append(titles, title)
 	}
 
-	// The first chapter must open the video. A Creator who marked their first
-	// chapter a little way in still gets chapters — the opening is simply
-	// pulled back to zero, which is what they meant.
-	times[0] = 0
+	if introDuration > 0 {
+		// A synthetic chapter for the channel intro itself — it is real screen
+		// time the viewer sees, so it earns its own entry rather than being
+		// folded silently into whatever the Creator's first marker was.
+		times = append([]float64{0}, times...)
+		titles = append([]string{"Intro"}, titles...)
+	} else {
+		// The first chapter must open the video. A Creator who marked their
+		// first chapter a little way in still gets chapters — the opening is
+		// simply pulled back to zero, which is what they meant.
+		times[0] = 0
+	}
 
 	for i := range times {
 		if i > 0 && times[i] <= times[i-1] {

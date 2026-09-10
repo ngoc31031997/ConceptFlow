@@ -64,8 +64,14 @@ import time
 from collections.abc import Callable
 
 from domain.errors import AnimationEngineError
-from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
-from domain.ports import ManimScriptRendererPort
+from domain.models import (
+    ChannelAssetRenderRequest,
+    ChannelAssetRenderResult,
+    DryRunResult,
+    ScriptRenderRequest,
+    ScriptRenderResult,
+)
+from domain.ports import ChannelAssetRendererPort, ManimScriptRendererPort
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +152,23 @@ DURATIONS_FILENAME = "cf_durations.json"
 #: (CR-018 FR49.2).
 DEFAULT_DRY_RUN_TIMEOUT_SECONDS = 300
 
+#: CR-023 D3/D4 — the only two scene classes `render_channel_asset` may run.
+#: A fixed map (not an arbitrary `scene_class_name` from the request) because,
+#: unlike `render()`, this path is not validated by CR-020's lint/dry-run gate
+#: first: the caller is the admin flow in D3, not a Creator-authored script.
+CHANNEL_ASSET_SCENES = {
+    "intro": "DefaultIntroSting",
+    "outro": "ChannelOutro",
+}
 
-class ManimScriptRenderer(ManimScriptRendererPort):
+#: Written to a throwaway script.py so `manim <script> <SceneClassName>` can
+#: find the class in the script module's own namespace — the same mechanism
+#: `_run_manim` already relies on for Creator scripts, just importing a fixed
+#: class instead of embedding Creator-authored source.
+_CHANNEL_ASSET_SCRIPT_TEMPLATE = "from conceptflow.channel_idents import {scene_class_name}\n"
+
+
+class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
     def __init__(
         self,
         timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS,
@@ -278,6 +299,53 @@ class ManimScriptRenderer(ManimScriptRendererPort):
             wait_offsets=wait_offsets,
             video_duration_seconds=video_duration,
         )
+
+    def render_channel_asset(
+        self, request: ChannelAssetRenderRequest, output_path: str
+    ) -> ChannelAssetRenderResult:
+        """Runs one of the two fixed `conceptflow.channel_idents` scenes
+        (CR-023 D3/D4).
+
+        Deliberately simpler than `render()`: no marks file, no durations
+        file, no wait-offset reconciliation — neither scene calls
+        `self.narrate(...)`, so there is nothing for those to reconcile.
+        Reuses `_run_manim`/`_find_rendered_file`/`_probe_duration` exactly as
+        `render()` does, just without the narration-timing machinery that
+        does not apply here.
+        """
+        scene_class_name = CHANNEL_ASSET_SCENES.get(request.kind)
+        if scene_class_name is None:
+            raise ValueError(
+                f"unknown channel asset kind {request.kind!r}; "
+                f"expected one of {sorted(CHANNEL_ASSET_SCENES)}"
+            )
+        quality = self._resolve_quality(request.render_quality)
+
+        # Not cached per-project like Creator scripts (there is no project_id
+        # here) — a fresh tempdir per call, always torn down.
+        media_dir = tempfile.mkdtemp(prefix="manim-media-channel-asset-")
+        script_path = os.path.join(media_dir, "script.py")
+        marks_path = os.path.join(media_dir, MARKS_FILENAME)
+        try:
+            with open(script_path, "w") as f:
+                f.write(_CHANNEL_ASSET_SCRIPT_TEMPLATE.format(scene_class_name=scene_class_name))
+
+            self._run_manim(script_path, scene_class_name, media_dir, marks_path, quality)
+
+            rendered_path = self._find_rendered_file(media_dir)
+            video_duration = _probe_duration(rendered_path)
+            shutil.move(rendered_path, output_path)
+        finally:
+            shutil.rmtree(media_dir, ignore_errors=True)
+
+        return ChannelAssetRenderResult(
+            video_path=output_path,
+            video_duration_seconds=video_duration,
+            render_quality=quality,
+        )
+
+    def resolve_render_quality(self, requested: str | None) -> str:
+        return self._resolve_quality(requested)
 
     def _resolve_quality(self, requested: str | None) -> str:
         """Per-project quality wins; an unknown or absent one falls back to the

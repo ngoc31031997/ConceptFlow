@@ -133,6 +133,35 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_mode TEXT NOT NULL DEFAUL
 -- silently skipped or failed caption upload is visible on the project.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_status TEXT;
 
+-- CR-023 D7/FR67.1/FR67.2: whether the fixed channel intro/outro is attached
+-- at assemble_video. Default TRUE for both — channel identity is opt-out, so
+-- a project created before these columns existed also gets it.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS outro_enabled BOOLEAN NOT NULL DEFAULT TRUE;
+-- CR-023 D2: the channel_assets id actually resolved and dispatched with this
+-- project's assemble_video command, persisted (not re-resolved) so a retry
+-- reconstructs the identical payload (Rule 5) rather than looking it up again
+-- and potentially disagreeing with what was already sent.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_asset_id TEXT;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS outro_asset_id TEXT;
+
+-- CR-023 correction: orchestrator no longer calls video-assembly over HTTP to
+-- find the active intro/outro asset (no such HTTP server exists between
+-- backend services). It keeps its own lightweight projection instead, kept
+-- current by subscribing to channel_asset_rendered/channel_asset_normalized
+-- events, mirroring how handle_step_event.go already folds saga events into
+-- projects. No path column here on purpose — video-assembly's own
+-- channel_assets table is the only place that resolves asset_id to a real
+-- file path.
+CREATE TABLE IF NOT EXISTS channel_asset_pointers (
+    kind TEXT NOT NULL,
+    render_quality TEXT NOT NULL,
+    asset_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (kind, render_quality)
+);
+
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,
     step_name TEXT NOT NULL,

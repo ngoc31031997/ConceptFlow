@@ -44,6 +44,9 @@ class FakeConnection:
         elif normalized.startswith("UPDATE outbox_events SET published_at"):
             (row_id,) = args
             self._store.outbox_events[row_id]["published_at"] = "now"
+        elif normalized.startswith("UPDATE channel_assets SET superseded_at"):
+            (asset_id,) = args
+            self._store.channel_assets[asset_id]["superseded_at"] = "now"
         else:
             raise NotImplementedError(query)
         return "OK"
@@ -53,6 +56,42 @@ class FakeConnection:
         if normalized.startswith("SELECT 1 FROM processed_messages"):
             (message_id,) = args
             return {"?column?": 1} if message_id in self._store.processed_message_ids else None
+        if normalized.startswith("SELECT id, kind, render_quality") and "WHERE id = $1" in normalized:
+            (asset_id,) = args
+            row = self._store.channel_assets.get(asset_id)
+            return dict(row) if row is not None else None
+        if normalized.startswith("SELECT id, kind, render_quality") and "superseded_at IS NULL" in normalized:
+            kind, render_quality = args
+            for row in self._store.channel_assets.values():
+                matches = row["kind"] == kind and row["render_quality"] == render_quality
+                if matches and row["superseded_at"] is None:
+                    return dict(row)
+            return None
+        if normalized.startswith("INSERT INTO channel_assets"):
+            (
+                kind,
+                render_quality,
+                source_hash,
+                video_path,
+                music_path,
+                version,
+                duration_seconds,
+                music_source_hash,
+            ) = args
+            asset_id = f"asset-{next(self._store.channel_asset_id_seq)}"
+            self._store.channel_assets[asset_id] = {
+                "id": asset_id,
+                "kind": kind,
+                "render_quality": render_quality,
+                "source_hash": source_hash,
+                "video_path": video_path,
+                "music_path": music_path,
+                "version": version,
+                "duration_seconds": duration_seconds,
+                "music_source_hash": music_source_hash,
+                "superseded_at": None,
+            }
+            return {"id": asset_id}
         raise NotImplementedError(query)
 
     async def fetch(self, query: str, *args: object) -> list[dict]:
@@ -71,6 +110,8 @@ class FakePostgresStore:
         self.outbox_events: dict[int, dict] = {}
         self.outbox_id_seq = itertools.count(1)
         self.processed_message_ids: set[str] = set()
+        self.channel_assets: dict[str, dict] = {}
+        self.channel_asset_id_seq = itertools.count(1)
 
 
 class FakePool:

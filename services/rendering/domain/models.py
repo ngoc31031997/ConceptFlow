@@ -79,3 +79,33 @@ class ScriptRenderResult:
     video_path: str
     wait_offsets: list[float] = field(default_factory=list)
     video_duration_seconds: float = 0.0
+
+
+@dataclass(frozen=True)
+class ChannelAssetRenderRequest:
+    """Input to building a channel-wide intro/outro (CR-023 FR65, D3/D4).
+
+    Unlike `ScriptRenderRequest` this carries no `script_content` — the scene
+    to run is one of `conceptflow.channel_idents`' two fixed classes, selected
+    by `kind`, not an arbitrary Creator script. There is also no
+    `narration_segments`: neither scene calls `self.narrate(...)`, so the
+    two-pass dry/real machinery CR-018 built for narrated scripts does not
+    apply here (D4 — deliberately independent of CR-018).
+    """
+
+    kind: str  # "intro" | "outro"
+    render_quality: str | None = None
+
+
+@dataclass(frozen=True)
+class ChannelAssetRenderResult:
+    """Where the rendered channel asset landed, plus its real duration.
+
+    video-assembly (D1) is the one that decides which asset is "active" and
+    stores this alongside `source_hash`/`version` in its own `channel_assets`
+    table — Rendering only ever produces the file.
+    """
+
+    video_path: str
+    video_duration_seconds: float = 0.0
+    render_quality: str = ""

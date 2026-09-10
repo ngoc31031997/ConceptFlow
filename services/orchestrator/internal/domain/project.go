@@ -205,6 +205,21 @@ type Project struct {
 	// CR-004 — resolution/framerate for this project's render.
 	RenderQuality RenderQuality
 
+	// CR-023 FR67.1/67.2 — whether the fixed channel intro/outro sting is
+	// attached at assemble_video. Both default true (long-form channel
+	// identity is opt-out, not opt-in).
+	IntroEnabled bool
+	OutroEnabled bool
+	// IntroAssetID/OutroAssetID are resolved once, at assemble_video dispatch
+	// time, from video-assembly's channel_assets (CR-023 D1/D2) and then
+	// persisted here — nil when disabled or when no active asset was found
+	// (the saga proceeds without one rather than failing). Storing the
+	// resolved id rather than re-resolving it keeps RetryStepUseCase's Rule 5
+	// guarantee: a retry rebuilds the command purely from Project, with no
+	// second lookup that could disagree with what was actually dispatched.
+	IntroAssetID *string
+	OutroAssetID *string
+
 	Scenes []Scene
 
 	// CR-006 — chapter markers from the script, resolved to timestamps only

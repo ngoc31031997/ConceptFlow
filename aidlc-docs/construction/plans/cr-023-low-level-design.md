@@ -111,6 +111,54 @@ body, không lưu file nếu fail.
 
 ---
 
+## Correction sau khi bắt đầu Code Generation (2026-09-10)
+
+Code generation phát hiện D3 sai một tiền đề: hệ thống **không có HTTP server
+nào giữa các backend service** — `video-assembly` và `rendering` chỉ nói
+chuyện qua AMQP (lệnh vào/sự kiện ra), giống mọi service khác; chỉ
+`orchestrator` có lớp HTTP (`internal/adapters/http`), và chỉ nó được
+`api-gateway` proxy tới (`ORCHESTRATOR_URL`). "Gọi đồng bộ kiểu HTTP" ở D3 chưa
+từng tồn tại trong repo này để bắt chước.
+
+**Sửa D3**: dựng asset vẫn đồng bộ về mặt use-case (không qua saga project),
+nhưng transport đúng như `validate_script` **thật sự** dùng — cùng
+`rendering.commands` queue, thêm lệnh `render_channel_asset`, phát sự kiện
+`channel_asset_rendered` / `channel_asset_render_failed` ra
+`rendering.events`. Đã triển khai đúng như vậy
+(`services/rendering/adapters/messaging/consumer.py`).
+
+**Sửa D1/D2 hệ quả**: `channel_assets` (bảng đầy đủ, có `video_path`) vẫn ở
+`video-assembly` — nó là nơi consume `channel_asset_rendered`/normalize file
+upload và là nơi `assemble_video` cần path thật để ghép. Nhưng **orchestrator
+không gọi HTTP sang video-assembly để tra "asset nào đang active"** (không có
+gì để gọi). Thay vào đó: orchestrator giữ **một bảng chiếu (projection) nhẹ
+của riêng nó**, `channel_asset_pointers` (kind, render_quality, asset_id,
+version) — không có path — được cập nhật bằng cách **tự subscribe** sự kiện từ
+`rendering.events`/`video-assembly.events` giống cách `handle_step_event.go`
+đã subscribe sự kiện saga khác. `assemble_video` envelope chỉ mang
+`asset_id` (opaque) mà orchestrator đọc từ bảng chiếu của mình; video-assembly
+tự resolve `asset_id` → path thật trong bảng đầy đủ của nó khi ghép.
+
+Contract HTTP `GET /internal/channel-assets/latest` mà
+`services/orchestrator/internal/adapters/videoassembly/client.go` đã dựng ở
+lượt code-gen đầu (giả định sai) **bị thay thế** — file đó xoá, thay bằng một
+Postgres-backed `ChannelAssetPort` đọc từ `channel_asset_pointers` local.
+
+Đường upload/preview cho Creator (FR65.1/65.4/67.4) đi qua `orchestrator`'s
+HTTP layer đã có sẵn (đúng đường api-gateway đã proxy), **không** phải một
+HTTP server mới trên video-assembly:
+- `api-gateway` nhận file, ghi thẳng vào shared volume (đúng pattern
+  `thumbnailUploadHandler.js`), rồi gọi orchestrator (`POST
+  /v1/channel-assets/intro` trên orchestrator) để orchestrator publish một
+  lệnh AMQP `normalize_channel_asset` (queue của video-assembly) mang đường
+  dẫn file vừa ghi + hash. video-assembly consume, chuẩn hoá, ghi
+  `channel_assets`, phát `channel_asset_normalized` → orchestrator cập nhật
+  bảng chiếu của mình.
+- Preview (`GET /v1/channel-assets/preview`) đọc thẳng bảng chiếu của
+  orchestrator (đủ dữ liệu: kind, quality, asset_id, version; nếu web-gui cần
+  xem video thật, dùng đường file tĩnh sẵn có qua shared volume, không cần
+  path từ video-assembly's DB).
+
 ## Rủi ro mang từ CR sang, cách xử lý cụ thể
 - **Mất stream-copy**: đo lại sau khi implement, ghi số liệu vào CR gốc, không
   chặn merge nếu mất (đã là chi phí chấp nhận được theo rủi ro đã nêu).

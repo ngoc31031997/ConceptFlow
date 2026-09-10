@@ -42,3 +42,27 @@ def assembly_failed_envelope(saga_id: str, project_id: str, error_message: str) 
     return build_envelope(
         saga_id, project_id, {"event_type": "assembly_failed", "error_message": error_message}
     )
+
+
+def channel_asset_normalized_envelope(
+    saga_id: str, project_id: str, kind: str, asset_id: str, render_quality: str, version: int
+) -> dict:
+    """CR-023 D1/D8 correction — the one event shaped enough for Orchestrator's
+    channel_asset_pointers projection (handle_step_event.go's
+    handleChannelAssetProjection reads exactly these field names: kind,
+    render_quality, asset_id, version). Published both after ingesting
+    rendering's channel_asset_rendered and after normalizing a Creator
+    upload — either path ends with a new active row in this service's own
+    channel_assets table, and this is how Orchestrator finds out about it.
+    """
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "channel_asset_normalized",
+            "kind": kind,
+            "asset_id": asset_id,
+            "render_quality": render_quality,
+            "version": version,
+        },
+    )

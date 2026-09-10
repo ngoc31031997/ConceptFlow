@@ -15,8 +15,14 @@ import os
 import aio_pika
 
 from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS, FfmpegVideoAssembler
-from adapters.messaging.consumer import AssembleVideoCommandHandler
+from adapters.messaging.consumer import (
+    AssembleVideoCommandHandler,
+    ChannelAssetRenderedEventHandler,
+    NormalizeChannelAssetCommandHandler,
+    VideoAssemblyCommandDispatcher,
+)
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
@@ -27,6 +33,10 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "video_assembly.commands"
+# CR-023 correction: rendering.events' channel_asset_rendered fans out here
+# via events.direct/"orchestrator" (infra/rabbitmq/definitions.json) — this
+# queue exists solely so video-assembly, not just Orchestrator, gets a copy.
+CHANNEL_ASSET_EVENTS_QUEUE = "video_assembly.channel_asset_events"
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 READY_SENTINEL_PATH = "/tmp/ready"
 
@@ -43,29 +53,43 @@ async def run() -> None:
     pool = await create_pool()
     inbox = InboxRepository(pool)
     outbox = OutboxRepository()
+    channel_assets = ChannelAssetsRepository(pool)
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
-    queue = await channel.get_queue(COMMANDS_QUEUE)
+    commands_queue = await channel.get_queue(COMMANDS_QUEUE)
+    channel_asset_events_queue = await channel.get_queue(CHANNEL_ASSET_EVENTS_QUEUE)
 
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    command_handler = AssembleVideoCommandHandler(use_case, pool, inbox, outbox)
+    assemble_video_handler = AssembleVideoCommandHandler(use_case, pool, inbox, outbox, channel_assets)
+    normalize_handler = NormalizeChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
+    command_dispatcher = VideoAssemblyCommandDispatcher(assemble_video_handler, normalize_handler)
+    channel_asset_rendered_handler = ChannelAssetRenderedEventHandler(pool, channel_assets, inbox, outbox)
+
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 
-    consumer_tag = await queue.consume(command_handler.handle)
+    commands_consumer_tag = await commands_queue.consume(command_dispatcher.handle)
+    channel_asset_events_consumer_tag = await channel_asset_events_queue.consume(
+        channel_asset_rendered_handler.handle
+    )
 
     with open(READY_SENTINEL_PATH, "w") as f:
         f.write("ready")
-    logger.info("Video Assembly Service ready — consuming '%s'", COMMANDS_QUEUE)
+    logger.info(
+        "Video Assembly Service ready — consuming '%s' and '%s'",
+        COMMANDS_QUEUE,
+        CHANNEL_ASSET_EVENTS_QUEUE,
+    )
 
     try:
         await asyncio.Future()  # run forever
     finally:
-        await queue.cancel(consumer_tag)
+        await commands_queue.cancel(commands_consumer_tag)
+        await channel_asset_events_queue.cancel(channel_asset_events_consumer_tag)
         await relay.stop()
         await connection.close()
         await pool.close()

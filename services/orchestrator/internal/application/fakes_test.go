@@ -186,3 +186,38 @@ func (f *fakeProgress) last() *domain.ProgressMessage {
 	}
 	return &f.messages[len(f.messages)-1]
 }
+
+// fakeChannelAssetPointers is a fake domain.ChannelAssetPort backed by an
+// in-memory map, standing in for postgres.ChannelAssetPointerRepository
+// (CR-023 correction).
+type fakeChannelAssetPointers struct {
+	pointers map[string]domain.ChannelAssetPointer
+}
+
+func newFakeChannelAssetPointers() *fakeChannelAssetPointers {
+	return &fakeChannelAssetPointers{pointers: map[string]domain.ChannelAssetPointer{}}
+}
+
+func (f *fakeChannelAssetPointers) key(kind string, quality domain.RenderQuality) string {
+	return kind + "|" + string(quality)
+}
+
+func (f *fakeChannelAssetPointers) LatestChannelAsset(_ context.Context, kind string, quality domain.RenderQuality) (string, error) {
+	if p, ok := f.pointers[f.key(kind, quality)]; ok {
+		return p.AssetID, nil
+	}
+	return "", nil
+}
+
+func (f *fakeChannelAssetPointers) UpsertChannelAssetPointer(_ context.Context, kind string, quality domain.RenderQuality, assetID string, version int) error {
+	f.pointers[f.key(kind, quality)] = domain.ChannelAssetPointer{Kind: kind, RenderQuality: quality, AssetID: assetID, Version: version}
+	return nil
+}
+
+func (f *fakeChannelAssetPointers) ListChannelAssetPointers(_ context.Context) ([]domain.ChannelAssetPointer, error) {
+	out := make([]domain.ChannelAssetPointer, 0, len(f.pointers))
+	for _, p := range f.pointers {
+		out = append(out, p)
+	}
+	return out, nil
+}
