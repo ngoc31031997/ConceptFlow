@@ -52,4 +52,7 @@ SCENE_METHODS = frozenset({
     "title", "heading", "body", "caption", "formula", "code",
     "stack", "row", "fit",
     "reveal", "dismiss", "swap", "emphasize", "clear_stage",
+    # Beat dựng sẵn (CR-019 FR53)
+    "hook", "recap", "call_to_action",
+    "narrate", "beat", "chapter",
 })

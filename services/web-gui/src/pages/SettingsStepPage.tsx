@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { NarrationPanel } from "../components/NarrationPanel";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
+import { VideoFormatPicker } from "../components/VideoFormatPicker";
+import { useVideoFormats } from "../hooks/useVideoFormats";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
@@ -16,6 +18,7 @@ import styles from "./WizardSteps.module.css";
 export function SettingsStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
+  const formats = useVideoFormats();
   const navigate = useNavigate();
   const hasScript = useRequireScript();
 
@@ -43,6 +46,12 @@ export function SettingsStepPage() {
           />
 
           <div className={styles.settingsRow}>
+            <VideoFormatPicker
+              formats={formats}
+              value={draft.videoFormatId}
+              onChange={(formatId) => dispatch({ type: "SET_VIDEO_FORMAT", payload: formatId })}
+            />
+
             <RenderQualityPicker
               value={draft.renderQuality}
               onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}

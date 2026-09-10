@@ -9,6 +9,7 @@ export interface RenderInput {
   subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "720p30" | "1080p60" | "4k60";
+  video_format_id?: string;
   background_music_volume?: number;
 }
 
@@ -127,4 +128,31 @@ export interface ProjectSummary {
   video_path?: string;
   error_message?: string;
   updated_at: string;
+}
+
+
+/** Một beat trong hình dạng video (CR-019 FR51). */
+export interface FormatBeat {
+  id: string;
+  role: string;
+  min_seconds: number;
+  max_seconds: number;
+  required: boolean;
+  max_repeat: number;
+}
+
+/**
+ * Hình dạng lặp lại của một video.
+ *
+ * Là dữ liệu chứ không phải hằng số trong mã nguồn: beat nào một chủ đề cần thì
+ * thay đổi rất nhiều, nên một bộ beat cố định sẽ sai ngay ở chủ đề đầu tiên
+ * không vừa khuôn. Creator nhân bản rồi sửa (FR51.5).
+ */
+export interface VideoFormat {
+  id: string;
+  name: string;
+  version: number;
+  min_seconds: number;
+  max_seconds: number;
+  beats: FormatBeat[];
 }

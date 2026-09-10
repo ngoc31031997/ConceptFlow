@@ -96,6 +96,7 @@ export function ReviewStepPage() {
               }
             : undefined,
         render_quality: draft.renderQuality,
+        video_format_id: draft.videoFormatId,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,
       });
       dispatch({ type: "MARK_SUBMITTED" });

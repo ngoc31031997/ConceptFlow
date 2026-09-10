@@ -633,3 +633,80 @@ func TestHandleStepEventUseCase_TTSDisabled_UsesCalibratedRateWhenAvailable(t *t
 		t.Fatalf("phải dùng số đo thật (%v) thay hằng số (%v)", got, plain)
 	}
 }
+
+func TestHandleStepEventUseCase_ScriptValidated_BlocksWhenARequiredBeatIsMissing(t *testing.T) {
+	// CR-019 FR52.3/52.5: chặn ở dữ kiện chắc chắn (beat bắt buộc thiếu), và
+	// chặn TRƯỚC TTS nên không tốn quota giọng đọc.
+	uc, repo, pub, prog := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true,
+		VideoFormatID: domain.DefaultVideoFormatID,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": "n0"},
+			},
+			// Có beat nhưng thiếu concrete/pattern/recap/cta.
+			"beats": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "id": "hook"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusFailedValidateScript {
+		t.Fatalf("muốn failed_at_validate_script, có %s", project.Status)
+	}
+	if last := pub.last(); last != nil && last.routingKey == "tts" {
+		t.Fatal("không được gửi lệnh TTS khi beat bắt buộc còn thiếu")
+	}
+	if got := prog.last(); got == nil || got.Status != "failed" {
+		t.Fatalf("phải báo failed lên GUI: %+v", got)
+	}
+}
+
+func TestHandleStepEventUseCase_ScriptValidated_DerivesChaptersFromBeats(t *testing.T) {
+	// FR52.2: chapter sinh từ beat thay cho marker `# CHAPTER:` rời rạc.
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	beats := []interface{}{}
+	for i, id := range []string{"hook", "concrete", "pattern", "recap", "cta"} {
+		beats = append(beats, map[string]interface{}{"scene_index": float64(i), "id": id})
+	}
+	scenes := []interface{}{}
+	for i := 0; i < 5; i++ {
+		scenes = append(scenes, map[string]interface{}{"scene_index": float64(i), "narration_text": "n"})
+	}
+
+	if err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{"scenes": scenes, "beats": beats},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if len(project.Chapters) != 5 {
+		t.Fatalf("muốn 5 chapter từ 5 beat, có %d", len(project.Chapters))
+	}
+	if project.Chapters[0].Title != "hook" || project.Chapters[0].SceneIndex != 0 {
+		t.Fatalf("chapter đầu sai: %+v", project.Chapters[0])
+	}
+	// FR51.6: phiên bản format được chốt lại tại thời điểm chạy.
+	if project.VideoFormatVersion == 0 {
+		t.Error("phải chốt phiên bản format")
+	}
+}

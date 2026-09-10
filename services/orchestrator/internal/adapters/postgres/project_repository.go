@@ -25,7 +25,7 @@ func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 // Get loads a Project by project_id, or domain.ErrProjectNotFound.
 func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
+		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version,
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
@@ -44,7 +44,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		chaptersJSON          []byte
 		subtitleMode          string
 	)
-	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage,
+	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeChannelID, &p.YoutubeVideoURL, &p.ErrorMessage,
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
@@ -195,16 +195,17 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	}
 
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language,
+		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version,
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		                       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33, now())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
 		    plugin_id = EXCLUDED.plugin_id, category_hint = EXCLUDED.category_hint, voice_language = EXCLUDED.voice_language,
+		    video_format_id = EXCLUDED.video_format_id, video_format_version = EXCLUDED.video_format_version,
 		    background_music_path = EXCLUDED.background_music_path, scenes = EXCLUDED.scenes,
 		    rendered_video_path = EXCLUDED.rendered_video_path,
 		    video_path = EXCLUDED.video_path, youtube_title = EXCLUDED.youtube_title,
@@ -225,7 +226,9 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    caption_status = EXCLUDED.caption_status,
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
-		project.CategoryHint, string(project.ContentLanguage), project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
+		project.CategoryHint, string(project.ContentLanguage),
+		project.VideoFormatID, project.VideoFormatVersion,
+		project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
 		project.YoutubeTitle, project.YoutubeDescription, tagsJSON, youtubeVisibility, project.YoutubePublishAt,
 		project.YoutubeThumbnailPath, project.YoutubeChannelID, project.YoutubeVideoURL, project.ErrorMessage,
 		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON,
@@ -333,4 +336,108 @@ func (r *ProjectRepository) ListVoiceCalibrations(ctx context.Context) ([]domain
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// SeedVideoFormats writes the built-in formats if they are not already there
+// (CR-019 FR51.2).
+//
+// Insert-if-absent rather than upsert: once the Creator has edited a format,
+// a restart must not quietly restore the shipped numbers underneath them.
+func (r *ProjectRepository) SeedVideoFormats(ctx context.Context) error {
+	for _, format := range domain.BuiltinFormats() {
+		beats, err := json.Marshal(format.Beats)
+		if err != nil {
+			return err
+		}
+		if _, err := r.pool.Exec(ctx, `
+			INSERT INTO video_formats (format_id, version, name, min_seconds, max_seconds, beats)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			ON CONFLICT (format_id, version) DO NOTHING
+		`, format.ID, format.Version, format.Name, format.MinSeconds, format.MaxSeconds, beats); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GetVideoFormat returns one format. version <= 0 means "the newest".
+func (r *ProjectRepository) GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error) {
+	if formatID == "" {
+		formatID = domain.DefaultVideoFormatID
+	}
+
+	query := `
+		SELECT format_id, version, name, min_seconds, max_seconds, beats
+		FROM video_formats WHERE format_id = $1 AND ($2 <= 0 OR version = $2)
+		ORDER BY version DESC LIMIT 1`
+
+	var format domain.VideoFormat
+	var beats []byte
+	err := r.pool.QueryRow(ctx, query, formatID, version).Scan(
+		&format.ID, &format.Version, &format.Name, &format.MinSeconds, &format.MaxSeconds, &beats,
+	)
+	if err != nil {
+		// A project pointing at a format that no longer exists still has to
+		// render. Falling back to the built-in default beats failing the saga
+		// over a bookkeeping problem the Creator cannot see.
+		return domain.FormatVisualFirst7Min, nil
+	}
+	if err := json.Unmarshal(beats, &format.Beats); err != nil {
+		return domain.FormatVisualFirst7Min, nil
+	}
+	return format, nil
+}
+
+// ListVideoFormats returns the newest version of every format.
+func (r *ProjectRepository) ListVideoFormats(ctx context.Context) ([]domain.VideoFormat, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT ON (format_id) format_id, version, name, min_seconds, max_seconds, beats
+		FROM video_formats ORDER BY format_id, version DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.VideoFormat, 0)
+	for rows.Next() {
+		var format domain.VideoFormat
+		var beats []byte
+		if err := rows.Scan(&format.ID, &format.Version, &format.Name,
+			&format.MinSeconds, &format.MaxSeconds, &beats); err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(beats, &format.Beats); err != nil {
+			return nil, err
+		}
+		out = append(out, format)
+	}
+	return out, rows.Err()
+}
+
+// SaveVideoFormat stores a format as a NEW version (CR-019 FR51.6).
+//
+// Never overwrites: a project rendered against version 3 must keep reporting
+// version 3's beats, otherwise editing a format silently rewrites the structure
+// of every video already made with it.
+func (r *ProjectRepository) SaveVideoFormat(ctx context.Context, format domain.VideoFormat) (domain.VideoFormat, error) {
+	beats, err := json.Marshal(format.Beats)
+	if err != nil {
+		return format, err
+	}
+	var version int
+	err = r.pool.QueryRow(ctx, `
+		INSERT INTO video_formats (format_id, version, name, min_seconds, max_seconds, beats)
+		VALUES (
+		    $1,
+		    COALESCE((SELECT MAX(version) FROM video_formats WHERE format_id = $1), 0) + 1,
+		    $2, $3, $4, $5
+		)
+		RETURNING version
+	`, format.ID, format.Name, format.MinSeconds, format.MaxSeconds, beats).Scan(&version)
+	if err != nil {
+		return format, err
+	}
+	format.Version = version
+	return format, nil
 }

@@ -73,6 +73,27 @@ CREATE TABLE IF NOT EXISTS voice_calibration (
     total_seconds DOUBLE PRECISION NOT NULL DEFAULT 0,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- CR-019: hình dạng lặp lại của một video, dưới dạng dữ liệu sửa được.
+--
+-- Là bảng chứ không phải hằng số trong mã nguồn vì beat nào một chủ đề cần thì
+-- thay đổi rất nhiều — một bộ beat hardcode sẽ sai ngay ở chủ đề đầu tiên không
+-- vừa khuôn (FR51.4/FR51.5). Cột version để một project render tháng trước vẫn
+-- báo đúng cấu trúc nó thực sự được dựng theo (FR51.6).
+CREATE TABLE IF NOT EXISTS video_formats (
+    format_id TEXT NOT NULL,
+    version INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    min_seconds DOUBLE PRECISION NOT NULL,
+    max_seconds DOUBLE PRECISION NOT NULL,
+    beats JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (format_id, version)
+);
+
+-- Format Creator chọn cho project, và phiên bản format tại thời điểm chạy.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_version INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
 -- CR-002: where each narration segment actually begins in the rendered video,
 -- as measured by Rendering. Projects rendered before this column existed have

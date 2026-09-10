@@ -167,6 +167,27 @@ Một video 12 phút loãng tệ hơn hẳn một video 7 phút chặt.
    chính vì lý do đó, và CR-022 sẽ thay các con số này bằng số đo thật khi kênh
    có đủ dữ liệu.
 
+## Điều chỉnh khi triển khai (2026-09-10)
+
+**Script không khai báo beat nào thì được cảnh báo, không bị chặn.**
+
+FR52.5 nói beat bắt buộc thiếu thì chặn. Khi triển khai lộ ra một ca biên CR
+chưa nói tới: script **chưa khai báo beat nào cả**. Áp luật nguyên văn thì mọi
+script đơn giản và mọi script viết trước khi beat tồn tại đều fail — cách nhanh
+nhất để Creator ghét cơ chế này thay vì dùng nó.
+
+Luật thực thi: chưa khai báo beat nào ⇒ cảnh báo, không chặn. Khai báo **một**
+beat là đã chọn dùng format ⇒ áp đủ luật. Việc chọn dùng là tất-cả-hoặc-không,
+nên lỗ hổng này không dùng được để né một beat bắt buộc phiền phức.
+
+**Kiểm beat chạy ở `orchestrator`, không ở `rendering`.** Lượt dry đã trả về
+danh sách beat từ CR-020, và `VideoFormat` sống trong domain Go, nên gửi format
+sang Rendering chỉ để nó kiểm hộ là thêm một đường dữ liệu không cần thiết.
+Kiểm ngay khi nhận `script_validated` — vẫn là trước TTS, đúng yêu cầu FR52.3.
+
+**Chapter lấy `beat.id` làm tiêu đề.** Làm cho nó đẹp hơn nghĩa là đoán xem
+phần đó nói về cái gì — đúng thứ CR-006 đã từ chối để model làm.
+
 ## Câu hỏi cần Creator chốt
 1. Format nào là format chính của kênh — độ dài mục tiêu và bộ beat cụ thể?
 2. Beat nào thực sự bắt buộc? Đề xuất trong CR là hook / promise / payoff / cta;

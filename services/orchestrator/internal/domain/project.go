@@ -171,6 +171,12 @@ type Project struct {
 	// Scene.DurationSeconds is filled from EstimateNarrationDuration instead.
 	TTSEnabled bool
 	VoiceID    string
+
+	// CR-019: hình dạng video project này được dựng theo. Version chốt lại tại
+	// thời điểm render, nên sửa format sau đó không làm sai lệch dàn ý hay
+	// chapter của video cũ (FR51.6).
+	VideoFormatID      string
+	VideoFormatVersion int
 	// SubtitlesEnabled is kept for wire/schema backward compatibility (a
 	// caller that never adopts subtitle_mode) but SubtitleMode is the
 	// source of truth from CR-015 on — see project_repository.go's Get for

@@ -47,4 +47,10 @@ type ProjectRepositoryPort interface {
 	RecordVoiceSamples(ctx context.Context, voiceID string, words int, seconds float64) error
 	GetVoiceCalibration(ctx context.Context, voiceID string) (VoiceCalibration, error)
 	ListVoiceCalibrations(ctx context.Context) ([]VoiceCalibration, error)
+
+	// CR-019: hình dạng video, lưu dưới dạng dữ liệu sửa được.
+	SeedVideoFormats(ctx context.Context) error
+	GetVideoFormat(ctx context.Context, formatID string, version int) (VideoFormat, error)
+	ListVideoFormats(ctx context.Context) ([]VideoFormat, error)
+	SaveVideoFormat(ctx context.Context, format VideoFormat) (VideoFormat, error)
 }

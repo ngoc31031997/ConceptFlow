@@ -31,6 +31,7 @@ export interface ProjectDraft {
   subtitleMode: SubtitleMode;
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
+  videoFormatId: string;
   backgroundMusicVolume: number;
   /**
    * True once this draft has been handed to the render saga. The draft then
@@ -57,6 +58,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_MODE"; payload: SubtitleMode }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
+  | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
   | { type: "MARK_SUBMITTED" }
   | { type: "RESET" };
@@ -82,6 +84,7 @@ const initialDraft: ProjectDraft = {
   subtitleMode: "track",
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
+  videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   hasSubmitted: false,
 };
@@ -136,6 +139,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
+    case "SET_VIDEO_FORMAT":
+      return { ...state, videoFormatId: action.payload };
     case "MARK_SUBMITTED":
       return { ...state, hasSubmitted: true };
     case "SET_SUBTITLE_STYLE":

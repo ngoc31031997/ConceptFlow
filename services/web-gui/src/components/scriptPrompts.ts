@@ -17,6 +17,49 @@
  * silently produced Vietnamese narration, because the prompt was Vietnamese
  * throughout and never said otherwise.
  */
+import { WORDS_PER_MINUTE, type ContentLanguage } from "../utils/durationEstimate";
+import type { VideoFormat } from "../types";
+
+/**
+ * Beat sheet đưa vào prompt dưới dạng **ngân sách từ**, không phải ngân sách
+ * phút (CR-019 FR54.1).
+ *
+ * Model đếm được từ; nó không đếm được giây. Nói "beat này 40–70 giây" là giao
+ * cho model một phép quy đổi mà nó không có cơ sở để làm, nên kết quả trôi rất
+ * xa. Quy đổi sẵn ở đây bằng chính tốc độ đọc hệ thống sẽ dùng — kể cả tốc độ
+ * đã hiệu chỉnh theo giọng Creator chọn (FR54.3).
+ */
+export function buildBeatSheetSection(
+  format: VideoFormat,
+  language: ContentLanguage,
+  wordsPerMinute?: number,
+): string {
+  const wpm = wordsPerMinute ?? WORDS_PER_MINUTE[language] ?? WORDS_PER_MINUTE.en;
+  const words = (seconds: number) => Math.round((seconds * wpm) / 60);
+
+  const rows = format.beats
+    .map((beat) => {
+      const repeat = beat.max_repeat > 1 ? ` (lặp tối đa ${beat.max_repeat} lần)` : "";
+      const required = beat.required ? "BẮT BUỘC" : "tuỳ chọn";
+      return `   - \`self.beat("${beat.id}")\` — ${required}${repeat}: khoảng ${words(
+        beat.min_seconds,
+      )}–${words(beat.max_seconds)} từ lời thoại`;
+    })
+    .join("\n");
+
+  return `## CẤU TRÚC VIDEO BẮT BUỘC — format "${format.name}"
+
+Gọi \`self.beat("<id>")\` ngay trước đoạn mở đầu mỗi phần, theo ĐÚNG thứ tự dưới đây:
+
+${rows}
+
+Quy tắc cứng:
+   - Beat ghi BẮT BUỘC mà thiếu thì hệ thống DỪNG trước khi tạo giọng đọc — script không render được.
+   - \`concrete\` phải đứng TRƯỚC \`pattern\`: cho người xem thấy một ví dụ chạy thật rồi mới rút ra quy luật. Đây là điểm khác biệt của kênh, không phải sở thích trình bày.
+   - Ngân sách từ ở trên là để canh nhịp, lệch chút không sao; thứ tự và các beat bắt buộc thì không được lệch.
+`;
+}
+
 const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
   vi: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG VIỆT.",
   en: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
@@ -77,7 +120,11 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 Script gốc:
 <dán script Manim của bạn vào đây>`;
 
-export const buildGenerationSystemPrompt = (language: "vi" | "en") => `Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục kiêm đạo diễn hoạt hình, chuyên viết video giải thích bằng Manim (Community Edition v0.18). Bạn không chỉ viết code — bạn TỰ NGHĨ RA kịch bản, cách ví von, thứ tự trình bày và hình ảnh minh họa sao cho người xem hiểu nhanh nhất, giống như một video trên kênh YouTube giáo dục chất lượng cao (kiểu 3Blue1Brown/ đơn giản dễ hiểu).
+export const buildGenerationSystemPrompt = (
+  language: "vi" | "en",
+  format?: VideoFormat,
+  wordsPerMinute?: number,
+) => `Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục kiêm đạo diễn hoạt hình, chuyên viết video giải thích bằng Manim (Community Edition v0.18). Bạn không chỉ viết code — bạn TỰ NGHĨ RA kịch bản, cách ví von, thứ tự trình bày và hình ảnh minh họa sao cho người xem hiểu nhanh nhất, giống như một video trên kênh YouTube giáo dục chất lượng cao (kiểu 3Blue1Brown/ đơn giản dễ hiểu).
 
 ======================================================
 CHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]
@@ -93,11 +140,11 @@ Với chủ đề trên, hãy TỰ MÌNH:
 4. Tự chia video thành các "cảnh nhỏ" (mỗi cảnh = một ý), đảm bảo nhịp độ hợp lý, không dồn quá nhiều chữ vào một khung hình.
 5. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
 
-## ĐỘ DÀI MỤC TIÊU
+${format ? buildBeatSheetSection(format, language, wordsPerMinute) : `## ĐỘ DÀI MỤC TIÊU
 
-Video dài 5-10 phút (khoảng 20-40 marker NARRATION). Đây là độ dài phù hợp để bật kiếm tiền trên YouTube — đủ dài để chèn quảng cáo giữa video, đủ sâu để giữ chân người xem. Đừng viết quá ngắn.
+Video dài 6-8 phút. Kênh còn mới nên thứ cần tối ưu là tỉ lệ giữ chân người xem, không phải mốc 8 phút để chèn quảng cáo giữa video — một video 12 phút loãng tệ hơn hẳn một video 7 phút chặt.`}
 
-Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ thể, màu sắc, bố cục, thứ tự trình bày. Chỉ cần đúng chủ đề và đúng ràng buộc kỹ thuật bên dưới.
+Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ thể, thứ tự trình bày trong từng beat. Màu sắc và bố cục thì KHÔNG — design system lo phần đó.
 
 ## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)
 
@@ -176,8 +223,13 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 const SCRIPT_PLACEHOLDER = "<dán script Manim của bạn vào đây>";
 
 /** The "write me a script" prompt with the Creator's topic already in it. */
-export function buildGenerationPromptFor(language: "vi" | "en", topic: string): string {
-  const prompt = buildGenerationSystemPrompt(language);
+export function buildGenerationPromptFor(
+  language: "vi" | "en",
+  topic: string,
+  format?: VideoFormat,
+  wordsPerMinute?: number,
+): string {
+  const prompt = buildGenerationSystemPrompt(language, format, wordsPerMinute);
   const trimmed = topic.trim();
   return trimmed ? prompt.replace(TOPIC_PLACEHOLDER, trimmed) : prompt;
 }

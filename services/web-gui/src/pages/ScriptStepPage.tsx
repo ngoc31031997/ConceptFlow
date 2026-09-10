@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { ScriptAssistant } from "../components/ScriptAssistant";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
+import { useVideoFormats } from "../hooks/useVideoFormats";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
@@ -30,6 +31,7 @@ export function ScriptStepPage() {
   }, [draft.hasSubmitted, dispatch]);
 
   const calibration = useVoiceCalibration();
+  const formats = useVideoFormats();
   const validation = validateScript(
     draft.scriptContent,
     draft.voiceLanguage,
@@ -61,6 +63,8 @@ export function ScriptStepPage() {
           <div className={styles.assistantColumn}>
             <ScriptAssistant
               contentLanguage={draft.voiceLanguage}
+              format={formats.find((f) => f.id === draft.videoFormatId)}
+              wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
               source={draft.scriptSource}
               onSourceChange={(source) => dispatch({ type: "SET_SCRIPT_SOURCE", payload: source })}
               onUseTemplate={() =>

@@ -46,6 +46,17 @@ type fakeProjectReader struct {
 	listErr      error
 	deleteErr    error
 	calibrations []domain.VoiceCalibration
+	savedFormat  *domain.VideoFormat
+}
+
+func (f *fakeProjectReader) ListVideoFormats(_ context.Context) ([]domain.VideoFormat, error) {
+	return domain.BuiltinFormats(), nil
+}
+
+func (f *fakeProjectReader) SaveVideoFormat(_ context.Context, format domain.VideoFormat) (domain.VideoFormat, error) {
+	f.savedFormat = &format
+	format.Version = 7
+	return format, nil
 }
 
 func (f *fakeProjectReader) ListVoiceCalibrations(_ context.Context) ([]domain.VoiceCalibration, error) {
@@ -250,5 +261,66 @@ func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 	}
 	if got := body.WordsPerMinute["vi-Enough"]; math.Abs(got-150) > 1e-9 {
 		t.Errorf("WPM = %v, muốn 150", got)
+	}
+}
+
+func TestHandleSaveFormat_RejectsAFormatWithNoBeats(t *testing.T) {
+	reader := &fakeProjectReader{}
+	router := NewRouter(nil, nil, nil, reader, nil)
+
+	body := []byte(`{"id":"x","name":"X","min_seconds":60,"max_seconds":120,"beats":[]}`)
+	req := httptest.NewRequest("POST", "/v1/formats", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	if reader.savedFormat != nil {
+		t.Error("không được lưu format rỗng beat")
+	}
+}
+
+func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
+	// FR51.6: không bao giờ ghi đè — project dựng theo version 3 phải tiếp tục
+	// báo đúng beat của version 3.
+	reader := &fakeProjectReader{}
+	router := NewRouter(nil, nil, nil, reader, nil)
+
+	body := []byte(`{"id":"visual_first_7min","name":"Của tôi","min_seconds":300,"max_seconds":480,
+	                 "beats":[{"id":"hook","role":"hook","min_seconds":5,"max_seconds":12,"required":true,"max_repeat":1}]}`)
+	req := httptest.NewRequest("POST", "/v1/formats", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 201 {
+		t.Fatalf("status = %d, body = %s", rec.Code, rec.Body.String())
+	}
+	var saved domain.VideoFormat
+	if err := json.Unmarshal(rec.Body.Bytes(), &saved); err != nil {
+		t.Fatalf("body không phải JSON: %v", err)
+	}
+	if saved.Version != 7 {
+		t.Errorf("phải trả về phiên bản mới, có %d", saved.Version)
+	}
+}
+
+func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil)
+	req := httptest.NewRequest("GET", "/v1/formats", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("status = %d", rec.Code)
+	}
+	var body struct {
+		Formats []domain.VideoFormat `json:"formats"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("body không phải JSON: %v", err)
+	}
+	if len(body.Formats) < 2 {
+		t.Fatalf("muốn ít nhất 2 format, có %d", len(body.Formats))
 	}
 }

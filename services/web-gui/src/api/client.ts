@@ -8,6 +8,7 @@ import type {
   RenderInput,
   SagaStartedResponse,
   Voice,
+  VideoFormat,
 } from "../types";
 
 const GATEWAY_URL = import.meta.env.VITE_API_BASE_URL;
@@ -15,6 +16,14 @@ const GATEWAY_URL = import.meta.env.VITE_API_BASE_URL;
 export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, thử lại sau";
 
 export class ApiError extends Error {}
+
+/** Các hình dạng video Creator chọn được (CR-019 FR51.3). */
+export async function fetchVideoFormats(): Promise<VideoFormat[]> {
+  const response = await fetch(`${GATEWAY_URL}/v1/formats`);
+  if (!response.ok) return [];
+  const body = await response.json();
+  return Array.isArray(body?.formats) ? (body.formats as VideoFormat[]) : [];
+}
 
 /**
  * Tốc độ đọc **đo được** của từng giọng (CR-016 FR43.2).

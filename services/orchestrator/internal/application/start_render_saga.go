@@ -20,6 +20,9 @@ type StartRenderSagaInput struct {
 	// CR-001 — narration/subtitle switches chosen by the Creator at submit time.
 	TTSEnabled bool
 	VoiceID    string
+
+	// CR-019 — empty means DefaultVideoFormatID.
+	VideoFormatID string
 	// SubtitlesEnabled is the pre-CR-015 shape, still accepted from a caller
 	// that has not adopted SubtitleMode; SubtitleMode wins when both are
 	// sent (a client migrating one field at a time should not regress).
@@ -84,6 +87,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		BackgroundMusicPath: input.BackgroundMusicPath,
 		TTSEnabled:          input.TTSEnabled,
 		VoiceID:             input.VoiceID,
+		VideoFormatID:       formatOrDefault(input.VideoFormatID),
 		// Kept in lockstep with SubtitleMode rather than taken verbatim from
 		// input, so anything still reading the legacy field (an older
 		// client of GET /v1/projects/{id}) sees a value consistent with
@@ -126,4 +130,13 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 	}
 
 	return &StartRenderSagaOutput{SagaID: sagaID, Status: domain.StatusParsingScript}, nil
+}
+
+// formatOrDefault keeps every project pointing at a real format, including the
+// ones created before formats existed (CR-019 FR51.3).
+func formatOrDefault(formatID string) string {
+	if formatID == "" {
+		return domain.DefaultVideoFormatID
+	}
+	return formatID
 }

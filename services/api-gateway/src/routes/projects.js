@@ -41,6 +41,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
   // lúc soạn khớp với giọng Creator thực sự dùng.
   router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-019 FR51.3/51.5 — hình dạng video: đọc danh sách, và lưu bản đã sửa
+  // thành một phiên bản mới (không bao giờ ghi đè).
+  router.get('/v1/formats', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/formats', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/video', videoHandler(orchestratorClient, sharedDir));
   router.post('/v1/projects/:id/retry', proxyHandler(orchestratorClient, 'orchestrator'));

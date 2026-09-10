@@ -231,15 +231,64 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 // which no amount of reading the source text could have counted correctly.
 func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event StepEvent, project *domain.Project) error {
 	project.Scenes = parseInitialScenes(event.Payload)
-	project.Chapters = parseChapters(event.Payload)
+	beats := parseBeats(event.Payload)
+
+	// CR-019 FR52.2: chapter sinh ra từ beat, không còn từ marker `# CHAPTER:`
+	// rời rạc. Hai cơ chế song song sẽ trôi khỏi nhau, và beat vốn đã là chỗ
+	// Creator quyết định cấu trúc.
+	project.Chapters = chaptersFromBeats(beats)
+
+	// Chốt phiên bản format tại thời điểm chạy (FR51.6), để sửa format sau này
+	// không làm sai lệch cấu trúc của video đã dựng.
+	format, err := uc.repo.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)
+	if err == nil {
+		project.VideoFormatID = format.ID
+		project.VideoFormatVersion = format.Version
+	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
+	}
+
+	// FR52.3/FR52.5: thiếu beat bắt buộc là dữ kiện chắc chắn nên chặn được;
+	// mọi thứ còn lại (beat lạ, lặp quá, sai thứ tự) chỉ cảnh báo, vì chặn
+	// render vì một con số mềm sẽ dạy Creator bỏ qua cả cơ chế.
+	if issues := format.ValidateBeats(beats); len(domain.BlockingBeatIssues(issues)) > 0 {
+		return uc.failValidationForBeats(ctx, event, domain.BlockingBeatIssues(issues))
 	}
 
 	if !project.TTSEnabled {
 		return uc.skipSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
 	}
 	return uc.startSynthesizeSpeech(ctx, event.SagaID, event.ProjectID, project)
+}
+
+// failValidationForBeats stops the saga at validate_script when the script is
+// missing a beat the format requires.
+func (uc *HandleStepEventUseCase) failValidationForBeats(ctx context.Context, event StepEvent, issues []domain.BeatIssue) error {
+	parts := make([]string, 0, len(issues))
+	for _, issue := range issues {
+		parts = append(parts, issue.Message)
+	}
+	errMsg := strings.Join(parts, "; ")
+
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{
+		SagaID: event.SagaID, StepName: domain.StepValidateScript,
+		Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
+	}); err != nil {
+		return err
+	}
+	if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusFailedValidateScript); err != nil {
+		return err
+	}
+	if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
+		ProjectID:    event.ProjectID,
+		Step:         string(domain.StepValidateScript),
+		Status:       "failed",
+		ErrorMessage: &errMsg,
+	}); err != nil {
+		return err
+	}
+	return errAggregationFailed
 }
 
 // recordVoiceCalibration folds this project's totals into its voice's running

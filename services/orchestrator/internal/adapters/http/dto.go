@@ -29,6 +29,7 @@ type startRenderSagaRequest struct {
 	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
 	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality         string                `json:"render_quality,omitempty"`
+	VideoFormatID         string                `json:"video_format_id,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
 }
 
@@ -87,6 +88,8 @@ type projectResponse struct {
 	SubtitleMode     string                `json:"subtitle_mode"`
 	SubtitleStyle    *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality    string                `json:"render_quality"`
+	VideoFormatID    string                `json:"video_format_id"`
+	VideoFormatVer   int                   `json:"video_format_version"`
 	YoutubeVideoURL  *string               `json:"youtube_video_url,omitempty"`
 	// CR-015 FR39.4 — absent when no caption was requested, otherwise
 	// "uploaded" | "skipped_no_scope" | "failed".
@@ -165,6 +168,8 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		SubtitleMode:     string(p.SubtitleMode),
 		SubtitleStyle:    p.SubtitleStyle,
 		RenderQuality:    string(p.RenderQuality),
+		VideoFormatID:    p.VideoFormatID,
+		VideoFormatVer:   p.VideoFormatVersion,
 		YoutubeVideoURL:  p.YoutubeVideoURL,
 		CaptionStatus:    p.CaptionStatus,
 		ErrorMessage:     p.ErrorMessage,

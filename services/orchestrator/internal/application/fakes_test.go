@@ -14,6 +14,7 @@ type fakeRepo struct {
 	projects    map[string]*domain.Project
 	steps       map[string]*domain.SagaStep // key: sagaID+"/"+stepName
 	calibration map[string]domain.VoiceCalibration
+	formats     map[string]domain.VideoFormat
 }
 
 func newFakeRepo() *fakeRepo {
@@ -21,6 +22,7 @@ func newFakeRepo() *fakeRepo {
 		projects:    map[string]*domain.Project{},
 		steps:       map[string]*domain.SagaStep{},
 		calibration: map[string]domain.VoiceCalibration{},
+		formats:     map[string]domain.VideoFormat{},
 	}
 }
 
@@ -42,6 +44,29 @@ func (r *fakeRepo) GetVoiceCalibration(_ context.Context, voiceID string) (domai
 		return c, nil
 	}
 	return domain.VoiceCalibration{VoiceID: voiceID}, nil
+}
+
+func (r *fakeRepo) SeedVideoFormats(_ context.Context) error { return nil }
+
+func (r *fakeRepo) GetVideoFormat(_ context.Context, formatID string, _ int) (domain.VideoFormat, error) {
+	if f, ok := r.formats[formatID]; ok {
+		return f, nil
+	}
+	return domain.FormatVisualFirst7Min, nil
+}
+
+func (r *fakeRepo) ListVideoFormats(_ context.Context) ([]domain.VideoFormat, error) {
+	out := make([]domain.VideoFormat, 0, len(r.formats))
+	for _, f := range r.formats {
+		out = append(out, f)
+	}
+	return out, nil
+}
+
+func (r *fakeRepo) SaveVideoFormat(_ context.Context, format domain.VideoFormat) (domain.VideoFormat, error) {
+	format.Version++
+	r.formats[format.ID] = format
+	return format, nil
 }
 
 func (r *fakeRepo) ListVoiceCalibrations(_ context.Context) ([]domain.VoiceCalibration, error) {

@@ -15,6 +15,7 @@ from manim import DOWN, RIGHT, Code, MathTex, Mobject, Scene, Text, VGroup
 
 from . import narration as narration_runtime
 from . import theme as theme_module
+from .components import Recap, TitleCard
 from .layout import Box, fit_scale
 from .theme import Theme
 from .transitions import (
@@ -118,6 +119,47 @@ class ConceptFlowScene(Scene):
     def chapter(self, title: str) -> None:
         """Mở một chapter YouTube (CR-006 FR15). Gắn vào lời thoại kế tiếp."""
         narration_runtime.chapter(self, title)
+
+    # --- Beat dựng sẵn (CR-019 FR53) ------------------------------------------
+    #
+    # Ba beat này là khuôn hình lặp lại ở MỌI video, nên chúng là method chứ
+    # không phải thứ Creator dựng lại mỗi lần. Chúng chỉ khả thi sau CR-018:
+    # trước đó lời thoại là comment phải đếm khớp theo thứ tự dòng, nên không
+    # thể nằm trong một hàm — đúng lý do CR-006 §Quyết định #2 phải lùi FR17
+    # xuống thành snippet Creator tự chép.
+
+    def hook(self, question: str, subtitle: str | None = None) -> None:
+        """Mở đầu: một câu hỏi hoặc nghịch lý, hiện bằng hình rồi mới nói.
+
+        Nội dung do Creator truyền vào, KHÔNG tự sinh từ tiêu đề video: tiêu đề
+        được soạn ở bước publish, sau khi render, nên tại đây nó chưa tồn tại
+        (cùng lý do khiến thumbnail tự động không burn chữ — CR-006 §Quyết định #3).
+        """
+        self.beat("hook")
+        card = TitleCard(question, subtitle, theme=self.theme)
+        self.reveal(card)
+        self.narrate(question)
+        self.dismiss(card)
+
+    def recap(self, points: list[str], title: str = "Tóm lại", narration: str | None = None) -> None:
+        """Màn tóm tắt: nhắc lại bằng hình, không phải danh sách gạch đầu dòng."""
+        self.beat("recap")
+        panel = Recap(points, title=title, theme=self.theme)
+        self.reveal(panel)
+        self.narrate(narration or ". ".join(points))
+        self.dismiss(panel)
+
+    def call_to_action(self, message: str, subtitle: str | None = None, hold_seconds: float = 8.0) -> None:
+        """Kêu gọi hành động, rồi giữ khung cuối.
+
+        `hold_seconds` là số cụ thể chứ không phải lời thoại: đây là khoảng lặng
+        để YouTube có chỗ hiện end-screen element (CR-006 FR17.1).
+        """
+        self.beat("cta")
+        card = TitleCard(message, subtitle, theme=self.theme)
+        self.reveal(card)
+        self.narrate(message)
+        self.wait(hold_seconds)
 
     # --- Chuyển cảnh ----------------------------------------------------------
 

@@ -145,3 +145,29 @@ def test_render_thieu_thoi_luong_bao_loi_ro_rang(tmp_path, monkeypatch):
 
     with pytest.raises(narration.NarrationError, match="tất định"):
         S().construct()
+
+
+def test_hook_recap_cta_tu_mang_beat_va_loi_thoai(dry):
+    """CR-019 FR53: ba beat này chỉ trở thành method được sau CR-018.
+
+    Trước đó lời thoại là comment phải đếm khớp theo thứ tự dòng, nên không thể
+    nằm trong một hàm — đúng lý do CR-006 §Quyết định #2 phải lùi FR17 xuống
+    thành snippet Creator tự chép.
+    """
+
+    class S(ConceptFlowScene):
+        def wait(self, duration=None, **kwargs):
+            pass
+
+        def construct(self):
+            self.hook("Vì sao vòng lặp này chạy mãi không dừng?")
+            self.recap(["for gồm bốn phần", "Quên bước nhảy là lặp vô hạn"])
+            self.call_to_action("Đăng ký để xem phần sau")
+
+    records = dry(S)
+    beats = [r["id"] for r in records if r["kind"] == "beat"]
+    assert beats == ["hook", "recap", "cta"]
+
+    narrations = [r["text"] for r in records if r["kind"] == "narration"]
+    assert len(narrations) == 3
+    assert narrations[0].startswith("Vì sao")

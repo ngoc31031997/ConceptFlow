@@ -38,6 +38,8 @@ type suggestPublishMetadataUseCase interface {
 // domain.ProjectRepositoryPort.
 type projectStore interface {
 	ListVoiceCalibrations(ctx context.Context) ([]domain.VoiceCalibration, error)
+	ListVideoFormats(ctx context.Context) ([]domain.VideoFormat, error)
+	SaveVideoFormat(ctx context.Context, format domain.VideoFormat) (domain.VideoFormat, error)
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 	List(ctx context.Context) ([]domain.ProjectSummary, error)
 	Delete(ctx context.Context, projectID string) error
@@ -65,6 +67,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/sagas/publish", rt.handleStartPublishSaga)
 	r.Get("/v1/projects", rt.handleListProjects)
 	r.Get("/v1/voice-calibration", rt.handleVoiceCalibration)
+	r.Get("/v1/formats", rt.handleListFormats)
+	r.Post("/v1/formats", rt.handleSaveFormat)
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
@@ -102,6 +106,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		ProjectID:             req.ProjectID,
 		ScriptContent:         req.ScriptContent,
 		PluginID:              req.PluginID,
+		VideoFormatID:         req.VideoFormatID,
 		CategoryHint:          req.CategoryHint,
 		ContentLanguage:       lang,
 		BackgroundMusicPath:   req.BackgroundMusicPath,
@@ -258,4 +263,48 @@ func (rt *Router) handleVoiceCalibration(w http.ResponseWriter, r *http.Request)
 		}
 	}
 	writeJSON(w, http.StatusOK, map[string]interface{}{"words_per_minute": out})
+}
+
+// handleListFormats serves the video formats the Creator can pick from
+// (CR-019 FR51.3).
+func (rt *Router) handleListFormats(w http.ResponseWriter, r *http.Request) {
+	formats, err := rt.projects.ListVideoFormats(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read video formats")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"formats": formats})
+}
+
+// handleSaveFormat stores a format as a new version (CR-019 FR51.5).
+//
+// Cloning and editing is the same operation as creating: post a format with a
+// new id to clone, or with an existing id to add a version to it. There is no
+// destructive edit, because a project rendered against version 3 has to keep
+// reporting version 3's beats.
+func (rt *Router) handleSaveFormat(w http.ResponseWriter, r *http.Request) {
+	var format domain.VideoFormat
+	if err := json.NewDecoder(r.Body).Decode(&format); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if format.ID == "" || format.Name == "" {
+		writeError(w, http.StatusBadRequest, "format id and name are required")
+		return
+	}
+	if len(format.Beats) == 0 {
+		writeError(w, http.StatusBadRequest, "a format needs at least one beat")
+		return
+	}
+	if format.MinSeconds < 0 || format.MaxSeconds < format.MinSeconds {
+		writeError(w, http.StatusBadRequest, "max_seconds must not be below min_seconds")
+		return
+	}
+
+	saved, err := rt.projects.SaveVideoFormat(r.Context(), format)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not save the format")
+		return
+	}
+	writeJSON(w, http.StatusCreated, saved)
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildGenerationSystemPrompt } from "../../src/components/scriptPrompts";
+import { buildBeatSheetSection, buildGenerationSystemPrompt } from "../../src/components/scriptPrompts";
 import {
   END_SCREEN_SNIPPETS,
   HOOK_SNIPPETS,
@@ -65,7 +65,9 @@ describe("content language drives the AI prompts", () => {
 
     expect(prompt.value).toContain("1800s");
     expect(prompt.value).not.toContain("timeout 300s");
-    expect(prompt.value).toContain("5-10 phút");
+    // CR-019: mốc 8 phút chỉ có ý nghĩa sau khi bật kiếm tiền; kênh mới phải
+    // tối ưu tỉ lệ giữ chân trước đã.
+    expect(prompt.value).toContain("6-8 phút");
   });
 });
 
@@ -105,5 +107,54 @@ describe("hook and end-screen snippets (CR-006 FR17)", () => {
     expect(HOOK_SNIPPETS.en).toMatch(/# NARRATION: "[A-Za-z]/);
     expect(END_SCREEN_SNIPPETS.en).toContain("Subscribe");
     expect(END_SCREEN_SNIPPETS.vi).toContain("đăng ký kênh");
+  });
+});
+
+describe("beat sheet trong prompt (CR-019 FR54)", () => {
+  const FORMAT = {
+    id: "t",
+    name: "Thử",
+    version: 1,
+    min_seconds: 360,
+    max_seconds: 480,
+    beats: [
+      { id: "hook", role: "hook", min_seconds: 8, max_seconds: 12, required: true, max_repeat: 1 },
+      { id: "concrete", role: "example", min_seconds: 40, max_seconds: 70, required: true, max_repeat: 1 },
+      { id: "variation", role: "example", min_seconds: 50, max_seconds: 90, required: false, max_repeat: 2 },
+    ],
+  };
+
+  it("quy ngân sách giây thành ngân sách TỪ", () => {
+    // Model đếm được từ; nó không đếm được giây. Giao cho nó phép quy đổi là
+    // giao một việc nó không có cơ sở để làm.
+    const section = buildBeatSheetSection(FORMAT, "vi");
+    // 8 giây ở 140 wpm ≈ 19 từ; 12 giây ≈ 28 từ.
+    expect(section).toContain("19–28 từ");
+    expect(section).not.toMatch(/\d+ giây/);
+  });
+
+  it("dùng WPM đã hiệu chỉnh khi có (FR54.3)", () => {
+    const base = buildBeatSheetSection(FORMAT, "vi");
+    const fast = buildBeatSheetSection(FORMAT, "vi", 280);
+    expect(fast).not.toEqual(base);
+  });
+
+  it("đánh dấu beat bắt buộc và số lần lặp cho phép", () => {
+    const section = buildBeatSheetSection(FORMAT, "vi");
+    expect(section).toContain('self.beat("hook")');
+    expect(section).toContain("BẮT BUỘC");
+    expect(section).toContain("lặp tối đa 2 lần");
+  });
+
+  it("nêu rõ concrete phải đứng trước pattern", () => {
+    // Đây là ràng buộc mang toàn bộ ý nghĩa của format — nếu chỉ nằm trong đầu
+    // người viết CR thì nó không tồn tại.
+    expect(buildBeatSheetSection(FORMAT, "vi")).toContain("TRƯỚC");
+  });
+
+  it("prompt dùng beat sheet khi có format", () => {
+    const withFormat = buildGenerationSystemPrompt("vi", FORMAT);
+    expect(withFormat).toContain("CẤU TRÚC VIDEO BẮT BUỘC");
+    expect(withFormat).not.toContain("ĐỘ DÀI MỤC TIÊU");
   });
 });

@@ -211,3 +211,50 @@ func floatFromMap(m map[string]interface{}, key string) float64 {
 		return 0
 	}
 }
+
+// parseBeats reads the beat markers the dry pass observed (CR-019 FR52.1).
+//
+// Each carries the narration index it opens on, not a timestamp — the real
+// timestamp is only known after the render pass measures it (CR-002), and
+// storing a guess here is what CR-006 FR15 deliberately avoided for chapters.
+func parseBeats(payload map[string]interface{}) []domain.BeatOccurrence {
+	raw, ok := payload["beats"].([]interface{})
+	if !ok {
+		return nil
+	}
+	beats := make([]domain.BeatOccurrence, 0, len(raw))
+	for _, item := range raw {
+		entry, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _ := entry["id"].(string)
+		if id == "" {
+			continue
+		}
+		index, _ := entry["scene_index"].(float64)
+		beats = append(beats, domain.BeatOccurrence{SceneIndex: int(index), ID: id})
+	}
+	return beats
+}
+
+// chaptersFromBeats turns the observed beats into YouTube chapters
+// (CR-019 FR52.2).
+//
+// Beats replace the old `# CHAPTER:` markers rather than living beside them:
+// two mechanisms describing the same structure drift apart, and the beat is
+// already where the Creator decided what the section is.
+//
+// The title is the beat id as written. Making it prettier would mean guessing
+// what the section is about, which is exactly what CR-006 refused to let a
+// model do.
+func chaptersFromBeats(beats []domain.BeatOccurrence) []domain.Chapter {
+	if len(beats) == 0 {
+		return nil
+	}
+	chapters := make([]domain.Chapter, 0, len(beats))
+	for _, beat := range beats {
+		chapters = append(chapters, domain.Chapter{SceneIndex: beat.SceneIndex, Title: beat.ID})
+	}
+	return chapters
+}

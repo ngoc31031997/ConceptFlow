@@ -54,6 +54,12 @@ func main() {
 
 	// 4. Construct postgres.ProjectRepository, InboxRepository, OutboxRepository.
 	projectRepo := postgres.NewProjectRepository(pool)
+	// CR-019 FR51.2: gieo các format dựng sẵn nếu chưa có. Insert-if-absent,
+	// không upsert — khi Creator đã sửa một format rồi thì lần khởi động sau
+	// không được lặng lẽ khôi phục lại số liệu gốc bên dưới.
+	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
+		logger.Warn("could not seed video formats", "error", err)
+	}
 	inboxRepo := postgres.NewInboxRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
 

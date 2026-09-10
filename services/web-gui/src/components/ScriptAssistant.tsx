@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { SelectableOption } from "./SelectableOption";
+import type { VideoFormat } from "../types";
 import { buildAdjustPromptFor, buildGenerationPromptFor } from "./scriptPrompts";
 import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
@@ -10,6 +11,9 @@ export type ScriptSource = "blank" | "draft" | "ready";
 
 interface ScriptAssistantProps {
   contentLanguage: "vi" | "en";
+  /** Format đã chọn — prompt sẽ mang beat sheet của nó (CR-019 FR54). */
+  format?: VideoFormat;
+  wordsPerMinute?: number;
   /** Replaces the editor's content — used by "dùng script mẫu". */
   onUseTemplate: () => void;
   source: ScriptSource;
@@ -55,6 +59,8 @@ function CopyIcon() {
  */
 export function ScriptAssistant({
   contentLanguage,
+  format,
+  wordsPerMinute,
   onUseTemplate,
   source,
   onSourceChange,
@@ -66,9 +72,9 @@ export function ScriptAssistant({
   const prompt = useMemo(
     () =>
       source === "blank"
-        ? buildGenerationPromptFor(contentLanguage, topic)
+        ? buildGenerationPromptFor(contentLanguage, topic, format, wordsPerMinute)
         : buildAdjustPromptFor(contentLanguage, existingScript),
-    [source, contentLanguage, topic, existingScript],
+    [source, contentLanguage, topic, existingScript, format, wordsPerMinute],
   );
 
   // The prompt is copyable either way, but saying it is incomplete is more
