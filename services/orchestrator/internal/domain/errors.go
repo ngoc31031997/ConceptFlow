@@ -21,4 +21,10 @@ var (
 
 	// ErrSagaStepNotFound is returned when GetStep finds no matching SagaStep.
 	ErrSagaStepNotFound = errors.New("saga step not found")
+
+	// ErrQCBlocked is returned by the Publish Saga when QC_ENFORCE is on and
+	// the project's latest QC report carries a blocking finding (CR-021 FR61.3).
+	// The Creator gets past it by re-posting with acknowledge_qc: true, which is
+	// the "conscious action" FR61.3 asks for — and which is recorded.
+	ErrQCBlocked = errors.New("quality check found blocking issues; re-submit with acknowledge_qc to publish anyway")
 )

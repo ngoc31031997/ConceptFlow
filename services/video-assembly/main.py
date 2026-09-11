@@ -19,6 +19,7 @@ from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
     ChannelAssetRenderedEventHandler,
     NormalizeChannelAssetCommandHandler,
+    QCVideoCommandHandler,
     VideoAssemblyCommandDispatcher,
 )
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
@@ -28,6 +29,7 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from application.assemble_video import AssembleVideoUseCase
+from domain.qc_rules import QCThresholds
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -66,7 +68,14 @@ async def run() -> None:
 
     assemble_video_handler = AssembleVideoCommandHandler(use_case, pool, inbox, outbox, channel_assets)
     normalize_handler = NormalizeChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
-    command_dispatcher = VideoAssemblyCommandDispatcher(assemble_video_handler, normalize_handler)
+    # CR-021 FR61.5: thresholds are read from the environment once, here, and
+    # nowhere else. QC_ENFORCE is deliberately NOT among them — this service
+    # scores and reports the real severity; whether a blocking finding actually
+    # stops a publish is Orchestrator's call (LLD D5).
+    qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
+    command_dispatcher = VideoAssemblyCommandDispatcher(
+        assemble_video_handler, normalize_handler, qc_handler
+    )
     channel_asset_rendered_handler = ChannelAssetRenderedEventHandler(pool, channel_assets, inbox, outbox)
 
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

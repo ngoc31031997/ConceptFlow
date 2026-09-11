@@ -72,14 +72,20 @@ func main() {
 	// realPublisher directly, so a command dispatch survives a crash between
 	// the state update and the network send.
 	startRenderSaga := application.NewStartRenderSagaUseCase(projectRepo, outboxRepo)
-	startPublishSaga := application.NewStartPublishSagaUseCase(projectRepo, outboxRepo)
+	// CR-021 D5/D6: the publish gate reads the QC report the saga stored, and
+	// QC_ENFORCE (default false) decides whether a blocking finding actually
+	// stops the Saga or is only shown.
+	qcReportRepo := postgres.NewQCReportRepository(pool)
+	startPublishSaga := application.NewStartPublishSagaUseCase(projectRepo, outboxRepo).
+		WithQCGate(qcReportRepo, cfg.QCEnforce)
 	// CR-023 correction: there is no HTTP server between backend services —
 	// Orchestrator resolves the active intro/outro from its own local
 	// channel_asset_pointers projection (kept current by subscribing to
 	// channel_asset_rendered/channel_asset_normalized events in
 	// handle_step_event.go), not by calling video-assembly over HTTP.
 	channelAssetPointers := postgres.NewChannelAssetPointerRepository(pool)
-	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger)
+	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger).
+		WithQCReports(qcReportRepo)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	ollamaClient := llm.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
@@ -110,7 +116,8 @@ func main() {
 	// Outbox (same durability guarantee as every other command), Preview
 	// reads the local channel_asset_pointers projection.
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
-	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets)
+	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
+		WithQCReports(qcReportRepo)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

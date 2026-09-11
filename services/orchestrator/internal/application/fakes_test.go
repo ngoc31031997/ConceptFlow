@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"orchestrator/internal/domain"
 )
@@ -220,4 +221,42 @@ func (f *fakeChannelAssetPointers) ListChannelAssetPointers(_ context.Context) (
 		out = append(out, p)
 	}
 	return out, nil
+}
+
+// fakeQCReports is an in-memory domain.QCReportPort for testing CR-021's
+// saga step and publish gate without a real Postgres instance.
+type fakeQCReports struct {
+	reports map[string][]domain.QCReport // keyed by project_id, append-only
+}
+
+func newFakeQCReports() *fakeQCReports {
+	return &fakeQCReports{reports: map[string][]domain.QCReport{}}
+}
+
+func (f *fakeQCReports) SaveQCReport(_ context.Context, report domain.QCReport) error {
+	f.reports[report.ProjectID] = append(f.reports[report.ProjectID], report)
+	return nil
+}
+
+func (f *fakeQCReports) LatestQCReport(_ context.Context, projectID string) (*domain.QCReport, error) {
+	rows := f.reports[projectID]
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	latest := rows[len(rows)-1]
+	return &latest, nil
+}
+
+func (f *fakeQCReports) RecordQCOverride(_ context.Context, projectID string, findings []domain.QCFinding) error {
+	rows := f.reports[projectID]
+	if len(rows) == 0 {
+		return nil
+	}
+	last := &rows[len(rows)-1]
+	if last.OverriddenAt == nil {
+		now := time.Now()
+		last.OverriddenAt = &now
+		last.OverriddenFindings = findings
+	}
+	return nil
 }

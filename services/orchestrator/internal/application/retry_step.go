@@ -23,7 +23,10 @@ var stepRoutingKey = map[domain.StepName]string{
 	domain.StepSynthesizeSpeech: "tts",
 	domain.StepRenderScenes:     "rendering",
 	domain.StepAssembleVideo:    "video_assembly",
-	domain.StepPublishVideo:     "publisher",
+	// CR-021 D1: same queue as assemble_video — the QC worker lives inside
+	// video-assembly, told apart by event_type.
+	domain.StepQCVideo:      "video_assembly",
+	domain.StepPublishVideo: "publisher",
 }
 
 var stepInProgressStatus = map[domain.StepName]domain.ProjectStatus{
@@ -32,6 +35,7 @@ var stepInProgressStatus = map[domain.StepName]domain.ProjectStatus{
 	domain.StepSynthesizeSpeech: domain.StatusSynthesizingSpeech,
 	domain.StepRenderScenes:     domain.StatusRendering,
 	domain.StepAssembleVideo:    domain.StatusAssemblingVideo,
+	domain.StepQCVideo:          domain.StatusRunningQC,
 	domain.StepPublishVideo:     domain.StatusPublishing,
 }
 
@@ -43,6 +47,9 @@ var failedStatusToStep = map[domain.ProjectStatus]domain.StepName{
 	domain.StatusFailedSynthesizeSpeech: domain.StepSynthesizeSpeech,
 	domain.StatusFailedRenderScenes:     domain.StepRenderScenes,
 	domain.StatusFailedAssembleVideo:    domain.StepAssembleVideo,
+	// Only reachable when the qc_completed message itself was unusable — QC
+	// never reports a failure of its own (FR61.4).
+	domain.StatusFailedQCVideo: domain.StepQCVideo,
 	domain.StatusFailedPublishVideo:     domain.StepPublishVideo,
 }
 
@@ -119,6 +126,8 @@ func rebuildPayload(stepName domain.StepName, project *domain.Project) map[strin
 		}
 	case domain.StepAssembleVideo:
 		return assembleVideoPayload(project)
+	case domain.StepQCVideo:
+		return qcVideoPayload(project)
 	case domain.StepPublishVideo:
 		return publishVideoPayload(project)
 	default:

@@ -190,3 +190,121 @@ describe("ResultPage publish state", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });
+
+describe("ResultPage QC gate (CR-021 FR61.3)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Như mockProjectFetch nhưng chặn lần publish ĐẦU bằng 409 code=qc_blocked,
+   * và cho lần thứ hai đi qua — đúng hình dạng Orchestrator trả về khi
+   * QC_ENFORCE=true và báo cáo có lỗi chặn.
+   */
+  function mockQCBlockedFetch(publishBodies: Array<Record<string, unknown>>) {
+    return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/v1/auth/youtube/status")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false, accounts: [] }) });
+      }
+      if (url.includes("/v1/auth/youtube/accounts") || url.includes("/v1/auth/youtube/apps")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+      if (url.includes("/v1/sagas/publish")) {
+        publishBodies.push(JSON.parse(String(init?.body)));
+        if (publishBodies.length === 1) {
+          return Promise.resolve({
+            ok: false,
+            status: 409,
+            json: async () => ({
+              error: "quality check found blocking issues; re-submit with acknowledge_qc to publish anyway",
+              code: "qc_blocked",
+            }),
+          });
+        }
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ saga_id: "s1", status: "publishing" }) });
+      }
+      if (url.includes("/qc-report")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            project_id: "p1",
+            status: "has_findings",
+            reason: null,
+            findings: [
+              { rule: "frame_overflow", severity: "blocking", message: "chữ vượt safe margin", timestamp_seconds: 12.5 },
+            ],
+            created_at: "2026-09-11T00:00:00Z",
+          }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          project_id: "p1",
+          status: "ready_to_publish",
+          scenes: [],
+          video_path: "/shared/p1/video/final.mp4",
+        }),
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  async function clickPublish() {
+    await waitFor(() => expect(screen.getByTestId("publish-form-title-input")).toBeInTheDocument());
+    fireEvent.change(screen.getByTestId("publish-form-title-input"), { target: { value: "Video" } });
+    fireEvent.click(screen.getByTestId("publish-form-submit-button"));
+  }
+
+  it("never sends acknowledge_qc on the first attempt", async () => {
+    // FR61.3: bỏ qua phải là hành động có ý thức. Gửi cờ ngay lần đầu là biến
+    // cổng chặn thành thứ trang tự mở hộ.
+    const bodies: Array<Record<string, unknown>> = [];
+    global.fetch = mockQCBlockedFetch(bodies);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderResultPage();
+    await clickPublish();
+
+    await waitFor(() => expect(bodies.length).toBe(1));
+    expect(bodies[0].acknowledge_qc).toBeUndefined();
+  });
+
+  it("asks for confirmation, then re-sends with acknowledge_qc", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    global.fetch = mockQCBlockedFetch(bodies);
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    renderResultPage();
+    await clickPublish();
+
+    await waitFor(() => expect(bodies.length).toBe(2));
+    expect(confirm).toHaveBeenCalled();
+    expect(bodies[1].acknowledge_qc).toBe(true);
+  });
+
+  it("does not publish when the Creator declines the override", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    global.fetch = mockQCBlockedFetch(bodies);
+    vi.spyOn(window, "confirm").mockReturnValue(false);
+
+    renderResultPage();
+    await clickPublish();
+
+    await waitFor(() => expect(bodies.length).toBe(1));
+    // Không có lần gửi thứ hai, và cũng không kẹt ở trạng thái đang gửi.
+    expect(screen.queryByTestId("result-publishing-status")).not.toBeInTheDocument();
+  });
+
+  it("shows the blocking finding before the publish button", async () => {
+    global.fetch = mockQCBlockedFetch([]);
+
+    renderResultPage();
+
+    const report = await screen.findByTestId("qc-report");
+    const form = screen.getByTestId("publish-form-submit-button");
+    expect(report).toHaveTextContent("Tràn khung");
+    expect(report.compareDocumentPosition(form)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+});

@@ -122,7 +122,8 @@ def test_che_do_render_cho_dung_thoi_luong_audio(tmp_path, monkeypatch):
 
     assert waited == [2.0, 3.5]
     kinds = [json.loads(line)["kind"] for line in marks.read_text().splitlines() if line]
-    assert kinds == ["mark", "mark"]
+    # Mỗi mốc kèm đúng một bản ghi bố cục cho QC (CR-021 FR58.1).
+    assert kinds == ["mark", "layout", "mark", "layout"]
 
 
 def test_render_thieu_thoi_luong_bao_loi_ro_rang(tmp_path, monkeypatch):
@@ -197,3 +198,101 @@ def test_khung_trong_duoc_noi_ro(dry):
 
     record = next(r for r in dry(S) if r["kind"] == "narration")
     assert record["visual"] == "khung trống"
+
+
+# --- CR-021 FR58: thu dữ liệu bố cục ở lượt render ---------------------------
+
+
+def _render_records(tmp_path, monkeypatch, scene_cls, count=1):
+    marks = tmp_path / "cf_marks.jsonl"
+    durations = tmp_path / "cf_durations.json"
+    durations.write_text(json.dumps([1.0] * count))
+    monkeypatch.setenv(narration.ENV_MARKS_PATH, str(marks))
+    monkeypatch.setenv(narration.ENV_DURATIONS_PATH, str(durations))
+    monkeypatch.setenv(narration.ENV_MODE, narration.MODE_RENDER)
+    narration.reset()
+    scene_cls().construct()
+    return [json.loads(line) for line in marks.read_text(encoding="utf-8").splitlines() if line]
+
+
+def test_ban_ghi_layout_di_kem_moc_render(tmp_path, monkeypatch):
+    """Bản ghi bố cục phải khớp index và mốc thời gian của bản ghi `mark`:
+    QC chấm hình tại đúng giây Video Assembly đặt lời thoại."""
+    from manim import YELLOW, Text
+
+    class S(ConceptFlowScene):
+        def wait(self, duration=None, **kwargs):
+            pass
+
+        def construct(self):
+            self.add(Text("xin chào", color=YELLOW))
+            self.narrate("một")
+
+    records = _render_records(tmp_path, monkeypatch, S)
+    mark = next(r for r in records if r["kind"] == "mark")
+    layout = next(r for r in records if r["kind"] == "layout")
+
+    assert layout["index"] == mark["index"] == 0
+    assert layout["t"] == mark["t"]
+    assert len(layout["mobjects"]) == 1
+    entry = layout["mobjects"][0]
+    assert entry["cls"] == "Text"
+    assert len(entry["bbox"]) == 4
+    assert entry["bbox"][0] < entry["bbox"][1]  # left < right
+    assert entry["bbox"][3] < entry["bbox"][2]  # bottom < top
+    # Màu thật của chữ, không phải #000000 mà `Text.get_color()` luôn trả về:
+    # luật tương phản FR59.4 sống hay chết ở con số này.
+    assert entry["color"] == "#FFFF00"
+    assert entry["font_size"] > 0
+
+
+def test_luot_dry_khong_thu_bo_cuc(dry):
+    """Lượt dry là cổng chặn trước TTS — chỗ Creator đang ngồi chờ, không phải
+    chỗ để thêm việc cho QC."""
+    from manim import Text
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.add(Text("a"))
+            self.narrate("một")
+
+    assert all(r["kind"] != "layout" for r in dry(S))
+
+
+def test_mobject_khong_phai_chu_co_font_size_none():
+    from manim import Square
+
+    class _Scene:
+        mobjects = [Square()]
+
+    (entry,) = narration._describe_layout(_Scene())
+    assert entry["cls"] == "Square"
+    assert entry["font_size"] is None
+    assert entry["color"].startswith("#")
+
+
+def test_khung_trong_cho_danh_sach_rong():
+    class _Scene:
+        mobjects = []
+
+    assert narration._describe_layout(_Scene()) == []
+
+
+def test_loi_thu_bo_cuc_khong_lam_hong_luot_render():
+    """FR58.2: dữ liệu QC không bao giờ được đắt hơn cái video nó đang chấm."""
+
+    class _Broken:
+        def get_left(self):
+            raise RuntimeError("mobject lạ")
+
+    class _Scene:
+        mobjects = [_Broken()]
+
+    assert narration._describe_layout(_Scene()) == []
+
+    class _NoMobjects:
+        @property
+        def mobjects(self):
+            raise RuntimeError("scene lạ")
+
+    assert narration._describe_layout(_NoMobjects()) == []

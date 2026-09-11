@@ -79,6 +79,10 @@ class ScriptRenderResult:
     video_path: str
     wait_offsets: list[float] = field(default_factory=list)
     video_duration_seconds: float = 0.0
+    # CR-021 FR58: một bản ghi cho mỗi mốc narration, giữ nguyên shape script
+    # đã ghi ra ({"kind","index","t","mobjects"}). Best-effort, nên rỗng là
+    # trạng thái hợp lệ — QC khi đó chỉ chấm được phần audio.
+    layout_marks: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

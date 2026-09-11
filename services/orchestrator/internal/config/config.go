@@ -27,6 +27,14 @@ type Config struct {
 	// channel intro/outro to assemble_video.
 	VideoAssemblyURL     string
 	VideoAssemblyTimeout time.Duration
+
+	// QCEnforce turns CR-021's publish gate from indicate-only into a real
+	// block. Default FALSE on purpose (D5 / CR-021 Decision #3): the rules ship
+	// unproven against real footage, and a gate that cries wolf on its first
+	// week is a gate Creators learn to click past — which costs more than
+	// having no gate at all. Findings are recorded with their true severity
+	// either way; this only decides whether a blocking one stops the Saga.
+	QCEnforce bool
 }
 
 // Load reads Config from the environment, applying the defaults documented
@@ -86,7 +94,13 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	qcEnforce, err := boolEnvOrDefault("QC_ENFORCE", false)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
+		QCEnforce:                     qcEnforce,
 		RabbitMQURL:                   rabbitMQURL,
 		DatabaseURL:                   databaseURL,
 		OutboxPollIntervalMS:          pollInterval,
@@ -100,6 +114,22 @@ func Load() (*Config, error) {
 		VideoAssemblyURL:              videoAssemblyURL,
 		VideoAssemblyTimeout:          time.Duration(videoAssemblyTimeoutSeconds) * time.Second,
 	}, nil
+}
+
+// boolEnvOrDefault reads a boolean env var, rejecting anything strconv does
+// not recognise rather than silently reading a typo as false — a misspelled
+// QC_ENFORCE that quietly disables the gate is the failure mode worth refusing
+// to start over.
+func boolEnvOrDefault(key string, def bool) (bool, error) {
+	raw := os.Getenv(key)
+	if raw == "" {
+		return def, nil
+	}
+	v, err := strconv.ParseBool(raw)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a boolean (true/false): %w", key, err)
+	}
+	return v, nil
 }
 
 func intEnvOrDefault(key string, def int) (int, error) {

@@ -288,6 +288,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
 
             rendered_path = self._find_rendered_file(media_dir)
             wait_offsets = self._read_wait_offsets(marks_path, expected=len(durations))
+            layout_marks = self._read_layout_marks(marks_path)
             video_duration = _probe_duration(rendered_path)
             shutil.move(rendered_path, output_path)
         finally:
@@ -298,6 +299,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             video_path=output_path,
             wait_offsets=wait_offsets,
             video_duration_seconds=video_duration,
+            layout_marks=layout_marks,
         )
 
     def render_channel_asset(
@@ -518,6 +520,16 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
                 "means it is not deterministic"
             )
         return [marks[i] for i in range(expected)]
+
+    @staticmethod
+    def _read_layout_marks(marks_path: str) -> list[dict]:
+        """The layout snapshots the render pass recorded (CR-021 FR58).
+
+        Unlike the timing marks, a missing or partial list is not fatal: the
+        script writes these best-effort, and QC scoring what it has beats
+        failing a render that produced a perfectly good video.
+        """
+        return [r for r in _read_marks(marks_path) if r.get("kind") == "layout"]
 
     @staticmethod
     def _find_rendered_file(media_dir: str) -> str:

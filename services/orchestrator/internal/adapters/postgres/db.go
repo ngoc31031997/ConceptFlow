@@ -162,6 +162,37 @@ CREATE TABLE IF NOT EXISTS channel_asset_pointers (
     PRIMARY KEY (kind, render_quality)
 );
 
+-- CR-021 FR58/D3: what was on screen at each narration mark, measured by
+-- Rendering and carried on rendering_completed. Stored here purely so the
+-- qc_video command can be rebuilt from Project alone (Rule 5) rather than
+-- needing the original event again — exactly the reason wait_offsets is stored.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS layout_marks JSONB;
+
+-- CR-021 D6/FR61.1: one row per automated QC pass.
+--
+-- findings is JSONB, not text: FR61.1 asks for machine-readable data and the
+-- GUI groups by severity, neither of which a log line supports. History is
+-- kept (no primary key on project_id) because the point of the indicate-first
+-- mode in D5 is to compare reports across renders while the thresholds are
+-- being calibrated.
+--
+-- overridden_at/overridden_findings are the audit half of FR61.3: a deliberate
+-- bypass has to leave a trace, and the trace is only meaningful if it says
+-- which findings were waved through — the report's findings can change on the
+-- next render, so they are copied, not referenced.
+CREATE TABLE IF NOT EXISTS qc_reports (
+    project_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reason TEXT,
+    findings JSONB NOT NULL DEFAULT '[]',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    overridden_at TIMESTAMPTZ NULL,
+    overridden_findings JSONB NULL
+);
+
+CREATE INDEX IF NOT EXISTS qc_reports_project_created_idx
+    ON qc_reports (project_id, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS saga_steps (
     saga_id TEXT NOT NULL,
     step_name TEXT NOT NULL,

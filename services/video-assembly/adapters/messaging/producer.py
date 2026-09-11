@@ -44,6 +44,35 @@ def assembly_failed_envelope(saga_id: str, project_id: str, error_message: str) 
     )
 
 
+def qc_completed_envelope(
+    saga_id: str,
+    project_id: str,
+    status: str,
+    findings: list[dict],
+    reason: str | None = None,
+) -> dict:
+    """CR-021 — the ONLY event `qc_video` ever produces.
+
+    There is deliberately no `qc_failed` counterpart (FR61.4 / LLD D2): a
+    technical failure (no layout marks, ffmpeg error, unreadable file) still
+    publishes this event with status="not_scored" and a reason, so the project
+    still reaches ready_to_publish. A broken gate must not become a locked gate.
+
+    `status` is one of "passed" (no findings), "has_findings", "not_scored".
+    `reason` explains the "not_scored" case and is null otherwise.
+    """
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "qc_completed",
+            "status": status,
+            "reason": reason,
+            "findings": findings,
+        },
+    )
+
+
 def channel_asset_normalized_envelope(
     saga_id: str, project_id: str, kind: str, asset_id: str, render_quality: str, version: int
 ) -> dict:

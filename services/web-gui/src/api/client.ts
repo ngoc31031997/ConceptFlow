@@ -15,7 +15,22 @@ const GATEWAY_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, thử lại sau";
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  /**
+   * Mã lỗi đọc được bằng máy, khi máy chủ gửi kèm. Publish trả 409 cho cả
+   * "project sai trạng thái" lẫn "QC có lỗi chặn" (CR-021 FR61.3), và chỉ cái
+   * thứ hai mới có đường đi tiếp — dò theo câu chữ sẽ vỡ ngay khi đổi từ ngữ.
+   */
+  readonly code?: string;
+
+  constructor(message: string, code?: string) {
+    super(message);
+    this.code = code;
+  }
+}
+
+/** CR-021 FR61.3 — mã 409 mà `acknowledge_qc: true` đi qua được. */
+export const ERROR_CODE_QC_BLOCKED = "qc_blocked";
 
 /** Duyệt dàn ý, cho Saga chạy tiếp (CR-024 FR69.2). */
 export async function approveOutline(projectId: string): Promise<void> {
@@ -140,13 +155,17 @@ export async function uploadMusic(projectId: string, file: File): Promise<MusicU
   });
 }
 
-async function parseErrorMessage(response: Response): Promise<string> {
+async function parseError(response: Response): Promise<{ message: string; code?: string }> {
   try {
     const body = await response.json();
-    if (typeof body?.error === "string") return body.error;
-    return body?.error?.message ?? body?.error_message ?? GENERIC_CONNECTION_ERROR;
+    const code = typeof body?.code === "string" ? body.code : undefined;
+    if (typeof body?.error === "string") return { message: body.error, code };
+    return {
+      message: body?.error?.message ?? body?.error_message ?? GENERIC_CONNECTION_ERROR,
+      code,
+    };
   } catch {
-    return GENERIC_CONNECTION_ERROR;
+    return { message: GENERIC_CONNECTION_ERROR };
   }
 }
 
@@ -158,7 +177,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(GENERIC_CONNECTION_ERROR);
   }
   if (!response.ok) {
-    throw new ApiError(await parseErrorMessage(response));
+    const { message, code } = await parseError(response);
+    throw new ApiError(message, code);
   }
   if (response.status === 204) {
     return undefined as T;
@@ -198,12 +218,49 @@ export async function deleteProject(id: string): Promise<void> {
 export function startPublishSaga(
   id: string,
   metadata: PublishMetadata,
+  /**
+   * CR-021 FR61.3 — chỉ gửi `true` sau khi Creator đã đọc báo cáo QC và chủ
+   * động chọn đăng bất chấp lỗi chặn. Không bao giờ gửi ở lần bấm đầu: bỏ qua
+   * phải là một hành động có ý thức, và máy chủ ghi lại lần bỏ qua đó.
+   */
+  acknowledgeQC = false,
 ): Promise<SagaStartedResponse> {
   return apiFetch<SagaStartedResponse>("/v1/sagas/publish", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: id, ...metadata }),
+    body: JSON.stringify({
+      project_id: id,
+      ...metadata,
+      ...(acknowledgeQC ? { acknowledge_qc: true } : {}),
+    }),
   });
+}
+
+/** CR-021 — một phát hiện QC, kèm mốc thời gian để tua tới chỗ đó (FR59.6). */
+export interface QCFinding {
+  rule: string;
+  severity: "blocking" | "warning";
+  message: string;
+  timestamp_seconds: number;
+}
+
+export interface QCReport {
+  project_id: string;
+  status: "passed" | "has_findings" | "not_scored";
+  reason: string | null;
+  findings: QCFinding[];
+  created_at: string;
+  overridden_at?: string;
+}
+
+/**
+ * Báo cáo QC của project (CR-021 FR61.1/FR61.2).
+ *
+ * Máy chủ luôn trả 200: chưa chấm thì `status: "not_scored"` với danh sách
+ * rỗng, không phải 404 — một cổng chưa chạy không phải một lỗi.
+ */
+export function getQCReport(id: string): Promise<QCReport> {
+  return apiFetch<QCReport>(`/v1/projects/${id}/qc-report`);
 }
 
 export interface SuggestedMetadata {

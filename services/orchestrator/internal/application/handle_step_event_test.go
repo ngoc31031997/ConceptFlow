@@ -840,3 +840,120 @@ func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
 		t.Fatalf("channel_asset_rendered must not populate the projection, got %+v", pointers.pointers)
 	}
 }
+
+// TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyToPublish
+// locks CR-021 D2's key behaviour change: video_assembled no longer ends the
+// Render Saga. It must dispatch qc_video and move the project to running_qc,
+// NOT ready_to_publish — that is now qc_completed's job.
+func TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyToPublish(t *testing.T) {
+	uc, repo, pub, _ := newTestUseCase()
+	rendered := "/shared/proj-1/rendered.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusAssemblingVideo,
+		RenderedVideoPath: &rendered,
+		LayoutMarks:       []map[string]interface{}{{"cls": "Text", "bbox": []interface{}{-1.0, 1.0, 1.0, -1.0}}},
+	}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{"video_path": "/shared/proj-1/video/final.mp4"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusRunningQC {
+		t.Fatalf("expected running_qc after video_assembled, got %s (must NOT be ready_to_publish)", project.Status)
+	}
+
+	last := pub.last()
+	if last == nil || last.routingKey != "video_assembly" {
+		t.Fatalf("expected qc_video dispatched to video_assembly queue, got %+v", last)
+	}
+	if last.envelope.EventType != string(domain.StepQCVideo) {
+		t.Fatalf("expected qc_video command, got %q", last.envelope.EventType)
+	}
+	if last.envelope.Payload["video_path"] != "/shared/proj-1/video/final.mp4" {
+		t.Fatalf("expected assembled video_path forwarded, got %v", last.envelope.Payload["video_path"])
+	}
+	marks, ok := last.envelope.Payload["layout_marks"].([]map[string]interface{})
+	if !ok || len(marks) != 1 {
+		t.Fatalf("expected layout_marks forwarded from project, got %v", last.envelope.Payload["layout_marks"])
+	}
+
+	step, err := repo.GetStep(context.Background(), "saga-1", domain.StepQCVideo)
+	if err != nil || step.Status != domain.SagaStepInProgress {
+		t.Fatalf("expected qc_video saga step in_progress, got %+v, err=%v", step, err)
+	}
+}
+
+// TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish is the direct lock
+// for CR-021 D2: ready_to_publish is now set by qc_completed, not
+// video_assembled.
+func TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	qc := newFakeQCReports()
+	uc.WithQCReports(qc)
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC}
+	repo.steps[stepKey("saga-1", domain.StepQCVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "qc_completed",
+		Payload: map[string]interface{}{
+			"status": "has_findings",
+			"findings": []interface{}{
+				map[string]interface{}{"rule": "frame_overflow", "severity": "blocking", "message": "text overflows frame", "timestamp_seconds": 12.5},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish after qc_completed, got %s", project.Status)
+	}
+
+	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
+	if report == nil || report.Status != domain.QCStatusHasFindings {
+		t.Fatalf("expected qc report stored with has_findings, got %+v", report)
+	}
+	if !report.HasBlockingFindings() {
+		t.Fatalf("expected the blocking finding to be preserved, got %+v", report.Findings)
+	}
+}
+
+// TestHandleStepEventUseCase_QCCompleted_NotScoredStillReachesReadyToPublish is
+// FR61.4: a QC that could not run must never become a lock. status=not_scored
+// still ends the saga at ready_to_publish.
+func TestHandleStepEventUseCase_QCCompleted_NotScoredStillReachesReadyToPublish(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	qc := newFakeQCReports()
+	uc.WithQCReports(qc)
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC}
+	repo.steps[stepKey("saga-1", domain.StepQCVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "qc_completed",
+		Payload: map[string]interface{}{
+			"status": "not_scored",
+			"reason": "layout_marks missing",
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish even when not_scored (FR61.4), got %s", project.Status)
+	}
+
+	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
+	if report == nil || report.Status != domain.QCStatusNotScored {
+		t.Fatalf("expected not_scored report stored, got %+v", report)
+	}
+}

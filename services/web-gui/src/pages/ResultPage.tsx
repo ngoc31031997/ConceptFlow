@@ -6,12 +6,14 @@ import { ThumbnailUpload } from "../components/ThumbnailUpload";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
 import { useProject } from "../hooks/useProject";
+import { QCReportPanel } from "../components/QCReportPanel";
 import {
   startPublishSaga,
   retryProject,
   deleteProject,
   getProjectVideoUrl,
   ApiError,
+  ERROR_CODE_QC_BLOCKED,
 } from "../api/client";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
@@ -32,20 +34,33 @@ export function ResultPage() {
     isSubmitting === false and fire two POSTs. The ref flips synchronously.
   */
   const inFlightRef = useRef(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  async function handlePublish(metadata: PublishMetadata) {
+  /** FR61.2 — bấm mốc thời gian trong báo cáo QC thì tua player tới đúng giây. */
+  function handleSeek(seconds: number) {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = seconds;
+  }
+
+  async function handlePublish(metadata: PublishMetadata, acknowledgeQC = false) {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
     setIsSubmitting(true);
     setError(null);
+    let qcBlocked = false;
     try {
-      await startPublishSaga(projectId, {
-        ...metadata,
-        thumbnail_path: thumbnailPath ?? undefined,
-        // Left out when no channel is connected yet, so the Publisher
-        // reports "not authenticated" rather than "channel '' not found".
-        channel_id: channelId ?? undefined,
-      });
+      await startPublishSaga(
+        projectId,
+        {
+          ...metadata,
+          thumbnail_path: thumbnailPath ?? undefined,
+          // Left out when no channel is connected yet, so the Publisher
+          // reports "not authenticated" rather than "channel '' not found".
+          channel_id: channelId ?? undefined,
+        },
+        acknowledgeQC,
+      );
       /*
         The POST only *starts* the saga; the project is now "publishing" and
         useProject's poll drives the rest of the UI. isSubmitting stays true
@@ -54,10 +69,34 @@ export function ResultPage() {
       */
       await refetch();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
+      /*
+        CR-021 FR61.3: QC chặn là loại 409 duy nhất có đường đi tiếp. Xin đồng ý
+        SAU khi đã nhả cờ in-flight ở finally, nếu không lần gọi lại sẽ bị chính
+        cái chốt chống bấm hai lần chặn mất.
+      */
+      if (err instanceof ApiError && err.code === ERROR_CODE_QC_BLOCKED && !acknowledgeQC) {
+        qcBlocked = true;
+      } else {
+        setError(err instanceof ApiError ? err.message : String(err));
+      }
     } finally {
       inFlightRef.current = false;
       setIsSubmitting(false);
+    }
+
+    /*
+      Không tự gửi lại kèm acknowledge_qc — Creator phải chủ động đồng ý, và
+      máy chủ ghi lại lần bỏ qua đó. Hỏi đúng một lần: nếu lần gửi có cờ vẫn bị
+      chặn thì đó là lỗi khác, và nó đi vào nhánh hiện nguyên văn ở trên.
+    */
+    if (
+      qcBlocked &&
+      window.confirm(
+        "Kiểm tra chất lượng phát hiện lỗi nghiêm trọng. Vẫn đăng video này? " +
+          "Lần bỏ qua sẽ được ghi lại.",
+      )
+    ) {
+      await handlePublish(metadata, true);
     }
   }
 
@@ -148,7 +187,9 @@ export function ResultPage() {
           */
           <div className={styles.layout}>
             <div className={styles.preview}>
-              {project.video_path && <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />}
+              {project.video_path && (
+                <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} videoRef={videoRef} />
+              )}
             </div>
 
             <div className={styles.publishColumn}>
@@ -200,6 +241,11 @@ export function ResultPage() {
                     contentLanguage={project.voice_language}
                   />
                   {errorBanner}
+                  {/*
+                    Trước nút đăng, không sau (FR61.2): báo cáo chỉ có tác dụng
+                    nếu Creator đọc nó trước khi quyết định đăng.
+                  */}
+                  <QCReportPanel projectId={projectId} onSeek={handleSeek} />
                   {/*
                     Once the publish step has failed the saga is resumed with
                     POST /retry above — a fresh POST /v1/sagas/publish would

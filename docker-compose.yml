@@ -197,6 +197,21 @@ services:
       # repaints frames), and Phase 0 measured stream copy at 250x faster.
       ASSEMBLY_LEAD_IN_SECONDS: "0"
       ASSEMBLY_TAIL_SECONDS: "0"
+      # CR-021 FR61.5 — ngưỡng chấm QC. Mọi biến QC_* đều có mặc định trong
+      # domain/qc_rules.py::QCThresholds; liệt kê ở đây để biết chỗ mà siết.
+      #
+      # Rủi ro số một của CR-021 là báo động giả: QC kêu ở video vốn ổn thì
+      # Creator bỏ qua báo cáo và cổng chặn thành hình thức. Nên mặc định nới
+      # rộng, chạy chỉ-báo (QC_ENFORCE ở orchestrator, không ở đây), đo trên
+      # video thật rồi siết dần bằng các biến dưới.
+      #
+      # QC_MIN_TEXT_PIXEL_HEIGHT: "24"      # sàn đọc được trên màn 5,5 inch
+      # QC_MIN_CONTRAST_RATIO: "3.0"        # WCAG AA cho chữ lớn
+      # QC_MAX_STATIC_SECONDS: "12"         # hình đứng yên bao lâu thì kêu
+      # QC_TEXT_OVERLAP_MIN_RATIO: "0.15"   # tỉ lệ giao mới coi là chồng lấn
+      # QC_SAFE_MARGIN: "0.6"               # theo theme.py, đổi cùng nhau
+      # QC_LOUDNESS_TOLERANCE_LU: "1.5"     # lệch -14 LUFS bao nhiêu thì kêu
+      # QC_NARRATION_OVERLAP_TOLERANCE_SECONDS: "0.15"
     # x264 is even more parallel than Manim (Phase 0 measured 5.6x CPU-time
     # over wall-clock when burning subtitles), so it needs a cap for the same
     # reason. Peak RSS measured at ~1 GB.
@@ -296,6 +311,15 @@ services:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       OLLAMA_TIMEOUT_SECONDS: "120"
+      # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
+      #
+      # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và
+      # vẫn mang severity thật, chỉ là lỗi blocking không chặn đăng video. Đây
+      # là cách duy nhất hiệu chỉnh ngưỡng — bật cổng trước khi biết tỉ lệ báo
+      # động giả là cách làm Creator mất niềm tin vào báo cáo.
+      #
+      # Bật sau khi đã soi báo cáo trên vài video thật: QC_ENFORCE: "true".
+      QC_ENFORCE: "${QC_ENFORCE:-false}"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
       interval: 10s

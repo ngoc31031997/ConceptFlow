@@ -23,6 +23,10 @@ const (
 	StatusSynthesizingSpeech     ProjectStatus = "synthesizing_speech"
 	StatusRendering              ProjectStatus = "rendering"
 	StatusAssemblingVideo        ProjectStatus = "assembling_video"
+	// CR-021 D2: video đã ghép xong và đang được chấm chất lượng tự động. Nằm
+	// giữa assembling_video và ready_to_publish — không phải trạng thái chờ
+	// người, Creator không phải làm gì ở đây.
+	StatusRunningQC              ProjectStatus = "running_qc"
 	StatusReadyToPublish         ProjectStatus = "ready_to_publish"
 	StatusPublishing             ProjectStatus = "publishing"
 	StatusPublished              ProjectStatus = "published"
@@ -31,7 +35,13 @@ const (
 	StatusFailedSynthesizeSpeech ProjectStatus = "failed_at_synthesize_speech"
 	StatusFailedRenderScenes     ProjectStatus = "failed_at_render_scenes"
 	StatusFailedAssembleVideo    ProjectStatus = "failed_at_assemble_video"
-	StatusFailedPublishVideo     ProjectStatus = "failed_at_publish_video"
+	// CR-021 FR61.4: QC KHÔNG có nhánh failed từ phía chấm điểm — không chấm
+	// được vẫn phát qc_completed với status="not_scored" và project vẫn về
+	// ready_to_publish. Trạng thái này chỉ dùng khi chính message hỏng (không
+	// dựng nổi envelope), đúng ngữ nghĩa các bước khác. Một cổng hỏng không
+	// được biến thành cổng khoá.
+	StatusFailedQCVideo      ProjectStatus = "failed_at_qc_video"
+	StatusFailedPublishVideo ProjectStatus = "failed_at_publish_video"
 )
 
 // StepName identifies one of the 6 Saga steps. It is the value stored on
@@ -45,7 +55,11 @@ const (
 	StepSynthesizeSpeech StepName = "synthesize_speech"
 	StepRenderScenes     StepName = "render_scenes"
 	StepAssembleVideo    StepName = "assemble_video"
-	StepPublishVideo     StepName = "publish_video"
+	// CR-021 D1: bước riêng, nhưng worker sống trong video-assembly (nơi đã có
+	// sẵn ffmpeg/ffprobe và chính file video vừa ghép). Lệnh `qc_video` đi trên
+	// đúng queue `video_assembly.commands` mà `assemble_video` đang đi.
+	StepQCVideo      StepName = "qc_video"
+	StepPublishVideo StepName = "publish_video"
 )
 
 // FailedStatusForStep returns the failed_at_<step> ProjectStatus
@@ -62,6 +76,8 @@ func FailedStatusForStep(step StepName) ProjectStatus {
 		return StatusFailedRenderScenes
 	case StepAssembleVideo:
 		return StatusFailedAssembleVideo
+	case StepQCVideo:
+		return StatusFailedQCVideo
 	case StepPublishVideo:
 		return StatusFailedPublishVideo
 	default:
@@ -247,6 +263,16 @@ type Project struct {
 	// animation time.
 	WaitOffsets          []float64
 	RenderedVideoSeconds float64 // Rendering's measured length of RenderedVideoPath
+
+	// CR-021 FR58/D3 — what was on screen at each narration mark, as measured
+	// by Rendering's `{"kind":"layout"}` records and carried out on
+	// `rendering_completed`. Orchestrator stores it and hands it straight back
+	// to the QC worker on `qc_video`; it never interprets it, which is why the
+	// element type is the raw decoded object rather than a struct. Typing it
+	// here would mean this service has to be redeployed in lockstep every time
+	// Rendering measures one more property of a mobject, for no gain: the only
+	// code that reads a bbox is `video-assembly/domain/qc_rules.py`.
+	LayoutMarks []map[string]interface{}
 
 	YoutubeTitle         *string
 	YoutubeDescription   *string

@@ -176,6 +176,60 @@ func floatSliceFromPayload(payload map[string]interface{}, key string) []float64
 	return out
 }
 
+// mapSliceFromPayload extracts a list-of-objects field verbatim (CR-021's
+// layout_marks).
+//
+// Verbatim is the point: Orchestrator carries this from rendering_completed to
+// the qc_video command without reading a single field of it. Decoding it into a
+// struct here would mean every property Rendering learns to measure needs a
+// matching Go field before it can reach the rules that use it — a coupling that
+// buys nothing, since the only reader is video-assembly's qc_rules.py.
+// Non-object entries are dropped rather than failing: a malformed mark should
+// cost that one mark, not the whole report.
+func mapSliceFromPayload(payload map[string]interface{}, key string) []map[string]interface{} {
+	raw, ok := payload[key].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]interface{}, 0, len(raw))
+	for _, item := range raw {
+		if m, ok := item.(map[string]interface{}); ok {
+			out = append(out, m)
+		}
+	}
+	return out
+}
+
+// parseQCFindings decodes the findings list off a qc_completed event.
+//
+// A finding whose severity is neither "blocking" nor "warning" is kept but
+// demoted to a warning: an unknown severity must never be the thing that stops
+// a publish, and dropping it silently would lose advice the Creator could use.
+func parseQCFindings(payload map[string]interface{}) []domain.QCFinding {
+	raw, ok := payload["findings"].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]domain.QCFinding, 0, len(raw))
+	for _, item := range raw {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		severity := stringFromMap(m, "severity")
+		if severity != domain.QCSeverityBlocking && severity != domain.QCSeverityWarning {
+			severity = domain.QCSeverityWarning
+		}
+		out = append(out, domain.QCFinding{
+			Rule:             stringFromMap(m, "rule"),
+			Severity:         severity,
+			Message:          stringFromMap(m, "message"),
+			TimestampSeconds: floatFromMap(m, "timestamp_seconds"),
+		})
+	}
+	return out
+}
+
 func intFromPayload(payload map[string]interface{}, key string) *int {
 	if _, ok := payload[key]; !ok {
 		return nil

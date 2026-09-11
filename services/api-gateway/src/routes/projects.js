@@ -18,6 +18,7 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 /**
  * `GET /v1/projects`, `GET /v1/projects/:id`, `GET /v1/voice-calibration` and
  * `POST /v1/projects/:id/retry` → Orchestrator Service.
+ * `GET /v1/projects/:id/qc-report` → Orchestrator Service (CR-021 FR61.2).
  * `GET /v1/projects/:id/video` streams the assembled video from the shared volume.
  * `POST /v1/projects/:id/suggest-metadata` drafts SEO title/description/tags via Ollama —
  * proxied through `orchestratorAiClient` (a longer timeout than the default
@@ -52,6 +53,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.post('/v1/projects/:id/approve', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/reject', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/narration', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:id/qc-report', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post(
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),

@@ -18,6 +18,12 @@ type StartPublishSagaInput struct {
 	PublishAt     *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
 	ThumbnailPath *string // absolute path on shared_artifacts, from a prior POST /v1/projects/{id}/thumbnail upload
 	ChannelID     *string // connected YouTube channel to publish to; nil leaves the choice to the Publisher's default (CR-012)
+	// AcknowledgeQC is the Creator saying, deliberately, that they have read
+	// the blocking QC findings and want to publish anyway (CR-021 FR61.3).
+	// It only means anything when QC_ENFORCE is on, and it is recorded on the
+	// report either way it is used — an override nobody can see afterwards is
+	// not an override, it is a hole.
+	AcknowledgeQC bool
 }
 
 // StartPublishSagaOutput is returned to the HTTP layer for the 201 response.
@@ -32,12 +38,30 @@ type StartPublishSagaOutput struct {
 type StartPublishSagaUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
+	// qcReports and qcEnforce are CR-021's publish gate (D5). Both are
+	// optional: with no report store, or with enforcement off, Execute behaves
+	// exactly as it did before this CR.
+	qcReports domain.QCReportPort
+	qcEnforce bool
 }
 
 // NewStartPublishSagaUseCase constructs the use case with its port
 // dependencies.
 func NewStartPublishSagaUseCase(repo domain.ProjectRepositoryPort, publisher domain.CommandPublisherPort) *StartPublishSagaUseCase {
 	return &StartPublishSagaUseCase{repo: repo, publisher: publisher}
+}
+
+// WithQCGate attaches CR-021's publish gate.
+//
+// enforce comes from QC_ENFORCE and defaults to false (D5 / Decision #3): until
+// the thresholds have been calibrated against real footage, findings are shown
+// and recorded but never block. Passing the flag in rather than reading the
+// environment here keeps the use case testable and keeps config-reading in
+// exactly one package.
+func (uc *StartPublishSagaUseCase) WithQCGate(qcReports domain.QCReportPort, enforce bool) *StartPublishSagaUseCase {
+	uc.qcReports = qcReports
+	uc.qcEnforce = enforce
+	return uc
 }
 
 // Execute validates Project.Status == ready_to_publish (business-rules.md
@@ -51,6 +75,13 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 	}
 	if project.Status != domain.StatusReadyToPublish {
 		return nil, domain.ErrInvalidStatus
+	}
+
+	// CR-021 FR61.3: the gate lives here, not in the GUI. A button is not where
+	// a rule is kept — anything that can POST this endpoint would otherwise
+	// walk straight past it.
+	if err := uc.checkQCGate(ctx, input); err != nil {
+		return nil, err
 	}
 
 	sagaID := newUUID()
@@ -94,6 +125,49 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 	}
 
 	return &StartPublishSagaOutput{SagaID: sagaID, Status: domain.StatusPublishing}, nil
+}
+
+// checkQCGate refuses a publish whose latest QC report carries a blocking
+// finding, unless the Creator acknowledged it (CR-021 FR61.3).
+//
+// Three ways this returns nil, and each is deliberate:
+//   - QC_ENFORCE off (the default, D5) — findings are advice, not a lock, while
+//     the thresholds are still being calibrated against real videos.
+//   - No report at all — a project rendered before CR-021, or one whose report
+//     failed to persist. FR61.4's principle covers both: an absent measurement
+//     is not evidence of a problem.
+//   - status not_scored, or findings that are all warnings — nothing blocking
+//     was actually found.
+func (uc *StartPublishSagaUseCase) checkQCGate(ctx context.Context, input StartPublishSagaInput) error {
+	if uc.qcReports == nil {
+		return nil
+	}
+	report, err := uc.qcReports.LatestQCReport(ctx, input.ProjectID)
+	if err != nil {
+		// A gate that cannot read its own report must open, not close
+		// (FR61.4): a database hiccup is not a quality finding.
+		return nil
+	}
+	if report == nil || !report.HasBlockingFindings() {
+		return nil
+	}
+
+	if !uc.qcEnforce {
+		return nil
+	}
+	if !input.AcknowledgeQC {
+		return domain.ErrQCBlocked
+	}
+
+	// The override is recorded before the command goes out, so a publish can
+	// never exist without the trace explaining why it was allowed. Best-effort
+	// on the write itself: the Creator has already made the decision, and
+	// refusing to act on it because the audit row failed would be punishing
+	// them for an infrastructure problem.
+	if err := uc.qcReports.RecordQCOverride(ctx, input.ProjectID, report.BlockingFindings()); err != nil {
+		return nil
+	}
+	return nil
 }
 
 // publishVideoPayload builds the publish_video command payload from Project

@@ -14,9 +14,13 @@ from unittest.mock import patch
 import pytest
 
 from adapters.messaging.consumer import (
+    QC_STATUS_HAS_FINDINGS,
+    QC_STATUS_NOT_SCORED,
+    QC_STATUS_PASSED,
     AssembleVideoCommandHandler,
     ChannelAssetRenderedEventHandler,
     NormalizeChannelAssetCommandHandler,
+    QCVideoCommandHandler,
 )
 from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.inbox import InboxRepository
@@ -25,6 +29,7 @@ from application.assemble_video import AssembleVideoUseCase
 from domain.errors import AssemblyEngineError
 from domain.models import VideoAssemblyRequest
 from domain.ports import VideoAssemblerPort
+from domain.qc_rules import QCThresholds
 from tests.adapters.fake_postgres import FakePool
 
 
@@ -586,3 +591,246 @@ async def test_channel_asset_render_failed_event_is_ignored() -> None:
     assert message.acked is True
     assert len(pool.store.channel_assets) == 0
     assert len(pool.store.outbox_events) == 0
+
+
+# --- qc_video (CR-021 FR59/FR60/FR61.4) --------------------------------------
+
+
+def make_qc_envelope(
+    message_id: str = "msg-qc1",
+    video_path: str = "/shared/project-1/video/final.mp4",
+    render_quality: str = "1080p60",
+    narration_segments=None,
+    subtitle_cues=None,
+    layout_marks=None,
+) -> bytes:
+    envelope = {
+        "message_id": message_id,
+        "saga_id": "saga-1",
+        "project_id": "project-1",
+        "event_type": "qc_video",
+        "schema_version": "1.0",
+        "timestamp": "2026-09-10T00:00:00Z",
+        "payload": {
+            "event_type": "qc_video",
+            "video_path": video_path,
+            "render_quality": render_quality,
+            "narration_segments": narration_segments
+            if narration_segments is not None
+            else [{"audio_path": "/shared/project-1/audio0.wav", "start_time": 0.0}],
+            "subtitle_cues": subtitle_cues if subtitle_cues is not None else [],
+            "layout_marks": layout_marks
+            if layout_marks is not None
+            else [
+                {
+                    "index": 0,
+                    "t": 12.5,
+                    "mobjects": [
+                        {
+                            "cls": "Text",
+                            "bbox": [-9.0, -7.5, 1.0, 0.0],
+                            "color": "#F2F7FF",
+                            "font_size": 36.0,
+                        }
+                    ],
+                }
+            ],
+        },
+    }
+    return json.dumps(envelope).encode("utf-8")
+
+
+def _build_qc_handler(thresholds: QCThresholds | None = None) -> tuple[QCVideoCommandHandler, FakePool]:
+    pool = FakePool()
+    inbox = InboxRepository(pool)
+    outbox = OutboxRepository()
+    handler = QCVideoCommandHandler(pool, inbox, outbox, thresholds or QCThresholds())
+    return handler, pool
+
+
+def _patch_probes(monkeypatch, *, loudness=-14.0, peak=-3.0, attributes=None, raise_on=None):
+    """Patches the ffmpeg_probe functions imported by name into
+    adapters.messaging.consumer, so QCVideoCommandHandler never shells out."""
+    attrs = attributes if attributes is not None else {
+        "width": 1920,
+        "height": 1080,
+        "frame_rate": 60.0,
+        "pix_fmt": "yuv420p",
+        "faststart": True,
+    }
+
+    def _measure_loudness(_video_path):
+        if raise_on == "loudness":
+            raise RuntimeError("ffmpeg exited with code 1")
+        return loudness
+
+    def _measure_peak(_video_path):
+        return peak
+
+    def _probe_attrs(_video_path):
+        return attrs
+
+    def _measure_durations(segments):
+        return [{**s, "duration_seconds": 3.0} for s in segments]
+
+    monkeypatch.setattr("adapters.messaging.consumer.measure_loudness", _measure_loudness)
+    monkeypatch.setattr("adapters.messaging.consumer.measure_peak_dbfs", _measure_peak)
+    monkeypatch.setattr("adapters.messaging.consumer.probe_publish_attributes", _probe_attrs)
+    monkeypatch.setattr(
+        "adapters.messaging.consumer.measure_narration_durations", _measure_durations
+    )
+
+
+@pytest.mark.asyncio
+async def test_qc_video_reports_findings_for_a_frame_overflowing_video(
+    shared_volume_root, monkeypatch
+) -> None:
+    """A normal qc_video with a real layout problem (bbox outside the Manim
+    frame) yields qc_completed with status=has_findings."""
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler()
+
+    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path)))
+
+    assert len(pool.store.outbox_events) == 1
+    event = next(iter(pool.store.outbox_events.values()))
+    payload = event["payload"]["payload"]
+    assert payload["event_type"] == "qc_completed"
+    assert payload["status"] == QC_STATUS_HAS_FINDINGS
+    assert payload["reason"] is None
+    assert any(f["rule"] == "frame_overflow" for f in payload["findings"])
+    assert all("timestamp_seconds" in f for f in payload["findings"])  # FR59.6
+
+
+@pytest.mark.asyncio
+async def test_qc_video_reports_passed_for_a_clean_video(shared_volume_root, monkeypatch) -> None:
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler()
+
+    clean_marks = [
+        {
+            "index": 0,
+            "t": 1.0,
+            "mobjects": [
+                {
+                    "cls": "Text",
+                    "bbox": [-3.0, -0.5, 1.0, 0.0],
+                    "color": "#F2F7FF",
+                    "font_size": 36.0,
+                }
+            ],
+        }
+    ]
+    await handler.handle(
+        FakeMessage(make_qc_envelope(video_path=video_path, layout_marks=clean_marks))
+    )
+
+    event = next(iter(pool.store.outbox_events.values()))
+    payload = event["payload"]["payload"]
+    assert payload["status"] == QC_STATUS_PASSED
+    assert payload["findings"] == []
+    assert payload["reason"] is None
+
+
+@pytest.mark.asyncio
+async def test_qc_video_missing_layout_marks_is_not_scored_not_failed(
+    shared_volume_root, monkeypatch
+) -> None:
+    """FR61.4 — a project with no layout_marks (e.g. an older render) still
+    produces qc_completed, never a failure event, and the reason explains
+    why nothing was scored."""
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler()
+
+    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path, layout_marks=[])))
+
+    assert len(pool.store.outbox_events) == 1
+    event = next(iter(pool.store.outbox_events.values()))
+    payload = event["payload"]["payload"]
+    assert payload["event_type"] == "qc_completed"
+    assert payload["status"] == QC_STATUS_NOT_SCORED
+    assert payload["findings"] == []
+    assert payload["reason"]  # non-empty explanation
+    assert "layout_marks" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_qc_video_ffmpeg_error_is_not_scored_not_failed(
+    shared_volume_root, monkeypatch
+) -> None:
+    """FR61.4 — a technical ffmpeg failure (e.g. loudnorm probe blowing up)
+    must not produce a qc_failed event; there is no such event. It still
+    publishes qc_completed with status=not_scored."""
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch, raise_on="loudness")
+    handler, pool = _build_qc_handler()
+
+    message = FakeMessage(make_qc_envelope(video_path=video_path))
+    await handler.handle(message)
+
+    assert message.acked is True
+    assert len(pool.store.outbox_events) == 1
+    event = next(iter(pool.store.outbox_events.values()))
+    payload = event["payload"]["payload"]
+    assert payload["event_type"] == "qc_completed"
+    assert payload["status"] == QC_STATUS_NOT_SCORED
+    assert payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_qc_video_missing_video_file_is_not_scored(monkeypatch) -> None:
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler()
+
+    await handler.handle(
+        FakeMessage(make_qc_envelope(video_path="/shared/does-not-exist.mp4"))
+    )
+
+    event = next(iter(pool.store.outbox_events.values()))
+    payload = event["payload"]["payload"]
+    assert payload["status"] == QC_STATUS_NOT_SCORED
+    assert "video" in payload["reason"]
+
+
+@pytest.mark.asyncio
+async def test_qc_video_marks_message_processed_and_is_idempotent(
+    shared_volume_root, monkeypatch
+) -> None:
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler()
+    envelope_bytes = make_qc_envelope(video_path=video_path, message_id="msg-qc-dup")
+
+    await handler.handle(FakeMessage(envelope_bytes))
+    await handler.handle(FakeMessage(envelope_bytes))
+
+    assert len(pool.store.outbox_events) == 1
+
+
+@pytest.mark.asyncio
+async def test_qc_video_reports_real_severity_regardless_of_enforcement(
+    shared_volume_root, monkeypatch
+) -> None:
+    """LLD D5: báo cáo luôn mang severity thật. Service này không đọc
+    QC_ENFORCE — cổng chặn là của orchestrator, nên chế độ chỉ-báo vẫn phải
+    nhìn thấy được finding nào sẽ chặn khi bật cổng."""
+    video_path = str(shared_volume_root / "final.mp4")
+    _touch(video_path)
+    _patch_probes(monkeypatch)
+    handler, pool = _build_qc_handler(QCThresholds())
+
+    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path)))
+
+    event = next(iter(pool.store.outbox_events.values()))
+    findings = event["payload"]["payload"]["findings"]
+    overflow = [f for f in findings if f["rule"] == "frame_overflow"]
+    assert overflow and overflow[0]["severity"] == "blocking"
+    assert {f["severity"] for f in findings} <= {"blocking", "warning"}

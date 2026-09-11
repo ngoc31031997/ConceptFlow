@@ -84,6 +84,33 @@ type ChannelAssetPort interface {
 	ListChannelAssetPointers(ctx context.Context) ([]ChannelAssetPointer, error)
 }
 
+// QCReportPort persists and reads back the automated QC reports (CR-021 D6,
+// FR61.1). Implemented by adapters/postgres.QCReportRepository.
+//
+// Only the latest report per project is ever read: a project is scored once per
+// assemble_video, and an older report describes a video file that no longer
+// exists. History is kept rather than overwritten so a re-render's report can
+// be compared against the one it replaced while thresholds are being calibrated
+// (CR-021's own answer to the false-positive risk).
+type QCReportPort interface {
+	// SaveQCReport stores one completed QC pass. A redelivered qc_completed
+	// event must not accumulate duplicate reports, so implementations key on
+	// (project_id, created_at) semantics of "one report per pass" — see the
+	// repository for how the saga_id-less event is deduped.
+	SaveQCReport(ctx context.Context, report QCReport) error
+
+	// LatestQCReport returns the most recent report for a project, or
+	// (nil, nil) when it was never scored — a project rendered before CR-021
+	// has no report and must still be publishable (FR61.4's reasoning applies
+	// identically to a missing report and an unscorable one).
+	LatestQCReport(ctx context.Context, projectID string) (*QCReport, error)
+
+	// RecordQCOverride stamps the latest report as deliberately bypassed
+	// (FR61.3). Idempotent: overriding twice keeps the first timestamp, so a
+	// double-clicked publish button does not rewrite the audit trail.
+	RecordQCOverride(ctx context.Context, projectID string, findings []QCFinding) error
+}
+
 // ChannelAssetPointer is one row of Orchestrator's channel_asset_pointers
 // projection (CR-023 correction).
 type ChannelAssetPointer struct {

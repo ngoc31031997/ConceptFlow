@@ -47,6 +47,24 @@ describe('routes/projects', () => {
     );
   });
 
+  test('GET /v1/projects/:id/qc-report proxies to orchestrator client', async () => {
+    const fakeClient = {
+      request: jest.fn().mockResolvedValue({
+        status: 200,
+        headers: new Map(),
+        body: { project_id: 'p1', status: 'has_findings', findings: [] },
+      }),
+    };
+    const app = buildApp(fakeClient);
+
+    const res = await request(app).get('/v1/projects/p1/qc-report');
+
+    expect(res.status).toBe(200);
+    expect(fakeClient.request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', path: '/v1/projects/p1/qc-report' }),
+    );
+  });
+
   test('GET /v1/projects proxies to orchestrator client', async () => {
     const fakeClient = {
       request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { projects: [] } }),

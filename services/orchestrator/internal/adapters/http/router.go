@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -47,6 +48,13 @@ type channelAssetsUseCase interface {
 	Preview(ctx context.Context) ([]domain.ChannelAssetPointer, error)
 }
 
+// qcReportReader is the single read this router needs from the QC report
+// store — narrower than domain.QCReportPort on purpose, so the GET endpoint
+// cannot accidentally write.
+type qcReportReader interface {
+	LatestQCReport(ctx context.Context, projectID string) (*domain.QCReport, error)
+}
+
 // projectStore is the read/delete capability the project-list and
 // project-detail/delete endpoints need; satisfied directly by
 // domain.ProjectRepositoryPort.
@@ -68,6 +76,15 @@ type Router struct {
 	projects               projectStore
 	suggestPublishMetadata suggestPublishMetadataUseCase
 	channelAssets          channelAssetsUseCase
+	qcReports              qcReportReader
+}
+
+// WithQCReports attaches the QC report store, enabling
+// GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
+// the route answers 404, the same way the CR-023 routes do when unwired.
+func (rt *Router) WithQCReports(qcReports qcReportReader) *Router {
+	rt.qcReports = qcReports
+	return rt
 }
 
 // NewRouter constructs the Router with its dependencies (module-structure.md).
@@ -95,6 +112,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	r.Post("/v1/channel-assets/{kind}", rt.handleNormalizeChannelAsset)
 	r.Get("/v1/channel-assets/preview", rt.handleChannelAssetPreview)
+	r.Get("/v1/projects/{project_id}/qc-report", rt.handleQCReport)
 	return r
 }
 
@@ -179,6 +197,7 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 		PublishAt:     req.PublishAt,
 		ThumbnailPath: req.ThumbnailPath,
 		ChannelID:     req.ChannelID,
+		AcknowledgeQC: req.AcknowledgeQC,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)
@@ -326,6 +345,56 @@ func (rt *Router) handleChannelAssetPreview(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": out})
 }
 
+// handleQCReport serves the project's latest automated QC report
+// (CR-021 FR61.1) — what FR61.2's ResultPage renders above the publish button.
+//
+// A project that was never scored answers 200 with status "not_scored" and no
+// findings, rather than 404. The GUI needs to draw something either way, and
+// "we have not measured this" is an answer, not a missing resource.
+func (rt *Router) handleQCReport(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	if rt.qcReports == nil {
+		writeError(w, http.StatusNotFound, "quality checks are not enabled")
+		return
+	}
+
+	report, err := rt.qcReports.LatestQCReport(r.Context(), projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read the qc report")
+		return
+	}
+	if report == nil {
+		writeJSON(w, http.StatusOK, qcReportResponse{
+			ProjectID: projectID,
+			Status:    string(domain.QCStatusNotScored),
+			Findings:  []qcFindingResponse{},
+		})
+		return
+	}
+
+	findings := make([]qcFindingResponse, 0, len(report.Findings))
+	for _, f := range report.Findings {
+		findings = append(findings, qcFindingResponse{
+			Rule: f.Rule, Severity: f.Severity, Message: f.Message, TimestampSeconds: f.TimestampSeconds,
+		})
+	}
+	out := qcReportResponse{
+		ProjectID: report.ProjectID,
+		Status:    string(report.Status),
+		Reason:    report.Reason,
+		Findings:  findings,
+	}
+	if !report.CreatedAt.IsZero() {
+		created := report.CreatedAt.Format(time.RFC3339)
+		out.CreatedAt = &created
+	}
+	if report.OverriddenAt != nil {
+		overridden := report.OverriddenAt.Format(time.RFC3339)
+		out.OverriddenAt = &overridden
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
 // writeUseCaseError maps domain sentinel errors to the HTTP status codes
 // specified in interface-contracts.md (404 for not found, 409 for invalid
 // status preconditions); anything else is a 500.
@@ -335,6 +404,11 @@ func writeUseCaseError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, err.Error())
+	// 409 rather than 422: nothing about the request is malformed, the project
+	// is simply in a state that does not allow publishing yet — and the message
+	// tells the Creator the one field that changes that (CR-021 FR61.3).
+	case errors.Is(err, domain.ErrQCBlocked):
+		writeErrorCode(w, http.StatusConflict, err.Error(), ErrorCodeQCBlocked)
 	default:
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
@@ -342,6 +416,10 @@ func writeUseCaseError(w http.ResponseWriter, err error) {
 
 func writeError(w http.ResponseWriter, status int, message string) {
 	writeJSON(w, status, errorResponse{Error: message})
+}
+
+func writeErrorCode(w http.ResponseWriter, status int, message string, code string) {
+	writeJSON(w, status, errorResponse{Error: message, Code: code})
 }
 
 func writeJSON(w http.ResponseWriter, status int, body interface{}) {

@@ -1,11 +1,14 @@
+import type { Ref } from "react";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoPlayer.module.css";
 
 interface VideoPlayerProps {
   videoSrc: string;
+  /** CR-021 FR61.2 — để báo cáo QC tua tới mốc của một phát hiện. */
+  videoRef?: Ref<HTMLVideoElement>;
 }
 
-export function VideoPlayer({ videoSrc }: VideoPlayerProps) {
+export function VideoPlayer({ videoSrc, videoRef }: VideoPlayerProps) {
   return (
     <div className={glass.card}>
       <div className={styles.frame}>
@@ -15,7 +18,13 @@ export function VideoPlayer({ videoSrc }: VideoPlayerProps) {
           choice made in step 2, before the render.
         */}
         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-        <video data-testid="video-player-element" src={videoSrc} controls className={styles.video} />
+        <video
+          ref={videoRef}
+          data-testid="video-player-element"
+          src={videoSrc}
+          controls
+          className={styles.video}
+        />
       </div>
     </div>
   );

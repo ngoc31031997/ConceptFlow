@@ -17,7 +17,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import subprocess
+from dataclasses import asdict
 from typing import Protocol
 
 import asyncpg
@@ -34,7 +36,14 @@ from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.producer import (
     assembly_failed_envelope,
     channel_asset_normalized_envelope,
+    qc_completed_envelope,
     video_assembled_envelope,
+)
+from adapters.qc.ffmpeg_probe import (
+    measure_loudness,
+    measure_narration_durations,
+    measure_peak_dbfs,
+    probe_publish_attributes,
 )
 from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.inbox import InboxRepository
@@ -53,6 +62,7 @@ from domain.models import (
     SubtitleStyle,
     VideoAssemblyRequest,
 )
+from domain.qc_rules import QCThresholds, evaluate_all
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +77,11 @@ QUALITY_FRAME_SIZE = {
     "4k60": (3840, 2160),
 }
 DEFAULT_QUALITY_FRAME_SIZE = QUALITY_FRAME_SIZE["1080p60"]
+
+# A qc_video command whose render_quality is missing is scored against the
+# project default rather than skipped — the layout rules do not depend on it
+# and the pixel-height rule needs *some* frame size.
+DEFAULT_QC_RENDER_QUALITY = "1080p60"
 
 # `asset_role` on normalize_channel_asset (CR-023 FR65.4/FR66.5): whether
 # file_path is the intro/outro clip or the music bed that goes into it.
@@ -616,23 +631,136 @@ def _probe_duration(video_path: str) -> float:
         return 0.0
 
 
+QC_STATUS_PASSED = "passed"
+QC_STATUS_HAS_FINDINGS = "has_findings"
+QC_STATUS_NOT_SCORED = "not_scored"
+
+
+class QCVideoCommandHandler:
+    """Handles `qc_video` (CR-021 FR59/FR60), the saga step between
+    assemble_video and publish_video.
+
+    Lives in video-assembly rather than a quality-service of its own (LLD D1):
+    QC needs exactly ffmpeg/ffprobe and the file this service just wrote, and
+    both are already here.
+
+    FR61.4 is the load-bearing rule of this handler: there is NO failure
+    branch. Missing layout_marks, an ffmpeg error, an unreadable file — all of
+    them still publish `qc_completed`, with status="not_scored" and a reason.
+    A broken gate must not become a locked gate, so any exception at all is
+    caught and turned into that event.
+    """
+
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        inbox: InboxRepository,
+        outbox: OutboxRepository,
+        thresholds: QCThresholds | None = None,
+    ) -> None:
+        self._pool = pool
+        self._inbox = inbox
+        self._outbox = outbox
+        # Read once at composition time (FR61.5) — a threshold change is a
+        # redeploy, not a per-message environment read.
+        self._thresholds = thresholds or QCThresholds.from_env()
+
+    async def handle(self, message: AckableMessage) -> None:
+        envelope = json.loads(message.body)
+        message_id = envelope["message_id"]
+        saga_id = envelope["saga_id"]
+        project_id = envelope["project_id"]
+        set_correlation_id(saga_id)
+
+        if await self._inbox.has_processed(message_id):
+            logger.info("Skipping already-processed message_id=%s", message_id)
+            await message.ack()
+            return
+
+        payload = envelope["payload"]
+        try:
+            status, findings, reason = await asyncio.to_thread(self._score, payload)
+        except Exception as exc:  # noqa: BLE001 — FR61.4, see class docstring
+            logger.exception("qc_video could not score project_id=%s", project_id)
+            status, findings, reason = (
+                QC_STATUS_NOT_SCORED,
+                [],
+                f"lỗi kỹ thuật khi chấm QC: {exc}",
+            )
+
+        out_envelope = qc_completed_envelope(saga_id, project_id, status, findings, reason)
+
+        async with self._pool.acquire() as conn, conn.transaction():
+            await self._outbox.enqueue(
+                conn, aggregate_id=project_id, event_type="qc_completed", envelope=out_envelope
+            )
+            await self._inbox.mark_processed(conn, message_id)
+
+        await message.ack()
+
+    def _score(self, payload: dict) -> tuple[str, list[dict], str | None]:
+        """Runs synchronously in a thread — loudnorm and astats each read the
+        whole file, exactly the kind of work that must not sit on the event
+        loop (same reason assemble runs via to_thread)."""
+        video_path = payload.get("video_path")
+        render_quality = payload.get("render_quality") or DEFAULT_QC_RENDER_QUALITY
+        layout_marks = payload.get("layout_marks")
+
+        if not video_path or not os.path.exists(video_path):
+            return QC_STATUS_NOT_SCORED, [], f"không đọc được file video: {video_path!r}"
+
+        if not layout_marks:
+            # The layout data comes from rendering's marks file (LLD D3). An
+            # older project, or a render whose mark capture silently failed,
+            # has none — the audio/packaging half could still be scored, but a
+            # report missing every layout rule while claiming to have passed
+            # would be a lie about what was checked.
+            return (
+                QC_STATUS_NOT_SCORED,
+                [],
+                "lệnh qc_video không mang layout_marks — không chấm được phần bố cục",
+            )
+
+        segments = measure_narration_durations(payload.get("narration_segments") or [])
+        measured_lufs = measure_loudness(video_path)
+        peak_dbfs = measure_peak_dbfs(video_path)
+        attributes = probe_publish_attributes(video_path)
+
+        findings = evaluate_all(
+            layout_marks=layout_marks,
+            narration_segments=segments,
+            subtitle_cues=payload.get("subtitle_cues") or [],
+            render_quality=render_quality,
+            measured_lufs=measured_lufs,
+            peak_dbfs=peak_dbfs,
+            publish_attributes=attributes,
+            thresholds=self._thresholds,
+        )
+        serialized = [asdict(finding) for finding in findings]
+        status = QC_STATUS_HAS_FINDINGS if serialized else QC_STATUS_PASSED
+        return status, serialized, None
+
+
 class VideoAssemblyCommandDispatcher:
-    """One queue, two commands (CR-023, mirrors RenderingCommandDispatcher on
+    """One queue, three commands (CR-023, mirrors RenderingCommandDispatcher on
     the Rendering side): `video_assembly.commands` carries `assemble_video`
-    (per-project, saga-driven) and now `normalize_channel_asset` (channel-
-    wide, admin/upload-triggered) — one queue because both are this
-    service's own work and both need to queue behind each other rather than
-    run concurrently and contend for the same ffmpeg thread pool.
+    (per-project, saga-driven), `normalize_channel_asset` (channel-wide,
+    admin/upload-triggered) and, since CR-021, `qc_video` — one queue because
+    all are this service's own work and all need to queue behind each other
+    rather than run concurrently and contend for the same ffmpeg thread pool.
     """
 
     def __init__(
         self,
         assemble_video: AssembleVideoCommandHandler,
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
+        qc_video: "QCVideoCommandHandler | None" = None,
     ) -> None:
         self._handlers = {"assemble_video": assemble_video.handle}
         if normalize_channel_asset is not None:
             self._handlers["normalize_channel_asset"] = normalize_channel_asset.handle
+        if qc_video is not None:
+            self._handlers["qc_video"] = qc_video.handle
 
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)

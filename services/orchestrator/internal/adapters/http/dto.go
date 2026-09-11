@@ -44,6 +44,35 @@ type startPublishSagaRequest struct {
 	PublishAt     *string  `json:"publish_at,omitempty"`
 	ThumbnailPath *string  `json:"thumbnail_path,omitempty"`
 	ChannelID     *string  `json:"channel_id,omitempty"`
+	// CR-021 FR61.3 — the conscious action that gets past a blocking QC
+	// finding. Absent means "no": an override has to be asked for.
+	AcknowledgeQC bool `json:"acknowledge_qc,omitempty"`
+}
+
+// qcFindingResponse is one entry of the QC report response
+// (GET /v1/projects/{project_id}/qc-report).
+type qcFindingResponse struct {
+	Rule             string  `json:"rule"`
+	Severity         string  `json:"severity"`
+	Message          string  `json:"message"`
+	TimestampSeconds float64 `json:"timestamp_seconds"`
+}
+
+// qcReportResponse is the GET /v1/projects/{project_id}/qc-report body
+// (CR-021 FR61.1/FR61.2).
+//
+// Status "not_scored" with an empty findings list is a normal, successful
+// response, not an error — the GUI says so rather than showing a green tick the
+// measurement never earned.
+type qcReportResponse struct {
+	ProjectID string              `json:"project_id"`
+	Status    string              `json:"status"`
+	Reason    *string             `json:"reason,omitempty"`
+	Findings  []qcFindingResponse `json:"findings"`
+	CreatedAt *string             `json:"created_at,omitempty"`
+	// OverriddenAt is set once the Creator published past a blocking finding
+	// (FR61.3), so the record of that decision is visible where the findings are.
+	OverriddenAt *string `json:"overridden_at,omitempty"`
 }
 
 // sagaStartedResponse is the 201 response shape shared by both saga-start
@@ -124,9 +153,19 @@ type suggestMetadataResponse struct {
 }
 
 // errorResponse is the JSON body for non-2xx responses.
+//
+// Code is set only where the client has to branch on *which* failure it was,
+// not merely report it. Publishing returns 409 both for a project in the wrong
+// status and for a QC block (CR-021 FR61.3), and only the second one offers the
+// Creator a way through — leaving the GUI to tell them apart by matching on
+// prose would break the moment the wording changes.
 type errorResponse struct {
 	Error string `json:"error"`
+	Code  string `json:"code,omitempty"`
 }
+
+// ErrorCodeQCBlocked marks the 409 that `acknowledge_qc: true` can get past.
+const ErrorCodeQCBlocked = "qc_blocked"
 
 func toProjectListResponse(summaries []domain.ProjectSummary) projectListResponse {
 	projects := make([]projectSummaryResponse, 0, len(summaries))

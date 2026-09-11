@@ -38,6 +38,11 @@ var eventStepMap = map[string]domain.StepName{
 	"rendering_failed":    domain.StepRenderScenes,
 	"video_assembled":     domain.StepAssembleVideo,
 	"assembly_failed":     domain.StepAssembleVideo,
+	// CR-021 FR61.4: qc_completed is the ONLY event qc_video ever produces.
+	// There is deliberately no qc_failed counterpart — a QC that could not run
+	// reports status="not_scored" and the saga carries on, so a broken measuring
+	// tool can never hold a finished video hostage.
+	"qc_completed":        domain.StepQCVideo,
 	"video_published":     domain.StepPublishVideo,
 	"publish_failed":      domain.StepPublishVideo,
 }
@@ -55,6 +60,12 @@ type HandleStepEventUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
 	progress  domain.ProgressPublisherPort
+	// qcReports stores the automated QC report (CR-021 D6). Optional/nil-checked
+	// at its call sites for the same reason channelAssets is: callers and tests
+	// written before CR-021 keep working, and a project simply ends up with no
+	// report — which the publish gate already has to treat as "nothing to
+	// enforce" anyway (FR61.4).
+	qcReports domain.QCReportPort
 	// channelAssets resolves the active intro/outro asset (CR-023 D1/D2).
 	// Optional (nil-checked at the one call site) so existing callers/tests
 	// built before CR-023 keep compiling and behaving exactly as before —
@@ -71,6 +82,16 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 		logger = slog.Default()
 	}
 	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, channelAssets: channelAssets, logger: logger}
+}
+
+// WithQCReports attaches the QC report store (CR-021 D6).
+//
+// A setter rather than another constructor parameter: NewHandleStepEventUseCase
+// already takes five, and every existing caller and test would have to be
+// edited to pass a nil for a dependency only one branch of the switch uses.
+func (uc *HandleStepEventUseCase) WithQCReports(qcReports domain.QCReportPort) *HandleStepEventUseCase {
+	uc.qcReports = qcReports
+	return uc
 }
 
 // Execute handles a single StepEvent. It never returns an error for a valid
@@ -208,6 +229,8 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 		nextErr = uc.onRenderingCompleted(ctx, event, project)
 	case domain.StepAssembleVideo:
 		nextErr = uc.onVideoAssembled(ctx, event, project)
+	case domain.StepQCVideo:
+		nextErr = uc.onQCCompleted(ctx, event, project)
 	case domain.StepPublishVideo:
 		nextErr = uc.onVideoPublished(ctx, event, project)
 	}
@@ -643,7 +666,95 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
+
+	// CR-021 D2: assembling the video no longer ends the Render Saga —
+	// qc_video does. Setting ready_to_publish here instead would put the
+	// publish button in front of the Creator before anything had looked at the
+	// file, which is the whole gap this CR closes.
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}); err != nil {
+		return err
+	}
+	// Same routing key as assemble_video: D1 puts the QC worker inside
+	// video-assembly (it already has ffmpeg/ffprobe and the file itself), so
+	// both commands ride the one video_assembly.commands queue and are told
+	// apart by event_type — exactly how rendering already runs three commands.
+	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "video_assembly", string(domain.StepQCVideo), qcVideoPayload(project)); err != nil {
+		return err
+	}
+	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRunningQC)
+}
+
+// onQCCompleted stores the QC report and ends the Render Saga.
+//
+// It ends it unconditionally. Whatever the verdict — passed, has_findings, or
+// not_scored — the project reaches ready_to_publish (FR61.4): QC decides what
+// the Creator is *told*, never whether the pipeline finishes. The one place a
+// blocking finding can actually stop anything is the Publish Saga, and only
+// with QC_ENFORCE on (D5).
+func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
+	status := domain.QCStatus(stringFromPayload(event.Payload, "status"))
+	switch status {
+	case domain.QCStatusPassed, domain.QCStatusHasFindings, domain.QCStatusNotScored:
+	default:
+		// An unrecognised verdict is a not_scored, not a failure: this service
+		// must not be the reason a video cannot ship because the QC worker
+		// grew a fourth status.
+		uc.logger.WarnContext(ctx, "unrecognised qc status, recording as not_scored",
+			"status", string(status), "project_id", event.ProjectID)
+		status = domain.QCStatusNotScored
+	}
+
+	report := domain.QCReport{
+		ProjectID: event.ProjectID,
+		Status:    status,
+		Findings:  parseQCFindings(event.Payload),
+	}
+	if reason := stringFromPayload(event.Payload, "reason"); reason != "" {
+		report.Reason = &reason
+	}
+
+	if uc.qcReports != nil {
+		// Best-effort, for the same reason the whole step is: a report that
+		// fails to persist is a Creator missing some advice, not grounds to
+		// strand a finished video short of ready_to_publish.
+		if err := uc.qcReports.SaveQCReport(ctx, report); err != nil {
+			uc.logger.Warn("could not store qc report", "project_id", event.ProjectID, "error", err)
+		}
+	}
+
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
+}
+
+// qcVideoPayload builds the qc_video command from data already on Project
+// (Rule 5 — a retry rebuilds it without re-running an earlier step).
+//
+// It sends the *assembled* video_path, not RenderedVideoPath: the loudness,
+// clipping and container checks of FR60 only mean anything against the file
+// that will actually be uploaded, music bed, intro sting and all.
+func qcVideoPayload(project *domain.Project) map[string]interface{} {
+	scenes := sortedScenes(project.Scenes)
+
+	quality := project.RenderQuality
+	if !quality.IsValid() {
+		quality = domain.DefaultRenderQuality
+	}
+
+	layoutMarks := project.LayoutMarks
+	if layoutMarks == nil {
+		layoutMarks = []map[string]interface{}{}
+	}
+
+	payload := map[string]interface{}{
+		"video_path":         derefString(project.VideoPath),
+		"render_quality":     string(quality),
+		"narration_segments": narrationSegments(scenes, project.WaitOffsets),
+		"layout_marks":       layoutMarks,
+	}
+	// Subtitle cues are sent whenever they exist, regardless of delivery mode:
+	// FR60.4 checks whether two cues overlap in time, which is wrong in a
+	// burn-in render exactly as much as in a sidecar .srt.
+	payload["subtitle_cues"] = subtitleCues(scenes, project.WaitOffsets)
+	return payload
 }
 
 // onVideoPublished stores youtube_video_url and ends the Publish Saga.
@@ -694,27 +805,13 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 	scenes := sortedScenes(project.Scenes)
 	offsets := project.WaitOffsets
 
-	narrationSegments := make([]map[string]interface{}, 0, len(scenes))
-	for i, s := range scenes {
-		if s.AudioPath == "" {
-			continue
-		}
-		startTime := 0.0
-		if i < len(offsets) {
-			startTime = offsets[i]
-		}
-		narrationSegments = append(narrationSegments, map[string]interface{}{
-			"audio_path": s.AudioPath,
-			"start_time": startTime,
-		})
-	}
 	var videoPath string
 	if project.RenderedVideoPath != nil {
 		videoPath = *project.RenderedVideoPath
 	}
 	payload := map[string]interface{}{
 		"video_path":             videoPath,
-		"narration_segments":     narrationSegments,
+		"narration_segments":     narrationSegments(scenes, offsets),
 		"video_duration_seconds": project.RenderedVideoSeconds,
 	}
 	// CR-023 D2: optional, nullable — nil (omitted) when the toggle is off or
@@ -757,6 +854,28 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 		payload["subtitle_mode"] = string(mode)
 	}
 	return payload
+}
+
+// narrationSegments pairs each scene's audio file with the offset Rendering
+// measured for it. Shared by assemble_video and qc_video (CR-021 FR60.2) so
+// the overlap check runs against precisely the placement assembly used —
+// a second, independently-built list is a second chance to disagree.
+func narrationSegments(scenes []domain.Scene, offsets []float64) []map[string]interface{} {
+	segments := make([]map[string]interface{}, 0, len(scenes))
+	for i, s := range scenes {
+		if s.AudioPath == "" {
+			continue
+		}
+		startTime := 0.0
+		if i < len(offsets) {
+			startTime = offsets[i]
+		}
+		segments = append(segments, map[string]interface{}{
+			"audio_path": s.AudioPath,
+			"start_time": startTime,
+		})
+	}
+	return segments
 }
 
 // subtitleCues shows each narration line from the offset Rendering measured

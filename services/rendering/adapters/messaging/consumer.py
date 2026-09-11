@@ -116,6 +116,7 @@ class RenderScriptCommandHandler:
                 result.video_path,
                 result.wait_offsets,
                 result.video_duration_seconds,
+                result.layout_marks,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():

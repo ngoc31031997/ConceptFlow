@@ -361,6 +361,36 @@ def test_read_wait_offsets_raises_when_file_absent(tmp_path):
         ManimScriptRenderer._read_wait_offsets(str(tmp_path / "nope.jsonl"), expected=1)
 
 
+def test_read_layout_marks_collects_only_layout_records(tmp_path):
+    """CR-021 FR58: the layout snapshots ride the same JSONL as the timing
+    marks, so parsing has to pick them out by `kind` and leave the rest alone."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text(
+        '{"kind": "mark", "index": 0, "t": 0.0}\n'
+        '{"kind": "layout", "index": 0, "t": 0.0, "mobjects": '
+        '[{"cls": "Text", "bbox": [-1.0, 1.0, 0.5, -0.5], "color": "#FFFFFF", "font_size": 36.0}]}\n'
+        '{"kind": "mark", "index": 1, "t": 4.0}\n'
+        '{"kind": "layout", "index": 1, "t": 4.0, "mobjects": []}\n'
+    )
+
+    layouts = ManimScriptRenderer._read_layout_marks(str(marks))
+
+    assert [r["index"] for r in layouts] == [0, 1]
+    assert layouts[0]["mobjects"][0]["font_size"] == 36.0
+    # The record travels whole to QC — index and t included.
+    assert layouts[1] == {"kind": "layout", "index": 1, "t": 4.0, "mobjects": []}
+
+
+def test_read_layout_marks_is_empty_when_the_script_recorded_none(tmp_path):
+    """Layout capture is best-effort upstream, so its absence must not be an
+    error here: a video with no layout data still gets its audio scored."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n')
+
+    assert ManimScriptRenderer._read_layout_marks(str(marks)) == []
+    assert ManimScriptRenderer._read_layout_marks(str(tmp_path / "nope.jsonl")) == []
+
+
 def test_cache_prune_evicts_oldest_projects_over_budget(tmp_path):
     """A persistent per-project media_dir is a cache; without a ceiling it
     grows until the shared volume fills."""

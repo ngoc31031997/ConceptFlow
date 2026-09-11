@@ -33,12 +33,17 @@ def rendering_completed_envelope(
     video_path: str,
     wait_offsets: list[float],
     video_duration_seconds: float,
+    layout_marks: list[dict] | None = None,
 ) -> dict:
     """wait_offsets / video_duration_seconds added by CR-002 (FR10.2).
 
     wait_offsets[i] is where narration segment i actually starts in the
     rendered video. The Orchestrator validates it against its own scene count
     before passing it to Video Assembly.
+
+    layout_marks added by CR-021 (FR58): the on-screen geometry at each
+    narration mark, which the Orchestrator stores and hands to `qc_video`.
+    Best-effort upstream, so an empty list is a normal value, not an error.
     """
     return build_envelope(
         saga_id,
@@ -48,6 +53,7 @@ def rendering_completed_envelope(
             "video_path": video_path,
             "wait_offsets": wait_offsets,
             "video_duration_seconds": video_duration_seconds,
+            "layout_marks": layout_marks or [],
         },
     )
 

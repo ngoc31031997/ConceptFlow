@@ -140,7 +140,13 @@ def narrate(scene, text: str) -> None:
         )
 
     # Đọc mốc TRƯỚC khi chờ: đây là thời điểm bắt đầu, thứ Video Assembly cần.
-    _recorder.write({"kind": "mark", "index": index, "t": scene.renderer.time})
+    now = scene.renderer.time
+    _recorder.write({"kind": "mark", "index": index, "t": now})
+    # CR-021 FR58.1: bố cục tại đúng mốc đó, để QC chấm được tràn khung /
+    # chồng lấn / chữ nhỏ / tương phản mà không phải xem lại từng khung hình.
+    # Chỉ ở lượt render: lượt dry là cổng chặn trước TTS, chỗ Creator đang chờ.
+    _recorder.write({"kind": "layout", "index": index, "t": now,
+                     "mobjects": _describe_layout(scene)})
     scene.wait(durations[index])
 
 
@@ -183,3 +189,83 @@ def _describe_stage(scene) -> str:
         )
     except Exception:  # noqa: BLE001 — xem docstring
         return ""
+
+
+def _describe_layout(scene) -> list[dict]:
+    """Bố cục khung hình hiện tại, dạng máy chấm được (CR-021 FR58.1).
+
+    Mỗi mobject thành một bản ghi: tên class, hộp bao theo toạ độ Manim
+    (trái/phải/trên/dưới), màu hex và cỡ chữ. Đó đúng là bốn thứ luật QC ở
+    `video-assembly` cần — tràn khung và chồng lấn đọc bbox, chữ quá nhỏ đọc
+    `font_size`, tương phản đọc `color`. Không cố đoán ý nghĩa hình, y như
+    `_describe_stage`: chấm điểm là việc của luật, không phải của chỗ thu số.
+
+    Best-effort tuyệt đối (FR58.2): đây là dữ liệu cho QC, không phải sản
+    phẩm, nên một mobject lạ hay một API Manim đổi kiểu phải làm mất dữ liệu
+    chứ không được làm hỏng lượt render đã tốn hàng phút.
+    """
+    try:
+        described: list[dict] = []
+        for mobject in getattr(scene, "mobjects", []):
+            try:
+                described.append({
+                    "cls": type(mobject).__name__,
+                    "bbox": [
+                        float(mobject.get_left()[0]),
+                        float(mobject.get_right()[0]),
+                        float(mobject.get_top()[1]),
+                        float(mobject.get_bottom()[1]),
+                    ],
+                    "color": _hex_color(mobject),
+                    # Chỉ mobject chữ mới có; None là câu trả lời đúng cho
+                    # phần còn lại, không phải một con số bịa ra.
+                    "font_size": _optional_float(getattr(mobject, "font_size", None)),
+                })
+            except Exception:  # noqa: BLE001 — bỏ qua đúng một mobject, giữ phần còn lại
+                continue
+        return described
+    except Exception:  # noqa: BLE001 — xem docstring
+        return []
+
+
+def _hex_color(mobject) -> str | None:
+    """Màu của mobject dạng `#RRGGBB`, hoặc None nếu không đọc được.
+
+    `Text` trong Manim 0.18 là một group các glyph: màu thật nằm ở glyph, còn
+    `Text.get_color()` luôn trả `#000000` kể cả khi chữ đang vàng. Lấy màu tô
+    của glyph đầu tiên cho nhóm có submobject, nếu không thì `get_color()` —
+    nếu không thế thì luật tương phản (FR59.4) sẽ chấm sai mọi dòng chữ.
+    """
+    try:
+        leaf = mobject
+        while getattr(leaf, "submobjects", None):
+            leaf = leaf.submobjects[0]
+        color = leaf.get_fill_color() if leaf is not mobject else mobject.get_color()
+    except Exception:  # noqa: BLE001
+        return None
+    # Manim 0.18 trả ManimColor có `.to_hex()`; các phiên bản/kiểu khác trả
+    # thẳng chuỗi. Cả hai đều chấp nhận được, thứ QC cần chỉ là chuỗi hex.
+    to_hex = getattr(color, "to_hex", None)
+    if callable(to_hex):
+        try:
+            value = to_hex()
+        except Exception:  # noqa: BLE001
+            return None
+    else:
+        value = color
+    if not isinstance(value, str):
+        return None
+    value = value.strip().upper()
+    # `to_hex()` có thể kèm kênh alpha (#RRGGBBAA); QC chấm tương phản trên RGB.
+    if len(value) == 9 and value.startswith("#"):
+        value = value[:7]
+    return value
+
+
+def _optional_float(value) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
