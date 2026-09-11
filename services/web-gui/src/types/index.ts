@@ -8,7 +8,7 @@ export interface RenderInput {
   /** CR-015 — "off" | "track" | "burn_in" | "both" (ADR-0027). */
   subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
-  render_quality?: "720p30" | "1080p60" | "4k60";
+  render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
   video_format_id?: string;
   background_music_volume?: number;
 }
@@ -69,6 +69,22 @@ export interface Project {
   review_enabled?: boolean;
   beats?: BeatOccurrence[];
   validation_warnings?: string[];
+  /**
+   * Đủ dữ liệu để gọi lại `startRenderSaga` cho ĐÚNG project_id này ở một
+   * `render_quality` khác (bug report: "cho phép render lại chất lượng cao
+   * hơn khi chốt final"). Không optional theo nghĩa "có thể thiếu dữ liệu" —
+   * orchestrator luôn trả các trường này — nhưng đánh dấu optional vì test cũ
+   * dựng `Project` tối giản không cần khai báo hết.
+   */
+  script_content?: string;
+  background_music_path?: string;
+  background_music_volume?: number;
+  tts_enabled?: boolean;
+  voice_id?: string;
+  subtitle_mode?: string;
+  subtitle_style?: SubtitleStylePayload;
+  render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
+  video_format_id?: string;
 }
 
 /** Một beat lượt dry quan sát được, gắn vào câu lời thoại mở đầu nó. */

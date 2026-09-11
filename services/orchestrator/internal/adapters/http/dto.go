@@ -131,6 +131,14 @@ type projectResponse struct {
 	// CR-007 D7 — the vertical clips generate_clips produced, if the saga has
 	// reached that step yet.
 	Clips []clipResultResponse `json:"clips,omitempty"`
+	// ScriptContent, BackgroundMusicPath and BackgroundMusicVolume round out
+	// what StartRenderSagaInput needs — the GUI's "render lại ở chất lượng
+	// khác" (bug report) resubmits POST /v1/sagas/render for this same
+	// project_id once it is done, and it can only carry over settings it can
+	// actually read back from here.
+	ScriptContent         string  `json:"script_content"`
+	BackgroundMusicPath   *string `json:"background_music_path,omitempty"`
+	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -265,5 +273,9 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		CaptionStatus:    p.CaptionStatus,
 		ErrorMessage:     p.ErrorMessage,
 		Clips:            toClipResultResponses(p.Clips),
+
+		ScriptContent:         p.ScriptContent,
+		BackgroundMusicPath:   p.BackgroundMusicPath,
+		BackgroundMusicVolume: p.BackgroundMusicVolume,
 	}
 }

@@ -61,8 +61,8 @@ Quy tắc cứng:
 }
 
 const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
-  vi: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG VIỆT.",
-  en: "Toàn bộ lời thoại trong `# NARRATION: \"...\"` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
+  vi: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.",
+  en: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
 };
 
 const NARRATION_PLACEHOLDER: Record<"vi" | "en", string> = {
@@ -83,39 +83,40 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
    đích danh từ manim (ví dụ \`from manim import Arrow\`), KHÔNG dùng
    \`from manim import *\`.
 
+   Nếu script đang dùng quy ước CŨ (comment \`# NARRATION: "..."\` kèm
+   \`self.wait(AUTO)\`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ
+   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời
+   gọi hàm \`self.narrate("...")\` duy nhất, đặt đúng vị trí \`self.wait(AUTO)\`
+   cũ (xem quy tắc 2 bên dưới).
+
 1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script
    có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class
    đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.
 
-2. Trước MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), thêm một
-   dòng comment ngay phía trên đúng định dạng:
-       # NARRATION: "${NARRATION_PLACEHOLDER[language]}"
-   (chỉ dùng dấu ngoặc kép thẳng ", không xuống dòng, không chứa dấu ngoặc
-   kép bên trong).
+2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay
+   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong
+   construct()):
+       self.narrate("${NARRATION_PLACEHOLDER[language]}")
+   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —
+   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên
+   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.
 
-3. Ngay sau mỗi comment NARRATION đó, thay lệnh self.wait(...) tương ứng
-   (hoặc thêm mới nếu chưa có) thành đúng:
-       self.wait(AUTO)
-   Đây là điểm animation sẽ DỪNG LẠI chờ đúng bằng độ dài audio giọng đọc thật —
-   hệ thống sẽ tự thay AUTO bằng số giây thực tế trước khi render, tôi không
-   cần chỉnh gì thêm.
-
-4. TUYỆT ĐỐI:
-   - Số lượng # NARRATION: "..." phải bằng đúng số lượng self.wait(AUTO).
-   - Không thêm self.wait(AUTO) vào những chỗ KHÔNG có giọng đọc.
+3. TUYỆT ĐỐI:
+   - KHÔNG dùng comment \`# NARRATION:\` hay \`self.wait(AUTO)\` dưới bất kỳ hình
+     thức nào — chúng không còn được hệ thống đọc.
    - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ
      animation nội bộ, không liên quan đến giọng đọc.
    - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.
-   - Giữ nguyên toàn bộ code, chỉ chèn comment NARRATION + đổi các self.wait
-     cần đồng bộ giọng đọc thành self.wait(AUTO).
+   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng
+     self.narrate(...).
 
-5. Chia lời thoại theo từng "nhịp" animation hợp lý — mỗi đoạn NARRATION nên
-   tương ứng với một hành động/animation trên màn hình đang diễn ra lúc đó,
-   không gộp toàn bộ nội dung vào một câu duy nhất.
+4. Chia lời thoại theo từng "nhịp" animation hợp lý — mỗi lời gọi
+   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình
+   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.
 
-6. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.
+5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.
 
-7. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
+6. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
 
 Script gốc:
 <dán script Manim của bạn vào đây>`;
@@ -158,19 +159,17 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
            ...
    Bảng màu, font, cỡ chữ và nhịp chuyển cảnh do ConceptFlowScene lo — KHÔNG khai báo màu, KHÔNG đặt font_size, KHÔNG set background.
 
-3. Với MỖI câu narration, chèn comment marker ngay TRƯỚC animation tương ứng rồi self.wait(AUTO) ngay sau, không có gì chen giữa:
-   # NARRATION: "Câu lời thoại tự nhiên, đúng ý cảnh này"
-   self.wait(AUTO)
+3. Lời thoại là một LỜI GỌI HÀM, không phải comment. Ngay tại điểm cần giọng đọc:
+   self.narrate("Câu lời thoại tự nhiên, đúng ý cảnh này")
 
    Quy tắc cứng:
-   - Số lượng \`# NARRATION: "..."\` phải bằng chính xác số lượng \`self.wait(AUTO)\` — KHÔNG được lệch, dù chỉ 1.
-   - \`AUTO\` là placeholder do engine tự thay bằng thời lượng giọng đọc TTS thật — không định nghĩa biến AUTO, không thay bằng số giây cụ thể.
+   - \`self.narrate(...)\` tự dừng animation đúng bằng thời lượng giọng đọc TTS thật. KHÔNG thêm \`self.wait(...)\` ngay sau nó.
    - Nội dung trong ngoặc kép là câu hoàn chỉnh, nghe tự nhiên khi đọc thành tiếng, không chứa dấu ngoặc kép bên trong, không xuống dòng, dùng dấu ngoặc kép thẳng " (không phải " " kiểu chữ nghiêng).
-   - self.wait(số giây cụ thể) chỉ dùng cho khoảng lặng KHÔNG có lời thoại (ví dụ giữ hình cuối vài giây).
-   - TUYỆT ĐỐI KHÔNG đặt \`self.wait(AUTO)\` bên trong một vòng lặp \`for\`/\`while\` — mỗi lần lặp sẽ sinh thêm một lệnh wait(AUTO) trong khi chỉ có 1 marker NARRATION phía trước, gây lệch số lượng (lỗi thường gặp nhất). Nếu cần dừng lại trong từng vòng lặp, dùng \`self.wait(0.3)\` (số cụ thể, không phải AUTO); chỉ đặt \`# NARRATION\`/\`self.wait(AUTO)\` MỘT LẦN, sau khi vòng lặp đã kết thúc.
-   - Mỗi \`self.wait(AUTO)\` trong toàn bộ file phải có đúng một \`# NARRATION: "..."\` ngay phía trên nó — không được có \`self.wait(AUTO)\` "mồ côi" (không có marker) hay marker không có wait theo sau.
+   - \`self.wait(số giây cụ thể)\` chỉ dùng cho khoảng lặng KHÔNG có lời thoại (ví dụ giữ hình cuối vài giây).
+   - Gọi được ở MỌI nơi: bên trong vòng lặp \`for\`/\`while\`, trong nhánh \`if\`, trong hàm helper. Không có ràng buộc về số lượng hay vị trí — danh sách lời thoại được lấy theo thứ tự chạy thật.
+   - TUYỆT ĐỐI KHÔNG dùng comment \`# NARRATION: "..."\` hay \`self.wait(AUTO)\`. Quy ước cũ đó đã bị gỡ khỏi hệ thống: script dùng nó sẽ không sinh ra lời thoại nào và bị từ chối với lỗi "narration_segments must not be empty".
 
-4. Animation minh họa đặt TRƯỚC narration/wait(AUTO) tương ứng để hình xuất hiện đúng lúc lời thoại nhắc đến nó.
+4. Animation minh họa đặt TRƯỚC lời gọi \`self.narrate(...)\` tương ứng, để hình xuất hiện đúng lúc lời thoại nhắc đến nó.
 
 ## API ĐƯỢC PHÉP DÙNG (chỉ những thứ dưới đây — thứ khác sẽ bị lint từ chối)
 
@@ -185,6 +184,11 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
 
 ### Method của scene (gọi qua \`self.\`)
+- Lời thoại và cấu trúc: \`self.narrate("câu lời thoại")\`, \`self.beat("<id>")\`, \`self.chapter("Tên chapter")\`
+- Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi \`self.beat(...)\` tương ứng bên trong:
+  - \`self.hook("Câu hỏi mở đầu", "phụ đề tuỳ chọn")\` — mở beat \`hook\`
+  - \`self.recap(["ý 1", "ý 2"], title="Tóm lại")\` — mở beat \`recap\`
+  - \`self.call_to_action("Lời kêu gọi", "phụ đề tuỳ chọn")\` — mở beat \`cta\`, tự giữ khung cuối cho end-screen
 - Chữ: \`self.title(...)\`, \`self.heading(...)\`, \`self.body(...)\`, \`self.caption(...)\`, \`self.formula("x^2")\`, \`self.code(src, "python")\`
 - Bố cục: \`self.stack(a, b, c)\` (xếp dọc), \`self.row(a, b)\` (xếp ngang), \`self.fit(obj)\` (co cho vừa khung)
 - Chuyển cảnh: \`self.reveal(obj)\`, \`self.dismiss(obj)\`, \`self.swap(cũ, mới)\`, \`self.emphasize(obj)\`, \`self.clear_stage()\`
@@ -200,11 +204,11 @@ Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ 
 
 ## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua)
 
-1. Đếm thủ công: đánh số thứ tự 1, 2, 3... cho từng \`# NARRATION:\` xuất hiện trong script, sau đó đếm riêng số lệnh \`self.wait(AUTO)\`. Hai con số này PHẢI bằng nhau. Nếu lệch, tìm và sửa (thường do wait(AUTO) bị đặt trong vòng lặp, hoặc marker/wait bị mồ côi).
-2. Rà lại toàn bộ vòng lặp for/while trong script — đảm bảo không có self.wait(AUTO) nào nằm bên trong.
+1. Tìm trong script: có còn chuỗi \`# NARRATION\` hoặc \`wait(AUTO)\` nào không? Nếu CÓ — dù chỉ một — script sẽ bị từ chối. Thay hết bằng \`self.narrate("...")\`.
+2. Mỗi lời thoại có phải một lời gọi \`self.narrate("...")\` đặt ngay SAU animation minh họa cho nó không? Có \`self.wait(...)\` nào bị thêm thừa ngay sau một lời gọi narrate không (không được — narrate đã tự chờ)?
 3. Kịch bản có mạch lạc, đúng trọng tâm chủ đề, không lan man không?
 4. Mỗi cảnh có hình ảnh minh họa RIÊNG, không lặp lại animation nhàm chán?
-5. Class Scene có đúng hậu tố "Scene"? Không còn self.wait(số cụ thể) ở chỗ có lời thoại?
+5. Class Scene có đúng hậu tố "Scene" và kế thừa \`ConceptFlowScene\` không?
 6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có \`from manim import *\`?
 
 ## OUTPUT

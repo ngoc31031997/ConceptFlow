@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
@@ -7,6 +7,7 @@ import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
+import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import glass from "../styles/glass.module.css";
 
 // Steps whose input comes straight from the "Soạn nội dung" screen
@@ -21,6 +22,7 @@ export function RenderPage() {
   const navigate = useNavigate();
   const progressState = useSSE(projectId);
   const { project, refetch } = useProject(projectId);
+  const dispatchDraft = useContext(ProjectDraftDispatchContext);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
 
@@ -83,7 +85,18 @@ export function RenderPage() {
           />
         )}
         {isAwaitingReview && project && (
-          <OutlineReview project={project} onDecided={refetch} />
+          <OutlineReview
+            project={project}
+            onDecided={refetch}
+            onRejected={() => {
+              // Server has already put this project_id back to draft
+              // (review_outline.go Reject). RESUME_EDITING keeps the script
+              // and project_id intact — only clears hasSubmitted — so
+              // ScriptStepPage does not wipe them via its own reset-on-mount.
+              dispatchDraft({ type: "RESUME_EDITING" });
+              navigate("/");
+            }}
+          />
         )}
 
         <ProgressTracker

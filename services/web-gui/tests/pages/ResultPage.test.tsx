@@ -8,6 +8,7 @@ function renderResultPage() {
     <MemoryRouter initialEntries={["/projects/p1/result"]}>
       <Routes>
         <Route path="/projects/:id/result" element={<ResultPage />} />
+        <Route path="/projects/:id/render" element={<div data-testid="render-page-stub" />} />
         <Route path="/videos" element={<div data-testid="video-list-page-stub" />} />
       </Routes>
     </MemoryRouter>,
@@ -306,5 +307,91 @@ describe("ResultPage QC gate (CR-021 FR61.3)", () => {
     const form = screen.getByTestId("publish-form-submit-button");
     expect(report).toHaveTextContent("Tràn khung");
     expect(report.compareDocumentPosition(form)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+});
+
+describe("render lại ở chất lượng khác", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function mockRerenderFetch(bodies: Array<Record<string, unknown>>) {
+    return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "POST" && url.includes("/v1/sagas/render")) {
+        bodies.push(JSON.parse(init.body as string));
+        return Promise.resolve({ ok: true, status: 201, json: async () => ({ saga_id: "s2", status: "draft" }) });
+      }
+      if (url.includes("/v1/auth/youtube") || url.includes("/qc-report")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false, accounts: [] }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          project_id: "p1",
+          status: "ready_to_publish",
+          scenes: [],
+          video_path: "/shared/p1/video/final.mp4",
+          script_content: "from conceptflow import *\n...",
+          voice_language: "vi",
+          tts_enabled: true,
+          subtitle_mode: "track",
+        }),
+      });
+    }) as unknown as typeof fetch;
+  }
+
+  it("hiện nút mở, ẩn form chọn chất lượng cho tới khi bấm", async () => {
+    global.fetch = mockRerenderFetch([]);
+    renderResultPage();
+
+    await screen.findByTestId("rerender-toggle");
+    expect(screen.queryByTestId("render-quality-picker")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("rerender-toggle"));
+
+    expect(screen.getByTestId("render-quality-picker")).toBeInTheDocument();
+  });
+
+  it("gửi lại script gốc kèm chất lượng mới, rồi điều hướng sang trang render", async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    global.fetch = mockRerenderFetch(bodies);
+    renderResultPage();
+
+    fireEvent.click(await screen.findByTestId("rerender-toggle"));
+    fireEvent.click(screen.getByTestId("render-quality-4k60"));
+    fireEvent.click(screen.getByTestId("rerender-submit"));
+
+    await waitFor(() => expect(bodies.length).toBe(1));
+    expect(bodies[0]).toMatchObject({
+      project_id: "p1",
+      script_content: "from conceptflow import *\n...",
+      render_quality: "4k60",
+    });
+  });
+
+  it("báo lỗi rõ ràng thay vì gọi API khi project thiếu script_content", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/v1/auth/youtube") || url.includes("/qc-report")) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ connected: false, accounts: [] }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ project_id: "p1", status: "ready_to_publish", scenes: [], video_path: "/shared/p1/video/final.mp4" }),
+      });
+    }) as unknown as typeof fetch;
+
+    renderResultPage();
+    fireEvent.click(await screen.findByTestId("rerender-toggle"));
+    fireEvent.click(screen.getByTestId("rerender-submit"));
+
+    await waitFor(() =>
+      expect(screen.getByText(/Thiếu script gốc/)).toBeInTheDocument(),
+    );
+    expect(global.fetch).not.toHaveBeenCalledWith(
+      expect.stringContaining("/v1/sagas/render"),
+      expect.anything(),
+    );
   });
 });

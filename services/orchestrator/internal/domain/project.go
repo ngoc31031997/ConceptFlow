@@ -138,6 +138,10 @@ const (
 type RenderQuality string
 
 const (
+	// Quality480p15 is Manim's lowest preset (-ql) — for iterating on a script's
+	// content/timing quickly, not for anything a viewer will ever see. Not the
+	// default for anything; a Creator opts into it explicitly per render.
+	Quality480p15  RenderQuality = "480p15"
 	Quality720p30  RenderQuality = "720p30"
 	Quality1080p60 RenderQuality = "1080p60"
 	Quality4k60    RenderQuality = "4k60"
@@ -150,7 +154,7 @@ const DefaultRenderQuality = Quality1080p60
 // IsValid reports whether q is a quality the Rendering Service can honour.
 func (q RenderQuality) IsValid() bool {
 	switch q {
-	case Quality720p30, Quality1080p60, Quality4k60:
+	case Quality480p15, Quality720p30, Quality1080p60, Quality4k60:
 		return true
 	}
 	return false

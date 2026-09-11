@@ -14,7 +14,8 @@ interface RenderQualityPickerProps {
  * works, and only the upload pass needs to be worth publishing.
  */
 const OPTIONS: { value: RenderQuality; label: string; hint: string }[] = [
-  { value: "720p30", label: "Nháp nhanh", hint: "720p30 — render nhanh nhất, để duyệt nội dung" },
+  { value: "480p15", label: "Test", hint: "480p15 — nhanh nhất, chỉ để kiểm nội dung/thời lượng, không dùng để xem thật" },
+  { value: "720p30", label: "Nháp", hint: "720p30 — xem thử hình ảnh rõ hơn, vẫn chưa nên đăng" },
   { value: "1080p60", label: "Chuẩn", hint: "1080p60 — mức nên dùng khi đăng YouTube" },
   { value: "4k60", label: "Cao", hint: "4K60 — rất nặng, chỉ dùng khi thật sự cần" },
 ];
@@ -39,7 +40,7 @@ export function RenderQualityPicker({ value, onChange }: RenderQualityPickerProp
         ))}
       </div>
 
-      {value === "720p30" && (
+      {(value === "480p15" || value === "720p30") && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
           Bản nháp không nên dùng để đăng — YouTube sẽ nén lại một lần nữa, nên nguồn cần dư chất lượng.
         </p>

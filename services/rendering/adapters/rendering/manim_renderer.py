@@ -115,6 +115,9 @@ ANIMATION_LINE_RE = re.compile(r"Animation (\d+)\s*:")
 # 3.6x the render time of 720p30 and 2.1x the peak memory, both well inside the
 # limits CR-003 raised.
 QUALITY_FLAGS = {
+    # -ql (480p15): fastest preset Manim ships, for iterating on a script's
+    # content/timing before spending time on anything a viewer will see.
+    "480p15": "-ql",
     "720p30": "-qm",
     "1080p60": "-qh",
     "4k60": "-qk",

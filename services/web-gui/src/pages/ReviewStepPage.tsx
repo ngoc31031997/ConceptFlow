@@ -11,7 +11,8 @@ import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
 
 const QUALITY_LABELS: Record<string, { label: string; hint: string }> = {
-  "720p30": { label: "Nháp nhanh", hint: "720p30 — không nên dùng để đăng" },
+  "480p15": { label: "Test", hint: "480p15 — chỉ để kiểm nội dung, không nên dùng để đăng" },
+  "720p30": { label: "Nháp", hint: "720p30 — không nên dùng để đăng" },
   "1080p60": { label: "Chuẩn", hint: "1080p60 — mức nên dùng khi đăng YouTube" },
   "4k60": { label: "Cao", hint: "4K60 — render rất nặng" },
 };

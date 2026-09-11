@@ -5,10 +5,12 @@ import { YoutubeChannels } from "../components/YoutubeChannels";
 import { ThumbnailUpload } from "../components/ThumbnailUpload";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
+import { RenderQualityPicker } from "../components/RenderQualityPicker";
 import { useProject } from "../hooks/useProject";
 import { QCReportPanel } from "../components/QCReportPanel";
 import {
   startPublishSaga,
+  startRenderSaga,
   retryProject,
   deleteProject,
   getProjectVideoUrl,
@@ -16,6 +18,7 @@ import {
   ERROR_CODE_QC_BLOCKED,
 } from "../api/client";
 import type { PublishMetadata } from "../types";
+import type { RenderQuality } from "../context/ProjectDraftContext";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
 
@@ -29,6 +32,10 @@ export function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
+  const [showRerender, setShowRerender] = useState(false);
+  const [rerenderQuality, setRerenderQuality] = useState<RenderQuality>("1080p60");
+  const [isRerendering, setIsRerendering] = useState(false);
+  const [rerenderError, setRerenderError] = useState<string | null>(null);
   /*
     State lands a render behind the click, so two fast clicks can both read
     isSubmitting === false and fire two POSTs. The ref flips synchronously.
@@ -113,6 +120,46 @@ export function ResultPage() {
     } finally {
       inFlightRef.current = false;
       setIsSubmitting(false);
+    }
+  }
+
+  /**
+   * "Render lại ở chất lượng khác" (bug report): dùng lại chính project_id
+   * này — StartRenderSagaUseCase (orchestrator) upsert theo project_id, nên
+   * đây là một saga render mới chạy lại từ parse_script, không phải một bước
+   * vá riêng. Chấp nhận cái giá đó (tốn TTS lại) để đổi lấy việc không phải
+   * xây một đường dựng lại-chỉ-hình riêng — thường dùng đúng một lần, khi
+   * chốt bản final ở chất lượng cao hơn bản đã duyệt nội dung.
+   */
+  async function handleRerender() {
+    if (inFlightRef.current || !project) return;
+    if (!project.script_content) {
+      setRerenderError("Thiếu script gốc của project này — không render lại tự động được.");
+      return;
+    }
+    inFlightRef.current = true;
+    setIsRerendering(true);
+    setRerenderError(null);
+    try {
+      await startRenderSaga({
+        project_id: projectId,
+        script_content: project.script_content,
+        voice_language: project.voice_language,
+        background_music_path: project.background_music_path,
+        tts_enabled: project.tts_enabled ?? true,
+        voice_id: project.voice_id,
+        subtitle_mode: project.subtitle_mode ?? "track",
+        subtitle_style: project.subtitle_style,
+        render_quality: rerenderQuality,
+        video_format_id: project.video_format_id,
+        background_music_volume: project.background_music_volume,
+      });
+      navigate(`/projects/${projectId}/render`);
+    } catch (err) {
+      setRerenderError(err instanceof ApiError ? err.message : String(err));
+    } finally {
+      inFlightRef.current = false;
+      setIsRerendering(false);
     }
   }
 
@@ -262,6 +309,57 @@ export function ResultPage() {
               )}
               {isPublishing && errorBanner}
             </div>
+          </div>
+        )}
+
+        {project.video_path && (
+          <div className={glass.card} style={{ marginTop: 20, padding: 20 }} data-testid="rerender-section">
+            {!showRerender ? (
+              <button
+                type="button"
+                className={glass.ghostBtn}
+                onClick={() => setShowRerender(true)}
+                data-testid="rerender-toggle"
+              >
+                Render lại ở chất lượng khác
+              </button>
+            ) : (
+              <>
+                <div className={glass.cardTitle} style={{ marginBottom: 10 }}>
+                  Render lại ở chất lượng khác
+                </div>
+                <p className={glass.cardHint} style={{ marginBottom: 14 }}>
+                  Chạy lại toàn bộ pipeline cho video này ở chất lượng mới — tốn thời gian và (nếu có
+                  giọng đọc) tốn quota TTS lại như một lần render mới. Dùng khi đã duyệt nội dung ở bản
+                  nháp và muốn chốt bản cuối ở chất lượng cao hơn.
+                </p>
+                <RenderQualityPicker value={rerenderQuality} onChange={setRerenderQuality} />
+                {rerenderError && (
+                  <p role="alert" className={glass.helperText} style={{ marginTop: 10 }}>
+                    {rerenderError}
+                  </p>
+                )}
+                <div className={glass.ctaRow} style={{ marginTop: 14 }}>
+                  <button
+                    type="button"
+                    className={glass.btnPrimary}
+                    disabled={isRerendering}
+                    onClick={handleRerender}
+                    data-testid="rerender-submit"
+                  >
+                    {isRerendering ? "Đang bắt đầu..." : "Render lại"}
+                  </button>
+                  <button
+                    type="button"
+                    className={glass.ghostBtn}
+                    disabled={isRerendering}
+                    onClick={() => setShowRerender(false)}
+                  >
+                    Huỷ
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         )}
 

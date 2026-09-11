@@ -43,11 +43,12 @@ TEXT_CLASSES = frozenset({"Text", "MarkupText", "Tex", "MathTex", "Title", "Para
 #: Khung pixel theo `render_quality` — cùng bảng với
 #: adapters/messaging/consumer.py::QUALITY_FRAME_SIZE.
 QUALITY_FRAME_SIZE = {
+    "480p15": (854, 480),
     "720p30": (1280, 720),
     "1080p60": (1920, 1080),
     "4k60": (3840, 2160),
 }
-QUALITY_FRAME_RATE = {"720p30": 30.0, "1080p60": 60.0, "4k60": 60.0}
+QUALITY_FRAME_RATE = {"480p15": 15.0, "720p30": 30.0, "1080p60": 60.0, "4k60": 60.0}
 DEFAULT_QUALITY = "1080p60"
 
 SEVERITY_BLOCKING = "blocking"

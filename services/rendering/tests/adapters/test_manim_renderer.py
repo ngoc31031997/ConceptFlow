@@ -531,7 +531,7 @@ def test_unknown_quality_is_rejected_at_construction():
 
 
 def test_quality_flags_cover_the_documented_presets():
-    assert set(QUALITY_FLAGS) == {"720p30", "1080p60", "4k60"}
+    assert set(QUALITY_FLAGS) == {"480p15", "720p30", "1080p60", "4k60"}
 
 
 def test_per_project_quality_overrides_the_service_default(tmp_path, monkeypatch):

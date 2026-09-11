@@ -75,6 +75,7 @@ logger = logging.getLogger(__name__)
 # flags (-qm/-qh/-qk), kept here as plain ffmpeg scale targets since this
 # service has no Manim dependency of its own.
 QUALITY_FRAME_SIZE = {
+    "480p15": (854, 480),
     "720p30": (1280, 720),
     "1080p60": (1920, 1080),
     "4k60": (3840, 2160),

@@ -181,6 +181,39 @@ func TestHandleGetProject_OK(t *testing.T) {
 	}
 }
 
+// TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality is the
+// bug report's second half: the GUI resubmits POST /v1/sagas/render for the
+// same project_id at a higher quality once a video is finalized, and can only
+// do that with settings it can read back from here.
+func TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality(t *testing.T) {
+	musicPath := "/shared/p1/music/bg.mp3"
+	router := NewRouter(
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+		&fakeProjectReader{project: &domain.Project{
+			ProjectID: "p1", Status: domain.StatusPublished,
+			ScriptContent: "from conceptflow import *\n...", BackgroundMusicPath: &musicPath,
+			BackgroundMusicVolume: 0.3,
+		}}, &fakeSuggestMetadata{}, nil, nil)
+
+	req := httptest.NewRequest("GET", "/v1/projects/p1", nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	var body map[string]interface{}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("could not decode response: %v", err)
+	}
+	if body["script_content"] != "from conceptflow import *\n..." {
+		t.Fatalf("expected script_content in response, got %v", body["script_content"])
+	}
+	if body["background_music_path"] != musicPath {
+		t.Fatalf("expected background_music_path in response, got %v", body["background_music_path"])
+	}
+	if body["background_music_volume"] != 0.3 {
+		t.Fatalf("expected background_music_volume in response, got %v", body["background_music_volume"])
+	}
+}
+
 func TestHandleRetry_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{},

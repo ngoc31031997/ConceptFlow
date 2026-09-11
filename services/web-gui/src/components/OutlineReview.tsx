@@ -7,7 +7,15 @@ import styles from "./OutlineReview.module.css";
 
 interface OutlineReviewProps {
   project: Project;
+  /** Duyệt xong hoặc lưu xong một dòng sửa — ở lại trang, chỉ cần tải lại project. */
   onDecided: () => void;
+  /**
+   * Từ chối dàn ý: server đưa project về trạng thái `draft` (review_outline.go
+   * Reject). Ở lại RenderPage sau đó là một ngõ cụt — trang không còn gì để
+   * hiện (không phải awaiting_review nữa, cũng chưa render) — nên phải điều
+   * hướng Creator quay về đúng chỗ sửa được script.
+   */
+  onRejected: () => void;
 }
 
 /**
@@ -21,7 +29,7 @@ interface OutlineReviewProps {
  * hiện thứ Creator cần để trả lời đúng một câu hỏi: video này nói gì, theo thứ
  * tự nào, và trên màn hình có gì.
  */
-export function OutlineReview({ project, onDecided }: OutlineReviewProps) {
+export function OutlineReview({ project, onDecided, onRejected }: OutlineReviewProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<number | null>(null);
@@ -35,12 +43,12 @@ export function OutlineReview({ project, onDecided }: OutlineReviewProps) {
     0,
   );
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void>, after: () => void) {
     setBusy(true);
     setError(null);
     try {
       await action();
-      onDecided();
+      after();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {
@@ -82,18 +90,19 @@ export function OutlineReview({ project, onDecided }: OutlineReviewProps) {
                     <div className={styles.editActions}>
                       <button
                         type="button"
+                        className={glass.btnPrimary}
                         disabled={busy}
                         onClick={() =>
                           run(async () => {
                             await editNarration(project.project_id, scene.scene_index, draftText);
                             setEditing(null);
-                          })
+                          }, onDecided)
                         }
                         data-testid={`outline-save-${scene.scene_index}`}
                       >
                         Lưu và kiểm lại
                       </button>
-                      <button type="button" onClick={() => setEditing(null)}>
+                      <button type="button" className={glass.ghostBtn} onClick={() => setEditing(null)}>
                         Huỷ
                       </button>
                     </div>
@@ -130,16 +139,18 @@ export function OutlineReview({ project, onDecided }: OutlineReviewProps) {
       <div className={styles.actions}>
         <button
           type="button"
+          className={glass.btnPrimary}
           disabled={busy}
-          onClick={() => run(() => approveOutline(project.project_id))}
+          onClick={() => run(() => approveOutline(project.project_id), onDecided)}
           data-testid="outline-approve"
         >
           Duyệt và sản xuất
         </button>
         <button
           type="button"
+          className={glass.ghostBtn}
           disabled={busy}
-          onClick={() => run(() => rejectOutline(project.project_id))}
+          onClick={() => run(() => rejectOutline(project.project_id), onRejected)}
           data-testid="outline-reject"
         >
           Quay lại sửa script

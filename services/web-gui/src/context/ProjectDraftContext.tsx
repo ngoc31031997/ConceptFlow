@@ -46,7 +46,7 @@ export interface ProjectDraft {
  * Resolution/framerate for the render (CR-004 FR12.6). A 720p30 draft is for
  * checking the content quickly; anything published should be 1080p60 or better.
  */
-export type RenderQuality = "720p30" | "1080p60" | "4k60";
+export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
@@ -61,6 +61,7 @@ export type ProjectDraftAction =
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
   | { type: "MARK_SUBMITTED" }
+  | { type: "RESUME_EDITING" }
   | { type: "RESET" };
 
 export const defaultSubtitleStyle: SubtitleStyle = {
@@ -92,18 +93,48 @@ const initialDraft: ProjectDraft = {
 const STORAGE_KEY = "conceptflow.draft.v1";
 
 /**
+ * The Creator's last-picked voice, kept separately from the per-project draft
+ * blob above. That blob is meant to reset with every new/submitted project
+ * (RESET, or loadDraft() refusing to restore a submitted one) — but a voice
+ * choice is a channel-level preference, not something tied to one script. Bug
+ * report: without this, every new video defaulted back to whichever voice
+ * happens to sort first (NarrationPanel's own fallback), forcing a reselect
+ * every single time.
+ */
+const LAST_VOICE_KEY = "conceptflow.lastVoiceId";
+
+function loadLastVoiceId(): string | null {
+  try {
+    return window.localStorage.getItem(LAST_VOICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function saveLastVoiceId(voiceId: string | null): void {
+  try {
+    if (voiceId) {
+      window.localStorage.setItem(LAST_VOICE_KEY, voiceId);
+    }
+  } catch {
+    /* storage unavailable or full — the preference simply will not persist */
+  }
+}
+
+/**
  * A draft only lived in memory, so a reload mid-edit threw away a script the
  * Creator may have spent a while getting right. Persisting is best-effort:
  * private browsing and a full quota both throw, and neither is worth failing
  * the render over.
  */
 function loadDraft(): ProjectDraft {
-  const fresh = { ...initialDraft, projectId: crypto.randomUUID() };
+  const fresh = { ...initialDraft, projectId: crypto.randomUUID(), voiceId: loadLastVoiceId() };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return fresh;
     const stored = JSON.parse(raw) as Partial<ProjectDraft>;
-    // A submitted draft is spent — never restore it onto a new session.
+    // A submitted draft is spent — never restore it onto a new session, but
+    // still carry over the last voice (see LAST_VOICE_KEY's docstring).
     if (stored.hasSubmitted) return fresh;
     return { ...fresh, ...stored, projectId: stored.projectId ?? fresh.projectId };
   } catch {
@@ -143,10 +174,19 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, videoFormatId: action.payload };
     case "MARK_SUBMITTED":
       return { ...state, hasSubmitted: true };
+    // CR-024's "Quay lại sửa script" (outline rejected): the render saga has
+    // already restarted the SAME project_id from scratch server-side
+    // (StartRenderSagaUseCase upserts it back to StatusDraft), so the fix here
+    // is the mirror image of MARK_SUBMITTED — clear the flag, keep everything
+    // else (scriptContent, projectId) so ScriptStepPage's own
+    // "hasSubmitted → RESET" effect does not wipe the very script the Creator
+    // came back to fix.
+    case "RESUME_EDITING":
+      return { ...state, hasSubmitted: false };
     case "SET_SUBTITLE_STYLE":
       return { ...state, subtitleStyle: { ...state.subtitleStyle, ...action.payload } };
     case "RESET":
-      return { ...initialDraft, projectId: crypto.randomUUID() };
+      return { ...initialDraft, projectId: crypto.randomUUID(), voiceId: loadLastVoiceId() };
   }
 }
 
@@ -159,6 +199,10 @@ export function ProjectDraftProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveDraft(state);
   }, [state]);
+
+  useEffect(() => {
+    saveLastVoiceId(state.voiceId);
+  }, [state.voiceId]);
 
   return (
     <ProjectDraftContext.Provider value={state}>
