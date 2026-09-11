@@ -32,10 +32,12 @@ from adapters.assembly.ffmpeg_assembler import (
     VIDEO_ENCODE_ARGS,
     FfmpegVideoAssembler,
 )
+from adapters.clips.vertical_clip import ClipRequest, generate_clip
 from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.producer import (
     assembly_failed_envelope,
     channel_asset_normalized_envelope,
+    clips_generated_envelope,
     qc_completed_envelope,
     video_assembled_envelope,
 )
@@ -62,6 +64,7 @@ from domain.models import (
     SubtitleStyle,
     VideoAssemblyRequest,
 )
+from domain.clip_rules import ClipThresholds
 from domain.qc_rules import QCThresholds, evaluate_all
 
 logger = logging.getLogger(__name__)
@@ -239,7 +242,11 @@ class AssembleVideoCommandHandler:
         else:
             event_type = "video_assembled"
             out_envelope = video_assembled_envelope(
-                saga_id, project_id, result.video_path, result.caption_path
+                saga_id,
+                project_id,
+                result.video_path,
+                result.caption_path,
+                intro_duration_seconds,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():
@@ -741,6 +748,97 @@ class QCVideoCommandHandler:
         return status, serialized, None
 
 
+class GenerateClipsCommandHandler:
+    """Handles `generate_clips` (CR-007 FR19), the saga step between
+    `qc_video` and `publish_video` (LLD D1).
+
+    One `clips_generated` event per command, carrying one entry per
+    `(request, preset)` pair with its own status — there is no global
+    failure branch (D1, same shape as QCVideoCommandHandler's FR61.4): a
+    clip that fails validation or ffmpeg does not stop the rest, and never
+    blocks publish.
+    """
+
+    def __init__(
+        self,
+        pool: asyncpg.Pool,
+        inbox: InboxRepository,
+        outbox: OutboxRepository,
+        thresholds: ClipThresholds | None = None,
+    ) -> None:
+        self._pool = pool
+        self._inbox = inbox
+        self._outbox = outbox
+        self._thresholds = thresholds or ClipThresholds.from_env()
+
+    async def handle(self, message: AckableMessage) -> None:
+        envelope = json.loads(message.body)
+        message_id = envelope["message_id"]
+        saga_id = envelope["saga_id"]
+        project_id = envelope["project_id"]
+        set_correlation_id(saga_id)
+
+        if await self._inbox.has_processed(message_id):
+            logger.info("Skipping already-processed message_id=%s", message_id)
+            await message.ack()
+            return
+
+        payload = envelope["payload"]
+        clips = await asyncio.to_thread(self._generate_all, project_id, payload)
+
+        out_envelope = clips_generated_envelope(saga_id, project_id, clips)
+
+        async with self._pool.acquire() as conn, conn.transaction():
+            await self._outbox.enqueue(
+                conn, aggregate_id=project_id, event_type="clips_generated", envelope=out_envelope
+            )
+            await self._inbox.mark_processed(conn, message_id)
+
+        await message.ack()
+
+    def _generate_all(self, project_id: str, payload: dict) -> list[dict]:
+        """Runs synchronously in a thread — six ffmpeg re-encodes (three clips
+        x two presets, per LLD Rủi ro) is exactly the blocking work that must
+        not sit on the event loop."""
+        video_path = payload["video_path"]
+        intro_duration_seconds = float(payload.get("intro_duration_seconds") or 0.0)
+        subtitle_cues = _parse_subtitle_cues(payload.get("subtitle_cues")) or []
+
+        results: list[dict] = []
+        for raw_request in payload.get("requests") or []:
+            request = ClipRequest(
+                name=raw_request["name"],
+                start_seconds=float(raw_request["start_seconds"]),
+                end_seconds=float(raw_request["end_seconds"]),
+            )
+            for preset in raw_request.get("presets") or []:
+                # One (request, preset) at a time — an exception from ffmpeg
+                # or an unreadable video must not take the sibling presets
+                # (or the next request) down with it (D1).
+                try:
+                    result = generate_clip(
+                        project_id=project_id,
+                        video_path=video_path,
+                        request=request,
+                        preset=preset,
+                        intro_duration_seconds=intro_duration_seconds,
+                        subtitle_cues=subtitle_cues,
+                        thresholds=self._thresholds,
+                    )
+                except Exception as exc:  # noqa: BLE001 — see class docstring
+                    logger.exception(
+                        "generate_clips: unexpected failure for %r/%s", request.name, preset
+                    )
+                    result = {
+                        "name": request.name,
+                        "preset": preset,
+                        "status": "error",
+                        "error_message": str(exc),
+                    }
+                results.append(result)
+        return results
+
+
 class VideoAssemblyCommandDispatcher:
     """One queue, three commands (CR-023, mirrors RenderingCommandDispatcher on
     the Rendering side): `video_assembly.commands` carries `assemble_video`
@@ -755,12 +853,15 @@ class VideoAssemblyCommandDispatcher:
         assemble_video: AssembleVideoCommandHandler,
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
         qc_video: "QCVideoCommandHandler | None" = None,
+        generate_clips: "GenerateClipsCommandHandler | None" = None,
     ) -> None:
         self._handlers = {"assemble_video": assemble_video.handle}
         if normalize_channel_asset is not None:
             self._handlers["normalize_channel_asset"] = normalize_channel_asset.handle
         if qc_video is not None:
             self._handlers["qc_video"] = qc_video.handle
+        if generate_clips is not None:
+            self._handlers["generate_clips"] = generate_clips.handle
 
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)

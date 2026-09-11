@@ -128,6 +128,9 @@ type projectResponse struct {
 	// "uploaded" | "skipped_no_scope" | "failed".
 	CaptionStatus *string `json:"caption_status,omitempty"`
 	ErrorMessage  *string `json:"error_message,omitempty"`
+	// CR-007 D7 — the vertical clips generate_clips produced, if the saga has
+	// reached that step yet.
+	Clips []clipResultResponse `json:"clips,omitempty"`
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -150,6 +153,48 @@ type suggestMetadataResponse struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Tags        []string `json:"tags"`
+}
+
+// createClipRequest is the body of POST /v1/projects/{project_id}/clips
+// (CR-007 FR19.2/D3/D7) — a Creator-entered clip selection.
+type createClipRequest struct {
+	Name         string   `json:"name"`
+	StartSeconds float64  `json:"start_seconds"`
+	EndSeconds   float64  `json:"end_seconds"`
+	Presets      []string `json:"presets"`
+}
+
+// clipResultResponse mirrors domain.ClipResult for
+// GET /v1/projects/{project_id}/clips (CR-007 D7/FR20.1).
+type clipResultResponse struct {
+	Name            string  `json:"name"`
+	Preset          string  `json:"preset"`
+	Status          string  `json:"status"`
+	OutputPath      string  `json:"output_path,omitempty"`
+	DurationSeconds float64 `json:"duration_seconds,omitempty"`
+	ErrorMessage    string  `json:"error_message,omitempty"`
+}
+
+// createClipResponse is the 200/202 response of
+// POST /v1/projects/{project_id}/clips. AcceptedPresets/RejectedPresets let
+// the GUI show exactly which preset(s) were saved and which were refused and
+// why (FR19.7 — one bad preset must never sink the request the Creator did
+// get right).
+type createClipResponse struct {
+	Name            string            `json:"name"`
+	AcceptedPresets []string          `json:"accepted_presets"`
+	RejectedPresets map[string]string `json:"rejected_presets,omitempty"`
+}
+
+func toClipResultResponses(clips []domain.ClipResult) []clipResultResponse {
+	out := make([]clipResultResponse, 0, len(clips))
+	for _, c := range clips {
+		out = append(out, clipResultResponse{
+			Name: c.Name, Preset: c.Preset, Status: c.Status,
+			OutputPath: c.OutputPath, DurationSeconds: c.DurationSeconds, ErrorMessage: c.ErrorMessage,
+		})
+	}
+	return out
 }
 
 // errorResponse is the JSON body for non-2xx responses.
@@ -219,5 +264,6 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		YoutubeVideoURL:  p.YoutubeVideoURL,
 		CaptionStatus:    p.CaptionStatus,
 		ErrorMessage:     p.ErrorMessage,
+		Clips:            toClipResultResponses(p.Clips),
 	}
 }

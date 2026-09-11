@@ -30,6 +30,7 @@ Kênh liên lạc duy nhất ra khỏi subprocess vẫn là file JSONL trỏ b�
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 
@@ -56,6 +57,10 @@ class _Recorder:
     def __init__(self) -> None:
         self._index = 0
         self._durations: list[float] | None = None
+        # Tên của clip đang mở, hoặc None. Dùng để chặn `clip()` lồng nhau —
+        # cùng một _recorder singleton nên state này thấy được từ mọi lời gọi
+        # `clip()`, kể cả xuyên qua `self.narrate()` bên trong nó.
+        self.open_clip: str | None = None
 
     @property
     def mode(self) -> str:
@@ -148,6 +153,51 @@ def narrate(scene, text: str) -> None:
     _recorder.write({"kind": "layout", "index": index, "t": now,
                      "mobjects": _describe_layout(scene)})
     scene.wait(durations[index])
+
+
+@contextlib.contextmanager
+def clip(scene, name: str):
+    """Đánh dấu một đoạn của scene là clip dọc phái sinh (CR-007 FR19.2).
+
+    Ghi **một** bản ghi `kind="clip"` duy nhất, lúc `__exit__`, mang cả
+    `t_start` lẫn `t_end`: gộp hai mốc vào một bản ghi thay vì ghi mở/đóng
+    riêng vì `manim_renderer.py` chỉ cần đọc mỗi clip đúng một lần — hai bản
+    ghi rời sẽ bắt phía Python phải tự ghép cặp theo `name`+`index`, thêm một
+    chỗ có thể lệch mà một bản ghi duy nhất không có.
+
+    `index` lấy tại `__enter__` (`upcoming_index`, giống `beat()`/`chapter()`):
+    đó là lời thoại **sắp** chạy khi clip mở ra, bất kể `self.narrate()` bên
+    trong block chạy bao nhiêu lần.
+
+    Không cho lồng nhau: cắt một clip nằm trong một clip khác không có nghĩa
+    rõ ràng (clip nào chứa clip nào khi xuất ra?), nên đây là lỗi ngay khi mở,
+    không phải thứ âm thầm nhận lấy nghĩa nào đó.
+    """
+    cleaned = str(name).strip()
+    if not cleaned:
+        raise NarrationError("clip() nhận tên rỗng")
+    if _recorder.open_clip is not None:
+        raise NarrationError(
+            f"clip() lồng nhau: đang ở trong clip {_recorder.open_clip!r} thì "
+            f"mở thêm clip {cleaned!r} — cắt clip lồng nhau không có nghĩa rõ "
+            "ràng, đóng clip trước bằng cách thoát khỏi khối `with` của nó"
+        )
+
+    index = _recorder.upcoming_index
+    t_start = scene.renderer.time if _recorder.mode == MODE_RENDER else None
+    _recorder.open_clip = cleaned
+    try:
+        yield
+    finally:
+        _recorder.open_clip = None
+        t_end = scene.renderer.time if _recorder.mode == MODE_RENDER else None
+        _recorder.write({
+            "kind": "clip",
+            "name": cleaned,
+            "index": index,
+            "t_start": t_start,
+            "t_end": t_end,
+        })
 
 
 def beat(scene, beat_id: str) -> None:

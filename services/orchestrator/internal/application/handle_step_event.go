@@ -42,9 +42,14 @@ var eventStepMap = map[string]domain.StepName{
 	// There is deliberately no qc_failed counterpart — a QC that could not run
 	// reports status="not_scored" and the saga carries on, so a broken measuring
 	// tool can never hold a finished video hostage.
-	"qc_completed":        domain.StepQCVideo,
-	"video_published":     domain.StepPublishVideo,
-	"publish_failed":      domain.StepPublishVideo,
+	"qc_completed": domain.StepQCVideo,
+	// CR-007 D1: clips_generated is the ONLY event generate_clips ever
+	// produces — same posture as qc_completed. A clip that failed to cut is
+	// reported inside its own entry (status="error"), never as a step-level
+	// failure, so there is no generate_clips_failed counterpart here.
+	"clips_generated": domain.StepGenerateClips,
+	"video_published": domain.StepPublishVideo,
+	"publish_failed":  domain.StepPublishVideo,
 }
 
 var failureEvents = map[string]bool{
@@ -231,6 +236,8 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 		nextErr = uc.onVideoAssembled(ctx, event, project)
 	case domain.StepQCVideo:
 		nextErr = uc.onQCCompleted(ctx, event, project)
+	case domain.StepGenerateClips:
+		nextErr = uc.onClipsGenerated(ctx, event, project)
 	case domain.StepPublishVideo:
 		nextErr = uc.onVideoPublished(ctx, event, project)
 	}
@@ -597,6 +604,11 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 	project.RenderedVideoPath = &videoPath
 	project.WaitOffsets = waitOffsets
 	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
+	// CR-007 FR19.2: the `with self.clip(...)` selections Rendering measured
+	// on this real render pass, stored verbatim exactly like LayoutMarks —
+	// Orchestrator never interprets a field inside, only carries it forward to
+	// generate_clips's request-merging (buildClipRequests).
+	project.ClipMarks = mapSliceFromPayload(event.Payload, "clip_marks")
 
 	// CR-023 D2: resolve the channel intro/outro before publishing
 	// assemble_video, and persist the resolved id on Project rather than
@@ -663,6 +675,7 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 	if captionPath := stringFromPayload(event.Payload, "caption_path"); captionPath != "" {
 		project.CaptionPath = &captionPath
 	}
+	project.IntroDurationSeconds = floatFromPayload(event.Payload, "intro_duration_seconds")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -684,13 +697,14 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRunningQC)
 }
 
-// onQCCompleted stores the QC report and ends the Render Saga.
+// onQCCompleted stores the QC report and dispatches generate_clips (CR-007
+// D1) — QC no longer ends the Render Saga itself.
 //
-// It ends it unconditionally. Whatever the verdict — passed, has_findings, or
-// not_scored — the project reaches ready_to_publish (FR61.4): QC decides what
-// the Creator is *told*, never whether the pipeline finishes. The one place a
-// blocking finding can actually stop anything is the Publish Saga, and only
-// with QC_ENFORCE on (D5).
+// It moves on unconditionally. Whatever the verdict — passed, has_findings, or
+// not_scored — the project proceeds to generate_clips (FR61.4): QC decides
+// what the Creator is *told*, never whether the pipeline finishes. The one
+// place a blocking finding can actually stop anything is the Publish Saga,
+// and only with QC_ENFORCE on (D5).
 func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
 	status := domain.QCStatus(stringFromPayload(event.Payload, "status"))
 	switch status {
@@ -722,7 +736,53 @@ func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepE
 		}
 	}
 
+	if err := uc.repo.Save(ctx, project); err != nil {
+		return err
+	}
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}); err != nil {
+		return err
+	}
+	// Same routing key/queue as assemble_video and qc_video (D1) — video-
+	// assembly already has ffmpeg and the assembled file itself.
+	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "video_assembly", string(domain.StepGenerateClips), generateClipsPayload(project)); err != nil {
+		return err
+	}
+	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusGeneratingClips)
+}
+
+// onClipsGenerated stores the outcome of generate_clips and ends the Render
+// Saga.
+//
+// It ends it unconditionally, exactly like onQCCompleted did before this CR:
+// a clip that failed to cut (status="error" on that one entry of "clips") is
+// surfaced to the Creator, never a reason to strand a finished, QC'd video
+// short of ready_to_publish (D1 — a vertical clip is a derivative product).
+func (uc *HandleStepEventUseCase) onClipsGenerated(ctx context.Context, event StepEvent, project *domain.Project) error {
+	project.Clips = parseClipResults(event.Payload)
+	if err := uc.repo.Save(ctx, project); err != nil {
+		return err
+	}
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
+}
+
+// generateClipsPayload builds the generate_clips command from data already on
+// Project (Rule 5 — a retry rebuilds it without re-running an earlier step):
+// the assembled video, its subtitle cues (dịch về mốc 0 của từng clip là việc
+// của video-assembly — D6, vì chỉ nó biết offset thật sau khi ghép intro), and
+// the merged request list (D3).
+//
+// intro_duration_seconds comes from Project.IntroDurationSeconds, which
+// onVideoAssembled stored from video-assembly's own measurement (the only
+// place that number exists — see the field's doc comment on domain.Project).
+// 0.0 when the project has no intro.
+func generateClipsPayload(project *domain.Project) map[string]interface{} {
+	scenes := sortedScenes(project.Scenes)
+	return map[string]interface{}{
+		"video_path":             derefString(project.VideoPath),
+		"intro_duration_seconds": project.IntroDurationSeconds,
+		"subtitle_cues":          subtitleCues(scenes, project.WaitOffsets),
+		"requests":               buildClipRequests(project.ClipMarks, project.ClipRequests),
+	}
 }
 
 // qcVideoPayload builds the qc_video command from data already on Project

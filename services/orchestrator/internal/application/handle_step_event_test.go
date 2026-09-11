@@ -305,6 +305,59 @@ func TestHandleStepEventUseCase_VideoAssembled_NoCaptionPathLeavesItNil(t *testi
 	}
 }
 
+// TestHandleStepEventUseCase_VideoAssembled_StoresIntroDurationForClips is
+// CR-007 D5's risk made concrete: video-assembly is the only place that ever
+// measures the channel intro's real length, so if this number is dropped on
+// the floor here, generate_clips would cut every clip off by exactly that
+// many seconds on any project with an intro enabled.
+func TestHandleStepEventUseCase_VideoAssembled_StoresIntroDurationForClips(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusAssemblingVideo}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{
+			"video_path":             "/shared/proj-1/video/final.mp4",
+			"intro_duration_seconds": 3.0,
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.IntroDurationSeconds != 3.0 {
+		t.Fatalf("expected IntroDurationSeconds=3.0, got %v", project.IntroDurationSeconds)
+	}
+
+	payload := generateClipsPayload(project)
+	if payload["intro_duration_seconds"] != 3.0 {
+		t.Fatalf("expected generate_clips payload to carry intro_duration_seconds=3.0, got %v", payload["intro_duration_seconds"])
+	}
+}
+
+// TestHandleStepEventUseCase_VideoAssembled_NoIntroDurationDefaultsToZero
+// covers the far more common case: no intro enabled at all.
+func TestHandleStepEventUseCase_VideoAssembled_NoIntroDurationDefaultsToZero(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusAssemblingVideo}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{"video_path": "/shared/proj-1/video/final.mp4"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.IntroDurationSeconds != 0.0 {
+		t.Fatalf("expected IntroDurationSeconds=0.0, got %v", project.IntroDurationSeconds)
+	}
+}
+
 // TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode is CR-015:
 // the assemble_video command must say subtitle_mode explicitly rather than
 // leaning on Video Assembly's own default, so the wire contract does not
@@ -889,11 +942,13 @@ func TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyT
 	}
 }
 
-// TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish is the direct lock
-// for CR-021 D2: ready_to_publish is now set by qc_completed, not
-// video_assembled.
-func TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish(t *testing.T) {
-	uc, repo, _, _ := newTestUseCase()
+// TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips is the
+// direct lock for CR-007 D1: qc_completed now dispatches generate_clips
+// (moved from setting ready_to_publish directly, which is CR-021 D2's old
+// behavior — see TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish
+// for where ready_to_publish now happens).
+func TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips(t *testing.T) {
+	uc, repo, publisher, _ := newTestUseCase()
 	qc := newFakeQCReports()
 	uc.WithQCReports(qc)
 	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC}
@@ -913,8 +968,18 @@ func TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish(t *testing.T) {
 	}
 
 	project, _ := repo.Get(context.Background(), "proj-1")
-	if project.Status != domain.StatusReadyToPublish {
-		t.Fatalf("expected ready_to_publish after qc_completed, got %s", project.Status)
+	if project.Status != domain.StatusGeneratingClips {
+		t.Fatalf("expected generating_clips after qc_completed (D1), got %s", project.Status)
+	}
+
+	cmd := publisher.last()
+	if cmd == nil || cmd.envelope.EventType != string(domain.StepGenerateClips) {
+		t.Fatalf("expected generate_clips command dispatched, got %+v", cmd)
+	}
+
+	step, _ := repo.GetStep(context.Background(), "saga-1", domain.StepGenerateClips)
+	if step.Status != domain.SagaStepInProgress {
+		t.Fatalf("expected generate_clips step in_progress, got %s", step.Status)
 	}
 
 	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
@@ -926,10 +991,10 @@ func TestHandleStepEventUseCase_QCCompleted_SetsReadyToPublish(t *testing.T) {
 	}
 }
 
-// TestHandleStepEventUseCase_QCCompleted_NotScoredStillReachesReadyToPublish is
-// FR61.4: a QC that could not run must never become a lock. status=not_scored
-// still ends the saga at ready_to_publish.
-func TestHandleStepEventUseCase_QCCompleted_NotScoredStillReachesReadyToPublish(t *testing.T) {
+// TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClips
+// is FR61.4's continuation under D1: a QC that could not run must never
+// become a lock. status=not_scored still moves the saga on to generate_clips.
+func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClips(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
 	qc := newFakeQCReports()
 	uc.WithQCReports(qc)
@@ -948,12 +1013,69 @@ func TestHandleStepEventUseCase_QCCompleted_NotScoredStillReachesReadyToPublish(
 	}
 
 	project, _ := repo.Get(context.Background(), "proj-1")
-	if project.Status != domain.StatusReadyToPublish {
-		t.Fatalf("expected ready_to_publish even when not_scored (FR61.4), got %s", project.Status)
+	if project.Status != domain.StatusGeneratingClips {
+		t.Fatalf("expected generating_clips even when not_scored (FR61.4/D1), got %s", project.Status)
 	}
 
 	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
 	if report == nil || report.Status != domain.QCStatusNotScored {
 		t.Fatalf("expected not_scored report stored, got %+v", report)
+	}
+}
+
+// TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish is CR-007 D1's
+// saga ending: clips_generated (not qc_completed) is what now sets
+// ready_to_publish.
+func TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusGeneratingClips}
+	repo.steps[stepKey("saga-1", domain.StepGenerateClips)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "clips_generated",
+		Payload: map[string]interface{}{
+			"clips": []interface{}{
+				map[string]interface{}{"name": "vi du", "preset": "short", "status": "ok", "output_path": "/shared/proj-1/clips/vi-du_short.mp4", "duration_seconds": 53.5},
+				map[string]interface{}{"name": "vi du", "preset": "long", "status": "error", "error_message": "too short for long"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish after clips_generated, got %s", project.Status)
+	}
+	if len(project.Clips) != 2 {
+		t.Fatalf("expected 2 clip results stored, got %d", len(project.Clips))
+	}
+}
+
+// TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish locks
+// D1's core guarantee: even when every clip failed, the saga still reaches
+// ready_to_publish — a vertical clip is a derivative product, not the main
+// video.
+func TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusGeneratingClips}
+	repo.steps[stepKey("saga-1", domain.StepGenerateClips)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "clips_generated",
+		Payload: map[string]interface{}{
+			"clips": []interface{}{
+				map[string]interface{}{"name": "vi du", "preset": "short", "status": "error", "error_message": "ffmpeg crashed"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish despite clip error (D1), got %s", project.Status)
 	}
 }

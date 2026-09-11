@@ -391,6 +391,40 @@ def test_read_layout_marks_is_empty_when_the_script_recorded_none(tmp_path):
     assert ManimScriptRenderer._read_layout_marks(str(tmp_path / "nope.jsonl")) == []
 
 
+def test_read_clip_marks_collects_only_clip_records(tmp_path):
+    """CR-007 FR19.2: clip selections ride the same JSONL, picked out by
+    `kind` like layout marks already are."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text(
+        '{"kind": "mark", "index": 0, "t": 0.0}\n'
+        '{"kind": "clip", "name": "vi du chay that", "index": 0, '
+        '"t_start": 1.0, "t_end": 5.0}\n'
+        '{"kind": "mark", "index": 1, "t": 6.0}\n'
+    )
+
+    clips = ManimScriptRenderer._read_clip_marks(str(marks))
+
+    assert clips == [
+        {
+            "kind": "clip",
+            "name": "vi du chay that",
+            "index": 0,
+            "t_start": 1.0,
+            "t_end": 5.0,
+        }
+    ]
+
+
+def test_read_clip_marks_is_empty_when_the_script_recorded_none(tmp_path):
+    """Most scripts never call `self.clip(...)` — an empty list here just
+    means there is nothing for Video Assembly to derive vertical clips from."""
+    marks = tmp_path / "cf_marks.jsonl"
+    marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n')
+
+    assert ManimScriptRenderer._read_clip_marks(str(marks)) == []
+    assert ManimScriptRenderer._read_clip_marks(str(tmp_path / "nope.jsonl")) == []
+
+
 def test_cache_prune_evicts_oldest_projects_over_budget(tmp_path):
     """A persistent per-project media_dir is a cache; without a ceiling it
     grows until the shared volume fills."""

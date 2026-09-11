@@ -22,20 +22,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # bằng font khác** khi font yêu cầu không có, nên thiếu bước này thì mọi video
 # vẫn render thành công — chỉ là bằng font của người khác, và không ai phát hiện
 # ra cho tới lúc nhìn video đã publish.
+#
+# Nguồn là repo google/fonts trên GitHub, không phải fonts.google.com/download:
+# endpoint download đó đã đổi thành một trang JS trả về HTML thay vì file zip
+# (phát hiện lúc build 2026-09-11 — `unzip` báo "End-of-central-directory
+# signature not found" vì file tải về là HTML, không phải zip). raw.githubusercontent
+# phục vụ đúng file .ttf tĩnh, ổn định hơn một endpoint UI có thể đổi bất cứ lúc nào.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-jetbrains-mono \
     fontconfig \
-    unzip \
     curl \
     && mkdir -p /usr/share/fonts/truetype/conceptflow \
-    && curl -fsSL -o /tmp/cormorant.zip \
-       "https://fonts.google.com/download?family=Cormorant%20Garamond" \
-    && curl -fsSL -o /tmp/bevietnam.zip \
-       "https://fonts.google.com/download?family=Be%20Vietnam%20Pro" \
-    && unzip -jo /tmp/cormorant.zip '*.ttf' -d /usr/share/fonts/truetype/conceptflow \
-    && unzip -jo /tmp/bevietnam.zip '*.ttf' -d /usr/share/fonts/truetype/conceptflow \
+    && cd /usr/share/fonts/truetype/conceptflow \
+    && curl -fsSL -o CormorantGaramond.ttf \
+       "https://raw.githubusercontent.com/google/fonts/main/ofl/cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf" \
+    && curl -fsSL -o BeVietnamPro-Regular.ttf \
+       "https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-Regular.ttf" \
+    && curl -fsSL -o BeVietnamPro-Bold.ttf \
+       "https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-Bold.ttf" \
+    && curl -fsSL -o BeVietnamPro-SemiBold.ttf \
+       "https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-SemiBold.ttf" \
     && fc-cache -f \
-    && rm -rf /tmp/*.zip /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 COPY requirements.txt .

@@ -19,10 +19,10 @@ const (
 	// CR-024: Saga dừng lại chờ Creator duyệt dàn ý. Đây là đường đi bình
 	// thường, KHÔNG phải một trạng thái lỗi — nó cố ý không nằm trong nhóm
 	// failed_at_* (FR69.1).
-	StatusAwaitingReview         ProjectStatus = "awaiting_review"
-	StatusSynthesizingSpeech     ProjectStatus = "synthesizing_speech"
-	StatusRendering              ProjectStatus = "rendering"
-	StatusAssemblingVideo        ProjectStatus = "assembling_video"
+	StatusAwaitingReview     ProjectStatus = "awaiting_review"
+	StatusSynthesizingSpeech ProjectStatus = "synthesizing_speech"
+	StatusRendering          ProjectStatus = "rendering"
+	StatusAssemblingVideo    ProjectStatus = "assembling_video"
 	// CR-021 D2: video đã ghép xong và đang được chấm chất lượng tự động. Nằm
 	// giữa assembling_video và ready_to_publish — không phải trạng thái chờ
 	// người, Creator không phải làm gì ở đây.
@@ -40,8 +40,20 @@ const (
 	// ready_to_publish. Trạng thái này chỉ dùng khi chính message hỏng (không
 	// dựng nổi envelope), đúng ngữ nghĩa các bước khác. Một cổng hỏng không
 	// được biến thành cổng khoá.
-	StatusFailedQCVideo      ProjectStatus = "failed_at_qc_video"
-	StatusFailedPublishVideo ProjectStatus = "failed_at_publish_video"
+	StatusFailedQCVideo ProjectStatus = "failed_at_qc_video"
+	// CR-007 D1: generate_clips sits between qc_video and publish_video —
+	// cutting vertical clips from a video QC already flagged just multiplies
+	// the same defect into two or three clips, and clips should exist before
+	// the Creator reaches the results screen.
+	StatusGeneratingClips ProjectStatus = "generating_clips"
+	// StatusFailedGenerateClips is used only when the generate_clips MESSAGE
+	// itself is broken (undeliverable command, dead-lettered) — never when an
+	// individual clip fails. D1: a clip's own failure is carried as
+	// status="error" on that one entry of clips_generated, and the saga still
+	// proceeds to ready_to_publish (a vertical clip is a derivative product,
+	// not the main video).
+	StatusFailedGenerateClips ProjectStatus = "failed_at_generate_clips"
+	StatusFailedPublishVideo  ProjectStatus = "failed_at_publish_video"
 )
 
 // StepName identifies one of the 6 Saga steps. It is the value stored on
@@ -58,8 +70,11 @@ const (
 	// CR-021 D1: bước riêng, nhưng worker sống trong video-assembly (nơi đã có
 	// sẵn ffmpeg/ffprobe và chính file video vừa ghép). Lệnh `qc_video` đi trên
 	// đúng queue `video_assembly.commands` mà `assemble_video` đang đi.
-	StepQCVideo      StepName = "qc_video"
-	StepPublishVideo StepName = "publish_video"
+	StepQCVideo StepName = "qc_video"
+	// CR-007 D1: worker lives in video-assembly (same queue/dispatcher as
+	// assemble_video/qc_video/normalize_channel_asset — event_type tells them apart).
+	StepGenerateClips StepName = "generate_clips"
+	StepPublishVideo  StepName = "publish_video"
 )
 
 // FailedStatusForStep returns the failed_at_<step> ProjectStatus
@@ -78,6 +93,8 @@ func FailedStatusForStep(step StepName) ProjectStatus {
 		return StatusFailedAssembleVideo
 	case StepQCVideo:
 		return StatusFailedQCVideo
+	case StepGenerateClips:
+		return StatusFailedGenerateClips
 	case StepPublishVideo:
 		return StatusFailedPublishVideo
 	default:
@@ -274,6 +291,35 @@ type Project struct {
 	// code that reads a bbox is `video-assembly/domain/qc_rules.py`.
 	LayoutMarks []map[string]interface{}
 
+	// CR-007 FR19.2 — the `with self.clip(...)` selections Rendering measured
+	// on the real render pass, carried verbatim on rendering_completed
+	// (kind="clip", name, t_start, t_end) exactly like LayoutMarks: Orchestrator
+	// never reads a field inside, only stores it and hands it to
+	// generate_clips's request-merging logic (D3).
+	ClipMarks []map[string]interface{}
+
+	// IntroDurationSeconds is the channel intro's real length, as measured by
+	// video-assembly when it resolved IntroAssetID and folded it into
+	// effective_lead_in (CR-023 D5) — carried out on video_assembled. It is
+	// the only source of this number: Orchestrator's channel_asset_pointers
+	// projection stores no duration, and Orchestrator does not call
+	// video-assembly over HTTP (CR-023 correction). generate_clips needs it
+	// to shift a Creator's clip selection by the same amount the narration
+	// and subtitles were already shifted — without it, a clip cut from a
+	// project with an intro enabled would be off by exactly the intro's
+	// length (CR-007 D5 risk).
+	IntroDurationSeconds float64
+	// ClipRequests holds the Creator-entered clip selections from
+	// POST /v1/projects/{id}/clips — {name, start_seconds, end_seconds,
+	// presets}. Kept separate from ClipMarks (script-sourced) so D3's "trùng
+	// tên thì GUI thắng" can be resolved at generate_clips dispatch time
+	// without the two sources overwriting each other on arrival.
+	ClipRequests []map[string]interface{}
+	// Clips is the outcome of generate_clips, stored verbatim from
+	// clips_generated (one entry per requested (name, preset) pair, "ok" or
+	// "error" — D1: a clip failure never blocks the saga).
+	Clips []ClipResult
+
 	YoutubeTitle         *string
 	YoutubeDescription   *string
 	YoutubeTags          []string
@@ -284,6 +330,17 @@ type Project struct {
 	YoutubeVideoURL      *string
 
 	ErrorMessage *string
+}
+
+// ClipResult is one (name, preset) outcome of the generate_clips step
+// (CR-007), stored verbatim from clips_generated's "clips" array.
+type ClipResult struct {
+	Name            string  `json:"name"`
+	Preset          string  `json:"preset"`
+	Status          string  `json:"status"` // "ok" | "error"
+	OutputPath      string  `json:"output_path,omitempty"`
+	DurationSeconds float64 `json:"duration_seconds,omitempty"`
+	ErrorMessage    string  `json:"error_message,omitempty"`
 }
 
 // ProjectSummary is the lightweight projection returned by GET /v1/projects

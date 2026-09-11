@@ -289,6 +289,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             rendered_path = self._find_rendered_file(media_dir)
             wait_offsets = self._read_wait_offsets(marks_path, expected=len(durations))
             layout_marks = self._read_layout_marks(marks_path)
+            clip_marks = self._read_clip_marks(marks_path)
             video_duration = _probe_duration(rendered_path)
             shutil.move(rendered_path, output_path)
         finally:
@@ -300,6 +301,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             wait_offsets=wait_offsets,
             video_duration_seconds=video_duration,
             layout_marks=layout_marks,
+            clip_marks=clip_marks,
         )
 
     def render_channel_asset(
@@ -530,6 +532,17 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         failing a render that produced a perfectly good video.
         """
         return [r for r in _read_marks(marks_path) if r.get("kind") == "layout"]
+
+    @staticmethod
+    def _read_clip_marks(marks_path: str) -> list[dict]:
+        """The clip selections `with self.clip(...)` recorded (CR-007 FR19.2).
+
+        Same best-effort posture as `_read_layout_marks`: a script that never
+        calls `self.clip(...)` is a perfectly normal (non-Shorts) video, so a
+        missing or empty list here is not an error — it just means Video
+        Assembly has nothing to derive vertical clips from.
+        """
+        return [r for r in _read_marks(marks_path) if r.get("kind") == "clip"]
 
     @staticmethod
     def _find_rendered_file(media_dir: str) -> str:

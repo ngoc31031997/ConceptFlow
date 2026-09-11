@@ -120,6 +120,17 @@ class ConceptFlowScene(Scene):
         """Mở một chapter YouTube (CR-006 FR15). Gắn vào lời thoại kế tiếp."""
         narration_runtime.chapter(self, title)
 
+    def clip(self, name: str):
+        """Đánh dấu một đoạn của scene là clip dọc phái sinh (CR-007 FR19.2).
+
+        Dùng như context manager: `with self.clip("tên"): ...`. Hoạt động
+        được cả khi bên trong gọi `self.narrate()` — dùng chung `_recorder`
+        singleton của `narration.py` nên không phá cơ chế đếm `index`. Không
+        cho lồng nhau: `NarrationError` nếu Creator mở một `clip()` khác
+        trong lúc clip trước chưa đóng.
+        """
+        return narration_runtime.clip(self, name)
+
     # --- Beat dựng sẵn (CR-019 FR53) ------------------------------------------
     #
     # Ba beat này là khuôn hình lặp lại ở MỌI video, nên chúng là method chứ

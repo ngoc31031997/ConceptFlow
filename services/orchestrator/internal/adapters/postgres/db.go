@@ -168,6 +168,28 @@ CREATE TABLE IF NOT EXISTS channel_asset_pointers (
 -- needing the original event again — exactly the reason wait_offsets is stored.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS layout_marks JSONB;
 
+-- CR-007 FR19.2/D1/D3: the with-self.clip(...) selections Rendering
+-- measured, carried verbatim on rendering_completed exactly like
+-- layout_marks — stored so generate_clips can be rebuilt from Project alone
+-- (Rule 5). clip_requests holds the Creator-entered selections from POST
+-- /v1/projects/{id}/clips separately (D3 merges the two at dispatch time,
+-- GUI wins on a matching name). clips is generate_clips's own result, one
+-- row's worth of (name, preset, status, output_path, duration_seconds,
+-- error_message) entries — a clip-level failure never blocks the saga (D1),
+-- so this is just the audit trail the Creator sees on the results screen.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_marks JSONB;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_requests JSONB;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS clips JSONB;
+
+-- CR-007 D5 risk: video-assembly is the only place that knows the channel
+-- intro's real length (it resolved intro_asset_id and folded it into
+-- effective_lead_in — CR-023), and Orchestrator has no synchronous way to ask
+-- it again (CR-023 correction: no HTTP between the two). Stored from
+-- video_assembled so generate_clips can shift a Creator's clip selection by
+-- the same amount narration/subtitles were already shifted — omit it and a
+-- clip is off by exactly the intro's length. 0 when the project has no intro.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_duration_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
+
 -- CR-021 D6/FR61.1: one row per automated QC pass.
 --
 -- findings is JSONB, not text: FR61.1 asks for machine-readable data and the

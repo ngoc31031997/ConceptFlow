@@ -83,6 +83,10 @@ class ScriptRenderResult:
     # đã ghi ra ({"kind","index","t","mobjects"}). Best-effort, nên rỗng là
     # trạng thái hợp lệ — QC khi đó chỉ chấm được phần audio.
     layout_marks: list[dict] = field(default_factory=list)
+    # CR-007 FR19.2: một bản ghi cho mỗi `with self.clip(...)` script mở ra,
+    # giữ nguyên shape script đã ghi ({"kind","name","index","t_start","t_end"}).
+    # Best-effort như layout_marks — rỗng nghĩa là script không cắt clip nào.
+    clip_marks: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

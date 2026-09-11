@@ -65,6 +65,11 @@ type projectStore interface {
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 	List(ctx context.Context) ([]domain.ProjectSummary, error)
 	Delete(ctx context.Context, projectID string) error
+	// Save persists the Creator's clip selections (CR-007 D7's POST
+	// /v1/projects/{id}/clips) — a plain field update, not a use case, since
+	// it only stores intent and never triggers anything by itself (merged into
+	// generate_clips's request list at dispatch time instead).
+	Save(ctx context.Context, project *domain.Project) error
 }
 
 // Router holds the REST handlers' use case dependencies.
@@ -113,6 +118,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/channel-assets/{kind}", rt.handleNormalizeChannelAsset)
 	r.Get("/v1/channel-assets/preview", rt.handleChannelAssetPreview)
 	r.Get("/v1/projects/{project_id}/qc-report", rt.handleQCReport)
+	r.Post("/v1/projects/{project_id}/clips", rt.handleCreateClip)
+	r.Get("/v1/projects/{project_id}/clips", rt.handleListClips)
 	return r
 }
 
@@ -393,6 +400,102 @@ func (rt *Router) handleQCReport(w http.ResponseWriter, r *http.Request) {
 		out.OverriddenAt = &overridden
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleCreateClip stores a Creator-entered vertical-clip selection (CR-007
+// FR19.2/D3/D7) — {name, start_seconds, end_seconds, presets}. It only saves
+// intent onto Project.ClipRequests; the actual cut happens later, when the
+// Render Saga reaches generate_clips and merges this list with whatever the
+// script's `with self.clip(...)` calls produced (D3 — a matching name here
+// wins over the script one).
+//
+// Each requested preset is validated independently (FR19.6/19.7): a segment
+// that does not fit "short" is rejected for that preset alone and reported in
+// rejected_presets, while any preset that does fit is still saved and
+// reported in accepted_presets. Only when EVERY preset is rejected does this
+// answer 400 — a single bad preset must never block the ones the Creator got
+// right.
+func (rt *Router) handleCreateClip(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+
+	var req createClipRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	if req.Name == "" {
+		writeError(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if len(req.Presets) == 0 {
+		writeError(w, http.StatusBadRequest, "presets is required (\"short\" and/or \"long\")")
+		return
+	}
+
+	duration := req.EndSeconds - req.StartSeconds
+	accepted := make([]string, 0, len(req.Presets))
+	rejected := make(map[string]string, len(req.Presets))
+	for _, preset := range req.Presets {
+		if err := domain.ValidateClipDuration(duration, preset); err != nil {
+			rejected[preset] = err.Error()
+			continue
+		}
+		accepted = append(accepted, preset)
+	}
+	if len(accepted) == 0 {
+		writeJSON(w, http.StatusBadRequest, createClipResponse{
+			Name: req.Name, AcceptedPresets: accepted, RejectedPresets: rejected,
+		})
+		return
+	}
+
+	project, err := rt.projects.Get(r.Context(), projectID)
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	// Upsert by name (D3): a Creator refining the same clip's timing sends
+	// another POST with the same name rather than accumulating duplicates.
+	clipRequests := make([]map[string]interface{}, 0, len(project.ClipRequests)+1)
+	for _, existing := range project.ClipRequests {
+		if s, _ := existing["name"].(string); s != req.Name {
+			clipRequests = append(clipRequests, existing)
+		}
+	}
+	presetsAny := make([]interface{}, len(accepted))
+	for i, p := range accepted {
+		presetsAny[i] = p
+	}
+	clipRequests = append(clipRequests, map[string]interface{}{
+		"name":          req.Name,
+		"start_seconds": req.StartSeconds,
+		"end_seconds":   req.EndSeconds,
+		"presets":       presetsAny,
+	})
+	project.ClipRequests = clipRequests
+
+	if err := rt.projects.Save(r.Context(), project); err != nil {
+		writeError(w, http.StatusInternalServerError, "could not save the clip selection")
+		return
+	}
+
+	writeJSON(w, http.StatusAccepted, createClipResponse{
+		Name: req.Name, AcceptedPresets: accepted, RejectedPresets: rejected,
+	})
+}
+
+// handleListClips serves the outcome of generate_clips (CR-007 D7/FR20.1) —
+// what the results screen offers for download. An empty list (not 404) when
+// the saga has not reached generate_clips yet, or when a project predates
+// this CR: "nothing generated yet" is a normal state, not a missing resource.
+func (rt *Router) handleListClips(w http.ResponseWriter, r *http.Request) {
+	projectID := chi.URLParam(r, "project_id")
+	project, err := rt.projects.Get(r.Context(), projectID)
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"clips": toClipResultResponses(project.Clips)})
 }
 
 // writeUseCaseError maps domain sentinel errors to the HTTP status codes

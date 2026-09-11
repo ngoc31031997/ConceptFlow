@@ -91,6 +91,11 @@ func (f *fakeProjectReader) Delete(_ context.Context, _ string) error {
 	return f.deleteErr
 }
 
+func (f *fakeProjectReader) Save(_ context.Context, project *domain.Project) error {
+	f.project = project
+	return nil
+}
+
 type fakeSuggestMetadata struct {
 	out *application.SuggestPublishMetadataOutput
 	err error

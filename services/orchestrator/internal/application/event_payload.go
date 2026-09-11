@@ -230,6 +230,112 @@ func parseQCFindings(payload map[string]interface{}) []domain.QCFinding {
 	return out
 }
 
+// parseClipResults decodes clips_generated's "clips" array (CR-007) into
+// domain.ClipResult values. A malformed entry is dropped rather than failing
+// the whole event — a report missing one clip is better than losing the
+// Render Saga's ending over a single bad entry (same posture as
+// mapSliceFromPayload for layout_marks).
+func parseClipResults(payload map[string]interface{}) []domain.ClipResult {
+	raw, ok := payload["clips"].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]domain.ClipResult, 0, len(raw))
+	for _, item := range raw {
+		m, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		out = append(out, domain.ClipResult{
+			Name:            stringFromMap(m, "name"),
+			Preset:          stringFromMap(m, "preset"),
+			Status:          stringFromMap(m, "status"),
+			OutputPath:      stringFromMap(m, "output_path"),
+			DurationSeconds: floatFromMap(m, "duration_seconds"),
+			ErrorMessage:    stringFromMap(m, "error_message"),
+		})
+	}
+	return out
+}
+
+// stringSliceFromMap reads a JSON array of strings; non-string entries are
+// dropped rather than failing the whole read.
+func stringSliceFromMap(m map[string]interface{}, key string) []string {
+	raw, ok := m[key].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// buildClipRequests merges CR-007 D3's two sources of clip selections into
+// the flat `requests` list generate_clips expects: clipMarks (from the
+// script's `with self.clip(...)`, t_start/t_end, no presets — defaulted to
+// both) and clipRequests (Creator-entered via POST /v1/projects/{id}/clips,
+// start_seconds/end_seconds/presets already in that shape). A name present
+// in both loses its script version — D3: "trùng tên thì GUI thắng", since a
+// Creator's typed-in selection is the newer intent.
+func buildClipRequests(clipMarks, clipRequests []map[string]interface{}) []map[string]interface{} {
+	byName := make(map[string]map[string]interface{})
+	order := make([]string, 0, len(clipMarks)+len(clipRequests))
+
+	upsert := func(name string, req map[string]interface{}) {
+		if name == "" {
+			return
+		}
+		if _, exists := byName[name]; !exists {
+			order = append(order, name)
+		}
+		byName[name] = req
+	}
+
+	for _, m := range clipMarks {
+		name := stringFromMap(m, "name")
+		startSeconds := floatFromMap(m, "t_start")
+		endSeconds := floatFromMap(m, "t_end")
+		if name == "" || endSeconds <= startSeconds {
+			// Dry-pass placeholders (t_start/t_end null, CR-024's outline gate)
+			// and anything else that never got a real timestamp — nothing to
+			// dispatch for those.
+			continue
+		}
+		upsert(name, map[string]interface{}{
+			"name":          name,
+			"start_seconds": startSeconds,
+			"end_seconds":   endSeconds,
+			"presets":       []string{domain.ClipPresetShort, domain.ClipPresetLong},
+		})
+	}
+	for _, m := range clipRequests {
+		name := stringFromMap(m, "name")
+		if name == "" {
+			continue
+		}
+		presets := stringSliceFromMap(m, "presets")
+		if len(presets) == 0 {
+			presets = []string{domain.ClipPresetShort, domain.ClipPresetLong}
+		}
+		upsert(name, map[string]interface{}{
+			"name":          name,
+			"start_seconds": floatFromMap(m, "start_seconds"),
+			"end_seconds":   floatFromMap(m, "end_seconds"),
+			"presets":       presets,
+		})
+	}
+
+	out := make([]map[string]interface{}, 0, len(order))
+	for _, name := range order {
+		out = append(out, byName[name])
+	}
+	return out
+}
+
 func intFromPayload(payload map[string]interface{}, key string) *int {
 	if _, ok := payload[key]; !ok {
 		return nil

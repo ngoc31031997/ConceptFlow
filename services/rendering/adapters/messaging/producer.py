@@ -34,6 +34,7 @@ def rendering_completed_envelope(
     wait_offsets: list[float],
     video_duration_seconds: float,
     layout_marks: list[dict] | None = None,
+    clip_marks: list[dict] | None = None,
 ) -> dict:
     """wait_offsets / video_duration_seconds added by CR-002 (FR10.2).
 
@@ -44,6 +45,12 @@ def rendering_completed_envelope(
     layout_marks added by CR-021 (FR58): the on-screen geometry at each
     narration mark, which the Orchestrator stores and hands to `qc_video`.
     Best-effort upstream, so an empty list is a normal value, not an error.
+
+    clip_marks added by CR-007 (FR19.2): the `with self.clip(...)` selections
+    the script made, one dict per clip
+    ({"kind","name","index","t_start","t_end"}). The Orchestrator merges these
+    with any GUI-entered clip requests (D3) before handing them to the
+    `generate_clips` saga step. Best-effort, same posture as layout_marks.
     """
     return build_envelope(
         saga_id,
@@ -54,6 +61,7 @@ def rendering_completed_envelope(
             "wait_offsets": wait_offsets,
             "video_duration_seconds": video_duration_seconds,
             "layout_marks": layout_marks or [],
+            "clip_marks": clip_marks or [],
         },
     )
 

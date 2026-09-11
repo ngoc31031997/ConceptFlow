@@ -65,6 +65,104 @@ describe('routes/projects', () => {
     );
   });
 
+  test('POST /v1/projects/:id/clips proxies to orchestrator client', async () => {
+    const fakeClient = {
+      request: jest.fn().mockResolvedValue({
+        status: 200,
+        headers: new Map(),
+        body: { name: 'demo', accepted_presets: ['short'], rejected_presets: {} },
+      }),
+    };
+    const app = buildApp(fakeClient);
+
+    const res = await request(app)
+      .post('/v1/projects/p1/clips')
+      .send({ name: 'demo', start_seconds: 10, end_seconds: 40, presets: ['short'] });
+
+    expect(res.status).toBe(200);
+    expect(fakeClient.request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'POST', path: '/v1/projects/p1/clips' }),
+    );
+  });
+
+  test('GET /v1/projects/:id/clips proxies to orchestrator client', async () => {
+    const fakeClient = {
+      request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { clips: [] } }),
+    };
+    const app = buildApp(fakeClient);
+
+    const res = await request(app).get('/v1/projects/p1/clips');
+
+    expect(res.status).toBe(200);
+    expect(fakeClient.request).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'GET', path: '/v1/projects/p1/clips' }),
+    );
+  });
+
+  describe('GET /v1/projects/:id/clips/:name/:preset', () => {
+    test('streams the clip file when it exists and is ok', async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'clip-serve-'));
+      const clipDir = path.join(tmpDir, 'p1', 'clips');
+      fs.mkdirSync(clipDir, { recursive: true });
+      const clipPath = path.join(clipDir, 'demo_short.mp4');
+      fs.writeFileSync(clipPath, 'fake-mp4-bytes');
+
+      const fakeClient = {
+        request: jest.fn().mockResolvedValue({
+          status: 200,
+          headers: new Map(),
+          body: {
+            clips: [
+              { name: 'demo', preset: 'short', status: 'ok', output_path: clipPath, duration_seconds: 42 },
+            ],
+          },
+        }),
+      };
+      const app = buildApp(fakeClient, tmpDir);
+
+      const res = await request(app)
+        .get('/v1/projects/p1/clips/demo/short')
+        .buffer(true)
+        .parse((response, callback) => {
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => callback(null, Buffer.concat(chunks)));
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.headers['content-type']).toBe('video/mp4');
+      expect(res.body.toString()).toBe('fake-mp4-bytes');
+    });
+
+    test('404s when no clip matches name/preset', async () => {
+      const fakeClient = {
+        request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { clips: [] } }),
+      };
+      const app = buildApp(fakeClient, os.tmpdir());
+
+      const res = await request(app).get('/v1/projects/p1/clips/demo/short');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('clip_not_found');
+    });
+
+    test('404s when the matching clip failed to generate', async () => {
+      const fakeClient = {
+        request: jest.fn().mockResolvedValue({
+          status: 200,
+          headers: new Map(),
+          body: { clips: [{ name: 'demo', preset: 'short', status: 'error', error_message: 'too short' }] },
+        }),
+      };
+      const app = buildApp(fakeClient, os.tmpdir());
+
+      const res = await request(app).get('/v1/projects/p1/clips/demo/short');
+
+      expect(res.status).toBe(404);
+      expect(res.body.error).toBe('clip_not_found');
+    });
+  });
+
   test('GET /v1/projects proxies to orchestrator client', async () => {
     const fakeClient = {
       request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { projects: [] } }),

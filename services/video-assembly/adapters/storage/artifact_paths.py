@@ -52,6 +52,13 @@ def channel_asset_with_music_path(kind: str, render_quality: str, version: int) 
     )
 
 
+def clip_output_path(project_id: str, slug: str, preset: str) -> str:
+    """Conventional path for a CR-007 vertical clip:
+    /shared/{project_id}/clips/{slug}_{preset}.mp4 — D7's download route reads
+    the same shared volume, so the shape here is the contract with it."""
+    return os.path.join(SHARED_VOLUME_ROOT, project_id, "clips", f"{slug}_{preset}.mp4")
+
+
 def video_exists(video_path: str) -> bool:
     return os.path.isfile(video_path)
 

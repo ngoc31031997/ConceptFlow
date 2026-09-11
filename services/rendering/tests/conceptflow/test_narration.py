@@ -99,6 +99,70 @@ def test_loi_thoai_rong_bi_tu_choi(dry):
         dry(S)
 
 
+def test_clip_ghi_mot_ban_ghi_o_luot_dry_voi_t_null(dry):
+    """CR-007 FR19.2: ở lượt dry chưa có thời gian thật — Creator chỉ cần thấy
+    clip nào được định cắt, để CR-024 duyệt dàn ý trước khi tốn TTS."""
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            with self.clip("ví dụ chạy thật"):
+                self.narrate("bên trong clip")
+
+    records = dry(S)
+    clips = [r for r in records if r["kind"] == "clip"]
+    assert len(clips) == 1
+    assert clips[0]["name"] == "ví dụ chạy thật"
+    assert clips[0]["index"] == 0
+    assert clips[0]["t_start"] is None
+    assert clips[0]["t_end"] is None
+
+
+def test_clip_khong_pha_index_cua_narrate_ben_trong(dry):
+    """`clip()` phải dùng chung `_recorder` singleton với `narrate()`, không
+    được tạo state đếm riêng — nếu không thứ tự/số lượng lời thoại sẽ lệch."""
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.narrate("trước clip")
+            with self.clip("đoạn giữa"):
+                self.narrate("một")
+                self.narrate("hai")
+            self.narrate("sau clip")
+
+    records = dry(S)
+    assert _texts(records) == ["trước clip", "một", "hai", "sau clip"]
+    clip = next(r for r in records if r["kind"] == "clip")
+    # index gắn vào lời thoại SẮP chạy khi clip mở ra (upcoming_index), giống
+    # beat()/chapter() — ở đây là "một", tức lời thoại thứ 1 (0-based).
+    assert clip["index"] == 1
+
+
+def test_clip_long_nhau_bi_tu_choi(dry):
+    class S(ConceptFlowScene):
+        def construct(self):
+            with self.clip("ngoài"):
+                with self.clip("trong"):
+                    pass
+
+    with pytest.raises(narration.NarrationError):
+        dry(S)
+
+
+def test_clip_dong_du_thi_mo_clip_khac_duoc(dry):
+    """Không lồng nhau, nhưng hai clip liên tiếp (đóng xong mới mở) là hợp lệ."""
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            with self.clip("một"):
+                self.narrate("a")
+            with self.clip("hai"):
+                self.narrate("b")
+
+    records = dry(S)
+    clips = [r for r in records if r["kind"] == "clip"]
+    assert [c["name"] for c in clips] == ["một", "hai"]
+
+
 def test_che_do_render_cho_dung_thoi_luong_audio(tmp_path, monkeypatch):
     marks = tmp_path / "cf_marks.jsonl"
     durations = tmp_path / "cf_durations.json"
@@ -146,6 +210,44 @@ def test_render_thieu_thoi_luong_bao_loi_ro_rang(tmp_path, monkeypatch):
 
     with pytest.raises(narration.NarrationError, match="tất định"):
         S().construct()
+
+
+def test_clip_o_luot_render_ghi_t_start_nho_hon_t_end(tmp_path, monkeypatch):
+    """CR-007 FR19.2: ở lượt render, t_start/t_end là mốc thật đọc từ
+    `scene.renderer.time`, không phải null như lượt dry.
+
+    Gọi thẳng `narration.clip()` với một scene giả có `renderer.time` tăng dần
+    — tránh phải dựng lại toàn bộ máy render thật của Manim chỉ để chứng minh
+    hai lần đọc `renderer.time` (lúc mở và lúc đóng) được ghi đúng thứ tự.
+    """
+    marks = tmp_path / "cf_marks.jsonl"
+    monkeypatch.setenv(narration.ENV_MARKS_PATH, str(marks))
+    monkeypatch.setenv(narration.ENV_MODE, narration.MODE_RENDER)
+    narration.reset()
+
+    class _FakeRenderer:
+        def __init__(self) -> None:
+            self._t = 0.0
+
+        @property
+        def time(self) -> float:
+            self._t += 1.0
+            return self._t
+
+    class _FakeScene:
+        renderer = _FakeRenderer()
+
+    with narration.clip(_FakeScene(), "ví dụ chạy thật"):
+        pass
+
+    records = [json.loads(line) for line in marks.read_text().splitlines() if line]
+    assert len(records) == 1
+    clip = records[0]
+    assert clip["kind"] == "clip"
+    assert clip["name"] == "ví dụ chạy thật"
+    assert clip["t_start"] is not None
+    assert clip["t_end"] is not None
+    assert clip["t_start"] < clip["t_end"]
 
 
 def test_hook_recap_cta_tu_mang_beat_va_loi_thoai(dry):

@@ -18,6 +18,7 @@ from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS,
 from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
     ChannelAssetRenderedEventHandler,
+    GenerateClipsCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
     VideoAssemblyCommandDispatcher,
@@ -29,6 +30,7 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from application.assemble_video import AssembleVideoUseCase
+from domain.clip_rules import ClipThresholds
 from domain.qc_rules import QCThresholds
 
 logging.basicConfig(level=logging.WARNING)
@@ -73,8 +75,11 @@ async def run() -> None:
     # scores and reports the real severity; whether a blocking finding actually
     # stops a publish is Orchestrator's call (LLD D5).
     qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
+    # CR-007 D2/C2b: preset thresholds read from the environment once, here —
+    # same convention as QC_ENFORCE-adjacent QCThresholds above.
+    generate_clips_handler = GenerateClipsCommandHandler(pool, inbox, outbox, ClipThresholds.from_env())
     command_dispatcher = VideoAssemblyCommandDispatcher(
-        assemble_video_handler, normalize_handler, qc_handler
+        assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler
     )
     channel_asset_rendered_handler = ChannelAssetRenderedEventHandler(pool, channel_assets, inbox, outbox)
 
