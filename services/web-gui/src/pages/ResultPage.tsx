@@ -4,6 +4,7 @@ import { VideoPlayer } from "../components/VideoPlayer";
 import { AppShell } from "../components/AppShell";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
 import { VideoOutputModePicker } from "../components/VideoOutputModePicker";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { useProject } from "../hooks/useProject";
 import { ProjectInputPanel } from "../components/ProjectInputPanel";
 import { ClipsPanel } from "../components/ClipsPanel";
@@ -30,6 +31,7 @@ export function ResultPage() {
   const { project } = useProject(projectId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [rerenderQuality, setRerenderQuality] = useState<RenderQuality>("1080p60");
   // null = "not touched yet": the sensible default is "carry over this
   // project's current mode", which is not known until `project` loads.
@@ -79,11 +81,8 @@ export function ResultPage() {
   }
 
   async function handleDelete() {
-    if (!window.confirm("Xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
-      return;
-    }
-    setIsDeleting(true);
     setError(null);
+    setIsDeleting(true);
     try {
       await deleteProject(projectId);
       navigate("/videos");
@@ -125,7 +124,11 @@ export function ResultPage() {
         <div className={styles.layout}>
           <div className={styles.preview}>
             {project.video_path && (
-              <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />
+              <VideoPlayer
+                videoSrc={getProjectVideoUrl(projectId)}
+                scenes={project.scenes}
+                contentLanguage={project.voice_language}
+              />
             )}
             {wantsClips && (
               <ClipsPanel projectId={projectId} clips={project.clips ?? []} videoOutputMode={outputMode} />
@@ -246,12 +249,23 @@ export function ResultPage() {
             data-testid="result-delete-button"
             className={glass.dangerGhostBtn}
             disabled={isDeleting}
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
           >
             {isDeleting ? "Đang xoá..." : "Xoá video"}
           </button>
         </div>
       </AppShell>
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Xác nhận xoá video"
+        message="Bạn có chắc chắn muốn xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác."
+        confirmLabel="Xoá video"
+        cancelLabel="Hủy"
+        isDangerous
+      />
     </div>
   );
 }

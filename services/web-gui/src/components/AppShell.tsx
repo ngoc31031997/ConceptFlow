@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ThemeToggle } from "./ThemeToggle";
 import styles from "./AppShell.module.css";
 
 /*
@@ -8,6 +9,15 @@ import styles from "./AppShell.module.css";
   and gave the two automatic phases equal billing, so it described the plumbing
   rather than the path.
 */
+const STEP_ROUTES = [
+  "/",
+  "/create/settings",
+  "/create/review",
+  "/projects/:id/render",
+  "/projects/:id/result",
+  "/projects/:id/publish",
+];
+
 const STEP_LABELS = ["Script", "Cấu hình", "Xem lại", "Xử lý", "Kết quả", "Đăng"] as const;
 
 interface AppShellProps {
@@ -29,6 +39,15 @@ function CheckIcon() {
 }
 
 export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
+  const navigate = useNavigate();
+
+  const handleStepClick = (stepNumber: number) => {
+    // Only allow navigation to completed steps
+    if (currentStep && stepNumber < currentStep && stepNumber <= 3) {
+      navigate(STEP_ROUTES[stepNumber - 1]);
+    }
+  };
+
   return (
     <div className={styles.stage}>
       <div className={`${styles.blob} ${styles.blob1}`} />
@@ -56,20 +75,31 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
                 const stepNumber = index + 1;
                 const isActive = stepNumber === currentStep;
                 const isDone = stepNumber < currentStep;
+                const isClickable = isDone && stepNumber <= 3; // Only first 3 steps are clickable
                 const className = [styles.stepItem, isActive ? styles.active : "", isDone ? styles.done : ""]
                   .filter(Boolean)
                   .join(" ");
                 return (
-                  <div key={label} className={className}>
+                  <button
+                    key={label}
+                    type="button"
+                    className={className}
+                    onClick={() => handleStepClick(stepNumber)}
+                    disabled={!isClickable}
+                    aria-current={isActive ? "step" : undefined}
+                    title={isClickable ? `Nhảy về ${label}` : undefined}
+                    style={{ cursor: isClickable ? "pointer" : "default" }}
+                  >
                     <span className={styles.stepNum}>{isDone ? <CheckIcon /> : stepNumber}</span>
                     {label}
-                  </div>
+                  </button>
                 );
               })}
             </div>
           )}
 
           <div className={styles.headerActions}>
+            <ThemeToggle />
             {headerAction}
             <Link to="/videos" className={styles.headerLink}>
               Danh sách video

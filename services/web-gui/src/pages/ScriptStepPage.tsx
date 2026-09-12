@@ -5,6 +5,7 @@ import { ScriptAssistant } from "../components/ScriptAssistant";
 import { ScriptEditor } from "../components/ScriptEditor";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { useVideoFormats } from "../hooks/useVideoFormats";
+import { useDebounce } from "../hooks/useDebounce";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
@@ -34,8 +35,12 @@ export function ScriptStepPage() {
 
   const calibration = useVoiceCalibration();
   const formats = useVideoFormats();
+  
+  // Debounce script content for validation to avoid re-validating on every keystroke
+  const debouncedScriptContent = useDebounce(draft.scriptContent, 500);
+  
   const validation = validateScript(
-    draft.scriptContent,
+    debouncedScriptContent,
     draft.voiceLanguage,
     wordsPerMinuteFor(calibration, draft.voiceId),
   );

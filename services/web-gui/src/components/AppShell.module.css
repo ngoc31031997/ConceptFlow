@@ -21,14 +21,14 @@
   height: 620px;
   top: -220px;
   left: -160px;
-  background: radial-gradient(circle at 30% 30%, var(--accent), transparent 70%);
+  background: radial-gradient(circle at 30% 30%, var(--blob1-color), transparent 70%);
 }
 .blob2 {
   width: 560px;
   height: 560px;
   top: 120px;
   right: -220px;
-  background: radial-gradient(circle at 60% 40%, var(--accent2), transparent 70%);
+  background: radial-gradient(circle at 60% 40%, var(--blob2-color), transparent 70%);
 }
 .blob3 {
   width: 480px;
@@ -36,7 +36,7 @@
   bottom: -240px;
   left: 30%;
   background: radial-gradient(circle at 50% 50%, #ffffff, transparent 70%);
-  opacity: 0.5;
+  opacity: var(--blob3-opacity);
 }
 
 .content {
@@ -103,6 +103,16 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--ink-faint);
+  background: transparent;
+  border: none;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.stepItem:not(:disabled):hover {
+  background: rgba(47, 143, 224, 0.08);
+  transform: scale(1.02);
+}
+.stepItem:disabled {
+  cursor: default;
 }
 .stepItem.active {
   background: linear-gradient(135deg, var(--accent), var(--accent2));

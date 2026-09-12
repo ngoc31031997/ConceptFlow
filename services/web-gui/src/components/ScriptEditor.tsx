@@ -1,5 +1,6 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS } from "./scriptTemplates";
+import { useDebounce } from "../hooks/useDebounce";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { formatDuration } from "../utils/durationEstimate";
@@ -59,9 +60,12 @@ function WarningIcon() {
  * round trip instead of hiding it in a menu.
  */
 export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute }: ScriptEditorProps) {
+  // Debounce the script value to avoid expensive validation on every keystroke
+  const debouncedValue = useDebounce(value, 500);
+  
   const validation = useMemo(
-    () => validateScript(value, contentLanguage, wordsPerMinute),
-    [value, contentLanguage, wordsPerMinute],
+    () => validateScript(debouncedValue, contentLanguage, wordsPerMinute),
+    [debouncedValue, contentLanguage, wordsPerMinute],
   );
   const [importError, setImportError] = useState<string | null>(null);
   const hasScript = value.trim().length > 0;

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { RenderPage } from "../../src/pages/RenderPage";
+import { ThemeProvider } from "../../src/context/ThemeContext";
 
 class FakeEventSource {
   static instances: FakeEventSource[] = [];
@@ -23,12 +24,14 @@ class FakeEventSource {
 
 function renderRenderPage() {
   return render(
-    <MemoryRouter initialEntries={["/projects/p1/render"]}>
-      <Routes>
-        <Route path="/projects/:id/render" element={<RenderPage />} />
-        <Route path="/" element={<div data-testid="new-project-page-stub" />} />
-      </Routes>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={["/projects/p1/render"]}>
+        <Routes>
+          <Route path="/projects/:id/render" element={<RenderPage />} />
+          <Route path="/" element={<div data-testid="new-project-page-stub" />} />
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 

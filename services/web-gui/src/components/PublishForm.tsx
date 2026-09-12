@@ -54,9 +54,14 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
   const [isSuggesting, setIsSuggesting] = useState(false);
   const [suggestError, setSuggestError] = useState<string | null>(null);
 
+  // Clear suggest error when user manually edits any field
+  const clearSuggestErrorOnEdit = () => {
+    if (suggestError) setSuggestError(null);
+  };
+
   async function handleSuggestAI() {
+    setSuggestError(null); // Clear previous error
     setIsSuggesting(true);
-    setSuggestError(null);
     try {
       const suggestion = await suggestPublishMetadata(projectId);
       // Normalised rather than trusted: this is a model-generated payload
@@ -130,7 +135,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           className={glass.textInput}
           value={title}
           maxLength={TITLE_MAX_LENGTH}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => {
+            setTitle(event.target.value);
+            clearSuggestErrorOnEdit();
+          }}
         />
       </div>
 
@@ -144,7 +152,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           className={`${glass.textArea} ${styles.field}`}
           style={{ minHeight: 72, font: "inherit" }}
           value={description}
-          onChange={(event) => setDescription(event.target.value)}
+          onChange={(event) => {
+            setDescription(event.target.value);
+            clearSuggestErrorOnEdit();
+          }}
         />
       </div>
 
@@ -158,7 +169,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           data-testid="publish-form-tags-input"
           className={glass.textInput}
           value={tags}
-          onChange={(event) => setTags(event.target.value)}
+          onChange={(event) => {
+            setTags(event.target.value);
+            clearSuggestErrorOnEdit();
+          }}
         />
         {tagList.length > 0 && (
           <div className={styles.tagRow}>

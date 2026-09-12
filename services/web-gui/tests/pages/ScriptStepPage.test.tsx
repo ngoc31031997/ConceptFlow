@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
+import { ThemeProvider } from "../../src/context/ThemeContext";
 
 describe("ScriptStepPage", () => {
   afterEach(() => {
@@ -16,11 +17,13 @@ describe("ScriptStepPage", () => {
     }) as unknown as typeof fetch;
 
     render(
-      <MemoryRouter>
-        <ProjectDraftProvider>
-          <ScriptStepPage />
-        </ProjectDraftProvider>
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ScriptStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
@@ -56,11 +59,13 @@ describe("ScriptStepPage draft lifecycle", () => {
     );
 
     render(
-      <MemoryRouter>
-        <ProjectDraftProvider>
-          <ScriptStepPage />
-        </ProjectDraftProvider>
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ScriptStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     expect(screen.getByTestId("new-project-script-textarea")).toHaveValue("");

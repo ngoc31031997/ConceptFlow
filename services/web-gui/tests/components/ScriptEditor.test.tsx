@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { ScriptEditor } from "../../src/components/ScriptEditor";
 import { HOOK_SNIPPETS } from "../../src/components/scriptTemplates";
 
@@ -19,13 +19,24 @@ describe("ScriptEditor", () => {
   it("reports the narration count instead of a marker/wait tally", () => {
     // Sau CR-018 không còn gì để đếm khớp: self.narrate() gộp marker và điểm
     // chờ làm một, nên lớp lỗi "lệch số lượng" biến mất theo cấu trúc.
-    const { rerender } = render(<ScriptEditor value={VALID} onChange={vi.fn()} contentLanguage="vi" />);
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<ScriptEditor value={VALID} onChange={vi.fn()} contentLanguage="vi" />);
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
 
-    rerender(
-      <ScriptEditor value={"x = 1"} onChange={vi.fn()} contentLanguage="vi" />,
-    );
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("class Scene");
+      rerender(
+        <ScriptEditor value={"x = 1"} onChange={vi.fn()} contentLanguage="vi" />,
+      );
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("class Scene");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("warns when the script still uses the pre-CR-018 markers", () => {

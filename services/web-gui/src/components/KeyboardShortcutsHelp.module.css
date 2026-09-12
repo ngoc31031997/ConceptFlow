@@ -1,0 +1,213 @@
+.trigger {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border: none;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(47, 143, 224, 0.35);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  z-index: 1000;
+}
+
+.trigger:hover {
+  transform: scale(1.1);
+  box-shadow: 0 12px 32px rgba(47, 143, 224, 0.45);
+}
+
+.trigger:active {
+  transform: scale(0.95);
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(16, 28, 40, 0.5);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+  animation: fadeIn 0.15s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  max-width: 500px;
+  width: 100%;
+  padding: 24px;
+  animation: slideUp 0.2s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--ink);
+}
+
+[data-theme="dark"] .closeBtn {
+  background: rgba(30, 41, 54, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .closeBtn:hover {
+  background: rgba(30, 41, 54, 0.85);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="dark"] .item {
+  background: rgba(30, 41, 54, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.kbd {
+  flex-shrink: 0;
+  min-width: 80px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(240, 240, 240, 0.9));
+  border: 1px solid rgba(22, 34, 46, 0.15);
+  box-shadow: 0 2px 4px rgba(22, 34, 46, 0.08), inset 0 -1px 0 rgba(22, 34, 46, 0.1);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: center;
+}
+
+[data-theme="dark"] .kbd {
+  background: linear-gradient(180deg, rgba(50, 60, 70, 0.9), rgba(40, 50, 60, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), inset 0 -1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.description {
+  flex: 1;
+  font-size: 14px;
+  color: var(--ink-soft);
+}
+
+.footer {
+  margin: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  text-align: center;
+}
+
+.inlineKbd {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(47, 143, 224, 0.1);
+  border: 1px solid rgba(47, 143, 224, 0.2);
+  font-family: "SF Mono", ui-monospace, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .trigger {
+    bottom: 16px;
+    right: 16px;
+    width: 44px;
+    height: 44px;
+  }
+
+  .modal {
+    max-height: 80vh;
+    overflow-y: auto;
+  }
+
+  .item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .kbd {
+    min-width: auto;
+  }
+}

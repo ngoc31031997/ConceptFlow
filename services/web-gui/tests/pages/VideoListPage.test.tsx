@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { VideoListPage } from "../../src/pages/VideoListPage";
+import { ThemeProvider } from "../../src/context/ThemeContext";
 
 describe("VideoListPage", () => {
   afterEach(() => {
@@ -27,9 +28,11 @@ describe("VideoListPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
-      <MemoryRouter>
-        <VideoListPage />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
@@ -57,9 +60,11 @@ describe("VideoListPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(
-      <MemoryRouter>
-        <VideoListPage />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
@@ -91,9 +96,11 @@ describe("VideoListPage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
-      <MemoryRouter>
-        <VideoListPage />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
@@ -129,9 +136,11 @@ describe("VideoListPage", () => {
     }) as unknown as typeof fetch;
 
     render(
-      <MemoryRouter>
-        <VideoListPage />
-      </MemoryRouter>,
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
     );
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());

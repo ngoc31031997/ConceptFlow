@@ -2,17 +2,20 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ResultPage } from "../../src/pages/ResultPage";
+import { ThemeProvider } from "../../src/context/ThemeContext";
 
 function renderResultPage() {
   return render(
-    <MemoryRouter initialEntries={["/projects/p1/result"]}>
-      <Routes>
-        <Route path="/projects/:id/result" element={<ResultPage />} />
-        <Route path="/projects/:id/render" element={<div data-testid="render-page-stub" />} />
-        <Route path="/projects/:id/publish" element={<div data-testid="publish-page-stub" />} />
-        <Route path="/videos" element={<div data-testid="video-list-page-stub" />} />
-      </Routes>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={["/projects/p1/result"]}>
+        <Routes>
+          <Route path="/projects/:id/result" element={<ResultPage />} />
+          <Route path="/projects/:id/render" element={<div data-testid="render-page-stub" />} />
+          <Route path="/projects/:id/publish" element={<div data-testid="publish-page-stub" />} />
+          <Route path="/videos" element={<div data-testid="video-list-page-stub" />} />
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
@@ -45,12 +48,12 @@ describe("ResultPage delete button", () => {
 
   it("deletes the project and navigates to the video list on confirm", async () => {
     global.fetch = mockFetch();
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     renderResultPage();
 
     await waitFor(() => expect(screen.getByTestId("result-delete-button")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("result-delete-button"));
+    fireEvent.click(await screen.findByTestId("confirm-modal-confirm"));
 
     await waitFor(() => expect(screen.getByTestId("video-list-page-stub")).toBeInTheDocument());
     expect(global.fetch).toHaveBeenCalledWith(
@@ -61,12 +64,12 @@ describe("ResultPage delete button", () => {
 
   it("does not delete or navigate when the user cancels", async () => {
     global.fetch = mockFetch();
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
     renderResultPage();
 
     await waitFor(() => expect(screen.getByTestId("result-delete-button")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("result-delete-button"));
+    fireEvent.click(await screen.findByTestId("confirm-modal-cancel"));
 
     expect(screen.getByTestId("result-page")).toBeInTheDocument();
     expect(global.fetch).not.toHaveBeenCalledWith(

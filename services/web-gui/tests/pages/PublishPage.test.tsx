@@ -2,15 +2,18 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { PublishPage } from "../../src/pages/PublishPage";
+import { ThemeProvider } from "../../src/context/ThemeContext";
 
 function renderPublishPage() {
   return render(
-    <MemoryRouter initialEntries={["/projects/p1/publish"]}>
-      <Routes>
-        <Route path="/projects/:id/publish" element={<PublishPage />} />
-        <Route path="/projects/:id/result" element={<div data-testid="result-page-stub" />} />
-      </Routes>
-    </MemoryRouter>,
+    <ThemeProvider>
+      <MemoryRouter initialEntries={["/projects/p1/publish"]}>
+        <Routes>
+          <Route path="/projects/:id/publish" element={<PublishPage />} />
+          <Route path="/projects/:id/result" element={<div data-testid="result-page-stub" />} />
+        </Routes>
+      </MemoryRouter>
+    </ThemeProvider>,
   );
 }
 
