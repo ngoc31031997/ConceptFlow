@@ -27,9 +27,35 @@ import {
 const NARRATE_RE = /self\.narrate\(\s*(["'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)/g;
 const SCENE_CLASS_RE = /^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:/;
 
+/**
+ * Toàn bộ nội dung được bọc trong một khối markdown ```python ... ``` (hoặc
+ * ``` trơn). Mọi prompt trong `scriptPrompts.ts` đều bảo AI trả lời đúng một
+ * khối như vậy — Creator copy nguyên cả khối, kể cả hai dòng backtick, là
+ * đường dán phổ biến nhất từ một cửa sổ chat. Kết quả là script không còn bắt
+ * đầu bằng `from conceptflow import *` mà bằng dòng "```python", nên
+ * `ast.parse` phía Rendering chết ngay ở dòng 1 với "invalid syntax" — một
+ * thông báo không nói cho Creator biết vấn đề thật là hai dòng thừa ở đầu/cuối.
+ */
+const MARKDOWN_FENCE_RE = /^```[a-zA-Z0-9]*\r?\n([\s\S]*?)\r?\n?```\s*$/;
+
+/** Gỡ khối markdown bọc ngoài nếu có; trả nguyên văn nếu không khớp. */
+export function stripMarkdownCodeFence(script: string): string {
+  const match = MARKDOWN_FENCE_RE.exec(script.trim());
+  return match ? match[1] : script;
+}
+
 /** Dấu hiệu script còn viết theo chuẩn trước CR-018. */
 const LEGACY_NARRATION_RE = /^\s*#\s*NARRATION:/m;
 const LEGACY_AUTO_WAIT_RE = /self\.wait\(\s*AUTO\s*\)/;
+
+/**
+ * Dấu hiệu còn sót dòng backtick mở đầu dù không khớp trọn khối (ví dụ
+ * Creator xoá mất dòng ``` đóng, hoặc dán thêm chữ phía trước). ScriptEditor
+ * tự gỡ khối trọn vẹn qua `stripMarkdownCodeFence`; kiểm tra này chỉ để bắt
+ * phần còn sót và nói đúng vấn đề thay vì để lỗi cú pháp Python mơ hồ ở
+ * `ast.parse` (dòng 1: invalid syntax) là thứ đầu tiên Creator nhìn thấy.
+ */
+const LEADING_FENCE_RE = /^```/;
 
 export interface NarrationEstimate {
   text: string;
@@ -71,6 +97,15 @@ export function validateScript(
 
   if (script.trim().length === 0) {
     return { ...base, isValid: true, message: null };
+  }
+
+  if (LEADING_FENCE_RE.test(script.trim())) {
+    return {
+      ...base,
+      isValid: false,
+      message:
+        'Script còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có) — script phải bắt đầu ngay bằng from conceptflow import *.',
+    };
   }
 
   if (LEGACY_NARRATION_RE.test(script) || LEGACY_AUTO_WAIT_RE.test(script)) {

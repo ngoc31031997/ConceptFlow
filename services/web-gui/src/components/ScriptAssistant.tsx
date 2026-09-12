@@ -29,12 +29,12 @@ const SOURCES: { value: ScriptSource; label: string; hint: string }[] = [
   {
     value: "draft",
     label: "Đã có script Manim",
-    hint: "Nhưng chưa có marker lời thoại — AI sẽ thêm giúp bạn",
+    hint: "Nhưng chưa có lời thoại self.narrate(...) — AI sẽ thêm giúp bạn",
   },
   {
     value: "ready",
     label: "Script đã đúng chuẩn",
-    hint: "Đã có # NARRATION và self.wait(AUTO) — dán thẳng vào là chạy",
+    hint: "Đã dùng self.narrate(\"...\"), kế thừa ConceptFlowScene — dán thẳng vào là chạy",
   },
 ];
 
@@ -114,8 +114,8 @@ export function ScriptAssistant({
       {source === "ready" && (
         <div className={styles.panel} data-testid="script-assistant-ready">
           <p className={styles.panelLead}>
-            Dán script của bạn vào ô soạn thảo bên dưới. Hệ thống sẽ kiểm tra ngay số marker{" "}
-            <code>{"# NARRATION"}</code> có khớp số <code>self.wait(AUTO)</code> không.
+            Dán script của bạn vào ô soạn thảo bên dưới. Hệ thống sẽ kiểm tra ngay script có kế thừa{" "}
+            <code>ConceptFlowScene</code> và dùng <code>{'self.narrate("...")'}</code> đúng chuẩn không.
           </p>
           <button type="button" className={glass.ghostBtn} onClick={onUseTemplate} data-testid="script-assistant-template">
             Hoặc xem một script mẫu chạy được ngay

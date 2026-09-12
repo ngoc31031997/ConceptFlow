@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateScript } from "../../src/utils/scriptValidation";
+import { stripMarkdownCodeFence, validateScript } from "../../src/utils/scriptValidation";
 
 const VALID =
   'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("một hai ba bốn năm")\n        self.narrate("sáu bảy tám chín mười")';
@@ -27,6 +27,17 @@ describe("validateScript", () => {
     expect(result.message).toContain("chuẩn cũ");
   });
 
+  it("báo còn dính dòng markdown ``` thay vì lỗi cú pháp Python mơ hồ", () => {
+    // Bug report 2026-09-12: Creator copy nguyên khối ```python ... ``` từ AI
+    // vào ScriptEditor. ScriptEditor tự gỡ khối trọn vẹn qua
+    // stripMarkdownCodeFence; luật này là lưới an toàn cho phần còn sót (ví dụ
+    // chỉ còn dòng mở, thiếu dòng đóng).
+    const withFence = "```python\nfrom conceptflow import *\n";
+    const result = validateScript(withFence, "vi");
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("```");
+  });
+
   it("báo khi thiếu class Scene", () => {
     expect(validateScript("x = 1", "vi").isValid).toBe(false);
   });
@@ -47,5 +58,28 @@ describe("validateScript", () => {
     const looped =
       'class A(ConceptFlowScene):\n    def construct(self):\n        for i in range(3):\n            self.narrate("lặp")';
     expect(validateScript(looped, "vi").narrationCount).toBe(1);
+  });
+});
+
+describe("stripMarkdownCodeFence", () => {
+  it("gỡ khối ```python ... ``` bọc trọn script", () => {
+    const wrapped = "```python\n" + VALID + "\n```";
+    expect(stripMarkdownCodeFence(wrapped)).toBe(VALID);
+  });
+
+  it("gỡ khối ``` trơn, không kèm tên ngôn ngữ", () => {
+    const wrapped = "```\n" + VALID + "\n```";
+    expect(stripMarkdownCodeFence(wrapped)).toBe(VALID);
+  });
+
+  it("giữ nguyên script không bọc trong khối markdown", () => {
+    expect(stripMarkdownCodeFence(VALID)).toBe(VALID);
+  });
+
+  it("giữ nguyên nếu chỉ có dòng mở, thiếu dòng ``` đóng", () => {
+    // Không khớp trọn khối — đây là ca mà scriptValidation's LEADING_FENCE_RE
+    // bắt tiếp, không phải hàm gỡ này.
+    const openOnly = "```python\n" + VALID;
+    expect(stripMarkdownCodeFence(openOnly)).toBe(openOnly);
   });
 });

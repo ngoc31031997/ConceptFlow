@@ -19,20 +19,21 @@ function openSystemPrompt(contentLanguage: "vi" | "en"): { value: string } {
 
 describe("content language drives the AI prompts", () => {
   it("offers a starter script per language", () => {
-    expect(SCRIPT_TEMPLATES.vi).toContain("# NARRATION:");
-    expect(SCRIPT_TEMPLATES.en).toContain("# NARRATION:");
+    expect(SCRIPT_TEMPLATES.vi).toContain("self.narrate(");
+    expect(SCRIPT_TEMPLATES.en).toContain("self.narrate(");
     expect(SCRIPT_TEMPLATES.vi).not.toEqual(SCRIPT_TEMPLATES.en);
   });
 
-  it("keeps both starter scripts structurally valid for the pipeline", () => {
-    // The renderer rejects a script whose NARRATION markers and wait(AUTO)
-    // calls do not line up one-to-one (CR-002 FR10.5), so a template that
-    // drifts would hand the Creator a script that cannot render.
+  it("keeps both starter scripts free of the pre-CR-018 marker convention", () => {
+    // render_script.py rejects a script with zero self.narrate() calls
+    // (narration_segments must not be empty) — a template still written with
+    // the removed `# NARRATION` + `self.wait(AUTO)` pair would hand the
+    // Creator a script that cannot render (bug report, 2026-09-12).
     for (const template of [SCRIPT_TEMPLATES.vi, SCRIPT_TEMPLATES.en]) {
-      const markers = template.match(/# NARRATION: "/g) ?? [];
-      const waits = template.match(/self\.wait\(AUTO\)/g) ?? [];
-      expect(markers.length).toBeGreaterThan(0);
-      expect(waits.length).toBe(markers.length);
+      expect(template).not.toContain("# NARRATION:");
+      expect(template).not.toMatch(/self\.wait\(\s*AUTO\s*\)/);
+      const narrations = template.match(/self\.narrate\(/g) ?? [];
+      expect(narrations.length).toBeGreaterThan(0);
     }
   });
 
@@ -72,9 +73,12 @@ describe("content language drives the AI prompts", () => {
 });
 
 describe("hook and end-screen snippets (CR-006 FR17)", () => {
-  it("keeps every snippet's NARRATION and wait(AUTO) balanced", () => {
-    // The renderer rejects a script where these drift (CR-002 FR10.5), and
-    // pasting a snippet must never be what breaks it.
+  it("uses the CR-019 convenience methods, not the removed marker convention", () => {
+    // Both self.hook() and self.call_to_action() already open their beat,
+    // reveal a TitleCard, call self.narrate() and dismiss — a snippet built
+    // by hand around `# NARRATION` + `self.wait(AUTO)` is both dead code
+    // (render_script.py never reads those) and duplicate of what the method
+    // already does.
     const snippets = [
       HOOK_SNIPPETS.vi,
       HOOK_SNIPPETS.en,
@@ -82,30 +86,18 @@ describe("hook and end-screen snippets (CR-006 FR17)", () => {
       END_SCREEN_SNIPPETS.en,
     ];
     for (const snippet of snippets) {
-      const markers = snippet.match(/# NARRATION: "/g) ?? [];
-      const autoWaits = snippet.match(/self\.wait\(AUTO\)/g) ?? [];
-      expect(markers.length).toBe(1);
-      expect(autoWaits.length).toBe(1);
+      expect(snippet).not.toContain("# NARRATION:");
+      expect(snippet).not.toMatch(/self\.wait\(\s*AUTO\s*\)/);
     }
-  });
-
-  it("does not put a wait(AUTO) inside a loop in any snippet", () => {
-    // A wait(AUTO) in a loop fires more often than its single marker, which is
-    // the most common way scripts break the count.
-    for (const snippet of [HOOK_SNIPPETS.vi, END_SCREEN_SNIPPETS.en]) {
-      expect(snippet).not.toMatch(/for .*:\s*[\s\S]*self\.wait\(AUTO\)/);
-    }
-  });
-
-  it("leaves a trailing hold for YouTube's end-screen elements", () => {
-    // A fixed wait, not AUTO — there is no narration over it.
-    expect(END_SCREEN_SNIPPETS.vi).toContain("self.wait(8)");
-    expect(END_SCREEN_SNIPPETS.en).toContain("self.wait(8)");
+    expect(HOOK_SNIPPETS.vi).toContain("self.hook(");
+    expect(HOOK_SNIPPETS.en).toContain("self.hook(");
+    expect(END_SCREEN_SNIPPETS.vi).toContain("self.call_to_action(");
+    expect(END_SCREEN_SNIPPETS.en).toContain("self.call_to_action(");
   });
 
   it("writes each snippet's narration in its own language", () => {
-    expect(HOOK_SNIPPETS.en).toMatch(/# NARRATION: "[A-Za-z]/);
-    expect(END_SCREEN_SNIPPETS.en).toContain("Subscribe");
+    expect(HOOK_SNIPPETS.en).toMatch(/self\.hook\(\s*\n\s*"[A-Za-z]/);
+    expect(END_SCREEN_SNIPPETS.en).toContain("subscribe");
     expect(END_SCREEN_SNIPPETS.vi).toContain("đăng ký kênh");
   });
 });

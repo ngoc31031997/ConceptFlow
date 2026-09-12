@@ -72,5 +72,10 @@ def test_template_khoi_dau_phai_qua_duoc_lint():
     ).read_text(encoding="utf-8")
 
     assert blocking_issues(lint_manim_script(source)) == []
-    # Bất biến của CR-002 (tới khi CR-018 thay bằng self.narrate)
-    assert source.count("# NARRATION:") == source.count("self.wait(AUTO)")
+    # CR-018: lời thoại là self.narrate(...), không phải marker + wait rời rạc.
+    # Một template còn dùng chuẩn cũ sẽ có narration_segments rỗng khi render
+    # thật (render_script.py từ chối) — lint không bắt được việc này vì đây là
+    # quy ước ngữ nghĩa, không phải API sai.
+    assert "self.narrate(" in source
+    assert "# NARRATION:" not in source
+    assert "self.wait(AUTO)" not in source

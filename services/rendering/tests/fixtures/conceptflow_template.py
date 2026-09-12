@@ -15,8 +15,9 @@ class ForLoopIntroScene(ConceptFlowScene):
         # --- Mở đầu ---------------------------------------------------------
         card = TitleCard("Vòng lặp for trong Java", "Khởi tạo · Điều kiện · Bước nhảy")
         self.reveal(card)
-        # NARRATION: "Vòng lặp for trong Java gồm ba phần: khởi tạo biến đếm, điều kiện lặp, và bước tăng giảm."
-        self.wait(AUTO)
+        self.narrate(
+            "Vòng lặp for trong Java gồm ba phần: khởi tạo biến đếm, điều kiện lặp, và bước tăng giảm."
+        )
         self.dismiss(card)
 
         # --- Ví dụ cụ thể trước, định nghĩa sau ------------------------------
@@ -27,14 +28,15 @@ class ForLoopIntroScene(ConceptFlowScene):
             "java",
         )
         self.reveal(panel)
-        # NARRATION: "Nhìn vào đoạn code này trước. Nó in ra các số từ không đến bốn."
-        self.wait(AUTO)
+        self.narrate("Nhìn vào đoạn code này trước. Nó in ra các số từ không đến bốn.")
 
         note = Callout("i chạy từ 0 đến 4, không tới 5", tone="warning")
         note.next_to(panel, DOWN, buff=0.5)
         self.reveal(note)
-        # NARRATION: "Điều kiện là i nhỏ hơn năm, nên vòng lặp dừng ngay khi i bằng năm. Số năm không bao giờ được in ra."
-        self.wait(AUTO)
+        self.narrate(
+            "Điều kiện là i nhỏ hơn năm, nên vòng lặp dừng ngay khi i bằng năm. "
+            "Số năm không bao giờ được in ra."
+        )
         self.dismiss(panel, note)
 
         # --- Rút ra quy luật -------------------------------------------------
@@ -45,11 +47,12 @@ class ForLoopIntroScene(ConceptFlowScene):
             "Bước nhảy: chạy sau mỗi vòng",
         ])
         self.reveal(steps)
-        # NARRATION: "Quy luật chung là bốn bước lặp lại: khởi tạo một lần, rồi kiểm tra điều kiện, chạy thân vòng lặp, và tăng biến đếm."
-        self.wait(AUTO)
+        self.narrate(
+            "Quy luật chung là bốn bước lặp lại: khởi tạo một lần, rồi kiểm tra điều kiện, "
+            "chạy thân vòng lặp, và tăng biến đếm."
+        )
         self.emphasize(steps)
-        # NARRATION: "Thứ tự này quan trọng: điều kiện luôn được kiểm tra trước khi thân vòng lặp chạy."
-        self.wait(AUTO)
+        self.narrate("Thứ tự này quan trọng: điều kiện luôn được kiểm tra trước khi thân vòng lặp chạy.")
         self.dismiss(steps)
 
         # --- So sánh ---------------------------------------------------------
@@ -58,8 +61,7 @@ class ForLoopIntroScene(ConceptFlowScene):
             "while", "Lặp tới khi điều kiện sai",
         )
         self.reveal(compare)
-        # NARRATION: "Khi biết trước cần lặp bao nhiêu lần thì dùng for. Khi không biết trước thì while tự nhiên hơn."
-        self.wait(AUTO)
+        self.narrate("Khi biết trước cần lặp bao nhiêu lần thì dùng for. Khi không biết trước thì while tự nhiên hơn.")
         self.dismiss(compare)
 
         # --- Tóm tắt ---------------------------------------------------------
@@ -69,5 +71,7 @@ class ForLoopIntroScene(ConceptFlowScene):
             "Quên bước nhảy là lặp vô hạn",
         ])
         self.reveal(recap)
-        # NARRATION: "Tóm lại: for gồm bốn phần chạy theo thứ tự cố định, điều kiện luôn kiểm tra trước, và quên bước nhảy sẽ khiến vòng lặp chạy mãi."
-        self.wait(AUTO)
+        self.narrate(
+            "Tóm lại: for gồm bốn phần chạy theo thứ tự cố định, điều kiện luôn kiểm tra trước, "
+            "và quên bước nhảy sẽ khiến vòng lặp chạy mãi."
+        )

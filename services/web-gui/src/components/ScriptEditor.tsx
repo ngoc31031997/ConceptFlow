@@ -3,7 +3,7 @@ import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS } from "./scriptTemplates";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { formatDuration } from "../utils/durationEstimate";
-import { validateScript } from "../utils/scriptValidation";
+import { stripMarkdownCodeFence, validateScript } from "../utils/scriptValidation";
 
 interface ScriptEditorProps {
   value: string;
@@ -71,7 +71,7 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      onChange(String(reader.result ?? ""));
+      onChange(stripMarkdownCodeFence(String(reader.result ?? "")));
       setImportError(null);
     };
     reader.onerror = () => setImportError("Không đọc được file, thử lại hoặc dán trực tiếp");
@@ -120,9 +120,9 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
         className={`${glass.textArea} ${styles.textarea}`}
         data-testid="new-project-script-textarea"
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => onChange(stripMarkdownCodeFence(event.target.value))}
         placeholder={
-          'class DemoScene(Scene):\n    def construct(self):\n        # NARRATION: "Loi thoai cho canh nay"\n        self.wait(AUTO)'
+          'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("Loi thoai cho canh nay")'
         }
         rows={11}
       />
