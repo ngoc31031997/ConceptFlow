@@ -8,6 +8,7 @@ and — once those lines have been synthesized — a real pass where each
 
 from __future__ import annotations
 
+import unicodedata
 from dataclasses import dataclass, field
 
 
@@ -42,6 +43,18 @@ class ScriptRenderRequest:
     # service default", which covers projects created before the field existed.
     render_quality: str | None = None
 
+    def __post_init__(self) -> None:
+        # A browser clipboard on macOS hands out Vietnamese diacritics
+        # decomposed (NFD: base letter + combining marks as separate
+        # codepoints) rather than precomposed (NFC: one codepoint per
+        # letter). Manim's Text mobject builds one submobject per codepoint
+        # via Pango glyph shaping, which can merge a decomposed sequence into
+        # fewer glyphs than codepoints — the mismatch then crashes
+        # `_gen_chars` with `IndexError: list index out of range`. Normalizing
+        # to NFC here, once, before the script ever reaches Manim, means every
+        # accented codepoint is the same one Pango shapes 1:1.
+        object.__setattr__(self, "script_content", unicodedata.normalize("NFC", self.script_content))
+
 
 @dataclass(frozen=True)
 class DryRunResult:
@@ -63,6 +76,13 @@ class DryRunResult:
     visuals: list[str] = field(default_factory=list)
     beats: list[tuple[int, str]] = field(default_factory=list)
     chapters: list[tuple[int, str]] = field(default_factory=list)
+    # Bug report (2026-09-12): `with self.clip(...)` đã ghi ra marks file từ
+    # lượt dry rồi (script chạy y hệt, chỉ không render hình) — chỉ là trước
+    # đây dry_run() không đọc lại. Hệ quả: một project chọn video_output_mode
+    # short/both mà script quên đánh dấu self.clip() phải render xong (tốn cả
+    # TTS) mới biết "Chưa có clip nào". Đọc ở đây để Orchestrator cảnh báo
+    # ngay tại màn duyệt dàn ý, trước khi TTS chạy.
+    clip_marks: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

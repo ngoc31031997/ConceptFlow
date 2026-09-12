@@ -24,6 +24,14 @@ CASES = [
     lambda: TitleCard("Vòng lặp for trong Java", "Khởi tạo · Điều kiện · Bước nhảy"),
     lambda: Callout("Đừng quên tăng biến đếm", tone="warning"),
     lambda: CodePanel("for i in range(5):\n    print(i)", "python"),
+    # `++`/`<=` là ligature lập trình của JetBrains Mono (qua OpenType "calt",
+    # thứ Manim's disable_ligatures không tắt được) — Pango gộp 2 ký tự thành 1
+    # glyph, làm `Text._gen_chars` lệch số và crash IndexError. Ca C-style loop
+    # này (không phải Python for-range) là ca thật Creator gặp; giữ nó ở đây để
+    # không lặp lại lỗ hổng coverage cũ.
+    lambda: CodePanel(
+        "for (int i = 1; i <= 5; i++) {\n    System.out.println(i);\n}", "java"
+    ),
     lambda: StepList(["Khởi tạo biến đếm", "Kiểm tra điều kiện", "Tăng biến đếm"]),
     lambda: ComparisonSplit("while", "Kiểm tra trước", "do-while", "Chạy trước"),
     lambda: Recap(["for gồm ba phần", "Quên tăng biến đếm là lặp vô hạn"]),

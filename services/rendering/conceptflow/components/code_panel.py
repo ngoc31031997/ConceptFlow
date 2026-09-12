@@ -19,6 +19,13 @@ class CodePanel(Component):
         super().__init__(theme=theme)
         t = self.theme
 
+        # Manim's Text mobject builds one submobject per character via Pango
+        # glyph layout, which emits zero glyphs for a raw tab — the char count
+        # then no longer matches the source string and Code._gen_colored_lines
+        # crashes with IndexError. Expand tabs to spaces so every character
+        # source code may contain actually gets a glyph.
+        source = source.expandtabs(4)
+
         block = Code(
             code=source,
             language=language,

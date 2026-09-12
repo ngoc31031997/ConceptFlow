@@ -88,7 +88,15 @@ class Fonts:
 
     display: str = "Cormorant Garamond"
     body: str = "Be Vietnam Pro"
-    mono: str = "JetBrains Mono"
+    # "NL" = No Ligatures. Cùng gia đình font, cùng thiết kế, chỉ khác là
+    # JetBrains Mono thường tự nối `++`, `<=`, `==`, `!=`, `->`... thành một
+    # glyph duy nhất (programming ligatures qua OpenType "calt", không phải
+    # "liga"/"dlig") — Manim's `disable_ligatures=True` chỉ tắt được liga/dlig,
+    # không tắt calt, nên `CodePanel` (Code mobject cần tô màu từng ký tự) crash
+    # với IndexError bất kỳ lúc nào code mẫu có một trong các chuỗi trên (tức
+    # là gần như mọi vòng lặp for/so sánh). Bản NL không có bảng ligature nào
+    # cả nên không bao giờ trôi khỏi giả định 1-ký-tự-1-glyph của Manim.
+    mono: str = "JetBrains Mono NL"
 
 
 @dataclass(frozen=True)
