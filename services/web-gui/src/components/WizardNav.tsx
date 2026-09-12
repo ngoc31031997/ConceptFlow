@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useKeyboardShortcuts, formatShortcut } from "../hooks/useKeyboardShortcuts";
 import glass from "../styles/glass.module.css";
 import styles from "./WizardNav.module.css";
 
@@ -47,6 +48,22 @@ export function WizardNav({
   nextTestId,
   extraAction,
 }: WizardNavProps) {
+  // Keyboard shortcut for Next button (Ctrl+Enter or ⌘+Enter)
+  useKeyboardShortcuts([
+    {
+      key: 'Enter',
+      ctrlKey: true,
+      action: () => {
+        if (!nextDisabled) {
+          onNext();
+        }
+      },
+      description: 'Submit wizard step',
+    },
+  ], !nextDisabled);
+
+  const nextTooltip = formatShortcut({ key: 'Enter', ctrlKey: true });
+
   return (
     <div className={styles.bar}>
       <div className={styles.inner}>
@@ -69,6 +86,7 @@ export function WizardNav({
           onClick={onNext}
           disabled={nextDisabled}
           data-testid={nextTestId}
+          title={`${nextLabel} (${nextTooltip})`}
         >
           {nextLabel}
           <ArrowRight />

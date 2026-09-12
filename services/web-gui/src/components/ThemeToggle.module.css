@@ -1,0 +1,32 @@
+.toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  color: var(--ink-soft);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.toggle:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  transform: scale(1.05);
+}
+
+.toggle:active {
+  transform: scale(0.95);
+}
+
+[data-theme="dark"] .toggle {
+  background: rgba(30, 41, 54, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+[data-theme="dark"] .toggle:hover {
+  background: rgba(30, 41, 54, 0.85);
+}

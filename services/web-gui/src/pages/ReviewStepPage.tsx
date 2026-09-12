@@ -74,8 +74,8 @@ export function ReviewStepPage() {
     : (resolvedVoice ?? (isLoadingVoices ? "Đang tải..." : "Chưa chọn được giọng đọc"));
 
   async function handleSubmit() {
+    setError(null); // Clear previous errors
     setIsSubmitting(true);
-    setError(null);
     try {
       const projectId = draft.projectId;
       await startRenderSaga({

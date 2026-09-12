@@ -1,0 +1,26 @@
+feat: UI/UX improvements and accessibility enhancements
+
+New Features:
+- Custom ConfirmModal with glassmorphism design
+- Dark mode with system preference detection
+- NavigationLoader for smooth page transitions
+- TranscriptViewer for video caption accessibility
+- Wizard step jump navigation
+- Keyboard shortcuts with platform-aware tooltips
+- KeyboardShortcutsHelp floating button
+
+Bug Fixes:
+- Auto-clear error states on user action
+- Fixed error persistence across submissions
+
+Performance:
+- Debounced script validation (500ms)
+- useDebounce hook for reusable logic
+
+Accessibility:
+- Full ARIA support
+- Screen reader accessible transcripts
+- Keyboard navigation support
+- Focus trap in modals
+
+Files: 21 new, 12 modified, 9 test files

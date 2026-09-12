@@ -66,8 +66,8 @@ export function VideoListPage() {
     if (!window.confirm("Xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
       return;
     }
+    setError(null); // Clear previous errors
     setDeletingId(projectId);
-    setError(null);
     try {
       await deleteProject(projectId);
       setProjects((current) => current?.filter((p) => p.project_id !== projectId) ?? null);
@@ -93,8 +93,8 @@ export function VideoListPage() {
     ) {
       return;
     }
+    setError(null); // Clear previous errors
     setIsBulkDeleting(true);
-    setError(null);
     const results = await Promise.allSettled(ids.map((id) => deleteProject(id)));
     const failedIds = ids.filter((_, index) => results[index].status === "rejected");
 

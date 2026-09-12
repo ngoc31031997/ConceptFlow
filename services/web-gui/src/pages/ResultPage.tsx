@@ -5,6 +5,7 @@ import { YoutubeChannels } from "../components/YoutubeChannels";
 import { ThumbnailUpload } from "../components/ThumbnailUpload";
 import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { useProject } from "../hooks/useProject";
 import {
   startPublishSaga,
@@ -27,6 +28,7 @@ export function ResultPage() {
   const [error, setError] = useState<string | null>(null);
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   /*
     State lands a render behind the click, so two fast clicks can both read
     isSubmitting === false and fire two POSTs. The ref flips synchronously.
@@ -36,8 +38,8 @@ export function ResultPage() {
   async function handlePublish(metadata: PublishMetadata) {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+    setError(null); // Clear previous errors
     setIsSubmitting(true);
-    setError(null);
     try {
       await startPublishSaga(projectId, {
         ...metadata,
@@ -64,8 +66,8 @@ export function ResultPage() {
   async function handleRetryPublish() {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
+    setError(null); // Clear previous errors
     setIsSubmitting(true);
-    setError(null);
     try {
       await retryProject(projectId);
       await refetch();
@@ -78,11 +80,8 @@ export function ResultPage() {
   }
 
   async function handleDelete() {
-    if (!window.confirm("Xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
-      return;
-    }
+    setError(null); // Clear previous errors
     setIsDeleting(true);
-    setError(null);
     try {
       await deleteProject(projectId);
       navigate("/videos");
@@ -135,7 +134,11 @@ export function ResultPage() {
             )}
             {project.video_path && (
               <div style={{ marginTop: 24 }}>
-                <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />
+                <VideoPlayer 
+                  videoSrc={getProjectVideoUrl(projectId)} 
+                  scenes={project.scenes}
+                  contentLanguage={project.voice_language}
+                />
               </div>
             )}
           </div>
@@ -148,7 +151,13 @@ export function ResultPage() {
           */
           <div className={styles.layout}>
             <div className={styles.preview}>
-              {project.video_path && <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />}
+              {project.video_path && (
+                <VideoPlayer 
+                  videoSrc={getProjectVideoUrl(projectId)} 
+                  scenes={project.scenes}
+                  contentLanguage={project.voice_language}
+                />
+              )}
             </div>
 
             <div className={styles.publishColumn}>
@@ -230,12 +239,23 @@ export function ResultPage() {
             data-testid="result-delete-button"
             className={glass.dangerGhostBtn}
             disabled={isDeleting}
-            onClick={handleDelete}
+            onClick={() => setShowDeleteModal(true)}
           >
             {isDeleting ? "Đang xoá..." : "Xoá video"}
           </button>
         </div>
       </AppShell>
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Xác nhận xoá video"
+        message="Bạn có chắc chắn muốn xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác."
+        confirmLabel="Xoá video"
+        cancelLabel="Hủy"
+        isDangerous
+      />
     </div>
   );
 }

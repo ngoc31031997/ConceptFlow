@@ -143,9 +143,10 @@ export function ThumbnailUpload({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    setPreviewUrl(URL.createObjectURL(file));
-    setUploadState("uploading");
+    // Clear previous error when user tries new upload
     setErrorMessage(null);
+    setUploadState("uploading");
+    setPreviewUrl(URL.createObjectURL(file));
 
     try {
       const result = await uploadThumbnail(projectId, file);

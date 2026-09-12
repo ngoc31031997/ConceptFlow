@@ -90,6 +90,8 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
     try {
       await disconnectYoutubeAccount(account.channel_id);
       await load();
+      // Clear error on successful action
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -100,9 +102,17 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
     try {
       await makeYoutubeAccountDefault(account.channel_id);
       await load();
+      // Clear error on successful action
+      setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     }
+  }
+
+  function handleAddChannelClick() {
+    // Clear error when user tries to add channel
+    setError(null);
+    handleAddChannel();
   }
 
   const unusableApps = apps.filter((app) => !app.redirect_ok);
@@ -116,7 +126,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
           </div>
           <div className={styles.title}>Kênh YouTube</div>
         </div>
-        <button type="button" data-testid="youtube-add-channel" className={styles.connectBtn} onClick={handleAddChannel}>
+        <button type="button" data-testid="youtube-add-channel" className={styles.connectBtn} onClick={handleAddChannelClick}>
           Thêm kênh
         </button>
       </div>
