@@ -224,6 +224,8 @@ NGÔN NGỮ LỜI THOẠI: {{narration_language_rule}}
 
 Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
 
+QUAN TRỌNG — KIỂU DỮ LIỆU: mọi tham số văn bản của các component trên (¤nội_dung¤, ¤tiêu_đề_trái¤, ¤nội_dung_trái¤, ¤tiêu_đề_phải¤, ¤nội_dung_phải¤, phần tử trong danh sách của ¤StepList¤/¤Recap¤...) CHỈ được là chuỗi ¤str¤. TUYỆT ĐỐI KHÔNG truyền một component/Mobject khác (ví dụ một ¤Callout(...)¤, ¤TitleCard(...)¤, hay biến giữ kết quả của chúng) vào các tham số này — code sẽ crash ngay khi chạy vì Manim gọi ¤.find()¤ trên chuỗi bên trong, không phải trên Mobject. Muốn đặt một hình minh họa cạnh chữ thì dùng ¤self.row(...)¤ hoặc ¤self.stack(...)¤ để ghép chúng lại, KHÔNG lồng Mobject vào bên trong tham số text của component khác.
+
 ### Method của scene (gọi qua ¤self.¤)
 - Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
 - Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi ¤self.beat(...)¤ tương ứng bên trong:
@@ -251,6 +253,7 @@ Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ 
 4. Mỗi cảnh có hình ảnh minh họa RIÊNG, không lặp lại animation nhàm chán?
 5. Class Scene có đúng hậu tố "Scene" và kế thừa ¤ConceptFlowScene¤ không?
 6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có ¤from manim import *¤?
+7. Rà lại từng lời gọi component (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) và method chữ (¤self.title/heading/body/caption¤): có tham số nào đang nhận một component/Mobject khác thay vì chuỗi ¤str¤ không? Nếu có, đó là lỗi runtime chắc chắn — sửa lại bằng chuỗi text thuần.
 
 ## OUTPUT
 
@@ -300,6 +303,8 @@ NARRATION LANGUAGE: {{narration_language_rule}}
 
 Components self-fit the safe frame and take color/font size from the theme. Do NOT pass absolute coordinates or font_size to them.
 
+IMPORTANT — DATA TYPES: every text parameter of the components above (¤content¤, ¤left_title¤, ¤left_content¤, ¤right_title¤, ¤right_content¤, list items in ¤StepList¤/¤Recap¤...) MUST be a plain ¤str¤. NEVER pass another component/Mobject (e.g. a ¤Callout(...)¤, ¤TitleCard(...)¤, or a variable holding one) into these parameters — the code will crash at runtime because Manim calls ¤.find()¤ on what it expects to be a string, not on a Mobject. To place a visual next to text, use ¤self.row(...)¤ or ¤self.stack(...)¤ to arrange them side by side — never nest a Mobject inside another component's text parameter.
+
 ### Scene methods (called via ¤self.¤)
 - Narration and structure: ¤self.narrate("line")¤, ¤self.beat("<id>")¤, ¤self.chapter("Chapter name")¤
 - Three built-in beats — USE THEM instead of hand-rolling, they already call ¤self.beat(...)¤ internally:
@@ -327,6 +332,7 @@ Components self-fit the safe frame and take color/font size from the theme. Do N
 4. Does each scene have its OWN illustration, not repeating the same animation?
 5. Does the Scene class have the "Scene" suffix and inherit ¤ConceptFlowScene¤?
 6. Double-check: does the script use only the components/methods listed in "ALLOWED API"? No hardcoded hex colors, no manual font_size, no ¤from manim import *¤?
+7. Check every component call (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) and text method (¤self.title/heading/body/caption¤): is any parameter receiving another component/Mobject instead of a plain ¤str¤? If so, that is a guaranteed runtime crash — replace it with plain text.
 
 ## OUTPUT
 
