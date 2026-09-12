@@ -131,6 +131,10 @@ func main() {
 	// CR-025 step 2: Visual Director's storyboard save, and the shared
 	// read-side use case both steps' rehydration relies on.
 	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo)
+	// CR-025 step 3/4: Manim Engineer's code save and Script Reviewer's
+	// verdict save, sharing the same read-side use case.
+	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo)
+	saveAuthoringReview := application.NewSaveAuthoringReviewUseCase(promptTemplateRepo)
 	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
@@ -138,6 +142,8 @@ func main() {
 		WithPromptTemplates(promptTemplates).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
+		WithAuthoringCode(saveAuthoringCode).
+		WithAuthoringReview(saveAuthoringReview).
 		WithAuthoringState(getAuthoringState)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running

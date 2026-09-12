@@ -160,3 +160,56 @@ func (r *PromptTemplateRepository) GetAuthoringStoryboard(ctx context.Context, p
 	}
 	return content, err
 }
+
+// --- CR-025 step 3: authoring code (Manim Engineer output) ----------------
+
+// SaveAuthoringCode upserts the pasted Manim code for a project. Same
+// insert-if-absent-row/update-in-place shape as SaveAuthoringStory/
+// SaveAuthoringStoryboard, sharing the same project_authoring row.
+func (r *PromptTemplateRepository) SaveAuthoringCode(ctx context.Context, projectID, content string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, code_content, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    code_content = EXCLUDED.code_content, updated_at = now()
+	`, projectID, content)
+	return err
+}
+
+// GetAuthoringCode returns the saved Manim code, or "" if none was saved yet.
+func (r *PromptTemplateRepository) GetAuthoringCode(ctx context.Context, projectID string) (string, error) {
+	var content string
+	err := r.pool.QueryRow(ctx, `
+		SELECT code_content FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&content)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return content, err
+}
+
+// --- CR-025 step 4: authoring review (Script Reviewer verdict) ------------
+
+// SaveAuthoringReview upserts the pasted reviewer verdict for a project. Same
+// shape as the other three authoring saves above.
+func (r *PromptTemplateRepository) SaveAuthoringReview(ctx context.Context, projectID, content string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, review_content, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    review_content = EXCLUDED.review_content, updated_at = now()
+	`, projectID, content)
+	return err
+}
+
+// GetAuthoringReview returns the saved reviewer verdict, or "" if none was saved yet.
+func (r *PromptTemplateRepository) GetAuthoringReview(ctx context.Context, projectID string) (string, error) {
+	var content string
+	err := r.pool.QueryRow(ctx, `
+		SELECT review_content FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&content)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return content, err
+}
