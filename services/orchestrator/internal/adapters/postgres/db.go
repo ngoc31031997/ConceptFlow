@@ -251,6 +251,43 @@ CREATE TABLE IF NOT EXISTS processed_messages (
     message_id UUID PRIMARY KEY,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- CR-025: prompt wording for the 4-role authoring pipeline (Story Architect →
+-- Visual Director → Manim Engineer → Script Reviewer), moved out of
+-- web-gui's scriptPrompts.ts so an editor can fix wording without a frontend
+-- rebuild. version increments on every update (mirrors video_formats'
+-- versioning intent, though templates are edited in place rather than
+-- appended as new rows — history is not needed here the way it is for
+-- rendered projects).
+CREATE TABLE IF NOT EXISTS prompt_templates (
+    role TEXT NOT NULL,
+    language TEXT NOT NULL,
+    template_text TEXT NOT NULL,
+    version INTEGER NOT NULL DEFAULT 1,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (role, language)
+);
+
+-- CR-025 step 1 (Story Architect): the pasted story outline a Creator gets
+-- back from the external AI, saved server-side so the wizard can hand it to
+-- the next pipeline step (Visual Director) via {{previous_output}}. A
+-- separate table rather than a projects column: Project's Save() is one large
+-- positional INSERT/UPDATE (49 columns) shared by every saga step, and this
+-- field is authoring-time-only data with a completely different write path
+-- (one Creator action, not saga event folding) — bolting it onto that query
+-- would risk misaligning every existing positional parameter.
+CREATE TABLE IF NOT EXISTS project_authoring (
+    project_id TEXT PRIMARY KEY,
+    story_content TEXT NOT NULL DEFAULT '',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- CR-025 step 2 (Visual Director): the pasted storyboard a Creator gets back
+-- from the external AI, same reasoning and same table as story_content above
+-- (one row per project, authoring-time-only data) — a second column rather
+-- than a second table since it shares the exact same key and lifecycle as
+-- story_content.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT NOT NULL DEFAULT '';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

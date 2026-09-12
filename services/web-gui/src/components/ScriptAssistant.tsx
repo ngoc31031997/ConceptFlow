@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { SelectableOption } from "./SelectableOption";
 import type { VideoFormat } from "../types";
-import { buildAdjustPromptFor, buildGenerationPromptFor } from "./scriptPrompts";
+import { buildAdjustPromptFor, buildBeatSheetSection, NARRATION_LANGUAGE_RULE } from "./scriptPrompts";
+import { getPromptTemplate } from "../api/client";
 import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
 import styles from "./ScriptAssistant.module.css";
@@ -18,6 +19,13 @@ interface ScriptAssistantProps {
   onUseTemplate: () => void;
   source: ScriptSource;
   onSourceChange: (source: ScriptSource) => void;
+  /**
+   * CR-025 — the dàn ý câu chuyện (Story Architect output) the Creator pasted
+   * back, and its setter. Only used when source === "blank": that path now
+   * asks for a story outline first (plain text), not Manim code.
+   */
+  storyOutline: string;
+  onStoryOutlineChange: (value: string) => void;
 }
 
 const SOURCES: { value: ScriptSource; label: string; hint: string }[] = [
@@ -64,18 +72,46 @@ export function ScriptAssistant({
   onUseTemplate,
   source,
   onSourceChange,
+  storyOutline,
+  onStoryOutlineChange,
 }: ScriptAssistantProps) {
   const [topic, setTopic] = useState("");
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const prompt = useMemo(
-    () =>
-      source === "blank"
-        ? buildGenerationPromptFor(contentLanguage, topic, format, wordsPerMinute)
-        : buildAdjustPromptFor(contentLanguage, existingScript),
-    [source, contentLanguage, topic, existingScript, format, wordsPerMinute],
-  );
+  // CR-025: the "blank" path's prompt now comes from the DB-backed
+  // story_architect template instead of a hardcoded builder, so an editor
+  // can change the wording without rebuilding web-gui. format_beats and the
+  // narration-language rule stay computed client-side (they are data, not
+  // editable prose) and get substituted into the fetched template text.
+  const [storyArchitectTemplate, setStoryArchitectTemplate] = useState<string | null>(null);
+  useEffect(() => {
+    if (source !== "blank") return;
+    let cancelled = false;
+    getPromptTemplate("story_architect", contentLanguage)
+      .then((template) => {
+        if (!cancelled) setStoryArchitectTemplate(template.template_text);
+      })
+      .catch(() => {
+        if (!cancelled) setStoryArchitectTemplate(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [source, contentLanguage]);
+
+  const prompt = useMemo(() => {
+    if (source !== "blank") return buildAdjustPromptFor(contentLanguage, existingScript);
+    const formatBeats = format ? buildBeatSheetSection(format, contentLanguage, wordsPerMinute) : "";
+    const base = storyArchitectTemplate ?? "Đang tải prompt...";
+    return base
+      .split("{{topic}}")
+      .join(topic.trim() || "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]")
+      .split("{{format_beats}}")
+      .join(formatBeats)
+      .split("{{narration_language_rule}}")
+      .join(NARRATION_LANGUAGE_RULE[contentLanguage]);
+  }, [source, contentLanguage, topic, existingScript, format, wordsPerMinute, storyArchitectTemplate]);
 
   // The prompt is copyable either way, but saying it is incomplete is more
   // useful than silently handing over one with a placeholder still in it.
@@ -195,15 +231,41 @@ export function ScriptAssistant({
             </div>
           </div>
 
-          {/* Step 3 — the step nobody was ever told about. */}
+          {/* Step 3 — CR-025: for "blank", this is now the story outline
+              (plain structured text), not Manim code — the pipeline's next
+              3 steps (Visual Director/Manim Engineer/Script Reviewer) turn
+              it into code later. */}
           <div className={styles.step}>
             <span className={styles.stepNum}>3</span>
             <div className={styles.stepBody}>
-              <div className={styles.stepLabel}>Copy đoạn code AI trả về, dán vào ô soạn thảo bên dưới</div>
-              <p className={styles.stepHint}>
-                Chỉ lấy phần code Python, không lấy phần AI giải thích. Dán xong hệ thống sẽ tự kiểm tra
-                định dạng.
-              </p>
+              {source === "blank" ? (
+                <>
+                  <label className={styles.stepLabel} htmlFor="story-outline-input">
+                    Dán kết quả AI trả về vào đây
+                  </label>
+                  <p className={styles.stepHint}>
+                    Đây là dàn ý câu chuyện (câu hỏi cốt lõi, insight, lời thoại nháp từng beat) — KHÔNG
+                    phải code. Dán nguyên văn phần AI trả lời, không cần chỉnh sửa.
+                  </p>
+                  <textarea
+                    id="story-outline-input"
+                    className={`${glass.textArea} ${styles.sourceTextarea}`}
+                    data-testid="script-assistant-story-outline"
+                    value={storyOutline}
+                    onChange={(event) => onStoryOutlineChange(event.target.value)}
+                    placeholder={"CÂU HỎI CỐT LÕI: ...\nINSIGHT CỐT LÕI: ...\n\nBEAT 1 — ...\n..."}
+                    rows={8}
+                  />
+                </>
+              ) : (
+                <>
+                  <div className={styles.stepLabel}>Copy đoạn code AI trả về, dán vào ô soạn thảo bên dưới</div>
+                  <p className={styles.stepHint}>
+                    Chỉ lấy phần code Python, không lấy phần AI giải thích. Dán xong hệ thống sẽ tự kiểm tra
+                    định dạng.
+                  </p>
+                </>
+              )}
             </div>
           </div>
         </div>

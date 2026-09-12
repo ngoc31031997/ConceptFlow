@@ -1,19 +1,35 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ScriptAssistant } from "../../src/components/ScriptAssistant";
+import * as apiClient from "../../src/api/client";
+
+// CR-025: the "blank" path's prompt now comes from the DB via
+// getPromptTemplate — stub it so these tests don't need a live backend.
+// Re-armed in beforeEach because afterEach below calls restoreAllMocks().
+beforeEach(() => {
+  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
+    role: "story_architect",
+    language: "vi",
+    version: 1,
+    template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
+  });
+});
 
 function renderAssistant(source: "blank" | "draft" | "ready" = "blank") {
   const onSourceChange = vi.fn();
   const onUseTemplate = vi.fn();
+  const onStoryOutlineChange = vi.fn();
   render(
     <ScriptAssistant
       contentLanguage="vi"
       source={source}
       onSourceChange={onSourceChange}
       onUseTemplate={onUseTemplate}
+      storyOutline=""
+      onStoryOutlineChange={onStoryOutlineChange}
     />,
   );
-  return { onSourceChange, onUseTemplate };
+  return { onSourceChange, onUseTemplate, onStoryOutlineChange };
 }
 
 describe("ScriptAssistant", () => {
@@ -34,6 +50,9 @@ describe("ScriptAssistant", () => {
     Object.assign(navigator, { clipboard: { writeText } });
     renderAssistant("blank");
 
+    // Wait for the DB-backed template to load before typing — otherwise the
+    // prompt is still the "Đang tải prompt..." placeholder.
+    await waitFor(() => expect(apiClient.getPromptTemplate).toHaveBeenCalled());
     fireEvent.change(screen.getByTestId("script-assistant-topic"), {
       target: { value: "Vòng lặp for trong Java" },
     });

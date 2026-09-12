@@ -1,16 +1,30 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
+import * as apiClient from "../../src/api/client";
+
+// CR-025: the default "blank" source now fetches its prompt from the DB and
+// asks for a pasted story outline instead of Manim code — stub the fetch so
+// these tests don't need a live backend. Re-armed in beforeEach because
+// afterEach below calls restoreAllMocks().
+beforeEach(() => {
+  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
+    role: "story_architect",
+    language: "vi",
+    version: 1,
+    template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
+  });
+});
 
 describe("ScriptStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("blocks the step until the script is valid", async () => {
+  it("blocks the step until a story outline is pasted (source: blank)", () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ connected: false }),
@@ -26,6 +40,32 @@ describe("ScriptStepPage", () => {
       </ThemeProvider>,
     );
 
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("script-assistant-story-outline"), {
+      target: { value: "CÂU HỎI CỐT LÕI: ...\nBEAT 1 — ..." },
+    });
+
+    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
+  });
+
+  it("blocks the step until the script is valid (source: draft)", () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ connected: false }),
+    }) as unknown as typeof fetch;
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ScriptStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("script-source-draft"));
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
 
     fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
@@ -68,7 +108,7 @@ describe("ScriptStepPage draft lifecycle", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByTestId("new-project-script-textarea")).toHaveValue("");
+    expect(screen.getByTestId("script-assistant-story-outline")).toHaveValue("");
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 });

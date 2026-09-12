@@ -60,6 +60,13 @@ func main() {
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
 		logger.Warn("could not seed video formats", "error", err)
 	}
+	// CR-025: seed the 4-role authoring-pipeline prompt templates, same
+	// insert-if-absent posture as SeedVideoFormats above — an editor's saved
+	// wording must survive a restart.
+	promptTemplateRepo := postgres.NewPromptTemplateRepository(pool)
+	if err := promptTemplateRepo.SeedPromptTemplates(ctx); err != nil {
+		logger.Warn("could not seed prompt templates", "error", err)
+	}
 	inboxRepo := postgres.NewInboxRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
 
@@ -117,9 +124,21 @@ func main() {
 	// Outbox (same durability guarantee as every other command), Preview
 	// reads the local channel_asset_pointers projection.
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
+	// CR-025: prompt-template CRUD (admin editor + web-gui runtime read) and
+	// step 1's story-save endpoint.
+	promptTemplates := application.NewPromptTemplatesUseCase(promptTemplateRepo)
+	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(promptTemplateRepo)
+	// CR-025 step 2: Visual Director's storyboard save, and the shared
+	// read-side use case both steps' rehydration relies on.
+	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo)
+	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
-		WithShortScriptSuggester(suggestShortScript)
+		WithShortScriptSuggester(suggestShortScript).
+		WithPromptTemplates(promptTemplates).
+		WithAuthoringStory(saveAuthoringStory).
+		WithAuthoringStoryboard(saveAuthoringStoryboard).
+		WithAuthoringState(getAuthoringState)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

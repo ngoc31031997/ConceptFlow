@@ -104,6 +104,11 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
             <Link to="/videos" className={styles.headerLink}>
               Danh sách video
             </Link>
+            {/* CR-025 — admin entry to edit the authoring pipeline's prompt
+                wording, deliberately outside the Creator's step pill above. */}
+            <Link to="/settings/prompts" className={styles.headerLink}>
+              Cài đặt prompt
+            </Link>
           </div>
         </div>
 
