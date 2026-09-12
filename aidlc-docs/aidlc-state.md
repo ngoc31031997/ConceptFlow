@@ -59,7 +59,7 @@
 | CR-004 | 1080p60 + profile encode chuẩn YouTube | P1 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** |
 | CR-005 | Giọng đọc chất lượng cao, ducking, loudnorm | P1 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** (fallback Piper xác nhận đúng; nhánh Google chưa test vì chưa có credential) |
 | CR-006 | Chapters, thumbnail, hook, metadata SEO | P2 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** |
-| CR-007 | Clip dọc 9:16 cho Shorts/TikTok | P1 | Requirements Analysis | **HOÃN theo yêu cầu Creator (2026-09-08)** — làm sau, sau khi các CR còn lại đã ổn định |
+| CR-007 | Clip dọc 9:16 cho Shorts/TikTok | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-11) — rendering 113, video-assembly 155, orchestrator 6/6, api-gateway 58/58 pass; Docker rebuild healthy trên 4 service. FR20.2 (adapter TikTok API) bỏ, đăng tay đủ cho MVP |
 | CR-008 | Ngôn ngữ nội dung áp dụng toàn pipeline | P1 | **Code Generation ✅** | **HOÀN THÀNH + verify E2E ✅** |
 | CR-009 | Azure Neural TTS song song Google (Google mất free tier) | P1 | Requirements Analysis | **SUPERSEDED (2026-09-09)** — không triển khai; cả Google lẫn Azure tắc ở tầng tài khoản |
 | CR-010 | Edge TTS thay Piper làm engine giọng đọc nền | P1 | **Code Generation ✅** | **HOÀN THÀNH** — 49/49 unit test pass; burst 8 scene 8/8 sau khi thêm retry (trước: 1/8). ADR-0024 |
@@ -77,28 +77,37 @@
 | CR-022 | Vòng phản hồi retention/analytics | P2 | Requirements Analysis | **HOÃN** — ngoài phạm vi đợt CR-016..024 |
 | CR-023 | Intro/outro cố định làm bản sắc kênh | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-11) — **việc tồn đọng: Creator cung cấp file sting intro dựng ngoài; pipeline đang chạy bằng bản Manim mặc định** |
 | CR-024 | Cổng duyệt dàn ý trước khi tốn TTS | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-10) |
+| CR-026 | Kịch bản riêng cho bản Shorts/TikTok, hỗ trợ bằng AI | P1 | **Requirements Analysis** | Đã viết requirements, chờ Creator duyệt trước khi sang Low-Level Design |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`,
 `cr-016-024-execution-plan.md`, `cr-023-low-level-design.md`,
 `cr-021-low-level-design.md`
 
 ## Current Status
-*Cập nhật 2026-09-11 — đợt CR-016..024 đã đóng.*
+*Cập nhật 2026-09-12 — verify E2E đợt CR-016..024 đã chạy; 2 bug orchestrator phát hiện lúc verify đã sửa.*
 
 - **Lifecycle Phase**: POST-CONSTRUCTION — 10/10 unit đã build và chạy; công việc đi theo từng Change Request.
-- **Saga hiện tại** (sau CR-020/021/023/024):
-  `parse_script -> validate_script -> [CHỜ DUYỆT] -> synthesize_speech -> render_scenes -> assemble_video -> qc_video -> publish_video`
+- **Saga hiện tại** (sau CR-007/020/021/023/024):
+  `parse_script -> validate_script -> [CHỜ DUYỆT] -> synthesize_speech -> render_scenes -> assemble_video -> qc_video -> generate_clips -> publish_video`
 - **Đã giao và verify E2E trên stack thật**: CR-001 → CR-006, CR-008. Lệch tiếng/hình 0.003s (trước 61.64s); 1080p60 + faststart; chapters/thumbnail/metadata SEO; ngôn ngữ nội dung thông suốt cả pipeline.
-- **Đã giao, chưa verify E2E**: CR-010, CR-011 (chưa có key Azure thật), và **toàn bộ đợt CR-016..024** — tất cả test unit xanh (orchestrator 6/6 gói, rendering 106, video-assembly 134, api-gateway 53, web-gui 128) nhưng chưa render một project đầy đủ trên stack thật sau đợt này.
-- **Backlog**: CR-007 (clip dọc 9:16, hoãn 2026-09-08), CR-022 (vòng phản hồi retention, hoãn ngoài phạm vi đợt).
-- **Next Stage**: chờ Creator chọn — (a) verify E2E đợt CR-016..024 trên stack thật, (b) hiệu chỉnh ngưỡng QC rồi bật `QC_ENFORCE` (CR-021), (c) CR-007, (d) verify Azure khi có key, hoặc (e) Change Request mới.
+- **Verify E2E đợt CR-016..024 (2026-09-12)** — chạy 1 project trọn saga trên stack thật (~35s, project `b90bfc7c…`):
+  - PASS: CR-016 (WPM calibration), CR-017 (design system), CR-018 (`self.narrate()`), CR-019 (beat sheet, đường happy path), CR-020 (gate, đường happy path), CR-024 (approval gate), CR-007 (clip dọc 1080×1920 thật), CR-011 (Azure TTS thật — audio file `azure:vi-VN-HoaiMyNeural`, usage 9921 ký tự, không fallback im lặng).
+  - **2 bug phát hiện và ĐÃ SỬA (2026-09-12)**:
+    1. CR-020 gate hở ở đường lỗi: `handle_step_event.go` `failureEvents` thiếu `"validation_failed"` — script crash thật vẫn lọt qua `awaiting_review` như đã hợp lệ. Đã thêm key, `go test ./...` 6/6 gói xanh, docker image orchestrator đã rebuild + healthy.
+    2. CR-021 QC không bao giờ chấm điểm được: `project.LayoutMarks` chưa từng được gán trong code thật (chỉ gán trong test) — mọi project trả `not_scored`. Đã thêm `project.LayoutMarks = mapSliceFromPayload(event.Payload, "layout_marks")` cạnh dòng `ClipMarks` tương ứng. Cùng rebuild, cùng test xanh.
+    - Còn chờ Creator tự chạy lại E2E để xác nhận 2 fix này hoạt động đúng trên project thật (không tự động re-verify).
+  - INCONCLUSIVE (không phải lỗi): CR-023 — `channel_asset_pointers` rỗng trên stack test, chưa từng đăng ký sting Manim mặc định nào, nên chưa có gì để ghép; cần kích hoạt sting mặc định trước khi verify được nhánh này.
+- **Đã giao, chưa verify E2E**: CR-012 (chưa verify với Google thật).
+- **Backlog**: CR-022 (vòng phản hồi retention, hoãn ngoài phạm vi đợt).
+- **Next Stage**: chờ Creator chọn — (a) tự chạy lại E2E xác nhận 2 fix orchestrator, (b) hiệu chỉnh ngưỡng QC rồi bật `QC_ENFORCE` (CR-021) — cần video thật, (c) verify CR-012 với Google thật, hoặc (d) Change Request mới.
 
 ## Việc tồn đọng cần Creator làm (không phải việc code)
 | Việc | Nguồn | Vì sao không làm bằng code được |
 |---|---|---|
 | Cung cấp file sting intro dựng ngoài (Runway/Kling/Blender) | CR-023 §Quyết định #2 | Logo là ảnh 3D photorealistic; Manim chỉ fade/scale được nó. Pipeline đang chạy bằng bản Manim mặc định |
 | Chọn và upload nhạc hiệu intro/outro | CR-023 Quyết định #4 | Chưa chọn nguồn; khe nhận file và chuẩn hoá -14 LUFS đã sẵn |
-| Hiệu chỉnh ngưỡng QC trên video thật rồi bật `QC_ENFORCE=true` | CR-021 Quyết định #3 | Ngưỡng hiện là ước lượng nới rộng. Bật cổng trước khi biết tỉ lệ báo động giả là cách làm Creator mất niềm tin vào báo cáo |
+| Hiệu chỉnh ngưỡng QC trên video thật rồi bật `QC_ENFORCE=true` | CR-021 Quyết định #3 | Ngưỡng hiện là ước lượng nới rộng. Bật cổng trước khi biết tỉ lệ báo động giả là cách làm Creator mất niềm tin vào báo cáo. Cần đo trên video thật sau khi fix LayoutMarks đã lên stack |
+| Verify CR-012 với tài khoản Google thật (đăng nhập OAuth thật qua web-gui) | CR-012 | Cần Creator tự đăng nhập, không có quyền tạo/đăng nhập tài khoản Google thay |
 
 ## Nợ kỹ thuật đã biết
 | Mục | Ghi nhận | Trạng thái |
