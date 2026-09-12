@@ -39,9 +39,17 @@ def write_subtitle_file(
 
 
 def _render(cues: list[SubtitleCue], style: SubtitleStyle, play_res: tuple[int, int]) -> str:
-    # FONT_SIZES are expressed against a 1080-tall frame; scale them so a
-    # "large" subtitle is the same fraction of the picture at any resolution.
-    scale = play_res[1] / DEFAULT_PLAY_RES_Y
+    # FONT_SIZES are expressed against a 1920-wide frame; scale by WIDTH, not
+    # height — width is what governs how many characters fit before ASS wraps
+    # a line, which is exactly what determines whether subtitles overflow.
+    # For any 16:9 resolution this is identical to scaling by height (width
+    # and height are proportional), so long-form output is unchanged. It is
+    # NOT identical for the 9:16 vertical clip (CR-007): that frame is
+    # narrower (1080) but much TALLER (1920) than the 16:9 default, so
+    # scaling by height alone inflated "large" from 72pt to ~128pt — a font
+    # too big for a frame that is also narrower, forcing every line to wrap
+    # after 1-2 words and covering nearly the whole picture (bug report).
+    scale = play_res[0] / DEFAULT_PLAY_RES_X
     font_size = round(FONT_SIZES.get(style.font_size, FONT_SIZES["medium"]) * scale)
     alignment = ALIGNMENT.get(style.position, ALIGNMENT["bottom"])
     primary = _to_ass_colour(style.text_color, opacity=1.0)

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from adapters.assembly.subtitle_file import write_subtitle_file
+from adapters.assembly.subtitle_file import DEFAULT_PLAY_RES_X, FONT_SIZES, write_subtitle_file
 from domain.models import SubtitleCue, SubtitleStyle
 
 
@@ -47,19 +47,37 @@ def test_font_size_scales_with_the_frame(tmp_path):
     assert size_2160 == size_1080 * 2
 
 
-def test_vertical_frame_scales_by_height_not_width(tmp_path):
-    """A 9:16 clip (CR-007) is narrower but taller than 1080p. Scaling off
-    width would shrink the text on exactly the format that needs it largest."""
-    content = read_written(tmp_path, play_res=(1080, 1920))
+def font_size_of(content: str) -> int:
+    return int(content.split("Style: Default,DejaVu Sans,")[1].split(",")[0])
 
-    size = int(content.split("Style: Default,DejaVu Sans,")[1].split(",")[0])
-    baseline = int(
-        read_written(tmp_path, play_res=(1920, 1080))
-        .split("Style: Default,DejaVu Sans,")[1]
-        .split(",")[0]
-    )
 
-    assert size > baseline
+def test_vertical_frame_scales_by_width_not_height(tmp_path):
+    """Bug report (screenshot): a 9:16 clip's subtitles covered nearly the
+    whole picture. Root cause was scaling font size by HEIGHT: a 9:16 clip
+    (1080x1920) is narrower but much TALLER than the 1920x1080 default, so
+    height-based scaling inflated "medium" ~1.78x (56 -> ~99pt) while the
+    frame was simultaneously narrower — every line wrapped after 1-2 words.
+
+    Width is what actually governs how many characters fit on one ASS line
+    before it wraps, which is exactly what determines whether subtitles
+    overflow — so scaling by width is what keeps a vertical clip's text from
+    ballooning to cover the screen. A 9:16 clip is narrower than 16:9 at the
+    same declared height, so its font must come out SMALLER, not larger."""
+    vertical = font_size_of(read_written(tmp_path, play_res=(1080, 1920)))
+    baseline = font_size_of(read_written(tmp_path, play_res=(1920, 1080)))
+
+    assert vertical < baseline
+
+
+def test_width_based_scaling_matches_height_based_for_16_9(tmp_path):
+    """Every existing (long-form, always 16:9) resolution must render
+    identically after this fix — width and height scale together 1:1 for any
+    16:9 frame, so switching the scale basis changes nothing for them."""
+    at_720p = font_size_of(read_written(tmp_path, play_res=(1280, 720)))
+    at_1080p = font_size_of(read_written(tmp_path, play_res=(1920, 1080)))
+
+    assert at_720p == round(FONT_SIZES["medium"] * 1280 / DEFAULT_PLAY_RES_X)
+    assert at_1080p == FONT_SIZES["medium"]
 
 
 def test_cue_timings_are_preserved(tmp_path):
