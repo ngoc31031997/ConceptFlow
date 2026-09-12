@@ -26,6 +26,8 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
  * `POST /v1/projects/:id/suggest-metadata` drafts SEO title/description/tags via Ollama —
  * proxied through `orchestratorAiClient` (a longer timeout than the default
  * 30s, since local LLM generation can take up to ~2 minutes).
+ * `POST /v1/short-script-suggestions` drafts a standalone Shorts/TikTok
+ * script via Ollama (CR-026 FR71) — same `orchestratorAiClient`, no :id.
  * `POST /v1/projects/:id/thumbnail` (multipart, field "thumbnail", max 2MB,
  * jpeg/png) saves a manually-uploaded thumbnail to the shared volume;
  * `GET /v1/projects/:id/thumbnail` serves it back for preview.
@@ -62,6 +64,14 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.get('/v1/projects/:id/clips/:name/:preset', clipHandler(orchestratorClient, sharedDir));
   router.post(
     '/v1/projects/:id/suggest-metadata',
+    proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
+  );
+  // CR-026 FR71 — same longer-timeout client as suggest-metadata: drafting a
+  // whole script via the local model takes longer than a title/description.
+  // No :id in the path (unlike suggest-metadata) — a Creator can draft a
+  // short from a bare topic without an existing project.
+  router.post(
+    '/v1/short-script-suggestions',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
   );
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
