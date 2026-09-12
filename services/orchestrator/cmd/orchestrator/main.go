@@ -89,6 +89,7 @@ func main() {
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	ollamaClient := llm.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
+	suggestShortScript := application.NewSuggestShortScriptUseCase(ollamaClient)
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
@@ -117,7 +118,8 @@ func main() {
 	// reads the local channel_asset_pointers projection.
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
-		WithQCReports(qcReportRepo)
+		WithQCReports(qcReportRepo).
+		WithShortScriptSuggester(suggestShortScript)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

@@ -160,6 +160,40 @@ func (q RenderQuality) IsValid() bool {
 	return false
 }
 
+// VideoOutputMode is which of the two shapes a project produces (CR-007
+// follow-up): the standard 16:9 long-form video, the vertical Shorts/TikTok
+// clip(s) cut from it, or both. A clip is always derived from the assembled
+// 16:9 video (CR-007 D1 — no standalone vertical production), so
+// ModeShortOnly still runs the full render pipeline as source material; the
+// mode only decides whether generate_clips runs at all, and which output the
+// Result screen puts front and center.
+type VideoOutputMode string
+
+const (
+	ModeLongOnly  VideoOutputMode = "long"
+	ModeShortOnly VideoOutputMode = "short"
+	ModeBoth      VideoOutputMode = "both"
+)
+
+// DefaultVideoOutputMode preserves the only behaviour that existed before
+// this field did: every project produces its long-form video, and never
+// spends the extra generate_clips round-trip unless the Creator opts in.
+const DefaultVideoOutputMode = ModeLongOnly
+
+// IsValid reports whether m is a mode the saga knows how to route.
+func (m VideoOutputMode) IsValid() bool {
+	switch m {
+	case ModeLongOnly, ModeShortOnly, ModeBoth:
+		return true
+	}
+	return false
+}
+
+// WantsClips reports whether the saga should run generate_clips at all.
+func (m VideoOutputMode) WantsClips() bool {
+	return m == ModeShortOnly || m == ModeBoth
+}
+
 // Visibility restricts youtube visibility to the three values accepted by
 // the Publish Saga input (interface-contracts.md POST /v1/sagas/publish).
 type Visibility string
@@ -242,6 +276,10 @@ type Project struct {
 	// CR-004 — resolution/framerate for this project's render.
 	RenderQuality RenderQuality
 
+	// Which shape(s) of output this project produces — long-form, short
+	// clips, or both. Drives whether generate_clips runs at all.
+	VideoOutputMode VideoOutputMode
+
 	// CR-023 FR67.1/67.2 — whether the fixed channel intro/outro sting is
 	// attached at assemble_video. Both default true (long-form channel
 	// identity is opt-out, not opt-in).
@@ -323,6 +361,16 @@ type Project struct {
 	// clips_generated (one entry per requested (name, preset) pair, "ok" or
 	// "error" — D1: a clip failure never blocks the saga).
 	Clips []ClipResult
+
+	// CompanionProjectID (CR-026 D1) links two independent projects that
+	// cover the same topic as two different outputs — a long-form video and
+	// a short-form one with its own dedicated script (not a crop of the
+	// long one). Self-referencing, no FK: the two projects have independent
+	// lifecycles, and deleting one must never fail because the other still
+	// points to it. Set both ways when the second project is created
+	// (StartRenderSagaUseCase), best-effort — a missing/failed link never
+	// blocks the video it points from.
+	CompanionProjectID *string
 
 	YoutubeTitle         *string
 	YoutubeDescription   *string

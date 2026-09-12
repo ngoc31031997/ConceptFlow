@@ -40,6 +40,13 @@ type suggestPublishMetadataUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
 }
 
+// suggestShortScriptUseCase backs CR-026's short-script assistant (FR71) —
+// no project_id, unlike suggestPublishMetadataUseCase, since a Creator can
+// start a short from a bare topic without an existing project.
+type suggestShortScriptUseCase interface {
+	Execute(ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage) (string, error)
+}
+
 // channelAssetsUseCase backs the two CR-023 correction endpoints. Normalize
 // only publishes an AMQP command (no HTTP call to video-assembly); Preview
 // only reads Orchestrator's own channel_asset_pointers projection.
@@ -82,6 +89,7 @@ type Router struct {
 	suggestPublishMetadata suggestPublishMetadataUseCase
 	channelAssets          channelAssetsUseCase
 	qcReports              qcReportReader
+	suggestShortScript     suggestShortScriptUseCase
 }
 
 // WithQCReports attaches the QC report store, enabling
@@ -89,6 +97,14 @@ type Router struct {
 // the route answers 404, the same way the CR-023 routes do when unwired.
 func (rt *Router) WithQCReports(qcReports qcReportReader) *Router {
 	rt.qcReports = qcReports
+	return rt
+}
+
+// WithShortScriptSuggester attaches CR-026's short-script assistant,
+// enabling POST /v1/short-script-suggestions. Without it the route answers
+// 404 — same "unwired means absent, not broken" posture as WithQCReports.
+func (rt *Router) WithShortScriptSuggester(suggestShortScript suggestShortScriptUseCase) *Router {
+	rt.suggestShortScript = suggestShortScript
 	return rt
 }
 
@@ -120,6 +136,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/qc-report", rt.handleQCReport)
 	r.Post("/v1/projects/{project_id}/clips", rt.handleCreateClip)
 	r.Get("/v1/projects/{project_id}/clips", rt.handleListClips)
+	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
 	return r
 }
 
@@ -165,6 +182,8 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		SubtitleStyle:         req.SubtitleStyle,
 		RenderQuality:         domain.RenderQuality(req.RenderQuality),
 		BackgroundMusicVolume: req.BackgroundMusicVolume,
+		VideoOutputMode:       domain.VideoOutputMode(req.VideoOutputMode),
+		CompanionProjectID:    req.CompanionProjectID,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)
@@ -226,6 +245,32 @@ func (rt *Router) handleSuggestMetadata(w http.ResponseWriter, r *http.Request) 
 		Description: out.Description,
 		Tags:        out.Tags,
 	})
+}
+
+func (rt *Router) handleSuggestShortScript(w http.ResponseWriter, r *http.Request) {
+	if rt.suggestShortScript == nil {
+		writeError(w, http.StatusNotFound, "short script suggestions are not enabled")
+		return
+	}
+
+	var req suggestShortScriptRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	lang := domain.ContentLanguage(req.Language)
+	if lang != domain.LanguageVietnamese && lang != domain.LanguageEnglish {
+		writeError(w, http.StatusBadRequest, "language must be 'vi' or 'en'")
+		return
+	}
+
+	script, err := rt.suggestShortScript.Execute(r.Context(), req.Topic, req.SourceScriptContent, lang)
+	if err != nil {
+		slog.Error("suggest-short-script failed", "error", err.Error())
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, suggestShortScriptResponse{ScriptContent: script})
 }
 
 func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {

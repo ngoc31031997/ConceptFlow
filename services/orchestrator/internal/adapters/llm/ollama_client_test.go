@@ -262,3 +262,101 @@ func TestTruncateScript_LeavesShortScriptsAlone(t *testing.T) {
 		t.Fatalf("expected the script unchanged, got %q", got)
 	}
 }
+
+// --- SuggestShortScript (CR-026 FR71) ---
+
+func TestStripCodeFence_GoMirrorOfTheTypeScriptHelper(t *testing.T) {
+	wrapped := "```python\nfrom conceptflow import *\n```"
+	if got := stripCodeFence(wrapped); got != "from conceptflow import *" {
+		t.Fatalf("expected the fence stripped, got %q", got)
+	}
+}
+
+func TestStripCodeFence_LeavesUnfencedScriptAlone(t *testing.T) {
+	script := "from conceptflow import *"
+	if got := stripCodeFence(script); got != script {
+		t.Fatalf("expected the script unchanged, got %q", got)
+	}
+}
+
+func TestBuildShortScriptSuggestionPrompt_RequiresTheClipWrapper(t *testing.T) {
+	// FR70.1/FR71: the entire point of this prompt is that the pipeline's
+	// existing generate_clips (CR-007) picks the result up with zero new
+	// code — that only works if the model is told, unambiguously, to wrap
+	// everything in self.clip("short").
+	prompt := buildShortScriptSuggestionPrompt("Vòng lặp for", "", domain.LanguageVietnamese)
+
+	if !strings.Contains(prompt, `self.clip("short")`) {
+		t.Fatalf(`expected the prompt to require self.clip("short"), got:\n%s`, prompt)
+	}
+	if !strings.Contains(prompt, "written in Vietnamese") {
+		t.Fatalf("expected the prompt to name the project's content language, got:\n%s", prompt)
+	}
+}
+
+func TestBuildShortScriptSuggestionPrompt_UsesSourceScriptAsContextOnly(t *testing.T) {
+	prompt := buildShortScriptSuggestionPrompt("", "print('long script body')", domain.LanguageEnglish)
+
+	if !strings.Contains(prompt, "print('long script body')") {
+		t.Fatal("expected the source script to reach the model as context")
+	}
+	if !strings.Contains(prompt, "do not summarize or transform its code") {
+		t.Fatal("expected the prompt to warn against transforming the long script's code")
+	}
+}
+
+func TestSuggestShortScript_StripsMarkdownFenceFromTheModelReply(t *testing.T) {
+	client, _ := newTestClient(t, modelReplying("```python\nfrom conceptflow import *\n```"))
+
+	script, err := client.SuggestShortScript(context.Background(), "topic", "", domain.LanguageVietnamese)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if script != "from conceptflow import *" {
+		t.Fatalf("expected the fence stripped from the model's reply, got %q", script)
+	}
+}
+
+func TestSuggestShortScript_RetriesOnEmptyReply(t *testing.T) {
+	attempt := 0
+	client, calls := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		attempt++
+		if attempt == 1 {
+			modelReplying("")(w, r)
+			return
+		}
+		modelReplying("from conceptflow import *")(w, r)
+	})
+
+	script, err := client.SuggestShortScript(context.Background(), "topic", "", domain.LanguageVietnamese)
+	if err != nil {
+		t.Fatalf("expected the retry to recover, got %v", err)
+	}
+	if script != "from conceptflow import *" {
+		t.Fatalf("expected the second attempt's script, got %q", script)
+	}
+	if *calls != 2 {
+		t.Fatalf("expected exactly 2 attempts, got %d", *calls)
+	}
+}
+
+func TestSuggestShortScript_DoesNotForceJSONFormat(t *testing.T) {
+	// Unlike Suggest (SEO metadata), the response here is multi-line Python
+	// source — format:"json" would make the model escape every newline and
+	// quote, which is a much easier way to get invalid Python back than
+	// asking for plain text is.
+	var gotFormat string
+	client, _ := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var req generateRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		gotFormat = req.Format
+		modelReplying("from conceptflow import *")(w, r)
+	})
+
+	if _, err := client.SuggestShortScript(context.Background(), "topic", "", domain.LanguageVietnamese); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotFormat != "" {
+		t.Fatalf(`expected no format constraint, got %q`, gotFormat)
+	}
+}

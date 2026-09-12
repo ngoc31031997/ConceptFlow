@@ -32,6 +32,11 @@ type startRenderSagaRequest struct {
 	VideoFormatID         string                `json:"video_format_id,omitempty"`
 	ReviewEnabled         *bool                 `json:"review_enabled,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
+	// "long" | "short" | "both" — empty means DefaultVideoOutputMode ("long").
+	VideoOutputMode string `json:"video_output_mode,omitempty"`
+	// CR-026 D1 — project_id of the companion video covering the same
+	// topic (the other of the long-form/short-form pair), if any.
+	CompanionProjectID *string `json:"companion_project_id,omitempty"`
 }
 
 // startPublishSagaRequest is the body of POST /v1/sagas/publish.
@@ -139,6 +144,13 @@ type projectResponse struct {
 	ScriptContent         string  `json:"script_content"`
 	BackgroundMusicPath   *string `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
+	// "long" | "short" | "both" (CR-007 follow-up) — which output(s) the
+	// Result screen should feature, and whether generate_clips ran at all.
+	VideoOutputMode string `json:"video_output_mode"`
+	// CR-026 D1/D6 — id only, not the nested project: the GUI re-fetches it
+	// through the same GET /v1/projects/{id} it already calls for anything
+	// else, rather than orchestrator embedding one project inside another.
+	CompanionProjectID *string `json:"companion_project_id,omitempty"`
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -153,6 +165,23 @@ type projectSummaryResponse struct {
 // projectListResponse is the GET /v1/projects response body.
 type projectListResponse struct {
 	Projects []projectSummaryResponse `json:"projects"`
+}
+
+// suggestShortScriptRequest is the body of POST /v1/short-script-suggestions
+// (CR-026 FR71.1). No project_id: a Creator can draft a short from a bare
+// topic without an existing project. SourceScriptContent is optional context
+// pulled from an existing long-form project when called from its Result
+// screen — the topic alone is enough to draft something without it.
+type suggestShortScriptRequest struct {
+	Topic               string `json:"topic"`
+	Language            string `json:"language"`
+	SourceScriptContent string `json:"source_script_content,omitempty"`
+}
+
+// suggestShortScriptResponse is the 200 response of
+// POST /v1/short-script-suggestions.
+type suggestShortScriptResponse struct {
+	ScriptContent string `json:"script_content"`
 }
 
 // suggestMetadataResponse is the 200 response of
@@ -277,5 +306,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		ScriptContent:         p.ScriptContent,
 		BackgroundMusicPath:   p.BackgroundMusicPath,
 		BackgroundMusicVolume: p.BackgroundMusicVolume,
+		VideoOutputMode:       string(p.VideoOutputMode),
+		CompanionProjectID:    p.CompanionProjectID,
 	}
 }

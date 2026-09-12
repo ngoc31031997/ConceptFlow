@@ -134,6 +134,104 @@ func TestStartRenderSagaUseCase_SubtitleModeOffClearsLegacyFlag(t *testing.T) {
 	}
 }
 
+func TestStartRenderSagaUseCase_VideoOutputMode_DefaultsToLong(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:       "proj-1",
+		ScriptContent:   "script",
+		ContentLanguage: domain.LanguageVietnamese,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.VideoOutputMode != domain.ModeLongOnly {
+		t.Fatalf("expected default video_output_mode=long, got %s", project.VideoOutputMode)
+	}
+}
+
+func TestStartRenderSagaUseCase_VideoOutputMode_ExplicitChoiceWins(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:       "proj-1",
+		ScriptContent:   "script",
+		ContentLanguage: domain.LanguageVietnamese,
+		VideoOutputMode: domain.ModeShortOnly,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.VideoOutputMode != domain.ModeShortOnly {
+		t.Fatalf("expected video_output_mode=short, got %s", project.VideoOutputMode)
+	}
+}
+
+func TestStartRenderSagaUseCase_CompanionProjectID_LinksBothWays(t *testing.T) {
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	// The long-form project already exists (as if rendered earlier).
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:       "proj-long",
+		ScriptContent:   "script long",
+		ContentLanguage: domain.LanguageVietnamese,
+	}); err != nil {
+		t.Fatalf("unexpected error creating the long project: %v", err)
+	}
+
+	companionID := "proj-long"
+	if _, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:          "proj-short",
+		ScriptContent:      "script short",
+		ContentLanguage:    domain.LanguageVietnamese,
+		VideoOutputMode:    domain.ModeShortOnly,
+		CompanionProjectID: &companionID,
+	}); err != nil {
+		t.Fatalf("unexpected error creating the short project: %v", err)
+	}
+
+	short, _ := repo.Get(context.Background(), "proj-short")
+	if short.CompanionProjectID == nil || *short.CompanionProjectID != "proj-long" {
+		t.Fatalf("expected proj-short.CompanionProjectID = proj-long, got %v", short.CompanionProjectID)
+	}
+
+	long, _ := repo.Get(context.Background(), "proj-long")
+	if long.CompanionProjectID == nil || *long.CompanionProjectID != "proj-short" {
+		t.Fatalf("expected proj-long.CompanionProjectID linked back to proj-short, got %v", long.CompanionProjectID)
+	}
+}
+
+func TestStartRenderSagaUseCase_CompanionProjectID_MissingCompanionIsBestEffort(t *testing.T) {
+	// CR-026 D1: a stale/wrong companion id must never cost the Creator the
+	// video they are actually here to create.
+	repo := newFakeRepo()
+	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})
+
+	companionID := "does-not-exist"
+	out, err := uc.Execute(context.Background(), StartRenderSagaInput{
+		ProjectID:          "proj-short",
+		ScriptContent:      "script short",
+		ContentLanguage:    domain.LanguageVietnamese,
+		CompanionProjectID: &companionID,
+	})
+	if err != nil {
+		t.Fatalf("expected the render to still start despite a missing companion, got error: %v", err)
+	}
+	if out.Status != domain.StatusParsingScript {
+		t.Fatalf("expected status parsing_script, got %s", out.Status)
+	}
+
+	short, _ := repo.Get(context.Background(), "proj-short")
+	if short.CompanionProjectID == nil || *short.CompanionProjectID != "does-not-exist" {
+		t.Fatalf("expected proj-short to still record its own companion_project_id, got %v", short.CompanionProjectID)
+	}
+}
+
 func TestStartRenderSagaUseCase_PublishFailure(t *testing.T) {
 	repo := newFakeRepo()
 	pub := &fakePublisher{failNext: true}

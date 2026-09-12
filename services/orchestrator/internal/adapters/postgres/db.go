@@ -190,6 +190,17 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS clips JSONB;
 -- clip is off by exactly the intro's length. 0 when the project has no intro.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_duration_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
 
+-- CR-007 follow-up: "long" | "short" | "both" — which output(s) this project
+-- produces. Default 'long' reproduces the only behaviour that existed before
+-- this column did: generate_clips never ran unless a Creator opted in.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DEFAULT 'long';
+
+-- CR-026 D1: links two independent projects covering the same topic (a
+-- long-form video and a short-form one with its own dedicated script) so
+-- the Result screen can show both together. Self-referencing, no FK — the
+-- two projects have independent lifecycles.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS companion_project_id TEXT;
+
 -- CR-021 D6/FR61.1: one row per automated QC pass.
 --
 -- findings is JSONB, not text: FR61.1 asks for machine-readable data and the

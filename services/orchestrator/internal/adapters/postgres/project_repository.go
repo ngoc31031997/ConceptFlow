@@ -31,7 +31,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		       clip_marks, clip_requests, clips, intro_duration_seconds
+		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -51,6 +51,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		clipMarksJSON         []byte
 		clipRequestsJSON      []byte
 		clipsJSON             []byte
+		videoOutputMode       string
 	)
 	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion, &p.ReviewEnabled, &beatsJSON, &warningsJSON,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
@@ -58,7 +59,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
 		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON, &p.CaptionPath, &subtitleMode, &p.CaptionStatus,
 		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID, &layoutMarksJSON,
-		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds)
+		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -68,6 +69,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 
 	p.Status = domain.ProjectStatus(status)
 	p.RenderQuality = domain.RenderQuality(renderQuality)
+	p.VideoOutputMode = domain.VideoOutputMode(videoOutputMode)
 	p.ContentLanguage = domain.ContentLanguage(voiceLanguage)
 	// '' means this row predates the subtitle_mode column (or was written by
 	// code that only knew SubtitlesEnabled) — derive it the one way that
@@ -287,8 +289,8 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		                       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		                       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		                       clip_marks, clip_requests, clips, intro_duration_seconds, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47, now())
+		                       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
@@ -323,6 +325,8 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    clip_requests = EXCLUDED.clip_requests,
 		    clips = EXCLUDED.clips,
 		    intro_duration_seconds = EXCLUDED.intro_duration_seconds,
+		    video_output_mode = EXCLUDED.video_output_mode,
+		    companion_project_id = EXCLUDED.companion_project_id,
 		    updated_at = now()`,
 		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
 		project.CategoryHint, string(project.ContentLanguage),
@@ -334,7 +338,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		waitOffsetsJSON, project.RenderedVideoSeconds, string(project.RenderQuality),
 		project.BackgroundMusicVolume, chaptersJSON, project.CaptionPath, string(project.SubtitleMode), project.CaptionStatus,
 		project.IntroEnabled, project.OutroEnabled, project.IntroAssetID, project.OutroAssetID, layoutMarksJSON,
-		clipMarksJSON, clipRequestsJSON, clipsJSON, project.IntroDurationSeconds)
+		clipMarksJSON, clipRequestsJSON, clipsJSON, project.IntroDurationSeconds, string(project.VideoOutputMode), project.CompanionProjectID)
 	return err
 }
 

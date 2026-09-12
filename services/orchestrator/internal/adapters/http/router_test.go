@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"math"
 	"net/http/httptest"
 	"testing"
@@ -470,5 +471,80 @@ func TestHandleChannelAssetPreview_ServesPointers(t *testing.T) {
 	}
 	if len(body.Assets) != 1 || body.Assets[0].AssetID != "asset-1" {
 		t.Fatalf("unexpected response: %+v", body)
+	}
+}
+
+// --- CR-026: POST /v1/short-script-suggestions ---
+
+type fakeSuggestShortScript struct {
+	script string
+	err    error
+}
+
+func (f *fakeSuggestShortScript) Execute(_ context.Context, _, _ string, _ domain.ContentLanguage) (string, error) {
+	return f.script, f.err
+}
+
+func TestHandleSuggestShortScript_404WhenUnwired(t *testing.T) {
+	// Same "unwired means absent, not broken" posture as qc-report (CR-021).
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil)
+
+	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "vi"})
+	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 404 {
+		t.Fatalf("expected 404 when unwired, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleSuggestShortScript_ReturnsTheDraft(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
+		WithShortScriptSuggester(&fakeSuggestShortScript{script: "from conceptflow import *\n"})
+
+	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "vi"})
+	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var resp suggestShortScriptResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	if resp.ScriptContent != "from conceptflow import *\n" {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestHandleSuggestShortScript_InvalidLanguage(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
+		WithShortScriptSuggester(&fakeSuggestShortScript{script: "x"})
+
+	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "fr"})
+	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("expected 400 for an unsupported language, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleSuggestShortScript_UseCaseErrorIs400(t *testing.T) {
+	// No project involved (unlike suggest-metadata) — every failure here is
+	// either a bad request (blank topic+source) or an upstream model error,
+	// neither of which is a 404/409 domain sentinel.
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
+		WithShortScriptSuggester(&fakeSuggestShortScript{err: errors.New("topic or source_script_content is required")})
+
+	body, _ := json.Marshal(map[string]string{"topic": "", "language": "vi"})
+	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, req)
+
+	if rec.Code != 400 {
+		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
 	}
 }

@@ -53,7 +53,7 @@ var eventStepMap = map[string]domain.StepName{
 }
 
 var failureEvents = map[string]bool{
-	"parse_failed": true, "synthesis_failed": true,
+	"parse_failed": true, "validation_failed": true, "synthesis_failed": true,
 	"rendering_failed": true, "assembly_failed": true, "publish_failed": true,
 }
 
@@ -316,6 +316,12 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event StepEvent, project *domain.Project) error {
 	project.Scenes = parseInitialScenes(event.Payload)
 	beats := parseBeats(event.Payload)
+	// Bug report (2026-09-12): the dry pass already knows whether the script
+	// called `with self.clip(...)` at all — store it now (render_scenes will
+	// overwrite with the real numbers later) so the warning below can fire
+	// before TTS runs, not just after a Creator reaches generate_clips and
+	// finds an empty ClipsPanel.
+	project.ClipMarks = mapSliceFromPayload(event.Payload, "clip_marks")
 
 	// CR-019 FR52.2: chapter sinh ra từ beat, không còn từ marker `# CHAPTER:`
 	// rời rạc. Hai cơ chế song song sẽ trôi khỏi nhau, và beat vốn đã là chỗ
@@ -348,6 +354,17 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	project.ValidationWarnings = append(
 		warningsFromPayload(event.Payload), beatIssueMessages(issues)...,
 	)
+	// Bug report: video_output_mode short/both promises a clip, but a clip
+	// only ever comes from `with self.clip(...)` in the script — nothing else
+	// produces one. Without this, the Creator only learned that after TTS,
+	// render and QC had already run, from an empty ClipsPanel with no link
+	// back to "the script never marked anything."
+	if project.VideoOutputMode.WantsClips() && len(project.ClipMarks) == 0 {
+		project.ValidationWarnings = append(project.ValidationWarnings,
+			"Đã chọn tạo bản Shorts/TikTok, nhưng script này không có đoạn nào đánh dấu "+
+				`with self.clip("tên"): — sẽ không có clip nào được tạo. Quay lại sửa script nếu muốn có clip.`,
+		)
+	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -604,6 +621,10 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 	project.RenderedVideoPath = &videoPath
 	project.WaitOffsets = waitOffsets
 	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
+	// CR-021 FR58: on-screen geometry per scene, needed by qc_video to score
+	// the render. Never assigned before this fix — every project fell back to
+	// QC's "not_scored" path regardless of QC_ENFORCE.
+	project.LayoutMarks = mapSliceFromPayload(event.Payload, "layout_marks")
 	// CR-007 FR19.2: the `with self.clip(...)` selections Rendering measured
 	// on this real render pass, stored verbatim exactly like LayoutMarks —
 	// Orchestrator never interprets a field inside, only carries it forward to
@@ -739,6 +760,16 @@ func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepE
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
+
+	// CR-007 follow-up: a project that only wants its long-form video (the
+	// default, and every project created before this field existed — Go's
+	// zero value for VideoOutputMode is "") has no clip requests to act on
+	// anyway, so dispatching generate_clips would only be a round-trip that
+	// comes back empty. Skip it and finish exactly like onClipsGenerated does.
+	if !project.VideoOutputMode.WantsClips() {
+		return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
+	}
+
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}

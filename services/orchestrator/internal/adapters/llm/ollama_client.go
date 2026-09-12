@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -136,6 +137,125 @@ Return exactly one JSON object with exactly the three keys "title", "description
 
 Script:
 %s`, categoryHint, maxTitleLength, languageName, languageName, languageName, languageName, scriptContent)
+}
+
+// buildShortScriptSuggestionPrompt (CR-026 FR71) asks for a genuinely
+// condensed Manim script — not a summary of the long-form script's Python
+// code (that would be summarizing animation code, which does not mean
+// anything), but a new short script on the same topic. sourceScriptContent,
+// when present, is truncated the same way buildSuggestPrompt already does:
+// only enough of the long-form narration to tell the model what the topic
+// actually is, not the whole thing.
+//
+// No format:"json" here (unlike Suggest): the output is multi-line Python
+// source, and forcing JSON would make the model escape every newline/quote,
+// which is a much easier way to get invalid Python back than plain text is.
+func buildShortScriptSuggestionPrompt(topic, sourceScriptContent string, language domain.ContentLanguage) string {
+	languageName := domain.ProfileFor(language).EnglishName
+	context := topic
+	if strings.TrimSpace(sourceScriptContent) != "" {
+		context = fmt.Sprintf("%s\n\nExisting long-form script on this topic, for context only — do not summarize or transform its code, just reuse the topic and key idea it teaches:\n%s", topic, truncateScript(sourceScriptContent))
+	}
+	return fmt.Sprintf(`You are writing a SHORT-FORM educational video script (Manim Community Edition v0.18) for YouTube Shorts/TikTok — 30 to 60 seconds of narration, ONE idea, no filler, hook in the first 2 seconds. This is NOT a trimmed-down version of a longer video; it must stand completely on its own.
+
+Topic:
+%s
+
+Hard rules (the render pipeline rejects anything that breaks these):
+1. Start with exactly: from conceptflow import *
+2. Exactly one class, inheriting ConceptFlowScene, name ending in "Scene":
+   class <TopicName>Scene(ConceptFlowScene):
+       def construct(self):
+           ...
+3. The ENTIRE body of construct() must be wrapped in exactly one:
+   with self.clip("short"):
+       ...
+   This is mandatory, not optional — it is how the pipeline recognizes this as a Shorts/TikTok clip.
+4. Every line of narration is a call, not a comment: self.narrate("...")
+5. Do not set colors, font sizes, or backgrounds by hand — the design system (ConceptFlowScene) handles all of that.
+6. Available components: TitleCard, Callout, CodePanel, StepList, ComparisonSplit, Recap. Available scene methods: self.narrate(...), self.hook(...), self.recap([...]), self.call_to_action(...), self.title/heading/body/caption/formula/code(...), self.stack/row/fit(...), self.reveal/dismiss/swap/emphasize/clear_stage(...).
+7. All narration text must be written in %s.
+
+Before answering, check: does construct() start with a single with self.clip("short"): wrapping everything else? Is there exactly one Scene class? Is every spoken line a self.narrate(...) call, not a comment?
+
+Respond with ONLY one Python code block (wrapped in `+"```python ... ```"+`), no explanation before or after it.`, context, languageName)
+}
+
+// stripCodeFence mirrors scriptPrompts.ts's stripMarkdownCodeFence — this is
+// a different runtime (Go, not the browser), so it cannot import that file;
+// duplicated deliberately rather than shared, since the two only need to
+// agree on "what a fenced code block looks like", not stay in lockstep.
+func stripCodeFence(script string) string {
+	trimmed := strings.TrimSpace(script)
+	fenceRe := regexp.MustCompile("(?s)```[a-zA-Z0-9]*\\r?\\n(.*?)\\r?\\n?```")
+	if match := fenceRe.FindStringSubmatch(trimmed); match != nil {
+		return match[1]
+	}
+	return script
+}
+
+// SuggestShortScript drafts a standalone short-form script for the same
+// topic as scriptContent/topic (CR-026 FR71). Retries the same number of
+// times as Suggest, for the same reason: a small local model occasionally
+// returns something unusable on the first try, and one retry is cheap next
+// to a Creator watching a spinner.
+func (c *OllamaClient) SuggestShortScript(
+	ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage,
+) (string, error) {
+	var lastErr error
+	for attempt := 1; attempt <= suggestMaxAttempts; attempt++ {
+		script, err := c.suggestShortScriptOnce(ctx, topic, sourceScriptContent, language)
+		if err == nil {
+			return script, nil
+		}
+		lastErr = err
+		if ctx.Err() != nil {
+			break
+		}
+	}
+	return "", lastErr
+}
+
+func (c *OllamaClient) suggestShortScriptOnce(
+	ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage,
+) (string, error) {
+	prompt := buildShortScriptSuggestionPrompt(topic, sourceScriptContent, language)
+
+	reqBody, err := json.Marshal(generateRequest{Model: c.model, Prompt: prompt, Stream: false})
+	if err != nil {
+		return "", fmt.Errorf("marshal ollama request: %w", err)
+	}
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/api/generate", bytes.NewReader(reqBody))
+	if err != nil {
+		return "", fmt.Errorf("build ollama request: %w", err)
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(httpReq)
+	if err != nil {
+		return "", fmt.Errorf("call ollama: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("read ollama response: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("ollama returned %d: %s", resp.StatusCode, string(body))
+	}
+
+	var genResp generateResponse
+	if err := json.Unmarshal(body, &genResp); err != nil {
+		return "", fmt.Errorf("parse ollama envelope: %w", err)
+	}
+
+	script := strings.TrimSpace(stripCodeFence(genResp.Response))
+	if script == "" {
+		return "", fmt.Errorf("model returned an empty script")
+	}
+	return script, nil
 }
 
 // Suggest asks the model for an SEO-oriented YouTube title, description and

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"orchestrator/internal/domain"
@@ -46,6 +47,14 @@ type StartRenderSagaInput struct {
 	// fields yet.
 	IntroEnabled *bool
 	OutroEnabled *bool
+
+	// CR-007 follow-up — empty means DefaultVideoOutputMode ("long").
+	VideoOutputMode domain.VideoOutputMode
+
+	// CR-026 D1 — nil means this project stands alone. When set, it must
+	// name an existing project covering the same topic; the two get linked
+	// both ways (best-effort — see Execute).
+	CompanionProjectID *string
 }
 
 // StartRenderSagaOutput is returned to the HTTP layer for the 201 response.
@@ -80,6 +89,11 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		quality = domain.DefaultRenderQuality
 	}
 
+	outputMode := input.VideoOutputMode
+	if !outputMode.IsValid() {
+		outputMode = domain.DefaultVideoOutputMode
+	}
+
 	// CR-015: SubtitleMode is authoritative when valid; otherwise fall back
 	// to the legacy boolean, which reproduces exactly the one behaviour it
 	// ever meant (burn-in) rather than guessing at a new one.
@@ -112,9 +126,26 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		BackgroundMusicVolume: input.BackgroundMusicVolume,
 		IntroEnabled:          input.IntroEnabled == nil || *input.IntroEnabled,
 		OutroEnabled:          input.OutroEnabled == nil || *input.OutroEnabled,
+		VideoOutputMode:       outputMode,
+		CompanionProjectID:    input.CompanionProjectID,
 	}
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return nil, err
+	}
+
+	// CR-026 D1: link the other project back to this new one. Best-effort —
+	// a Creator who typed a stale/wrong companion id, or a race with that
+	// project being deleted, must never cost them the video they are
+	// actually here to create.
+	if input.CompanionProjectID != nil {
+		if companion, err := uc.repo.Get(ctx, *input.CompanionProjectID); err != nil {
+			slog.Warn("could not load companion project to link back", "companion_project_id", *input.CompanionProjectID, "error", err)
+		} else {
+			companion.CompanionProjectID = &project.ProjectID
+			if err := uc.repo.Save(ctx, companion); err != nil {
+				slog.Warn("could not save companion project link", "companion_project_id", *input.CompanionProjectID, "error", err)
+			}
+		}
 	}
 
 	step := &domain.SagaStep{

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"orchestrator/internal/domain"
@@ -810,6 +811,77 @@ func TestHandleStepEventUseCase_ScriptValidated_StopsAtTheReviewGate(t *testing.
 	}
 }
 
+// TestHandleStepEventUseCase_ScriptValidated_WarnsWhenClipsWantedButScriptHasNone
+// is the bug report (2026-09-12): a project with video_output_mode short/both
+// whose script never calls self.clip(...) only found out "Chưa có clip nào"
+// after TTS/render/QC had already run for nothing — the warning must reach
+// the Creator here, at the review gate, before any of that runs.
+func TestHandleStepEventUseCase_ScriptValidated_WarnsWhenClipsWantedButScriptHasNone(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", SagaID: "saga-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ReviewEnabled: true,
+		VideoOutputMode: domain.ModeBoth,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": "n0"},
+			},
+			// No "clip_marks" key at all — same as a script that never calls
+			// self.clip(...); mapSliceFromPayload must treat that as empty.
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	found := false
+	for _, w := range project.ValidationWarnings {
+		if strings.Contains(w, "self.clip") {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected a warning about the missing self.clip() marker, got %+v", project.ValidationWarnings)
+	}
+}
+
+// TestHandleStepEventUseCase_ScriptValidated_NoClipWarningWhenLongOnly is the
+// default-mode counterpart: a project that never asked for clips must not be
+// warned about not having any — that would be noise on every ordinary video.
+func TestHandleStepEventUseCase_ScriptValidated_NoClipWarningWhenLongOnly(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", SagaID: "saga-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ReviewEnabled: true,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scenes": []interface{}{
+				map[string]interface{}{"scene_index": float64(0), "narration_text": "n0"},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	for _, w := range project.ValidationWarnings {
+		if strings.Contains(w, "self.clip") {
+			t.Fatalf("long-only project should never see the clip warning, got %+v", project.ValidationWarnings)
+		}
+	}
+}
+
 func TestHandleStepEventUseCase_ScriptValidated_SkipsTheGateWhenDisabled(t *testing.T) {
 	// FR69.7: một cổng không bỏ qua được sẽ biến thành thao tác bấm cho xong.
 	uc, repo, pub, _ := newTestUseCase()
@@ -951,7 +1023,7 @@ func TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips(t *testing.T
 	uc, repo, publisher, _ := newTestUseCase()
 	qc := newFakeQCReports()
 	uc.WithQCReports(qc)
-	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC}
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC, VideoOutputMode: domain.ModeBoth}
 	repo.steps[stepKey("saga-1", domain.StepQCVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
@@ -998,7 +1070,7 @@ func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClip
 	uc, repo, _, _ := newTestUseCase()
 	qc := newFakeQCReports()
 	uc.WithQCReports(qc)
-	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC}
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC, VideoOutputMode: domain.ModeBoth}
 	repo.steps[stepKey("saga-1", domain.StepQCVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}
 
 	err := uc.Execute(context.Background(), StepEvent{
@@ -1020,6 +1092,35 @@ func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClip
 	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
 	if report == nil || report.Status != domain.QCStatusNotScored {
 		t.Fatalf("expected not_scored report stored, got %+v", report)
+	}
+}
+
+// TestHandleStepEventUseCase_QCCompleted_SkipsGenerateClipsWhenLongOnly is the
+// CR-007 follow-up: a project that only wants its long-form video (the
+// default VideoOutputMode, and every project predating this field) must not
+// pay for a generate_clips round-trip that would come back with nothing —
+// qc_completed goes straight to ready_to_publish instead.
+func TestHandleStepEventUseCase_QCCompleted_SkipsGenerateClipsWhenLongOnly(t *testing.T) {
+	uc, repo, publisher, _ := newTestUseCase()
+	qc := newFakeQCReports()
+	uc.WithQCReports(qc)
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusRunningQC, VideoOutputMode: domain.ModeLongOnly}
+	repo.steps[stepKey("saga-1", domain.StepQCVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "qc_completed",
+		Payload: map[string]interface{}{"status": "passed"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish when video_output_mode=long, got %s", project.Status)
+	}
+	if cmd := publisher.last(); cmd != nil && cmd.envelope.EventType == string(domain.StepGenerateClips) {
+		t.Fatalf("expected no generate_clips command dispatched, got %+v", cmd)
 	}
 }
 
