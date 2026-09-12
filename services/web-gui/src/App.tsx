@@ -13,6 +13,7 @@ import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { VideoListPage } from "./pages/VideoListPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
+import { ScriptReviewerStepPage } from "./pages/ScriptReviewerStepPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 
 export function App() {
@@ -29,6 +30,7 @@ export function App() {
                 path; step 3 (Manim Engineer) is still a stub. */}
             <Route path="/create/visual-director" element={<VisualDirectorStepPage />} />
             <Route path="/create/manim-engineer" element={<ManimEngineerStepPage />} />
+            <Route path="/create/script-reviewer" element={<ScriptReviewerStepPage />} />
             <Route path="/create/settings" element={<SettingsStepPage />} />
             <Route path="/create/review" element={<ReviewStepPage />} />
 

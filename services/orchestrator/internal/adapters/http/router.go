@@ -75,8 +75,20 @@ type saveAuthoringStoryboardUseCase interface {
 	Execute(ctx context.Context, projectID, content string) error
 }
 
+// saveAuthoringCodeUseCase backs CR-025 step 3's POST
+// /v1/projects/{id}/authoring/code.
+type saveAuthoringCodeUseCase interface {
+	Execute(ctx context.Context, projectID, content string) error
+}
+
+// saveAuthoringReviewUseCase backs CR-025 step 4's POST
+// /v1/projects/{id}/authoring/review.
+type saveAuthoringReviewUseCase interface {
+	Execute(ctx context.Context, projectID, content string) error
+}
+
 // getAuthoringStateUseCase backs GET /v1/projects/{id}/authoring, letting the
-// wizard rehydrate saved story/storyboard on reload/back-navigation.
+// wizard rehydrate saved story/storyboard/code/review on reload/back-navigation.
 type getAuthoringStateUseCase interface {
 	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
 }
@@ -119,6 +131,8 @@ type Router struct {
 	promptTemplates         promptTemplatesUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
+	saveAuthoringCode       saveAuthoringCodeUseCase
+	saveAuthoringReview     saveAuthoringReviewUseCase
 	getAuthoringState       getAuthoringStateUseCase
 }
 
@@ -142,6 +156,20 @@ func (rt *Router) WithAuthoringStory(saveAuthoringStory saveAuthoringStoryUseCas
 // enabling POST /v1/projects/{project_id}/authoring/storyboard.
 func (rt *Router) WithAuthoringStoryboard(saveAuthoringStoryboard saveAuthoringStoryboardUseCase) *Router {
 	rt.saveAuthoringStoryboard = saveAuthoringStoryboard
+	return rt
+}
+
+// WithAuthoringCode attaches CR-025 step 3's save-code use case, enabling
+// POST /v1/projects/{project_id}/authoring/code.
+func (rt *Router) WithAuthoringCode(saveAuthoringCode saveAuthoringCodeUseCase) *Router {
+	rt.saveAuthoringCode = saveAuthoringCode
+	return rt
+}
+
+// WithAuthoringReview attaches CR-025 step 4's save-review use case, enabling
+// POST /v1/projects/{project_id}/authoring/review.
+func (rt *Router) WithAuthoringReview(saveAuthoringReview saveAuthoringReviewUseCase) *Router {
+	rt.saveAuthoringReview = saveAuthoringReview
 	return rt
 }
 
@@ -207,6 +235,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/admin/prompts/{role}", rt.handleUpdatePromptTemplate)
 	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
+	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
+	r.Post("/v1/projects/{project_id}/authoring/review", rt.handleSaveAuthoringReview)
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
 	return r
 }
@@ -895,10 +925,59 @@ func (rt *Router) handleSaveAuthoringStoryboard(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
 }
 
-// handleGetAuthoringState serves both saved authoring outputs (story,
-// storyboard) so the wizard can rehydrate on reload/back-navigation instead
-// of relying solely on client-side draft state. Missing outputs come back as
-// "" rather than 404 — a step not yet saved is a normal state.
+// handleSaveAuthoringCode stores the Manim Engineer output a Creator pasted
+// back after the external-AI round trip (CR-025 step 3).
+func (rt *Router) handleSaveAuthoringCode(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringCode == nil {
+		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if err := rt.saveAuthoringCode.Execute(r.Context(), projectID, req.Content); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
+}
+
+// handleSaveAuthoringReview stores the Script Reviewer verdict a Creator
+// pasted back after the external-AI round trip (CR-025 step 4).
+func (rt *Router) handleSaveAuthoringReview(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringReview == nil {
+		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if err := rt.saveAuthoringReview.Execute(r.Context(), projectID, req.Content); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
+}
+
+// handleGetAuthoringState serves every saved authoring output (story,
+// storyboard, code, review) so the wizard can rehydrate on reload/
+// back-navigation instead of relying solely on client-side draft state.
+// Missing outputs come back as "" rather than 404 — a step not yet saved is
+// a normal state.
 func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request) {
 	if rt.getAuthoringState == nil {
 		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
@@ -911,5 +990,10 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusInternalServerError, "could not read authoring state")
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"story": state.Story, "storyboard": state.Storyboard})
+	writeJSON(w, http.StatusOK, map[string]string{
+		"story":      state.Story,
+		"storyboard": state.Storyboard,
+		"code":       state.Code,
+		"review":     state.Review,
+	})
 }

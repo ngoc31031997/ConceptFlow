@@ -16,7 +16,7 @@ beforeEach(() => {
     version: 1,
     template_text: "DÀN Ý: {{previous_output}}",
   });
-  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ story: "", storyboard: "" });
+  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ story: "", storyboard: "", code: "", review: "" });
   vi.spyOn(apiClient, "saveAuthoringStoryboard").mockResolvedValue(undefined);
 });
 

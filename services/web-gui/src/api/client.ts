@@ -402,8 +402,26 @@ export async function saveAuthoringStoryboard(projectId: string, content: string
   });
 }
 
+/** CR-025 bước 3 — lưu code Manim (Manim Engineer) Creator dán vào. */
+export async function saveAuthoringCode(projectId: string, content: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+/** CR-025 bước 4 — lưu verdict PASS/REVISE (Script Reviewer) Creator dán vào. */
+export async function saveAuthoringReview(projectId: string, content: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
 /**
- * Cả hai kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
+ * Cả bốn kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
  * lại trạng thái khi Creator tải lại trang hoặc quay lại một bước trước đó,
  * thay vì chỉ dựa vào draft ở client (localStorage có thể đã mất khi mở lại
  * bằng một trình duyệt/máy khác dùng chung project_id).
@@ -411,6 +429,8 @@ export async function saveAuthoringStoryboard(projectId: string, content: string
 export interface AuthoringState {
   story: string;
   storyboard: string;
+  code: string;
+  review: string;
 }
 
 export function getAuthoringState(projectId: string): Promise<AuthoringState> {

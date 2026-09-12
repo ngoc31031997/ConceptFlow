@@ -288,6 +288,16 @@ CREATE TABLE IF NOT EXISTS project_authoring (
 -- than a second table since it shares the exact same key and lifecycle as
 -- story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT NOT NULL DEFAULT '';
+
+-- CR-025 step 3 (Manim Engineer): the pasted Manim code a Creator gets back
+-- from the external AI, same reasoning/table as story_content/
+-- storyboard_content above.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NULL DEFAULT '';
+
+-- CR-025 step 4 (Script Reviewer): the pasted PASS/REVISE verdict text a
+-- Creator gets back from the external AI, same reasoning/table as the columns
+-- above.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

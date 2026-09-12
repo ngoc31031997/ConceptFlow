@@ -104,19 +104,78 @@ func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID
 	return uc.authoring.SaveAuthoringStoryboard(ctx, projectID, content)
 }
 
-// AuthoringStateReaderPort is the read side both authoring outputs share —
-// used by GET /v1/projects/{id}/authoring so the wizard can rehydrate on
-// reload/back-navigation instead of relying solely on client-side draft state.
+// AuthoringCodePort persists CR-025 step 3's pasted Manim code.
+type AuthoringCodePort interface {
+	SaveAuthoringCode(ctx context.Context, projectID, content string) error
+	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
+}
+
+// SaveAuthoringCodeUseCase stores the Manim Engineer output a Creator pasted
+// back after the external-AI round trip (CR-025 step 3) — same "just persist
+// intent" posture as SaveAuthoringStoryUseCase/SaveAuthoringStoryboardUseCase.
+type SaveAuthoringCodeUseCase struct {
+	authoring AuthoringCodePort
+}
+
+func NewSaveAuthoringCodeUseCase(authoring AuthoringCodePort) *SaveAuthoringCodeUseCase {
+	return &SaveAuthoringCodeUseCase{authoring: authoring}
+}
+
+func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, content string) error {
+	if projectID == "" {
+		return fmt.Errorf("project_id is required")
+	}
+	if content == "" {
+		return fmt.Errorf("content is required")
+	}
+	return uc.authoring.SaveAuthoringCode(ctx, projectID, content)
+}
+
+// AuthoringReviewPort persists CR-025 step 4's pasted reviewer verdict.
+type AuthoringReviewPort interface {
+	SaveAuthoringReview(ctx context.Context, projectID, content string) error
+	GetAuthoringReview(ctx context.Context, projectID string) (string, error)
+}
+
+// SaveAuthoringReviewUseCase stores the Script Reviewer verdict a Creator
+// pasted back after the external-AI round trip (CR-025 step 4) — same
+// "just persist intent" posture as the other three authoring save use cases.
+type SaveAuthoringReviewUseCase struct {
+	authoring AuthoringReviewPort
+}
+
+func NewSaveAuthoringReviewUseCase(authoring AuthoringReviewPort) *SaveAuthoringReviewUseCase {
+	return &SaveAuthoringReviewUseCase{authoring: authoring}
+}
+
+func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, content string) error {
+	if projectID == "" {
+		return fmt.Errorf("project_id is required")
+	}
+	if content == "" {
+		return fmt.Errorf("content is required")
+	}
+	return uc.authoring.SaveAuthoringReview(ctx, projectID, content)
+}
+
+// AuthoringStateReaderPort is the read side all four authoring outputs
+// share — used by GET /v1/projects/{id}/authoring so the wizard can
+// rehydrate on reload/back-navigation instead of relying solely on
+// client-side draft state.
 type AuthoringStateReaderPort interface {
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
+	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
+	GetAuthoringReview(ctx context.Context, projectID string) (string, error)
 }
 
-// AuthoringState is what GET /v1/projects/{id}/authoring returns — both
-// pipeline outputs saved so far, empty string when a step has not been saved.
+// AuthoringState is what GET /v1/projects/{id}/authoring returns — every
+// pipeline output saved so far, empty string when a step has not been saved.
 type AuthoringState struct {
 	Story      string
 	Storyboard string
+	Code       string
+	Review     string
 }
 
 // GetAuthoringStateUseCase backs the read side of CR-025's authoring pipeline.
@@ -137,5 +196,13 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	return AuthoringState{Story: story, Storyboard: storyboard}, nil
+	code, err := uc.authoring.GetAuthoringCode(ctx, projectID)
+	if err != nil {
+		return AuthoringState{}, err
+	}
+	review, err := uc.authoring.GetAuthoringReview(ctx, projectID)
+	if err != nil {
+		return AuthoringState{}, err
+	}
+	return AuthoringState{Story: story, Storyboard: storyboard, Code: code, Review: review}, nil
 }

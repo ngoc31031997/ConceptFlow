@@ -13,10 +13,17 @@ import (
 type fakeAuthoringStore struct {
 	story      map[string]string
 	storyboard map[string]string
+	code       map[string]string
+	review     map[string]string
 }
 
 func newFakeAuthoringStore() *fakeAuthoringStore {
-	return &fakeAuthoringStore{story: map[string]string{}, storyboard: map[string]string{}}
+	return &fakeAuthoringStore{
+		story:      map[string]string{},
+		storyboard: map[string]string{},
+		code:       map[string]string{},
+		review:     map[string]string{},
+	}
 }
 
 func (f *fakeAuthoringStore) SaveAuthoringStory(_ context.Context, projectID, content string) error {
@@ -35,6 +42,24 @@ func (f *fakeAuthoringStore) SaveAuthoringStoryboard(_ context.Context, projectI
 
 func (f *fakeAuthoringStore) GetAuthoringStoryboard(_ context.Context, projectID string) (string, error) {
 	return f.storyboard[projectID], nil
+}
+
+func (f *fakeAuthoringStore) SaveAuthoringCode(_ context.Context, projectID, content string) error {
+	f.code[projectID] = content
+	return nil
+}
+
+func (f *fakeAuthoringStore) GetAuthoringCode(_ context.Context, projectID string) (string, error) {
+	return f.code[projectID], nil
+}
+
+func (f *fakeAuthoringStore) SaveAuthoringReview(_ context.Context, projectID, content string) error {
+	f.review[projectID] = content
+	return nil
+}
+
+func (f *fakeAuthoringStore) GetAuthoringReview(_ context.Context, projectID string) (string, error) {
+	return f.review[projectID], nil
 }
 
 func TestSaveAuthoringStoryUseCase(t *testing.T) {
@@ -73,17 +98,55 @@ func TestSaveAuthoringStoryboardUseCase(t *testing.T) {
 	}
 }
 
+func TestSaveAuthoringCodeUseCase(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringCodeUseCase(store)
+
+	if err := uc.Execute(context.Background(), "", "some code"); err == nil {
+		t.Fatal("expected error for empty project_id")
+	}
+	if err := uc.Execute(context.Background(), "p1", ""); err == nil {
+		t.Fatal("expected error for empty content")
+	}
+	if err := uc.Execute(context.Background(), "p1", "the code"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := store.code["p1"]; got != "the code" {
+		t.Fatalf("code not saved, got %q", got)
+	}
+}
+
+func TestSaveAuthoringReviewUseCase(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringReviewUseCase(store)
+
+	if err := uc.Execute(context.Background(), "", "some review"); err == nil {
+		t.Fatal("expected error for empty project_id")
+	}
+	if err := uc.Execute(context.Background(), "p1", ""); err == nil {
+		t.Fatal("expected error for empty content")
+	}
+	if err := uc.Execute(context.Background(), "p1", "the review"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := store.review["p1"]; got != "the review" {
+		t.Fatalf("review not saved, got %q", got)
+	}
+}
+
 func TestGetAuthoringStateUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
 	store.story["p1"] = "the story"
 	store.storyboard["p1"] = "the storyboard"
+	store.code["p1"] = "the code"
+	store.review["p1"] = "the review"
 
 	uc := application.NewGetAuthoringStateUseCase(store)
 	state, err := uc.Execute(context.Background(), "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if state.Story != "the story" || state.Storyboard != "the storyboard" {
+	if state.Story != "the story" || state.Storyboard != "the storyboard" || state.Code != "the code" || state.Review != "the review" {
 		t.Fatalf("unexpected state: %+v", state)
 	}
 
@@ -92,7 +155,7 @@ func TestGetAuthoringStateUseCase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if empty.Story != "" || empty.Storyboard != "" {
+	if empty.Story != "" || empty.Storyboard != "" || empty.Code != "" || empty.Review != "" {
 		t.Fatalf("expected empty state, got %+v", empty)
 	}
 }
