@@ -11,6 +11,10 @@ export interface RenderInput {
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
   video_format_id?: string;
   background_music_volume?: number;
+  /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
+  video_output_mode?: "long" | "short" | "both";
+  /** CR-026 D1 — links this project to another covering the same topic. */
+  companion_project_id?: string;
 }
 
 export interface SubtitleStylePayload {
@@ -85,6 +89,22 @@ export interface Project {
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
   video_format_id?: string;
+  /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
+  video_output_mode?: "long" | "short" | "both";
+  /** Kết quả generate_clips, nếu saga đã chạy tới bước đó. */
+  clips?: Clip[];
+  /** CR-026 D1 — id của project cùng chủ đề (bản dài/bản ngắn kia), nếu có. */
+  companion_project_id?: string;
+}
+
+/** Một clip dọc Shorts/TikTok cắt từ video 16:9 đã render (CR-007 D7). */
+export interface Clip {
+  name: string;
+  preset: "short" | "long";
+  status: "ok" | "error";
+  output_path?: string;
+  duration_seconds?: number;
+  error_message?: string;
 }
 
 /** Một beat lượt dry quan sát được, gắn vào câu lời thoại mở đầu nó. */

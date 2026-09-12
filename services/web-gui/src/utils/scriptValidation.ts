@@ -38,10 +38,26 @@ const SCENE_CLASS_RE = /^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:/;
  */
 const MARKDOWN_FENCE_RE = /^```[a-zA-Z0-9]*\r?\n([\s\S]*?)\r?\n?```\s*$/;
 
+/**
+ * Cùng một khối fence, nhưng KHÔNG neo đầu/cuối chuỗi. Bắt trường hợp AI
+ * (đặc biệt Gemini/ChatGPT ở chế độ mặc định) phá lệnh "chỉ trả lời bằng đúng
+ * một khối code" và vẫn thêm câu mở đầu ("Đây là script đã chỉnh sửa:") hay
+ * lời chào cuối ("Nếu cần chỉnh gì thêm...") quanh khối — khi đó
+ * MARKDOWN_FENCE_RE không khớp toàn chuỗi nên không gỡ được gì, và Creator
+ * dán luôn cả câu văn lẫn hai dòng backtick vào script.
+ */
+const MARKDOWN_FENCE_ANYWHERE_RE = /```[a-zA-Z0-9]*\r?\n([\s\S]*?)\r?\n```/;
+
 /** Gỡ khối markdown bọc ngoài nếu có; trả nguyên văn nếu không khớp. */
 export function stripMarkdownCodeFence(script: string): string {
-  const match = MARKDOWN_FENCE_RE.exec(script.trim());
-  return match ? match[1] : script;
+  const trimmed = script.trim();
+  const fullMatch = MARKDOWN_FENCE_RE.exec(trimmed);
+  if (fullMatch) return fullMatch[1];
+
+  const anywhereMatch = MARKDOWN_FENCE_ANYWHERE_RE.exec(trimmed);
+  if (anywhereMatch) return anywhereMatch[1];
+
+  return script;
 }
 
 /** Dấu hiệu script còn viết theo chuẩn trước CR-018. */

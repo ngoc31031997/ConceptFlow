@@ -33,6 +33,7 @@ export interface ProjectDraft {
   renderQuality: RenderQuality;
   videoFormatId: string;
   backgroundMusicVolume: number;
+  videoOutputMode: VideoOutputMode;
   /**
    * True once this draft has been handed to the render saga. The draft then
    * belongs to a project that already exists, so reusing it would start a
@@ -48,6 +49,16 @@ export interface ProjectDraft {
  */
 export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 
+/**
+ * Which output(s) this project produces (CR-007 follow-up). A short clip is
+ * always cut from the rendered 16:9 video (CR-007 D1 — no standalone vertical
+ * production), so "short" still renders the full long-form pipeline as
+ * source; it only changes what generate_clips does and what step 5
+ * (ResultPage) puts front and center — publishing a Shorts/TikTok clip stays
+ * a manual upload outside this app either way (no auto-publish adapter).
+ */
+export type VideoOutputMode = "long" | "short" | "both";
+
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
   | { type: "SET_SCRIPT_SOURCE"; payload: ScriptSource }
@@ -58,6 +69,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_MODE"; payload: SubtitleMode }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
+  | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
   | { type: "MARK_SUBMITTED" }
@@ -87,6 +99,7 @@ const initialDraft: ProjectDraft = {
   renderQuality: "1080p60",
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
+  videoOutputMode: "long",
   hasSubmitted: false,
 };
 
@@ -170,6 +183,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
+    case "SET_VIDEO_OUTPUT_MODE":
+      return { ...state, videoOutputMode: action.payload };
     case "SET_VIDEO_FORMAT":
       return { ...state, videoFormatId: action.payload };
     case "MARK_SUBMITTED":

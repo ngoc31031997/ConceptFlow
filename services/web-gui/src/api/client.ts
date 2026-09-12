@@ -104,6 +104,11 @@ export function getProjectThumbnailUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/thumbnail`;
 }
 
+/** CR-007 D7 — streams one generated vertical clip from the shared volume. */
+export function getProjectClipUrl(projectId: string, name: string, preset: string): string {
+  return `${GATEWAY_URL}/v1/projects/${projectId}/clips/${encodeURIComponent(name)}/${preset}`;
+}
+
 export interface ThumbnailInfo {
   exists: boolean;
   thumbnail_path: string | null;
@@ -271,6 +276,22 @@ export interface SuggestedMetadata {
 
 export function suggestPublishMetadata(id: string): Promise<SuggestedMetadata> {
   return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, { method: "POST" });
+}
+
+export interface SuggestShortScriptInput {
+  topic: string;
+  language: "vi" | "en";
+  /** Ngữ cảnh tuỳ chọn — script dài đã có, dùng để rút chủ đề (CR-026 FR71.1). */
+  source_script_content?: string;
+}
+
+/** CR-026 FR71 — soạn nháp script Shorts/TikTok bằng AI nội bộ (Ollama). */
+export function suggestShortScript(input: SuggestShortScriptInput): Promise<{ script_content: string }> {
+  return apiFetch<{ script_content: string }>("/v1/short-script-suggestions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }
 
 export function getYoutubeAuthStartUrl(projectId: string, clientId?: string): string {

@@ -118,6 +118,16 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 
 6. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
 
+7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):
+   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh
+     if): còn sót chuỗi \`# NARRATION\` hay \`wait(AUTO)\` nào không? Script dài
+     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng
+     đầu.
+   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán
+     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.
+   - Số lượng \`self.narrate(...)\` có khớp đúng số điểm cần giọng đọc trong
+     script gốc không (không thiếu, không thừa)?
+
 Script gốc:
 <dán script Manim của bạn vào đây>`;
 
@@ -244,3 +254,81 @@ export function buildAdjustPromptFor(language: "vi" | "en", script: string): str
   const trimmed = script.trim();
   return trimmed ? prompt.replace(SCRIPT_PLACEHOLDER, trimmed) : prompt;
 }
+
+/**
+ * CR-026 FR70 — a short-form (Shorts/TikTok) script is NOT a trimmed-down
+ * long-form video: it must stand on its own, hook in the first 2 seconds,
+ * one idea, no filler. And it is NOT a summary of the long-form script's
+ * Manim CODE either (that would mean summarizing animation instructions,
+ * which does not mean anything) — `sourceTopic`, when given, is only handed
+ * over as *context* for what the short should also be about, never as code
+ * to transform.
+ *
+ * The one hard requirement beyond the usual design-system rules: the entire
+ * `construct()` body must be wrapped in exactly one
+ * `with self.clip("short"):` — CR-007's existing `generate_clips` picks up
+ * anything wrapped like that with zero new code on the rendering/orchestrator
+ * side. Without this line the render still succeeds, it just produces no
+ * clip to publish, which is a `Chưa có clip nào` message with no obvious
+ * cause days later — not a normal way to lose this feature.
+ */
+export const buildShortScriptSystemPrompt = (
+  language: "vi" | "en",
+  sourceTopic?: string,
+) => `Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.
+
+======================================================
+CHỦ ĐỀ VIDEO: ${sourceTopic?.trim() ? sourceTopic.trim() : "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]"}
+======================================================
+
+## RÀNG BUỘC NỘI DUNG — khác hẳn video dài
+
+1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn "khởi
+   động" hay hạ nhiệt giữa video như bản dài.
+2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không
+   phải một câu giới thiệu chung chung.
+3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn
+   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.
+
+## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)
+
+1. Dòng import luôn là:
+   from conceptflow import *
+
+2. Định nghĩa đúng MỘT class Scene chính, kế thừa \`ConceptFlowScene\`:
+   class <TênMôTảChủĐề>Scene(ConceptFlowScene):
+       def construct(self):
+           ...
+
+3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong \`construct()\` phải
+   nằm trong ĐÚNG MỘT khối:
+       with self.clip("short"):
+           ...toàn bộ animation và self.narrate(...) ở đây...
+   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc
+   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip
+   nào xuất ra, và không có cảnh báo nào khác ngoài "Chưa có clip nào" ở màn
+   kết quả.
+
+4. Lời thoại là một LỜI GỌI HÀM: \`self.narrate("Câu lời thoại tự nhiên")\` —
+   không dùng comment, không thêm \`self.wait(...)\` ngay sau nó.
+
+5. NGÔN NGỮ: ${NARRATION_LANGUAGE_RULE[language]}
+
+## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)
+
+Component: \`TitleCard\`, \`Callout\`, \`CodePanel\`, \`StepList\`, \`ComparisonSplit\`, \`Recap\`.
+Method: \`self.narrate(...)\`, \`self.hook(...)\`, \`self.call_to_action(...)\`,
+\`self.title/heading/body/caption/formula/code(...)\`, \`self.stack/row/fit(...)\`,
+\`self.reveal/dismiss/swap/emphasize/clear_stage(...)\`. KHÔNG đặt màu/font_size
+bằng tay — theme lo phần đó.
+
+## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA
+
+1. Toàn bộ \`construct()\` có nằm trong ĐÚNG MỘT \`with self.clip("short"):\` không?
+2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?
+3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?
+4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?
+
+## OUTPUT
+
+Chỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\\`\\\`\\\`python ... \\\`\\\`\\\`), không giải thích thêm ở ngoài code.`;

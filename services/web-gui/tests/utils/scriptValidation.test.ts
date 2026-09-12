@@ -82,4 +82,19 @@ describe("stripMarkdownCodeFence", () => {
     const openOnly = "```python\n" + VALID;
     expect(stripMarkdownCodeFence(openOnly)).toBe(openOnly);
   });
+
+  it("gỡ khối fence dù AI thêm câu mở đầu trước khối code", () => {
+    const withPreamble = "Đây là script đã chỉnh sửa:\n```python\n" + VALID + "\n```";
+    expect(stripMarkdownCodeFence(withPreamble)).toBe(VALID);
+  });
+
+  it("gỡ khối fence dù AI thêm lời chào sau khối code", () => {
+    const withTrailer = "```python\n" + VALID + "\n```\nNếu cần chỉnh gì thêm, cứ nói nhé!";
+    expect(stripMarkdownCodeFence(withTrailer)).toBe(VALID);
+  });
+
+  it("gỡ khối fence dù AI thêm cả câu mở đầu lẫn lời chào cuối", () => {
+    const wrapped = "Chắc chắn rồi!\n```python\n" + VALID + "\n```\nChúc bạn quay video vui vẻ.";
+    expect(stripMarkdownCodeFence(wrapped)).toBe(VALID);
+  });
 });
