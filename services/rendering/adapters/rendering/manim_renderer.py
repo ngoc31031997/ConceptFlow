@@ -143,6 +143,7 @@ _CONCEPTFLOW_PARENT = os.path.dirname(
 # re-render) is thrown away on every pass. Rounding to a frame boundary keeps
 # the hashes stable without shifting anything the viewer can perceive.
 QUALITY_FPS = {
+    "480p15": 15,
     "720p30": 30,
     "1080p60": 60,
     "4k60": 60,
@@ -250,6 +251,10 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             chapters=[
                 (int(r["index"]), r["title"]) for r in records if r.get("kind") == "chapter"
             ],
+            # Bug report: `records` already has "clip" entries from this same
+            # dry pass (self.clip() writes marks regardless of dry/real) —
+            # just never extracted before. Same filter as _read_clip_marks.
+            clip_marks=[r for r in records if r.get("kind") == "clip"],
         )
 
     def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:

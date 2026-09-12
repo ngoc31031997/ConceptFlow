@@ -22,6 +22,7 @@ from adapters.rendering.manim_renderer import (
     DEFAULT_RENDER_QUALITY,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
     QUALITY_FLAGS,
+    QUALITY_FPS,
     ManimScriptRenderer,
 )
 from domain.errors import AnimationEngineError
@@ -534,6 +535,14 @@ def test_quality_flags_cover_the_documented_presets():
     assert set(QUALITY_FLAGS) == {"480p15", "720p30", "1080p60", "4k60"}
 
 
+def test_quality_fps_covers_every_quality_flag():
+    """QUALITY_FPS từng thiếu "480p15" — QUALITY_FLAGS cho phép chọn preset đó
+    (Test/Draft ở RenderQualityPicker) nhưng render() tra QUALITY_FPS[quality]
+    vô điều kiện, nên chọn preset này chỉ crash ở lượt render THẬT (KeyError),
+    không bao giờ bị dry-run hay lint bắt trước. Hai dict phải luôn khớp key."""
+    assert set(QUALITY_FPS) == set(QUALITY_FLAGS)
+
+
 def test_per_project_quality_overrides_the_service_default(tmp_path, monkeypatch):
     """CR-004 FR12.6: a Creator checks content with a fast 720p30 draft, then
     renders the upload pass at 1080p60 — same project, different pass."""
@@ -631,6 +640,55 @@ def test_dry_run_collects_narration_beats_and_chapters(tmp_path, monkeypatch):
         "PATH", "HOME", "CF_MARKS_PATH", "PYTHONPATH", "CF_MODE",
     }
     assert not os.path.exists(os.path.join(str(tmp_path), "out.mp4"))
+
+
+def test_dry_run_collects_clip_marks(tmp_path, monkeypatch):
+    """Bug report (2026-09-12): a project that picked video_output_mode
+    short/both with a script that never called self.clip(...) only found out
+    "Chưa có clip nào" after TTS + render had already run — because dry_run()
+    discarded "clip" records the same marks file already had. This locks the
+    fix: clip_marks must come back from the dry pass, same shape as
+    _read_clip_marks reads for the real render."""
+    import json
+
+    renderer = ManimScriptRenderer(cache_root=None)
+
+    def fake_popen(cmd, **kwargs):
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w", encoding="utf-8") as f:
+            for record in [
+                {"kind": "narration", "index": 0, "text": "dòng một"},
+                {
+                    "kind": "clip", "name": "vi du", "index": 0,
+                    "t_start": 1.0, "t_end": 5.0,
+                },
+            ]:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+
+    result = renderer.dry_run(make_request())
+
+    assert result.clip_marks == [
+        {"kind": "clip", "name": "vi du", "index": 0, "t_start": 1.0, "t_end": 5.0},
+    ]
+
+
+def test_dry_run_clip_marks_empty_when_script_never_calls_self_clip(tmp_path, monkeypatch):
+    import json
+
+    renderer = ManimScriptRenderer(cache_root=None)
+
+    def fake_popen(cmd, **kwargs):
+        with open(kwargs["env"]["CF_MARKS_PATH"], "w", encoding="utf-8") as f:
+            f.write(json.dumps({"kind": "narration", "index": 0, "text": "x"}) + "\n")
+        return FakePopen()
+
+    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
+
+    result = renderer.dry_run(make_request())
+
+    assert result.clip_marks == []
 
 
 def test_dry_run_fails_when_script_produces_no_narration(monkeypatch):

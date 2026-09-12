@@ -187,6 +187,7 @@ class ValidateScriptCommandHandler:
                 result.dry_run.beats,
                 result.dry_run.chapters,
                 [str(issue) for issue in result.warnings],
+                result.dry_run.clip_marks,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():

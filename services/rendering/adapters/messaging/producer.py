@@ -80,6 +80,7 @@ def script_validated_envelope(
     beats: list[tuple[int, str]],
     chapters: list[tuple[int, str]],
     warnings: list[str],
+    clip_marks: list[dict] | None = None,
 ) -> dict:
     """CR-020 FR56 — kết quả cổng kiểm tra, chạy trước TTS.
 
@@ -87,6 +88,14 @@ def script_validated_envelope(
     và các bước phía sau không phải đổi cách đọc. Khác biệt nằm ở nguồn: danh
     sách này đến từ việc **chạy** script (thứ tự runtime), không phải từ việc
     quét comment (thứ tự dòng).
+
+    clip_marks (bug report, 2026-09-12): lượt dry đã tính được `with
+    self.clip(...)` từ trước (CR-007), nhưng trước đây chỉ gửi đi ở
+    `rendering_completed` — tức là SAU khi đã tốn TTS. Một project chọn
+    `video_output_mode` short/both mà script không đánh dấu gì thì render
+    xong mới biết "Chưa có clip nào", tốn hết mọi thứ trước đó vô ích. Gửi
+    kèm ở đây để Orchestrator/GUI cảnh báo ngay tại màn duyệt dàn ý — trước
+    khi TTS chạy — cho Creator cơ hội quay lại sửa script khi chưa tốn gì.
     """
     return build_envelope(
         saga_id,
@@ -109,6 +118,7 @@ def script_validated_envelope(
             "chapters": [{"scene_index": i, "title": value} for i, value in chapters],
             # Cảnh báo không chặn Saga; Orchestrator chuyển tiếp để GUI hiện ra.
             "warnings": warnings,
+            "clip_marks": clip_marks or [],
         },
     )
 
