@@ -1,4 +1,4 @@
-import { useContext, useEffect } from "react";
+import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { ScriptAssistant } from "../components/ScriptAssistant";
@@ -10,6 +10,7 @@ import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { validateScript } from "../utils/scriptValidation";
+import { saveAuthoringStory } from "../api/client";
 import styles from "./WizardSteps.module.css";
 
 /**
@@ -40,13 +41,45 @@ export function ScriptStepPage() {
     wordsPerMinuteFor(calibration, draft.voiceId),
   );
   const isEmpty = draft.scriptContent.trim().length === 0;
-  const canContinue = !isEmpty && validation.isValid;
 
-  const hint = isEmpty
-    ? "Dán hoặc tạo script Manim để tiếp tục"
-    : validation.isValid
-      ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-      : validation.message;
+  // CR-025: source "blank" now goes through the Story Architect pipeline —
+  // "Tiếp tục" saves the pasted story outline server-side and advances to
+  // the (stub) Visual Director step, instead of validating Manim code.
+  const isStoryMode = draft.scriptSource === "blank";
+  const [savingStory, setSavingStory] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const storyIsEmpty = draft.authoringStory.trim().length === 0;
+
+  const canContinue = isStoryMode ? !storyIsEmpty && !savingStory : !isEmpty && validation.isValid;
+
+  const hint = isStoryMode
+    ? saveError
+      ? saveError
+      : storyIsEmpty
+        ? "Dán dàn ý câu chuyện AI trả về để tiếp tục"
+        : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh"
+    : isEmpty
+      ? "Dán hoặc tạo script Manim để tiếp tục"
+      : validation.isValid
+        ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+        : validation.message;
+
+  async function handleContinue() {
+    if (!isStoryMode) {
+      navigate("/create/settings");
+      return;
+    }
+    setSavingStory(true);
+    setSaveError(null);
+    try {
+      await saveAuthoringStory(draft.projectId, draft.authoringStory);
+      navigate("/create/visual-director");
+    } catch {
+      setSaveError("Không lưu được dàn ý, thử lại.");
+    } finally {
+      setSavingStory(false);
+    }
+  }
 
   return (
     <div data-testid="script-step-page">
@@ -72,23 +105,31 @@ export function ScriptStepPage() {
               onUseTemplate={() =>
                 dispatch({ type: "SET_SCRIPT", payload: SCRIPT_TEMPLATES[draft.voiceLanguage] })
               }
+              storyOutline={draft.authoringStory}
+              onStoryOutlineChange={(value) => dispatch({ type: "SET_AUTHORING_STORY", payload: value })}
             />
           </div>
 
-          <ScriptEditor
-            value={draft.scriptContent}
-            onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
-            contentLanguage={draft.voiceLanguage}
-            wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
-          />
+          {/* CR-025: "blank" no longer pastes Manim code directly here — the
+              story outline textarea inside ScriptAssistant replaces this
+              step until the pipeline (Visual Director → Manim Engineer)
+              produces actual code. */}
+          {!isStoryMode && (
+            <ScriptEditor
+              value={draft.scriptContent}
+              onChange={(value) => dispatch({ type: "SET_SCRIPT", payload: value })}
+              contentLanguage={draft.voiceLanguage}
+              wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
+            />
+          )}
         </div>
       </AppShell>
 
       <WizardNav
         hint={hint}
-        isBlocked={!isEmpty && !validation.isValid}
-        onNext={() => navigate("/create/settings")}
-        nextLabel="Tiếp tục"
+        isBlocked={isStoryMode ? !!saveError : !isEmpty && !validation.isValid}
+        onNext={handleContinue}
+        nextLabel={isStoryMode ? (savingStory ? "Đang lưu..." : "Tiếp tục") : "Tiếp tục"}
         nextDisabled={!canContinue}
         nextTestId="script-step-next"
       />

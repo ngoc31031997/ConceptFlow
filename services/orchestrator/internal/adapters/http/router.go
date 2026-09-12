@@ -55,6 +55,32 @@ type channelAssetsUseCase interface {
 	Preview(ctx context.Context) ([]domain.ChannelAssetPointer, error)
 }
 
+// promptTemplatesUseCase backs CR-025's prompt-template CRUD endpoints (the
+// admin screen, and web-gui's runtime read of the current wording).
+type promptTemplatesUseCase interface {
+	Get(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error)
+	List(ctx context.Context) ([]domain.PromptTemplate, error)
+	Update(ctx context.Context, role domain.PromptRole, language, templateText string) (domain.PromptTemplate, error)
+}
+
+// saveAuthoringStoryUseCase backs CR-025 step 1's POST
+// /v1/projects/{id}/authoring/story.
+type saveAuthoringStoryUseCase interface {
+	Execute(ctx context.Context, projectID, content string) error
+}
+
+// saveAuthoringStoryboardUseCase backs CR-025 step 2's POST
+// /v1/projects/{id}/authoring/storyboard.
+type saveAuthoringStoryboardUseCase interface {
+	Execute(ctx context.Context, projectID, content string) error
+}
+
+// getAuthoringStateUseCase backs GET /v1/projects/{id}/authoring, letting the
+// wizard rehydrate saved story/storyboard on reload/back-navigation.
+type getAuthoringStateUseCase interface {
+	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
+}
+
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -81,15 +107,49 @@ type projectStore interface {
 
 // Router holds the REST handlers' use case dependencies.
 type Router struct {
-	startRenderSaga        startRenderSagaUseCase
-	startPublishSaga       startPublishSagaUseCase
-	retryStep              retryStepUseCase
-	reviewOutline          reviewOutlineUseCase
-	projects               projectStore
-	suggestPublishMetadata suggestPublishMetadataUseCase
-	channelAssets          channelAssetsUseCase
-	qcReports              qcReportReader
-	suggestShortScript     suggestShortScriptUseCase
+	startRenderSaga         startRenderSagaUseCase
+	startPublishSaga        startPublishSagaUseCase
+	retryStep               retryStepUseCase
+	reviewOutline           reviewOutlineUseCase
+	projects                projectStore
+	suggestPublishMetadata  suggestPublishMetadataUseCase
+	channelAssets           channelAssetsUseCase
+	qcReports               qcReportReader
+	suggestShortScript      suggestShortScriptUseCase
+	promptTemplates         promptTemplatesUseCase
+	saveAuthoringStory      saveAuthoringStoryUseCase
+	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
+	getAuthoringState       getAuthoringStateUseCase
+}
+
+// WithPromptTemplates attaches CR-025's prompt-template use case, enabling
+// GET /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the
+// routes answer 404, the same "unwired means absent" posture as
+// WithQCReports.
+func (rt *Router) WithPromptTemplates(promptTemplates promptTemplatesUseCase) *Router {
+	rt.promptTemplates = promptTemplates
+	return rt
+}
+
+// WithAuthoringStory attaches CR-025 step 1's save-story use case, enabling
+// POST /v1/projects/{project_id}/authoring/story.
+func (rt *Router) WithAuthoringStory(saveAuthoringStory saveAuthoringStoryUseCase) *Router {
+	rt.saveAuthoringStory = saveAuthoringStory
+	return rt
+}
+
+// WithAuthoringStoryboard attaches CR-025 step 2's save-storyboard use case,
+// enabling POST /v1/projects/{project_id}/authoring/storyboard.
+func (rt *Router) WithAuthoringStoryboard(saveAuthoringStoryboard saveAuthoringStoryboardUseCase) *Router {
+	rt.saveAuthoringStoryboard = saveAuthoringStoryboard
+	return rt
+}
+
+// WithAuthoringState attaches CR-025's read-side use case, enabling
+// GET /v1/projects/{project_id}/authoring.
+func (rt *Router) WithAuthoringState(getAuthoringState getAuthoringStateUseCase) *Router {
+	rt.getAuthoringState = getAuthoringState
+	return rt
 }
 
 // WithQCReports attaches the QC report store, enabling
@@ -137,6 +197,17 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/clips", rt.handleCreateClip)
 	r.Get("/v1/projects/{project_id}/clips", rt.handleListClips)
 	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
+	// CR-025: prompt wording moved to the DB. Public read (web-gui's wizard
+	// fetches the current template at runtime); admin list/update (the
+	// PromptSettingsPage editor). No auth guard exists on this router today —
+	// same "add plainly, don't invent auth" posture the plan called for; see
+	// the router_test.go note and the final report's followup item.
+	r.Get("/v1/prompts/{role}", rt.handleGetPromptTemplate)
+	r.Get("/v1/admin/prompts", rt.handleListPromptTemplates)
+	r.Put("/v1/admin/prompts/{role}", rt.handleUpdatePromptTemplate)
+	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
+	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
+	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
 	return r
 }
 
@@ -706,4 +777,139 @@ func (rt *Router) handleEditNarration(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusInternalServerError, "could not edit the narration")
 	}
+}
+
+// handleGetPromptTemplate serves the current wording for one pipeline role
+// (CR-025). ?language defaults to "vi" — the primary content language this
+// codebase's Creator-facing strings are written in.
+func (rt *Router) handleGetPromptTemplate(w http.ResponseWriter, r *http.Request) {
+	if rt.promptTemplates == nil {
+		writeError(w, http.StatusNotFound, "prompt templates are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+	if !domain.ValidPromptRole(role) {
+		writeError(w, http.StatusBadRequest, "unknown role")
+		return
+	}
+	language := r.URL.Query().Get("language")
+	if language == "" {
+		language = "vi"
+	}
+
+	template, err := rt.promptTemplates.Get(r.Context(), domain.PromptRole(role), language)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "no template for this role/language")
+		return
+	}
+	writeJSON(w, http.StatusOK, template)
+}
+
+// handleListPromptTemplates serves every role/language row for the admin
+// editor screen (CR-025).
+func (rt *Router) handleListPromptTemplates(w http.ResponseWriter, r *http.Request) {
+	if rt.promptTemplates == nil {
+		writeError(w, http.StatusNotFound, "prompt templates are not enabled")
+		return
+	}
+	templates, err := rt.promptTemplates.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read prompt templates")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"templates": templates})
+}
+
+// handleUpdatePromptTemplate saves an editor's wording change and bumps
+// version (CR-025). No destructive history is kept — unlike video_formats,
+// a stale prompt does not need to stay reproducible against past renders.
+func (rt *Router) handleUpdatePromptTemplate(w http.ResponseWriter, r *http.Request) {
+	if rt.promptTemplates == nil {
+		writeError(w, http.StatusNotFound, "prompt templates are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+
+	var req struct {
+		Language     string `json:"language"`
+		TemplateText string `json:"template_text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	updated, err := rt.promptTemplates.Update(r.Context(), domain.PromptRole(role), req.Language, req.TemplateText)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+// handleSaveAuthoringStory stores the Story Architect output a Creator
+// pasted back after the external-AI round trip (CR-025 step 1).
+func (rt *Router) handleSaveAuthoringStory(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringStory == nil {
+		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if err := rt.saveAuthoringStory.Execute(r.Context(), projectID, req.Content); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
+}
+
+// handleSaveAuthoringStoryboard stores the Visual Director output a Creator
+// pasted back after the external-AI round trip (CR-025 step 2).
+func (rt *Router) handleSaveAuthoringStoryboard(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringStoryboard == nil {
+		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	if err := rt.saveAuthoringStoryboard.Execute(r.Context(), projectID, req.Content); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
+}
+
+// handleGetAuthoringState serves both saved authoring outputs (story,
+// storyboard) so the wizard can rehydrate on reload/back-navigation instead
+// of relying solely on client-side draft state. Missing outputs come back as
+// "" rather than 404 — a step not yet saved is a normal state.
+func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request) {
+	if rt.getAuthoringState == nil {
+		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	state, err := rt.getAuthoringState.Execute(r.Context(), projectID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not read authoring state")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"story": state.Story, "storyboard": state.Storyboard})
 }

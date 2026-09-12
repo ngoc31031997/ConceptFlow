@@ -60,7 +60,7 @@ Quy tắc cứng:
 `;
 }
 
-const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
+export const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
   vi: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.",
   en: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
 };

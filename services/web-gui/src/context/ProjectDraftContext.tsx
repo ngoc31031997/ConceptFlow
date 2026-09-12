@@ -35,6 +35,20 @@ export interface ProjectDraft {
   backgroundMusicVolume: number;
   videoOutputMode: VideoOutputMode;
   /**
+   * CR-025 step 1 — the Story Architect story outline the Creator pasted
+   * back and the server has saved (POST /v1/projects/:id/authoring/story).
+   * Kept here so step 2 (Visual Director, currently a stub) can show it as
+   * {{previous_output}} without a re-fetch.
+   */
+  authoringStory: string;
+  /**
+   * CR-025 step 2 — the Visual Director storyboard the Creator pasted back
+   * and the server has saved (POST /v1/projects/:id/authoring/storyboard).
+   * Kept here so step 3 (Manim Engineer, currently a stub) can show
+   * story+storyboard as {{previous_output}} without a re-fetch.
+   */
+  authoringStoryboard: string;
+  /**
    * True once this draft has been handed to the render saga. The draft then
    * belongs to a project that already exists, so reusing it would start a
    * second saga against the same project_id and overwrite the first video.
@@ -72,6 +86,8 @@ export type ProjectDraftAction =
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
+  | { type: "SET_AUTHORING_STORY"; payload: string }
+  | { type: "SET_AUTHORING_STORYBOARD"; payload: string }
   | { type: "MARK_SUBMITTED" }
   | { type: "RESUME_EDITING" }
   | { type: "RESET" };
@@ -100,6 +116,8 @@ const initialDraft: ProjectDraft = {
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
+  authoringStory: "",
+  authoringStoryboard: "",
   hasSubmitted: false,
 };
 
@@ -187,6 +205,10 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, videoOutputMode: action.payload };
     case "SET_VIDEO_FORMAT":
       return { ...state, videoFormatId: action.payload };
+    case "SET_AUTHORING_STORY":
+      return { ...state, authoringStory: action.payload };
+    case "SET_AUTHORING_STORYBOARD":
+      return { ...state, authoringStoryboard: action.payload };
     case "MARK_SUBMITTED":
       return { ...state, hasSubmitted: true };
     // CR-024's "Quay lại sửa script" (outline rejected): the render saga has

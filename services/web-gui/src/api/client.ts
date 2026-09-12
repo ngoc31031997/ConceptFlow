@@ -351,6 +351,72 @@ export async function completeYoutubeAuthCallback(
   return response.json() as Promise<YoutubeAuthCallbackResult>;
 }
 
+/** CR-025 — one role/language row of the DB-backed prompt-template store. */
+export interface PromptTemplate {
+  role: "story_architect" | "visual_director" | "manim_engineer" | "script_reviewer";
+  language: "vi" | "en";
+  template_text: string;
+  version: number;
+  updated_at?: string;
+}
+
+/** Đọc wording hiện tại của một vai trò (chạy lúc runtime, không hardcode nữa). */
+export function getPromptTemplate(role: PromptTemplate["role"], language: "vi" | "en"): Promise<PromptTemplate> {
+  return apiFetch<PromptTemplate>(`/v1/prompts/${role}?language=${language}`);
+}
+
+/** Toàn bộ template (mọi vai trò/ngôn ngữ) — cho màn admin sửa prompt. */
+export async function listPromptTemplates(): Promise<PromptTemplate[]> {
+  const result = await apiFetch<{ templates: PromptTemplate[] }>("/v1/admin/prompts");
+  return result.templates;
+}
+
+/** Lưu nội dung một template mới, tăng version (CR-025). */
+export function updatePromptTemplate(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+  templateText: string,
+): Promise<PromptTemplate> {
+  return apiFetch<PromptTemplate>(`/v1/admin/prompts/${role}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language, template_text: templateText }),
+  });
+}
+
+/** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
+export async function saveAuthoringStory(projectId: string, content: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/story`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+/** CR-025 bước 2 — lưu storyboard (Visual Director) Creator dán vào. */
+export async function saveAuthoringStoryboard(projectId: string, content: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/storyboard`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
+}
+
+/**
+ * Cả hai kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
+ * lại trạng thái khi Creator tải lại trang hoặc quay lại một bước trước đó,
+ * thay vì chỉ dựa vào draft ở client (localStorage có thể đã mất khi mở lại
+ * bằng một trình duyệt/máy khác dùng chung project_id).
+ */
+export interface AuthoringState {
+  story: string;
+  storyboard: string;
+}
+
+export function getAuthoringState(projectId: string): Promise<AuthoringState> {
+  return apiFetch<AuthoringState>(`/v1/projects/${projectId}/authoring`);
+}
+
 export function subscribeProgress(
   projectId: string,
   onMessage: (msg: ProgressMessage) => void,

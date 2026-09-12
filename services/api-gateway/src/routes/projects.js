@@ -62,6 +62,14 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.post('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/clips/:name/:preset', clipHandler(orchestratorClient, sharedDir));
+  // CR-025 step 1 — saves the Story Architect output a Creator pasted back
+  // after the external-AI round trip.
+  router.post('/v1/projects/:id/authoring/story', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-025 step 2 — same shape, for the Visual Director's pasted storyboard.
+  router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-025 — rehydrates both saved authoring outputs (story + storyboard) so
+  // the wizard can restore state on reload/back-navigation.
+  router.get('/v1/projects/:id/authoring', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post(
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
