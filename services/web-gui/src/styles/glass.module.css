@@ -148,3 +148,91 @@
   resize: vertical;
   font: 13.5px/1.7 "SF Mono", ui-monospace, Menlo, monospace;
 }
+
+/*
+  Spacing utilities (UX review #1) — replace ad-hoc inline
+  `style={{ marginTop: N }}` with the theme.css scale. Margin-top only: every
+  site that needed this was stacking one block under another, never side gaps.
+*/
+.mtXs {
+  margin-top: var(--space-xs);
+}
+.mtSm {
+  margin-top: var(--space-sm);
+}
+.mtMd {
+  margin-top: var(--space-md);
+}
+.mtLg {
+  margin-top: var(--space-lg);
+}
+
+/*
+  Disclosure toggle (UX review #5) — one "show more" affordance (chevron that
+  rotates open) shared by every collapsible section, replacing three
+  different patterns that had grown up independently (a custom chevron
+  button in ProjectInputPanel, a plain ghostBtn swapped for a card in
+  ResultPage's rerender/Shorts-companion boxes, and a native
+  <details>/<summary> in ShortScriptAssistant's prompt preview).
+*/
+.discloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.discloseChevron {
+  font-size: 14px;
+  flex: none;
+  margin-left: 10px;
+  transition: transform 0.15s ease;
+  color: rgba(16, 28, 40, 0.55);
+}
+.discloseChevron[data-open="true"] {
+  transform: rotate(180deg);
+}
+
+/*
+  Status badge (UX review #3) — lifted from VideoListPage, which had the only
+  status-color vocabulary in the app; RenderPage/ResultPage each re-invented
+  their own status visual (spinner text, colored card border) instead of
+  reusing it. See components/StatusBadge.tsx.
+*/
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.badgeDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.badgeSuccess {
+  background: rgba(31, 157, 85, 0.12);
+  color: var(--success);
+}
+.badgeProgress {
+  background: rgba(47, 143, 224, 0.12);
+  color: var(--accent);
+}
+.badgeFailed {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.badgeNeutral {
+  background: rgba(22, 34, 46, 0.08);
+  color: var(--ink-soft);
+}

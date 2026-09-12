@@ -20,9 +20,15 @@ const OPTIONS: { value: RenderQuality; label: string; hint: string }[] = [
   { value: "4k60", label: "Cao", hint: "4K60 — rất nặng, chỉ dùng khi thật sự cần" },
 ];
 
+/**
+ * No outer `glass.card` here (UX review #2 nesting fix) — both call sites
+ * (SettingsStepPage, ResultPage's rerender section) now render this inside a
+ * `Disclosure`, which already provides the card; wrapping again produced a
+ * visible card-inside-a-card.
+ */
 export function RenderQualityPicker({ value, onChange }: RenderQualityPickerProps) {
   return (
-    <div className={glass.card} style={{ padding: 22 }} data-testid="render-quality-picker">
+    <div data-testid="render-quality-picker">
       <div className={glass.cardTitle} style={{ marginBottom: 10 }}>
         Chất lượng video
       </div>

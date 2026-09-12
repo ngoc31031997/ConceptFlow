@@ -1,0 +1,28 @@
+/*
+  OutlineReview (CR-024) can run to dozens of narration lines — cramming it
+  above ProgressTracker in one stacked column pushed the status tracker far
+  down the page and made the whole screen feel like a wall of text. Split into
+  two columns only while there is actually a second thing to show (the
+  outline); RenderPage falls back to a single centered column the rest of the
+  time, same as before this changed.
+*/
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 22px;
+}
+
+.tracker {
+  position: sticky;
+  top: 24px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .tracker {
+    position: static;
+  }
+}

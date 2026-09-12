@@ -1,18 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { StatusBadge } from "../components/StatusBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
-import { statusLabel } from "../utils/pipelineLabels";
-
-function statusBadgeClass(status: string): string {
-  if (status.startsWith("failed_at_")) return styles.badgeFailed;
-  if (status === "published" || status === "ready_to_publish") return styles.badgeSuccess;
-  if (status === "draft") return styles.badgeNeutral;
-  return styles.badgeProgress;
-}
 
 function TrashIcon() {
   return (
@@ -176,12 +169,11 @@ export function VideoListPage() {
                   <div className={styles.rowMain}>
                     <div className={styles.projectId}>{project.project_id}</div>
                     <div className={styles.meta}>
-                      <span className={`${styles.badge} ${statusBadgeClass(project.status)}`}>
-                        <span className={styles.badgeDot} />
-                        {statusLabel(project.status)}
-                      </span>
+                      <StatusBadge status={project.status} />
+                      {project.error_message && (
+                        <span className={styles.errorText}>{project.error_message}</span>
+                      )}
                       <span className={glass.cardHint}>
-                        {project.error_message ? `${project.error_message} · ` : ""}
                         {new Date(project.updated_at).toLocaleString("vi-VN")}
                       </span>
                     </div>

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, getMusicInfo, getProjectMusicUrl, uploadMusic } from "../api/client";
-import glass from "../styles/glass.module.css";
 import styles from "./BackgroundMusicPicker.module.css";
 
 interface BackgroundMusicPickerProps {
@@ -86,8 +85,11 @@ export function BackgroundMusicPicker({
     }
   }
 
+  // No outer `glass.card` here (UX review #2 nesting fix) — its only call
+  // site (SettingsStepPage) now renders this inside a `Disclosure`, which
+  // already provides the card.
   return (
-    <div className={glass.card}>
+    <div>
       <div className={styles.row}>
         <div className={styles.label}>
           <div className={styles.icon}>

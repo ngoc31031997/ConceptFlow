@@ -8,10 +8,10 @@ import styles from "./AppShell.module.css";
   and gave the two automatic phases equal billing, so it described the plumbing
   rather than the path.
 */
-const STEP_LABELS = ["Script", "Cấu hình", "Xem lại", "Xử lý", "Đăng"] as const;
+const STEP_LABELS = ["Script", "Cấu hình", "Xem lại", "Xử lý", "Kết quả", "Đăng"] as const;
 
 interface AppShellProps {
-  currentStep?: 1 | 2 | 3 | 4 | 5;
+  currentStep?: 1 | 2 | 3 | 4 | 5 | 6;
   title: string;
   subtitle: string;
   wide?: boolean;

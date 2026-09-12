@@ -13,7 +13,9 @@ import { validateScript } from "../utils/scriptValidation";
 import styles from "./WizardSteps.module.css";
 
 /**
- * Step 1 of 3 — get a valid script.
+ * Step 1 of 5 (AppShell's STEP_LABELS) — get a valid script. Steps 4/5
+ * (render/publish) only became visible screens after CR-024/CR-021; this
+ * docstring used to still say "of 3" from before that.
  *
  * Content language leads the step because it decides what language the AI is
  * asked to write the narration in; picking it later would mean regenerating

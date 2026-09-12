@@ -1,0 +1,88 @@
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 22px;
+}
+
+.preview {
+  position: sticky;
+  top: 24px;
+}
+
+.publishColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .preview {
+    position: static;
+  }
+}
+
+/*
+  The publish button used to re-enable the moment POST /v1/sagas/publish
+  returned — the saga had only been *started*, so a second click landed on a
+  409 and the user had no sign the upload was running. These two cards render
+  the publishing / failed states the project status reports instead.
+*/
+.publishedCard {
+  text-align: center;
+  padding: 44px 32px;
+}
+
+.publishedTitle {
+  margin: 0 0 12px;
+  font-size: 19px;
+  font-weight: 700;
+}
+
+.publishStatus {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px;
+}
+
+.spinner {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2.5px solid rgba(120, 120, 140, 0.25);
+  border-top-color: rgba(90, 120, 255, 0.9);
+  animation: publishSpin 0.8s linear infinite;
+}
+
+@keyframes publishSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}
+
+.publishStatusText {
+  margin: 0;
+  font-weight: 600;
+}
+
+.publishStatusHint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.failedCard {
+  padding: 20px 22px;
+  border: 1px solid rgba(224, 67, 47, 0.35);
+}

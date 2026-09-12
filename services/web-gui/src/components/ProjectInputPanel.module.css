@@ -1,0 +1,32 @@
+/* Toggle/chevron/body moved to the shared Disclosure component (UX review #5). */
+
+.grid {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+  margin: 0 0 18px;
+  font-size: 13px;
+}
+
+.grid dt {
+  color: rgba(16, 28, 40, 0.6);
+}
+
+.grid dd {
+  margin: 0;
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.scriptHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.scriptLabel {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgba(16, 28, 40, 0.75);
+}

@@ -68,4 +68,26 @@ describe("RenderPage error recovery", () => {
     await waitFor(() => expect(screen.getByTestId("error-banner-retry-button")).toBeInTheDocument());
     expect(screen.queryByTestId("error-banner-back-button")).not.toBeInTheDocument();
   });
+
+  it("hiện dàn ý và tiến độ cùng lúc, cạnh nhau, khi đang chờ duyệt", async () => {
+    // Bug report: OutlineReview (có thể dài hàng chục dòng) xếp chồng lên
+    // ProgressTracker trong một cột duy nhất đẩy tiến độ xuống rất xa, làm cả
+    // trang giống một bức tường chữ. Cả hai phải cùng hiện, không cái nào che
+    // mất cái kia.
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        project_id: "p1",
+        status: "awaiting_review",
+        scenes: [{ scene_index: 0, narration_text: "Vì sao vòng lặp này chạy mãi" }],
+        beats: [],
+      }),
+    }) as unknown as typeof fetch;
+
+    renderRenderPage();
+
+    await waitFor(() => expect(screen.getByTestId("outline-review")).toBeInTheDocument());
+    expect(screen.getByText(/Vì sao vòng lặp này chạy mãi/)).toBeInTheDocument();
+    expect(screen.getByTestId("progress-tracker-steps")).toBeInTheDocument();
+  });
 });

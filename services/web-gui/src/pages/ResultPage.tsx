@@ -1,127 +1,43 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { VideoPlayer } from "../components/VideoPlayer";
-import { YoutubeChannels } from "../components/YoutubeChannels";
-import { ThumbnailUpload } from "../components/ThumbnailUpload";
-import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
+import { VideoOutputModePicker } from "../components/VideoOutputModePicker";
 import { useProject } from "../hooks/useProject";
-import { QCReportPanel } from "../components/QCReportPanel";
-import {
-  startPublishSaga,
-  startRenderSaga,
-  retryProject,
-  deleteProject,
-  getProjectVideoUrl,
-  ApiError,
-  ERROR_CODE_QC_BLOCKED,
-} from "../api/client";
-import type { PublishMetadata } from "../types";
-import type { RenderQuality } from "../context/ProjectDraftContext";
+import { ProjectInputPanel } from "../components/ProjectInputPanel";
+import { ClipsPanel } from "../components/ClipsPanel";
+import { ShortScriptAssistant } from "../components/ShortScriptAssistant";
+import { CompanionProjectCard } from "../components/CompanionProjectCard";
+import { Disclosure } from "../components/Disclosure";
+import { startRenderSaga, deleteProject, getProjectVideoUrl, ApiError } from "../api/client";
+import type { RenderQuality, VideoOutputMode } from "../context/ProjectDraftContext";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
 
+/**
+ * Bước 5 — "Kết quả" (bug report, 2026-09-12): trước đây trang này vừa xem
+ * lại video vừa đăng bài cùng lúc, nên "chỉ muốn xem/chỉnh sửa" và "chỉ muốn
+ * đăng" luôn phải đi qua chung một trang dài. Tách ra: trang này CHỈ xem lại
+ * và các thao tác khác (render lại, tạo bản Shorts, xem input, xoá) — đăng
+ * bài chuyển hẳn sang `PublishPage` (Bước 6), tới đây bằng nút "Tiếp tục để
+ * đăng" hoặc link "Xem chi tiết" khi đã đăng rồi.
+ */
 export function ResultPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
-  const { project, refetch } = useProject(projectId);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { project } = useProject(projectId);
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
-  const [channelId, setChannelId] = useState<string | null>(null);
-  const [showRerender, setShowRerender] = useState(false);
   const [rerenderQuality, setRerenderQuality] = useState<RenderQuality>("1080p60");
+  // null = "not touched yet": the sensible default is "carry over this
+  // project's current mode", which is not known until `project` loads.
+  const [rerenderOutputModeOverride, setRerenderOutputModeOverride] = useState<VideoOutputMode | null>(
+    null,
+  );
   const [isRerendering, setIsRerendering] = useState(false);
   const [rerenderError, setRerenderError] = useState<string | null>(null);
-  /*
-    State lands a render behind the click, so two fast clicks can both read
-    isSubmitting === false and fire two POSTs. The ref flips synchronously.
-  */
-  const inFlightRef = useRef(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  /** FR61.2 — bấm mốc thời gian trong báo cáo QC thì tua player tới đúng giây. */
-  function handleSeek(seconds: number) {
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = seconds;
-  }
-
-  async function handlePublish(metadata: PublishMetadata, acknowledgeQC = false) {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    setIsSubmitting(true);
-    setError(null);
-    let qcBlocked = false;
-    try {
-      await startPublishSaga(
-        projectId,
-        {
-          ...metadata,
-          thumbnail_path: thumbnailPath ?? undefined,
-          // Left out when no channel is connected yet, so the Publisher
-          // reports "not authenticated" rather than "channel '' not found".
-          channel_id: channelId ?? undefined,
-        },
-        acknowledgeQC,
-      );
-      /*
-        The POST only *starts* the saga; the project is now "publishing" and
-        useProject's poll drives the rest of the UI. isSubmitting stays true
-        until that refetch lands so the button never flickers back to enabled
-        in between.
-      */
-      await refetch();
-    } catch (err) {
-      /*
-        CR-021 FR61.3: QC chặn là loại 409 duy nhất có đường đi tiếp. Xin đồng ý
-        SAU khi đã nhả cờ in-flight ở finally, nếu không lần gọi lại sẽ bị chính
-        cái chốt chống bấm hai lần chặn mất.
-      */
-      if (err instanceof ApiError && err.code === ERROR_CODE_QC_BLOCKED && !acknowledgeQC) {
-        qcBlocked = true;
-      } else {
-        setError(err instanceof ApiError ? err.message : String(err));
-      }
-    } finally {
-      inFlightRef.current = false;
-      setIsSubmitting(false);
-    }
-
-    /*
-      Không tự gửi lại kèm acknowledge_qc — Creator phải chủ động đồng ý, và
-      máy chủ ghi lại lần bỏ qua đó. Hỏi đúng một lần: nếu lần gửi có cờ vẫn bị
-      chặn thì đó là lỗi khác, và nó đi vào nhánh hiện nguyên văn ở trên.
-    */
-    if (
-      qcBlocked &&
-      window.confirm(
-        "Kiểm tra chất lượng phát hiện lỗi nghiêm trọng. Vẫn đăng video này? " +
-          "Lần bỏ qua sẽ được ghi lại.",
-      )
-    ) {
-      await handlePublish(metadata, true);
-    }
-  }
-
-  async function handleRetryPublish() {
-    if (inFlightRef.current) return;
-    inFlightRef.current = true;
-    setIsSubmitting(true);
-    setError(null);
-    try {
-      await retryProject(projectId);
-      await refetch();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : String(err));
-    } finally {
-      inFlightRef.current = false;
-      setIsSubmitting(false);
-    }
-  }
 
   /**
    * "Render lại ở chất lượng khác" (bug report): dùng lại chính project_id
@@ -132,12 +48,11 @@ export function ResultPage() {
    * chốt bản final ở chất lượng cao hơn bản đã duyệt nội dung.
    */
   async function handleRerender() {
-    if (inFlightRef.current || !project) return;
+    if (!project) return;
     if (!project.script_content) {
       setRerenderError("Thiếu script gốc của project này — không render lại tự động được.");
       return;
     }
-    inFlightRef.current = true;
     setIsRerendering(true);
     setRerenderError(null);
     try {
@@ -151,6 +66,7 @@ export function ResultPage() {
         subtitle_mode: project.subtitle_mode ?? "track",
         subtitle_style: project.subtitle_style,
         render_quality: rerenderQuality,
+        video_output_mode: rerenderOutputMode,
         video_format_id: project.video_format_id,
         background_music_volume: project.background_music_volume,
       });
@@ -158,7 +74,6 @@ export function ResultPage() {
     } catch (err) {
       setRerenderError(err instanceof ApiError ? err.message : String(err));
     } finally {
-      inFlightRef.current = false;
       setIsRerendering(false);
     }
   }
@@ -181,187 +96,144 @@ export function ResultPage() {
   if (!project) return null;
 
   const isPublished = project.status === "published" || Boolean(project.youtube_video_url);
-  const isPublishing = isSubmitting || project.status === "publishing";
-  const hasPublishFailed = project.status === "failed_at_publish_video";
 
-  const errorBanner = error && (
-    <p role="alert" className={glass.helperText}>
-      {error}
-    </p>
-  );
+  // CR-007 follow-up: a clip only ever comes from `with self.clip(...)` in
+  // the script — picking "short"/"both" alone never produces one.
+  const outputMode = project.video_output_mode ?? "long";
+  const wantsClips = outputMode === "short" || outputMode === "both";
+  const rerenderOutputMode = rerenderOutputModeOverride ?? outputMode;
 
   return (
     <div data-testid="result-page">
       <AppShell
         currentStep={5}
         wide
-        title="Xem kết quả & đăng video"
-        subtitle="Xem trước video, kết nối YouTube và điền thông tin để xuất bản."
+        title="Xem kết quả"
+        subtitle="Xem lại video, cắt clip, hoặc render lại — đăng bài chuyển sang bước tiếp theo."
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }
       >
-        {isPublished ? (
-          <div className={glass.card} style={{ textAlign: "center", padding: "44px 32px" }}>
-            <p style={{ margin: "0 0 12px", fontSize: 19, fontWeight: 700 }}>Đã đăng thành công!</p>
-            <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
-            {project.caption_status === "skipped_no_scope" && (
-              <p role="alert" className={glass.helperText} style={{ marginTop: 12 }}>
-                Video không có phụ đề YouTube: kênh này cần được nối lại để cấp thêm quyền. Vào mục
-                Kênh YouTube ở lần đăng sau, ngắt rồi nối lại kênh này.
-              </p>
-            )}
-            {project.caption_status === "failed" && (
-              <p role="alert" className={glass.helperText} style={{ marginTop: 12 }}>
-                Video đã đăng nhưng tải phụ đề lên YouTube thất bại — thử đăng lại, hoặc tải phụ đề
-                lên thủ công trong YouTube Studio.
-              </p>
-            )}
+        {error && (
+          <p role="alert" className={glass.helperText}>
+            {error}
+          </p>
+        )}
+
+        <div className={styles.layout}>
+          <div className={styles.preview}>
             {project.video_path && (
-              <div style={{ marginTop: 24 }}>
-                <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />
+              <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />
+            )}
+            {wantsClips && (
+              <ClipsPanel projectId={projectId} clips={project.clips ?? []} videoOutputMode={outputMode} />
+            )}
+          </div>
+
+          <div className={styles.publishColumn}>
+            {isPublished ? (
+              <div className={glass.card} data-testid="result-published-banner">
+                <div className={glass.cardTitle}>Đã đăng thành công!</div>
+                <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
+                <div className={glass.mtSm}>
+                  <Link
+                    className={glass.ghostBtn}
+                    style={{ textDecoration: "none", display: "inline-block" }}
+                    to={`/projects/${projectId}/publish`}
+                  >
+                    Xem chi tiết đăng bài
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <div className={glass.card} data-testid="result-continue-to-publish">
+                <div className={glass.cardTitle}>Sẵn sàng đăng?</div>
+                <p className={glass.cardHint}>
+                  Xem lại video ổn rồi thì qua bước đăng — kết nối YouTube, điền tiêu đề/mô tả và xuất
+                  bản.
+                </p>
+                <div className={`${glass.ctaRow} ${glass.mtSm}`}>
+                  <Link
+                    className={glass.btnPrimary}
+                    style={{ textDecoration: "none" }}
+                    to={`/projects/${projectId}/publish`}
+                    data-testid="result-continue-to-publish-link"
+                  >
+                    Tiếp tục để đăng
+                  </Link>
+                </div>
               </div>
             )}
           </div>
-        ) : (
-          /*
-            Preview on the left, everything the upload needs on the right. The
-            publish button used to sit at the bottom of a single stacked column
-            — below the player, the connect button and the thumbnail uploader —
-            so the action the page exists for was the last thing reachable.
-          */
-          <div className={styles.layout}>
-            <div className={styles.preview}>
-              {project.video_path && (
-                <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} videoRef={videoRef} />
-              )}
-            </div>
+        </div>
 
-            <div className={styles.publishColumn}>
-              {isPublishing ? (
-                <div
-                  className={`${glass.card} ${styles.publishStatus}`}
-                  data-testid="result-publishing-status"
-                  role="status"
-                  aria-live="polite"
-                >
-                  <span className={styles.spinner} aria-hidden="true" />
-                  <div>
-                    <p className={styles.publishStatusText}>Đang tải video lên YouTube...</p>
-                    <p className={styles.publishStatusHint}>
-                      Quá trình này có thể mất vài phút. Bạn không cần bấm lại — trang sẽ tự cập nhật
-                      khi đăng xong.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {hasPublishFailed && (
-                    <div
-                      className={`${glass.card} ${styles.failedCard}`}
-                      data-testid="result-publish-failed"
-                      role="alert"
-                    >
-                      <p className={styles.publishStatusText}>Đăng lên YouTube thất bại</p>
-                      <p className={styles.publishStatusHint}>
-                        {project.error_message ?? "Không rõ nguyên nhân."}
-                      </p>
-                      <div className={glass.ctaRow} style={{ marginTop: 14 }}>
-                        <button
-                          type="button"
-                          data-testid="result-retry-publish-button"
-                          className={glass.btnPrimary}
-                          disabled={isSubmitting}
-                          onClick={handleRetryPublish}
-                        >
-                          Thử đăng lại
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <YoutubeChannels projectId={projectId} onSelectedChannelChange={setChannelId} />
-                  <ThumbnailUpload
-                    projectId={projectId}
-                    onThumbnailPathChange={setThumbnailPath}
-                    contentLanguage={project.voice_language}
-                  />
-                  {errorBanner}
-                  {/*
-                    Trước nút đăng, không sau (FR61.2): báo cáo chỉ có tác dụng
-                    nếu Creator đọc nó trước khi quyết định đăng.
-                  */}
-                  <QCReportPanel projectId={projectId} onSeek={handleSeek} />
-                  {/*
-                    Once the publish step has failed the saga is resumed with
-                    POST /retry above — a fresh POST /v1/sagas/publish would
-                    only 409, since it requires status ready_to_publish.
-                  */}
-                  {!hasPublishFailed && (
-                    <PublishForm
-                      projectId={projectId}
-                      onSubmit={handlePublish}
-                      isSubmitting={isSubmitting}
-                    />
-                  )}
-                </>
-              )}
-              {isPublishing && errorBanner}
-            </div>
-          </div>
-        )}
+        {/*
+          UX review #2 — the highest-impact fix on this page: these used to be
+          3-4 full-weight glass cards stacked as peers of the primary preview
+          +publish layout above, each with its own bespoke toggle. Grouped
+          under one demoted heading, using the one shared Disclosure
+          affordance (review #5), so the page reads as "primary: preview &
+          publish" then "secondary: everything else" instead of five stacked
+          look-alikes.
+        */}
+        <div className={styles.moreActions}>
+          <div className={styles.moreActionsHeading}>Thao tác khác</div>
 
-        {project.video_path && (
-          <div className={glass.card} style={{ marginTop: 20, padding: 20 }} data-testid="rerender-section">
-            {!showRerender ? (
-              <button
-                type="button"
-                className={glass.ghostBtn}
-                onClick={() => setShowRerender(true)}
-                data-testid="rerender-toggle"
-              >
-                Render lại ở chất lượng khác
-              </button>
-            ) : (
-              <>
+          {project.companion_project_id && (
+            <CompanionProjectCard companionProjectId={project.companion_project_id} />
+          )}
+
+          {project.video_path && (
+            <Disclosure
+              title="Render lại ở chất lượng hoặc loại video khác"
+              hint="Chạy lại toàn bộ pipeline — tốn thời gian và (nếu có giọng đọc) tốn quota TTS lại như một lần render mới."
+              testId="rerender"
+            >
+              <RenderQualityPicker value={rerenderQuality} onChange={setRerenderQuality} />
+              <div className={glass.mtSm}>
                 <div className={glass.cardTitle} style={{ marginBottom: 10 }}>
-                  Render lại ở chất lượng khác
+                  Loại video
                 </div>
-                <p className={glass.cardHint} style={{ marginBottom: 14 }}>
-                  Chạy lại toàn bộ pipeline cho video này ở chất lượng mới — tốn thời gian và (nếu có
-                  giọng đọc) tốn quota TTS lại như một lần render mới. Dùng khi đã duyệt nội dung ở bản
-                  nháp và muốn chốt bản cuối ở chất lượng cao hơn.
+                <VideoOutputModePicker value={rerenderOutputMode} onChange={setRerenderOutputModeOverride} bare />
+              </div>
+              {rerenderError && (
+                <p role="alert" className={`${glass.helperText} ${glass.mtXs}`}>
+                  {rerenderError}
                 </p>
-                <RenderQualityPicker value={rerenderQuality} onChange={setRerenderQuality} />
-                {rerenderError && (
-                  <p role="alert" className={glass.helperText} style={{ marginTop: 10 }}>
-                    {rerenderError}
-                  </p>
-                )}
-                <div className={glass.ctaRow} style={{ marginTop: 14 }}>
-                  <button
-                    type="button"
-                    className={glass.btnPrimary}
-                    disabled={isRerendering}
-                    onClick={handleRerender}
-                    data-testid="rerender-submit"
-                  >
-                    {isRerendering ? "Đang bắt đầu..." : "Render lại"}
-                  </button>
-                  <button
-                    type="button"
-                    className={glass.ghostBtn}
-                    disabled={isRerendering}
-                    onClick={() => setShowRerender(false)}
-                  >
-                    Huỷ
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+              )}
+              <div className={`${glass.ctaRow} ${glass.mtSm}`}>
+                <button
+                  type="button"
+                  className={glass.btnPrimary}
+                  disabled={isRerendering}
+                  onClick={handleRerender}
+                  data-testid="rerender-submit"
+                >
+                  {isRerendering ? "Đang bắt đầu..." : "Render lại"}
+                </button>
+              </div>
+            </Disclosure>
+          )}
+
+          {!project.companion_project_id && project.video_path && (
+            <Disclosure
+              title="Tạo bản Shorts/TikTok riêng cho video này"
+              hint="Kịch bản riêng, không phải cắt từ video này — tự có hook, tự cô đọng, tự đứng được một mình."
+              testId="short-companion"
+            >
+              <ShortScriptAssistant
+                sourceProjectId={projectId}
+                sourceScriptContent={project.script_content}
+                contentLanguage={project.voice_language}
+                onCreated={(newProjectId) => navigate(`/projects/${newProjectId}/render`)}
+              />
+            </Disclosure>
+          )}
+
+          <ProjectInputPanel project={project} />
+        </div>
 
         {/*
           A destructive, rarely-used action does not belong at the top of the

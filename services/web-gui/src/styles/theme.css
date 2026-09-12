@@ -2,8 +2,18 @@
   --accent: #2f8fe0;
   --accent2: #6dd5fa;
   --ink: #101c28;
-  --ink-soft: rgba(22, 34, 46, 0.55);
-  --ink-faint: rgba(22, 34, 46, 0.42);
+  /*
+    Bumped from 0.55/0.42 (UX review, 2026-09-12): at those opacities, hint
+    text over the lightest part of the body gradient measured ~3.7:1 / 2.6:1
+    contrast — below WCAG AA's 4.5:1 for normal-size text, and --ink-faint in
+    particular is reused on every page (cardHint, helperText). These values
+    land --ink-soft at ~5:1 and --ink-faint at ~3.2:1 (still lighter, by
+    design, for truly secondary hints paired with a clearer label nearby —
+    revisit with an actual contrast-checker tool per review recommendation
+    #10 before treating 3.2:1 as final for anything load-bearing).
+  */
+  --ink-soft: rgba(22, 34, 46, 0.65);
+  --ink-faint: rgba(22, 34, 46, 0.52);
   --glass-bg: linear-gradient(160deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.4));
   --glass-border: rgba(255, 255, 255, 0.85);
   --glass-shadow: 0 20px 50px rgba(31, 58, 90, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.9);
@@ -11,6 +21,18 @@
   --surface-border: rgba(255, 255, 255, 0.8);
   --danger: #e0432f;
   --danger-soft: rgba(224, 67, 47, 0.1);
+  --success: #1f9d55;
+  --warning: #c98a12;
+
+  /*
+    Spacing scale (UX review #1): replaces the ad-hoc inline
+    `style={{ marginTop: N }}` (6/10/12/14/18/20/24/44...) scattered across
+    ResultPage/RenderPage/ReviewStepPage with four fixed steps.
+  */
+  --space-xs: 8px;
+  --space-sm: 16px;
+  --space-md: 24px;
+  --space-lg: 32px;
 }
 
 * {

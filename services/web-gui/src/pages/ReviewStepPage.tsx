@@ -17,6 +17,12 @@ const QUALITY_LABELS: Record<string, { label: string; hint: string }> = {
   "4k60": { label: "Cao", hint: "4K60 — render rất nặng" },
 };
 
+const OUTPUT_MODE_LABELS: Record<string, string> = {
+  long: "Chỉ video dài",
+  short: "Chỉ video ngắn (Shorts/TikTok)",
+  both: "Cả hai",
+};
+
 const SUBTITLE_SIZE_LABELS: Record<string, string> = { small: "Nhỏ", medium: "Vừa", large: "Lớn" };
 
 const SUBTITLE_MODE_LABELS: Record<string, string> = {
@@ -30,7 +36,7 @@ const SUBTITLE_MODE_LABELS: Record<string, string> = {
 const ENGINE_NAMES: Record<string, string> = { edge: "Edge", azure: "Azure", google: "Google" };
 
 /**
- * Step 3 of 3 — everything that is about to be rendered, in one place.
+ * Step 3 of 5 (AppShell's STEP_LABELS) — everything that is about to be rendered, in one place.
  *
  * A render takes many minutes, so the last thing before committing to one is
  * a plain-language summary of what was chosen. Each row links back to the step
@@ -97,6 +103,7 @@ export function ReviewStepPage() {
               }
             : undefined,
         render_quality: draft.renderQuality,
+        video_output_mode: draft.videoOutputMode,
         video_format_id: draft.videoFormatId,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,
       });
@@ -136,6 +143,7 @@ export function ReviewStepPage() {
           : undefined,
     },
     { label: "Chất lượng", value: quality.label, hint: quality.hint },
+    { label: "Loại video", value: OUTPUT_MODE_LABELS[draft.videoOutputMode] ?? draft.videoOutputMode },
     {
       label: "Nhạc nền",
       value: draft.backgroundMusicPath ? "Có" : "Không",

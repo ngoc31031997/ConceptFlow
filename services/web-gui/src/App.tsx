@@ -5,6 +5,7 @@ import { SettingsStepPage } from "./pages/SettingsStepPage";
 import { ReviewStepPage } from "./pages/ReviewStepPage";
 import { RenderPage } from "./pages/RenderPage";
 import { ResultPage } from "./pages/ResultPage";
+import { PublishPage } from "./pages/PublishPage";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { VideoListPage } from "./pages/VideoListPage";
 
@@ -20,6 +21,7 @@ export function App() {
 
           <Route path="/projects/:id/render" element={<RenderPage />} />
           <Route path="/projects/:id/result" element={<ResultPage />} />
+          <Route path="/projects/:id/publish" element={<PublishPage />} />
           <Route path="/oauth/youtube/callback" element={<OAuthCallbackPage />} />
           <Route path="/videos" element={<VideoListPage />} />
         </Routes>
