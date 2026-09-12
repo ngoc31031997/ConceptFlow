@@ -1,96 +1,61 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { NavigationLoader } from "../../src/components/NavigationLoader";
 
-// Mock useNavigation hook
-const mockUseNavigation = vi.fn();
+// `useNavigation()` only works under a data router (`createBrowserRouter`);
+// this app uses plain `<BrowserRouter>`, so the component tracks route
+// changes via `useLocation()` instead — mock that one hook the same way the
+// old test mocked `useNavigation`.
+const mockUseLocation = vi.fn();
 vi.mock("react-router-dom", () => ({
-  useNavigation: () => mockUseNavigation(),
+  useLocation: () => mockUseLocation(),
 }));
 
 describe("NavigationLoader", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    mockUseLocation.mockReturnValue({ pathname: "/" });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("does not show loader when navigation state is idle", () => {
-    mockUseNavigation.mockReturnValue({ state: "idle" });
+  it("does not show loader when the route hasn't changed", () => {
     render(<NavigationLoader />);
     expect(screen.queryByTestId("navigation-loader")).not.toBeInTheDocument();
   });
 
-  it("shows loader after delay when navigation state is loading", () => {
-    mockUseNavigation.mockReturnValue({ state: "loading" });
-    render(<NavigationLoader />);
-
-    // Should not show immediately
+  it("shows loader briefly when the route changes", () => {
+    const { rerender } = render(<NavigationLoader />);
     expect(screen.queryByTestId("navigation-loader")).not.toBeInTheDocument();
 
-    // Should show after 100ms delay
-    act(() => {
+    mockUseLocation.mockReturnValue({ pathname: "/create/settings" });
+    rerender(<NavigationLoader />);
 
-      vi.advanceTimersByTime(100);
-
-    });
     expect(screen.getByTestId("navigation-loader")).toBeInTheDocument();
     expect(screen.getByText("Đang tải...")).toBeInTheDocument();
   });
 
-  it("does not show loader if navigation completes before delay", () => {
-    mockUseNavigation.mockReturnValue({ state: "loading" });
+  it("hides the loader again after the delay", () => {
     const { rerender } = render(<NavigationLoader />);
 
-    // Navigation completes before 100ms
-    act(() => {
-
-      vi.advanceTimersByTime(50);
-
-    });
-    mockUseNavigation.mockReturnValue({ state: "idle" });
+    mockUseLocation.mockReturnValue({ pathname: "/create/settings" });
     rerender(<NavigationLoader />);
-
-    act(() => {
-
-
-      vi.advanceTimersByTime(100);
-
-
-    });
-    expect(screen.queryByTestId("navigation-loader")).not.toBeInTheDocument();
-  });
-
-  it("hides loader when navigation completes", () => {
-    mockUseNavigation.mockReturnValue({ state: "loading" });
-    const { rerender } = render(<NavigationLoader />);
-
-    act(() => {
-
-
-      vi.advanceTimersByTime(100);
-
-
-    });
     expect(screen.getByTestId("navigation-loader")).toBeInTheDocument();
 
-    // Navigation completes
-    mockUseNavigation.mockReturnValue({ state: "idle" });
-    rerender(<NavigationLoader />);
+    act(() => {
+      vi.advanceTimersByTime(250);
+    });
+
     expect(screen.queryByTestId("navigation-loader")).not.toBeInTheDocument();
   });
 
   it("has proper accessibility attributes", () => {
-    mockUseNavigation.mockReturnValue({ state: "loading" });
-    render(<NavigationLoader />);
-    act(() => {
-
-      vi.advanceTimersByTime(100);
-
-    });
+    const { rerender } = render(<NavigationLoader />);
+    mockUseLocation.mockReturnValue({ pathname: "/create/settings" });
+    rerender(<NavigationLoader />);
 
     const loader = screen.getByTestId("navigation-loader");
     expect(loader).toHaveAttribute("role", "status");

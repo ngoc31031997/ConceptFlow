@@ -1,24 +1,29 @@
-import { useEffect, useState } from "react";
-import { useNavigation } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import styles from "./NavigationLoader.module.css";
 
 /**
- * Shows a loading indicator when React Router is navigating between pages.
- * Uses the router's native navigation state to avoid manual coordination.
+ * Shows a brief loading indicator on route changes.
+ *
+ * `useNavigation()` only works under a data router (`createBrowserRouter`);
+ * this app uses plain `<BrowserRouter>` with statically imported pages, so
+ * that hook throws "invariant" outside a data router context on every
+ * render — it crashed the whole app. `useLocation` works with any router
+ * and still gives a visual cue on navigation.
  */
 export function NavigationLoader() {
-  const navigation = useNavigation();
+  const location = useLocation();
   const [shouldShow, setShouldShow] = useState(false);
+  const previousPath = useRef(location.pathname);
 
   useEffect(() => {
-    if (navigation.state === "loading") {
-      // Delay showing the loader to avoid flashing for fast navigations
-      const timer = setTimeout(() => setShouldShow(true), 100);
-      return () => clearTimeout(timer);
-    } else {
-      setShouldShow(false);
-    }
-  }, [navigation.state]);
+    if (previousPath.current === location.pathname) return;
+    previousPath.current = location.pathname;
+
+    setShouldShow(true);
+    const timer = setTimeout(() => setShouldShow(false), 250);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   if (!shouldShow) return null;
 
