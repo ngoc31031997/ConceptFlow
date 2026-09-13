@@ -226,6 +226,8 @@ Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ 
 
 QUAN TRỌNG — KIỂU DỮ LIỆU: mọi tham số văn bản của các component trên (¤nội_dung¤, ¤tiêu_đề_trái¤, ¤nội_dung_trái¤, ¤tiêu_đề_phải¤, ¤nội_dung_phải¤, phần tử trong danh sách của ¤StepList¤/¤Recap¤...) CHỈ được là chuỗi ¤str¤. TUYỆT ĐỐI KHÔNG truyền một component/Mobject khác (ví dụ một ¤Callout(...)¤, ¤TitleCard(...)¤, hay biến giữ kết quả của chúng) vào các tham số này — code sẽ crash ngay khi chạy vì Manim gọi ¤.find()¤ trên chuỗi bên trong, không phải trên Mobject. Muốn đặt một hình minh họa cạnh chữ thì dùng ¤self.row(...)¤ hoặc ¤self.stack(...)¤ để ghép chúng lại, KHÔNG lồng Mobject vào bên trong tham số text của component khác.
 
+QUAN TRỌNG — VỊ TRÍ KHI MÀN HÌNH ĐÃ CÓ THỨ GÌ ĐÓ: khi thêm chữ (¤self.caption/body/title/heading(...)¤) hoặc bất kỳ component nào trong lúc khung hình KHÔNG rỗng (đã có hình/bảng/component khác đang hiện), BẮT BUỘC đặt vị trí của nó tường minh theo thứ đã có sẵn — ¤.to_edge(DOWN/UP/LEFT/RIGHT)¤ hoặc ¤.next_to(vật_đã_có, DIRECTION, buff=...)¤. TUYỆT ĐỐI KHÔNG để nó ở vị trí mặc định (giữa màn hình) khi màn hình không rỗng — Manim đặt mọi Mobject chưa định vị vào đúng tâm khung hình, nên hai vật cùng ở giữa sẽ chồng khít lên nhau và không đọc được.
+
 ### Method của scene (gọi qua ¤self.¤)
 - Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
 - Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi ¤self.beat(...)¤ tương ứng bên trong:
@@ -254,6 +256,7 @@ QUAN TRỌNG — KIỂU DỮ LIỆU: mọi tham số văn bản của các compo
 5. Class Scene có đúng hậu tố "Scene" và kế thừa ¤ConceptFlowScene¤ không?
 6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có ¤from manim import *¤?
 7. Rà lại từng lời gọi component (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) và method chữ (¤self.title/heading/body/caption¤): có tham số nào đang nhận một component/Mobject khác thay vì chuỗi ¤str¤ không? Nếu có, đó là lỗi runtime chắc chắn — sửa lại bằng chuỗi text thuần.
+8. Mỗi lần thêm chữ hoặc component MỚI trong khi màn hình chưa dọn sạch (chưa gọi ¤self.clear_stage()¤ hoặc ¤self.dismiss(...)¤ cho thứ trước đó): vật mới có đang được đặt vị trí tường minh bằng ¤.to_edge(...)¤ hoặc ¤.next_to(...)¤ không? Nếu nó bị bỏ ở vị trí mặc định trong khi màn hình không rỗng, nó sẽ chồng lên đúng giữa vật đang có sẵn — sửa lại bằng cách đặt vị trí tường minh.
 
 ## OUTPUT
 
@@ -305,6 +308,8 @@ Components self-fit the safe frame and take color/font size from the theme. Do N
 
 IMPORTANT — DATA TYPES: every text parameter of the components above (¤content¤, ¤left_title¤, ¤left_content¤, ¤right_title¤, ¤right_content¤, list items in ¤StepList¤/¤Recap¤...) MUST be a plain ¤str¤. NEVER pass another component/Mobject (e.g. a ¤Callout(...)¤, ¤TitleCard(...)¤, or a variable holding one) into these parameters — the code will crash at runtime because Manim calls ¤.find()¤ on what it expects to be a string, not on a Mobject. To place a visual next to text, use ¤self.row(...)¤ or ¤self.stack(...)¤ to arrange them side by side — never nest a Mobject inside another component's text parameter.
 
+IMPORTANT — POSITION WHEN SOMETHING IS ALREADY ON SCREEN: whenever you add text (¤self.caption/body/title/heading(...)¤) or any component while the frame is NOT empty (something else — an image, a table, another component — is already showing), you MUST set its position explicitly relative to what is already there — ¤.to_edge(DOWN/UP/LEFT/RIGHT)¤ or ¤.next_to(existing_obj, DIRECTION, buff=...)¤. NEVER leave it at the default (screen-center) position while the screen isn't empty — Manim places every unpositioned Mobject dead-center, so two things left there overlap exactly and become illegible.
+
 ### Scene methods (called via ¤self.¤)
 - Narration and structure: ¤self.narrate("line")¤, ¤self.beat("<id>")¤, ¤self.chapter("Chapter name")¤
 - Three built-in beats — USE THEM instead of hand-rolling, they already call ¤self.beat(...)¤ internally:
@@ -333,6 +338,7 @@ IMPORTANT — DATA TYPES: every text parameter of the components above (¤conten
 5. Does the Scene class have the "Scene" suffix and inherit ¤ConceptFlowScene¤?
 6. Double-check: does the script use only the components/methods listed in "ALLOWED API"? No hardcoded hex colors, no manual font_size, no ¤from manim import *¤?
 7. Check every component call (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) and text method (¤self.title/heading/body/caption¤): is any parameter receiving another component/Mobject instead of a plain ¤str¤? If so, that is a guaranteed runtime crash — replace it with plain text.
+8. Every time you add new text or a new component while the screen has not been cleared (no ¤self.clear_stage()¤ or ¤self.dismiss(...)¤ yet for what came before): is the new object given an explicit position via ¤.to_edge(...)¤ or ¤.next_to(...)¤? If it is left at the default position while the screen isn't empty, it will land exactly on top of what's already there — fix it with an explicit position.
 
 ## OUTPUT
 

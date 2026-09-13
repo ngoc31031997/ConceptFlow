@@ -200,6 +200,33 @@ def clip(scene, name: str):
         })
 
 
+def is_dry_run() -> bool:
+    """True trong lượt dry (CF_MODE=dry).
+
+    Bug report (2026-09-12): phát hiện chồng lấn hình ảnh (`ConceptFlowScene`
+    overlap check) chỉ chạy được ở đây — lượt render thật không cần trả tiền
+    thêm cho một phép tính hình học chỉ có ích trước khi tốn TTS.
+    """
+    return _recorder.mode == MODE_DRY
+
+
+def record_overlap(scene, description: str) -> None:
+    """Ghi một cảnh báo chồng lấn hình ảnh phát hiện ở lượt dry.
+
+    Bug report (2026-09-12): một `self.caption(...)` không định vị (rơi vào
+    tâm khung hình mặc định của Manim) đã chồng khít lên một bảng/table đang
+    hiện, cả hai không đọc được. `index` dùng `upcoming_index` — cùng quy ước
+    với `beat()`/`chapter()` — vì chồng lấn được phát hiện GIỮA hai lời thoại,
+    nên "lời thoại đang tới" là điểm quy chiếu duy nhất có ý nghĩa với người
+    duyệt dàn ý.
+    """
+    _recorder.write({
+        "kind": "overlap",
+        "index": _recorder.upcoming_index,
+        "description": str(description).strip(),
+    })
+
+
 def beat(scene, beat_id: str) -> None:
     """Đánh dấu mở đầu một beat trong beat sheet (CR-019)."""
     _recorder.write(

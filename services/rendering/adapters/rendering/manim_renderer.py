@@ -68,6 +68,7 @@ from domain.models import (
     ChannelAssetRenderRequest,
     ChannelAssetRenderResult,
     DryRunResult,
+    OverlapWarning,
     ScriptRenderRequest,
     ScriptRenderResult,
 )
@@ -255,6 +256,18 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             # dry pass (self.clip() writes marks regardless of dry/real) —
             # just never extracted before. Same filter as _read_clip_marks.
             clip_marks=[r for r in records if r.get("kind") == "clip"],
+            # Bug report (2026-09-12): ConceptFlowScene.play() writes one
+            # "overlap" record per colliding pair it finds while CF_MODE=dry
+            # (conceptflow/scene.py._check_overlaps) — surface them here so
+            # ValidateScriptUseCase can carry them non-blocking to the outline
+            # review gate, same path as the narration/beat/clip data above.
+            layout_warnings=[
+                OverlapWarning(
+                    narration_index=int(r["index"]), description=str(r.get("description", ""))
+                )
+                for r in records
+                if r.get("kind") == "overlap"
+            ],
         )
 
     def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:

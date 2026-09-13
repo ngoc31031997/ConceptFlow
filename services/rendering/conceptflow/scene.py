@@ -26,6 +26,15 @@ from .transitions import (
 )
 
 
+#: Ngưỡng chồng lấn (tỉ lệ diện tích giao nhau trên diện tích vật NHỎ HƠN
+#: trong cặp). Bug report (2026-09-12): một caption không định vị chồng khít
+#: lên một bảng/table đang hiện — cả hai không đọc được. 25% là ngưỡng cho
+#: một cặp mobject cố ý đặt gần nhau (ví dụ nhãn sát mép một hình) mà không
+#: báo động giả, trong khi vẫn bắt được trường hợp "chồng gần như hoàn toàn"
+#: là bug thật. Hằng số riêng, dễ chỉnh nếu thực tế cho thấy cần khác.
+OVERLAP_AREA_RATIO_THRESHOLD = 0.25
+
+
 class ConceptFlowScene(Scene):
     """Base scene mang theme của kênh.
 
@@ -172,6 +181,59 @@ class ConceptFlowScene(Scene):
         self.narrate(message)
         self.wait(hold_seconds)
 
+    # --- Phát hiện chồng lấn (bug report 2026-09-12) ---------------------------
+
+    def play(self, *args, **kwargs):
+        """Bọc `Scene.play` để soi chồng lấn hình ảnh SAU mỗi animation.
+
+        Chỉ chạy ở lượt dry (`narration_runtime.is_dry_run()`): đây là cổng
+        kiểm tra trước TTS (CR-020), không phải thứ đáng trả thêm thời gian ở
+        lượt render thật — lượt đó chạy đúng lại animation y hệt nên chồng lấn
+        (nếu có) đã được báo ở lượt dry rồi.
+        """
+        result = super().play(*args, **kwargs)
+        if narration_runtime.is_dry_run():
+            self._check_overlaps()
+        return result
+
+    def _check_overlaps(self) -> None:
+        """So từng cặp mobject top-level đang hiện, báo cặp chồng > ngưỡng.
+
+        "Top-level" nghĩa là `self.mobjects` — danh sách Manim tự giữ, đúng
+        những gì `self.add`/`self.play` đã đưa vào khung ở cấp cao nhất (một
+        `VGroup` tính là một mobject, không tách con ra so riêng — chồng lấn
+        bên trong một component do design system tự canh, không phải lỗi
+        script). Không có phần tử nền/trang trí nào được thêm vào
+        `self.mobjects` trong `__init__` (chỉ đổi `camera.background_color`),
+        nên không cần lọc gì thêm ở đây.
+
+        Best-effort tuyệt đối, giống `narration._describe_layout`: một mobject
+        lạ không đọc được bbox không được làm hỏng cả lượt dry.
+        """
+        mobjects = list(self.mobjects)
+        boxes: list[tuple[object, tuple[float, float, float, float]] | None] = []
+        for mobject in mobjects:
+            try:
+                boxes.append((mobject, _bbox_of(mobject)))
+            except Exception:  # noqa: BLE001 — xem docstring
+                boxes.append(None)
+
+        for i in range(len(boxes)):
+            entry_i = boxes[i]
+            if entry_i is None:
+                continue
+            for j in range(i + 1, len(boxes)):
+                entry_j = boxes[j]
+                if entry_j is None:
+                    continue
+                ratio = _overlap_ratio(entry_i[1], entry_j[1])
+                if ratio > OVERLAP_AREA_RATIO_THRESHOLD:
+                    narration_runtime.record_overlap(
+                        self,
+                        f"{type(entry_i[0]).__name__} và {type(entry_j[0]).__name__} "
+                        f"chồng lấn {ratio:.0%} diện tích vật nhỏ hơn",
+                    )
+
     # --- Chuyển cảnh ----------------------------------------------------------
 
     def reveal(self, *mobjects: Mobject, speed: str = "normal") -> None:
@@ -199,4 +261,46 @@ class ConceptFlowScene(Scene):
         return {"fast": pacing.fast, "normal": pacing.normal, "slow": pacing.slow}.get(
             speed, pacing.normal
         )
+
+
+def _bbox_of(mobject: Mobject) -> tuple[float, float, float, float]:
+    """Hộp bao trục-song-song (left, right, top, bottom) theo toạ độ Manim.
+
+    Cùng bốn accessor `narration._describe_layout` đã dùng cho QC (FR58.1) —
+    giữ một nguồn sự thật duy nhất cho "hộp bao của một mobject là gì".
+    """
+    return (
+        float(mobject.get_left()[0]),
+        float(mobject.get_right()[0]),
+        float(mobject.get_top()[1]),
+        float(mobject.get_bottom()[1]),
+    )
+
+
+def _overlap_ratio(
+    a: tuple[float, float, float, float], b: tuple[float, float, float, float]
+) -> float:
+    """Diện tích giao của hai hộp bao, chia cho diện tích hộp NHỎ hơn.
+
+    Chia cho hộp nhỏ hơn (không phải hợp, không phải hộp lớn hơn) vì đó là
+    điều một Creator thực sự muốn biết: "vật nhỏ có bị vật kia nuốt phần lớn
+    diện tích của nó không" — một nhãn nhỏ nằm sát mép một hình lớn không đáng
+    báo, nhưng một nhãn nhỏ NẰM GIỮA một hình lớn (diện tích giao gần bằng cả
+    nhãn) chính là kiểu bug này tồn tại để bắt.
+    """
+    left_a, right_a, top_a, bottom_a = a
+    left_b, right_b, top_b, bottom_b = b
+
+    inter_width = min(right_a, right_b) - max(left_a, left_b)
+    inter_height = min(top_a, top_b) - max(bottom_a, bottom_b)
+    if inter_width <= 0 or inter_height <= 0:
+        return 0.0
+    inter_area = inter_width * inter_height
+
+    area_a = (right_a - left_a) * (top_a - bottom_a)
+    area_b = (right_b - left_b) * (top_b - bottom_b)
+    smaller_area = min(area_a, area_b)
+    if smaller_area <= 0:
+        return 0.0
+    return inter_area / smaller_area
 

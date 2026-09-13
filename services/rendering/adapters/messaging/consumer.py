@@ -188,6 +188,10 @@ class ValidateScriptCommandHandler:
                 result.dry_run.chapters,
                 [str(issue) for issue in result.warnings],
                 result.dry_run.clip_marks,
+                layout_warnings=[
+                    {"scene_index": w.narration_index, "description": w.description}
+                    for w in result.dry_run.layout_warnings
+                ],
             )
 
         async with self._pool.acquire() as conn, conn.transaction():

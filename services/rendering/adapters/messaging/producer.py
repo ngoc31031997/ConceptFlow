@@ -81,6 +81,7 @@ def script_validated_envelope(
     chapters: list[tuple[int, str]],
     warnings: list[str],
     clip_marks: list[dict] | None = None,
+    layout_warnings: list[dict] | None = None,
 ) -> dict:
     """CR-020 FR56 — kết quả cổng kiểm tra, chạy trước TTS.
 
@@ -119,6 +120,11 @@ def script_validated_envelope(
             # Cảnh báo không chặn Saga; Orchestrator chuyển tiếp để GUI hiện ra.
             "warnings": warnings,
             "clip_marks": clip_marks or [],
+            # Bug report (2026-09-12): chồng lấn hình ảnh phát hiện ở lượt dry
+            # (ConceptFlowScene._check_overlaps) — không chặn Saga, cùng nguyên
+            # tắc như `warnings` ở trên, chỉ tách field vì nguồn gốc khác
+            # (hình học runtime, không phải lint tĩnh).
+            "layout_warnings": layout_warnings or [],
         },
     )
 

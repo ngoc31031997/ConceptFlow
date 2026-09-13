@@ -57,6 +57,26 @@ class ScriptRenderRequest:
 
 
 @dataclass(frozen=True)
+class OverlapWarning:
+    """Một cặp mobject chồng lấn hình học, phát hiện ở lượt dry (bug report
+    2026-09-12: một `self.caption(...)` không định vị đã chồng khít lên một
+    bảng đang hiện, cả hai không đọc được).
+
+    Cùng hình dạng hai-trường như `LintIssue` (`script_lint.py`) để cách xử lý
+    warning nhất quán trên toàn service — chỉ khác `line` (vị trí trong file
+    nguồn) thay bằng `narration_index` (lời thoại sắp chạy khi phát hiện chồng
+    lấn — không có ý nghĩa "dòng file" nào ở đây, vì phát hiện diễn ra ở
+    runtime giữa hai lời thoại).
+    """
+
+    narration_index: int
+    description: str
+
+    def __str__(self) -> str:
+        return f"chồng lấn hình ảnh tại lời thoại #{self.narration_index}: {self.description}"
+
+
+@dataclass(frozen=True)
 class DryRunResult:
     """What the dry pass learned by running the script without rendering it.
 
@@ -83,6 +103,12 @@ class DryRunResult:
     # TTS) mới biết "Chưa có clip nào". Đọc ở đây để Orchestrator cảnh báo
     # ngay tại màn duyệt dàn ý, trước khi TTS chạy.
     clip_marks: list[dict] = field(default_factory=list)
+    # Bug report (2026-09-12): CR-024's outline review gate is the only screen
+    # a Creator sees between writing a script and paying for TTS/render — so
+    # any script-authoring mistake a static lint or a human reviewer could
+    # miss (an unpositioned Text landing on top of an existing visual) must
+    # surface here too, non-blocking like `warnings` in ValidationResult.
+    layout_warnings: list[OverlapWarning] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

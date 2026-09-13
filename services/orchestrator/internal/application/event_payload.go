@@ -1,6 +1,10 @@
 package application
 
-import "orchestrator/internal/domain"
+import (
+	"fmt"
+
+	"orchestrator/internal/domain"
+)
 
 // This file holds pure functions that decode the loosely-typed
 // map[string]interface{} event payloads (as produced by encoding/json
@@ -433,6 +437,38 @@ func warningsFromPayload(payload map[string]interface{}) []string {
 		if message, ok := item.(string); ok && message != "" {
 			out = append(out, message)
 		}
+	}
+	return out
+}
+
+// layoutWarningsFromPayload reads the non-blocking overlap warnings the
+// rendering dry pass reported (bug report 2026-09-12: an unpositioned
+// self.caption(...) landed exactly on top of an already-visible table).
+//
+// Formatted into plain strings here, the same shape `warningsFromPayload`
+// returns, so both ride in the single `ValidationWarnings` slice on Project
+// and reach the outline review gate through the one existing path —
+// OutlineReview.tsx renders any string in that slice already, so no parallel
+// storage or rendering is needed for these.
+func layoutWarningsFromPayload(payload map[string]interface{}) []string {
+	raw, ok := payload["layout_warnings"].([]interface{})
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		entry, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		description, _ := entry["description"].(string)
+		if description == "" {
+			continue
+		}
+		index, _ := entry["scene_index"].(float64)
+		out = append(out, fmt.Sprintf(
+			"chồng lấn hình ảnh tại lời thoại #%d: %s", int(index), description,
+		))
 	}
 	return out
 }

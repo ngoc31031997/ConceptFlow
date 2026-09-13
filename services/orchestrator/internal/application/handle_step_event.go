@@ -354,6 +354,13 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	project.ValidationWarnings = append(
 		warningsFromPayload(event.Payload), beatIssueMessages(issues)...,
 	)
+	// Bug report (2026-09-12): overlap warnings from the dry pass's geometry
+	// check (an unpositioned Text landing on an existing visual) ride the same
+	// non-blocking ValidationWarnings slice as lint warnings and beat issues —
+	// one list, one place the Creator looks, per CR-024 FR68.3.
+	project.ValidationWarnings = append(
+		project.ValidationWarnings, layoutWarningsFromPayload(event.Payload)...,
+	)
 	// Bug report: video_output_mode short/both promises a clip, but a clip
 	// only ever comes from `with self.clip(...)` in the script — nothing else
 	// produces one. Without this, the Creator only learned that after TTS,
