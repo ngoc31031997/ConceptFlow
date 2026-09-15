@@ -228,6 +228,11 @@ QUAN TRỌNG — KIỂU DỮ LIỆU: mọi tham số văn bản của các compo
 
 QUAN TRỌNG — VỊ TRÍ KHI MÀN HÌNH ĐÃ CÓ THỨ GÌ ĐÓ: khi thêm chữ (¤self.caption/body/title/heading(...)¤) hoặc bất kỳ component nào trong lúc khung hình KHÔNG rỗng (đã có hình/bảng/component khác đang hiện), BẮT BUỘC đặt vị trí của nó tường minh theo thứ đã có sẵn — ¤.to_edge(DOWN/UP/LEFT/RIGHT)¤ hoặc ¤.next_to(vật_đã_có, DIRECTION, buff=...)¤. TUYỆT ĐỐI KHÔNG để nó ở vị trí mặc định (giữa màn hình) khi màn hình không rỗng — Manim đặt mọi Mobject chưa định vị vào đúng tâm khung hình, nên hai vật cùng ở giữa sẽ chồng khít lên nhau và không đọc được.
 
+QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời gọi trong toàn script, không chỉ bên trong component):
+- KHÔNG viết màu bằng mã hex thẳng (ví dụ ¤"#3B82F6"¤) ở bất kỳ đâu — kể cả trong ¤self.title/heading/body/caption(...)¤ hay khi dùng API thô của Manim. Luôn dùng màu của theme: ¤self.theme.accent¤, ¤self.theme.ink¤, ¤self.theme.muted¤, ¤self.theme.series_color(i)¤. Script có màu hex sẽ bị lint cảnh báo ngay.
+- KHÔNG tự đặt ¤font_size=¤ bằng một số tuỳ ý ở bất kỳ lời gọi nào. Nếu thật sự cần chỉnh cỡ chữ tay (hiếm khi cần vì ¤self.title/heading/body/caption¤ đã tự chọn cỡ đúng theo vai trò), chỉ được dùng một trong bốn giá trị: 48, 36, 28, hoặc 20 — bất kỳ số nào khác sẽ bị lint cảnh báo.
+- KHÔNG dùng toạ độ tuyệt đối hardcode (ví dụ ¤move_to([2.3, -1.1, 0])¤ hay ¤shift(RIGHT * 3.7)¤ áng chừng cho vừa mắt). Luôn định vị TƯƠNG ĐỐI so với vật đã có trên khung hình bằng ¤.next_to(vật_khác, DIRECTION, buff=...)¤ hoặc theo mép khung bằng ¤.to_edge(DIRECTION)¤ — toạ độ tuyệt đối không co giãn theo nội dung thật và dễ vỡ bố cục khi nội dung dài/ngắn khác dự tính.
+
 ### Method của scene (gọi qua ¤self.¤)
 - Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
 - Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi ¤self.beat(...)¤ tương ứng bên trong:
@@ -257,6 +262,8 @@ QUAN TRỌNG — VỊ TRÍ KHI MÀN HÌNH ĐÃ CÓ THỨ GÌ ĐÓ: khi thêm ch�
 6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có ¤from manim import *¤?
 7. Rà lại từng lời gọi component (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) và method chữ (¤self.title/heading/body/caption¤): có tham số nào đang nhận một component/Mobject khác thay vì chuỗi ¤str¤ không? Nếu có, đó là lỗi runtime chắc chắn — sửa lại bằng chuỗi text thuần.
 8. Mỗi lần thêm chữ hoặc component MỚI trong khi màn hình chưa dọn sạch (chưa gọi ¤self.clear_stage()¤ hoặc ¤self.dismiss(...)¤ cho thứ trước đó): vật mới có đang được đặt vị trí tường minh bằng ¤.to_edge(...)¤ hoặc ¤.next_to(...)¤ không? Nếu nó bị bỏ ở vị trí mặc định trong khi màn hình không rỗng, nó sẽ chồng lên đúng giữa vật đang có sẵn — sửa lại bằng cách đặt vị trí tường minh.
+9. Rà toàn bộ script một lượt cuối tìm ba lỗi cú pháp/hiển thị thường gặp: (a) có màu hex viết thẳng ở đâu không (kể cả ngoài component); (b) có ¤font_size=¤ nào không thuộc {48, 36, 28, 20} không; (c) có toạ độ tuyệt đối hardcode (¤move_to([...])¤, ¤shift(...)¤ với số áng chừng) thay vì ¤.next_to()¤/¤.to_edge()¤ không? Sửa hết trước khi trả lời.
+10. Đọc lại toàn bộ code một lượt như một trình thông dịch Python: script có hợp lệ 100%, không thiếu dấu ngoặc/thụt lề, không bị cắt cụt giữa chừng, và KHÔNG có chữ giải thích hay dấu ¤¤¤ nào lọt vào bên trong phần code không?
 
 ## OUTPUT
 
@@ -310,6 +317,11 @@ IMPORTANT — DATA TYPES: every text parameter of the components above (¤conten
 
 IMPORTANT — POSITION WHEN SOMETHING IS ALREADY ON SCREEN: whenever you add text (¤self.caption/body/title/heading(...)¤) or any component while the frame is NOT empty (something else — an image, a table, another component — is already showing), you MUST set its position explicitly relative to what is already there — ¤.to_edge(DOWN/UP/LEFT/RIGHT)¤ or ¤.next_to(existing_obj, DIRECTION, buff=...)¤. NEVER leave it at the default (screen-center) position while the screen isn't empty — Manim places every unpositioned Mobject dead-center, so two things left there overlap exactly and become illegible.
 
+IMPORTANT — COLOR, FONT SIZE, COORDINATES (applies to EVERY call in the whole script, not just inside components):
+- NEVER write a hardcoded hex color (e.g. ¤"#3B82F6"¤) anywhere — including inside ¤self.title/heading/body/caption(...)¤ or when using raw Manim API. Always use the theme's colors: ¤self.theme.accent¤, ¤self.theme.ink¤, ¤self.theme.muted¤, ¤self.theme.series_color(i)¤. A hardcoded hex color triggers an immediate lint warning.
+- NEVER set ¤font_size=¤ to an arbitrary number on any call. If you genuinely need to override the size by hand (rare — ¤self.title/heading/body/caption¤ already pick the right size for their role), only 48, 36, 28, or 20 are allowed — any other value triggers a lint warning.
+- NEVER use hardcoded absolute coordinates (e.g. ¤move_to([2.3, -1.1, 0])¤ or ¤shift(RIGHT * 3.7)¤ eyeballed to "look right"). Always position RELATIVE to what's already on screen via ¤.next_to(other_obj, DIRECTION, buff=...)¤, or relative to the frame edge via ¤.to_edge(DIRECTION)¤ — absolute coordinates don't adapt to actual content size and break the layout whenever content is longer/shorter than expected.
+
 ### Scene methods (called via ¤self.¤)
 - Narration and structure: ¤self.narrate("line")¤, ¤self.beat("<id>")¤, ¤self.chapter("Chapter name")¤
 - Three built-in beats — USE THEM instead of hand-rolling, they already call ¤self.beat(...)¤ internally:
@@ -339,6 +351,8 @@ IMPORTANT — POSITION WHEN SOMETHING IS ALREADY ON SCREEN: whenever you add tex
 6. Double-check: does the script use only the components/methods listed in "ALLOWED API"? No hardcoded hex colors, no manual font_size, no ¤from manim import *¤?
 7. Check every component call (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) and text method (¤self.title/heading/body/caption¤): is any parameter receiving another component/Mobject instead of a plain ¤str¤? If so, that is a guaranteed runtime crash — replace it with plain text.
 8. Every time you add new text or a new component while the screen has not been cleared (no ¤self.clear_stage()¤ or ¤self.dismiss(...)¤ yet for what came before): is the new object given an explicit position via ¤.to_edge(...)¤ or ¤.next_to(...)¤? If it is left at the default position while the screen isn't empty, it will land exactly on top of what's already there — fix it with an explicit position.
+9. Do one final pass over the whole script for three common syntax/display mistakes: (a) any hardcoded hex color anywhere, including outside components; (b) any ¤font_size=¤ that isn't one of {48, 36, 28, 20}; (c) any hardcoded absolute coordinate (¤move_to([...])¤, eyeballed ¤shift(...)¤) instead of ¤.next_to()¤/¤.to_edge()¤. Fix all of them before answering.
+10. Read through the whole code once more as a Python interpreter would: is it 100% valid — no missing brackets/indentation, not truncated partway through — and is there NO explanatory text or stray ¤¤¤ marks that leaked inside the code itself?
 
 ## OUTPUT
 
