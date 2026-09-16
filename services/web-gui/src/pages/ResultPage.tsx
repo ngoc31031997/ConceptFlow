@@ -13,6 +13,7 @@ import { CompanionProjectCard } from "../components/CompanionProjectCard";
 import { Disclosure } from "../components/Disclosure";
 import { startRenderSaga, deleteProject, getProjectVideoUrl, ApiError } from "../api/client";
 import type { RenderQuality, VideoOutputMode } from "../context/ProjectDraftContext";
+import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
 
@@ -137,8 +138,7 @@ export function ResultPage() {
 
           <div className={styles.publishColumn}>
             {isPublished ? (
-              <div className={glass.card} data-testid="result-published-banner">
-                <div className={glass.cardTitle}>Đã đăng thành công!</div>
+              <Card title="Đã đăng thành công!" data-testid="result-published-banner">
                 <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
                 <div className={glass.mtSm}>
                   <Link
@@ -149,14 +149,13 @@ export function ResultPage() {
                     Xem chi tiết đăng bài
                   </Link>
                 </div>
-              </div>
+              </Card>
             ) : (
-              <div className={glass.card} data-testid="result-continue-to-publish">
-                <div className={glass.cardTitle}>Sẵn sàng đăng?</div>
-                <p className={glass.cardHint}>
-                  Xem lại video ổn rồi thì qua bước đăng — kết nối YouTube, điền tiêu đề/mô tả và xuất
-                  bản.
-                </p>
+              <Card
+                title="Sẵn sàng đăng?"
+                hint="Xem lại video ổn rồi thì qua bước đăng — kết nối YouTube, điền tiêu đề/mô tả và xuất bản."
+                data-testid="result-continue-to-publish"
+              >
                 <div className={`${glass.ctaRow} ${glass.mtSm}`}>
                   <Link
                     className={glass.btnPrimary}
@@ -167,7 +166,7 @@ export function ResultPage() {
                     Tiếp tục để đăng
                   </Link>
                 </div>
-              </div>
+              </Card>
             )}
           </div>
         </div>
@@ -207,15 +206,9 @@ export function ResultPage() {
                 </p>
               )}
               <div className={`${glass.ctaRow} ${glass.mtSm}`}>
-                <button
-                  type="button"
-                  className={glass.btnPrimary}
-                  disabled={isRerendering}
-                  onClick={handleRerender}
-                  data-testid="rerender-submit"
-                >
+                <Button disabled={isRerendering} onClick={handleRerender} data-testid="rerender-submit">
                   {isRerendering ? "Đang bắt đầu..." : "Render lại"}
-                </button>
+                </Button>
               </div>
             </Disclosure>
           )}
@@ -244,15 +237,14 @@ export function ResultPage() {
         */}
         <div className={styles.dangerZone}>
           <span className={glass.cardHint}>Xoá vĩnh viễn video này và toàn bộ dữ liệu liên quan.</span>
-          <button
-            type="button"
+          <Button
+            variant="dangerGhost"
             data-testid="result-delete-button"
-            className={glass.dangerGhostBtn}
             disabled={isDeleting}
             onClick={() => setShowDeleteModal(true)}
           >
             {isDeleting ? "Đang xoá..." : "Xoá video"}
-          </button>
+          </Button>
         </div>
       </AppShell>
 

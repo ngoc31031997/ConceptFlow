@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useKeyboardShortcuts, formatShortcut } from "../hooks/useKeyboardShortcuts";
-import glass from "../styles/glass.module.css";
+import { Button } from "./ui";
 import styles from "./WizardNav.module.css";
 
 interface WizardNavProps {
@@ -68,10 +68,10 @@ export function WizardNav({
     <div className={styles.bar}>
       <div className={styles.inner}>
         {onBack && (
-          <button type="button" className={glass.ghostBtn} onClick={onBack} data-testid="wizard-back">
+          <Button variant="ghost" onClick={onBack} data-testid="wizard-back">
             <ArrowLeft />
             {backLabel}
-          </button>
+          </Button>
         )}
         <p
           className={`${styles.hint} ${isBlocked ? styles.hintBlocked : ""}`}
@@ -80,9 +80,7 @@ export function WizardNav({
           {hint}
         </p>
         {extraAction}
-        <button
-          type="button"
-          className={glass.btnPrimary}
+        <Button
           onClick={onNext}
           disabled={nextDisabled}
           data-testid={nextTestId}
@@ -90,7 +88,7 @@ export function WizardNav({
         >
           {nextLabel}
           <ArrowRight />
-        </button>
+        </Button>
       </div>
     </div>
   );

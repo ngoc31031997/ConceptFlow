@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./ThumbnailUpload.module.css";
+import { Button, Card, TextArea } from "./ui";
 
 interface ThumbnailUploadProps {
   projectId: string;
@@ -171,33 +172,27 @@ export function ThumbnailUpload({
   }
 
   return (
-    <div className={`${glass.card} ${styles.wrapper}`}>
+    <Card className={styles.wrapper}>
       <div className={styles.header}>
         <div className={styles.label}>Thumbnail</div>
-        <button
-          type="button"
+        <Button
+          variant="ghost"
           data-testid="thumbnail-system-prompt-toggle"
-          className={glass.ghostBtn}
           onClick={() => setPromptPanelOpen((open) => !open)}
         >
           <WandIcon />
           System Prompt (tạo ảnh)
-        </button>
+        </Button>
       </div>
 
       {promptPanelOpen && (
         <div className={styles.promptPanel} data-testid="thumbnail-system-prompt-panel">
           <div className={styles.promptPanelHeader}>
             <span>System prompt để nhờ AI sinh ảnh (Midjourney/DALL-E/...) tạo thumbnail cho video</span>
-            <button
-              type="button"
-              className={glass.ghostBtn}
-              disabled={topicState === "loading"}
-              onClick={handleCopyPrompt}
-            >
+            <Button variant="ghost" disabled={topicState === "loading"} onClick={handleCopyPrompt}>
               <CopyIcon />
               {promptCopied ? "Đã copy!" : "Copy"}
-            </button>
+            </Button>
           </div>
           {topicState === "loading" && (
             <p className={glass.helperText} style={{ marginTop: 0, fontSize: 12 }}>
@@ -209,8 +204,8 @@ export function ThumbnailUpload({
               Không lấy được chủ đề video tự động — dán chủ đề vào prompt bên dưới trước khi dùng.
             </p>
           )}
-          <textarea
-            className={`${glass.textArea} ${styles.promptTextarea}`}
+          <TextArea
+            className={styles.promptTextarea}
             data-testid="thumbnail-system-prompt-textarea"
             value={thumbnailSystemPrompt}
             readOnly
@@ -269,6 +264,6 @@ export function ThumbnailUpload({
           {errorMessage}
         </span>
       )}
-    </div>
+    </Card>
   );
 }

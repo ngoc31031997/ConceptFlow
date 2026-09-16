@@ -3,7 +3,7 @@ import { SelectableOption } from "./SelectableOption";
 import type { VideoFormat } from "../types";
 import { buildAdjustPromptFor, buildBeatSheetSection, NARRATION_LANGUAGE_RULE } from "./scriptPrompts";
 import { getPromptTemplate } from "../api/client";
-import glass from "../styles/glass.module.css";
+import { Card, Button, TextInput, TextArea } from "./ui";
 import selectable from "../styles/selectable.module.css";
 import styles from "./ScriptAssistant.module.css";
 
@@ -128,8 +128,7 @@ export function ScriptAssistant({
   }
 
   return (
-    <div className={glass.card} data-testid="script-assistant">
-      <div className={glass.cardTitle}>Bạn đang ở tình huống nào?</div>
+    <Card title="Bạn đang ở tình huống nào?" data-testid="script-assistant">
       <p className={styles.lead}>
         Chọn đúng tình huống của bạn — các bước bên dưới sẽ đổi theo.
       </p>
@@ -153,9 +152,9 @@ export function ScriptAssistant({
             Dán script của bạn vào ô soạn thảo bên dưới. Hệ thống sẽ kiểm tra ngay script có kế thừa{" "}
             <code>ConceptFlowScene</code> và dùng <code>{'self.narrate("...")'}</code> đúng chuẩn không.
           </p>
-          <button type="button" className={glass.ghostBtn} onClick={onUseTemplate} data-testid="script-assistant-template">
+          <Button variant="ghost" onClick={onUseTemplate} data-testid="script-assistant-template">
             Hoặc xem một script mẫu chạy được ngay
-          </button>
+          </Button>
         </div>
       )}
 
@@ -169,19 +168,18 @@ export function ScriptAssistant({
                 {source === "blank" ? "Chủ đề video của bạn là gì?" : "Dán script Manim hiện có của bạn"}
               </label>
               {source === "blank" ? (
-                <input
+                <TextInput
                   id="assistant-input"
                   type="text"
-                  className={glass.textInput}
                   data-testid="script-assistant-topic"
                   value={topic}
                   onChange={(event) => setTopic(event.target.value)}
                   placeholder="Ví dụ: Vòng lặp for trong Java, khi nào dùng while thay thế"
                 />
               ) : (
-                <textarea
+                <TextArea
                   id="assistant-input"
-                  className={`${glass.textArea} ${styles.sourceTextarea}`}
+                  className={styles.sourceTextarea}
                   data-testid="script-assistant-existing"
                   value={existingScript}
                   onChange={(event) => setExistingScript(event.target.value)}
@@ -220,8 +218,8 @@ export function ScriptAssistant({
               </div>
               <details className={styles.preview}>
                 <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
-                <textarea
-                  className={`${glass.textArea} ${styles.previewTextarea}`}
+                <TextArea
+                  className={styles.previewTextarea}
                   data-testid="script-assistant-prompt"
                   value={prompt}
                   readOnly
@@ -247,9 +245,9 @@ export function ScriptAssistant({
                     Đây là dàn ý câu chuyện (câu hỏi cốt lõi, insight, lời thoại nháp từng beat) — KHÔNG
                     phải code. Dán nguyên văn phần AI trả lời, không cần chỉnh sửa.
                   </p>
-                  <textarea
+                  <TextArea
                     id="story-outline-input"
-                    className={`${glass.textArea} ${styles.sourceTextarea}`}
+                    className={styles.sourceTextarea}
                     data-testid="script-assistant-story-outline"
                     value={storyOutline}
                     onChange={(event) => onStoryOutlineChange(event.target.value)}
@@ -270,6 +268,6 @@ export function ScriptAssistant({
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 }

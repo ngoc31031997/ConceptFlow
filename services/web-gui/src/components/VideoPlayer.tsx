@@ -1,7 +1,7 @@
 import type { Ref } from "react";
 import type { Scene } from "../types";
 import { TranscriptViewer } from "./TranscriptViewer";
-import glass from "../styles/glass.module.css";
+import { Card } from "./ui";
 import styles from "./VideoPlayer.module.css";
 
 interface VideoPlayerProps {
@@ -15,7 +15,7 @@ interface VideoPlayerProps {
 export function VideoPlayer({ videoSrc, videoRef, scenes, contentLanguage = "vi" }: VideoPlayerProps) {
   return (
     <>
-      <div className={glass.card}>
+      <Card>
         <div className={styles.frame}>
           {/*
             No <track>: subtitles are burnt into the frames by Rendering (CR-002),
@@ -31,7 +31,7 @@ export function VideoPlayer({ videoSrc, videoRef, scenes, contentLanguage = "vi"
             className={styles.video}
           />
         </div>
-      </div>
+      </Card>
 
       {scenes && scenes.length > 0 && (
         <TranscriptViewer scenes={scenes} contentLanguage={contentLanguage} />

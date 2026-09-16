@@ -16,6 +16,7 @@ import {
   ERROR_CODE_QC_BLOCKED,
 } from "../api/client";
 import type { PublishMetadata } from "../types";
+import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishPage.module.css";
 
@@ -162,7 +163,7 @@ export function PublishPage() {
         }
       >
         {isPublished ? (
-          <div className={`${glass.card} ${styles.publishedCard}`}>
+          <Card className={styles.publishedCard}>
             <p className={styles.publishedTitle}>Đã đăng thành công!</p>
             <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
             {project.caption_status === "skipped_no_scope" && (
@@ -183,7 +184,7 @@ export function PublishPage() {
               </div>
             )}
             {clipsPanel}
-          </div>
+          </Card>
         ) : (
           /*
             Preview on the left, everything the upload needs on the right. The
@@ -201,14 +202,13 @@ export function PublishPage() {
 
             <div className={styles.publishColumn}>
               {outputMode === "short" && !showYoutubePublish ? (
-                <button
-                  type="button"
-                  className={glass.ghostBtn}
+                <Button
+                  variant="ghost"
                   onClick={() => setYoutubePublishOverride(true)}
                   data-testid="result-show-youtube-publish"
                 >
                   Cũng muốn đăng bản dài này lên YouTube?
-                </button>
+                </Button>
               ) : isPublishing ? (
                 <div
                   className={`${glass.card} ${styles.publishStatus}`}
@@ -238,15 +238,13 @@ export function PublishPage() {
                         {project.error_message ?? "Không rõ nguyên nhân."}
                       </p>
                       <div className={`${glass.ctaRow} ${glass.mtSm}`}>
-                        <button
-                          type="button"
+                        <Button
                           data-testid="result-retry-publish-button"
-                          className={glass.btnPrimary}
                           disabled={isSubmitting}
                           onClick={handleRetryPublish}
                         >
                           Thử đăng lại
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   )}

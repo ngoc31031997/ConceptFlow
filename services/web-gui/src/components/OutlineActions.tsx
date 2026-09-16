@@ -1,5 +1,5 @@
 import type { UseOutlineReview } from "../hooks/useOutlineReview";
-import glass from "../styles/glass.module.css";
+import { Card, Button } from "./ui";
 import styles from "./OutlineReview.module.css";
 
 interface OutlineActionsProps {
@@ -17,27 +17,15 @@ export function OutlineActions({ outline }: OutlineActionsProps) {
   const { busy, approve, reject } = outline;
 
   return (
-    <div className={glass.card} style={{ padding: 22 }} data-testid="outline-actions">
+    <Card data-testid="outline-actions">
       <div className={styles.actions} style={{ marginTop: 0 }}>
-        <button
-          type="button"
-          className={glass.btnPrimary}
-          disabled={busy}
-          onClick={approve}
-          data-testid="outline-approve"
-        >
+        <Button disabled={busy} onClick={approve} data-testid="outline-approve">
           Duyệt và sản xuất
-        </button>
-        <button
-          type="button"
-          className={glass.ghostBtn}
-          disabled={busy}
-          onClick={reject}
-          data-testid="outline-reject"
-        >
+        </Button>
+        <Button variant="ghost" disabled={busy} onClick={reject} data-testid="outline-reject">
           Quay lại sửa script
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
   );
 }

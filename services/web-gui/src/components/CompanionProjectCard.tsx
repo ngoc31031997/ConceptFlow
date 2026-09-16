@@ -4,6 +4,7 @@ import { getProjectVideoUrl } from "../api/client";
 import { VideoPlayer } from "./VideoPlayer";
 import { ClipsPanel } from "./ClipsPanel";
 import { StatusBadge } from "./StatusBadge";
+import { Card } from "./ui";
 import glass from "../styles/glass.module.css";
 
 interface CompanionProjectCardProps {
@@ -23,14 +24,11 @@ export function CompanionProjectCard({ companionProjectId }: CompanionProjectCar
   const { project, error } = useProject(companionProjectId);
 
   return (
-    <div className={glass.card} data-testid="companion-project-card">
-      <div className={glass.cardHeader}>
-        <span className={glass.cardTitle}>
-          {project?.video_output_mode === "short" ? "Bản Shorts/TikTok riêng" : "Video cùng chủ đề"}
-        </span>
-        {project && <StatusBadge status={project.status} />}
-      </div>
-
+    <Card
+      data-testid="companion-project-card"
+      title={project?.video_output_mode === "short" ? "Bản Shorts/TikTok riêng" : "Video cùng chủ đề"}
+      headerAction={project && <StatusBadge status={project.status} />}
+    >
       {error && (
         <p role="alert" className={glass.helperText}>
           Không tải được project liên kết ({error}).
@@ -64,6 +62,6 @@ export function CompanionProjectCard({ companionProjectId }: CompanionProjectCar
           </Link>
         </>
       )}
-    </div>
+    </Card>
   );
 }

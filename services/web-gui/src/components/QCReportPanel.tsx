@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ApiError, getQCReport } from "../api/client";
 import type { QCFinding, QCReport } from "../api/client";
+import { Card } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./QCReportPanel.module.css";
 
@@ -100,16 +101,17 @@ export function QCReportPanel({ projectId, onSeek }: QCReportPanelProps) {
   const warnings = findings.filter((f) => f.severity === "warning");
 
   return (
-    <div className={glass.card} data-testid="qc-report">
-      <div className={glass.cardHeader}>
-        <span className={glass.cardTitle}>Kiểm tra chất lượng</span>
-        {report.overridden_at && (
+    <Card
+      data-testid="qc-report"
+      title="Kiểm tra chất lượng"
+      headerAction={
+        report.overridden_at && (
           <span className={styles.overridden} data-testid="qc-overridden">
             Đã bỏ qua
           </span>
-        )}
-      </div>
-
+        )
+      }
+    >
       {report.status === "not_scored" && (
         <p className={glass.cardHint} data-testid="qc-not-scored">
           Không chấm được lần này{report.reason ? `: ${report.reason}` : "."} Video vẫn đăng được
@@ -144,6 +146,6 @@ export function QCReportPanel({ projectId, onSeek }: QCReportPanelProps) {
           </ul>
         </section>
       )}
-    </div>
+    </Card>
   );
 }
