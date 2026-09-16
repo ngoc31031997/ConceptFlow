@@ -25,17 +25,41 @@ from domain.ports import ScriptParserPort
 #: (`MovingCameraScene`...). Class đầu tiên tìm thấy là class được render.
 SCENE_CLASS_RE = re.compile(r"^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:")
 
+#: Remotion: một entry file (Root.tsx) đăng ký composition qua
+#: `<Composition id="..." component={...} .../>` bên trong `registerRoot()`
+#: (https://www.remotion.dev/docs/the-fundamentals). Chỉ regex-confirm hai
+#: dấu hiệu này tồn tại — không parse sâu JSX/TSX (ngoài phạm vi CR này).
+REMOTION_COMPOSITION_RE = re.compile(r"<Composition\b[^>]*\bid\s*=\s*[\"']([\w-]+)[\"']")
+REGISTER_ROOT_RE = re.compile(r"\bregisterRoot\s*\(")
+
 
 class ManimScriptParser(ScriptParserPort):
+    """Detects and parses either a Manim Python script or a Remotion
+    entry file (CR: Remotion rendering engine).
+
+    Manim is tried first — its `class ... (...Scene...):` declaration is
+    unambiguous and was the only grammar this service ever knew. A script
+    that instead registers a Remotion `<Composition>` inside
+    `registerRoot()` is the new, second grammar; anything matching
+    neither is a syntax error exactly as before.
+    """
+
     def parse(self, raw_script: str) -> ParsedScript:
         scene_class_name = self._find_scene_class(raw_script.splitlines())
-        if scene_class_name is None:
-            raise ScriptSyntaxError(
-                None,
-                "không tìm thấy class Scene nào "
-                "(cần dạng `class TenScene(ConceptFlowScene):`)",
-            )
-        return ParsedScript(scene_class_name=scene_class_name)
+        if scene_class_name is not None:
+            return ParsedScript(scene_class_name=scene_class_name, engine="manim")
+
+        composition_id = self._find_remotion_composition(raw_script)
+        if composition_id is not None:
+            return ParsedScript(scene_class_name=composition_id, engine="remotion")
+
+        raise ScriptSyntaxError(
+            None,
+            "không tìm thấy class Scene nào (cần dạng "
+            "`class TenScene(ConceptFlowScene):`) và cũng không tìm thấy "
+            "Remotion composition nào (cần `<Composition id=\"...\" ... />` "
+            "bên trong `registerRoot()`)",
+        )
 
     @staticmethod
     def _find_scene_class(lines: list[str]) -> str | None:
@@ -44,3 +68,12 @@ class ManimScriptParser(ScriptParserPort):
             if match:
                 return match.group(1)
         return None
+
+    @staticmethod
+    def _find_remotion_composition(raw_script: str) -> str | None:
+        if not REGISTER_ROOT_RE.search(raw_script):
+            return None
+        match = REMOTION_COMPOSITION_RE.search(raw_script)
+        if match is None:
+            return None
+        return match.group(1)

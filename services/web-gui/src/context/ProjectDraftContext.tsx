@@ -31,6 +31,7 @@ export interface ProjectDraft {
   subtitleMode: SubtitleMode;
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
+  renderEngine: RenderEngine;
   videoFormatId: string;
   backgroundMusicVolume: number;
   videoOutputMode: VideoOutputMode;
@@ -64,6 +65,14 @@ export interface ProjectDraft {
 export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 
 /**
+ * feature/remotion-engine — which engine renders scriptContent. "manim"
+ * stays the default; Remotion is a minimal first cut (see
+ * RenderEnginePicker.tsx). Backend defaults to "manim" too when this is
+ * omitted, so every project created before this field existed keeps working.
+ */
+export type RenderEngine = "manim" | "remotion";
+
+/**
  * Which output(s) this project produces (CR-007 follow-up). A short clip is
  * always cut from the rendered 16:9 video (CR-007 D1 — no standalone vertical
  * production), so "short" still renders the full long-form pipeline as
@@ -83,6 +92,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_MODE"; payload: SubtitleMode }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
+  | { type: "SET_RENDER_ENGINE"; payload: RenderEngine }
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
@@ -113,6 +123,7 @@ const initialDraft: ProjectDraft = {
   subtitleMode: "track",
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
+  renderEngine: "manim",
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
@@ -201,6 +212,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
+    case "SET_RENDER_ENGINE":
+      return { ...state, renderEngine: action.payload };
     case "SET_VIDEO_OUTPUT_MODE":
       return { ...state, videoOutputMode: action.payload };
     case "SET_VIDEO_FORMAT":

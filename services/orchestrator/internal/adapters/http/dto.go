@@ -29,6 +29,8 @@ type startRenderSagaRequest struct {
 	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
 	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
 	RenderQuality         string                `json:"render_quality,omitempty"`
+	// "manim" | "remotion" — empty means DefaultRenderEngine ("manim").
+	RenderEngine          string                `json:"render_engine,omitempty"`
 	VideoFormatID         string                `json:"video_format_id,omitempty"`
 	ReviewEnabled         *bool                 `json:"review_enabled,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
@@ -123,6 +125,7 @@ type projectResponse struct {
 	SubtitleMode     string                  `json:"subtitle_mode"`
 	SubtitleStyle    *domain.SubtitleStyle   `json:"subtitle_style,omitempty"`
 	RenderQuality    string                  `json:"render_quality"`
+	RenderEngine     string                  `json:"render_engine"`
 	VideoFormatID    string                  `json:"video_format_id"`
 	ReviewEnabled    bool                    `json:"review_enabled"`
 	Beats            []domain.BeatOccurrence `json:"beats"`
@@ -293,6 +296,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		SubtitleMode:     string(p.SubtitleMode),
 		SubtitleStyle:    p.SubtitleStyle,
 		RenderQuality:    string(p.RenderQuality),
+		RenderEngine:     string(p.RenderEngine),
 		VideoFormatID:    p.VideoFormatID,
 		ReviewEnabled:    p.ReviewEnabled,
 		Beats:            p.Beats,

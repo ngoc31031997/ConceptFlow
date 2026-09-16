@@ -12,6 +12,14 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ParsedScript:
-    """Service này không giữ trạng thái gì — không lưu lại raw_script."""
+    """Service này không giữ trạng thái gì — không lưu lại raw_script.
+
+    scene_class_name giữ tên định danh Rendering phải chạy: tên class Manim
+    Scene cho engine "manim", hoặc `id` của `<Composition>` cho engine
+    "remotion" (Root.tsx tra `id` đó trong `selectComposition`/`renderMedia`
+    — xem services/rendering/adapters/rendering/remotion_renderer.py).
+    """
 
     scene_class_name: str
+    # "manim" (mặc định) | "remotion" — engine nào sinh ra định danh trên.
+    engine: str = "manim"

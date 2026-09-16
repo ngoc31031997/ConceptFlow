@@ -104,6 +104,7 @@ export function ReviewStepPage() {
               }
             : undefined,
         render_quality: draft.renderQuality,
+        render_engine: draft.renderEngine,
         video_output_mode: draft.videoOutputMode,
         video_format_id: draft.videoFormatId,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,

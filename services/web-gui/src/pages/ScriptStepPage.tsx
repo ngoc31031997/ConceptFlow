@@ -55,7 +55,22 @@ export function ScriptStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
 
-  const canContinue = isStoryMode ? !storyIsEmpty && !savingStory : !isEmpty && validation.isValid;
+  // feature/remotion-engine: the engine picker lives in the Settings step,
+  // which comes AFTER this one — so at script-paste time we don't yet know
+  // whether this project will render with Manim or Remotion. validateScript
+  // only understands Manim's conventions (self.narrate, ConceptFlowScene);
+  // running it against pasted Remotion (.tsx) code would just block a
+  // Creator who hasn't done anything wrong. Detect "this doesn't look like
+  // Manim" instead of asking the Creator to declare the engine twice, and
+  // defer the real check to the backend's validate_script step, which
+  // already skips Manim lint for engine=remotion (see
+  // rendering/application/validate_script.py).
+  const looksLikeManim = /from\s+conceptflow\s+import|ConceptFlowScene/.test(draft.scriptContent);
+  const skipManimValidation = !isStoryMode && !isEmpty && !looksLikeManim;
+
+  const canContinue = isStoryMode
+    ? !storyIsEmpty && !savingStory
+    : !isEmpty && (skipManimValidation || validation.isValid);
 
   const hint = isStoryMode
     ? saveError
@@ -65,9 +80,11 @@ export function ScriptStepPage() {
         : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh"
     : isEmpty
       ? "Dán hoặc tạo script Manim để tiếp tục"
-      : validation.isValid
-        ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-        : validation.message;
+      : skipManimValidation
+        ? "Không phải script Manim — bỏ qua kiểm tra ở đây, hệ thống sẽ kiểm tra thật ở bước render"
+        : validation.isValid
+          ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+          : validation.message;
 
   async function handleContinue() {
     if (!isStoryMode) {
@@ -132,7 +149,7 @@ export function ScriptStepPage() {
 
       <WizardNav
         hint={hint}
-        isBlocked={isStoryMode ? !!saveError : !isEmpty && !validation.isValid}
+        isBlocked={isStoryMode ? !!saveError : !isEmpty && !skipManimValidation && !validation.isValid}
         onNext={handleContinue}
         nextLabel={isStoryMode ? (savingStory ? "Đang lưu..." : "Tiếp tục") : "Tiếp tục"}
         nextDisabled={!canContinue}
