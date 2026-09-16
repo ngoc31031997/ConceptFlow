@@ -55,6 +55,14 @@ export function ScriptStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
 
+  // feature/remotion-engine: Remotion has no 4-role pipeline (no Visual
+  // Director/Manim Engineer/Script Reviewer stub for it) — its "blank"
+  // prompt (remotion_engineer, see ScriptAssistant) hands back CODE directly,
+  // not a story outline. draft.authoringStory is reused as the paste-back
+  // staging field regardless of engine (same textarea either way); only what
+  // happens to it on "Tiếp tục" differs — see handleContinue.
+  const isRemotionBlank = isStoryMode && draft.renderEngine === "remotion";
+
   // feature/remotion-engine: the engine picker lives in the Settings step,
   // which comes AFTER this one — so at script-paste time we don't yet know
   // whether this project will render with Manim or Remotion. validateScript
@@ -76,8 +84,12 @@ export function ScriptStepPage() {
     ? saveError
       ? saveError
       : storyIsEmpty
-        ? "Dán dàn ý câu chuyện AI trả về để tiếp tục"
-        : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh"
+        ? isRemotionBlank
+          ? "Dán code Remotion AI trả về để tiếp tục"
+          : "Dán dàn ý câu chuyện AI trả về để tiếp tục"
+        : isRemotionBlank
+          ? "Code đã sẵn sàng — bước tiếp theo là cấu hình render"
+          : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh"
     : isEmpty
       ? "Dán hoặc tạo script Manim để tiếp tục"
       : skipManimValidation
@@ -88,6 +100,13 @@ export function ScriptStepPage() {
 
   async function handleContinue() {
     if (!isStoryMode) {
+      navigate("/create/settings");
+      return;
+    }
+    if (isRemotionBlank) {
+      // No server-side authoring pipeline for Remotion yet — the pasted
+      // content IS the final script, same as the "ready" source path.
+      dispatch({ type: "SET_SCRIPT", payload: draft.authoringStory });
       navigate("/create/settings");
       return;
     }
@@ -122,6 +141,7 @@ export function ScriptStepPage() {
               contentLanguage={draft.voiceLanguage}
               format={formats.find((f) => f.id === draft.videoFormatId)}
               wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
+              renderEngine={draft.renderEngine}
               source={draft.scriptSource}
               onSourceChange={(source) => dispatch({ type: "SET_SCRIPT_SOURCE", payload: source })}
               onUseTemplate={() =>

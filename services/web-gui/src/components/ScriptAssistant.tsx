@@ -15,6 +15,16 @@ interface ScriptAssistantProps {
   /** Format đã chọn — prompt sẽ mang beat sheet của nó (CR-019 FR54). */
   format?: VideoFormat;
   wordsPerMinute?: number;
+  /**
+   * feature/remotion-engine — which engine the project currently has
+   * selected (draft.renderEngine, set in the Settings step but read here as
+   * whatever it's already holding, per-request: keeping the wizard's step
+   * order unchanged, this just changes which prompt "blank" fetches). Manim
+   * still gets the 4-role story_architect pipeline; Remotion has no
+   * multi-step pipeline yet, so it gets a single flat prompt instead
+   * (remotion_engineer) whose output is code, not a story outline.
+   */
+  renderEngine: "manim" | "remotion";
   /** Replaces the editor's content — used by "dùng script mẫu". */
   onUseTemplate: () => void;
   source: ScriptSource;
@@ -69,6 +79,7 @@ export function ScriptAssistant({
   contentLanguage,
   format,
   wordsPerMinute,
+  renderEngine,
   onUseTemplate,
   source,
   onSourceChange,
@@ -79,31 +90,38 @@ export function ScriptAssistant({
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // CR-025: the "blank" path's prompt now comes from the DB-backed
-  // story_architect template instead of a hardcoded builder, so an editor
-  // can change the wording without rebuilding web-gui. format_beats and the
-  // narration-language rule stay computed client-side (they are data, not
-  // editable prose) and get substituted into the fetched template text.
-  const [storyArchitectTemplate, setStoryArchitectTemplate] = useState<string | null>(null);
+  // CR-025 / feature/remotion-engine: the "blank" path's prompt comes from a
+  // DB-backed template instead of a hardcoded builder, so an editor can
+  // change the wording without rebuilding web-gui — which role depends on
+  // renderEngine: Manim still gets the 4-role story_architect pipeline;
+  // Remotion (no multi-step pipeline yet) gets the single flat
+  // remotion_engineer prompt instead. format_beats and the narration-language
+  // rule stay computed client-side (they are data, not editable prose) and
+  // get substituted into the fetched template text (remotion_engineer's
+  // template simply has no {{format_beats}} token, so that substitution is a
+  // harmless no-op for it).
+  const blankRole = renderEngine === "remotion" ? "remotion_engineer" : "story_architect";
+  const [blankTemplate, setBlankTemplate] = useState<string | null>(null);
   useEffect(() => {
     if (source !== "blank") return;
     let cancelled = false;
-    getPromptTemplate("story_architect", contentLanguage)
+    setBlankTemplate(null);
+    getPromptTemplate(blankRole, contentLanguage)
       .then((template) => {
-        if (!cancelled) setStoryArchitectTemplate(template.template_text);
+        if (!cancelled) setBlankTemplate(template.template_text);
       })
       .catch(() => {
-        if (!cancelled) setStoryArchitectTemplate(null);
+        if (!cancelled) setBlankTemplate(null);
       });
     return () => {
       cancelled = true;
     };
-  }, [source, contentLanguage]);
+  }, [source, blankRole, contentLanguage]);
 
   const prompt = useMemo(() => {
     if (source !== "blank") return buildAdjustPromptFor(contentLanguage, existingScript);
     const formatBeats = format ? buildBeatSheetSection(format, contentLanguage, wordsPerMinute) : "";
-    const base = storyArchitectTemplate ?? "Đang tải prompt...";
+    const base = blankTemplate ?? "Đang tải prompt...";
     return base
       .split("{{topic}}")
       .join(topic.trim() || "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]")
@@ -111,7 +129,7 @@ export function ScriptAssistant({
       .join(formatBeats)
       .split("{{narration_language_rule}}")
       .join(NARRATION_LANGUAGE_RULE[contentLanguage]);
-  }, [source, contentLanguage, topic, existingScript, format, wordsPerMinute, storyArchitectTemplate]);
+  }, [source, contentLanguage, topic, existingScript, format, wordsPerMinute, blankTemplate]);
 
   // The prompt is copyable either way, but saying it is incomplete is more
   // useful than silently handing over one with a placeholder still in it.
@@ -242,8 +260,9 @@ export function ScriptAssistant({
                     Dán kết quả AI trả về vào đây
                   </label>
                   <p className={styles.stepHint}>
-                    Đây là dàn ý câu chuyện (câu hỏi cốt lõi, insight, lời thoại nháp từng beat) — KHÔNG
-                    phải code. Dán nguyên văn phần AI trả lời, không cần chỉnh sửa.
+                    {renderEngine === "remotion"
+                      ? "Đây là code Remotion (.tsx) AI trả về — dán nguyên văn khối code, không lấy phần AI giải thích."
+                      : "Đây là dàn ý câu chuyện (câu hỏi cốt lõi, insight, lời thoại nháp từng beat) — KHÔNG phải code. Dán nguyên văn phần AI trả lời, không cần chỉnh sửa."}
                   </p>
                   <TextArea
                     id="story-outline-input"
@@ -251,7 +270,11 @@ export function ScriptAssistant({
                     data-testid="script-assistant-story-outline"
                     value={storyOutline}
                     onChange={(event) => onStoryOutlineChange(event.target.value)}
-                    placeholder={"CÂU HỎI CỐT LÕI: ...\nINSIGHT CỐT LÕI: ...\n\nBEAT 1 — ...\n..."}
+                    placeholder={
+                      renderEngine === "remotion"
+                        ? "import {registerRoot, Composition} from 'remotion';\n..."
+                        : "CÂU HỎI CỐT LÕI: ...\nINSIGHT CỐT LÕI: ...\n\nBEAT 1 — ...\n..."
+                    }
                     rows={8}
                   />
                 </>

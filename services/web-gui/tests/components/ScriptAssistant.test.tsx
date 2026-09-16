@@ -15,13 +15,17 @@ beforeEach(() => {
   });
 });
 
-function renderAssistant(source: "blank" | "draft" | "ready" = "blank") {
+function renderAssistant(
+  source: "blank" | "draft" | "ready" = "blank",
+  renderEngine: "manim" | "remotion" = "manim",
+) {
   const onSourceChange = vi.fn();
   const onUseTemplate = vi.fn();
   const onStoryOutlineChange = vi.fn();
   render(
     <ScriptAssistant
       contentLanguage="vi"
+      renderEngine={renderEngine}
       source={source}
       onSourceChange={onSourceChange}
       onUseTemplate={onUseTemplate}
@@ -64,6 +68,24 @@ describe("ScriptAssistant", () => {
     // common way the round trip failed.
     expect(copied).toContain("Vòng lặp for trong Java");
     expect(copied).not.toContain("[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]");
+  });
+
+  it("fetches remotion_engineer instead of story_architect when renderEngine is remotion", async () => {
+    vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
+      role: "remotion_engineer",
+      language: "vi",
+      version: 1,
+      template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{narration_language_rule}}",
+    });
+    renderAssistant("blank", "remotion");
+
+    await waitFor(() =>
+      expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer", "vi"),
+    );
+    // The Remotion path pastes CODE back, not a story outline — the hint text
+    // must say so, since it's the only cue the Creator gets that this box
+    // means something different than it does for Manim.
+    expect(screen.getByText(/code Remotion/)).toBeInTheDocument();
   });
 
   it("substitutes the existing script for the adjust prompt instead", async () => {
