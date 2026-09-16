@@ -12,12 +12,18 @@ const (
 	RoleVisualDirector PromptRole = "visual_director"
 	RoleManimEngineer  PromptRole = "manim_engineer"
 	RoleScriptReviewer PromptRole = "script_reviewer"
+	// feature/remotion-engine: a single flat prompt (topic -> code), the same
+	// shape the Manim path had before CR-025 split it into 4 roles — Remotion
+	// has no design system/multi-step pipeline yet, so one prompt is the
+	// whole story for now. Selected instead of story_architect when the
+	// Creator's project has render_engine=remotion (see ScriptAssistant.tsx).
+	RoleRemotionEngineer PromptRole = "remotion_engineer"
 )
 
-// ValidPromptRole reports whether role is one of the 4 pipeline roles.
+// ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer, RoleScriptReviewer:
+	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer, RoleScriptReviewer, RoleRemotionEngineer:
 		return true
 	default:
 		return false
