@@ -47,3 +47,49 @@ def test_khong_con_bat_buoc_co_narration_trong_text():
     biết. Bắt lỗi ở đây sẽ chặn nhầm đúng loại script mà CR-018 mở ra."""
     script = "class DemoScene(ConceptFlowScene):\n    def construct(self):\n        pass\n"
     assert ManimScriptParser().parse(script).scene_class_name == "DemoScene"
+
+
+REMOTION_ENTRY = (
+    "import { registerRoot, Composition } from 'remotion';\n"
+    "import { MyVideo } from './MyVideo';\n\n"
+    "export const RemotionRoot: React.FC = () => {\n"
+    "  return (\n"
+    "    <Composition\n"
+    '      id="MyComp"\n'
+    "      component={MyVideo}\n"
+    "      durationInFrames={150}\n"
+    "      fps={30}\n"
+    "      width={1920}\n"
+    "      height={1080}\n"
+    "    />\n"
+    "  );\n"
+    "};\n\n"
+    "registerRoot(RemotionRoot);\n"
+)
+
+
+def test_nhan_dien_remotion_composition_trong_registerroot():
+    parsed = ManimScriptParser().parse(REMOTION_ENTRY)
+    assert parsed.scene_class_name == "MyComp"
+    assert parsed.engine == "remotion"
+
+
+def test_manim_van_uu_tien_khi_ca_hai_dang_deu_co_the_khop():
+    """Class Scene được thử trước — grammar Manim đã tồn tại từ trước và
+    không được lùi bước trước grammar Remotion mới thêm."""
+    parsed = ManimScriptParser().parse(SCRIPT)
+    assert parsed.engine == "manim"
+
+
+def test_composition_khong_trong_registerroot_thi_khong_tinh():
+    """Chỉ có `<Composition id="...">` mà không có `registerRoot(...)` thì
+    không phải một entry file Remotion hợp lệ — báo lỗi như trước đây."""
+    script = '<Composition id="MyComp" component={X} />\n'
+    with pytest.raises(ScriptSyntaxError):
+        ManimScriptParser().parse(script)
+
+
+def test_registerroot_khong_co_composition_thi_khong_tinh():
+    script = "registerRoot(RemotionRoot);\n"
+    with pytest.raises(ScriptSyntaxError):
+        ManimScriptParser().parse(script)
