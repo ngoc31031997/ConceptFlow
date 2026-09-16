@@ -76,7 +76,10 @@ class RenderScriptUseCase:
             raise ValueError("scene_class_name must not be empty")
         if not request.script_content.strip():
             raise ValueError("script_content must not be empty")
-        issues = lint_manim_script(request.script_content)
+        # feature/remotion-engine: same reasoning as validate_script.py —
+        # this lint parses Python via `ast`; a Remotion script is TypeScript,
+        # so it was never a candidate for this check in the first place.
+        issues = lint_manim_script(request.script_content) if request.engine == "manim" else []
         blocking = blocking_issues(issues)
         if blocking:
             raise InvalidManimApiUsageError(blocking)

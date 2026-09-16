@@ -119,10 +119,20 @@ func rebuildPayload(stepName domain.StepName, project *domain.Project) map[strin
 	case domain.StepSynthesizeSpeech:
 		return map[string]interface{}{"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID)}
 	case domain.StepRenderScenes:
+		// feature/remotion-engine: without "engine" here, retrying this step
+		// silently fell back to Manim (rendering's consumer.py defaults an
+		// absent engine to "manim") regardless of what render_engine the
+		// project actually picked — the render would then run the Manim AST
+		// lint against a Remotion (.tsx) script and fail immediately.
+		engine := project.RenderEngine
+		if !engine.IsValid() {
+			engine = domain.DefaultRenderEngine
+		}
 		return map[string]interface{}{
 			"scenes":           scenesToPayload(project.Scenes),
 			"script_content":   project.ScriptContent,
 			"scene_class_name": project.ManimSceneClassName,
+			"engine":           string(engine),
 		}
 	case domain.StepAssembleVideo:
 		return assembleVideoPayload(project)

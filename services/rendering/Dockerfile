@@ -79,8 +79,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY remotion_project/package.json remotion_project/package-lock.json* remotion_project/
-RUN cd remotion_project && npm ci
+COPY remotion_project/package.json remotion_project/
+# `npm install`, not `npm ci`: no package-lock.json is committed yet for
+# this first cut (nothing has generated one against a real npm registry
+# from inside this repo before) — `npm ci` requires one to exist.
+RUN cd remotion_project && npm install
 COPY . .
 # Downloads Chrome Headless Shell into the image at build time (per Remotion's
 # Docker docs) rather than on first render — a cold first render in
