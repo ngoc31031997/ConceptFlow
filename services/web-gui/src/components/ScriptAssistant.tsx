@@ -38,23 +38,41 @@ interface ScriptAssistantProps {
   onStoryOutlineChange: (value: string) => void;
 }
 
-const SOURCES: { value: ScriptSource; label: string; hint: string }[] = [
-  {
-    value: "blank",
-    label: "Chưa có gì, chỉ có ý tưởng",
-    hint: "Nhập chủ đề, AI sẽ viết script Manim hoàn chỉnh cho bạn",
-  },
-  {
-    value: "draft",
-    label: "Đã có script Manim",
-    hint: "Nhưng chưa có lời thoại self.narrate(...) — AI sẽ thêm giúp bạn",
-  },
-  {
-    value: "ready",
-    label: "Script đã đúng chuẩn",
-    hint: "Đã dùng self.narrate(\"...\"), kế thừa ConceptFlowScene — dán thẳng vào là chạy",
-  },
-];
+/**
+ * "draft"/"ready" only make sense for Manim: they refer to
+ * self.narrate(...)/ConceptFlowScene, an existing-script situation Remotion
+ * has no equivalent flow for yet (its only path is the single
+ * remotion_engineer prompt, source "blank"). Showing them for Remotion would
+ * offer two options that quietly do nothing useful.
+ */
+function sourcesFor(renderEngine: "manim" | "remotion"): { value: ScriptSource; label: string; hint: string }[] {
+  if (renderEngine === "remotion") {
+    return [
+      {
+        value: "blank",
+        label: "Chưa có gì, chỉ có ý tưởng",
+        hint: "Nhập chủ đề, AI sẽ viết script Remotion hoàn chỉnh cho bạn",
+      },
+    ];
+  }
+  return [
+    {
+      value: "blank",
+      label: "Chưa có gì, chỉ có ý tưởng",
+      hint: "Nhập chủ đề, AI sẽ viết script Manim hoàn chỉnh cho bạn",
+    },
+    {
+      value: "draft",
+      label: "Đã có script Manim",
+      hint: "Nhưng chưa có lời thoại self.narrate(...) — AI sẽ thêm giúp bạn",
+    },
+    {
+      value: "ready",
+      label: "Script đã đúng chuẩn",
+      hint: "Đã dùng self.narrate(\"...\"), kế thừa ConceptFlowScene — dán thẳng vào là chạy",
+    },
+  ];
+}
 
 function CopyIcon() {
   return (
@@ -152,7 +170,7 @@ export function ScriptAssistant({
       </p>
 
       <div className={selectable.stack} role="radiogroup" aria-label="Tình huống script">
-        {SOURCES.map((option) => (
+        {sourcesFor(renderEngine).map((option) => (
           <SelectableOption
             key={option.value}
             selected={source === option.value}

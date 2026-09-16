@@ -147,7 +147,16 @@ export function ScriptStepPage() {
               prompt, không phải sau khi quay lại từ bước 2. */}
           <RenderEnginePicker
             value={draft.renderEngine}
-            onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
+            onChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              // "draft"/"ready" only mean anything for a Manim script
+              // (self.narrate/ConceptFlowScene) — switching to Remotion
+              // while one of those is selected would leave the Creator on
+              // an option ScriptAssistant no longer offers.
+              if (engine === "remotion" && draft.scriptSource !== "blank") {
+                dispatch({ type: "SET_SCRIPT_SOURCE", payload: "blank" });
+              }
+            }}
           />
         </div>
 
