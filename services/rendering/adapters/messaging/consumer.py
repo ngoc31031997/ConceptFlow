@@ -87,6 +87,7 @@ class RenderScriptCommandHandler:
                 for s in payload["scenes"]
             ],
             render_quality=payload.get("render_quality"),
+            engine=payload.get("engine", "manim"),
         )
 
         try:
@@ -169,6 +170,7 @@ class ValidateScriptCommandHandler:
             # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
             narration_segments=[],
             render_quality=payload.get("render_quality"),
+            engine=payload.get("engine", "manim"),
         )
 
         try:

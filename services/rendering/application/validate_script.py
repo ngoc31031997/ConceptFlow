@@ -59,7 +59,12 @@ class ValidateScriptUseCase:
         if not request.scene_class_name:
             raise ScriptValidationError("thiếu scene_class_name")
 
-        issues = lint_manim_script(request.script_content)
+        # feature/remotion-engine: this lint parses Python via `ast` — running
+        # it against a Remotion script's TypeScript would fail immediately on
+        # syntax it was never meant to read. Remotion has no lint of its own
+        # yet (explicitly out of scope for the first cut); its dry pass is
+        # still the real check, same as Manim's.
+        issues = lint_manim_script(request.script_content) if request.engine == "manim" else []
         blocking = blocking_issues(issues)
         if blocking:
             # Dừng ở đây: chạy lượt dry cho một script đã biết là sai chỉ tốn

@@ -1,0 +1,18 @@
+{
+  "name": "conceptflow-remotion-project",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Minimal Remotion project template the Rendering Service uses to render Creator-authored .tsx compositions (ConceptFlow Remotion engine support, feature/remotion-engine). package.json alone (no node_modules) is what the Dockerfile COPYs before `npm ci`, so dependency changes bust the Docker layer cache correctly.",
+  "type": "module",
+  "dependencies": {
+    "remotion": "4.0.525",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@remotion/bundler": "4.0.525",
+    "@remotion/renderer": "4.0.525",
+    "@remotion/cli": "4.0.525",
+    "typescript": "5.4.5"
+  }
+}

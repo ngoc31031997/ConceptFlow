@@ -26,6 +26,7 @@ from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
+from adapters.rendering.engine_router import EngineRouterRenderer
 from adapters.rendering.manim_renderer import (
     CACHE_ROOT,
     DEFAULT_RENDER_MEMORY_LIMIT_GB,
@@ -33,6 +34,7 @@ from adapters.rendering.manim_renderer import (
     DEFAULT_RENDER_TIMEOUT_SECONDS,
     ManimScriptRenderer,
 )
+from adapters.rendering.remotion_renderer import RemotionScriptRenderer
 from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
@@ -51,12 +53,18 @@ async def run() -> None:
     # RENDER_CACHE_ROOT="" turns caching off, restoring the old
     # tempdir + --disable_caching behaviour without a code change.
     cache_root = os.environ.get("RENDER_CACHE_ROOT", CACHE_ROOT) or None
-    renderer = ManimScriptRenderer(
+    manim_renderer = ManimScriptRenderer(
         timeout_seconds=timeout_seconds,
         memory_limit_gb=memory_limit_gb,
         cache_root=cache_root,
         quality=os.environ.get("RENDER_QUALITY", DEFAULT_RENDER_QUALITY),
     )
+    # feature/remotion-engine: RenderScriptUseCase/ValidateScriptUseCase go
+    # through the router so either engine can be picked per-request; channel
+    # asset idents (below) stay Manim-only, so they keep using manim_renderer
+    # directly — RemotionScriptRenderer doesn't implement that port at all.
+    remotion_renderer = RemotionScriptRenderer(timeout_seconds=timeout_seconds)
+    renderer = EngineRouterRenderer(manim=manim_renderer, remotion=remotion_renderer)
     use_case = RenderScriptUseCase(renderer)
 
     pool = await create_pool()
@@ -81,8 +89,10 @@ async def run() -> None:
         ),
         # Dựng intro/outro cố định của kênh (CR-023 D3) — cùng renderer, khác
         # use case: không có script Creator, không có lượt dry/narration.
+        # feature/remotion-engine: dùng thẳng manim_renderer (ChannelAssetRendererPort
+        # chỉ có ManimScriptRenderer implement — xem docstring remotion_renderer.py).
         RenderChannelAssetCommandHandler(
-            RenderChannelAssetUseCase(renderer), pool, inbox, outbox
+            RenderChannelAssetUseCase(manim_renderer), pool, inbox, outbox
         ),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

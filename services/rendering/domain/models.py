@@ -42,6 +42,11 @@ class ScriptRenderRequest:
     # check the content, then a 1080p60 pass for upload). None means "use the
     # service default", which covers projects created before the field existed.
     render_quality: str | None = None
+    # feature/remotion-engine: which engine renders scene_class_name. "manim"
+    # (default) covers every project created before this field existed —
+    # Orchestrator only sends "engine" at all once a project actually picked
+    # something other than the default (see handle_step_event.go).
+    engine: str = "manim"
 
     def __post_init__(self) -> None:
         # A browser clipboard on macOS hands out Vietnamese diacritics
