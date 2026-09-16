@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { NarrationPanel } from "../components/NarrationPanel";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
-import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import { VideoOutputModePicker } from "../components/VideoOutputModePicker";
 import { VideoFormatPicker } from "../components/VideoFormatPicker";
 import { useVideoFormats } from "../hooks/useVideoFormats";
@@ -80,20 +79,6 @@ export function SettingsStepPage() {
               <RenderQualityPicker
                 value={draft.renderQuality}
                 onChange={(quality) => dispatch({ type: "SET_RENDER_QUALITY", payload: quality })}
-              />
-            </Disclosure>
-
-            {/* feature/remotion-engine — same collapsed-by-default treatment
-                as RenderQualityPicker above: no consequence for how the
-                script gets written, just which engine renders it. */}
-            <Disclosure
-              title="Công cụ render"
-              hint={`Hiện tại: ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`}
-              testId="settings-render-engine"
-            >
-              <RenderEnginePicker
-                value={draft.renderEngine}
-                onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
               />
             </Disclosure>
 

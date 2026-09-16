@@ -7,6 +7,7 @@ import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibra
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
+import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
@@ -127,13 +128,28 @@ export function ScriptStepPage() {
       <AppShell
         currentStep={1}
         wide
-        title="Bước 1 — Script Manim"
-        subtitle="Hệ thống render script Manim của bạn thành video. Trước tiên cần một script có đánh dấu lời thoại."
+        title={draft.renderEngine === "remotion" ? "Bước 1 — Script Remotion" : "Bước 1 — Script Manim"}
+        subtitle={
+          draft.renderEngine === "remotion"
+            ? "Hệ thống render script Remotion của bạn thành video. Trước tiên cần một script có đánh dấu lời thoại."
+            : "Hệ thống render script Manim của bạn thành video. Trước tiên cần một script có đánh dấu lời thoại."
+        }
       >
-        <ContentLanguagePicker
-          value={draft.voiceLanguage}
-          onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
-        />
+        <div className={styles.settingsRow}>
+          <ContentLanguagePicker
+            value={draft.voiceLanguage}
+            onChange={(lang) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang })}
+          />
+
+          {/* feature/remotion-engine: chọn engine NGAY Ở ĐÂY, không phải chỉ
+              ở bước Cấu hình — prompt bên dưới (ScriptAssistant) đổi ngay
+              theo lựa chọn này, nên Creator cần thấy nó trước khi copy
+              prompt, không phải sau khi quay lại từ bước 2. */}
+          <RenderEnginePicker
+            value={draft.renderEngine}
+            onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
+          />
+        </div>
 
         <div className={styles.scriptLayout}>
           <div className={styles.assistantColumn}>
