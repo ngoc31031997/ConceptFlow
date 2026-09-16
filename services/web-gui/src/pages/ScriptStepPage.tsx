@@ -172,6 +172,7 @@ export function ScriptStepPage() {
               format={formats.find((f) => f.id === draft.videoFormatId)}
               wordsPerMinute={wordsPerMinuteFor(calibration, draft.voiceId)}
               renderEngine={draft.renderEngine}
+              wide={isStoryMode}
               source={draft.scriptSource}
               onSourceChange={(source) => dispatch({ type: "SET_SCRIPT_SOURCE", payload: source })}
               onUseTemplate={() =>

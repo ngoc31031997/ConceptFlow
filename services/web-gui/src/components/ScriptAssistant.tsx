@@ -25,6 +25,16 @@ interface ScriptAssistantProps {
    * (remotion_engineer) whose output is code, not a story outline.
    */
   renderEngine: "manim" | "remotion";
+  /**
+   * True only when the parent gives this component the FULL page width to
+   * work with (source "blank" — no ScriptEditor rendered alongside it, see
+   * ScriptStepPage). Only then is there room for an internal 2-column
+   * split (form + always-expanded prompt preview); "draft" always shares
+   * the page with ScriptEditor in an outer 2-column layout already, so it
+   * keeps the prompt preview as an inline collapsed section instead of
+   * nesting a second grid inside an already-narrow column.
+   */
+  wide?: boolean;
   /** Replaces the editor's content — used by "dùng script mẫu". */
   onUseTemplate: () => void;
   source: ScriptSource;
@@ -98,6 +108,7 @@ export function ScriptAssistant({
   format,
   wordsPerMinute,
   renderEngine,
+  wide,
   onUseTemplate,
   source,
   onSourceChange,
@@ -163,8 +174,14 @@ export function ScriptAssistant({
     }
   }
 
+  // Only "blank"/"draft" have a prompt worth previewing — "ready" skips the
+  // AI round trip entirely (CR-025), so it has no second column to show.
+  const hasPreview = source !== "ready";
+  const sideBySide = wide && hasPreview;
+
   return (
-    <Card title="Bạn đang ở tình huống nào?" data-testid="script-assistant">
+    <div className={sideBySide ? styles.layout : undefined} data-testid="script-assistant">
+    <Card title="Bạn đang ở tình huống nào?" className={sideBySide ? styles.formCard : undefined}>
       <p className={styles.lead}>
         Chọn đúng tình huống của bạn — các bước bên dưới sẽ đổi theo.
       </p>
@@ -252,16 +269,22 @@ export function ScriptAssistant({
                       : "Chưa dán script"}
                 </span>
               </div>
-              <details className={styles.preview}>
-                <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
-                <TextArea
-                  className={styles.previewTextarea}
-                  data-testid="script-assistant-prompt"
-                  value={prompt}
-                  readOnly
-                  rows={10}
-                />
-              </details>
+              {/* "draft" shares the page with ScriptEditor (outer 2-column
+                  layout) — no room for a second internal column, so it
+                  keeps the old collapsed-by-default preview here instead of
+                  the always-expanded side panel "blank" gets below. */}
+              {!sideBySide && (
+                <details className={styles.preview}>
+                  <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
+                  <TextArea
+                    className={styles.previewTextarea}
+                    data-testid="script-assistant-prompt"
+                    value={prompt}
+                    readOnly
+                    rows={10}
+                  />
+                </details>
+              )}
             </div>
           </div>
 
@@ -310,5 +333,26 @@ export function ScriptAssistant({
         </div>
       )}
     </Card>
+
+    {/* Right column, always expanded — only when "blank" has the full page
+        width to itself (see the `wide` prop doc comment). This used to be a
+        collapsed <details> inline with step 2, hiding substantial real
+        content by default and leaving the right half of the page empty
+        (feedback: "vẫn còn khoảng trống khổng lồ"). */}
+    {sideBySide && (
+      <Card
+        title="Xem trước prompt"
+        hint="Nội dung sẽ copy ra AI ngoài — cập nhật ngay khi bạn gõ."
+        className={styles.previewCard}
+      >
+        <TextArea
+          className={styles.previewTextareaFull}
+          data-testid="script-assistant-prompt"
+          value={prompt}
+          readOnly
+        />
+      </Card>
+    )}
+    </div>
   );
 }
