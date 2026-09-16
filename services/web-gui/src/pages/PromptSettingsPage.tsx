@@ -14,6 +14,9 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "manim_engineer", label: "3. Manim Engineer — viết code" },
   { value: "script_reviewer", label: "4. Script Reviewer — duyệt kết quả" },
+  // feature/remotion-engine — không thuộc chuỗi 4 bước trên (Remotion chưa
+  // có pipeline nhiều bước), tách riêng thay vì đánh số tiếp theo.
+  { value: "remotion_engineer", label: "Remotion Engineer — viết code Remotion" },
 ];
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
