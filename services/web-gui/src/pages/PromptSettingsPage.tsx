@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
+import { Card, Button, FormField, Select, TextArea, CtaRow } from "../components/ui";
 import {
   getPromptTemplate,
   updatePromptTemplate,
   type PromptTemplate,
 } from "../api/client";
-import styles from "./WizardSteps.module.css";
+import glass from "../styles/glass.module.css";
+import styles from "./PromptSettingsPage.module.css";
 
 const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
@@ -36,6 +38,9 @@ function renderPreview(templateText: string): string {
  * kịch bản, không cần build lại web-gui. Cố tình để ngoài luồng wizard của
  * Creator (mục "Cài đặt" riêng) — đây là công cụ cho người vận hành kênh,
  * không phải bước Creator đi qua mỗi lần tạo video.
+ *
+ * Dùng components/ui (Card/Button/FormField/Select/TextArea/CtaRow) thay vì
+ * tự viết class/style — đây là màn tham chiếu cho DESIGN_SYSTEM.md.
  */
 export function PromptSettingsPage() {
   const [role, setRole] = useState<PromptTemplate["role"]>("story_architect");
@@ -93,68 +98,80 @@ export function PromptSettingsPage() {
         subtitle="Sửa nội dung prompt của từng bước trong quy trình 4 vai trò (CR-025) — không cần build lại giao diện."
         wide
       >
-        <div className={styles.scriptLayout}>
-          <div className={styles.assistantColumn}>
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Vai trò
-              <select
-                data-testid="prompt-role-select"
-                value={role}
-                onChange={(e) => setRole(e.target.value as PromptTemplate["role"])}
-                style={{ display: "block", width: "100%", marginTop: 4 }}
+        <div className={styles.layout}>
+          <div className={styles.controls}>
+            <Card title="Chọn prompt">
+              <FormField label="Vai trò">
+                <Select
+                  data-testid="prompt-role-select"
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as PromptTemplate["role"])}
+                >
+                  {ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+
+              <FormField label="Ngôn ngữ nội dung video" className={glass.mtSm}>
+                <Select
+                  data-testid="prompt-language-select"
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as "vi" | "en")}
+                >
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="en">Tiếng Anh</option>
+                </Select>
+              </FormField>
+
+              {version !== null && (
+                <p className={`${styles.versionRow} ${glass.mtSm}`}>Phiên bản hiện tại: {version}</p>
+              )}
+              {status && (
+                <p className={`${glass.cardHint} ${glass.mtXs}`} data-testid="prompt-settings-status">
+                  {status}
+                </p>
+              )}
+            </Card>
+
+            <CtaRow>
+              <Button
+                variant="ghost"
+                onClick={() => setShowPreview((v) => !v)}
+                data-testid="prompt-preview-toggle"
               >
-                {ROLES.map((r) => (
-                  <option key={r.value} value={r.value}>
-                    {r.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label style={{ display: "block", marginBottom: 8 }}>
-              Ngôn ngữ nội dung video
-              <select
-                data-testid="prompt-language-select"
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as "vi" | "en")}
-                style={{ display: "block", width: "100%", marginTop: 4 }}
-              >
-                <option value="vi">Tiếng Việt</option>
-                <option value="en">Tiếng Anh</option>
-              </select>
-            </label>
-
-            {version !== null && <p>Phiên bản hiện tại: {version}</p>}
-            {status && <p data-testid="prompt-settings-status">{status}</p>}
-
-            <button type="button" onClick={handleSave} disabled={saving || loading} data-testid="prompt-save-button">
-              {saving ? "Đang lưu..." : "Lưu"}
-            </button>{" "}
-            <button type="button" onClick={() => setShowPreview((v) => !v)} data-testid="prompt-preview-toggle">
-              {showPreview ? "Ẩn xem trước" : "Xem trước"}
-            </button>
+                {showPreview ? "Ẩn xem trước" : "Xem trước"}
+              </Button>
+              <Button onClick={handleSave} disabled={saving || loading} data-testid="prompt-save-button">
+                {saving ? "Đang lưu..." : "Lưu"}
+              </Button>
+            </CtaRow>
           </div>
 
           <div>
-            <textarea
-              data-testid="prompt-template-textarea"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={loading}
-              rows={24}
-              style={{ width: "100%", fontFamily: "monospace" }}
-            />
+            <Card title="Nội dung prompt">
+              <TextArea
+                data-testid="prompt-template-textarea"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                disabled={loading}
+                rows={24}
+              />
+            </Card>
+
             {showPreview && (
-              <>
-                <h3>Xem trước (dữ liệu mẫu, không gửi server)</h3>
-                <textarea
-                  data-testid="prompt-preview-textarea"
-                  value={renderPreview(text)}
-                  readOnly
-                  rows={20}
-                  style={{ width: "100%", fontFamily: "monospace" }}
-                />
-              </>
+              <div className={styles.previewBlock}>
+                <Card title="Xem trước" hint="Dữ liệu mẫu, không gửi server">
+                  <TextArea
+                    data-testid="prompt-preview-textarea"
+                    value={renderPreview(text)}
+                    readOnly
+                    rows={20}
+                  />
+                </Card>
+              </div>
             )}
           </div>
         </div>
