@@ -3,6 +3,7 @@ import { suggestPublishMetadata, ApiError } from "../api/client";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishForm.module.css";
+import { Button, TextArea, TextInput } from "./ui";
 
 interface PublishFormProps {
   projectId: string;
@@ -128,11 +129,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
             {title.length}/{TITLE_MAX_LENGTH}
           </span>
         </div>
-        <input
+        <TextInput
           id="publish-title"
           type="text"
           data-testid="publish-form-title-input"
-          className={glass.textInput}
           value={title}
           maxLength={TITLE_MAX_LENGTH}
           onChange={(event) => {
@@ -146,10 +146,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
         <label className={styles.label} htmlFor="publish-description">
           Mô tả
         </label>
-        <textarea
+        <TextArea
           id="publish-description"
           data-testid="publish-form-description-textarea"
-          className={`${glass.textArea} ${styles.field}`}
+          className={styles.field}
           style={{ minHeight: 72, font: "inherit" }}
           value={description}
           onChange={(event) => {
@@ -163,11 +163,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
         <label className={styles.label} htmlFor="publish-tags">
           Tags (phân cách bởi dấu phẩy)
         </label>
-        <input
+        <TextInput
           id="publish-tags"
           type="text"
           data-testid="publish-form-tags-input"
-          className={glass.textInput}
           value={tags}
           onChange={(event) => {
             setTags(event.target.value);
@@ -208,11 +207,10 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           <label className={styles.label} htmlFor="publish-at">
             Tự động công khai lúc (tùy chọn)
           </label>
-          <input
+          <TextInput
             id="publish-at"
             type="datetime-local"
             data-testid="publish-form-publish-at-input"
-            className={glass.textInput}
             value={publishAt}
             onChange={(event) => setPublishAt(event.target.value)}
           />
@@ -230,14 +228,13 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
       )}
 
       <div className={styles.ctaRow}>
-        <button
+        <Button
           type="submit"
           data-testid="publish-form-submit-button"
-          className={glass.btnPrimary}
           disabled={!isTitleValid || isSubmitting || (visibility === "private" && !!publishAt && !isPublishAtValid)}
         >
           {isSubmitting ? "Đang gửi yêu cầu..." : "Đăng lên YouTube"}
-        </button>
+        </Button>
       </div>
     </form>
   );

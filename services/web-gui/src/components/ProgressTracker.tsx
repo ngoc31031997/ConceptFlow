@@ -1,7 +1,7 @@
 import type { ProgressState } from "../hooks/useSSE";
-import glass from "../styles/glass.module.css";
 import styles from "./ProgressTracker.module.css";
 import { RENDER_STEPS, stepLabel } from "../utils/pipelineLabels";
+import { Card } from "./ui";
 
 interface ProgressTrackerProps {
   progressState: ProgressState;
@@ -27,7 +27,7 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
   const activeIndex = currentStep ? RENDER_STEPS.indexOf(currentStep as (typeof RENDER_STEPS)[number]) : -1;
 
   return (
-    <div className={glass.card}>
+    <Card>
       <div className={styles.wrap}>
         <p className={styles.stepLabel} data-testid="progress-tracker-step-label">
           {currentStep
@@ -73,7 +73,7 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
           })}
         </ol>
       </div>
-    </div>
+    </Card>
   );
 }
 

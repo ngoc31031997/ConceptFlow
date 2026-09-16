@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS } from "./scriptTemplates";
 import { useDebounce } from "../hooks/useDebounce";
+import { Button, Card, TextArea } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { formatDuration } from "../utils/durationEstimate";
@@ -84,32 +85,30 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
   }
 
   return (
-    <div className={glass.card} id="script-editor">
-      <div className={glass.cardHeader}>
-        <div className={glass.cardTitle}>Script Manim (.py)</div>
+    <Card
+      title="Script Manim (.py)"
+      headerAction={
         <div className={styles.headerActions}>
           {/* Snippets append to an existing script, so they only make sense
               once there is one to append to. */}
           {hasScript && (
             <>
-              <button
-                type="button"
-                className={glass.ghostBtn}
+              <Button
+                variant="ghost"
                 data-testid="script-editor-insert-hook"
                 onClick={() => onChange(`${value}\n${HOOK_SNIPPETS[contentLanguage]}`)}
               >
                 <TemplateIcon />
                 Chèn hook mở đầu
-              </button>
-              <button
-                type="button"
-                className={glass.ghostBtn}
+              </Button>
+              <Button
+                variant="ghost"
                 data-testid="script-editor-insert-end-screen"
                 onClick={() => onChange(`${value}\n${END_SCREEN_SNIPPETS[contentLanguage]}`)}
               >
                 <TemplateIcon />
                 Chèn end screen
-              </button>
+              </Button>
             </>
           )}
           <label className={glass.ghostBtn}>
@@ -118,10 +117,10 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
             <input type="file" accept=".py" onChange={handleFileImport} className={styles.hiddenFileInput} />
           </label>
         </div>
-      </div>
-
-      <textarea
-        className={`${glass.textArea} ${styles.textarea}`}
+      }
+    >
+      <TextArea
+        className={styles.textarea}
         data-testid="new-project-script-textarea"
         value={value}
         onChange={(event) => onChange(stripMarkdownCodeFence(event.target.value))}
@@ -187,6 +186,6 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
         đọc cho từng câu và giữ animation đúng bằng thời lượng audio thật. Lời gọi này dùng được
         cả trong vòng lặp và trong hàm.
       </div>
-    </div>
+    </Card>
   );
 }

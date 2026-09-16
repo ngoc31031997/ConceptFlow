@@ -1,6 +1,7 @@
 import { estimateNarrationDuration, formatDuration } from "../utils/durationEstimate";
 import type { UseOutlineReview } from "../hooks/useOutlineReview";
 import type { Project } from "../types";
+import { Button, Card } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./OutlineReview.module.css";
 
@@ -38,8 +39,7 @@ export function OutlineReview({ project, outline }: OutlineReviewProps) {
   );
 
   return (
-    <div className={glass.card} style={{ padding: 22 }} data-testid="outline-review">
-      <div className={glass.cardTitle}>Duyệt dàn ý trước khi sản xuất</div>
+    <Card title="Duyệt dàn ý trước khi sản xuất" data-testid="outline-review">
       <p className={glass.helperText} style={{ marginRight: 0 }}>
         Chưa tạo giọng đọc và chưa render — sửa ở đây không tốn gì. Ước tính{" "}
         <strong>{formatDuration(total)}</strong> lời thoại, {scenes.length} câu.
@@ -69,18 +69,16 @@ export function OutlineReview({ project, outline }: OutlineReviewProps) {
                       data-testid={`outline-edit-${scene.scene_index}`}
                     />
                     <div className={styles.editActions}>
-                      <button
-                        type="button"
-                        className={glass.btnPrimary}
+                      <Button
                         disabled={busy}
                         onClick={() => saveEdit(scene.scene_index)}
                         data-testid={`outline-save-${scene.scene_index}`}
                       >
                         Lưu và kiểm lại
-                      </button>
-                      <button type="button" className={glass.ghostBtn} onClick={cancelEdit}>
+                      </Button>
+                      <Button variant="ghost" onClick={cancelEdit}>
                         Huỷ
-                      </button>
+                      </Button>
                     </div>
                   </>
                 ) : (
@@ -108,6 +106,6 @@ export function OutlineReview({ project, outline }: OutlineReviewProps) {
           {error}
         </p>
       )}
-    </div>
+    </Card>
   );
 }

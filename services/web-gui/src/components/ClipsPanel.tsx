@@ -1,5 +1,6 @@
 import type { Clip } from "../types";
 import { getProjectClipUrl } from "../api/client";
+import { Card } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ClipsPanel.module.css";
 
@@ -28,11 +29,7 @@ export function ClipsPanel({ projectId, clips, videoOutputMode }: ClipsPanelProp
   const errorClips = clips.filter((c) => c.status !== "ok");
 
   return (
-    <div className={glass.card} style={{ marginTop: 20 }} data-testid="clips-panel">
-      <div className={glass.cardTitle} style={{ marginBottom: 6 }}>
-        Clip dọc Shorts/TikTok
-      </div>
-
+    <Card title="Clip dọc Shorts/TikTok" className={glass.mtLg} data-testid="clips-panel">
       {clips.length === 0 ? (
         <p className={glass.cardHint}>
           Chưa có clip nào. Clip chỉ cắt được từ đoạn script có đánh dấu{" "}
@@ -87,6 +84,6 @@ export function ClipsPanel({ projectId, clips, videoOutputMode }: ClipsPanelProp
           )}
         </>
       )}
-    </div>
+    </Card>
   );
 }

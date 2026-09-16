@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ApiError, startRenderSaga, suggestShortScript } from "../api/client";
 import { buildShortScriptSystemPrompt } from "./scriptPrompts";
+import { Button, CtaRow, TextArea, TextInput } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptAssistant.module.css";
 
@@ -108,10 +109,9 @@ export function ShortScriptAssistant({
           <label className={styles.stepLabel} htmlFor="short-script-topic">
             Chủ đề bản ngắn (có thể khác trọng tâm video dài — chọn lát cắt hay nhất)
           </label>
-          <input
+          <TextInput
             id="short-script-topic"
             type="text"
-            className={glass.textInput}
             data-testid="short-script-topic"
             value={topic}
             onChange={(event) => setTopic(event.target.value)}
@@ -134,15 +134,14 @@ export function ShortScriptAssistant({
               <CopyIcon />
               {copied ? "Đã copy!" : "Copy prompt (dán vào ChatGPT/Claude/Gemini)"}
             </button>
-            <button
-              type="button"
-              className={glass.ghostBtn}
+            <Button
+              variant="ghost"
               data-testid="short-script-suggest-ai"
               onClick={handleSuggestWithLocalAI}
               disabled={isSuggesting}
             >
               {isSuggesting ? "Đang soạn..." : "Hoặc soạn bằng AI nội bộ"}
-            </button>
+            </Button>
             <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
               <span className={styles.copyStatusDot} aria-hidden="true" />
               {isFilled ? "Đã gắn chủ đề của bạn" : "Chưa nhập chủ đề"}
@@ -155,8 +154,8 @@ export function ShortScriptAssistant({
           )}
           <details className={styles.preview}>
             <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
-            <textarea
-              className={`${glass.textArea} ${styles.previewTextarea}`}
+            <TextArea
+              className={styles.previewTextarea}
               data-testid="short-script-prompt-preview"
               value={prompt}
               readOnly
@@ -172,9 +171,9 @@ export function ShortScriptAssistant({
           <label className={styles.stepLabel} htmlFor="short-script-draft">
             Dán (hoặc sửa) script ngắn ở đây rồi nộp
           </label>
-          <textarea
+          <TextArea
             id="short-script-draft"
-            className={`${glass.textArea} ${styles.sourceTextarea}`}
+            className={styles.sourceTextarea}
             data-testid="short-script-draft"
             value={draftScript}
             onChange={(event) => setDraftScript(event.target.value)}
@@ -186,17 +185,15 @@ export function ShortScriptAssistant({
               {submitError}
             </p>
           )}
-          <div className={glass.ctaRow} style={{ marginTop: 12 }}>
-            <button
-              type="button"
-              className={glass.btnPrimary}
+          <CtaRow>
+            <Button
               data-testid="short-script-submit"
               onClick={handleSubmit}
               disabled={isSubmitting || draftScript.trim().length === 0}
             >
               {isSubmitting ? "Đang bắt đầu..." : "Bắt đầu render bản ngắn"}
-            </button>
-          </div>
+            </Button>
+          </CtaRow>
         </div>
       </div>
     </div>

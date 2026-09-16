@@ -7,6 +7,7 @@ import { startRenderSaga, ApiError, listVoices } from "../api/client";
 import { useRequireScript } from "../hooks/useRequireScript";
 import { validateScript } from "../utils/scriptValidation";
 import type { Voice } from "../types";
+import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
 
@@ -162,10 +163,7 @@ export function ReviewStepPage() {
         subtitle="Render mất vài phút và không dừng giữa chừng được. Kiểm tra nhanh những lựa chọn dưới đây."
       >
         <div className={styles.reviewLayout}>
-          <div className={glass.card}>
-            <div className={glass.cardTitle} style={{ marginBottom: 14 }}>
-              Video sắp render
-            </div>
+          <Card title="Video sắp render">
             <div className={styles.summary} data-testid="review-summary">
               {rows.map((row) => (
                 <div key={row.label} className={styles.summaryItem}>
@@ -176,11 +174,11 @@ export function ReviewStepPage() {
               ))}
             </div>
             <div className={styles.summaryActions}>
-              <button type="button" className={glass.ghostBtn} onClick={() => navigate("/create/settings")}>
+              <Button variant="ghost" onClick={() => navigate("/create/settings")}>
                 Sửa cấu hình
-              </button>
+              </Button>
             </div>
-          </div>
+          </Card>
 
           {error && (
             <p role="alert" className={glass.helperText} style={{ marginRight: 0 }}>

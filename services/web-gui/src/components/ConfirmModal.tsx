@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { formatShortcut } from "../hooks/useKeyboardShortcuts";
 import glass from "../styles/glass.module.css";
 import styles from "./ConfirmModal.module.css";
+import { Button } from "./ui";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -135,15 +136,14 @@ export function ConfirmModal({
         </p>
 
         <div className={styles.actions}>
-          <button
-            type="button"
-            className={glass.ghostBtn}
+          <Button
+            variant="ghost"
             onClick={onClose}
             data-testid="confirm-modal-cancel"
             title={`${cancelLabel} (${escTooltip})`}
           >
             {cancelLabel}
-          </button>
+          </Button>
           <button
             ref={confirmButtonRef}
             type="button"

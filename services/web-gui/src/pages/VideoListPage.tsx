@@ -4,6 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
+import { Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
 
@@ -151,7 +152,7 @@ export function VideoListPage() {
               </button>
             </div>
 
-            <div className={glass.card}>
+            <Card>
               {projects.map((project) => (
                 <div
                   key={project.project_id}
@@ -206,7 +207,7 @@ export function VideoListPage() {
                   </div>
                 </div>
               ))}
-            </div>
+            </Card>
           </>
         )}
       </AppShell>

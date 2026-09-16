@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Project } from "../types";
 import { Disclosure } from "./Disclosure";
+import { Button, TextArea } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ProjectInputPanel.module.css";
 
@@ -93,14 +94,13 @@ export function ProjectInputPanel({ project }: ProjectInputPanelProps) {
       <div className={styles.scriptHeader}>
         <span className={styles.scriptLabel}>Script gốc</span>
         {project.script_content && (
-          <button type="button" className={glass.ghostBtn} onClick={handleCopyScript}>
+          <Button variant="ghost" onClick={handleCopyScript}>
             {copied ? "Đã copy!" : "Copy script"}
-          </button>
+          </Button>
         )}
       </div>
       {project.script_content ? (
-        <textarea
-          className={glass.textArea}
+        <TextArea
           readOnly
           value={project.script_content}
           rows={16}

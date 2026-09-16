@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Scene } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./TranscriptViewer.module.css";
+import { Button } from "./ui";
 
 interface TranscriptViewerProps {
   scenes: Scene[];
@@ -120,15 +121,10 @@ export function TranscriptViewer({ scenes, contentLanguage }: TranscriptViewerPr
                 ? "Toàn bộ nội dung lời thoại trong video, giúp người dùng screen reader và công cụ tìm kiếm truy cập dễ dàng."
                 : "Full narration content for screen readers and search accessibility."}
             </p>
-            <button
-              type="button"
-              className={glass.ghostBtn}
-              onClick={handleDownload}
-              data-testid="transcript-download-button"
-            >
+            <Button variant="ghost" onClick={handleDownload} data-testid="transcript-download-button">
               <DownloadIcon />
               {contentLanguage === "vi" ? "Tải transcript" : "Download"}
-            </button>
+            </Button>
           </div>
 
           <ol className={styles.list} aria-label={contentLanguage === "vi" ? "Danh sách lời thoại" : "Narration list"}>

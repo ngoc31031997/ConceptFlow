@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { listVoices } from "../api/client";
 import type { Voice } from "../types";
+import { Card } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./NarrationPanel.module.css";
 import selectable from "../styles/selectable.module.css";
@@ -161,11 +162,7 @@ export function NarrationPanel({
   useEffect(() => () => audioRef.current?.pause(), []);
 
   return (
-    <div className={glass.card} style={{ padding: 22 }} data-testid="narration-panel">
-      <div className={glass.cardTitle} style={{ marginBottom: 8 }}>
-        Giọng đọc &amp; phụ đề
-      </div>
-
+    <Card title="Giọng đọc & phụ đề" data-testid="narration-panel">
       <Toggle
         label="Giọng đọc TTS"
         hint={ttsEnabled ? "Video sẽ có giọng đọc tự động" : "Video sẽ không có giọng đọc"}
@@ -281,6 +278,6 @@ export function NarrationPanel({
           Video sẽ không có lời thoại lẫn phụ đề — người xem chỉ thấy hình ảnh.
         </p>
       )}
-    </div>
+    </Card>
   );
 }
