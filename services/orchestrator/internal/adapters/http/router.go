@@ -282,6 +282,7 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		SubtitleMode:          domain.SubtitleMode(req.SubtitleMode),
 		SubtitleStyle:         req.SubtitleStyle,
 		RenderQuality:         domain.RenderQuality(req.RenderQuality),
+		RenderEngine:          domain.RenderEngine(req.RenderEngine),
 		BackgroundMusicVolume: req.BackgroundMusicVolume,
 		VideoOutputMode:       domain.VideoOutputMode(req.VideoOutputMode),
 		CompanionProjectID:    req.CompanionProjectID,

@@ -38,6 +38,8 @@ type StartRenderSagaInput struct {
 
 	// CR-004 — empty means DefaultRenderQuality.
 	RenderQuality domain.RenderQuality
+	// empty means DefaultRenderEngine ("manim").
+	RenderEngine domain.RenderEngine
 	// CR-005 FR14.2 — 0 means DefaultBackgroundMusicVolume.
 	BackgroundMusicVolume float64
 
@@ -94,6 +96,11 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		outputMode = domain.DefaultVideoOutputMode
 	}
 
+	engine := input.RenderEngine
+	if !engine.IsValid() {
+		engine = domain.DefaultRenderEngine
+	}
+
 	// CR-015: SubtitleMode is authoritative when valid; otherwise fall back
 	// to the legacy boolean, which reproduces exactly the one behaviour it
 	// ever meant (burn-in) rather than guessing at a new one.
@@ -123,6 +130,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		SubtitleMode:          subtitleMode,
 		SubtitleStyle:         input.SubtitleStyle,
 		RenderQuality:         quality,
+		RenderEngine:          engine,
 		BackgroundMusicVolume: input.BackgroundMusicVolume,
 		IntroEnabled:          input.IntroEnabled == nil || *input.IntroEnabled,
 		OutroEnabled:          input.OutroEnabled == nil || *input.OutroEnabled,

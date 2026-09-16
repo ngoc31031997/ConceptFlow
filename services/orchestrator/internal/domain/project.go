@@ -151,6 +151,33 @@ const (
 // including every project created before this field existed.
 const DefaultRenderQuality = Quality1080p60
 
+// RenderEngine is which rendering backend produces this project's video —
+// Manim (Python, the original engine) or Remotion (React/TypeScript,
+// headless-Chromium via @remotion/renderer). It is orthogonal to
+// RenderQuality: both engines are driven by the same resolution/framerate
+// choice.
+type RenderEngine string
+
+const (
+	RenderEngineManim    RenderEngine = "manim"
+	RenderEngineRemotion RenderEngine = "remotion"
+)
+
+// DefaultRenderEngine preserves the only behaviour that existed before this
+// field did — every project (including ones created before it existed) is a
+// Manim project unless the Creator opts into Remotion.
+const DefaultRenderEngine = RenderEngineManim
+
+// IsValid reports whether e is a render engine the Rendering Service knows
+// how to run.
+func (e RenderEngine) IsValid() bool {
+	switch e {
+	case RenderEngineManim, RenderEngineRemotion:
+		return true
+	}
+	return false
+}
+
 // IsValid reports whether q is a quality the Rendering Service can honour.
 func (q RenderQuality) IsValid() bool {
 	switch q {
@@ -275,6 +302,11 @@ type Project struct {
 
 	// CR-004 — resolution/framerate for this project's render.
 	RenderQuality RenderQuality
+
+	// RenderEngine is which rendering backend (Manim or Remotion) executes
+	// this project's script. Empty (pre-existing projects) is treated as
+	// DefaultRenderEngine everywhere it is read.
+	RenderEngine RenderEngine
 
 	// Which shape(s) of output this project produces — long-form, short
 	// clips, or both. Drives whether generate_clips runs at all.

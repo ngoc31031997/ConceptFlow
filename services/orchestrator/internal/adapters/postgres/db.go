@@ -201,6 +201,11 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DE
 -- two projects have independent lifecycles.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS companion_project_id TEXT;
 
+-- Remotion engine: which rendering backend (Manim or Remotion) runs this
+-- project's script. Default 'manim' reproduces the only behaviour that
+-- existed before this column did.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_engine TEXT NOT NULL DEFAULT 'manim';
+
 -- CR-021 D6/FR61.1: one row per automated QC pass.
 --
 -- findings is JSONB, not text: FR61.1 asks for machine-readable data and the

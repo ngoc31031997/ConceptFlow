@@ -300,10 +300,15 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 		return err
 	}
 
+	engine := project.RenderEngine
+	if !engine.IsValid() {
+		engine = domain.DefaultRenderEngine
+	}
 	payload := map[string]interface{}{
 		"script_content":   project.ScriptContent,
 		"scene_class_name": project.ManimSceneClassName,
 		"render_quality":   string(project.RenderQuality),
+		"engine":           string(engine),
 	}
 	return uc.dispatch(ctx, event.SagaID, event.ProjectID, "rendering", string(domain.StepValidateScript), payload)
 }
@@ -574,11 +579,16 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 		// Covers projects created before CR-004 added the field.
 		quality = domain.DefaultRenderQuality
 	}
+	engine := project.RenderEngine
+	if !engine.IsValid() {
+		engine = domain.DefaultRenderEngine
+	}
 	payload := map[string]interface{}{
 		"scenes":           scenesToPayload(project.Scenes),
 		"script_content":   project.ScriptContent,
 		"scene_class_name": project.ManimSceneClassName,
 		"render_quality":   string(quality),
+		"engine":           string(engine),
 	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err
