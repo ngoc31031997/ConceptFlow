@@ -68,6 +68,7 @@ export function ResultPage() {
         subtitle_mode: project.subtitle_mode ?? "track",
         subtitle_style: project.subtitle_style,
         render_quality: rerenderQuality,
+        render_engine: project.render_engine,
         video_output_mode: rerenderOutputMode,
         video_format_id: project.video_format_id,
         background_music_volume: project.background_music_volume,

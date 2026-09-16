@@ -9,6 +9,8 @@ export interface RenderInput {
   subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
+  /** feature/remotion-engine — "manim" (default) | "remotion". */
+  render_engine?: "manim" | "remotion";
   video_format_id?: string;
   background_music_volume?: number;
   /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
@@ -88,6 +90,8 @@ export interface Project {
   subtitle_mode?: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
+  /** feature/remotion-engine — "manim" (default) | "remotion". */
+  render_engine?: "manim" | "remotion";
   video_format_id?: string;
   /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
   video_output_mode?: "long" | "short" | "both";
