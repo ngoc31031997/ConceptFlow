@@ -160,7 +160,12 @@ export function ScriptStepPage() {
           />
         </div>
 
-        <div className={styles.scriptLayout}>
+        {/* CR-025: "blank" has no ScriptEditor to show (see below) — the
+            2-column grid used to reserve that column's width anyway, leaving
+            the assistant squeezed into ~40% of the page with the other 60%
+            empty. Single column, full width, when there's nothing to put in
+            the second one. */}
+        <div className={isStoryMode ? styles.scriptLayoutSingle : styles.scriptLayout}>
           <div className={styles.assistantColumn}>
             <ScriptAssistant
               contentLanguage={draft.voiceLanguage}

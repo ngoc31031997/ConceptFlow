@@ -22,12 +22,12 @@ describe("RenderEnginePicker", () => {
   it("warns that Remotion has no design system yet", () => {
     render(<RenderEnginePicker value="remotion" onChange={vi.fn()} />);
 
-    expect(screen.getByRole("status").textContent).toContain("giai đoạn đầu");
+    expect(screen.getByTestId("render-engine-picker").textContent).toContain("giai đoạn đầu");
   });
 
-  it("shows no warning for Manim", () => {
+  it("describes Manim as the full-featured default", () => {
     render(<RenderEnginePicker value="manim" onChange={vi.fn()} />);
 
-    expect(screen.queryByRole("status")).toBeNull();
+    expect(screen.getByTestId("render-engine-picker").textContent).toContain("Mặc định");
   });
 });

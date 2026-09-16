@@ -2,6 +2,7 @@ import type { RenderEngine } from "../context/ProjectDraftContext";
 import { SelectableOption } from "./SelectableOption";
 import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
+import styles from "./RenderEnginePicker.module.css";
 
 interface RenderEnginePickerProps {
   value: RenderEngine;
@@ -13,37 +14,41 @@ interface RenderEnginePickerProps {
  * stays the default and the only engine with a design system, lint, and
  * overlap-detection so far; Remotion is a minimal first cut (plain centered
  * text primitives, script pasted directly, no wizard prompts yet).
+ *
+ * Shaped like ContentLanguagePicker (compact inline row, not a stack of
+ * hint-heavy cards) — both live side by side atop Step 1, so a matching
+ * shape reads as one pair of quick settings instead of two differently-sized
+ * widgets fighting for the same row.
  */
-const OPTIONS: { value: RenderEngine; label: string; hint: string }[] = [
-  { value: "manim", label: "Manim", hint: "Mặc định — có đầy đủ design system, lint, kiểm tra chồng lấn hình ảnh" },
-  { value: "remotion", label: "Remotion", hint: "Mới — chỉ có component chữ tối giản, chưa có lint hay design system riêng" },
+const OPTIONS: { value: RenderEngine; label: string }[] = [
+  { value: "manim", label: "Manim" },
+  { value: "remotion", label: "Remotion" },
 ];
 
 export function RenderEnginePicker({ value, onChange }: RenderEnginePickerProps) {
   return (
-    <div data-testid="render-engine-picker">
-      <div className={glass.cardTitle} style={{ marginBottom: 10 }}>
-        Công cụ render
+    <div className={`${glass.card} ${styles.card}`} data-testid="render-engine-picker">
+      <div className={styles.text}>
+        <div className={glass.cardTitle}>Công cụ render</div>
+        <p className={styles.hint}>
+          {value === "remotion"
+            ? "Remotion còn ở giai đoạn đầu — chưa có design system/lint riêng, cần viết code Remotion (.tsx)."
+            : "Mặc định — có đầy đủ design system, lint, kiểm tra chồng lấn hình ảnh."}
+        </p>
       </div>
 
-      <div className={selectable.stack} role="radiogroup" aria-label="Công cụ render">
+      <div className={selectable.row} role="radiogroup" aria-label="Công cụ render">
         {OPTIONS.map((option) => (
           <SelectableOption
             key={option.value}
             selected={value === option.value}
             onSelect={() => onChange(option.value)}
             label={option.label}
-            hint={option.hint}
+            inline
             testId={`render-engine-${option.value}`}
           />
         ))}
       </div>
-
-      {value === "remotion" && (
-        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Remotion còn ở giai đoạn đầu — script Manim dán sẵn sẽ không chạy được, cần viết code Remotion (.tsx) riêng.
-        </p>
-      )}
     </div>
   );
 }

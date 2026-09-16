@@ -13,6 +13,19 @@
 }
 
 /*
+  Source "blank" has no ScriptEditor — the 2-column grid above would still
+  reserve that column's ~1.4fr, leaving the assistant cramped into a narrow
+  strip with the rest of the page empty beside it. A capped single column
+  (not simply 100%: at 1680px wide, an unbroken line of prose in
+  "Xem trước nội dung prompt" gets hard to read) fixes that without needing
+  the assistant's own internal layout to change.
+*/
+.scriptLayoutSingle {
+  display: block;
+  max-width: 760px;
+}
+
+/*
   Not sticky: the assistant is taller than the viewport, and pinning it meant
   its last step sat permanently under the navigation bar.
 */
