@@ -291,16 +291,19 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 
 5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ \`<TitleText>...</TitleText>\`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong \`narrations\` hay trong thuộc tính \`style={{...}}\`: KHÔNG được viết trần các ký tự \`<\`, \`>\`, \`{\`, \`}\` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự \`>\` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ "42 > 29"), diễn đạt lại bằng chữ ("42 lớn hơn 29") hoặc bọc riêng ký tự đó: \`{'>'}\` (ví dụ: \`42 {'>'} 29\`).
 
-6. NGÔN NGỮ: ${REMOTION_NARRATION_LANGUAGE_RULE[language]}
+6. KHÔNG xếp chồng hai khối full-khung-hình (hai \`<AbsoluteFill>\`, hoặc một hình minh hoạ tự vẽ đặt \`position: 'absolute'\` phủ cả khung) làm ANH EM CÙNG CẤP trong một \`index\` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Nếu một \`index\` cần VỪA hình minh hoạ VỪA lời thoại, gói cả hai vào CHUNG một \`<AbsoluteFill style={{flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>\` — hình ở trên (trong một \`<div>\` cỡ cố định, KHÔNG \`position: 'absolute'\` phủ hết khung), đoạn text ở dưới trong \`<div>\` thường (không dùng lại \`<BodyText>\` — nó tự phủ kín khung hình).
 
-7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:
+7. NGÔN NGỮ: ${REMOTION_NARRATION_LANGUAGE_RULE[language]}
+
+8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:
    - Có đúng MỘT dòng \`export const narrations: string[]\`, đủ và đúng thứ tự mọi câu lời thoại?
    - \`<Composition id="creator" ...>\` có đúng \`id="creator"\` và có \`calculateMetadata={calculateMetadataFromSegments}\` không?
    - Component chính có dùng \`<Segments>\` đúng cách, số phần tử render ra khớp đúng số câu trong \`narrations\` không (không thiếu, không thừa)?
    - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong \`narrations\` hay \`style={{...}}\`): có ký tự \`<\`, \`>\`, \`{\`, \`}\` nào bị viết trần không?
+   - Có \`index\` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.
    - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?
 
-8. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.
+9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.
 
 Code gốc:
 ${REMOTION_SCRIPT_PLACEHOLDER}`;

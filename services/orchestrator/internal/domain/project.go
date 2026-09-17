@@ -436,6 +436,7 @@ type ProjectSummary struct {
 	VideoPath    *string
 	ErrorMessage *string
 	UpdatedAt    time.Time
+	RenderEngine RenderEngine
 }
 
 // SagaStep tracks the processing state of a single step within one Saga

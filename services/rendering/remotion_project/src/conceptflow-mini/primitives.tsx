@@ -45,9 +45,20 @@ export function TitleText({children}: {children: React.ReactNode}) {
 }
 
 export function BodyText({children}: {children: React.ReactNode}) {
+  // backgroundColor was missing here (unlike TitleText, which has one) — a
+  // transparent AbsoluteFill lets whatever custom illustration the AI draws
+  // for the same segment show straight through the text region instead of
+  // being covered by it. Since AI-written illustrations are often their own
+  // full-screen absolutely-positioned elements (no layout coordination with
+  // BodyText enforced anywhere), the two ended up stacked on top of each
+  // other in the exact same spot, rendering as unreadable overlapping text —
+  // seen in production (binary-search video, both narration and a number
+  // range diagram sharing the middle of the frame). An opaque background
+  // guarantees text stays legible regardless of what else got drawn.
   return (
     <AbsoluteFill
       style={{
+        backgroundColor: BACKGROUND,
         justifyContent: 'center',
         alignItems: 'center',
         padding: '0 160px',

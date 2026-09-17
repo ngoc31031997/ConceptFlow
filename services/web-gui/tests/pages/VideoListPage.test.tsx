@@ -123,6 +123,32 @@ describe("VideoListPage", () => {
     ]);
   });
 
+  it("marks which engine rendered each video", async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        projects: [
+          { project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z", render_engine: "manim" },
+          { project_id: "p2", status: "published", updated_at: "2026-01-02T00:00:00Z", render_engine: "remotion" },
+        ],
+      }),
+    }) as unknown as typeof fetch;
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
+    const badges = screen.getAllByTestId("render-engine-badge");
+    expect(badges[0]).toHaveTextContent("Manim");
+    expect(badges[1]).toHaveTextContent("Remotion");
+  });
+
   it("selects all videos via the header checkbox", async () => {
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

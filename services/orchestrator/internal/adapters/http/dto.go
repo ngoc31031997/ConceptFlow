@@ -163,6 +163,9 @@ type projectSummaryResponse struct {
 	VideoPath    *string `json:"video_path,omitempty"`
 	ErrorMessage *string `json:"error_message,omitempty"`
 	UpdatedAt    string  `json:"updated_at"`
+	// "manim" | "remotion" — which engine rendered (or will render) this
+	// project's video, so the video list can mark which is which.
+	RenderEngine string `json:"render_engine"`
 }
 
 // projectListResponse is the GET /v1/projects response body.
@@ -261,6 +264,7 @@ func toProjectListResponse(summaries []domain.ProjectSummary) projectListRespons
 			VideoPath:    s.VideoPath,
 			ErrorMessage: s.ErrorMessage,
 			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
+			RenderEngine: string(s.RenderEngine),
 		})
 	}
 	return projectListResponse{Projects: projects}
