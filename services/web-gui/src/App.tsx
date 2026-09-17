@@ -11,6 +11,7 @@ import { ResultPage } from "./pages/ResultPage";
 import { PublishPage } from "./pages/PublishPage";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { VideoListPage } from "./pages/VideoListPage";
+import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
 import { ScriptReviewerStepPage } from "./pages/ScriptReviewerStepPage";
@@ -24,13 +25,16 @@ export function App() {
           <NavigationLoader />
           <KeyboardShortcutsHelp />
           <Routes>
-            {/* The three creation steps, each its own URL so Back works. */}
+            {/* "/" only picks the situation (dựng từ đầu / đã có code / code
+                chuẩn) — "dựng từ đầu" immediately hands off to the 4-tab
+                sub-wizard below (see ScriptPipelineTabs), each tab its own
+                URL so Back/reload/bookmarks all work and every tab stays
+                reachable regardless of progress. */}
             <Route path="/" element={<ScriptStepPage />} />
-            {/* CR-025 step 2 — reached from step 1's "blank" (Story Architect)
-                path; step 3 (Manim Engineer) is still a stub. */}
-            <Route path="/create/visual-director" element={<VisualDirectorStepPage />} />
-            <Route path="/create/manim-engineer" element={<ManimEngineerStepPage />} />
-            <Route path="/create/script-reviewer" element={<ScriptReviewerStepPage />} />
+            <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
+            <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
+            <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
+            <Route path="/create/script/review" element={<ScriptReviewerStepPage />} />
             <Route path="/create/settings" element={<SettingsStepPage />} />
             <Route path="/create/review" element={<ReviewStepPage />} />
 

@@ -68,4 +68,24 @@ describe("ScriptEditor", () => {
     fireEvent.click(screen.getByTestId("script-editor-insert-hook"));
     expect(onChange).toHaveBeenCalledWith(`${VALID}\n${HOOK_SNIPPETS.vi}`);
   });
+
+  it("skips the Manim-only lint entirely for Remotion code, instead of misreporting it as invalid Manim", () => {
+    const REMOTION_CODE =
+      'export const narrations: string[] = ["xin chào"];\n\nfunction CreatorComposition() { return null; }';
+    render(
+      <ScriptEditor
+        value={REMOTION_CODE}
+        onChange={vi.fn()}
+        contentLanguage="vi"
+        renderEngine="remotion"
+      />,
+    );
+    // Manim's validateScript would call this "Chưa tìm thấy class Scene" —
+    // that check has nothing to do with Remotion and must not appear here.
+    expect(screen.getByTestId("script-editor-validation")).not.toHaveTextContent("class Scene");
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("chưa có lint tự động");
+    // Manim-only snippets (self.hook()/self.call_to_action()) don't apply.
+    expect(screen.queryByTestId("script-editor-insert-hook")).not.toBeInTheDocument();
+    expect(screen.getByText("Script Remotion (.tsx)")).toBeInTheDocument();
+  });
 });

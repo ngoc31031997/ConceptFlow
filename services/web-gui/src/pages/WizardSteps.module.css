@@ -114,6 +114,29 @@
   }
 }
 
+/*
+  The prompt-preview textarea and its copy button: monospace so the pasted
+  system prompt reads legibly, and the button sits right below the box it
+  copies — reviewing the text and copying it happen in the same place instead
+  of the button living somewhere else on the page (feedback: creators want to
+  read the prompt before copying, not hunt for the button afterward).
+*/
+.promptTextarea {
+  min-height: 360px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.copyButton {
+  margin-top: 12px;
+}
+
+.fixSaveError {
+  margin-top: 10px;
+  font-size: 13px;
+  color: var(--danger, #c0392b);
+}
+
 @media (max-width: 900px) {
   .scriptLayout {
     grid-template-columns: minmax(0, 1fr);

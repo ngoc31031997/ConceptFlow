@@ -4,22 +4,34 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringCode } from "../api/client";
-import { validateScript } from "../utils/scriptValidation";
+import { validateScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
+import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
+import { Card, Button, TextArea } from "../components/ui";
+import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import styles from "./WizardSteps.module.css";
 
 /**
- * CR-025 step 3 (Manim Engineer) — mirrors step 2 (Visual Director)'s
- * round-trip-through-an-external-AI shape: fetch the current template, fill
- * it with the previous steps' saved output (story + storyboard), let the
- * Creator copy it out and paste the AI's Manim code back, validate it with
- * the same client-side lint ScriptStepPage uses for "draft"/"ready" scripts,
- * then save it server-side, store it as the draft's scriptContent, and
- * advance to step 4 (Script Reviewer).
+ * Bước 1c (Engineer) — third tab of the "Bước 1 — Script" sub-wizard (see
+ * ScriptPipelineTabs): fetch the current template, fill it with the
+ * previous tabs' saved output (story + storyboard), let the Creator copy it
+ * out and paste the AI's code back, then save it server-side, store it as
+ * the draft's scriptContent, and advance to tab 1d (Duyệt).
+ *
+ * feature/remotion-engine: the render engine picker lives HERE, not on the
+ * situation-chooser page — tabs 1a/1b (story/storyboard) are identical
+ * either way; this is the only tab whose prompt role (manim_engineer vs
+ * remotion_engineer) and lint behavior (validateScript only understands
+ * Manim's self.narrate/ConceptFlowScene conventions; Remotion has no
+ * client-side lint yet) actually depend on which engine renders the video.
  */
 export function ManimEngineerStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
+  const isRemotion = draft.renderEngine === "remotion";
+  const engineerRole = isRemotion ? "remotion_engineer" : "manim_engineer";
+  const engineerLabel = isRemotion ? "Remotion Engineer" : "Manim Engineer";
   const [prompt, setPrompt] = useState("Đang tải...");
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,22 +67,28 @@ export function ManimEngineerStepPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate("manim_engineer", draft.voiceLanguage)
+    getPromptTemplate(engineerRole, draft.voiceLanguage)
       .then((template) => {
         if (cancelled) return;
-        const filled = template.template_text.split("{{previous_output}}").join(
-          previousOutput || "(chưa có dàn ý/storyboard đã lưu ở các bước trước)",
-        );
+        const filled = template.template_text
+          .split("{{previous_output}}")
+          .join(previousOutput || "(chưa có dàn ý/storyboard đã lưu ở các bước trước)")
+          .split("{{narration_language_rule}}")
+          .join(
+            isRemotion
+              ? REMOTION_NARRATION_LANGUAGE_RULE[draft.voiceLanguage]
+              : NARRATION_LANGUAGE_RULE[draft.voiceLanguage],
+          );
         setPrompt(filled);
       })
       .catch(() => {
-        if (!cancelled) setPrompt("Không tải được template manim_engineer.");
+        if (!cancelled) setPrompt(`Không tải được template ${engineerRole}.`);
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.voiceLanguage, previousOutput]);
+  }, [draft.voiceLanguage, previousOutput, engineerRole]);
 
   async function handleCopy() {
     try {
@@ -82,10 +100,23 @@ export function ManimEngineerStepPage() {
     }
   }
 
-  const [code, setCode] = useState(draft.scriptContent);
+  // Bound directly to draft.scriptContent (not a local buffer) so switching
+  // to another tab and back — now that all 4 tabs are freely reachable —
+  // never loses code that hasn't been through "Tiếp tục" yet.
+  const code = draft.scriptContent;
+  // The engineer prompt asks the AI to wrap its answer in a ```python/```tsx
+  // fence — pasting that whole block (fence included) is the single most
+  // common way this round trip fails: the fence markers are not valid
+  // Python/TSX, so esbuild/ast.parse chokes on line 1 with a syntax error
+  // that says nothing about the real cause. Strip it the same way
+  // ScriptEditor already does for the "draft"/"ready" situations.
+  const setCode = (value: string) => dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(value) });
   const validation = validateScript(code, draft.voiceLanguage);
   const isEmpty = code.trim().length === 0;
-  const isValid = !isEmpty && validation.isValid;
+  // Remotion has no client-side lint yet (validateScript only understands
+  // Manim's self.narrate/ConceptFlowScene conventions) — the real check
+  // happens at render time, same as ScriptStepPage's Remotion handling.
+  const isValid = !isEmpty && (isRemotion || validation.isValid);
 
   async function handleContinue() {
     if (!isValid) return;
@@ -93,8 +124,7 @@ export function ManimEngineerStepPage() {
     setSaveError(null);
     try {
       await saveAuthoringCode(draft.projectId, code);
-      dispatch({ type: "SET_SCRIPT", payload: code });
-      navigate("/create/script-reviewer");
+      navigate("/create/script/review");
     } catch {
       setSaveError("Không lưu được code, thử lại.");
     } finally {
@@ -105,56 +135,73 @@ export function ManimEngineerStepPage() {
   const hint = saveError
     ? saveError
     : isEmpty
-      ? "Dán code Manim AI trả về để tiếp tục"
-      : validation.isValid
-        ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-        : validation.message;
+      ? `Dán code ${engineerLabel} AI trả về để tiếp tục`
+      : isRemotion
+        ? "Code đã sẵn sàng — bước tiếp theo sẽ đánh giá lại toàn bộ trước khi render"
+        : validation.isValid
+          ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+          : validation.message;
 
   return (
     <div data-testid="manim-engineer-step-page">
-      <AppShell
-        title="Bước 3 — Manim Engineer"
-        subtitle="Sinh code Manim từ storyboard đã lưu ở bước 2."
-        wide
-      >
+      <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1c. Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`} wide>
+        <ScriptPipelineTabs
+          active="code"
+          outlineDone={draft.authoringStory.trim().length > 0}
+          storyboardDone={draft.authoringStoryboard.trim().length > 0}
+          codeDone={!isEmpty}
+        />
+
+        <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
+          <RenderEnginePicker
+            value={draft.renderEngine}
+            onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
+          />
+        </div>
+
         <div className={styles.scriptLayout}>
-          <div>
-            <p>
-              1. Copy prompt bên dưới và dán vào ChatGPT, Claude hoặc Gemini. 2. Dán code Manim AI trả về vào
-              ô phía dưới. 3. Bấm Tiếp tục để lưu và chuyển sang bước 4 (Script Reviewer).
-            </p>
-            <div>
-              <button type="button" onClick={handleCopy} data-testid="manim-engineer-copy">
-                {copied ? "Đã copy!" : "Copy prompt"}
-              </button>
-            </div>
-            <textarea
+          <Card
+            title="1. Copy prompt"
+            hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+          >
+            <TextArea
               readOnly
               value={prompt}
-              rows={20}
-              style={{ width: "100%", fontFamily: "monospace" }}
+              rows={18}
+              className={styles.promptTextarea}
               data-testid="manim-engineer-prompt"
             />
+            <Button onClick={handleCopy} className={styles.copyButton} data-testid="manim-engineer-copy">
+              {copied ? "Đã copy!" : "Copy prompt"}
+            </Button>
+          </Card>
 
-            <label htmlFor="manim-engineer-code-input" style={{ display: "block", marginTop: "1rem" }}>
-              Dán code Manim AI trả về vào đây
-            </label>
-            <textarea
+          <Card
+            title="2. Dán kết quả"
+            hint={`Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1d (Duyệt).`}
+          >
+            <TextArea
               id="manim-engineer-code-input"
               value={code}
               onChange={(event) => setCode(event.target.value)}
-              rows={20}
-              style={{ width: "100%", fontFamily: "monospace" }}
-              placeholder={"from conceptflow import *\n\nclass ...Scene(ConceptFlowScene):\n    def construct(self):\n        ..."}
+              rows={18}
+              className={styles.promptTextarea}
+              placeholder={
+                isRemotion
+                  ? "import {registerRoot, Composition} from 'remotion';\n..."
+                  : "from conceptflow import *\n\nclass ...Scene(ConceptFlowScene):\n    def construct(self):\n        ..."
+              }
               data-testid="manim-engineer-code-input"
             />
-          </div>
+          </Card>
         </div>
       </AppShell>
 
       <WizardNav
         hint={hint}
-        isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
+        isBlocked={!!saveError || (!isRemotion && !isEmpty && !validation.isValid)}
+        onBack={() => navigate("/create/script/storyboard")}
+        backLabel="Quay lại Storyboard"
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={!isValid || saving}

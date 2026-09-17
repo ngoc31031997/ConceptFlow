@@ -90,4 +90,78 @@ describe("ManimEngineerStepPage", () => {
       expect(screen.getByText("Không lưu được code, thử lại.")).toBeInTheDocument();
     });
   });
+
+  it("strips a pasted markdown code fence instead of saving the ``` markers as part of the script", () => {
+    // The engineer prompt asks the AI to answer with exactly one ```python
+    // (or ```tsx) fenced block. Pasting that whole block, fence included, is
+    // the single most common way this round trip fails: esbuild/ast.parse
+    // chokes on line 1 with an opaque syntax error that says nothing about
+    // the real cause.
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
+      target: { value: "```python\n" + VALID_CODE + "\n```" },
+    });
+
+    expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
+  });
+
+  it("shows the pipeline tab bar (1c active) and the render engine picker", () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("script-tab-code")).toHaveAttribute("aria-selected", "true");
+    // feature/remotion-engine: the engine choice lives on THIS tab now, not
+    // on the situation-chooser page — switching it must fetch the matching
+    // prompt role (remotion_engineer instead of manim_engineer).
+    expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("render-engine-remotion"));
+    expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer", "vi");
+  });
+
+  it("keeps typed code across a re-render instead of a local buffer that a tab switch would lose", () => {
+    const { unmount } = render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
+      target: { value: VALID_CODE },
+    });
+    unmount();
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+    // draft.scriptContent (persisted to localStorage by ProjectDraftProvider)
+    // is the source of truth now, not a local useState buffer that would
+    // reset to draft.scriptContent-at-mount-time and drop unsaved typing.
+    expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
+  });
 });

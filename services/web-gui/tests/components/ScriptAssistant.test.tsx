@@ -1,94 +1,23 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ScriptAssistant } from "../../src/components/ScriptAssistant";
-import * as apiClient from "../../src/api/client";
 
-// CR-025: the "blank" path's prompt now comes from the DB via
-// getPromptTemplate — stub it so these tests don't need a live backend.
-// Re-armed in beforeEach because afterEach below calls restoreAllMocks().
-beforeEach(() => {
-  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
-    role: "story_architect",
-    language: "vi",
-    version: 1,
-    template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
-  });
-});
-
-function renderAssistant(
-  source: "blank" | "draft" | "ready" = "blank",
-  renderEngine: "manim" | "remotion" = "manim",
-) {
-  const onSourceChange = vi.fn();
+// "Dựng từ đầu" (blank) moved out to its own 4-tab sub-wizard
+// (ScriptOutlineStepPage etc. — see ScriptPipelineTabs); ScriptAssistant now
+// only covers "draft" (adjust an existing script) and "ready" (paste
+// directly, no AI round trip).
+function renderAssistant(source: "draft" | "ready" = "draft", renderEngine: "manim" | "remotion" = "manim") {
   const onUseTemplate = vi.fn();
-  const onStoryOutlineChange = vi.fn();
   render(
-    <ScriptAssistant
-      contentLanguage="vi"
-      renderEngine={renderEngine}
-      source={source}
-      onSourceChange={onSourceChange}
-      onUseTemplate={onUseTemplate}
-      storyOutline=""
-      onStoryOutlineChange={onStoryOutlineChange}
-    />,
+    <ScriptAssistant contentLanguage="vi" renderEngine={renderEngine} source={source} onUseTemplate={onUseTemplate} />,
   );
-  return { onSourceChange, onUseTemplate, onStoryOutlineChange };
+  return { onUseTemplate };
 }
 
 describe("ScriptAssistant", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("marks exactly one situation as chosen", () => {
-    // The whole point of the picker is that the active option is obvious, so
-    // the selected state is asserted rather than left to the styling.
-    renderAssistant("draft");
-
-    expect(screen.getByTestId("script-source-draft")).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByTestId("script-source-blank")).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByTestId("script-source-ready")).toHaveAttribute("aria-checked", "false");
-  });
-
-  it("copies a prompt with the Creator's topic already substituted in", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.assign(navigator, { clipboard: { writeText } });
-    renderAssistant("blank");
-
-    // Wait for the DB-backed template to load before typing — otherwise the
-    // prompt is still the "Đang tải prompt..." placeholder.
-    await waitFor(() => expect(apiClient.getPromptTemplate).toHaveBeenCalled());
-    fireEvent.change(screen.getByTestId("script-assistant-topic"), {
-      target: { value: "Vòng lặp for trong Java" },
-    });
-    fireEvent.click(screen.getByTestId("script-assistant-copy"));
-
-    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const copied = writeText.mock.calls[0][0] as string;
-    // Copying a prompt that still says "paste your topic here" was the most
-    // common way the round trip failed.
-    expect(copied).toContain("Vòng lặp for trong Java");
-    expect(copied).not.toContain("[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]");
-  });
-
-  it("fetches remotion_engineer instead of story_architect when renderEngine is remotion", async () => {
-    vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
-      role: "remotion_engineer",
-      language: "vi",
-      version: 1,
-      template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{narration_language_rule}}",
-    });
-    renderAssistant("blank", "remotion");
-
-    await waitFor(() =>
-      expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer", "vi"),
-    );
-    // The Remotion path pastes CODE back, not a story outline — the hint text
-    // must say so, since it's the only cue the Creator gets that this box
-    // means something different than it does for Manim.
-    expect(screen.getByText(/code Remotion/)).toBeInTheDocument();
-  });
-
-  it("substitutes the existing script for the adjust prompt instead", async () => {
+  it("substitutes the existing script into the Manim adjust prompt", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderAssistant("draft");
@@ -104,19 +33,48 @@ describe("ScriptAssistant", () => {
     expect(copied).not.toContain("<dán script Manim của bạn vào đây>");
   });
 
-  it("says when the prompt is still missing its input", () => {
-    renderAssistant("blank");
-    expect(screen.getByText("Chưa nhập chủ đề")).toBeInTheDocument();
+  it("substitutes the existing script into the Remotion adjust prompt instead, when renderEngine is remotion", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText } });
+    renderAssistant("draft", "remotion");
 
-    fireEvent.change(screen.getByTestId("script-assistant-topic"), { target: { value: "Java" } });
-    expect(screen.getByText("Đã gắn chủ đề của bạn")).toBeInTheDocument();
+    fireEvent.change(screen.getByTestId("script-assistant-existing"), {
+      target: { value: "export const narrations = ['x'];" },
+    });
+    fireEvent.click(screen.getByTestId("script-assistant-copy"));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0][0] as string;
+    // The Remotion adjust prompt talks about narrations/Composition
+    // id="creator", not self.narrate/ConceptFlowScene.
+    expect(copied).toContain("export const narrations = ['x'];");
+    expect(copied).toContain('Composition id="creator"');
+    expect(copied).not.toContain("self.narrate");
   });
 
-  it("skips the AI round trip entirely for a ready script", () => {
+  it("says when the prompt is still missing its input", () => {
+    renderAssistant("draft");
+    expect(screen.getByText("Chưa dán script")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("script-assistant-existing"), {
+      target: { value: "class A(Scene): pass" },
+    });
+    expect(screen.getByText("Đã gắn script của bạn")).toBeInTheDocument();
+  });
+
+  it("skips the AI round trip entirely for a ready script (Manim)", () => {
     const { onUseTemplate } = renderAssistant("ready");
 
     expect(screen.queryByTestId("script-assistant-guide")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("script-assistant-template"));
     expect(onUseTemplate).toHaveBeenCalled();
+  });
+
+  it("has no sample-template button for a ready Remotion script (no Remotion sample exists)", () => {
+    renderAssistant("ready", "remotion");
+
+    expect(screen.queryByTestId("script-assistant-guide")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("script-assistant-template")).not.toBeInTheDocument();
+    expect(screen.getByText(/export const narrations/)).toBeInTheDocument();
   });
 });

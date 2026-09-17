@@ -14,6 +14,17 @@ interface ScriptEditorProps {
   contentLanguage: "vi" | "en";
   /** WPM đo được của giọng đang chọn; bỏ trống thì dùng hằng số theo ngôn ngữ (CR-016 FR43). */
   wordsPerMinute?: number;
+  /**
+   * feature/remotion-engine — this editor used to be Manim-only (hardcoded
+   * title, hook/end-screen snippets that insert self.hook()/self.narrate()
+   * calls, and validateScript's self.narrate/ConceptFlowScene lint always
+   * on). Now that "draft"/"ready" exist for Remotion too (ScriptAssistant),
+   * pasting valid Remotion code here was failing the Manim-only lint with a
+   * "Chưa tìm thấy class Scene" error that has nothing to do with Remotion.
+   * Defaults to "manim" so every other call site (all existing tests) keeps
+   * behaving exactly as before without passing this explicitly.
+   */
+  renderEngine?: "manim" | "remotion";
 }
 
 function UploadIcon() {
@@ -60,10 +71,22 @@ function WarningIcon() {
  * script part of the job now belongs to ScriptAssistant, which explains the
  * round trip instead of hiding it in a menu.
  */
-export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute }: ScriptEditorProps) {
+export function ScriptEditor({
+  value,
+  onChange,
+  contentLanguage,
+  wordsPerMinute,
+  renderEngine = "manim",
+}: ScriptEditorProps) {
+  const isRemotion = renderEngine === "remotion";
   // Debounce the script value to avoid expensive validation on every keystroke
   const debouncedValue = useDebounce(value, 500);
-  
+
+  // validateScript only understands Manim's self.narrate/ConceptFlowScene
+  // conventions — running it against Remotion code would just report a
+  // confident-looking but meaningless "Chưa tìm thấy class Scene". Remotion
+  // has no client-side lint yet (same as ManimEngineerStepPage/
+  // ScriptReviewerStepPage); the real check happens at render time.
   const validation = useMemo(
     () => validateScript(debouncedValue, contentLanguage, wordsPerMinute),
     [debouncedValue, contentLanguage, wordsPerMinute],
@@ -86,12 +109,12 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
 
   return (
     <Card
-      title="Script Manim (.py)"
+      title={isRemotion ? "Script Remotion (.tsx)" : "Script Manim (.py)"}
       headerAction={
         <div className={styles.headerActions}>
-          {/* Snippets append to an existing script, so they only make sense
-              once there is one to append to. */}
-          {hasScript && (
+          {/* Snippets insert self.hook()/self.call_to_action() calls — a
+              Manim-only convention Remotion code has no equivalent for. */}
+          {hasScript && !isRemotion && (
             <>
               <Button
                 variant="ghost"
@@ -114,7 +137,12 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
           <label className={glass.ghostBtn}>
             <UploadIcon />
             Nhập từ file
-            <input type="file" accept=".py" onChange={handleFileImport} className={styles.hiddenFileInput} />
+            <input
+              type="file"
+              accept={isRemotion ? ".tsx,.ts" : ".py"}
+              onChange={handleFileImport}
+              className={styles.hiddenFileInput}
+            />
           </label>
         </div>
       }
@@ -125,7 +153,9 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
         value={value}
         onChange={(event) => onChange(stripMarkdownCodeFence(event.target.value))}
         placeholder={
-          'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("Loi thoai cho canh nay")'
+          isRemotion
+            ? 'export const narrations: string[] = [\n  "Loi thoai cho canh nay",\n];\n\nfunction CreatorComposition({segments = []}) {\n  return <Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>;\n}'
+            : 'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("Loi thoai cho canh nay")'
         }
         rows={11}
       />
@@ -137,7 +167,14 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
         </div>
       )}
 
-      {hasScript && (
+      {hasScript && isRemotion && (
+        <div id="script-validation" className={styles.validationOk} data-testid="script-editor-validation">
+          <CheckCircleIcon />
+          Remotion chưa có lint tự động ở đây — hệ thống sẽ kiểm tra thật lúc render.
+        </div>
+      )}
+
+      {hasScript && !isRemotion && (
         <div
           id="script-validation"
           className={validation.isValid ? styles.validationOk : styles.validationError}
@@ -157,7 +194,7 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
         </div>
       )}
 
-      {hasScript && validation.narrationCount > 0 && (
+      {hasScript && !isRemotion && validation.narrationCount > 0 && (
         <div className={styles.durationEstimate} data-testid="script-duration-estimate">
           <div className={styles.durationHeadline}>
             ≈ {formatDuration(validation.estimatedNarrationSeconds)} lời thoại
@@ -182,9 +219,19 @@ export function ScriptEditor({ value, onChange, contentLanguage, wordsPerMinute 
       )}
 
       <div className={glass.cardHint}>
-        Mỗi câu lời thoại là một lời gọi <code>{'self.narrate("...")'}</code> — hệ thống tạo giọng
-        đọc cho từng câu và giữ animation đúng bằng thời lượng audio thật. Lời gọi này dùng được
-        cả trong vòng lặp và trong hàm.
+        {isRemotion ? (
+          <>
+            Mỗi câu lời thoại là một phần tử trong <code>export const narrations</code> — hệ thống tạo
+            giọng đọc cho từng câu theo đúng thứ tự, và <code>{'<Segments>'}</code> hiển thị hình ảnh
+            khớp với đoạn đang đọc.
+          </>
+        ) : (
+          <>
+            Mỗi câu lời thoại là một lời gọi <code>{'self.narrate("...")'}</code> — hệ thống tạo giọng
+            đọc cho từng câu và giữ animation đúng bằng thời lượng audio thật. Lời gọi này dùng được
+            cả trong vòng lặp và trong hàm.
+          </>
+        )}
       </div>
     </Card>
   );

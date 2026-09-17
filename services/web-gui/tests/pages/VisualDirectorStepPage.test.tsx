@@ -76,4 +76,22 @@ describe("VisualDirectorStepPage", () => {
       expect(screen.getByText("Không lưu được storyboard, thử lại.")).toBeInTheDocument();
     });
   });
+
+  it("shows the pipeline tab bar with 1b active and lets the Creator jump to any other tab", () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <VisualDirectorStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("script-tab-storyboard")).toHaveAttribute("aria-selected", "true");
+    // Free navigation: every tab stays clickable regardless of progress.
+    expect(screen.getByTestId("script-tab-outline")).not.toBeDisabled();
+    expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
+    expect(screen.getByTestId("script-tab-review")).not.toBeDisabled();
+  });
 });

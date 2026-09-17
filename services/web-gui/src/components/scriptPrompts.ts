@@ -65,6 +65,18 @@ export const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
   en: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
 };
 
+/**
+ * feature/remotion-engine — Remotion has no `self.narrate(...)` call; its
+ * narration lives in the `narrations` array instead (see
+ * buildRemotionAdjustPromptTemplate / the remotion_engineer DB prompt).
+ * Reusing NARRATION_LANGUAGE_RULE as-is for Remotion would tell the AI to
+ * write "self.narrate(...)" in TIẾNG VIỆT, a call that doesn't exist there.
+ */
+export const REMOTION_NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
+  vi: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.",
+  en: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (TitleText, BodyText, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
+};
+
 const NARRATION_PLACEHOLDER: Record<"vi" | "en", string> = {
   vi: "Nội dung lời thoại tiếng Việt cho đoạn này",
   en: "The English narration line for this beat",
@@ -253,6 +265,51 @@ export function buildAdjustPromptFor(language: "vi" | "en", script: string): str
   const prompt = buildAiPromptTemplate(language);
   const trimmed = script.trim();
   return trimmed ? prompt.replace(SCRIPT_PLACEHOLDER, trimmed) : prompt;
+}
+
+const REMOTION_SCRIPT_PLACEHOLDER = "<dán code Remotion của bạn vào đây>";
+
+/**
+ * feature/remotion-engine — Remotion's equivalent of buildAiPromptTemplate:
+ * the Creator already has SOME Remotion code (from an earlier draft, a
+ * tutorial, etc.) that isn't in the shape this system's render pipeline
+ * expects. Same required-structure rules as the engineer-step prompt
+ * (narrations export, Composition id="creator", Segments wiring), just
+ * framed as "fix my existing code" instead of "write this from scratch".
+ */
+export const buildRemotionAdjustPromptTemplate = (language: "vi" | "en") => `Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.
+Hãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,
+theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:
+
+1. Phải có \`export const narrations: string[]\` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.
+
+2. Phải có \`<Composition id="creator" ...>\` — \`id\` PHẢI đúng là chuỗi \`"creator"\` (không đổi tên khác), và PHẢI có \`calculateMetadata={calculateMetadataFromSegments}\` (import từ \`./conceptflow-mini/segments\`) — thiếu cái này thời lượng video sẽ sai.
+
+3. Component chính phải nhận prop \`segments\` (mảng hệ thống tự truyền vào lúc render) và dùng \`<Segments segments={segments}>{(index) => ...}</Segments>\` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ \`index\` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong \`narrations\`, theo đúng thứ tự.
+
+4. Import bắt buộc ở đầu file: \`import {registerRoot, Composition} from 'remotion';\`
+
+5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ \`<TitleText>...</TitleText>\`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong \`narrations\` hay trong thuộc tính \`style={{...}}\`: KHÔNG được viết trần các ký tự \`<\`, \`>\`, \`{\`, \`}\` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự \`>\` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ "42 > 29"), diễn đạt lại bằng chữ ("42 lớn hơn 29") hoặc bọc riêng ký tự đó: \`{'>'}\` (ví dụ: \`42 {'>'} 29\`).
+
+6. NGÔN NGỮ: ${REMOTION_NARRATION_LANGUAGE_RULE[language]}
+
+7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:
+   - Có đúng MỘT dòng \`export const narrations: string[]\`, đủ và đúng thứ tự mọi câu lời thoại?
+   - \`<Composition id="creator" ...>\` có đúng \`id="creator"\` và có \`calculateMetadata={calculateMetadataFromSegments}\` không?
+   - Component chính có dùng \`<Segments>\` đúng cách, số phần tử render ra khớp đúng số câu trong \`narrations\` không (không thiếu, không thừa)?
+   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong \`narrations\` hay \`style={{...}}\`): có ký tự \`<\`, \`>\`, \`{\`, \`}\` nào bị viết trần không?
+   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?
+
+8. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.
+
+Code gốc:
+${REMOTION_SCRIPT_PLACEHOLDER}`;
+
+/** The Remotion "fix my existing code" prompt with the Creator's script already in it. */
+export function buildRemotionAdjustPromptFor(language: "vi" | "en", script: string): string {
+  const prompt = buildRemotionAdjustPromptTemplate(language);
+  const trimmed = script.trim();
+  return trimmed ? prompt.replace(REMOTION_SCRIPT_PLACEHOLDER, trimmed) : prompt;
 }
 
 /**

@@ -1,87 +1,25 @@
-import { useEffect, useMemo, useState } from "react";
-import { SelectableOption } from "./SelectableOption";
-import type { VideoFormat } from "../types";
-import { buildAdjustPromptFor, buildBeatSheetSection, NARRATION_LANGUAGE_RULE } from "./scriptPrompts";
-import { getPromptTemplate } from "../api/client";
-import { Card, Button, TextInput, TextArea } from "./ui";
-import selectable from "../styles/selectable.module.css";
+import { useMemo, useState } from "react";
+import { buildAdjustPromptFor, buildRemotionAdjustPromptFor } from "./scriptPrompts";
+import { Card, Button, TextArea } from "./ui";
 import styles from "./ScriptAssistant.module.css";
 
-/** Which of the three situations the Creator is actually in. */
-export type ScriptSource = "blank" | "draft" | "ready";
+/**
+ * "Dựng từ đầu" (blank) moved out to its own 4-tab sub-wizard
+ * (ScriptOutlineStepPage → .../storyboard → .../code → .../review, see
+ * ScriptPipelineTabs) — this component now only covers the two situations
+ * that skip that pipeline entirely: the Creator already has SOME code and
+ * either needs it adjusted to fit this system's conventions ("draft") or it
+ * already fits and just needs pasting into the editor ("ready").
+ */
+export type ScriptSource = "draft" | "ready";
 
 interface ScriptAssistantProps {
   contentLanguage: "vi" | "en";
-  /** Format đã chọn — prompt sẽ mang beat sheet của nó (CR-019 FR54). */
-  format?: VideoFormat;
-  wordsPerMinute?: number;
-  /**
-   * feature/remotion-engine — which engine the project currently has
-   * selected (draft.renderEngine, set in the Settings step but read here as
-   * whatever it's already holding, per-request: keeping the wizard's step
-   * order unchanged, this just changes which prompt "blank" fetches). Manim
-   * still gets the 4-role story_architect pipeline; Remotion has no
-   * multi-step pipeline yet, so it gets a single flat prompt instead
-   * (remotion_engineer) whose output is code, not a story outline.
-   */
+  /** Which engine's conventions the adjust-prompt/hints should talk about. */
   renderEngine: "manim" | "remotion";
-  /**
-   * True only when the parent gives this component the FULL page width to
-   * work with (source "blank" — no ScriptEditor rendered alongside it, see
-   * ScriptStepPage). Only then is there room for an internal 2-column
-   * split (form + always-expanded prompt preview); "draft" always shares
-   * the page with ScriptEditor in an outer 2-column layout already, so it
-   * keeps the prompt preview as an inline collapsed section instead of
-   * nesting a second grid inside an already-narrow column.
-   */
-  wide?: boolean;
-  /** Replaces the editor's content — used by "dùng script mẫu". */
+  /** Replaces the editor's content — used by "dùng script mẫu" (Manim only). */
   onUseTemplate: () => void;
   source: ScriptSource;
-  onSourceChange: (source: ScriptSource) => void;
-  /**
-   * CR-025 — the dàn ý câu chuyện (Story Architect output) the Creator pasted
-   * back, and its setter. Only used when source === "blank": that path now
-   * asks for a story outline first (plain text), not Manim code.
-   */
-  storyOutline: string;
-  onStoryOutlineChange: (value: string) => void;
-}
-
-/**
- * "draft"/"ready" only make sense for Manim: they refer to
- * self.narrate(...)/ConceptFlowScene, an existing-script situation Remotion
- * has no equivalent flow for yet (its only path is the single
- * remotion_engineer prompt, source "blank"). Showing them for Remotion would
- * offer two options that quietly do nothing useful.
- */
-function sourcesFor(renderEngine: "manim" | "remotion"): { value: ScriptSource; label: string; hint: string }[] {
-  if (renderEngine === "remotion") {
-    return [
-      {
-        value: "blank",
-        label: "Chưa có gì, chỉ có ý tưởng",
-        hint: "Nhập chủ đề, AI sẽ viết script Remotion hoàn chỉnh cho bạn",
-      },
-    ];
-  }
-  return [
-    {
-      value: "blank",
-      label: "Chưa có gì, chỉ có ý tưởng",
-      hint: "Nhập chủ đề, AI sẽ viết script Manim hoàn chỉnh cho bạn",
-    },
-    {
-      value: "draft",
-      label: "Đã có script Manim",
-      hint: "Nhưng chưa có lời thoại self.narrate(...) — AI sẽ thêm giúp bạn",
-    },
-    {
-      value: "ready",
-      label: "Script đã đúng chuẩn",
-      hint: "Đã dùng self.narrate(\"...\"), kế thừa ConceptFlowScene — dán thẳng vào là chạy",
-    },
-  ];
 }
 
 function CopyIcon() {
@@ -94,75 +32,26 @@ function CopyIcon() {
 }
 
 /**
- * Getting a usable script means a round trip through an external AI, and the
- * old "Công cụ AI" dropdown never said so. It listed five items that mixed two
- * unrelated actions — prompts you copy somewhere else, and text inserted right
- * here — under a name that described neither.
+ * "draft": the Creator has an existing script that doesn't yet fit this
+ * system's conventions — collects it, hands back an adjust-prompt ready to
+ * paste into an external AI, whose result gets pasted into the sibling
+ * ScriptEditor (not here — this only produces the prompt).
  *
- * This asks which of three situations the Creator is in, collects the one
- * thing the prompt is missing (a topic, or their existing script), and hands
- * back a prompt that is ready to paste with nothing left to edit by hand.
+ * "ready": the script already fits; no AI round trip needed at all.
  */
-export function ScriptAssistant({
-  contentLanguage,
-  format,
-  wordsPerMinute,
-  renderEngine,
-  wide,
-  onUseTemplate,
-  source,
-  onSourceChange,
-  storyOutline,
-  onStoryOutlineChange,
-}: ScriptAssistantProps) {
-  const [topic, setTopic] = useState("");
+export function ScriptAssistant({ contentLanguage, renderEngine, onUseTemplate, source }: ScriptAssistantProps) {
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // CR-025 / feature/remotion-engine: the "blank" path's prompt comes from a
-  // DB-backed template instead of a hardcoded builder, so an editor can
-  // change the wording without rebuilding web-gui — which role depends on
-  // renderEngine: Manim still gets the 4-role story_architect pipeline;
-  // Remotion (no multi-step pipeline yet) gets the single flat
-  // remotion_engineer prompt instead. format_beats and the narration-language
-  // rule stay computed client-side (they are data, not editable prose) and
-  // get substituted into the fetched template text (remotion_engineer's
-  // template simply has no {{format_beats}} token, so that substitution is a
-  // harmless no-op for it).
-  const blankRole = renderEngine === "remotion" ? "remotion_engineer" : "story_architect";
-  const [blankTemplate, setBlankTemplate] = useState<string | null>(null);
-  useEffect(() => {
-    if (source !== "blank") return;
-    let cancelled = false;
-    setBlankTemplate(null);
-    getPromptTemplate(blankRole, contentLanguage)
-      .then((template) => {
-        if (!cancelled) setBlankTemplate(template.template_text);
-      })
-      .catch(() => {
-        if (!cancelled) setBlankTemplate(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [source, blankRole, contentLanguage]);
+  const prompt = useMemo(
+    () =>
+      renderEngine === "remotion"
+        ? buildRemotionAdjustPromptFor(contentLanguage, existingScript)
+        : buildAdjustPromptFor(contentLanguage, existingScript),
+    [contentLanguage, existingScript, renderEngine],
+  );
 
-  const prompt = useMemo(() => {
-    if (source !== "blank") return buildAdjustPromptFor(contentLanguage, existingScript);
-    const formatBeats = format ? buildBeatSheetSection(format, contentLanguage, wordsPerMinute) : "";
-    const base = blankTemplate ?? "Đang tải prompt...";
-    return base
-      .split("{{topic}}")
-      .join(topic.trim() || "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]")
-      .split("{{format_beats}}")
-      .join(formatBeats)
-      .split("{{narration_language_rule}}")
-      .join(NARRATION_LANGUAGE_RULE[contentLanguage]);
-  }, [source, contentLanguage, topic, existingScript, format, wordsPerMinute, blankTemplate]);
-
-  // The prompt is copyable either way, but saying it is incomplete is more
-  // useful than silently handing over one with a placeholder still in it.
-  const isFilled = source === "blank" ? topic.trim().length > 0 : existingScript.trim().length > 0;
+  const isFilled = existingScript.trim().length > 0;
 
   async function handleCopy() {
     try {
@@ -174,185 +63,103 @@ export function ScriptAssistant({
     }
   }
 
-  // Only "blank"/"draft" have a prompt worth previewing — "ready" skips the
-  // AI round trip entirely (CR-025), so it has no second column to show.
-  const hasPreview = source !== "ready";
-  const sideBySide = wide && hasPreview;
+  if (source === "ready") {
+    return (
+      <Card data-testid="script-assistant">
+        <div data-testid="script-assistant-ready">
+          <p className={styles.panelLead}>
+            {renderEngine === "remotion" ? (
+              <>
+                Dán code của bạn vào ô soạn thảo bên cạnh. Đảm bảo đã có{" "}
+                <code>export const narrations</code> và <code>{'<Composition id="creator" ...>'}</code>{" "}
+                đúng chuẩn hệ thống.
+              </>
+            ) : (
+              <>
+                Dán script của bạn vào ô soạn thảo bên cạnh. Hệ thống sẽ kiểm tra ngay script có kế thừa{" "}
+                <code>ConceptFlowScene</code> và dùng <code>{'self.narrate("...")'}</code> đúng chuẩn không.
+              </>
+            )}
+          </p>
+          {renderEngine === "manim" && (
+            <Button variant="ghost" onClick={onUseTemplate} data-testid="script-assistant-template">
+              Hoặc xem một script mẫu chạy được ngay
+            </Button>
+          )}
+        </div>
+      </Card>
+    );
+  }
 
   return (
-    <div className={sideBySide ? styles.layout : undefined} data-testid="script-assistant">
-    <Card title="Bạn đang ở tình huống nào?" className={sideBySide ? styles.formCard : undefined}>
-      <p className={styles.lead}>
-        Chọn đúng tình huống của bạn — các bước bên dưới sẽ đổi theo.
-      </p>
+    <Card data-testid="script-assistant">
+      <div data-testid="script-assistant-guide">
+        <div className={styles.step}>
+          <span className={styles.stepNum}>1</span>
+          <div className={styles.stepBody}>
+            <label className={styles.stepLabel} htmlFor="assistant-input">
+              Dán code {renderEngine === "remotion" ? "Remotion" : "Manim"} hiện có của bạn
+            </label>
+            <TextArea
+              id="assistant-input"
+              className={styles.sourceTextarea}
+              data-testid="script-assistant-existing"
+              value={existingScript}
+              onChange={(event) => setExistingScript(event.target.value)}
+              placeholder={
+                renderEngine === "remotion"
+                  ? "export const narrations = [...];\n\nfunction CreatorComposition(...) {\n  ...\n}"
+                  : "class MyScene(Scene):\n    def construct(self):\n        ..."
+              }
+              rows={5}
+            />
+          </div>
+        </div>
 
-      <div className={selectable.stack} role="radiogroup" aria-label="Tình huống script">
-        {sourcesFor(renderEngine).map((option) => (
-          <SelectableOption
-            key={option.value}
-            selected={source === option.value}
-            onSelect={() => onSourceChange(option.value)}
-            label={option.label}
-            hint={option.hint}
-            testId={`script-source-${option.value}`}
-          />
-        ))}
+        <div className={styles.step}>
+          <span className={styles.stepNum}>2</span>
+          <div className={styles.stepBody}>
+            <div className={styles.stepLabel}>Copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini</div>
+            <div className={styles.copyRow}>
+              <button
+                type="button"
+                className={styles.copyButton}
+                data-testid="script-assistant-copy"
+                onClick={handleCopy}
+              >
+                <CopyIcon />
+                {copied ? "Đã copy!" : "Copy prompt"}
+              </button>
+              <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
+                <span className={styles.copyStatusDot} aria-hidden="true" />
+                {isFilled ? "Đã gắn script của bạn" : "Chưa dán script"}
+              </span>
+            </div>
+            <details className={styles.preview}>
+              <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
+              <TextArea
+                className={styles.previewTextarea}
+                data-testid="script-assistant-prompt"
+                value={prompt}
+                readOnly
+                rows={10}
+              />
+            </details>
+          </div>
+        </div>
+
+        <div className={styles.step}>
+          <span className={styles.stepNum}>3</span>
+          <div className={styles.stepBody}>
+            <div className={styles.stepLabel}>Copy đoạn code AI trả về, dán vào ô soạn thảo bên cạnh</div>
+            <p className={styles.stepHint}>
+              {renderEngine === "remotion"
+                ? "Chỉ lấy phần code TypeScript, không lấy phần AI giải thích."
+                : "Chỉ lấy phần code Python, không lấy phần AI giải thích. Dán xong hệ thống sẽ tự kiểm tra định dạng."}
+            </p>
+          </div>
+        </div>
       </div>
-
-      {source === "ready" && (
-        <div className={styles.panel} data-testid="script-assistant-ready">
-          <p className={styles.panelLead}>
-            Dán script của bạn vào ô soạn thảo bên dưới. Hệ thống sẽ kiểm tra ngay script có kế thừa{" "}
-            <code>ConceptFlowScene</code> và dùng <code>{'self.narrate("...")'}</code> đúng chuẩn không.
-          </p>
-          <Button variant="ghost" onClick={onUseTemplate} data-testid="script-assistant-template">
-            Hoặc xem một script mẫu chạy được ngay
-          </Button>
-        </div>
-      )}
-
-      {source !== "ready" && (
-        <div className={styles.panel} data-testid="script-assistant-guide">
-          {/* Step 1 — the one input the prompt is missing. */}
-          <div className={styles.step}>
-            <span className={styles.stepNum}>1</span>
-            <div className={styles.stepBody}>
-              <label className={styles.stepLabel} htmlFor="assistant-input">
-                {source === "blank" ? "Chủ đề video của bạn là gì?" : "Dán script Manim hiện có của bạn"}
-              </label>
-              {source === "blank" ? (
-                <TextInput
-                  id="assistant-input"
-                  type="text"
-                  data-testid="script-assistant-topic"
-                  value={topic}
-                  onChange={(event) => setTopic(event.target.value)}
-                  placeholder="Ví dụ: Vòng lặp for trong Java, khi nào dùng while thay thế"
-                />
-              ) : (
-                <TextArea
-                  id="assistant-input"
-                  className={styles.sourceTextarea}
-                  data-testid="script-assistant-existing"
-                  value={existingScript}
-                  onChange={(event) => setExistingScript(event.target.value)}
-                  placeholder={"class MyScene(Scene):\n    def construct(self):\n        ..."}
-                  rows={5}
-                />
-              )}
-            </div>
-          </div>
-
-          {/* Step 2 — copy a prompt that needs no further editing. */}
-          <div className={styles.step}>
-            <span className={styles.stepNum}>2</span>
-            <div className={styles.stepBody}>
-              <div className={styles.stepLabel}>Copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini</div>
-              <div className={styles.copyRow}>
-                <button
-                  type="button"
-                  className={styles.copyButton}
-                  data-testid="script-assistant-copy"
-                  onClick={handleCopy}
-                >
-                  <CopyIcon />
-                  {copied ? "Đã copy!" : "Copy prompt"}
-                </button>
-                <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
-                  <span className={styles.copyStatusDot} aria-hidden="true" />
-                  {isFilled
-                    ? source === "blank"
-                      ? "Đã gắn chủ đề của bạn"
-                      : "Đã gắn script của bạn"
-                    : source === "blank"
-                      ? "Chưa nhập chủ đề"
-                      : "Chưa dán script"}
-                </span>
-              </div>
-              {/* "draft" shares the page with ScriptEditor (outer 2-column
-                  layout) — no room for a second internal column, so it
-                  keeps the old collapsed-by-default preview here instead of
-                  the always-expanded side panel "blank" gets below. */}
-              {!sideBySide && (
-                <details className={styles.preview}>
-                  <summary className={styles.previewSummary}>Xem trước nội dung prompt</summary>
-                  <TextArea
-                    className={styles.previewTextarea}
-                    data-testid="script-assistant-prompt"
-                    value={prompt}
-                    readOnly
-                    rows={10}
-                  />
-                </details>
-              )}
-            </div>
-          </div>
-
-          {/* Step 3 — CR-025: for "blank", this is now the story outline
-              (plain structured text), not Manim code — the pipeline's next
-              3 steps (Visual Director/Manim Engineer/Script Reviewer) turn
-              it into code later. */}
-          <div className={styles.step}>
-            <span className={styles.stepNum}>3</span>
-            <div className={styles.stepBody}>
-              {source === "blank" ? (
-                <>
-                  <label className={styles.stepLabel} htmlFor="story-outline-input">
-                    Dán kết quả AI trả về vào đây
-                  </label>
-                  <p className={styles.stepHint}>
-                    {renderEngine === "remotion"
-                      ? "Đây là code Remotion (.tsx) AI trả về — dán nguyên văn khối code, không lấy phần AI giải thích."
-                      : "Đây là dàn ý câu chuyện (câu hỏi cốt lõi, insight, lời thoại nháp từng beat) — KHÔNG phải code. Dán nguyên văn phần AI trả lời, không cần chỉnh sửa."}
-                  </p>
-                  <TextArea
-                    id="story-outline-input"
-                    className={styles.sourceTextarea}
-                    data-testid="script-assistant-story-outline"
-                    value={storyOutline}
-                    onChange={(event) => onStoryOutlineChange(event.target.value)}
-                    placeholder={
-                      renderEngine === "remotion"
-                        ? "import {registerRoot, Composition} from 'remotion';\n..."
-                        : "CÂU HỎI CỐT LÕI: ...\nINSIGHT CỐT LÕI: ...\n\nBEAT 1 — ...\n..."
-                    }
-                    rows={8}
-                  />
-                </>
-              ) : (
-                <>
-                  <div className={styles.stepLabel}>Copy đoạn code AI trả về, dán vào ô soạn thảo bên dưới</div>
-                  <p className={styles.stepHint}>
-                    Chỉ lấy phần code Python, không lấy phần AI giải thích. Dán xong hệ thống sẽ tự kiểm tra
-                    định dạng.
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </Card>
-
-    {/* Right column, always expanded — only when "blank" has the full page
-        width to itself (see the `wide` prop doc comment). This used to be a
-        collapsed <details> inline with step 2, hiding substantial real
-        content by default and leaving the right half of the page empty
-        (feedback: "vẫn còn khoảng trống khổng lồ"). */}
-    {sideBySide && (
-      <Card
-        title="Xem trước prompt"
-        hint="Nội dung sẽ copy ra AI ngoài — cập nhật ngay khi bạn gõ."
-        className={styles.previewCard}
-      >
-        <TextArea
-          className={styles.previewTextareaFull}
-          data-testid="script-assistant-prompt"
-          value={prompt}
-          readOnly
-        />
-      </Card>
-    )}
-    </div>
   );
 }
