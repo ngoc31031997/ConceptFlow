@@ -69,12 +69,26 @@ describe("ScriptEditor", () => {
     expect(onChange).toHaveBeenCalledWith(`${VALID}\n${HOOK_SNIPPETS.vi}`);
   });
 
+  const VALID_REMOTION_CODE = [
+    "import {registerRoot, Composition} from 'remotion';",
+    "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';",
+    "import {TitleText} from './conceptflow-mini/primitives';",
+    "",
+    'export const narrations: string[] = ["xin chào"];',
+    "",
+    "function CreatorComposition({segments = []}) {",
+    "  return <Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>;",
+    "}",
+    "",
+    'registerRoot(() => (',
+    '  <Composition id="creator" component={CreatorComposition} width={1920} height={1080} fps={30} durationInFrames={150} calculateMetadata={calculateMetadataFromSegments} />',
+    "));",
+  ].join("\n");
+
   it("skips the Manim-only lint entirely for Remotion code, instead of misreporting it as invalid Manim", () => {
-    const REMOTION_CODE =
-      'export const narrations: string[] = ["xin chào"];\n\nfunction CreatorComposition() { return null; }';
     render(
       <ScriptEditor
-        value={REMOTION_CODE}
+        value={VALID_REMOTION_CODE}
         onChange={vi.fn()}
         contentLanguage="vi"
         renderEngine="remotion"
@@ -83,9 +97,21 @@ describe("ScriptEditor", () => {
     // Manim's validateScript would call this "Chưa tìm thấy class Scene" —
     // that check has nothing to do with Remotion and must not appear here.
     expect(screen.getByTestId("script-editor-validation")).not.toHaveTextContent("class Scene");
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("chưa có lint tự động");
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
     // Manim-only snippets (self.hook()/self.call_to_action()) don't apply.
     expect(screen.queryByTestId("script-editor-insert-hook")).not.toBeInTheDocument();
     expect(screen.getByText("Script Remotion (.tsx)")).toBeInTheDocument();
+  });
+
+  it("runs Remotion's own structural lint instead of accepting any non-empty text", () => {
+    render(
+      <ScriptEditor
+        value={'export const narrations: string[] = ["xin chào"];'}
+        onChange={vi.fn()}
+        contentLanguage="vi"
+        renderEngine="remotion"
+      />,
+    );
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent('id="creator"');
   });
 });

@@ -5,7 +5,7 @@ import { Button, Card, TextArea } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptEditor.module.css";
 import { formatDuration } from "../utils/durationEstimate";
-import { stripMarkdownCodeFence, validateScript } from "../utils/scriptValidation";
+import { stripMarkdownCodeFence, validateScript, validateRemotionScript } from "../utils/scriptValidation";
 
 interface ScriptEditorProps {
   value: string;
@@ -84,13 +84,14 @@ export function ScriptEditor({
 
   // validateScript only understands Manim's self.narrate/ConceptFlowScene
   // conventions — running it against Remotion code would just report a
-  // confident-looking but meaningless "Chưa tìm thấy class Scene". Remotion
-  // has no client-side lint yet (same as ManimEngineerStepPage/
-  // ScriptReviewerStepPage); the real check happens at render time.
+  // confident-looking but meaningless "Chưa tìm thấy class Scene".
+  // validateRemotionScript checks Remotion's own structural requirements
+  // instead (narrations export, Composition id="creator", etc.).
   const validation = useMemo(
     () => validateScript(debouncedValue, contentLanguage, wordsPerMinute),
     [debouncedValue, contentLanguage, wordsPerMinute],
   );
+  const remotionValidation = useMemo(() => validateRemotionScript(debouncedValue), [debouncedValue]);
   const [importError, setImportError] = useState<string | null>(null);
   const hasScript = value.trim().length > 0;
 
@@ -168,9 +169,22 @@ export function ScriptEditor({
       )}
 
       {hasScript && isRemotion && (
-        <div id="script-validation" className={styles.validationOk} data-testid="script-editor-validation">
-          <CheckCircleIcon />
-          Remotion chưa có lint tự động ở đây — hệ thống sẽ kiểm tra thật lúc render.
+        <div
+          id="script-validation"
+          className={remotionValidation.isValid ? styles.validationOk : styles.validationError}
+          data-testid="script-editor-validation"
+        >
+          {remotionValidation.isValid ? (
+            <>
+              <CheckCircleIcon />
+              Hợp lệ: {remotionValidation.narrationCount} đoạn lời thoại.
+            </>
+          ) : (
+            <>
+              <WarningIcon />
+              {remotionValidation.message}
+            </>
+          )}
         </div>
       )}
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
@@ -57,17 +57,45 @@ describe("ScriptStepPage", () => {
     expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
   });
 
-  it("skips the Manim lint entirely for a Remotion draft/ready script", () => {
-    renderPage();
+  it("runs Remotion's own structural lint instead of skipping validation entirely", () => {
+    vi.useFakeTimers();
+    try {
+      renderPage();
 
-    fireEvent.click(screen.getByTestId("render-engine-remotion"));
-    fireEvent.click(screen.getByTestId("script-source-ready"));
+      fireEvent.click(screen.getByTestId("render-engine-remotion"));
+      fireEvent.click(screen.getByTestId("script-source-ready"));
 
-    fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
-      target: { value: 'export const narrations: string[] = ["xin chào"];' },
-    });
+      // Missing structure (no Composition id="creator", etc.) — must still block.
+      fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
+        target: { value: 'export const narrations: string[] = ["xin chào"];' },
+      });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByTestId("script-step-next")).toBeDisabled();
 
-    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
+      const validCode = [
+        "import {registerRoot, Composition} from 'remotion';",
+        "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';",
+        "import {TitleText} from './conceptflow-mini/primitives';",
+        'export const narrations: string[] = ["xin chào"];',
+        "function CreatorComposition({segments = []}) {",
+        "  return <Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>;",
+        "}",
+        'registerRoot(() => (',
+        '  <Composition id="creator" component={CreatorComposition} width={1920} height={1080} fps={30} durationInFrames={150} calculateMetadata={calculateMetadataFromSegments} />',
+        "));",
+      ].join("\n");
+      fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
+        target: { value: validCode },
+      });
+      act(() => {
+        vi.advanceTimersByTime(500);
+      });
+      expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

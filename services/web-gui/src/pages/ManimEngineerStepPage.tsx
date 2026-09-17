@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringCode } from "../api/client";
-import { validateScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
+import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
@@ -111,12 +111,17 @@ export function ManimEngineerStepPage() {
   // that says nothing about the real cause. Strip it the same way
   // ScriptEditor already does for the "draft"/"ready" situations.
   const setCode = (value: string) => dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(value) });
-  const validation = validateScript(code, draft.voiceLanguage);
+  // validateScript only understands Manim's self.narrate/ConceptFlowScene
+  // conventions; validateRemotionScript checks the structural rules the
+  // remotion_engineer prompt requires (narrations export, Composition
+  // id="creator", calculateMetadata, <Segments>, balanced braces) — same
+  // idea as validateScript, different syntax. Neither catches everything
+  // the prompt's self-check asks for (e.g. overlapping full-frame JSX), but
+  // both catch the recurring failure modes actually hit in production
+  // before wasting a render cycle on them.
+  const validation = isRemotion ? validateRemotionScript(code) : validateScript(code, draft.voiceLanguage);
   const isEmpty = code.trim().length === 0;
-  // Remotion has no client-side lint yet (validateScript only understands
-  // Manim's self.narrate/ConceptFlowScene conventions) — the real check
-  // happens at render time, same as ScriptStepPage's Remotion handling.
-  const isValid = !isEmpty && (isRemotion || validation.isValid);
+  const isValid = !isEmpty && validation.isValid;
 
   async function handleContinue() {
     if (!isValid) return;
@@ -136,11 +141,9 @@ export function ManimEngineerStepPage() {
     ? saveError
     : isEmpty
       ? `Dán code ${engineerLabel} AI trả về để tiếp tục`
-      : isRemotion
-        ? "Code đã sẵn sàng — bước tiếp theo sẽ đánh giá lại toàn bộ trước khi render"
-        : validation.isValid
-          ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-          : validation.message;
+      : validation.isValid
+        ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+        : validation.message;
 
   return (
     <div data-testid="manim-engineer-step-page">
@@ -199,7 +202,7 @@ export function ManimEngineerStepPage() {
 
       <WizardNav
         hint={hint}
-        isBlocked={!!saveError || (!isRemotion && !isEmpty && !validation.isValid)}
+        isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
         onBack={() => navigate("/create/script/storyboard")}
         backLabel="Quay lại Storyboard"
         onNext={handleContinue}

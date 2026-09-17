@@ -4,28 +4,32 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringReview, saveAuthoringCode } from "../api/client";
-import { validateScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
+import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import styles from "./WizardSteps.module.css";
 
-/** Plain-text rendering of validateScript's result, for the {{lint_results}}
- * placeholder — reuses the existing client-side lint instead of calling any
- * backend lint endpoint (none is needed here).
- *
- * feature/remotion-engine: validateScript only understands Manim's
- * self.narrate/ConceptFlowScene conventions — running it against Remotion
- * code would just report a confident-looking but meaningless "LỖI". Remotion
- * has no client-side lint yet (same as ManimEngineerStepPage), so this just
- * says so and asks the reviewer AI to check structure by reading the code.
+/** Plain-text rendering of validateScript's/validateRemotionScript's result,
+ * for the {{lint_results}} placeholder — reuses the existing client-side
+ * lint instead of calling any backend lint endpoint (none is needed here).
+ * Neither one catches everything the engineer prompt's own self-check asks
+ * for (e.g. two overlapping full-frame Remotion elements) — that's called
+ * out explicitly so the reviewer AI knows to check it by reading the code,
+ * not assume "no lint error" means "no problem".
  */
 function renderLintResults(code: string, language: "vi" | "en", isRemotion: boolean): string {
   if (code.trim().length === 0) {
     return `(chưa có code ${isRemotion ? "Remotion" : "Manim"} đã lưu ở bước 1c)`;
   }
   if (isRemotion) {
-    return "(Remotion chưa có lint tự động ở phía hệ thống — tự rà code ở trên theo đúng cấu trúc bắt buộc: export const narrations, Composition id=\"creator\" với calculateMetadata, component chính dùng đúng <Segments>.)";
+    const validation = validateRemotionScript(code);
+    const lines = [
+      validation.isValid ? "OK — không phát hiện lỗi cấu trúc." : `LỖI: ${validation.message}`,
+      `Số đoạn lời thoại (phần tử trong narrations): ${validation.narrationCount}`,
+      "Lưu ý: lint này KHÔNG kiểm tra được việc hai khối full-khung-hình bị đè lên nhau, hay việc mỗi beat có chuyển động/hình minh hoạ thật sự hay chỉ là chữ tĩnh — tự đọc code để đánh giá hai điều này.",
+    ];
+    return lines.join("\n");
   }
   const validation = validateScript(code, language);
   const lines = [

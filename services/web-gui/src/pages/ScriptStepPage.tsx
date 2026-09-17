@@ -13,7 +13,7 @@ import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import { WizardNav } from "../components/WizardNav";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { validateScript } from "../utils/scriptValidation";
+import { validateScript, validateRemotionScript } from "../utils/scriptValidation";
 import selectable from "../styles/selectable.module.css";
 import styles from "./WizardSteps.module.css";
 
@@ -90,22 +90,18 @@ export function ScriptStepPage() {
 
   // Debounce script content for validation to avoid re-validating on every keystroke
   const debouncedScriptContent = useDebounce(draft.scriptContent, 500);
-  const validation = validateScript(
-    debouncedScriptContent,
-    draft.voiceLanguage,
-    wordsPerMinuteFor(calibration, draft.voiceId),
-  );
+  const isRemotion = draft.renderEngine === "remotion";
+  // validateScript only understands Manim's self.narrate/ConceptFlowScene
+  // conventions; validateRemotionScript checks Remotion's own structural
+  // requirements (narrations export, Composition id="creator", etc.) — same
+  // idea, different syntax, so "draft"/"ready" get a real pre-flight check
+  // either way instead of Remotion being waved through unconditionally.
+  const validation = isRemotion
+    ? validateRemotionScript(debouncedScriptContent)
+    : validateScript(debouncedScriptContent, draft.voiceLanguage, wordsPerMinuteFor(calibration, draft.voiceId));
   const isEmpty = draft.scriptContent.trim().length === 0;
   const isDraftOrReady = draft.scriptSource !== "blank";
-
-  // feature/remotion-engine: validateScript only understands Manim's
-  // conventions (self.narrate, ConceptFlowScene); running it against pasted
-  // Remotion (.tsx) code would just block a Creator who hasn't done anything
-  // wrong. Remotion has no client-side lint yet — the real check happens at
-  // render time either way (rendering/application/validate_script.py
-  // already skips Manim lint for engine=remotion).
-  const skipManimValidation = isDraftOrReady && !isEmpty && draft.renderEngine === "remotion";
-  const canContinue = isDraftOrReady && !isEmpty && (skipManimValidation || validation.isValid);
+  const canContinue = isDraftOrReady && !isEmpty && validation.isValid;
 
   function handleSituationSelect(source: ScriptSource) {
     dispatch({ type: "SET_SCRIPT_SOURCE", payload: source });
@@ -119,19 +115,17 @@ export function ScriptStepPage() {
   const hint = !isDraftOrReady
     ? "Chọn 'Chưa có gì, chỉ có ý tưởng' sẽ tự chuyển sang màn dựng script."
     : isEmpty
-      ? `Dán hoặc tạo script ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"} để tiếp tục`
-      : skipManimValidation
-        ? "Không phải script Manim — bỏ qua kiểm tra ở đây, hệ thống sẽ kiểm tra thật ở bước render"
-        : validation.isValid
-          ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-          : validation.message;
+      ? `Dán hoặc tạo script ${isRemotion ? "Remotion" : "Manim"} để tiếp tục`
+      : validation.isValid
+        ? `Script hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+        : validation.message;
 
   return (
     <div data-testid="script-step-page">
       <AppShell
         currentStep={1}
         wide
-        title={draft.renderEngine === "remotion" ? "Bước 1 — Script Remotion" : "Bước 1 — Script Manim"}
+        title={isRemotion ? "Bước 1 — Script Remotion" : "Bước 1 — Script Manim"}
         subtitle="Chọn tình huống của bạn để bắt đầu."
       >
         <div className={styles.settingsRow}>
@@ -191,7 +185,7 @@ export function ScriptStepPage() {
 
       <WizardNav
         hint={hint}
-        isBlocked={isDraftOrReady && !isEmpty && !skipManimValidation && !validation.isValid}
+        isBlocked={isDraftOrReady && !isEmpty && !validation.isValid}
         onNext={handleContinue}
         nextLabel="Tiếp tục"
         nextDisabled={!canContinue}
