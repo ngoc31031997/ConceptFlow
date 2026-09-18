@@ -48,6 +48,25 @@ func (uc *PromptTemplatesUseCase) Update(ctx context.Context, role domain.Prompt
 	return uc.templates.Update(ctx, role, language, templateText)
 }
 
+// Reset overwrites a template with the default shipped in this binary.
+//
+// It goes through Update rather than a dedicated repository call, so a reset
+// bumps version and updated_at exactly like a manual save does — from the
+// audit trail's point of view a reset IS an edit, one that happens to paste
+// the shipped text. This is the deliberate counterpart to seeding staying
+// insert-if-absent: shipped wording reaches a running database only when
+// someone asks for it here.
+func (uc *PromptTemplatesUseCase) Reset(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error) {
+	if !domain.ValidPromptRole(string(role)) {
+		return domain.PromptTemplate{}, fmt.Errorf("invalid role %q", role)
+	}
+	def, ok := domain.DefaultPromptTemplate(role, language)
+	if !ok {
+		return domain.PromptTemplate{}, fmt.Errorf("no built-in default for role %q language %q", role, language)
+	}
+	return uc.templates.Update(ctx, role, language, def.TemplateText)
+}
+
 // AuthoringStoryPort persists CR-025 step 1's pasted story outline.
 type AuthoringStoryPort interface {
 	SaveAuthoringStory(ctx context.Context, projectID, content string) error

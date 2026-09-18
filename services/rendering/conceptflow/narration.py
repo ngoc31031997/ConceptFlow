@@ -151,7 +151,8 @@ def narrate(scene, text: str) -> None:
     # chồng lấn / chữ nhỏ / tương phản mà không phải xem lại từng khung hình.
     # Chỉ ở lượt render: lượt dry là cổng chặn trước TTS, chỗ Creator đang chờ.
     _recorder.write({"kind": "layout", "index": index, "t": now,
-                     "mobjects": _describe_layout(scene)})
+                     "mobjects": _describe_layout(scene),
+                     "frame": _describe_frame(scene)})
     scene.wait(durations[index])
 
 
@@ -255,7 +256,8 @@ def _describe_stage(scene) -> str:
     """
     try:
         counts: dict[str, int] = {}
-        for mobject in getattr(scene, "mobjects", []):
+        stage = getattr(scene, "stage_mobjects", None)
+        for mobject in stage() if stage else getattr(scene, "mobjects", []):
             name = type(mobject).__name__
             counts[name] = counts.get(name, 0) + 1
         if not counts:
@@ -283,7 +285,9 @@ def _describe_layout(scene) -> list[dict]:
     """
     try:
         described: list[dict] = []
-        for mobject in getattr(scene, "mobjects", []):
+        stage = getattr(scene, "stage_mobjects", None)
+        added_during_zoom = getattr(scene, "added_during_zoom", None)
+        for mobject in stage() if stage else getattr(scene, "mobjects", []):
             try:
                 described.append({
                     "cls": type(mobject).__name__,
@@ -297,12 +301,35 @@ def _describe_layout(scene) -> list[dict]:
                     # Chỉ mobject chữ mới có; None là câu trả lời đúng cho
                     # phần còn lại, không phải một con số bịa ra.
                     "font_size": _optional_float(getattr(mobject, "font_size", None)),
+                    # Vật hiện ra trong lúc camera đang zoom: QC soi tràn khung
+                    # của nó theo khung camera (`_describe_frame`), không theo
+                    # khung toàn cảnh.
+                    "added_during_zoom": bool(added_during_zoom and added_during_zoom(mobject)),
                 })
             except Exception:  # noqa: BLE001 — bỏ qua đúng một mobject, giữ phần còn lại
                 continue
         return described
     except Exception:  # noqa: BLE001 — xem docstring
         return []
+
+
+def _describe_frame(scene) -> list[float] | None:
+    """Hộp bao (left, right, top, bottom) của khung camera tại mốc này.
+
+    Khác khung toàn cảnh khi script đã `focus()`. QC dùng nó để biết người xem
+    thật sự thấy vùng nào, và chữ đang được phóng to bao nhiêu. Best-effort
+    như `_describe_layout`: không có frame (Scene thường) thì None.
+    """
+    try:
+        frame = scene.camera.frame
+        return [
+            float(frame.get_left()[0]),
+            float(frame.get_right()[0]),
+            float(frame.get_top()[1]),
+            float(frame.get_bottom()[1]),
+        ]
+    except Exception:  # noqa: BLE001 — xem docstring
+        return None
 
 
 def _hex_color(mobject) -> str | None:

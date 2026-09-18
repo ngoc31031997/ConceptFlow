@@ -237,6 +237,35 @@ def _iter_mobjects(layout_marks: list[dict]):
                 yield timestamp, mobject
 
 
+#: Khung camera hẹp hơn toàn cảnh quá ngưỡng này mới coi là đang zoom — tránh
+#: sai số float của `restore_view()` biến một mốc toàn cảnh thành "zoom 0.9999".
+ZOOM_EPSILON = 1e-3
+
+
+def _camera_frame(mark: dict) -> tuple[float, float, float, float] | None:
+    """Khung camera của mốc nếu script đang `focus()`, ngược lại None.
+
+    Mốc cũ (trước khi có camera) không có trường `frame` → None → luật chạy
+    y như trước.
+    """
+    box = _bbox({"bbox": mark.get("frame")})
+    if box is None:
+        return None
+    left, right, _, _ = box
+    if right - left >= FRAME_WIDTH - ZOOM_EPSILON:
+        return None
+    return box
+
+
+def _zoom_factor(mark: dict) -> float:
+    """Chữ đang hiện to hơn cỡ gốc bao nhiêu lần do camera zoom."""
+    frame = _camera_frame(mark)
+    if frame is None:
+        return 1.0
+    left, right, _, _ = frame
+    return FRAME_WIDTH / (right - left)
+
+
 def _label(mobject: dict) -> str:
     cls = mobject.get("cls") or "mobject"
     text = (mobject.get("text") or "").strip()
@@ -250,62 +279,99 @@ def _label(mobject: dict) -> str:
 
 
 def check_frame_overflow(layout_marks: list[dict], thresholds: QCThresholds) -> list[QCFinding]:
-    """Bbox vượt khung Manim, hoặc lấn vào safe margin của theme."""
+    """Bbox vượt khung đang quay, hoặc lấn vào safe margin của theme.
+
+    Khung đang quay là khung toàn cảnh, trừ khi script đang `focus()`. Khi đó:
+    - vật có sẵn TRƯỚC lần zoom bị camera cắt đi là chủ ý (zoom để tập trung)
+      và đã được soi ở các mốc toàn cảnh trước → bỏ qua;
+    - vật xuất hiện TRONG lúc zoom (`added_during_zoom`) được soi theo khung
+      camera, safe margin thu nhỏ theo đúng tỉ lệ zoom.
+    """
     severity = thresholds.severity_for("frame_overflow")
-    half_width = FRAME_WIDTH / 2.0
-    half_height = FRAME_HEIGHT / 2.0
     tol = thresholds.frame_overflow_tolerance
-    margin = thresholds.safe_margin
 
     findings: list[QCFinding] = []
-    for timestamp, mobject in _iter_mobjects(layout_marks):
-        if not _is_visible(mobject):
-            continue
-        box = _bbox(mobject)
-        if box is None:
-            continue
-        left, right, top, bottom = box
+    for mark in layout_marks or []:
+        timestamp = _mark_time(mark)
+        camera = _camera_frame(mark)
+        if camera is None:
+            center_x = center_y = 0.0
+            half_width, half_height = FRAME_WIDTH / 2.0, FRAME_HEIGHT / 2.0
+            margin = thresholds.safe_margin
+        else:
+            cam_left, cam_right, cam_top, cam_bottom = camera
+            center_x, center_y = (cam_left + cam_right) / 2.0, (cam_top + cam_bottom) / 2.0
+            half_width, half_height = (cam_right - cam_left) / 2.0, (cam_top - cam_bottom) / 2.0
+            margin = thresholds.safe_margin / _zoom_factor(mark)
+        where = "khung" if camera is None else "khung camera đang zoom"
 
-        outside = (
-            left < -half_width - tol
-            or right > half_width + tol
-            or bottom < -half_height - tol
-            or top > half_height + tol
+        for mobject in mark.get("mobjects") or []:
+            if not isinstance(mobject, dict):
+                continue
+            if camera is not None and not mobject.get("added_during_zoom"):
+                continue
+            findings += _overflow_of(
+                mobject, timestamp, severity, tol, margin,
+                center_x, center_y, half_width, half_height, where,
+            )
+    return findings
+
+
+def _overflow_of(
+    mobject: dict, timestamp: float, severity: str, tol: float, margin: float,
+    center_x: float, center_y: float, half_width: float, half_height: float, where: str,
+) -> list[QCFinding]:
+    """Tràn khung / lấn safe margin của một vật, theo toạ độ đã dời về tâm khung."""
+    findings: list[QCFinding] = []
+    if not _is_visible(mobject):
+        return findings
+    box = _bbox(mobject)
+    if box is None:
+        return findings
+    left, right, top, bottom = box
+    left, right = left - center_x, right - center_x
+    top, bottom = top - center_y, bottom - center_y
+
+    outside = (
+        left < -half_width - tol
+        or right > half_width + tol
+        or bottom < -half_height - tol
+        or top > half_height + tol
+    )
+    if outside:
+        findings.append(
+            QCFinding(
+                rule="frame_overflow",
+                severity=severity,
+                message=(
+                    f"{_label(mobject)} tràn ra ngoài {where} "
+                    f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f}, "
+                    f"khung ±{half_width:.2f} × ±{half_height:.2f})"
+                ),
+                timestamp_seconds=timestamp,
+            )
         )
-        if outside:
-            findings.append(
-                QCFinding(
-                    rule="frame_overflow",
-                    severity=severity,
-                    message=(
-                        f"{_label(mobject)} tràn ra ngoài khung "
-                        f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f}, "
-                        f"khung ±{half_width:.2f} × ±{half_height:.2f})"
-                    ),
-                    timestamp_seconds=timestamp,
-                )
-            )
-            continue
+        return findings
 
-        inner_x = half_width - margin
-        inner_y = half_height - margin
-        if (
-            left < -inner_x - tol
-            or right > inner_x + tol
-            or bottom < -inner_y - tol
-            or top > inner_y + tol
-        ):
-            findings.append(
-                QCFinding(
-                    rule="frame_overflow",
-                    severity=severity,
-                    message=(
-                        f"{_label(mobject)} lấn vào safe margin {margin:.2f} "
-                        f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f})"
-                    ),
-                    timestamp_seconds=timestamp,
-                )
+    inner_x = half_width - margin
+    inner_y = half_height - margin
+    if (
+        left < -inner_x - tol
+        or right > inner_x + tol
+        or bottom < -inner_y - tol
+        or top > inner_y + tol
+    ):
+        findings.append(
+            QCFinding(
+                rule="frame_overflow",
+                severity=severity,
+                message=(
+                    f"{_label(mobject)} lấn vào safe margin {margin:.2f} "
+                    f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f})"
+                ),
+                timestamp_seconds=timestamp,
             )
+        )
     return findings
 
 
@@ -387,7 +453,21 @@ def check_text_too_small(
 ) -> list[QCFinding]:
     severity = thresholds.severity_for("text_too_small")
     findings: list[QCFinding] = []
-    for timestamp, mobject in _iter_mobjects(layout_marks):
+    for mark in layout_marks or []:
+        findings += _too_small_in_mark(mark, render_quality, thresholds, severity)
+    return findings
+
+
+def _too_small_in_mark(
+    mark: dict, render_quality: str, thresholds: QCThresholds, severity: str
+) -> list[QCFinding]:
+    """Cỡ chữ nhìn thấy = cỡ gốc × hệ số zoom camera của mốc."""
+    timestamp = _mark_time(mark)
+    zoom = _zoom_factor(mark)
+    findings: list[QCFinding] = []
+    for mobject in mark.get("mobjects") or []:
+        if not isinstance(mobject, dict):
+            continue
         if not _is_text(mobject) or not _is_visible(mobject):
             continue
         raw = mobject.get("font_size")
@@ -397,7 +477,7 @@ def check_text_too_small(
             font_size = float(raw)
         except (TypeError, ValueError):
             continue
-        pixels = font_size_to_pixels(font_size, render_quality, thresholds)
+        pixels = font_size_to_pixels(font_size, render_quality, thresholds) * zoom
         if pixels < thresholds.min_text_pixel_height:
             findings.append(
                 QCFinding(

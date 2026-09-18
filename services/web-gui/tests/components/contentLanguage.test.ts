@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { buildBeatSheetSection, buildGenerationSystemPrompt } from "../../src/components/scriptPrompts";
+import {
+  buildBeatSheetSection,
+  buildStoryBeatSheetSection,
+  buildGenerationSystemPrompt,
+  CHANNEL_IDENTITY,
+} from "../../src/components/scriptPrompts";
 import {
   END_SCREEN_SNIPPETS,
   HOOK_SNIPPETS,
@@ -99,6 +104,64 @@ describe("hook and end-screen snippets (CR-006 FR17)", () => {
     expect(HOOK_SNIPPETS.en).toMatch(/self\.hook\(\s*\n\s*"[A-Za-z]/);
     expect(END_SCREEN_SNIPPETS.en).toContain("subscribe");
     expect(END_SCREEN_SNIPPETS.vi).toContain("đăng ký kênh");
+  });
+});
+
+describe("beat sheet cho Story Architect (bước 1/4)", () => {
+  const FORMAT = {
+    id: "t",
+    name: "Thử",
+    version: 1,
+    min_seconds: 360,
+    max_seconds: 480,
+    beats: [
+      { id: "hook", role: "hook", min_seconds: 8, max_seconds: 12, required: true, max_repeat: 1 },
+      { id: "concrete", role: "example", min_seconds: 40, max_seconds: 70, required: true, max_repeat: 1 },
+      { id: "variation", role: "example", min_seconds: 50, max_seconds: 90, required: false, max_repeat: 2 },
+    ],
+  };
+
+  it("không chứa cú pháp code — bước 1 nhả dàn ý, không nhả code", () => {
+    // Đây là lý do hàm này tồn tại tách khỏi buildBeatSheetSection: chèn
+    // `self.beat(...)` vào một prompt vừa nói "OUTPUT KHÔNG PHẢI CODE" là tự
+    // mâu thuẫn, và model làm theo vế nào cũng được.
+    const section = buildStoryBeatSheetSection(FORMAT, "vi");
+    expect(section).not.toContain("self.beat");
+    expect(section).not.toContain("render");
+  });
+
+  it("bắt model dùng đúng id beat, để Visual Director map được 1:1", () => {
+    const section = buildStoryBeatSheetSection(FORMAT, "vi");
+    expect(section).toContain("`hook`");
+    expect(section).toContain("`concrete`");
+    expect(section).toContain("ĐÚNG id");
+  });
+
+  it("vẫn là ngân sách TỪ, vẫn nhận WPM hiệu chỉnh", () => {
+    const section = buildStoryBeatSheetSection(FORMAT, "vi");
+    expect(section).toContain("19–28 từ");
+    expect(section).not.toMatch(/\d+ giây/);
+    expect(buildStoryBeatSheetSection(FORMAT, "vi", 280)).not.toEqual(section);
+  });
+
+  it("giữ ràng buộc concrete trước pattern", () => {
+    expect(buildStoryBeatSheetSection(FORMAT, "vi")).toContain("TRƯỚC");
+  });
+});
+
+describe("bản sắc kênh ({{channel_identity}})", () => {
+  it("không định nghĩa kênh bằng tên kênh khác", () => {
+    // Nếu chuỗi này quay lại, prompt lại đang mượn thương hiệu người khác làm
+    // bản sắc — đúng thứ CHANNEL_IDENTITY sinh ra để thay thế.
+    for (const text of Object.values(CHANNEL_IDENTITY)) {
+      expect(text).not.toMatch(/3Blue1Brown/i);
+    }
+  });
+
+  it("có đủ 5 đặc điểm ở cả hai ngôn ngữ", () => {
+    for (const text of Object.values(CHANNEL_IDENTITY)) {
+      expect(text).toMatch(/^5\./m);
+    }
   });
 });
 

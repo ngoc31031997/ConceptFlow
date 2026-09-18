@@ -77,3 +77,63 @@ def test_bao_loi_cu_phap():
     assert len(issues) == 1
     assert issues[0].severity == BLOCKING
     assert "không phải Python hợp lệ" in issues[0].message
+
+
+def test_chan_ten_doc_nhung_chua_dinh_nghia():
+    """`color=BLUE` không phải lời gọi nên bản cũ bỏ lọt, rồi NameError lúc render."""
+    script = "from conceptflow import *\nc = Callout('x')\nc.set_color(BLUE)\n"
+    issues = blocking_issues(lint_manim_script(script))
+    assert len(issues) == 1
+    assert "BLUE" in issues[0].message
+    assert issues[0].line == 3
+
+
+def test_ten_gan_bang_moi_cu_phap_khong_bi_bao():
+    script = (
+        "from conceptflow import *\n"
+        "from manim import BLUE\n"
+        "class S(ConceptFlowScene):\n"
+        "    def construct(self):\n"
+        "        for i, item in enumerate(['a']):\n"
+        "            print(i, item)\n"
+        "        with open('f') as fh:\n"
+        "            print(fh)\n"
+        "        xs = [y for y in range(3)]\n"
+        "        f = lambda v: v * 2\n"
+        "        if (n := len(xs)) > 1:\n"
+        "            print(n, f(1), BLUE, UP)\n"
+        "        try:\n"
+        "            pass\n"
+        "        except Exception as err:\n"
+        "            print(err)\n"
+    )
+    assert blocking_issues(lint_manim_script(script)) == []
+
+
+def test_ham_dinh_nghia_sau_cho_dung_van_hop_le():
+    script = "from conceptflow import *\nx = helper()\ndef helper():\n    return LIMIT\nLIMIT = 3\n"
+    assert blocking_issues(lint_manim_script(script)) == []
+
+
+def test_star_import_module_khac_tat_kiem_tra_ten_la():
+    script = "from conceptflow import *\nfrom math import *\ny = sqrt(pi)\n"
+    assert blocking_issues(lint_manim_script(script)) == []
+
+
+def test_component_moi_nam_trong_whitelist():
+    script = (
+        "from conceptflow import *\n"
+        "a = FlowDiagram(['A', 'B'])\n"
+        "b = BarChart(['x'], [1])\n"
+        "c = FunctionPlot(lambda x: x, (-1, 1))\n"
+        "d = DataTable(['h'], [['v']])\n"
+        "e = Timeline(['m'])\n"
+    )
+    assert lint_manim_script(script) == []
+
+
+def test_thang_co_chu_cua_lint_lay_tu_theme():
+    from conceptflow.theme import FontScale
+    from domain.script_lint import ALLOWED_FONT_SIZES
+
+    assert ALLOWED_FONT_SIZES == set(FontScale().all_sizes())

@@ -384,6 +384,24 @@ export function updatePromptTemplate(
   });
 }
 
+/**
+ * Khôi phục prompt mặc định đang ship trong binary Orchestrator, bỏ bản người
+ * vận hành đã sửa.
+ *
+ * Seeding ở Orchestrator là insert-if-absent — nó cố ý KHÔNG đè lên bản sửa
+ * tay khi service khởi động lại. Nên khi prompt trong source được cải tiến,
+ * đây là đường duy nhất để bản mới vào được một DB đã bootstrap, và nó xảy ra
+ * vì người vận hành bấm nút, không phải vì một tiến trình vừa restart.
+ */
+export function resetPromptTemplate(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+): Promise<PromptTemplate> {
+  return apiFetch<PromptTemplate>(`/v1/admin/prompts/${role}/reset?language=${language}`, {
+    method: "POST",
+  });
+}
+
 /** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
 export async function saveAuthoringStory(projectId: string, content: string): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/story`, {

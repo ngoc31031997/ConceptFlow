@@ -366,3 +366,42 @@ def test_evaluate_all_sorts_findings_along_the_timeline() -> None:
     )
     assert [f.timestamp_seconds for f in findings] == [0.0, 4.0, 30.0]
     assert findings[0].rule == "loudness_off_target"
+
+
+# --- Camera zoom (focus/restore_view) ----------------------------------------
+
+#: Khung camera zoom 4 lần quanh điểm (2, 1): rộng 14.22/4, cao 8/4.
+ZOOMED_FRAME = [2 - 14.222222222222221 / 8, 2 + 14.222222222222221 / 8, 1 + 1.0, 1 - 1.0]
+
+
+def zoomed_mark(*mobjects) -> dict:
+    return {**mark(*mobjects), "frame": ZOOMED_FRAME}
+
+
+def test_frame_overflow_ignores_objects_cut_off_by_zoom_that_existed_before() -> None:
+    """Zoom cố ý gạt vật có sẵn ra khỏi khung — không phải lỗi."""
+    assert check_frame_overflow([zoomed_mark(text(-6.0, -4.0, 3.0, 2.5))], T) == []
+
+
+def test_frame_overflow_flags_object_added_during_zoom_outside_camera() -> None:
+    label = {**text(-6.0, -4.0, 3.0, 2.5), "added_during_zoom": True}
+    findings = check_frame_overflow([zoomed_mark(label)], T)
+    assert [f.rule for f in findings] == ["frame_overflow"]
+    assert "khung camera đang zoom" in findings[0].message
+
+
+def test_frame_overflow_passes_object_added_during_zoom_inside_camera() -> None:
+    label = {**text(1.5, 2.5, 1.2, 0.8), "added_during_zoom": True}
+    assert check_frame_overflow([zoomed_mark(label)], T) == []
+
+
+def test_full_view_frame_behaves_like_no_frame() -> None:
+    full = {**mark(text(-9.0, -7.5, 1.0, 0.0)), "frame": [-7.111111111111111, 7.111111111111111, 4.0, -4.0]}
+    assert [f.rule for f in check_frame_overflow([full], T)] == ["frame_overflow"]
+
+
+def test_text_too_small_accounts_for_camera_zoom() -> None:
+    """Chữ cỡ 8 ≈ 11px ở 1080p là quá nhỏ, nhưng zoom 4 lần thì ≈ 43px."""
+    tiny = text(1.5, 2.5, 1.2, 0.8, font_size=8.0)
+    assert check_text_too_small([mark(tiny)], "1080p60", T) != []
+    assert check_text_too_small([zoomed_mark(tiny)], "1080p60", T) == []

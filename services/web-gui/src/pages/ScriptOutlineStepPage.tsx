@@ -5,7 +5,11 @@ import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringStory } from "../api/client";
-import { buildBeatSheetSection, NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
+import {
+  buildStoryBeatSheetSection,
+  CHANNEL_IDENTITY,
+  NARRATION_LANGUAGE_RULE,
+} from "../components/scriptPrompts";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
@@ -73,10 +77,17 @@ export function ScriptOutlineStepPage() {
     };
   }, [draft.voiceLanguage]);
 
-  const formatBeats = format ? buildBeatSheetSection(format, draft.voiceLanguage, wordsPerMinuteFor(calibration, draft.voiceId)) : "";
+  // buildStoryBeatSheetSection, không buildBeatSheetSection: bước 1 không viết
+  // code, nên khối beat ở đây phải bỏ hết cú pháp `self.beat(...)` — xem chú
+  // thích của hàm đó trong scriptPrompts.ts.
+  const formatBeats = format
+    ? buildStoryBeatSheetSection(format, draft.voiceLanguage, wordsPerMinuteFor(calibration, draft.voiceId))
+    : "";
   const prompt = (template ?? "Đang tải prompt...")
     .split("{{topic}}")
     .join(draft.authoringTopic.trim() || TOPIC_PLACEHOLDER)
+    .split("{{channel_identity}}")
+    .join(CHANNEL_IDENTITY[draft.voiceLanguage])
     .split("{{format_beats}}")
     .join(formatBeats)
     .split("{{narration_language_rule}}")

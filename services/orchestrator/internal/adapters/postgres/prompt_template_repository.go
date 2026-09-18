@@ -30,6 +30,12 @@ func NewPromptTemplateRepository(pool *pgxpool.Pool) *PromptTemplateRepository {
 // language) row is not already there — insert-if-absent, same reasoning as
 // SeedVideoFormats: once an editor has changed the wording, a restart must
 // not quietly restore the shipped copy underneath them.
+//
+// Deliberately NOT version-aware. Making seeding overwrite on a version bump
+// was tried and removed: it meant editing wording in the admin screen was
+// silently undone by whatever the binary happened to carry, and the editor had
+// no say in when that happened. Getting a shipped default back into a running
+// database is an explicit action instead — see ResetPromptTemplate.
 func (r *PromptTemplateRepository) SeedPromptTemplates(ctx context.Context) error {
 	for _, t := range domain.DefaultPromptTemplates() {
 		if _, err := r.pool.Exec(ctx, `

@@ -12,30 +12,79 @@
  * image (see ../../Dockerfile's font step) — so Vietnamese diacritics render
  * correctly here too without needing a second font source.
  */
-import React from 'react';
-import {AbsoluteFill} from 'remotion';
+import React, {useState} from 'react';
+import {AbsoluteFill, continueRender, delayRender} from 'remotion';
 
-const FONT_FAMILY = "'Be Vietnam Pro', sans-serif";
+const FONT_NAME = 'Be Vietnam Pro';
+const FONT_FAMILY = `'${FONT_NAME}', sans-serif`;
 const DEFAULT_COLOR = '#F2F2F2';
 const BACKGROUND = '#0B1220';
 
-export function TitleText({children}: {children: React.ReactNode}) {
+// Hold the first frame until the system-installed font is actually loaded,
+// so frames aren't captured with the sans-serif fallback. Module-level so it
+// runs once per bundle rather than once per component instance.
+let fontReady: Promise<void> | null = null;
+function useFontLoaded() {
+  useState(() => {
+    fontReady ??= Promise.all(
+      [400, 700].map((weight) => document.fonts.load(`${weight} 36px '${FONT_NAME}'`)),
+    ).then((faces) => {
+      if (faces.some((f) => f.length === 0)) {
+        console.warn(`conceptflow-mini: font '${FONT_NAME}' not found, falling back to sans-serif`);
+      }
+    });
+    const handle = delayRender(`Loading font ${FONT_NAME}`);
+    fontReady.then(
+      () => continueRender(handle),
+      () => continueRender(handle),
+    );
+    return null;
+  });
+}
+
+function CenteredText({
+  children,
+  fontSize,
+  fontWeight,
+  paddingX,
+  position,
+}: {
+  children: React.ReactNode;
+  fontSize: number;
+  fontWeight: number;
+  paddingX: number;
+  position: 'center' | 'bottom';
+}) {
+  useFontLoaded();
+  const isBottom = position === 'bottom';
   return (
     <AbsoluteFill
       style={{
-        backgroundColor: BACKGROUND,
-        justifyContent: 'center',
+        // Opaque when centered: AI-written illustrations are often full-frame
+        // absolute elements with no layout coordination, and stacking them
+        // under transparent text made it unreadable. 'bottom' instead keeps
+        // the frame free for the illustration and only backs the caption.
+        backgroundColor: isBottom ? undefined : BACKGROUND,
+        justifyContent: isBottom ? 'flex-end' : 'center',
         alignItems: 'center',
-        padding: '0 120px',
+        padding: isBottom ? `0 ${paddingX}px 60px` : `0 ${paddingX}px`,
       }}
     >
       <div
         style={{
           fontFamily: FONT_FAMILY,
-          fontWeight: 700,
-          fontSize: 64,
+          fontWeight,
+          fontSize,
+          lineHeight: 1.4,
           color: DEFAULT_COLOR,
           textAlign: 'center',
+          overflowWrap: 'break-word',
+          maxWidth: '100%',
+          ...(isBottom && {
+            backgroundColor: 'rgba(11, 18, 32, 0.8)',
+            padding: '16px 32px',
+            borderRadius: 12,
+          }),
         }}
       >
         {children}
@@ -44,36 +93,20 @@ export function TitleText({children}: {children: React.ReactNode}) {
   );
 }
 
-export function BodyText({children}: {children: React.ReactNode}) {
-  // backgroundColor was missing here (unlike TitleText, which has one) — a
-  // transparent AbsoluteFill lets whatever custom illustration the AI draws
-  // for the same segment show straight through the text region instead of
-  // being covered by it. Since AI-written illustrations are often their own
-  // full-screen absolutely-positioned elements (no layout coordination with
-  // BodyText enforced anywhere), the two ended up stacked on top of each
-  // other in the exact same spot, rendering as unreadable overlapping text —
-  // seen in production (binary-search video, both narration and a number
-  // range diagram sharing the middle of the frame). An opaque background
-  // guarantees text stays legible regardless of what else got drawn.
+type TextProps = {children: React.ReactNode; position?: 'center' | 'bottom'};
+
+export function TitleText({children, position = 'center'}: TextProps) {
   return (
-    <AbsoluteFill
-      style={{
-        backgroundColor: BACKGROUND,
-        justifyContent: 'center',
-        alignItems: 'center',
-        padding: '0 160px',
-      }}
-    >
-      <div
-        style={{
-          fontFamily: FONT_FAMILY,
-          fontSize: 36,
-          color: DEFAULT_COLOR,
-          textAlign: 'center',
-        }}
-      >
-        {children}
-      </div>
-    </AbsoluteFill>
+    <CenteredText fontSize={64} fontWeight={700} paddingX={120} position={position}>
+      {children}
+    </CenteredText>
+  );
+}
+
+export function BodyText({children, position = 'center'}: TextProps) {
+  return (
+    <CenteredText fontSize={36} fontWeight={400} paddingX={160} position={position}>
+      {children}
+    </CenteredText>
   );
 }
