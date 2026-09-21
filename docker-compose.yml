@@ -128,6 +128,11 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@rendering-db:5432/rendering
       RENDER_TIMEOUT_SECONDS: "1800"
+      # The validate_script dry pass executes every animation, so a heavy
+      # script costs the same order of magnitude as the -ql render it gates.
+      # At the old fixed 300s such a script failed here with nothing but a
+      # timeout to show for it.
+      DRY_RUN_TIMEOUT_SECONDS: "2000"
       RENDER_MEMORY_LIMIT_GB: "4"
       # Manim 0.18 keeps its cache inside media_dir, so this directory is
       # reused per project rather than being a throwaway tempdir. Set it to an

@@ -7,7 +7,8 @@ holds RabbitMQ/Postgres credentials in its environment). Guardrails applied
 to the subprocess:
 
 - A stripped environment (no RABBITMQ_URL/DATABASE_URL/etc. — only PATH/HOME).
-- A wall-clock timeout (RENDER_TIMEOUT_SECONDS, default 1800s).
+- A wall-clock timeout (RENDER_TIMEOUT_SECONDS, default 1800s; the dry pass
+  gets its own, DRY_RUN_TIMEOUT_SECONDS, default 300s).
 - An address-space (memory) resource limit via `resource.setrlimit`, applied in
   the child before exec via `preexec_fn`.
 
@@ -155,6 +156,13 @@ DURATIONS_FILENAME = "cf_durations.json"
 #: A dry pass must not be allowed to run as long as a real render — a script
 #: that hangs should surface on the cheap pass, not the expensive one
 #: (CR-018 FR49.2).
+#:
+#: Overridable via DRY_RUN_TIMEOUT_SECONDS, because "cheaper than a real
+#: render" is not the same as "fast": the dry pass deliberately executes every
+#: animation (see _run_manim), so a heavy script can cost the same order of
+#: magnitude as the -ql render it precedes. A fixed budget here meant such a
+#: script timed out on the gate and never reached the real renderer, with a
+#: timeout as its only diagnosis.
 DEFAULT_DRY_RUN_TIMEOUT_SECONDS = 300
 
 #: CR-023 D3/D4 — the only two scene classes `render_channel_asset` may run.
@@ -177,6 +185,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
     def __init__(
         self,
         timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS,
+        dry_run_timeout_seconds: int = DEFAULT_DRY_RUN_TIMEOUT_SECONDS,
         memory_limit_gb: int = DEFAULT_RENDER_MEMORY_LIMIT_GB,
         cache_root: str | None = CACHE_ROOT,
         cache_budget_bytes: int = DEFAULT_CACHE_BUDGET_BYTES,
@@ -184,6 +193,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         quality: str = DEFAULT_RENDER_QUALITY,
     ) -> None:
         self._timeout_seconds = timeout_seconds
+        self._dry_run_timeout_seconds = dry_run_timeout_seconds
         self._memory_limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
         self._cache_root = cache_root
         self._cache_budget_bytes = cache_budget_bytes
@@ -430,13 +440,13 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
 
         # The dry pass gets the same isolation as the real one (FR49.3). It runs
         # unvetted code earlier in the pipeline, not safer code.
-        timeout = DEFAULT_DRY_RUN_TIMEOUT_SECONDS if dry else self._timeout_seconds
+        timeout = self._dry_run_timeout_seconds if dry else self._timeout_seconds
+        label = "Manim dry run" if dry else "Manim render"
         returncode, stderr = self._run_with_heartbeat(
-            cmd, media_dir, safe_env, timeout=timeout
+            cmd, media_dir, safe_env, timeout=timeout, label=label
         )
 
         if returncode != 0:
-            label = "Manim dry run" if dry else "Manim render"
             logger.warning("%s failed: %s", label, stderr)
             raise AnimationEngineError(f"{label} failed:\n{stderr}")
 
@@ -446,6 +456,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         media_dir: str,
         safe_env: dict[str, str],
         timeout: int | None = None,
+        label: str = "Manim render",
     ) -> tuple[int, str]:
         """Runs Manim, streaming stderr so a long render can report that it is
         still alive (CR-003 FR11.4).
@@ -499,7 +510,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             process.kill()
             process.wait()
             raise AnimationEngineError(
-                f"Manim render timed out after {timeout or self._timeout_seconds}s"
+                f"{label} timed out after {timeout or self._timeout_seconds}s"
             ) from exc
         finally:
             done.set()
