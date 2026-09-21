@@ -368,7 +368,7 @@ Màn `LLMUsagePage` cạnh `PromptSettingsPage`, dùng `components/ui` sẵn có
 | `LLM_PROVIDER` | `hive` nếu có key, ngược lại `ollama` | |
 | `HIVE_API_KEY` | `""` | Rỗng ⇒ về `ollama`, **không crash lúc khởi động** (FR83.2) |
 | `HIVE_BASE_URL` | `https://api-cdn.thehive.ai/api/v3` | |
-| `HIVE_MODEL` | *chưa chốt* | Chờ phép đo sinh code — xem "Việc đang chờ" |
+| `HIVE_MODEL` | `deepseek-ai/deepseek-v4.1-flash` | **Chốt Creator 2026-09-21** — xem D14 |
 | `HIVE_MAX_OUTPUT_TOKENS` | `16000` | Rộng tay vì reasoning của glm đốt >50% ngân sách đầu ra (D13) |
 | `HIVE_TIMEOUT_SECONDS` | `180` | |
 | `HIVE_MAX_INPUT_CHARS` | `120000` | ~30k token, thừa cho prompt dài nhất (14k ký tự) mà vẫn chặn được project hỏng |
@@ -389,6 +389,25 @@ Màn `LLMUsagePage` cạnh `PromptSettingsPage`, dùng `components/ui` sẵn có
 
 Mọi câu đều kèm "hoặc dùng nút Copy prompt như cũ" (FR79.3). Retry dùng
 exponential backoff có jitter, đúng khuôn `AzureTTSAdapter` của CR-013.
+
+### D14 — `HIVE_MODEL` = `deepseek-ai/deepseek-v4.1-flash` (chốt Creator 2026-09-21)
+Chốt trước khi chạy phép đo lint tự động. Các dữ kiện đã đo ủng hộ lựa chọn này:
+
+- **Không đốt token cho reasoning** (`reasoning_tokens: 0`), trong khi glm tiêu
+  54% ngân sách đầu ra cho phần đó. Với prompt 10–14k ký tự chạy 4 bước mỗi
+  video, đây là khác biệt chi phí thật, không phải chi tiết vi mô.
+- **Có `prompt_tokens_details.cached_tokens`** — prompt caching quan sát được.
+  Phần đầu prompt (bản sắc kênh, whitelist API, beat sheet) gần như không đổi
+  giữa các lượt gọi, nên đây là đường giảm chi phí có sẵn về sau.
+- **Đầu ra dễ đoán hơn**: `content` luôn có chữ, không có trường
+  `reasoning_content` phải bóc, không có lớp lỗi `budget` của D13 (dù vẫn cài
+  đặt D13 đầy đủ — nó là hợp đồng của provider, không phải của một model).
+
+**Đây là một biến môi trường, không phải một cam kết kiến trúc.** Đổi sang
+`zai-org/glm-5.3-flash` là sửa một dòng `.env` + restart, không sửa code —
+`LLMProviderPort` (D1) và parser usage (D12) đều đã chịu được cả hai. Phép đo
+lint tự động ở mốc 7 vì thế vẫn nên chạy: nó rẻ, và nếu kết quả lật ngược giả
+thuyết thì việc đổi lại gần như không tốn gì.
 
 ---
 
@@ -414,17 +433,11 @@ thêm `rendering`) + `up -d`, xác nhận healthy.
 ~~`HIVE_API_KEY` chưa có~~ — **đã có và đã xác minh (2026-09-21)**, xem mục
 "Đã đo thật". Hai model trong doc đều tồn tại và gọi được.
 
-Còn lại đúng một việc chặn: **chốt `HIVE_MODEL`.** Cần chạy cùng một chủ đề
-qua `deepseek-ai/deepseek-v4.1-flash` và `zai-org/glm-5.3-flash` ở bước sinh
-code, đếm lỗi lint BLOCKING mỗi bên, và **đo trên cả hai engine** (Manim và
-Remotion) — từ vựng hình ảnh khác hẳn nhau nên một model khá ở Manim chưa chắc
-khá ở Remotion.
+~~Chốt `HIVE_MODEL`~~ — **đã chốt: `deepseek-ai/deepseek-v4.1-flash`** (D14).
 
-Phép đo này cần mốc 5 (render prompt ở server) và mốc 6 (`POST /lint`) đã xong
-thì mới **chấm điểm tự động** được. Làm sớm hơn thì phải chấm bằng mắt, tốn
-công mà kém tin cậy. ⇒ Không chặn gì cả: cứ làm mốc 1–6, đo ở mốc 7.
+**Không còn việc nào chặn.** LLD đủ để bắt đầu mốc 1.
 
-Giả thuyết ban đầu để đi đo (không phải kết luận): deepseek có vẻ hợp hơn cho
-sinh code — không đốt token cho reasoning, có prompt caching quan sát được, và
-output dễ đoán hơn. Nhưng reasoning của glm có thể lại là thứ giúp nó bám đúng
-whitelist API của CR-017. Phải đo, không đoán.
+Việc còn lại thuộc mốc 7, không phải điều kiện tiên quyết: chạy cùng một chủ đề
+qua cả hai model ở bước sinh code, đếm lỗi lint BLOCKING, đo trên **cả hai
+engine** (Manim và Remotion — từ vựng hình ảnh khác hẳn nhau). Kết quả chỉ để
+xác nhận hoặc lật lại D14; đổi model là sửa một dòng `.env`.
