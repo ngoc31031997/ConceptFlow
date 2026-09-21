@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -84,7 +85,10 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 	}
 
 	sagaID := project.SagaID
-	payload := rebuildPayload(stepName, project)
+	payload, err := rebuildPayload(stepName, project)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: stepName, Status: domain.SagaStepInProgress}); err != nil {
 		return nil, err
@@ -112,12 +116,27 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 
 // rebuildPayload reconstructs the command payload for stepName purely from
 // Project's accumulated data (Rule 5).
-func rebuildPayload(stepName domain.StepName, project *domain.Project) map[string]interface{} {
+func rebuildPayload(stepName domain.StepName, project *domain.Project) (map[string]interface{}, error) {
 	switch stepName {
 	case domain.StepParseScript:
-		return map[string]interface{}{"script_content": project.ScriptContent}
+		return map[string]interface{}{"script_content": project.ScriptContent}, nil
+	case domain.StepValidateScript:
+		// Must mirror the original dispatch in handle_step_event.go's
+		// onScriptParsed: rendering's consumer reads script_content and
+		// scene_class_name unconditionally, so an incomplete payload here
+		// crashes it with a KeyError instead of failing the step.
+		engine := project.RenderEngine
+		if !engine.IsValid() {
+			engine = domain.DefaultRenderEngine
+		}
+		return map[string]interface{}{
+			"script_content":   project.ScriptContent,
+			"scene_class_name": project.ManimSceneClassName,
+			"render_quality":   string(project.RenderQuality),
+			"engine":           string(engine),
+		}, nil
 	case domain.StepSynthesizeSpeech:
-		return map[string]interface{}{"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID)}
+		return map[string]interface{}{"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID)}, nil
 	case domain.StepRenderScenes:
 		// feature/remotion-engine: without "engine" here, retrying this step
 		// silently fell back to Manim (rendering's consumer.py defaults an
@@ -133,14 +152,17 @@ func rebuildPayload(stepName domain.StepName, project *domain.Project) map[strin
 			"script_content":   project.ScriptContent,
 			"scene_class_name": project.ManimSceneClassName,
 			"engine":           string(engine),
-		}
+		}, nil
 	case domain.StepAssembleVideo:
-		return assembleVideoPayload(project)
+		return assembleVideoPayload(project), nil
 	case domain.StepQCVideo:
-		return qcVideoPayload(project)
+		return qcVideoPayload(project), nil
 	case domain.StepPublishVideo:
-		return publishVideoPayload(project)
+		return publishVideoPayload(project), nil
 	default:
-		return map[string]interface{}{}
+		// Never publish an empty payload: a consumer that reads its fields
+		// unconditionally would crash on it and redeliver forever. A step
+		// with no rebuild rule is a bug here, not a retryable command.
+		return nil, fmt.Errorf("retry: no payload rebuild rule for step %q", stepName)
 	}
 }

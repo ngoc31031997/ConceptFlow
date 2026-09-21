@@ -29,6 +29,7 @@ from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.engine_router import EngineRouterRenderer
 from adapters.rendering.manim_renderer import (
     CACHE_ROOT,
+    DEFAULT_DRY_RUN_TIMEOUT_SECONDS,
     DEFAULT_RENDER_MEMORY_LIMIT_GB,
     DEFAULT_RENDER_QUALITY,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
@@ -49,12 +50,16 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 async def run() -> None:
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
+    dry_run_timeout_seconds = int(
+        os.environ.get("DRY_RUN_TIMEOUT_SECONDS", DEFAULT_DRY_RUN_TIMEOUT_SECONDS)
+    )
     memory_limit_gb = int(os.environ.get("RENDER_MEMORY_LIMIT_GB", DEFAULT_RENDER_MEMORY_LIMIT_GB))
     # RENDER_CACHE_ROOT="" turns caching off, restoring the old
     # tempdir + --disable_caching behaviour without a code change.
     cache_root = os.environ.get("RENDER_CACHE_ROOT", CACHE_ROOT) or None
     manim_renderer = ManimScriptRenderer(
         timeout_seconds=timeout_seconds,
+        dry_run_timeout_seconds=dry_run_timeout_seconds,
         memory_limit_gb=memory_limit_gb,
         cache_root=cache_root,
         quality=os.environ.get("RENDER_QUALITY", DEFAULT_RENDER_QUALITY),
