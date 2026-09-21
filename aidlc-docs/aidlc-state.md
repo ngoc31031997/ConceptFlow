@@ -78,7 +78,7 @@
 | CR-023 | Intro/outro cố định làm bản sắc kênh | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-11) — **việc tồn đọng: Creator cung cấp file sting intro dựng ngoài; pipeline đang chạy bằng bản Manim mặc định** |
 | CR-024 | Cổng duyệt dàn ý trước khi tốn TTS | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-10) |
 | CR-026 | Kịch bản riêng cho bản Shorts/TikTok, hỗ trợ bằng AI | P1 | **Requirements Analysis** | Đã viết requirements, chờ Creator duyệt trước khi sang Low-Level Design |
-| CR-027 | Gọi LLM trong app qua Hive (OpenAI-compatible), bỏ copy-paste ra AI ngoài | P1 | **Requirements Analysis ✅ → Low-Level Design** | Requirements **đã được Creator duyệt (2026-09-21)**. Lật lại quyết định "copy tay / không gọi API trả phí" của CR-025 — context 1M của Hive gỡ nút thắt `num_ctx` (CR-014). Chốt: Hive chính/Ollama fallback, cả 5 vai trò, chạy từng bước, prompt hai tầng (`prompt_overrides` bảng riêng). Cần ADR-0029. Còn 5 câu hỏi mở ở LLD |
+| CR-027 | Gọi LLM trong app qua Hive (OpenAI-compatible), bỏ copy-paste ra AI ngoài | P1 | **Low-Level Design — chờ duyệt** | Requirements **đã được Creator duyệt (2026-09-21)**. Lật lại quyết định "copy tay / không gọi API trả phí" của CR-025 — context 1M của Hive gỡ nút thắt `num_ctx` (CR-014). Chốt: Hive chính/Ollama fallback, cả 6 vai trò, chạy từng bước, prompt hai tầng (`prompt_overrides` bảng riêng). LLD: `cr-027-low-level-design.md` (D0–D11). Cần ADR-0029. **Chặn: chưa có `HIVE_API_KEY` ⇒ chưa chốt được `HIVE_MODEL`; mốc 1–6 không cần key** |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`,
 `cr-016-024-execution-plan.md`, `cr-023-low-level-design.md`,
