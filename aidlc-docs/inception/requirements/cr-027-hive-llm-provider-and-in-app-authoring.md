@@ -70,10 +70,30 @@ qua env. Hive lỗi/hết số dư/mất mạng → tự rơi về Ollama cho **
 lớn **không fallback** — trả lỗi rõ ràng và giữ nguyên đường copy tay, vì một
 bản nháp do model 2048-token sinh ra còn tệ hơn không có gì (CR-014).
 
-**D2 — Cả 5 vai trò đều chạy được bằng AI.**
-`story_architect`, `visual_director`, `manim_engineer`, `script_reviewer`,
-`remotion_engineer`. Hai vai trò sinh code là chỗ rủi ro nhất, nên chúng — và
-chỉ chúng — bắt buộc đi qua vòng lint-và-sửa ở FR81.
+**D2 — Cả 6 vai trò đều chạy được bằng AI.**
+*(Cập nhật 2026-09-21: 5 → 6 sau khi `fix/remotion-pipeline-topic-and-storyboard`
+vào `main`.)* `story_architect`, `visual_director`, `manim_engineer`,
+`script_reviewer`, `remotion_visual_director`, `remotion_engineer` — 12 hàng
+seed (6 vai trò × 2 ngôn ngữ).
+
+Pipeline vì thế **rẽ nhánh theo engine từ tab 1b trở đi**, không phải từ 1c:
+
+| Tab | Manim | Remotion |
+|---|---|---|
+| 1a dàn ý | `story_architect` | `story_architect` (dùng chung) |
+| 1b storyboard | `visual_director` | `remotion_visual_director` |
+| 1c code | `manim_engineer` | `remotion_engineer` |
+| 1d duyệt | `script_reviewer` | `script_reviewer` (dùng chung) |
+
+Lý do tách 1b (ghi trong `prompt_template.go`): storyboard là bước sớm nhất
+**không** engine-agnostic, vì nó trao cho engineer một bộ từ vựng hình ảnh —
+design system của Manim có component và camera mà `conceptflow-mini` của
+Remotion không có, nên storyboard viết bằng từ vựng Manim khiến engineer
+Remotion bịa ra import không tồn tại. `story_architect` vẫn dùng chung: nó
+quyết định **câu chuyện**, không quyết định pixel.
+
+Hai vai trò sinh code là chỗ rủi ro nhất, nên chúng — và chỉ chúng — bắt buộc
+đi qua vòng lint-và-sửa ở FR81.
 
 **D3 — Chạy từng bước, Creator duyệt giữa.**
 Mỗi tab pipeline có nút "Chạy bằng AI" riêng. Không có nút chạy liền 4 bước ở
@@ -153,8 +173,13 @@ gọi API cho ra kết quả lệch nhau mà không ai biết.
 - **FR78.4**: Endpoint PHẢI idempotent theo nghĩa thực dụng: hai lần bấm liên
   tiếp không tạo hai lượt gọi tính tiền. Khoá theo `(project_id, step)` trong
   lúc một lượt đang chạy, lượt thứ hai trả `409`.
-- **FR78.5**: `remotion_engineer` dùng đúng endpoint `step=code`, phân biệt
-  bằng `render_engine` của project — không thêm step thứ năm.
+- **FR78.5**: Bốn `step` giữ nguyên bất kể engine. Việc ánh xạ `step` → vai trò
+  là của **server**, đọc `render_engine` của project: `step=storyboard` →
+  `visual_director` hoặc `remotion_visual_director`; `step=code` →
+  `manim_engineer` hoặc `remotion_engineer`. Không thêm step thứ năm, và GUI
+  không được tự chọn vai trò — hôm nay chính GUI đang làm việc này
+  (`ScriptReviewerStepPage` tự tính `engineerRole`), và đó là cùng một lớp lỗi
+  mà FR77 đang đi sửa.
 
 ### FR79 — Nút "Chạy bằng AI" trên web-gui
 - **FR79.1**: Mỗi tab của `ScriptPipelineTabs` (1a dàn ý, 1b storyboard, 1c
@@ -281,10 +306,17 @@ một hàng phải gánh hai vai. Tách hai tầng là gỡ đúng gốc.
   biết ngay, và `DELETE FROM prompt_templates` trở thành một thao tác an toàn.
 
 #### Hiện trạng DB đã đo (2026-09-21, stack đang chạy)
-So md5 của cả 10 hàng `prompt_templates` với `DefaultPromptTemplates()` trong
-binary: **10/10 khớp từng byte.** Nghĩa là **hôm nay không có bản sửa tay nào
-đang sống** — FR84.8 hiện không có gì phải cứu. Vẫn phải cài đặt và test đầy
-đủ: trạng thái này có thể đổi bất cứ lúc nào trước khi CR được làm.
+Đo hai lần: trước khi merge `main` (10 hàng) và sau khi merge (12 hàng, thêm
+`remotion_visual_director` vi/en). Cả hai lần so md5 với
+`DefaultPromptTemplates()` trong binary: **khớp từng byte 100%.** Nghĩa là
+**hôm nay không có bản sửa tay nào đang sống** — FR84.8 hiện không có gì phải
+cứu. Vẫn phải cài đặt và test đầy đủ: trạng thái này đổi bất cứ lúc nào.
+
+Lần đo thứ hai cũng khoanh đúng **phạm vi của cái bẫy `DO NOTHING`**, hẹp hơn
+mô tả ban đầu: hai hàng `remotion_visual_director` là **vai trò mới**, và
+chúng vào DB trơn tru — `DO NOTHING` chỉ bỏ qua hàng đã tồn tại. Cái bẫy chỉ
+đánh vào việc **sửa text của vai trò đã có**, không đánh vào việc thêm vai trò
+mới. FR84 vẫn cần, nhưng với đúng lý do đó.
 
 Một phát hiện quan trọng hơn cho FR84.8: **cột `version` KHÔNG dùng được để
 biết một hàng đã bị sửa hay chưa.** `story_architect` đang ở version 4 (vi) và
