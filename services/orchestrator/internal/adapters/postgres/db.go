@@ -319,6 +319,44 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT N
 -- carries the same "paste your topic here" placeholder the GUI shows today.
 -- No attempt is made to guess a topic out of story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
+
+-- CR-027 D9/FR82: one row per LLM call, so the Creator can see spend in the
+-- web GUI instead of on a provider dashboard. This is the first paid service
+-- in the pipeline, and CR-021's lesson applies: measure first, enforce later.
+-- No spending cap here on purpose — a cap set before anyone knows the real
+-- numbers is how a gate loses its credibility.
+--
+-- Prompts and answers are NOT stored: project_authoring already holds them,
+-- and a second copy would double the data at risk for no new insight.
+--
+-- reasoning_tokens is its own column rather than folded into completion:
+-- measured, glm-5.3-flash spent 66 of 122 completion tokens reasoning before
+-- answering a one-sentence question (D12). A screen that hides that cannot
+-- explain why one model costs twice another for the same visible output.
+--
+-- project_id is nullable and carries NO foreign key: suggest-short-script
+-- (CR-026 FR71.1) runs before any project exists, and deleting a project must
+-- not erase the record of what it cost.
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id                BIGSERIAL PRIMARY KEY,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    provider          TEXT NOT NULL,
+    model             TEXT NOT NULL,
+    role              TEXT NOT NULL DEFAULT '',
+    step              TEXT NOT NULL DEFAULT '',
+    project_id        TEXT,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,
+    cached_tokens     INTEGER NOT NULL DEFAULT 0,
+    duration_ms       INTEGER NOT NULL DEFAULT 0,
+    ok                BOOLEAN NOT NULL,
+    error_kind        TEXT NOT NULL DEFAULT ''
+);
+
+-- Every read of this table is "recent first" or "the last N days", so the
+-- index matches the only access pattern there is.
+CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

@@ -108,6 +108,16 @@ func (e *LLMError) Error() string {
 
 func (e *LLMError) Unwrap() error { return e.Err }
 
+// billedUsage returns the tokens a failed call was still charged for, or a
+// zero value when err carries none.
+func billedUsage(err error) TokenUsage {
+	var llmErr *LLMError
+	if errors.As(err, &llmErr) {
+		return llmErr.Usage
+	}
+	return TokenUsage{}
+}
+
 // LLMErrorKindOf reports the kind of err, or "" if err is not an LLMError.
 func LLMErrorKindOf(err error) LLMErrorKind {
 	var llmErr *LLMError

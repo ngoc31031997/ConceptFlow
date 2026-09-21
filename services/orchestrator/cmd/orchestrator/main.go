@@ -110,7 +110,13 @@ func main() {
 		llmProvider = llm.NewHiveClient(cfg.HiveBaseURL, cfg.HiveAPIKey, cfg.HiveModel, cfg.HiveTimeout, cfg.HiveMaxRetries)
 	}
 	logger.Info("llm provider selected", "provider", llmProvider.Name(), "model", cfg.HiveModel)
-	_ = llmProvider // wired to the authoring generate use case in a later milestone
+
+	// CR-027 FR82 — the usage ledger. Constructed before the first billable
+	// call can happen, so no call ever runs unmeasured.
+	llmUsageRecorder := application.NewLLMUsageRecorder(postgres.NewLLMUsageRepository(pool), logger)
+
+	_ = llmProvider      // wired to the authoring generate use case in a later milestone
+	_ = llmUsageRecorder // same
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
