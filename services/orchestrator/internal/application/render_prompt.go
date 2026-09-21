@@ -1,0 +1,253 @@
+package application
+
+import (
+	"context"
+	"fmt"
+	"strings"
+
+	"orchestrator/internal/domain"
+)
+
+// PromptRenderContextPort supplies everything a prompt needs that is not the
+// template itself.
+type PromptRenderContextPort interface {
+	Get(ctx context.Context, projectID string) (*domain.Project, error)
+	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
+	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
+	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
+	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
+}
+
+// VoiceCalibrationPort returns what a voice has actually been measured doing
+// (CR-016). The measurement is only trusted after enough samples; see
+// domain.VoiceCalibration.WordsPerMinute.
+type VoiceCalibrationPort interface {
+	GetVoiceCalibration(ctx context.Context, voiceID string) (domain.VoiceCalibration, error)
+}
+
+// FormatLookupPort resolves the project's chosen format at the version the
+// project was created against — a format edited since must not silently
+// change the budgets an existing outline was written to.
+type FormatLookupPort interface {
+	GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error)
+}
+
+// RenderPromptUseCase fills a role's template with this project's data
+// (CR-027 FR77).
+//
+// This used to happen in the browser: scriptPrompts.ts substituted the
+// variables into the template web-gui had fetched. That left the server
+// unable to produce a prompt, which FR78's generate endpoints need to do —
+// and it meant the only copy of the substitution logic lived in a place the
+// server could not reach.
+//
+// One renderer serves both paths. The Copy-prompt button and the Run-with-AI
+// button must send identical text to the model; two implementations would
+// let them drift on the same role with nothing in either output to show it.
+type RenderPromptUseCase struct {
+	overrides   PromptOverridePort
+	projects    PromptRenderContextPort
+	formats     FormatLookupPort
+	calibration VoiceCalibrationPort
+}
+
+func NewRenderPromptUseCase(
+	overrides PromptOverridePort,
+	projects PromptRenderContextPort,
+	formats FormatLookupPort,
+	calibration VoiceCalibrationPort,
+) *RenderPromptUseCase {
+	return &RenderPromptUseCase{
+		overrides: overrides, projects: projects,
+		formats: formats, calibration: calibration,
+	}
+}
+
+// RenderedPrompt is one fully substituted prompt.
+type RenderedPrompt struct {
+	Role         domain.PromptRole `json:"role"`
+	Language     string            `json:"language"`
+	Prompt       string            `json:"prompt"`
+	FromOverride bool              `json:"from_override"`
+}
+
+// TopicPlaceholder is what {{topic}} becomes when the project has no topic
+// saved — every project created before CR-027 D0. Identical to the string
+// web-gui has always shown, so an old project's prompt reads exactly as it
+// did before.
+const TopicPlaceholder = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]"
+
+// RoleFor maps a pipeline step to the prompt role, which depends on the
+// project's render engine (CR-027 D4).
+//
+// This lives on the server on purpose. web-gui currently works it out in two
+// separate pages, and a third copy in a third place is how the Remotion and
+// Manim branches end up disagreeing about which prompt step 3 uses.
+func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
+	remotion := renderEngine == "remotion"
+	switch step {
+	case "story":
+		// Shared: this step decides the story, not the pixels.
+		return domain.RoleStoryArchitect, nil
+	case "storyboard":
+		// NOT shared: a storyboard hands the engineer a visual vocabulary,
+		// and Manim's design system has components and a camera that
+		// conceptflow-mini does not.
+		if remotion {
+			return domain.RoleRemotionVisualDirector, nil
+		}
+		return domain.RoleVisualDirector, nil
+	case "code":
+		if remotion {
+			return domain.RoleRemotionEngineer, nil
+		}
+		return domain.RoleManimEngineer, nil
+	case "review":
+		return domain.RoleScriptReviewer, nil
+	default:
+		return "", fmt.Errorf("unknown step %q", step)
+	}
+}
+
+// Execute renders the prompt for one role of one project.
+//
+// lintResults is passed in rather than fetched here: the review step's
+// {{lint_results}} comes from the rendering service, and this use case has
+// no business knowing how to reach it. Empty is fine — it renders as a note
+// saying no code has been saved yet.
+func (uc *RenderPromptUseCase) Execute(
+	ctx context.Context, projectID string, role domain.PromptRole, lintResults string,
+) (RenderedPrompt, error) {
+	if projectID == "" {
+		return RenderedPrompt{}, fmt.Errorf("project_id is required")
+	}
+	project, err := uc.projects.Get(ctx, projectID)
+	if err != nil {
+		return RenderedPrompt{}, fmt.Errorf("load project: %w", err)
+	}
+
+	language := string(project.ContentLanguage)
+	if language != "vi" && language != "en" {
+		language = "vi"
+	}
+
+	effective, err := uc.overrides.GetEffective(ctx, role, language)
+	if err != nil {
+		return RenderedPrompt{}, fmt.Errorf("load template: %w", err)
+	}
+
+	vars, err := uc.variablesFor(ctx, projectID, project, role, language, lintResults)
+	if err != nil {
+		return RenderedPrompt{}, err
+	}
+
+	out := effective.TemplateText
+	for name, value := range vars {
+		out = strings.ReplaceAll(out, "{{"+name+"}}", value)
+	}
+
+	return RenderedPrompt{
+		Role: role, Language: language,
+		Prompt: out, FromOverride: effective.FromOverride,
+	}, nil
+}
+
+func (uc *RenderPromptUseCase) variablesFor(
+	ctx context.Context, projectID string, project *domain.Project,
+	role domain.PromptRole, language, lintResults string,
+) (map[string]string, error) {
+	topic, err := uc.projects.GetAuthoringTopic(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("load topic: %w", err)
+	}
+	if strings.TrimSpace(topic) == "" {
+		topic = TopicPlaceholder
+	}
+
+	previous, err := uc.previousOutputFor(ctx, projectID, role)
+	if err != nil {
+		return nil, err
+	}
+
+	vars := map[string]string{
+		"topic":                   topic,
+		"channel_identity":        domain.ChannelIdentity(language),
+		"narration_language_rule": domain.NarrationLanguageRule(language),
+		"previous_output":         previous,
+		"lint_results":            lintResults,
+		"format_beats":            "",
+	}
+
+	if lintResults == "" {
+		vars["lint_results"] = "(chưa có kết quả kiểm tra tĩnh)"
+	}
+
+	// The beat sheet only means something for the step that writes the
+	// outline; fetching a format for the others would be work whose result
+	// nothing reads.
+	if role == domain.RoleStoryArchitect && project.VideoFormatID != "" {
+		format, err := uc.formats.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)
+		if err == nil {
+			var wpm float64
+			if project.VoiceID != "" {
+				// A voice with too few samples is not an error: fall back to
+				// the language default rather than refusing to render a
+				// prompt over a missing nicety. Same rule the GUI applies.
+				if c, calErr := uc.calibration.GetVoiceCalibration(ctx, project.VoiceID); calErr == nil {
+					if measured, ok := c.WordsPerMinute(); ok {
+						wpm = measured
+					}
+				}
+			}
+			vars["format_beats"] = domain.BuildStoryBeatSheetSection(format, language, wpm)
+		}
+	}
+
+	return vars, nil
+}
+
+// previousOutputFor assembles {{previous_output}} the way each step needs it:
+// every earlier artefact, oldest first, joined the way web-gui has always
+// joined them.
+func (uc *RenderPromptUseCase) previousOutputFor(
+	ctx context.Context, projectID string, role domain.PromptRole,
+) (string, error) {
+	var parts []string
+	add := func(s string) {
+		if strings.TrimSpace(s) != "" {
+			parts = append(parts, s)
+		}
+	}
+
+	story, err := uc.projects.GetAuthoringStory(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("load story: %w", err)
+	}
+	storyboard, err := uc.projects.GetAuthoringStoryboard(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("load storyboard: %w", err)
+	}
+	code, err := uc.projects.GetAuthoringCode(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("load code: %w", err)
+	}
+
+	switch role {
+	case domain.RoleStoryArchitect:
+		// Nothing comes before step 1.
+	case domain.RoleVisualDirector, domain.RoleRemotionVisualDirector:
+		add(story)
+	case domain.RoleManimEngineer, domain.RoleRemotionEngineer:
+		add(story)
+		add(storyboard)
+	case domain.RoleScriptReviewer:
+		add(story)
+		add(storyboard)
+		add(code)
+	}
+
+	if len(parts) == 0 {
+		return "(chưa có dàn ý/storyboard/code đã lưu ở các bước trước)", nil
+	}
+	return strings.Join(parts, "\n\n---\n\n"), nil
+}

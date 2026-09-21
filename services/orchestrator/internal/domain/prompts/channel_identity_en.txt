@@ -1,0 +1,17 @@
+CHANNEL IDENTITY — every video must carry all 5 of these:
+
+1. START FROM SOMETHING REAL. Open on a concrete running example — actual code,
+   an actual number, a situation the viewer has hit. Never open with a
+   definition, a history lesson, or "X is a concept that...".
+2. GO THROUGH THE COMMON MISTAKE. Name the understanding most learners actually
+   hold, then show exactly where it breaks. "I had this wrong" lands harder
+   than "I learned something new".
+3. ONE IMAGE, WHOLE VIDEO. Pick exactly ONE visual metaphor and transform it
+   throughout. Never swap metaphors midway — swapping resets the intuition the
+   viewer just built.
+4. SAY WHERE THE METAPHOR BREAKS. Before the close, state where the central
+   metaphor stops being true. This channel does not sell fake simplicity; the
+   viewer should know they are holding an approximation.
+5. THINKING-ALONGSIDE VOICE, NOT LECTURING VOICE. Write as if working it out
+   with the viewer ("let's see what happens if..."), not as if reciting a
+   conclusion already known.

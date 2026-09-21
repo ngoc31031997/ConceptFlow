@@ -8,8 +8,12 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  * (same passthrough posture as sagasRouter/projectsRouter, no
  * transformation at the Gateway boundary):
  *
- * `GET /v1/prompts/:role` — public read, used at runtime by web-gui's wizard
- * to fetch the current wording for one pipeline role.
+ * `GET /v1/prompts/:role` — the raw template for one pipeline role.
+ * `GET /v1/projects/:projectId/prompts/:role` — CR-027 FR77.2, the same
+ * template with every {{variable}} already substituted from that project.
+ * This is what web-gui's Copy button uses: the browser no longer does the
+ * substitution, so the copy-out path and the server's own generate call
+ * cannot drift apart on the same role.
  * `GET /v1/admin/prompts` — list every role/language row, for the admin
  * editor screen (PromptSettingsPage).
  * `PUT /v1/admin/prompts/:role` — save an editor's wording change.
@@ -31,6 +35,7 @@ const { proxyHandler } = require('../handlers/proxyHandler');
 function promptsRouter(orchestratorClient) {
   const router = express.Router();
   router.get('/v1/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/admin/prompts', proxyHandler(orchestratorClient, 'orchestrator'));
   router.put('/v1/admin/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/admin/prompts/:role/reset', proxyHandler(orchestratorClient, 'orchestrator'));

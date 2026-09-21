@@ -73,6 +73,13 @@ type promptOverridesUseCase interface {
 	Delete(ctx context.Context, role domain.PromptRole, language string) error
 }
 
+// renderPromptUseCase backs CR-027 FR77's GET
+// /v1/projects/{id}/prompts/{role} — the prompt fully substituted, so the
+// Copy button and the server's own generate call use the same text.
+type renderPromptUseCase interface {
+	Execute(ctx context.Context, projectID string, role domain.PromptRole, lintResults string) (application.RenderedPrompt, error)
+}
+
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
@@ -140,6 +147,7 @@ type Router struct {
 	suggestShortScript      suggestShortScriptUseCase
 	promptTemplates         promptTemplatesUseCase
 	promptOverrides         promptOverridesUseCase
+	renderPrompt            renderPromptUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -151,6 +159,12 @@ type Router struct {
 // GET /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the
 // routes answer 404, the same "unwired means absent" posture as
 // WithQCReports.
+// WithRenderPrompt enables CR-027 FR77's server-side prompt rendering.
+func (rt *Router) WithRenderPrompt(renderPrompt renderPromptUseCase) *Router {
+	rt.renderPrompt = renderPrompt
+	return rt
+}
+
 // WithPromptOverrides enables the CR-027 FR84 Creator-owned prompt layer.
 func (rt *Router) WithPromptOverrides(promptOverrides promptOverridesUseCase) *Router {
 	rt.promptOverrides = promptOverrides
@@ -261,6 +275,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
 	r.Post("/v1/projects/{project_id}/authoring/review", rt.handleSaveAuthoringReview)
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
+	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
+	r.Get("/v1/projects/{project_id}/prompts/{role}", rt.handleRenderPrompt)
 	return r
 }
 
@@ -1169,4 +1185,41 @@ func (rt *Router) handleDeletePromptOverride(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleRenderPrompt serves one role's prompt with every {{variable}}
+// already substituted (CR-027 FR77.2).
+//
+// web-gui's Copy button moves to this endpoint. Before, the browser fetched
+// the raw template and did the substitution itself — which is why the server
+// could not produce a prompt at all, and why the two paths could have drifted
+// once the server started producing them too.
+func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
+	if rt.renderPrompt == nil {
+		writeError(w, http.StatusNotFound, "prompt rendering is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+	role := chi.URLParam(r, "role")
+	if !domain.ValidPromptRole(role) {
+		writeError(w, http.StatusBadRequest, "unknown role")
+		return
+	}
+
+	// lint_results is supplied by the caller for now. The review step's real
+	// lint comes from the rendering service, which has no HTTP surface yet —
+	// that is its own milestone, and wiring it through here before it exists
+	// would mean guessing at its shape.
+	lintResults := r.URL.Query().Get("lint_results")
+
+	rendered, err := rt.renderPrompt.Execute(r.Context(), projectID, domain.PromptRole(role), lintResults)
+	if err != nil {
+		if errors.Is(err, domain.ErrProjectNotFound) {
+			writeError(w, http.StatusNotFound, "project not found")
+			return
+		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rendered)
 }

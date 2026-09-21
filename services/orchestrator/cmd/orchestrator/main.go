@@ -21,6 +21,7 @@ import (
 	"orchestrator/internal/adapters/postgres"
 	"orchestrator/internal/application"
 	"orchestrator/internal/config"
+	"orchestrator/internal/domain"
 )
 
 func main() {
@@ -176,6 +177,8 @@ func main() {
 		WithShortScriptSuggester(suggestShortScript).
 		WithPromptTemplates(promptTemplates).
 		WithPromptOverrides(application.NewPromptOverridesUseCase(promptTemplateRepo)).
+		WithRenderPrompt(application.NewRenderPromptUseCase(
+			promptTemplateRepo, promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo}, projectRepo, projectRepo)).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
 		WithAuthoringCode(saveAuthoringCode).
@@ -205,4 +208,39 @@ func main() {
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown error", "error", err)
 	}
+}
+
+// promptRenderContext joins the two repositories CR-027's prompt renderer
+// reads from: the project itself lives in ProjectRepository, while the
+// authoring artefacts live in PromptTemplateRepository.
+//
+// A four-line struct here rather than a new method on either repository —
+// the split is an accident of which table each row sits in, and neither
+// repository should grow a dependency on the other to paper over it.
+// Embedding both would be shorter but the two repositories each have a Get,
+// so the selector is ambiguous — and forwarding explicitly says which store
+// each field of a prompt comes from.
+type promptRenderContext struct {
+	projects  *postgres.ProjectRepository
+	authoring *postgres.PromptTemplateRepository
+}
+
+func (c promptRenderContext) Get(ctx context.Context, projectID string) (*domain.Project, error) {
+	return c.projects.Get(ctx, projectID)
+}
+
+func (c promptRenderContext) GetAuthoringTopic(ctx context.Context, projectID string) (string, error) {
+	return c.authoring.GetAuthoringTopic(ctx, projectID)
+}
+
+func (c promptRenderContext) GetAuthoringStory(ctx context.Context, projectID string) (string, error) {
+	return c.authoring.GetAuthoringStory(ctx, projectID)
+}
+
+func (c promptRenderContext) GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error) {
+	return c.authoring.GetAuthoringStoryboard(ctx, projectID)
+}
+
+func (c promptRenderContext) GetAuthoringCode(ctx context.Context, projectID string) (string, error) {
+	return c.authoring.GetAuthoringCode(ctx, projectID)
 }

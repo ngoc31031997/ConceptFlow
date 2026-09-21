@@ -1,0 +1,20 @@
+## CẤU TRÚC BẮT BUỘC — format "Giải thích khái niệm"
+
+Dàn ý phải gồm ĐÚNG các beat dưới đây, theo ĐÚNG thứ tự này, và mỗi beat phải
+được đặt tên bằng ĐÚNG id trong danh sách (đừng tự đặt tên beat mới):
+
+   - id `hook` — BẮT BUỘC: khoảng 20–39 từ lời thoại
+   - id `concrete` — BẮT BUỘC: khoảng 88–176 từ lời thoại
+   - id `variation` — tuỳ chọn (lặp tối đa 3 lần): khoảng 59–117 từ lời thoại
+   - id `pattern` — BẮT BUỘC: khoảng 117–234 từ lời thoại
+   - id `recap` — BẮT BUỘC: khoảng 29–59 từ lời thoại
+
+Quy tắc cứng:
+   - Thiếu một beat BẮT BUỘC thì dàn ý bị trả lại — các bước sau không dựng được.
+   - `concrete` phải đứng TRƯỚC `pattern`: cho người xem thấy một ví dụ chạy
+     thật rồi mới rút ra quy luật. Đây là bản sắc của kênh, không phải sở thích
+     trình bày.
+   - Ngân sách từ là để canh nhịp — lệch trong khoảng ±15% thì không sao; thứ tự
+     và các beat bắt buộc thì không được lệch.
+   - Cuối mỗi beat, ghi số từ thực tế của lời thoại nháp bạn vừa viết, để tự
+     kiểm. Tổng các beat bắt buộc rơi vào khoảng 254 từ trở lên.
