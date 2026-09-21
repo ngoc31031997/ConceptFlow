@@ -353,7 +353,13 @@ export async function completeYoutubeAuthCallback(
 
 /** CR-025 — one role/language row of the DB-backed prompt-template store. */
 export interface PromptTemplate {
-  role: "story_architect" | "visual_director" | "manim_engineer" | "script_reviewer" | "remotion_engineer";
+  role:
+    | "story_architect"
+    | "visual_director"
+    | "manim_engineer"
+    | "script_reviewer"
+    | "remotion_engineer"
+    | "remotion_visual_director";
   language: "vi" | "en";
   template_text: string;
   version: number;
@@ -381,6 +387,24 @@ export function updatePromptTemplate(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ language, template_text: templateText }),
+  });
+}
+
+/**
+ * Khôi phục prompt mặc định đang ship trong binary Orchestrator, bỏ bản người
+ * vận hành đã sửa.
+ *
+ * Seeding ở Orchestrator là insert-if-absent — nó cố ý KHÔNG đè lên bản sửa
+ * tay khi service khởi động lại. Nên khi prompt trong source được cải tiến,
+ * đây là đường duy nhất để bản mới vào được một DB đã bootstrap, và nó xảy ra
+ * vì người vận hành bấm nút, không phải vì một tiến trình vừa restart.
+ */
+export function resetPromptTemplate(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+): Promise<PromptTemplate> {
+  return apiFetch<PromptTemplate>(`/v1/admin/prompts/${role}/reset?language=${language}`, {
+    method: "POST",
   });
 }
 

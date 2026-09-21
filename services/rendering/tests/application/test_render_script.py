@@ -39,7 +39,7 @@ class FakeRenderer(ManimScriptRendererPort):
 def make_request(project_id: str = "proj-1") -> ScriptRenderRequest:
     return ScriptRenderRequest(
         project_id=project_id,
-        script_content="class DemoScene(Scene):\n    def construct(self):\n        self.wait(AUTO)\n",
+        script_content="from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate(\"xin chào\")\n",
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, audio_path="/shared/proj-1/audio/0.wav", duration_seconds=2.0)],
     )
@@ -101,7 +101,7 @@ def test_render_rejects_empty_project_id():
 
     request = ScriptRenderRequest(
         project_id="",
-        script_content="x",
+        script_content="pass",
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, audio_path="a.wav", duration_seconds=1.0)],
     )
@@ -115,7 +115,7 @@ def test_render_rejects_non_positive_duration():
 
     request = ScriptRenderRequest(
         project_id="proj-1",
-        script_content="x",
+        script_content="pass",
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, audio_path="a.wav", duration_seconds=0)],
     )
@@ -128,7 +128,7 @@ def test_render_rejects_empty_narration_segments():
     use_case = RenderScriptUseCase(renderer)
 
     request = ScriptRenderRequest(
-        project_id="proj-1", script_content="x", scene_class_name="DemoScene", narration_segments=[]
+        project_id="proj-1", script_content="pass", scene_class_name="DemoScene", narration_segments=[]
     )
     with pytest.raises(ValueError):
         use_case.render(request)
@@ -141,7 +141,7 @@ def test_renders_when_audio_path_is_absent():
     use_case = RenderScriptUseCase(renderer)
     request = ScriptRenderRequest(
         project_id="proj-1",
-        script_content="class DemoScene(Scene):\n    def construct(self):\n        self.wait(AUTO)\n",
+        script_content="from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate(\"xin chào\")\n",
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, duration_seconds=2.0)],
     )

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
+import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
 import { Card } from "../components/ui";
@@ -171,6 +172,7 @@ export function VideoListPage() {
                     <div className={styles.projectId}>{project.project_id}</div>
                     <div className={styles.meta}>
                       <StatusBadge status={project.status} />
+                      <RenderEngineBadge renderEngine={project.render_engine} />
                       {project.error_message && (
                         <span className={styles.errorText}>{project.error_message}</span>
                       )}

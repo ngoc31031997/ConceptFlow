@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stripMarkdownCodeFence, validateScript } from "../../src/utils/scriptValidation";
+import { stripMarkdownCodeFence, validateScript, validateRemotionScript } from "../../src/utils/scriptValidation";
 
 const VALID =
   'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("một hai ba bốn năm")\n        self.narrate("sáu bảy tám chín mười")';
@@ -96,5 +96,88 @@ describe("stripMarkdownCodeFence", () => {
   it("gỡ khối fence dù AI thêm cả câu mở đầu lẫn lời chào cuối", () => {
     const wrapped = "Chắc chắn rồi!\n```python\n" + VALID + "\n```\nChúc bạn quay video vui vẻ.";
     expect(stripMarkdownCodeFence(wrapped)).toBe(VALID);
+  });
+});
+
+const VALID_REMOTION = [
+  "import {registerRoot, Composition} from 'remotion';",
+  "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';",
+  "import {TitleText} from './conceptflow-mini/primitives';",
+  "",
+  'export const narrations: string[] = ["một hai", "ba bốn"];',
+  "",
+  "function CreatorComposition({segments = []}) {",
+  "  return <Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>;",
+  "}",
+  "",
+  "registerRoot(() => (",
+  '  <Composition id="creator" component={CreatorComposition} width={1920} height={1080} fps={30} durationInFrames={150} calculateMetadata={calculateMetadataFromSegments} />',
+  "));",
+].join("\n");
+
+describe("validateRemotionScript", () => {
+  it("chấp nhận code Remotion đúng chuẩn và đếm đúng số câu trong narrations", () => {
+    const result = validateRemotionScript(VALID_REMOTION);
+    expect(result.isValid).toBe(true);
+    expect(result.narrationCount).toBe(2);
+  });
+
+  it("báo thiếu export const narrations", () => {
+    const result = validateRemotionScript(VALID_REMOTION.replace("export const narrations", "const narrations"));
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("narrations");
+  });
+
+  it("báo narrations rỗng", () => {
+    const result = validateRemotionScript(
+      VALID_REMOTION.replace('["một hai", "ba bốn"]', "[]"),
+    );
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("rỗng");
+  });
+
+  it("báo thiếu id=\"creator\" trên Composition", () => {
+    const result = validateRemotionScript(VALID_REMOTION.replace('id="creator"', 'id="other"'));
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("creator");
+  });
+
+  it("báo thiếu calculateMetadata", () => {
+    const result = validateRemotionScript(
+      VALID_REMOTION.replace("calculateMetadata={calculateMetadataFromSegments}", ""),
+    );
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("calculateMetadata");
+  });
+
+  it("báo thiếu <Segments>", () => {
+    const result = validateRemotionScript(
+      VALID_REMOTION.replace(
+        "<Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>",
+        "<TitleText>{narrations[0]}</TitleText>",
+      ),
+    );
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("Segments");
+  });
+
+  it("báo dính dòng markdown ``` ở đầu", () => {
+    const result = validateRemotionScript("```tsx\n" + VALID_REMOTION + "\n```");
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("markdown");
+  });
+
+  it("báo ngoặc không cân khi code bị cắt cụt", () => {
+    // Drop just the closing "));" — everything else (including the required
+    // Composition id="creator" tag) stays intact, so this is a pure
+    // unbalanced-parens case, not a missing-structure one.
+    const truncated = VALID_REMOTION.slice(0, VALID_REMOTION.lastIndexOf("\n));"));
+    const result = validateRemotionScript(truncated);
+    expect(result.isValid).toBe(false);
+    expect(result.message).toContain("cắt cụt");
+  });
+
+  it("coi script rỗng là hợp lệ (chưa có gì để báo lỗi)", () => {
+    expect(validateRemotionScript("").isValid).toBe(true);
   });
 });

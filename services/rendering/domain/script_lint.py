@@ -32,7 +32,8 @@ import builtins
 import re
 from dataclasses import dataclass
 
-from conceptflow.api import COMPONENT_NAMES, PUBLIC_NAMES, SCENE_METHODS
+from conceptflow.api import COMPONENT_NAMES, PUBLIC_NAMES
+from conceptflow.theme import FontScale
 
 BLOCKING = "blocking"
 WARNING = "warning"
@@ -40,9 +41,9 @@ WARNING = "warning"
 #: Màu viết thẳng bằng mã hex — cách phổ biến nhất để bảng màu trôi khỏi theme.
 HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 
-#: Cỡ chữ hợp lệ là bốn bậc trong `Theme.scale`. Giữ dưới dạng số ở đây thay vì
-#: import Theme để module không phụ thuộc runtime của conceptflow.
-ALLOWED_FONT_SIZES = frozenset({48, 36, 28, 20})
+#: Cỡ chữ hợp lệ là các bậc trong `Theme.scale`. Đọc thẳng từ `FontScale` (module
+#: số thuần, không import manim) để đổi thang cỡ chữ ở theme thì lint đổi theo.
+ALLOWED_FONT_SIZES = frozenset(FontScale().all_sizes())
 
 _BUILTINS = frozenset(dir(builtins))
 
@@ -91,6 +92,13 @@ class _Collector(ast.NodeVisitor):
         #: Tên do chính script định nghĩa hoặc import — không phải API lạ.
         self.defined: set[str] = set()
         self._calls: list[ast.Call] = []
+        #: Tên được đọc (không phải gọi) — `color=BLUE`, `shift(UL)`. Kiểm ở
+        #: `finalize` vì tên có thể được định nghĩa ở dòng sau (hàm, class).
+        self._loads: list[ast.Name] = []
+        #: Star-import từ module khác conceptflow (`from math import *`) đưa vào
+        #: những tên phân tích tĩnh không liệt kê được, nên tắt kiểm tra tên lạ
+        #: thay vì báo lỗi giả hàng loạt.
+        self._unknown_star = False
 
     # --- thu thập tên script tự định nghĩa -----------------------------------
 
@@ -109,6 +117,9 @@ class _Collector(ast.NodeVisitor):
         if module == "conceptflow" or module.startswith("conceptflow."):
             if any(alias.name == "*" for alias in node.names):
                 self.defined |= set(PUBLIC_NAMES)
+        elif module != "manim" and not module.startswith("manim."):
+            if any(alias.name == "*" for alias in node.names):
+                self._unknown_star = True
         elif module == "manim" or module.startswith("manim."):
             if any(alias.name == "*" for alias in node.names):
                 # Star-import từ manim che khuất chính các tên của conceptflow,
@@ -143,10 +154,21 @@ class _Collector(ast.NodeVisitor):
         self.defined.add(node.name)
         self.generic_visit(node)
 
-    def visit_Assign(self, node: ast.Assign) -> None:
-        for target in node.targets:
-            for name in _names_in_target(target):
-                self.defined.add(name)
+    def visit_Name(self, node: ast.Name) -> None:
+        # Mọi vị trí gán tên đều đi qua đây: `=`, `for`, `with ... as`,
+        # comprehension, `:=`, `+=`. Không cần một visitor cho từng cú pháp.
+        if isinstance(node.ctx, (ast.Store, ast.Del)):
+            self.defined.add(node.id)
+        else:
+            self._loads.append(node)
+
+    def visit_arg(self, node: ast.arg) -> None:
+        self.defined.add(node.arg)
+        self.generic_visit(node)
+
+    def visit_ExceptHandler(self, node: ast.ExceptHandler) -> None:
+        if node.name:
+            self.defined.add(node.name)
         self.generic_visit(node)
 
     # --- kiểm tra lời gọi -----------------------------------------------------
@@ -204,14 +226,17 @@ class _Collector(ast.NodeVisitor):
     # --- chạy sau khi đã duyệt hết cây ----------------------------------------
 
     def finalize(self) -> None:
+        if self._unknown_star:
+            return
+        called = {id(node.func) for node in self._calls}
         for node in self._calls:
-            name = _called_name(node.func)
-            if name is None:
-                continue
             if _is_attribute_call(node.func):
-                self._check_scene_method(node, name)
+                # Method trên biến (`group.arrange(...)`, `self.body(...)`) không
+                # kiểm được tĩnh vì không biết kiểu của biến, và script được tự
+                # thêm helper vào class Scene của mình — để runtime lo.
                 continue
-            if name in self.defined or name in PUBLIC_NAMES or name in _BUILTINS:
+            name = _called_name(node.func)
+            if name is None or self._known(name):
                 continue
             self.issues.append(
                 LintIssue(
@@ -224,40 +249,23 @@ class _Collector(ast.NodeVisitor):
                     severity=BLOCKING,
                 )
             )
+        for node in self._loads:
+            if id(node) in called or self._known(node.id):
+                continue
+            self.issues.append(
+                LintIssue(
+                    line=node.lineno,
+                    message=(
+                        f"`{node.id}` chưa được định nghĩa và không thuộc API của "
+                        "conceptflow — chạy tới đây sẽ NameError. Màu lấy từ "
+                        "`self.theme`; hằng số hay class của Manim thì import đích danh."
+                    ),
+                    severity=BLOCKING,
+                )
+            )
 
-    def _check_scene_method(self, node: ast.Call, name: str) -> None:
-        """Chỉ soi `self.<gì đó>()`.
-
-        Method trên biến khác (`group.arrange(...)`, `text.next_to(...)`) không
-        kiểm được bằng phân tích tĩnh vì không biết kiểu của biến — để runtime lo.
-        """
-        func = node.func
-        if not isinstance(func, ast.Attribute):
-            return
-        if not (isinstance(func.value, ast.Name) and func.value.id == "self"):
-            return
-        if name in SCENE_METHODS or name in _MANIM_SCENE_METHODS:
-            return
-        # Không báo lỗi: script hoàn toàn có thể tự định nghĩa method helper trên
-        # class Scene của mình, và phân tích tĩnh ở đây không thấy được điều đó.
-
-
-#: Method của `Scene` mà script vẫn cần gọi trực tiếp.
-_MANIM_SCENE_METHODS = frozenset({
-    "play", "wait", "add", "remove", "construct", "bring_to_front", "bring_to_back",
-    "narrate", "beat", "chapter",  # CR-018/CR-019 — thêm ở bước sau
-})
-
-
-def _names_in_target(target: ast.expr) -> list[str]:
-    if isinstance(target, ast.Name):
-        return [target.id]
-    if isinstance(target, (ast.Tuple, ast.List)):
-        names: list[str] = []
-        for element in target.elts:
-            names.extend(_names_in_target(element))
-        return names
-    return []
+    def _known(self, name: str) -> bool:
+        return name in self.defined or name in PUBLIC_NAMES or name in _BUILTINS
 
 
 def _called_name(func: ast.expr) -> str | None:

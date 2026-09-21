@@ -13,6 +13,10 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  * `GET /v1/admin/prompts` — list every role/language row, for the admin
  * editor screen (PromptSettingsPage).
  * `PUT /v1/admin/prompts/:role` — save an editor's wording change.
+ * `POST /v1/admin/prompts/:role/reset` — restore the wording shipped in the
+ * Orchestrator binary, discarding the editor's copy. Seeding is
+ * insert-if-absent, so this is how a prompt improvement in the source tree
+ * reaches a database that has already bootstrapped.
  *
  * @param {import('../clients/httpClient').HttpClient} orchestratorClient
  */
@@ -21,6 +25,7 @@ function promptsRouter(orchestratorClient) {
   router.get('/v1/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/admin/prompts', proxyHandler(orchestratorClient, 'orchestrator'));
   router.put('/v1/admin/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/admin/prompts/:role/reset', proxyHandler(orchestratorClient, 'orchestrator'));
   return router;
 }
 

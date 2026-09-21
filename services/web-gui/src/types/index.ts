@@ -184,6 +184,8 @@ export interface ProjectSummary {
   video_path?: string;
   error_message?: string;
   updated_at: string;
+  /** "manim" | "remotion" — which engine rendered (or will render) this project's video. */
+  render_engine: string;
 }
 
 

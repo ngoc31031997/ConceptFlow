@@ -36,6 +36,13 @@ export interface ProjectDraft {
   backgroundMusicVolume: number;
   videoOutputMode: VideoOutputMode;
   /**
+   * The topic the Creator typed on the outline tab (1a) — kept in the draft
+   * (not local component state) so switching to another tab and back, or a
+   * reload, does not lose it. Never sent to the server on its own; it only
+   * exists to keep filling the story_architect prompt on that tab.
+   */
+  authoringTopic: string;
+  /**
    * CR-025 step 1 — the Story Architect story outline the Creator pasted
    * back and the server has saved (POST /v1/projects/:id/authoring/story).
    * Kept here so step 2 (Visual Director, currently a stub) can show it as
@@ -96,6 +103,7 @@ export type ProjectDraftAction =
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
+  | { type: "SET_AUTHORING_TOPIC"; payload: string }
   | { type: "SET_AUTHORING_STORY"; payload: string }
   | { type: "SET_AUTHORING_STORYBOARD"; payload: string }
   | { type: "MARK_SUBMITTED" }
@@ -127,6 +135,7 @@ const initialDraft: ProjectDraft = {
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
+  authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",
   hasSubmitted: false,
@@ -218,6 +227,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, videoOutputMode: action.payload };
     case "SET_VIDEO_FORMAT":
       return { ...state, videoFormatId: action.payload };
+    case "SET_AUTHORING_TOPIC":
+      return { ...state, authoringTopic: action.payload };
     case "SET_AUTHORING_STORY":
       return { ...state, authoringStory: action.payload };
     case "SET_AUTHORING_STORYBOARD":

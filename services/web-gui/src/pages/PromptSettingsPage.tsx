@@ -4,6 +4,7 @@ import { Card, Button, FormField, Select, TextArea, CtaRow } from "../components
 import {
   getPromptTemplate,
   updatePromptTemplate,
+  resetPromptTemplate,
   type PromptTemplate,
 } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -17,12 +18,14 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   // feature/remotion-engine — không thuộc chuỗi 4 bước Manim ở trên (Remotion
   // chưa có pipeline nhiều bước), nhưng vẫn đánh số tiếp theo cho nhất quán
   // với các lựa chọn khác trong danh sách.
-  { value: "remotion_engineer", label: "5. Remotion Engineer — viết code Remotion" },
+  { value: "remotion_visual_director", label: "5. Remotion Visual Director — storyboard cho engine Remotion" },
+  { value: "remotion_engineer", label: "6. Remotion Engineer — viết code Remotion" },
 ];
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
 const PREVIEW_SAMPLE: Record<string, string> = {
   topic: "Vì sao bầu trời có màu xanh",
+  channel_identity: "(khối bản sắc kênh — CHANNEL_IDENTITY trong scriptPrompts.ts — sẽ hiện ở đây)",
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",
   previous_output: "(nội dung bước trước — dàn ý/storyboard/code — sẽ hiện ở đây)",
@@ -53,6 +56,7 @@ export function PromptSettingsPage() {
   const [version, setVersion] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
@@ -92,6 +96,33 @@ export function PromptSettingsPage() {
       setStatus("Lưu thất bại, thử lại.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  /**
+   * Khôi phục prompt mặc định đang ship trong binary.
+   *
+   * Hỏi xác nhận vì thao tác này xoá hẳn bản người vận hành đã sửa, và phía
+   * server không giữ lịch sử prompt (khác video_formats — một prompt cũ không
+   * cần tái lập lại được với các bản render trước).
+   */
+  async function handleReset() {
+    const ok = window.confirm(
+      "Khôi phục prompt mặc định? Nội dung bạn đã sửa cho vai trò/ngôn ngữ này sẽ mất và không khôi phục lại được.",
+    );
+    if (!ok) return;
+
+    setResetting(true);
+    setStatus(null);
+    try {
+      const restored = await resetPromptTemplate(role, language);
+      setText(restored.template_text);
+      setVersion(restored.version);
+      setStatus(`Đã khôi phục prompt mặc định — phiên bản ${restored.version}.`);
+    } catch {
+      setStatus("Khôi phục thất bại, thử lại.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -148,7 +179,19 @@ export function PromptSettingsPage() {
               >
                 {showPreview ? "Ẩn xem trước" : "Xem trước"}
               </Button>
-              <Button onClick={handleSave} disabled={saving || loading} data-testid="prompt-save-button">
+              <Button
+                variant="ghost"
+                onClick={handleReset}
+                disabled={resetting || saving || loading}
+                data-testid="prompt-reset-button"
+              >
+                {resetting ? "Đang khôi phục..." : "Khôi phục mặc định"}
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={saving || resetting || loading}
+                data-testid="prompt-save-button"
+              >
                 {saving ? "Đang lưu..." : "Lưu"}
               </Button>
             </CtaRow>

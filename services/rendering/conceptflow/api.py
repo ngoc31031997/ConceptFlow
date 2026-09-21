@@ -23,6 +23,12 @@ COMPONENT_NAMES = frozenset({
     "StepList",
     "ComparisonSplit",
     "Recap",
+    # Quan hệ và dữ liệu: sơ đồ, biểu đồ, đồ thị, bảng, dòng thời gian
+    "FlowDiagram",
+    "BarChart",
+    "FunctionPlot",
+    "DataTable",
+    "Timeline",
 })
 
 #: Theme và hình học khung an toàn.
@@ -46,13 +52,18 @@ PUBLIC_NAMES: frozenset[str] = (
     SCENE_NAMES | COMPONENT_NAMES | THEME_NAMES | GEOMETRY_NAMES | REEXPORTED_MANIM_NAMES
 )
 
-#: Method dựng chữ/bố cục/chuyển cảnh trên ConceptFlowScene. Lint dùng để phân
-#: biệt `self.body(...)` (hợp lệ) với `self.add_something_odd(...)`.
+#: Method công khai của ConceptFlowScene — bề mặt mà prompt sinh script liệt kê.
+#: Lint KHÔNG dùng danh sách này để chặn `self.xxx()` (script được tự thêm
+#: helper vào class của mình); `tests/conceptflow/test_components.py` khoá nó
+#: trùng với method thật của scene để tài liệu không trôi khỏi code.
 SCENE_METHODS = frozenset({
     "title", "heading", "body", "caption", "formula", "code",
     "stack", "row", "fit",
+    "connect", "outline",
     "reveal", "dismiss", "swap", "emphasize", "clear_stage",
+    # Camera
+    "focus", "restore_view", "pace",
     # Beat dựng sẵn (CR-019 FR53)
     "hook", "recap", "call_to_action",
-    "narrate", "beat", "chapter",
+    "narrate", "beat", "chapter", "clip",
 })

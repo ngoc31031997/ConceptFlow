@@ -25,6 +25,30 @@ describe("VisualDirectorStepPage", () => {
     vi.restoreAllMocks();
   });
 
+  // feature/remotion-engine: the storyboard vocabulary is engine specific —
+  // a Remotion project must not be handed the Manim storyboard prompt.
+  it("fetches the Remotion storyboard role when the draft renders with Remotion", async () => {
+    window.localStorage.setItem(
+      "conceptflow.draft.v1",
+      JSON.stringify({ renderEngine: "remotion", voiceLanguage: "vi" }),
+    );
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <VisualDirectorStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_visual_director", "vi");
+    });
+    window.localStorage.clear();
+  });
+
   it("blocks the step until a storyboard is pasted, then saves and advances", async () => {
     render(
       <ThemeProvider>
@@ -75,5 +99,23 @@ describe("VisualDirectorStepPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Không lưu được storyboard, thử lại.")).toBeInTheDocument();
     });
+  });
+
+  it("shows the pipeline tab bar with 1b active and lets the Creator jump to any other tab", () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <VisualDirectorStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(screen.getByTestId("script-tab-storyboard")).toHaveAttribute("aria-selected", "true");
+    // Free navigation: every tab stays clickable regardless of progress.
+    expect(screen.getByTestId("script-tab-outline")).not.toBeDisabled();
+    expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
+    expect(screen.getByTestId("script-tab-review")).not.toBeDisabled();
   });
 });

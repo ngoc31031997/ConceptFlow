@@ -154,7 +154,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT project_id, status, video_path, error_message, updated_at
+		SELECT project_id, status, video_path, error_message, updated_at, render_engine
 		FROM projects ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -164,11 +164,12 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 	summaries := make([]domain.ProjectSummary, 0)
 	for rows.Next() {
 		var s domain.ProjectSummary
-		var status string
-		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt); err != nil {
+		var status, renderEngine string
+		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine); err != nil {
 			return nil, err
 		}
 		s.Status = domain.ProjectStatus(status)
+		s.RenderEngine = domain.RenderEngine(renderEngine)
 		summaries = append(summaries, s)
 	}
 	return summaries, rows.Err()

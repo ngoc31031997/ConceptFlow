@@ -10,7 +10,12 @@ import pytest
 pytest.importorskip("manim", reason="component cần manim thật để đo bounding box")
 
 from conceptflow import (  # noqa: E402
+    BarChart,
     Callout,
+    DataTable,
+    FlowDiagram,
+    FunctionPlot,
+    Timeline,
     CodePanel,
     ComparisonSplit,
     Recap,
@@ -35,6 +40,12 @@ CASES = [
     lambda: StepList(["Khởi tạo biến đếm", "Kiểm tra điều kiện", "Tăng biến đếm"]),
     lambda: ComparisonSplit("while", "Kiểm tra trước", "do-while", "Chạy trước"),
     lambda: Recap(["for gồm ba phần", "Quên tăng biến đếm là lặp vô hạn"]),
+    lambda: FlowDiagram(["Request", "Controller", "Service", "Database"]),
+    lambda: FlowDiagram(["Viết code", "Biên dịch", "Chạy"], direction="down"),
+    lambda: BarChart(["O(1)", "O(log n)", "O(n)", "O(n²)"], [1, 3, 8, 64]),
+    lambda: FunctionPlot(lambda x: x * x, (-3, 3), label="y = x²"),
+    lambda: DataTable(["Kiểu", "Kích thước"], [["int", "4 byte"], ["long", "8 byte"]]),
+    lambda: Timeline([("1991", "Python ra đời"), ("2008", "Python 3"), ("2020", "Hết hỗ trợ Python 2")]),
 ]
 
 
@@ -87,3 +98,56 @@ def test_template_khoi_dau_phai_qua_duoc_lint():
     assert "self.narrate(" in source
     assert "# NARRATION:" not in source
     assert "self.wait(AUTO)" not in source
+
+
+@pytest.mark.parametrize("length", [2, 6, 12])
+def test_flow_diagram_nhieu_buoc_van_lot_khung(length):
+    steps = [f"Bước {i}" for i in range(length)]
+    assert overflow(Box.from_mobject(FlowDiagram(steps))) == ()
+
+
+def test_bar_chart_cot_thap_dung_chung_duong_day():
+    """Cột thấp phải đứng trên cùng đường đáy với cột cao, không lơ lửng."""
+    chart = BarChart(["a", "b", "c"], [1, 10, 4])
+    bottoms = {round(float(bar.get_bottom()[1]), 4) for bar in chart.bars}
+    assert len(bottoms) == 1
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda: BarChart([], []),
+        lambda: BarChart(["a"], [-1]),
+        lambda: DataTable(["a", "b"], [["chỉ một ô"]]),
+        lambda: FunctionPlot(lambda x: x, (2, 1)),
+        lambda: FlowDiagram([]),
+    ],
+)
+def test_dau_vao_sai_bao_loi_ro_rang(build):
+    with pytest.raises(ValueError):
+        build()
+
+
+def test_function_plot_bo_qua_diem_khong_xac_dinh():
+    """1/x không xác định tại 0 — trục y vẫn phải tính được từ các điểm còn lại."""
+    from conceptflow.components.function_plot import _y_bounds
+
+    low, high = _y_bounds(lambda x: 1 / x, -2, 2)
+    assert low < 0 < high
+
+
+def test_scene_methods_khop_voi_method_that_cua_scene():
+    """`api.SCENE_METHODS` là thứ prompt liệt kê cho LLM; lệch với scene thật thì
+    LLM hoặc gọi method không tồn tại, hoặc không biết method mới có."""
+    from conceptflow import ConceptFlowScene
+    from conceptflow.api import SCENE_METHODS
+
+    own = {
+        name
+        for name, value in vars(ConceptFlowScene).items()
+        if callable(value) and not name.startswith("_")
+    }
+    # `play` là override của Manim; `stage_mobjects`, `is_zoomed`,
+    # `added_during_zoom` là helper cho QC/narration, không phải thứ script cần gọi.
+    own -= {"play", "stage_mobjects", "is_zoomed", "added_during_zoom"}
+    assert own == set(SCENE_METHODS)

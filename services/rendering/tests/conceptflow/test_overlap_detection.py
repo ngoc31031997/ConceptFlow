@@ -114,3 +114,46 @@ def test_overlap_ratio_khong_giao_nhau_bang_khong():
     left = (-3.0, -1.0, 1.0, -1.0)
     right = (1.0, 3.0, 1.0, -1.0)
     assert _overlap_ratio(left, right) == 0.0
+
+
+def test_focus_va_restore_view_khong_bi_tinh_la_chong_lan(dry):
+    """`focus()` khiến Manim thêm camera frame vào `self.mobjects`; frame phủ
+    cả khung nên nếu không lọc nó sẽ bị báo chồng lấn với mọi vật."""
+
+    class Focused(ConceptFlowScene):
+        def construct(self):
+            box = Rectangle(width=2, height=1)
+            self.reveal(box)
+            frame = self.camera.frame
+            home_width = frame.width
+            self.focus(box)
+            assert frame.width < home_width
+            self.restore_view()
+            assert frame.width == home_width
+            self.clear_stage()
+            assert self.stage_mobjects() == []
+
+    assert _overlaps(dry(Focused)) == []
+
+
+def test_layout_danh_dau_vat_xuat_hien_trong_luc_zoom_va_ghi_khung_camera(dry):
+    """QC tràn khung (video-assembly) cần hai thứ này để soi đúng khung camera."""
+
+    class Zoomed(ConceptFlowScene):
+        def construct(self):
+            box = Rectangle(width=2, height=1)
+            self.reveal(box)
+            full = narration._describe_frame(self)
+            self.focus(box)
+            label = Text("x").next_to(box, DOWN)
+            self.reveal(label)
+            assert not self.added_during_zoom(box)
+            assert self.added_during_zoom(label)
+            zoomed = narration._describe_frame(self)
+            assert zoomed[1] - zoomed[0] < full[1] - full[0]
+            flags = {e["cls"]: e["added_during_zoom"] for e in narration._describe_layout(self)}
+            assert flags == {"Rectangle": False, "Text": True}
+            self.restore_view()
+            assert not self.added_during_zoom(label)
+
+    dry(Zoomed)

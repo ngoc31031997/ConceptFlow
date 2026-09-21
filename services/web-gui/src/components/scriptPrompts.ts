@@ -60,9 +60,125 @@ Quy tắc cứng:
 `;
 }
 
+/**
+ * Beat sheet dành riêng cho Story Architect (bước 1/4).
+ *
+ * Khác buildBeatSheetSection ở một điểm quan trọng: KHÔNG có cú pháp code.
+ * Bản kia sinh ra cho prompt một-lượt (buildGenerationSystemPrompt) nên nó
+ * dạy model gọi `self.beat("...")` và cảnh báo "script không render được" —
+ * chèn nguyên văn khối đó vào một prompt vừa nói "OUTPUT KHÔNG PHẢI CODE" là
+ * tự mâu thuẫn, và đó chính là lý do Story Architect thỉnh thoảng nhả ra code
+ * Manim thay vì dàn ý. Ở bước 1 model chỉ cần biết: có những beat nào, đúng
+ * id nào, theo thứ tự nào, mỗi beat bao nhiêu từ.
+ *
+ * Ngân sách vẫn là **từ**, không phải giây, vì lý do như bản gốc: model đếm
+ * được từ, không đếm được giây (CR-019 FR54.1).
+ */
+export function buildStoryBeatSheetSection(
+  format: VideoFormat,
+  language: ContentLanguage,
+  wordsPerMinute?: number,
+): string {
+  const wpm = wordsPerMinute ?? WORDS_PER_MINUTE[language] ?? WORDS_PER_MINUTE.en;
+  const words = (seconds: number) => Math.round((seconds * wpm) / 60);
+
+  const rows = format.beats
+    .map((beat) => {
+      const repeat = beat.max_repeat > 1 ? ` (lặp tối đa ${beat.max_repeat} lần)` : "";
+      const required = beat.required ? "BẮT BUỘC" : "tuỳ chọn";
+      return `   - id \`${beat.id}\` — ${required}${repeat}: khoảng ${words(
+        beat.min_seconds,
+      )}–${words(beat.max_seconds)} từ lời thoại`;
+    })
+    .join("\n");
+
+  const total = format.beats
+    .filter((b) => b.required)
+    .reduce((sum, b) => sum + words(b.min_seconds), 0);
+
+  return `## CẤU TRÚC BẮT BUỘC — format "${format.name}"
+
+Dàn ý phải gồm ĐÚNG các beat dưới đây, theo ĐÚNG thứ tự này, và mỗi beat phải
+được đặt tên bằng ĐÚNG id trong danh sách (đừng tự đặt tên beat mới):
+
+${rows}
+
+Quy tắc cứng:
+   - Thiếu một beat BẮT BUỘC thì dàn ý bị trả lại — các bước sau không dựng được.
+   - \`concrete\` phải đứng TRƯỚC \`pattern\`: cho người xem thấy một ví dụ chạy
+     thật rồi mới rút ra quy luật. Đây là bản sắc của kênh, không phải sở thích
+     trình bày.
+   - Ngân sách từ là để canh nhịp — lệch trong khoảng ±15% thì không sao; thứ tự
+     và các beat bắt buộc thì không được lệch.
+   - Cuối mỗi beat, ghi số từ thực tế của lời thoại nháp bạn vừa viết, để tự
+     kiểm. Tổng các beat bắt buộc rơi vào khoảng ${total} từ trở lên.
+`;
+}
+
+/**
+ * Bản sắc kênh — khối text mô tả kênh NÀY là kênh gì, thay cho cách cũ là nói
+ * "làm video kiểu 3Blue1Brown".
+ *
+ * Định nghĩa một kênh bằng tên kênh khác có ba vấn đề: nó không nói thêm điều
+ * gì mà các quy tắc bên dưới chưa nói rõ hơn; model rút gọn cái tên đó thành
+ * cliché bề mặt (nền xanh đậm, MathTex, giọng trầm ngâm) chứ không lấy được
+ * phương pháp; và trần chất lượng của kênh bị đóng ở mức "bản sao mờ".
+ *
+ * Đây là giá trị mặc định. Chỉnh nó ở đây khi bản sắc kênh thay đổi — prompt
+ * trong DB tham chiếu qua {{channel_identity}} nên không cần sửa prompt.
+ */
+export const CHANNEL_IDENTITY: Record<"vi" | "en", string> = {
+  vi: `BẢN SẮC KÊNH — mọi video phải mang đủ 5 đặc điểm này:
+
+1. BẮT ĐẦU TỪ MỘT THỨ CÓ THẬT. Mở đầu bằng một ví dụ cụ thể đang chạy — một
+   đoạn code thật, một con số thật, một tình huống người xem đã gặp. Không mở
+   bằng định nghĩa, không mở bằng lịch sử, không mở bằng "khái niệm X là...".
+2. ĐI TỪ CÁI SAI PHỔ BIẾN. Nêu ra cách hiểu mà đa số người học mắc phải, rồi
+   cho thấy chính xác nó gãy ở đâu. Cảm giác "hoá ra mình hiểu sai" mạnh hơn
+   cảm giác "à mình vừa học thêm".
+3. MỘT HÌNH ẢNH, CẢ VIDEO. Chọn đúng MỘT ẩn dụ trực quan và biến hoá nó suốt
+   video. Không đổi ẩn dụ giữa chừng — đổi ẩn dụ là đổi luôn trực giác người
+   xem vừa xây được.
+4. NÓI RÕ CHỖ ẨN DỤ GÃY. Trước khi kết, chỉ ra ẩn dụ chủ đạo ngừng đúng ở đâu.
+   Kênh này không bán sự đơn giản giả; người xem phải biết mình đang cầm một
+   mô hình gần đúng.
+5. GIỌNG CÙNG NGHĨ, KHÔNG PHẢI GIỌNG GIẢNG. Viết như đang nghĩ ra cùng người
+   xem ("thử xem điều gì xảy ra nếu..."), không phải như đang đọc lại kết luận
+   đã biết sẵn.`,
+  en: `CHANNEL IDENTITY — every video must carry all 5 of these:
+
+1. START FROM SOMETHING REAL. Open on a concrete running example — actual code,
+   an actual number, a situation the viewer has hit. Never open with a
+   definition, a history lesson, or "X is a concept that...".
+2. GO THROUGH THE COMMON MISTAKE. Name the understanding most learners actually
+   hold, then show exactly where it breaks. "I had this wrong" lands harder
+   than "I learned something new".
+3. ONE IMAGE, WHOLE VIDEO. Pick exactly ONE visual metaphor and transform it
+   throughout. Never swap metaphors midway — swapping resets the intuition the
+   viewer just built.
+4. SAY WHERE THE METAPHOR BREAKS. Before the close, state where the central
+   metaphor stops being true. This channel does not sell fake simplicity; the
+   viewer should know they are holding an approximation.
+5. THINKING-ALONGSIDE VOICE, NOT LECTURING VOICE. Write as if working it out
+   with the viewer ("let's see what happens if..."), not as if reciting a
+   conclusion already known.`,
+};
+
 export const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
   vi: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.",
   en: "Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
+};
+
+/**
+ * feature/remotion-engine — Remotion has no `self.narrate(...)` call; its
+ * narration lives in the `narrations` array instead (see
+ * buildRemotionAdjustPromptTemplate / the remotion_engineer DB prompt).
+ * Reusing NARRATION_LANGUAGE_RULE as-is for Remotion would tell the AI to
+ * write "self.narrate(...)" in TIẾNG VIỆT, a call that doesn't exist there.
+ */
+export const REMOTION_NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
+  vi: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.",
+  en: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (TitleText, BodyText, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
 };
 
 const NARRATION_PLACEHOLDER: Record<"vi" | "en", string> = {
@@ -78,7 +194,9 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
    class kế thừa \`ConceptFlowScene\` thay vì \`Scene\`. Thay các mobject thô bằng
    component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có
    khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so
-   sánh hai cột), Recap (tóm tắt). Bỏ mọi khai báo màu hex, font_size và
+   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ
+   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);
+   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và
    background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import
    đích danh từ manim (ví dụ \`from manim import Arrow\`), KHÔNG dùng
    \`from manim import *\`.
@@ -190,6 +308,12 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 - \`StepList([...])\` — danh sách bước, mỗi bước có số trong vòng tròn.
 - \`ComparisonSplit(tiêu_đề_trái, nội_dung_trái, tiêu_đề_phải, nội_dung_phải)\` — so sánh hai cột.
 - \`Recap([...])\` — màn tóm tắt cuối video.
+- \`FlowDiagram([bước, ...], direction="right"|"down")\` — sơ đồ luồng: các khối nối nhau bằng mũi tên (pipeline, vòng đời, luồng dữ liệu). \`.nodes[i]\` là từng khối.
+- \`BarChart([nhãn, ...], [giá_trị, ...], unit="")\` — biểu đồ cột so sánh độ lớn (giá trị không âm). \`.bars[i]\` là từng cột.
+- \`FunctionPlot(lambda x: ..., (x_min, x_max), label=None)\` — trục toạ độ cộng đồ thị hàm số. \`.axes\`, \`.graph\` để nhấn/đặt nhãn.
+- \`DataTable([tiêu_đề_cột, ...], [[ô, ...], ...])\` — bảng dữ liệu, một đường kẻ dưới tiêu đề. \`.rows[i]\` là từng hàng.
+- \`Timeline([(mốc, mô_tả), ...])\` — dòng thời gian ngang. \`.marks[i]\` là từng mốc.
+- \`self.connect(a, b, label=None)\` — mũi tên theo theme nối hai vật; \`self.outline(vật, tone="accent")\` — khung khoanh quanh một vật.
 
 Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
 
@@ -255,6 +379,54 @@ export function buildAdjustPromptFor(language: "vi" | "en", script: string): str
   return trimmed ? prompt.replace(SCRIPT_PLACEHOLDER, trimmed) : prompt;
 }
 
+const REMOTION_SCRIPT_PLACEHOLDER = "<dán code Remotion của bạn vào đây>";
+
+/**
+ * feature/remotion-engine — Remotion's equivalent of buildAiPromptTemplate:
+ * the Creator already has SOME Remotion code (from an earlier draft, a
+ * tutorial, etc.) that isn't in the shape this system's render pipeline
+ * expects. Same required-structure rules as the engineer-step prompt
+ * (narrations export, Composition id="creator", Segments wiring), just
+ * framed as "fix my existing code" instead of "write this from scratch".
+ */
+export const buildRemotionAdjustPromptTemplate = (language: "vi" | "en") => `Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.
+Hãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,
+theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:
+
+1. Phải có \`export const narrations: string[]\` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.
+
+2. Phải có \`<Composition id="creator" ...>\` — \`id\` PHẢI đúng là chuỗi \`"creator"\` (không đổi tên khác), và PHẢI có \`calculateMetadata={calculateMetadataFromSegments}\` (import từ \`./conceptflow-mini/segments\`) — thiếu cái này thời lượng video sẽ sai.
+
+3. Component chính phải nhận prop \`segments\` (mảng hệ thống tự truyền vào lúc render) và dùng \`<Segments segments={segments}>{(index) => ...}</Segments>\` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ \`index\` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong \`narrations\`, theo đúng thứ tự.
+
+4. Import bắt buộc ở đầu file: \`import {registerRoot, Composition} from 'remotion';\`
+
+5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ \`<TitleText>...</TitleText>\`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong \`narrations\` hay trong thuộc tính \`style={{...}}\`: KHÔNG được viết trần các ký tự \`<\`, \`>\`, \`{\`, \`}\` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự \`>\` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ "42 > 29"), diễn đạt lại bằng chữ ("42 lớn hơn 29") hoặc bọc riêng ký tự đó: \`{'>'}\` (ví dụ: \`42 {'>'} 29\`).
+
+6. KHÔNG xếp chồng hai khối full-khung-hình (hai \`<AbsoluteFill>\`, hoặc một hình minh hoạ tự vẽ đặt \`position: 'absolute'\` phủ cả khung) làm ANH EM CÙNG CẤP trong một \`index\` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Nếu một \`index\` cần VỪA hình minh hoạ VỪA lời thoại, gói cả hai vào CHUNG một \`<AbsoluteFill style={{flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>\` — hình ở trên (trong một \`<div>\` cỡ cố định, KHÔNG \`position: 'absolute'\` phủ hết khung), đoạn text ở dưới trong \`<div>\` thường (không dùng lại \`<BodyText>\` — nó tự phủ kín khung hình).
+
+7. NGÔN NGỮ: ${REMOTION_NARRATION_LANGUAGE_RULE[language]}
+
+8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:
+   - Có đúng MỘT dòng \`export const narrations: string[]\`, đủ và đúng thứ tự mọi câu lời thoại?
+   - \`<Composition id="creator" ...>\` có đúng \`id="creator"\` và có \`calculateMetadata={calculateMetadataFromSegments}\` không?
+   - Component chính có dùng \`<Segments>\` đúng cách, số phần tử render ra khớp đúng số câu trong \`narrations\` không (không thiếu, không thừa)?
+   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong \`narrations\` hay \`style={{...}}\`): có ký tự \`<\`, \`>\`, \`{\`, \`}\` nào bị viết trần không?
+   - Có \`index\` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.
+   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?
+
+9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.
+
+Code gốc:
+${REMOTION_SCRIPT_PLACEHOLDER}`;
+
+/** The Remotion "fix my existing code" prompt with the Creator's script already in it. */
+export function buildRemotionAdjustPromptFor(language: "vi" | "en", script: string): string {
+  const prompt = buildRemotionAdjustPromptTemplate(language);
+  const trimmed = script.trim();
+  return trimmed ? prompt.replace(REMOTION_SCRIPT_PLACEHOLDER, trimmed) : prompt;
+}
+
 /**
  * CR-026 FR70 — a short-form (Shorts/TikTok) script is NOT a trimmed-down
  * long-form video: it must stand on its own, hook in the first 2 seconds,
@@ -316,7 +488,8 @@ CHỦ ĐỀ VIDEO: ${sourceTopic?.trim() ? sourceTopic.trim() : "[DÁN CHỦ Đ�
 
 ## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)
 
-Component: \`TitleCard\`, \`Callout\`, \`CodePanel\`, \`StepList\`, \`ComparisonSplit\`, \`Recap\`.
+Component: \`TitleCard\`, \`Callout\`, \`CodePanel\`, \`StepList\`, \`ComparisonSplit\`, \`Recap\`,
+\`FlowDiagram\`, \`BarChart\`, \`FunctionPlot\`, \`DataTable\`, \`Timeline\`.
 Method: \`self.narrate(...)\`, \`self.hook(...)\`, \`self.call_to_action(...)\`,
 \`self.title/heading/body/caption/formula/code(...)\`, \`self.stack/row/fit(...)\`,
 \`self.reveal/dismiss/swap/emphasize/clear_stage(...)\`. KHÔNG đặt màu/font_size

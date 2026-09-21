@@ -4,17 +4,15 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringStoryboard } from "../api/client";
+import { Card, Button, TextArea } from "../components/ui";
+import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import styles from "./WizardSteps.module.css";
 
 /**
- * CR-025 step 2 (Visual Director) — mirrors step 1 (ScriptStepPage +
- * ScriptAssistant)'s round-trip-through-an-external-AI shape: fetch the
- * current template, fill it with the previous step's saved output, let the
- * Creator copy it out and paste the AI's storyboard back, then save it
- * server-side and advance.
- *
- * Steps 3-4 (Manim Engineer code generation, Script Reviewer verdict) stay a
- * documented TODO — this only makes step 2 itself real.
+ * Bước 1b (Visual Director) — second tab of the "Bước 1 — Script"
+ * sub-wizard (see ScriptPipelineTabs): fetch the current template, fill it
+ * with the previous tab's saved output, let the Creator copy it out and
+ * paste the AI's storyboard back, then save it server-side and advance.
  */
 export function VisualDirectorStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -47,9 +45,17 @@ export function VisualDirectorStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
+  // feature/remotion-engine: the storyboard is the one pre-code step that is
+  // NOT engine agnostic — the Manim wording hands the engineer a vocabulary
+  // (TitleCard/FlowDiagram/BarChart, camera zoom, cross-beat morphs) that
+  // conceptflow-mini does not have, so a Remotion project gets its own
+  // storyboard role. Tab 1a (story_architect) stays shared: it decides the
+  // story, not the pixels.
+  const directorRole = draft.renderEngine === "remotion" ? "remotion_visual_director" : "visual_director";
+
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate("visual_director", draft.voiceLanguage)
+    getPromptTemplate(directorRole, draft.voiceLanguage)
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text.split("{{previous_output}}").join(
@@ -58,12 +64,12 @@ export function VisualDirectorStepPage() {
         setPrompt(filled);
       })
       .catch(() => {
-        if (!cancelled) setPrompt("Không tải được template visual_director.");
+        if (!cancelled) setPrompt(`Không tải được template ${directorRole}.`);
       });
     return () => {
       cancelled = true;
     };
-  }, [draft.voiceLanguage, draft.authoringStory]);
+  }, [draft.voiceLanguage, draft.authoringStory, directorRole]);
 
   async function handleCopy() {
     try {
@@ -76,13 +82,14 @@ export function VisualDirectorStepPage() {
   }
 
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
+  const engineerLabel = draft.renderEngine === "remotion" ? "Remotion Engineer" : "Manim Engineer";
 
   async function handleContinue() {
     setSaving(true);
     setSaveError(null);
     try {
       await saveAuthoringStoryboard(draft.projectId, draft.authoringStoryboard);
-      navigate("/create/manim-engineer");
+      navigate("/create/script/code");
     } catch {
       setSaveError("Không lưu được storyboard, thử lại.");
     } finally {
@@ -94,55 +101,58 @@ export function VisualDirectorStepPage() {
     ? saveError
     : storyboardIsEmpty
       ? "Dán storyboard AI trả về để tiếp tục"
-      : "Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code Manim";
+      : `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`;
 
   return (
     <div data-testid="visual-director-step-page">
-      <AppShell
-        title="Bước 2 — Visual Director"
-        subtitle="Dựng storyboard hình ảnh từ dàn ý câu chuyện đã lưu ở bước 1."
-        wide
-      >
+      <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`} wide>
+        <ScriptPipelineTabs
+          active="storyboard"
+          outlineDone={draft.authoringStory.trim().length > 0}
+          storyboardDone={!storyboardIsEmpty}
+          codeDone={draft.scriptContent.trim().length > 0}
+        />
+
         <div className={styles.scriptLayout}>
-          <div>
-            <p>
-              1. Copy prompt bên dưới và dán vào ChatGPT, Claude hoặc Gemini. 2. Dán storyboard AI trả về vào
-              ô phía dưới. 3. Bấm Tiếp tục để lưu và chuyển sang bước 3 (Manim Engineer).
-            </p>
-            <div>
-              <button type="button" onClick={handleCopy} data-testid="visual-director-copy">
-                {copied ? "Đã copy!" : "Copy prompt"}
-              </button>
-            </div>
-            <textarea
+          <Card
+            title="1. Copy prompt"
+            hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+          >
+            <TextArea
               readOnly
               value={prompt}
-              rows={20}
-              style={{ width: "100%", fontFamily: "monospace" }}
+              rows={18}
+              className={styles.promptTextarea}
               data-testid="visual-director-prompt"
             />
+            <Button onClick={handleCopy} className={styles.copyButton} data-testid="visual-director-copy">
+              {copied ? "Đã copy!" : "Copy prompt"}
+            </Button>
+          </Card>
 
-            <label htmlFor="storyboard-input" style={{ display: "block", marginTop: "1rem" }}>
-              Dán storyboard AI trả về vào đây
-            </label>
-            <textarea
+          <Card
+            title="2. Dán kết quả"
+            hint={`Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`}
+          >
+            <TextArea
               id="storyboard-input"
               value={draft.authoringStoryboard}
               onChange={(event) =>
                 dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: event.target.value })
               }
-              rows={12}
-              style={{ width: "100%" }}
+              rows={18}
               placeholder={"CẢNH 1 — ...\nCẢNH 2 — ..."}
               data-testid="visual-director-storyboard-input"
             />
-          </div>
+          </Card>
         </div>
       </AppShell>
 
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
+        onBack={() => navigate("/create/script/outline")}
+        backLabel="Quay lại Dàn ý"
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={storyboardIsEmpty || saving}

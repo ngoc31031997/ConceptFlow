@@ -173,7 +173,7 @@ Hard rules (the render pipeline rejects anything that breaks these):
    This is mandatory, not optional — it is how the pipeline recognizes this as a Shorts/TikTok clip.
 4. Every line of narration is a call, not a comment: self.narrate("...")
 5. Do not set colors, font sizes, or backgrounds by hand — the design system (ConceptFlowScene) handles all of that.
-6. Available components: TitleCard, Callout, CodePanel, StepList, ComparisonSplit, Recap. Available scene methods: self.narrate(...), self.hook(...), self.recap([...]), self.call_to_action(...), self.title/heading/body/caption/formula/code(...), self.stack/row/fit(...), self.reveal/dismiss/swap/emphasize/clear_stage(...).
+6. Available components: TitleCard, Callout, CodePanel, StepList, ComparisonSplit, Recap, FlowDiagram, BarChart, FunctionPlot, DataTable, Timeline. Available scene methods: self.narrate(...), self.hook(...), self.recap([...]), self.call_to_action(...), self.title/heading/body/caption/formula/code(...), self.stack/row/fit(...), self.connect/outline(...), self.reveal/dismiss/swap/emphasize/clear_stage(...).
 7. All narration text must be written in %s.
 
 Before answering, check: does construct() start with a single with self.clip("short"): wrapping everything else? Is there exactly one Scene class? Is every spoken line a self.narrate(...) call, not a comment?

@@ -144,6 +144,120 @@ export function validateScript(
   return { ...base, isValid: true, message: null };
 }
 
+/**
+ * feature/remotion-engine — Remotion had NO client-side check at all (any
+ * non-empty text was accepted), so every one of the recurring failure modes
+ * we've actually hit in production (missing `export const narrations`,
+ * `<Composition>` missing `id="creator"`/`calculateMetadata`, a pasted
+ * markdown fence, code truncated mid-paste) only ever surfaced minutes later
+ * at real render time inside esbuild, with a stack trace instead of a plain
+ * sentence. This mirrors validateScript's role for Manim: catch what a
+ * regex safely can BEFORE the round trip to render, so a Creator fixes it in
+ * the textarea instead of an error log. It intentionally does NOT try to
+ * catch everything the prompt's self-check asks for (e.g. two overlapping
+ * full-frame elements) — that needs real JSX layout, not text matching, and
+ * a wrong flag there would be worse than not checking it at all.
+ */
+const REMOTION_NARRATIONS_ARRAY_RE = /export\s+const\s+narrations\s*:\s*string\[\]\s*=\s*\[([\s\S]*?)\]/;
+const REMOTION_STRING_LITERAL_RE = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
+const REMOTION_COMPOSITION_ID_RE = /<Composition\b[^>]*\bid\s*=\s*["']creator["']/;
+const REMOTION_CALCULATE_METADATA_RE = /calculateMetadata\s*=\s*\{\s*calculateMetadataFromSegments\s*\}/;
+const REMOTION_SEGMENTS_USAGE_RE = /<Segments\b/;
+const REMOTION_IMPORT_RE = /import\s*\{[^}]*\bregisterRoot\b[^}]*\}\s*from\s*['"]remotion['"]/;
+
+export interface RemotionScriptValidation {
+  narrationCount: number;
+  isValid: boolean;
+  message: string | null;
+}
+
+function countChar(text: string, char: string): number {
+  let count = 0;
+  for (const c of text) if (c === char) count += 1;
+  return count;
+}
+
+function extractRemotionNarrationCount(script: string): number {
+  const arrayMatch = REMOTION_NARRATIONS_ARRAY_RE.exec(script);
+  if (!arrayMatch) return 0;
+  const literals = arrayMatch[1].match(REMOTION_STRING_LITERAL_RE);
+  return literals ? literals.length : 0;
+}
+
+export function validateRemotionScript(script: string): RemotionScriptValidation {
+  const narrationCount = extractRemotionNarrationCount(script);
+  const base = { narrationCount };
+
+  if (script.trim().length === 0) {
+    return { ...base, isValid: true, message: null };
+  }
+
+  if (LEADING_FENCE_RE.test(script.trim())) {
+    return {
+      ...base,
+      isValid: false,
+      message:
+        "Code còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có).",
+    };
+  }
+
+  if (!REMOTION_NARRATIONS_ARRAY_RE.test(script)) {
+    return {
+      ...base,
+      isValid: false,
+      message: 'Thiếu `export const narrations: string[] = [...]` — hệ thống lấy lời thoại TTS từ đây, không đọc từ đâu khác.',
+    };
+  }
+
+  if (narrationCount === 0) {
+    return { ...base, isValid: false, message: "`narrations` đang rỗng — cần ít nhất một câu lời thoại." };
+  }
+
+  if (!REMOTION_COMPOSITION_ID_RE.test(script)) {
+    return {
+      ...base,
+      isValid: false,
+      message: 'Thiếu `<Composition id="creator" ...>` hoặc `id` không đúng chuỗi "creator".',
+    };
+  }
+
+  if (!REMOTION_CALCULATE_METADATA_RE.test(script)) {
+    return {
+      ...base,
+      isValid: false,
+      message: "`<Composition>` thiếu `calculateMetadata={calculateMetadataFromSegments}` — thời lượng video sẽ tính sai.",
+    };
+  }
+
+  if (!REMOTION_SEGMENTS_USAGE_RE.test(script)) {
+    return {
+      ...base,
+      isValid: false,
+      message: "Không thấy `<Segments>` — component chính phải dùng nó để hiển thị đúng hình theo từng đoạn lời thoại.",
+    };
+  }
+
+  if (!REMOTION_IMPORT_RE.test(script)) {
+    return {
+      ...base,
+      isValid: false,
+      message: "Thiếu `import {registerRoot, Composition} from 'remotion';` ở đầu file.",
+    };
+  }
+
+  const braceBalance = countChar(script, "{") - countChar(script, "}");
+  const parenBalance = countChar(script, "(") - countChar(script, ")");
+  if (braceBalance !== 0 || parenBalance !== 0) {
+    return {
+      ...base,
+      isValid: false,
+      message: "Dấu ngoặc { } hoặc ( ) không cân — code có thể đã bị cắt cụt lúc dán, thử copy và dán lại toàn bộ.",
+    };
+  }
+
+  return { ...base, isValid: true, message: null };
+}
+
 function extractNarrations(
   script: string,
   language: ContentLanguage,

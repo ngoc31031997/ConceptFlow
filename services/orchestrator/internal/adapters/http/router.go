@@ -61,6 +61,7 @@ type promptTemplatesUseCase interface {
 	Get(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error)
 	List(ctx context.Context) ([]domain.PromptTemplate, error)
 	Update(ctx context.Context, role domain.PromptRole, language, templateText string) (domain.PromptTemplate, error)
+	Reset(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error)
 }
 
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
@@ -233,6 +234,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/prompts/{role}", rt.handleGetPromptTemplate)
 	r.Get("/v1/admin/prompts", rt.handleListPromptTemplates)
 	r.Put("/v1/admin/prompts/{role}", rt.handleUpdatePromptTemplate)
+	r.Post("/v1/admin/prompts/{role}/reset", rt.handleResetPromptTemplate)
 	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
@@ -876,6 +878,32 @@ func (rt *Router) handleUpdatePromptTemplate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, http.StatusOK, updated)
+}
+
+// handleResetPromptTemplate restores the wording shipped in this binary for
+// one role/language, discarding whatever the editor had saved.
+//
+// Needed because seeding is insert-if-absent: without this there is no way to
+// pull a prompt improvement from the source tree into a database that has
+// already bootstrapped, short of copy-pasting it by hand into the editor.
+func (rt *Router) handleResetPromptTemplate(w http.ResponseWriter, r *http.Request) {
+	if rt.promptTemplates == nil {
+		writeError(w, http.StatusNotFound, "prompt templates are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+
+	language := r.URL.Query().Get("language")
+	if language == "" {
+		language = "vi"
+	}
+
+	restored, err := rt.promptTemplates.Reset(r.Context(), domain.PromptRole(role), language)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, restored)
 }
 
 // handleSaveAuthoringStory stores the Story Architect output a Creator

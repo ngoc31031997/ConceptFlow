@@ -11,7 +11,19 @@ hội trôi khỏi chuẩn. Lint (FR46.4) cảnh báo đúng việc đó.
 
 from __future__ import annotations
 
-from manim import DOWN, RIGHT, Code, MathTex, Mobject, Scene, Text, VGroup
+import numpy as np
+from manim import (
+    DOWN,
+    RIGHT,
+    Arrow,
+    Code,
+    MathTex,
+    Mobject,
+    MovingCameraScene,
+    SurroundingRectangle,
+    Text,
+    VGroup,
+)
 
 from . import narration as narration_runtime
 from . import theme as theme_module
@@ -34,11 +46,19 @@ from .transitions import (
 #: là bug thật. Hằng số riêng, dễ chỉnh nếu thực tế cho thấy cần khác.
 OVERLAP_AREA_RATIO_THRESHOLD = 0.25
 
+#: `focus()` zoom sao cho vật chiếm khoảng 1/1.6 bề ngang khung: đủ gần để thấy
+#: chi tiết, vẫn còn chỗ cho nhãn đặt cạnh vật.
+CAMERA_FOCUS_PADDING = 1.6
 
-class ConceptFlowScene(Scene):
+
+class ConceptFlowScene(MovingCameraScene):
     """Base scene mang theme của kênh.
 
     Đặt `theme_name` ở class con để dùng theme khác; bỏ trống thì lấy mặc định.
+
+    Kế thừa `MovingCameraScene` (không phải `Scene`) để camera di chuyển được:
+    script gọi `focus`/`restore_view` chứ không chạm thẳng vào
+    `self.camera.frame`, nên độ zoom và nhịp vẫn nằm trong design system.
     """
 
     theme_name: str | None = None
@@ -110,6 +130,28 @@ class ConceptFlowScene(Scene):
             mobject.scale(factor)
         return mobject
 
+    # --- Nối và khoanh (thay cho Arrow/SurroundingRectangle thô) ---------------
+
+    def connect(self, source: Mobject, target: Mobject, label: str | None = None) -> VGroup:
+        """Mũi tên từ `source` tới `target`, kèm nhãn nhỏ ở giữa nếu có.
+
+        Trả về mobject chứ không tự hiện: script quyết định lúc nào `reveal`.
+        Đây là lý do phổ biến nhất khiến script phải `from manim import Arrow`.
+        """
+        arrow = Arrow(source, target, buff=0.15, color=self.theme.muted, stroke_width=3)
+        group = VGroup(arrow)
+        if label:
+            # Đặt nhãn vuông góc với mũi tên để không đè lên thân nó.
+            dx, dy, _ = arrow.get_unit_vector()
+            tag = self.caption(label).next_to(arrow.get_center(), np.array([-dy, dx, 0.0]), buff=0.15)
+            group.add(tag)
+        return group
+
+    def outline(self, mobject: Mobject, tone: str = "accent") -> Mobject:
+        """Khung bao quanh một đối tượng để chỉ vào nó, màu theo sắc thái."""
+        color = getattr(self.theme, tone if tone in {"accent", "success", "warning", "danger"} else "accent")
+        return SurroundingRectangle(mobject, color=color, buff=0.15, corner_radius=0.12, stroke_width=3)
+
     # --- Lời thoại (CR-018) ---------------------------------------------------
 
     def narrate(self, text: str) -> None:
@@ -156,6 +198,7 @@ class ConceptFlowScene(Scene):
         (cùng lý do khiến thumbnail tự động không burn chữ — CR-006 §Quyết định #3).
         """
         self.beat("hook")
+        self.restore_view()
         card = TitleCard(question, subtitle, theme=self.theme)
         self.reveal(card)
         self.narrate(question)
@@ -164,6 +207,7 @@ class ConceptFlowScene(Scene):
     def recap(self, points: list[str], title: str = "Tóm lại", narration: str | None = None) -> None:
         """Màn tóm tắt: nhắc lại bằng hình, không phải danh sách gạch đầu dòng."""
         self.beat("recap")
+        self.restore_view()
         panel = Recap(points, title=title, theme=self.theme)
         self.reveal(panel)
         self.narrate(narration or ". ".join(points))
@@ -176,6 +220,7 @@ class ConceptFlowScene(Scene):
         để YouTube có chỗ hiện end-screen element (CR-006 FR17.1).
         """
         self.beat("cta")
+        self.restore_view()
         card = TitleCard(message, subtitle, theme=self.theme)
         self.reveal(card)
         self.narrate(message)
@@ -203,14 +248,13 @@ class ConceptFlowScene(Scene):
         những gì `self.add`/`self.play` đã đưa vào khung ở cấp cao nhất (một
         `VGroup` tính là một mobject, không tách con ra so riêng — chồng lấn
         bên trong một component do design system tự canh, không phải lỗi
-        script). Không có phần tử nền/trang trí nào được thêm vào
-        `self.mobjects` trong `__init__` (chỉ đổi `camera.background_color`),
-        nên không cần lọc gì thêm ở đây.
+        script). Chỉ lọc camera frame (xem `stage_mobjects`); ngoài nó không có
+        phần tử nền/trang trí nào được thêm vào `self.mobjects`.
 
         Best-effort tuyệt đối, giống `narration._describe_layout`: một mobject
         lạ không đọc được bbox không được làm hỏng cả lượt dry.
         """
-        mobjects = list(self.mobjects)
+        mobjects = self.stage_mobjects()
         boxes: list[tuple[object, tuple[float, float, float, float]] | None] = []
         for mobject in mobjects:
             try:
@@ -252,9 +296,76 @@ class ConceptFlowScene(Scene):
         self.play(*(emphasize_animation(m, run_time) for m in mobjects))
 
     def clear_stage(self, speed: str = "fast") -> None:
-        """Dọn sạch khung. Gọi giữa hai beat để không tích tụ rác thị giác."""
-        if self.mobjects:
-            self.dismiss(*self.mobjects, speed=speed)
+        """Dọn sạch khung. Gọi giữa hai beat để không tích tụ rác thị giác.
+
+        Trả camera về toàn cảnh trước: beat kế tiếp dựng vật quanh tâm khung
+        mặc định, nên nếu camera còn đang zoom thì chúng sẽ lệch hoặc ra ngoài.
+        """
+        self.restore_view(speed=speed)
+        mobjects = self.stage_mobjects()
+        if mobjects:
+            self.dismiss(*mobjects, speed=speed)
+
+    # --- Camera ---------------------------------------------------------------
+
+    def focus(self, *mobjects: Mobject, speed: str = "normal") -> None:
+        """Zoom camera vào một vật (hoặc cả nhóm vật), chừa một khoảng thở.
+
+        Độ zoom suy ra từ kích thước vật, không phải con số script tự chọn —
+        cùng lý do cỡ chữ và toạ độ tuyệt đối bị cấm.
+        """
+        target = mobjects[0] if len(mobjects) == 1 else VGroup(*mobjects)
+        frame = self.camera.frame
+        self._remember_home_view()
+        if not self.is_zoomed():
+            # Vật có sẵn trước lần zoom này bị camera cắt đi là CHỦ Ý; QC chỉ
+            # soi tràn khung với vật xuất hiện sau đó (xem `added_during_zoom`).
+            self._pre_zoom_ids = {id(m) for m in self.stage_mobjects()}
+        width = max(target.width, target.height * frame.width / frame.height)
+        width = min(width * CAMERA_FOCUS_PADDING, self._home_view[1])
+        self.play(
+            frame.animate.move_to(target.get_center()).set(width=width),
+            run_time=self._run_time(speed),
+        )
+
+    def restore_view(self, speed: str = "normal") -> None:
+        """Đưa camera về toàn cảnh ban đầu. Không làm gì nếu chưa từng zoom."""
+        if getattr(self, "_home_view", None) is None:
+            return
+        center, width = self._home_view
+        frame = self.camera.frame
+        self._pre_zoom_ids = None
+        if frame.width == width and (frame.get_center() == center).all():
+            return
+        self.play(frame.animate.move_to(center).set(width=width), run_time=self._run_time(speed))
+
+    def is_zoomed(self) -> bool:
+        return getattr(self, "_pre_zoom_ids", None) is not None
+
+    def added_during_zoom(self, mobject: Mobject) -> bool:
+        """True nếu đang zoom và vật này xuất hiện SAU lần `focus` đầu tiên."""
+        pre = getattr(self, "_pre_zoom_ids", None)
+        return pre is not None and id(mobject) not in pre
+
+    def stage_mobjects(self) -> list[Mobject]:
+        """Các vật đang hiện, trừ camera frame.
+
+        `self.play(frame.animate...)` khiến Manim thêm frame vào `self.mobjects`;
+        nó không phải hình trên màn hình, nên dọn cảnh, dò chồng lấn và QC
+        đều phải bỏ qua nó.
+        """
+        frame = self.camera.frame
+        return [m for m in self.mobjects if m is not frame]
+
+    def _remember_home_view(self) -> None:
+        if getattr(self, "_home_view", None) is None:
+            frame = self.camera.frame
+            self._home_view = (frame.get_center().copy(), frame.width)
+
+    def pace(self, speed: str = "normal") -> float:
+        """Số giây của một tốc độ theme, cho animation script tự `self.play(...)`
+        (`MoveAlongPath`, `ValueTracker`...) mà không phải tự chọn run_time."""
+        return self._run_time(speed)
 
     def _run_time(self, speed: str) -> float:
         pacing = self.theme.pacing

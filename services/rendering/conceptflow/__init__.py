@@ -12,6 +12,11 @@ video tham vọng nhất thì nó đang làm hại chứ không giúp.
 from manim import DOWN, LEFT, ORIGIN, RIGHT, UP, VGroup
 
 from .components import (
+    BarChart,
+    DataTable,
+    FlowDiagram,
+    FunctionPlot,
+    Timeline,
     Callout,
     CodePanel,
     ComparisonSplit,
@@ -34,6 +39,11 @@ __all__ = [
     "StepList",
     "ComparisonSplit",
     "Recap",
+    "FlowDiagram",
+    "BarChart",
+    "FunctionPlot",
+    "DataTable",
+    "Timeline",
     # Theme
     "Theme",
     "get",
