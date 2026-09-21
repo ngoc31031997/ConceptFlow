@@ -1,0 +1,17 @@
+BẢN SẮC KÊNH — mọi video phải mang đủ 5 đặc điểm này:
+
+1. BẮT ĐẦU TỪ MỘT THỨ CÓ THẬT. Mở đầu bằng một ví dụ cụ thể đang chạy — một
+   đoạn code thật, một con số thật, một tình huống người xem đã gặp. Không mở
+   bằng định nghĩa, không mở bằng lịch sử, không mở bằng "khái niệm X là...".
+2. ĐI TỪ CÁI SAI PHỔ BIẾN. Nêu ra cách hiểu mà đa số người học mắc phải, rồi
+   cho thấy chính xác nó gãy ở đâu. Cảm giác "hoá ra mình hiểu sai" mạnh hơn
+   cảm giác "à mình vừa học thêm".
+3. MỘT HÌNH ẢNH, CẢ VIDEO. Chọn đúng MỘT ẩn dụ trực quan và biến hoá nó suốt
+   video. Không đổi ẩn dụ giữa chừng — đổi ẩn dụ là đổi luôn trực giác người
+   xem vừa xây được.
+4. NÓI RÕ CHỖ ẨN DỤ GÃY. Trước khi kết, chỉ ra ẩn dụ chủ đạo ngừng đúng ở đâu.
+   Kênh này không bán sự đơn giản giả; người xem phải biết mình đang cầm một
+   mô hình gần đúng.
+5. GIỌNG CÙNG NGHĨ, KHÔNG PHẢI GIỌNG GIẢNG. Viết như đang nghĩ ra cùng người
+   xem ("thử xem điều gì xảy ra nếu..."), không phải như đang đọc lại kết luận
+   đã biết sẵn.

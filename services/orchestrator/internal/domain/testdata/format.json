@@ -1,0 +1,49 @@
+{
+  "id": "concept-explainer",
+  "name": "Giải thích khái niệm",
+  "version": 3,
+  "min_seconds": 360,
+  "max_seconds": 480,
+  "beats": [
+    {
+      "id": "hook",
+      "role": "hook",
+      "min_seconds": 10,
+      "max_seconds": 20,
+      "required": true,
+      "max_repeat": 1
+    },
+    {
+      "id": "concrete",
+      "role": "example",
+      "min_seconds": 45,
+      "max_seconds": 90,
+      "required": true,
+      "max_repeat": 1
+    },
+    {
+      "id": "variation",
+      "role": "example",
+      "min_seconds": 30,
+      "max_seconds": 60,
+      "required": false,
+      "max_repeat": 3
+    },
+    {
+      "id": "pattern",
+      "role": "insight",
+      "min_seconds": 60,
+      "max_seconds": 120,
+      "required": true,
+      "max_repeat": 1
+    },
+    {
+      "id": "recap",
+      "role": "recap",
+      "min_seconds": 15,
+      "max_seconds": 30,
+      "required": true,
+      "max_repeat": 1
+    }
+  ]
+}
