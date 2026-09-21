@@ -382,6 +382,13 @@ CREATE TABLE IF NOT EXISTS prompt_overrides (
     updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (role, language)
 );
+
+-- CR-027 FR84.7: which shipped version this wording was written against.
+-- Without a baseline there is no way to notice that the shipped prompt has
+-- moved on underneath an active override — the Creator would keep running
+-- their own copy, unaware it was forked from a version two improvements ago.
+-- Nothing is done automatically; the admin screen just says so.
+ALTER TABLE prompt_overrides ADD COLUMN IF NOT EXISTS based_on_version INTEGER NOT NULL DEFAULT 0;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

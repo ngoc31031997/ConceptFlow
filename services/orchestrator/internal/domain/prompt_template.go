@@ -78,8 +78,13 @@ type PromptOverride struct {
 	// IsActive off keeps the wording but runs the shipped text instead. This
 	// is what replaced the old destructive reset: switching back on restores
 	// the Creator's version unchanged.
-	IsActive  bool   `json:"is_active"`
-	UpdatedAt string `json:"updated_at"`
+	IsActive bool `json:"is_active"`
+	// BasedOnVersion is the shipped version this wording was written
+	// against, so the admin screen can flag an override that has fallen
+	// behind (FR84.7). 0 means "unknown" — a row created by the migration
+	// from a database that predates this column.
+	BasedOnVersion int    `json:"based_on_version"`
+	UpdatedAt      string `json:"updated_at"`
 }
 
 // EffectivePromptTemplate is what the pipeline actually renders: the

@@ -364,6 +364,26 @@ export interface PromptTemplate {
   template_text: string;
   version: number;
   updated_at?: string;
+  /** CR-027 FR84.4 — true khi nội dung trả về là bản tuỳ chỉnh đang bật. */
+  from_override?: boolean;
+}
+
+/**
+ * CR-027 FR84 — bản prompt do Creator tự viết, sống ở bảng riêng
+ * `prompt_overrides`, tách hẳn khỏi bản gốc ship trong binary.
+ *
+ * `is_active` tắt thì giữ nguyên nội dung nhưng chạy bản gốc — đây là bản
+ * thay thế không phá huỷ cho nút "Khôi phục mặc định" cũ, vốn xoá hẳn bản đã
+ * sửa và không lấy lại được.
+ */
+export interface PromptOverride {
+  role: PromptTemplate["role"];
+  language: "vi" | "en";
+  template_text: string;
+  is_active: boolean;
+  /** Version của bản gốc mà bản tuỳ chỉnh này được viết dựa trên (0 = không rõ). */
+  based_on_version: number;
+  updated_at?: string;
 }
 
 /** Đọc wording hiện tại của một vai trò (chạy lúc runtime, không hardcode nữa). */
@@ -390,9 +410,55 @@ export function updatePromptTemplate(
   });
 }
 
+/** CR-027 — mọi bản tuỳ chỉnh của Creator, cho màn admin hai tầng. */
+export async function listPromptOverrides(): Promise<PromptOverride[]> {
+  const result = await apiFetch<{ overrides: PromptOverride[] }>("/v1/admin/prompt-overrides");
+  return result.overrides;
+}
+
+/** Lưu bản tuỳ chỉnh. Sửa nội dung KHÔNG tự bật một bản đang tắt. */
+export function savePromptOverride(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+  templateText: string,
+): Promise<PromptOverride> {
+  return apiFetch<PromptOverride>(`/v1/admin/prompt-overrides/${role}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language, template_text: templateText }),
+  });
+}
+
 /**
- * Khôi phục prompt mặc định đang ship trong binary Orchestrator, bỏ bản người
- * vận hành đã sửa.
+ * Bật/tắt bản tuỳ chỉnh (FR84.5).
+ *
+ * Tắt là quay về bản gốc mà KHÔNG mất nội dung đã viết — bật lại là có
+ * nguyên. Khác hẳn `resetPromptTemplate` bên dưới, vốn xoá vĩnh viễn.
+ */
+export function setPromptOverrideActive(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+  active: boolean,
+): Promise<PromptOverride> {
+  return apiFetch<PromptOverride>(`/v1/admin/prompt-overrides/${role}/active`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ language, active }),
+  });
+}
+
+/** Xoá hẳn bản tuỳ chỉnh, trả quyền cho bản gốc. */
+export async function deletePromptOverride(
+  role: PromptTemplate["role"],
+  language: "vi" | "en",
+): Promise<void> {
+  await apiFetch<undefined>(`/v1/admin/prompt-overrides/${role}?language=${language}`, {
+    method: "DELETE",
+  });
+}
+
+/**
+ * CR-025 legacy — khôi phục prompt mặc định, xoá bản người vận hành đã sửa.
  *
  * Seeding ở Orchestrator là insert-if-absent — nó cố ý KHÔNG đè lên bản sửa
  * tay khi service khởi động lại. Nên khi prompt trong source được cải tiến,

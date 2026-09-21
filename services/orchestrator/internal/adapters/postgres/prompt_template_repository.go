@@ -359,9 +359,9 @@ func (r *PromptTemplateRepository) GetOverride(ctx context.Context, role domain.
 	var o domain.PromptOverride
 	var updatedAt time.Time
 	err := r.pool.QueryRow(ctx, `
-		SELECT role, language, template_text, is_active, updated_at
+		SELECT role, language, template_text, is_active, based_on_version, updated_at
 		FROM prompt_overrides WHERE role = $1 AND language = $2
-	`, string(role), language).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &updatedAt)
+	`, string(role), language).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &o.BasedOnVersion, &updatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.PromptOverride{}, ErrPromptOverrideNotFound
 	}
@@ -375,7 +375,7 @@ func (r *PromptTemplateRepository) GetOverride(ctx context.Context, role domain.
 // ListOverrides returns every saved override, for the admin screen.
 func (r *PromptTemplateRepository) ListOverrides(ctx context.Context) ([]domain.PromptOverride, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT role, language, template_text, is_active, updated_at
+		SELECT role, language, template_text, is_active, based_on_version, updated_at
 		FROM prompt_overrides ORDER BY role, language
 	`)
 	if err != nil {
@@ -387,7 +387,7 @@ func (r *PromptTemplateRepository) ListOverrides(ctx context.Context) ([]domain.
 	for rows.Next() {
 		var o domain.PromptOverride
 		var updatedAt time.Time
-		if err := rows.Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &updatedAt); err != nil {
+		if err := rows.Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &o.BasedOnVersion, &updatedAt); err != nil {
 			return nil, err
 		}
 		o.UpdatedAt = updatedAt.Format(time.RFC3339)
@@ -403,13 +403,16 @@ func (r *PromptTemplateRepository) SaveOverride(ctx context.Context, role domain
 	var o domain.PromptOverride
 	var updatedAt time.Time
 	err := r.pool.QueryRow(ctx, `
-		INSERT INTO prompt_overrides (role, language, template_text, is_active, updated_at)
-		VALUES ($1, $2, $3, true, now())
+		INSERT INTO prompt_overrides (role, language, template_text, is_active, based_on_version, updated_at)
+		VALUES ($1, $2, $3, true,
+		        COALESCE((SELECT version FROM prompt_templates WHERE role = $1 AND language = $2), 0),
+		        now())
 		ON CONFLICT (role, language) DO UPDATE SET
 		    template_text = EXCLUDED.template_text,
+		    based_on_version = EXCLUDED.based_on_version,
 		    updated_at = now()
-		RETURNING role, language, template_text, is_active, updated_at
-	`, string(role), language, templateText).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &updatedAt)
+		RETURNING role, language, template_text, is_active, based_on_version, updated_at
+	`, string(role), language, templateText).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &o.BasedOnVersion, &updatedAt)
 	if err != nil {
 		return domain.PromptOverride{}, err
 	}
@@ -428,8 +431,8 @@ func (r *PromptTemplateRepository) SetOverrideActive(ctx context.Context, role d
 	err := r.pool.QueryRow(ctx, `
 		UPDATE prompt_overrides SET is_active = $3, updated_at = now()
 		WHERE role = $1 AND language = $2
-		RETURNING role, language, template_text, is_active, updated_at
-	`, string(role), language, active).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &updatedAt)
+		RETURNING role, language, template_text, is_active, based_on_version, updated_at
+	`, string(role), language, active).Scan(&o.Role, &o.Language, &o.TemplateText, &o.IsActive, &o.BasedOnVersion, &updatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.PromptOverride{}, ErrPromptOverrideNotFound
 	}
