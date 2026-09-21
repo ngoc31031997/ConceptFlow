@@ -357,6 +357,31 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 -- Every read of this table is "recent first" or "the last N days", so the
 -- index matches the only access pattern there is.
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
+
+-- CR-027 FR84: the Creator's own wording, kept apart from the shipped
+-- wording in prompt_templates.
+--
+-- Until now one row carried both jobs, and that forced SeedPromptTemplates to
+-- be insert-if-absent: overwriting on startup would have wiped an editor's
+-- saved text. Its own docstring records that version-aware seeding was tried
+-- and removed for exactly that reason. The cost of that compromise was a
+-- silent trap — edit the wording in Go, rebuild, restart, and the running
+-- database keeps the old text with nothing to say so.
+--
+-- Splitting the two jobs dissolves the conflict instead of balancing it.
+-- prompt_templates becomes read-only to humans and is overwritten from the
+-- binary on every start; edits live here and seeding never touches them.
+-- Switching is_active off keeps the row but falls back to the shipped
+-- wording, which replaces the old reset endpoint: reset destroyed the edit,
+-- this does not.
+CREATE TABLE IF NOT EXISTS prompt_overrides (
+    role          TEXT NOT NULL,
+    language      TEXT NOT NULL,
+    template_text TEXT NOT NULL,
+    is_active     BOOLEAN NOT NULL DEFAULT false,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (role, language)
+);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

@@ -60,10 +60,25 @@ func main() {
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
 		logger.Warn("could not seed video formats", "error", err)
 	}
-	// CR-025: seed the 4-role authoring-pipeline prompt templates, same
-	// insert-if-absent posture as SeedVideoFormats above — an editor's saved
-	// wording must survive a restart.
+	// CR-025/CR-027: the authoring-pipeline prompts, now in two layers.
+	//
+	// Order is load-bearing. MigrateEditsToOverrides reads the text that
+	// seeding is about to replace, so running it second would find the
+	// shipped wording already in place and silently discard whatever the
+	// Creator had written (FR84.8).
 	promptTemplateRepo := postgres.NewPromptTemplateRepository(pool)
+	if migrated, err := promptTemplateRepo.MigrateEditsToOverrides(ctx); err != nil {
+		logger.Warn("could not migrate edited prompts to overrides", "error", err)
+	} else if len(migrated) > 0 {
+		for _, m := range migrated {
+			logger.Warn("CR-027: moved an edited prompt into prompt_overrides and switched it on",
+				"role", m.Role, "language", m.Language)
+		}
+	}
+	// Unlike SeedVideoFormats above, this now overwrites: after FR84 nobody
+	// can edit prompt_templates, so there is nothing of the Creator's here to
+	// protect, and overwriting ends the trap where a rebuilt binary left the
+	// running database on the old wording without a word (FR84.2).
 	if err := promptTemplateRepo.SeedPromptTemplates(ctx); err != nil {
 		logger.Warn("could not seed prompt templates", "error", err)
 	}
@@ -160,6 +175,7 @@ func main() {
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
 		WithPromptTemplates(promptTemplates).
+		WithPromptOverrides(application.NewPromptOverridesUseCase(promptTemplateRepo)).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
 		WithAuthoringCode(saveAuthoringCode).

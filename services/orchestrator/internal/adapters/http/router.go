@@ -64,6 +64,15 @@ type promptTemplatesUseCase interface {
 	Reset(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error)
 }
 
+// promptOverridesUseCase backs the Creator-owned prompt layer (CR-027 FR84).
+type promptOverridesUseCase interface {
+	Effective(ctx context.Context, role domain.PromptRole, language string) (domain.EffectivePromptTemplate, error)
+	List(ctx context.Context) ([]domain.PromptOverride, error)
+	Save(ctx context.Context, role domain.PromptRole, language, templateText string) (domain.PromptOverride, error)
+	SetActive(ctx context.Context, role domain.PromptRole, language string, active bool) (domain.PromptOverride, error)
+	Delete(ctx context.Context, role domain.PromptRole, language string) error
+}
+
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
@@ -130,6 +139,7 @@ type Router struct {
 	qcReports               qcReportReader
 	suggestShortScript      suggestShortScriptUseCase
 	promptTemplates         promptTemplatesUseCase
+	promptOverrides         promptOverridesUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -141,6 +151,12 @@ type Router struct {
 // GET /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the
 // routes answer 404, the same "unwired means absent" posture as
 // WithQCReports.
+// WithPromptOverrides enables the CR-027 FR84 Creator-owned prompt layer.
+func (rt *Router) WithPromptOverrides(promptOverrides promptOverridesUseCase) *Router {
+	rt.promptOverrides = promptOverrides
+	return rt
+}
+
 func (rt *Router) WithPromptTemplates(promptTemplates promptTemplatesUseCase) *Router {
 	rt.promptTemplates = promptTemplates
 	return rt
@@ -235,6 +251,11 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/admin/prompts", rt.handleListPromptTemplates)
 	r.Put("/v1/admin/prompts/{role}", rt.handleUpdatePromptTemplate)
 	r.Post("/v1/admin/prompts/{role}/reset", rt.handleResetPromptTemplate)
+	// CR-027 FR84 — the Creator-owned layer, beside the read-only shipped one.
+	r.Get("/v1/admin/prompt-overrides", rt.handleListPromptOverrides)
+	r.Put("/v1/admin/prompt-overrides/{role}", rt.handleSavePromptOverride)
+	r.Post("/v1/admin/prompt-overrides/{role}/active", rt.handleSetPromptOverrideActive)
+	r.Delete("/v1/admin/prompt-overrides/{role}", rt.handleDeletePromptOverride)
 	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
@@ -830,6 +851,30 @@ func (rt *Router) handleGetPromptTemplate(w http.ResponseWriter, r *http.Request
 		language = "vi"
 	}
 
+	// CR-027 FR84.4 — read through the two layers, so an override the
+	// Creator switched on actually reaches the wizard. Reading
+	// prompt_templates directly here would leave the admin screen able to
+	// save an override that changes nothing, which is worse than not having
+	// the feature.
+	if rt.promptOverrides != nil {
+		effective, err := rt.promptOverrides.Effective(r.Context(), domain.PromptRole(role), language)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "no template for this role/language")
+			return
+		}
+		// Shape kept identical to the pre-CR-027 response — the wizard reads
+		// template_text and nothing else — with the two-layer facts added
+		// alongside for the admin screen.
+		writeJSON(w, http.StatusOK, map[string]any{
+			"role":          effective.Role,
+			"language":      effective.Language,
+			"template_text": effective.TemplateText,
+			"version":       effective.SeedVersion,
+			"from_override": effective.FromOverride,
+		})
+		return
+	}
+
 	template, err := rt.promptTemplates.Get(r.Context(), domain.PromptRole(role), language)
 	if err != nil {
 		writeError(w, http.StatusNotFound, "no template for this role/language")
@@ -1030,4 +1075,98 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"code":       state.Code,
 		"review":     state.Review,
 	})
+}
+
+// --- CR-027 FR84: the Creator-owned prompt layer --------------------------
+
+// handleListPromptOverrides serves every saved override, for the admin
+// screen to show beside the read-only shipped wording.
+func (rt *Router) handleListPromptOverrides(w http.ResponseWriter, r *http.Request) {
+	if rt.promptOverrides == nil {
+		writeError(w, http.StatusNotFound, "prompt overrides are not enabled")
+		return
+	}
+	overrides, err := rt.promptOverrides.List(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not list prompt overrides")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"overrides": overrides})
+}
+
+// handleSavePromptOverride stores the Creator's own wording for one role.
+func (rt *Router) handleSavePromptOverride(w http.ResponseWriter, r *http.Request) {
+	if rt.promptOverrides == nil {
+		writeError(w, http.StatusNotFound, "prompt overrides are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+
+	var req struct {
+		Language     string `json:"language"`
+		TemplateText string `json:"template_text"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+
+	override, err := rt.promptOverrides.Save(r.Context(), domain.PromptRole(role), req.Language, req.TemplateText)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, override)
+}
+
+// handleSetPromptOverrideActive switches one override on or off.
+//
+// Switching off is the non-destructive replacement for the old reset
+// endpoint: the Creator's wording stays put and switching back on restores
+// it, where reset overwrote it for good (FR84.5).
+func (rt *Router) handleSetPromptOverrideActive(w http.ResponseWriter, r *http.Request) {
+	if rt.promptOverrides == nil {
+		writeError(w, http.StatusNotFound, "prompt overrides are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+
+	var req struct {
+		Language string `json:"language"`
+		Active   *bool  `json:"active"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	// A pointer, not a bool: omitting the field would otherwise read as
+	// "switch it off", which is the opposite of harmless.
+	if req.Active == nil {
+		writeError(w, http.StatusBadRequest, "active is required")
+		return
+	}
+
+	override, err := rt.promptOverrides.SetActive(r.Context(), domain.PromptRole(role), req.Language, *req.Active)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, override)
+}
+
+// handleDeletePromptOverride throws the Creator's wording away, leaving the
+// shipped text in charge.
+func (rt *Router) handleDeletePromptOverride(w http.ResponseWriter, r *http.Request) {
+	if rt.promptOverrides == nil {
+		writeError(w, http.StatusNotFound, "prompt overrides are not enabled")
+		return
+	}
+	role := chi.URLParam(r, "role")
+	language := r.URL.Query().Get("language")
+
+	if err := rt.promptOverrides.Delete(r.Context(), domain.PromptRole(role), language); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
