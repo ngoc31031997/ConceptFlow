@@ -45,9 +45,17 @@ export function VisualDirectorStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
+  // feature/remotion-engine: the storyboard is the one pre-code step that is
+  // NOT engine agnostic — the Manim wording hands the engineer a vocabulary
+  // (TitleCard/FlowDiagram/BarChart, camera zoom, cross-beat morphs) that
+  // conceptflow-mini does not have, so a Remotion project gets its own
+  // storyboard role. Tab 1a (story_architect) stays shared: it decides the
+  // story, not the pixels.
+  const directorRole = draft.renderEngine === "remotion" ? "remotion_visual_director" : "visual_director";
+
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate("visual_director", draft.voiceLanguage)
+    getPromptTemplate(directorRole, draft.voiceLanguage)
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text.split("{{previous_output}}").join(
@@ -56,12 +64,12 @@ export function VisualDirectorStepPage() {
         setPrompt(filled);
       })
       .catch(() => {
-        if (!cancelled) setPrompt("Không tải được template visual_director.");
+        if (!cancelled) setPrompt(`Không tải được template ${directorRole}.`);
       });
     return () => {
       cancelled = true;
     };
-  }, [draft.voiceLanguage, draft.authoringStory]);
+  }, [draft.voiceLanguage, draft.authoringStory, directorRole]);
 
   async function handleCopy() {
     try {
@@ -97,7 +105,7 @@ export function VisualDirectorStepPage() {
 
   return (
     <div data-testid="visual-director-step-page">
-      <AppShell currentStep={1} title="Bước 1 — Script" subtitle="1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện." wide>
+      <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`} wide>
         <ScriptPipelineTabs
           active="storyboard"
           outlineDone={draft.authoringStory.trim().length > 0}

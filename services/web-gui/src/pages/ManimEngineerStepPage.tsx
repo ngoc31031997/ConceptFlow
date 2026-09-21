@@ -11,6 +11,8 @@ import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import styles from "./WizardSteps.module.css";
 
+const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
+
 /**
  * Bước 1c (Engineer) — third tab of the "Bước 1 — Script" sub-wizard (see
  * ScriptPipelineTabs): fetch the current template, fill it with the
@@ -71,6 +73,13 @@ export function ManimEngineerStepPage() {
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text
+          // feature/remotion-engine: the remotion_engineer prompt is a flat
+          // topic -> code prompt, so it carries {{topic}} instead of only
+          // {{previous_output}}. Without this substitution the Creator copies
+          // out a prompt that still literally says "paste your topic here"
+          // and the AI writes a video about nothing in particular.
+          .split("{{topic}}")
+          .join(draft.authoringTopic.trim() || TOPIC_PLACEHOLDER)
           .split("{{previous_output}}")
           .join(previousOutput || "(chưa có dàn ý/storyboard đã lưu ở các bước trước)")
           .split("{{narration_language_rule}}")
@@ -88,7 +97,7 @@ export function ManimEngineerStepPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.voiceLanguage, previousOutput, engineerRole]);
+  }, [draft.voiceLanguage, draft.authoringTopic, previousOutput, engineerRole]);
 
   async function handleCopy() {
     try {
