@@ -15,6 +15,80 @@ Requirements: `aidlc-docs/inception/requirements/cr-027-hive-llm-provider-and-in
 
 ---
 
+## Đã đo thật với key Hive (2026-09-21)
+
+Key hoạt động. **Chỉ cần Secret Key** — auth là `Authorization: Bearer <secret>`;
+Access Key ID không dùng tới ở API này.
+
+| Thử | Kết quả |
+|---|---|
+| `GET /models` | **404** cả hai vùng — Hive không có endpoint liệt kê model. Tên model phải hardcode/cấu hình |
+| `POST /chat/completions` @ `api-cdn` | **200**, cả hai model |
+| `POST /chat/completions` @ `api-va1` | **500 Internal Server Error**, dù key có quyền `va1:*` |
+
+⇒ `HIVE_BASE_URL` mặc định `https://api-cdn.thehive.ai/api/v3`. Vùng `va1`
+không dùng được lúc này; không cài đặt chuyển vùng tự động.
+
+### Hai model trả `usage` KHÁC NHAU — và một model là reasoning model
+```
+glm-5.3-flash      usage = {prompt_tokens, completion_tokens, total_tokens,
+                            prompt_tokens_details: null,
+                            reasoning_tokens: 66}          <- Ở CẤP CAO NHẤT
+deepseek-v4.1-flash usage = {prompt_tokens, completion_tokens, total_tokens,
+                            prompt_tokens_details: {cached_tokens: 0},
+                            completion_tokens_details: {reasoning_tokens: 0}}
+```
+
+Hai phát hiện, cả hai đều đổi thiết kế:
+
+**1. `glm-5.3-flash` là reasoning model.** Nó trả thêm trường
+`message.reasoning_content` và đốt token cho nó: một câu trả lời một dòng tốn
+**66/122 token cho reasoning — 54% chi phí đầu ra**. Lượt thử đầu với
+`max_tokens: 5` trả về `content: ""`, `finish_reason: "length"` và
+`reasoning_content` có chữ: toàn bộ ngân sách bị reasoning nuốt sạch trước khi
+kịp viết chữ nào vào `content`.
+
+**2. `deepseek-v4.1-flash` không reasoning** (`reasoning_tokens: 0`), và có
+`prompt_tokens_details.cached_tokens` — tức prompt caching quan sát được.
+
+### D12 — Parser `usage` phải chịu được cả hai hình dạng
+```go
+type hiveUsage struct {
+    PromptTokens     int `json:"prompt_tokens"`
+    CompletionTokens int `json:"completion_tokens"`
+    ReasoningTokens  int `json:"reasoning_tokens"`            // glm: cấp cao nhất
+    CompletionDetails *struct {
+        ReasoningTokens int `json:"reasoning_tokens"`         // deepseek: lồng
+    } `json:"completion_tokens_details"`
+    PromptDetails *struct {
+        CachedTokens int `json:"cached_tokens"`
+    } `json:"prompt_tokens_details"`
+}
+```
+Đọc reasoning từ cấp cao nhất, không có thì đọc từ `completion_tokens_details`.
+`llm_usage` (D9) thêm hai cột `reasoning_tokens` và `cached_tokens` — nếu không
+tách reasoning ra thì màn theo dõi sẽ không giải thích nổi vì sao bước code của
+glm đắt gấp đôi deepseek ở cùng một lượng chữ trả về.
+
+### D13 — `content` rỗng KHÔNG mặc nhiên là lỗi model
+FR81.3 nói content rỗng ⇒ lỗi. Đo thật cho thấy phải chia đôi:
+
+| finish_reason | content | Kết luận | `error_kind` |
+|---|---|---|---|
+| `length` | rỗng | **Hết `max_tokens`, reasoning nuốt hết** | `budget` |
+| `length` | có chữ | Bị cắt giữa chừng | `truncated` |
+| `stop` | rỗng | Model thật sự trả rỗng | `empty` |
+| `stop` | có chữ | OK | — |
+
+Gộp cả ba thành "Hive trả về kết quả rỗng" sẽ khiến Creator đi tìm sai chỗ:
+`budget` sửa bằng cách tăng `max_tokens`, `empty` là lỗi prompt hoặc model.
+
+Kéo theo: **`max_tokens` phải rộng tay cho bước sinh code.** Một script Manim
+hoàn chỉnh cỡ 400–600 dòng; cộng phần reasoning của glm thì
+`HIVE_MAX_OUTPUT_TOKENS` mặc định **16000**, không phải vài nghìn.
+
+---
+
 ## Lỗ hổng phát hiện lúc thiết kế — `{{topic}}` không tồn tại ở server
 
 Soi schema trước khi thiết kế FR77 và tìm ra một thứ chặn đường: **server không
@@ -268,6 +342,8 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     project_id        TEXT,
     prompt_tokens     INTEGER NOT NULL DEFAULT 0,
     completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,  -- D12
+    cached_tokens     INTEGER NOT NULL DEFAULT 0,  -- D12
     duration_ms       INTEGER NOT NULL DEFAULT 0,
     ok                BOOLEAN NOT NULL,
     error_kind        TEXT NOT NULL DEFAULT ''
@@ -292,7 +368,8 @@ Màn `LLMUsagePage` cạnh `PromptSettingsPage`, dùng `components/ui` sẵn có
 | `LLM_PROVIDER` | `hive` nếu có key, ngược lại `ollama` | |
 | `HIVE_API_KEY` | `""` | Rỗng ⇒ về `ollama`, **không crash lúc khởi động** (FR83.2) |
 | `HIVE_BASE_URL` | `https://api-cdn.thehive.ai/api/v3` | |
-| `HIVE_MODEL` | *chưa chốt* | Chờ phép đo — xem "Việc đang chờ" |
+| `HIVE_MODEL` | *chưa chốt* | Chờ phép đo sinh code — xem "Việc đang chờ" |
+| `HIVE_MAX_OUTPUT_TOKENS` | `16000` | Rộng tay vì reasoning của glm đốt >50% ngân sách đầu ra (D13) |
 | `HIVE_TIMEOUT_SECONDS` | `180` | |
 | `HIVE_MAX_INPUT_CHARS` | `120000` | ~30k token, thừa cho prompt dài nhất (14k ký tự) mà vẫn chặn được project hỏng |
 | `HIVE_MAX_RETRIES` | `3` | |
@@ -305,7 +382,10 @@ Màn `LLMUsagePage` cạnh `PromptSettingsPage`, dùng `components/ui` sẵn có
 | 429 | `rate_limit` | **có** | "Hive đang quá tải, đã thử lại 3 lần" |
 | 5xx | `server` | **có** | "Hive lỗi phía máy chủ" |
 | timeout | `timeout` | không | "Hive không trả lời trong 180s" |
-| rỗng/không parse được | `empty` | không | "Hive trả về kết quả rỗng hoặc sai định dạng" |
+| 200, `stop` + content rỗng | `empty` | không | "Hive trả về kết quả rỗng" |
+| 200, `length` + content rỗng | `budget` | không | "Toàn bộ ngân sách token bị phần suy luận của model dùng hết — tăng `HIVE_MAX_OUTPUT_TOKENS`" |
+| 200, `length` + có content | `truncated` | không | "Kết quả bị cắt giữa chừng — tăng `HIVE_MAX_OUTPUT_TOKENS`" |
+| không parse được JSON | `malformed` | không | "Hive trả về dữ liệu sai định dạng" |
 
 Mọi câu đều kèm "hoặc dùng nút Copy prompt như cũ" (FR79.3). Retry dùng
 exponential backoff có jitter, đúng khuôn `AzureTTSAdapter` của CR-013.
@@ -331,14 +411,20 @@ thêm `rendering`) + `up -d`, xác nhận healthy.
 ---
 
 ## Việc đang chờ Creator
-**`HIVE_API_KEY` chưa có trong `.env`.** Hai việc phụ thuộc vào nó, cả hai đều
-không làm được bằng suy luận:
+~~`HIVE_API_KEY` chưa có~~ — **đã có và đã xác minh (2026-09-21)**, xem mục
+"Đã đo thật". Hai model trong doc đều tồn tại và gọi được.
 
-1. **Chốt `HIVE_MODEL`** — chạy cùng một chủ đề qua `deepseek-ai/deepseek-v4.1-flash`
-   và `zai-org/glm-5.3-flash` ở bước sinh code, đếm lỗi lint BLOCKING của mỗi
-   bên. Phải đo trên **cả hai engine** (Manim và Remotion) vì chúng có bộ từ
-   vựng hình ảnh khác hẳn nhau — một model khá ở Manim chưa chắc khá ở Remotion.
-2. **Xác nhận tên model trên dashboard Hive** — doc có thể đi sau bảng model
-   thật, không hardcode theo doc.
+Còn lại đúng một việc chặn: **chốt `HIVE_MODEL`.** Cần chạy cùng một chủ đề
+qua `deepseek-ai/deepseek-v4.1-flash` và `zai-org/glm-5.3-flash` ở bước sinh
+code, đếm lỗi lint BLOCKING mỗi bên, và **đo trên cả hai engine** (Manim và
+Remotion) — từ vựng hình ảnh khác hẳn nhau nên một model khá ở Manim chưa chắc
+khá ở Remotion.
 
-Mốc 1–6 **không** cần key và làm được ngay.
+Phép đo này cần mốc 5 (render prompt ở server) và mốc 6 (`POST /lint`) đã xong
+thì mới **chấm điểm tự động** được. Làm sớm hơn thì phải chấm bằng mắt, tốn
+công mà kém tin cậy. ⇒ Không chặn gì cả: cứ làm mốc 1–6, đo ở mốc 7.
+
+Giả thuyết ban đầu để đi đo (không phải kết luận): deepseek có vẻ hợp hơn cho
+sinh code — không đốt token cho reasoning, có prompt caching quan sát được, và
+output dễ đoán hơn. Nhưng reasoning của glm có thể lại là thứ giúp nó bám đúng
+whitelist API của CR-017. Phải đo, không đoán.
