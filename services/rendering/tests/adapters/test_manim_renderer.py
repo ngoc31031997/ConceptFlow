@@ -736,3 +736,31 @@ def test_render_hands_durations_to_the_script_and_writes_it_unmodified(tmp_path,
     assert seen["script"] == VALID_SCRIPT
     assert seen["durations"] == [2.5, 3.0]
     assert seen["mode"] == "render"
+
+
+def test_dry_run_uses_its_own_configurable_timeout(tmp_path, monkeypatch):
+    """The dry pass executes every animation, so a heavy script can need more
+    than the old hardcoded 300s — and the failure must say which pass ran out.
+    """
+    renderer = ManimScriptRenderer(
+        timeout_seconds=1800, dry_run_timeout_seconds=7, cache_root=None
+    )
+    child = FakePopen(hang=True)
+    seen: list[int | None] = []
+
+    real_wait = child.wait
+
+    def recording_wait(timeout=None):
+        seen.append(timeout)
+        return real_wait(timeout)
+
+    child.wait = recording_wait
+    monkeypatch.setattr(
+        "adapters.rendering.manim_renderer.subprocess.Popen", lambda cmd, **kw: child
+    )
+
+    with pytest.raises(AnimationEngineError, match="Manim dry run timed out after 7s"):
+        renderer.dry_run(make_request())
+
+    assert seen[0] == 7, "the dry pass must not inherit the real render's timeout"
+    assert child.killed
