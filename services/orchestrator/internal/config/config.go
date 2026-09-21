@@ -22,6 +22,16 @@ type Config struct {
 	OllamaURL                     string
 	OllamaModel                   string
 	OllamaTimeout                 time.Duration
+	// CR-027 — Hive is the primary LLM provider; Ollama stays as the
+	// fallback for the light tasks (see llm.OllamaProvider).
+	LLMProvider         string
+	HiveAPIKey          string
+	HiveBaseURL         string
+	HiveModel           string
+	HiveTimeout         time.Duration
+	HiveMaxRetries      int
+	HiveMaxInputChars   int
+	HiveMaxOutputTokens int
 	// CR-023 D2: base URL of the video-assembly service, whose own database
 	// owns channel_assets — Orchestrator reads it synchronously to attach the
 	// channel intro/outro to assemble_video.
@@ -85,6 +95,52 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	// CR-027 FR83.2 — no key is a supported way to run: the app falls back to
+	// Ollama for the light tasks and every prompt stays copy-out-to-an-AI, as
+	// it was before CR-027. Refusing to start would turn an optional paid
+	// service into a hard dependency of the whole orchestrator.
+	hiveAPIKey := os.Getenv("HIVE_API_KEY")
+	llmProvider := os.Getenv("LLM_PROVIDER")
+	if llmProvider == "" {
+		if hiveAPIKey != "" {
+			llmProvider = "hive"
+		} else {
+			llmProvider = "ollama"
+		}
+	}
+	hiveBaseURL := os.Getenv("HIVE_BASE_URL")
+	if hiveBaseURL == "" {
+		// api-cdn, not api-va1: measured 2026-09-21, api-va1 answered 500
+		// even for a key carrying va1:* permissions.
+		hiveBaseURL = "https://api-cdn.thehive.ai/api/v3"
+	}
+	hiveModel := os.Getenv("HIVE_MODEL")
+	if hiveModel == "" {
+		hiveModel = "deepseek-ai/deepseek-v4.1-flash"
+	}
+	hiveTimeoutSeconds, err := intEnvOrDefault("HIVE_TIMEOUT_SECONDS", 180)
+	if err != nil {
+		return nil, err
+	}
+	hiveMaxRetries, err := intEnvOrDefault("HIVE_MAX_RETRIES", 3)
+	if err != nil {
+		return nil, err
+	}
+	// Hive's context window is 1M tokens, so this is not a context limit —
+	// it is a blast radius. One broken project must not turn into one
+	// enormous billable call.
+	hiveMaxInputChars, err := intEnvOrDefault("HIVE_MAX_INPUT_CHARS", 120000)
+	if err != nil {
+		return nil, err
+	}
+	// Generous on purpose: a full Manim script runs to several hundred lines,
+	// and on a reasoning model part of this budget is spent before the first
+	// character of the answer is written (CR-027 D13).
+	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 16000)
+	if err != nil {
+		return nil, err
+	}
+
 	videoAssemblyURL := os.Getenv("VIDEO_ASSEMBLY_URL")
 	if videoAssemblyURL == "" {
 		videoAssemblyURL = "http://video-assembly:8000"
@@ -111,6 +167,14 @@ func Load() (*Config, error) {
 		OllamaURL:                     ollamaURL,
 		OllamaModel:                   ollamaModel,
 		OllamaTimeout:                 time.Duration(ollamaTimeoutSeconds) * time.Second,
+		LLMProvider:                   llmProvider,
+		HiveAPIKey:                    hiveAPIKey,
+		HiveBaseURL:                   hiveBaseURL,
+		HiveModel:                     hiveModel,
+		HiveTimeout:                   time.Duration(hiveTimeoutSeconds) * time.Second,
+		HiveMaxRetries:                hiveMaxRetries,
+		HiveMaxInputChars:             hiveMaxInputChars,
+		HiveMaxOutputTokens:           hiveMaxOutputTokens,
 		VideoAssemblyURL:              videoAssemblyURL,
 		VideoAssemblyTimeout:          time.Duration(videoAssemblyTimeoutSeconds) * time.Second,
 	}, nil

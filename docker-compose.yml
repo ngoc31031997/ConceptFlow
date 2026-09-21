@@ -311,6 +311,16 @@ services:
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
       OLLAMA_TIMEOUT_SECONDS: "120"
+      # CR-027 — Hive is the primary LLM provider. Leave HIVE_API_KEY unset
+      # and the orchestrator starts normally on Ollama, exactly as before.
+      LLM_PROVIDER: ${LLM_PROVIDER:-}
+      HIVE_API_KEY: ${HIVE_API_KEY:-}
+      HIVE_BASE_URL: ${HIVE_BASE_URL:-https://api-cdn.thehive.ai/api/v3}
+      HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
+      HIVE_TIMEOUT_SECONDS: ${HIVE_TIMEOUT_SECONDS:-180}
+      HIVE_MAX_RETRIES: ${HIVE_MAX_RETRIES:-3}
+      HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
+      HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-16000}
       # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
       #
       # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và

@@ -98,6 +98,20 @@ func main() {
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
 	suggestShortScript := application.NewSuggestShortScriptUseCase(ollamaClient)
 
+	// CR-027 — the LLM provider the authoring pipeline talks to. Both
+	// adapters are built regardless of LLM_PROVIDER: the Ollama one is the
+	// declared fallback for the light tasks, and building it costs an http
+	// client. Without a Hive key the provider is Ollama and the pipeline's
+	// generate endpoints simply stay unavailable, which is how the system
+	// ran before CR-027 (FR83.2).
+	ollamaProvider := llm.NewOllamaProvider(ollamaClient)
+	var llmProvider application.LLMProviderPort = ollamaProvider
+	if cfg.LLMProvider == "hive" && cfg.HiveAPIKey != "" {
+		llmProvider = llm.NewHiveClient(cfg.HiveBaseURL, cfg.HiveAPIKey, cfg.HiveModel, cfg.HiveTimeout, cfg.HiveMaxRetries)
+	}
+	logger.Info("llm provider selected", "provider", llmProvider.Name(), "model", cfg.HiveModel)
+	_ = llmProvider // wired to the authoring generate use case in a later milestone
+
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
 	// (ADR-0022) — a broker reconnect implicitly drops all consumers, and
