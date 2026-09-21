@@ -16,7 +16,7 @@ beforeEach(() => {
     version: 1,
     template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
   });
-  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ story: "", storyboard: "", code: "", review: "" });
+  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "", review: "" });
   vi.spyOn(apiClient, "saveAuthoringStory").mockResolvedValue(undefined);
 });
 
@@ -35,6 +35,7 @@ function renderPage() {
 describe("ScriptOutlineStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
   it("copies a prompt with the Creator's topic already substituted in", async () => {
@@ -67,7 +68,57 @@ describe("ScriptOutlineStepPage", () => {
     fireEvent.click(screen.getByTestId("script-outline-step-next"));
 
     await waitFor(() => {
-      expect(apiClient.saveAuthoringStory).toHaveBeenCalledWith(expect.any(String), "CÂU HỎI CỐT LÕI: ...\nBEAT 1 — ...");
+      expect(apiClient.saveAuthoringStory).toHaveBeenCalledWith(
+        expect.any(String),
+        "CÂU HỎI CỐT LÕI: ...\nBEAT 1 — ...",
+        expect.any(String),
+      );
+    });
+  });
+
+  // CR-027 D0 — the topic used to live only in this browser, so the server
+  // could not render {{topic}} itself. These two cover the round trip that
+  // FR77 depends on: it goes up with the outline, and it comes back down.
+  it("sends the Creator's topic to the server alongside the outline", async () => {
+    renderPage();
+
+    fireEvent.change(screen.getByTestId("script-outline-topic"), {
+      target: { value: "Vì sao bầu trời có màu xanh" },
+    });
+    fireEvent.change(screen.getByTestId("script-outline-story-input"), {
+      target: { value: "CÂU HỎI CỐT LÕI: ..." },
+    });
+    fireEvent.click(screen.getByTestId("script-outline-step-next"));
+
+    await waitFor(() => {
+      expect(apiClient.saveAuthoringStory).toHaveBeenCalledWith(
+        expect.any(String),
+        "CÂU HỎI CỐT LÕI: ...",
+        "Vì sao bầu trời có màu xanh",
+      );
+    });
+  });
+
+  it("rehydrates the topic from the server on reload", async () => {
+    // Rehydration only runs for a draft that already has a project_id — a
+    // reload, not a fresh wizard. Seed the persisted draft the way a real
+    // reload would find it.
+    window.localStorage.setItem(
+      "conceptflow.draft.v1",
+      JSON.stringify({ projectId: "p-123", voiceLanguage: "vi" }),
+    );
+    vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+      topic: "Thuật toán sắp xếp nổi bọt",
+      story: "dàn ý đã lưu",
+      storyboard: "",
+      code: "",
+      review: "",
+    });
+
+    renderPage();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("script-outline-topic")).toHaveValue("Thuật toán sắp xếp nổi bọt");
     });
   });
 

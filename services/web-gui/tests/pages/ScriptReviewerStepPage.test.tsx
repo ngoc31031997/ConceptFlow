@@ -17,6 +17,7 @@ beforeEach(() => {
     template_text: "NOI DUNG: {{previous_output}} LINT: {{lint_results}}",
   });
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+    topic: "",
     story: "dan y",
     storyboard: "storyboard",
     code: "from conceptflow import *\nclass X(ConceptFlowScene):\n    def construct(self):\n        pass",

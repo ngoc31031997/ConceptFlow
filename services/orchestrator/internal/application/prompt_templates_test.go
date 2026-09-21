@@ -12,6 +12,7 @@ import (
 // save/read use cases — a bare in-memory map is enough since these use
 // cases do nothing but validate and delegate.
 type fakeAuthoringStore struct {
+	topic      map[string]string
 	story      map[string]string
 	storyboard map[string]string
 	code       map[string]string
@@ -20,6 +21,7 @@ type fakeAuthoringStore struct {
 
 func newFakeAuthoringStore() *fakeAuthoringStore {
 	return &fakeAuthoringStore{
+		topic:      map[string]string{},
 		story:      map[string]string{},
 		storyboard: map[string]string{},
 		code:       map[string]string{},
@@ -27,9 +29,18 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 	}
 }
 
-func (f *fakeAuthoringStore) SaveAuthoringStory(_ context.Context, projectID, content string) error {
+// SaveAuthoringStory mirrors the repository's CR-027 D0 rule: an empty topic
+// leaves the stored one alone rather than clearing it.
+func (f *fakeAuthoringStore) SaveAuthoringStory(_ context.Context, projectID, content, topic string) error {
 	f.story[projectID] = content
+	if topic != "" {
+		f.topic[projectID] = topic
+	}
 	return nil
+}
+
+func (f *fakeAuthoringStore) GetAuthoringTopic(_ context.Context, projectID string) (string, error) {
+	return f.topic[projectID], nil
 }
 
 func (f *fakeAuthoringStore) GetAuthoringStory(_ context.Context, projectID string) (string, error) {
@@ -67,17 +78,43 @@ func TestSaveAuthoringStoryUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
 	uc := application.NewSaveAuthoringStoryUseCase(store)
 
-	if err := uc.Execute(context.Background(), "", "some story"); err == nil {
+	if err := uc.Execute(context.Background(), "", "some story", "a topic"); err == nil {
 		t.Fatal("expected error for empty project_id")
 	}
-	if err := uc.Execute(context.Background(), "p1", ""); err == nil {
+	if err := uc.Execute(context.Background(), "p1", "", "a topic"); err == nil {
 		t.Fatal("expected error for empty content")
 	}
-	if err := uc.Execute(context.Background(), "p1", "the story"); err != nil {
+	if err := uc.Execute(context.Background(), "p1", "the story", "why the sky is blue"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got := store.story["p1"]; got != "the story" {
 		t.Fatalf("story not saved, got %q", got)
+	}
+	if got := store.topic["p1"]; got != "why the sky is blue" {
+		t.Fatalf("topic not saved, got %q", got)
+	}
+}
+
+// TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne covers
+// CR-027 D0. A missing topic must not block saving the outline — that would
+// break every pre-CR-027 caller for a field it does not know about — and it
+// must not wipe a topic the Creator already gave us, since every later
+// pipeline step renders {{topic}} from it.
+func TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringStoryUseCase(store)
+
+	if err := uc.Execute(context.Background(), "p1", "v1", "the real topic"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := uc.Execute(context.Background(), "p1", "v2", ""); err != nil {
+		t.Fatalf("an empty topic must not be an error: %v", err)
+	}
+	if got := store.story["p1"]; got != "v2" {
+		t.Fatalf("outline should have been replaced, got %q", got)
+	}
+	if got := store.topic["p1"]; got != "the real topic" {
+		t.Fatalf("an empty topic must leave the stored one alone, got %q", got)
 	}
 }
 

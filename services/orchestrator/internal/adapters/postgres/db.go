@@ -303,6 +303,92 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NUL
 -- Creator gets back from the external AI, same reasoning/table as the columns
 -- above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';
+
+-- CR-027 D0: the project's topic. Until now the topic lived only in the
+-- browser (ProjectDraftContext + localStorage) and was interpolated into
+-- {{topic}} by scriptPrompts.ts on the client, so the server had no way to
+-- render a prompt at all — which is exactly what CR-027 FR77 needs to do.
+--
+-- Same table as the four *_content columns above and for the same reason:
+-- authoring-time-only data, one row per project, written by a Creator action
+-- rather than by folding a saga event. Deliberately NOT a column on projects,
+-- whose single long positional UPDATE would put every existing parameter at
+-- risk of misalignment for the sake of one authoring field.
+--
+-- Projects created before CR-027 keep '' here; their rendered prompt then
+-- carries the same "paste your topic here" placeholder the GUI shows today.
+-- No attempt is made to guess a topic out of story_content.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
+
+-- CR-027 D9/FR82: one row per LLM call, so the Creator can see spend in the
+-- web GUI instead of on a provider dashboard. This is the first paid service
+-- in the pipeline, and CR-021's lesson applies: measure first, enforce later.
+-- No spending cap here on purpose — a cap set before anyone knows the real
+-- numbers is how a gate loses its credibility.
+--
+-- Prompts and answers are NOT stored: project_authoring already holds them,
+-- and a second copy would double the data at risk for no new insight.
+--
+-- reasoning_tokens is its own column rather than folded into completion:
+-- measured, glm-5.3-flash spent 66 of 122 completion tokens reasoning before
+-- answering a one-sentence question (D12). A screen that hides that cannot
+-- explain why one model costs twice another for the same visible output.
+--
+-- project_id is nullable and carries NO foreign key: suggest-short-script
+-- (CR-026 FR71.1) runs before any project exists, and deleting a project must
+-- not erase the record of what it cost.
+CREATE TABLE IF NOT EXISTS llm_usage (
+    id                BIGSERIAL PRIMARY KEY,
+    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+    provider          TEXT NOT NULL,
+    model             TEXT NOT NULL,
+    role              TEXT NOT NULL DEFAULT '',
+    step              TEXT NOT NULL DEFAULT '',
+    project_id        TEXT,
+    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
+    completion_tokens INTEGER NOT NULL DEFAULT 0,
+    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,
+    cached_tokens     INTEGER NOT NULL DEFAULT 0,
+    duration_ms       INTEGER NOT NULL DEFAULT 0,
+    ok                BOOLEAN NOT NULL,
+    error_kind        TEXT NOT NULL DEFAULT ''
+);
+
+-- Every read of this table is "recent first" or "the last N days", so the
+-- index matches the only access pattern there is.
+CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
+
+-- CR-027 FR84: the Creator's own wording, kept apart from the shipped
+-- wording in prompt_templates.
+--
+-- Until now one row carried both jobs, and that forced SeedPromptTemplates to
+-- be insert-if-absent: overwriting on startup would have wiped an editor's
+-- saved text. Its own docstring records that version-aware seeding was tried
+-- and removed for exactly that reason. The cost of that compromise was a
+-- silent trap — edit the wording in Go, rebuild, restart, and the running
+-- database keeps the old text with nothing to say so.
+--
+-- Splitting the two jobs dissolves the conflict instead of balancing it.
+-- prompt_templates becomes read-only to humans and is overwritten from the
+-- binary on every start; edits live here and seeding never touches them.
+-- Switching is_active off keeps the row but falls back to the shipped
+-- wording, which replaces the old reset endpoint: reset destroyed the edit,
+-- this does not.
+CREATE TABLE IF NOT EXISTS prompt_overrides (
+    role          TEXT NOT NULL,
+    language      TEXT NOT NULL,
+    template_text TEXT NOT NULL,
+    is_active     BOOLEAN NOT NULL DEFAULT false,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (role, language)
+);
+
+-- CR-027 FR84.7: which shipped version this wording was written against.
+-- Without a baseline there is no way to notice that the shipped prompt has
+-- moved on underneath an active override — the Creator would keep running
+-- their own copy, unaware it was forked from a version two improvements ago.
+-- Nothing is done automatically; the admin screen just says so.
+ALTER TABLE prompt_overrides ADD COLUMN IF NOT EXISTS based_on_version INTEGER NOT NULL DEFAULT 0;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

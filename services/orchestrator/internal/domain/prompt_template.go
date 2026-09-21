@@ -66,3 +66,37 @@ func RenderPromptTemplate(templateText string, values map[string]string) string 
 	}
 	return out
 }
+
+// PromptOverride is the Creator's own wording for one role/language
+// (CR-027 FR84.3). It lives in its own table, apart from the shipped
+// PromptTemplate, so that seeding can overwrite the shipped text on every
+// start without ever touching what the Creator wrote.
+type PromptOverride struct {
+	Role         PromptRole `json:"role"`
+	Language     string     `json:"language"`
+	TemplateText string     `json:"template_text"`
+	// IsActive off keeps the wording but runs the shipped text instead. This
+	// is what replaced the old destructive reset: switching back on restores
+	// the Creator's version unchanged.
+	IsActive bool `json:"is_active"`
+	// BasedOnVersion is the shipped version this wording was written
+	// against, so the admin screen can flag an override that has fallen
+	// behind (FR84.7). 0 means "unknown" — a row created by the migration
+	// from a database that predates this column.
+	BasedOnVersion int    `json:"based_on_version"`
+	UpdatedAt      string `json:"updated_at"`
+}
+
+// EffectivePromptTemplate is what the pipeline actually renders: the
+// override when one is switched on, otherwise the shipped text.
+//
+// FromOverride and SeedVersion are carried so the admin screen can say which
+// of the two is in force, and warn when the shipped wording has moved on
+// underneath an active override (FR84.7).
+type EffectivePromptTemplate struct {
+	Role         PromptRole `json:"role"`
+	Language     string     `json:"language"`
+	TemplateText string     `json:"template_text"`
+	FromOverride bool       `json:"from_override"`
+	SeedVersion  int        `json:"seed_version"`
+}

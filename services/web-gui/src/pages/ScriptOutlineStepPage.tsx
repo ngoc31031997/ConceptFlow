@@ -46,12 +46,18 @@ export function ScriptOutlineStepPage() {
   // the server copy is the one source of truth later steps read from, so
   // rehydrate it the same way the other 3 tabs do.
   useEffect(() => {
-    if (!draft.projectId || draft.authoringStory) return;
+    if (!draft.projectId || (draft.authoringStory && draft.authoringTopic)) return;
     let cancelled = false;
     getAuthoringState(draft.projectId)
       .then((state) => {
-        if (!cancelled && state.story) {
+        if (cancelled) return;
+        if (state.story && !draft.authoringStory) {
           dispatch({ type: "SET_AUTHORING_STORY", payload: state.story });
+        }
+        // CR-027 D0 — chủ đề giờ cũng nằm ở server, nên nó rehydrate được
+        // như 4 artefact kia. "" nghĩa là project tạo trước CR-027.
+        if (state.topic && !draft.authoringTopic) {
+          dispatch({ type: "SET_AUTHORING_TOPIC", payload: state.topic });
         }
       })
       .catch(() => {
@@ -109,7 +115,10 @@ export function ScriptOutlineStepPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      await saveAuthoringStory(draft.projectId, draft.authoringStory);
+      // CR-027 D0 — chủ đề đi kèm dàn ý trong cùng một lượt lưu. Trước đây
+      // nó chỉ sống trong localStorage của trình duyệt, nên server không có
+      // gì để điền vào {{topic}} lúc tự render prompt (FR77).
+      await saveAuthoringStory(draft.projectId, draft.authoringStory, draft.authoringTopic.trim());
       navigate("/create/script/storyboard");
     } catch {
       setSaveError("Không lưu được dàn ý, thử lại.");

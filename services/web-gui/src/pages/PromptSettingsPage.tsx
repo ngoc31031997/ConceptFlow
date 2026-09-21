@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Card, Button, FormField, Select, TextArea, CtaRow } from "../components/ui";
 import {
-  getPromptTemplate,
-  updatePromptTemplate,
-  resetPromptTemplate,
+  listPromptTemplates,
+  listPromptOverrides,
+  savePromptOverride,
+  setPromptOverrideActive,
+  deletePromptOverride,
   type PromptTemplate,
+  type PromptOverride,
 } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./PromptSettingsPage.module.css";
@@ -52,85 +55,108 @@ function renderPreview(templateText: string): string {
 export function PromptSettingsPage() {
   const [role, setRole] = useState<PromptTemplate["role"]>("story_architect");
   const [language, setLanguage] = useState<"vi" | "en">("vi");
-  const [text, setText] = useState("");
-  const [version, setVersion] = useState<number | null>(null);
+
+  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
+  const [overrides, setOverrides] = useState<PromptOverride[]>([]);
+  const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [resetting, setResetting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  /**
+   * Cả hai tầng tải cùng một lượt rồi ghép ở client. Hai danh sách đúng 12
+   * hàng mỗi bên, nên gọi thêm một endpoint chuyên dụng chỉ để tránh một
+   * phép ghép là không đáng.
+   */
+  const reload = useCallback(async () => {
     setLoading(true);
-    setStatus(null);
-    getPromptTemplate(role, language)
-      .then((template) => {
-        if (cancelled) return;
-        setText(template.template_text);
-        setVersion(template.version);
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setText("");
-          setVersion(null);
-          setStatus("Không tải được template — có thể vai trò/ngôn ngữ này chưa có sẵn.");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [role, language]);
-
-  async function handleSave() {
-    setSaving(true);
-    setStatus(null);
     try {
-      const saved = await updatePromptTemplate(role, language, text);
-      setVersion(saved.version);
-      setStatus(`Đã lưu — phiên bản ${saved.version}.`);
+      const [t, o] = await Promise.all([listPromptTemplates(), listPromptOverrides()]);
+      setTemplates(t);
+      setOverrides(o);
     } catch {
-      setStatus("Lưu thất bại, thử lại.");
+      setStatus("Không tải được prompt — kiểm tra Orchestrator.");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  const seed = templates.find((t) => t.role === role && t.language === language) ?? null;
+  const override = overrides.find((o) => o.role === role && o.language === language) ?? null;
+
+  // Đổi vai trò/ngôn ngữ thì ô soạn thảo theo bản tuỳ chỉnh của đúng ô đó.
+  useEffect(() => {
+    setDraft(override?.template_text ?? "");
+    setStatus(null);
+  }, [role, language, override?.template_text]);
 
   /**
-   * Khôi phục prompt mặc định đang ship trong binary.
-   *
-   * Hỏi xác nhận vì thao tác này xoá hẳn bản người vận hành đã sửa, và phía
-   * server không giữ lịch sử prompt (khác video_formats — một prompt cũ không
-   * cần tái lập lại được với các bản render trước).
+   * FR84.7 — bản gốc đã đi tiếp kể từ lúc bản tuỳ chỉnh này được viết.
+   * Chỉ báo, không tự làm gì: tự trộn vào nội dung Creator đã viết là đúng
+   * kiểu bất ngờ mà cả CR này sinh ra để dẹp. `based_on_version === 0` nghĩa
+   * là không rõ (hàng do di trú tạo ra), nên không kết luận gì.
    */
-  async function handleReset() {
-    const ok = window.confirm(
-      "Khôi phục prompt mặc định? Nội dung bạn đã sửa cho vai trò/ngôn ngữ này sẽ mất và không khôi phục lại được.",
-    );
-    if (!ok) return;
+  const seedMovedOn =
+    override !== null &&
+    override.is_active &&
+    override.based_on_version > 0 &&
+    seed !== null &&
+    seed.version > override.based_on_version;
 
-    setResetting(true);
+  const inUse = override?.is_active ? "override" : "seed";
+  const effectiveText = inUse === "override" ? (override?.template_text ?? "") : (seed?.template_text ?? "");
+
+  async function run(action: () => Promise<void>, ok: string) {
+    setBusy(true);
     setStatus(null);
     try {
-      const restored = await resetPromptTemplate(role, language);
-      setText(restored.template_text);
-      setVersion(restored.version);
-      setStatus(`Đã khôi phục prompt mặc định — phiên bản ${restored.version}.`);
+      await action();
+      await reload();
+      setStatus(ok);
     } catch {
-      setStatus("Khôi phục thất bại, thử lại.");
+      setStatus("Thao tác thất bại, thử lại.");
     } finally {
-      setResetting(false);
+      setBusy(false);
     }
   }
+
+  const handleSave = () =>
+    run(async () => {
+      await savePromptOverride(role, language, draft);
+    }, "Đã lưu bản tuỳ chỉnh.");
+
+  const handleStartFromSeed = () => setDraft(seed?.template_text ?? "");
+
+  const handleToggle = () =>
+    run(async () => {
+      await setPromptOverrideActive(role, language, !(override?.is_active ?? false));
+    }, override?.is_active ? "Đã tắt — đang chạy bản gốc." : "Đã bật bản tuỳ chỉnh.");
+
+  /**
+   * Xoá là thao tác phá huỷ duy nhất còn lại ở màn này, nên vẫn hỏi xác nhận.
+   * Muốn tạm quay về bản gốc thì dùng công tắc bật/tắt — không mất gì.
+   */
+  const handleDelete = () => {
+    const okToDelete = window.confirm(
+      "Xoá hẳn bản tuỳ chỉnh này? Không khôi phục lại được. Nếu chỉ muốn tạm dùng bản gốc, hãy TẮT nó thay vì xoá.",
+    );
+    if (!okToDelete) return;
+    return run(async () => {
+      await deletePromptOverride(role, language);
+      setDraft("");
+    }, "Đã xoá bản tuỳ chỉnh — đang chạy bản gốc.");
+  };
 
   return (
     <div data-testid="prompt-settings-page">
       <AppShell
         title="Cài đặt prompt soạn kịch bản"
-        subtitle="Sửa nội dung prompt của từng bước trong quy trình 4 vai trò (CR-025) — không cần build lại giao diện."
+        subtitle="Prompt gốc của hệ thống là chỉ-đọc và tự cập nhật theo mỗi bản build. Bản tuỳ chỉnh của bạn nằm riêng, bật/tắt được bất cứ lúc nào."
         wide
       >
         <div className={styles.layout}>
@@ -161,9 +187,21 @@ export function PromptSettingsPage() {
                 </Select>
               </FormField>
 
-              {version !== null && (
-                <p className={`${styles.versionRow} ${glass.mtSm}`}>Phiên bản hiện tại: {version}</p>
+              <p className={`${styles.versionRow} ${glass.mtSm}`} data-testid="prompt-in-use">
+                {inUse === "override"
+                  ? "Đang chạy: BẢN TUỲ CHỈNH của bạn"
+                  : "Đang chạy: bản gốc của hệ thống"}
+                {seed !== null && ` (bản gốc phiên bản ${seed.version})`}
+              </p>
+
+              {seedMovedOn && (
+                <p className={`${glass.cardHint} ${glass.mtXs}`} data-testid="prompt-seed-moved-on">
+                  ⚠ Bản gốc đã cập nhật lên phiên bản {seed?.version} kể từ khi bạn viết bản tuỳ chỉnh
+                  này (dựa trên phiên bản {override?.based_on_version}). Hệ thống không tự trộn —
+                  bạn tự đối chiếu rồi quyết định.
+                </p>
               )}
+
               {status && (
                 <p className={`${glass.cardHint} ${glass.mtXs}`} data-testid="prompt-settings-status">
                   {status}
@@ -181,41 +219,85 @@ export function PromptSettingsPage() {
               </Button>
               <Button
                 variant="ghost"
-                onClick={handleReset}
-                disabled={resetting || saving || loading}
-                data-testid="prompt-reset-button"
+                onClick={handleStartFromSeed}
+                disabled={busy || loading || seed === null}
+                data-testid="prompt-copy-seed-button"
               >
-                {resetting ? "Đang khôi phục..." : "Khôi phục mặc định"}
+                Chép từ bản gốc
               </Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || resetting || loading}
+                disabled={busy || loading || draft.trim().length === 0}
                 data-testid="prompt-save-button"
               >
-                {saving ? "Đang lưu..." : "Lưu"}
+                {busy ? "Đang lưu..." : "Lưu bản tuỳ chỉnh"}
               </Button>
             </CtaRow>
+
+            {override !== null && (
+              <CtaRow>
+                <Button
+                  variant="ghost"
+                  onClick={handleToggle}
+                  disabled={busy || loading}
+                  data-testid="prompt-toggle-button"
+                >
+                  {override.is_active ? "Tắt (quay về bản gốc)" : "Bật bản tuỳ chỉnh"}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleDelete}
+                  disabled={busy || loading}
+                  data-testid="prompt-delete-button"
+                >
+                  Xoá bản tuỳ chỉnh
+                </Button>
+              </CtaRow>
+            )}
           </div>
 
           <div>
-            <Card title="Nội dung prompt">
+            <Card
+              title="Bản tuỳ chỉnh của bạn"
+              hint={
+                override === null
+                  ? "Chưa có. Bấm 'Chép từ bản gốc' để lấy điểm khởi đầu."
+                  : override.is_active
+                    ? "Đang được dùng."
+                    : "Đang tắt — hệ thống chạy bản gốc. Nội dung vẫn được giữ."
+              }
+            >
               <TextArea
                 data-testid="prompt-template-textarea"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
                 disabled={loading}
-                rows={24}
+                rows={20}
               />
             </Card>
 
+            <div className={styles.previewBlock}>
+              <Card
+                title="Prompt gốc của hệ thống (chỉ đọc)"
+                hint="Tự cập nhật theo mỗi bản build. Không sửa và không xoá được — bản sửa của bạn nằm ở khung trên."
+              >
+                <TextArea
+                  data-testid="prompt-seed-textarea"
+                  value={seed?.template_text ?? ""}
+                  readOnly
+                  rows={14}
+                />
+              </Card>
+            </div>
+
             {showPreview && (
               <div className={styles.previewBlock}>
-                <Card title="Xem trước" hint="Dữ liệu mẫu, không gửi server">
+                <Card title="Xem trước nội dung ĐANG CHẠY" hint="Dữ liệu mẫu, không gửi server">
                   <TextArea
                     data-testid="prompt-preview-textarea"
-                    value={renderPreview(text)}
+                    value={renderPreview(effectiveText)}
                     readOnly
-                    rows={20}
+                    rows={18}
                   />
                 </Card>
               </div>
