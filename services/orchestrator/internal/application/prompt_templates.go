@@ -67,9 +67,10 @@ func (uc *PromptTemplatesUseCase) Reset(ctx context.Context, role domain.PromptR
 	return uc.templates.Update(ctx, role, language, def.TemplateText)
 }
 
-// AuthoringStoryPort persists CR-025 step 1's pasted story outline.
+// AuthoringStoryPort persists CR-025 step 1's pasted story outline, and from
+// CR-027 D0 the topic it was written from.
 type AuthoringStoryPort interface {
-	SaveAuthoringStory(ctx context.Context, projectID, content string) error
+	SaveAuthoringStory(ctx context.Context, projectID, content, topic string) error
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 }
 
@@ -86,14 +87,18 @@ func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort) *SaveAuthoringSt
 	return &SaveAuthoringStoryUseCase{authoring: authoring}
 }
 
-func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, content string) error {
+// Execute saves the outline and, when one is supplied, the topic. topic is
+// deliberately NOT required: the outline is what this step exists to store,
+// and refusing to save it because a topic is missing would break every
+// pre-CR-027 caller for a field they do not know about.
+func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, content, topic string) error {
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
 	}
 	if content == "" {
 		return fmt.Errorf("content is required")
 	}
-	return uc.authoring.SaveAuthoringStory(ctx, projectID, content)
+	return uc.authoring.SaveAuthoringStory(ctx, projectID, content, topic)
 }
 
 // AuthoringStoryboardPort persists CR-025 step 2's pasted storyboard.
@@ -182,6 +187,7 @@ func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, co
 // rehydrate on reload/back-navigation instead of relying solely on
 // client-side draft state.
 type AuthoringStateReaderPort interface {
+	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
@@ -191,6 +197,7 @@ type AuthoringStateReaderPort interface {
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
 // pipeline output saved so far, empty string when a step has not been saved.
 type AuthoringState struct {
+	Topic      string
 	Story      string
 	Storyboard string
 	Code       string
@@ -207,6 +214,10 @@ func NewGetAuthoringStateUseCase(authoring AuthoringStateReaderPort) *GetAuthori
 }
 
 func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID string) (AuthoringState, error) {
+	topic, err := uc.authoring.GetAuthoringTopic(ctx, projectID)
+	if err != nil {
+		return AuthoringState{}, err
+	}
 	story, err := uc.authoring.GetAuthoringStory(ctx, projectID)
 	if err != nil {
 		return AuthoringState{}, err
@@ -223,5 +234,5 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	return AuthoringState{Story: story, Storyboard: storyboard, Code: code, Review: review}, nil
+	return AuthoringState{Topic: topic, Story: story, Storyboard: storyboard, Code: code, Review: review}, nil
 }

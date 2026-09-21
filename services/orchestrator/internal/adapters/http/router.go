@@ -67,7 +67,7 @@ type promptTemplatesUseCase interface {
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
-	Execute(ctx context.Context, projectID, content string) error
+	Execute(ctx context.Context, projectID, content, topic string) error
 }
 
 // saveAuthoringStoryboardUseCase backs CR-025 step 2's POST
@@ -917,13 +917,17 @@ func (rt *Router) handleSaveAuthoringStory(w http.ResponseWriter, r *http.Reques
 
 	var req struct {
 		Content string `json:"content"`
+		// CR-027 D0 — optional: an empty topic leaves the stored one alone
+		// (see PromptTemplateRepository.SaveAuthoringStory), so a browser
+		// running pre-CR-027 JavaScript keeps working unchanged.
+		Topic string `json:"topic"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 
-	if err := rt.saveAuthoringStory.Execute(r.Context(), projectID, req.Content); err != nil {
+	if err := rt.saveAuthoringStory.Execute(r.Context(), projectID, req.Content, req.Topic); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
@@ -1020,6 +1024,7 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
+		"topic":      state.Topic,
 		"story":      state.Story,
 		"storyboard": state.Storyboard,
 		"code":       state.Code,

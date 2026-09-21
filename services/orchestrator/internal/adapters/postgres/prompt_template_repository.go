@@ -115,15 +115,39 @@ func (r *PromptTemplateRepository) Update(ctx context.Context, role domain.Promp
 
 // --- CR-025 step 1: authoring story (Story Architect output) --------------
 
-// SaveAuthoringStory upserts the pasted story outline for a project.
-func (r *PromptTemplateRepository) SaveAuthoringStory(ctx context.Context, projectID, content string) error {
+// SaveAuthoringStory upserts the pasted story outline for a project, plus the
+// topic it was written from (CR-027 D0 — the topic is what {{topic}} renders
+// to, and tab 1a is where the Creator types it).
+//
+// An empty topic leaves the stored one alone instead of clearing it. A caller
+// that has no topic to offer — a browser still running pre-CR-027 JavaScript,
+// or any later save that only means to replace the outline — must not wipe a
+// topic the Creator already gave us, since every later pipeline step renders
+// its prompt from it.
+func (r *PromptTemplateRepository) SaveAuthoringStory(ctx context.Context, projectID, content, topic string) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring (project_id, story_content, updated_at)
-		VALUES ($1, $2, now())
+		INSERT INTO project_authoring (project_id, story_content, topic, updated_at)
+		VALUES ($1, $2, $3, now())
 		ON CONFLICT (project_id) DO UPDATE SET
-		    story_content = EXCLUDED.story_content, updated_at = now()
-	`, projectID, content)
+		    story_content = EXCLUDED.story_content,
+		    topic = CASE WHEN EXCLUDED.topic = '' THEN project_authoring.topic
+		                 ELSE EXCLUDED.topic END,
+		    updated_at = now()
+	`, projectID, content, topic)
 	return err
+}
+
+// GetAuthoringTopic returns the saved topic, or "" if none was saved yet
+// (every project created before CR-027 D0).
+func (r *PromptTemplateRepository) GetAuthoringTopic(ctx context.Context, projectID string) (string, error) {
+	var topic string
+	err := r.pool.QueryRow(ctx, `
+		SELECT topic FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&topic)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return topic, err
 }
 
 // GetAuthoringStory returns the saved story outline, or "" if none was saved yet.

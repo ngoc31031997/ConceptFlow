@@ -303,6 +303,22 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NUL
 -- Creator gets back from the external AI, same reasoning/table as the columns
 -- above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';
+
+-- CR-027 D0: the project's topic. Until now the topic lived only in the
+-- browser (ProjectDraftContext + localStorage) and was interpolated into
+-- {{topic}} by scriptPrompts.ts on the client, so the server had no way to
+-- render a prompt at all — which is exactly what CR-027 FR77 needs to do.
+--
+-- Same table as the four *_content columns above and for the same reason:
+-- authoring-time-only data, one row per project, written by a Creator action
+-- rather than by folding a saga event. Deliberately NOT a column on projects,
+-- whose single long positional UPDATE would put every existing parameter at
+-- risk of misalignment for the sake of one authoring field.
+--
+-- Projects created before CR-027 keep '' here; their rendered prompt then
+-- carries the same "paste your topic here" placeholder the GUI shows today.
+-- No attempt is made to guess a topic out of story_content.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

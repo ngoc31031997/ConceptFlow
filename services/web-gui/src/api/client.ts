@@ -409,11 +409,15 @@ export function resetPromptTemplate(
 }
 
 /** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
-export async function saveAuthoringStory(projectId: string, content: string): Promise<void> {
+export async function saveAuthoringStory(
+  projectId: string,
+  content: string,
+  topic: string,
+): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/story`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, topic }),
   });
 }
 
@@ -451,6 +455,8 @@ export async function saveAuthoringReview(projectId: string, content: string): P
  * bằng một trình duyệt/máy khác dùng chung project_id).
  */
 export interface AuthoringState {
+  /** CR-027 D0 — "" cho mọi project tạo trước CR-027. */
+  topic: string;
   story: string;
   storyboard: string;
   code: string;

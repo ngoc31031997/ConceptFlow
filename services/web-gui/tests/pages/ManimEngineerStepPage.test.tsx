@@ -25,6 +25,7 @@ beforeEach(() => {
     template_text: "TIEN DE: {{previous_output}}",
   });
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+    topic: "",
     story: "",
     storyboard: "",
     code: "",
