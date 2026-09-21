@@ -18,7 +18,8 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   // feature/remotion-engine — không thuộc chuỗi 4 bước Manim ở trên (Remotion
   // chưa có pipeline nhiều bước), nhưng vẫn đánh số tiếp theo cho nhất quán
   // với các lựa chọn khác trong danh sách.
-  { value: "remotion_engineer", label: "5. Remotion Engineer — viết code Remotion" },
+  { value: "remotion_visual_director", label: "5. Remotion Visual Director — storyboard cho engine Remotion" },
+  { value: "remotion_engineer", label: "6. Remotion Engineer — viết code Remotion" },
 ];
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */

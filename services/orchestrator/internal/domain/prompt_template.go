@@ -4,7 +4,8 @@ import "strings"
 
 // PromptRole identifies which stage of the CR-025 authoring pipeline a
 // template drives: Story Architect → Visual Director → Manim Engineer →
-// Script Reviewer.
+// Script Reviewer, plus the Remotion variants of the two engine-specific
+// roles (remotion_visual_director, remotion_engineer).
 type PromptRole string
 
 const (
@@ -18,12 +19,21 @@ const (
 	// whole story for now. Selected instead of story_architect when the
 	// Creator's project has render_engine=remotion (see ScriptAssistant.tsx).
 	RoleRemotionEngineer PromptRole = "remotion_engineer"
+	// The Remotion counterpart of visual_director: tab 1b's storyboard is the
+	// one earlier step that is NOT engine agnostic, because it hands the
+	// engineer a visual vocabulary — Manim's design system has components and
+	// a camera that conceptflow-mini simply does not have, and a storyboard
+	// written in those words makes the Remotion engineer invent imports that
+	// do not exist. story_architect stays shared: it decides story, not
+	// pixels.
+	RoleRemotionVisualDirector PromptRole = "remotion_visual_director"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer, RoleScriptReviewer, RoleRemotionEngineer:
+	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer, RoleScriptReviewer,
+		RoleRemotionEngineer, RoleRemotionVisualDirector:
 		return true
 	default:
 		return false

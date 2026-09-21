@@ -353,7 +353,13 @@ export async function completeYoutubeAuthCallback(
 
 /** CR-025 — one role/language row of the DB-backed prompt-template store. */
 export interface PromptTemplate {
-  role: "story_architect" | "visual_director" | "manim_engineer" | "script_reviewer" | "remotion_engineer";
+  role:
+    | "story_architect"
+    | "visual_director"
+    | "manim_engineer"
+    | "script_reviewer"
+    | "remotion_engineer"
+    | "remotion_visual_director";
   language: "vi" | "en";
   template_text: string;
   version: number;

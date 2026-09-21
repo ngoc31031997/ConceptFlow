@@ -114,6 +114,34 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
   });
 
+  // feature/remotion-engine: the remotion_engineer prompt is topic -> code,
+  // so it carries {{topic}}. Leaving it unsubstituted hands the Creator a
+  // prompt that still says "paste your topic here".
+  it("fills {{topic}} in the engineer prompt instead of leaving the raw token", async () => {
+    vi.mocked(apiClient.getPromptTemplate).mockResolvedValue({
+      role: "remotion_engineer",
+      language: "vi",
+      version: 1,
+      template_text: "CHU DE VIDEO: {{topic}}",
+    });
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("manim-engineer-prompt")).toHaveValue(
+        "CHU DE VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]",
+      );
+    });
+  });
+
   it("shows the pipeline tab bar (1c active) and the render engine picker", () => {
     render(
       <ThemeProvider>
