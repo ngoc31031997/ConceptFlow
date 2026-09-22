@@ -967,11 +967,14 @@ func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
 	}
 }
 
-// TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyToPublish
-// locks CR-021 D2's key behaviour change: video_assembled no longer ends the
-// Render Saga. It must dispatch qc_video and move the project to running_qc,
-// NOT ready_to_publish — that is now qc_completed's job.
-func TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyToPublish(t *testing.T) {
+// TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish
+// locks CR-029's behaviour change: qc_video is off the main saga (it ran
+// after every cost was already spent and had no fail branch, so it never
+// actually gated anything — see cr-029-render-saga-consolidation.md).
+// video_assembled now reaches ready_to_publish directly when the project has
+// no clip requests (VideoOutputMode zero value), same destination
+// onQCCompleted used to reach via qc_completed.
+func TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	rendered := "/shared/proj-1/rendered.mp4"
 	repo.projects["proj-1"] = &domain.Project{
@@ -990,28 +993,49 @@ func TestHandleStepEventUseCase_VideoAssembled_DispatchesQCVideoAndDoesNotReadyT
 	}
 
 	project, _ := repo.Get(context.Background(), "proj-1")
-	if project.Status != domain.StatusRunningQC {
-		t.Fatalf("expected running_qc after video_assembled, got %s (must NOT be ready_to_publish)", project.Status)
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("expected ready_to_publish after video_assembled (no clip requests, qc_video off), got %s", project.Status)
+	}
+
+	if last := pub.last(); last != nil && last.envelope.EventType == string(domain.StepQCVideo) {
+		t.Fatalf("qc_video must not be dispatched anymore, got %+v", last)
+	}
+
+	if _, err := repo.GetStep(context.Background(), "saga-1", domain.StepQCVideo); err == nil {
+		t.Fatalf("qc_video saga step must not be opened anymore")
+	}
+}
+
+// TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips
+// covers the other CR-029 branch: a project that wants Shorts/TikTok clips
+// still gets generate_clips dispatched straight after assembly, just without
+// the qc_video hop in between.
+func TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips(t *testing.T) {
+	uc, repo, pub, _ := newTestUseCase()
+	rendered := "/shared/proj-1/rendered.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusAssemblingVideo,
+		RenderedVideoPath: &rendered,
+		VideoOutputMode:   domain.ModeShortOnly,
+	}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{"video_path": "/shared/proj-1/video/final.mp4"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusGeneratingClips {
+		t.Fatalf("expected generating_clips after video_assembled, got %s", project.Status)
 	}
 
 	last := pub.last()
-	if last == nil || last.routingKey != "video_assembly" {
-		t.Fatalf("expected qc_video dispatched to video_assembly queue, got %+v", last)
-	}
-	if last.envelope.EventType != string(domain.StepQCVideo) {
-		t.Fatalf("expected qc_video command, got %q", last.envelope.EventType)
-	}
-	if last.envelope.Payload["video_path"] != "/shared/proj-1/video/final.mp4" {
-		t.Fatalf("expected assembled video_path forwarded, got %v", last.envelope.Payload["video_path"])
-	}
-	marks, ok := last.envelope.Payload["layout_marks"].([]map[string]interface{})
-	if !ok || len(marks) != 1 {
-		t.Fatalf("expected layout_marks forwarded from project, got %v", last.envelope.Payload["layout_marks"])
-	}
-
-	step, err := repo.GetStep(context.Background(), "saga-1", domain.StepQCVideo)
-	if err != nil || step.Status != domain.SagaStepInProgress {
-		t.Fatalf("expected qc_video saga step in_progress, got %+v, err=%v", step, err)
+	if last == nil || last.envelope.EventType != string(domain.StepGenerateClips) {
+		t.Fatalf("expected generate_clips dispatched, got %+v", last)
 	}
 }
 
