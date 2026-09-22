@@ -21,6 +21,7 @@ const BASE_DRAFT: ProjectDraft = {
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
+  authoringMode: "manual",
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",

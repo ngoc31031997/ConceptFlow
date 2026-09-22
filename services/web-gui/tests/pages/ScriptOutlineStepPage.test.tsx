@@ -130,4 +130,164 @@ describe("ScriptOutlineStepPage", () => {
     expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
     expect(screen.getByTestId("script-tab-review")).not.toBeDisabled();
   });
+
+  // CR-027 FR79 — chế độ làm việc là lựa chọn cho CẢ bước 1, không phải một
+  // nút riêng từng tab. Mặc định là copy tay, đúng cái mọi project vẫn làm
+  // trước CR-027.
+  describe("chế độ làm bước 1 (CR-027 FR79)", () => {
+    function mockLlm(enabled: boolean, reason?: string) {
+      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
+        enabled,
+        provider: enabled ? "hive" : "",
+        reason,
+      });
+    }
+
+    it("mặc định là copy tay: có ô prompt và nút Copy, chưa có nút chạy AI", async () => {
+      mockLlm(true);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
+      expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
+      expect(screen.getByTestId("script-outline-copy")).toBeInTheDocument();
+      expect(screen.queryByTestId("run-with-ai-story")).not.toBeInTheDocument();
+    });
+
+    it("chọn 'Gọi API trực tiếp' thì ẩn ô prompt copy tay và hiện nút chạy", async () => {
+      mockLlm(true);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+
+      expect(screen.getByTestId("run-with-ai-story")).toBeInTheDocument();
+      expect(screen.queryByTestId("script-outline-prompt")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("script-outline-copy")).not.toBeInTheDocument();
+    });
+
+    it("chạy bước 1 bằng API và điền kết quả vào ô dàn ý", async () => {
+      mockLlm(true);
+      vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      const generate = vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
+        step: "story",
+        role: "story_architect",
+        content: "CÂU HỎI CỐT LÕI: vì sao?",
+        provider: "hive",
+        usage: { model: "deepseek" },
+      });
+      renderPage();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), {
+        target: { value: "Vòng lặp for" },
+      });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      await waitFor(() => expect(generate).toHaveBeenCalledWith(expect.any(String), "story", undefined));
+      await waitFor(() =>
+        expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?"),
+      );
+    });
+
+    it("lưu chủ đề lên server trước khi gọi, vì prompt được render ở server", async () => {
+      mockLlm(true);
+      const saveDraft = vi
+        .spyOn(apiClient, "createProjectDraft")
+        .mockResolvedValue({ similarProjects: [] });
+      vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
+        step: "story",
+        role: "story_architect",
+        content: "dàn ý",
+        provider: "hive",
+        usage: { model: "deepseek" },
+      });
+      renderPage();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), {
+        target: { value: "Cây nhị phân" },
+      });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      await waitFor(() =>
+        expect(saveDraft).toHaveBeenCalledWith(expect.any(String), "Cây nhị phân", "vi"),
+      );
+    });
+
+    // FR79.4 — chưa có key thì chế độ AI không chọn được, và đường copy tay
+    // vẫn nguyên vẹn; không bao giờ có một nút bấm vào là lỗi.
+    it("không cho chọn chế độ AI khi chưa có API key", async () => {
+      mockLlm(false, "Chưa cấu hình HIVE_API_KEY");
+      renderPage();
+
+      await waitFor(() =>
+        expect(screen.getByTestId("authoring-mode-bar")).toHaveTextContent("HIVE_API_KEY"),
+      );
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+
+      expect(screen.queryByTestId("run-with-ai-story")).not.toBeInTheDocument();
+      expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
+      expect(screen.getByTestId("script-outline-copy")).toBeInTheDocument();
+    });
+
+    it("nói rõ nguyên nhân khi lượt chạy thất bại", async () => {
+      mockLlm(true);
+      vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      vi.spyOn(apiClient, "generateAuthoringStep").mockRejectedValue(
+        new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Copy prompt như cũ."),
+      );
+      renderPage();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "X" } });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      await waitFor(() =>
+        expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("hết số dư"),
+      );
+      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Copy prompt");
+    });
+
+    // FR79 — chế độ nằm ở project trong DB, không chỉ localStorage: đó là cái
+    // làm nó sống qua reload, qua trình duyệt khác và qua restart, ở bất cứ
+    // bước nào của dự án.
+    it("lưu chế độ lên server khi Creator đổi", async () => {
+      mockLlm(true);
+      const saveMode = vi.spyOn(apiClient, "saveAuthoringMode").mockResolvedValue(undefined);
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+
+      await waitFor(() => expect(saveMode).toHaveBeenCalledWith(expect.any(String), "ai"));
+
+      fireEvent.click(screen.getByTestId("authoring-mode-manual"));
+      await waitFor(() => expect(saveMode).toHaveBeenCalledWith(expect.any(String), "manual"));
+    });
+
+    it("nạp lại chế độ từ server, kể cả khi draft trong trình duyệt nói khác", async () => {
+      mockLlm(true);
+      // Draft (localStorage) nói manual; project trong DB nói ai. Server thắng:
+      // nó là bản ghi của dự án, localStorage chỉ là bản nháp của một máy.
+      window.localStorage.setItem(
+        "conceptflow.draft.v1",
+        JSON.stringify({ projectId: "p-123", voiceLanguage: "vi", authoringMode: "manual" }),
+      );
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+        mode: "ai",
+        topic: "Chủ đề đã lưu",
+        story: "",
+        storyboard: "",
+        code: "",
+        review: "",
+      });
+      renderPage();
+
+      await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toBeInTheDocument());
+      expect(screen.queryByTestId("script-outline-prompt")).not.toBeInTheDocument();
+    });
+  });
 });

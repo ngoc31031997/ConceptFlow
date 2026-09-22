@@ -8,6 +8,9 @@ import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
 
 /** Plain-text rendering of validateScript's/validateRemotionScript's result,
@@ -247,6 +250,15 @@ export function ScriptReviewerStepPage() {
           ? "PASS — còn vài điểm NÊN SỬA (không bắt buộc). Bấm Tiếp tục để render luôn, hoặc dùng prompt sửa lỗi bên dưới trước rồi mới tiếp tục."
           : "Kết quả đánh giá đã sẵn sàng — bước tiếp theo là cấu hình video";
 
+  // CR-027 FR79 — cùng lựa chọn chế độ với các tab khác của bước 1.
+  const llm = useLlmStatus();
+  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
+  const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
+  // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
+  // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
+  const aiMode = authoringMode === "ai" && llm?.enabled === true;
+
   return (
     <div data-testid="script-reviewer-step-page">
       <AppShell currentStep={1} title="Bước 1 — Script" subtitle="1d. Rà soát lại toàn bộ dàn ý, storyboard và code trước khi render." wide>
@@ -257,26 +269,53 @@ export function ScriptReviewerStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
-        <div className={styles.scriptLayout}>
-          <Card
-            title="1. Copy prompt"
-            hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
-          >
-            <TextArea
-              readOnly
-              value={prompt}
-              rows={18}
-              className={styles.promptTextarea}
-              data-testid="script-reviewer-prompt"
-            />
-            <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-reviewer-copy">
-              {copied ? "Đã copy!" : "Copy prompt"}
-            </Button>
-          </Card>
+        <div className={styles.settingsRow}>
+          <AuthoringModeBar
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            step="review"
+            what="bản duyệt"
+            // Cùng kết quả lint mà ô prompt bên dưới đang hiện, nên hai đường
+            // đưa cho reviewer đúng một bản lint (FR80.3).
+            lintResults={lintResults}
+            runDisabled={draft.scriptContent.trim().length === 0}
+            runDisabledReason="Cần code ở tab 1c trước — không có gì để duyệt."
+            onGenerated={(content) => setVerdict(content)}
+          />
+        </div>
+
+        <div className={aiMode ? styles.scriptLayoutSingle : styles.scriptLayout}>
+          {/* Ở chế độ AI, thẻ prompt không còn việc gì: server render đúng văn
+              bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn.
+              Khối "sửa lỗi" bên dưới vẫn là copy tay ở cả hai chế độ: nó sinh
+              code mới, không phải kết quả của bước 1d. */}
+          {!aiMode && (
+            <Card
+              title="1. Copy prompt"
+              hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+            >
+              <TextArea
+                readOnly
+                value={prompt}
+                rows={18}
+                className={styles.promptTextarea}
+                data-testid="script-reviewer-prompt"
+              />
+              <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-reviewer-copy">
+                {copied ? "Đã copy!" : "Copy prompt"}
+              </Button>
+            </Card>
+          )}
 
           <Card
-            title="2. Dán kết quả"
-            hint="Dán kết quả đánh giá (PASS/REVISE) AI trả về. PASS thì bấm Tiếp tục; REVISE sẽ mở khối sửa lỗi bên dưới."
+            title={aiMode ? "Kết quả duyệt" : "2. Dán kết quả"}
+            hint={
+              aiMode
+                ? "Kết quả AI trả về hiện ở đây để bạn đọc lại. PASS thì bấm Tiếp tục; REVISE sẽ mở khối sửa lỗi bên dưới."
+                : "Dán kết quả đánh giá (PASS/REVISE) AI trả về. PASS thì bấm Tiếp tục; REVISE sẽ mở khối sửa lỗi bên dưới."
+            }
           >
             <TextArea
               id="script-reviewer-verdict-input"

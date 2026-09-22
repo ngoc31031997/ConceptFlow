@@ -1,0 +1,59 @@
+/*
+  Dáng thẻ lấy từ ContentLanguagePicker/RenderEnginePicker: cùng một hàng glass
+  card chạy hết chiều ngang, chữ bên trái, lựa chọn bên phải. Cách làm cả bước
+  1 là một quyết định ngang hàng với ngôn ngữ nội dung và công cụ render, nên
+  nó phải trông như vậy — không phải một tiện ích nhỏ nhét dưới ô prompt.
+*/
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.text {
+  min-width: 0;
+  flex: 1 1 260px;
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+/* Nút chạy nằm cùng hàng với hai lựa chọn: chọn "Gọi API" rồi bấm chạy là một
+   động tác liên tục, không phải hai chỗ cách nhau nửa trang. */
+.run {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.status {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  text-align: right;
+  max-width: 320px;
+}
+
+.error {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--danger, #c0392b);
+  text-align: right;
+  max-width: 320px;
+}

@@ -81,6 +81,16 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // CR-025 — rehydrates every saved authoring output (story + storyboard +
   // code + review) so the wizard can restore state on reload/back-navigation.
   router.get('/v1/projects/:id/authoring', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-027 FR79 — cách làm bước 1 (copy tay / gọi API), nhớ theo project nên
+  // mở lại ở máy khác hay sau khi restart vẫn đúng chế độ đã chọn.
+  router.put('/v1/projects/:id/authoring/mode', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
+  // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
+  // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
+  router.post(
+    '/v1/projects/:id/authoring/:step/generate',
+    proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
+  );
   router.post(
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),

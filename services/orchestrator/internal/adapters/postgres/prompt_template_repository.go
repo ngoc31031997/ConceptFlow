@@ -571,3 +571,33 @@ func (r *PromptTemplateRepository) DeleteOverride(ctx context.Context, role doma
 	`, string(role), language)
 	return err
 }
+
+// --- CR-027 FR79: how the Creator works step 1 ----------------------------
+
+// SaveAuthoringMode upserts the step-1 working mode ("manual" or "ai").
+//
+// Upsert on project_id alone, like SaveAuthoringTopic: the mode can be chosen
+// on tab 1a before any outline exists, so it cannot wait for a content row.
+func (r *PromptTemplateRepository) SaveAuthoringMode(ctx context.Context, projectID, mode string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, authoring_mode, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    authoring_mode = EXCLUDED.authoring_mode, updated_at = now()
+	`, projectID, mode)
+	return err
+}
+
+// GetAuthoringMode returns the saved mode, or "" when this project has no
+// authoring row yet. "" is not an error and not a third mode — the caller
+// treats it as the default, which is "manual".
+func (r *PromptTemplateRepository) GetAuthoringMode(ctx context.Context, projectID string) (string, error) {
+	var mode string
+	err := r.pool.QueryRow(ctx, `
+		SELECT authoring_mode FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&mode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return mode, err
+}

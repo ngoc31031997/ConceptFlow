@@ -22,6 +22,9 @@ type fakeAuthoringStore struct {
 	// GetStatus below maps "" to draft) — set per project_id to simulate a
 	// project whose render has already started (CR-028 FR84.2).
 	status map[string]domain.ProjectStatus
+	// mode backs CR-027 FR79's step-1 working mode. Unset means a project
+	// whose row predates the column, which reads back as the default.
+	mode map[string]string
 }
 
 func newFakeAuthoringStore() *fakeAuthoringStore {
@@ -33,7 +36,18 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 		review:     map[string]string{},
 		history:    map[string][]string{},
 		status:     map[string]domain.ProjectStatus{},
+		mode:       map[string]string{},
 	}
+}
+
+// SaveAuthoringMode/GetAuthoringMode back CR-027 FR79's step-1 working mode.
+func (f *fakeAuthoringStore) SaveAuthoringMode(_ context.Context, projectID, mode string) error {
+	f.mode[projectID] = mode
+	return nil
+}
+
+func (f *fakeAuthoringStore) GetAuthoringMode(_ context.Context, projectID string) (string, error) {
+	return f.mode[projectID], nil
 }
 
 // GetStatus backs CR-028 FR84.2's authoring lock. Defaults to draft (unset
@@ -297,5 +311,56 @@ func TestResetPromptTemplateRejectsUnknownRoleAndLanguage(t *testing.T) {
 	// rather than overwriting the row with an empty string.
 	if _, err := uc.Reset(context.Background(), domain.RoleStoryArchitect, "fr"); err == nil {
 		t.Error("expected an error for a language with no shipped default")
+	}
+}
+
+// CR-027 FR79 — the step-1 working mode lives in the database, so a project
+// picked up again on any tab (another browser, after a restart) still knows how
+// its Creator chose to work.
+func TestSaveAuthoringModeRoundTrip(t *testing.T) {
+	store := newFakeAuthoringStore()
+	save := application.NewSaveAuthoringModeUseCase(store)
+	read := application.NewGetAuthoringStateUseCase(store)
+
+	if err := save.Execute(context.Background(), "p1", "ai"); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	state, err := read.Execute(context.Background(), "p1")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if state.Mode != "ai" {
+		t.Errorf("mode = %q, want ai", state.Mode)
+	}
+}
+
+// A project whose row predates the column reads back as manual — what it was
+// actually doing — not as an empty third mode the GUI would have to guess at.
+func TestGetAuthoringStateDefaultsModeToManual(t *testing.T) {
+	store := newFakeAuthoringStore()
+	state, err := application.NewGetAuthoringStateUseCase(store).Execute(context.Background(), "old-project")
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if state.Mode != string(domain.AuthoringModeManual) {
+		t.Errorf("mode = %q, want manual", state.Mode)
+	}
+}
+
+// An unknown mode is rejected rather than normalised: it means the client and
+// the server disagree about what modes exist, and quietly storing "manual"
+// would hide that.
+func TestSaveAuthoringModeRejectsUnknownMode(t *testing.T) {
+	store := newFakeAuthoringStore()
+	save := application.NewSaveAuthoringModeUseCase(store)
+
+	if err := save.Execute(context.Background(), "p1", "sometimes"); err == nil {
+		t.Fatal("want an error for an unknown mode")
+	}
+	if _, ok := store.mode["p1"]; ok {
+		t.Error("nothing should have been stored")
+	}
+	if err := save.Execute(context.Background(), "", "ai"); err == nil {
+		t.Fatal("want an error for a missing project_id")
 	}
 }

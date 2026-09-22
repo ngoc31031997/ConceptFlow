@@ -474,6 +474,67 @@ export function resetPromptTemplate(
   });
 }
 
+/**
+ * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
+ * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
+ */
+export type LlmStatus = {
+  enabled: boolean;
+  provider: string;
+  reason?: string;
+};
+
+export function getLlmStatus(): Promise<LlmStatus> {
+  return apiFetch<LlmStatus>("/v1/llm/status");
+}
+
+/**
+ * CR-027 FR79 — cách làm bước 1, theo đúng hai giá trị server nhận. Kiểu nằm ở
+ * đây vì đây là hợp đồng trên đường truyền; ProjectDraftContext export lại nó
+ * kèm ý nghĩa nghiệp vụ.
+ */
+export type AuthoringMode = "manual" | "ai";
+
+/** Bốn bước của pipeline soạn kịch bản, theo đúng tên server dùng (FR78.5). */
+export type AuthoringStep = "story" | "storyboard" | "code" | "review";
+
+/**
+ * CR-027 FR78 — kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
+ * sinh được nội dung nhưng chưa lưu được (ví dụ project đã khoá vì đang
+ * render): nội dung vẫn trả về, vì token đã bị tính tiền rồi.
+ */
+export type GeneratedStep = {
+  step: string;
+  role: string;
+  content: string;
+  provider: string;
+  usage: {
+    model: string;
+    PromptTokens?: number;
+    CompletionTokens?: number;
+  };
+  save_error?: string;
+};
+
+/**
+ * CR-027 FR78.1 — chạy một bước bằng API: server tự render prompt (cùng một
+ * hàm với nút Copy), gọi provider, lưu kết quả, trả nội dung về.
+ *
+ * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Copy prompt vẫn là
+ * đường đi khi chưa có key, hết số dư, hoặc Creator muốn dùng AI khác.
+ */
+export function generateAuthoringStep(
+  projectId: string,
+  step: AuthoringStep,
+  lintResults?: string,
+): Promise<GeneratedStep> {
+  const query = lintResults ? `?lint_results=${encodeURIComponent(lintResults)}` : "";
+  return apiFetch<GeneratedStep>(`/v1/projects/${projectId}/authoring/${step}/generate${query}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
 /** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
 export async function saveAuthoringStory(
   projectId: string,
@@ -521,6 +582,12 @@ export async function saveAuthoringReview(projectId: string, content: string): P
  * bằng một trình duyệt/máy khác dùng chung project_id).
  */
 export interface AuthoringState {
+  /**
+   * CR-027 FR79 — cách làm bước 1 đã lưu cho project này: "manual" hoặc "ai".
+   * Server luôn trả một trong hai (project cũ đọc ra "manual"), nhưng để
+   * optional để một orchestrator chưa nâng cấp không làm vỡ phần rehydrate.
+   */
+  mode?: AuthoringMode;
   /** CR-027 D0 — "" cho mọi project tạo trước CR-027. */
   topic: string;
   story: string;
@@ -531,6 +598,21 @@ export interface AuthoringState {
 
 export function getAuthoringState(projectId: string): Promise<AuthoringState> {
   return apiFetch<AuthoringState>(`/v1/projects/${projectId}/authoring`);
+}
+
+/**
+ * CR-027 FR79 — lưu cách làm bước 1 cho project này.
+ *
+ * Nằm ở server, không chỉ trong localStorage: lựa chọn này áp cho cả 4 tab và
+ * một project có thể được mở lại ở bất cứ tab nào, từ trình duyệt khác hoặc
+ * sau khi stack restart. PUT nên bấm qua lại nhiều lần cũng chỉ là một giá trị.
+ */
+export async function saveAuthoringMode(projectId: string, mode: AuthoringMode): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/mode`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode }),
+  });
 }
 
 /** CR-028 FR85 — một project khác (cùng ngôn ngữ) có chủ đề trùng sau khi chuẩn hoá. */

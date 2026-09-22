@@ -80,6 +80,22 @@ type renderPromptUseCase interface {
 	Execute(ctx context.Context, projectID string, role domain.PromptRole, lintResults string) (application.RenderedPrompt, error)
 }
 
+// saveAuthoringModeUseCase backs CR-027 FR79's PUT
+// /v1/projects/{id}/authoring/mode — the step-1 working mode, stored per
+// project so it survives a reload, another browser and a restart.
+type saveAuthoringModeUseCase interface {
+	Execute(ctx context.Context, projectID, mode string) error
+}
+
+// generateAuthoringUseCase backs CR-027 FR78's POST
+// /v1/projects/{id}/authoring/{step}/generate — the second way to do a step,
+// beside the Copy-prompt round trip, which stays exactly as it was (FR77.4).
+type generateAuthoringUseCase interface {
+	Execute(ctx context.Context, projectID, step, lintResults string) (application.GeneratedStep, error)
+	Available() bool
+	Provider() string
+}
+
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
@@ -167,6 +183,8 @@ type Router struct {
 	promptTemplates         promptTemplatesUseCase
 	promptOverrides         promptOverridesUseCase
 	renderPrompt            renderPromptUseCase
+	generateAuthoring       generateAuthoringUseCase
+	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -184,6 +202,21 @@ type Router struct {
 // WithRenderPrompt enables CR-027 FR77's server-side prompt rendering.
 func (rt *Router) WithRenderPrompt(renderPrompt renderPromptUseCase) *Router {
 	rt.renderPrompt = renderPrompt
+	return rt
+}
+
+// WithAuthoringMode enables CR-027 FR79's persisted step-1 working mode.
+func (rt *Router) WithAuthoringMode(saveAuthoringMode saveAuthoringModeUseCase) *Router {
+	rt.saveAuthoringMode = saveAuthoringMode
+	return rt
+}
+
+// WithGenerateAuthoring enables CR-027 FR78's run-a-step-with-AI endpoint.
+// Left unwired (no API key), the route answers 404 and GET /v1/llm/status
+// reports disabled, so the GUI hides the button and says why instead of
+// offering one that fails on the first press (FR79.4).
+func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
+	rt.generateAuthoring = generateAuthoring
 	return rt
 }
 
@@ -313,6 +346,12 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
 	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
 	r.Get("/v1/projects/{project_id}/prompts/{role}", rt.handleRenderPrompt)
+	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether
+	// that option exists at all before it draws the button.
+	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
+	r.Get("/v1/llm/status", rt.handleLLMStatus)
+	// CR-027 FR79 — the step-1 working mode, remembered per project.
+	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	return r
 }
 
@@ -1198,12 +1237,39 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
+		// CR-027 FR79 — how the Creator is working step 1, so the wizard
+		// restores the choice on reload or on another machine instead of
+		// falling back to copy-and-paste. Always "manual" or "ai".
+		"mode":       state.Mode,
 		"topic":      state.Topic,
 		"story":      state.Story,
 		"storyboard": state.Storyboard,
 		"code":       state.Code,
 		"review":     state.Review,
 	})
+}
+
+// handleSaveAuthoringMode stores how the Creator works step 1 (CR-027 FR79).
+//
+// PUT, not POST: it replaces one value, and sending it twice must mean the
+// same as sending it once — the GUI writes it on every toggle.
+func (rt *Router) handleSaveAuthoringMode(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringMode == nil {
+		writeError(w, http.StatusNotFound, "authoring mode is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req saveAuthoringModeRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := rt.saveAuthoringMode.Execute(r.Context(), projectID, req.Mode); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // --- CR-027 FR84: the Creator-owned prompt layer --------------------------
@@ -1335,4 +1401,106 @@ func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, rendered)
+}
+
+// llmStatusResponse tells the GUI whether the "Chạy bằng AI" button has
+// anything to call (CR-027 FR79.4).
+type llmStatusResponse struct {
+	Enabled  bool   `json:"enabled"`
+	Provider string `json:"provider"`
+	// Reason is filled only when Enabled is false, in Vietnamese, pointing at
+	// the file the Creator has to edit — a disabled button that does not say
+	// why is a bug report waiting to happen.
+	Reason string `json:"reason,omitempty"`
+}
+
+func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
+	if rt.generateAuthoring == nil || !rt.generateAuthoring.Available() {
+		writeJSON(w, http.StatusOK, llmStatusResponse{
+			Enabled: false,
+			Reason:  "Chưa cấu hình HIVE_API_KEY (hoặc LLM_PROVIDER không phải hive) — dùng nút Copy prompt như cũ.",
+		})
+		return
+	}
+	writeJSON(w, http.StatusOK, llmStatusResponse{
+		Enabled: true, Provider: rt.generateAuthoring.Provider(),
+	})
+}
+
+// handleGenerateAuthoring runs one authoring step through the configured
+// provider (CR-027 FR78.1).
+//
+// It is an addition, not a replacement: GET .../prompts/{role} still serves
+// the same text for the Copy button, and every failure below names the
+// copy-out path as the way through.
+func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request) {
+	if rt.generateAuthoring == nil {
+		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+	step := chi.URLParam(r, "step")
+
+	// lint_results, same as the Copy path: supplied by the caller until the
+	// rendering service's real lint has an HTTP surface (FR80.3).
+	lintResults := r.URL.Query().Get("lint_results")
+
+	result, err := rt.generateAuthoring.Execute(r.Context(), projectID, step, lintResults)
+	if err != nil {
+		writeGenerateError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// writeGenerateError maps a failed run onto a status code and a Vietnamese
+// sentence that says what to do about it (FR76.6/FR79.3). "AI failed" would
+// send a Creator with an empty Hive balance to go rewrite their prompt.
+func writeGenerateError(w http.ResponseWriter, err error) {
+	const fallback = " Hoặc dùng nút Copy prompt như cũ."
+
+	switch {
+	case errors.Is(err, application.ErrGenerateBusy):
+		writeError(w, http.StatusConflict, "Một lượt chạy AI cho bước này đang diễn ra, chờ nó xong đã.")
+		return
+	case errors.Is(err, application.ErrLLMNotConfigured):
+		writeError(w, http.StatusServiceUnavailable,
+			"Chưa cấu hình HIVE_API_KEY trong .env nên không gọi được AI."+fallback)
+		return
+	case errors.Is(err, domain.ErrProjectNotFound):
+		writeError(w, http.StatusNotFound, "project not found")
+		return
+	}
+
+	status := http.StatusBadGateway
+	var message string
+	switch application.LLMErrorKindOf(err) {
+	case application.ErrKindAuth:
+		status = http.StatusBadGateway
+		message = "API key bị từ chối — kiểm tra lại HIVE_API_KEY trong .env."
+	case application.ErrKindBalance:
+		message = "Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive."
+	case application.ErrKindRateLimit:
+		status = http.StatusTooManyRequests
+		message = "Hive đang chặn vì gọi quá nhanh — chờ một lát rồi thử lại."
+	case application.ErrKindTimeout:
+		status = http.StatusGatewayTimeout
+		message = "AI không trả lời trong thời gian cho phép — thử lại, hoặc tăng HIVE_TIMEOUT_SECONDS."
+	case application.ErrKindBudget, application.ErrKindTruncated:
+		message = "Câu trả lời bị cắt vì hết hạn mức token — tăng HIVE_MAX_OUTPUT_TOKENS rồi chạy lại."
+	case application.ErrKindEmpty:
+		message = "AI trả về rỗng — thử chạy lại, hoặc sửa lời prompt ở trang Prompt."
+	case application.ErrKindMalformed:
+		message = "Phản hồi của nhà cung cấp không đúng định dạng mong đợi."
+	case application.ErrKindServer:
+		message = "Nhà cung cấp AI đang lỗi phía họ — thử lại sau."
+	default:
+		// Not a provider failure: a bad step name, a locked project, a failed
+		// save. Those already carry their own message.
+		// Not a provider failure: a bad step name, a locked project, a
+		// prompt over the input cap. Those already carry their own message.
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeError(w, status, message+fallback)
 }

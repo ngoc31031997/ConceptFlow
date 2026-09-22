@@ -36,6 +36,10 @@ function promptsRouter(orchestratorClient) {
   const router = express.Router();
   router.get('/v1/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-027 FR79.4 — nút "Chạy bằng AI" có gọi được gì không: web-gui hỏi
+  // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
+  // nút bấm vào là lỗi.
+  router.get('/v1/llm/status', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/admin/prompts', proxyHandler(orchestratorClient, 'orchestrator'));
   router.put('/v1/admin/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/admin/prompts/:role/reset', proxyHandler(orchestratorClient, 'orchestrator'));

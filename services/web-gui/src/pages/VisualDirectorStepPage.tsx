@@ -6,6 +6,9 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
 import { getPromptTemplate, getAuthoringState, saveAuthoringStoryboard } from "../api/client";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
 
 /**
@@ -97,6 +100,16 @@ export function VisualDirectorStepPage() {
     }
   }
 
+  // CR-027 FR79 — cùng một lựa chọn chế độ với tab 1a; nó nằm trong draft nên
+  // không phải chọn lại ở đây.
+  const llm = useLlmStatus();
+  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
+  const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
+  // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
+  // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
+  const aiMode = authoringMode === "ai" && llm?.enabled === true;
+
   const hint = saveError
     ? saveError
     : storyboardIsEmpty
@@ -113,26 +126,48 @@ export function VisualDirectorStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
-        <div className={styles.scriptLayout}>
-          <Card
-            title="1. Copy prompt"
-            hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
-          >
-            <TextArea
-              readOnly
-              value={prompt}
-              rows={18}
-              className={styles.promptTextarea}
-              data-testid="visual-director-prompt"
-            />
-            <Button onClick={handleCopy} className={styles.copyButton} data-testid="visual-director-copy">
-              {copied ? "Đã copy!" : "Copy prompt"}
-            </Button>
-          </Card>
+        <div className={styles.settingsRow}>
+          <AuthoringModeBar
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            step="storyboard"
+            what="storyboard"
+            runDisabled={draft.authoringStory.trim().length === 0}
+            runDisabledReason="Cần dàn ý ở tab 1a trước — server đọc nó làm {{previous_output}}."
+            onGenerated={(content) => dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content })}
+          />
+        </div>
+
+        <div className={aiMode ? styles.scriptLayoutSingle : styles.scriptLayout}>
+          {/* Ở chế độ AI, cả thẻ prompt không còn việc gì: server render đúng
+              văn bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn. */}
+          {!aiMode && (
+            <Card
+              title="1. Copy prompt"
+              hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+            >
+              <TextArea
+                readOnly
+                value={prompt}
+                rows={18}
+                className={styles.promptTextarea}
+                data-testid="visual-director-prompt"
+              />
+              <Button onClick={handleCopy} className={styles.copyButton} data-testid="visual-director-copy">
+                {copied ? "Đã copy!" : "Copy prompt"}
+              </Button>
+            </Card>
+          )}
 
           <Card
-            title="2. Dán kết quả"
-            hint={`Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`}
+            title={aiMode ? "Storyboard" : "2. Dán kết quả"}
+            hint={
+              aiMode
+                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+                : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+            }
           >
             <TextArea
               id="storyboard-input"

@@ -3,6 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import {
   getPromptTemplate,
@@ -143,6 +146,14 @@ export function ScriptOutlineStepPage() {
   }
 
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
+  const topicIsEmpty = draft.authoringTopic.trim().length === 0;
+  const llm = useLlmStatus();
+  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
+  const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
+  // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
+  // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
+  const aiMode = authoringMode === "ai" && llm?.enabled === true;
 
   async function handleContinue() {
     setSaving(true);
@@ -176,8 +187,38 @@ export function ScriptOutlineStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
+        {/* CR-027 FR79 — cách làm cả bước 1, đặt ngang hàng với
+            ContentLanguagePicker ở các bước khác: Creator chọn một lần, cả 4
+            tab 1a–1d đi theo. */}
+        <div className={styles.settingsRow}>
+          <AuthoringModeBar
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            step="story"
+            what="dàn ý"
+            runDisabled={topicIsEmpty}
+            runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."
+            beforeRun={async () => {
+              // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
+              // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
+              // thiếu đúng cái thứ duy nhất bước này cần.
+              await createProjectDraft(draft.projectId, draft.authoringTopic.trim(), draft.voiceLanguage);
+            }}
+            onGenerated={(content) => dispatch({ type: "SET_AUTHORING_STORY", payload: content })}
+          />
+        </div>
+
         <div className={styles.scriptLayout}>
-          <Card title="1. Copy prompt" hint="Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini.">
+          <Card
+            title={aiMode ? "1. Chủ đề" : "1. Copy prompt"}
+            hint={
+              aiMode
+                ? "Chủ đề là tất cả những gì bước này cần — server tự điền nó vào prompt khi gọi AI."
+                : "Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
+            }
+          >
             <TextInput
               type="text"
               data-testid="script-outline-topic"
@@ -200,21 +241,32 @@ export function ScriptOutlineStepPage() {
                 . Bạn vẫn có thể tiếp tục — đây chỉ là cảnh báo.
               </div>
             )}
-            <TextArea
-              readOnly
-              value={prompt}
-              rows={16}
-              className={styles.promptTextarea}
-              data-testid="script-outline-prompt"
-            />
-            <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-outline-copy">
-              {copied ? "Đã copy!" : "Copy prompt"}
-            </Button>
+            {/* Ở chế độ AI, ô prompt để copy không còn việc gì: server tự
+                render đúng văn bản này rồi tự gọi. Đổi lại chế độ là nó quay
+                lại nguyên vẹn — không có gì bị xoá. */}
+            {!aiMode && (
+              <>
+                <TextArea
+                  readOnly
+                  value={prompt}
+                  rows={16}
+                  className={styles.promptTextarea}
+                  data-testid="script-outline-prompt"
+                />
+                <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-outline-copy">
+                  {copied ? "Đã copy!" : "Copy prompt"}
+                </Button>
+              </>
+            )}
           </Card>
 
           <Card
-            title="2. Dán kết quả"
-            hint="Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+            title={aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
+            hint={
+              aiMode
+                ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+            }
           >
             <TextArea
               id="story-outline-input"

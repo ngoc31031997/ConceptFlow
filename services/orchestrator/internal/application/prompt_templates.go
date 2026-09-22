@@ -251,6 +251,10 @@ func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, co
 // client-side draft state.
 type AuthoringStateReaderPort interface {
 	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
+	// GetAuthoringMode returns "" for a project saved before CR-027 FR79, or
+	// one whose Creator never touched the choice. Execute turns that into the
+	// default rather than leaking an empty third value to the GUI.
+	GetAuthoringMode(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
@@ -260,6 +264,9 @@ type AuthoringStateReaderPort interface {
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
 // pipeline output saved so far, empty string when a step has not been saved.
 type AuthoringState struct {
+	// Mode is CR-027 FR79's step-1 working mode, always either "manual" or
+	// "ai" — never "".
+	Mode       string
 	Topic      string
 	Story      string
 	Storyboard string
@@ -297,5 +304,50 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	return AuthoringState{Topic: topic, Story: story, Storyboard: storyboard, Code: code, Review: review}, nil
+	mode, err := uc.authoring.GetAuthoringMode(ctx, projectID)
+	if err != nil {
+		return AuthoringState{}, err
+	}
+	return AuthoringState{
+		Mode: domain.NormalizeAuthoringMode(mode), Topic: topic,
+		Story: story, Storyboard: storyboard, Code: code, Review: review,
+	}, nil
+}
+
+// AuthoringModePort persists CR-027 FR79's step-1 working mode.
+type AuthoringModePort interface {
+	SaveAuthoringMode(ctx context.Context, projectID, mode string) error
+}
+
+// SaveAuthoringModeUseCase stores how the Creator is working step 1 — copy the
+// prompts out by hand, or let the server call the provider (CR-027 FR79).
+//
+// Server-side because the choice covers all four tabs and a project can be
+// picked up again on any of them: another browser, another machine, or after
+// this stack restarts. The browser draft still holds it for the current
+// session; this is what makes it survive.
+//
+// No draft lock and no history row, unlike the four content saves: this is not
+// a pipeline artefact, it is how the Creator prefers to work. Refusing to
+// remember a preference because the project has moved on to rendering would be
+// a lock protecting nothing.
+type SaveAuthoringModeUseCase struct {
+	authoring AuthoringModePort
+}
+
+func NewSaveAuthoringModeUseCase(authoring AuthoringModePort) *SaveAuthoringModeUseCase {
+	return &SaveAuthoringModeUseCase{authoring: authoring}
+}
+
+// Execute validates the mode and saves it. An unknown mode is rejected rather
+// than normalised to the default: it means the caller and the server disagree
+// about what modes exist, and silently storing "manual" would hide that.
+func (uc *SaveAuthoringModeUseCase) Execute(ctx context.Context, projectID, mode string) error {
+	if projectID == "" {
+		return fmt.Errorf("project_id is required")
+	}
+	if !domain.ValidAuthoringMode(mode) {
+		return fmt.Errorf("mode must be %q or %q", domain.AuthoringModeManual, domain.AuthoringModeAI)
+	}
+	return uc.authoring.SaveAuthoringMode(ctx, projectID, mode)
 }
