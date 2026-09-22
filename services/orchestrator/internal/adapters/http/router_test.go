@@ -556,11 +556,10 @@ type fakeGenerateAuthoring struct {
 	err       error
 	available bool
 	gotStep   string
-	gotLint   string
 }
 
-func (f *fakeGenerateAuthoring) Execute(_ context.Context, _, step, lintResults string) (application.GeneratedStep, error) {
-	f.gotStep, f.gotLint = step, lintResults
+func (f *fakeGenerateAuthoring) Execute(_ context.Context, _, step string) (application.GeneratedStep, error) {
+	f.gotStep = step
 	return f.out, f.err
 }
 func (f *fakeGenerateAuthoring) Available() bool  { return f.available }
@@ -598,14 +597,16 @@ func TestHandleGenerateAuthoring_OK(t *testing.T) {
 	}
 }
 
-func TestHandleGenerateAuthoring_PassesLintResults(t *testing.T) {
+// CR-030 — bước duyệt đã bị bỏ, nên "review" không còn là một step hợp lệ:
+// route vẫn khớp, nhưng use case từ chối nó.
+func TestHandleGenerateAuthoring_ForwardsStepVerbatim(t *testing.T) {
 	gen := &fakeGenerateAuthoring{available: true}
 	rec := httptest.NewRecorder()
 	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/review/generate?lint_results=BLOCKING%3A+x", nil))
+		httptest.NewRequest("POST", "/v1/projects/p1/authoring/code/generate", nil))
 
-	if gen.gotLint != "BLOCKING: x" {
-		t.Errorf("lint_results = %q, want it forwarded like the Copy path does", gen.gotLint)
+	if gen.gotStep != "code" {
+		t.Errorf("step = %q, want code", gen.gotStep)
 	}
 }
 

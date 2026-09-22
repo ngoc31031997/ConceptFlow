@@ -16,7 +16,7 @@ beforeEach(() => {
     version: 1,
     template_text: "DÀN Ý: {{previous_output}}",
   });
-  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "", review: "" });
+  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "saveAuthoringStoryboard").mockResolvedValue(undefined);
 });
 
@@ -114,8 +114,8 @@ describe("VisualDirectorStepPage", () => {
 
     expect(screen.getByTestId("script-tab-storyboard")).toHaveAttribute("aria-selected", "true");
     // Free navigation: every tab stays clickable regardless of progress.
+    // CR-030 — chỉ còn 3 tab, tab "1d. Duyệt" đã bị bỏ hẳn.
     expect(screen.getByTestId("script-tab-outline")).not.toBeDisabled();
     expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
-    expect(screen.getByTestId("script-tab-review")).not.toBeDisabled();
   });
 });

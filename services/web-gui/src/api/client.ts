@@ -357,7 +357,6 @@ export interface PromptTemplate {
     | "story_architect"
     | "visual_director"
     | "manim_engineer"
-    | "script_reviewer"
     | "remotion_engineer"
     | "remotion_visual_director";
   language: "vi" | "en";
@@ -495,8 +494,13 @@ export function getLlmStatus(): Promise<LlmStatus> {
  */
 export type AuthoringMode = "manual" | "ai";
 
-/** Bốn bước của pipeline soạn kịch bản, theo đúng tên server dùng (FR78.5). */
-export type AuthoringStep = "story" | "storyboard" | "code" | "review";
+/**
+ * Ba bước của pipeline soạn kịch bản, theo đúng tên server dùng (FR78.5).
+ *
+ * CR-030 — bước "review" (Script Reviewer) đã bị bỏ hẳn khỏi sản phẩm; server
+ * cũng không còn nhận nó nữa.
+ */
+export type AuthoringStep = "story" | "storyboard" | "code";
 
 /**
  * CR-027 FR78 — kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
@@ -523,13 +527,8 @@ export type GeneratedStep = {
  * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Copy prompt vẫn là
  * đường đi khi chưa có key, hết số dư, hoặc Creator muốn dùng AI khác.
  */
-export function generateAuthoringStep(
-  projectId: string,
-  step: AuthoringStep,
-  lintResults?: string,
-): Promise<GeneratedStep> {
-  const query = lintResults ? `?lint_results=${encodeURIComponent(lintResults)}` : "";
-  return apiFetch<GeneratedStep>(`/v1/projects/${projectId}/authoring/${step}/generate${query}`, {
+export function generateAuthoringStep(projectId: string, step: AuthoringStep): Promise<GeneratedStep> {
+  return apiFetch<GeneratedStep>(`/v1/projects/${projectId}/authoring/${step}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
@@ -566,17 +565,8 @@ export async function saveAuthoringCode(projectId: string, content: string): Pro
   });
 }
 
-/** CR-025 bước 4 — lưu verdict PASS/REVISE (Script Reviewer) Creator dán vào. */
-export async function saveAuthoringReview(projectId: string, content: string): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/review`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content }),
-  });
-}
-
 /**
- * Cả bốn kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
+ * Cả ba kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
  * lại trạng thái khi Creator tải lại trang hoặc quay lại một bước trước đó,
  * thay vì chỉ dựa vào draft ở client (localStorage có thể đã mất khi mở lại
  * bằng một trình duyệt/máy khác dùng chung project_id).
@@ -593,7 +583,6 @@ export interface AuthoringState {
   story: string;
   storyboard: string;
   code: string;
-  review: string;
 }
 
 export function getAuthoringState(projectId: string): Promise<AuthoringState> {
@@ -649,13 +638,24 @@ export async function createProjectDraft(
   projectId: string,
   topic: string,
   contentLanguage: "vi" | "en",
+  // CR-030 — optional: "" (mặc định) nghĩa là "không khai báo ở lượt gọi
+  // này", server giữ nguyên engine đã lưu chứ không reset về Manim. Truyền
+  // vào khi Creator vừa chọn engine ở "/" hoặc ngay trước khi chạy chuỗi AI
+  // 1a→1b→1c ở tab 1a — server đọc project.RenderEngine để chọn đúng vai trò
+  // Manim/Remotion cho 1b/1c, nên nó phải có mặt trước khi bước 1a chạy xong.
+  renderEngine?: "manim" | "remotion",
 ): Promise<{ similarProjects: SimilarProject[] }> {
   const res = await apiFetch<{ project_id: string; similar_projects: similarProjectsWire[] }>(
     "/v1/projects",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id: projectId, topic, content_language: contentLanguage }),
+      body: JSON.stringify({
+        project_id: projectId,
+        topic,
+        content_language: contentLanguage,
+        ...(renderEngine ? { render_engine: renderEngine } : {}),
+      }),
     },
   );
   return { similarProjects: fromWireSimilarProjects(res.similar_projects ?? []) };

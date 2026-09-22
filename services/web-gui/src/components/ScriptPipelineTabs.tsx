@@ -1,13 +1,12 @@
 import { useNavigate } from "react-router-dom";
 import styles from "./ScriptPipelineTabs.module.css";
 
-export type ScriptPipelineTab = "outline" | "storyboard" | "code" | "review";
+export type ScriptPipelineTab = "outline" | "storyboard" | "code";
 
 const TABS: { key: ScriptPipelineTab; path: string; label: string }[] = [
   { key: "outline", path: "/create/script/outline", label: "1a. Dàn ý" },
   { key: "storyboard", path: "/create/script/storyboard", label: "1b. Storyboard" },
   { key: "code", path: "/create/script/code", label: "1c. Code" },
-  { key: "review", path: "/create/script/review", label: "1d. Duyệt" },
 ];
 
 function CheckIcon() {
@@ -29,13 +28,16 @@ interface ScriptPipelineTabsProps {
 }
 
 /**
- * "Bước 1 — Script" used to be one page that silently hopped between four
- * separate URLs (/, /create/visual-director, /create/manim-engineer,
- * /create/script-reviewer) with no way to see the other steps or jump back
- * to one already done except the couple of hardcoded "Quay lại X" links.
- * This makes all four steps visible at once and always reachable — no step
- * is ever locked behind finishing an earlier one, so a Creator who wants to
- * tweak the outline after already generating code can just click "1a".
+ * "Bước 1 — Script" used to be one page that silently hopped between
+ * separate URLs (/, /create/visual-director, /create/manim-engineer) with no
+ * way to see the other steps or jump back to one already done except the
+ * couple of hardcoded "Quay lại X" links. This makes all three steps visible
+ * at once and always reachable — no step is ever locked behind finishing an
+ * earlier one, so a Creator who wants to tweak the outline after already
+ * generating code can just click "1a".
+ *
+ * CR-030 — tab "1d. Duyệt" (Script Reviewer) đã bị bỏ hẳn: bước 1 giờ kết
+ * thúc ở 1c và đi thẳng sang /create/settings.
  */
 export function ScriptPipelineTabs({ active, outlineDone, storyboardDone, codeDone }: ScriptPipelineTabsProps) {
   const navigate = useNavigate();
@@ -43,7 +45,6 @@ export function ScriptPipelineTabs({ active, outlineDone, storyboardDone, codeDo
     outline: outlineDone,
     storyboard: storyboardDone,
     code: codeDone,
-    review: false,
   };
 
   return (

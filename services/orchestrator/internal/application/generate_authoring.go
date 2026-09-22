@@ -33,7 +33,6 @@ type GenerateAuthoringUseCase struct {
 	story      authoringStorySaver
 	storyboard authoringContentSaver
 	code       authoringContentSaver
-	review     authoringContentSaver
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
@@ -54,7 +53,7 @@ type GenerateAuthoringUseCase struct {
 // by construction: one renderer, so the two paths cannot send different text
 // to the same model (FR77.3).
 type authoringPromptRenderer interface {
-	Execute(ctx context.Context, projectID string, role domain.PromptRole, lintResults string) (RenderedPrompt, error)
+	Execute(ctx context.Context, projectID string, role domain.PromptRole) (RenderedPrompt, error)
 }
 
 // authoringStorySaver is SaveAuthoringStoryUseCase — step 1 alone carries the
@@ -63,7 +62,7 @@ type authoringStorySaver interface {
 	Execute(ctx context.Context, projectID, content, topic string) error
 }
 
-// authoringContentSaver is the shape steps 2–4 share.
+// authoringContentSaver is the shape steps 2–3 share.
 type authoringContentSaver interface {
 	Execute(ctx context.Context, projectID, content string) error
 }
@@ -84,13 +83,12 @@ func NewGenerateAuthoringUseCase(
 	story authoringStorySaver,
 	storyboard authoringContentSaver,
 	code authoringContentSaver,
-	review authoringContentSaver,
 	maxInputChars, maxOutputTokens int,
 ) *GenerateAuthoringUseCase {
 	return &GenerateAuthoringUseCase{
 		renderer: renderer, provider: provider, recorder: recorder,
 		projects: projects, story: story, storyboard: storyboard,
-		code: code, review: review,
+		code: code,
 		maxInputChars: maxInputChars, maxOutputTokens: maxOutputTokens,
 		running: map[string]bool{},
 	}
@@ -131,10 +129,12 @@ func (uc *GenerateAuthoringUseCase) Provider() string {
 // Execute runs one step end to end: render the prompt, call the provider,
 // record the cost, save the output.
 //
-// lintResults is passed through to the renderer for the review step, exactly
-// as the Copy path passes it.
+// CR-030 — web-gui chạy ba bước bằng cách gọi hàm này ba lần theo thứ tự, chứ
+// không có một endpoint "chạy cả chuỗi": mỗi lượt đã tự lưu kết quả rồi, nên
+// bước sau render prompt từ đúng dữ liệu bước trước vừa lưu, và một bước hỏng
+// giữa chừng không xoá mất những bước đã xong.
 func (uc *GenerateAuthoringUseCase) Execute(
-	ctx context.Context, projectID, step, lintResults string,
+	ctx context.Context, projectID, step string,
 ) (GeneratedStep, error) {
 	if projectID == "" {
 		return GeneratedStep{}, fmt.Errorf("project_id is required")
@@ -160,7 +160,7 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	}
 	defer release()
 
-	rendered, err := uc.renderer.Execute(ctx, projectID, role, lintResults)
+	rendered, err := uc.renderer.Execute(ctx, projectID, role)
 	if err != nil {
 		return GeneratedStep{}, err
 	}
@@ -180,7 +180,7 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		// written as standing instructions ("bạn là Story Architect..."),
 		// not as a question.
 		System:      rendered.Prompt,
-		User:        userTurnFor(role),
+		User:        userTurnNudge,
 		MaxTokens:   uc.maxOutputTokens,
 		Temperature: 0.7,
 	})
@@ -212,14 +212,9 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	return out, nil
 }
 
-// userTurnFor is the one-line nudge that follows the system prompt. Some
+// userTurnNudge is the one-line nudge that follows the system prompt. Some
 // providers answer an empty user turn with a question back.
-func userTurnFor(role domain.PromptRole) string {
-	if role == domain.RoleScriptReviewer {
-		return "Hãy duyệt và trả kết quả theo đúng định dạng đã mô tả."
-	}
-	return "Hãy thực hiện nhiệm vụ trên và chỉ trả về kết quả theo đúng định dạng đã mô tả."
-}
+const userTurnNudge = "Hãy thực hiện nhiệm vụ trên và chỉ trả về kết quả theo đúng định dạng đã mô tả."
 
 func (uc *GenerateAuthoringUseCase) save(ctx context.Context, projectID, step, content string) error {
 	switch step {
@@ -234,8 +229,6 @@ func (uc *GenerateAuthoringUseCase) save(ctx context.Context, projectID, step, c
 		return saveWith(ctx, uc.storyboard, projectID, content, step)
 	case "code":
 		return saveWith(ctx, uc.code, projectID, content, step)
-	case "review":
-		return saveWith(ctx, uc.review, projectID, content, step)
 	default:
 		return fmt.Errorf("unknown step %q", step)
 	}

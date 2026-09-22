@@ -77,7 +77,7 @@ type promptOverridesUseCase interface {
 // /v1/projects/{id}/prompts/{role} — the prompt fully substituted, so the
 // Copy button and the server's own generate call use the same text.
 type renderPromptUseCase interface {
-	Execute(ctx context.Context, projectID string, role domain.PromptRole, lintResults string) (application.RenderedPrompt, error)
+	Execute(ctx context.Context, projectID string, role domain.PromptRole) (application.RenderedPrompt, error)
 }
 
 // saveAuthoringModeUseCase backs CR-027 FR79's PUT
@@ -91,7 +91,7 @@ type saveAuthoringModeUseCase interface {
 // /v1/projects/{id}/authoring/{step}/generate — the second way to do a step,
 // beside the Copy-prompt round trip, which stays exactly as it was (FR77.4).
 type generateAuthoringUseCase interface {
-	Execute(ctx context.Context, projectID, step, lintResults string) (application.GeneratedStep, error)
+	Execute(ctx context.Context, projectID, step string) (application.GeneratedStep, error)
 	Available() bool
 	Provider() string
 }
@@ -114,14 +114,8 @@ type saveAuthoringCodeUseCase interface {
 	Execute(ctx context.Context, projectID, content string) error
 }
 
-// saveAuthoringReviewUseCase backs CR-025 step 4's POST
-// /v1/projects/{id}/authoring/review.
-type saveAuthoringReviewUseCase interface {
-	Execute(ctx context.Context, projectID, content string) error
-}
-
 // getAuthoringStateUseCase backs GET /v1/projects/{id}/authoring, letting the
-// wizard rehydrate saved story/storyboard/code/review on reload/back-navigation.
+// wizard rehydrate saved story/storyboard/code on reload/back-navigation.
 type getAuthoringStateUseCase interface {
 	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
 }
@@ -188,7 +182,6 @@ type Router struct {
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
-	saveAuthoringReview     saveAuthoringReviewUseCase
 	getAuthoringState       getAuthoringStateUseCase
 	createProjectDraft      createProjectDraftUseCase
 	updateProjectTopic      updateProjectTopicUseCase
@@ -249,13 +242,6 @@ func (rt *Router) WithAuthoringStoryboard(saveAuthoringStoryboard saveAuthoringS
 // POST /v1/projects/{project_id}/authoring/code.
 func (rt *Router) WithAuthoringCode(saveAuthoringCode saveAuthoringCodeUseCase) *Router {
 	rt.saveAuthoringCode = saveAuthoringCode
-	return rt
-}
-
-// WithAuthoringReview attaches CR-025 step 4's save-review use case, enabling
-// POST /v1/projects/{project_id}/authoring/review.
-func (rt *Router) WithAuthoringReview(saveAuthoringReview saveAuthoringReviewUseCase) *Router {
-	rt.saveAuthoringReview = saveAuthoringReview
 	return rt
 }
 
@@ -342,7 +328,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/authoring/story", rt.handleSaveAuthoringStory)
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
-	r.Post("/v1/projects/{project_id}/authoring/review", rt.handleSaveAuthoringReview)
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
 	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
 	r.Get("/v1/projects/{project_id}/prompts/{role}", rt.handleRenderPrompt)
@@ -507,10 +492,15 @@ func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "content_language must be 'vi' or 'en'")
 		return
 	}
+	if req.RenderEngine != "" && !domain.RenderEngine(req.RenderEngine).IsValid() {
+		writeError(w, http.StatusBadRequest, "render_engine must be 'manim' or 'remotion'")
+		return
+	}
 	out, err := rt.createProjectDraft.Execute(r.Context(), application.CreateProjectDraftInput{
 		ProjectID:       req.ProjectID,
 		Topic:           req.Topic,
 		ContentLanguage: lang,
+		RenderEngine:    domain.RenderEngine(req.RenderEngine),
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -1195,32 +1185,8 @@ func (rt *Router) handleSaveAuthoringCode(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
 }
 
-// handleSaveAuthoringReview stores the Script Reviewer verdict a Creator
-// pasted back after the external-AI round trip (CR-025 step 4).
-func (rt *Router) handleSaveAuthoringReview(w http.ResponseWriter, r *http.Request) {
-	if rt.saveAuthoringReview == nil {
-		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
-		return
-	}
-	projectID := chi.URLParam(r, "project_id")
-
-	var req struct {
-		Content string `json:"content"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid JSON body")
-		return
-	}
-
-	if err := rt.saveAuthoringReview.Execute(r.Context(), projectID, req.Content); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
-}
-
 // handleGetAuthoringState serves every saved authoring output (story,
-// storyboard, code, review) so the wizard can rehydrate on reload/
+// storyboard, code) so the wizard can rehydrate on reload/
 // back-navigation instead of relying solely on client-side draft state.
 // Missing outputs come back as "" rather than 404 — a step not yet saved is
 // a normal state.
@@ -1245,7 +1211,6 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"story":      state.Story,
 		"storyboard": state.Storyboard,
 		"code":       state.Code,
-		"review":     state.Review,
 	})
 }
 
@@ -1385,13 +1350,7 @@ func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// lint_results is supplied by the caller for now. The review step's real
-	// lint comes from the rendering service, which has no HTTP surface yet —
-	// that is its own milestone, and wiring it through here before it exists
-	// would mean guessing at its shape.
-	lintResults := r.URL.Query().Get("lint_results")
-
-	rendered, err := rt.renderPrompt.Execute(r.Context(), projectID, domain.PromptRole(role), lintResults)
+	rendered, err := rt.renderPrompt.Execute(r.Context(), projectID, domain.PromptRole(role))
 	if err != nil {
 		if errors.Is(err, domain.ErrProjectNotFound) {
 			writeError(w, http.StatusNotFound, "project not found")
@@ -1441,11 +1400,7 @@ func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request
 	projectID := chi.URLParam(r, "project_id")
 	step := chi.URLParam(r, "step")
 
-	// lint_results, same as the Copy path: supplied by the caller until the
-	// rendering service's real lint has an HTTP surface (FR80.3).
-	lintResults := r.URL.Query().Get("lint_results")
-
-	result, err := rt.generateAuthoring.Execute(r.Context(), projectID, step, lintResults)
+	result, err := rt.generateAuthoring.Execute(r.Context(), projectID, step)
 	if err != nil {
 		writeGenerateError(w, err)
 		return

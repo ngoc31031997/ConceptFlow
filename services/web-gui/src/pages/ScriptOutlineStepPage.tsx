@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import { AuthoringModeBar } from "../components/AuthoringModeBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
@@ -19,6 +20,7 @@ import {
   CHANNEL_IDENTITY,
   NARRATION_LANGUAGE_RULE,
 } from "../components/scriptPrompts";
+import { stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
@@ -30,13 +32,17 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 /**
  * Bước 1a (Story Architect) — first tab of the "Bước 1 — Script" sub-wizard.
  * Used to be baked into ScriptStepPage + ScriptAssistant as the "blank"
- * situation; pulled out into its own tab/route so all 4 pipeline steps
- * (dàn ý/storyboard/code/duyệt) are visible and reachable at once (see
+ * situation; pulled out into its own tab/route so all 3 pipeline steps
+ * (dàn ý/storyboard/code) are visible and reachable at once (see
  * ScriptPipelineTabs), instead of a single hidden path through "/".
  *
- * The engine choice (Manim vs Remotion) is NOT asked here — this step's
- * output (a plain-text story outline) is identical either way; only step 1c
- * (Code) needs to know which engine, to fetch the right system prompt.
+ * The engine choice (Manim vs Remotion) does not change THIS step's own
+ * prompt — a plain-text story outline reads the same either way — but
+ * CR-030's "chạy cả bước 1 bằng AI" button runs 1b (storyboard) and 1c
+ * (code) too, and those two DO branch by engine (RoleFor on the server). So
+ * the picker lives here as well, not only on 1c: choosing it up front, before
+ * the chain runs, is the only way the chain's own storyboard/code calls see
+ * the right engine instead of always defaulting to Manim.
  */
 export function ScriptOutlineStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -187,26 +193,60 @@ export function ScriptOutlineStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
+        {/* CR-030 — engine chọn ở đây, không chỉ ở 1c: nút "chạy cả bước 1"
+            bên dưới gọi luôn cả 1b/1c, nên tới lúc Creator xuống tới 1c để
+            đổi thì storyboard/code đã render bằng engine mặc định (Manim)
+            rồi. onChange lưu lên server ngay — xem AuthoringModeBar's
+            beforeRun bên dưới cho lượt lưu lại ngay trước khi chuỗi chạy. */}
+        <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
+          <RenderEnginePicker
+            value={draft.renderEngine}
+            onChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              if (draft.projectId) {
+                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
+              }
+            }}
+          />
+        </div>
+
         {/* CR-027 FR79 — cách làm cả bước 1, đặt ngang hàng với
-            ContentLanguagePicker ở các bước khác: Creator chọn một lần, cả 4
-            tab 1a–1d đi theo. */}
+            ContentLanguagePicker ở các bước khác: Creator chọn một lần, cả 3
+            tab 1a–1c đi theo.
+
+            CR-030 — ở chế độ AI, nút này chạy thẳng cả ba bước: chủ đề là đầu
+            vào duy nhất của cả chuỗi, nên bắt Creator quay lại bấm ở 1b rồi
+            1c chỉ là ba lần chờ thay vì một. Tab 1b/1c vẫn giữ nút chạy riêng
+            để sinh lại đúng một bước sau khi sửa tay. */}
         <div className={styles.settingsRow}>
           <AuthoringModeBar
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            step="story"
+            steps={["story", "storyboard", "code"]}
             what="dàn ý"
             runDisabled={topicIsEmpty}
             runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."
             beforeRun={async () => {
               // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
               // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
-              // thiếu đúng cái thứ duy nhất bước này cần.
-              await createProjectDraft(draft.projectId, draft.authoringTopic.trim(), draft.voiceLanguage);
+              // thiếu đúng cái thứ duy nhất bước này cần. Engine đi kèm ở đây
+              // nữa, làm lưới an toàn cho lượt lưu ở onChange phía trên —
+              // chuỗi 1b/1c phải thấy đúng engine trước khi chạy, không phải
+              // sau.
+              await createProjectDraft(
+                draft.projectId,
+                draft.authoringTopic.trim(),
+                draft.voiceLanguage,
+                draft.renderEngine,
+              );
             }}
-            onGenerated={(content) => dispatch({ type: "SET_AUTHORING_STORY", payload: content })}
+            onGenerated={(step, content) => {
+              if (step === "story") dispatch({ type: "SET_AUTHORING_STORY", payload: content });
+              else if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
+              else dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(content) });
+            }}
           />
         </div>
 

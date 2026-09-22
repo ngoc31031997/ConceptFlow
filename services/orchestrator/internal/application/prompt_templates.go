@@ -210,40 +210,6 @@ func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, cont
 	return uc.history.SaveAuthoringHistory(ctx, projectID, "code_content", content)
 }
 
-// AuthoringReviewPort persists CR-025 step 4's pasted reviewer verdict.
-type AuthoringReviewPort interface {
-	SaveAuthoringReview(ctx context.Context, projectID, content string) error
-	GetAuthoringReview(ctx context.Context, projectID string) (string, error)
-}
-
-// SaveAuthoringReviewUseCase stores the Script Reviewer verdict a Creator
-// pasted back after the external-AI round trip (CR-025 step 4) — same
-// "just persist intent" posture as the other three authoring save use cases.
-type SaveAuthoringReviewUseCase struct {
-	authoring AuthoringReviewPort
-	locks     AuthoringLockPort
-	history   AuthoringHistoryWriterPort
-}
-
-func NewSaveAuthoringReviewUseCase(authoring AuthoringReviewPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringReviewUseCase {
-	return &SaveAuthoringReviewUseCase{authoring: authoring, locks: locks, history: history}
-}
-
-func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, content string) error {
-	if projectID == "" {
-		return fmt.Errorf("project_id is required")
-	}
-	if content == "" {
-		return fmt.Errorf("content is required")
-	}
-	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
-		return err
-	}
-	if err := uc.authoring.SaveAuthoringReview(ctx, projectID, content); err != nil {
-		return err
-	}
-	return uc.history.SaveAuthoringHistory(ctx, projectID, "review_content", content)
-}
 
 // AuthoringStateReaderPort is the read side all four authoring outputs
 // share — used by GET /v1/projects/{id}/authoring so the wizard can
@@ -258,7 +224,6 @@ type AuthoringStateReaderPort interface {
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
-	GetAuthoringReview(ctx context.Context, projectID string) (string, error)
 }
 
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
@@ -271,7 +236,6 @@ type AuthoringState struct {
 	Story      string
 	Storyboard string
 	Code       string
-	Review     string
 }
 
 // GetAuthoringStateUseCase backs the read side of CR-025's authoring pipeline.
@@ -300,17 +264,13 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	review, err := uc.authoring.GetAuthoringReview(ctx, projectID)
-	if err != nil {
-		return AuthoringState{}, err
-	}
 	mode, err := uc.authoring.GetAuthoringMode(ctx, projectID)
 	if err != nil {
 		return AuthoringState{}, err
 	}
 	return AuthoringState{
 		Mode: domain.NormalizeAuthoringMode(mode), Topic: topic,
-		Story: story, Storyboard: storyboard, Code: code, Review: review,
+		Story: story, Storyboard: storyboard, Code: code,
 	}, nil
 }
 

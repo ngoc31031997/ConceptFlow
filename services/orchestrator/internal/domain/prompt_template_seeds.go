@@ -25,8 +25,6 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleVisualDirector, Language: "en", Version: 5, TemplateText: bt(visualDirectorEN)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 3, TemplateText: bt(manimEngineerVI)},
 		{Role: RoleManimEngineer, Language: "en", Version: 3, TemplateText: bt(manimEngineerEN)},
-		{Role: RoleScriptReviewer, Language: "vi", Version: 1, TemplateText: bt(scriptReviewerVI)},
-		{Role: RoleScriptReviewer, Language: "en", Version: 1, TemplateText: bt(scriptReviewerEN)},
 		{Role: RoleRemotionVisualDirector, Language: "vi", Version: 1, TemplateText: bt(remotionVisualDirectorVI)},
 		{Role: RoleRemotionVisualDirector, Language: "en", Version: 1, TemplateText: bt(remotionVisualDirectorEN)},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 2, TemplateText: bt(remotionEngineerVI)},
@@ -818,96 +816,6 @@ IMPORTANT — COLOR, FONT SIZE, COORDINATES (applies to EVERY call in the whole 
 ## OUTPUT
 
 Answer with exactly one complete Python code block (wrapped in ¤¤¤python ... ¤¤¤), no explanation outside the code.`
-
-// --- Script Reviewer (FR74.1/FR74.2) ---------------------------------------
-// New role: structured PASS/REVISE verdict grouped by category, consuming
-// story+storyboard+code via {{previous_output}} and static lint results via
-// {{lint_results}}.
-const scriptReviewerVI = `Bạn là một NGƯỜI DUYỆT SCRIPT (Script Reviewer) cho video giải thích bằng Manim. Bạn nhận toàn bộ quá trình tạo ra script này — câu chuyện, storyboard, code — cùng kết quả kiểm tra tĩnh (lint), và phải đưa ra MỘT QUYẾT ĐỊNH RÕ RÀNG.
-
-## CÂU CHUYỆN + STORYBOARD + CODE
-
-{{previous_output}}
-
-## KẾT QUẢ LINT TĨNH
-
-{{lint_results}}
-
-## YÊU CẦU
-
-Đưa ra ĐÚNG MỘT trong hai verdict: ¤PASS¤ hoặc ¤REVISE¤.
-
-- ¤PASS¤: script sẵn sàng render, không có vấn đề chặn.
-- ¤REVISE¤: có ít nhất một vấn đề cần sửa trước khi render.
-
-Với MỌI vấn đề tìm thấy (kể cả khi verdict là PASS nhưng có góp ý không bắt buộc), liệt kê theo đúng 3 nhóm sau, không viết văn xuôi tự do:
-
-### NỘI DUNG
-- [ ] <vấn đề cụ thể> — <vì sao đây là vấn đề> — <mức độ: BẮT BUỘC SỬA | NÊN SỬA>
-
-### HÌNH ẢNH
-- [ ] <vấn đề cụ thể> — <vì sao đây là vấn đề> — <mức độ>
-
-### KỸ THUẬT
-- [ ] <vấn đề cụ thể, ví dụ từ lint_results> — <vì sao đây là vấn đề> — <mức độ>
-
-Nếu một nhóm không có vấn đề gì, ghi "Không có vấn đề." dưới tiêu đề nhóm đó — không bỏ trống nhóm.
-
-## OUTPUT — ĐÚNG ĐỊNH DẠNG SAU, KHÔNG THÊM GÌ KHÁC
-
-VERDICT: PASS|REVISE
-
-### NỘI DUNG
-...
-
-### HÌNH ẢNH
-...
-
-### KỸ THUẬT
-...`
-
-const scriptReviewerEN = `You are the Script Reviewer for a Manim explainer video. You receive the full pipeline that produced this script — story, storyboard, code — plus static lint results, and must give ONE CLEAR VERDICT.
-
-## STORY + STORYBOARD + CODE
-
-{{previous_output}}
-
-## STATIC LINT RESULTS
-
-{{lint_results}}
-
-## REQUIREMENT
-
-Give exactly ONE of two verdicts: ¤PASS¤ or ¤REVISE¤.
-
-- ¤PASS¤: the script is ready to render, no blocking issues.
-- ¤REVISE¤: at least one issue must be fixed before rendering.
-
-For EVERY issue found (even non-blocking suggestions when the verdict is PASS), list it under exactly these 3 categories — no free-form prose:
-
-### CONTENT
-- [ ] <specific issue> — <why it's a problem> — <severity: MUST FIX | SHOULD FIX>
-
-### VISUALS
-- [ ] <specific issue> — <why it's a problem> — <severity>
-
-### TECHNICAL
-- [ ] <specific issue, e.g. from lint_results> — <why it's a problem> — <severity>
-
-If a category has no issues, write "No issues." under that category's heading — never leave a category blank.
-
-## OUTPUT — EXACTLY THIS FORMAT, NOTHING ELSE
-
-VERDICT: PASS|REVISE
-
-### CONTENT
-...
-
-### VISUALS
-...
-
-### TECHNICAL
-...`
 
 // --- Remotion Visual Director (feature/remotion-engine) --------------------
 // Same job as visualDirectorVI — turn the Story Architect's outline into a

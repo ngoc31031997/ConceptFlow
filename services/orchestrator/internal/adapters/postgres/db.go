@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS processed_messages (
 );
 
 -- CR-025: prompt wording for the 4-role authoring pipeline (Story Architect →
--- Visual Director → Manim Engineer → Script Reviewer), moved out of
+-- Visual Director → Manim Engineer; CR-030 bỏ bước Script Reviewer), moved out of
 -- web-gui's scriptPrompts.ts so an editor can fix wording without a frontend
 -- rebuild. version increments on every update (mirrors video_formats'
 -- versioning intent, though templates are edited in place rather than
@@ -299,7 +299,8 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT N
 -- storyboard_content above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NULL DEFAULT '';
 
--- CR-025 step 4 (Script Reviewer): the pasted PASS/REVISE verdict text a
+-- CR-025 step 4 (Script Reviewer), bước đã bị CR-030 bỏ hẳn: cột giữ lại cho
+-- dữ liệu cũ, không còn gì đọc/ghi. The pasted PASS/REVISE verdict text a
 -- Creator gets back from the external AI, same reasoning/table as the columns
 -- above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';

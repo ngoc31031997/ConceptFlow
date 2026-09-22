@@ -132,11 +132,11 @@ export function VisualDirectorStepPage() {
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            step="storyboard"
+            steps={["storyboard"]}
             what="storyboard"
             runDisabled={draft.authoringStory.trim().length === 0}
             runDisabledReason="Cần dàn ý ở tab 1a trước — server đọc nó làm {{previous_output}}."
-            onGenerated={(content) => dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content })}
+            onGenerated={(_step, content) => dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content })}
           />
         </div>
 

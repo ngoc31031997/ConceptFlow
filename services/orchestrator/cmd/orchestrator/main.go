@@ -169,10 +169,9 @@ func main() {
 	// CR-025 step 2: Visual Director's storyboard save, and the shared
 	// read-side use case both steps' rehydration relies on.
 	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	// CR-025 step 3/4: Manim Engineer's code save and Script Reviewer's
-	// verdict save, sharing the same read-side use case.
+	// CR-025 step 3: Manim Engineer's code save, sharing the same read-side
+	// use case. CR-030 đã bỏ hẳn bước 4 (Script Reviewer).
 	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	saveAuthoringReview := application.NewSaveAuthoringReviewUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
 	// CR-027 FR79 — the step-1 working mode, stored per project so the choice
 	// survives a reload, another browser, and a restart of this service.
@@ -199,7 +198,7 @@ func main() {
 		generateAuthoring = application.NewGenerateAuthoringUseCase(
 			renderPrompt, llmProvider, llmUsageRecorder,
 			promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
-			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode, saveAuthoringReview,
+			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
 		)
 	}
@@ -213,7 +212,6 @@ func main() {
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
 		WithAuthoringCode(saveAuthoringCode).
-		WithAuthoringReview(saveAuthoringReview).
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory)
@@ -285,6 +283,10 @@ func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, 
 
 func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]application.SimilarProject, error) {
 	return a.authoring.FindSimilarTopics(ctx, language, normalizedTopic, excludeProjectID)
+}
+
+func (a projectDraftAdapter) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
+	return a.projects.SaveRenderEngine(ctx, projectID, engine)
 }
 
 type promptRenderContext struct {

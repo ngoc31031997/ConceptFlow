@@ -7,6 +7,13 @@ import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
+/** Nhãn tiếng Việt của từng bước, để câu trạng thái nói đúng nó đang ở đâu. */
+const STEP_LABELS: Record<AuthoringStep, string> = {
+  story: "1a. Dàn ý",
+  storyboard: "1b. Storyboard",
+  code: "1c. Code",
+};
+
 interface AuthoringModeBarProps {
   /**
    * Trạng thái provider, do trang sở hữu (useLlmStatus) chứ không phải thẻ
@@ -19,20 +26,23 @@ interface AuthoringModeBarProps {
   mode: AuthoringMode;
   onModeChange: (mode: AuthoringMode) => void;
   projectId: string;
-  /** Tab hiện tại — server tự suy ra vai trò prompt từ nó (CR-027 FR78.5). */
-  step: AuthoringStep;
+  /**
+   * CR-030 — chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Tab 1a
+   * truyền cả ba (`story`, `storyboard`, `code`): Creator chỉ nhập chủ đề rồi
+   * bấm một lần, server chạy tuần tự, mỗi bước đọc kết quả bước trước đã lưu.
+   * Tab 1b/1c truyền đúng một bước, để chạy lại riêng bước đó sau khi sửa tay.
+   */
+  steps: AuthoringStep[];
   /** Bước này sinh ra cái gì, để câu chữ trên nút nói đúng việc nó làm. */
   what: string;
-  /** Kết quả trả về, để trang nhét thẳng vào ô soạn thảo (FR78.2). */
-  onGenerated: (content: string) => void;
+  /** Kết quả từng bước, để trang nhét thẳng vào ô soạn thảo (FR78.2). */
+  onGenerated: (step: AuthoringStep, content: string) => void;
   /**
    * Việc phải xong trước khi gọi — lưu chủ đề/kết quả bước trước lên server,
    * vì server render prompt từ dữ liệu của nó, không từ state trình duyệt
    * (FR80.1).
    */
   beforeRun?: () => Promise<void>;
-  /** Bước 1d truyền kết quả lint vào {{lint_results}} (FR80.3). */
-  lintResults?: string;
   /** Chặn nút chạy dù đã chọn chế độ AI — ví dụ chưa nhập chủ đề. */
   runDisabled?: boolean;
   runDisabledReason?: string;
@@ -44,12 +54,12 @@ const MODES: { value: AuthoringMode; label: string }[] = [
 ];
 
 /**
- * CR-027 FR79 — cách làm **cả bước 1**, đặt ở đầu mỗi tab 1a/1b/1c/1d.
+ * CR-027 FR79 — cách làm **cả bước 1**, đặt ở đầu mỗi tab 1a/1b/1c.
  *
  * Một lựa chọn cho toàn bộ pipeline, không phải một nút riêng mỗi tab:
  * Creator đã quyết định chạy script này bằng API thì không muốn quyết định
- * lại ở 1b, 1c, 1d. Lựa chọn nằm trong draft nên nó sống qua việc đổi tab và
- * tải lại trang, và mặc định là `manual` — đúng cái mọi project vẫn làm trước
+ * lại ở 1b, 1c. Lựa chọn nằm trong draft nên nó sống qua việc đổi tab và tải
+ * lại trang, và mặc định là `manual` — đúng cái mọi project vẫn làm trước
  * CR-027.
  *
  * Chế độ `manual` không bao giờ mất đi: nó là đường đi khi chưa có key, hết số
@@ -57,21 +67,28 @@ const MODES: { value: AuthoringMode; label: string }[] = [
  * (FR77.4/FR83.2). Vì vậy khi máy chủ chưa cấu hình key, lựa chọn "Gọi API"
  * hiện ra ở trạng thái không chọn được kèm lý do, chứ không lẳng lặng biến mất
  * — Creator cần biết tính năng có tồn tại và thiếu gì để bật.
+ *
+ * CR-030 — ở chế độ AI, tab 1a chạy cả ba bước trong một lần bấm (`steps`).
+ * Chuỗi chạy ở client chứ không phải một endpoint mới, vì mỗi lượt gọi đã tự
+ * lưu kết quả lên server rồi: bước sau render prompt từ đúng dữ liệu bước
+ * trước vừa lưu. Đổi lại, khi một bước giữa chừng hỏng thì những bước đã xong
+ * vẫn còn nguyên, và Creator chạy tiếp từ tab đang dở thay vì mất cả chuỗi.
  */
 export function AuthoringModeBar({
   llm,
   mode,
   onModeChange,
   projectId,
-  step,
+  steps,
   what,
   onGenerated,
   beforeRun,
-  lintResults,
   runDisabled,
   runDisabledReason,
 }: AuthoringModeBarProps) {
   const [running, setRunning] = useState(false);
+  /** Bước đang chạy, để hiện "2/3 — 1b. Storyboard" thay vì một spinner câm. */
+  const [progress, setProgress] = useState<{ index: number; step: AuthoringStep } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -80,24 +97,46 @@ export function AuthoringModeBar({
   if (!llm) return null;
 
   const aiMode = mode === "ai" && llm.enabled;
+  const isChain = steps.length > 1;
 
   async function handleRun() {
     setRunning(true);
     setError(null);
     setNote(null);
+    let at: AuthoringStep | null = null;
     try {
       // Server render prompt từ dữ liệu của chính nó, nên những gì Creator vừa
       // gõ phải lên server trước, không thì prompt thiếu dữ liệu bước này cần.
       if (beforeRun) await beforeRun();
-      const result = await generateAuthoringStep(projectId, step, lintResults);
-      onGenerated(result.content);
-      if (result.save_error) setNote(result.save_error);
+      for (let i = 0; i < steps.length; i += 1) {
+        const step = steps[i];
+        // Biến cục bộ chứ không đọc lại state `progress` ở khối catch: state
+        // vừa set chưa nhìn thấy được trong cùng một lượt chạy, nên câu lỗi sẽ
+        // chỉ sai tên bước.
+        at = step;
+        setProgress({ index: i, step });
+        const result = await generateAuthoringStep(projectId, step);
+        onGenerated(step, result.content);
+        if (result.save_error) {
+          // Nội dung sinh ra được nhưng không lưu được: bước sau sẽ render
+          // prompt từ dữ liệu cũ trên server, tức là làm sai đề. Dừng chuỗi
+          // ngay, giữ lại thứ vừa sinh trong ô soạn thảo.
+          setNote(result.save_error);
+          break;
+        }
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.");
+      const where = at && isChain ? ` (dừng ở ${STEP_LABELS[at]})` : "";
+      setError(
+        (err instanceof Error ? err.message : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.") + where,
+      );
     } finally {
       setRunning(false);
+      setProgress(null);
     }
   }
+
+  const runLabel = isChain ? `Chạy cả bước 1 bằng AI (1a → 1b → 1c)` : `Chạy ${what} bằng AI`;
 
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="authoring-mode-bar">
@@ -107,8 +146,8 @@ export function AuthoringModeBar({
           {!llm.enabled
             ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
             : aiMode
-              ? `Áp dụng cho cả 4 tab 1a–1d: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`
-              : "Áp dụng cho cả 4 tab 1a–1d: bạn copy prompt, dán vào ChatGPT/Claude/Gemini rồi dán kết quả về. Đổi sang 'Gọi API' bất cứ lúc nào."}
+              ? `Áp dụng cho cả 3 tab 1a–1c: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`
+              : "Áp dụng cho cả 3 tab 1a–1c: bạn copy prompt, dán vào ChatGPT/Claude/Gemini rồi dán kết quả về. Đổi sang 'Gọi API' bất cứ lúc nào."}
         </p>
       </div>
 
@@ -137,14 +176,16 @@ export function AuthoringModeBar({
             <Button
               onClick={handleRun}
               disabled={running || runDisabled}
-              data-testid={`run-with-ai-${step}`}
+              data-testid={`run-with-ai-${steps[0]}`}
               title={runDisabled ? runDisabledReason : `Gọi trực tiếp ${llm.provider}`}
             >
-              {running ? "AI đang chạy..." : `Chạy ${what} bằng AI`}
+              {running ? "AI đang chạy..." : runLabel}
             </Button>
             {running && (
               <p className={styles.status} data-testid="run-with-ai-running">
-                Có thể mất vài chục giây, đừng đóng trang.
+                {progress && isChain
+                  ? `Bước ${progress.index + 1}/${steps.length} — ${STEP_LABELS[progress.step]}. Có thể mất vài phút, đừng đóng trang.`
+                  : "Có thể mất vài chục giây, đừng đóng trang."}
               </p>
             )}
             {!running && runDisabled && runDisabledReason && (

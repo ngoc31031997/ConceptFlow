@@ -271,6 +271,9 @@ type createProjectDraftRequest struct {
 	ProjectID       string `json:"project_id,omitempty"`
 	Topic           string `json:"topic"`
 	ContentLanguage string `json:"content_language"`
+	// RenderEngine is optional (CR-030): "" means "unchanged" — see
+	// CreateProjectDraftInput.RenderEngine's doc comment.
+	RenderEngine string `json:"render_engine,omitempty"`
 }
 
 // updateProjectTopicRequest is the body of PATCH

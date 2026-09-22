@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringCode } from "../api/client";
+import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
@@ -21,7 +21,8 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * ScriptPipelineTabs): fetch the current template, fill it with the
  * previous tabs' saved output (story + storyboard), let the Creator copy it
  * out and paste the AI's code back, then save it server-side, store it as
- * the draft's scriptContent, and advance to tab 1d (Duyệt).
+ * the draft's scriptContent, and advance to /create/settings — 1c is the
+ * last tab of bước 1 since CR-030 removed the "1d. Duyệt" review tab.
  *
  * feature/remotion-engine: the render engine picker lives HERE, not on the
  * situation-chooser page — tabs 1a/1b (story/storyboard) are identical
@@ -141,7 +142,9 @@ export function ManimEngineerStepPage() {
     setSaveError(null);
     try {
       await saveAuthoringCode(draft.projectId, code);
-      navigate("/create/script/review");
+      // CR-030 — 1c là tab cuối của bước 1 (tab "1d. Duyệt" đã bị bỏ), nên
+      // "Tiếp tục" đi thẳng sang phần cấu hình giọng đọc/render.
+      navigate("/create/settings");
     } catch {
       setSaveError("Không lưu được code, thử lại.");
     } finally {
@@ -179,7 +182,16 @@ export function ManimEngineerStepPage() {
         <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
           <RenderEnginePicker
             value={draft.renderEngine}
-            onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
+            onChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              // CR-030 — server phải biết engine trước khi render prompt cho
+              // storyboard/code (RoleFor đọc project.RenderEngine), không chỉ
+              // ở lúc nộp render. Best-effort như useAuthoringMode: lỗi mạng ở
+              // đây không được chặn Creator đổi lựa chọn trên màn hình.
+              if (draft.projectId) {
+                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
+              }
+            }}
           />
         </div>
 
@@ -189,11 +201,11 @@ export function ManimEngineerStepPage() {
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            step="code"
+            steps={["code"]}
             what={`code ${isRemotion ? "Remotion" : "Manim"}`}
             runDisabled={draft.authoringStoryboard.trim().length === 0}
             runDisabledReason="Cần storyboard ở tab 1b trước — server đọc dàn ý + storyboard làm {{previous_output}}."
-            onGenerated={(content) => setCode(content)}
+            onGenerated={(_step, content) => setCode(content)}
           />
         </div>
 
@@ -222,8 +234,8 @@ export function ManimEngineerStepPage() {
             title={aiMode ? `Code ${isRemotion ? "Remotion" : "Manim"}` : "2. Dán kết quả"}
             hint={
               aiMode
-                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa — lint bên dưới vẫn chạy như khi dán tay. Bấm Tiếp tục để chuyển sang bước 1d (Duyệt).`
-                : `Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1d (Duyệt).`
+                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa — lint bên dưới vẫn chạy như khi dán tay. Bấm Tiếp tục để sang phần cấu hình giọng đọc.`
+                : `Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để sang phần cấu hình giọng đọc.`
             }
           >
             <TextArea

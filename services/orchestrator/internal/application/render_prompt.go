@@ -102,8 +102,6 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 			return domain.RoleRemotionEngineer, nil
 		}
 		return domain.RoleManimEngineer, nil
-	case "review":
-		return domain.RoleScriptReviewer, nil
 	default:
 		return "", fmt.Errorf("unknown step %q", step)
 	}
@@ -111,12 +109,10 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 
 // Execute renders the prompt for one role of one project.
 //
-// lintResults is passed in rather than fetched here: the review step's
-// {{lint_results}} comes from the rendering service, and this use case has
-// no business knowing how to reach it. Empty is fine — it renders as a note
-// saying no code has been saved yet.
+// CR-030 — không còn tham số lintResults: {{lint_results}} chỉ tồn tại cho
+// bước duyệt (Script Reviewer), mà bước đó đã bị bỏ khỏi sản phẩm.
 func (uc *RenderPromptUseCase) Execute(
-	ctx context.Context, projectID string, role domain.PromptRole, lintResults string,
+	ctx context.Context, projectID string, role domain.PromptRole,
 ) (RenderedPrompt, error) {
 	if projectID == "" {
 		return RenderedPrompt{}, fmt.Errorf("project_id is required")
@@ -136,7 +132,7 @@ func (uc *RenderPromptUseCase) Execute(
 		return RenderedPrompt{}, fmt.Errorf("load template: %w", err)
 	}
 
-	vars, err := uc.variablesFor(ctx, projectID, project, role, language, lintResults)
+	vars, err := uc.variablesFor(ctx, projectID, project, role, language)
 	if err != nil {
 		return RenderedPrompt{}, err
 	}
@@ -154,7 +150,7 @@ func (uc *RenderPromptUseCase) Execute(
 
 func (uc *RenderPromptUseCase) variablesFor(
 	ctx context.Context, projectID string, project *domain.Project,
-	role domain.PromptRole, language, lintResults string,
+	role domain.PromptRole, language string,
 ) (map[string]string, error) {
 	topic, err := uc.projects.GetAuthoringTopic(ctx, projectID)
 	if err != nil {
@@ -174,12 +170,7 @@ func (uc *RenderPromptUseCase) variablesFor(
 		"channel_identity":        domain.ChannelIdentity(language),
 		"narration_language_rule": domain.NarrationLanguageRule(language),
 		"previous_output":         previous,
-		"lint_results":            lintResults,
 		"format_beats":            "",
-	}
-
-	if lintResults == "" {
-		vars["lint_results"] = "(chưa có kết quả kiểm tra tĩnh)"
 	}
 
 	// The beat sheet only means something for the step that writes the
@@ -227,11 +218,6 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 	if err != nil {
 		return "", fmt.Errorf("load storyboard: %w", err)
 	}
-	code, err := uc.projects.GetAuthoringCode(ctx, projectID)
-	if err != nil {
-		return "", fmt.Errorf("load code: %w", err)
-	}
-
 	switch role {
 	case domain.RoleStoryArchitect:
 		// Nothing comes before step 1.
@@ -240,10 +226,6 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 	case domain.RoleManimEngineer, domain.RoleRemotionEngineer:
 		add(story)
 		add(storyboard)
-	case domain.RoleScriptReviewer:
-		add(story)
-		add(storyboard)
-		add(code)
 	}
 
 	if len(parts) == 0 {

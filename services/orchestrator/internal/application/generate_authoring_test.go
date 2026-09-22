@@ -86,7 +86,7 @@ func newGenerateFixture(t *testing.T, provider *stubProvider, story *recordingSa
 	uc := application.NewGenerateAuthoringUseCase(
 		newRenderer("Chủ đề: {{topic}}", renderCtx),
 		provider, nil, renderCtx,
-		story, storyboard, &contentSaver{}, &contentSaver{},
+		story, storyboard, &contentSaver{},
 		maxInputChars, 16000,
 	)
 	return uc, storyboard
@@ -97,7 +97,7 @@ func TestGenerateAuthoringStorySendsRenderedPromptAndSaves(t *testing.T) {
 	story := &recordingSaver{}
 	uc, _ := newGenerateFixture(t, provider, story, 0)
 
-	got, err := uc.Execute(context.Background(), "p1", "story", "")
+	got, err := uc.Execute(context.Background(), "p1", "story")
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -125,7 +125,7 @@ func TestGenerateAuthoringMapsStepToEngineRole(t *testing.T) {
 	provider := &stubProvider{content: "storyboard"}
 	uc, storyboard := newGenerateFixture(t, provider, &recordingSaver{}, 0)
 
-	got, err := uc.Execute(context.Background(), "p1", "storyboard", "")
+	got, err := uc.Execute(context.Background(), "p1", "storyboard")
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
@@ -139,7 +139,7 @@ func TestGenerateAuthoringMapsStepToEngineRole(t *testing.T) {
 
 func TestGenerateAuthoringRejectsUnknownStep(t *testing.T) {
 	uc, _ := newGenerateFixture(t, &stubProvider{content: "x"}, &recordingSaver{}, 0)
-	if _, err := uc.Execute(context.Background(), "p1", "outline", ""); err == nil {
+	if _, err := uc.Execute(context.Background(), "p1", "outline"); err == nil {
 		t.Fatal("want an error for an unknown step")
 	}
 }
@@ -148,7 +148,7 @@ func TestGenerateAuthoringRefusesPromptOverInputCap(t *testing.T) {
 	provider := &stubProvider{content: "x"}
 	uc, _ := newGenerateFixture(t, provider, &recordingSaver{}, 5)
 
-	_, err := uc.Execute(context.Background(), "p1", "story", "")
+	_, err := uc.Execute(context.Background(), "p1", "story")
 	if err == nil || !strings.Contains(err.Error(), "HIVE_MAX_INPUT_CHARS") {
 		t.Fatalf("err = %v, want the input-cap refusal", err)
 	}
@@ -162,7 +162,7 @@ func TestGenerateAuthoringEmptyAnswerIsClassified(t *testing.T) {
 	story := &recordingSaver{}
 	uc, _ := newGenerateFixture(t, provider, story, 0)
 
-	_, err := uc.Execute(context.Background(), "p1", "story", "")
+	_, err := uc.Execute(context.Background(), "p1", "story")
 	if application.LLMErrorKindOf(err) != application.ErrKindEmpty {
 		t.Fatalf("err = %v, want kind %q", err, application.ErrKindEmpty)
 	}
@@ -176,7 +176,7 @@ func TestGenerateAuthoringReturnsContentWhenSaveFails(t *testing.T) {
 	story := &recordingSaver{err: errors.New("project đã khoá")}
 	uc, _ := newGenerateFixture(t, provider, story, 0)
 
-	got, err := uc.Execute(context.Background(), "p1", "story", "")
+	got, err := uc.Execute(context.Background(), "p1", "story")
 	if err != nil {
 		t.Fatalf("Execute: %v — a billed call must not be thrown away", err)
 	}
@@ -196,13 +196,13 @@ func TestGenerateAuthoringSecondConcurrentCallIsBusy(t *testing.T) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		_, _ = uc.Execute(context.Background(), "p1", "story", "")
+		_, _ = uc.Execute(context.Background(), "p1", "story")
 	}()
 	// Wait until the provider is actually inside the call, so the second
 	// attempt races the lock rather than the goroutine scheduler.
 	<-provider.entered
 
-	_, err := uc.Execute(context.Background(), "p1", "story", "")
+	_, err := uc.Execute(context.Background(), "p1", "story")
 	if !errors.Is(err, application.ErrGenerateBusy) {
 		t.Fatalf("err = %v, want ErrGenerateBusy", err)
 	}
@@ -214,11 +214,11 @@ func TestGenerateAuthoringSecondConcurrentCallIsBusy(t *testing.T) {
 }
 
 func TestGenerateAuthoringWithoutProviderIsNotConfigured(t *testing.T) {
-	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, nil, 0, 0)
+	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, 0, 0)
 	if uc.Available() {
 		t.Error("Available() = true with no provider")
 	}
-	if _, err := uc.Execute(context.Background(), "p1", "story", ""); !errors.Is(err, application.ErrLLMNotConfigured) {
+	if _, err := uc.Execute(context.Background(), "p1", "story"); !errors.Is(err, application.ErrLLMNotConfigured) {
 		t.Fatalf("err = %v, want ErrLLMNotConfigured", err)
 	}
 }

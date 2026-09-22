@@ -16,7 +16,7 @@ beforeEach(() => {
     version: 1,
     template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
   });
-  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "", review: "" });
+  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "saveAuthoringStory").mockResolvedValue(undefined);
 });
 
@@ -112,7 +112,6 @@ describe("ScriptOutlineStepPage", () => {
       story: "dàn ý đã lưu",
       storyboard: "",
       code: "",
-      review: "",
     });
 
     renderPage();
@@ -128,7 +127,52 @@ describe("ScriptOutlineStepPage", () => {
     expect(screen.getByTestId("script-tab-outline")).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("script-tab-storyboard")).not.toBeDisabled();
     expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
-    expect(screen.getByTestId("script-tab-review")).not.toBeDisabled();
+    // CR-030 — tab "1d. Duyệt" đã bị bỏ hẳn khỏi bước 1.
+    expect(screen.queryByTestId("script-tab-review")).not.toBeInTheDocument();
+  });
+
+  // CR-030 — engine phải lên server ngay khi chọn, không phải chỉ lúc nộp
+  // render: chuỗi 1a→1b→1c đọc project.RenderEngine từ server để chọn đúng
+  // vai trò storyboard/code, nên tới lúc Creator xuống 1c đổi thì đã trễ.
+  describe("chọn công cụ render (CR-030)", () => {
+    it("mặc định chọn Manim và lưu Remotion lên server ngay khi Creator đổi", async () => {
+      const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      renderPage();
+
+      expect(screen.getByTestId("render-engine-manim")).toHaveAttribute("aria-checked", "true");
+
+      fireEvent.click(screen.getByTestId("render-engine-remotion"));
+
+      await waitFor(() =>
+        expect(createDraft).toHaveBeenCalledWith(expect.any(String), "", "vi", "remotion"),
+      );
+    });
+
+    it("gửi kèm engine hiện tại ngay trước khi chạy chuỗi AI", async () => {
+      const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+      vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
+        step: "story",
+        role: "story_architect",
+        content: "CÂU HỎI CỐT LÕI: ...",
+        provider: "hive",
+        usage: { model: "deepseek" },
+      });
+      renderPage();
+
+      fireEvent.click(screen.getByTestId("render-engine-remotion"));
+      await waitFor(() => expect(createDraft).toHaveBeenCalledWith(expect.any(String), "", "vi", "remotion"));
+      createDraft.mockClear();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      await waitFor(() =>
+        expect(createDraft).toHaveBeenCalledWith(expect.any(String), "Vòng lặp for", "vi", "remotion"),
+      );
+    });
   });
 
   // CR-027 FR79 — chế độ làm việc là lựa chọn cho CẢ bước 1, không phải một
@@ -165,16 +209,26 @@ describe("ScriptOutlineStepPage", () => {
       expect(screen.queryByTestId("script-outline-copy")).not.toBeInTheDocument();
     });
 
-    it("chạy bước 1 bằng API và điền kết quả vào ô dàn ý", async () => {
+    // CR-030 — một lần bấm chạy cả 1a → 1b → 1c. Chuỗi chạy tuần tự vì mỗi
+    // lượt gọi tự lưu kết quả lên server, và bước sau render prompt từ đúng
+    // dữ liệu bước trước vừa lưu.
+    it("chạy cả ba bước bằng API và điền kết quả vào đúng từng ô", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      const generate = vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
-        step: "story",
-        role: "story_architect",
-        content: "CÂU HỎI CỐT LÕI: vì sao?",
-        provider: "hive",
-        usage: { model: "deepseek" },
-      });
+      const byStep: Record<string, string> = {
+        story: "CÂU HỎI CỐT LÕI: vì sao?",
+        storyboard: "SHOT 1 — ...",
+        code: "class Demo(ConceptFlowScene): pass",
+      };
+      const generate = vi
+        .spyOn(apiClient, "generateAuthoringStep")
+        .mockImplementation(async (_projectId, step) => ({
+          step,
+          role: step,
+          content: byStep[step],
+          provider: "hive",
+          usage: { model: "deepseek" },
+        }));
       renderPage();
 
       fireEvent.change(screen.getByTestId("script-outline-topic"), {
@@ -184,10 +238,44 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
-      await waitFor(() => expect(generate).toHaveBeenCalledWith(expect.any(String), "story", undefined));
+      await waitFor(() => expect(generate).toHaveBeenCalledTimes(3));
+      expect(generate.mock.calls.map((call) => call[1])).toEqual(["story", "storyboard", "code"]);
       await waitFor(() =>
         expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?"),
       );
+    });
+
+    // Một bước hỏng giữa chừng không được xoá mất những bước đã xong: Creator
+    // sửa tay rồi chạy lại đúng bước đó ở tab của nó.
+    it("dừng chuỗi ở bước hỏng, giữ nguyên kết quả bước trước", async () => {
+      mockLlm(true);
+      vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      const generate = vi
+        .spyOn(apiClient, "generateAuthoringStep")
+        .mockImplementation(async (_projectId, step) => {
+          if (step === "storyboard") throw new Error("Hive hết số dư.");
+          return {
+            step,
+            role: step,
+            content: "CÂU HỎI CỐT LÕI: vì sao?",
+            provider: "hive",
+            usage: { model: "deepseek" },
+          };
+        });
+      renderPage();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), {
+        target: { value: "Vòng lặp for" },
+      });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      await waitFor(() => expect(screen.getByTestId("run-with-ai-error")).toBeInTheDocument());
+      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("1b. Storyboard");
+      // Bước 1a đã xong vẫn còn nguyên trong ô soạn thảo.
+      expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?");
+      expect(generate).toHaveBeenCalledTimes(2);
     });
 
     it("lưu chủ đề lên server trước khi gọi, vì prompt được render ở server", async () => {
@@ -282,7 +370,6 @@ describe("ScriptOutlineStepPage", () => {
         story: "",
         storyboard: "",
         code: "",
-        review: "",
       });
       renderPage();
 

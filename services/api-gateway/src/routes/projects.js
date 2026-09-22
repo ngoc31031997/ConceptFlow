@@ -76,10 +76,8 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-025 step 3 — the Manim Engineer's pasted code.
   router.post('/v1/projects/:id/authoring/code', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-025 step 4 — the Script Reviewer's pasted PASS/REVISE verdict.
-  router.post('/v1/projects/:id/authoring/review', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-025 — rehydrates every saved authoring output (story + storyboard +
-  // code + review) so the wizard can restore state on reload/back-navigation.
+  // code) so the wizard can restore state on reload/back-navigation.
   router.get('/v1/projects/:id/authoring', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-027 FR79 — cách làm bước 1 (copy tay / gọi API), nhớ theo project nên
   // mở lại ở máy khác hay sau khi restart vẫn đúng chế độ đã chọn.

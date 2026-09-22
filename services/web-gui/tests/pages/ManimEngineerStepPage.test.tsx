@@ -29,7 +29,6 @@ beforeEach(() => {
     story: "",
     storyboard: "",
     code: "",
-    review: "",
   });
   vi.spyOn(apiClient, "saveAuthoringCode").mockResolvedValue(undefined);
 });
