@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"sort"
@@ -126,6 +127,26 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 	}
 
 	step, err := uc.repo.GetStep(ctx, event.SagaID, stepName)
+	if errors.Is(err, domain.ErrSagaStepNotFound) {
+		// Not an infrastructure failure, so it must not be returned as one.
+		// The consumer nacks with requeue=true on any error from here, and
+		// orchestrator.events is a classic queue with neither a delivery limit
+		// nor a dead-letter exchange (infra/rabbitmq/definitions.json) — so a
+		// returned error on an event that can never succeed becomes an
+		// unbounded hot redelivery loop. Observed live: two validation_failed
+		// events for projects whose rows no longer existed produced thousands
+		// of identical ERROR lines per second, burning CPU and drowning Loki.
+		//
+		// A missing step row is the same class of thing as the "step is no
+		// longer in_progress" case just below — an event that belongs to a saga
+		// this Orchestrator cannot account for (a deleted project, a reset
+		// database, an event published by an older run). Nothing about it will
+		// be different on redelivery, so warn and ack, exactly as Rule 4 says.
+		uc.logger.WarnContext(ctx, "event for unknown saga step, dropping",
+			"event_type", event.EventType, "saga_id", event.SagaID, "step", stepName,
+			"project_id", event.ProjectID)
+		return nil
+	}
 	if err != nil {
 		return err
 	}

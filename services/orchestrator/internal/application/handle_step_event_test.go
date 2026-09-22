@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
@@ -1178,5 +1179,55 @@ func TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish(t *t
 	project, _ := repo.Get(context.Background(), "proj-1")
 	if project.Status != domain.StatusReadyToPublish {
 		t.Fatalf("expected ready_to_publish despite clip error (D1), got %s", project.Status)
+	}
+}
+
+// TestHandleStepEventUseCase_UnknownSagaStepAcked guards the fix for a live
+// incident: two validation_failed events arrived for sagas whose saga_steps
+// rows no longer existed (their projects had been removed), GetStep returned
+// domain.ErrSagaStepNotFound, Execute handed that back as an error, and the
+// consumer nacked with requeue onto a queue that has neither a delivery limit
+// nor a dead-letter exchange. The result was an unbounded hot redelivery loop
+// writing thousands of identical ERROR lines per second.
+//
+// A missing step row can never become present on redelivery, so Execute must
+// treat it like any other unprocessable event: return nil so the caller acks.
+func TestHandleStepEventUseCase_UnknownSagaStepAcked(t *testing.T) {
+	uc, repo, pub, prog := newTestUseCase()
+	// Deliberately empty: no project row, no saga_steps row for this saga.
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-gone", ProjectID: "proj-gone", EventType: "validation_failed",
+		Payload: map[string]interface{}{"error_message": "boom"},
+	})
+	if err != nil {
+		t.Fatalf("expected no error so the consumer acks instead of requeueing forever, got %v", err)
+	}
+	if len(pub.published) != 0 {
+		t.Fatalf("expected no command dispatched, got %d", len(pub.published))
+	}
+	if len(prog.messages) != 0 {
+		t.Fatalf("expected no progress message, got %d", len(prog.messages))
+	}
+	if len(repo.steps) != 0 {
+		t.Fatalf("expected no saga step written, got %d", len(repo.steps))
+	}
+}
+
+// TestHandleStepEventUseCase_RepoErrorStillSurfaces is the other half of the
+// pair above: a genuine infrastructure failure must still come back as an
+// error, so the delivery is retried rather than silently dropped. Narrowing
+// ErrSagaStepNotFound must not have widened into "swallow every GetStep error".
+func TestHandleStepEventUseCase_RepoErrorStillSurfaces(t *testing.T) {
+	repo := newFakeRepo()
+	repo.getStepErr = errors.New("connection refused")
+	uc := NewHandleStepEventUseCase(repo, &fakePublisher{}, &fakeProgress{}, nil, nil)
+
+	err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "validation_failed",
+		Payload: map[string]interface{}{"error_message": "boom"},
+	})
+	if err == nil {
+		t.Fatal("expected an infrastructure error to surface for retry")
 	}
 }
