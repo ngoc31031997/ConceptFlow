@@ -197,6 +197,15 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         self._memory_limit_bytes = memory_limit_gb * 1024 * 1024 * 1024
         self._cache_root = cache_root
         self._cache_budget_bytes = cache_budget_bytes
+        # media_dirs of runs currently in flight. The pruner must never evict
+        # one of these: rmtree'ing a directory while its Manim subprocess is
+        # still writing takes the marks file — the only channel out of that
+        # subprocess — with it, and the run dies on a FileNotFoundError that
+        # says nothing about what actually happened. `keep` alone is not
+        # enough, since it only covers the run doing the pruning. Guarded by a
+        # lock because renders arrive on asyncio.to_thread worker threads.
+        self._inflight: set[str] = set()
+        self._inflight_lock = threading.Lock()
         # Called from the render thread every HEARTBEAT_INTERVAL_SECONDS with
         # (elapsed_seconds, latest_animation_index). Optional so tests and the
         # use case can ignore progress entirely.
@@ -244,6 +253,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
 
             records = _read_marks(marks_path)
         finally:
+            self._release_media_dir(media_dir)
             if ephemeral:
                 shutil.rmtree(media_dir, ignore_errors=True)
 
@@ -324,6 +334,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             video_duration = _probe_duration(rendered_path)
             shutil.move(rendered_path, output_path)
         finally:
+            self._release_media_dir(media_dir)
             if ephemeral:
                 shutil.rmtree(media_dir, ignore_errors=True)
 
@@ -603,13 +614,30 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         With caching on, each project keeps its own directory so Manim's
         partial_movie_files survive between renders. With caching off, a
         tempdir is used and torn down, exactly as before.
+
+        The returned directory is marked in-flight, so every caller must pair
+        this with `_release_media_dir` in a `finally`.
         """
         if self._cache_root is None:
-            return tempfile.mkdtemp(prefix="manim-media-"), True
+            media_dir = tempfile.mkdtemp(prefix="manim-media-")
+            self._claim_media_dir(media_dir)
+            return media_dir, True
         media_dir = os.path.join(self._cache_root, project_id)
         os.makedirs(media_dir, exist_ok=True)
+        # Claimed before pruning, not after: the pruner reads this set, and a
+        # gap between the two is exactly the window in which another thread
+        # could evict the directory we just made.
+        self._claim_media_dir(media_dir)
         self._prune_cache(keep=project_id)
         return media_dir, False
+
+    def _claim_media_dir(self, media_dir: str) -> None:
+        with self._inflight_lock:
+            self._inflight.add(os.path.abspath(media_dir))
+
+    def _release_media_dir(self, media_dir: str) -> None:
+        with self._inflight_lock:
+            self._inflight.discard(os.path.abspath(media_dir))
 
     def _prune_cache(self, keep: str) -> None:
         """Evicts least-recently-used project caches once the budget is
@@ -633,12 +661,19 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
                         entries.append((entry.stat().st_mtime, size, entry.path))
 
             entries.sort()  # oldest first
+            with self._inflight_lock:
+                inflight = set(self._inflight)
             for _mtime, size, path in entries:
                 if total <= self._cache_budget_bytes:
                     break
+                if os.path.abspath(path) in inflight:
+                    continue
                 shutil.rmtree(path, ignore_errors=True)
                 total -= size
-                logger.info("Evicted Manim cache %s to stay within budget", path)
+                # Warning, not info: the service's root logger is configured at
+                # WARNING, so at info this deleted a directory and left no
+                # trace of having done it.
+                logger.warning("Evicted Manim cache %s to stay within budget", path)
         except OSError:
             logger.exception("Could not prune the Manim cache at %s", self._cache_root)
 
