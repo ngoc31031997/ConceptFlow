@@ -130,6 +130,12 @@ export interface ProgressMessage {
    */
   elapsed_seconds?: number;
   animation_index?: number;
+  // CR-029: assemble_video reports by ffmpeg pass completed (main mux, then
+  // intro/outro concat when present — at most 2), generate_clips by clip cut.
+  stage_index?: number;
+  stage_total?: number;
+  clip_index?: number;
+  clip_total?: number;
   error_message?: string;
 }
 
