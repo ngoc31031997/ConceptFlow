@@ -2,6 +2,7 @@ package amqp
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -12,13 +13,21 @@ import (
 )
 
 // requeueBackoff is how long to wait before nacking a delivery back onto the
-// queue. orchestrator.events has no delivery limit and no dead-letter exchange
-// (infra/rabbitmq/definitions.json), so requeue is the only option left for a
-// retryable failure — and without a pause the broker hands the message
-// straight back, producing a hot loop that pins a core and writes thousands of
-// identical log lines per second. This does not make a permanent failure
-// succeed; it makes the retries slow enough to read, and slow enough that a
-// database that is merely restarting has time to come back.
+// queue. orchestrator.events has no per-message delivery-count limit (classic
+// queue, not quorum), so requeue is still the mechanism for a retryable
+// failure — and without a pause the broker hands the message straight back,
+// producing a hot loop that pins a core and writes thousands of identical log
+// lines per second. This does not make a permanent failure succeed; it makes
+// the retries slow enough to read, and slow enough that a database that is
+// merely restarting has time to come back.
+//
+// A stuck message does not retry forever, though: orchestrator.events now
+// carries x-dead-letter-exchange/routing-key to orchestrator.events.dlq
+// (infra/rabbitmq/definitions.json), same as the *.commands queues. Its
+// existing x-message-ttl (24h) is the bound — a message still failing after
+// 24h of requeue-with-backoff expires and is dead-lettered, where
+// handleEventsDLQDelivery below fails the saga step instead of looping
+// forever.
 const requeueBackoff = 2 * time.Second
 
 // nackWithBackoff pauses, then returns the delivery to the queue. The pause
@@ -34,6 +43,11 @@ func nackWithBackoff(ctx context.Context, d amqp.Delivery) {
 // eventsQueue is the single queue Orchestrator consumes all 12 Saga event
 // types from (interface-contracts.md).
 const eventsQueue = "orchestrator.events"
+
+// eventsDLQQueue receives an orchestrator.events message once its
+// x-message-ttl (24h) expires while still failing — see requeueBackoff's doc
+// comment.
+const eventsDLQQueue = "orchestrator.events.dlq"
 
 // dlqQueues are the 6 dead-letter queues (one per command routing key,
 // Unit 1's "*.commands.dlq" pattern) Orchestrator also consumes — a
@@ -98,6 +112,9 @@ func (c *Consumer) Start(ctx context.Context) error {
 			return err
 		}
 	}
+	if err := c.consumeEventsDLQ(ctx, eventsDLQQueue); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -124,6 +141,20 @@ func (c *Consumer) consumeDLQ(ctx context.Context, queue string) error {
 		for d := range deliveries {
 			delivery := d
 			go c.handleDLQDelivery(ctx, delivery)
+		}
+	}()
+	return nil
+}
+
+func (c *Consumer) consumeEventsDLQ(ctx context.Context, queue string) error {
+	deliveries, err := c.chans.Channel().Consume(queue, "", false, false, false, false, nil)
+	if err != nil {
+		return err
+	}
+	go func() {
+		for d := range deliveries {
+			delivery := d
+			go c.handleEventsDLQDelivery(ctx, delivery)
 		}
 	}()
 	return nil
@@ -210,6 +241,50 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 	}
 	if err := c.repo.UpdateStatus(ctx, envelope.ProjectID, domain.FailedStatusForStep(stepName)); err != nil {
 		c.logger.ErrorContext(ctx, "failed to update project status for DLQ delivery", "error", err)
+		nackWithBackoff(ctx, d)
+		return
+	}
+	_ = d.Ack(false)
+}
+
+// handleEventsDLQDelivery handles an orchestrator.events message that has
+// been dead-lettered after 24h of failing redelivery (requeueBackoff's doc
+// comment) — the event's own event_type resolves to the saga step it
+// belongs to (application.StepForEventType, the same eventStepMap Execute
+// itself uses), which this fails directly rather than calling Execute again,
+// since Execute already had 24h of attempts.
+//
+// scene_rendered (progress-only) and channel_asset_rendered/
+// channel_asset_normalized (channel projections, not saga steps) are not in
+// eventStepMap by design — StepForEventType returns !known for them, and
+// they are dropped rather than treated as a step failure.
+func (c *Consumer) handleEventsDLQDelivery(ctx context.Context, d amqp.Delivery) {
+	envelope, err := DecodeEnvelope(d.Body)
+	if err != nil {
+		c.logger.ErrorContext(ctx, "failed to decode orchestrator.events DLQ envelope, dropping", "error", err)
+		_ = d.Ack(false)
+		return
+	}
+
+	eventType := resolveEventType(envelope)
+	stepName, known := application.StepForEventType(eventType)
+	if !known {
+		c.logger.WarnContext(ctx, "dead-lettered event has no saga step, dropping",
+			"event_type", eventType, "saga_id", envelope.SagaID, "project_id", envelope.ProjectID)
+		_ = d.Ack(false)
+		return
+	}
+
+	errMsg := fmt.Sprintf("event dead-lettered after exceeding TTL: event_type=%s", eventType)
+	if err := c.repo.UpdateStep(ctx, &domain.SagaStep{
+		SagaID: envelope.SagaID, StepName: stepName, Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
+	}); err != nil {
+		c.logger.ErrorContext(ctx, "failed to update saga step for events DLQ delivery", "error", err)
+		nackWithBackoff(ctx, d)
+		return
+	}
+	if err := c.repo.UpdateStatus(ctx, envelope.ProjectID, domain.FailedStatusForStep(stepName)); err != nil {
+		c.logger.ErrorContext(ctx, "failed to update project status for events DLQ delivery", "error", err)
 		nackWithBackoff(ctx, d)
 		return
 	}

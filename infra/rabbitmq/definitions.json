@@ -124,8 +124,17 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {
-        "x-message-ttl": 86400000
+        "x-message-ttl": 86400000,
+        "x-dead-letter-exchange": "dlx.direct",
+        "x-dead-letter-routing-key": "orchestrator.events.dlq"
       }
+    },
+    {
+      "name": "orchestrator.events.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {}
     },
     {
       "name": "script_processing.commands.dlq",
@@ -259,6 +268,14 @@
       "destination": "publisher.commands.dlq",
       "destination_type": "queue",
       "routing_key": "publisher.commands.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "dlx.direct",
+      "vhost": "/",
+      "destination": "orchestrator.events.dlq",
+      "destination_type": "queue",
+      "routing_key": "orchestrator.events.dlq",
       "arguments": {}
     },
     {
