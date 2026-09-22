@@ -18,5 +18,10 @@ client_secret_*.json
 # Google OAuth client_secret files (CR-012) — never commit these
 secrets/*.json
 
+# Default host bind-mount target for shared_artifacts (video output) — see
+# VIDEO_OUTPUT_HOST_DIR in .env.example. Contents can be large.
+data/shared_artifacts/*
+!data/shared_artifacts/.gitkeep
+
 # Manim ghi cache/output vào ./media khi chạy ngoài container
 media/
