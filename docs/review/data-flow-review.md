@@ -52,7 +52,12 @@ thành template + override có version là điểm cộng lớn cho việc tinh 
 
 ---
 
-### Giai đoạn B — Render Saga (7 bước)
+### Giai đoạn B — Render Saga (5 bước hiệu lực, sau CR-029)
+
+> **Cập nhật 2026-09-22 (CR-029):** `parse_script` + `validate_script` gộp
+> thành một điểm dừng duy nhất; `qc_video` tắt khỏi luồng chính (đưa backlog —
+> xem `cr-029-render-saga-consolidation.md`). Sơ đồ gốc 7 bước giữ lại bên dưới
+> để tham chiếu lịch sử.
 
 `Project` là aggregate root duy nhất, tích luỹ dần dữ liệu qua từng bước. Mọi bước đều đi qua
 Outbox → `commands.direct` → queue của service → Inbox → xử lý → Outbox → `events.direct` →
@@ -100,6 +105,42 @@ Outbox → `commands.direct` → queue của service → Inbox → xử lý → 
                                   ▼
                         status: ready_to_publish
 ```
+
+### Sơ đồ hiện hành (CR-029)
+
+```
+  ┌──────────────────────────────────────────────────────────────────┐
+  │ POST /v1/sagas/render  →  Project{status: draft}                 │
+  └───────────────────────────────┬──────────────────────────────────┘
+                                  ▼
+ 1. parse_and_validate_script   script_processing.commands → rendering.commands
+      (gộp parse_script + validate_script — vẫn 1 dry-run Manim thật)
+      ghi: Scenes[], ManimSceneClassName, Chapters[], Beats[], ValidationWarnings[]
+      status: validating_script     ⚠ lỗi → cho sửa script/prompt ngay tại đây, chạy lại bước này
+                                  ▼
+      ┌─────────── CỔNG DUYỆT DÀN Ý (CR-024) ───────────┐
+      │ status: awaiting_review — saga DỪNG, chờ người   │
+      └─────────────────────┬───────────────────────────┘
+                            ▼
+ 2. synthesize_speech     tts.commands                  → speech_synthesized
+      status: synthesizing_speech   → phát % tiến trình (theo câu hoàn thành, không theo tick)
+                                  ▼
+ 3. render_scenes         rendering.commands (RENDER THẬT) → rendering_completed
+      status: rendering             → đã có scene_rendered/progress.fanout, giữ nguyên
+                                  ▼
+ 4. assemble_video        video_assembly.commands       → video_assembled
+      status: assembling_video      → phát % theo giai đoạn ffmpeg hoàn thành (mux audio/sub/intro)
+                                  ▼
+ 5. generate_clips        video_assembly.commands       → clips_generated
+      chỉ chạy nếu VideoOutputMode ∈ {short, both}      status: generating_clips
+      status → phát % theo clip hoàn thành
+                                  ▼
+                        status: ready_to_publish
+```
+
+`qc_video` **không còn được dispatch** trong luồng chính — code vẫn giữ trong
+`video-assembly` (tắt, không gọi) để thiết kế lại đúng vị trí sau (backlog: đưa
+kiểm `LayoutMarks` lên trước bước 4, xem `cr-029-render-saga-consolidation.md`).
 
 **Điểm thiết kế xuất sắc cần ghi nhận:**
 
