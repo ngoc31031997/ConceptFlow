@@ -1,4 +1,5 @@
 import { createContext, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
+import type { AuthoringMode } from "../api/client";
 
 export interface SubtitleStyle {
   fontSize: "small" | "medium" | "large";
@@ -19,6 +20,30 @@ export type SubtitleMode = "off" | "track" | "burn_in" | "both";
 
 /** Which of the three script situations the Creator picked in step 1. */
 export type ScriptSource = "blank" | "draft" | "ready";
+
+/**
+ * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 1 — Script",
+ * not one tab at a time:
+ *
+ *   manual — copy each prompt into ChatGPT/Claude/Gemini and paste the answer
+ *            back. The only way that existed before CR-027, and the way that
+ *            still works with no API key, no credit, or a provider outage
+ *            (FR77.4/FR83.2).
+ *   ai     — the server renders the prompt, calls the provider and fills the
+ *            editor in (FR78).
+ *
+ * One choice for the whole pipeline rather than a button per tab: a Creator
+ * who has decided to run this script through the API does not want to make
+ * that decision again on 1b, 1c and 1d.
+ *
+ * It is also stored server-side, in project_authoring — the draft below keeps
+ * it for this session, but the project is what owns it, so the choice survives
+ * a reload, another browser and a restart of the stack whichever step the
+ * project is sitting on. Defaults to `manual`, which is what every project did
+ * before this existed. The type itself lives in api/client.ts, beside the wire
+ * contract that has to agree with the server.
+ */
+export type { AuthoringMode };
 
 export interface ProjectDraft {
   projectId: string;
@@ -41,6 +66,11 @@ export interface ProjectDraft {
    * reload, does not lose it. Never sent to the server on its own; it only
    * exists to keep filling the story_architect prompt on that tab.
    */
+  /**
+   * CR-027 FR79 — copy-prompt-by-hand or call the API, for all four tabs of
+   * step 1. See AuthoringMode. Defaults to "manual".
+   */
+  authoringMode: AuthoringMode;
   authoringTopic: string;
   /**
    * CR-025 step 1 — the Story Architect story outline the Creator pasted
@@ -103,6 +133,7 @@ export type ProjectDraftAction =
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
+  | { type: "SET_AUTHORING_MODE"; payload: AuthoringMode }
   | { type: "SET_AUTHORING_TOPIC"; payload: string }
   | { type: "SET_AUTHORING_STORY"; payload: string }
   | { type: "SET_AUTHORING_STORYBOARD"; payload: string }
@@ -135,6 +166,7 @@ const initialDraft: ProjectDraft = {
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
+  authoringMode: "manual",
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",
@@ -298,6 +330,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, authoringTopic: action.payload };
     case "SET_AUTHORING_STORY":
       return { ...state, authoringStory: action.payload };
+    case "SET_AUTHORING_MODE":
+      return { ...state, authoringMode: action.payload };
     case "SET_AUTHORING_STORYBOARD":
       return { ...state, authoringStoryboard: action.payload };
     case "MARK_SUBMITTED":

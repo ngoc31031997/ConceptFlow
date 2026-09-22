@@ -369,6 +369,20 @@ func (r *ProjectRepository) UpdateStatus(ctx context.Context, projectID string, 
 	return nil
 }
 
+// SaveRenderEngine updates only Project.RenderEngine (CR-030 — the wizard
+// picks the engine at step "/" / tab 1a, before any authoring content
+// exists, so this has to land on the row without touching the other columns
+// Save()'s full upsert would otherwise reset). A no-op on an unknown
+// projectID's absence is intentionally NOT an error here: this is called
+// best-effort from CreateProjectDraftUseCase, which already 404s on its own
+// terms when the project truly does not exist.
+func (r *ProjectRepository) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
+	_, err := r.pool.Exec(ctx,
+		`UPDATE projects SET render_engine = $1, updated_at = now() WHERE project_id = $2`,
+		string(engine), projectID)
+	return err
+}
+
 // GetStep loads a SagaStep by (saga_id, step_name), or domain.ErrSagaStepNotFound.
 func (r *ProjectRepository) GetStep(ctx context.Context, sagaID string, stepName domain.StepName) (*domain.SagaStep, error) {
 	row := r.pool.QueryRow(ctx, `SELECT saga_id, step_name, status, error_message FROM saga_steps WHERE saga_id = $1 AND step_name = $2`,

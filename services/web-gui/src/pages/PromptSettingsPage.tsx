@@ -17,12 +17,11 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "manim_engineer", label: "3. Manim Engineer — viết code" },
-  { value: "script_reviewer", label: "4. Script Reviewer — duyệt kết quả" },
-  // feature/remotion-engine — không thuộc chuỗi 4 bước Manim ở trên (Remotion
+  // feature/remotion-engine — không thuộc chuỗi 3 bước Manim ở trên (Remotion
   // chưa có pipeline nhiều bước), nhưng vẫn đánh số tiếp theo cho nhất quán
   // với các lựa chọn khác trong danh sách.
-  { value: "remotion_visual_director", label: "5. Remotion Visual Director — storyboard cho engine Remotion" },
-  { value: "remotion_engineer", label: "6. Remotion Engineer — viết code Remotion" },
+  { value: "remotion_visual_director", label: "4. Remotion Visual Director — storyboard cho engine Remotion" },
+  { value: "remotion_engineer", label: "5. Remotion Engineer — viết code Remotion" },
 ];
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
@@ -32,7 +31,6 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",
   previous_output: "(nội dung bước trước — dàn ý/storyboard/code — sẽ hiện ở đây)",
-  lint_results: "(kết quả kiểm tra tĩnh sẽ hiện ở đây)",
 };
 
 function renderPreview(templateText: string): string {

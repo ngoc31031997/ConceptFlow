@@ -253,6 +253,12 @@ type errorResponse struct {
 	Code  string `json:"code,omitempty"`
 }
 
+// saveAuthoringModeRequest is the body of PUT
+// /v1/projects/{id}/authoring/mode (CR-027 FR79): "manual" or "ai".
+type saveAuthoringModeRequest struct {
+	Mode string `json:"mode"`
+}
+
 // ErrorCodeQCBlocked marks the 409 that `acknowledge_qc: true` can get past.
 const ErrorCodeQCBlocked = "qc_blocked"
 
@@ -265,6 +271,9 @@ type createProjectDraftRequest struct {
 	ProjectID       string `json:"project_id,omitempty"`
 	Topic           string `json:"topic"`
 	ContentLanguage string `json:"content_language"`
+	// RenderEngine is optional (CR-030): "" means "unchanged" — see
+	// CreateProjectDraftInput.RenderEngine's doc comment.
+	RenderEngine string `json:"render_engine,omitempty"`
 }
 
 // updateProjectTopicRequest is the body of PATCH

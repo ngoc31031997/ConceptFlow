@@ -14,7 +14,6 @@ import { VideoListPage } from "./pages/VideoListPage";
 import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
-import { ScriptReviewerStepPage } from "./pages/ScriptReviewerStepPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 
 export function App() {
@@ -26,7 +25,7 @@ export function App() {
           <KeyboardShortcutsHelp />
           <Routes>
             {/* "/" only picks the situation (dựng từ đầu / đã có code / code
-                chuẩn) — "dựng từ đầu" immediately hands off to the 4-tab
+                chuẩn) — "dựng từ đầu" immediately hands off to the 3-tab
                 sub-wizard below (see ScriptPipelineTabs), each tab its own
                 URL so Back/reload/bookmarks all work and every tab stays
                 reachable regardless of progress. */}
@@ -34,7 +33,6 @@ export function App() {
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
-            <Route path="/create/script/review" element={<ScriptReviewerStepPage />} />
             <Route path="/create/settings" element={<SettingsStepPage />} />
             <Route path="/create/review" element={<ReviewStepPage />} />
 

@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS processed_messages (
 );
 
 -- CR-025: prompt wording for the 4-role authoring pipeline (Story Architect →
--- Visual Director → Manim Engineer → Script Reviewer), moved out of
+-- Visual Director → Manim Engineer; CR-030 bỏ bước Script Reviewer), moved out of
 -- web-gui's scriptPrompts.ts so an editor can fix wording without a frontend
 -- rebuild. version increments on every update (mirrors video_formats'
 -- versioning intent, though templates are edited in place rather than
@@ -299,7 +299,8 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT N
 -- storyboard_content above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NULL DEFAULT '';
 
--- CR-025 step 4 (Script Reviewer): the pasted PASS/REVISE verdict text a
+-- CR-025 step 4 (Script Reviewer), bước đã bị CR-030 bỏ hẳn: cột giữ lại cho
+-- dữ liệu cũ, không còn gì đọc/ghi. The pasted PASS/REVISE verdict text a
 -- Creator gets back from the external AI, same reasoning/table as the columns
 -- above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';
@@ -319,6 +320,22 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT N
 -- carries the same "paste your topic here" placeholder the GUI shows today.
 -- No attempt is made to guess a topic out of story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
+
+-- CR-027 FR79: how the Creator works step 1 — 'manual' (copy each prompt out
+-- to ChatGPT/Claude/Gemini and paste the answer back) or 'ai' (the server
+-- renders the prompt and calls the provider itself).
+--
+-- Server-side, not just in the browser's draft: the choice governs all four
+-- tabs of step 1 and a project can be picked up again on any of them, from
+-- another browser or after this stack restarts. localStorage answers none of
+-- those — it is per-browser and gone the moment someone clears it, and a
+-- Creator who chose 'ai' on 1a would silently be back to copy-and-paste on 1c.
+--
+-- Same table and same reasoning as the columns above: one row per project,
+-- authoring-time-only, written by a Creator action rather than by folding a
+-- saga event. Every project that existed before this column gets 'manual',
+-- which is exactly what it was doing.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS authoring_mode TEXT NOT NULL DEFAULT 'manual';
 
 -- CR-028 FR85.2: projects never had a created_at column — every existing
 -- consumer of this table either already knew its own creation time (the

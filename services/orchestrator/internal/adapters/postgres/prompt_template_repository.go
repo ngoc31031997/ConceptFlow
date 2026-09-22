@@ -417,32 +417,6 @@ func (r *PromptTemplateRepository) GetAuthoringCode(ctx context.Context, project
 	return content, err
 }
 
-// --- CR-025 step 4: authoring review (Script Reviewer verdict) ------------
-
-// SaveAuthoringReview upserts the pasted reviewer verdict for a project. Same
-// shape as the other three authoring saves above.
-func (r *PromptTemplateRepository) SaveAuthoringReview(ctx context.Context, projectID, content string) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring (project_id, review_content, updated_at)
-		VALUES ($1, $2, now())
-		ON CONFLICT (project_id) DO UPDATE SET
-		    review_content = EXCLUDED.review_content, updated_at = now()
-	`, projectID, content)
-	return err
-}
-
-// GetAuthoringReview returns the saved reviewer verdict, or "" if none was saved yet.
-func (r *PromptTemplateRepository) GetAuthoringReview(ctx context.Context, projectID string) (string, error) {
-	var content string
-	err := r.pool.QueryRow(ctx, `
-		SELECT review_content FROM project_authoring WHERE project_id = $1
-	`, projectID).Scan(&content)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
-	return content, err
-}
-
 // --- CR-027 FR84: the Creator's own wording -------------------------------
 
 // GetEffective returns the template the pipeline should actually use: the
@@ -570,4 +544,34 @@ func (r *PromptTemplateRepository) DeleteOverride(ctx context.Context, role doma
 		DELETE FROM prompt_overrides WHERE role = $1 AND language = $2
 	`, string(role), language)
 	return err
+}
+
+// --- CR-027 FR79: how the Creator works step 1 ----------------------------
+
+// SaveAuthoringMode upserts the step-1 working mode ("manual" or "ai").
+//
+// Upsert on project_id alone, like SaveAuthoringTopic: the mode can be chosen
+// on tab 1a before any outline exists, so it cannot wait for a content row.
+func (r *PromptTemplateRepository) SaveAuthoringMode(ctx context.Context, projectID, mode string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, authoring_mode, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    authoring_mode = EXCLUDED.authoring_mode, updated_at = now()
+	`, projectID, mode)
+	return err
+}
+
+// GetAuthoringMode returns the saved mode, or "" when this project has no
+// authoring row yet. "" is not an error and not a third mode — the caller
+// treats it as the default, which is "manual".
+func (r *PromptTemplateRepository) GetAuthoringMode(ctx context.Context, projectID string) (string, error) {
+	var mode string
+	err := r.pool.QueryRow(ctx, `
+		SELECT authoring_mode FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&mode)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return mode, err
 }

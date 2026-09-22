@@ -88,15 +88,22 @@ func aProject() *domain.Project {
 	}
 }
 
-// TestRoleFor_StoryAndReviewAreSharedByBothEngines — step 1 decides the
-// story and step 4 judges the result; neither is about pixels.
-func TestRoleFor_StoryAndReviewAreSharedByBothEngines(t *testing.T) {
+// TestRoleFor_StoryIsSharedByBothEngines — step 1 decides the story, not the
+// pixels, so both engines run the same role.
+func TestRoleFor_StoryIsSharedByBothEngines(t *testing.T) {
 	for _, engine := range []string{"manim", "remotion"} {
 		if got, _ := application.RoleFor("story", engine); got != domain.RoleStoryArchitect {
 			t.Fatalf("%s: want story_architect, got %q", engine, got)
 		}
-		if got, _ := application.RoleFor("review", engine); got != domain.RoleScriptReviewer {
-			t.Fatalf("%s: want script_reviewer, got %q", engine, got)
+	}
+}
+
+// CR-030 — bước duyệt đã bị bỏ khỏi sản phẩm, nên "review" phải bị từ chối
+// như bất cứ tên bước lạ nào, chứ không lặng lẽ render một prompt không ai gọi.
+func TestRoleFor_ReviewIsNoLongerAStep(t *testing.T) {
+	for _, engine := range []string{"manim", "remotion"} {
+		if _, err := application.RoleFor("review", engine); err == nil {
+			t.Fatalf("%s: want an error for the removed review step", engine)
 		}
 	}
 }
@@ -137,7 +144,7 @@ func TestRender_SubstitutesEveryVariable(t *testing.T) {
 		&fakeRenderContext{project: aProject(), topic: "Vì sao bầu trời có màu xanh"},
 	)
 
-	out, err := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect, "")
+	out, err := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -161,7 +168,7 @@ func TestRender_SubstitutesEveryVariable(t *testing.T) {
 func TestRender_ProjectWithoutATopicGetsThePlaceholder(t *testing.T) {
 	uc := newRenderer("CHỦ ĐỀ: {{topic}}", &fakeRenderContext{project: aProject(), topic: ""})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect, "")
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect)
 
 	if !strings.Contains(out.Prompt, application.TopicPlaceholder) {
 		t.Fatalf("want the placeholder, got %q", out.Prompt)
@@ -184,13 +191,12 @@ func TestRender_PreviousOutputGrowsWithThePipeline(t *testing.T) {
 		{domain.RoleStoryArchitect, nil, []string{"DÀN Ý", "STORYBOARD", "CODE"}},
 		{domain.RoleVisualDirector, []string{"DÀN Ý"}, []string{"STORYBOARD", "CODE"}},
 		{domain.RoleManimEngineer, []string{"DÀN Ý", "STORYBOARD"}, []string{"CODE"}},
-		{domain.RoleScriptReviewer, []string{"DÀN Ý", "STORYBOARD", "CODE"}, nil},
 	}
 
 	for _, tc := range cases {
 		t.Run(string(tc.role), func(t *testing.T) {
 			uc := newRenderer("TRƯỚC ĐÓ:\n{{previous_output}}", data)
-			out, err := uc.Execute(context.Background(), "p1", tc.role, "")
+			out, err := uc.Execute(context.Background(), "p1", tc.role)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -215,7 +221,7 @@ func TestRender_ArtefactsAreJoinedTheWayTheGUIJoinedThem(t *testing.T) {
 		project: aProject(), story: "A", storyboard: "B",
 	})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer, "")
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer)
 
 	if out.Prompt != "A\n\n---\n\nB" {
 		t.Fatalf("unexpected join: %q", out.Prompt)
@@ -225,7 +231,7 @@ func TestRender_ArtefactsAreJoinedTheWayTheGUIJoinedThem(t *testing.T) {
 func TestRender_EmptyPipelineSaysSoInsteadOfLeavingABlank(t *testing.T) {
 	uc := newRenderer("{{previous_output}}", &fakeRenderContext{project: aProject()})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleScriptReviewer, "")
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleVisualDirector)
 
 	if strings.TrimSpace(out.Prompt) == "" {
 		t.Fatal("an empty previous_output must explain itself, not render as nothing")
@@ -238,7 +244,7 @@ func TestRender_EmptyPipelineSaysSoInsteadOfLeavingABlank(t *testing.T) {
 func TestRender_BeatSheetOnlyForTheOutlineStep(t *testing.T) {
 	uc := newRenderer("{{format_beats}}", &fakeRenderContext{project: aProject()})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer, "")
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer)
 
 	if strings.Contains(out.Prompt, "CẤU TRÚC BẮT BUỘC") {
 		t.Fatal("the beat sheet belongs to the outline step only")
@@ -250,7 +256,7 @@ func TestRender_LanguageFollowsTheProject(t *testing.T) {
 	project.ContentLanguage = domain.LanguageEnglish
 	uc := newRenderer("{{narration_language_rule}}", &fakeRenderContext{project: project})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect, "")
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleStoryArchitect)
 
 	if !strings.Contains(out.Prompt, "TIẾNG ANH") {
 		t.Fatalf("an English project must get the English narration rule, got %q", out.Prompt)
@@ -263,7 +269,7 @@ func TestRender_LanguageFollowsTheProject(t *testing.T) {
 func TestRender_RequiresAProjectID(t *testing.T) {
 	uc := newRenderer("x", &fakeRenderContext{project: aProject()})
 
-	if _, err := uc.Execute(context.Background(), "", domain.RoleStoryArchitect, ""); err == nil {
+	if _, err := uc.Execute(context.Background(), "", domain.RoleStoryArchitect); err == nil {
 		t.Fatal("expected an error for an empty project_id")
 	}
 }

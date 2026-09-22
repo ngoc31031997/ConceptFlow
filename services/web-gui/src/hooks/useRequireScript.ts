@@ -14,7 +14,7 @@ import { validateScript } from "../utils/scriptValidation";
  * self.narrate/ConceptFlowScene conventions — calling it unconditionally
  * meant a project with a perfectly valid Remotion script would fail this
  * check and get silently bounced back to "/" every time Settings/Review
- * mounted (e.g. right after Script Reviewer's PASS navigated here). Remotion
+ * mounted (e.g. right after tab 1c navigated here). Remotion
  * has no client-side lint yet (same as ScriptEditor/ManimEngineerStepPage);
  * non-empty is enough here, same bar the "ready" source already trusts.
  */

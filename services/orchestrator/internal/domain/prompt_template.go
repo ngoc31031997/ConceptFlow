@@ -3,16 +3,20 @@ package domain
 import "strings"
 
 // PromptRole identifies which stage of the CR-025 authoring pipeline a
-// template drives: Story Architect → Visual Director → Manim Engineer →
-// Script Reviewer, plus the Remotion variants of the two engine-specific
-// roles (remotion_visual_director, remotion_engineer).
+// template drives: Story Architect → Visual Director → Manim Engineer, plus
+// the Remotion variants of the two engine-specific roles
+// (remotion_visual_director, remotion_engineer).
+//
+// CR-030 bỏ hẳn vai trò thứ tư, Script Reviewer: bước duyệt không còn tồn tại
+// trong sản phẩm. Cột review_content và những dòng prompt cũ trong DB vẫn nằm
+// yên đó — không có gì đọc chúng nữa, và xoá dữ liệu của Creator để dọn dẹp là
+// cái giá không đáng.
 type PromptRole string
 
 const (
 	RoleStoryArchitect PromptRole = "story_architect"
 	RoleVisualDirector PromptRole = "visual_director"
 	RoleManimEngineer  PromptRole = "manim_engineer"
-	RoleScriptReviewer PromptRole = "script_reviewer"
 	// feature/remotion-engine: a single flat prompt (topic -> code), the same
 	// shape the Manim path had before CR-025 split it into 4 roles — Remotion
 	// has no design system/multi-step pipeline yet, so one prompt is the
@@ -32,7 +36,7 @@ const (
 // ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer, RoleScriptReviewer,
+	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
 		RoleRemotionEngineer, RoleRemotionVisualDirector:
 		return true
 	default:

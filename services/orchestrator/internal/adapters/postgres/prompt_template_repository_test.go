@@ -77,10 +77,10 @@ func TestShouldMigrateToOverride_RealEditIsPreserved(t *testing.T) {
 // and "close enough" is not a safe standard when the cost of being wrong is
 // losing it.
 func TestShouldMigrateToOverride_EvenOneWhitespaceCounts(t *testing.T) {
-	def, _ := domain.DefaultPromptTemplate(domain.RoleScriptReviewer, "en")
+	def, _ := domain.DefaultPromptTemplate(domain.RoleManimEngineer, "en")
 
 	stored := domain.PromptTemplate{
-		Role: domain.RoleScriptReviewer, Language: "en",
+		Role: domain.RoleManimEngineer, Language: "en",
 		TemplateText: def.TemplateText + "\n",
 	}
 

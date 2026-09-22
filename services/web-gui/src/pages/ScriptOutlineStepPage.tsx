@@ -3,6 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
+import { RenderEnginePicker } from "../components/RenderEnginePicker";
+import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import {
   getPromptTemplate,
@@ -16,6 +20,7 @@ import {
   CHANNEL_IDENTITY,
   NARRATION_LANGUAGE_RULE,
 } from "../components/scriptPrompts";
+import { stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
@@ -27,13 +32,17 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 /**
  * Bước 1a (Story Architect) — first tab of the "Bước 1 — Script" sub-wizard.
  * Used to be baked into ScriptStepPage + ScriptAssistant as the "blank"
- * situation; pulled out into its own tab/route so all 4 pipeline steps
- * (dàn ý/storyboard/code/duyệt) are visible and reachable at once (see
+ * situation; pulled out into its own tab/route so all 3 pipeline steps
+ * (dàn ý/storyboard/code) are visible and reachable at once (see
  * ScriptPipelineTabs), instead of a single hidden path through "/".
  *
- * The engine choice (Manim vs Remotion) is NOT asked here — this step's
- * output (a plain-text story outline) is identical either way; only step 1c
- * (Code) needs to know which engine, to fetch the right system prompt.
+ * The engine choice (Manim vs Remotion) does not change THIS step's own
+ * prompt — a plain-text story outline reads the same either way — but
+ * CR-030's "chạy cả bước 1 bằng AI" button runs 1b (storyboard) and 1c
+ * (code) too, and those two DO branch by engine (RoleFor on the server). So
+ * the picker lives here as well, not only on 1c: choosing it up front, before
+ * the chain runs, is the only way the chain's own storyboard/code calls see
+ * the right engine instead of always defaulting to Manim.
  */
 export function ScriptOutlineStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -143,6 +152,14 @@ export function ScriptOutlineStepPage() {
   }
 
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
+  const topicIsEmpty = draft.authoringTopic.trim().length === 0;
+  const llm = useLlmStatus();
+  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
+  const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
+  // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
+  // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
+  const aiMode = authoringMode === "ai" && llm?.enabled === true;
 
   async function handleContinue() {
     setSaving(true);
@@ -176,8 +193,72 @@ export function ScriptOutlineStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
+        {/* CR-030 — engine chọn ở đây, không chỉ ở 1c: nút "chạy cả bước 1"
+            bên dưới gọi luôn cả 1b/1c, nên tới lúc Creator xuống tới 1c để
+            đổi thì storyboard/code đã render bằng engine mặc định (Manim)
+            rồi. onChange lưu lên server ngay — xem AuthoringModeBar's
+            beforeRun bên dưới cho lượt lưu lại ngay trước khi chuỗi chạy. */}
+        <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
+          <RenderEnginePicker
+            value={draft.renderEngine}
+            onChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              if (draft.projectId) {
+                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
+              }
+            }}
+          />
+        </div>
+
+        {/* CR-027 FR79 — cách làm cả bước 1, đặt ngang hàng với
+            ContentLanguagePicker ở các bước khác: Creator chọn một lần, cả 3
+            tab 1a–1c đi theo.
+
+            CR-030 — ở chế độ AI, nút này chạy thẳng cả ba bước: chủ đề là đầu
+            vào duy nhất của cả chuỗi, nên bắt Creator quay lại bấm ở 1b rồi
+            1c chỉ là ba lần chờ thay vì một. Tab 1b/1c vẫn giữ nút chạy riêng
+            để sinh lại đúng một bước sau khi sửa tay. */}
+        <div className={styles.settingsRow}>
+          <AuthoringModeBar
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            steps={["story", "storyboard", "code"]}
+            what="dàn ý"
+            runDisabled={topicIsEmpty}
+            runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."
+            beforeRun={async () => {
+              // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
+              // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
+              // thiếu đúng cái thứ duy nhất bước này cần. Engine đi kèm ở đây
+              // nữa, làm lưới an toàn cho lượt lưu ở onChange phía trên —
+              // chuỗi 1b/1c phải thấy đúng engine trước khi chạy, không phải
+              // sau.
+              await createProjectDraft(
+                draft.projectId,
+                draft.authoringTopic.trim(),
+                draft.voiceLanguage,
+                draft.renderEngine,
+              );
+            }}
+            onGenerated={(step, content) => {
+              if (step === "story") dispatch({ type: "SET_AUTHORING_STORY", payload: content });
+              else if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
+              else dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(content) });
+            }}
+          />
+        </div>
+
         <div className={styles.scriptLayout}>
-          <Card title="1. Copy prompt" hint="Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini.">
+          <Card
+            title={aiMode ? "1. Chủ đề" : "1. Copy prompt"}
+            hint={
+              aiMode
+                ? "Chủ đề là tất cả những gì bước này cần — server tự điền nó vào prompt khi gọi AI."
+                : "Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
+            }
+          >
             <TextInput
               type="text"
               data-testid="script-outline-topic"
@@ -200,21 +281,32 @@ export function ScriptOutlineStepPage() {
                 . Bạn vẫn có thể tiếp tục — đây chỉ là cảnh báo.
               </div>
             )}
-            <TextArea
-              readOnly
-              value={prompt}
-              rows={16}
-              className={styles.promptTextarea}
-              data-testid="script-outline-prompt"
-            />
-            <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-outline-copy">
-              {copied ? "Đã copy!" : "Copy prompt"}
-            </Button>
+            {/* Ở chế độ AI, ô prompt để copy không còn việc gì: server tự
+                render đúng văn bản này rồi tự gọi. Đổi lại chế độ là nó quay
+                lại nguyên vẹn — không có gì bị xoá. */}
+            {!aiMode && (
+              <>
+                <TextArea
+                  readOnly
+                  value={prompt}
+                  rows={16}
+                  className={styles.promptTextarea}
+                  data-testid="script-outline-prompt"
+                />
+                <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-outline-copy">
+                  {copied ? "Đã copy!" : "Copy prompt"}
+                </Button>
+              </>
+            )}
           </Card>
 
           <Card
-            title="2. Dán kết quả"
-            hint="Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+            title={aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
+            hint={
+              aiMode
+                ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+            }
           >
             <TextArea
               id="story-outline-input"

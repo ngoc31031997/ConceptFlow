@@ -461,3 +461,41 @@ type ProgressMessage struct {
 	SceneTotal   *int    `json:"scene_total,omitempty"`
 	ErrorMessage *string `json:"error_message,omitempty"`
 }
+
+// AuthoringMode is how the Creator works step 1 of the wizard (CR-027 FR79):
+// copy each prompt out to an external AI and paste the answer back, or let the
+// server render the prompt and call the provider itself.
+//
+// One value per project, not per tab. A Creator who decided to run this script
+// through the API does not want to decide again on 1b, 1c and 1d — and because
+// it lives in project_authoring rather than only in the browser, the decision
+// survives a reload, another browser, and a restart of this service, whichever
+// step the project is sitting on.
+type AuthoringMode string
+
+const (
+	// AuthoringModeManual is the copy-prompt-out round trip — the only way
+	// that existed before CR-027, and the way that still works with no API
+	// key, no credit, or a provider outage (FR77.4/FR83.2). It is the default
+	// for every project, including every project created before FR79.
+	AuthoringModeManual AuthoringMode = "manual"
+	// AuthoringModeAI lets the server render the prompt and call the provider
+	// (FR78). It is only offered where a provider is actually configured.
+	AuthoringModeAI AuthoringMode = "ai"
+)
+
+// ValidAuthoringMode reports whether s names a mode.
+func ValidAuthoringMode(s string) bool {
+	return AuthoringMode(s) == AuthoringModeManual || AuthoringMode(s) == AuthoringModeAI
+}
+
+// NormalizeAuthoringMode turns anything unrecognised — "" from a project whose
+// row predates the column, or a value from a newer client — into the default.
+// Read paths normalise; the write path (SaveAuthoringModeUseCase) rejects
+// instead, so a disagreement surfaces where it can be fixed.
+func NormalizeAuthoringMode(s string) string {
+	if ValidAuthoringMode(s) {
+		return s
+	}
+	return string(AuthoringModeManual)
+}

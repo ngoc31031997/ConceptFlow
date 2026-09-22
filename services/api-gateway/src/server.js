@@ -32,10 +32,15 @@ function main() {
   const config = loadConfig();
 
   // 2. Initialize httpClient for the 3 targets, plus a longer-timeout
-  // variant of the orchestrator client for the AI metadata-suggestion route
-  // (local LLM generation can take up to ~2 minutes).
+  // variant of the orchestrator client for the AI routes (local LLM
+  // generation can take up to ~2 minutes).
+  //
+  // 200s, not 130s: CR-027's authoring-generate route sits behind this client
+  // and the orchestrator's own HIVE_TIMEOUT_SECONDS defaults to 180. A gateway
+  // that gave up first would show the Creator a timeout for a call that was
+  // still going to succeed, after the tokens were already billed.
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
-  const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 130_000 });
+  const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 200_000 });
   const publisherClient = createHttpClient(config.publisherUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.

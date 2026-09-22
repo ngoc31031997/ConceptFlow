@@ -131,8 +131,6 @@ func main() {
 	// call can happen, so no call ever runs unmeasured.
 	llmUsageRecorder := application.NewLLMUsageRecorder(postgres.NewLLMUsageRepository(pool), logger)
 
-	_ = llmProvider      // wired to the authoring generate use case in a later milestone
-	_ = llmUsageRecorder // same
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
@@ -171,11 +169,13 @@ func main() {
 	// CR-025 step 2: Visual Director's storyboard save, and the shared
 	// read-side use case both steps' rehydration relies on.
 	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	// CR-025 step 3/4: Manim Engineer's code save and Script Reviewer's
-	// verdict save, sharing the same read-side use case.
+	// CR-025 step 3: Manim Engineer's code save, sharing the same read-side
+	// use case. CR-030 đã bỏ hẳn bước 4 (Script Reviewer).
 	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	saveAuthoringReview := application.NewSaveAuthoringReviewUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
+	// CR-027 FR79 — the step-1 working mode, stored per project so the choice
+	// survives a reload, another browser, and a restart of this service.
+	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(promptTemplateRepo)
 	// CR-028 FR83: the project row is created here, at wizard step 1
 	// (POST /v1/projects), instead of at POST /v1/sagas/render — see
 	// projectDraftAdapter below for why this needs both repositories.
@@ -183,19 +183,41 @@ func main() {
 	createProjectDraft := application.NewCreateProjectDraftUseCase(draftPort)
 	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
 	listAuthoringHistory := application.NewListAuthoringHistoryUseCase(promptTemplateRepo)
+	// CR-027 FR77.1 — ONE renderer, shared by the Copy button (FR77.2) and the
+	// generate endpoint (FR78.1). Two instances would be two chances for the
+	// manual path and the API path to send different text for the same role.
+	renderPrompt := application.NewRenderPromptUseCase(
+		promptTemplateRepo, promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo}, projectRepo, projectRepo)
+
+	// CR-027 FR78/FR79 — the API option, beside the copy-out one. Without a
+	// Hive key llmProvider is the Ollama fallback, whose models are not up to
+	// writing a Manim scene, so the option is simply not offered and the GUI
+	// says so (FR79.4/FR83.2) rather than serving a button that fails.
+	var generateAuthoring *application.GenerateAuthoringUseCase
+	if cfg.LLMProvider == "hive" && cfg.HiveAPIKey != "" {
+		generateAuthoring = application.NewGenerateAuthoringUseCase(
+			renderPrompt, llmProvider, llmUsageRecorder,
+			promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
+			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
+			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
+		)
+	}
+
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
 		WithPromptTemplates(promptTemplates).
 		WithPromptOverrides(application.NewPromptOverridesUseCase(promptTemplateRepo)).
-		WithRenderPrompt(application.NewRenderPromptUseCase(
-			promptTemplateRepo, promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo}, projectRepo, projectRepo)).
+		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
 		WithAuthoringCode(saveAuthoringCode).
-		WithAuthoringReview(saveAuthoringReview).
 		WithAuthoringState(getAuthoringState).
+		WithAuthoringMode(saveAuthoringMode).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory)
+	if generateAuthoring != nil {
+		router = router.WithGenerateAuthoring(generateAuthoring)
+	}
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).
@@ -261,6 +283,10 @@ func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, 
 
 func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]application.SimilarProject, error) {
 	return a.authoring.FindSimilarTopics(ctx, language, normalizedTopic, excludeProjectID)
+}
+
+func (a projectDraftAdapter) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
+	return a.projects.SaveRenderEngine(ctx, projectID, engine)
 }
 
 type promptRenderContext struct {

@@ -3,12 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringCode } from "../api/client";
+import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { RenderEnginePicker } from "../components/RenderEnginePicker";
+import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { useLlmStatus } from "../hooks/useLlmStatus";
+import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
 
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
@@ -18,7 +21,8 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * ScriptPipelineTabs): fetch the current template, fill it with the
  * previous tabs' saved output (story + storyboard), let the Creator copy it
  * out and paste the AI's code back, then save it server-side, store it as
- * the draft's scriptContent, and advance to tab 1d (Duyệt).
+ * the draft's scriptContent, and advance to /create/settings — 1c is the
+ * last tab of bước 1 since CR-030 removed the "1d. Duyệt" review tab.
  *
  * feature/remotion-engine: the render engine picker lives HERE, not on the
  * situation-chooser page — tabs 1a/1b (story/storyboard) are identical
@@ -138,7 +142,9 @@ export function ManimEngineerStepPage() {
     setSaveError(null);
     try {
       await saveAuthoringCode(draft.projectId, code);
-      navigate("/create/script/review");
+      // CR-030 — 1c là tab cuối của bước 1 (tab "1d. Duyệt" đã bị bỏ), nên
+      // "Tiếp tục" đi thẳng sang phần cấu hình giọng đọc/render.
+      navigate("/create/settings");
     } catch {
       setSaveError("Không lưu được code, thử lại.");
     } finally {
@@ -154,6 +160,15 @@ export function ManimEngineerStepPage() {
         ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
         : validation.message;
 
+  // CR-027 FR79 — cùng lựa chọn chế độ với các tab khác của bước 1.
+  const llm = useLlmStatus();
+  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
+  const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
+  // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
+  // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
+  const aiMode = authoringMode === "ai" && llm?.enabled === true;
+
   return (
     <div data-testid="manim-engineer-step-page">
       <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1c. Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`} wide>
@@ -167,30 +182,61 @@ export function ManimEngineerStepPage() {
         <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
           <RenderEnginePicker
             value={draft.renderEngine}
-            onChange={(engine) => dispatch({ type: "SET_RENDER_ENGINE", payload: engine })}
+            onChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              // CR-030 — server phải biết engine trước khi render prompt cho
+              // storyboard/code (RoleFor đọc project.RenderEngine), không chỉ
+              // ở lúc nộp render. Best-effort như useAuthoringMode: lỗi mạng ở
+              // đây không được chặn Creator đổi lựa chọn trên màn hình.
+              if (draft.projectId) {
+                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
+              }
+            }}
           />
         </div>
 
-        <div className={styles.scriptLayout}>
-          <Card
-            title="1. Copy prompt"
-            hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
-          >
-            <TextArea
-              readOnly
-              value={prompt}
-              rows={18}
-              className={styles.promptTextarea}
-              data-testid="manim-engineer-prompt"
-            />
-            <Button onClick={handleCopy} className={styles.copyButton} data-testid="manim-engineer-copy">
-              {copied ? "Đã copy!" : "Copy prompt"}
-            </Button>
-          </Card>
+        <div className={styles.settingsRow}>
+          <AuthoringModeBar
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            steps={["code"]}
+            what={`code ${isRemotion ? "Remotion" : "Manim"}`}
+            runDisabled={draft.authoringStoryboard.trim().length === 0}
+            runDisabledReason="Cần storyboard ở tab 1b trước — server đọc dàn ý + storyboard làm {{previous_output}}."
+            onGenerated={(_step, content) => setCode(content)}
+          />
+        </div>
+
+        <div className={aiMode ? styles.scriptLayoutSingle : styles.scriptLayout}>
+          {/* Ở chế độ AI, thẻ prompt không còn việc gì: server render đúng văn
+              bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn. */}
+          {!aiMode && (
+            <Card
+              title="1. Copy prompt"
+              hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+            >
+              <TextArea
+                readOnly
+                value={prompt}
+                rows={18}
+                className={styles.promptTextarea}
+                data-testid="manim-engineer-prompt"
+              />
+              <Button onClick={handleCopy} className={styles.copyButton} data-testid="manim-engineer-copy">
+                {copied ? "Đã copy!" : "Copy prompt"}
+              </Button>
+            </Card>
+          )}
 
           <Card
-            title="2. Dán kết quả"
-            hint={`Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1d (Duyệt).`}
+            title={aiMode ? `Code ${isRemotion ? "Remotion" : "Manim"}` : "2. Dán kết quả"}
+            hint={
+              aiMode
+                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa — lint bên dưới vẫn chạy như khi dán tay. Bấm Tiếp tục để sang phần cấu hình giọng đọc.`
+                : `Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để sang phần cấu hình giọng đọc.`
+            }
           >
             <TextArea
               id="manim-engineer-code-input"
