@@ -29,6 +29,8 @@ COMPONENT_NAMES = frozenset({
     "FunctionPlot",
     "DataTable",
     "Timeline",
+    # Con số chạy được trong lúc quay — khuôn hình duy nhất có trạng thái
+    "Readout",
 })
 
 #: Theme và hình học khung an toàn.
@@ -59,8 +61,10 @@ PUBLIC_NAMES: frozenset[str] = (
 SCENE_METHODS = frozenset({
     "title", "heading", "body", "caption", "formula", "code",
     "stack", "row", "fit",
-    "connect", "outline",
-    "reveal", "dismiss", "swap", "emphasize", "clear_stage",
+    "connect", "outline", "brace",
+    # Hình cơ bản và số chạy, theo theme (thay cho API thô của Manim)
+    "shape", "path", "readout", "count",
+    "reveal", "dismiss", "swap", "emphasize", "travel", "clear_stage",
     # Camera
     "focus", "restore_view", "pace",
     # Beat dựng sẵn (CR-019 FR53)

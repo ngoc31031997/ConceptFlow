@@ -14,20 +14,31 @@ from __future__ import annotations
 import numpy as np
 from manim import (
     DOWN,
+    PI,
     RIGHT,
+    ArcBetweenPoints,
     Arrow,
+    Brace,
+    Circle,
     Code,
+    CurvedArrow,
+    Dot,
+    Line,
     MathTex,
     Mobject,
     MovingCameraScene,
+    Polygon,
+    Rectangle,
+    Square,
     SurroundingRectangle,
     Text,
     VGroup,
+    VMobject,
 )
 
 from . import narration as narration_runtime
 from . import theme as theme_module
-from .components import Recap, TitleCard
+from .components import Readout, Recap, TitleCard
 from .layout import Box, fit_scale
 from .theme import Theme
 from .transitions import (
@@ -35,6 +46,7 @@ from .transitions import (
     emphasize_animation,
     reveal_animation,
     swap_animation,
+    travel_animation,
 )
 
 
@@ -45,6 +57,14 @@ from .transitions import (
 #: báo động giả, trong khi vẫn bắt được trường hợp "chồng gần như hoàn toàn"
 #: là bug thật. Hằng số riêng, dễ chỉnh nếu thực tế cho thấy cần khác.
 OVERLAP_AREA_RATIO_THRESHOLD = 0.25
+
+#: Sắc thái gọi được bằng tên trong `shape`, `connect`, `outline`, `readout`.
+#: Script chọn màu bằng từ khoá của theme, không bằng mã màu — xem `Callout.TONES`.
+TONES = ("accent", "accent_alt", "success", "warning", "danger", "muted", "ink")
+
+#: Độ cong của `connect(style="curved")`, tính bằng radian. Một phần ba PI đủ để
+#: mũi tên vòng qua một vật nằm chắn giữa mà không thành vòng cung điệu đà.
+CURVED_ARROW_ANGLE = -PI / 3
 
 #: `focus()` zoom sao cho vật chiếm khoảng 1/1.6 bề ngang khung: đủ gần để thấy
 #: chi tiết, vẫn còn chỗ cho nhãn đặt cạnh vật.
@@ -132,25 +152,147 @@ class ConceptFlowScene(MovingCameraScene):
 
     # --- Nối và khoanh (thay cho Arrow/SurroundingRectangle thô) ---------------
 
-    def connect(self, source: Mobject, target: Mobject, label: str | None = None) -> VGroup:
+    def connect(
+        self,
+        source: Mobject,
+        target: Mobject,
+        label: str | None = None,
+        style: str = "straight",
+        tone: str = "muted",
+    ) -> VGroup:
         """Mũi tên từ `source` tới `target`, kèm nhãn nhỏ ở giữa nếu có.
+
+        `style="curved"` vòng cung sang một bên — dùng khi đường thẳng sẽ cắt
+        ngang một vật thứ ba, hoặc khi cần một mũi tên đi ngược lại (A→B thẳng,
+        B→A cong) mà hai mũi tên không chồng lên nhau.
 
         Trả về mobject chứ không tự hiện: script quyết định lúc nào `reveal`.
         Đây là lý do phổ biến nhất khiến script phải `from manim import Arrow`.
         """
-        arrow = Arrow(source, target, buff=0.15, color=self.theme.muted, stroke_width=3)
+        color = self._tone_color(tone)
+        if style == "curved":
+            start, end = _edge_points(source, target)
+            arrow = CurvedArrow(start, end, angle=CURVED_ARROW_ANGLE, color=color)
+            arrow.set_stroke(width=3)
+        else:
+            arrow = Arrow(source, target, buff=0.15, color=color, stroke_width=3)
+
         group = VGroup(arrow)
         if label:
-            # Đặt nhãn vuông góc với mũi tên để không đè lên thân nó.
-            dx, dy, _ = arrow.get_unit_vector()
-            tag = self.caption(label).next_to(arrow.get_center(), np.array([-dy, dx, 0.0]), buff=0.15)
-            group.add(tag)
+            # Đặt nhãn vuông góc với trục đầu-cuối để không đè lên thân mũi tên.
+            # Tính từ hai đầu chứ không từ `get_unit_vector()`: mũi tên cong là
+            # một `Arc`, không phải `Line`, nên không có method đó.
+            dx, dy, _ = _unit_vector(arrow.get_start(), arrow.get_end())
+            mid = arrow.point_from_proportion(0.5)
+            group.add(self.caption(label).next_to(mid, np.array([-dy, dx, 0.0]), buff=0.15))
         return group
 
     def outline(self, mobject: Mobject, tone: str = "accent") -> Mobject:
         """Khung bao quanh một đối tượng để chỉ vào nó, màu theo sắc thái."""
-        color = getattr(self.theme, tone if tone in {"accent", "success", "warning", "danger"} else "accent")
-        return SurroundingRectangle(mobject, color=color, buff=0.15, corner_radius=0.12, stroke_width=3)
+        return SurroundingRectangle(
+            mobject, color=self._tone_color(tone), buff=0.15, corner_radius=0.12, stroke_width=3
+        )
+
+    def brace(self, mobject: Mobject, label: str | None = None, direction=DOWN) -> VGroup:
+        """Dấu ngoặc ôm lấy một vật, kèm nhãn — "đoạn này là ...".
+
+        Khác `outline` ở chỗ nó chỉ vào một **chiều**: độ dài một đoạn, chiều
+        cao một cột, một khoảng trên trục. Đó là lý do phổ biến thứ hai (sau
+        `Arrow`) khiến script phải import API thô của Manim.
+        """
+        brace = Brace(mobject, direction=direction, color=self.theme.muted)
+        group = VGroup(brace)
+        if label:
+            group.add(self.caption(label).next_to(brace, direction, buff=0.15))
+        return group
+
+    # --- Hình cơ bản (thay cho Rectangle/Circle/Line... thô) ------------------
+
+    def shape(
+        self,
+        kind: str = "rect",
+        tone: str = "accent",
+        filled: bool = False,
+        width: float = 2.4,
+        height: float = 1.4,
+        radius: float = 0.7,
+        points: list | None = None,
+    ) -> VMobject:
+        """Một khối hình mang màu và độ dày nét của theme.
+
+        `kind`: "rect", "square", "circle", "dot", "polygon" (cần `points`).
+        `filled=True` thêm nền `surface` mờ — cùng chất liệu với `Callout` và
+        các khối của `FlowDiagram`, nên hình tự dựng không lạc khỏi phần còn lại.
+
+        Kích thước nhận bằng tham số chứ không bằng `.scale()` sau đó, để một
+        hình vuông cạnh 1.4 ở video này bằng đúng hình vuông cạnh 1.4 ở video kia.
+        """
+        color = self._tone_color(tone)
+        builders = {
+            "rect": lambda: Rectangle(width=width, height=height),
+            "square": lambda: Square(side_length=height),
+            "circle": lambda: Circle(radius=radius),
+            "dot": lambda: Dot(radius=0.1),
+            "polygon": lambda: Polygon(*(_as_point(p) for p in (points or []))),
+        }
+        if kind == "polygon" and len(points or []) < 3:
+            raise ValueError("shape('polygon') cần ít nhất 3 điểm trong `points`")
+        mobject = builders.get(kind, builders["rect"])()
+
+        if kind == "dot":
+            return mobject.set_color(color)
+        mobject.set_stroke(color=color, width=3)
+        mobject.set_fill(
+            color=self.theme.surface if filled else color,
+            opacity=0.55 if filled else 0.0,
+        )
+        return mobject
+
+    def path(self, *points, tone: str = "muted", curve: float = 0.0) -> VMobject:
+        """Đường đi qua các điểm (hoặc qua tâm các vật) đã cho.
+
+        Hai điểm và `curve != 0` thì thành cung; còn lại là đường gấp khúc. Trả
+        về một đường thật (không phải mũi tên) nên dùng được làm quỹ đạo cho
+        `travel()` — đó là lý do nó nhận nhiều hơn hai điểm.
+        """
+        anchors = [_as_point(p) for p in points]
+        if len(anchors) < 2:
+            raise ValueError("path() cần ít nhất hai điểm")
+
+        if len(anchors) == 2 and curve:
+            line: VMobject = ArcBetweenPoints(anchors[0], anchors[1], angle=curve)
+        elif len(anchors) == 2:
+            line = Line(anchors[0], anchors[1])
+        else:
+            line = VMobject().set_points_as_corners(anchors)
+        line.set_stroke(color=self._tone_color(tone), width=3)
+        return line
+
+    # --- Số chạy --------------------------------------------------------------
+
+    def readout(
+        self,
+        value: float = 0,
+        label: str | None = None,
+        unit: str = "",
+        decimals: int = 0,
+        tone: str = "accent",
+    ) -> Readout:
+        """Một con số lớn mà `count()` animate được. Xem `components.readout`."""
+        return Readout(
+            value, label=label, unit=unit, decimals=decimals, tone=tone, theme=self.theme
+        )
+
+    def count(self, readout: Readout, to: float, speed: str = "slow") -> None:
+        """Chạy con số từ giá trị hiện tại tới `to`, không nhảy cóc.
+
+        Mặc định `slow`: người xem cần đủ thời gian đọc được các chữ số đang
+        đổi, nếu không thì hiệu ứng chỉ còn là một vệt nhoè.
+        """
+        self.play(readout.tracker.animate.set_value(to), run_time=self._run_time(speed))
+
+    def _tone_color(self, tone: str) -> str:
+        return getattr(self.theme, tone if tone in TONES else "accent")
 
     # --- Lời thoại (CR-018) ---------------------------------------------------
 
@@ -291,9 +433,23 @@ class ConceptFlowScene(MovingCameraScene):
     def swap(self, old: Mobject, new: Mobject, speed: str = "normal") -> None:
         self.play(swap_animation(old, new, self._run_time(speed)))
 
-    def emphasize(self, *mobjects: Mobject, speed: str = "normal") -> None:
+    def emphasize(self, *mobjects: Mobject, style: str = "pulse", speed: str = "normal") -> None:
+        """Nhấn vào vật đã có trên màn hình. `style="circle"` khoanh thay vì phóng.
+
+        Dùng `circle` khi vật nằm lọt trong một hình lớn (một ô của bảng, một
+        khối của sơ đồ): phóng to nó ở đó sẽ đè lên hàng xóm.
+        """
         run_time = self._run_time(speed)
-        self.play(*(emphasize_animation(m, run_time) for m in mobjects))
+        color = self.theme.accent
+        self.play(*(emphasize_animation(m, run_time, style, color) for m in mobjects))
+
+    def travel(self, mobject: Mobject, path: VMobject, speed: str = "slow") -> None:
+        """Cho một vật chạy dọc `path` (dựng bằng `self.path(...)`).
+
+        Chậm mặc định: quỹ đạo là thứ người xem phải theo mắt được, và một
+        chuyển động nhanh dọc đường cong đọc thành một cú nhảy.
+        """
+        self.play(travel_animation(mobject, path, self._run_time(speed)))
 
     def clear_stage(self, speed: str = "fast") -> None:
         """Dọn sạch khung. Gọi giữa hai beat để không tích tụ rác thị giác.
@@ -363,8 +519,11 @@ class ConceptFlowScene(MovingCameraScene):
             self._home_view = (frame.get_center().copy(), frame.width)
 
     def pace(self, speed: str = "normal") -> float:
-        """Số giây của một tốc độ theme, cho animation script tự `self.play(...)`
-        (`MoveAlongPath`, `ValueTracker`...) mà không phải tự chọn run_time."""
+        """Số giây của một tốc độ theme, cho animation script tự `self.play(...)`.
+
+        Đường thoát hiểm cuối cùng: nếu phải gọi một animation thô của Manim thì
+        ít nhất nhịp của nó vẫn lấy từ theme. Các ca thường gặp đã có method
+        riêng (`travel`, `count`, `emphasize`) nên không cần tới đây."""
         return self._run_time(speed)
 
     def _run_time(self, speed: str) -> float:
@@ -372,6 +531,34 @@ class ConceptFlowScene(MovingCameraScene):
         return {"fast": pacing.fast, "normal": pacing.normal, "slow": pacing.slow}.get(
             speed, pacing.normal
         )
+
+
+def _as_point(value) -> np.ndarray:
+    """Toạ độ của một đối số `shape`/`path`: tâm của mobject, hoặc điểm cho sẵn."""
+    if isinstance(value, Mobject):
+        return value.get_center()
+    point = np.asarray(value, dtype=float)
+    # Toạ độ Manim luôn 3 chiều; script viết (x, y) là chuyện thường gặp.
+    return np.array([point[0], point[1], point[2] if len(point) > 2 else 0.0])
+
+
+def _unit_vector(start: np.ndarray, end: np.ndarray) -> np.ndarray:
+    delta = np.asarray(end, dtype=float) - np.asarray(start, dtype=float)
+    norm = float(np.linalg.norm(delta))
+    return delta / norm if norm else np.array([1.0, 0.0, 0.0])
+
+
+def _edge_points(source: Mobject, target: Mobject, buff: float = 0.15):
+    """Hai điểm trên mép của hai vật, nhìn về phía nhau.
+
+    `Arrow(source, target)` tự làm việc này; `CurvedArrow` chỉ nhận toạ độ, nên
+    nếu đưa thẳng tâm vào thì mũi tên cắm vào giữa vật.
+    """
+    unit = _unit_vector(source.get_center(), target.get_center())
+    return (
+        source.get_boundary_point(unit) + unit * buff,
+        target.get_boundary_point(-unit) - unit * buff,
+    )
 
 
 def _bbox_of(mobject: Mobject) -> tuple[float, float, float, float]:

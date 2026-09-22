@@ -13,6 +13,7 @@ from .comparison import ComparisonSplit
 from .data_table import DataTable
 from .flow_diagram import FlowDiagram
 from .function_plot import FunctionPlot
+from .readout import Readout
 from .recap import Recap
 from .step_list import StepList
 from .timeline import Timeline
@@ -32,4 +33,5 @@ __all__ = [
     "FunctionPlot",
     "DataTable",
     "Timeline",
+    "Readout",
 ]

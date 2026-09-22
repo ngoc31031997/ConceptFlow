@@ -13,11 +13,13 @@ from __future__ import annotations
 from manim import (
     DOWN,
     UP,
+    Circumscribe,
     Create,
     FadeIn,
     FadeOut,
     Indicate,
     Mobject,
+    MoveAlongPath,
     ReplacementTransform,
     VMobject,
 )
@@ -45,8 +47,29 @@ def swap_animation(old: Mobject, new: Mobject, run_time: float):
     return ReplacementTransform(old, new, run_time=run_time)
 
 
-def emphasize_animation(mobject: Mobject, run_time: float):
+def emphasize_animation(
+    mobject: Mobject, run_time: float, style: str = "pulse", color: str | None = None
+):
+    """Nhấn vào một vật đã có trên màn hình.
+
+    `pulse` phóng nhẹ — hợp với một vật nhỏ đứng riêng. `circle` khoanh một
+    khung chạy quanh vật rồi biến mất — hợp khi vật nằm trong một hình lớn và
+    phóng to nó sẽ đè lên hàng xóm. Màu do scene truyền vào (từ theme), vì
+    module này cố tình không biết gì về bảng màu.
+    """
+    if style == "circle":
+        kwargs = {"color": color} if color else {}
+        return Circumscribe(mobject, buff=0.15, run_time=run_time, **kwargs)
     return Indicate(mobject, scale_factor=1.12, run_time=run_time)
+
+
+def travel_animation(mobject: Mobject, path: VMobject, run_time: float):
+    """Đưa một vật chạy dọc theo một đường.
+
+    Tách khỏi `reveal`: ở đây vật đã có sẵn trên màn hình và cái người xem theo
+    dõi là **quỹ đạo**, không phải sự xuất hiện.
+    """
+    return MoveAlongPath(mobject, path, run_time=run_time)
 
 
 def _is_texty(mobject: Mobject) -> bool:
@@ -57,4 +80,9 @@ def _is_texty(mobject: Mobject) -> bool:
     chỉ dùng cho đúng một phép so ở đây.
     """
     names = {type(mobject).__name__, *(c.__name__ for c in type(mobject).__mro__)}
-    return bool(names & {"Text", "MarkupText", "Tex", "MathTex", "SingleStringMathTex", "Code"})
+    # `Readout` là một con số: vẽ dần nét của các chữ số trông như lỗi font, và
+    # bản sống của nó dựng lại mỗi frame nên `Create` không có gì để vẽ tiếp.
+    return bool(
+        names
+        & {"Text", "MarkupText", "Tex", "MathTex", "SingleStringMathTex", "Code", "Readout"}
+    )

@@ -313,7 +313,10 @@ Bạn được toàn quyền sáng tạo về: cách ví von, ví dụ cụ th�
 - \`FunctionPlot(lambda x: ..., (x_min, x_max), label=None)\` — trục toạ độ cộng đồ thị hàm số. \`.axes\`, \`.graph\` để nhấn/đặt nhãn.
 - \`DataTable([tiêu_đề_cột, ...], [[ô, ...], ...])\` — bảng dữ liệu, một đường kẻ dưới tiêu đề. \`.rows[i]\` là từng hàng.
 - \`Timeline([(mốc, mô_tả), ...])\` — dòng thời gian ngang. \`.marks[i]\` là từng mốc.
-- \`self.connect(a, b, label=None)\` — mũi tên theo theme nối hai vật; \`self.outline(vật, tone="accent")\` — khung khoanh quanh một vật.
+- \`self.readout(0, label="phép so sánh", unit="lần", decimals=0, tone="accent")\` — một con số LỚN chạy được: dùng \`self.count(số, 128)\` để nó đếm dần lên (đừng dựng lại chữ mới).
+- \`self.connect(a, b, label=None, style="straight"|"curved")\` — mũi tên theo theme nối hai vật (\`curved\` khi đường thẳng sẽ cắt qua vật khác, hoặc khi cần mũi tên chiều ngược lại); \`self.outline(vật, tone="accent")\` — khung khoanh quanh một vật; \`self.brace(vật, "nhãn", direction=DOWN)\` — dấu ngoặc chỉ vào MỘT CHIỀU của vật.
+- \`self.shape("rect"|"square"|"circle"|"dot"|"polygon", tone="accent", filled=False, width=..., height=..., radius=..., points=[...])\` — hình cơ bản mang màu, độ dày nét và nền của theme. DÙNG CÁI NÀY thay cho \`Rectangle/Square/Circle/Dot/Polygon\` thô.
+- \`self.path(điểm_hoặc_vật, ..., tone="muted", curve=0.0)\` — đường nối các điểm (\`curve\` khác 0 và đúng hai điểm thì thành cung), dùng làm quỹ đạo cho \`self.travel(...)\`, thay cho \`Line/ArcBetweenPoints/VMobject\` thô.
 
 Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
 
@@ -325,13 +328,13 @@ Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ 
   - \`self.call_to_action("Lời kêu gọi", "phụ đề tuỳ chọn")\` — mở beat \`cta\`, tự giữ khung cuối cho end-screen
 - Chữ: \`self.title(...)\`, \`self.heading(...)\`, \`self.body(...)\`, \`self.caption(...)\`, \`self.formula("x^2")\`, \`self.code(src, "python")\`
 - Bố cục: \`self.stack(a, b, c)\` (xếp dọc), \`self.row(a, b)\` (xếp ngang), \`self.fit(obj)\` (co cho vừa khung)
-- Chuyển cảnh: \`self.reveal(obj)\`, \`self.dismiss(obj)\`, \`self.swap(cũ, mới)\`, \`self.emphasize(obj)\`, \`self.clear_stage()\`
+- Chuyển cảnh: \`self.reveal(obj)\`, \`self.dismiss(obj)\`, \`self.swap(cũ, mới)\`, \`self.emphasize(obj, style="pulse"|"circle")\`, \`self.travel(obj, đường_đi)\`, \`self.clear_stage()\`
   (mỗi cái nhận \`speed="fast"|"normal"|"slow"\`; KHÔNG đặt run_time bằng tay)
 - Gom nhóm và chỉ hướng: \`VGroup\`, \`UP\`, \`DOWN\`, \`LEFT\`, \`RIGHT\`, \`ORIGIN\`
 - Đặt vị trí tương đối: \`obj.next_to(khác, DOWN, buff=0.5)\`, \`obj.shift(UP * 0.5)\`
 
 ### Ràng buộc thi hành
-- Cần một hình mà component không diễn đạt được? Import đích danh từ Manim (ví dụ \`from manim import Arrow\`). Được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
+- Cần một hình mà component không diễn đạt được? TRƯỚC HẾT xem lại \`self.shape\`, \`self.path\`, \`self.connect\`, \`self.brace\`, \`self.readout\`, \`self.travel\`, \`self.emphasize(style="circle")\` — chúng có sẵn cho hầu hết hình học, mũi tên, số chạy và chuyển động. Chỉ khi vẫn không đủ mới import đích danh từ Manim (ví dụ \`from manim import Angle\`): được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
 - MỖI phân đoạn nên có ít nhất một hình ảnh/hình học, không chỉ toàn chữ. Video toàn chữ là thứ kênh này muốn tránh.
 - Script chạy trong subprocess giới hạn tài nguyên (timeout 1800s, RAM 4 GiB) — tránh vòng lặp/animation quá nặng, nhưng không cần cắt ngắn nội dung vì lo timeout.
 - Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.

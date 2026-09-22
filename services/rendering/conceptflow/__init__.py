@@ -16,6 +16,7 @@ from .components import (
     DataTable,
     FlowDiagram,
     FunctionPlot,
+    Readout,
     Timeline,
     Callout,
     CodePanel,
@@ -44,6 +45,7 @@ __all__ = [
     "FunctionPlot",
     "DataTable",
     "Timeline",
+    "Readout",
     # Theme
     "Theme",
     "get",

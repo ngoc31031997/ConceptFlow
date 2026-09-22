@@ -12,9 +12,11 @@ pytest.importorskip("manim", reason="component cần manim thật để đo boun
 from conceptflow import (  # noqa: E402
     BarChart,
     Callout,
+    ConceptFlowScene,
     DataTable,
     FlowDiagram,
     FunctionPlot,
+    Readout,
     Timeline,
     CodePanel,
     ComparisonSplit,
@@ -46,6 +48,7 @@ CASES = [
     lambda: FunctionPlot(lambda x: x * x, (-3, 3), label="y = x²"),
     lambda: DataTable(["Kiểu", "Kích thước"], [["int", "4 byte"], ["long", "8 byte"]]),
     lambda: Timeline([("1991", "Python ra đời"), ("2008", "Python 3"), ("2020", "Hết hỗ trợ Python 2")]),
+    lambda: Readout(0, label="phép so sánh", unit="lần"),
 ]
 
 
@@ -151,3 +154,131 @@ def test_scene_methods_khop_voi_method_that_cua_scene():
     # `added_during_zoom` là helper cho QC/narration, không phải thứ script cần gọi.
     own -= {"play", "stage_mobjects", "is_zoomed", "added_during_zoom"}
     assert own == set(SCENE_METHODS)
+
+
+# --- Hình cơ bản và số chạy theo theme (thay cho API thô của Manim) ----------
+
+
+@pytest.fixture
+def scene():
+    return ConceptFlowScene()
+
+
+@pytest.mark.parametrize(
+    "kind,kwargs",
+    [
+        ("rect", {}),
+        ("square", {}),
+        ("circle", {}),
+        ("dot", {}),
+        ("polygon", {"points": [(-1, 0), (1, 0), (0, 1.5)]}),
+    ],
+)
+def test_shape_mang_mau_cua_theme(scene, kind, kwargs):
+    """Mọi hình cơ bản phải lấy màu từ theme — đó là lý do chúng tồn tại."""
+    mobject = scene.shape(kind, tone="success", **kwargs)
+    color = mobject.get_color() if kind == "dot" else mobject.get_stroke_color()
+    assert str(color).upper() == scene.theme.success.upper()
+
+
+def test_shape_tone_la_roi_ve_accent(scene):
+    """Như `Callout`: sắc thái sai không được làm hỏng cả lượt render."""
+    assert str(scene.shape("rect", tone="khong-ton-tai").get_stroke_color()).upper() == (
+        scene.theme.accent.upper()
+    )
+
+
+@pytest.mark.parametrize(
+    "build",
+    [
+        lambda s: s.shape("polygon", points=[(0, 0)]),
+        lambda s: s.path((0, 0)),
+    ],
+)
+def test_hinh_thieu_diem_bao_loi_ro_rang(scene, build):
+    with pytest.raises(ValueError):
+        build(scene)
+
+
+def test_path_nhieu_diem_di_qua_dung_cac_diem(scene):
+    """`path` là quỹ đạo cho `travel`, nên nó phải chạm đúng các điểm đã cho."""
+    line = scene.path((-3, -1), (0, 2), (3, -1))
+    assert float(line.get_start()[0]) == pytest.approx(-3)
+    assert float(line.get_end()[0]) == pytest.approx(3)
+    assert float(line.get_top()[1]) == pytest.approx(2)
+
+
+def test_connect_cong_khong_trung_voi_connect_thang(scene):
+    """Hai chiều của cùng một cặp vật phải phân biệt được bằng mắt, nếu không
+    thì mũi tên đi và mũi tên về chồng khít lên nhau."""
+    a = scene.shape("rect")
+    b = scene.shape("circle").shift([4, 0, 0])
+    straight = scene.connect(a, b)[0]
+    curved = scene.connect(a, b, style="curved")[0]
+    assert float(curved.point_from_proportion(0.5)[1]) != pytest.approx(
+        float(straight.point_from_proportion(0.5)[1])
+    )
+
+
+def test_connect_khong_cam_vao_giua_vat(scene):
+    """`CurvedArrow` chỉ nhận toạ độ; đưa thẳng tâm vào thì mũi tên xuyên qua vật."""
+    a = scene.shape("rect")
+    b = scene.shape("circle").shift([5, 0, 0])
+    arrow = scene.connect(a, b, style="curved")[0]
+    assert float(arrow.get_start()[0]) > float(a.get_right()[0])
+    assert float(arrow.get_end()[0]) < float(b.get_left()[0])
+
+
+def test_brace_co_nhan_nam_ngoai_vat(scene):
+    box = scene.shape("rect")
+    group = scene.brace(box, "một chu kỳ")
+    assert len(group) == 2
+    assert float(group[1].get_top()[1]) < float(box.get_bottom()[1])
+
+
+def test_so_chay_bam_theo_group_khi_script_doi_cho():
+    """Bản sống dựng lại mỗi frame, nên nếu nó không bám vào bóng thì nhãn đi
+    lên còn con số vẫn nằm giữa khung — lỗi thật, thấy được trên khung hình."""
+    readout = Readout(0, label="phép so sánh", unit="lần")
+    readout.shift([0, 2.6, 0])
+    readout.update()  # ép `always_redraw` chạy như trong một frame thật
+    assert float(readout.number.get_center()[1]) == pytest.approx(
+        float(readout._ghost.get_center()[1]), abs=0.05
+    )
+
+
+def test_so_chay_co_theo_khi_bi_stack_thu_nho():
+    """`stack()` co cả cụm; cỡ chữ đã chốt thành số nên phải co theo bóng."""
+    scene = ConceptFlowScene()
+    readout = Readout(0, label="vòng")
+    before = readout.number.height
+    scene.stack(scene.heading("Số vòng lặp"), readout, scene.body("x" * 120))
+    readout.update()
+    assert readout.number.height < before
+
+
+def test_so_chay_doi_gia_tri_theo_tracker():
+    readout = Readout(0, decimals=0)
+    readout.tracker.set_value(128)
+    readout.update()
+    assert readout.value == pytest.approx(128)
+    assert len(readout.number[0]) == 3  # ba chữ số trên màn hình
+
+
+def test_emphasize_kieu_khoanh_khac_kieu_phong():
+    """Hai kiểu nhấn phải là hai animation khác nhau, không phải một tham số trang trí."""
+    from conceptflow.transitions import emphasize_animation
+
+    square = Readout(1)
+    assert type(emphasize_animation(square, 0.8, "circle", "#FFFFFF")).__name__ == (
+        "Circumscribe"
+    )
+    assert type(emphasize_animation(square, 0.8)).__name__ == "Indicate"
+
+
+def test_reveal_mot_readout_la_fade_chu_khong_phai_ve_dan():
+    """`Create` vẽ dần nét chữ số (trông như lỗi font) và đánh nhau với bản
+    sống dựng lại mỗi frame — từng làm cả lượt render crash."""
+    from conceptflow.transitions import reveal_animation
+
+    assert type(reveal_animation(Readout(0), 0.8)).__name__ == "FadeIn"

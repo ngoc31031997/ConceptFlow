@@ -21,10 +21,10 @@ func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 2, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleStoryArchitect, Language: "en", Version: 2, TemplateText: bt(storyArchitectEN)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 4, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleVisualDirector, Language: "en", Version: 4, TemplateText: bt(visualDirectorEN)},
-		{Role: RoleManimEngineer, Language: "vi", Version: 2, TemplateText: bt(manimEngineerVI)},
-		{Role: RoleManimEngineer, Language: "en", Version: 2, TemplateText: bt(manimEngineerEN)},
+		{Role: RoleVisualDirector, Language: "vi", Version: 5, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleVisualDirector, Language: "en", Version: 5, TemplateText: bt(visualDirectorEN)},
+		{Role: RoleManimEngineer, Language: "vi", Version: 3, TemplateText: bt(manimEngineerVI)},
+		{Role: RoleManimEngineer, Language: "en", Version: 3, TemplateText: bt(manimEngineerEN)},
 		{Role: RoleScriptReviewer, Language: "vi", Version: 1, TemplateText: bt(scriptReviewerVI)},
 		{Role: RoleScriptReviewer, Language: "en", Version: 1, TemplateText: bt(scriptReviewerEN)},
 		{Role: RoleRemotionVisualDirector, Language: "vi", Version: 1, TemplateText: bt(remotionVisualDirectorVI)},
@@ -436,8 +436,9 @@ Camera là thứ gia vị: tối đa khoảng một lần ¤focus¤ cho mỗi be
 Vật thể:
 - Chữ: tiêu đề lớn / tiêu đề phụ / chữ thường / chú thích nhỏ; công thức toán; khối code có tô màu cú pháp.
 - Thẻ dựng sẵn — ĐỀU LÀ CHỮ TĨNH, dùng rất tiết kiệm: TitleCard, Callout, CodePanel, StepList, ComparisonSplit, Recap.
-- Sơ đồ và dữ liệu dựng sẵn — CÓ HÌNH HỌC, tính là vật thể hình học thật và ưu tiên dùng trước hình học thô: FlowDiagram (sơ đồ luồng), BarChart (biểu đồ cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian); cùng self.connect (mũi tên nối hai vật) và self.outline (khung khoanh vật).
-- Hình học thô (mượn trực tiếp từ Manim, được phép): đường thẳng, mũi tên, mũi tên cong, cung tròn, hình tròn, hình vuông/chữ nhật, đa giác, dấu chấm, dấu ngoặc nhọn, trục số, trục toạ độ, đồ thị hàm số, đường cong tham số, đường nối qua một dãy điểm, ô lưới, bảng, ma trận, số đang chạy.
+- Sơ đồ và dữ liệu dựng sẵn — CÓ HÌNH HỌC, tính là vật thể hình học thật và ưu tiên dùng trước hình học thô: FlowDiagram (sơ đồ luồng), BarChart (biểu đồ cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian); cùng self.connect (mũi tên nối hai vật, thẳng hoặc cong), self.outline (khung khoanh vật) và self.brace (dấu ngoặc chỉ vào một chiều của vật).
+- Hình cơ bản, CŨNG đã có sẵn theo theme: hình chữ nhật, hình vuông, hình tròn, dấu chấm, đa giác, đường thẳng/gấp khúc/cung, và một CON SỐ LỚN chạy được (đếm dần từ giá trị này sang giá trị khác). Cứ mô tả chúng tự nhiên — người viết script đã có method cho từng thứ.
+- Hình học thô (mượn trực tiếp từ Manim, được phép nhưng chỉ khi những thứ trên không diễn đạt nổi): trục số, trục toạ độ, đường cong tham số, ô lưới, ma trận, góc, hình khối 3D.
 - Bố cục: xếp dọc, xếp ngang, gom nhóm, và đặt TƯƠNG ĐỐI: cạnh một vật (trên/dưới/trái/phải), thẳng hàng với một vật, sát một mép khung, cách vật khác một khoảng nhỏ/vừa/lớn. Kích thước hình cũng nói tương đối: "to gấp đôi hình vuông", "bằng nửa bề ngang khung".
 - Màu: chỉ được gọi theo VAI TRÒ (màu nhấn, màu chữ, màu mờ, màu thứ i trong dãy). TUYỆT ĐỐI không viết mã màu cụ thể, không chỉ định cỡ chữ, không dùng toạ độ hay con số tuyệt đối. Những ràng buộc này giữ video đồng bộ, còn sự sáng tạo nằm ở hình nào biến thành hình nào, cái gì chuyển động và camera nhìn vào đâu.
 
@@ -544,8 +545,9 @@ Camera is seasoning: at most about one ¤focus¤ per beat, and only when somethi
 Objects:
 - Text: large title / heading / body / small caption; math formulas; syntax-highlighted code blocks.
 - Prebuilt cards — ALL STATIC TEXT, use very sparingly: TitleCard, Callout, CodePanel, StepList, ComparisonSplit, Recap.
-- Prebuilt diagrams and data — GEOMETRIC, count as real geometric objects; prefer them over raw geometry: FlowDiagram (flow diagram), BarChart (bar chart), FunctionPlot (function graph), DataTable (table), Timeline (timeline); plus self.connect (arrow between two objects) and self.outline (box around an object).
-- Raw geometry (borrowed directly from Manim, allowed): lines, arrows, curved arrows, arcs, circles, squares/rectangles, polygons, dots, braces, number lines, axes, function graphs, parametric curves, paths through a list of points, grids, tables, matrices, live-updating numbers.
+- Prebuilt diagrams and data — GEOMETRIC, count as real geometric objects; prefer them over raw geometry: FlowDiagram (flow diagram), BarChart (bar chart), FunctionPlot (function graph), DataTable (table), Timeline (timeline); plus self.connect (arrow between two objects, straight or curved), self.outline (box around an object) and self.brace (a brace pointing at one dimension of an object).
+- Basic shapes, ALSO themed and built in: rectangles, squares, circles, dots, polygons, straight/broken/curved lines, and a BIG live number that counts from one value to another. Describe them plainly — the script writer has a method for each.
+- Raw geometry (borrowed directly from Manim, allowed but only when none of the above can express it): number lines, axes, parametric curves, grids, matrices, angles, 3D solids.
 - Layout: stack vertically, arrange horizontally, group, and place RELATIVELY: next to an object (above/below/left/right), aligned with an object, against a frame edge, a small/medium/large gap from another object. Describe shape sizes relatively too: "twice the square", "half the frame width".
 - Color: refer to it ONLY by ROLE (accent color, ink color, muted color, i-th series color). NEVER write a specific color code, never specify a font size, never use absolute coordinates or numbers. These constraints keep videos consistent; creativity lives in which shape becomes which, what moves, and where the camera looks.
 
@@ -657,7 +659,10 @@ NGÔN NGỮ LỜI THOẠI: {{narration_language_rule}}
 - ¤FunctionPlot(lambda x: ..., (x_min, x_max), label=None)¤ — trục toạ độ cộng đồ thị hàm số. ¤.axes¤, ¤.graph¤ để nhấn/đặt nhãn.
 - ¤DataTable([tiêu_đề_cột, ...], [[ô, ...], ...])¤ — bảng dữ liệu, một đường kẻ dưới tiêu đề. ¤.rows[i]¤ là từng hàng.
 - ¤Timeline([(mốc, mô_tả), ...])¤ — dòng thời gian ngang. ¤.marks[i]¤ là từng mốc.
-- ¤self.connect(a, b, label=None)¤ — mũi tên theo theme nối hai vật; ¤self.outline(vật, tone="accent")¤ — khung khoanh quanh một vật.
+- ¤self.readout(0, label="phép so sánh", unit="lần", decimals=0, tone="accent")¤ — một con số LỚN chạy được: dùng ¤self.count(số, 128)¤ để nó đếm dần lên (đừng dựng lại chữ mới). Đây là cách diễn đạt "đại lượng này tăng/giảm" mà không cần ¤ValueTracker¤/¤DecimalNumber¤ thô.
+- ¤self.connect(a, b, label=None, style="straight"|"curved")¤ — mũi tên theo theme nối hai vật (¤curved¤ khi đường thẳng sẽ cắt qua vật khác, hoặc khi cần mũi tên chiều ngược lại); ¤self.outline(vật, tone="accent")¤ — khung khoanh quanh một vật; ¤self.brace(vật, "nhãn", direction=DOWN)¤ — dấu ngoặc chỉ vào MỘT CHIỀU của vật (độ dài một đoạn, chiều cao một cột).
+- ¤self.shape("rect"|"square"|"circle"|"dot"|"polygon", tone="accent", filled=False, width=..., height=..., radius=..., points=[...])¤ — hình cơ bản mang màu, độ dày nét và nền của theme. DÙNG CÁI NÀY thay cho ¤Rectangle/Square/Circle/Dot/Polygon¤ thô.
+- ¤self.path(điểm_hoặc_vật, ..., tone="muted", curve=0.0)¤ — đường nối các điểm (¤curve¤ khác 0 và đúng hai điểm thì thành cung). Dùng làm quỹ đạo cho ¤self.travel(...)¤, thay cho ¤Line/ArcBetweenPoints/VMobject¤ thô.
 
 Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
 
@@ -678,18 +683,18 @@ QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời
   - ¤self.call_to_action("Lời kêu gọi", "phụ đề tuỳ chọn")¤ — mở beat ¤cta¤, tự giữ khung cuối cho end-screen
 - Chữ: ¤self.title(...)¤, ¤self.heading(...)¤, ¤self.body(...)¤, ¤self.caption(...)¤, ¤self.formula("x^2")¤, ¤self.code(src, "python")¤
 - Bố cục: ¤self.stack(a, b, c)¤ (xếp dọc), ¤self.row(a, b)¤ (xếp ngang), ¤self.fit(obj)¤ (co cho vừa khung)
-- Chuyển cảnh: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(cũ, mới)¤, ¤self.emphasize(obj)¤, ¤self.clear_stage()¤
+- Chuyển cảnh: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(cũ, mới)¤, ¤self.emphasize(obj, style="pulse"|"circle")¤, ¤self.travel(obj, đường_đi)¤, ¤self.clear_stage()¤
   (mỗi cái nhận ¤speed="fast"|"normal"|"slow"¤; KHÔNG đặt run_time bằng tay)
 - Camera: ¤self.focus(obj)¤ / ¤self.focus(a, b)¤ (zoom vào vật hoặc nhóm; gọi lại với vật khác để lia), ¤self.restore_view()¤ (về toàn cảnh). Cũng nhận ¤speed=¤. KHÔNG chạm thẳng vào ¤self.camera.frame¤. ¤self.clear_stage()¤, ¤self.hook/recap/call_to_action¤ đã tự gọi ¤restore_view()¤.
-- Storyboard ghi ¤move¤ / ¤vary¤ / ¤trace¤ → dịch bằng ¤self.play(...)¤ với animation import đích danh từ Manim, và đặt ¤run_time=self.pace("normal")¤ theo tốc độ storyboard ghi (KHÔNG tự viết số giây):
-  - ¤move(vật, tới đâu)¤ → ¤self.play(obj.animate.next_to(khác, RIGHT))¤, hoặc chạy theo đường: ¤self.play(MoveAlongPath(obj, path))¤
-  - ¤vary(đại lượng, a → b)¤ → ¤t = ValueTracker(a)¤, hình phụ thuộc dựng bằng ¤always_redraw(lambda: ...)¤ đọc ¤t.get_value()¤, số hiển thị bằng ¤DecimalNumber¤ + ¤add_updater¤, rồi ¤self.play(t.animate.set_value(b))¤
-  - ¤trace(vật)¤ → ¤self.play(Circumscribe(obj, color=self.theme.accent))¤
+- Storyboard ghi ¤move¤ / ¤vary¤ / ¤trace¤ → dịch bằng method của scene, KHÔNG import animation thô của Manim (mọi method dưới đây đã tự lấy nhịp từ theme, nên không cần ¤run_time¤ lẫn ¤self.pace(...)¤ — chỉ truyền ¤speed=¤ đúng tốc độ storyboard ghi):
+  - ¤move(vật, tới đâu)¤ → ¤self.play(obj.animate.next_to(khác, RIGHT), run_time=self.pace("normal"))¤, hoặc chạy theo đường: ¤self.travel(obj, self.path(a, b, curve=0.6))¤
+  - ¤vary(đại lượng, a → b)¤ → ¤số = self.readout(a, label="tên đại lượng")¤ rồi ¤self.count(số, b)¤
+  - ¤trace(vật)¤ → ¤self.emphasize(obj, style="circle")¤
 - Gom nhóm và chỉ hướng: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
 - Đặt vị trí tương đối: ¤obj.next_to(khác, DOWN, buff=0.5)¤, ¤obj.shift(UP * 0.5)¤
 
 ### Ràng buộc thi hành
-- Cần một hình mà component không diễn đạt được? Import đích danh từ Manim (ví dụ ¤from manim import Arrow¤). Được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
+- Cần một hình mà component không diễn đạt được? TRƯỚC HẾT xem lại ¤self.shape¤, ¤self.path¤, ¤self.connect¤, ¤self.brace¤, ¤self.readout¤, ¤self.travel¤, ¤self.emphasize(style="circle")¤ — chúng có sẵn cho hầu hết hình học, mũi tên, số chạy và chuyển động, và chúng được theme lo màu/nét/nhịp. Chỉ khi vẫn không đủ mới import đích danh từ Manim (ví dụ ¤from manim import Angle¤): được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
 - MỖI phân đoạn nên có ít nhất một hình ảnh/hình học, không chỉ toàn chữ. Video toàn chữ là thứ kênh này muốn tránh.
 - Script chạy trong subprocess giới hạn tài nguyên (timeout 1800s, RAM 4 GiB) — tránh vòng lặp/animation quá nặng, nhưng không cần cắt ngắn nội dung vì lo timeout.
 - Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.
@@ -757,7 +762,10 @@ NARRATION LANGUAGE: {{narration_language_rule}}
 - ¤FunctionPlot(lambda x: ..., (x_min, x_max), label=None)¤ — axes plus a function graph. ¤.axes¤, ¤.graph¤ for emphasis/labels.
 - ¤DataTable([column_header, ...], [[cell, ...], ...])¤ — data table with a single rule under the header. ¤.rows[i]¤ is each row.
 - ¤Timeline([(when, what), ...])¤ — horizontal timeline. ¤.marks[i]¤ is each mark.
-- ¤self.connect(a, b, label=None)¤ — themed arrow between two objects; ¤self.outline(obj, tone="accent")¤ — a box drawn around an object.
+- ¤self.readout(0, label="comparisons", unit="x", decimals=0, tone="accent")¤ — a BIG live number: use ¤self.count(readout, 128)¤ to make it count up (never rebuild the text). This is how you express "this quantity grows/shrinks" without raw ¤ValueTracker¤/¤DecimalNumber¤.
+- ¤self.connect(a, b, label=None, style="straight"|"curved")¤ — themed arrow between two objects (¤curved¤ when a straight one would cut through a third object, or for the return arrow of a pair); ¤self.outline(obj, tone="accent")¤ — a box drawn around an object; ¤self.brace(obj, "label", direction=DOWN)¤ — a brace pointing at ONE dimension of an object (the length of a span, the height of a bar).
+- ¤self.shape("rect"|"square"|"circle"|"dot"|"polygon", tone="accent", filled=False, width=..., height=..., radius=..., points=[...])¤ — a basic shape carrying the theme's color, stroke width and fill. USE THIS instead of raw ¤Rectangle/Square/Circle/Dot/Polygon¤.
+- ¤self.path(point_or_object, ..., tone="muted", curve=0.0)¤ — a line through the given points (with exactly two points and ¤curve¤ != 0 it becomes an arc). Use it as the trajectory for ¤self.travel(...)¤, instead of raw ¤Line/ArcBetweenPoints/VMobject¤.
 
 Components self-fit the safe frame and take color/font size from the theme. Do NOT pass absolute coordinates or font_size to them.
 
@@ -778,18 +786,18 @@ IMPORTANT — COLOR, FONT SIZE, COORDINATES (applies to EVERY call in the whole 
   - ¤self.call_to_action("Call to action", "optional subtitle")¤ — opens beat ¤cta¤, holds the final frame for the end screen
 - Text: ¤self.title(...)¤, ¤self.heading(...)¤, ¤self.body(...)¤, ¤self.caption(...)¤, ¤self.formula("x^2")¤, ¤self.code(src, "python")¤
 - Layout: ¤self.stack(a, b, c)¤ (vertical), ¤self.row(a, b)¤ (horizontal), ¤self.fit(obj)¤ (fit to frame)
-- Transitions: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(old, new)¤, ¤self.emphasize(obj)¤, ¤self.clear_stage()¤
+- Transitions: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(old, new)¤, ¤self.emphasize(obj, style="pulse"|"circle")¤, ¤self.travel(obj, path)¤, ¤self.clear_stage()¤
   (each takes ¤speed="fast"|"normal"|"slow"¤; do NOT set run_time by hand)
 - Camera: ¤self.focus(obj)¤ / ¤self.focus(a, b)¤ (zoom onto an object or group; call again with another object to pan), ¤self.restore_view()¤ (back to full view). Both take ¤speed=¤. Do NOT touch ¤self.camera.frame¤ directly. ¤self.clear_stage()¤ and ¤self.hook/recap/call_to_action¤ already call ¤restore_view()¤.
-- Storyboard says ¤move¤ / ¤vary¤ / ¤trace¤ → translate with ¤self.play(...)¤ and animations imported by name from Manim, with ¤run_time=self.pace("normal")¤ matching the storyboard's speed (never a hand-picked number of seconds):
-  - ¤move(object, where)¤ → ¤self.play(obj.animate.next_to(other, RIGHT))¤, or along a path: ¤self.play(MoveAlongPath(obj, path))¤
-  - ¤vary(quantity, a → b)¤ → ¤t = ValueTracker(a)¤, dependent shapes built with ¤always_redraw(lambda: ...)¤ reading ¤t.get_value()¤, displayed numbers via ¤DecimalNumber¤ + ¤add_updater¤, then ¤self.play(t.animate.set_value(b))¤
-  - ¤trace(object)¤ → ¤self.play(Circumscribe(obj, color=self.theme.accent))¤
+- Storyboard says ¤move¤ / ¤vary¤ / ¤trace¤ → translate with scene methods, NOT with raw Manim animations (every method below already takes its pacing from the theme, so it needs neither ¤run_time¤ nor ¤self.pace(...)¤ — just pass the ¤speed=¤ the storyboard asks for):
+  - ¤move(object, where)¤ → ¤self.play(obj.animate.next_to(other, RIGHT), run_time=self.pace("normal"))¤, or along a path: ¤self.travel(obj, self.path(a, b, curve=0.6))¤
+  - ¤vary(quantity, a → b)¤ → ¤readout = self.readout(a, label="quantity name")¤ then ¤self.count(readout, b)¤
+  - ¤trace(object)¤ → ¤self.emphasize(obj, style="circle")¤
 - Grouping and direction: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
 - Relative positioning: ¤obj.next_to(other, DOWN, buff=0.5)¤, ¤obj.shift(UP * 0.5)¤
 
 ### Execution constraints
-- Need a shape the components cannot express? Import it by name from Manim (e.g. ¤from manim import Arrow¤). Allowed, but it's outside the design system, so use it sparingly.
+- Need a shape the components cannot express? FIRST re-read ¤self.shape¤, ¤self.path¤, ¤self.connect¤, ¤self.brace¤, ¤self.readout¤, ¤self.travel¤, ¤self.emphasize(style="circle")¤ — they cover most geometry, arrows, live numbers and motion, and the theme owns their color/stroke/pacing. Only if they still fall short, import by name from Manim (e.g. ¤from manim import Angle¤): allowed, but it's outside the design system, so use it sparingly.
 - Each segment should have at least one visual/geometric element, not just text. All-text video is what this channel wants to avoid.
 - The script runs in a resource-limited subprocess (1800s timeout, 4 GiB RAM) — avoid extremely heavy loops/animations, but do not shorten content out of timeout worry.
 - No external libraries, no file I/O, no network, no subprocess/exec/eval.
