@@ -60,6 +60,7 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
               : `Đang xử lý: ${stepLabel(currentStep)}`
             : "Đang khởi tạo..."}
         </p>
+
         {isRendering && !isFailed && (
           <span className={styles.sceneLabel} data-testid="progress-tracker-elapsed">
             Đã render {formatElapsed(elapsedSeconds ?? 0)}
@@ -72,7 +73,7 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
               <div className={styles.barFill} style={{ width: `${percent}%` }} data-testid="progress-tracker-bar" />
             </div>
             <span className={styles.sceneLabel}>
-              {unit.word} {unit.index}/{unit.total}
+              {unit.word} {unit.index}/{unit.total} ({percent}%)
             </span>
           </>
         )}
