@@ -19,6 +19,7 @@ import aio_pika
 
 from adapters.messaging.consumer import SynthesizeSpeechCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
@@ -88,12 +89,15 @@ async def run() -> None:
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
+    progress_exchange = await channel.get_exchange(PROGRESS_EXCHANGE)
     queue = await channel.get_queue(COMMANDS_QUEUE)
 
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    command_handler = SynthesizeSpeechCommandHandler(batch_use_case, pool, inbox, outbox)
+    command_handler = SynthesizeSpeechCommandHandler(
+        batch_use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
+    )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 
