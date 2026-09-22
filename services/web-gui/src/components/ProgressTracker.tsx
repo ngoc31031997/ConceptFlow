@@ -1,6 +1,6 @@
 import type { ProgressState } from "../hooks/useSSE";
 import styles from "./ProgressTracker.module.css";
-import { RENDER_STEPS, stepLabel } from "../utils/pipelineLabels";
+import { RENDER_STEPS, stepLabel, mergedStep } from "../utils/pipelineLabels";
 import { Card } from "./ui";
 
 interface ProgressTrackerProps {
@@ -17,14 +17,38 @@ function CheckIcon() {
   );
 }
 
+/**
+ * CR-029: render_scenes reports elapsed time (no reliable total — see
+ * ProgressMessage), but synthesize_speech/assemble_video/generate_clips
+ * each report a real (index, total) pair now, just under different field
+ * names per step. This picks whichever one the current message actually
+ * carries and gives it the right Vietnamese unit word for the bar's label.
+ */
+function unitProgress(
+  progressState: ProgressState
+): { index: number; total: number; word: string } | null {
+  const { sceneIndex, sceneTotal, stageIndex, stageTotal, clipIndex, clipTotal } = progressState;
+  if (sceneIndex !== null && sceneTotal !== null && sceneTotal > 0) {
+    return { index: sceneIndex, total: sceneTotal, word: "Cảnh" };
+  }
+  if (stageIndex !== null && stageTotal !== null && stageTotal > 0) {
+    return { index: stageIndex, total: stageTotal, word: "Giai đoạn" };
+  }
+  if (clipIndex !== null && clipTotal !== null && clipTotal > 0) {
+    return { index: clipIndex, total: clipTotal, word: "Clip" };
+  }
+  return null;
+}
+
 export function ProgressTracker({ progressState, isFailed = false }: ProgressTrackerProps) {
-  const { currentStep, sceneIndex, sceneTotal, elapsedSeconds, animationIndex } = progressState;
-  const hasSceneProgress = sceneIndex !== null && sceneTotal !== null && sceneTotal > 0;
-  const percent = hasSceneProgress ? Math.round(((sceneIndex ?? 0) / (sceneTotal ?? 1)) * 100) : null;
+  const { currentStep, elapsedSeconds, animationIndex } = progressState;
+  const unit = unitProgress(progressState);
+  const hasSceneProgress = unit !== null;
+  const percent = hasSceneProgress ? Math.round((unit.index / unit.total) * 100) : null;
   // A render reports elapsed time rather than a percentage — see ProgressMessage.
   const isRendering = !hasSceneProgress && elapsedSeconds !== null;
 
-  const activeIndex = currentStep ? RENDER_STEPS.indexOf(currentStep as (typeof RENDER_STEPS)[number]) : -1;
+  const activeIndex = currentStep ? RENDER_STEPS.indexOf(mergedStep(currentStep) as (typeof RENDER_STEPS)[number]) : -1;
 
   return (
     <Card>
@@ -42,13 +66,13 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
             {animationIndex !== null ? ` — animation ${animationIndex}` : ""}
           </span>
         )}
-        {hasSceneProgress && (
+        {unit && (
           <>
             <div className={styles.bar}>
               <div className={styles.barFill} style={{ width: `${percent}%` }} data-testid="progress-tracker-bar" />
             </div>
             <span className={styles.sceneLabel}>
-              Cảnh {sceneIndex}/{sceneTotal}
+              {unit.word} {unit.index}/{unit.total}
             </span>
           </>
         )}

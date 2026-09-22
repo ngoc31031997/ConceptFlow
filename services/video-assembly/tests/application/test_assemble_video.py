@@ -25,11 +25,15 @@ class FakeVideoAssembler(VideoAssemblerPort):
         self.calls: list[VideoAssemblyRequest] = []
         self._caption_path = caption_path
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+    def assemble(
+        self, request: VideoAssemblyRequest, output_path: str, on_stage_done=None
+    ) -> str | None:
         self.calls.append(request)
         _touch(output_path)
         if self._caption_path:
             _touch(self._caption_path)
+        if on_stage_done is not None:
+            on_stage_done(1, 1)
         return self._caption_path
 
 

@@ -9,6 +9,7 @@ classify_scenes is already handled at Content Plugin Service.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from application.synthesize_speech import SynthesizeSpeechUseCase
 from domain.errors import EmptyTextError, TTSEngineError, UnsupportedLanguageError
@@ -47,8 +48,19 @@ class SynthesizeSpeechBatchUseCase:
     def __init__(self, single_scene_use_case: SynthesizeSpeechUseCase) -> None:
         self._synthesize_speech = single_scene_use_case
 
-    def execute(self, project_id: str, scenes: list[SceneSpeechRequest]) -> BatchSynthesisOutcome:
+    def execute(
+        self,
+        project_id: str,
+        scenes: list[SceneSpeechRequest],
+        on_scene_done: Callable[[int, int], None] | None = None,
+    ) -> BatchSynthesisOutcome:
+        """CR-029: on_scene_done(scene_index, scene_total), called right after
+        each scene's audio is ready, lets the caller publish a progress ping
+        without this use case knowing anything about RabbitMQ/asyncio — it
+        stays synchronous and testable exactly as before.
+        """
         results: list[SceneSpeechResult] = []
+        total = len(scenes)
         for scene in scenes:
             request = SpeechRequest(
                 project_id=project_id,
@@ -74,4 +86,6 @@ class SynthesizeSpeechBatchUseCase:
                     duration_seconds=result.duration_seconds,
                 )
             )
+            if on_scene_done is not None:
+                on_scene_done(len(results), total)
         return BatchSynthesisSuccess(results=results)

@@ -10,6 +10,7 @@ processed in the Inbox.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Protocol
@@ -18,6 +19,7 @@ import asyncpg
 
 from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.producer import failure_envelope, success_envelope
+from adapters.messaging.progress import ProgressPublisher
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.synthesize_speech_batch import (
@@ -46,11 +48,13 @@ class SynthesizeSpeechCommandHandler:
         pool: asyncpg.Pool,
         inbox: InboxRepository,
         outbox: OutboxRepository,
+        progress: ProgressPublisher | None = None,
     ) -> None:
         self._batch_use_case = batch_use_case
         self._pool = pool
         self._inbox = inbox
         self._outbox = outbox
+        self._progress = progress
 
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)
@@ -75,7 +79,18 @@ class SynthesizeSpeechCommandHandler:
             for s in payload["scenes"]
         ]
 
-        outcome = self._batch_use_case.execute(project_id, scenes)
+        def on_scene_done(scene_index: int, scene_total: int) -> None:
+            if self._progress is None:
+                return
+            # Fire-and-forget from sync code: handle() is already running
+            # inside the event loop, so scheduling a task here does not block
+            # the batch loop waiting on RabbitMQ I/O (CR-029 — same posture as
+            # rendering's heartbeat: progress must never slow down real work).
+            asyncio.ensure_future(
+                self._progress.publish_scene_progress(project_id, scene_index, scene_total)
+            )
+
+        outcome = self._batch_use_case.execute(project_id, scenes, on_scene_done=on_scene_done)
 
         if isinstance(outcome, BatchSynthesisFailure):
             logger.warning(

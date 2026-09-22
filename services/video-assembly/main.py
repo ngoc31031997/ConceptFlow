@@ -24,6 +24,7 @@ from adapters.messaging.consumer import (
     VideoAssemblyCommandDispatcher,
 )
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
+from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
@@ -62,13 +63,21 @@ async def run() -> None:
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
+    progress_exchange = await channel.get_exchange(PROGRESS_EXCHANGE)
     commands_queue = await channel.get_queue(COMMANDS_QUEUE)
     channel_asset_events_queue = await channel.get_queue(CHANNEL_ASSET_EVENTS_QUEUE)
 
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    assemble_video_handler = AssembleVideoCommandHandler(use_case, pool, inbox, outbox, channel_assets)
+    # CR-029: assemble_video/generate_clips run their ffmpeg work in a worker
+    # thread (asyncio.to_thread) — ProgressPublisher needs the running loop
+    # itself to marshal a publish back onto it from that thread.
+    progress = ProgressPublisher(progress_exchange, asyncio.get_running_loop())
+
+    assemble_video_handler = AssembleVideoCommandHandler(
+        use_case, pool, inbox, outbox, channel_assets, progress
+    )
     normalize_handler = NormalizeChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
     # CR-021 FR61.5: thresholds are read from the environment once, here, and
     # nowhere else. QC_ENFORCE is deliberately NOT among them — this service
@@ -77,7 +86,9 @@ async def run() -> None:
     qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
     # CR-007 D2/C2b: preset thresholds read from the environment once, here —
     # same convention as QC_ENFORCE-adjacent QCThresholds above.
-    generate_clips_handler = GenerateClipsCommandHandler(pool, inbox, outbox, ClipThresholds.from_env())
+    generate_clips_handler = GenerateClipsCommandHandler(
+        pool, inbox, outbox, ClipThresholds.from_env(), progress
+    )
     command_dispatcher = VideoAssemblyCommandDispatcher(
         assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler
     )

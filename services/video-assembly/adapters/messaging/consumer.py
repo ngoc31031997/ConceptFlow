@@ -7,9 +7,11 @@ it directly from this coroutine would block the asyncio event loop for
 that duration — starving RabbitMQ heartbeats and the OutboxRelay. It's
 therefore run via asyncio.to_thread().
 
-Unlike Rendering Service, there is no per-scene progress event — a single
-command always produces exactly one Outbox row (Low-Level Design
-Question 10), written in the same transaction as the Inbox mark.
+Each command still produces exactly one Outbox row (Low-Level Design
+Question 10), written in the same transaction as the Inbox mark — CR-029's
+progress pings (adapters/messaging/progress.py) are a separate, fire-and-forget
+publish straight to progress.fanout, not an Outbox event, since they are UX-only
+and must never gate that one durable transaction.
 """
 
 from __future__ import annotations
@@ -41,21 +43,23 @@ from adapters.messaging.producer import (
     qc_completed_envelope,
     video_assembled_envelope,
 )
+from adapters.messaging.progress import ProgressPublisher
+from adapters.persistence.channel_assets import ChannelAssetsRepository
+from adapters.persistence.inbox import InboxRepository
+from adapters.persistence.outbox import OutboxRepository
 from adapters.qc.ffmpeg_probe import (
     measure_loudness,
     measure_narration_durations,
     measure_peak_dbfs,
     probe_publish_attributes,
 )
-from adapters.persistence.channel_assets import ChannelAssetsRepository
-from adapters.persistence.inbox import InboxRepository
-from adapters.persistence.outbox import OutboxRepository
 from adapters.storage.artifact_paths import (
     channel_asset_with_music_path,
     ensure_parent_dir,
     normalized_channel_asset_path,
 )
 from application.assemble_video import AssembleVideoUseCase
+from domain.clip_rules import ClipThresholds
 from domain.errors import AssemblyEngineError, MissingArtifactError
 from domain.models import (
     ChannelAsset,
@@ -64,7 +68,6 @@ from domain.models import (
     SubtitleStyle,
     VideoAssemblyRequest,
 )
-from domain.clip_rules import ClipThresholds
 from domain.qc_rules import QCThresholds, evaluate_all
 
 logger = logging.getLogger(__name__)
@@ -166,6 +169,7 @@ class AssembleVideoCommandHandler:
         inbox: InboxRepository,
         outbox: OutboxRepository,
         channel_assets: ChannelAssetsRepository | None = None,
+        progress: ProgressPublisher | None = None,
     ) -> None:
         self._use_case = use_case
         self._pool = pool
@@ -175,6 +179,9 @@ class AssembleVideoCommandHandler:
         # which know about channel assets) keeps working unchanged — a
         # command with no intro_asset_id/outro_asset_id never touches this.
         self._channel_assets = channel_assets
+        # CR-029: optional for the same reason — every pre-existing test
+        # constructs this handler without a progress publisher.
+        self._progress = progress
 
     async def _resolve_channel_asset(self, asset_id: str | None) -> tuple[str | None, float]:
         """Resolves an opaque intro_asset_id/outro_asset_id to (video_path,
@@ -244,7 +251,10 @@ class AssembleVideoCommandHandler:
                 intro_duration_seconds=intro_duration_seconds,
                 outro_video_path=outro_video_path,
             )
-            result = await asyncio.to_thread(self._use_case.assemble, request)
+            on_stage_done = None
+            if self._progress is not None:
+                on_stage_done = lambda i, t: self._progress.publish_stage_progress(project_id, i, t)  # noqa: E731
+            result = await asyncio.to_thread(self._use_case.assemble, request, on_stage_done)
         except (MissingArtifactError, AssemblyEngineError, KeyError, TypeError, ValueError) as exc:
             logger.warning("assemble_video failed for project_id=%s: %s", project_id, exc)
             event_type = "assembly_failed"
@@ -806,11 +816,13 @@ class GenerateClipsCommandHandler:
         inbox: InboxRepository,
         outbox: OutboxRepository,
         thresholds: ClipThresholds | None = None,
+        progress: ProgressPublisher | None = None,
     ) -> None:
         self._pool = pool
         self._inbox = inbox
         self._outbox = outbox
         self._thresholds = thresholds or ClipThresholds.from_env()
+        self._progress = progress
 
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)
@@ -855,9 +867,12 @@ class GenerateClipsCommandHandler:
         video_path = payload["video_path"]
         intro_duration_seconds = float(payload.get("intro_duration_seconds") or 0.0)
         subtitle_cues = _parse_subtitle_cues(payload.get("subtitle_cues")) or []
+        raw_requests = payload.get("requests") or []
+        clip_total = sum(len(r.get("presets") or []) for r in raw_requests)
+        clip_index = 0
 
         results: list[dict] = []
-        for raw_request in payload.get("requests") or []:
+        for raw_request in raw_requests:
             request = ClipRequest(
                 name=raw_request["name"],
                 start_seconds=float(raw_request["start_seconds"]),
@@ -888,6 +903,9 @@ class GenerateClipsCommandHandler:
                         "error_message": str(exc),
                     }
                 results.append(result)
+                clip_index += 1
+                if self._progress is not None:
+                    self._progress.publish_clip_progress(project_id, clip_index, clip_total)
         return results
 
 
@@ -904,8 +922,8 @@ class VideoAssemblyCommandDispatcher:
         self,
         assemble_video: AssembleVideoCommandHandler,
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
-        qc_video: "QCVideoCommandHandler | None" = None,
-        generate_clips: "GenerateClipsCommandHandler | None" = None,
+        qc_video: QCVideoCommandHandler | None = None,
+        generate_clips: GenerateClipsCommandHandler | None = None,
     ) -> None:
         self._handlers = {"assemble_video": assemble_video.handle}
         if normalize_channel_asset is not None:

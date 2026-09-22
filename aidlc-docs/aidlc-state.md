@@ -79,6 +79,7 @@
 | CR-024 | Cổng duyệt dàn ý trước khi tốn TTS | P1 | **Code Generation ✅** | **HOÀN THÀNH** (2026-09-10) |
 | CR-026 | Kịch bản riêng cho bản Shorts/TikTok, hỗ trợ bằng AI | P1 | **Requirements Analysis** | Đã viết requirements, chờ Creator duyệt trước khi sang Low-Level Design |
 | CR-027 | Gọi LLM trong app qua Hive (OpenAI-compatible), bỏ copy-paste ra AI ngoài | P1 | **Low-Level Design — chờ duyệt** | Requirements **đã được Creator duyệt (2026-09-21)**. Lật lại quyết định "copy tay / không gọi API trả phí" của CR-025 — context 1M của Hive gỡ nút thắt `num_ctx` (CR-014). Chốt: Hive chính/Ollama fallback, cả 6 vai trò, chạy từng bước, prompt hai tầng (`prompt_overrides` bảng riêng). LLD: `cr-027-low-level-design.md` (D0–D11). Cần ADR-0029. Key Hive đã xác minh 2026-09-21 (chỉ cần Secret Key, vùng `api-cdn`; `api-va1` trả 500). `HIVE_MODEL` = `deepseek-ai/deepseek-v4.1-flash` (chốt 2026-09-21, D14). **LLD đủ để bắt đầu mốc 1** |
+| CR-029 | Gộp `parse_script`+`validate_script` thành 1 bước, bỏ `qc_video` khỏi luồng chính (đưa backlog), thêm % tiến trình cho `synthesize_speech`/`assemble_video`/`generate_clips` | P1 | **Requirements Analysis → Implementation** | Quyết định 2026-09-22: `validate_script` là dry-run thật (sinh `Beats[]`), không phải static check, nên gộp cùng `parse_script` thành 1 điểm dừng/sửa lỗi. `qc_video` chạy sau `assemble_video` và không có nhánh fail nên không gate được gì — tắt khỏi saga, giữ code lại cho lần thiết kế sau. Progress event tái dùng pattern `scene_rendered`/`progress.fanout`, bắn theo đơn vị hoàn thành, không theo tick thời gian. Nhánh: `feature/cr-029-render-saga-consolidation` |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`,
 `cr-016-024-execution-plan.md`, `cr-023-low-level-design.md`,
@@ -88,8 +89,9 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 *Cập nhật 2026-09-12 — verify E2E đợt CR-016..024 đã chạy; 2 bug orchestrator phát hiện lúc verify đã sửa.*
 
 - **Lifecycle Phase**: POST-CONSTRUCTION — 10/10 unit đã build và chạy; công việc đi theo từng Change Request.
-- **Saga hiện tại** (sau CR-007/020/021/023/024):
-  `parse_script -> validate_script -> [CHỜ DUYỆT] -> synthesize_speech -> render_scenes -> assemble_video -> qc_video -> generate_clips -> publish_video`
+- **Saga hiện tại** (sau CR-007/020/021/023/024/029):
+  `parse_and_validate_script -> [CHỜ DUYỆT] -> synthesize_speech -> render_scenes -> assemble_video -> generate_clips -> publish_video`
+  (`qc_video` tắt khỏi luồng chính từ CR-029 — xem backlog)
 - **Đã giao và verify E2E trên stack thật**: CR-001 → CR-006, CR-008. Lệch tiếng/hình 0.003s (trước 61.64s); 1080p60 + faststart; chapters/thumbnail/metadata SEO; ngôn ngữ nội dung thông suốt cả pipeline.
 - **Verify E2E đợt CR-016..024 (2026-09-12)** — chạy 1 project trọn saga trên stack thật (~35s, project `b90bfc7c…`):
   - PASS: CR-016 (WPM calibration), CR-017 (design system), CR-018 (`self.narrate()`), CR-019 (beat sheet, đường happy path), CR-020 (gate, đường happy path), CR-024 (approval gate), CR-007 (clip dọc 1080×1920 thật), CR-011 (Azure TTS thật — audio file `azure:vi-VN-HoaiMyNeural`, usage 9921 ký tự, không fallback im lặng).

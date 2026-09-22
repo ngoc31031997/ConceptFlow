@@ -749,21 +749,37 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 		return err
 	}
 
-	// CR-021 D2: assembling the video no longer ends the Render Saga —
-	// qc_video does. Setting ready_to_publish here instead would put the
-	// publish button in front of the Creator before anything had looked at the
-	// file, which is the whole gap this CR closes.
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepQCVideo, Status: domain.SagaStepInProgress}); err != nil {
+	// CR-029: qc_video is off the main saga. It ran *after* assembly with no
+	// fail branch (a "not_scored" verdict never blocked anything), so it never
+	// gated quality — it only added a QC-report side effect once every cost
+	// (TTS+render+assembly) had already been spent. That posture belongs
+	// before render, not after it (backlog — see
+	// cr-029-render-saga-consolidation.md), so assembly now goes straight to
+	// the same branch onQCCompleted used to reach (generate_clips or
+	// ready_to_publish). The qc_video plumbing (StepQCVideo, qcVideoPayload,
+	// onQCCompleted) stays in place, unused, so re-enabling it later is a
+	// one-line dispatch change rather than a rebuild.
+	return uc.advanceAfterVideoReady(ctx, event, project)
+}
+
+// advanceAfterVideoReady is the branch that used to run only after
+// onQCCompleted (CR-007 D1): a project with no clip requests is done,
+// everything else gets generate_clips dispatched. CR-029 also reaches it
+// directly from onVideoAssembled now that qc_video sits between them no more.
+func (uc *HandleStepEventUseCase) advanceAfterVideoReady(ctx context.Context, event StepEvent, project *domain.Project) error {
+	if !project.VideoOutputMode.WantsClips() {
+		return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
+	}
+
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
-	// Same routing key as assemble_video: D1 puts the QC worker inside
-	// video-assembly (it already has ffmpeg/ffprobe and the file itself), so
-	// both commands ride the one video_assembly.commands queue and are told
-	// apart by event_type — exactly how rendering already runs three commands.
-	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "video_assembly", string(domain.StepQCVideo), qcVideoPayload(project)); err != nil {
+	// Same routing key/queue as assemble_video (and qc_video, when enabled) —
+	// video-assembly already has ffmpeg and the assembled file itself.
+	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "video_assembly", string(domain.StepGenerateClips), generateClipsPayload(project)); err != nil {
 		return err
 	}
-	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusRunningQC)
+	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusGeneratingClips)
 }
 
 // onQCCompleted stores the QC report and dispatches generate_clips (CR-007
@@ -814,19 +830,7 @@ func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepE
 	// zero value for VideoOutputMode is "") has no clip requests to act on
 	// anyway, so dispatching generate_clips would only be a round-trip that
 	// comes back empty. Skip it and finish exactly like onClipsGenerated does.
-	if !project.VideoOutputMode.WantsClips() {
-		return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
-	}
-
-	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: domain.StepGenerateClips, Status: domain.SagaStepInProgress}); err != nil {
-		return err
-	}
-	// Same routing key/queue as assemble_video and qc_video (D1) — video-
-	// assembly already has ffmpeg and the assembled file itself.
-	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "video_assembly", string(domain.StepGenerateClips), generateClipsPayload(project)); err != nil {
-		return err
-	}
-	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusGeneratingClips)
+	return uc.advanceAfterVideoReady(ctx, event, project)
 }
 
 // onClipsGenerated stores the outcome of generate_clips and ends the Render
