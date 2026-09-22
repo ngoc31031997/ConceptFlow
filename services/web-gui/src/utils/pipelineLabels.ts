@@ -45,6 +45,30 @@ export function stepLabel(step: string): string {
   return STEP_LABELS[step] ?? step;
 }
 
+/**
+ * Maps a persisted project.status to the SSE step id it corresponds to.
+ *
+ * Bug report: a Creator who navigates away mid-render and comes back sees
+ * "Đang khởi tạo..." no matter how far the saga actually got — useSSE's
+ * state only fills in from the NEXT live progress.fanout message, and one
+ * may not arrive for minutes (e.g. mid render_scenes). The render is still
+ * running server-side the whole time; only the tracker looked stuck. This
+ * lets RenderPage seed the tracker from the project's own persisted status
+ * (already fetched via useProject) until a live message replaces it.
+ */
+export function statusToStep(status: string): string | null {
+  const map: Record<string, string> = {
+    parsing_script: "parse_script",
+    validating_script: "validate_script",
+    synthesizing_speech: "synthesize_speech",
+    rendering: "render_scenes",
+    assembling_video: "assemble_video",
+    running_qc: "qc_video",
+    generating_clips: "generate_clips",
+  };
+  return map[status] ?? null;
+}
+
 export function statusLabel(status: string): string {
   if (status.startsWith("failed_at_")) {
     const step = status.replace("failed_at_", "");

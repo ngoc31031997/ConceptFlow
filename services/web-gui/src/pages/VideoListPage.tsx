@@ -5,6 +5,18 @@ import { StatusBadge } from "../components/StatusBadge";
 import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
+
+// Bug report: "Chi tiết" always linked to /result, which shows nothing
+// useful for a project that hasn't finished yet (no video_path, no progress
+// tracker) — a Creator who left mid-render and came back via this list had
+// no way back to the live tracker. /result is only meaningful once there is
+// something to review or re-publish; everything else belongs on /render,
+// which now also seeds its tracker from project.status (RenderPage).
+const RESULT_PAGE_STATUSES = new Set(["ready_to_publish", "publishing", "published"]);
+function detailPathFor(project: ProjectSummary): string {
+  const suffix = RESULT_PAGE_STATUSES.has(project.status) ? "result" : "render";
+  return `/projects/${project.project_id}/${suffix}`;
+}
 import { Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
@@ -193,7 +205,7 @@ export function VideoListPage() {
                         Xem video
                       </a>
                     )}
-                    <Link className={glass.ghostBtn} to={`/projects/${project.project_id}/result`}>
+                    <Link className={glass.ghostBtn} to={detailPathFor(project)}>
                       Chi tiết
                     </Link>
                     <button
