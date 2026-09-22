@@ -553,7 +553,18 @@ services:
 
 volumes:
   rabbitmq_data:
+  # Video/clip/caption output. Defaults to a Docker-managed volume; set
+  # VIDEO_OUTPUT_HOST_DIR in .env to bind-mount a host directory instead —
+  # output can run large (rendered clips + assembled final videos), and a
+  # host path is easier to prune/move/inspect than Docker's own volume
+  # storage. Path must be an existing absolute directory on the host, or
+  # `docker compose up` fails.
   shared_artifacts:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${VIDEO_OUTPUT_HOST_DIR:-./data/shared_artifacts}
   tts_db_data:
   script_processing_db_data:
   rendering_db_data:
