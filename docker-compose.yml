@@ -1,3 +1,15 @@
+# Every service below now carries a deploy.resources.limits.memory (rendering
+# and video-assembly already had one — RENDER_MEMORY_LIMIT/ASSEMBLY_MEMORY_LIMIT
+# predate this). Without a cap, a container is free to grow until it starves
+# every other process sharing the Docker VM's RAM — on Docker Desktop that VM
+# has a FIXED memory ceiling of its own (Settings > Resources), separate from
+# host RAM, and previously only rendering/video-assembly were bounded. Summing
+# every default limit below is deliberately > a typical 8G Docker Desktop VM
+# (~20G): these are per-container CEILINGS, not reservations, and rendering,
+# assembly and ollama rarely peak at the same time — but if the VM's own
+# allocation is at or below 8G, raise it (or lower the *_MEMORY_LIMIT vars
+# below via .env) before running a render and an assembly concurrently.
+# Override any of them per-host via .env, same pattern as .env.window.
 services:
   rabbitmq:
     image: rabbitmq:3.13-management
@@ -11,6 +23,10 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
       - ./infra/rabbitmq/definitions.json:/etc/rabbitmq/definitions.json:ro
       - ./infra/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/10-definitions.conf:ro
+    deploy:
+      resources:
+        limits:
+          memory: ${RABBITMQ_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -28,6 +44,10 @@ services:
       POSTGRES_DB: tts
     volumes:
       - tts_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d tts"]
       interval: 5s
@@ -50,6 +70,10 @@ services:
       # catalogue fall back to the identical Edge voice.
       AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
       AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
+    deploy:
+      resources:
+        limits:
+          memory: ${TTS_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s
@@ -77,6 +101,10 @@ services:
       POSTGRES_DB: script_processing
     volumes:
       - script_processing_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d script_processing"]
       interval: 5s
@@ -91,6 +119,10 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@script-processing-db:5432/script_processing
+    deploy:
+      resources:
+        limits:
+          memory: ${SCRIPT_PROCESSING_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s
@@ -113,6 +145,10 @@ services:
       POSTGRES_DB: rendering
     volumes:
       - rendering_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d rendering"]
       interval: 5s
@@ -187,6 +223,10 @@ services:
       POSTGRES_DB: video_assembly
     volumes:
       - video_assembly_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d video_assembly"]
       interval: 5s
@@ -256,6 +296,10 @@ services:
       POSTGRES_DB: publisher
     volumes:
       - publisher_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d publisher"]
       interval: 5s
@@ -277,6 +321,10 @@ services:
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
       GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI}
       UPLOAD_TIMEOUT_SECONDS: "600"
+    deploy:
+      resources:
+        limits:
+          memory: ${PUBLISHER_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -304,6 +352,10 @@ services:
       POSTGRES_DB: orchestrator
     volumes:
       - orchestrator_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d orchestrator"]
       interval: 5s
@@ -342,6 +394,10 @@ services:
       #
       # Bật sau khi đã soi báo cáo trên vài video thật: QC_ENFORCE: "true".
       QC_ENFORCE: "${QC_ENFORCE:-false}"
+    deploy:
+      resources:
+        limits:
+          memory: ${ORCHESTRATOR_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
       interval: 10s
@@ -360,6 +416,14 @@ services:
     container_name: ollama
     volumes:
       - ollama_data:/root/.ollama
+    # A loaded model sits in RAM for the life of the container — llama3.2 (the
+    # default model) needs a few GB. Only relevant when LLM_PROVIDER leaves
+    # orchestrator on Ollama instead of Hive; raise this if OLLAMA_MODEL is
+    # swapped for a larger one.
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEMORY_LIMIT:-6G}
     healthcheck:
       test: ["CMD-SHELL", "ollama list || exit 1"]
       interval: 10s
@@ -381,6 +445,10 @@ services:
       - -c
       - "curl -s http://ollama:11434/api/pull -d '{\"name\":\"${OLLAMA_MODEL:-llama3.2}\"}'"
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
     networks:
       - backend
 
@@ -396,6 +464,10 @@ services:
       SHARED_DIR: /shared
     ports:
       - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          memory: ${API_GATEWAY_MEMORY_LIMIT:-256M}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
       interval: 10s
@@ -421,6 +493,10 @@ services:
     container_name: web-gui
     ports:
       - "3000:80"
+    deploy:
+      resources:
+        limits:
+          memory: ${WEB_GUI_MEMORY_LIMIT:-128M}
     networks:
       - backend
 
@@ -430,6 +506,10 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - loki_data:/loki
+    deploy:
+      resources:
+        limits:
+          memory: ${LOKI_MEMORY_LIMIT:-512M}
     networks:
       - backend
 
@@ -443,6 +523,10 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
     depends_on:
       - loki
+    deploy:
+      resources:
+        limits:
+          memory: ${PROMTAIL_MEMORY_LIMIT:-256M}
     networks:
       - backend
 
@@ -460,6 +544,10 @@ services:
       - "3001:3000"
     depends_on:
       - loki
+    deploy:
+      resources:
+        limits:
+          memory: ${GRAFANA_MEMORY_LIMIT:-512M}
     networks:
       - backend
 
