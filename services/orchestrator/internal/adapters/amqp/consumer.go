@@ -3,12 +3,33 @@ package amqp
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 
 	"orchestrator/internal/application"
 	"orchestrator/internal/domain"
 )
+
+// requeueBackoff is how long to wait before nacking a delivery back onto the
+// queue. orchestrator.events has no delivery limit and no dead-letter exchange
+// (infra/rabbitmq/definitions.json), so requeue is the only option left for a
+// retryable failure — and without a pause the broker hands the message
+// straight back, producing a hot loop that pins a core and writes thousands of
+// identical log lines per second. This does not make a permanent failure
+// succeed; it makes the retries slow enough to read, and slow enough that a
+// database that is merely restarting has time to come back.
+const requeueBackoff = 2 * time.Second
+
+// nackWithBackoff pauses, then returns the delivery to the queue. The pause
+// respects ctx so shutdown is not held up by it.
+func nackWithBackoff(ctx context.Context, d amqp.Delivery) {
+	select {
+	case <-time.After(requeueBackoff):
+	case <-ctx.Done():
+	}
+	_ = d.Nack(false, true)
+}
 
 // eventsQueue is the single queue Orchestrator consumes all 12 Saga event
 // types from (interface-contracts.md).
@@ -136,7 +157,7 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 	processed, err := c.inbox.HasProcessed(ctx, envelope.MessageID)
 	if err != nil {
 		c.logger.ErrorContext(ctx, "inbox check failed, nacking for redelivery", "error", err, "message_id", envelope.MessageID)
-		_ = d.Nack(false, true)
+		nackWithBackoff(ctx, d)
 		return
 	}
 	if processed {
@@ -156,7 +177,7 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 	})
 	if err != nil {
 		c.logger.ErrorContext(ctx, "event processing failed, nacking for redelivery", "error", err, "event_type", eventType)
-		_ = d.Nack(false, true)
+		nackWithBackoff(ctx, d)
 		return
 	}
 
@@ -184,12 +205,12 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 		SagaID: envelope.SagaID, StepName: stepName, Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
 	}); err != nil {
 		c.logger.ErrorContext(ctx, "failed to update saga step for DLQ delivery", "error", err)
-		_ = d.Nack(false, true)
+		nackWithBackoff(ctx, d)
 		return
 	}
 	if err := c.repo.UpdateStatus(ctx, envelope.ProjectID, domain.FailedStatusForStep(stepName)); err != nil {
 		c.logger.ErrorContext(ctx, "failed to update project status for DLQ delivery", "error", err)
-		_ = d.Nack(false, true)
+		nackWithBackoff(ctx, d)
 		return
 	}
 	_ = d.Ack(false)
