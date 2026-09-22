@@ -53,6 +53,16 @@ var eventStepMap = map[string]domain.StepName{
 	"publish_failed":  domain.StepPublishVideo,
 }
 
+// StepForEventType exposes eventStepMap to adapters that need to resolve an
+// event's saga step without going through Execute — specifically
+// adapters/amqp/consumer.go's orchestrator.events.dlq handler, which marks a
+// step Failed directly rather than replaying business logic on a message
+// RabbitMQ has already given up on.
+func StepForEventType(eventType string) (domain.StepName, bool) {
+	step, ok := eventStepMap[eventType]
+	return step, ok
+}
+
 var failureEvents = map[string]bool{
 	"parse_failed": true, "validation_failed": true, "synthesis_failed": true,
 	"rendering_failed": true, "assembly_failed": true, "publish_failed": true,
