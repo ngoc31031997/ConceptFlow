@@ -44,6 +44,13 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   const router = express.Router();
   router.get('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-028 FR83.1/FR83.2 — the project row is created at wizard step 1
+  // (topic entry), not at POST /v1/sagas/render, so authoring state written
+  // from step 1 on always has a real project to hang off of.
+  router.post('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.patch('/v1/projects/:id/topic', proxyHandler(orchestratorClient, 'orchestrator'));
+  // CR-028 FR84.3 — read-only history of every authoring field overwrite.
+  router.get('/v1/projects/:id/authoring/history', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
   // lúc soạn khớp với giọng Creator thực sự dùng.
   router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));

@@ -9,7 +9,11 @@ import { useVideoFormats } from "../hooks/useVideoFormats";
 import { BackgroundMusicPicker } from "../components/BackgroundMusicPicker";
 import { WizardNav } from "../components/WizardNav";
 import { Disclosure } from "../components/Disclosure";
-import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
+import {
+  ProjectDraftContext,
+  ProjectDraftDispatchContext,
+  saveLastUsedSettings,
+} from "../context/ProjectDraftContext";
 import { useRequireScript } from "../hooks/useRequireScript";
 import styles from "./WizardSteps.module.css";
 
@@ -108,7 +112,13 @@ export function SettingsStepPage() {
         hint="Không đổi gì cũng được — mặc định là 1080p60, có giọng đọc, không phụ đề."
         onBack={() => navigate("/")}
         backLabel="Quay lại script"
-        onNext={() => navigate("/create/review")}
+        onNext={() => {
+          // CR-028 FR86.1 — this project's settings become the default for
+          // the next one, from here on (not before — an in-progress edit
+          // must not leak into a project the Creator hasn't confirmed yet).
+          saveLastUsedSettings(draft);
+          navigate("/create/review");
+        }}
         nextLabel="Tiếp tục"
         nextTestId="settings-step-next"
       />

@@ -163,15 +163,26 @@ func main() {
 	// CR-025: prompt-template CRUD (admin editor + web-gui runtime read) and
 	// step 1's story-save endpoint.
 	promptTemplates := application.NewPromptTemplatesUseCase(promptTemplateRepo)
-	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(promptTemplateRepo)
+	// CR-028 FR84.2/FR84.3: every authoring save shares the same lock check
+	// (project must still be status=draft) and the same history write
+	// (project_authoring_history) — both live on promptTemplateRepo, right
+	// alongside the project_authoring table itself.
+	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	// CR-025 step 2: Visual Director's storyboard save, and the shared
 	// read-side use case both steps' rehydration relies on.
-	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo)
+	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	// CR-025 step 3/4: Manim Engineer's code save and Script Reviewer's
 	// verdict save, sharing the same read-side use case.
-	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo)
-	saveAuthoringReview := application.NewSaveAuthoringReviewUseCase(promptTemplateRepo)
+	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
+	saveAuthoringReview := application.NewSaveAuthoringReviewUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
+	// CR-028 FR83: the project row is created here, at wizard step 1
+	// (POST /v1/projects), instead of at POST /v1/sagas/render — see
+	// projectDraftAdapter below for why this needs both repositories.
+	draftPort := projectDraftAdapter{projects: projectRepo, authoring: promptTemplateRepo}
+	createProjectDraft := application.NewCreateProjectDraftUseCase(draftPort)
+	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
+	listAuthoringHistory := application.NewListAuthoringHistoryUseCase(promptTemplateRepo)
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
@@ -183,7 +194,8 @@ func main() {
 		WithAuthoringStoryboard(saveAuthoringStoryboard).
 		WithAuthoringCode(saveAuthoringCode).
 		WithAuthoringReview(saveAuthoringReview).
-		WithAuthoringState(getAuthoringState)
+		WithAuthoringState(getAuthoringState).
+		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).
@@ -220,6 +232,37 @@ func main() {
 // Embedding both would be shorter but the two repositories each have a Get,
 // so the selector is ambiguous — and forwarding explicitly says which store
 // each field of a prompt comes from.
+// projectDraftAdapter joins the two repositories CR-028's early-draft use
+// cases read/write: the projects row itself lives in ProjectRepository
+// (Save, the same upsert StartRenderSaga already calls), while the topic
+// and its collision search live in PromptTemplateRepository alongside the
+// rest of project_authoring — same split as promptRenderContext above, for
+// the same reason.
+type projectDraftAdapter struct {
+	projects  *postgres.ProjectRepository
+	authoring *postgres.PromptTemplateRepository
+}
+
+func (a projectDraftAdapter) Save(ctx context.Context, project *domain.Project) error {
+	return a.projects.Save(ctx, project)
+}
+
+func (a projectDraftAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
+	return a.authoring.GetStatus(ctx, projectID)
+}
+
+func (a projectDraftAdapter) GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error) {
+	return a.authoring.GetStatusAndLanguage(ctx, projectID)
+}
+
+func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, topic string) error {
+	return a.authoring.SaveAuthoringTopic(ctx, projectID, topic)
+}
+
+func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]application.SimilarProject, error) {
+	return a.authoring.FindSimilarTopics(ctx, language, normalizedTopic, excludeProjectID)
+}
+
 type promptRenderContext struct {
 	projects  *postgres.ProjectRepository
 	authoring *postgres.PromptTemplateRepository

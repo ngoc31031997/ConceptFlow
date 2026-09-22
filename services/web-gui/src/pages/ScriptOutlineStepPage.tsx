@@ -4,7 +4,13 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringStory } from "../api/client";
+import {
+  getPromptTemplate,
+  getAuthoringState,
+  saveAuthoringStory,
+  createProjectDraft,
+  type SimilarProject,
+} from "../api/client";
 import {
   buildStoryBeatSheetSection,
   CHANNEL_IDENTITY,
@@ -12,6 +18,7 @@ import {
 } from "../components/scriptPrompts";
 import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
 import { useVideoFormats } from "../hooks/useVideoFormats";
+import { useDebounce } from "../hooks/useDebounce";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
 import styles from "./WizardSteps.module.css";
 
@@ -40,6 +47,32 @@ export function ScriptOutlineStepPage() {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // CR-028 FR83.1/FR83.2/FR85 — the project row (and its topic) is created/
+  // updated on the server as soon as the Creator stops typing, instead of
+  // waiting for POST /v1/sagas/render (docs/review/data-flow-review.md's
+  // "orphan draft" risk). similarProjects backs the FR85 collision banner.
+  const [similarProjects, setSimilarProjects] = useState<SimilarProject[]>([]);
+  const debouncedTopic = useDebounce(draft.authoringTopic.trim(), 600);
+
+  useEffect(() => {
+    if (!draft.projectId || !debouncedTopic) {
+      setSimilarProjects([]);
+      return;
+    }
+    let cancelled = false;
+    createProjectDraft(draft.projectId, debouncedTopic, draft.voiceLanguage)
+      .then(({ similarProjects }) => {
+        if (!cancelled) setSimilarProjects(similarProjects);
+      })
+      .catch(() => {
+        // Best-effort — a Creator offline or mid-render (FR84.2 lock) can
+        // still type/paste normally; the collision warning just won't show.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft.projectId, debouncedTopic, draft.voiceLanguage]);
 
   // Reload lands here directly (or the Creator jumps back to "1a" from a
   // later tab) — the in-memory draft survives via localStorage already, but
@@ -153,6 +186,20 @@ export function ScriptOutlineStepPage() {
               placeholder="Ví dụ: Vòng lặp for trong Java, khi nào dùng while thay thế"
               style={{ marginBottom: 12 }}
             />
+            {similarProjects.length > 0 && (
+              <div className={styles.topicCollisionBanner} data-testid="topic-collision-banner">
+                Chủ đề này trùng với {similarProjects.length} project khác:{" "}
+                {similarProjects.map((p, i) => (
+                  <span key={p.projectId}>
+                    {i > 0 && ", "}
+                    <a href="/videos" target="_blank" rel="noreferrer">
+                      {p.topic || p.projectId} ({p.status})
+                    </a>
+                  </span>
+                ))}
+                . Bạn vẫn có thể tiếp tục — đây chỉ là cảnh báo.
+              </div>
+            )}
             <TextArea
               readOnly
               value={prompt}

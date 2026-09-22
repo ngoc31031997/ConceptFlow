@@ -137,6 +137,21 @@
   color: var(--danger, #c0392b);
 }
 
+/* CR-028 FR85.3 — warning, not error: a matching topic never blocks Continue. */
+.topicCollisionBanner {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: var(--warning-bg, #fff8e1);
+  border: 1px solid var(--warning-border, #f0c419);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.topicCollisionBanner a {
+  font-weight: 600;
+}
+
 @media (max-width: 900px) {
   .scriptLayout {
     grid-template-columns: minmax(0, 1fr);

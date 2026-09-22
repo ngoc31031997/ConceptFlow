@@ -74,6 +74,37 @@ type AuthoringStoryPort interface {
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 }
 
+// AuthoringLockPort is the CR-028 FR84.2 precondition every authoring save
+// shares: writes are unrestricted while the project is still status=draft,
+// and refused once render has started. AuthoringHistoryWriterPort is the
+// FR84.3 side effect every save also shares: every overwrite is kept, not
+// just the latest value.
+type AuthoringLockPort interface {
+	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
+}
+
+// AuthoringHistoryWriterPort records one past version per overwrite
+// (CR-028 FR84.3).
+type AuthoringHistoryWriterPort interface {
+	SaveAuthoringHistory(ctx context.Context, projectID, fieldName, content string) error
+}
+
+// checkAuthoringUnlocked is the FR84.2 precondition shared by all four
+// SaveAuthoring*UseCase.Execute methods: a project that does not exist yet
+// cannot have its authoring edited (CR-028 requires POST /v1/projects
+// first), and one that has already started rendering is locked so the
+// script that got rendered cannot silently change under it.
+func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projectID string) error {
+	status, err := locks.GetStatus(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if status != domain.StatusDraft {
+		return domain.ErrInvalidStatus
+	}
+	return nil
+}
+
 // SaveAuthoringStoryUseCase stores the Story Architect output a Creator
 // pasted back after the external-AI round trip (CR-025 step 1). It performs
 // no saga/state-machine transition by itself — same "just persist intent"
@@ -81,10 +112,12 @@ type AuthoringStoryPort interface {
 // it back via {{previous_output}}.
 type SaveAuthoringStoryUseCase struct {
 	authoring AuthoringStoryPort
+	locks     AuthoringLockPort
+	history   AuthoringHistoryWriterPort
 }
 
-func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort) *SaveAuthoringStoryUseCase {
-	return &SaveAuthoringStoryUseCase{authoring: authoring}
+func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringStoryUseCase {
+	return &SaveAuthoringStoryUseCase{authoring: authoring, locks: locks, history: history}
 }
 
 // Execute saves the outline and, when one is supplied, the topic. topic is
@@ -98,7 +131,13 @@ func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, con
 	if content == "" {
 		return fmt.Errorf("content is required")
 	}
-	return uc.authoring.SaveAuthoringStory(ctx, projectID, content, topic)
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	if err := uc.authoring.SaveAuthoringStory(ctx, projectID, content, topic); err != nil {
+		return err
+	}
+	return uc.history.SaveAuthoringHistory(ctx, projectID, "story_content", content)
 }
 
 // AuthoringStoryboardPort persists CR-025 step 2's pasted storyboard.
@@ -112,10 +151,12 @@ type AuthoringStoryboardPort interface {
 // "just persist intent" posture as SaveAuthoringStoryUseCase.
 type SaveAuthoringStoryboardUseCase struct {
 	authoring AuthoringStoryboardPort
+	locks     AuthoringLockPort
+	history   AuthoringHistoryWriterPort
 }
 
-func NewSaveAuthoringStoryboardUseCase(authoring AuthoringStoryboardPort) *SaveAuthoringStoryboardUseCase {
-	return &SaveAuthoringStoryboardUseCase{authoring: authoring}
+func NewSaveAuthoringStoryboardUseCase(authoring AuthoringStoryboardPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringStoryboardUseCase {
+	return &SaveAuthoringStoryboardUseCase{authoring: authoring, locks: locks, history: history}
 }
 
 func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID, content string) error {
@@ -125,7 +166,13 @@ func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID
 	if content == "" {
 		return fmt.Errorf("content is required")
 	}
-	return uc.authoring.SaveAuthoringStoryboard(ctx, projectID, content)
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	if err := uc.authoring.SaveAuthoringStoryboard(ctx, projectID, content); err != nil {
+		return err
+	}
+	return uc.history.SaveAuthoringHistory(ctx, projectID, "storyboard_content", content)
 }
 
 // AuthoringCodePort persists CR-025 step 3's pasted Manim code.
@@ -139,10 +186,12 @@ type AuthoringCodePort interface {
 // intent" posture as SaveAuthoringStoryUseCase/SaveAuthoringStoryboardUseCase.
 type SaveAuthoringCodeUseCase struct {
 	authoring AuthoringCodePort
+	locks     AuthoringLockPort
+	history   AuthoringHistoryWriterPort
 }
 
-func NewSaveAuthoringCodeUseCase(authoring AuthoringCodePort) *SaveAuthoringCodeUseCase {
-	return &SaveAuthoringCodeUseCase{authoring: authoring}
+func NewSaveAuthoringCodeUseCase(authoring AuthoringCodePort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringCodeUseCase {
+	return &SaveAuthoringCodeUseCase{authoring: authoring, locks: locks, history: history}
 }
 
 func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, content string) error {
@@ -152,7 +201,13 @@ func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, cont
 	if content == "" {
 		return fmt.Errorf("content is required")
 	}
-	return uc.authoring.SaveAuthoringCode(ctx, projectID, content)
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	if err := uc.authoring.SaveAuthoringCode(ctx, projectID, content); err != nil {
+		return err
+	}
+	return uc.history.SaveAuthoringHistory(ctx, projectID, "code_content", content)
 }
 
 // AuthoringReviewPort persists CR-025 step 4's pasted reviewer verdict.
@@ -166,10 +221,12 @@ type AuthoringReviewPort interface {
 // "just persist intent" posture as the other three authoring save use cases.
 type SaveAuthoringReviewUseCase struct {
 	authoring AuthoringReviewPort
+	locks     AuthoringLockPort
+	history   AuthoringHistoryWriterPort
 }
 
-func NewSaveAuthoringReviewUseCase(authoring AuthoringReviewPort) *SaveAuthoringReviewUseCase {
-	return &SaveAuthoringReviewUseCase{authoring: authoring}
+func NewSaveAuthoringReviewUseCase(authoring AuthoringReviewPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringReviewUseCase {
+	return &SaveAuthoringReviewUseCase{authoring: authoring, locks: locks, history: history}
 }
 
 func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, content string) error {
@@ -179,7 +236,13 @@ func (uc *SaveAuthoringReviewUseCase) Execute(ctx context.Context, projectID, co
 	if content == "" {
 		return fmt.Errorf("content is required")
 	}
-	return uc.authoring.SaveAuthoringReview(ctx, projectID, content)
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	if err := uc.authoring.SaveAuthoringReview(ctx, projectID, content); err != nil {
+		return err
+	}
+	return uc.history.SaveAuthoringHistory(ctx, projectID, "review_content", content)
 }
 
 // AuthoringStateReaderPort is the read side all four authoring outputs

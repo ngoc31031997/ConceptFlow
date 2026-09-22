@@ -173,13 +173,80 @@ function saveLastVoiceId(voiceId: string | null): void {
 }
 
 /**
+ * CR-028 FR86 — "một bộ cấu hình lần cuối dùng" toàn cục: engine, quality,
+ * TTS, giọng, sub, nhạc nền, output mode, hình dạng video. Saved once when
+ * the Creator finishes wizard step 6 (SettingsStepPage's onNext calls
+ * saveLastUsedSettings), read back to prefill every new draft from then on
+ * — same client-only posture as LAST_VOICE_KEY above (a browser-level
+ * convenience, not business data that needs to sync across devices).
+ */
+const LAST_SETTINGS_KEY = "conceptflow.lastUsedSettings.v1";
+
+type LastUsedSettings = Pick<
+  ProjectDraft,
+  | "ttsEnabled"
+  | "voiceId"
+  | "subtitleMode"
+  | "subtitleStyle"
+  | "renderQuality"
+  | "renderEngine"
+  | "videoFormatId"
+  | "backgroundMusicPath"
+  | "backgroundMusicVolume"
+  | "videoOutputMode"
+>;
+
+function loadLastUsedSettings(): Partial<LastUsedSettings> {
+  try {
+    const raw = window.localStorage.getItem(LAST_SETTINGS_KEY);
+    return raw ? (JSON.parse(raw) as Partial<LastUsedSettings>) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Call once a project's step-6 settings are final (SettingsStepPage's
+ * "Tiếp tục"). Deliberately not saved on every keystroke while still
+ * editing — a half-finished change to one project's settings must not leak
+ * into the next project's defaults before the Creator confirms it (FR86.2).
+ */
+export function saveLastUsedSettings(draft: ProjectDraft): void {
+  try {
+    const settings: LastUsedSettings = {
+      ttsEnabled: draft.ttsEnabled,
+      voiceId: draft.voiceId,
+      subtitleMode: draft.subtitleMode,
+      subtitleStyle: draft.subtitleStyle,
+      renderQuality: draft.renderQuality,
+      renderEngine: draft.renderEngine,
+      videoFormatId: draft.videoFormatId,
+      backgroundMusicPath: draft.backgroundMusicPath,
+      backgroundMusicVolume: draft.backgroundMusicVolume,
+      videoOutputMode: draft.videoOutputMode,
+    };
+    window.localStorage.setItem(LAST_SETTINGS_KEY, JSON.stringify(settings));
+  } catch {
+    /* storage unavailable or full — the preference simply will not persist */
+  }
+}
+
+/**
  * A draft only lived in memory, so a reload mid-edit threw away a script the
  * Creator may have spent a while getting right. Persisting is best-effort:
  * private browsing and a full quota both throw, and neither is worth failing
  * the render over.
  */
 function loadDraft(): ProjectDraft {
-  const fresh = { ...initialDraft, projectId: crypto.randomUUID(), voiceId: loadLastVoiceId() };
+  const fresh = {
+    ...initialDraft,
+    ...loadLastUsedSettings(),
+    projectId: crypto.randomUUID(),
+    // LAST_VOICE_KEY predates FR86 and stays authoritative for voiceId
+    // specifically — same value in practice, but no behaviour change for
+    // anyone already relying on it.
+    voiceId: loadLastVoiceId(),
+  };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
     if (!raw) return fresh;
@@ -247,7 +314,12 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
     case "SET_SUBTITLE_STYLE":
       return { ...state, subtitleStyle: { ...state.subtitleStyle, ...action.payload } };
     case "RESET":
-      return { ...initialDraft, projectId: crypto.randomUUID(), voiceId: loadLastVoiceId() };
+      return {
+        ...initialDraft,
+        ...loadLastUsedSettings(),
+        projectId: crypto.randomUUID(),
+        voiceId: loadLastVoiceId(),
+      };
   }
 }
 

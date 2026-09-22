@@ -533,6 +533,71 @@ export function getAuthoringState(projectId: string): Promise<AuthoringState> {
   return apiFetch<AuthoringState>(`/v1/projects/${projectId}/authoring`);
 }
 
+/** CR-028 FR85 — một project khác (cùng ngôn ngữ) có chủ đề trùng sau khi chuẩn hoá. */
+export interface SimilarProject {
+  projectId: string;
+  topic: string;
+  status: string;
+  createdAt: string;
+}
+
+interface similarProjectsWire {
+  project_id: string;
+  topic: string;
+  status: string;
+  created_at: string;
+}
+
+function fromWireSimilarProjects(wire: similarProjectsWire[]): SimilarProject[] {
+  return wire.map((p) => ({
+    projectId: p.project_id,
+    topic: p.topic,
+    status: p.status,
+    createdAt: p.created_at,
+  }));
+}
+
+/**
+ * CR-028 FR83.1 — tạo hàng project ngay khi Creator gõ xong chủ đề (bước 1),
+ * thay vì đợi tới POST /v1/sagas/render. `projectId` là id đã sinh sẵn ở
+ * client (ProjectDraftContext) — gửi lên để mọi endpoint authoring đã và sẽ
+ * gọi với id đó vẫn trỏ đúng một project, không đổi kiến trúc id ở client.
+ */
+export async function createProjectDraft(
+  projectId: string,
+  topic: string,
+  contentLanguage: "vi" | "en",
+): Promise<{ similarProjects: SimilarProject[] }> {
+  const res = await apiFetch<{ project_id: string; similar_projects: similarProjectsWire[] }>(
+    "/v1/projects",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ project_id: projectId, topic, content_language: contentLanguage }),
+    },
+  );
+  return { similarProjects: fromWireSimilarProjects(res.similar_projects ?? []) };
+}
+
+/**
+ * CR-028 FR83.2 — Creator quay lại bước 1 và sửa chủ đề của draft đã tạo.
+ * 409 nếu render đã bắt đầu (FR84.2 — cùng khoá với authoring saves).
+ */
+export async function updateProjectTopic(
+  projectId: string,
+  topic: string,
+): Promise<{ similarProjects: SimilarProject[] }> {
+  const res = await apiFetch<{ similar_projects: similarProjectsWire[] }>(
+    `/v1/projects/${projectId}/topic`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic }),
+    },
+  );
+  return { similarProjects: fromWireSimilarProjects(res.similar_projects ?? []) };
+}
+
 export function subscribeProgress(
   projectId: string,
   onMessage: (msg: ProgressMessage) => void,
