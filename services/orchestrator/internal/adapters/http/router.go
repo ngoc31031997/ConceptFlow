@@ -110,6 +110,25 @@ type getAuthoringStateUseCase interface {
 	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
 }
 
+// createProjectDraftUseCase backs CR-028 FR83.1's POST /v1/projects — the
+// project row is created here, at wizard step 1, instead of at
+// POST /v1/sagas/render.
+type createProjectDraftUseCase interface {
+	Execute(ctx context.Context, input application.CreateProjectDraftInput) (*application.CreateProjectDraftOutput, error)
+}
+
+// updateProjectTopicUseCase backs CR-028 FR83.2's PATCH
+// /v1/projects/{id}/topic.
+type updateProjectTopicUseCase interface {
+	Execute(ctx context.Context, input application.UpdateProjectTopicInput) (*application.UpdateProjectTopicOutput, error)
+}
+
+// listAuthoringHistoryUseCase backs CR-028 FR84.3's GET
+// /v1/projects/{id}/authoring/history.
+type listAuthoringHistoryUseCase interface {
+	Execute(ctx context.Context, projectID, fieldName string) ([]application.AuthoringHistoryEntry, error)
+}
+
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -153,6 +172,9 @@ type Router struct {
 	saveAuthoringCode       saveAuthoringCodeUseCase
 	saveAuthoringReview     saveAuthoringReviewUseCase
 	getAuthoringState       getAuthoringStateUseCase
+	createProjectDraft      createProjectDraftUseCase
+	updateProjectTopic      updateProjectTopicUseCase
+	listAuthoringHistory    listAuthoringHistoryUseCase
 }
 
 // WithPromptTemplates attaches CR-025's prompt-template use case, enabling
@@ -211,6 +233,16 @@ func (rt *Router) WithAuthoringState(getAuthoringState getAuthoringStateUseCase)
 	return rt
 }
 
+// WithProjectDrafts attaches CR-028's early-draft use cases, enabling
+// POST /v1/projects, PATCH /v1/projects/{project_id}/topic, and GET
+// /v1/projects/{project_id}/authoring/history.
+func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase, updateProjectTopic updateProjectTopicUseCase, listAuthoringHistory listAuthoringHistoryUseCase) *Router {
+	rt.createProjectDraft = createProjectDraft
+	rt.updateProjectTopic = updateProjectTopic
+	rt.listAuthoringHistory = listAuthoringHistory
+	return rt
+}
+
 // WithQCReports attaches the QC report store, enabling
 // GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
 // the route answers 404, the same way the CR-023 routes do when unwired.
@@ -240,6 +272,10 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/sagas/render", rt.handleStartRenderSaga)
 	r.Post("/v1/sagas/publish", rt.handleStartPublishSaga)
 	r.Get("/v1/projects", rt.handleListProjects)
+	// CR-028 FR83/FR84/FR85: the project row now exists from wizard step 1.
+	r.Post("/v1/projects", rt.handleCreateProjectDraft)
+	r.Patch("/v1/projects/{project_id}/topic", rt.handleUpdateProjectTopic)
+	r.Get("/v1/projects/{project_id}/authoring/history", rt.handleListAuthoringHistory)
 	r.Get("/v1/voice-calibration", rt.handleVoiceCalibration)
 	r.Get("/v1/formats", rt.handleListFormats)
 	r.Post("/v1/formats", rt.handleSaveFormat)
@@ -412,6 +448,83 @@ func (rt *Router) handleSuggestShortScript(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, suggestShortScriptResponse{ScriptContent: script})
+}
+
+// handleCreateProjectDraft backs CR-028 FR83.1 — POST /v1/projects, called
+// by wizard step 1 as soon as the Creator finishes typing a topic. Replaces
+// the client-generated UUID ProjectDraftContext used to keep locally.
+func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Request) {
+	if rt.createProjectDraft == nil {
+		writeError(w, http.StatusNotFound, "project drafts are not enabled")
+		return
+	}
+	var req createProjectDraftRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	lang := domain.ContentLanguage(req.ContentLanguage)
+	if lang != domain.LanguageVietnamese && lang != domain.LanguageEnglish {
+		writeError(w, http.StatusBadRequest, "content_language must be 'vi' or 'en'")
+		return
+	}
+	out, err := rt.createProjectDraft.Execute(r.Context(), application.CreateProjectDraftInput{
+		ProjectID:       req.ProjectID,
+		Topic:           req.Topic,
+		ContentLanguage: lang,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusCreated, createProjectDraftResponse{
+		ProjectID:       out.ProjectID,
+		SimilarProjects: toSimilarProjectsResponse(out.SimilarProjects),
+	})
+}
+
+// handleUpdateProjectTopic backs CR-028 FR83.2 — PATCH
+// /v1/projects/{project_id}/topic, called when the Creator returns to step 1
+// and edits the topic of a draft they already created. 409s once render has
+// started (FR84.2 — same lock as the authoring saves).
+func (rt *Router) handleUpdateProjectTopic(w http.ResponseWriter, r *http.Request) {
+	if rt.updateProjectTopic == nil {
+		writeError(w, http.StatusNotFound, "project drafts are not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+	var req updateProjectTopicRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	out, err := rt.updateProjectTopic.Execute(r.Context(), application.UpdateProjectTopicInput{
+		ProjectID: projectID,
+		Topic:     req.Topic,
+	})
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, updateProjectTopicResponse{SimilarProjects: toSimilarProjectsResponse(out.SimilarProjects)})
+}
+
+// handleListAuthoringHistory backs CR-028 FR84.3 — GET
+// /v1/projects/{project_id}/authoring/history?field=story_content.
+// Read-only; restoring an old version is not part of this CR.
+func (rt *Router) handleListAuthoringHistory(w http.ResponseWriter, r *http.Request) {
+	if rt.listAuthoringHistory == nil {
+		writeError(w, http.StatusNotFound, "authoring history is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+	field := r.URL.Query().Get("field")
+	entries, err := rt.listAuthoringHistory.Execute(r.Context(), projectID, field)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, toAuthoringHistoryResponse(entries))
 }
 
 func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {

@@ -7,6 +7,7 @@ package http
 import (
 	"time"
 
+	"orchestrator/internal/application"
 	"orchestrator/internal/domain"
 )
 
@@ -26,14 +27,14 @@ type startRenderSagaRequest struct {
 	SubtitlesEnabled bool   `json:"subtitles_enabled,omitempty"`
 	// CR-015 FR41 — "off" | "track" | "burn_in" | "both". Wins over
 	// SubtitlesEnabled when both are present (start_render_saga.go).
-	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
-	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
-	RenderQuality         string                `json:"render_quality,omitempty"`
+	SubtitleMode  string                `json:"subtitle_mode,omitempty"`
+	SubtitleStyle *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality string                `json:"render_quality,omitempty"`
 	// "manim" | "remotion" — empty means DefaultRenderEngine ("manim").
-	RenderEngine          string                `json:"render_engine,omitempty"`
-	VideoFormatID         string                `json:"video_format_id,omitempty"`
-	ReviewEnabled         *bool                 `json:"review_enabled,omitempty"`
-	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
+	RenderEngine          string  `json:"render_engine,omitempty"`
+	VideoFormatID         string  `json:"video_format_id,omitempty"`
+	ReviewEnabled         *bool   `json:"review_enabled,omitempty"`
+	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
 	// "long" | "short" | "both" — empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode string `json:"video_output_mode,omitempty"`
 	// CR-026 D1 — project_id of the companion video covering the same
@@ -254,6 +255,77 @@ type errorResponse struct {
 
 // ErrorCodeQCBlocked marks the 409 that `acknowledge_qc: true` can get past.
 const ErrorCodeQCBlocked = "qc_blocked"
+
+// createProjectDraftRequest is the body of POST /v1/projects (CR-028
+// FR83.1) — sent as soon as the Creator finishes typing a topic on wizard
+// step 1, well before there is any script.
+type createProjectDraftRequest struct {
+	// ProjectID is optional — see CreateProjectDraftInput's doc comment for
+	// why web-gui sends its own client-generated id here.
+	ProjectID       string `json:"project_id,omitempty"`
+	Topic           string `json:"topic"`
+	ContentLanguage string `json:"content_language"`
+}
+
+// updateProjectTopicRequest is the body of PATCH
+// /v1/projects/{project_id}/topic (CR-028 FR83.2).
+type updateProjectTopicRequest struct {
+	Topic string `json:"topic"`
+}
+
+// similarProjectResponse is one entry of the FR85 collision-warning list.
+type similarProjectResponse struct {
+	ProjectID string    `json:"project_id"`
+	Topic     string    `json:"topic"`
+	Status    string    `json:"status"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// createProjectDraftResponse is the 201 response of POST /v1/projects.
+type createProjectDraftResponse struct {
+	ProjectID       string                   `json:"project_id"`
+	SimilarProjects []similarProjectResponse `json:"similar_projects"`
+}
+
+// updateProjectTopicResponse is the 200 response of PATCH
+// /v1/projects/{project_id}/topic.
+type updateProjectTopicResponse struct {
+	SimilarProjects []similarProjectResponse `json:"similar_projects"`
+}
+
+func toSimilarProjectsResponse(in []application.SimilarProject) []similarProjectResponse {
+	out := make([]similarProjectResponse, 0, len(in))
+	for _, s := range in {
+		out = append(out, similarProjectResponse{
+			ProjectID: s.ProjectID,
+			Topic:     s.Topic,
+			Status:    string(s.Status),
+			CreatedAt: s.CreatedAt,
+		})
+	}
+	return out
+}
+
+// authoringHistoryEntryResponse is one entry of GET
+// /v1/projects/{project_id}/authoring/history (CR-028 FR84.3).
+type authoringHistoryEntryResponse struct {
+	Content string    `json:"content"`
+	SavedAt time.Time `json:"saved_at"`
+}
+
+// authoringHistoryResponse is the 200 response of GET
+// /v1/projects/{project_id}/authoring/history.
+type authoringHistoryResponse struct {
+	Entries []authoringHistoryEntryResponse `json:"entries"`
+}
+
+func toAuthoringHistoryResponse(in []application.AuthoringHistoryEntry) authoringHistoryResponse {
+	entries := make([]authoringHistoryEntryResponse, 0, len(in))
+	for _, e := range in {
+		entries = append(entries, authoringHistoryEntryResponse{Content: e.Content, SavedAt: e.SavedAt})
+	}
+	return authoringHistoryResponse{Entries: entries}
+}
 
 func toProjectListResponse(summaries []domain.ProjectSummary) projectListResponse {
 	projects := make([]projectSummaryResponse, 0, len(summaries))

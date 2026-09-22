@@ -17,6 +17,11 @@ type fakeAuthoringStore struct {
 	storyboard map[string]string
 	code       map[string]string
 	review     map[string]string
+	history    map[string][]string
+	// status defaults to domain.StatusDraft (Go zero value is "", so
+	// GetStatus below maps "" to draft) — set per project_id to simulate a
+	// project whose render has already started (CR-028 FR84.2).
+	status map[string]domain.ProjectStatus
 }
 
 func newFakeAuthoringStore() *fakeAuthoringStore {
@@ -26,7 +31,26 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 		storyboard: map[string]string{},
 		code:       map[string]string{},
 		review:     map[string]string{},
+		history:    map[string][]string{},
+		status:     map[string]domain.ProjectStatus{},
 	}
+}
+
+// GetStatus backs CR-028 FR84.2's authoring lock. Defaults to draft (unset
+// entries) so every pre-existing test above, which never touches status,
+// keeps passing unmodified.
+func (f *fakeAuthoringStore) GetStatus(_ context.Context, projectID string) (domain.ProjectStatus, error) {
+	if s, ok := f.status[projectID]; ok {
+		return s, nil
+	}
+	return domain.StatusDraft, nil
+}
+
+// SaveAuthoringHistory backs CR-028 FR84.3.
+func (f *fakeAuthoringStore) SaveAuthoringHistory(_ context.Context, projectID, fieldName, content string) error {
+	key := projectID + ":" + fieldName
+	f.history[key] = append(f.history[key], content)
+	return nil
 }
 
 // SaveAuthoringStory mirrors the repository's CR-027 D0 rule: an empty topic
@@ -76,7 +100,7 @@ func (f *fakeAuthoringStore) GetAuthoringReview(_ context.Context, projectID str
 
 func TestSaveAuthoringStoryUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringStoryUseCase(store)
+	uc := application.NewSaveAuthoringStoryUseCase(store, store, store)
 
 	if err := uc.Execute(context.Background(), "", "some story", "a topic"); err == nil {
 		t.Fatal("expected error for empty project_id")
@@ -102,7 +126,7 @@ func TestSaveAuthoringStoryUseCase(t *testing.T) {
 // pipeline step renders {{topic}} from it.
 func TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringStoryUseCase(store)
+	uc := application.NewSaveAuthoringStoryUseCase(store, store, store)
 
 	if err := uc.Execute(context.Background(), "p1", "v1", "the real topic"); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -120,7 +144,7 @@ func TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne(t *te
 
 func TestSaveAuthoringStoryboardUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringStoryboardUseCase(store)
+	uc := application.NewSaveAuthoringStoryboardUseCase(store, store, store)
 
 	if err := uc.Execute(context.Background(), "", "some storyboard"); err == nil {
 		t.Fatal("expected error for empty project_id")
@@ -138,7 +162,7 @@ func TestSaveAuthoringStoryboardUseCase(t *testing.T) {
 
 func TestSaveAuthoringCodeUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringCodeUseCase(store)
+	uc := application.NewSaveAuthoringCodeUseCase(store, store, store)
 
 	if err := uc.Execute(context.Background(), "", "some code"); err == nil {
 		t.Fatal("expected error for empty project_id")
@@ -156,7 +180,7 @@ func TestSaveAuthoringCodeUseCase(t *testing.T) {
 
 func TestSaveAuthoringReviewUseCase(t *testing.T) {
 	store := newFakeAuthoringStore()
-	uc := application.NewSaveAuthoringReviewUseCase(store)
+	uc := application.NewSaveAuthoringReviewUseCase(store, store, store)
 
 	if err := uc.Execute(context.Background(), "", "some review"); err == nil {
 		t.Fatal("expected error for empty project_id")

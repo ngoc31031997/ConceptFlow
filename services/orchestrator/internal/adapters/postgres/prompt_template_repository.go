@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"orchestrator/internal/application"
 	"orchestrator/internal/domain"
 )
 
@@ -227,6 +228,125 @@ func (r *PromptTemplateRepository) GetAuthoringTopic(ctx context.Context, projec
 		return "", nil
 	}
 	return topic, err
+}
+
+// SaveAuthoringTopic upserts just the topic (CR-028 FR83.1/FR83.2) — unlike
+// SaveAuthoringStory, content is not required here: this is called at step 1
+// of the wizard, before any outline exists.
+func (r *PromptTemplateRepository) SaveAuthoringTopic(ctx context.Context, projectID, topic string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, topic, updated_at)
+		VALUES ($1, $2, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    topic = EXCLUDED.topic,
+		    updated_at = now()
+	`, projectID, topic)
+	return err
+}
+
+// FindSimilarTopics backs CR-028 FR85 — other projects, in the same
+// content_language, whose saved topic normalizes to the same string as
+// normalizedTopic. excludeProjectID keeps a project from "colliding" with
+// its own topic when the Creator re-saves it unchanged. An empty
+// normalizedTopic never matches anything (an unset topic is not a
+// collision).
+func (r *PromptTemplateRepository) FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]application.SimilarProject, error) {
+	if normalizedTopic == "" {
+		return nil, nil
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT p.project_id, a.topic, p.status, p.created_at
+		FROM project_authoring a
+		JOIN projects p ON p.project_id = a.project_id
+		WHERE p.voice_language = $1
+		  AND p.project_id != $2
+		  AND lower(regexp_replace(trim(a.topic), '\s+', ' ', 'g')) = $3
+		ORDER BY p.created_at DESC
+		LIMIT 10
+	`, string(language), excludeProjectID, normalizedTopic)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []application.SimilarProject
+	for rows.Next() {
+		var s application.SimilarProject
+		var status string
+		if err := rows.Scan(&s.ProjectID, &s.Topic, &status, &s.CreatedAt); err != nil {
+			return nil, err
+		}
+		s.Status = domain.ProjectStatus(status)
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// SaveAuthoringHistory appends one row per overwrite of an authoring field
+// (CR-028 FR84.3) — called alongside every SaveAuthoring* write, never
+// instead of it; project_authoring stays the current-value table, this is
+// the append-only trail behind it.
+func (r *PromptTemplateRepository) SaveAuthoringHistory(ctx context.Context, projectID, fieldName, content string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring_history (project_id, field_name, content)
+		VALUES ($1, $2, $3)
+	`, projectID, fieldName, content)
+	return err
+}
+
+// ListAuthoringHistory returns every saved version of one authoring field,
+// newest first (CR-028 FR84.3's read side — GET
+// /v1/projects/{id}/authoring/history).
+func (r *PromptTemplateRepository) ListAuthoringHistory(ctx context.Context, projectID, fieldName string) ([]application.AuthoringHistoryEntry, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT content, saved_at FROM project_authoring_history
+		WHERE project_id = $1 AND field_name = $2
+		ORDER BY saved_at DESC
+	`, projectID, fieldName)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []application.AuthoringHistoryEntry
+	for rows.Next() {
+		var e application.AuthoringHistoryEntry
+		if err := rows.Scan(&e.Content, &e.SavedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// GetStatus is the narrow read CR-028 FR84.2's authoring lock needs — just
+// enough to decide draft-vs-locked without paying for the full 49-column
+// Project scan Get does.
+func (r *PromptTemplateRepository) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
+	var status string
+	err := r.pool.QueryRow(ctx, `SELECT status FROM projects WHERE project_id = $1`, projectID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return domain.ProjectStatus(status), nil
+}
+
+// GetStatusAndLanguage is GetStatus plus content_language, for FR83.2's
+// re-scan of the collision list (comparison stays scoped to the project's
+// own language).
+func (r *PromptTemplateRepository) GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error) {
+	var status, language string
+	err := r.pool.QueryRow(ctx, `SELECT status, voice_language FROM projects WHERE project_id = $1`, projectID).Scan(&status, &language)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return domain.ProjectStatus(status), domain.ContentLanguage(language), nil
 }
 
 // GetAuthoringStory returns the saved story outline, or "" if none was saved yet.

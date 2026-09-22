@@ -10,6 +10,7 @@ import { useProject } from "../hooks/useProject";
 import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
+import { statusToStep } from "../utils/pipelineLabels";
 import type { Project } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./RenderPage.module.css";
@@ -60,6 +61,22 @@ export function RenderPage() {
   const errorMessage = progressState.errorMessage ?? project?.error_message ?? "";
   const failedStep = progressState.currentStep ?? project?.status.replace("failed_at_", "") ?? null;
   const isInputError = isFailed && failedStep !== null && INPUT_RELATED_STEPS.has(failedStep);
+
+  // Bug report: navigating away mid-render and back showed "Đang khởi
+  // tạo..." with no sign of progress, or of whether it was even still
+  // running. useSSE only knows what arrived on THIS tab's SSE connection —
+  // reopening the page starts that at null, and the next progress.fanout
+  // message can be minutes away. The render itself never paused (nothing
+  // client-side can pause a saga already running server-side); only the
+  // tracker looked stuck. Seed it from the project's own persisted status
+  // until a live message replaces it with real scene/elapsed detail.
+  const displayStep = isFailed
+    ? failedStep
+    : (progressState.currentStep ?? (project ? statusToStep(project.status) : null));
+  const displayProgressState =
+    displayStep && displayStep !== progressState.currentStep
+      ? { ...progressState, currentStep: displayStep, status: isFailed ? progressState.status : "in_progress" as const }
+      : progressState;
 
   useEffect(() => {
     if (project?.status === "ready_to_publish") {
@@ -123,7 +140,7 @@ export function RenderPage() {
               <OutlineActions outline={outline} />
               <div className={glass.mtSm}>
                 <ProgressTracker
-                  progressState={failedStep ? { ...progressState, currentStep: failedStep } : progressState}
+                  progressState={displayProgressState}
                   isFailed={isFailed}
                 />
               </div>
@@ -146,7 +163,7 @@ export function RenderPage() {
               />
             )}
             <ProgressTracker
-              progressState={failedStep ? { ...progressState, currentStep: failedStep } : progressState}
+              progressState={displayProgressState}
               isFailed={isFailed}
             />
           </>

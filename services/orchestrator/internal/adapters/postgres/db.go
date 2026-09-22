@@ -320,6 +320,54 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT N
 -- No attempt is made to guess a topic out of story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
 
+-- CR-028 FR85.2: projects never had a created_at column — every existing
+-- consumer of this table either already knew its own creation time (the
+-- Creator, from the wizard) or didn't need it. FR85's collision list does
+-- ("tạo lúc ..."), so it gets one now. DEFAULT now() means every row that
+-- already existed when this migration runs gets the migration's timestamp,
+-- not its true creation time — acceptable here: this column is a display/
+-- sort convenience for the warning banner, not data anything else keys off.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
+-- CR-028 FR83.3: project_authoring was deliberately FK-less because a
+-- project could outlive its own existence check — authoring rows were
+-- written under a project_id the projects table might never see (the
+-- review that found this: docs/review/data-flow-review.md, "Rủi ro"). Now
+-- that POST /v1/projects (FR83.1) always creates the projects row FIRST,
+-- the FK is safe to add — NOT VALID so it only checks rows written from now
+-- on and does not fail startup over authoring rows orphaned before this
+-- migration ran (those are cleaned up by hand, FR83.5 decision: no
+-- automatic sweep). A future CR can VALIDATE CONSTRAINT once the backlog is
+-- confirmed clean.
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'project_authoring_project_id_fkey'
+    ) THEN
+        ALTER TABLE project_authoring
+            ADD CONSTRAINT project_authoring_project_id_fkey
+            FOREIGN KEY (project_id) REFERENCES projects (project_id) ON DELETE CASCADE
+            NOT VALID;
+    END IF;
+END $$;
+
+-- CR-028 FR84.3: append-only history of every authoring field overwrite, so
+-- a Creator who ghi đè nhầm một bước (outline/storyboard/code/review) can
+-- look back at an earlier draft of that same field. Write-only from this
+-- CR's use cases; no restore endpoint yet (P2, FR84.3 decision) — this
+-- table exists so that endpoint has data to read when it is built, without
+-- a backfill.
+CREATE TABLE IF NOT EXISTS project_authoring_history (
+    id BIGSERIAL PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects (project_id) ON DELETE CASCADE,
+    field_name TEXT NOT NULL,
+    content TEXT NOT NULL,
+    saved_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS project_authoring_history_lookup_idx
+    ON project_authoring_history (project_id, field_name, saved_at DESC);
+
 -- CR-027 D9/FR82: one row per LLM call, so the Creator can see spend in the
 -- web GUI instead of on a provider dashboard. This is the first paid service
 -- in the pipeline, and CR-021's lesson applies: measure first, enforce later.
