@@ -464,6 +464,41 @@ def test_cache_prune_never_evicts_the_running_project(tmp_path):
     assert os.path.isdir(media_dir)
 
 
+def test_cache_prune_never_evicts_a_concurrently_running_project(tmp_path):
+    """`keep` only protects the run doing the pruning, so a second render
+    starting while the first is mid-flight could rmtree the first's media_dir —
+    taking cf_marks.jsonl, the only channel out of that Manim subprocess, with
+    it. The victim then died on a bare FileNotFoundError that named a path
+    nothing in the logs explained.
+
+    Observed live with three overlapping dry runs.
+    """
+    import os
+
+    root = tmp_path / "cache"
+    root.mkdir()
+    inflight = root / "proj-inflight"
+    inflight.mkdir()
+    (inflight / "blob.bin").write_bytes(b"x" * 10_000)
+
+    renderer = ManimScriptRenderer(cache_root=str(root), cache_budget_bytes=1)
+    # proj-inflight is mid-render: its dir is claimed but it is not the project
+    # the second, overlapping render is pruning for.
+    first_dir, _ = renderer._media_dir_for("proj-inflight")
+    renderer._media_dir_for("proj-second")
+
+    assert os.path.isdir(first_dir), "pruner deleted a running render's media_dir"
+    marks = os.path.join(first_dir, "cf_marks.jsonl")
+    with open(marks, "a", encoding="utf-8") as f:
+        f.write("{}\n")  # the write that used to raise FileNotFoundError
+
+    # Once the first render finishes and releases its claim, the dir becomes an
+    # ordinary eviction candidate again — the fix must not pin dirs forever.
+    renderer._release_media_dir(first_dir)
+    renderer._media_dir_for("proj-third")
+    assert not os.path.isdir(first_dir)
+
+
 def test_default_quality_is_1080p60(tmp_path, monkeypatch):
     """CR-004 FR12.1. 720p30 was hardcoded, which is below what a monetized
     channel should publish and throws away Manim's main strength — smooth

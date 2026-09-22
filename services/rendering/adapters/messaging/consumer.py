@@ -45,6 +45,8 @@ class AckableMessage(Protocol):
 
     async def ack(self) -> None: ...
 
+    async def reject(self, requeue: bool = False) -> None: ...
+
 
 class RenderScriptCommandHandler:
     def __init__(
@@ -74,23 +76,29 @@ class RenderScriptCommandHandler:
             return
 
         payload = envelope["payload"]
-        request = ScriptRenderRequest(
-            project_id=project_id,
-            script_content=payload["script_content"],
-            scene_class_name=payload["scene_class_name"],
-            narration_segments=[
-                NarrationSegment(
-                    scene_index=s["scene_index"],
-                    audio_path=s.get("audio_path"),
-                    duration_seconds=s["duration_seconds"],
-                )
-                for s in payload["scenes"]
-            ],
-            render_quality=payload.get("render_quality"),
-            engine=payload.get("engine", "manim"),
-        )
 
         try:
+            # Built inside the try so a malformed payload lands on the same
+            # failure path as a failed render. Outside it, the KeyError escaped
+            # `handle` entirely: aio-pika logged "Task exception was never
+            # retrieved" and the delivery was left neither acked nor nacked, so
+            # it held a prefetch slot until the connection dropped and the Saga
+            # waited forever for an event nobody would ever publish.
+            request = ScriptRenderRequest(
+                project_id=project_id,
+                script_content=payload["script_content"],
+                scene_class_name=payload["scene_class_name"],
+                narration_segments=[
+                    NarrationSegment(
+                        scene_index=s["scene_index"],
+                        audio_path=s.get("audio_path"),
+                        duration_seconds=s["duration_seconds"],
+                    )
+                    for s in payload["scenes"]
+                ],
+                render_quality=payload.get("render_quality"),
+                engine=payload.get("engine", "manim"),
+            )
             # The renderer's heartbeat fires on the render thread, but aio-pika
             # is only safe to touch from the event loop — hence the hop back.
             loop = asyncio.get_running_loop()
@@ -105,7 +113,7 @@ class RenderScriptCommandHandler:
 
             self._use_case.set_heartbeat(emit_heartbeat)
             result = await asyncio.to_thread(self._use_case.render, request)
-        except (ValueError, InvalidDurationError, AnimationEngineError) as exc:
+        except (ValueError, InvalidDurationError, AnimationEngineError, KeyError, TypeError) as exc:
             logger.warning("render_scenes failed for project_id=%s: %s", project_id, exc)
             event_type = "rendering_failed"
             final_envelope = rendering_failed_envelope(saga_id, project_id, str(exc))
@@ -163,19 +171,23 @@ class ValidateScriptCommandHandler:
             return
 
         payload = envelope["payload"]
-        request = ScriptRenderRequest(
-            project_id=project_id,
-            script_content=payload["script_content"],
-            scene_class_name=payload["scene_class_name"],
-            # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
-            narration_segments=[],
-            render_quality=payload.get("render_quality"),
-            engine=payload.get("engine", "manim"),
-        )
 
         try:
+            # Dựng request bên trong try: một payload thiếu field là script
+            # không kiểm tra được, tức là đúng nghĩa `validation_failed` — chứ
+            # không phải một KeyError bay khỏi `handle` và để lại message không
+            # ack cũng không nack (xem RenderScriptCommandHandler).
+            request = ScriptRenderRequest(
+                project_id=project_id,
+                script_content=payload["script_content"],
+                scene_class_name=payload["scene_class_name"],
+                # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
+                narration_segments=[],
+                render_quality=payload.get("render_quality"),
+                engine=payload.get("engine", "manim"),
+            )
             result = await asyncio.to_thread(self._use_case.validate, request)
-        except (ScriptValidationError, AnimationEngineError, ValueError) as exc:
+        except (ScriptValidationError, AnimationEngineError, ValueError, KeyError, TypeError) as exc:
             logger.warning("validate_script failed for project_id=%s: %s", project_id, exc)
             event_type = "validation_failed"
             final_envelope = validation_failed_envelope(saga_id, project_id, str(exc))
@@ -241,12 +253,14 @@ class RenderChannelAssetCommandHandler:
             return
 
         payload = envelope["payload"]
-        kind = payload["kind"]
+        kind = payload.get("kind")
         render_quality = payload.get("render_quality")
 
         try:
+            if not kind:
+                raise ValueError("payload thiếu 'kind'")
             result = await asyncio.to_thread(self._use_case.render, kind, render_quality)
-        except (ChannelAssetRenderError, AnimationEngineError, ValueError) as exc:
+        except (ChannelAssetRenderError, AnimationEngineError, ValueError, KeyError, TypeError) as exc:
             logger.warning("render_channel_asset failed for kind=%s: %s", kind, exc)
             event_type = "channel_asset_render_failed"
             final_envelope = channel_asset_render_failed_envelope(
@@ -297,8 +311,19 @@ class RenderingCommandDispatcher:
             self._handlers["render_channel_asset"] = render_channel_asset.handle
 
     async def handle(self, message: AckableMessage) -> None:
-        envelope = json.loads(message.body)
-        command = envelope.get("event_type")
+        try:
+            envelope = json.loads(message.body)
+            command = envelope.get("event_type")
+        except (ValueError, TypeError) as exc:
+            # Cùng lý lẽ với nhánh "lệnh không rõ" bên dưới: một envelope không
+            # parse được sẽ không parse được ở lần thử lại. Reject thay vì để
+            # exception bay ra khỏi `handle` — aio-pika chỉ log "Task exception
+            # was never retrieved" và message nằm lại mãi, không ack không nack,
+            # giữ suốt một suất prefetch.
+            logger.warning("Bỏ envelope không đọc được trên rendering.commands: %s", exc)
+            await message.reject(requeue=False)
+            return
+
         handler = self._handlers.get(command)
         if handler is None:
             # Ack chứ không nack: một lệnh không hiểu được sẽ không tự hiểu được
@@ -306,4 +331,12 @@ class RenderingCommandDispatcher:
             logger.warning("Bỏ qua lệnh không rõ %r cho rendering.commands", command)
             await message.ack()
             return
-        await handler(message)
+
+        try:
+            await handler(message)
+        except Exception:
+            # Lưới cuối. Handler đã tự lo payload sai (thành event *_failed),
+            # nên tới đây chỉ còn lỗi hạ tầng — nack để thử lại, và quan trọng
+            # nhất là message không bao giờ bị bỏ lửng ở trạng thái unacked.
+            logger.exception("Lệnh %r thất bại ngoài dự kiến, nack để thử lại", command)
+            await message.reject(requeue=True)

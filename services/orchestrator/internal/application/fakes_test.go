@@ -16,6 +16,8 @@ type fakeRepo struct {
 	steps       map[string]*domain.SagaStep // key: sagaID+"/"+stepName
 	calibration map[string]domain.VoiceCalibration
 	formats     map[string]domain.VideoFormat
+	// getStepErr, when set, makes every GetStep fail with it.
+	getStepErr error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -128,6 +130,11 @@ func (f *fakeRepo) UpdateStatus(_ context.Context, projectID string, status doma
 }
 
 func (f *fakeRepo) GetStep(_ context.Context, sagaID string, stepName domain.StepName) (*domain.SagaStep, error) {
+	// getStepErr stands in for an infrastructure failure (a dropped connection),
+	// as distinct from ErrSagaStepNotFound — the two must not be handled alike.
+	if f.getStepErr != nil {
+		return nil, f.getStepErr
+	}
 	s, ok := f.steps[stepKey(sagaID, stepName)]
 	if !ok {
 		return nil, domain.ErrSagaStepNotFound

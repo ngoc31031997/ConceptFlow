@@ -46,9 +46,13 @@ class FakeMessage:
     def __init__(self, body: bytes) -> None:
         self.body = body
         self.acked = False
+        self.rejected: bool | None = None
 
     async def ack(self) -> None:
         self.acked = True
+
+    async def reject(self, requeue: bool = False) -> None:
+        self.rejected = requeue
 
 
 def make_envelope(message_id: str = "msg-1", scenes: list | None = None) -> bytes:
@@ -136,3 +140,100 @@ async def test_skips_reprocessing_duplicate_message_id(shared_volume_root) -> No
 
     assert message.acked is True
     assert len(pool.store.outbox_events) == 0
+
+
+# --- Malformed payloads must never leave a delivery unacked -------------------
+#
+# Live incident: a render_scenes command arrived without "script_content". The
+# KeyError was raised while building ScriptRenderRequest, which sat OUTSIDE the
+# try block, so it escaped `handle` entirely. aio-pika could only log "Task
+# exception was never retrieved"; the delivery was neither acked nor nacked, so
+# it held a prefetch slot indefinitely and the Saga waited forever for an event
+# that would never be published. Four such messages accumulated.
+
+
+def _malformed_envelope(drop: str, message_id: str = "msg-bad") -> bytes:
+    envelope = json.loads(make_envelope(message_id=message_id))
+    del envelope["payload"][drop]
+    return json.dumps(envelope).encode("utf-8")
+
+
+@pytest.mark.asyncio
+async def test_render_missing_script_content_fails_the_saga_instead_of_leaking(
+    shared_volume_root,
+) -> None:
+    handler, pool = _build_handler(FakeManimScriptRenderer())
+    message = FakeMessage(_malformed_envelope("script_content"))
+
+    await handler.handle(message)
+
+    assert message.acked is True, "a malformed command must be acked, not left in limbo"
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "rendering_failed"
+
+
+@pytest.mark.asyncio
+async def test_render_malformed_scenes_fails_the_saga_instead_of_leaking(
+    shared_volume_root,
+) -> None:
+    # A scene entry missing "duration_seconds" raises inside the list
+    # comprehension — the same escape route as the missing top-level key.
+    envelope = json.loads(make_envelope())
+    envelope["payload"]["scenes"] = [{"scene_index": 0}]
+    handler, pool = _build_handler(FakeManimScriptRenderer())
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert message.acked is True
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "rendering_failed"
+
+
+@pytest.mark.asyncio
+async def test_validate_missing_script_content_enqueues_validation_failed(
+    shared_volume_root,
+) -> None:
+    from adapters.messaging.consumer import ValidateScriptCommandHandler
+    from application.validate_script import ValidateScriptUseCase
+
+    pool = FakePool()
+    handler = ValidateScriptCommandHandler(
+        ValidateScriptUseCase(FakeManimScriptRenderer()),
+        pool,
+        InboxRepository(pool),
+        OutboxRepository(),
+    )
+    message = FakeMessage(_malformed_envelope("script_content"))
+
+    await handler.handle(message)
+
+    assert message.acked is True
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "validation_failed"
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_rejects_undecodable_envelope(shared_volume_root) -> None:
+    from adapters.messaging.consumer import (
+        RenderingCommandDispatcher,
+        ValidateScriptCommandHandler,
+    )
+    from application.validate_script import ValidateScriptUseCase
+
+    handler, pool = _build_handler(FakeManimScriptRenderer())
+    validate = ValidateScriptCommandHandler(
+        ValidateScriptUseCase(FakeManimScriptRenderer()),
+        pool,
+        InboxRepository(pool),
+        OutboxRepository(),
+    )
+    dispatcher = RenderingCommandDispatcher(validate=validate, render=handler)
+    message = FakeMessage(b"{not json at all")
+
+    await dispatcher.handle(message)
+
+    # Rejected without requeue: a body that cannot be parsed now will not parse
+    # on redelivery either, so requeueing it only builds a loop.
+    assert message.rejected is False
+    assert message.acked is False
