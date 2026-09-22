@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 import os
 import subprocess
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
 
@@ -127,8 +128,13 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         self._tail_seconds = tail_seconds
         self._executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="ffmpeg-assembly")
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
-        future = self._executor.submit(self._run_pipeline, request, output_path)
+    def assemble(
+        self,
+        request: VideoAssemblyRequest,
+        output_path: str,
+        on_stage_done: Callable[[int, int], None] | None = None,
+    ) -> str | None:
+        future = self._executor.submit(self._run_pipeline, request, output_path, on_stage_done)
         try:
             return future.result(timeout=self._timeout_seconds)
         except FutureTimeoutError as exc:
@@ -139,7 +145,12 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             logger.exception("ffmpeg assembly failed")
             raise AssemblyEngineError(str(exc)) from exc
 
-    def _run_pipeline(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+    def _run_pipeline(
+        self,
+        request: VideoAssemblyRequest,
+        output_path: str,
+        on_stage_done: Callable[[int, int], None] | None = None,
+    ) -> str | None:
         segments = sorted(request.narration_segments, key=lambda s: s.start_time)
         n = len(segments)
 
@@ -293,8 +304,18 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         cmd += [main_target]
         self._run_ffmpeg(cmd)
 
+        # CR-029: report progress by completed unit of work, not by tick —
+        # each ffmpeg pass here can run for minutes, and with only one giant
+        # subprocess call, "which pass just finished" is the finest-grained
+        # signal available without parsing ffmpeg's own -progress stream.
+        total_stages = 2 if has_channel_assets else 1
+        if on_stage_done is not None:
+            on_stage_done(1, total_stages)
+
         if has_channel_assets:
             self._concat_channel_assets(request, main_target, output_path)
+            if on_stage_done is not None:
+                on_stage_done(2, total_stages)
 
         self._write_thumbnail_candidate(output_path, target_duration)
         return caption_path

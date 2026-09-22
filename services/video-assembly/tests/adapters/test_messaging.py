@@ -44,7 +44,7 @@ class FakeVideoAssembler(VideoAssemblerPort):
         self._fail_with = fail_with
         self._caption_path = caption_path
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str, on_stage_done=None) -> str | None:
         if self._fail_with is not None:
             raise self._fail_with
         _touch(output_path)
@@ -169,7 +169,7 @@ class RecordingVideoAssembler(VideoAssemblerPort):
     def __init__(self) -> None:
         self.last_request: VideoAssemblyRequest | None = None
 
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+    def assemble(self, request: VideoAssemblyRequest, output_path: str, on_stage_done=None) -> str | None:
         self.last_request = request
         _touch(output_path)
         return None
@@ -916,7 +916,7 @@ async def test_dispatcher_nacks_unexpected_handler_exception(shared_volume_root)
     from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
 
     class ExplodingAssembler(VideoAssemblerPort):
-        def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+        def assemble(self, request: VideoAssemblyRequest, output_path: str, on_stage_done=None) -> str | None:
             raise RuntimeError("infra blew up")
 
     handler, _ = _build_handler(ExplodingAssembler())

@@ -8,6 +8,7 @@ touching business logic.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 
 from domain.models import VideoAssemblyRequest
 
@@ -18,9 +19,19 @@ class VideoAssemblerPort(ABC):
     and writes the result to output_path."""
 
     @abstractmethod
-    def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+    def assemble(
+        self,
+        request: VideoAssemblyRequest,
+        output_path: str,
+        on_stage_done: Callable[[int, int], None] | None = None,
+    ) -> str | None:
         """Assembles request.video_path + request.audio_segments (+
         optional background music) into a single video file at output_path.
+
+        on_stage_done(stage_index, stage_total), when given, is called once
+        per completed unit of assembly work (CR-029 progress reporting) —
+        never on a timer, so a caller can turn it into a UI ping without that
+        ping ever being able to lag or race actual progress.
 
         Returns the path to a .srt caption-track file when request.subtitle_mode
         produced one (CR-015 FR38.4) — "track" or "both" with cues present —

@@ -7,6 +7,8 @@ Question 10), so this one use case is the whole application layer.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from adapters.storage.artifact_paths import (
     caption_output_path,
     ensure_parent_dir,
@@ -27,7 +29,11 @@ class AssembleVideoUseCase:
     def __init__(self, assembler: VideoAssemblerPort) -> None:
         self._assembler = assembler
 
-    def assemble(self, request: VideoAssemblyRequest) -> VideoAssemblyResult:
+    def assemble(
+        self,
+        request: VideoAssemblyRequest,
+        on_stage_done: Callable[[int, int], None] | None = None,
+    ) -> VideoAssemblyResult:
         output_path = video_output_path(request.project_id)
         caption_path = caption_output_path(request.project_id)
 
@@ -43,7 +49,7 @@ class AssembleVideoUseCase:
         self._validate(request)
 
         ensure_parent_dir(output_path)
-        produced_caption_path = self._assembler.assemble(request, output_path)
+        produced_caption_path = self._assembler.assemble(request, output_path, on_stage_done=on_stage_done)
         return VideoAssemblyResult(video_path=output_path, caption_path=produced_caption_path)
 
     @staticmethod
