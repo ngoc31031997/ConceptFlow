@@ -127,13 +127,17 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@rendering-db:5432/rendering
-      RENDER_TIMEOUT_SECONDS: "1800"
+      # Defaults below match the original dev machine; override per-host via
+      # .env (e.g. .env.window for a weaker CPU where quality still matters
+      # more than wall-clock time — see docs/setup/ or ask before lowering
+      # RENDER_QUALITY, that's a deliberate per-host quality/time trade-off).
+      RENDER_TIMEOUT_SECONDS: "${RENDER_TIMEOUT_SECONDS:-1800}"
       # The validate_script dry pass executes every animation, so a heavy
       # script costs the same order of magnitude as the -ql render it gates.
       # At the old fixed 300s such a script failed here with nothing but a
       # timeout to show for it.
-      DRY_RUN_TIMEOUT_SECONDS: "2000"
-      RENDER_MEMORY_LIMIT_GB: "4"
+      DRY_RUN_TIMEOUT_SECONDS: "${DRY_RUN_TIMEOUT_SECONDS:-2000}"
+      RENDER_MEMORY_LIMIT_GB: "${RENDER_MEMORY_LIMIT_GB:-4}"
       # Manim 0.18 keeps its cache inside media_dir, so this directory is
       # reused per project rather than being a throwaway tempdir. Set it to an
       # empty string to disable caching. Measured 21s -> 4s on an unchanged
@@ -142,7 +146,7 @@ services:
       # Fallback quality when a project does not specify one (CR-004). The
       # Creator picks per project in the GUI; this covers projects created
       # before that field existed.
-      RENDER_QUALITY: "1080p60"
+      RENDER_QUALITY: "${RENDER_QUALITY:-1080p60}"
       # Where conceptflow.channel_idents finds the logo for the intro/outro
       # stings (CR-023). Mounted rather than COPYed: the build context is
       # ./services/rendering, so docs/brand/ cannot enter the image without
@@ -151,12 +155,13 @@ services:
     # Manim renders on every core it can get (Phase 0 measured CPU-time at
     # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
     # the Postgres instances on the same host. 5G sits just above the 4 GiB
-    # RLIMIT_AS the render subprocess is given.
+    # RLIMIT_AS the render subprocess is given. Override per-host via .env —
+    # e.g. a 4-thread CPU gets no benefit from cpus > 4.
     deploy:
       resources:
         limits:
-          cpus: "6.0"
-          memory: 5G
+          cpus: "${RENDER_CPU_LIMIT:-6.0}"
+          memory: ${RENDER_MEMORY_LIMIT:-5G}
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s
@@ -196,7 +201,9 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@video-assembly-db:5432/video_assembly
-      ASSEMBLY_TIMEOUT_SECONDS: "900"
+      # Override per-host via .env (e.g. .env.window) — a weaker CPU needs a
+      # longer ceiling, not a lower crf/preset (those stay quality-first).
+      ASSEMBLY_TIMEOUT_SECONDS: "${ASSEMBLY_TIMEOUT_SECONDS:-900}"
       # CR-005 FR14.5 — silence before the first line and after the last.
       # Off by default: padding either end forces a full re-encode (tpad
       # repaints frames), and Phase 0 measured stream copy at 250x faster.
@@ -223,8 +230,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: "6.0"
-          memory: 3G
+          cpus: "${ASSEMBLY_CPU_LIMIT:-6.0}"
+          memory: ${ASSEMBLY_MEMORY_LIMIT:-3G}
     healthcheck:
       test: ["CMD", "test", "-f", "/tmp/ready"]
       interval: 10s
