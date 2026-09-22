@@ -155,6 +155,8 @@ class AckableMessage(Protocol):
 
     async def ack(self) -> None: ...
 
+    async def reject(self, requeue: bool = False) -> None: ...
+
 
 class AssembleVideoCommandHandler:
     def __init__(
@@ -215,28 +217,35 @@ class AssembleVideoCommandHandler:
         )
         outro_video_path, _ = await self._resolve_channel_asset(payload.get("outro_asset_id"))
 
-        request = VideoAssemblyRequest(
-            project_id=project_id,
-            video_path=payload["video_path"],
-            narration_segments=_parse_narration_segments(payload),
-            video_duration_seconds=float(payload.get("video_duration_seconds") or 0.0),
-            background_music_path=payload.get("background_music_path"),
-            background_music_volume=float(payload.get("background_music_volume") or 0.2),
-            subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
-            subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
-            # Default matches VideoAssemblyRequest's own default: a command
-            # already in the queue when CR-015 ships carries no subtitle_mode
-            # at all, and must keep producing exactly what it produced before
-            # (burn-in), not silently switch to a caption track.
-            subtitle_mode=payload.get("subtitle_mode") or "burn_in",
-            intro_video_path=intro_video_path,
-            intro_duration_seconds=intro_duration_seconds,
-            outro_video_path=outro_video_path,
-        )
-
         try:
+            # Built inside the try so a malformed payload (e.g. missing
+            # video_path) lands on the same assembly_failed path as a failed
+            # assemble — same reasoning as rendering's consumer.py fix
+            # (bee76b1): outside the try, the KeyError escapes `handle`
+            # entirely, aio-pika only logs "Task exception was never
+            # retrieved", and the delivery is left neither acked nor nacked,
+            # holding a prefetch slot forever while the Saga waits on an event
+            # nobody will ever publish.
+            request = VideoAssemblyRequest(
+                project_id=project_id,
+                video_path=payload["video_path"],
+                narration_segments=_parse_narration_segments(payload),
+                video_duration_seconds=float(payload.get("video_duration_seconds") or 0.0),
+                background_music_path=payload.get("background_music_path"),
+                background_music_volume=float(payload.get("background_music_volume") or 0.2),
+                subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
+                subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
+                # Default matches VideoAssemblyRequest's own default: a command
+                # already in the queue when CR-015 ships carries no subtitle_mode
+                # at all, and must keep producing exactly what it produced before
+                # (burn-in), not silently switch to a caption track.
+                subtitle_mode=payload.get("subtitle_mode") or "burn_in",
+                intro_video_path=intro_video_path,
+                intro_duration_seconds=intro_duration_seconds,
+                outro_video_path=outro_video_path,
+            )
             result = await asyncio.to_thread(self._use_case.assemble, request)
-        except (MissingArtifactError, AssemblyEngineError) as exc:
+        except (MissingArtifactError, AssemblyEngineError, KeyError, TypeError, ValueError) as exc:
             logger.warning("assemble_video failed for project_id=%s: %s", project_id, exc)
             event_type = "assembly_failed"
             out_envelope = assembly_failed_envelope(saga_id, project_id, str(exc))
@@ -303,13 +312,29 @@ class ChannelAssetRenderedEventHandler:
             await message.ack()
             return
 
-        kind = payload["kind"]
-        video_path = payload["video_path"]
-        duration_seconds = float(payload.get("video_duration_seconds") or 0.0)
-        # Rendering names the quality it actually rendered at (FR65.5) — an
-        # intro rendered at 1080p60 cannot be concatenated onto a 4k60 body,
-        # so it is registered for that one quality and no other.
-        render_quality = payload["render_quality"]
+        try:
+            kind = payload["kind"]
+            video_path = payload["video_path"]
+            duration_seconds = float(payload.get("video_duration_seconds") or 0.0)
+            # Rendering names the quality it actually rendered at (FR65.5) — an
+            # intro rendered at 1080p60 cannot be concatenated onto a 4k60 body,
+            # so it is registered for that one quality and no other.
+            render_quality = payload["render_quality"]
+        except (KeyError, TypeError, ValueError) as exc:
+            # Malformed rendering event: no *_failed counterpart exists for
+            # this internal projection, and it will not parse any better on
+            # redelivery — mark processed and ack rather than leak the
+            # delivery unacked (same reasoning as consumer.py's dispatcher
+            # rejecting an undecodable envelope).
+            logger.warning(
+                "channel_asset_rendered event malformed, dropping message_id=%s: %s",
+                message_id,
+                exc,
+            )
+            async with self._pool.acquire() as conn, conn.transaction():
+                await self._inbox.mark_processed(conn, message_id)
+            await message.ack()
+            return
         # No real source_hash travels on this event (rendering doesn't
         # compute one for its own Manim output) — this is descriptive only,
         # not used for de-duplication here. FR65.6's cache check applies to
@@ -382,12 +407,27 @@ class NormalizeChannelAssetCommandHandler:
             return
 
         payload = envelope["payload"]
-        kind = payload["kind"]
-        file_path = payload["file_path"]
-        source_hash = payload["source_hash"]
-        render_quality = payload["render_quality"]
-        # Commands published before asset_role existed carry only video.
-        asset_role = payload.get("asset_role") or ASSET_ROLE_VIDEO
+        try:
+            kind = payload["kind"]
+            file_path = payload["file_path"]
+            source_hash = payload["source_hash"]
+            render_quality = payload["render_quality"]
+            # Commands published before asset_role existed carry only video.
+            asset_role = payload.get("asset_role") or ASSET_ROLE_VIDEO
+        except (KeyError, TypeError) as exc:
+            # No failure event exists for this command (D8 leaves it to the
+            # Creator to retry the upload, same as the AssemblyEngineError
+            # branch below) — mark processed so a malformed payload is not
+            # left unacked nor retried forever.
+            logger.warning(
+                "normalize_channel_asset payload malformed, dropping message_id=%s: %s",
+                message_id,
+                exc,
+            )
+            async with self._pool.acquire() as conn, conn.transaction():
+                await self._inbox.mark_processed(conn, message_id)
+            await message.ack()
+            return
 
         async with self._pool.acquire() as conn:
             active = await self._channel_assets.get_active(conn, kind, render_quality)
@@ -785,7 +825,18 @@ class GenerateClipsCommandHandler:
             return
 
         payload = envelope["payload"]
-        clips = await asyncio.to_thread(self._generate_all, project_id, payload)
+        try:
+            clips = await asyncio.to_thread(self._generate_all, project_id, payload)
+        except (KeyError, TypeError, ValueError) as exc:
+            # A malformed top-level field (e.g. missing video_path) affects
+            # every request/preset pair at once, unlike a single clip's own
+            # ffmpeg failure (see class docstring) — publish an empty
+            # clips_generated rather than let the exception escape `handle`
+            # and leave the delivery unacked.
+            logger.warning(
+                "generate_clips payload malformed for project_id=%s: %s", project_id, exc
+            )
+            clips = []
 
         out_envelope = clips_generated_envelope(saga_id, project_id, clips)
 
@@ -865,7 +916,19 @@ class VideoAssemblyCommandDispatcher:
             self._handlers["generate_clips"] = generate_clips.handle
 
     async def handle(self, message: AckableMessage) -> None:
-        envelope = json.loads(message.body)
+        try:
+            envelope = json.loads(message.body)
+        except (ValueError, TypeError) as exc:
+            # Same reasoning as the "unrecognized command" branch below: an
+            # envelope that fails to parse now will fail to parse on
+            # redelivery too. Reject instead of letting the exception escape
+            # `handle` — aio-pika only logs "Task exception was never
+            # retrieved" and the delivery sits unacked forever, holding a
+            # prefetch slot (see rendering's consumer.py, bee76b1).
+            logger.warning("Bỏ envelope không đọc được trên video_assembly.commands: %s", exc)
+            await message.reject(requeue=False)
+            return
+
         # The dispatch key is the envelope's own top-level event_type
         # (domain.Envelope's `EventType` field on the orchestrator side —
         # ports.go — set to string(domain.StepAssembleVideo) == "assemble_video"
@@ -881,4 +944,13 @@ class VideoAssemblyCommandDispatcher:
             logger.warning("Unrecognized command %r on video_assembly.commands, ignoring", command)
             await message.ack()
             return
-        await handler(message)
+
+        try:
+            await handler(message)
+        except Exception:
+            # Last resort. Each handler already turns a malformed payload
+            # into its own *_failed event (or acks it, where none exists) —
+            # anything reaching here is infra-level, so nack to retry. This
+            # is what keeps a delivery from ever being left unacked.
+            logger.exception("Lệnh %r thất bại ngoài dự kiến, nack để thử lại", command)
+            await message.reject(requeue=True)

@@ -57,9 +57,13 @@ class FakeMessage:
     def __init__(self, body: bytes) -> None:
         self.body = body
         self.acked = False
+        self.rejected: bool | None = None
 
     async def ack(self) -> None:
         self.acked = True
+
+    async def reject(self, requeue: bool = False) -> None:
+        self.rejected = requeue
 
 
 def make_envelope(message_id: str = "msg-1", shared_volume_root=None) -> bytes:
@@ -834,3 +838,97 @@ async def test_qc_video_reports_real_severity_regardless_of_enforcement(
     overflow = [f for f in findings if f["rule"] == "frame_overflow"]
     assert overflow and overflow[0]["severity"] == "blocking"
     assert {f["severity"] for f in findings} <= {"blocking", "warning"}
+
+
+# --- Malformed payloads must never leave a delivery unacked -------------------
+#
+# Same class of bug as rendering's consumer.py (bee76b1): building a domain
+# request straight from payload[...] outside a try block lets a KeyError
+# escape `handle` entirely. aio-pika only logs "Task exception was never
+# retrieved" and the delivery sits neither acked nor nacked, holding a
+# prefetch slot forever while the Saga waits on an event nobody will publish.
+
+
+@pytest.mark.asyncio
+async def test_assemble_video_missing_video_path_fails_the_saga_instead_of_leaking(
+    shared_volume_root,
+) -> None:
+    handler, pool = _build_handler(FakeVideoAssembler())
+    envelope = json.loads(make_envelope(shared_volume_root=shared_volume_root))
+    del envelope["payload"]["video_path"]
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert message.acked is True, "a malformed command must be acked, not left in limbo"
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "assembly_failed"
+
+
+@pytest.mark.asyncio
+async def test_channel_asset_rendered_missing_kind_is_dropped_not_leaked() -> None:
+    handler, pool = _build_rendered_handler()
+    envelope = json.loads(make_channel_asset_rendered_envelope())
+    del envelope["payload"]["kind"]
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert message.acked is True
+    assert len(pool.store.channel_assets) == 0
+    assert len(pool.store.outbox_events) == 0
+
+
+@pytest.mark.asyncio
+async def test_normalize_channel_asset_missing_file_path_is_dropped_not_leaked() -> None:
+    handler, pool = _build_normalize_handler()
+    envelope = json.loads(make_normalize_envelope())
+    del envelope["payload"]["file_path"]
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert message.acked is True
+    assert len(pool.store.channel_assets) == 0
+
+
+# --- VideoAssemblyCommandDispatcher: same safety nets as rendering's --------
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_rejects_undecodable_envelope() -> None:
+    from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
+
+    handler, _ = _build_handler(FakeVideoAssembler())
+    dispatcher = VideoAssemblyCommandDispatcher(assemble_video=handler)
+    message = FakeMessage(b"{not json at all")
+
+    await dispatcher.handle(message)
+
+    # Rejected without requeue: a body that cannot be parsed now will not
+    # parse on redelivery either, so requeueing it only builds a loop.
+    assert message.rejected is False
+    assert message.acked is False
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_nacks_unexpected_handler_exception(shared_volume_root) -> None:
+    from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
+
+    class ExplodingAssembler(VideoAssemblerPort):
+        def assemble(self, request: VideoAssemblyRequest, output_path: str) -> str | None:
+            raise RuntimeError("infra blew up")
+
+    handler, _ = _build_handler(ExplodingAssembler())
+    dispatcher = VideoAssemblyCommandDispatcher(assemble_video=handler)
+    envelope = json.loads(make_envelope(shared_volume_root=shared_volume_root))
+    envelope["event_type"] = "assemble_video"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await dispatcher.handle(message)
+
+    # RuntimeError is not one of the handler's own except clauses, so it
+    # escapes `handle` — the dispatcher's last-resort catch must nack it for
+    # retry rather than leave it unacked.
+    assert message.rejected is True
+    assert message.acked is False

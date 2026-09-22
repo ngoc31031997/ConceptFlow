@@ -283,6 +283,26 @@ async def test_short_preset_error_does_not_block_long_preset(no_real_ffmpeg, tmp
 
 
 @pytest.mark.asyncio
+async def test_generate_clips_missing_video_path_acks_with_empty_clips(
+    no_real_ffmpeg, tmp_path, monkeypatch
+) -> None:
+    """A malformed top-level payload (missing video_path) affects every
+    request/preset pair at once — same class of bug as rendering's
+    consumer.py (bee76b1): must not escape `handle` and leave the delivery
+    unacked."""
+    handler, pool = _build_handler(tmp_path, monkeypatch)
+    envelope = json.loads(make_generate_clips_envelope())
+    del envelope["payload"]["video_path"]
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await handler.handle(message)
+
+    assert message.acked is True
+    payload = _clips_generated_payload(pool)
+    assert payload["clips"] == []
+
+
+@pytest.mark.asyncio
 async def test_generate_clips_is_idempotent_on_message_id(no_real_ffmpeg, tmp_path, monkeypatch) -> None:
     handler, pool = _build_handler(tmp_path, monkeypatch)
     body = make_generate_clips_envelope()
