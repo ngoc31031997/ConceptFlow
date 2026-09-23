@@ -19,13 +19,6 @@ type SimilarProject struct {
 	CreatedAt time.Time
 }
 
-// AuthoringHistoryEntry is one past version of an authoring field (CR-028
-// FR84.3), newest first.
-type AuthoringHistoryEntry struct {
-	Content string
-	SavedAt time.Time
-}
-
 // ProjectDraftPort is the persistence capability CR-028's early-draft use
 // cases need. Save reuses domain.ProjectRepositoryPort's existing upsert
 // (INSERT ... ON CONFLICT DO UPDATE) — the same Save call StartRenderSaga
@@ -206,37 +199,4 @@ func (uc *UpdateProjectTopicUseCase) Execute(ctx context.Context, input UpdatePr
 		return nil, err
 	}
 	return &UpdateProjectTopicOutput{SimilarProjects: similar}, nil
-}
-
-// AuthoringHistoryPort is the read capability behind GET
-// /v1/projects/{id}/authoring/history (CR-028 FR84.3).
-type AuthoringHistoryPort interface {
-	ListAuthoringHistory(ctx context.Context, projectID, fieldName string) ([]AuthoringHistoryEntry, error)
-}
-
-// ListAuthoringHistoryUseCase returns every saved version of one authoring
-// field, newest first. Read-only — no restore in this CR (P2 decision).
-type ListAuthoringHistoryUseCase struct {
-	history AuthoringHistoryPort
-}
-
-func NewListAuthoringHistoryUseCase(history AuthoringHistoryPort) *ListAuthoringHistoryUseCase {
-	return &ListAuthoringHistoryUseCase{history: history}
-}
-
-var validAuthoringFields = map[string]bool{
-	"story_content":      true,
-	"storyboard_content": true,
-	"code_content":       true,
-	"review_content":     true,
-}
-
-func (uc *ListAuthoringHistoryUseCase) Execute(ctx context.Context, projectID, fieldName string) ([]AuthoringHistoryEntry, error) {
-	if projectID == "" {
-		return nil, fmt.Errorf("project_id is required")
-	}
-	if !validAuthoringFields[fieldName] {
-		return nil, fmt.Errorf("field must be one of story_content, storyboard_content, code_content, review_content")
-	}
-	return uc.history.ListAuthoringHistory(ctx, projectID, fieldName)
 }

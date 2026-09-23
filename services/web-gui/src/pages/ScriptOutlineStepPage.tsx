@@ -171,7 +171,23 @@ export function ScriptOutlineStepPage() {
       // CR-027 D0 — chủ đề đi kèm dàn ý trong cùng một lượt lưu. Trước đây
       // nó chỉ sống trong localStorage của trình duyệt, nên server không có
       // gì để điền vào {{topic}} lúc tự render prompt (FR77).
+      // Đổi dàn ý thì storyboard và code dựng từ bản cũ bị xoá ở server: hỏi
+      // trước, rồi đọc lại để bản nháp không giữ thứ đã mất.
+      const saved = await getAuthoringState(draft.projectId).catch(() => null);
+      const changed = saved !== null && saved.story !== "" && saved.story !== draft.authoringStory;
+      if (changed && (saved.storyboard || saved.code)) {
+        const ok = window.confirm(
+          "Dàn ý đã đổi. Storyboard (1b) và code (1c) dựng từ dàn ý cũ sẽ bị xoá để làm lại. Tiếp tục?",
+        );
+        if (!ok) return;
+      }
       await saveAuthoringStory(draft.projectId, draft.authoringStory, draft.authoringTopic.trim());
+      if (changed) {
+        dispatch({
+          type: "SYNC_AUTHORING",
+          payload: { story: draft.authoringStory, storyboard: "", code: "" },
+        });
+      }
       navigate("/create/script/storyboard");
     } catch {
       setSaveError("Không lưu được dàn ý, thử lại.");

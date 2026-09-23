@@ -34,6 +34,10 @@ type GenerateAuthoringUseCase struct {
 	story      authoringStorySaver
 	storyboard authoringContentSaver
 	code       authoringContentSaver
+	// clearer drops the steps built on this one when its run fails, so a stale
+	// storyboard/code is not left standing on an outline that never landed.
+	// Optional: nil leaves downstream output alone.
+	clearer AuthoringClearerPort
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
@@ -102,6 +106,30 @@ func NewGenerateAuthoringUseCase(
 		maxInputChars: maxInputChars, maxOutputTokens: maxOutputTokens,
 		running: map[string]bool{},
 	}
+}
+
+// WithClearer enables clearing downstream steps when a run fails.
+func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *GenerateAuthoringUseCase {
+	uc.clearer = clearer
+	return uc
+}
+
+// clearDownstream is best-effort: the run's own error is what the Creator
+// needs to see, and a failed cleanup must not replace it.
+func (uc *GenerateAuthoringUseCase) clearDownstream(ctx context.Context, project *domain.Project, step string) {
+	if uc.clearer == nil || project.Status != domain.StatusDraft {
+		return
+	}
+	var steps []AuthoringStep
+	switch step {
+	case "story":
+		steps = []AuthoringStep{AuthoringStepStoryboard, AuthoringStepCode}
+	case "storyboard":
+		steps = []AuthoringStep{AuthoringStepCode}
+	default:
+		return
+	}
+	_ = uc.clearer.ClearAuthoringSteps(ctx, project.ProjectID, steps...)
 }
 
 // GeneratedStep is what one run produced, plus what it cost. The content is
@@ -211,11 +239,13 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		uc.provider.Name(), string(role), step, projectID, result.Usage, started, chatErr,
 	))
 	if chatErr != nil {
+		uc.clearDownstream(ctx, project, step)
 		return GeneratedStep{}, chatErr
 	}
 
 	content := strings.TrimSpace(result.Content)
 	if content == "" {
+		uc.clearDownstream(ctx, project, step)
 		return GeneratedStep{}, &LLMError{
 			Kind: ErrKindEmpty, Provider: uc.provider.Name(),
 			Usage: result.Usage, Err: errors.New("provider returned no content"),

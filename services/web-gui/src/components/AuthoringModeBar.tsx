@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useContext, useState } from "react";
 import { Button } from "./ui";
-import { generateAuthoringStep, type AuthoringStep, type LlmStatus } from "../api/client";
+import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
+import { generateAuthoringStep, getAuthoringState, type AuthoringStep, type LlmStatus } from "../api/client";
 import type { AuthoringMode } from "../context/ProjectDraftContext";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import glass from "../styles/glass.module.css";
@@ -107,6 +108,21 @@ export function AuthoringModeBar({
   // chạy dở ở tab khác thay vì tưởng mình rảnh và cho bấm chạy chồng lên.
   const run = useAuthoringRun();
   const dispatchRun = useAuthoringRunDispatch();
+  const dispatchDraft = useContext(ProjectDraftDispatchContext);
+
+  // Một lượt chạy ghi đè bước của nó và xoá các bước dựng trên nó (cả khi hỏng),
+  // nên đọc lại cả ba từ server thay vì để bản nháp ở client lệch đi.
+  async function syncFromServer() {
+    try {
+      const state = await getAuthoringState(projectId);
+      dispatchDraft({
+        type: "SYNC_AUTHORING",
+        payload: { story: state.story, storyboard: state.storyboard, code: state.code },
+      });
+    } catch {
+      /* best-effort — lần mở lại sau vẫn đọc từ server */
+    }
+  }
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -140,6 +156,7 @@ export function AuthoringModeBar({
         at = step;
         dispatchRun({ type: "PROGRESS", index: i });
         const result = await generateAuthoringStep(projectId, step);
+        await syncFromServer();
         onGenerated?.(step, result.content);
         if (result.save_error) {
           // Nội dung sinh ra được nhưng không lưu được: bước sau sẽ render
@@ -150,6 +167,7 @@ export function AuthoringModeBar({
         }
       }
     } catch (err) {
+      await syncFromServer();
       const where = at && isChain ? ` (dừng ở ${STEP_LABELS[at]})` : "";
       setError(
         (err instanceof Error

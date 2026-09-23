@@ -95,7 +95,20 @@ export function VisualDirectorStepPage() {
     setSaving(true);
     setSaveError(null);
     try {
+      // Đổi storyboard thì code dựng từ bản cũ bị xoá ở server: hỏi trước.
+      const saved = await getAuthoringState(draft.projectId).catch(() => null);
+      const changed = saved !== null && saved.storyboard !== "" && saved.storyboard !== draft.authoringStoryboard;
+      if (changed && saved.code) {
+        const ok = window.confirm("Storyboard đã đổi. Code (1c) dựng từ storyboard cũ sẽ bị xoá để làm lại. Tiếp tục?");
+        if (!ok) return;
+      }
       await saveAuthoringStoryboard(draft.projectId, draft.authoringStoryboard);
+      if (changed) {
+        dispatch({
+          type: "SYNC_AUTHORING",
+          payload: { story: draft.authoringStory, storyboard: draft.authoringStoryboard, code: "" },
+        });
+      }
       navigate("/create/script/code");
     } catch {
       setSaveError("Không lưu được storyboard, thử lại.");

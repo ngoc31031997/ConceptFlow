@@ -139,12 +139,6 @@ type updateProjectTopicUseCase interface {
 	Execute(ctx context.Context, input application.UpdateProjectTopicInput) (*application.UpdateProjectTopicOutput, error)
 }
 
-// listAuthoringHistoryUseCase backs CR-028 FR84.3's GET
-// /v1/projects/{id}/authoring/history.
-type listAuthoringHistoryUseCase interface {
-	Execute(ctx context.Context, projectID, fieldName string) ([]application.AuthoringHistoryEntry, error)
-}
-
 // saveWizardSettingsUseCase backs PUT /v1/projects/{id}/settings (wizard step 2).
 type saveWizardSettingsUseCase interface {
 	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
@@ -198,7 +192,6 @@ type Router struct {
 	getAuthoringState       getAuthoringStateUseCase
 	createProjectDraft      createProjectDraftUseCase
 	updateProjectTopic      updateProjectTopicUseCase
-	listAuthoringHistory    listAuthoringHistoryUseCase
 }
 
 // WithPromptTemplates attaches CR-025's prompt-template use case, enabling
@@ -273,12 +266,10 @@ func (rt *Router) WithAuthoringState(getAuthoringState getAuthoringStateUseCase)
 }
 
 // WithProjectDrafts attaches CR-028's early-draft use cases, enabling
-// POST /v1/projects, PATCH /v1/projects/{project_id}/topic, and GET
-// /v1/projects/{project_id}/authoring/history.
-func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase, updateProjectTopic updateProjectTopicUseCase, listAuthoringHistory listAuthoringHistoryUseCase) *Router {
+// POST /v1/projects and PATCH /v1/projects/{project_id}/topic.
+func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase, updateProjectTopic updateProjectTopicUseCase) *Router {
 	rt.createProjectDraft = createProjectDraft
 	rt.updateProjectTopic = updateProjectTopic
-	rt.listAuthoringHistory = listAuthoringHistory
 	return rt
 }
 
@@ -321,7 +312,6 @@ func (rt *Router) Handler() http.Handler {
 	// CR-028 FR83/FR84/FR85: the project row now exists from wizard step 1.
 	r.Post("/v1/projects", rt.handleCreateProjectDraft)
 	r.Patch("/v1/projects/{project_id}/topic", rt.handleUpdateProjectTopic)
-	r.Get("/v1/projects/{project_id}/authoring/history", rt.handleListAuthoringHistory)
 	r.Get("/v1/voice-calibration", rt.handleVoiceCalibration)
 	r.Get("/v1/formats", rt.handleListFormats)
 	r.Post("/v1/formats", rt.handleSaveFormat)
@@ -565,24 +555,6 @@ func (rt *Router) handleUpdateProjectTopic(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, updateProjectTopicResponse{SimilarProjects: toSimilarProjectsResponse(out.SimilarProjects)})
-}
-
-// handleListAuthoringHistory backs CR-028 FR84.3 — GET
-// /v1/projects/{project_id}/authoring/history?field=story_content.
-// Read-only; restoring an old version is not part of this CR.
-func (rt *Router) handleListAuthoringHistory(w http.ResponseWriter, r *http.Request) {
-	if rt.listAuthoringHistory == nil {
-		writeError(w, http.StatusNotFound, "authoring history is not enabled")
-		return
-	}
-	projectID := chi.URLParam(r, "project_id")
-	field := r.URL.Query().Get("field")
-	entries, err := rt.listAuthoringHistory.Execute(r.Context(), projectID, field)
-	if err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, toAuthoringHistoryResponse(entries))
 }
 
 func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {

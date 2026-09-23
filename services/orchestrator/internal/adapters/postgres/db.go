@@ -381,22 +381,10 @@ BEGIN
     END IF;
 END $$;
 
--- CR-028 FR84.3: append-only history of every authoring field overwrite, so
--- a Creator who ghi đè nhầm một bước (outline/storyboard/code/review) can
--- look back at an earlier draft of that same field. Write-only from this
--- CR's use cases; no restore endpoint yet (P2, FR84.3 decision) — this
--- table exists so that endpoint has data to read when it is built, without
--- a backfill.
-CREATE TABLE IF NOT EXISTS project_authoring_history (
-    id BIGSERIAL PRIMARY KEY,
-    project_id TEXT NOT NULL REFERENCES projects (project_id) ON DELETE CASCADE,
-    field_name TEXT NOT NULL,
-    content TEXT NOT NULL,
-    saved_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE INDEX IF NOT EXISTS project_authoring_history_lookup_idx
-    ON project_authoring_history (project_id, field_name, saved_at DESC);
+-- The append-only project_authoring_history table (CR-028 FR84.3) was never
+-- read by anything; authoring saves now just overwrite, and clear the steps
+-- built on the one that changed.
+DROP TABLE IF EXISTS project_authoring_history;
 
 -- CR-027 D9/FR82: one row per LLM call, so the Creator can see spend in the
 -- web GUI instead of on a provider dashboard. This is the first paid service

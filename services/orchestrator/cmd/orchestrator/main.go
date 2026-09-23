@@ -161,10 +161,10 @@ func main() {
 	// CR-025: prompt-template CRUD (admin editor + web-gui runtime read) and
 	// step 1's story-save endpoint.
 	promptTemplates := application.NewPromptTemplatesUseCase(promptTemplateRepo)
-	// CR-028 FR84.2/FR84.3: every authoring save shares the same lock check
-	// (project must still be status=draft) and the same history write
-	// (project_authoring_history) — both live on promptTemplateRepo, right
-	// alongside the project_authoring table itself.
+	// CR-028 FR84.2: every authoring save shares the same lock check (project
+	// must still be status=draft), and clears the steps built on the one it
+	// overwrote — both live on promptTemplateRepo, right alongside the
+	// project_authoring table itself.
 	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
 	// CR-025 step 2: Visual Director's storyboard save, and the shared
 	// read-side use case both steps' rehydration relies on.
@@ -186,7 +186,6 @@ func main() {
 	draftPort := projectDraftAdapter{projects: projectRepo, authoring: promptTemplateRepo}
 	createProjectDraft := application.NewCreateProjectDraftUseCase(draftPort)
 	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
-	listAuthoringHistory := application.NewListAuthoringHistoryUseCase(promptTemplateRepo)
 	// Wizard steps 1-2: "Tiếp tục" stores the step's data and how far the
 	// Creator got, so a reload or another browser resumes in place.
 	wizardPort := wizardAdapter{projects: projectRepo, authoring: promptTemplateRepo}
@@ -209,7 +208,7 @@ func main() {
 			promptTemplateRepo,
 			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-		)
+		).WithClearer(promptTemplateRepo)
 	}
 
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
@@ -224,7 +223,7 @@ func main() {
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
-		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory).
+		WithProjectDrafts(createProjectDraft, updateProjectTopic).
 		WithWizard(saveWizardSettings)
 	if generateAuthoring != nil {
 		router = router.WithGenerateAuthoring(generateAuthoring)

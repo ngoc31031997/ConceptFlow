@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { getAuthoringState, getProject } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
@@ -62,6 +62,9 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
 export function ResumeProjectPage() {
   const { id = "" } = useParams();
   const navigate = useNavigate();
+  // ?edit=1: "Quay lại sửa script" từ màn lỗi — project chưa render gì nên vẫn
+  // mở lại được để sửa, không đẩy về màn theo dõi của trạng thái lỗi.
+  const editAfterFailure = useSearchParams()[0].get("edit") === "1";
   const dispatch = useContext(ProjectDraftDispatchContext);
   const [error, setError] = useState<string | null>(null);
 
@@ -71,7 +74,7 @@ export function ResumeProjectPage() {
       try {
         const project = await getProject(id);
         if (cancelled) return;
-        if (project.status !== "draft") {
+        if (project.status !== "draft" && !editAfterFailure) {
           // projectPath("draft") sẽ trỏ lại đây, nên chỉ gọi khi đã qua draft.
           navigate(projectPath(id, project.status), { replace: true });
           return;
@@ -80,7 +83,7 @@ export function ResumeProjectPage() {
         if (cancelled) return;
         dispatch({ type: "LOAD_PROJECT", payload: draftFromServer(project, state) });
         const step = project.wizard_step ?? 1;
-        const target = step <= 1 ? "/" : step === 2 ? "/create/script/settings" : scriptTabPath(state);
+        const target = editAfterFailure ? scriptTabPath(state) : step <= 1 ? "/" : step === 2 ? "/create/script/settings" : scriptTabPath(state);
         navigate(target, { replace: true });
       } catch {
         if (!cancelled) setError("Không mở lại được project — có thể nó đã bị xoá hoặc mất kết nối.");
@@ -89,7 +92,7 @@ export function ResumeProjectPage() {
     return () => {
       cancelled = true;
     };
-  }, [id, dispatch, navigate]);
+  }, [id, dispatch, navigate, editAfterFailure]);
 
   return (
     <AppShell title="Đang mở lại project" subtitle="Nạp lại những gì bạn đã lưu ở các bước trước.">

@@ -348,27 +348,6 @@ func toSimilarProjectsResponse(in []application.SimilarProject) []similarProject
 	return out
 }
 
-// authoringHistoryEntryResponse is one entry of GET
-// /v1/projects/{project_id}/authoring/history (CR-028 FR84.3).
-type authoringHistoryEntryResponse struct {
-	Content string    `json:"content"`
-	SavedAt time.Time `json:"saved_at"`
-}
-
-// authoringHistoryResponse is the 200 response of GET
-// /v1/projects/{project_id}/authoring/history.
-type authoringHistoryResponse struct {
-	Entries []authoringHistoryEntryResponse `json:"entries"`
-}
-
-func toAuthoringHistoryResponse(in []application.AuthoringHistoryEntry) authoringHistoryResponse {
-	entries := make([]authoringHistoryEntryResponse, 0, len(in))
-	for _, e := range in {
-		entries = append(entries, authoringHistoryEntryResponse{Content: e.Content, SavedAt: e.SavedAt})
-	}
-	return authoringHistoryResponse{Entries: entries}
-}
-
 func toProjectListResponse(summaries []domain.ProjectSummary) projectListResponse {
 	projects := make([]projectSummaryResponse, 0, len(summaries))
 	for _, s := range summaries {

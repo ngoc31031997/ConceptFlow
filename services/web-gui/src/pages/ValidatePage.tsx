@@ -163,7 +163,7 @@ export function ValidatePage() {
                 errorMessage={retryError ?? errorMessage}
                 onRetry={handleRetry}
                 isRetrying={isRetrying}
-                onBack={() => navigate("/")}
+                onBack={() => navigate(`/projects/${projectId}/resume?edit=1`)}
               />
             )}
             <ProgressTracker

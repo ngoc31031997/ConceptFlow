@@ -3,6 +3,8 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -282,41 +284,29 @@ func (r *PromptTemplateRepository) FindSimilarTopics(ctx context.Context, langua
 	return out, rows.Err()
 }
 
-// SaveAuthoringHistory appends one row per overwrite of an authoring field
-// (CR-028 FR84.3) — called alongside every SaveAuthoring* write, never
-// instead of it; project_authoring stays the current-value table, this is
-// the append-only trail behind it.
-func (r *PromptTemplateRepository) SaveAuthoringHistory(ctx context.Context, projectID, fieldName, content string) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring_history (project_id, field_name, content)
-		VALUES ($1, $2, $3)
-	`, projectID, fieldName, content)
-	return err
-}
-
-// ListAuthoringHistory returns every saved version of one authoring field,
-// newest first (CR-028 FR84.3's read side — GET
-// /v1/projects/{id}/authoring/history).
-func (r *PromptTemplateRepository) ListAuthoringHistory(ctx context.Context, projectID, fieldName string) ([]application.AuthoringHistoryEntry, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT content, saved_at FROM project_authoring_history
-		WHERE project_id = $1 AND field_name = $2
-		ORDER BY saved_at DESC
-	`, projectID, fieldName)
-	if err != nil {
-		return nil, err
+// ClearAuthoringSteps empties the saved output of the given steps. Only the
+// three chained outputs can be named, so the column list below is fixed.
+func (r *PromptTemplateRepository) ClearAuthoringSteps(ctx context.Context, projectID string, steps ...application.AuthoringStep) error {
+	columns := map[application.AuthoringStep]string{
+		application.AuthoringStepStory:      "story_content",
+		application.AuthoringStepStoryboard: "storyboard_content",
+		application.AuthoringStepCode:       "code_content",
 	}
-	defer rows.Close()
-
-	var out []application.AuthoringHistoryEntry
-	for rows.Next() {
-		var e application.AuthoringHistoryEntry
-		if err := rows.Scan(&e.Content, &e.SavedAt); err != nil {
-			return nil, err
+	var sets []string
+	for _, step := range steps {
+		column, ok := columns[step]
+		if !ok {
+			return fmt.Errorf("unknown authoring step %q", step)
 		}
-		out = append(out, e)
+		sets = append(sets, column+" = ''")
 	}
-	return out, rows.Err()
+	if len(sets) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx,
+		"UPDATE project_authoring SET "+strings.Join(sets, ", ")+", updated_at = now() WHERE project_id = $1",
+		projectID)
+	return err
 }
 
 // GetStatus is the narrow read CR-028 FR84.2's authoring lock needs — just

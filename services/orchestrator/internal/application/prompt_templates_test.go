@@ -16,7 +16,6 @@ type fakeAuthoringStore struct {
 	story      map[string]string
 	storyboard map[string]string
 	code       map[string]string
-	history    map[string][]string
 	// status defaults to domain.StatusDraft (Go zero value is "", so
 	// GetStatus below maps "" to draft) — set per project_id to simulate a
 	// project whose render has already started (CR-028 FR84.2).
@@ -36,7 +35,6 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 		story:      map[string]string{},
 		storyboard: map[string]string{},
 		code:       map[string]string{},
-		history:    map[string][]string{},
 		status:     map[string]domain.ProjectStatus{},
 		mode:       map[string]string{},
 		models:     map[string]domain.AuthoringStepModels{},
@@ -73,10 +71,18 @@ func (f *fakeAuthoringStore) GetStatus(_ context.Context, projectID string) (dom
 	return domain.StatusDraft, nil
 }
 
-// SaveAuthoringHistory backs CR-028 FR84.3.
-func (f *fakeAuthoringStore) SaveAuthoringHistory(_ context.Context, projectID, fieldName, content string) error {
-	key := projectID + ":" + fieldName
-	f.history[key] = append(f.history[key], content)
+// ClearAuthoringSteps backs the downstream clearing on an upstream change.
+func (f *fakeAuthoringStore) ClearAuthoringSteps(_ context.Context, projectID string, steps ...application.AuthoringStep) error {
+	for _, step := range steps {
+		switch step {
+		case application.AuthoringStepStory:
+			f.story[projectID] = ""
+		case application.AuthoringStepStoryboard:
+			f.storyboard[projectID] = ""
+		case application.AuthoringStepCode:
+			f.code[projectID] = ""
+		}
+	}
 	return nil
 }
 
@@ -157,6 +163,45 @@ func TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne(t *te
 	}
 	if got := store.topic["p1"]; got != "the real topic" {
 		t.Fatalf("an empty topic must leave the stored one alone, got %q", got)
+	}
+}
+
+// Changing an upstream output drops what was built on the old one; saving the
+// same text again must not.
+func TestSaveAuthoring_ChangingUpstreamClearsDownstream(t *testing.T) {
+	ctx := context.Background()
+	store := newFakeAuthoringStore()
+	story := application.NewSaveAuthoringStoryUseCase(store, store, store)
+	storyboard := application.NewSaveAuthoringStoryboardUseCase(store, store, store)
+	code := application.NewSaveAuthoringCodeUseCase(store, store, store)
+
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(story.Execute(ctx, "p1", "outline", "topic"))
+	must(storyboard.Execute(ctx, "p1", "board"))
+	must(code.Execute(ctx, "p1", "code"))
+
+	must(story.Execute(ctx, "p1", "outline", "topic"))
+	if store.storyboard["p1"] != "board" || store.code["p1"] != "code" {
+		t.Fatal("re-saving an identical outline must not clear anything")
+	}
+
+	must(storyboard.Execute(ctx, "p1", "board v2"))
+	if store.code["p1"] != "" {
+		t.Fatalf("a changed storyboard must clear the code, got %q", store.code["p1"])
+	}
+	if store.story["p1"] != "outline" {
+		t.Fatal("changing the storyboard must not touch the outline")
+	}
+
+	must(code.Execute(ctx, "p1", "code v2"))
+	must(story.Execute(ctx, "p1", "outline v2", ""))
+	if store.storyboard["p1"] != "" || store.code["p1"] != "" {
+		t.Fatal("a changed outline must clear the storyboard and the code")
 	}
 }
 

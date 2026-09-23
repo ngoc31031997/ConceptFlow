@@ -36,6 +36,7 @@ function renderValidatePage() {
             <Route path="/projects/:id/render" element={<div data-testid="render-page-stub" />} />
             <Route path="/projects/:id/result" element={<div data-testid="result-page-stub" />} />
             <Route path="/" element={<div data-testid="new-project-page-stub" />} />
+            <Route path="/projects/:id/resume" element={<div data-testid="resume-page-stub" />} />
           </Routes>
         </ProjectDraftProvider>
       </MemoryRouter>
@@ -98,7 +99,8 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
 
     await waitFor(() => expect(screen.getByTestId("error-banner-back-button")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("error-banner-back-button"));
-    expect(screen.getByTestId("new-project-page-stub")).toBeInTheDocument();
+    // Mở lại project từ server (?edit=1) thay vì về trang trống.
+    expect(screen.getByTestId("resume-page-stub")).toBeInTheDocument();
   });
 
   it("đi tiếp sang bước 5 khi saga đã qua cổng duyệt", async () => {

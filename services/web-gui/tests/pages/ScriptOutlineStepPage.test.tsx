@@ -241,6 +241,11 @@ describe("ScriptOutlineStepPage", () => {
           provider: "hive",
           usage: { model: "deepseek" },
         }));
+      // Sau mỗi lượt chạy, bản nháp đọc lại ba kết quả từ server — mô phỏng
+      // server đã lưu dàn ý của bước 1a.
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+        topic: "Vòng lặp for", story: "CÂU HỎI CỐT LÕI: vì sao?", storyboard: "", code: "",
+      });
       renderPage();
       expandSettings();
 
@@ -275,6 +280,11 @@ describe("ScriptOutlineStepPage", () => {
             usage: { model: "deepseek" },
           };
         });
+      // Sau mỗi lượt chạy, bản nháp đọc lại ba kết quả từ server — mô phỏng
+      // server đã lưu dàn ý của bước 1a.
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+        topic: "Vòng lặp for", story: "CÂU HỎI CỐT LÕI: vì sao?", storyboard: "", code: "",
+      });
       renderPage();
       expandSettings();
 

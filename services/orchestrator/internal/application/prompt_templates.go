@@ -76,17 +76,26 @@ type AuthoringStoryPort interface {
 
 // AuthoringLockPort is the CR-028 FR84.2 precondition every authoring save
 // shares: writes are unrestricted while the project is still status=draft,
-// and refused once render has started. AuthoringHistoryWriterPort is the
-// FR84.3 side effect every save also shares: every overwrite is kept, not
-// just the latest value.
+// and refused once render has started.
 type AuthoringLockPort interface {
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 }
 
-// AuthoringHistoryWriterPort records one past version per overwrite
-// (CR-028 FR84.3).
-type AuthoringHistoryWriterPort interface {
-	SaveAuthoringHistory(ctx context.Context, projectID, fieldName, content string) error
+// AuthoringStep names one of the three chained authoring outputs.
+type AuthoringStep string
+
+const (
+	AuthoringStepStory      AuthoringStep = "story"
+	AuthoringStepStoryboard AuthoringStep = "storyboard"
+	AuthoringStepCode       AuthoringStep = "code"
+)
+
+// AuthoringClearerPort empties the saved output of downstream steps. Each
+// step is written from the one before it (story → storyboard → code), so when
+// an upstream output changes, what was built on the old one is stale and is
+// dropped rather than left to disagree with it. No history is kept.
+type AuthoringClearerPort interface {
+	ClearAuthoringSteps(ctx context.Context, projectID string, steps ...AuthoringStep) error
 }
 
 // checkAuthoringUnlocked is the FR84.2 precondition shared by all four
@@ -99,10 +108,13 @@ func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projec
 	if err != nil {
 		return err
 	}
-	if status != domain.StatusDraft {
-		return domain.ErrInvalidStatus
+	// A project that stopped at parse/validate has rendered nothing, and its
+	// only way forward is to fix the script and resubmit, so it stays editable.
+	switch status {
+	case domain.StatusDraft, domain.StatusFailedParseScript, domain.StatusFailedValidateScript:
+		return nil
 	}
-	return nil
+	return domain.ErrInvalidStatus
 }
 
 // SaveAuthoringStoryUseCase stores the Story Architect output a Creator
@@ -113,11 +125,11 @@ func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projec
 type SaveAuthoringStoryUseCase struct {
 	authoring AuthoringStoryPort
 	locks     AuthoringLockPort
-	history   AuthoringHistoryWriterPort
+	clearer   AuthoringClearerPort
 }
 
-func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringStoryUseCase {
-	return &SaveAuthoringStoryUseCase{authoring: authoring, locks: locks, history: history}
+func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort, locks AuthoringLockPort, clearer AuthoringClearerPort) *SaveAuthoringStoryUseCase {
+	return &SaveAuthoringStoryUseCase{authoring: authoring, locks: locks, clearer: clearer}
 }
 
 // Execute saves the outline and, when one is supplied, the topic. topic is
@@ -134,10 +146,17 @@ func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, con
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
+	previous, err := uc.authoring.GetAuthoringStory(ctx, projectID)
+	if err != nil {
+		return err
+	}
 	if err := uc.authoring.SaveAuthoringStory(ctx, projectID, content, topic); err != nil {
 		return err
 	}
-	return uc.history.SaveAuthoringHistory(ctx, projectID, "story_content", content)
+	if previous == content {
+		return nil
+	}
+	return uc.clearer.ClearAuthoringSteps(ctx, projectID, AuthoringStepStoryboard, AuthoringStepCode)
 }
 
 // AuthoringStoryboardPort persists CR-025 step 2's pasted storyboard.
@@ -152,11 +171,11 @@ type AuthoringStoryboardPort interface {
 type SaveAuthoringStoryboardUseCase struct {
 	authoring AuthoringStoryboardPort
 	locks     AuthoringLockPort
-	history   AuthoringHistoryWriterPort
+	clearer   AuthoringClearerPort
 }
 
-func NewSaveAuthoringStoryboardUseCase(authoring AuthoringStoryboardPort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringStoryboardUseCase {
-	return &SaveAuthoringStoryboardUseCase{authoring: authoring, locks: locks, history: history}
+func NewSaveAuthoringStoryboardUseCase(authoring AuthoringStoryboardPort, locks AuthoringLockPort, clearer AuthoringClearerPort) *SaveAuthoringStoryboardUseCase {
+	return &SaveAuthoringStoryboardUseCase{authoring: authoring, locks: locks, clearer: clearer}
 }
 
 func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID, content string) error {
@@ -169,10 +188,17 @@ func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
+	previous, err := uc.authoring.GetAuthoringStoryboard(ctx, projectID)
+	if err != nil {
+		return err
+	}
 	if err := uc.authoring.SaveAuthoringStoryboard(ctx, projectID, content); err != nil {
 		return err
 	}
-	return uc.history.SaveAuthoringHistory(ctx, projectID, "storyboard_content", content)
+	if previous == content {
+		return nil
+	}
+	return uc.clearer.ClearAuthoringSteps(ctx, projectID, AuthoringStepCode)
 }
 
 // AuthoringCodePort persists CR-025 step 3's pasted Manim code.
@@ -187,11 +213,11 @@ type AuthoringCodePort interface {
 type SaveAuthoringCodeUseCase struct {
 	authoring AuthoringCodePort
 	locks     AuthoringLockPort
-	history   AuthoringHistoryWriterPort
+	clearer   AuthoringClearerPort
 }
 
-func NewSaveAuthoringCodeUseCase(authoring AuthoringCodePort, locks AuthoringLockPort, history AuthoringHistoryWriterPort) *SaveAuthoringCodeUseCase {
-	return &SaveAuthoringCodeUseCase{authoring: authoring, locks: locks, history: history}
+func NewSaveAuthoringCodeUseCase(authoring AuthoringCodePort, locks AuthoringLockPort, clearer AuthoringClearerPort) *SaveAuthoringCodeUseCase {
+	return &SaveAuthoringCodeUseCase{authoring: authoring, locks: locks, clearer: clearer}
 }
 
 func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, content string) error {
@@ -207,7 +233,7 @@ func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, cont
 	if err := uc.authoring.SaveAuthoringCode(ctx, projectID, content); err != nil {
 		return err
 	}
-	return uc.history.SaveAuthoringHistory(ctx, projectID, "code_content", content)
+	return nil
 }
 
 
