@@ -58,6 +58,8 @@ interface AuthoringModeBarProps {
    * gọn, để Creator bấm chạy luôn mà không phải mở "Đổi".
    */
   showSwitch?: boolean;
+  /** Nằm trong thẻ khác (PipelineSettingsBar): không vẽ thẻ glass lồng nhau. */
+  embedded?: boolean;
 }
 
 const MODE_LABELS: Record<AuthoringMode, string> = {
@@ -98,6 +100,7 @@ export function AuthoringModeBar({
   runDisabled,
   runDisabledReason,
   showSwitch = true,
+  embedded = false,
 }: AuthoringModeBarProps) {
   // Trạng thái "đang chạy" sống ở AuthoringRunContext, ngoài component này —
   // dùng chung cho cả 3 tab 1a/1b/1c, để tab vừa mở thấy đúng một chuỗi đang
@@ -162,7 +165,7 @@ export function AuthoringModeBar({
 
   return (
     <div
-      className={showSwitch ? `${glass.card} ${styles.card}` : styles.flat}
+      className={embedded ? `${styles.embedded} ${showSwitch ? styles.embeddedOpen : ""}` : showSwitch ? `${glass.card} ${styles.card}` : styles.flat}
       data-testid="authoring-mode-bar"
     >
       {showSwitch && (

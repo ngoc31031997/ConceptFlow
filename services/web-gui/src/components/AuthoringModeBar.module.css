@@ -334,3 +334,50 @@
     animation-duration: 3s;
   }
 }
+
+/* Nằm trong thẻ PipelineSettingsBar: một khối phẳng, khi mở công tắc thì có
+   khung mờ riêng để tách khỏi hàng tóm tắt thay vì thẻ glass lồng thẻ glass. */
+.embedded {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.embeddedOpen {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(22, 34, 46, 0.035);
+  border: 1px solid rgba(22, 34, 46, 0.06);
+}
+
+.embedded .text {
+  flex: none;
+}
+
+.embedded .right {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+}
+
+.embedded .switchRow {
+  align-self: flex-start;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(22, 34, 46, 0.08);
+}
+
+.embedded .run {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.embedded .status,
+.embedded .error {
+  text-align: left;
+  max-width: none;
+}

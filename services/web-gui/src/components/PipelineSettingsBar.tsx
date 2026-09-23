@@ -71,6 +71,8 @@ export function PipelineSettingsBar({
           className={styles.toggle}
           onClick={() => setExpanded((v) => !v)}
           aria-expanded={expanded}
+          disabled={running}
+          title={running ? "AI đang chạy — chờ xong mới đổi được" : undefined}
           data-testid="pipeline-settings-toggle"
         >
           {expanded ? "Xong" : "Đổi"}
@@ -97,6 +99,7 @@ export function PipelineSettingsBar({
         beforeRun={beforeRun}
         onGenerated={onGenerated}
         showSwitch={expanded}
+        embedded
       />
     </div>
   );

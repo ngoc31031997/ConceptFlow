@@ -52,3 +52,12 @@
   gap: 12px;
   margin-top: 12px;
 }
+
+.toggle:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toggle:disabled:hover {
+  background: rgba(22, 34, 46, 0.08);
+}
