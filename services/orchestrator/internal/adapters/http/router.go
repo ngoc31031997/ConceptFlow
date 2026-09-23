@@ -87,6 +87,12 @@ type saveAuthoringModeUseCase interface {
 	Execute(ctx context.Context, projectID, mode string) error
 }
 
+// saveAuthoringModelsUseCase backs PUT /v1/projects/{id}/authoring/models —
+// the model-per-step picker's choice for the three authoring tabs.
+type saveAuthoringModelsUseCase interface {
+	Execute(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
+}
+
 // generateAuthoringUseCase backs CR-027 FR78's POST
 // /v1/projects/{id}/authoring/{step}/generate — the second way to do a step,
 // beside the Copy-prompt round trip, which stays exactly as it was (FR77.4).
@@ -179,6 +185,7 @@ type Router struct {
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	saveAuthoringMode       saveAuthoringModeUseCase
+	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -201,6 +208,13 @@ func (rt *Router) WithRenderPrompt(renderPrompt renderPromptUseCase) *Router {
 // WithAuthoringMode enables CR-027 FR79's persisted step-1 working mode.
 func (rt *Router) WithAuthoringMode(saveAuthoringMode saveAuthoringModeUseCase) *Router {
 	rt.saveAuthoringMode = saveAuthoringMode
+	return rt
+}
+
+// WithAuthoringModels enables the model-per-step picker's PUT
+// /v1/projects/{id}/authoring/models.
+func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUseCase) *Router {
+	rt.saveAuthoringModels = saveAuthoringModels
 	return rt
 }
 
@@ -337,6 +351,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/llm/status", rt.handleLLMStatus)
 	// CR-027 FR79 — the step-1 working mode, remembered per project.
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
+	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	return r
 }
 
@@ -1211,7 +1226,38 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"story":      state.Story,
 		"storyboard": state.Storyboard,
 		"code":       state.Code,
+		// Model-per-step picker's saved choice for each tab, "" meaning
+		// "server default" — same rehydrate-on-reload reasoning as mode.
+		"story_model":      state.Models.Story,
+		"storyboard_model": state.Models.Storyboard,
+		"code_model":       state.Models.Code,
 	})
+}
+
+// handleSaveAuthoringModels stores the model-per-step picker's choice for
+// the three authoring tabs — the follow-up to CR-027 FR79 that lets each
+// step call a different Hive model instead of the one HIVE_MODEL hardcodes.
+//
+// PUT, not POST, for the same reason as handleSaveAuthoringMode: it replaces
+// the triple, and the GUI writes it on every change.
+func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Request) {
+	if rt.saveAuthoringModels == nil {
+		writeError(w, http.StatusNotFound, "authoring models is not enabled")
+		return
+	}
+	projectID := chi.URLParam(r, "project_id")
+
+	var req saveAuthoringModelsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	models := domain.AuthoringStepModels{Story: req.Story, Storyboard: req.Storyboard, Code: req.Code}
+	if err := rt.saveAuthoringModels.Execute(r.Context(), projectID, models); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // handleSaveAuthoringMode stores how the Creator works step 1 (CR-027 FR79).
@@ -1371,6 +1417,12 @@ type llmStatusResponse struct {
 	// the file the Creator has to edit — a disabled button that does not say
 	// why is a bug report waiting to happen.
 	Reason string `json:"reason,omitempty"`
+	// Models is the model-per-step picker's catalog (domain.
+	// AuthoringModelCatalog) — served here rather than hardcoded a second
+	// time in web-gui, so the GUI's dropdown and the server's own validation
+	// (SaveAuthoringModelsUseCase) can never drift apart. Empty when the AI
+	// path itself is unavailable — nothing to pick a model for.
+	Models []domain.AuthoringModelOption `json:"models,omitempty"`
 }
 
 func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
@@ -1383,6 +1435,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, llmStatusResponse{
 		Enabled: true, Provider: rt.generateAuthoring.Provider(),
+		Models: domain.AuthoringModelCatalog,
 	})
 }
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
@@ -18,6 +18,8 @@ function renderPage() {
           <Routes>
             <Route path="/" element={<ScriptStepPage />} />
             <Route path="/create/script/outline" element={<div data-testid="landed-on-outline" />} />
+            <Route path="/create/script/storyboard" element={<div data-testid="landed-on-storyboard" />} />
+            <Route path="/create/script/code" element={<div data-testid="landed-on-code" />} />
           </Routes>
         </ProjectDraftProvider>
       </MemoryRouter>
@@ -28,74 +30,49 @@ function renderPage() {
 describe("ScriptStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    window.localStorage.clear();
   });
 
-  it("hands off to the outline sub-wizard tab as soon as 'blank' is picked", () => {
-    // "Dựng từ đầu" no longer has any inline UI on this page — it moved to
-    // its own 4-tab sub-wizard (ScriptPipelineTabs), reached via routing.
+  // CR-031 — bốn tình huống, mỗi cái là một điểm vào khác nhau của chuỗi
+  // 1a → 1b → 1c. Đây là cả nội dung của bước 1: chọn sai điểm vào thì Creator
+  // hoặc phải bỏ qua một tab bằng tay, hoặc mất luôn đường dán artefact sẵn có.
+  it.each([
+    ["idea", "landed-on-outline"],
+    ["outline", "landed-on-outline"],
+    ["storyboard", "landed-on-storyboard"],
+    ["code", "landed-on-code"],
+  ])("đưa tình huống '%s' vào đúng tab của chuỗi script", (source, landingTestId) => {
     renderPage();
 
-    expect(screen.getByTestId("script-step-next")).toBeDisabled();
-    fireEvent.click(screen.getByTestId("script-source-blank"));
+    fireEvent.click(screen.getByTestId(`script-source-${source}`));
+    fireEvent.click(screen.getByTestId("script-step-next"));
 
+    expect(screen.getByTestId(landingTestId)).toBeInTheDocument();
+  });
+
+  it("mặc định vào 'chỉ có ý tưởng' nên Tiếp tục luôn đi được, không chặn", () => {
+    // Trang này không còn ô soạn thảo nào để chặn: mọi việc nhập liệu đã sang
+    // các tab 1a–1c, nên một nút Tiếp tục bị khoá ở đây chỉ là ngõ cụt.
+    renderPage();
+
+    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId("script-step-next"));
     expect(screen.getByTestId("landed-on-outline")).toBeInTheDocument();
   });
 
-  it("blocks the step until the script is valid (source: draft)", () => {
+  it("chốt ngôn ngữ, engine và cách làm ngay tại đây vì cả ba chi phối mọi tab sau", async () => {
     renderPage();
 
-    fireEvent.click(screen.getByTestId("script-source-draft"));
-    expect(screen.getByTestId("script-step-next")).toBeDisabled();
+    expect(screen.getByTestId("render-engine-remotion")).toBeInTheDocument();
+    // AuthoringModeBar chờ biết máy chủ có API key hay không rồi mới vẽ, nên
+    // nó xuất hiện sau một vòng fetch.
+    await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
 
-    fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
-      target: {
-        value:
-          'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("xin chào")',
-      },
-    });
+    fireEvent.click(screen.getByTestId("render-engine-remotion"));
 
-    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
-  });
-
-  it("runs Remotion's own structural lint instead of skipping validation entirely", () => {
-    vi.useFakeTimers();
-    try {
-      renderPage();
-
-      fireEvent.click(screen.getByTestId("render-engine-remotion"));
-      fireEvent.click(screen.getByTestId("script-source-ready"));
-
-      // Missing structure (no Composition id="creator", etc.) — must still block.
-      fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
-        target: { value: 'export const narrations: string[] = ["xin chào"];' },
-      });
-      act(() => {
-        vi.advanceTimersByTime(500);
-      });
-      expect(screen.getByTestId("script-step-next")).toBeDisabled();
-
-      const validCode = [
-        "import {registerRoot, Composition} from 'remotion';",
-        "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';",
-        "import {TitleText} from './conceptflow-mini/primitives';",
-        'export const narrations: string[] = ["xin chào"];',
-        "function CreatorComposition({segments = []}) {",
-        "  return <Segments segments={segments}>{(index) => <TitleText>{narrations[index]}</TitleText>}</Segments>;",
-        "}",
-        'registerRoot(() => (',
-        '  <Composition id="creator" component={CreatorComposition} width={1920} height={1080} fps={30} durationInFrames={150} calculateMetadata={calculateMetadataFromSegments} />',
-        "));",
-      ].join("\n");
-      fireEvent.change(screen.getByTestId("new-project-script-textarea"), {
-        target: { value: validCode },
-      });
-      act(() => {
-        vi.advanceTimersByTime(500);
-      });
-      expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
-    } finally {
-      vi.useRealTimers();
-    }
+    // Chữ của tình huống "đã có code" đi theo engine — Creator phải biết mình
+    // sắp dán Remotion hay Manim trước khi bấm vào.
+    expect(screen.getByTestId("script-source-code")).toHaveTextContent("code Remotion");
   });
 });
 
@@ -115,10 +92,22 @@ describe("ScriptStepPage draft lifecycle", () => {
 
     renderPage();
 
-    // A fresh draft defaults back to scriptSource "blank" — no draft/ready
-    // panel, and Next stays disabled until a situation with inline content
-    // is picked (or "blank" is picked, which navigates away instead).
-    expect(screen.queryByTestId("new-project-script-textarea")).not.toBeInTheDocument();
-    expect(screen.getByTestId("script-step-next")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("script-step-next"));
+    // Draft mới quay về tình huống mặc định "idea", nên Tiếp tục đi vào 1a —
+    // không phải vào 1c như script đã tiêu ở draft cũ.
+    expect(screen.getByTestId("landed-on-outline")).toBeInTheDocument();
+  });
+
+  it("dịch tên tình huống cũ trong localStorage sang tên mới thay vì bỏ trắng lựa chọn", () => {
+    // Draft lưu trước CR-031 mang "ready" — nghĩa là đã có code đúng chuẩn.
+    window.localStorage.setItem(
+      "conceptflow.draft.v1",
+      JSON.stringify({ projectId: "old-project", scriptSource: "ready", hasSubmitted: false }),
+    );
+
+    renderPage();
+
+    fireEvent.click(screen.getByTestId("script-step-next"));
+    expect(screen.getByTestId("landed-on-code")).toBeInTheDocument();
   });
 });

@@ -85,7 +85,7 @@ func newGenerateFixture(t *testing.T, provider *stubProvider, story *recordingSa
 	storyboard := &contentSaver{}
 	uc := application.NewGenerateAuthoringUseCase(
 		newRenderer("Chủ đề: {{topic}}", renderCtx),
-		provider, nil, renderCtx,
+		provider, nil, renderCtx, nil,
 		story, storyboard, &contentSaver{},
 		maxInputChars, 16000,
 	)
@@ -214,7 +214,7 @@ func TestGenerateAuthoringSecondConcurrentCallIsBusy(t *testing.T) {
 }
 
 func TestGenerateAuthoringWithoutProviderIsNotConfigured(t *testing.T) {
-	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, 0, 0)
+	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, nil, 0, 0)
 	if uc.Available() {
 		t.Error("Available() = true with no provider")
 	}

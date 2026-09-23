@@ -6,7 +6,7 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
 import { getPromptTemplate, getAuthoringState, saveAuthoringStoryboard } from "../api/client";
 import { Card, Button, TextArea } from "../components/ui";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
-import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
@@ -86,6 +86,10 @@ export function VisualDirectorStepPage() {
 
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
   const engineerLabel = draft.renderEngine === "remotion" ? "Remotion Engineer" : "Manim Engineer";
+  // CR-031 — "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
+  // ở 1a có thể trống hẳn trong trường hợp đó, và đấy là hợp lệ: storyboard là
+  // thứ duy nhất bước 1c cần đọc.
+  const hasOwnStoryboard = draft.scriptSource === "storyboard";
 
   async function handleContinue() {
     setSaving(true);
@@ -113,12 +117,23 @@ export function VisualDirectorStepPage() {
   const hint = saveError
     ? saveError
     : storyboardIsEmpty
-      ? "Dán storyboard AI trả về để tiếp tục"
+      ? hasOwnStoryboard
+        ? "Dán storyboard sẵn có của bạn để tiếp tục"
+        : "Dán storyboard AI trả về để tiếp tục"
       : `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`;
 
   return (
     <div data-testid="visual-director-step-page">
-      <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`} wide>
+      <AppShell
+        currentStep={1}
+        title="Bước 1 — Script"
+        subtitle={
+          hasOwnStoryboard
+            ? `1b. Dán storyboard sẵn có của bạn (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`
+            : `1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`
+        }
+        wide
+      >
         <ScriptPipelineTabs
           active="storyboard"
           outlineDone={draft.authoringStory.trim().length > 0}
@@ -127,7 +142,11 @@ export function VisualDirectorStepPage() {
         />
 
         <div className={styles.settingsRow}>
-          <AuthoringModeBar
+          {/* Không truyền onEngineChange: storyboard đọc dàn ý, không đọc
+              engine, nên đây không phải chỗ đổi nó — chỉ tóm tắt để Creator
+              biết đang dựng cho engine nào. */}
+          <PipelineSettingsBar
+            renderEngine={draft.renderEngine}
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
@@ -162,11 +181,13 @@ export function VisualDirectorStepPage() {
           )}
 
           <Card
-            title={aiMode ? "Storyboard" : "2. Dán kết quả"}
+            title={hasOwnStoryboard ? "Storyboard của bạn" : aiMode ? "Storyboard" : "2. Dán kết quả"}
             hint={
-              aiMode
-                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
-                : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+              hasOwnStoryboard
+                ? `Dán storyboard sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+                : aiMode
+                  ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+                  : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
             }
           >
             <TextArea
@@ -186,8 +207,8 @@ export function VisualDirectorStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
-        onBack={() => navigate("/create/script/outline")}
-        backLabel="Quay lại Dàn ý"
+        onBack={() => navigate(hasOwnStoryboard ? "/" : "/create/script/outline")}
+        backLabel={hasOwnStoryboard ? "Quay lại chọn tình huống" : "Quay lại Dàn ý"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={storyboardIsEmpty || saving}

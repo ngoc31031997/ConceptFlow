@@ -6,17 +6,7 @@ import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
 
-// Bug report: "Chi tiết" always linked to /result, which shows nothing
-// useful for a project that hasn't finished yet (no video_path, no progress
-// tracker) — a Creator who left mid-render and came back via this list had
-// no way back to the live tracker. /result is only meaningful once there is
-// something to review or re-publish; everything else belongs on /render,
-// which now also seeds its tracker from project.status (RenderPage).
-const RESULT_PAGE_STATUSES = new Set(["ready_to_publish", "publishing", "published"]);
-function detailPathFor(project: ProjectSummary): string {
-  const suffix = RESULT_PAGE_STATUSES.has(project.status) ? "result" : "render";
-  return `/projects/${project.project_id}/${suffix}`;
-}
+import { projectPath } from "../utils/pipelineLabels";
 import { Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
@@ -205,7 +195,13 @@ export function VideoListPage() {
                         Xem video
                       </a>
                     )}
-                    <Link className={glass.ghostBtn} to={detailPathFor(project)}>
+                    {/* Bug report: "Chi tiết" từng luôn trỏ vào /result, vốn
+                        chẳng hiển thị gì cho một project chưa xong — Creator
+                        rời đi giữa chừng rồi quay lại qua danh sách này thì
+                        không có đường về màn theo dõi. projectPath trả lời
+                        "project ở trạng thái này thuộc màn nào", và từ CR-031
+                        câu trả lời đó có thêm bước 4 (Validate). */}
+                    <Link className={glass.ghostBtn} to={projectPath(project.project_id, project.status)}>
                       Chi tiết
                     </Link>
                     <button

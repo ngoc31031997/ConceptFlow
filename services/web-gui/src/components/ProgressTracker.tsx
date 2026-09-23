@@ -1,10 +1,18 @@
 import type { ProgressState } from "../hooks/useSSE";
 import styles from "./ProgressTracker.module.css";
-import { RENDER_STEPS, stepLabel, mergedStep } from "../utils/pipelineLabels";
+import { stepLabel } from "../utils/pipelineLabels";
 import { Card } from "./ui";
 
 interface ProgressTrackerProps {
   progressState: ProgressState;
+  /**
+   * CR-031 — các bước màn hình NÀY chịu trách nhiệm, theo thứ tự. Trước đây
+   * tracker luôn vẽ cả saga từ một hằng số dùng chung; từ khi bước 4
+   * (Validate) và bước 5 (Xử lý) là hai màn riêng, mỗi màn chỉ được vẽ phần
+   * của mình — nếu không thì cả hai cùng hiện một danh sách giống hệt và
+   * Creator không biết mình đang ở đâu.
+   */
+  steps: readonly string[];
   /** Dims the tracker and drops the live wording once the saga has failed. */
   isFailed?: boolean;
 }
@@ -40,7 +48,7 @@ function unitProgress(
   return null;
 }
 
-export function ProgressTracker({ progressState, isFailed = false }: ProgressTrackerProps) {
+export function ProgressTracker({ progressState, steps, isFailed = false }: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
   const unit = unitProgress(progressState);
   const hasSceneProgress = unit !== null;
@@ -48,7 +56,9 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
   // A render reports elapsed time rather than a percentage — see ProgressMessage.
   const isRendering = !hasSceneProgress && elapsedSeconds !== null;
 
-  const activeIndex = currentStep ? RENDER_STEPS.indexOf(mergedStep(currentStep) as (typeof RENDER_STEPS)[number]) : -1;
+  // Một bước không thuộc màn này (saga đã chạy qua, hoặc chưa tới) cho -1 —
+  // và -1 vẽ ra danh sách toàn "pending", đúng nghĩa "màn này chưa tới lượt".
+  const activeIndex = currentStep ? steps.indexOf(currentStep) : -1;
 
   return (
     <Card>
@@ -84,7 +94,7 @@ export function ProgressTracker({ progressState, isFailed = false }: ProgressTra
           far the project actually got.
         */}
         <ol className={styles.stepList} data-testid="progress-tracker-steps">
-          {RENDER_STEPS.map((step, index) => {
+          {steps.map((step, index) => {
             const isDone = activeIndex >= 0 && index < activeIndex;
             const isActive = index === activeIndex;
             const state = isDone ? "done" : isActive ? (isFailed ? "failed" : "active") : "pending";

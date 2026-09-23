@@ -9,19 +9,43 @@ import styles from "./AppShell.module.css";
   and gave the two automatic phases equal billing, so it described the plumbing
   rather than the path.
 */
+/*
+  Chỉ 3 mục đầu là đích nhảy được — xem BACKTRACKABLE_STEPS. Ba mục sau thuộc
+  về một project đã tồn tại, nên đường của chúng cần :id mà thanh này không
+  có; chúng ở đây để chỉ chỗ, không để bấm.
+*/
 const STEP_ROUTES = [
   "/",
   "/create/settings",
   "/create/review",
+  "/projects/:id/validate",
   "/projects/:id/render",
   "/projects/:id/result",
   "/projects/:id/publish",
 ];
 
-const STEP_LABELS = ["Script", "Cấu hình", "Xem lại", "Xử lý", "Kết quả", "Đăng"] as const;
+/*
+  CR-031 — bảy bước. "Xử lý" cũ gộp hai việc rất khác nhau vào một màn: chạy
+  thử kịch bản (vài giây, miễn phí, sửa được) và sản xuất thật (nhiều phút,
+  tốn TTS/render, không dừng được). Tách ra thành "Validate" rồi "Xử lý" để
+  cổng duyệt dàn ý nằm đúng ranh giới đó, thay vì ẩn bên trong một bước duy
+  nhất mà Creator tưởng đã là quá trình render.
+*/
+const STEP_LABELS = [
+  "Script",
+  "Cấu hình",
+  "Xem lại",
+  "Validate",
+  "Xử lý",
+  "Kết quả",
+  "Đăng",
+] as const;
+
+/** Số bước đầu tiên có URL không cần project id, nên nhảy ngược về được. */
+const BACKTRACKABLE_STEPS = 3;
 
 interface AppShellProps {
-  currentStep?: 1 | 2 | 3 | 4 | 5 | 6;
+  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   title: string;
   subtitle: string;
   wide?: boolean;
@@ -43,7 +67,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
 
   const handleStepClick = (stepNumber: number) => {
     // Only allow navigation to completed steps
-    if (currentStep && stepNumber < currentStep && stepNumber <= 3) {
+    if (currentStep && stepNumber < currentStep && stepNumber <= BACKTRACKABLE_STEPS) {
       navigate(STEP_ROUTES[stepNumber - 1]);
     }
   };
@@ -75,7 +99,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
                 const stepNumber = index + 1;
                 const isActive = stepNumber === currentStep;
                 const isDone = stepNumber < currentStep;
-                const isClickable = isDone && stepNumber <= 3; // Only first 3 steps are clickable
+                const isClickable = isDone && stepNumber <= BACKTRACKABLE_STEPS;
                 const className = [styles.stepItem, isActive ? styles.active : "", isDone ? styles.done : ""]
                   .filter(Boolean)
                   .join(" ");

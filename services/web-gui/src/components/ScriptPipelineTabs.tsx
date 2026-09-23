@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { useAuthoringRun } from "../context/AuthoringRunContext";
 import styles from "./ScriptPipelineTabs.module.css";
 
 export type ScriptPipelineTab = "outline" | "storyboard" | "code";
@@ -41,6 +42,12 @@ interface ScriptPipelineTabsProps {
  */
 export function ScriptPipelineTabs({ active, outlineDone, storyboardDone, codeDone }: ScriptPipelineTabsProps) {
   const navigate = useNavigate();
+  // CR bug report — chạy chuỗi AI rồi lỡ bấm sang tab khác giữa chừng khiến
+  // Creator tưởng chuỗi đã dừng (form của tab mới không biết gì về nó nữa,
+  // dù state chạy giờ đã dùng chung). Khoá cả 3 tab lại trong lúc chạy: cách
+  // duy nhất để theo dõi tiến độ là đứng yên nhìn panel, đúng ý người dùng
+  // muốn — 3 prompt hiện cùng lúc, disable, không cho thao tác chồng lên.
+  const { running } = useAuthoringRun();
   const doneByKey: Record<ScriptPipelineTab, boolean> = {
     outline: outlineDone,
     storyboard: storyboardDone,
@@ -62,6 +69,8 @@ export function ScriptPipelineTabs({ active, outlineDone, storyboardDone, codeDo
             role="tab"
             aria-selected={isActive}
             className={className}
+            disabled={running && !isActive}
+            title={running && !isActive ? "Đang chạy AI — chờ xong rồi hẵng chuyển tab" : undefined}
             onClick={() => navigate(tab.path)}
             data-testid={`script-tab-${tab.key}`}
           >

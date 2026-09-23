@@ -575,3 +575,36 @@ func (r *PromptTemplateRepository) GetAuthoringMode(ctx context.Context, project
 	}
 	return mode, err
 }
+
+// SaveAuthoringModels upserts the per-step Hive model choice (model-per-step
+// follow-up to CR-027) — all three tabs in one write, mirroring how the GUI
+// saves them (one picker, at step 1, for all of 1a/1b/1c at once).
+//
+// Upsert on project_id alone, like SaveAuthoringMode: the choice can be made
+// on tab 1a before any outline exists.
+func (r *PromptTemplateRepository) SaveAuthoringModels(ctx context.Context, projectID string, models domain.AuthoringStepModels) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, story_model, storyboard_model, code_model, updated_at)
+		VALUES ($1, $2, $3, $4, now())
+		ON CONFLICT (project_id) DO UPDATE SET
+		    story_model = EXCLUDED.story_model,
+		    storyboard_model = EXCLUDED.storyboard_model,
+		    code_model = EXCLUDED.code_model,
+		    updated_at = now()
+	`, projectID, models.Story, models.Storyboard, models.Code)
+	return err
+}
+
+// GetAuthoringModels returns the saved per-step model choice, or the zero
+// value (every step "" — the server default) when this project has no
+// authoring row yet or predates this column.
+func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error) {
+	var models domain.AuthoringStepModels
+	err := r.pool.QueryRow(ctx, `
+		SELECT story_model, storyboard_model, code_model FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&models.Story, &models.Storyboard, &models.Code)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.AuthoringStepModels{}, nil
+	}
+	return models, err
+}

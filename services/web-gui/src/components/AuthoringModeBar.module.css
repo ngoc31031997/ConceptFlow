@@ -33,6 +33,85 @@
   flex: 0 0 auto;
 }
 
+/* Hai lựa chọn "Copy prompt" / "Gọi API" là một cặp loại trừ nhau (đúng một
+   trong hai bật), nên trình bày như một cái switch — gạt trái/phải — thay vì
+   hai thẻ SelectableOption đứng cạnh nhau, để ăn khớp với ngôn ngữ bật/tắt ở
+   .statusOn/.statusOff chỗ khác trong app. */
+.switchRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.switchLabelBtn {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-faint);
+  cursor: pointer;
+  transition: color 0.15s ease, font-weight 0.15s ease;
+}
+
+.switchLabelBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.switchLabelBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.switchLabelActive {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: rgba(22, 34, 46, 0.16);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.switchOn {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+}
+
+.switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.switchKnob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(22, 34, 46, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.switchOn .switchKnob {
+  transform: translateX(20px);
+}
+
 /* Nút chạy nằm cùng hàng với hai lựa chọn: chọn "Gọi API" rồi bấm chạy là một
    động tác liên tục, không phải hai chỗ cách nhau nửa trang. */
 .run {
@@ -56,4 +135,47 @@
   color: var(--danger, #c0392b);
   text-align: right;
   max-width: 320px;
+}
+
+/* Ba prompt 1a/1b/1c cùng lúc, mỗi cái một trạng thái — thay cho một dòng
+   chữ câm khi Creator không đứng ở đúng tab đang chạy. */
+.runPanel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(22, 34, 46, 0.08);
+}
+
+.runPanelItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: rgba(22, 34, 46, 0.06);
+  color: var(--ink-faint);
+}
+
+.runPanelItem_running {
+  background: rgba(88, 101, 242, 0.12);
+  color: var(--accent, #5865f2);
+}
+
+.runPanelItem_done {
+  color: var(--ink);
+}
+
+.runPanelIcon {
+  font-weight: 700;
+}
+
+.runPanelNote {
+  font-weight: 400;
+  color: inherit;
+  opacity: 0.75;
 }

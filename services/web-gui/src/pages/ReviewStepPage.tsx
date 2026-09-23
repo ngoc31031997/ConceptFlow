@@ -108,9 +108,12 @@ export function ReviewStepPage() {
         video_output_mode: draft.videoOutputMode,
         video_format_id: draft.videoFormatId,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,
+        // CR-031 — bước 4 tồn tại để dừng ở đây; nói thẳng ra thay vì dựa vào
+        // mặc định phía server.
+        review_enabled: true,
       });
       dispatch({ type: "MARK_SUBMITTED" });
-      navigate(`/projects/${projectId}/render`);
+      navigate(`/projects/${projectId}/validate`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -160,8 +163,8 @@ export function ReviewStepPage() {
       <AppShell
         wide
         currentStep={3}
-        title="Bước 3 — Xem lại trước khi render"
-        subtitle="Render mất vài phút và không dừng giữa chừng được. Kiểm tra nhanh những lựa chọn dưới đây."
+        title="Bước 3 — Xem lại trước khi chạy"
+        subtitle="Bước tiếp theo chỉ chạy thử kịch bản (chưa tốn giọng đọc hay render), rồi dừng lại cho bạn duyệt dàn ý."
       >
         <div className={styles.reviewLayout}>
           <Card title="Video sắp render">
@@ -194,13 +197,13 @@ export function ReviewStepPage() {
           isVoiceMissing
             ? "Chưa chọn được giọng đọc — quay lại bước 2 hoặc tắt giọng đọc"
             : isSubmitting
-              ? "Đang gửi yêu cầu render..."
-              : "Sau khi bắt đầu, bạn sẽ theo dõi tiến trình ở bước tiếp theo."
+              ? "Đang gửi yêu cầu..."
+              : "Bước 4 chạy thử kịch bản rồi dừng chờ bạn duyệt — chưa tốn gì, sửa lại vẫn kịp."
         }
         isBlocked={isVoiceMissing}
         onBack={() => navigate("/create/settings")}
         onNext={handleSubmit}
-        nextLabel={isSubmitting ? "Đang gửi..." : "Bắt đầu render"}
+        nextLabel={isSubmitting ? "Đang gửi..." : "Chạy kiểm tra kịch bản"}
         nextDisabled={isSubmitting || isVoiceMissing}
         nextTestId="new-project-submit-button"
       />

@@ -30,6 +30,7 @@ type GenerateAuthoringUseCase struct {
 	provider   LLMProviderPort
 	recorder   *LLMUsageRecorder
 	projects   PromptRenderContextPort
+	models     AuthoringModelsReaderPort
 	story      authoringStorySaver
 	storyboard authoringContentSaver
 	code       authoringContentSaver
@@ -67,6 +68,14 @@ type authoringContentSaver interface {
 	Execute(ctx context.Context, projectID, content string) error
 }
 
+// AuthoringModelsReaderPort is the read side of the model-per-step picker —
+// separate from AuthoringModelsPort (prompt_templates.go's write side) since
+// this use case only ever reads it, once per call, to know which model to
+// pass the provider.
+type AuthoringModelsReaderPort interface {
+	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
+}
+
 // ErrGenerateBusy is the second of two concurrent clicks (FR78.4) — 409, not
 // an error the Creator did anything about.
 var ErrGenerateBusy = errors.New("một lượt chạy AI cho bước này đang diễn ra")
@@ -80,6 +89,7 @@ func NewGenerateAuthoringUseCase(
 	provider LLMProviderPort,
 	recorder *LLMUsageRecorder,
 	projects PromptRenderContextPort,
+	models AuthoringModelsReaderPort,
 	story authoringStorySaver,
 	storyboard authoringContentSaver,
 	code authoringContentSaver,
@@ -87,7 +97,7 @@ func NewGenerateAuthoringUseCase(
 ) *GenerateAuthoringUseCase {
 	return &GenerateAuthoringUseCase{
 		renderer: renderer, provider: provider, recorder: recorder,
-		projects: projects, story: story, storyboard: storyboard,
+		projects: projects, models: models, story: story, storyboard: storyboard,
 		code: code,
 		maxInputChars: maxInputChars, maxOutputTokens: maxOutputTokens,
 		running: map[string]bool{},
@@ -173,6 +183,18 @@ func (uc *GenerateAuthoringUseCase) Execute(
 			len(rendered.Prompt), uc.maxInputChars)
 	}
 
+	// Model-per-step picker: "" (unset, or this use case wired without a
+	// models port — e.g. an older test) falls through to the provider's own
+	// configured default, same as before this existed.
+	var model string
+	if uc.models != nil {
+		stepModels, err := uc.models.GetAuthoringModels(ctx, projectID)
+		if err != nil {
+			return GeneratedStep{}, fmt.Errorf("load authoring models: %w", err)
+		}
+		model = stepModels.ModelFor(step)
+	}
+
 	started := time.Now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		// The rendered template is the whole instruction. It goes in the
@@ -183,6 +205,7 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		User:        userTurnNudge,
 		MaxTokens:   uc.maxOutputTokens,
 		Temperature: 0.7,
+		Model:       model,
 	})
 	uc.recorder.Record(ctx, RecordFor(
 		uc.provider.Name(), string(role), step, projectID, result.Usage, started, chatErr,

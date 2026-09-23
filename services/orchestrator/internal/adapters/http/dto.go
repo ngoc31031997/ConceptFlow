@@ -259,6 +259,15 @@ type saveAuthoringModeRequest struct {
 	Mode string `json:"mode"`
 }
 
+// saveAuthoringModelsRequest is the body of PUT
+// /v1/projects/{id}/authoring/models — the model-per-step picker's choice
+// for each of the three tabs, "" meaning "server default".
+type saveAuthoringModelsRequest struct {
+	Story      string `json:"story"`
+	Storyboard string `json:"storyboard"`
+	Code       string `json:"code"`
+}
+
 // ErrorCodeQCBlocked marks the 409 that `acknowledge_qc: true` can get past.
 const ErrorCodeQCBlocked = "qc_blocked"
 

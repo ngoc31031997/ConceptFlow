@@ -176,6 +176,10 @@ func main() {
 	// CR-027 FR79 — the step-1 working mode, stored per project so the choice
 	// survives a reload, another browser, and a restart of this service.
 	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(promptTemplateRepo)
+	// Model-per-step picker (follow-up to CR-027 FR79) — which Hive model
+	// each of 1a/1b/1c calls, stored the same place and the same way as the
+	// mode above.
+	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(promptTemplateRepo)
 	// CR-028 FR83: the project row is created here, at wizard step 1
 	// (POST /v1/projects), instead of at POST /v1/sagas/render — see
 	// projectDraftAdapter below for why this needs both repositories.
@@ -198,6 +202,7 @@ func main() {
 		generateAuthoring = application.NewGenerateAuthoringUseCase(
 			renderPrompt, llmProvider, llmUsageRecorder,
 			promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
+			promptTemplateRepo,
 			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
 		)
@@ -214,6 +219,7 @@ func main() {
 		WithAuthoringCode(saveAuthoringCode).
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
+		WithAuthoringModels(saveAuthoringModels).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory)
 	if generateAuthoring != nil {
 		router = router.WithGenerateAuthoring(generateAuthoring)

@@ -8,13 +8,13 @@
 
 /** Saga step ids, as they arrive on the SSE progress stream. */
 export const STEP_LABELS: Record<string, string> = {
-  // CR-029: parse_script và validate_script hiển thị chung một nhãn — với
-  // Creator đây là một điểm dừng duy nhất (xử lý & kiểm tra kịch bản trước
-  // khi tốn TTS/render), dù nội bộ vẫn là 2 lệnh nối tiếp qua 2 service
-  // (script-processing rồi rendering). RENDER_STEPS/mergedStep() gộp chúng
-  // làm một ô trong danh sách bước.
-  parse_script: "Xử lý & kiểm tra kịch bản",
-  validate_script: "Xử lý & kiểm tra kịch bản",
+  // CR-031: hai bước này lại có nhãn riêng. CR-029 từng gộp chúng làm một ô vì
+  // cả hai nằm lọt giữa một bước "Xử lý" duy nhất, nên phân biệt chỉ thêm
+  // nhiễu. Giờ chúng là toàn bộ nội dung của bước 4 (Validate) — đó là màn hình
+  // Creator ngồi đợi, nên biết đang phân tích hay đang chạy thử là khác biệt
+  // thật: một cái tính bằng giây, một cái tính bằng phút.
+  parse_script: "Phân tích kịch bản",
+  validate_script: "Chạy thử & kiểm tra",
   classify_scenes: "Phân loại cảnh",
   synthesize_speech: "Tạo giọng đọc",
   render_scenes: "Render hoạt hình",
@@ -30,8 +30,8 @@ export const STEP_LABELS: Record<string, string> = {
 /** Project statuses, as stored on the project record. */
 const STATUS_LABELS: Record<string, string> = {
   draft: "Nháp",
-  parsing_script: "Đang xử lý & kiểm tra kịch bản",
-  validating_script: "Đang xử lý & kiểm tra kịch bản",
+  parsing_script: "Đang phân tích kịch bản",
+  validating_script: "Đang chạy thử & kiểm tra",
   classifying_scenes: "Đang phân loại cảnh",
   awaiting_review: "Chờ duyệt dàn ý",
   synthesizing_speech: "Đang tổng hợp giọng đọc",
@@ -57,13 +57,16 @@ export function stepLabel(step: string): string {
  * state only fills in from the NEXT live progress.fanout message, and one
  * may not arrive for minutes (e.g. mid render_scenes). The render is still
  * running server-side the whole time; only the tracker looked stuck. This
- * lets RenderPage seed the tracker from the project's own persisted status
+ * lets the page seed the tracker from the project's own persisted status
  * (already fetched via useProject) until a live message replaces it.
  */
 export function statusToStep(status: string): string | null {
   const map: Record<string, string> = {
     parsing_script: "parse_script",
     validating_script: "validate_script",
+    // Cổng duyệt dừng NGAY SAU validate_script, nên ô sáng đúng là ô cuối của
+    // bước 4 — không phải "chưa bắt đầu gì cả".
+    awaiting_review: "validate_script",
     synthesizing_speech: "synthesize_speech",
     rendering: "render_scenes",
     assembling_video: "assemble_video",
@@ -82,22 +85,70 @@ export function statusLabel(status: string): string {
 }
 
 /**
- * The ordered pipeline shown to the Creator (CR-029): parse_script and
- * validate_script collapse into a single entry, and qc_video is gone (off
- * the main saga — see cr-029-render-saga-consolidation.md backlog note).
- * mergedStep() below folds the raw SSE step id onto this list before any
- * indexOf lookup, so "validate_script" lights up the same dot as
- * "parse_script" instead of failing to match and freezing the tracker.
+ * CR-031 bước 4 — "Validate": phần rẻ của saga. Chạy xong hai bước này là đã
+ * biết script có chạy được không và dàn ý ra sao, mà chưa tốn một giây TTS
+ * hay render nào. Cổng duyệt dàn ý (CR-024) dừng đúng ở cuối danh sách này.
  */
-export const RENDER_STEPS = [
-  "parse_script",
+export const VALIDATE_STEPS = ["parse_script", "validate_script"] as const;
+
+/**
+ * CR-031 bước 5 — "Xử lý": phần đắt, chỉ chạy sau khi Creator duyệt ở bước 4.
+ * qc_video không có ở đây (off luồng chính từ CR-029).
+ */
+export const PROCESS_STEPS = [
   "synthesize_speech",
   "render_scenes",
   "assemble_video",
   "generate_clips",
 ] as const;
 
-/** Folds steps CR-029 merged in the UI onto the RENDER_STEPS id that represents them. */
-export function mergedStep(step: string): string {
-  return step === "validate_script" ? "parse_script" : step;
+/**
+ * Bước nào của wizard 7 bước đang sở hữu một project ở trạng thái này.
+ *
+ * Tách bước 4/5 nghĩa là có hai URL cùng theo dõi một saga, nên "project này
+ * thuộc màn nào" phải trả lời được từ một chỗ duy nhất: nếu không, một Creator
+ * mở lại bookmark cũ, hoặc bấm back sau khi duyệt, sẽ ngồi trên màn hình theo
+ * dõi những bước đã chạy xong từ lâu mà không bao giờ thấy động tĩnh gì.
+ */
+export type ProjectPhase = "validate" | "process" | "result" | "publish";
+
+export function projectPhase(status: string): ProjectPhase {
+  const step = status.startsWith("failed_at_") ? status.replace("failed_at_", "") : null;
+  if (step) {
+    // Một bước hỏng thuộc về màn hình đang chạy nó — đó là nơi có nút thử lại
+    // và câu giải thích đúng ngữ cảnh.
+    // classify_scenes không còn trong saga, nhưng project cũ hỏng ở đó vẫn tồn
+    // tại — và nó cũng là lỗi đầu vào, nên thuộc bước 4, nơi có đường quay về
+    // sửa script.
+    if ((VALIDATE_STEPS as readonly string[]).includes(step) || step === "classify_scenes") {
+      return "validate";
+    }
+    if (step === "publish_video") return "publish";
+    return "process";
+  }
+  switch (status) {
+    case "draft":
+    case "parsing_script":
+    case "validating_script":
+    case "classifying_scenes":
+    case "awaiting_review":
+      return "validate";
+    case "ready_to_publish":
+      return "result";
+    case "publishing":
+    case "published":
+      return "publish";
+    default:
+      return "process";
+  }
+}
+
+/** URL của màn hình sở hữu project ở trạng thái này. */
+export function projectPath(projectId: string, status: string): string {
+  const phase = projectPhase(status);
+  if (phase === "validate") return `/projects/${projectId}/validate`;
+  if (phase === "process") return `/projects/${projectId}/render`;
+  // Đã đăng hay đang đăng thì màn kết quả vẫn là chỗ đúng để quay về: nó có
+  // link sang màn đăng, còn chiều ngược lại thì không.
+  return `/projects/${projectId}/result`;
 }

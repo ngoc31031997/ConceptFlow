@@ -1,10 +1,9 @@
 import { useState } from "react";
-import { SelectableOption } from "./SelectableOption";
 import { Button } from "./ui";
 import { generateAuthoringStep, type AuthoringStep, type LlmStatus } from "../api/client";
 import type { AuthoringMode } from "../context/ProjectDraftContext";
+import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import glass from "../styles/glass.module.css";
-import selectable from "../styles/selectable.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
 /** Nhãn tiếng Việt của từng bước, để câu trạng thái nói đúng nó đang ở đâu. */
@@ -13,6 +12,8 @@ const STEP_LABELS: Record<AuthoringStep, string> = {
   storyboard: "1b. Storyboard",
   code: "1c. Code",
 };
+
+const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "code"];
 
 interface AuthoringModeBarProps {
   /**
@@ -31,12 +32,17 @@ interface AuthoringModeBarProps {
    * truyền cả ba (`story`, `storyboard`, `code`): Creator chỉ nhập chủ đề rồi
    * bấm một lần, server chạy tuần tự, mỗi bước đọc kết quả bước trước đã lưu.
    * Tab 1b/1c truyền đúng một bước, để chạy lại riêng bước đó sau khi sửa tay.
+   *
+   * CR-031 — để trống ở màn chọn tình huống: ở đó chưa có chủ đề, chưa có
+   * artefact nào để sinh, nên chỉ có công tắc chế độ chứ không có nút chạy.
+   * Chọn chế độ ngay từ đó là có ích vì nó lưu lên project và đi theo sang cả
+   * ba tab.
    */
-  steps: AuthoringStep[];
+  steps?: AuthoringStep[];
   /** Bước này sinh ra cái gì, để câu chữ trên nút nói đúng việc nó làm. */
-  what: string;
+  what?: string;
   /** Kết quả từng bước, để trang nhét thẳng vào ô soạn thảo (FR78.2). */
-  onGenerated: (step: AuthoringStep, content: string) => void;
+  onGenerated?: (step: AuthoringStep, content: string) => void;
   /**
    * Việc phải xong trước khi gọi — lưu chủ đề/kết quả bước trước lên server,
    * vì server render prompt từ dữ liệu của nó, không từ state trình duyệt
@@ -48,10 +54,10 @@ interface AuthoringModeBarProps {
   runDisabledReason?: string;
 }
 
-const MODES: { value: AuthoringMode; label: string }[] = [
-  { value: "manual", label: "Copy prompt ra ngoài" },
-  { value: "ai", label: "Gọi API trực tiếp" },
-];
+const MODE_LABELS: Record<AuthoringMode, string> = {
+  manual: "Copy prompt ra ngoài",
+  ai: "Gọi API trực tiếp",
+};
 
 /**
  * CR-027 FR79 — cách làm **cả bước 1**, đặt ở đầu mỗi tab 1a/1b/1c.
@@ -79,16 +85,18 @@ export function AuthoringModeBar({
   mode,
   onModeChange,
   projectId,
-  steps,
-  what,
+  steps = [],
+  what = "",
   onGenerated,
   beforeRun,
   runDisabled,
   runDisabledReason,
 }: AuthoringModeBarProps) {
-  const [running, setRunning] = useState(false);
-  /** Bước đang chạy, để hiện "2/3 — 1b. Storyboard" thay vì một spinner câm. */
-  const [progress, setProgress] = useState<{ index: number; step: AuthoringStep } | null>(null);
+  // Trạng thái "đang chạy" sống ở AuthoringRunContext, ngoài component này —
+  // dùng chung cho cả 3 tab 1a/1b/1c, để tab vừa mở thấy đúng một chuỗi đang
+  // chạy dở ở tab khác thay vì tưởng mình rảnh và cho bấm chạy chồng lên.
+  const run = useAuthoringRun();
+  const dispatchRun = useAuthoringRunDispatch();
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -98,9 +106,15 @@ export function AuthoringModeBar({
 
   const aiMode = mode === "ai" && llm.enabled;
   const isChain = steps.length > 1;
+  const canRun = steps.length > 0;
+  const running = run.running;
+  // Có chuỗi khác (tab khác) đang chạy, không phải chuỗi của chính nút này —
+  // câu trạng thái phải nói rõ đang chờ cái gì, không chỉ "đang chạy" chung
+  // chung khiến Creator tưởng máy đứng hình.
+  const runningElsewhere = running && run.steps !== steps && run.steps.join() !== steps.join();
 
   async function handleRun() {
-    setRunning(true);
+    dispatchRun({ type: "START", steps });
     setError(null);
     setNote(null);
     let at: AuthoringStep | null = null;
@@ -114,9 +128,9 @@ export function AuthoringModeBar({
         // vừa set chưa nhìn thấy được trong cùng một lượt chạy, nên câu lỗi sẽ
         // chỉ sai tên bước.
         at = step;
-        setProgress({ index: i, step });
+        dispatchRun({ type: "PROGRESS", index: i });
         const result = await generateAuthoringStep(projectId, step);
-        onGenerated(step, result.content);
+        onGenerated?.(step, result.content);
         if (result.save_error) {
           // Nội dung sinh ra được nhưng không lưu được: bước sau sẽ render
           // prompt từ dữ liệu cũ trên server, tức là làm sai đề. Dừng chuỗi
@@ -131,8 +145,7 @@ export function AuthoringModeBar({
         (err instanceof Error ? err.message : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.") + where,
       );
     } finally {
-      setRunning(false);
-      setProgress(null);
+      dispatchRun({ type: "FINISH" });
     }
   }
 
@@ -152,40 +165,67 @@ export function AuthoringModeBar({
       </div>
 
       <div className={styles.right}>
-        <div className={selectable.row} role="radiogroup" aria-label="Cách làm bước 1">
-          {MODES.map((option) => {
-            const blocked = option.value === "ai" && !llm.enabled;
-            return (
-              <SelectableOption
-                key={option.value}
-                selected={mode === option.value && !blocked}
-                onSelect={() => {
-                  if (!blocked) onModeChange(option.value);
-                }}
-                label={option.label}
-                inline
-                testId={`authoring-mode-${option.value}`}
-                ariaLabel={blocked ? `${option.label} (chưa cấu hình API key)` : option.label}
-              />
-            );
-          })}
+        <div className={styles.switchRow}>
+          <button
+            type="button"
+            data-testid="authoring-mode-manual"
+            className={`${styles.switchLabelBtn} ${!aiMode ? styles.switchLabelActive : ""}`}
+            onClick={() => onModeChange("manual")}
+          >
+            {MODE_LABELS.manual}
+          </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={aiMode}
+            aria-label="Cách làm bước 1"
+            data-testid="authoring-mode-switch"
+            className={`${styles.switch} ${aiMode ? styles.switchOn : ""}`}
+            disabled={!llm.enabled}
+            title={!llm.enabled ? llm.reason || "Chưa cấu hình API key" : undefined}
+            onClick={() => onModeChange(mode === "ai" ? "manual" : "ai")}
+          >
+            <span className={styles.switchKnob} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            data-testid="authoring-mode-ai"
+            className={`${styles.switchLabelBtn} ${aiMode ? styles.switchLabelActive : ""}`}
+            disabled={!llm.enabled}
+            title={!llm.enabled ? llm.reason || "Chưa cấu hình API key" : undefined}
+            onClick={() => {
+              if (llm.enabled) onModeChange("ai");
+            }}
+          >
+            {MODE_LABELS.ai}
+          </button>
         </div>
 
-        {aiMode && (
+        {aiMode && canRun && (
           <div className={styles.run}>
             <Button
               onClick={handleRun}
               disabled={running || runDisabled}
               data-testid={`run-with-ai-${steps[0]}`}
-              title={runDisabled ? runDisabledReason : `Gọi trực tiếp ${llm.provider}`}
+              title={
+                runningElsewhere
+                  ? "Một chuỗi khác đang chạy — chờ xong đã"
+                  : runDisabled
+                    ? runDisabledReason
+                    : `Gọi trực tiếp ${llm.provider}`
+              }
             >
               {running ? "AI đang chạy..." : runLabel}
             </Button>
             {running && (
               <p className={styles.status} data-testid="run-with-ai-running">
-                {progress && isChain
-                  ? `Bước ${progress.index + 1}/${steps.length} — ${STEP_LABELS[progress.step]}. Có thể mất vài phút, đừng đóng trang.`
-                  : "Có thể mất vài chục giây, đừng đóng trang."}
+                {runningElsewhere
+                  ? `Đang chạy ở tab khác: ${
+                      run.currentIndex >= 0 ? STEP_LABELS[run.steps[run.currentIndex]] : "..."
+                    }. Chờ xong rồi mới chạy tiếp được.`
+                  : run.currentIndex >= 0 && isChain
+                    ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút, đừng đóng trang.`
+                    : "Có thể mất vài chục giây, đừng đóng trang."}
               </p>
             )}
             {!running && runDisabled && runDisabledReason && (
@@ -200,6 +240,33 @@ export function AuthoringModeBar({
           </div>
         )}
       </div>
+
+      {/* Chạy cả chuỗi (1a → 1b → 1c) đụng đúng chỗ Creator từng bị lạc: bấm
+          chạy ở 1a rồi lỡ chuyển sang 1b/1c xem tiến độ, màn đó trước đây
+          không biết gì về chuỗi đang chạy. Giờ panel này hiện trên CẢ BA tab
+          bất cứ khi nào một chuỗi nhiều bước đang chạy, nên đứng ở tab nào
+          cũng thấy đủ ba prompt và biết đang chờ đúng bước nào. */}
+      {running && run.steps.length > 1 && (
+        <div className={styles.runPanel} data-testid="authoring-run-panel">
+          {ALL_STEPS.map((step, index) => {
+            const status = index < run.currentIndex ? "done" : index === run.currentIndex ? "running" : "pending";
+            return (
+              <div
+                key={step}
+                className={`${styles.runPanelItem} ${styles[`runPanelItem_${status}`]}`}
+                data-testid={`authoring-run-panel-${step}`}
+              >
+                <span className={styles.runPanelIcon} aria-hidden="true">
+                  {status === "done" ? "✓" : status === "running" ? "…" : "•"}
+                </span>
+                <span>{STEP_LABELS[step]}</span>
+                {status === "running" && <span className={styles.runPanelNote}>đang chạy</span>}
+                {status === "done" && <span className={styles.runPanelNote}>xong</span>}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

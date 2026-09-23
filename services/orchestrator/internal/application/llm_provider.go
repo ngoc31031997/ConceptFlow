@@ -30,6 +30,12 @@ type ChatRequest struct {
 	// character of the answer (CR-027 D13).
 	MaxTokens   int
 	Temperature float64
+	// Model overrides the adapter's own configured model (HIVE_MODEL) for
+	// this one call — the model-per-step picker at wizard step 1 (follow-up
+	// to CR-027). "" means "use the adapter's default", so every caller that
+	// predates this field, and every project that never touched the picker,
+	// keeps behaving exactly as before.
+	Model string
 }
 
 // ChatResult is what came back, plus what it cost.

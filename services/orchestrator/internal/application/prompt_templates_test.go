@@ -24,6 +24,10 @@ type fakeAuthoringStore struct {
 	// mode backs CR-027 FR79's step-1 working mode. Unset means a project
 	// whose row predates the column, which reads back as the default.
 	mode map[string]string
+	// models backs the model-per-step picker. Unset means a project whose
+	// row predates the columns, which reads back as the zero value (every
+	// step "" — server default).
+	models map[string]domain.AuthoringStepModels
 }
 
 func newFakeAuthoringStore() *fakeAuthoringStore {
@@ -35,6 +39,7 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 		history:    map[string][]string{},
 		status:     map[string]domain.ProjectStatus{},
 		mode:       map[string]string{},
+		models:     map[string]domain.AuthoringStepModels{},
 	}
 }
 
@@ -46,6 +51,16 @@ func (f *fakeAuthoringStore) SaveAuthoringMode(_ context.Context, projectID, mod
 
 func (f *fakeAuthoringStore) GetAuthoringMode(_ context.Context, projectID string) (string, error) {
 	return f.mode[projectID], nil
+}
+
+// SaveAuthoringModels/GetAuthoringModels back the model-per-step picker.
+func (f *fakeAuthoringStore) SaveAuthoringModels(_ context.Context, projectID string, models domain.AuthoringStepModels) error {
+	f.models[projectID] = models
+	return nil
+}
+
+func (f *fakeAuthoringStore) GetAuthoringModels(_ context.Context, projectID string) (domain.AuthoringStepModels, error) {
+	return f.models[projectID], nil
 }
 
 // GetStatus backs CR-028 FR84.2's authoring lock. Defaults to draft (unset

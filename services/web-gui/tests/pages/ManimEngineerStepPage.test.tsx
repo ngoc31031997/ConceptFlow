@@ -157,6 +157,8 @@ describe("ManimEngineerStepPage", () => {
     // feature/remotion-engine: the engine choice lives on THIS tab now, not
     // on the situation-chooser page — switching it must fetch the matching
     // prompt role (remotion_engineer instead of manim_engineer).
+    // CR-031 — thu gọn sau PipelineSettingsBar's "Đổi".
+    fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
     expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("render-engine-remotion"));
     expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer", "vi");
@@ -225,6 +227,7 @@ describe("ManimEngineerStepPage", () => {
     it("mang chế độ AI sang tab 1c: ẩn prompt copy tay, hiện nút chạy", async () => {
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
       renderWithAiMode();
+      fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
 
       await waitFor(() => expect(screen.getByTestId("run-with-ai-code")).toBeInTheDocument());
       expect(screen.queryByTestId("manim-engineer-prompt")).not.toBeInTheDocument();
@@ -241,6 +244,7 @@ describe("ManimEngineerStepPage", () => {
         usage: { model: "deepseek" },
       });
       renderWithAiMode();
+      fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
 
       await waitFor(() => expect(screen.getByTestId("run-with-ai-code")).not.toBeDisabled());
       fireEvent.click(screen.getByTestId("run-with-ai-code"));

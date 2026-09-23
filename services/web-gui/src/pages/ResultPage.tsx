@@ -74,7 +74,9 @@ export function ResultPage() {
         video_format_id: project.video_format_id,
         background_music_volume: project.background_music_volume,
       });
-      navigate(`/projects/${projectId}/render`);
+      // Render lại chạy lại saga TỪ ĐẦU, nên nó bắt đầu ở bước 4 (chạy thử +
+      // duyệt dàn ý), không phải bước 5.
+      navigate(`/projects/${projectId}/validate`);
     } catch (err) {
       setRerenderError(err instanceof ApiError ? err.message : String(err));
     } finally {
@@ -107,7 +109,7 @@ export function ResultPage() {
   return (
     <div data-testid="result-page">
       <AppShell
-        currentStep={5}
+        currentStep={6}
         wide
         title="Xem kết quả"
         subtitle="Xem lại video, cắt clip, hoặc render lại — đăng bài chuyển sang bước tiếp theo."
@@ -224,7 +226,7 @@ export function ResultPage() {
                 sourceProjectId={projectId}
                 sourceScriptContent={project.script_content}
                 contentLanguage={project.voice_language}
-                onCreated={(newProjectId) => navigate(`/projects/${newProjectId}/render`)}
+                onCreated={(newProjectId) => navigate(`/projects/${newProjectId}/validate`)}
               />
             </Disclosure>
           )}

@@ -1,0 +1,51 @@
+/* Cùng dáng thẻ với AuthoringModeBar — hàng glass card chạy hết chiều ngang,
+   chữ giải thích bên trái, các lựa chọn bên phải. */
+.card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 18px 22px;
+}
+
+.text {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.hint {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  line-height: 1.5;
+}
+
+.selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  flex: 0 0 auto;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+}
+
+.fieldLabel {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+}
+
+.select {
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(22, 34, 46, 0.16);
+  background: var(--surface, #fff);
+  color: var(--ink);
+  font-size: 12.5px;
+}

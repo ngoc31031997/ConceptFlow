@@ -1,5 +1,5 @@
 import { createContext, useEffect, useReducer, type Dispatch, type ReactNode } from "react";
-import type { AuthoringMode } from "../api/client";
+import type { AuthoringMode, AuthoringStepModels } from "../api/client";
 
 export interface SubtitleStyle {
   fontSize: "small" | "medium" | "large";
@@ -18,8 +18,43 @@ export interface SubtitleStyle {
  */
 export type SubtitleMode = "off" | "track" | "burn_in" | "both";
 
-/** Which of the three script situations the Creator picked in step 1. */
-export type ScriptSource = "blank" | "draft" | "ready";
+/**
+ * CR-031 — bốn tình huống của bước 1, mỗi cái là một điểm vào khác nhau của
+ * chuỗi 1a → 1b → 1c:
+ *
+ *   idea       — chưa có gì, chỉ có ý tưởng      → vào 1a, nhập chủ đề
+ *   outline    — đã có dàn ý                     → vào 1a, dán dàn ý sẵn có
+ *   storyboard — đã có storyboard                → vào 1b, dán storyboard
+ *   code       — đã có code Manim/Remotion       → vào 1c, dán code
+ *
+ * Trước đây chỉ có ba ("blank"/"draft"/"ready"), và hai cái sau đều nghĩa là
+ * "đã có code" — khác nhau ở chỗ code đã đúng chuẩn hệ thống hay chưa. Đó là
+ * thứ lint ở tab 1c tự trả lời được sau khi dán, nên bắt Creator tự phân loại
+ * trước khi dán là hỏi một câu họ chưa có cơ sở để trả lời. Gộp lại thành
+ * "code", và dùng chỗ trống đó cho hai điểm vào thật sự còn thiếu: dàn ý và
+ * storyboard, trước đây không có đường nào ngoài việc giả vờ chọn "chỉ có ý
+ * tưởng" rồi bỏ qua tab đầu.
+ */
+export type ScriptSource = "idea" | "outline" | "storyboard" | "code";
+
+/**
+ * Draft cũ trong localStorage vẫn mang tên tình huống trước CR-031. Không dịch
+ * thì `scriptSource` rơi ra ngoài union và bước 1 không khớp lựa chọn nào —
+ * Creator mở lại tab thấy mình chưa chọn gì, kể cả khi script đã dán xong.
+ */
+const LEGACY_SCRIPT_SOURCES: Record<string, ScriptSource> = {
+  blank: "idea",
+  draft: "code",
+  ready: "code",
+};
+
+function normalizeScriptSource(value: unknown): ScriptSource | null {
+  if (typeof value !== "string") return null;
+  if (value === "idea" || value === "outline" || value === "storyboard" || value === "code") {
+    return value;
+  }
+  return LEGACY_SCRIPT_SOURCES[value] ?? null;
+}
 
 /**
  * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 1 — Script",
@@ -71,6 +106,13 @@ export interface ProjectDraft {
    * step 1. See AuthoringMode. Defaults to "manual".
    */
   authoringMode: AuthoringMode;
+  /**
+   * Model-per-step picker — model Hive cho từng tab (1a/1b/1c), chọn ở bước 1
+   * khi authoringMode là "ai". "" nghĩa là dùng mặc định máy chủ. Lưu
+   * server-side như authoringMode (xem useAuthoringModels), giữ ở đây để mọi
+   * trang đọc cùng một giá trị mà không phải fetch lại.
+   */
+  authoringModels: AuthoringStepModels;
   authoringTopic: string;
   /**
    * CR-025 step 1 — the Story Architect story outline the Creator pasted
@@ -134,6 +176,7 @@ export type ProjectDraftAction =
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
   | { type: "SET_AUTHORING_MODE"; payload: AuthoringMode }
+  | { type: "SET_AUTHORING_MODELS"; payload: AuthoringStepModels }
   | { type: "SET_AUTHORING_TOPIC"; payload: string }
   | { type: "SET_AUTHORING_STORY"; payload: string }
   | { type: "SET_AUTHORING_STORYBOARD"; payload: string }
@@ -151,7 +194,7 @@ export const defaultSubtitleStyle: SubtitleStyle = {
 const initialDraft: ProjectDraft = {
   projectId: "",
   scriptContent: "",
-  scriptSource: "blank",
+  scriptSource: "idea",
   voiceLanguage: "vi",
   backgroundMusicPath: null,
   ttsEnabled: true,
@@ -167,6 +210,7 @@ const initialDraft: ProjectDraft = {
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
   authoringMode: "manual",
+  authoringModels: { story: "", storyboard: "", code: "" },
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",
@@ -286,7 +330,12 @@ function loadDraft(): ProjectDraft {
     // A submitted draft is spent — never restore it onto a new session, but
     // still carry over the last voice (see LAST_VOICE_KEY's docstring).
     if (stored.hasSubmitted) return fresh;
-    return { ...fresh, ...stored, projectId: stored.projectId ?? fresh.projectId };
+    return {
+      ...fresh,
+      ...stored,
+      projectId: stored.projectId ?? fresh.projectId,
+      scriptSource: normalizeScriptSource(stored.scriptSource) ?? fresh.scriptSource,
+    };
   } catch {
     return fresh;
   }
@@ -332,6 +381,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, authoringStory: action.payload };
     case "SET_AUTHORING_MODE":
       return { ...state, authoringMode: action.payload };
+    case "SET_AUTHORING_MODELS":
+      return { ...state, authoringModels: action.payload };
     case "SET_AUTHORING_STORYBOARD":
       return { ...state, authoringStoryboard: action.payload };
     case "MARK_SUBMITTED":

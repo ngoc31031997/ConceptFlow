@@ -9,7 +9,7 @@ import type { ProjectDraft } from "../../src/context/ProjectDraftContext";
 const BASE_DRAFT: ProjectDraft = {
   projectId: "p1",
   scriptContent: "",
-  scriptSource: "ready",
+  scriptSource: "code",
   voiceLanguage: "vi",
   backgroundMusicPath: null,
   ttsEnabled: true,
@@ -22,6 +22,7 @@ const BASE_DRAFT: ProjectDraft = {
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
   authoringMode: "manual",
+  authoringModels: { story: "", storyboard: "", code: "" },
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",
