@@ -38,11 +38,10 @@ export function OAuthCallbackPage() {
   }, [searchParams, navigate]);
 
   return (
-    // Connecting YouTube happens from the result screen, so this is step 5
-    // ("Đăng"). It read 3 — the last step of the wizard back when creation
-    // was three screens — which lit up "Xem lại" mid-publish.
+    // Nối YouTube bắt đầu từ màn kết quả, nên đây là bước 6 ("Kết quả") —
+    // Creator sẽ quay lại đúng chỗ đó sau khi nối xong.
     <AppShell
-      currentStep={5}
+      currentStep={6}
       title={connectedChannel ? `Đã nối kênh ${connectedChannel}` : "Đang kết nối YouTube..."}
       subtitle="Vui lòng chờ trong giây lát."
     >

@@ -1,0 +1,54 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 12px 22px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summaryText {
+  font-size: 13px;
+  color: var(--ink-faint);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.summaryLabel {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.dot {
+  opacity: 0.5;
+}
+
+.toggle {
+  flex: 0 0 auto;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(22, 34, 46, 0.08);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  background: rgba(22, 34, 46, 0.14);
+}
+
+.expanded {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}

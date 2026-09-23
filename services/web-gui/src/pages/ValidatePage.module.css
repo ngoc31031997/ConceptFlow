@@ -3,8 +3,8 @@
   above ProgressTracker in one stacked column pushed the status tracker far
   down the page and made the whole screen feel like a wall of text. Split into
   two columns only while there is actually a second thing to show (the
-  outline); RenderPage falls back to a single centered column the rest of the
-  time, same as before this changed.
+  outline); the page falls back to a single centered column while the dry run
+  is still going.
 */
 .layout {
   display: grid;

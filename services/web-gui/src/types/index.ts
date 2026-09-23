@@ -17,6 +17,15 @@ export interface RenderInput {
   video_output_mode?: "long" | "short" | "both";
   /** CR-026 D1 — links this project to another covering the same topic. */
   companion_project_id?: string;
+  /**
+   * CR-024 cổng duyệt dàn ý; bỏ trống thì server hiểu là bật.
+   *
+   * CR-031 — bước 4 (Validate) CHÍNH LÀ cổng đó: nó là màn hình Creator dừng
+   * lại để xem dàn ý và cảnh báo trước khi tốn TTS/render. Tắt cổng nghĩa là
+   * bước 4 không có gì để dừng và saga chạy thẳng sang bước 5, nên nơi nào
+   * nộp saga từ wizard đều gửi `true` tường minh thay vì dựa vào mặc định.
+   */
+  review_enabled?: boolean;
 }
 
 export interface SubtitleStylePayload {

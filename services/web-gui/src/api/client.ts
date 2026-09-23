@@ -477,10 +477,22 @@ export function resetPromptTemplate(
  * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
  * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
  */
+/**
+ * Một model trong danh mục Hive máy chủ cho phép chọn (model-per-step, tiếp
+ * theo CR-027) — `id` là chuỗi gửi thẳng cho Hive, `label` là tên hiển thị.
+ * "" luôn là một lựa chọn hợp lệ, nghĩa là "dùng mặc định máy chủ".
+ */
+export type AuthoringModelOption = {
+  id: string;
+  label: string;
+};
+
 export type LlmStatus = {
   enabled: boolean;
   provider: string;
   reason?: string;
+  /** Danh mục model cho picker ở bước 1 — rỗng khi chế độ AI chưa khả dụng. */
+  models?: AuthoringModelOption[];
 };
 
 export function getLlmStatus(): Promise<LlmStatus> {
@@ -583,6 +595,10 @@ export interface AuthoringState {
   story: string;
   storyboard: string;
   code: string;
+  /** Model-per-step picker's đã lưu cho project này — "" nghĩa là mặc định. */
+  story_model?: string;
+  storyboard_model?: string;
+  code_model?: string;
 }
 
 export function getAuthoringState(projectId: string): Promise<AuthoringState> {
@@ -601,6 +617,25 @@ export async function saveAuthoringMode(projectId: string, mode: AuthoringMode):
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mode }),
+  });
+}
+
+/** Model-per-step picker's cho từng tab — "" nghĩa là dùng mặc định máy chủ. */
+export interface AuthoringStepModels {
+  story: string;
+  storyboard: string;
+  code: string;
+}
+
+/**
+ * Lưu model Hive cho cả ba tab 1a/1b/1c trong một lượt — một picker ở bước 1
+ * quyết định cho cả ba, giống hệt cách saveAuthoringMode lưu cách làm.
+ */
+export async function saveAuthoringModels(projectId: string, models: AuthoringStepModels): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/models`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(models),
   });
 }
 

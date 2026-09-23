@@ -499,3 +499,66 @@ func NormalizeAuthoringMode(s string) string {
 	}
 	return string(AuthoringModeManual)
 }
+
+// AuthoringModelOption is one entry of the Hive model picker the Creator sees
+// at wizard step 1 (in-app authoring, model-per-step follow-up to CR-027).
+// ID is the exact string Hive's chat-completions API expects in the "model"
+// field — the two values below are the ones CR-027's own measurements were
+// taken against (see llm_provider.go's TokenUsage doc and hive_client.go).
+type AuthoringModelOption struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+}
+
+// AuthoringModelCatalog is the fixed list the picker offers. "" is always
+// first and always valid: it means "use the server's configured default"
+// (HIVE_MODEL), which is what every project used before this picker existed
+// and what an empty/legacy project_authoring row still means today.
+var AuthoringModelCatalog = []AuthoringModelOption{
+	{ID: "", Label: "Mặc định máy chủ"},
+	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
+	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
+}
+
+// ValidAuthoringModel reports whether id is "" (server default) or one of
+// AuthoringModelCatalog's entries. Like ValidAuthoringMode, the write path
+// rejects anything else rather than silently falling back — a client and
+// server that disagree about which models exist need to be told, not papered
+// over with a default that quietly ignores the Creator's choice.
+func ValidAuthoringModel(id string) bool {
+	if id == "" {
+		return true
+	}
+	for _, opt := range AuthoringModelCatalog {
+		if opt.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+// AuthoringStepModels is the per-step model choice for one project — one Hive
+// model id (or "" for the server default) per tab of "Bước 1 — Script". Only
+// meaningful when AuthoringMode is "ai"; a manual project simply carries
+// empty strings here.
+type AuthoringStepModels struct {
+	Story      string
+	Storyboard string
+	Code       string
+}
+
+// ModelFor returns the chosen model for one authoring step ("story",
+// "storyboard", or "code"), or "" for an unrecognised step — callers already
+// validate the step elsewhere (RoleFor), so this never has to reject one.
+func (m AuthoringStepModels) ModelFor(step string) string {
+	switch step {
+	case "story":
+		return m.Story
+	case "storyboard":
+		return m.Storyboard
+	case "code":
+		return m.Code
+	default:
+		return ""
+	}
+}

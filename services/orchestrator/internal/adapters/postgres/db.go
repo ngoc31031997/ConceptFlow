@@ -337,6 +337,15 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAU
 -- which is exactly what it was doing.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS authoring_mode TEXT NOT NULL DEFAULT 'manual';
 
+-- Model-per-step follow-up to CR-027: which Hive model each of the three
+-- authoring tabs (1a story / 1b storyboard / 1c code) calls, instead of the
+-- one model HIVE_MODEL hardcodes for the whole deployment. "" means "server
+-- default" — same meaning, same reasoning as authoring_mode's own default
+-- above, and the value every project had before this picker existed.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_model TEXT NOT NULL DEFAULT '';
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_model TEXT NOT NULL DEFAULT '';
+
 -- CR-028 FR85.2: projects never had a created_at column — every existing
 -- consumer of this table either already knew its own creation time (the
 -- Creator, from the wizard) or didn't need it. FR85's collision list does

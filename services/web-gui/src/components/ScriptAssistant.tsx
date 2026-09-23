@@ -1,25 +1,12 @@
 import { useMemo, useState } from "react";
 import { buildAdjustPromptFor, buildRemotionAdjustPromptFor } from "./scriptPrompts";
-import { Card, Button, TextArea } from "./ui";
+import { Card, TextArea } from "./ui";
 import styles from "./ScriptAssistant.module.css";
-
-/**
- * "Dựng từ đầu" (blank) moved out to its own 4-tab sub-wizard
- * (ScriptOutlineStepPage → .../storyboard → .../code → .../review, see
- * ScriptPipelineTabs) — this component now only covers the two situations
- * that skip that pipeline entirely: the Creator already has SOME code and
- * either needs it adjusted to fit this system's conventions ("draft") or it
- * already fits and just needs pasting into the editor ("ready").
- */
-export type ScriptSource = "draft" | "ready";
 
 interface ScriptAssistantProps {
   contentLanguage: "vi" | "en";
   /** Which engine's conventions the adjust-prompt/hints should talk about. */
   renderEngine: "manim" | "remotion";
-  /** Replaces the editor's content — used by "dùng script mẫu" (Manim only). */
-  onUseTemplate: () => void;
-  source: ScriptSource;
 }
 
 function CopyIcon() {
@@ -32,14 +19,16 @@ function CopyIcon() {
 }
 
 /**
- * "draft": the Creator has an existing script that doesn't yet fit this
- * system's conventions — collects it, hands back an adjust-prompt ready to
- * paste into an external AI, whose result gets pasted into the sibling
- * ScriptEditor (not here — this only produces the prompt).
+ * Trợ lý chuẩn hoá code sẵn có: nhận code Creator đã viết ở đâu đó, trả về
+ * một prompt yêu cầu AI sửa nó cho khớp quy ước hệ thống. Nó CHỈ sinh prompt —
+ * kết quả được dán vào ô soạn thảo của tab 1c, không phải vào đây.
  *
- * "ready": the script already fits; no AI round trip needed at all.
+ * CR-031 — trước đây component này còn một nhánh "ready" chỉ gồm một đoạn
+ * hướng dẫn và nút script mẫu, dùng ở màn "/" cũ. Màn đó giờ chỉ còn chọn
+ * tình huống, và cả hai thứ kia đã về tab 1c (nơi ô soạn thảo thật sự nằm),
+ * nên nhánh đó không còn ai gọi.
  */
-export function ScriptAssistant({ contentLanguage, renderEngine, onUseTemplate, source }: ScriptAssistantProps) {
+export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssistantProps) {
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
@@ -61,34 +50,6 @@ export function ScriptAssistant({ contentLanguage, renderEngine, onUseTemplate, 
     } catch {
       setCopied(false);
     }
-  }
-
-  if (source === "ready") {
-    return (
-      <Card data-testid="script-assistant">
-        <div data-testid="script-assistant-ready">
-          <p className={styles.panelLead}>
-            {renderEngine === "remotion" ? (
-              <>
-                Dán code của bạn vào ô soạn thảo bên cạnh. Đảm bảo đã có{" "}
-                <code>export const narrations</code> và <code>{'<Composition id="creator" ...>'}</code>{" "}
-                đúng chuẩn hệ thống.
-              </>
-            ) : (
-              <>
-                Dán script của bạn vào ô soạn thảo bên cạnh. Hệ thống sẽ kiểm tra ngay script có kế thừa{" "}
-                <code>ConceptFlowScene</code> và dùng <code>{'self.narrate("...")'}</code> đúng chuẩn không.
-              </>
-            )}
-          </p>
-          {renderEngine === "manim" && (
-            <Button variant="ghost" onClick={onUseTemplate} data-testid="script-assistant-template">
-              Hoặc xem một script mẫu chạy được ngay
-            </Button>
-          )}
-        </div>
-      </Card>
-    );
   }
 
   return (

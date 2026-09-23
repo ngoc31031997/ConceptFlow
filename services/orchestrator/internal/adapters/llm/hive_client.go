@@ -169,8 +169,15 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 	}
 	messages = append(messages, hiveMessage{Role: "user", Content: req.User})
 
+	// req.Model is the model-per-step picker's choice for this call; ""
+	// (no override, or a project that never touched the picker) falls back
+	// to the adapter's own configured model (HIVE_MODEL).
+	requestModel := c.model
+	if req.Model != "" {
+		requestModel = req.Model
+	}
 	body, err := json.Marshal(hiveRequest{
-		Model: c.model, Messages: messages,
+		Model: requestModel, Messages: messages,
 		MaxTokens: req.MaxTokens, Temperature: req.Temperature,
 	})
 	if err != nil {
@@ -214,7 +221,11 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 
 	model := parsed.Model
 	if model == "" {
-		model = c.model
+		// Hive did not echo the model back — fall back to the one this
+		// call actually requested (the per-step override if there was one,
+		// else the adapter's own default), not blindly c.model, or a usage
+		// row for an overridden call would misreport which model was billed.
+		model = requestModel
 	}
 	usage := application.TokenUsage{
 		Model:            model,

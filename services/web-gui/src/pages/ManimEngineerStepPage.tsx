@@ -7,9 +7,11 @@ import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectD
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
+import { Disclosure } from "../components/Disclosure";
+import { ScriptAssistant } from "../components/ScriptAssistant";
+import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
-import { RenderEnginePicker } from "../components/RenderEnginePicker";
-import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
@@ -135,6 +137,10 @@ export function ManimEngineerStepPage() {
   const validation = isRemotion ? validateRemotionScript(code) : validateScript(code, draft.voiceLanguage);
   const isEmpty = code.trim().length === 0;
   const isValid = !isEmpty && validation.isValid;
+  // CR-031 — tình huống "Đã có code" vào thẳng tab này. Trước đây nó có màn
+  // riêng ở "/" kèm ScriptAssistant; giờ trợ lý đó sống ở đây, cạnh đúng ô
+  // soạn thảo mà kết quả của nó phải được dán vào.
+  const hasOwnCode = draft.scriptSource === "code";
 
   async function handleContinue() {
     if (!isValid) return;
@@ -171,7 +177,16 @@ export function ManimEngineerStepPage() {
 
   return (
     <div data-testid="manim-engineer-step-page">
-      <AppShell currentStep={1} title="Bước 1 — Script" subtitle={`1c. Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`} wide>
+      <AppShell
+        currentStep={1}
+        title="Bước 1 — Script"
+        subtitle={
+          hasOwnCode
+            ? `1c. Dán code ${isRemotion ? "Remotion" : "Manim"} sẵn có của bạn — hệ thống kiểm tra ngay.`
+            : `1c. Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
+        }
+        wide
+      >
         <ScriptPipelineTabs
           active="code"
           outlineDone={draft.authoringStory.trim().length > 0}
@@ -179,10 +194,10 @@ export function ManimEngineerStepPage() {
           codeDone={!isEmpty}
         />
 
-        <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
-          <RenderEnginePicker
-            value={draft.renderEngine}
-            onChange={(engine) => {
+        <div className={styles.settingsRow}>
+          <PipelineSettingsBar
+            renderEngine={draft.renderEngine}
+            onEngineChange={(engine) => {
               dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
               // CR-030 — server phải biết engine trước khi render prompt cho
               // storyboard/code (RoleFor đọc project.RenderEngine), không chỉ
@@ -192,11 +207,6 @@ export function ManimEngineerStepPage() {
                 void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
               }
             }}
-          />
-        </div>
-
-        <div className={styles.settingsRow}>
-          <AuthoringModeBar
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
@@ -208,6 +218,33 @@ export function ManimEngineerStepPage() {
             onGenerated={(_step, content) => setCode(content)}
           />
         </div>
+
+        {/* Chỉ hiện cho tình huống "Đã có code": đây là đường đi khi code sẵn
+            có chưa đúng chuẩn hệ thống (thiếu self.narrate / thiếu
+            narrations+Composition). Mở sẵn khi ô code còn trống, vì lúc đó nó
+            chính là việc tiếp theo; đã dán code rồi thì thu lại để không che
+            mất kết quả lint. */}
+        {hasOwnCode && (
+          <div className={styles.settingsRow}>
+            <Disclosure
+              title={`Code sẵn có chưa đúng chuẩn? Lấy prompt chuẩn hoá ${isRemotion ? "Remotion" : "Manim"}`}
+              hint="Dán code cũ vào đây để nhận một prompt yêu cầu AI sửa nó về đúng quy ước của hệ thống."
+              defaultOpen={isEmpty}
+              testId="existing-code-assistant"
+            >
+              <ScriptAssistant contentLanguage={draft.voiceLanguage} renderEngine={draft.renderEngine} />
+              {!isRemotion && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setCode(SCRIPT_TEMPLATES[draft.voiceLanguage])}
+                  data-testid="script-assistant-template"
+                >
+                  Hoặc dùng một script mẫu chạy được ngay
+                </Button>
+              )}
+            </Disclosure>
+          </div>
+        )}
 
         <div className={aiMode ? styles.scriptLayoutSingle : styles.scriptLayout}>
           {/* Ở chế độ AI, thẻ prompt không còn việc gì: server render đúng văn
@@ -258,8 +295,8 @@ export function ManimEngineerStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
-        onBack={() => navigate("/create/script/storyboard")}
-        backLabel="Quay lại Storyboard"
+        onBack={() => navigate(hasOwnCode ? "/" : "/create/script/storyboard")}
+        backLabel={hasOwnCode ? "Quay lại chọn tình huống" : "Quay lại Storyboard"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={!isValid || saving}

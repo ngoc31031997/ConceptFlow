@@ -18,6 +18,14 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
  * because a bookkeeping request did not land would block the actual work over
  * nothing. The mode is re-sent on the next toggle anyway.
  */
+// One save can still be in flight when the next tab mounts and immediately
+// re-fetches (the Creator toggled the mode on step 1, then hit "Tiếp tục"
+// before the PUT settled). Tracking it here — module scope, keyed by
+// project — lets that tab's read notice the race and trust the draft's own
+// value instead of a GET that can resolve before the PUT it raced against
+// has committed.
+const pendingSaves = new Map<string, Promise<unknown>>();
+
 export function useAuthoringMode(projectId: string): {
   mode: AuthoringMode;
   setMode: (mode: AuthoringMode) => void;
@@ -31,8 +39,10 @@ export function useAuthoringMode(projectId: string): {
     getAuthoringState(projectId)
       .then((state) => {
         // A server that does not know this field yet sends nothing; keep the
-        // draft's value rather than resetting the Creator to manual.
-        if (!cancelled && state.mode) {
+        // draft's value rather than resetting the Creator to manual. Same if
+        // a save for this project is still in flight — this read may have
+        // been resolved by a stale value that predates it.
+        if (!cancelled && state.mode && !pendingSaves.has(projectId)) {
           dispatch({ type: "SET_AUTHORING_MODE", payload: state.mode });
         }
       })
@@ -50,8 +60,12 @@ export function useAuthoringMode(projectId: string): {
     setMode: (mode) => {
       dispatch({ type: "SET_AUTHORING_MODE", payload: mode });
       if (!projectId) return;
-      void saveAuthoringMode(projectId, mode).catch(() => {
+      const save = saveAuthoringMode(projectId, mode).catch(() => {
         /* best-effort — see the docstring */
+      });
+      pendingSaves.set(projectId, save);
+      void save.finally(() => {
+        if (pendingSaves.get(projectId) === save) pendingSaves.delete(projectId);
       });
     },
   };

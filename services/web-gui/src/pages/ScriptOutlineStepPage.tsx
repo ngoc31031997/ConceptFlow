@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
-import { RenderEnginePicker } from "../components/RenderEnginePicker";
-import { AuthoringModeBar } from "../components/AuthoringModeBar";
+import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
@@ -153,6 +152,10 @@ export function ScriptOutlineStepPage() {
 
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
   const topicIsEmpty = draft.authoringTopic.trim().length === 0;
+  // CR-031 — "Đã có dàn ý" vào đúng tab này, nhưng để dán chứ không để sinh.
+  // Cùng một màn hình, hai nửa khác nhau được dùng, nên chữ phải nói rõ nửa
+  // nào là việc của Creator lúc này.
+  const hasOwnOutline = draft.scriptSource === "outline";
   const llm = useLlmStatus();
   // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
   // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
@@ -180,12 +183,23 @@ export function ScriptOutlineStepPage() {
   const hint = saveError
     ? saveError
     : storyIsEmpty
-      ? "Dán dàn ý câu chuyện AI trả về để tiếp tục"
+      ? hasOwnOutline
+        ? "Dán dàn ý sẵn có của bạn để tiếp tục"
+        : "Dán dàn ý câu chuyện AI trả về để tiếp tục"
       : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh";
 
   return (
     <div data-testid="script-outline-step-page">
-      <AppShell currentStep={1} wide title="Bước 1 — Script" subtitle="1a. Dựng dàn ý câu chuyện với Story Architect.">
+      <AppShell
+        currentStep={1}
+        wide
+        title="Bước 1 — Script"
+        subtitle={
+          hasOwnOutline
+            ? "1a. Dán dàn ý sẵn có của bạn vào ô bên phải — không cần chạy Story Architect."
+            : "1a. Dựng dàn ý câu chuyện với Story Architect."
+        }
+      >
         <ScriptPipelineTabs
           active="outline"
           outlineDone={!storyIsEmpty}
@@ -193,33 +207,21 @@ export function ScriptOutlineStepPage() {
           codeDone={draft.scriptContent.trim().length > 0}
         />
 
-        {/* CR-030 — engine chọn ở đây, không chỉ ở 1c: nút "chạy cả bước 1"
-            bên dưới gọi luôn cả 1b/1c, nên tới lúc Creator xuống tới 1c để
-            đổi thì storyboard/code đã render bằng engine mặc định (Manim)
-            rồi. onChange lưu lên server ngay — xem AuthoringModeBar's
-            beforeRun bên dưới cho lượt lưu lại ngay trước khi chuỗi chạy. */}
+        {/* CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
+            huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
+            chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
+            mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
+            "chạy cả bước 1" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
+            xong TRƯỚC khi bấm chạy, không phải ở 1c lúc đã muộn). */}
         <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
-          <RenderEnginePicker
-            value={draft.renderEngine}
-            onChange={(engine) => {
+          <PipelineSettingsBar
+            renderEngine={draft.renderEngine}
+            onEngineChange={(engine) => {
               dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
               if (draft.projectId) {
                 void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
               }
             }}
-          />
-        </div>
-
-        {/* CR-027 FR79 — cách làm cả bước 1, đặt ngang hàng với
-            ContentLanguagePicker ở các bước khác: Creator chọn một lần, cả 3
-            tab 1a–1c đi theo.
-
-            CR-030 — ở chế độ AI, nút này chạy thẳng cả ba bước: chủ đề là đầu
-            vào duy nhất của cả chuỗi, nên bắt Creator quay lại bấm ở 1b rồi
-            1c chỉ là ba lần chờ thay vì một. Tab 1b/1c vẫn giữ nút chạy riêng
-            để sinh lại đúng một bước sau khi sửa tay. */}
-        <div className={styles.settingsRow}>
-          <AuthoringModeBar
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
@@ -252,11 +254,13 @@ export function ScriptOutlineStepPage() {
 
         <div className={styles.scriptLayout}>
           <Card
-            title={aiMode ? "1. Chủ đề" : "1. Copy prompt"}
+            title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Copy prompt"}
             hint={
-              aiMode
-                ? "Chủ đề là tất cả những gì bước này cần — server tự điền nó vào prompt khi gọi AI."
-                : "Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
+              hasOwnOutline
+                ? "Đã có dàn ý rồi thì chủ đề chỉ để đặt tên và đối chiếu trùng lặp — prompt bên dưới bỏ qua được."
+                : aiMode
+                  ? "Chủ đề là tất cả những gì bước này cần — server tự điền nó vào prompt khi gọi AI."
+                  : "Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
             }
           >
             <TextInput
@@ -301,11 +305,13 @@ export function ScriptOutlineStepPage() {
           </Card>
 
           <Card
-            title={aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
+            title={hasOwnOutline ? "Dàn ý của bạn" : aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
             hint={
-              aiMode
-                ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
-                : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+              hasOwnOutline
+                ? "Dán dàn ý sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                : aiMode
+                  ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                  : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
             }
           >
             <TextArea

@@ -224,6 +224,10 @@ type AuthoringStateReaderPort interface {
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
+	// GetAuthoringModels returns the per-step Hive model choice, zero value
+	// ("" for every step, meaning "server default") for a project saved
+	// before this picker existed.
+	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
 }
 
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
@@ -236,6 +240,10 @@ type AuthoringState struct {
 	Story      string
 	Storyboard string
 	Code       string
+	// Models is the per-step Hive model choice, only meaningful when Mode is
+	// "ai" — each field either "" (server default) or one of
+	// domain.AuthoringModelCatalog's ids.
+	Models domain.AuthoringStepModels
 }
 
 // GetAuthoringStateUseCase backs the read side of CR-025's authoring pipeline.
@@ -268,9 +276,13 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
+	models, err := uc.authoring.GetAuthoringModels(ctx, projectID)
+	if err != nil {
+		return AuthoringState{}, err
+	}
 	return AuthoringState{
 		Mode: domain.NormalizeAuthoringMode(mode), Topic: topic,
-		Story: story, Storyboard: storyboard, Code: code,
+		Story: story, Storyboard: storyboard, Code: code, Models: models,
 	}, nil
 }
 
@@ -310,4 +322,41 @@ func (uc *SaveAuthoringModeUseCase) Execute(ctx context.Context, projectID, mode
 		return fmt.Errorf("mode must be %q or %q", domain.AuthoringModeManual, domain.AuthoringModeAI)
 	}
 	return uc.authoring.SaveAuthoringMode(ctx, projectID, mode)
+}
+
+// AuthoringModelsPort persists the per-step Hive model choice — the
+// model-per-step follow-up to CR-027's FR79 mode switch.
+type AuthoringModelsPort interface {
+	SaveAuthoringModels(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
+}
+
+// SaveAuthoringModelsUseCase stores which Hive model each of the three
+// authoring tabs calls when the Creator runs step 1 by API. One picker at
+// step 1 sets all three at once (mirrors AuthoringMode: a Creator who has
+// already decided this on 1a does not want to decide it again per tab), but
+// each tab can still come back and change its own later, so all three save
+// together here rather than being locked in per-tab.
+type SaveAuthoringModelsUseCase struct {
+	authoring AuthoringModelsPort
+}
+
+func NewSaveAuthoringModelsUseCase(authoring AuthoringModelsPort) *SaveAuthoringModelsUseCase {
+	return &SaveAuthoringModelsUseCase{authoring: authoring}
+}
+
+// Execute validates every non-empty model id against the catalog and saves
+// the triple. Like SaveAuthoringModeUseCase, an unknown id is rejected
+// rather than silently normalised to the default — a client offering a model
+// id this server does not recognise means the two have drifted apart, which
+// silently falling back would hide.
+func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID string, models domain.AuthoringStepModels) error {
+	if projectID == "" {
+		return fmt.Errorf("project_id is required")
+	}
+	for _, id := range []string{models.Story, models.Storyboard, models.Code} {
+		if !domain.ValidAuthoringModel(id) {
+			return fmt.Errorf("unknown model %q", id)
+		}
+	}
+	return uc.authoring.SaveAuthoringModels(ctx, projectID, models)
 }

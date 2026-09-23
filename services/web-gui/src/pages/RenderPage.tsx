@@ -1,66 +1,49 @@
-import { useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
-import { OutlineReview } from "../components/OutlineReview";
-import { OutlineActions } from "../components/OutlineActions";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
-import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
-import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { statusToStep } from "../utils/pipelineLabels";
-import type { Project } from "../types";
+import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
 import glass from "../styles/glass.module.css";
-import styles from "./RenderPage.module.css";
 
-// Steps whose input comes straight from the "Soạn nội dung" screen
-// (script/plugin/category) — a failure here is most likely a bad input,
-// so the user should go back and fix it rather than blindly retry the
-// same input against the same failing step.
-// validate_script (CR-020) is where a Creator's own script mistake (bad API
-// call, crashed dry run, missing beat) surfaces — the Creator needs to go
-// fix the script, not retry the same broken one. classify_scenes no longer
-// exists in the saga but is kept here for old projects that failed on it
-// before that step was removed.
-const INPUT_RELATED_STEPS = new Set(["parse_script", "validate_script", "classify_scenes"]);
-
-// useOutlineReview cannot be called conditionally (Rules of Hooks) even
-// though its buttons only render once `project` exists — this placeholder
-// keeps the hook call unconditional without ever being read for real, since
-// nothing renders the actions until isAwaitingReview && project are true.
-const EMPTY_PROJECT: Project = { project_id: "", status: "draft", voice_language: "vi", scenes: [] };
-
+/**
+ * Bước 5 của 7 — "Xử lý": phần đắt, chạy sau khi Creator duyệt dàn ý ở bước 4.
+ *
+ * CR-031 — màn này từng ôm cả lượt chạy thử kịch bản lẫn cổng duyệt dàn ý.
+ * Cả hai đã sang bước 4 (ValidatePage), nên ở đây không còn nhánh nào dừng
+ * chờ người: mọi thứ từ lúc này tới `ready_to_publish` đều tự chạy, và việc
+ * duy nhất của trang là cho thấy nó chạy tới đâu.
+ *
+ * Lỗi ở đây khác hẳn lỗi ở bước 4. TTS/render/ghép hỏng thường vì hạ tầng —
+ * hết quota, worker chết, hết đĩa — nên "Thử lại" là việc đúng, và không có
+ * nút quay về sửa script: script này đã qua lượt chạy thử và đã được duyệt.
+ */
 export function RenderPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
   const progressState = useSSE(projectId);
-  const { project, refetch } = useProject(projectId);
-  const dispatchDraft = useContext(ProjectDraftDispatchContext);
+  const { project } = useProject(projectId);
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
 
-  // CR-024: Saga đang dừng chờ người, không phải đang chạy. Phân biệt hai thứ
-  // này là cả điểm của FR69.5 — nếu không Creator sẽ ngồi đợi một tiến trình
-  // đã dừng từ lâu.
-  const isAwaitingReview = project?.status === "awaiting_review";
-
-  const outline = useOutlineReview(project ?? EMPTY_PROJECT, refetch, () => {
-    // Server has already put this project_id back to draft (review_outline.go
-    // Reject). RESUME_EDITING keeps the script and project_id intact — only
-    // clears hasSubmitted — so ScriptStepPage does not wipe them via its own
-    // reset-on-mount.
-    dispatchDraft({ type: "RESUME_EDITING" });
-    navigate("/");
-  });
+  // Một project chưa qua bước 4 (hoặc đã xong hẳn) không thuộc màn này. Bookmark
+  // cũ, nút back sau khi duyệt, hay một saga bị đẩy lùi vì Creator từ chối dàn
+  // ý — cả ba đều dẫn tới đây với một trạng thái mà trang này không có gì để
+  // hiển thị ngoài bốn ô "pending" bất động.
+  const phase = project ? projectPhase(project.status) : null;
+  useEffect(() => {
+    if (project && phase !== "process") {
+      navigate(projectPath(projectId, project.status), { replace: true });
+    }
+  }, [project, phase, projectId, navigate]);
 
   const isFailed =
     progressState.status === "failed" || Boolean(project?.status.startsWith("failed_at_"));
   const errorMessage = progressState.errorMessage ?? project?.error_message ?? "";
-  const failedStep = progressState.currentStep ?? project?.status.replace("failed_at_", "") ?? null;
-  const isInputError = isFailed && failedStep !== null && INPUT_RELATED_STEPS.has(failedStep);
 
   // Bug report: navigating away mid-render and back showed "Đang khởi
   // tạo..." with no sign of progress, or of whether it was even still
@@ -70,19 +53,18 @@ export function RenderPage() {
   // client-side can pause a saga already running server-side); only the
   // tracker looked stuck. Seed it from the project's own persisted status
   // until a live message replaces it with real scene/elapsed detail.
-  const displayStep = isFailed
-    ? failedStep
-    : (progressState.currentStep ?? (project ? statusToStep(project.status) : null));
+  const displayStep =
+    (isFailed
+      ? (progressState.currentStep ?? project?.status.replace("failed_at_", ""))
+      : progressState.currentStep) ?? (project ? statusToStep(project.status) : null);
   const displayProgressState =
     displayStep && displayStep !== progressState.currentStep
-      ? { ...progressState, currentStep: displayStep, status: isFailed ? progressState.status : "in_progress" as const }
+      ? {
+          ...progressState,
+          currentStep: displayStep,
+          status: isFailed ? progressState.status : ("in_progress" as const),
+        }
       : progressState;
-
-  useEffect(() => {
-    if (project?.status === "ready_to_publish") {
-      navigate(`/projects/${projectId}/result`);
-    }
-  }, [project?.status, projectId, navigate]);
 
   async function handleRetry() {
     setIsRetrying(true);
@@ -99,75 +81,36 @@ export function RenderPage() {
   return (
     <div data-testid="render-page">
       <AppShell
-        currentStep={4}
-        wide={isAwaitingReview}
+        currentStep={5}
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }
-        title={
-          isFailed
-            ? "Đã xảy ra lỗi"
-            : isAwaitingReview
-              ? "Duyệt dàn ý trước khi sản xuất"
-              : "Đang xử lý video"
-        }
+        title={isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
         subtitle={
           isFailed
-            ? "Một bước trong quá trình xử lý không hoàn tất."
-            : isAwaitingReview
-              ? "Chưa tạo giọng đọc, chưa render — sửa gì cũng không tốn gì. Duyệt xong hệ thống mới bắt đầu tốn tiền/thời gian."
-              : "Hệ thống đang tạo hoạt hình, giọng đọc và ghép video cho bạn."
+            ? "Một bước trong quá trình sản xuất không hoàn tất."
+            : "Dàn ý đã duyệt — hệ thống đang tạo giọng đọc, render hoạt hình và ghép video."
         }
       >
-        {isAwaitingReview && project ? (
-          /*
-            Two columns only while there is an outline to review: it can run
-            to dozens of lines, and stacking it above the tracker used to push
-            status far down a wall of text. The tracker moves to a sticky
-            side column instead of disappearing — Creator still sees where
-            the saga is while reading/editing the outline.
-
-            OutlineActions (Duyệt/Từ chối) sits at the TOP of that side
-            column, above the tracker — bug report: the buttons used to live
-            at the bottom of the outline list itself, which could run to
-            dozens of lines and scroll them out of view exactly when needed.
-          */
-          <div className={styles.layout}>
-            <OutlineReview project={project} outline={outline} />
-            <div className={styles.tracker}>
-              <OutlineActions outline={outline} />
-              <div className={glass.mtSm}>
-                <ProgressTracker
-                  progressState={displayProgressState}
-                  isFailed={isFailed}
-                />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/*
-              The tracker stays visible after a failure. Replacing it outright
-              hid how far the pipeline actually got, which is the first thing
-              you want to know when deciding between retrying and going back
-              to the script.
-            */}
-            {isFailed && (
-              <ErrorBanner
-                errorMessage={retryError ?? errorMessage}
-                onRetry={handleRetry}
-                isRetrying={isRetrying}
-                onBack={isInputError ? () => navigate("/") : undefined}
-              />
-            )}
-            <ProgressTracker
-              progressState={displayProgressState}
-              isFailed={isFailed}
-            />
-          </>
+        {/*
+          The tracker stays visible after a failure. Replacing it outright
+          hid how far the pipeline actually got, which is the first thing
+          you want to know when deciding whether to retry.
+        */}
+        {isFailed && (
+          <ErrorBanner
+            errorMessage={retryError ?? errorMessage}
+            onRetry={handleRetry}
+            isRetrying={isRetrying}
+          />
         )}
+        <ProgressTracker
+          progressState={displayProgressState}
+          steps={PROCESS_STEPS}
+          isFailed={isFailed}
+        />
       </AppShell>
     </div>
   );

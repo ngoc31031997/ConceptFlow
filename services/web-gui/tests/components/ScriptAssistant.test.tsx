@@ -2,16 +2,11 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ScriptAssistant } from "../../src/components/ScriptAssistant";
 
-// "Dựng từ đầu" (blank) moved out to its own 4-tab sub-wizard
-// (ScriptOutlineStepPage etc. — see ScriptPipelineTabs); ScriptAssistant now
-// only covers "draft" (adjust an existing script) and "ready" (paste
-// directly, no AI round trip).
-function renderAssistant(source: "draft" | "ready" = "draft", renderEngine: "manim" | "remotion" = "manim") {
-  const onUseTemplate = vi.fn();
-  render(
-    <ScriptAssistant contentLanguage="vi" renderEngine={renderEngine} source={source} onUseTemplate={onUseTemplate} />,
-  );
-  return { onUseTemplate };
+// CR-031 — ScriptAssistant chỉ còn một việc: biến code sẵn có thành một
+// prompt yêu cầu AI chuẩn hoá nó. Nhánh "ready" cũ (hướng dẫn + nút script
+// mẫu) đã về tab 1c, nơi ô soạn thảo thật sự nằm.
+function renderAssistant(renderEngine: "manim" | "remotion" = "manim") {
+  render(<ScriptAssistant contentLanguage="vi" renderEngine={renderEngine} />);
 }
 
 describe("ScriptAssistant", () => {
@@ -20,7 +15,7 @@ describe("ScriptAssistant", () => {
   it("substitutes the existing script into the Manim adjust prompt", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    renderAssistant("draft");
+    renderAssistant();
 
     fireEvent.change(screen.getByTestId("script-assistant-existing"), {
       target: { value: "class OldScene(Scene): pass" },
@@ -36,7 +31,7 @@ describe("ScriptAssistant", () => {
   it("substitutes the existing script into the Remotion adjust prompt instead, when renderEngine is remotion", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
-    renderAssistant("draft", "remotion");
+    renderAssistant("remotion");
 
     fireEvent.change(screen.getByTestId("script-assistant-existing"), {
       target: { value: "export const narrations = ['x'];" },
@@ -53,7 +48,7 @@ describe("ScriptAssistant", () => {
   });
 
   it("says when the prompt is still missing its input", () => {
-    renderAssistant("draft");
+    renderAssistant();
     expect(screen.getByText("Chưa dán script")).toBeInTheDocument();
 
     fireEvent.change(screen.getByTestId("script-assistant-existing"), {
@@ -62,19 +57,4 @@ describe("ScriptAssistant", () => {
     expect(screen.getByText("Đã gắn script của bạn")).toBeInTheDocument();
   });
 
-  it("skips the AI round trip entirely for a ready script (Manim)", () => {
-    const { onUseTemplate } = renderAssistant("ready");
-
-    expect(screen.queryByTestId("script-assistant-guide")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("script-assistant-template"));
-    expect(onUseTemplate).toHaveBeenCalled();
-  });
-
-  it("has no sample-template button for a ready Remotion script (no Remotion sample exists)", () => {
-    renderAssistant("ready", "remotion");
-
-    expect(screen.queryByTestId("script-assistant-guide")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("script-assistant-template")).not.toBeInTheDocument();
-    expect(screen.getByText(/export const narrations/)).toBeInTheDocument();
-  });
 });

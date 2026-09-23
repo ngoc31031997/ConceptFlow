@@ -32,6 +32,14 @@ function renderPage() {
   );
 }
 
+// CR-031 bug report — engine/cách làm đã chốt ở màn chọn tình huống, nên mỗi
+// tab giờ chỉ hiện một dòng tóm tắt, thu gọn hai bộ chọn đầy đủ lại (xem
+// PipelineSettingsBar). Các test dưới đây thao tác trực tiếp với hai bộ chọn
+// đó, nên phải mở panel ra trước — y hệt một Creator bấm "Đổi".
+function expandSettings() {
+  fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
+}
+
 describe("ScriptOutlineStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
@@ -138,6 +146,7 @@ describe("ScriptOutlineStepPage", () => {
     it("mặc định chọn Manim và lưu Remotion lên server ngay khi Creator đổi", async () => {
       const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       renderPage();
+      expandSettings();
 
       expect(screen.getByTestId("render-engine-manim")).toHaveAttribute("aria-checked", "true");
 
@@ -159,6 +168,7 @@ describe("ScriptOutlineStepPage", () => {
         usage: { model: "deepseek" },
       });
       renderPage();
+      expandSettings();
 
       fireEvent.click(screen.getByTestId("render-engine-remotion"));
       await waitFor(() => expect(createDraft).toHaveBeenCalledWith(expect.any(String), "", "vi", "remotion"));
@@ -190,6 +200,7 @@ describe("ScriptOutlineStepPage", () => {
     it("mặc định là copy tay: có ô prompt và nút Copy, chưa có nút chạy AI", async () => {
       mockLlm(true);
       renderPage();
+      expandSettings();
 
       await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
       expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
@@ -200,6 +211,7 @@ describe("ScriptOutlineStepPage", () => {
     it("chọn 'Gọi API trực tiếp' thì ẩn ô prompt copy tay và hiện nút chạy", async () => {
       mockLlm(true);
       renderPage();
+      expandSettings();
 
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
@@ -230,6 +242,7 @@ describe("ScriptOutlineStepPage", () => {
           usage: { model: "deepseek" },
         }));
       renderPage();
+      expandSettings();
 
       fireEvent.change(screen.getByTestId("script-outline-topic"), {
         target: { value: "Vòng lặp for" },
@@ -263,6 +276,7 @@ describe("ScriptOutlineStepPage", () => {
           };
         });
       renderPage();
+      expandSettings();
 
       fireEvent.change(screen.getByTestId("script-outline-topic"), {
         target: { value: "Vòng lặp for" },
@@ -291,6 +305,7 @@ describe("ScriptOutlineStepPage", () => {
         usage: { model: "deepseek" },
       });
       renderPage();
+      expandSettings();
 
       fireEvent.change(screen.getByTestId("script-outline-topic"), {
         target: { value: "Cây nhị phân" },
@@ -309,6 +324,7 @@ describe("ScriptOutlineStepPage", () => {
     it("không cho chọn chế độ AI khi chưa có API key", async () => {
       mockLlm(false, "Chưa cấu hình HIVE_API_KEY");
       renderPage();
+      expandSettings();
 
       await waitFor(() =>
         expect(screen.getByTestId("authoring-mode-bar")).toHaveTextContent("HIVE_API_KEY"),
@@ -327,6 +343,7 @@ describe("ScriptOutlineStepPage", () => {
         new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Copy prompt như cũ."),
       );
       renderPage();
+      expandSettings();
 
       fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "X" } });
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
@@ -346,6 +363,7 @@ describe("ScriptOutlineStepPage", () => {
       mockLlm(true);
       const saveMode = vi.spyOn(apiClient, "saveAuthoringMode").mockResolvedValue(undefined);
       renderPage();
+      expandSettings();
 
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
@@ -372,6 +390,7 @@ describe("ScriptOutlineStepPage", () => {
         code: "",
       });
       renderPage();
+      expandSettings();
 
       await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toBeInTheDocument());
       expect(screen.queryByTestId("script-outline-prompt")).not.toBeInTheDocument();
