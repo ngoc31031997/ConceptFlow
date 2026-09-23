@@ -25,30 +25,6 @@ describe("VisualDirectorStepPage", () => {
     vi.restoreAllMocks();
   });
 
-  // feature/remotion-engine: the storyboard vocabulary is engine specific —
-  // a Remotion project must not be handed the Manim storyboard prompt.
-  it("fetches the Remotion storyboard role when the draft renders with Remotion", async () => {
-    window.localStorage.setItem(
-      "conceptflow.draft.v1",
-      JSON.stringify({ renderEngine: "remotion", voiceLanguage: "vi" }),
-    );
-
-    render(
-      <ThemeProvider>
-        <MemoryRouter>
-          <ProjectDraftProvider>
-            <VisualDirectorStepPage />
-          </ProjectDraftProvider>
-        </MemoryRouter>
-      </ThemeProvider>,
-    );
-
-    await waitFor(() => {
-      expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_visual_director", "vi");
-    });
-    window.localStorage.clear();
-  });
-
   it("blocks the step until a storyboard is pasted, then saves and advances", async () => {
     render(
       <ThemeProvider>

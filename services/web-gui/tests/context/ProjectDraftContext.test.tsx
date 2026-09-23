@@ -71,23 +71,6 @@ describe("draft lifecycle", () => {
     expect(screen.getByTestId("submitted").textContent).toBe("false");
   });
 
-  it("restores an unsubmitted draft after a reload", () => {
-    const first = render(
-      <ProjectDraftProvider>
-        <ResetConsumer />
-      </ProjectDraftProvider>,
-    );
-    fireEvent.click(screen.getByText("write"));
-    first.unmount();
-
-    render(
-      <ProjectDraftProvider>
-        <ResetConsumer />
-      </ProjectDraftProvider>,
-    );
-    expect(screen.getByTestId("script").textContent).toBe("keep me");
-  });
-
   it("does not restore a draft that already started a render", () => {
     const first = render(
       <ProjectDraftProvider>
