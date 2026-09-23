@@ -47,6 +47,28 @@ class TestExtractNarrations:
     def test_no_narrations_export_returns_empty(self):
         assert _extract_narrations("export default function() {}") == []
 
+    def test_extracts_template_literal_array(self):
+        script = "export const narrations: string[] = [`dong mot`, `dong hai`];"
+        assert _extract_narrations(script) == ["dong mot", "dong hai"]
+
+    def test_bracket_inside_a_narration_does_not_truncate_the_array(self):
+        script = 'export const narrations: string[] = ["Xem muc [1] nhe.", "dong hai"];'
+        assert _extract_narrations(script) == ["Xem muc [1] nhe.", "dong hai"]
+
+    def test_ignores_a_narrations_array_left_in_a_comment(self):
+        script = (
+            '// narrations = ["gia 1", "gia 2", "gia 3"]\n'
+            'export const narrations: string[] = ["that 1", "that 2"];'
+        )
+        assert _extract_narrations(script) == ["that 1", "that 2"]
+
+    def test_ignores_an_unrelated_const_without_export(self):
+        script = (
+            "const myNarrations = ['rac 1', 'rac 2'];\n"
+            "export const narrations = ['that 1', 'that 2'];"
+        )
+        assert _extract_narrations(script) == ["that 1", "that 2"]
+
 
 class TestDryRun:
     def test_returns_narrations_in_order(self, tmp_path):

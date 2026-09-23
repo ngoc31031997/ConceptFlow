@@ -180,4 +180,28 @@ describe("validateRemotionScript", () => {
   it("coi script rỗng là hợp lệ (chưa có gì để báo lỗi)", () => {
     expect(validateRemotionScript("").isValid).toBe(true);
   });
+
+  it("đếm đúng khi lời thoại chứa dấu ] (không bị cắt cụt mảng)", () => {
+    const result = validateRemotionScript(
+      VALID_REMOTION.replace('["một hai", "ba bốn"]', '["Xem mục [1] nhé", "ba bốn"]'),
+    );
+    expect(result.isValid).toBe(true);
+    expect(result.narrationCount).toBe(2);
+  });
+
+  it("đếm đúng khi narrations dùng template literal", () => {
+    const result = validateRemotionScript(
+      VALID_REMOTION.replace('["một hai", "ba bốn"]', "[`một hai`, `ba bốn`]"),
+    );
+    expect(result.isValid).toBe(true);
+    expect(result.narrationCount).toBe(2);
+  });
+
+  it("bỏ qua một mảng narrations để lại trong comment, dùng đúng mảng export const", () => {
+    const result = validateRemotionScript(
+      '// narrations = ["giả 1", "giả 2", "giả 3"]\n' + VALID_REMOTION,
+    );
+    expect(result.isValid).toBe(true);
+    expect(result.narrationCount).toBe(2);
+  });
 });

@@ -158,7 +158,12 @@ export function validateScript(
  * full-frame elements) — that needs real JSX layout, not text matching, and
  * a wrong flag there would be worse than not checking it at all.
  */
-const REMOTION_NARRATIONS_ARRAY_RE = /export\s+const\s+narrations\s*:\s*string\[\]\s*=\s*\[([\s\S]*?)\]/;
+// Anchored on `export const narrations` — the type annotation is optional
+// (mirrors remotion_renderer.py's dry_run(), which doesn't require it
+// either) — so a `// narrations = [...]` left in a comment, or an unrelated
+// `const myNarrations = [...]`, can never be picked up in place of the real
+// array.
+const REMOTION_NARRATIONS_HEADER_RE = /export\s+const\s+narrations\s*(?::\s*string\s*\[\s*\]\s*)?=\s*\[/;
 const REMOTION_STRING_LITERAL_RE = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
 const REMOTION_COMPOSITION_ID_RE = /<Composition\b[^>]*\bid\s*=\s*["']creator["']/;
 const REMOTION_CALCULATE_METADATA_RE = /calculateMetadata\s*=\s*\{\s*calculateMetadataFromSegments\s*\}/;
@@ -177,10 +182,88 @@ function countChar(text: string, char: string): number {
   return count;
 }
 
+/** Removes line and block comments, respecting string literals, so a
+ * comment can never be mistaken for the real narrations array. */
+function stripComments(script: string): string {
+  let out = "";
+  let inString: string | null = null;
+  let i = 0;
+  while (i < script.length) {
+    const ch = script[i];
+    if (inString) {
+      out += ch;
+      if (ch === "\\" && i + 1 < script.length) {
+        out += script[i + 1];
+        i += 2;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      inString = ch;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && script[i + 1] === "/") {
+      while (i < script.length && script[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && script[i + 1] === "*") {
+      i += 2;
+      while (i + 1 < script.length && !(script[i] === "*" && script[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+/** Finds the `export const narrations = [...]` array and returns its body —
+ * the raw text between the brackets — or null if absent. Scans
+ * bracket/string-aware instead of a `[^\]]*` regex, which would cut the
+ * array short at the first `]` even when it's inside a narration string
+ * (e.g. `"Xem mục [1] nhé."`). */
+function extractNarrationsBody(script: string): string | null {
+  const stripped = stripComments(script);
+  const header = REMOTION_NARRATIONS_HEADER_RE.exec(stripped);
+  if (!header) return null;
+
+  let i = header.index + header[0].length;
+  const start = i;
+  let depth = 1;
+  let inString: string | null = null;
+  while (i < stripped.length && depth > 0) {
+    const ch = stripped[i];
+    if (inString) {
+      if (ch === "\\" && i + 1 < stripped.length) {
+        i += 2;
+        continue;
+      }
+      if (ch === inString) inString = null;
+      i += 1;
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      inString = ch;
+    } else if (ch === "[") {
+      depth += 1;
+    } else if (ch === "]") {
+      depth -= 1;
+    }
+    i += 1;
+  }
+  return stripped.slice(start, i - 1);
+}
+
 function extractRemotionNarrationCount(script: string): number {
-  const arrayMatch = REMOTION_NARRATIONS_ARRAY_RE.exec(script);
-  if (!arrayMatch) return 0;
-  const literals = arrayMatch[1].match(REMOTION_STRING_LITERAL_RE);
+  const body = extractNarrationsBody(script);
+  if (body === null) return 0;
+  const literals = body.match(REMOTION_STRING_LITERAL_RE);
   return literals ? literals.length : 0;
 }
 
@@ -201,7 +284,7 @@ export function validateRemotionScript(script: string): RemotionScriptValidation
     };
   }
 
-  if (!REMOTION_NARRATIONS_ARRAY_RE.test(script)) {
+  if (extractNarrationsBody(script) === null) {
     return {
       ...base,
       isValid: false,

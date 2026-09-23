@@ -51,7 +51,11 @@ function main() {
   // 4. Initialize Express app, register correlation middleware.
   const app = express();
   app.use(corsMiddleware(config.webGuiOrigin));
-  app.use(express.json());
+  // Default express.json() body limit is 100kb, which the Manim Engineer's
+  // pasted code/storyboard/story text (often Vietnamese, multi-byte UTF-8)
+  // can exceed — the gateway would 413 before the request ever reaches the
+  // orchestrator, surfacing as a generic "save failed" in the UI.
+  app.use(express.json({ limit: '10mb' }));
   app.use(correlationMiddleware());
 
   // 5. Register routes.
