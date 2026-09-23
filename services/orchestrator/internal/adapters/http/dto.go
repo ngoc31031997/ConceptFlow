@@ -171,6 +171,9 @@ type projectSummaryResponse struct {
 	// "manim" | "remotion" — which engine rendered (or will render) this
 	// project's video, so the video list can mark which is which.
 	RenderEngine string `json:"render_engine"`
+	// WizardStep (1-7) is the step the project is at, so the list can show
+	// "Bước N — …" next to the saga status.
+	WizardStep int `json:"wizard_step"`
 }
 
 // projectListResponse is the GET /v1/projects response body.
@@ -272,11 +275,6 @@ type saveWizardSettingsRequest struct {
 	VideoOutputMode       string                `json:"video_output_mode,omitempty"`
 	BackgroundMusicPath   *string               `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
-}
-
-// advanceWizardStepRequest is the body of PUT /v1/projects/{id}/wizard-step.
-type advanceWizardStepRequest struct {
-	Step int `json:"step"`
 }
 
 // saveAuthoringModeRequest is the body of PUT
@@ -381,6 +379,7 @@ func toProjectListResponse(summaries []domain.ProjectSummary) projectListRespons
 			ErrorMessage: s.ErrorMessage,
 			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
 			RenderEngine: string(s.RenderEngine),
+			WizardStep:   domain.EffectiveWizardStep(&domain.Project{Status: s.Status, WizardStep: s.WizardStep}),
 		})
 	}
 	return projectListResponse{Projects: projects}

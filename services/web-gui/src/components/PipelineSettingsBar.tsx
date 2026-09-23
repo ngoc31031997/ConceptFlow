@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RenderEnginePicker } from "./RenderEnginePicker";
 import { AuthoringModeBar } from "./AuthoringModeBar";
+import { useAuthoringRun } from "../context/AuthoringRunContext";
 import type { RenderEngine } from "../context/ProjectDraftContext";
 import type { AuthoringMode, AuthoringStep, LlmStatus } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -52,6 +53,7 @@ export function PipelineSettingsBar({
   onGenerated,
 }: PipelineSettingsBarProps) {
   const [expanded, setExpanded] = useState(false);
+  const { running } = useAuthoringRun();
   const engineLabel = renderEngine === "remotion" ? "Remotion" : "Manim";
   const modeLabel = mode === "ai" && llm?.enabled ? "Gọi API trực tiếp" : "Copy prompt ra ngoài";
 
@@ -77,21 +79,25 @@ export function PipelineSettingsBar({
 
       {expanded && (
         <div className={styles.expanded}>
-          {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} />}
-          <AuthoringModeBar
-            llm={llm}
-            mode={mode}
-            onModeChange={onModeChange}
-            projectId={projectId}
-            steps={steps}
-            what={what}
-            runDisabled={runDisabled}
-            runDisabledReason={runDisabledReason}
-            beforeRun={beforeRun}
-            onGenerated={onGenerated}
-          />
+          {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} disabled={running} />}
         </div>
       )}
+
+      {/* Một instance duy nhất, không mount lại khi thu gọn/mở rộng — nút chạy
+          và lỗi/tiến độ phải còn nguyên; chỉ công tắc chế độ ẩn theo `expanded`. */}
+      <AuthoringModeBar
+        llm={llm}
+        mode={mode}
+        onModeChange={onModeChange}
+        projectId={projectId}
+        steps={steps}
+        what={what}
+        runDisabled={runDisabled}
+        runDisabledReason={runDisabledReason}
+        beforeRun={beforeRun}
+        onGenerated={onGenerated}
+        showSwitch={expanded}
+      />
     </div>
   );
 }

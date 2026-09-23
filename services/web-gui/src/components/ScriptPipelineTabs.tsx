@@ -29,7 +29,7 @@ interface ScriptPipelineTabsProps {
 }
 
 /**
- * "Bước 1 — Script" used to be one page that silently hopped between
+ * "Bước 3 — Script" used to be one page that silently hopped between
  * separate URLs (/, /create/visual-director, /create/manim-engineer) with no
  * way to see the other steps or jump back to one already done except the
  * couple of hardcoded "Quay lại X" links. This makes all three steps visible

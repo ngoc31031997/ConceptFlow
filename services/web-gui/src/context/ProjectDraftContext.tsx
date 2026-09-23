@@ -57,7 +57,7 @@ function normalizeScriptSource(value: unknown): ScriptSource | null {
 }
 
 /**
- * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 1 — Script",
+ * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 3 — Script",
  * not one tab at a time:
  *
  *   manual — copy each prompt into ChatGPT/Claude/Gemini and paste the answer

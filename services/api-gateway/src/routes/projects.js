@@ -85,9 +85,8 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
   router.put('/v1/projects/:id/authoring/models', proxyHandler(orchestratorClient, 'orchestrator'));
   // Wizard: "Tiếp tục" lưu dữ liệu của bước và bước đã tới. settings = bước 2
-  // (Cấu hình); wizard-step = bước không có dữ liệu riêng (1 → 2).
+  // (Cấu hình).
   router.put('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.put('/v1/projects/:id/wizard-step', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.

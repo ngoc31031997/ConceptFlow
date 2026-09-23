@@ -23,12 +23,6 @@ func (f *fakeWizardRepo) SaveWizardSettings(_ context.Context, _ string, s domai
 	f.step = domain.WizardStepScript
 	return nil
 }
-func (f *fakeWizardRepo) AdvanceWizardStep(_ context.Context, _ string, step int) error {
-	if step > f.step {
-		f.step = step
-	}
-	return nil
-}
 
 func TestSaveWizardSettings_DefaultsAndAdvancesToScript(t *testing.T) {
 	repo := &fakeWizardRepo{status: domain.StatusDraft}
@@ -62,19 +56,6 @@ func TestSaveWizardSettings_RejectsBadInputAndStartedProjects(t *testing.T) {
 	err = started.Execute(context.Background(), "p1", domain.WizardSettings{ContentLanguage: "vi"})
 	if !errors.Is(err, domain.ErrInvalidStatus) {
 		t.Errorf("started project: err = %v, want ErrInvalidStatus", err)
-	}
-}
-
-func TestAdvanceWizardStep_OnlyAuthoredStepsOnDrafts(t *testing.T) {
-	repo := &fakeWizardRepo{status: domain.StatusDraft}
-	uc := application.NewAdvanceWizardStepUseCase(repo)
-	if err := uc.Execute(context.Background(), "p1", 2); err != nil || repo.step != 2 {
-		t.Fatalf("step 2: err=%v step=%d", err, repo.step)
-	}
-	for _, bad := range []int{0, 1, 4, 7} {
-		if err := uc.Execute(context.Background(), "p1", bad); !errors.Is(err, domain.ErrInvalidWizardInput) {
-			t.Errorf("step %d: err = %v", bad, err)
-		}
 	}
 }
 

@@ -203,6 +203,8 @@ export interface ProjectSummary {
   updated_at: string;
   /** "manim" | "remotion" — which engine rendered (or will render) this project's video. */
   render_engine: string;
+  /** 1-7, bước wizard project đang ở. */
+  wizard_step?: number;
 }
 
 

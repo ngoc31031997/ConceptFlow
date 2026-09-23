@@ -12,7 +12,7 @@ import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
 
 /**
- * Bước 1b (Visual Director) — second tab of the "Bước 1 — Script"
+ * Bước 1b (Visual Director) — second tab of the "Bước 3 — Script"
  * sub-wizard (see ScriptPipelineTabs): fetch the current template, fill it
  * with the previous tab's saved output, let the Creator copy it out and
  * paste the AI's storyboard back, then save it server-side and advance.
@@ -62,7 +62,7 @@ export function VisualDirectorStepPage() {
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text.split("{{previous_output}}").join(
-          draft.authoringStory || "(chưa có dàn ý câu chuyện đã lưu ở bước 1)",
+          draft.authoringStory || "(chưa có dàn ý câu chuyện đã lưu ở bước 3)",
         );
         setPrompt(filled);
       })
@@ -126,7 +126,7 @@ export function VisualDirectorStepPage() {
     <div data-testid="visual-director-step-page">
       <AppShell
         currentStep={3}
-        title="Bước 1 — Script"
+        title="Bước 3 — Script"
         subtitle={
           hasOwnStoryboard
             ? `1b. Dán storyboard sẵn có của bạn (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`

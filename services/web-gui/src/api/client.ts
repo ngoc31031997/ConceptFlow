@@ -736,15 +736,6 @@ export async function saveWizardSettings(projectId: string, s: WizardSettingsInp
   });
 }
 
-/** Ghi nhận Creator đã xác nhận một bước không có dữ liệu riêng (1 → 2). */
-export async function advanceWizardStep(projectId: string, step: 2 | 3): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/wizard-step`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ step }),
-  });
-}
-
 /**
  * CR-028 FR83.2 — Creator quay lại bước 1 và sửa chủ đề của draft đã tạo.
  * 409 nếu render đã bắt đầu (FR84.2 — cùng khoá với authoring saves).

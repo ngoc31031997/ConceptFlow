@@ -191,7 +191,6 @@ func main() {
 	// Creator got, so a reload or another browser resumes in place.
 	wizardPort := wizardAdapter{projects: projectRepo, authoring: promptTemplateRepo}
 	saveWizardSettings := application.NewSaveWizardSettingsUseCase(wizardPort)
-	advanceWizardStep := application.NewAdvanceWizardStepUseCase(wizardPort)
 	// CR-027 FR77.1 — ONE renderer, shared by the Copy button (FR77.2) and the
 	// generate endpoint (FR78.1). Two instances would be two chances for the
 	// manual path and the API path to send different text for the same role.
@@ -226,7 +225,7 @@ func main() {
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory).
-		WithWizard(saveWizardSettings, advanceWizardStep)
+		WithWizard(saveWizardSettings)
 	if generateAuthoring != nil {
 		router = router.WithGenerateAuthoring(generateAuthoring)
 	}
@@ -315,10 +314,6 @@ func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.
 
 func (a wizardAdapter) SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error {
 	return a.projects.SaveWizardSettings(ctx, projectID, s)
-}
-
-func (a wizardAdapter) AdvanceWizardStep(ctx context.Context, projectID string, step int) error {
-	return a.projects.AdvanceWizardStep(ctx, projectID, step)
 }
 
 type promptRenderContext struct {

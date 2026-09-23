@@ -7,6 +7,8 @@ import styles from "./RenderEnginePicker.module.css";
 interface RenderEnginePickerProps {
   value: RenderEngine;
   onChange: (engine: RenderEngine) => void;
+  /** Đang có lượt AI chạy — engine phải đứng yên tới khi nó xong. */
+  disabled?: boolean;
 }
 
 /**
@@ -25,7 +27,7 @@ const OPTIONS: { value: RenderEngine; label: string }[] = [
   { value: "remotion", label: "Remotion" },
 ];
 
-export function RenderEnginePicker({ value, onChange }: RenderEnginePickerProps) {
+export function RenderEnginePicker({ value, onChange, disabled }: RenderEnginePickerProps) {
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="render-engine-picker">
       <div className={styles.text}>
@@ -37,12 +39,20 @@ export function RenderEnginePicker({ value, onChange }: RenderEnginePickerProps)
         </p>
       </div>
 
-      <div className={selectable.row} role="radiogroup" aria-label="Công cụ render">
+      <div
+        className={selectable.row}
+        role="radiogroup"
+        aria-label="Công cụ render"
+        aria-disabled={disabled}
+        style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}
+      >
         {OPTIONS.map((option) => (
           <SelectableOption
             key={option.value}
             selected={value === option.value}
-            onSelect={() => onChange(option.value)}
+            onSelect={() => {
+              if (!disabled) onChange(option.value);
+            }}
             label={option.label}
             inline
             testId={`render-engine-${option.value}`}

@@ -11,7 +11,6 @@ import (
 type WizardPort interface {
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 	SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error
-	AdvanceWizardStep(ctx context.Context, projectID string, step int) error
 }
 
 // requireDraft is the same lock the authoring saves use (CR-028 FR84.2): once
@@ -79,25 +78,4 @@ func (uc *SaveWizardSettingsUseCase) Execute(ctx context.Context, projectID stri
 		return err
 	}
 	return uc.repo.SaveWizardSettings(ctx, projectID, s)
-}
-
-// AdvanceWizardStepUseCase records that the Creator confirmed a step that has
-// no data of its own to save (step 1 → 2). Steps after
-// domain.LastAuthoredWizardStep follow the saga's status and are refused here.
-type AdvanceWizardStepUseCase struct {
-	repo WizardPort
-}
-
-func NewAdvanceWizardStepUseCase(repo WizardPort) *AdvanceWizardStepUseCase {
-	return &AdvanceWizardStepUseCase{repo: repo}
-}
-
-func (uc *AdvanceWizardStepUseCase) Execute(ctx context.Context, projectID string, step int) error {
-	if step < domain.WizardStepConfig || step > domain.LastAuthoredWizardStep {
-		return fmt.Errorf("%w: step must be between %d and %d", domain.ErrInvalidWizardInput, domain.WizardStepConfig, domain.LastAuthoredWizardStep)
-	}
-	if err := requireDraft(ctx, uc.repo, projectID); err != nil {
-		return err
-	}
-	return uc.repo.AdvanceWizardStep(ctx, projectID, step)
 }

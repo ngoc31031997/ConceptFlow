@@ -1,3 +1,4 @@
+import { wizardStepLabel } from "../utils/pipelineLabels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
@@ -173,6 +174,11 @@ export function VideoListPage() {
                   <div className={styles.rowMain}>
                     <div className={styles.projectId}>{project.project_id}</div>
                     <div className={styles.meta}>
+                      {wizardStepLabel(project.wizard_step) && (
+                        <span className={glass.cardHint} data-testid="wizard-step">
+                          {wizardStepLabel(project.wizard_step)}
+                        </span>
+                      )}
                       <StatusBadge status={project.status} />
                       <RenderEngineBadge renderEngine={project.render_engine} />
                       {project.error_message && (

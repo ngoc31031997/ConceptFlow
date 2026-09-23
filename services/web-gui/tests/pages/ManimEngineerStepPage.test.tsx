@@ -195,7 +195,7 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
   });
 
-  // CR-027 FR79 — chế độ đã chọn ở tab 1a áp cho cả bước 1: tab này đọc nó từ
+  // CR-027 FR79 — chế độ đã chọn ở tab 1a áp cho cả bước 3: tab này đọc nó từ
   // draft (đã persist sang localStorage) chứ không hỏi lại.
   describe("chế độ làm bước 1 (CR-027 FR79)", () => {
     afterEach(() => {

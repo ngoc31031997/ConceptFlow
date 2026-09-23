@@ -154,7 +154,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT project_id, status, video_path, error_message, updated_at, render_engine
+		SELECT project_id, status, video_path, error_message, updated_at, render_engine, wizard_step
 		FROM projects ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 	for rows.Next() {
 		var s domain.ProjectSummary
 		var status, renderEngine string
-		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine); err != nil {
+		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine, &s.WizardStep); err != nil {
 			return nil, err
 		}
 		s.Status = domain.ProjectStatus(status)
@@ -381,22 +381,6 @@ func (r *ProjectRepository) SaveRenderEngine(ctx context.Context, projectID stri
 		`UPDATE projects SET render_engine = $1, updated_at = now() WHERE project_id = $2`,
 		string(engine), projectID)
 	return err
-}
-
-// AdvanceWizardStep records that the Creator confirmed a wizard step. It only
-// ever moves forward (GREATEST): going back to edit an earlier step must not
-// forget how far the project got.
-func (r *ProjectRepository) AdvanceWizardStep(ctx context.Context, projectID string, step int) error {
-	tag, err := r.pool.Exec(ctx,
-		`UPDATE projects SET wizard_step = GREATEST(wizard_step, $1), updated_at = now() WHERE project_id = $2`,
-		step, projectID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrProjectNotFound
-	}
-	return nil
 }
 
 // SaveWizardSettings writes wizard step 2's choices onto the columns the saga

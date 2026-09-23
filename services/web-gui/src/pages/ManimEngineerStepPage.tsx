@@ -19,7 +19,7 @@ import styles from "./WizardSteps.module.css";
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
 /**
- * Bước 1c (Engineer) — third tab of the "Bước 1 — Script" sub-wizard (see
+ * Bước 1c (Engineer) — third tab of the "Bước 3 — Script" sub-wizard (see
  * ScriptPipelineTabs): fetch the current template, fill it with the
  * previous tabs' saved output (story + storyboard), let the Creator copy it
  * out and paste the AI's code back, then save it server-side, store it as
@@ -205,7 +205,7 @@ export function ManimEngineerStepPage() {
     <div data-testid="manim-engineer-step-page">
       <AppShell
         currentStep={3}
-        title="Bước 1 — Script"
+        title="Bước 3 — Script"
         subtitle={
           hasOwnCode
             ? `1c. Dán code ${isRemotion ? "Remotion" : "Manim"} sẵn có của bạn — hệ thống kiểm tra ngay.`

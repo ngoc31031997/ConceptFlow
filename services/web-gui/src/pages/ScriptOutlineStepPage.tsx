@@ -29,7 +29,7 @@ import styles from "./WizardSteps.module.css";
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
 /**
- * Bước 1a (Story Architect) — first tab of the "Bước 1 — Script" sub-wizard.
+ * Bước 1a (Story Architect) — first tab of the "Bước 3 — Script" sub-wizard.
  * Used to be baked into ScriptStepPage + ScriptAssistant as the "blank"
  * situation; pulled out into its own tab/route so all 3 pipeline steps
  * (dàn ý/storyboard/code) are visible and reachable at once (see
@@ -37,7 +37,7 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  *
  * The engine choice (Manim vs Remotion) does not change THIS step's own
  * prompt — a plain-text story outline reads the same either way — but
- * CR-030's "chạy cả bước 1 bằng AI" button runs 1b (storyboard) and 1c
+ * CR-030's "chạy cả bước 3 bằng AI" button runs 1b (storyboard) and 1c
  * (code) too, and those two DO branch by engine (RoleFor on the server). So
  * the picker lives here as well, not only on 1c: choosing it up front, before
  * the chain runs, is the only way the chain's own storyboard/code calls see
@@ -193,7 +193,7 @@ export function ScriptOutlineStepPage() {
       <AppShell
         currentStep={3}
         wide
-        title="Bước 1 — Script"
+        title="Bước 3 — Script"
         subtitle={
           hasOwnOutline
             ? "1a. Dán dàn ý sẵn có của bạn vào ô bên phải — không cần chạy Story Architect."
@@ -211,7 +211,7 @@ export function ScriptOutlineStepPage() {
             huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
             chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
             mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
-            "chạy cả bước 1" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
+            "chạy cả bước 3" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
             xong TRƯỚC khi bấm chạy, không phải ở 1c lúc đã muộn). */}
         <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
           <PipelineSettingsBar

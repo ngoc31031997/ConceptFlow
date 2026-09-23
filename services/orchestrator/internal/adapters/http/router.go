@@ -150,11 +150,6 @@ type saveWizardSettingsUseCase interface {
 	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
 }
 
-// advanceWizardStepUseCase backs PUT /v1/projects/{id}/wizard-step.
-type advanceWizardStepUseCase interface {
-	Execute(ctx context.Context, projectID string, step int) error
-}
-
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -197,7 +192,6 @@ type Router struct {
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveWizardSettings      saveWizardSettingsUseCase
-	advanceWizardStep       advanceWizardStepUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -289,10 +283,9 @@ func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase
 }
 
 // WithWizard attaches the wizard's per-step saves, enabling
-// PUT /v1/projects/{project_id}/settings and /wizard-step.
-func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase, advanceStep advanceWizardStepUseCase) *Router {
+// PUT /v1/projects/{project_id}/settings.
+func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase) *Router {
 	rt.saveWizardSettings = saveSettings
-	rt.advanceWizardStep = advanceStep
 	return rt
 }
 
@@ -373,7 +366,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
-	r.Put("/v1/projects/{project_id}/wizard-step", rt.handleAdvanceWizardStep)
 	return r
 }
 
@@ -1315,25 +1307,6 @@ func (rt *Router) handleSaveWizardSettings(w http.ResponseWriter, r *http.Reques
 		BackgroundMusicVolume: req.BackgroundMusicVolume,
 	})
 	if err != nil {
-		writeUseCaseError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// handleAdvanceWizardStep records that the Creator confirmed a step with no
-// data of its own (step 1 → 2).
-func (rt *Router) handleAdvanceWizardStep(w http.ResponseWriter, r *http.Request) {
-	if rt.advanceWizardStep == nil {
-		writeError(w, http.StatusNotFound, "wizard step is not enabled")
-		return
-	}
-	var req advanceWizardStepRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := rt.advanceWizardStep.Execute(r.Context(), chi.URLParam(r, "project_id"), req.Step); err != nil {
 		writeUseCaseError(w, err)
 		return
 	}
