@@ -696,6 +696,55 @@ export async function createProjectDraft(
   return { similarProjects: fromWireSimilarProjects(res.similar_projects ?? []) };
 }
 
+/** Bước 2 (Cấu hình) — mọi thứ Creator chọn trước khi vào Script. */
+export interface WizardSettingsInput {
+  voiceLanguage: "vi" | "en";
+  renderEngine: "manim" | "remotion";
+  ttsEnabled: boolean;
+  voiceId: string | null;
+  subtitleMode: string;
+  subtitleStyle?: { font_size: string; text_color: string; background_opacity: number; position: string };
+  renderQuality: string;
+  videoFormatId: string;
+  videoOutputMode: string;
+  backgroundMusicPath: string | null;
+  backgroundMusicVolume: number;
+}
+
+/**
+ * Lưu bước 2 lên server khi Creator bấm "Tiếp tục" — giọng đọc, phụ đề, định
+ * dạng, chất lượng, nhạc nền nằm trong hàng project chứ không chỉ trong
+ * localStorage, nên mở lại ở máy khác vẫn còn. 409 nếu render đã bắt đầu.
+ */
+export async function saveWizardSettings(projectId: string, s: WizardSettingsInput): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/settings`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      voice_language: s.voiceLanguage,
+      render_engine: s.renderEngine,
+      tts_enabled: s.ttsEnabled,
+      voice_id: s.ttsEnabled ? (s.voiceId ?? undefined) : undefined,
+      subtitle_mode: s.subtitleMode,
+      subtitle_style: s.subtitleStyle,
+      render_quality: s.renderQuality,
+      video_format_id: s.videoFormatId,
+      video_output_mode: s.videoOutputMode,
+      background_music_path: s.backgroundMusicPath ?? undefined,
+      background_music_volume: s.backgroundMusicPath ? s.backgroundMusicVolume : undefined,
+    }),
+  });
+}
+
+/** Ghi nhận Creator đã xác nhận một bước không có dữ liệu riêng (1 → 2). */
+export async function advanceWizardStep(projectId: string, step: 2 | 3): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/wizard-step`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ step }),
+  });
+}
+
 /**
  * CR-028 FR83.2 — Creator quay lại bước 1 và sửa chủ đề của draft đã tạo.
  * 409 nếu render đã bắt đầu (FR84.2 — cùng khoá với authoring saves).

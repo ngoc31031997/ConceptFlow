@@ -155,6 +155,10 @@ type projectResponse struct {
 	// through the same GET /v1/projects/{id} it already calls for anything
 	// else, rather than orchestrator embedding one project inside another.
 	CompanionProjectID *string `json:"companion_project_id,omitempty"`
+	// WizardStep (1-7) is where the Creator should resume: the furthest step
+	// confirmed with "Tiếp tục", or the one the saga status implies.
+	WizardStep int `json:"wizard_step"`
+	// SubtitleStyle/BackgroundMusic* above already round-trip step 2 settings.
 }
 
 // projectSummaryResponse is one entry of the GET /v1/projects (list) response.
@@ -251,6 +255,28 @@ func toClipResultResponses(clips []domain.ClipResult) []clipResultResponse {
 type errorResponse struct {
 	Error string `json:"error"`
 	Code  string `json:"code,omitempty"`
+}
+
+// saveWizardSettingsRequest is the body of PUT /v1/projects/{id}/settings —
+// wizard step 2 ("Cấu hình"), sent when the Creator presses "Tiếp tục".
+// Field names match POST /v1/sagas/render so the two never drift.
+type saveWizardSettingsRequest struct {
+	ContentLanguage       string                `json:"voice_language"`
+	RenderEngine          string                `json:"render_engine,omitempty"`
+	TTSEnabled            *bool                 `json:"tts_enabled,omitempty"`
+	VoiceID               string                `json:"voice_id,omitempty"`
+	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
+	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality         string                `json:"render_quality,omitempty"`
+	VideoFormatID         string                `json:"video_format_id,omitempty"`
+	VideoOutputMode       string                `json:"video_output_mode,omitempty"`
+	BackgroundMusicPath   *string               `json:"background_music_path,omitempty"`
+	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
+}
+
+// advanceWizardStepRequest is the body of PUT /v1/projects/{id}/wizard-step.
+type advanceWizardStepRequest struct {
+	Step int `json:"step"`
 }
 
 // saveAuthoringModeRequest is the body of PUT
@@ -406,5 +432,6 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		BackgroundMusicVolume: p.BackgroundMusicVolume,
 		VideoOutputMode:       string(p.VideoOutputMode),
 		CompanionProjectID:    p.CompanionProjectID,
+		WizardStep:            domain.EffectiveWizardStep(p),
 	}
 }

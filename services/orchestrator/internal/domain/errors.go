@@ -28,3 +28,7 @@ var (
 	// the "conscious action" FR61.3 asks for — and which is recorded.
 	ErrQCBlocked = errors.New("quality check found blocking issues; re-submit with acknowledge_qc to publish anyway")
 )
+
+// ErrInvalidWizardInput marks a wizard save whose body is malformed (unknown
+// quality, subtitle mode, step number...). The HTTP layer maps it to 400.
+var ErrInvalidWizardInput = errors.New("invalid wizard input")

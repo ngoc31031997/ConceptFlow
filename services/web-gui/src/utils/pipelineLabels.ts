@@ -145,6 +145,8 @@ export function projectPhase(status: string): ProjectPhase {
 
 /** URL của màn hình sở hữu project ở trạng thái này. */
 export function projectPath(projectId: string, status: string): string {
+  // Draft chưa chạy saga: không có màn theo dõi nào, phải mở lại đúng bước wizard.
+  if (status === "draft") return `/projects/${projectId}/resume`;
   const phase = projectPhase(status);
   if (phase === "validate") return `/projects/${projectId}/validate`;
   if (phase === "process") return `/projects/${projectId}/render`;

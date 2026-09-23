@@ -1,13 +1,12 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProjectDraftProvider } from "./context/ProjectDraftContext";
 import { AuthoringRunProvider } from "./context/AuthoringRunContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationLoader } from "./components/NavigationLoader";
 import { KeyboardShortcutsHelp } from "./components/KeyboardShortcutsHelp";
 import { ScriptStepPage } from "./pages/ScriptStepPage";
+import { ResumeProjectPage } from "./pages/ResumeProjectPage";
 import { ScriptAuthoringSettingsStepPage } from "./pages/ScriptAuthoringSettingsStepPage";
-import { SettingsStepPage } from "./pages/SettingsStepPage";
-import { ReviewStepPage } from "./pages/ReviewStepPage";
 import { ValidatePage } from "./pages/ValidatePage";
 import { RenderPage } from "./pages/RenderPage";
 import { ResultPage } from "./pages/ResultPage";
@@ -39,8 +38,8 @@ export function App() {
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
-            <Route path="/create/settings" element={<SettingsStepPage />} />
-            <Route path="/create/review" element={<ReviewStepPage />} />
+            <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
+            <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />
 
             {/* CR-025 — admin screen to edit pipeline prompt wording, outside
                 the Creator wizard flow. */}
@@ -49,6 +48,7 @@ export function App() {
             {/* CR-031 — bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng
                 thái project không thuộc về nó (projectPath). */}
+            <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />
             <Route path="/projects/:id/validate" element={<ValidatePage />} />
             <Route path="/projects/:id/render" element={<RenderPage />} />
             <Route path="/projects/:id/result" element={<ResultPage />} />

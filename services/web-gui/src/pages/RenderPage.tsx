@@ -81,7 +81,7 @@ export function RenderPage() {
   return (
     <div data-testid="render-page">
       <AppShell
-        currentStep={6}
+        currentStep={5}
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới

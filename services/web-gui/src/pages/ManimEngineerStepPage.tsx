@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft } from "../api/client";
+import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
@@ -23,8 +23,9 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * ScriptPipelineTabs): fetch the current template, fill it with the
  * previous tabs' saved output (story + storyboard), let the Creator copy it
  * out and paste the AI's code back, then save it server-side, store it as
- * the draft's scriptContent, and advance to /create/settings — 1c is the
- * last tab of bước 1 since CR-030 removed the "1d. Duyệt" review tab.
+ * the draft's scriptContent, and start the validate saga — 1c is the
+ * last tab of bước 3 since the "Xem lại" step was removed (settings now live
+ * in bước 2, so nothing is left to collect before submitting).
  *
  * feature/remotion-engine: the render engine picker lives HERE, not on the
  * situation-chooser page — tabs 1a/1b (story/storyboard) are identical
@@ -148,11 +149,36 @@ export function ManimEngineerStepPage() {
     setSaveError(null);
     try {
       await saveAuthoringCode(draft.projectId, code);
-      // CR-030 — 1c là tab cuối của bước 1 (tab "1d. Duyệt" đã bị bỏ), nên
-      // "Tiếp tục" đi thẳng sang phần cấu hình giọng đọc/render.
-      navigate("/create/settings");
-    } catch {
-      setSaveError("Không lưu được code, thử lại.");
+      const projectId = draft.projectId;
+      await startRenderSaga({
+        project_id: projectId,
+        script_content: code,
+        voice_language: draft.voiceLanguage,
+        background_music_path: draft.backgroundMusicPath ?? undefined,
+        tts_enabled: draft.ttsEnabled,
+        voice_id: draft.ttsEnabled ? (draft.voiceId ?? undefined) : undefined,
+        subtitle_mode: draft.subtitleMode,
+        subtitle_style:
+          draft.subtitleMode === "burn_in" || draft.subtitleMode === "both"
+            ? {
+                font_size: draft.subtitleStyle.fontSize,
+                text_color: draft.subtitleStyle.textColor,
+                background_opacity: draft.subtitleStyle.backgroundOpacity,
+                position: draft.subtitleStyle.position,
+              }
+            : undefined,
+        render_quality: draft.renderQuality,
+        render_engine: draft.renderEngine,
+        video_output_mode: draft.videoOutputMode,
+        video_format_id: draft.videoFormatId,
+        background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,
+        // Bước Validate tồn tại để dừng ở cổng duyệt dàn ý.
+        review_enabled: true,
+      });
+      dispatch({ type: "MARK_SUBMITTED" });
+      navigate(`/projects/${projectId}/validate`);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : "Không lưu được code, thử lại.");
     } finally {
       setSaving(false);
     }
@@ -178,7 +204,7 @@ export function ManimEngineerStepPage() {
   return (
     <div data-testid="manim-engineer-step-page">
       <AppShell
-        currentStep={2}
+        currentStep={3}
         title="Bước 1 — Script"
         subtitle={
           hasOwnCode
@@ -298,7 +324,7 @@ export function ManimEngineerStepPage() {
         onBack={() => navigate(hasOwnCode ? "/create/script/settings" : "/create/script/storyboard")}
         backLabel={hasOwnCode ? "Quay lại cấu hình" : "Quay lại Storyboard"}
         onNext={handleContinue}
-        nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
+        nextLabel={saving ? "Đang gửi..." : "Chạy kiểm tra kịch bản"}
         nextDisabled={!isValid || saving}
         nextTestId="manim-engineer-step-next"
       />

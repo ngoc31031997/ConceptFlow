@@ -414,6 +414,13 @@ type Project struct {
 	YoutubeVideoURL      *string
 
 	ErrorMessage *string
+
+	// WizardStep is the furthest wizard step the Creator has confirmed with
+	// "Tiếp tục" (1-3; later steps are implied by Status — see
+	// EffectiveWizardStep). Read-only here: Save does not write it, only
+	// AdvanceWizardStep / SaveWizardSettings do, so a full-row upsert from the
+	// saga can never move a Creator backwards.
+	WizardStep int
 }
 
 // ClipResult is one (name, preset) outcome of the generate_clips step

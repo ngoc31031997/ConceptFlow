@@ -191,7 +191,7 @@ export function ScriptOutlineStepPage() {
   return (
     <div data-testid="script-outline-step-page">
       <AppShell
-        currentStep={2}
+        currentStep={3}
         wide
         title="Bước 1 — Script"
         subtitle={

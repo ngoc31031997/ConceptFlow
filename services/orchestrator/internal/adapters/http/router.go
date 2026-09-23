@@ -145,6 +145,16 @@ type listAuthoringHistoryUseCase interface {
 	Execute(ctx context.Context, projectID, fieldName string) ([]application.AuthoringHistoryEntry, error)
 }
 
+// saveWizardSettingsUseCase backs PUT /v1/projects/{id}/settings (wizard step 2).
+type saveWizardSettingsUseCase interface {
+	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
+}
+
+// advanceWizardStepUseCase backs PUT /v1/projects/{id}/wizard-step.
+type advanceWizardStepUseCase interface {
+	Execute(ctx context.Context, projectID string, step int) error
+}
+
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -186,6 +196,8 @@ type Router struct {
 	generateAuthoring       generateAuthoringUseCase
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
+	saveWizardSettings      saveWizardSettingsUseCase
+	advanceWizardStep       advanceWizardStepUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
 	saveAuthoringStoryboard saveAuthoringStoryboardUseCase
 	saveAuthoringCode       saveAuthoringCodeUseCase
@@ -276,6 +288,14 @@ func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase
 	return rt
 }
 
+// WithWizard attaches the wizard's per-step saves, enabling
+// PUT /v1/projects/{project_id}/settings and /wizard-step.
+func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase, advanceStep advanceWizardStepUseCase) *Router {
+	rt.saveWizardSettings = saveSettings
+	rt.advanceWizardStep = advanceStep
+	return rt
+}
+
 // WithQCReports attaches the QC report store, enabling
 // GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
 // the route answers 404, the same way the CR-023 routes do when unwired.
@@ -352,6 +372,8 @@ func (rt *Router) Handler() http.Handler {
 	// CR-027 FR79 — the step-1 working mode, remembered per project.
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
+	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
+	r.Put("/v1/projects/{project_id}/wizard-step", rt.handleAdvanceWizardStep)
 	return r
 }
 
@@ -848,6 +870,8 @@ func writeUseCaseError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrProjectNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, domain.ErrInvalidWizardInput):
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, err.Error())
 	// 409 rather than 422: nothing about the request is malformed, the project
@@ -1255,6 +1279,62 @@ func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Reque
 	models := domain.AuthoringStepModels{Story: req.Story, Storyboard: req.Storyboard, Code: req.Code}
 	if err := rt.saveAuthoringModels.Execute(r.Context(), projectID, models); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSaveWizardSettings persists wizard step 2 when the Creator presses
+// "Tiếp tục". PUT: it replaces the whole settings set and is safe to repeat.
+// 409 once the render has started, the same lock the authoring saves use.
+func (rt *Router) handleSaveWizardSettings(w http.ResponseWriter, r *http.Request) {
+	if rt.saveWizardSettings == nil {
+		writeError(w, http.StatusNotFound, "wizard settings is not enabled")
+		return
+	}
+	var req saveWizardSettingsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	ttsEnabled := true
+	if req.TTSEnabled != nil {
+		ttsEnabled = *req.TTSEnabled
+	}
+	err := rt.saveWizardSettings.Execute(r.Context(), chi.URLParam(r, "project_id"), domain.WizardSettings{
+		ContentLanguage:       domain.ContentLanguage(req.ContentLanguage),
+		RenderEngine:          domain.RenderEngine(req.RenderEngine),
+		TTSEnabled:            ttsEnabled,
+		VoiceID:               req.VoiceID,
+		SubtitleMode:          domain.SubtitleMode(req.SubtitleMode),
+		SubtitleStyle:         req.SubtitleStyle,
+		RenderQuality:         domain.RenderQuality(req.RenderQuality),
+		VideoFormatID:         req.VideoFormatID,
+		VideoOutputMode:       domain.VideoOutputMode(req.VideoOutputMode),
+		BackgroundMusicPath:   req.BackgroundMusicPath,
+		BackgroundMusicVolume: req.BackgroundMusicVolume,
+	})
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAdvanceWizardStep records that the Creator confirmed a step with no
+// data of its own (step 1 → 2).
+func (rt *Router) handleAdvanceWizardStep(w http.ResponseWriter, r *http.Request) {
+	if rt.advanceWizardStep == nil {
+		writeError(w, http.StatusNotFound, "wizard step is not enabled")
+		return
+	}
+	var req advanceWizardStepRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := rt.advanceWizardStep.Execute(r.Context(), chi.URLParam(r, "project_id"), req.Step); err != nil {
+		writeUseCaseError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

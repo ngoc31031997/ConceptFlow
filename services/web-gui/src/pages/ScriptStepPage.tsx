@@ -4,7 +4,7 @@ import { AppShell } from "../components/AppShell";
 import { Card, TextArea } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { createProjectDraft } from "../api/client";
+import { createProjectDraft, advanceWizardStep } from "../api/client";
 
 /**
  * Bước 1 — chỉ còn tình huống "chưa có gì, chỉ có ý tưởng" (các tình huống
@@ -33,6 +33,8 @@ export function ScriptStepPage() {
     setCreating(true);
     try {
       await createProjectDraft(draft.projectId, topic.trim(), draft.voiceLanguage, draft.renderEngine);
+      // Bước 1 xong: ghi nhận Creator đã sang bước 2.
+      await advanceWizardStep(draft.projectId, 2);
       navigate("/create/script/settings");
     } catch {
       setError("Không tạo được project — kiểm tra kết nối rồi thử lại.");
