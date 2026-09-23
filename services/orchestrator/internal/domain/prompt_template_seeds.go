@@ -19,14 +19,14 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the 4 pipeline roles per CR-025's low-level design.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 2, TemplateText: bt(storyArchitectVI)},
-		{Role: RoleStoryArchitect, Language: "en", Version: 2, TemplateText: bt(storyArchitectEN)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 5, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleVisualDirector, Language: "en", Version: 5, TemplateText: bt(visualDirectorEN)},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 3, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleStoryArchitect, Language: "en", Version: 3, TemplateText: bt(storyArchitectEN)},
+		{Role: RoleVisualDirector, Language: "vi", Version: 6, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleVisualDirector, Language: "en", Version: 6, TemplateText: bt(visualDirectorEN)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleManimEngineer, Language: "en", Version: 4, TemplateText: bt(withThemeReference(manimEngineerEN, "en"))},
-		{Role: RoleRemotionVisualDirector, Language: "vi", Version: 1, TemplateText: bt(remotionVisualDirectorVI)},
-		{Role: RoleRemotionVisualDirector, Language: "en", Version: 1, TemplateText: bt(remotionVisualDirectorEN)},
+		{Role: RoleRemotionVisualDirector, Language: "vi", Version: 2, TemplateText: bt(remotionVisualDirectorVI)},
+		{Role: RoleRemotionVisualDirector, Language: "en", Version: 2, TemplateText: bt(remotionVisualDirectorEN)},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 2, TemplateText: bt(remotionEngineerVI)},
 		{Role: RoleRemotionEngineer, Language: "en", Version: 2, TemplateText: bt(remotionEngineerEN)},
 	}
@@ -221,7 +221,7 @@ TỰ KIỂM: <đã soi 10 mục — sửa: ... / đã soi 10 mục, không phả
 
 Sửa xong hết rồi mới xuất output. Không in danh sách tự kiểm này ra, chỉ in đúng một dòng TỰ KIỂM như trong mẫu OUTPUT.
 
-Đây là bước 1/4 — Visual Director (bước 2) sẽ nhận đúng nội dung này để dựng storyboard, nên đừng mô tả animation cụ thể ở đây. Chỉ NỘI DUNG và MẠCH LỜI THOẠI.`
+Đây là bước 1/3 — Visual Director (bước 2) sẽ nhận đúng nội dung này để dựng storyboard, nên đừng mô tả animation cụ thể ở đây. Chỉ NỘI DUNG và MẠCH LỜI THOẠI.`
 
 const storyArchitectEN = `You are the educational content creator (Story Architect) for this channel. Your job at this step is the STORY and the NARRATION ARC of an explainer video — not a textbook read-aloud, and not code.
 
@@ -365,7 +365,7 @@ SELF-CHECK: <all 10 items checked — fixed: ... / all 10 items checked, nothing
 
 Only output once everything is fixed. Do not print this checklist — print only the single SELF-CHECK line shown in the output template.
 
-This is step 1/4 — the Visual Director (step 2) receives exactly this to build the storyboard, so do not describe specific animations here. CONTENT and NARRATION ARC only.`
+This is step 1/3 — the Visual Director (step 2) receives exactly this to build the storyboard, so do not describe specific animations here. CONTENT and NARRATION ARC only.`
 
 // --- Visual Director (FR72.2-72.4) ----------------------------------------
 // Turns the story outline into a storyboard. v2: the storyboard's unit is no
@@ -496,7 +496,7 @@ Kết beat: <những gì còn lại trên màn hình để bắc cầu sang beat
 10. Nếu có vật neo: nó có thật sự xuất hiện và biến hình qua các beat không, hay chỉ được nhắc ở dòng đầu rồi bỏ quên? Nếu ghi "không áp dụng": trục thị giác có được giữ xuyên suốt không?
 11. Storyboard có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
 
-Đây là bước 2/4 — Manim Engineer ở bước sau sẽ dịch ĐÚNG storyboard này thành code, nên hãy viết đủ chi tiết để không phải đoán thêm, nhưng tuyệt đối không viết code Python ở bước này.`
+Đây là bước 2/3 — Manim Engineer ở bước sau sẽ dịch ĐÚNG storyboard này thành code, nên hãy viết đủ chi tiết để không phải đoán thêm, nhưng tuyệt đối không viết code Python ở bước này.`
 
 const visualDirectorEN = `You are the VISUAL DIRECTOR for a Manim explainer video. You receive the story outline from the Story Architect and decide what EVERY SECOND on screen looks like — but you do not write code yet.
 
@@ -605,7 +605,7 @@ Beat exit: <what remains on screen to bridge into the next beat>
 10. If there is an anchor: does it actually appear and morph across the beats, or was it named on line 1 and then forgotten? If "not applicable": is the visual spine held throughout?
 11. Does the storyboard preserve the Story Architect's core question, insight, misconception, aha moment and order of understanding?
 
-This is step 2/4 — the Manim Engineer will translate exactly this storyboard into code, so be detailed enough that nothing needs guessing, but write no Python code at this step.`
+This is step 2/3 — the Manim Engineer will translate exactly this storyboard into code, so be detailed enough that nothing needs guessing, but write no Python code at this step.`
 
 // --- Manim Engineer --------------------------------------------------------
 // Near-verbatim copy of buildGenerationSystemPrompt's format/API/self-check/
@@ -909,7 +909,7 @@ Kết beat: <hình cuối cùng còn trên màn hình, để beat sau vẽ lại
 7. Có bao nhiêu đoạn chỉ toàn chữ? Nếu quá một phần ba, thiết kế lại.
 8. Storyboard có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, aha và thứ tự nhận thức của Story Architect không?
 
-Đây là bước 2/4 — Remotion Engineer ở bước sau sẽ dịch ĐÚNG storyboard này thành code TSX, nên hãy viết đủ chi tiết để không phải đoán thêm, nhưng tuyệt đối không viết code ở bước này.`
+Đây là bước 2/3 — Remotion Engineer ở bước sau sẽ dịch ĐÚNG storyboard này thành code TSX, nên hãy viết đủ chi tiết để không phải đoán thêm, nhưng tuyệt đối không viết code ở bước này.`
 
 const remotionVisualDirectorEN = `You are the VISUAL DIRECTOR for a REMOTION (React/TypeScript) explainer video. You receive the story outline from the Story Architect and decide what EVERY SECOND on screen looks like — but you do not write code yet.
 
@@ -989,11 +989,11 @@ Beat end: <the last visual left on screen for the next beat to re-draw from>
 7. How many segments are text-only? If more than a third, redesign.
 8. Does the storyboard preserve the Story Architect's core question, insight, misconception, aha moment and order of understanding?
 
-This is step 2/4 — the Remotion Engineer will translate exactly this storyboard into TSX code, so be detailed enough that nothing needs guessing, but write no code at this step.`
+This is step 2/3 — the Remotion Engineer will translate exactly this storyboard into TSX code, so be detailed enough that nothing needs guessing, but write no code at this step.`
 
 // --- Remotion Engineer (feature/remotion-engine) ---------------------------
 // The Remotion counterpart of manim_engineer, and it now runs in the SAME
-// 4-tab pipeline: tabs 1a/1b (story_architect + visual_director) are engine
+// 3-step pipeline: tabs 1a/1b (story_architect + visual_director) are engine
 // agnostic, so this prompt consumes their output via {{previous_output}}
 // exactly like manimEngineerVI does, with {{topic}} kept as a one-line
 // header (and as the fallback when a Creator jumps straight to tab 1c
