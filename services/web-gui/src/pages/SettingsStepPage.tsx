@@ -41,7 +41,7 @@ export function SettingsStepPage() {
     <div data-testid="settings-step-page">
       <AppShell
         wide
-        currentStep={2}
+        currentStep={3}
         title="Bước 2 — Giọng đọc & hình ảnh"
         subtitle="Mọi mục ở đây đều đã có sẵn lựa chọn hợp lý. Bạn có thể bấm Tiếp tục ngay nếu không cần đổi gì."
       >

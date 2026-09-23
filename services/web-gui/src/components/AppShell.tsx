@@ -16,6 +16,7 @@ import styles from "./AppShell.module.css";
 */
 const STEP_ROUTES = [
   "/",
+  "/create/script/settings",
   "/create/settings",
   "/create/review",
   "/projects/:id/validate",
@@ -25,13 +26,17 @@ const STEP_ROUTES = [
 ];
 
 /*
-  CR-031 — bảy bước. "Xử lý" cũ gộp hai việc rất khác nhau vào một màn: chạy
-  thử kịch bản (vài giây, miễn phí, sửa được) và sản xuất thật (nhiều phút,
-  tốn TTS/render, không dừng được). Tách ra thành "Validate" rồi "Xử lý" để
-  cổng duyệt dàn ý nằm đúng ranh giới đó, thay vì ẩn bên trong một bước duy
-  nhất mà Creator tưởng đã là quá trình render.
+  CR-031 — tám bước. "Script" cũ gộp cả tình huống, cấu hình ngôn ngữ/engine/
+  cách làm và chuỗi 1a-1b-1c vào một pill duy nhất; tách "Ý tưởng" (chọn tình
+  huống, nhập chủ đề) ra làm bước riêng để thanh tiến trình phản ánh đúng
+  màn hình Creator đang đứng, thay vì gộp hai việc khác hẳn nhau (chọn ý
+  tưởng vs. soạn script) vào một mục. "Xử lý" cũ cũng từng gộp hai việc rất
+  khác nhau vào một màn: chạy thử kịch bản (vài giây, miễn phí, sửa được) và
+  sản xuất thật (nhiều phút, tốn TTS/render, không dừng được) — tách thành
+  "Validate" rồi "Xử lý" để cổng duyệt dàn ý nằm đúng ranh giới đó.
 */
 const STEP_LABELS = [
+  "Ý tưởng",
   "Script",
   "Cấu hình",
   "Xem lại",
@@ -42,10 +47,10 @@ const STEP_LABELS = [
 ] as const;
 
 /** Số bước đầu tiên có URL không cần project id, nên nhảy ngược về được. */
-const BACKTRACKABLE_STEPS = 3;
+const BACKTRACKABLE_STEPS = 4;
 
 interface AppShellProps {
-  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
   title: string;
   subtitle: string;
   wide?: boolean;
