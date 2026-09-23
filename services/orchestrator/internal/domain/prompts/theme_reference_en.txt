@@ -1,0 +1,26 @@
+### The channel theme — use ONLY what is listed below
+
+Access via `self.theme.<name>`. There is NO name outside this list; do not guess (`self.theme.blue`, `self.theme.primary`… do not exist).
+
+Colors (values shown only so you can picture them — NEVER write hex into code):
+- `self.theme.background` #080E1C — video background (already painted, do NOT paint it)
+- `self.theme.ink` #F2F7FF — primary text and strokes
+- `self.theme.muted` #A6ADC8 — secondary text, axes, low-priority elements
+- `self.theme.surface` #313244 — fill of filled boxes
+- `self.theme.accent` #8FC7EF — the channel's main highlight — what the viewer should look at
+- `self.theme.accent_alt` #B4BEFE — secondary highlight paired with accent
+- `self.theme.success` #A6E3A1 — correct, passing, good result
+- `self.theme.warning` #F9E2AF — caution, edge case
+- `self.theme.danger` #F38BA8 — wrong, error, bad result
+- `self.theme.series_color(i)` — i-th of a 6-color series (#89B4FA, #FAB387, #94E2D5, #CBA6F7, #F9E2AF, #A6E3A1), cycling; use to tell same-kind branches/columns apart
+
+`tone=` values (for shape/connect/outline/readout): `accent`, `accent_alt`, `success`, `warning`, `danger`, `muted`, `ink`. They are the color names above; pass the name, not a color.
+
+Measures (use when placing by hand; scene methods already use them by default):
+- `self.theme.spacing.<…>` — gaps, for `buff=`: `tight` = 0.15, `normal` = 0.35, `loose` = 0.6
+- `self.theme.strokes.<…>` — line thickness, for `stroke_width=`: `thin` = 1.5, `normal` = 3.0, `bold` = 4.0
+- `self.theme.shapes.<…>` — shared shape of frames/boxes: `corner_radius` = 0.15, `fill_opacity` = 0.55
+- `self.theme.pacing.<…>` — transition duration, via `self.pace("fast"|"normal"|"slow")` or `speed=`: `fast` = 0.5, `normal` = 0.8, `slow` = 1.4
+- `self.theme.scale.<…>` — font sizes; pick via self.title/heading/body/caption, never set by hand: `h1` = 48, `h2` = 36, `body` = 28, `caption` = 20
+
+Constants available after `from conceptflow import *`: `DOWN`, `LEFT`, `ORIGIN`, `RIGHT`, `UP`, `VGroup`. There is NO `CENTER` — to center use `ORIGIN` or `.move_to(ORIGIN)`. Need any other Manim constant/class? `from manim import X` by name.

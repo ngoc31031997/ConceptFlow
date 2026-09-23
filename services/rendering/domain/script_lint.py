@@ -33,6 +33,7 @@ import re
 from dataclasses import dataclass
 
 from conceptflow.api import COMPONENT_NAMES, PUBLIC_NAMES
+from conceptflow.reference import theme_attribute_paths
 from conceptflow.theme import FontScale
 
 BLOCKING = "blocking"
@@ -46,6 +47,7 @@ HEX_COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
 ALLOWED_FONT_SIZES = frozenset(FontScale().all_sizes())
 
 _BUILTINS = frozenset(dir(builtins))
+_THEME_PATHS = theme_attribute_paths()
 
 
 @dataclass(frozen=True)
@@ -178,6 +180,39 @@ class _Collector(ast.NodeVisitor):
         self._check_kwargs(node)
         self.generic_visit(node)
 
+    def visit_Attribute(self, node: ast.Attribute) -> None:
+        self._check_theme_attribute(node)
+        self.generic_visit(node)
+
+    def _check_theme_attribute(self, node: ast.Attribute) -> None:
+        """`self.theme.<x>` và `self.theme.<nhóm>.<y>` phải có thật trong `Theme`.
+
+        Model hay bịa tên (`self.theme.blue`, `self.theme.spacing.medium`); những
+        tên đó chỉ nổ AttributeError lúc render, sau khi đã tốn cả lượt dựng.
+        """
+        owner = node.value
+        if _is_self_theme(owner):
+            if node.attr not in _THEME_PATHS:
+                self._unknown_theme_name(node, f"self.theme.{node.attr}", sorted(_THEME_PATHS))
+        elif (
+            isinstance(owner, ast.Attribute)
+            and _is_self_theme(owner.value)
+            and _THEME_PATHS.get(owner.attr)
+            and node.attr not in _THEME_PATHS[owner.attr]
+        ):
+            self._unknown_theme_name(
+                node, f"self.theme.{owner.attr}.{node.attr}", sorted(_THEME_PATHS[owner.attr])
+            )
+
+    def _unknown_theme_name(self, node: ast.Attribute, written: str, valid: list[str]) -> None:
+        self.issues.append(
+            LintIssue(
+                line=node.lineno,
+                message=f"`{written}` không có trong theme. Tên hợp lệ: {', '.join(valid)}.",
+                severity=BLOCKING,
+            )
+        )
+
     def visit_Constant(self, node: ast.Constant) -> None:
         if isinstance(node.value, str) and HEX_COLOR_RE.match(node.value):
             self.issues.append(
@@ -266,6 +301,15 @@ class _Collector(ast.NodeVisitor):
 
     def _known(self, name: str) -> bool:
         return name in self.defined or name in PUBLIC_NAMES or name in _BUILTINS
+
+
+def _is_self_theme(node: ast.expr) -> bool:
+    return (
+        isinstance(node, ast.Attribute)
+        and node.attr == "theme"
+        and isinstance(node.value, ast.Name)
+        and node.value.id == "self"
+    )
 
 
 def _called_name(func: ast.expr) -> str | None:

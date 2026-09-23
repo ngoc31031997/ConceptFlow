@@ -23,8 +23,8 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleStoryArchitect, Language: "en", Version: 2, TemplateText: bt(storyArchitectEN)},
 		{Role: RoleVisualDirector, Language: "vi", Version: 5, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleVisualDirector, Language: "en", Version: 5, TemplateText: bt(visualDirectorEN)},
-		{Role: RoleManimEngineer, Language: "vi", Version: 3, TemplateText: bt(manimEngineerVI)},
-		{Role: RoleManimEngineer, Language: "en", Version: 3, TemplateText: bt(manimEngineerEN)},
+		{Role: RoleManimEngineer, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
+		{Role: RoleManimEngineer, Language: "en", Version: 4, TemplateText: bt(withThemeReference(manimEngineerEN, "en"))},
 		{Role: RoleRemotionVisualDirector, Language: "vi", Version: 1, TemplateText: bt(remotionVisualDirectorVI)},
 		{Role: RoleRemotionVisualDirector, Language: "en", Version: 1, TemplateText: bt(remotionVisualDirectorEN)},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 2, TemplateText: bt(remotionEngineerVI)},
@@ -673,6 +673,8 @@ QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời
 - KHÔNG tự đặt ¤font_size=¤ bằng một số tuỳ ý ở bất kỳ lời gọi nào. Nếu thật sự cần chỉnh cỡ chữ tay (hiếm khi cần vì ¤self.title/heading/body/caption¤ đã tự chọn cỡ đúng theo vai trò), chỉ được dùng một trong bốn giá trị: 48, 36, 28, hoặc 20 — bất kỳ số nào khác sẽ bị lint cảnh báo.
 - KHÔNG dùng toạ độ tuyệt đối hardcode (ví dụ ¤move_to([2.3, -1.1, 0])¤ hay ¤shift(RIGHT * 3.7)¤ áng chừng cho vừa mắt). Luôn định vị TƯƠNG ĐỐI so với vật đã có trên khung hình bằng ¤.next_to(vật_khác, DIRECTION, buff=...)¤ hoặc theo mép khung bằng ¤.to_edge(DIRECTION)¤ — toạ độ tuyệt đối không co giãn theo nội dung thật và dễ vỡ bố cục khi nội dung dài/ngắn khác dự tính.
 
+{{theme_reference}}
+
 ### Method của scene (gọi qua ¤self.¤)
 - Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
 - Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi ¤self.beat(...)¤ tương ứng bên trong:
@@ -689,7 +691,7 @@ QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời
   - ¤vary(đại lượng, a → b)¤ → ¤số = self.readout(a, label="tên đại lượng")¤ rồi ¤self.count(số, b)¤
   - ¤trace(vật)¤ → ¤self.emphasize(obj, style="circle")¤
 - Gom nhóm và chỉ hướng: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
-- Đặt vị trí tương đối: ¤obj.next_to(khác, DOWN, buff=0.5)¤, ¤obj.shift(UP * 0.5)¤
+- Đặt vị trí tương đối: ¤obj.next_to(khác, DOWN, buff=self.theme.spacing.normal)¤, ¤obj.shift(UP * self.theme.spacing.normal)¤
 
 ### Ràng buộc thi hành
 - Cần một hình mà component không diễn đạt được? TRƯỚC HẾT xem lại ¤self.shape¤, ¤self.path¤, ¤self.connect¤, ¤self.brace¤, ¤self.readout¤, ¤self.travel¤, ¤self.emphasize(style="circle")¤ — chúng có sẵn cho hầu hết hình học, mũi tên, số chạy và chuyển động, và chúng được theme lo màu/nét/nhịp. Chỉ khi vẫn không đủ mới import đích danh từ Manim (ví dụ ¤from manim import Angle¤): được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
@@ -776,6 +778,8 @@ IMPORTANT — COLOR, FONT SIZE, COORDINATES (applies to EVERY call in the whole 
 - NEVER set ¤font_size=¤ to an arbitrary number on any call. If you genuinely need to override the size by hand (rare — ¤self.title/heading/body/caption¤ already pick the right size for their role), only 48, 36, 28, or 20 are allowed — any other value triggers a lint warning.
 - NEVER use hardcoded absolute coordinates (e.g. ¤move_to([2.3, -1.1, 0])¤ or ¤shift(RIGHT * 3.7)¤ eyeballed to "look right"). Always position RELATIVE to what's already on screen via ¤.next_to(other_obj, DIRECTION, buff=...)¤, or relative to the frame edge via ¤.to_edge(DIRECTION)¤ — absolute coordinates don't adapt to actual content size and break the layout whenever content is longer/shorter than expected.
 
+{{theme_reference}}
+
 ### Scene methods (called via ¤self.¤)
 - Narration and structure: ¤self.narrate("line")¤, ¤self.beat("<id>")¤, ¤self.chapter("Chapter name")¤
 - Three built-in beats — USE THEM instead of hand-rolling, they already call ¤self.beat(...)¤ internally:
@@ -792,7 +796,7 @@ IMPORTANT — COLOR, FONT SIZE, COORDINATES (applies to EVERY call in the whole 
   - ¤vary(quantity, a → b)¤ → ¤readout = self.readout(a, label="quantity name")¤ then ¤self.count(readout, b)¤
   - ¤trace(object)¤ → ¤self.emphasize(obj, style="circle")¤
 - Grouping and direction: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
-- Relative positioning: ¤obj.next_to(other, DOWN, buff=0.5)¤, ¤obj.shift(UP * 0.5)¤
+- Relative positioning: ¤obj.next_to(other, DOWN, buff=self.theme.spacing.normal)¤, ¤obj.shift(UP * self.theme.spacing.normal)¤
 
 ### Execution constraints
 - Need a shape the components cannot express? FIRST re-read ¤self.shape¤, ¤self.path¤, ¤self.connect¤, ¤self.brace¤, ¤self.readout¤, ¤self.travel¤, ¤self.emphasize(style="circle")¤ — they cover most geometry, arrows, live numbers and motion, and the theme owns their color/stroke/pacing. Only if they still fall short, import by name from Manim (e.g. ¤from manim import Angle¤): allowed, but it's outside the design system, so use it sparingly.

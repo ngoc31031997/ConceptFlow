@@ -1,0 +1,26 @@
+### Theme của kênh — CHỈ được dùng đúng những gì liệt kê dưới đây
+
+Truy cập qua `self.theme.<tên>`. KHÔNG có tên nào ngoài danh sách; đừng đoán (`self.theme.blue`, `self.theme.primary`… đều không tồn tại).
+
+Màu (giá trị chỉ để bạn hình dung, KHÔNG viết mã hex vào code):
+- `self.theme.background` #080E1C — nền video (đã được vẽ sẵn, KHÔNG tự tô)
+- `self.theme.ink` #F2F7FF — chữ chính, nét chính
+- `self.theme.muted` #A6ADC8 — chữ phụ, đường trục, thứ ít quan trọng
+- `self.theme.surface` #313244 — nền của khung/hộp đặc
+- `self.theme.accent` #8FC7EF — màu nhấn chính của kênh — thứ cần người xem nhìn vào
+- `self.theme.accent_alt` #B4BEFE — màu nhấn phụ, đi cặp với accent
+- `self.theme.success` #A6E3A1 — đúng, đạt, kết quả tốt
+- `self.theme.warning` #F9E2AF — cẩn thận, chú ý, trường hợp biên
+- `self.theme.danger` #F38BA8 — sai, lỗi, kết quả xấu
+- `self.theme.series_color(i)` — màu thứ i trong dải 6 màu (#89B4FA, #FAB387, #94E2D5, #CBA6F7, #F9E2AF, #A6E3A1), quay vòng; dùng để phân biệt các nhánh/cột cùng loại
+
+Sắc thái `tone=` (cho shape/connect/outline/readout): `accent`, `accent_alt`, `success`, `warning`, `danger`, `muted`, `ink`. Đây là tên màu ở trên; truyền tên, không truyền màu.
+
+Số đo (dùng nếu cần đặt tay; mặc định các method của scene đã tự dùng):
+- `self.theme.spacing.<…>` — khoảng cách, dùng cho `buff=`: `tight` = 0.15, `normal` = 0.35, `loose` = 0.6
+- `self.theme.strokes.<…>` — độ dày nét, dùng cho `stroke_width=`: `thin` = 1.5, `normal` = 3.0, `bold` = 4.0
+- `self.theme.shapes.<…>` — hình dạng chung của khung/hộp: `corner_radius` = 0.15, `fill_opacity` = 0.55
+- `self.theme.pacing.<…>` — thời lượng chuyển cảnh, dùng qua `self.pace("fast"|"normal"|"slow")` hoặc `speed=`: `fast` = 0.5, `normal` = 0.8, `slow` = 1.4
+- `self.theme.scale.<…>` — cỡ chữ; chọn bằng method self.title/heading/body/caption, không đặt tay: `h1` = 48, `h2` = 36, `body` = 28, `caption` = 20
+
+Hằng số có sẵn sau `from conceptflow import *`: `DOWN`, `LEFT`, `ORIGIN`, `RIGHT`, `UP`, `VGroup`. KHÔNG có `CENTER` — muốn căn giữa dùng `ORIGIN` hoặc `.move_to(ORIGIN)`. Cần hằng số/class khác của Manim thì `from manim import X` đích danh.

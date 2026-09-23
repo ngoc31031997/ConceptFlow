@@ -40,7 +40,7 @@ from . import narration as narration_runtime
 from . import theme as theme_module
 from .components import Readout, Recap, TitleCard
 from .layout import Box, fit_scale
-from .theme import Theme
+from .theme import TONES, Theme
 from .transitions import (
     dismiss_animation,
     emphasize_animation,
@@ -57,10 +57,6 @@ from .transitions import (
 #: báo động giả, trong khi vẫn bắt được trường hợp "chồng gần như hoàn toàn"
 #: là bug thật. Hằng số riêng, dễ chỉnh nếu thực tế cho thấy cần khác.
 OVERLAP_AREA_RATIO_THRESHOLD = 0.25
-
-#: Sắc thái gọi được bằng tên trong `shape`, `connect`, `outline`, `readout`.
-#: Script chọn màu bằng từ khoá của theme, không bằng mã màu — xem `Callout.TONES`.
-TONES = ("accent", "accent_alt", "success", "warning", "danger", "muted", "ink")
 
 #: Độ cong của `connect(style="curved")`, tính bằng radian. Một phần ba PI đủ để
 #: mũi tên vòng qua một vật nằm chắn giữa mà không thành vòng cung điệu đà.
@@ -121,7 +117,7 @@ class ConceptFlowScene(MovingCameraScene):
         kwargs.setdefault("style", "monokai")
         kwargs.setdefault("background", "rectangle")
         kwargs.setdefault("background_stroke_color", self.theme.accent)
-        kwargs.setdefault("corner_radius", 0.15)
+        kwargs.setdefault("corner_radius", self.theme.shapes.corner_radius)
         return Code(code=source, language=language, **kwargs)
 
     def _text(self, text: str, size: int, font: str, **kwargs) -> Text:
@@ -130,13 +126,17 @@ class ConceptFlowScene(MovingCameraScene):
 
     # --- Bố cục ---------------------------------------------------------------
 
-    def stack(self, *mobjects: Mobject, buff: float = 0.35) -> VGroup:
+    def stack(self, *mobjects: Mobject, buff: float | None = None) -> VGroup:
         """Xếp dọc, canh giữa, rồi co cho vừa khung an toàn."""
-        group = VGroup(*mobjects).arrange(DOWN, buff=buff)
+        group = VGroup(*mobjects).arrange(
+            DOWN, buff=self.theme.spacing.normal if buff is None else buff
+        )
         return self.fit(group)
 
-    def row(self, *mobjects: Mobject, buff: float = 0.6) -> VGroup:
-        group = VGroup(*mobjects).arrange(RIGHT, buff=buff)
+    def row(self, *mobjects: Mobject, buff: float | None = None) -> VGroup:
+        group = VGroup(*mobjects).arrange(
+            RIGHT, buff=self.theme.spacing.loose if buff is None else buff
+        )
         return self.fit(group)
 
     def fit(self, mobject: Mobject) -> Mobject:
@@ -173,9 +173,12 @@ class ConceptFlowScene(MovingCameraScene):
         if style == "curved":
             start, end = _edge_points(source, target)
             arrow = CurvedArrow(start, end, angle=CURVED_ARROW_ANGLE, color=color)
-            arrow.set_stroke(width=3)
+            arrow.set_stroke(width=self.theme.strokes.normal)
         else:
-            arrow = Arrow(source, target, buff=0.15, color=color, stroke_width=3)
+            arrow = Arrow(
+                source, target, buff=self.theme.spacing.tight, color=color,
+                stroke_width=self.theme.strokes.normal,
+            )
 
         group = VGroup(arrow)
         if label:
@@ -184,13 +187,19 @@ class ConceptFlowScene(MovingCameraScene):
             # một `Arc`, không phải `Line`, nên không có method đó.
             dx, dy, _ = _unit_vector(arrow.get_start(), arrow.get_end())
             mid = arrow.point_from_proportion(0.5)
-            group.add(self.caption(label).next_to(mid, np.array([-dy, dx, 0.0]), buff=0.15))
+            group.add(self.caption(label).next_to(
+                mid, np.array([-dy, dx, 0.0]), buff=self.theme.spacing.tight
+            ))
         return group
 
     def outline(self, mobject: Mobject, tone: str = "accent") -> Mobject:
         """Khung bao quanh một đối tượng để chỉ vào nó, màu theo sắc thái."""
         return SurroundingRectangle(
-            mobject, color=self._tone_color(tone), buff=0.15, corner_radius=0.12, stroke_width=3
+            mobject,
+            color=self._tone_color(tone),
+            buff=self.theme.spacing.tight,
+            corner_radius=self.theme.shapes.corner_radius,
+            stroke_width=self.theme.strokes.normal,
         )
 
     def brace(self, mobject: Mobject, label: str | None = None, direction=DOWN) -> VGroup:
@@ -203,7 +212,7 @@ class ConceptFlowScene(MovingCameraScene):
         brace = Brace(mobject, direction=direction, color=self.theme.muted)
         group = VGroup(brace)
         if label:
-            group.add(self.caption(label).next_to(brace, direction, buff=0.15))
+            group.add(self.caption(label).next_to(brace, direction, buff=self.theme.spacing.tight))
         return group
 
     # --- Hình cơ bản (thay cho Rectangle/Circle/Line... thô) ------------------
@@ -241,10 +250,10 @@ class ConceptFlowScene(MovingCameraScene):
 
         if kind == "dot":
             return mobject.set_color(color)
-        mobject.set_stroke(color=color, width=3)
+        mobject.set_stroke(color=color, width=self.theme.strokes.normal)
         mobject.set_fill(
             color=self.theme.surface if filled else color,
-            opacity=0.55 if filled else 0.0,
+            opacity=self.theme.shapes.fill_opacity if filled else 0.0,
         )
         return mobject
 
@@ -265,7 +274,7 @@ class ConceptFlowScene(MovingCameraScene):
             line = Line(anchors[0], anchors[1])
         else:
             line = VMobject().set_points_as_corners(anchors)
-        line.set_stroke(color=self._tone_color(tone), width=3)
+        line.set_stroke(color=self._tone_color(tone), width=self.theme.strokes.normal)
         return line
 
     # --- Số chạy --------------------------------------------------------------

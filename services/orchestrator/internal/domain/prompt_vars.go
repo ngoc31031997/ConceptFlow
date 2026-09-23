@@ -28,6 +28,16 @@ var channelIdentityVI string
 //go:embed prompts/channel_identity_en.txt
 var channelIdentityEN string
 
+// theme_reference_*.txt are GENERATED from rendering/conceptflow/theme.py by
+// rendering/tools/gen_theme_reference.py — never edit them by hand. The
+// rendering test suite fails if they drift from the Theme they describe.
+//
+//go:embed prompts/theme_reference_vi.txt
+var themeReferenceVI string
+
+//go:embed prompts/theme_reference_en.txt
+var themeReferenceEN string
+
 //go:embed prompts/narration_rule_vi.txt
 var narrationRuleVI string
 
@@ -52,6 +62,24 @@ func ChannelIdentity(language string) string {
 		return channelIdentityVI
 	}
 	return channelIdentityEN
+}
+
+// ThemeReference returns the block {{theme_reference}} expands to: every color,
+// measure and constant the generated Manim script may use, so the model stops
+// inventing names (self.theme.blue, CENTER) that only fail at render time.
+func ThemeReference(language string) string {
+	if language == "vi" {
+		return themeReferenceVI
+	}
+	return themeReferenceEN
+}
+
+// withThemeReference expands {{theme_reference}} at seed time. It is baked in
+// rather than substituted per request because the copy-the-prompt-by-hand flow
+// in web-gui reads the stored template as-is and would otherwise show the
+// literal placeholder.
+func withThemeReference(text, language string) string {
+	return strings.ReplaceAll(text, "{{theme_reference}}", ThemeReference(language))
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language

@@ -78,6 +78,36 @@ class Pacing:
 
 
 @dataclass(frozen=True)
+class Spacing:
+    """Khoảng cách giữa các vật. Ba bậc, dùng cho `buff=` khi xếp/đặt vị trí.
+
+    Script viết `next_to(vật, DOWN, buff=self.theme.spacing.normal)` thay vì tự
+    áng chừng một con số — khoảng cách cũng là thứ dễ trôi khỏi chuẩn như màu.
+    """
+
+    tight: float = 0.15
+    normal: float = 0.35
+    loose: float = 0.6
+
+
+@dataclass(frozen=True)
+class Strokes:
+    """Độ dày nét. `normal` là nét của hình, mũi tên, đường nối."""
+
+    thin: float = 1.5
+    normal: float = 3.0
+    bold: float = 4.0
+
+
+@dataclass(frozen=True)
+class Shapes:
+    """Hình dạng chung của khung, hộp, hình cơ bản."""
+
+    corner_radius: float = 0.15
+    fill_opacity: float = 0.55
+
+
+@dataclass(frozen=True)
 class Fonts:
     """Cormorant Garamond chỉ dùng cho H1/H2.
 
@@ -97,6 +127,12 @@ class Fonts:
     # là gần như mọi vòng lặp for/so sánh). Bản NL không có bảng ligature nào
     # cả nên không bao giờ trôi khỏi giả định 1-ký-tự-1-glyph của Manim.
     mono: str = "JetBrains Mono NL"
+
+
+#: Sắc thái gọi được bằng tên trong `shape`, `connect`, `outline`, `readout`.
+#: Script chọn màu bằng từ khoá của theme, không bằng mã màu. Mỗi tên là một
+#: thuộc tính màu của `Theme` (test khoá điều đó).
+TONES = ("accent", "accent_alt", "success", "warning", "danger", "muted", "ink")
 
 
 @dataclass(frozen=True)
@@ -134,6 +170,9 @@ class Theme:
     fonts: Fonts = field(default_factory=Fonts)
     scale: FontScale = field(default_factory=FontScale)
     pacing: Pacing = field(default_factory=Pacing)
+    spacing: Spacing = field(default_factory=Spacing)
+    strokes: Strokes = field(default_factory=Strokes)
+    shapes: Shapes = field(default_factory=Shapes)
     safe_margin: float = SAFE_MARGIN
 
     def derive(self, name: str, **overrides: object) -> "Theme":
