@@ -109,7 +109,7 @@ export function ValidatePage() {
   return (
     <div data-testid="validate-page">
       <AppShell
-        currentStep={4}
+        currentStep={5}
         wide={isAwaitingReview}
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>

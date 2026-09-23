@@ -9,10 +9,13 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
  * lần đổi, giữ trong draft để mọi trang đọc cùng một giá trị.
  *
  * Cùng race condition useAuthoringMode từng gặp (bug report: chọn ở bước 1
- * rồi sang tab kế bị đọc đè lại giá trị cũ) nên cùng cách chặn: theo dõi lượt
- * lưu đang bay theo project, bỏ qua kết quả đọc khi một lượt lưu chưa xong.
+ * rồi sang tab kế bị đọc đè lại giá trị cũ). Chặn bằng bộ đếm version: một
+ * presence-check trên "lượt lưu đang bay" không đủ, vì PUT có thể resolve
+ * (tự xoá khỏi map) trước khi GET đang đua — đọc dữ liệu cũ — resolve xong,
+ * nên giá trị cũ vẫn thắng. Đếm version theo project: chỉ áp kết quả đọc khi
+ * không có lượt setModels nào xảy ra kể từ lúc đọc bắt đầu.
  */
-const pendingSaves = new Map<string, Promise<unknown>>();
+const writeVersion = new Map<string, number>();
 
 export function useAuthoringModels(projectId: string): {
   models: AuthoringStepModels;
@@ -24,9 +27,10 @@ export function useAuthoringModels(projectId: string): {
   useEffect(() => {
     if (!projectId) return;
     let cancelled = false;
+    const versionAtStart = writeVersion.get(projectId) ?? 0;
     getAuthoringState(projectId)
       .then((state) => {
-        if (cancelled || pendingSaves.has(projectId)) return;
+        if (cancelled || (writeVersion.get(projectId) ?? 0) !== versionAtStart) return;
         dispatch({
           type: "SET_AUTHORING_MODELS",
           payload: {
@@ -50,12 +54,9 @@ export function useAuthoringModels(projectId: string): {
     setModels: (models) => {
       dispatch({ type: "SET_AUTHORING_MODELS", payload: models });
       if (!projectId) return;
-      const save = saveAuthoringModels(projectId, models).catch(() => {
+      writeVersion.set(projectId, (writeVersion.get(projectId) ?? 0) + 1);
+      void saveAuthoringModels(projectId, models).catch(() => {
         /* best-effort — see useAuthoringMode's docstring */
-      });
-      pendingSaves.set(projectId, save);
-      void save.finally(() => {
-        if (pendingSaves.get(projectId) === save) pendingSaves.delete(projectId);
       });
     },
   };

@@ -40,6 +40,10 @@
 .ghostBtn:hover {
   background: rgba(255, 255, 255, 0.85);
 }
+.ghostBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 .ghostBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -62,6 +66,10 @@
   background: var(--danger-soft);
   border-color: rgba(224, 67, 47, 0.45);
 }
+.dangerGhostBtn:focus-visible {
+  outline: 2px solid var(--danger);
+  outline-offset: 2px;
+}
 .dangerGhostBtn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -79,7 +87,16 @@
   background: linear-gradient(135deg, var(--danger), #ff6b52);
   box-shadow: 0 8px 20px rgba(224, 67, 47, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.4);
-  transition: opacity 0.15s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
+}
+.dangerBtn:hover:not(:disabled) {
+  box-shadow: 0 10px 24px rgba(224, 67, 47, 0.4);
+  transform: translateY(-1px);
+}
+.dangerBtn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(224, 67, 47, 0.35);
 }
 .dangerBtn:disabled {
   background: rgba(22, 34, 46, 0.08);
@@ -113,6 +130,16 @@
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   box-shadow: 0 10px 26px rgba(47, 143, 224, 0.35);
   border: 1px solid rgba(255, 255, 255, 0.4);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+.btnPrimary:hover:not(:disabled) {
+  box-shadow: 0 12px 30px rgba(47, 143, 224, 0.45);
+  transform: translateY(-1px);
+}
+.btnPrimary:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(47, 143, 224, 0.35);
 }
 .btnPrimary:disabled {
   background: rgba(22, 34, 46, 0.08);

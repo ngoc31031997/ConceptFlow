@@ -109,7 +109,7 @@ export function ResultPage() {
   return (
     <div data-testid="result-page">
       <AppShell
-        currentStep={6}
+        currentStep={7}
         wide
         title="Xem kết quả"
         subtitle="Xem lại video, cắt clip, hoặc render lại — đăng bài chuyển sang bước tiếp theo."

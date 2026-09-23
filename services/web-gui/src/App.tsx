@@ -5,6 +5,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationLoader } from "./components/NavigationLoader";
 import { KeyboardShortcutsHelp } from "./components/KeyboardShortcutsHelp";
 import { ScriptStepPage } from "./pages/ScriptStepPage";
+import { ScriptAuthoringSettingsStepPage } from "./pages/ScriptAuthoringSettingsStepPage";
 import { SettingsStepPage } from "./pages/SettingsStepPage";
 import { ReviewStepPage } from "./pages/ReviewStepPage";
 import { ValidatePage } from "./pages/ValidatePage";
@@ -27,13 +28,14 @@ export function App() {
           <NavigationLoader />
           <KeyboardShortcutsHelp />
           <Routes>
-            {/* "/" chỉ chọn ngôn ngữ, engine, cách làm và tình huống (ý tưởng
-                / đã có dàn ý / đã có storyboard / đã có code); mỗi tình huống
-                mở đúng một tab của chuỗi 3 tab bên dưới (xem
-                ScriptPipelineTabs). Mỗi tab một URL riêng để Back/reload/
-                bookmark đều chạy, và tab nào cũng bấm sang được bất kể tiến
-                độ. */}
+            {/* "/" (Bước 1) chỉ còn tình huống "chỉ có ý tưởng" — chọn xong
+                là tạo project ngay. "/create/script/settings" (Bước 2) chọn
+                ngôn ngữ, engine, cách làm rồi mới vào chuỗi 3 tab bên dưới
+                (xem ScriptPipelineTabs). Mỗi tab một URL riêng để Back/
+                reload/bookmark đều chạy, và tab nào cũng bấm sang được bất
+                kể tiến độ. */}
             <Route path="/" element={<ScriptStepPage />} />
+            <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />

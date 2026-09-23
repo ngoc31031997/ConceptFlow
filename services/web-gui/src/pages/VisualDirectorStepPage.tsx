@@ -125,7 +125,7 @@ export function VisualDirectorStepPage() {
   return (
     <div data-testid="visual-director-step-page">
       <AppShell
-        currentStep={1}
+        currentStep={2}
         title="Bước 1 — Script"
         subtitle={
           hasOwnStoryboard
@@ -207,8 +207,8 @@ export function VisualDirectorStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
-        onBack={() => navigate(hasOwnStoryboard ? "/" : "/create/script/outline")}
-        backLabel={hasOwnStoryboard ? "Quay lại chọn tình huống" : "Quay lại Dàn ý"}
+        onBack={() => navigate(hasOwnStoryboard ? "/create/script/settings" : "/create/script/outline")}
+        backLabel={hasOwnStoryboard ? "Quay lại cấu hình" : "Quay lại Dàn ý"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={storyboardIsEmpty || saving}

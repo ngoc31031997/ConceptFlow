@@ -162,7 +162,7 @@ export function ReviewStepPage() {
     <div data-testid="review-step-page">
       <AppShell
         wide
-        currentStep={3}
+        currentStep={4}
         title="Bước 3 — Xem lại trước khi chạy"
         subtitle="Bước tiếp theo chỉ chạy thử kịch bản (chưa tốn giọng đọc hay render), rồi dừng lại cho bạn duyệt dàn ý."
       >

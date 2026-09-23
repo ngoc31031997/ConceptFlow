@@ -178,7 +178,7 @@ export function ManimEngineerStepPage() {
   return (
     <div data-testid="manim-engineer-step-page">
       <AppShell
-        currentStep={1}
+        currentStep={2}
         title="Bước 1 — Script"
         subtitle={
           hasOwnCode
@@ -295,8 +295,8 @@ export function ManimEngineerStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
-        onBack={() => navigate(hasOwnCode ? "/" : "/create/script/storyboard")}
-        backLabel={hasOwnCode ? "Quay lại chọn tình huống" : "Quay lại Storyboard"}
+        onBack={() => navigate(hasOwnCode ? "/create/script/settings" : "/create/script/storyboard")}
+        backLabel={hasOwnCode ? "Quay lại cấu hình" : "Quay lại Storyboard"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={!isValid || saving}

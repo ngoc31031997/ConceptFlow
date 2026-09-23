@@ -191,7 +191,7 @@ export function ScriptOutlineStepPage() {
   return (
     <div data-testid="script-outline-step-page">
       <AppShell
-        currentStep={1}
+        currentStep={2}
         wide
         title="Bước 1 — Script"
         subtitle={
@@ -330,8 +330,8 @@ export function ScriptOutlineStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
-        onBack={() => navigate("/")}
-        backLabel="Quay lại chọn tình huống"
+        onBack={() => navigate("/create/script/settings")}
+        backLabel="Quay lại cấu hình"
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={storyIsEmpty || saving}
