@@ -35,12 +35,14 @@ function main() {
   // variant of the orchestrator client for the AI routes (local LLM
   // generation can take up to ~2 minutes).
   //
-  // 200s, not 130s: CR-027's authoring-generate route sits behind this client
+  // TEMPORARY: timeoutMs 0 = no gateway timeout, so heavy system prompts can
+  // wait on Hive as long as needed (pairs with HIVE_TIMEOUT_SECONDS=0).
+  // Previously 200s, not 130s: CR-027's authoring-generate route sits behind this client
   // and the orchestrator's own HIVE_TIMEOUT_SECONDS defaults to 180. A gateway
   // that gave up first would show the Creator a timeout for a call that was
   // still going to succeed, after the tokens were already billed.
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
-  const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 200_000 });
+  const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 0 });
   const publisherClient = createHttpClient(config.publisherUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.

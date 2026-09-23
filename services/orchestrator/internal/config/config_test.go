@@ -83,7 +83,7 @@ func TestLoad_HiveDefaults(t *testing.T) {
 	if cfg.HiveMaxOutputTokens != 16000 {
 		t.Fatalf("unexpected output budget %d", cfg.HiveMaxOutputTokens)
 	}
-	if cfg.HiveTimeout.Seconds() != 180 {
+	if cfg.HiveTimeout != 0 {
 		t.Fatalf("unexpected timeout %v", cfg.HiveTimeout)
 	}
 }
