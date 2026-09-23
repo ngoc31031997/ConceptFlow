@@ -145,10 +145,20 @@ export function projectPhase(status: string): ProjectPhase {
 
 /** URL của màn hình sở hữu project ở trạng thái này. */
 export function projectPath(projectId: string, status: string): string {
+  // Draft chưa chạy saga: không có màn theo dõi nào, phải mở lại đúng bước wizard.
+  if (status === "draft") return `/projects/${projectId}/resume`;
   const phase = projectPhase(status);
   if (phase === "validate") return `/projects/${projectId}/validate`;
   if (phase === "process") return `/projects/${projectId}/render`;
-  // Đã đăng hay đang đăng thì màn kết quả vẫn là chỗ đúng để quay về: nó có
-  // link sang màn đăng, còn chiều ngược lại thì không.
+  // Bước 7 (đang đăng / đã đăng / đăng lỗi) có màn riêng, khớp nhãn "Bước 7 — Đăng".
+  if (phase === "publish") return `/projects/${projectId}/publish`;
   return `/projects/${projectId}/result`;
+}
+
+const WIZARD_STEP_NAMES = ["Ý tưởng", "Cấu hình", "Script", "Validate", "Xử lý", "Kết quả", "Đăng"];
+
+/** "Bước 3 — Script": bước wizard mà project đang ở (wizard_step từ server, 1-7). */
+export function wizardStepLabel(step: number | undefined): string | null {
+  if (!step || step < 1 || step > WIZARD_STEP_NAMES.length) return null;
+  return `Bước ${step} — ${WIZARD_STEP_NAMES[step - 1]}`;
 }

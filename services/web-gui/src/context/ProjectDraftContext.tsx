@@ -57,7 +57,7 @@ function normalizeScriptSource(value: unknown): ScriptSource | null {
 }
 
 /**
- * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 1 — Script",
+ * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 3 — Script",
  * not one tab at a time:
  *
  *   manual — copy each prompt into ChatGPT/Claude/Gemini and paste the answer
@@ -180,6 +180,7 @@ export type ProjectDraftAction =
   | { type: "SET_AUTHORING_TOPIC"; payload: string }
   | { type: "SET_AUTHORING_STORY"; payload: string }
   | { type: "SET_AUTHORING_STORYBOARD"; payload: string }
+  | { type: "LOAD_PROJECT"; payload: Partial<ProjectDraft> }
   | { type: "MARK_SUBMITTED" }
   | { type: "RESUME_EDITING" }
   | { type: "RESET" };
@@ -385,6 +386,11 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, authoringModels: action.payload };
     case "SET_AUTHORING_STORYBOARD":
       return { ...state, authoringStoryboard: action.payload };
+    // Mở lại một draft đã lưu trên server (ResumeProjectPage): thay cả bản nháp
+    // đang giữ, không trộn — trường nào server không có thì về mặc định chứ
+    // không mang giá trị của project khác sang.
+    case "LOAD_PROJECT":
+      return { ...initialDraft, ...action.payload, hasSubmitted: false };
     case "MARK_SUBMITTED":
       return { ...state, hasSubmitted: true };
     // CR-024's "Quay lại sửa script" (outline rejected): the render saga has

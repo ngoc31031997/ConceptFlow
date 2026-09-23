@@ -206,6 +206,10 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS companion_project_id TEXT;
 -- existed before this column did.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_engine TEXT NOT NULL DEFAULT 'manim';
 
+-- Wizard progress: the furthest step (1-3) the Creator confirmed with "Tiếp
+-- tục". Steps 4-7 are derived from status, so they are never stored here.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS wizard_step INTEGER NOT NULL DEFAULT 1;
+
 -- CR-021 D6/FR61.1: one row per automated QC pass.
 --
 -- findings is JSONB, not text: FR61.1 asks for machine-readable data and the

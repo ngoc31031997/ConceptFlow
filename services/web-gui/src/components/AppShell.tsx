@@ -10,15 +10,14 @@ import styles from "./AppShell.module.css";
   rather than the path.
 */
 /*
-  Chỉ 3 mục đầu là đích nhảy được — xem BACKTRACKABLE_STEPS. Ba mục sau thuộc
+  Chỉ 3 mục đầu là đích nhảy được — xem BACKTRACKABLE_STEPS. Các mục sau thuộc
   về một project đã tồn tại, nên đường của chúng cần :id mà thanh này không
   có; chúng ở đây để chỉ chỗ, không để bấm.
 */
 const STEP_ROUTES = [
   "/",
   "/create/script/settings",
-  "/create/settings",
-  "/create/review",
+  "/create/script/outline",
   "/projects/:id/validate",
   "/projects/:id/render",
   "/projects/:id/result",
@@ -26,7 +25,7 @@ const STEP_ROUTES = [
 ];
 
 /*
-  CR-031 — tám bước. "Script" cũ gộp cả tình huống, cấu hình ngôn ngữ/engine/
+  CR-031 — bảy bước. "Cấu hình" (bước 2) gộp ngôn ngữ/engine/cách làm với giọng đọc/hình ảnh và đứng trước "Script" (chuỗi 1a-1b-1c); bước "Xem lại" đã bỏ, nút cuối của 1c chạy thẳng saga. "Script" cũ gộp cả tình huống, cấu hình ngôn ngữ/engine/
   cách làm và chuỗi 1a-1b-1c vào một pill duy nhất; tách "Ý tưởng" (chọn tình
   huống, nhập chủ đề) ra làm bước riêng để thanh tiến trình phản ánh đúng
   màn hình Creator đang đứng, thay vì gộp hai việc khác hẳn nhau (chọn ý
@@ -37,9 +36,8 @@ const STEP_ROUTES = [
 */
 const STEP_LABELS = [
   "Ý tưởng",
-  "Script",
   "Cấu hình",
-  "Xem lại",
+  "Script",
   "Validate",
   "Xử lý",
   "Kết quả",
@@ -47,10 +45,10 @@ const STEP_LABELS = [
 ] as const;
 
 /** Số bước đầu tiên có URL không cần project id, nên nhảy ngược về được. */
-const BACKTRACKABLE_STEPS = 4;
+const BACKTRACKABLE_STEPS = 3;
 
 interface AppShellProps {
-  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
   title: string;
   subtitle: string;
   wide?: boolean;

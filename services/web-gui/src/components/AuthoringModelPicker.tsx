@@ -19,7 +19,7 @@ interface AuthoringModelPickerProps {
  * Model-per-step picker — Creator chọn model Hive cho từng tab (1a/1b/1c)
  * ngay ở bước 1, một lần, thay vì hệ thống lúc nào cũng gọi đúng một model
  * cố định (HIVE_MODEL). Đặt cạnh AuthoringModeBar vì cùng là quyết định "cách
- * làm cả bước 1", chỉ hiện khi Creator đã chọn "Gọi API trực tiếp" — chưa
+ * làm cả bước 3", chỉ hiện khi Creator đã chọn "Gọi API trực tiếp" — chưa
  * chọn API thì chưa có model nào để chọn.
  *
  * Lựa chọn áp dụng ngay khi gọi generateAuthoringStep thật (server đọc lại

@@ -54,10 +54,12 @@ type hiveMessage struct {
 }
 
 type hiveRequest struct {
-	Model       string        `json:"model"`
-	Messages    []hiveMessage `json:"messages"`
-	MaxTokens   int           `json:"max_tokens"`
-	Temperature float64       `json:"temperature"`
+	Model    string        `json:"model"`
+	Messages []hiveMessage `json:"messages"`
+	// omitempty: 0 means "no cap" (HIVE_MAX_OUTPUT_TOKENS=0) — the field is
+	// left out and the provider applies its own ceiling.
+	MaxTokens   int     `json:"max_tokens,omitempty"`
+	Temperature float64 `json:"temperature"`
 }
 
 type hiveChoice struct {

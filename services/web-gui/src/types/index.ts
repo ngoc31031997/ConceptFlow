@@ -65,6 +65,8 @@ export interface Scene {
 export interface Project {
   project_id: string;
   status: string;
+  /** Bước wizard (1-7) nên mở lại: bước đã xác nhận xa nhất hoặc bước saga đang ở. */
+  wizard_step?: number;
   /**
    * The project's content language. The wire name is historical (CR-008 §C2):
    * it now drives subtitles, metadata and prompts, not just the TTS voice.
@@ -201,6 +203,8 @@ export interface ProjectSummary {
   updated_at: string;
   /** "manim" | "remotion" — which engine rendered (or will render) this project's video. */
   render_engine: string;
+  /** 1-7, bước wizard project đang ở. */
+  wizard_step?: number;
 }
 
 

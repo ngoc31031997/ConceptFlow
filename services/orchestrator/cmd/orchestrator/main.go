@@ -187,6 +187,10 @@ func main() {
 	createProjectDraft := application.NewCreateProjectDraftUseCase(draftPort)
 	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
 	listAuthoringHistory := application.NewListAuthoringHistoryUseCase(promptTemplateRepo)
+	// Wizard steps 1-2: "Tiếp tục" stores the step's data and how far the
+	// Creator got, so a reload or another browser resumes in place.
+	wizardPort := wizardAdapter{projects: projectRepo, authoring: promptTemplateRepo}
+	saveWizardSettings := application.NewSaveWizardSettingsUseCase(wizardPort)
 	// CR-027 FR77.1 — ONE renderer, shared by the Copy button (FR77.2) and the
 	// generate endpoint (FR78.1). Two instances would be two chances for the
 	// manual path and the API path to send different text for the same role.
@@ -220,7 +224,8 @@ func main() {
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
-		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory)
+		WithProjectDrafts(createProjectDraft, updateProjectTopic, listAuthoringHistory).
+		WithWizard(saveWizardSettings)
 	if generateAuthoring != nil {
 		router = router.WithGenerateAuthoring(generateAuthoring)
 	}
@@ -293,6 +298,22 @@ func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language dom
 
 func (a projectDraftAdapter) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
 	return a.projects.SaveRenderEngine(ctx, projectID, engine)
+}
+
+// wizardAdapter joins the projects row (settings, wizard_step) with the
+// status lookup that lives beside project_authoring, same split as
+// projectDraftAdapter above.
+type wizardAdapter struct {
+	projects  *postgres.ProjectRepository
+	authoring *postgres.PromptTemplateRepository
+}
+
+func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
+	return a.authoring.GetStatus(ctx, projectID)
+}
+
+func (a wizardAdapter) SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error {
+	return a.projects.SaveWizardSettings(ctx, projectID, s)
 }
 
 type promptRenderContext struct {

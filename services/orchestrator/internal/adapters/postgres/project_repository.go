@@ -31,7 +31,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine
+		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine, wizard_step
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -60,7 +60,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
 		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON, &p.CaptionPath, &subtitleMode, &p.CaptionStatus,
 		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID, &layoutMarksJSON,
-		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID, &renderEngine)
+		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -154,7 +154,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT project_id, status, video_path, error_message, updated_at, render_engine
+		SELECT project_id, status, video_path, error_message, updated_at, render_engine, wizard_step
 		FROM projects ORDER BY updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -165,7 +165,7 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 	for rows.Next() {
 		var s domain.ProjectSummary
 		var status, renderEngine string
-		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine); err != nil {
+		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine, &s.WizardStep); err != nil {
 			return nil, err
 		}
 		s.Status = domain.ProjectStatus(status)
@@ -381,6 +381,39 @@ func (r *ProjectRepository) SaveRenderEngine(ctx context.Context, projectID stri
 		`UPDATE projects SET render_engine = $1, updated_at = now() WHERE project_id = $2`,
 		string(engine), projectID)
 	return err
+}
+
+// SaveWizardSettings writes wizard step 2's choices onto the columns the saga
+// later reads, and marks step 2 as confirmed. Touches only those columns, so —
+// unlike Save's full upsert — it cannot reset the authoring/saga fields.
+func (r *ProjectRepository) SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error {
+	var subtitleStyleJSON []byte
+	if s.SubtitleStyle != nil {
+		var err error
+		if subtitleStyleJSON, err = json.Marshal(s.SubtitleStyle); err != nil {
+			return err
+		}
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE projects SET
+		    voice_language = $1, render_engine = $2, tts_enabled = $3, voice_id = $4,
+		    subtitle_mode = $5, subtitles_enabled = $6, subtitle_style = $7,
+		    render_quality = $8, video_format_id = $9, video_output_mode = $10,
+		    background_music_path = $11, background_music_volume = $12,
+		    wizard_step = GREATEST(wizard_step, $13), updated_at = now()
+		WHERE project_id = $14`,
+		string(s.ContentLanguage), string(s.RenderEngine), s.TTSEnabled, s.VoiceID,
+		string(s.SubtitleMode), s.SubtitleMode.NeedsCues(), subtitleStyleJSON,
+		string(s.RenderQuality), s.VideoFormatID, string(s.VideoOutputMode),
+		s.BackgroundMusicPath, s.BackgroundMusicVolume,
+		domain.WizardStepScript, projectID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
 }
 
 // GetStep loads a SagaStep by (saga_id, step_name), or domain.ErrSagaStepNotFound.

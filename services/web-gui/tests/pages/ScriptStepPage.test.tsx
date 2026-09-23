@@ -5,109 +5,94 @@ import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 
-function renderPage() {
-  global.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ connected: false }),
-  }) as unknown as typeof fetch;
+function renderPage(fetchImpl: () => Promise<unknown>) {
+  const fetchMock = vi.fn(fetchImpl);
+  global.fetch = fetchMock as unknown as typeof fetch;
 
-  return render(
+  render(
     <ThemeProvider>
       <MemoryRouter initialEntries={["/"]}>
         <ProjectDraftProvider>
           <Routes>
             <Route path="/" element={<ScriptStepPage />} />
-            <Route path="/create/script/outline" element={<div data-testid="landed-on-outline" />} />
-            <Route path="/create/script/storyboard" element={<div data-testid="landed-on-storyboard" />} />
-            <Route path="/create/script/code" element={<div data-testid="landed-on-code" />} />
+            <Route path="/create/script/settings" element={<div data-testid="landed-on-settings" />} />
           </Routes>
         </ProjectDraftProvider>
       </MemoryRouter>
     </ThemeProvider>,
   );
+  return fetchMock;
 }
 
-describe("ScriptStepPage", () => {
+const createdOk = () =>
+  Promise.resolve({
+    ok: true,
+    status: 201,
+    json: async () => ({ project_id: "p1", similar_projects: [] }),
+  });
+
+function typeTopic(value: string) {
+  fireEvent.change(screen.getByTestId("script-step-topic"), { target: { value } });
+}
+
+describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
-  // CR-031 — bốn tình huống, mỗi cái là một điểm vào khác nhau của chuỗi
-  // 1a → 1b → 1c. Đây là cả nội dung của bước 1: chọn sai điểm vào thì Creator
-  // hoặc phải bỏ qua một tab bằng tay, hoặc mất luôn đường dán artefact sẵn có.
-  it.each([
-    ["idea", "landed-on-outline"],
-    ["outline", "landed-on-outline"],
-    ["storyboard", "landed-on-storyboard"],
-    ["code", "landed-on-code"],
-  ])("đưa tình huống '%s' vào đúng tab của chuỗi script", (source, landingTestId) => {
-    renderPage();
+  it("khoá Tiếp tục khi chủ đề còn trống hoặc chỉ có khoảng trắng", () => {
+    renderPage(createdOk);
 
-    fireEvent.click(screen.getByTestId(`script-source-${source}`));
-    fireEvent.click(screen.getByTestId("script-step-next"));
-
-    expect(screen.getByTestId(landingTestId)).toBeInTheDocument();
-  });
-
-  it("mặc định vào 'chỉ có ý tưởng' nên Tiếp tục luôn đi được, không chặn", () => {
-    // Trang này không còn ô soạn thảo nào để chặn: mọi việc nhập liệu đã sang
-    // các tab 1a–1c, nên một nút Tiếp tục bị khoá ở đây chỉ là ngõ cụt.
-    renderPage();
-
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
+    typeTopic("   ");
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
+    typeTopic("Vòng lặp for trong Java");
     expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
+  });
+
+  it("tạo project bằng đúng một lệnh POST rồi sang Bước 2", async () => {
+    const fetchMock = renderPage(createdOk);
+
+    typeTopic("  Vòng lặp for trong Java  ");
     fireEvent.click(screen.getByTestId("script-step-next"));
-    expect(screen.getByTestId("landed-on-outline")).toBeInTheDocument();
+
+    await waitFor(() => expect(screen.getByTestId("landed-on-settings")).toBeInTheDocument());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toMatch(/\/v1\/projects$/);
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(init.body as string)).toMatchObject({ topic: "Vòng lặp for trong Java" });
   });
 
-  it("chốt ngôn ngữ, engine và cách làm ngay tại đây vì cả ba chi phối mọi tab sau", async () => {
-    renderPage();
+  it("báo lỗi và ở lại trang khi không tạo được project", async () => {
+    renderPage(() => Promise.reject(new Error("network down")));
 
-    expect(screen.getByTestId("render-engine-remotion")).toBeInTheDocument();
-    // AuthoringModeBar chờ biết máy chủ có API key hay không rồi mới vẽ, nên
-    // nó xuất hiện sau một vòng fetch.
-    await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
+    typeTopic("Đệ quy");
+    fireEvent.click(screen.getByTestId("script-step-next"));
 
-    fireEvent.click(screen.getByTestId("render-engine-remotion"));
-
-    // Chữ của tình huống "đã có code" đi theo engine — Creator phải biết mình
-    // sắp dán Remotion hay Manim trước khi bấm vào.
-    expect(screen.getByTestId("script-source-code")).toHaveTextContent("code Remotion");
-  });
-});
-
-describe("ScriptStepPage draft lifecycle", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-    window.localStorage.clear();
+    await waitFor(() => expect(screen.getByText(/Không tạo được project/)).toBeInTheDocument());
+    expect(screen.queryByTestId("landed-on-settings")).not.toBeInTheDocument();
+    // Lỗi xong thì Creator thử lại được, không bị kẹt ở trạng thái "Đang tạo".
+    expect(screen.getByTestId("script-step-next")).not.toBeDisabled();
   });
 
-  it("starts a fresh draft when the stored one already began a render", () => {
-    // Without this, going back to "/" after a render reused the same
-    // project_id and the next submit overwrote the previous video.
+  it("bắt đầu draft mới khi draft đã lưu từng chạy render", () => {
+    // Không có việc này thì quay lại "/" sau một lần render sẽ dùng lại
+    // project_id cũ và lần tạo tiếp theo ghi đè video trước.
     window.localStorage.setItem(
       "conceptflow.draft.v1",
-      JSON.stringify({ projectId: "spent-project", scriptContent: "old script", hasSubmitted: true }),
+      JSON.stringify({
+        projectId: "spent-project",
+        authoringTopic: "chủ đề cũ",
+        hasSubmitted: true,
+      }),
     );
 
-    renderPage();
+    renderPage(createdOk);
 
-    fireEvent.click(screen.getByTestId("script-step-next"));
-    // Draft mới quay về tình huống mặc định "idea", nên Tiếp tục đi vào 1a —
-    // không phải vào 1c như script đã tiêu ở draft cũ.
-    expect(screen.getByTestId("landed-on-outline")).toBeInTheDocument();
-  });
-
-  it("dịch tên tình huống cũ trong localStorage sang tên mới thay vì bỏ trắng lựa chọn", () => {
-    // Draft lưu trước CR-031 mang "ready" — nghĩa là đã có code đúng chuẩn.
-    window.localStorage.setItem(
-      "conceptflow.draft.v1",
-      JSON.stringify({ projectId: "old-project", scriptSource: "ready", hasSubmitted: false }),
-    );
-
-    renderPage();
-
-    fireEvent.click(screen.getByTestId("script-step-next"));
-    expect(screen.getByTestId("landed-on-code")).toBeInTheDocument();
+    expect((screen.getByTestId("script-step-topic") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 });
