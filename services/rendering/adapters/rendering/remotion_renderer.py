@@ -52,15 +52,92 @@ _SERVICE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(
 PROJECT_TEMPLATE_DIR = os.path.join(_SERVICE_ROOT, "remotion_project")
 RENDER_SCRIPT = os.path.join(PROJECT_TEMPLATE_DIR, "render.mjs")
 
-# A plain array of double- or single-quoted string literals:
-#   export const narrations: string[] = ["a", 'b', ...];
-# Deliberately simple (no template literals, no concatenation, no escaped
-# quotes inside a segment) — matches script-processing's own "regex-confirm
-# only, no real JSX/TS parsing" scope decision for this first cut.
-_NARRATIONS_RE = re.compile(
-    r"narrations\s*(?::\s*string\s*\[\s*\]\s*)?=\s*\[(?P<body>[^\]]*)\]", re.DOTALL
+# Anchored on `export const narrations` (mirrors web-gui's
+# scriptValidation.ts, which rejects a script missing the `export`) so a
+# `// narrations = [...]` left in a comment, or an unrelated `const
+# myNarrations = [...]`, can never be picked up in place of the real array.
+_NARRATIONS_HEADER_RE = re.compile(
+    r"export\s+const\s+narrations\s*(?::\s*string\s*\[\s*\]\s*)?=\s*\["
 )
-_STRING_LITERAL_RE = re.compile(r"""(['"])((?:(?!\1)[^\\]|\\.)*)\1""")
+# Double/single/back-quoted string literals — matches web-gui's
+# REMOTION_STRING_LITERAL_RE exactly, including the backtick that the old
+# regex here was missing (a `narrations` array of template literals used to
+# silently count as empty).
+_STRING_LITERAL_RE = re.compile(r"""(['"`])((?:(?!\1)[^\\]|\\.)*)\1""")
+
+
+def _strip_comments(text: str) -> str:
+    """Removes `//` and `/* */` comments, respecting string literals, so a
+    comment can never be mistaken for the real narrations array."""
+    out: list[str] = []
+    i, n = 0, len(text)
+    in_string: str | None = None
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            if ch == in_string:
+                in_string = None
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            in_string = ch
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _narrations_body(script_content: str) -> str | None:
+    """Finds the `export const narrations = [...]` array and returns its
+    body — the raw text between the brackets — or None if absent.
+
+    Scans bracket/string-aware instead of the old `[^\\]]*` regex, which cut
+    the array short at the first `]` even when it was inside a narration
+    string (e.g. `"Xem mục [1] nhé."`).
+    """
+    stripped = _strip_comments(script_content)
+    header = _NARRATIONS_HEADER_RE.search(stripped)
+    if not header:
+        return None
+    i, n = header.end(), len(stripped)
+    depth = 1
+    in_string: str | None = None
+    start = i
+    while i < n and depth > 0:
+        ch = stripped[i]
+        if in_string:
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if ch == in_string:
+                in_string = None
+            i += 1
+            continue
+        if ch in ("'", '"', "`"):
+            in_string = ch
+        elif ch == "[":
+            depth += 1
+        elif ch == "]":
+            depth -= 1
+        i += 1
+    return stripped[start : i - 1]
 
 
 class RemotionScriptRenderer(ManimScriptRendererPort):
@@ -169,10 +246,10 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
 
 
 def _extract_narrations(script_content: str) -> list[str]:
-    match = _NARRATIONS_RE.search(script_content)
-    if not match:
+    body = _narrations_body(script_content)
+    if body is None:
         return []
-    return [m.group(2) for m in _STRING_LITERAL_RE.finditer(match.group("body"))]
+    return [m.group(2) for m in _STRING_LITERAL_RE.finditer(body)]
 
 
 def _segments_from(narration_segments) -> list[dict]:
