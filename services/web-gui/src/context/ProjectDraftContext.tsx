@@ -38,25 +38,6 @@ export type SubtitleMode = "off" | "track" | "burn_in" | "both";
 export type ScriptSource = "idea" | "outline" | "storyboard" | "code";
 
 /**
- * Draft cũ trong localStorage vẫn mang tên tình huống trước CR-031. Không dịch
- * thì `scriptSource` rơi ra ngoài union và bước 1 không khớp lựa chọn nào —
- * Creator mở lại tab thấy mình chưa chọn gì, kể cả khi script đã dán xong.
- */
-const LEGACY_SCRIPT_SOURCES: Record<string, ScriptSource> = {
-  blank: "idea",
-  draft: "code",
-  ready: "code",
-};
-
-function normalizeScriptSource(value: unknown): ScriptSource | null {
-  if (typeof value !== "string") return null;
-  if (value === "idea" || value === "outline" || value === "storyboard" || value === "code") {
-    return value;
-  }
-  return LEGACY_SCRIPT_SOURCES[value] ?? null;
-}
-
-/**
  * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 3 — Script",
  * not one tab at a time:
  *
@@ -218,7 +199,30 @@ const initialDraft: ProjectDraft = {
   hasSubmitted: false,
 };
 
-const STORAGE_KEY = "conceptflow.draft.v1";
+/**
+ * Model Hive cho từng tab (1a/1b/1c) lần cuối Creator chọn, dùng làm mặc định
+ * cho project mới. Cùng kiểu client-only với LAST_VOICE_KEY.
+ */
+const LAST_MODELS_KEY = "conceptflow.lastModels.v1";
+
+function loadLastModels(): AuthoringStepModels | null {
+  try {
+    const raw = window.localStorage.getItem(LAST_MODELS_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<AuthoringStepModels>;
+    return { ...initialDraft.authoringModels, ...parsed };
+  } catch {
+    return null;
+  }
+}
+
+function saveLastModels(models: AuthoringStepModels): void {
+  try {
+    window.localStorage.setItem(LAST_MODELS_KEY, JSON.stringify(models));
+  } catch {
+    /* storage unavailable or full — the preference simply will not persist */
+  }
+}
 
 /**
  * The Creator's last-picked voice, kept separately from the per-project draft
@@ -309,45 +313,20 @@ export function saveLastUsedSettings(draft: ProjectDraft): void {
 }
 
 /**
- * A draft only lived in memory, so a reload mid-edit threw away a script the
- * Creator may have spent a while getting right. Persisting is best-effort:
- * private browsing and a full quota both throw, and neither is worth failing
- * the render over.
+ * Draft không còn được lưu vào localStorage: reload là bắt đầu project mới.
+ * Chỉ các lựa chọn "lần cuối dùng" (settings, giọng, model) được mang sang.
  */
 function loadDraft(): ProjectDraft {
-  const fresh = {
+  return {
     ...initialDraft,
     ...loadLastUsedSettings(),
+    authoringModels: loadLastModels() ?? initialDraft.authoringModels,
     projectId: crypto.randomUUID(),
     // LAST_VOICE_KEY predates FR86 and stays authoritative for voiceId
     // specifically — same value in practice, but no behaviour change for
     // anyone already relying on it.
     voiceId: loadLastVoiceId(),
   };
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return fresh;
-    const stored = JSON.parse(raw) as Partial<ProjectDraft>;
-    // A submitted draft is spent — never restore it onto a new session, but
-    // still carry over the last voice (see LAST_VOICE_KEY's docstring).
-    if (stored.hasSubmitted) return fresh;
-    return {
-      ...fresh,
-      ...stored,
-      projectId: stored.projectId ?? fresh.projectId,
-      scriptSource: normalizeScriptSource(stored.scriptSource) ?? fresh.scriptSource,
-    };
-  } catch {
-    return fresh;
-  }
-}
-
-function saveDraft(draft: ProjectDraft): void {
-  try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-  } catch {
-    /* storage unavailable or full — the draft simply will not survive a reload */
-  }
 }
 
 function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): ProjectDraft {
@@ -408,6 +387,7 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return {
         ...initialDraft,
         ...loadLastUsedSettings(),
+        authoringModels: loadLastModels() ?? initialDraft.authoringModels,
         projectId: crypto.randomUUID(),
         voiceId: loadLastVoiceId(),
       };
@@ -421,8 +401,8 @@ export function ProjectDraftProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(projectDraftReducer, initialDraft, loadDraft);
 
   useEffect(() => {
-    saveDraft(state);
-  }, [state]);
+    saveLastModels(state.authoringModels);
+  }, [state.authoringModels]);
 
   useEffect(() => {
     saveLastVoiceId(state.voiceId);
