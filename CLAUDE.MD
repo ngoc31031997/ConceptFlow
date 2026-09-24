@@ -24,3 +24,6 @@ When implementing:
 - Auto-commit (and push, once a remote is configured) is enabled for this project — no need to ask permission before each commit.
 - **CRITICAL**: Only commit after the user has given explicit approval for the stage/step whose artifacts are being committed (e.g., after they respond "ok"/"approve"/"go" to a stage's completion message). Do NOT commit immediately after generating artifacts, even if a stage is otherwise complete — generated-but-unapproved work must stay uncommitted until approval lands.
 - Each commit should correspond to one approved stage/step, with a message describing what was approved.
+## CR completion policy
+- When a Change Request is finished (implemented, verified, and its stage approved per the policy above), automatically commit and push its `feature/cr-<NNN>-<slug>` branch, then merge it into `main` (`--no-ff`) and push `main` — no need to ask again.
+- Before merging, pull the latest `main` so the merge is fast and conflict-free; if the merge conflicts, stop and report instead of resolving blindly.
