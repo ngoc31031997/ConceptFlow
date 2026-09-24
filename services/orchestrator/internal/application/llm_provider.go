@@ -36,6 +36,18 @@ type ChatRequest struct {
 	// predates this field, and every project that never touched the picker,
 	// keeps behaving exactly as before.
 	Model string
+	// OnProgress, when set, is called as the reply streams in with running
+	// totals — a provider that cannot stream simply never calls it. It runs on
+	// the calling goroutine, so it must return quickly.
+	OnProgress func(ChatProgress)
+}
+
+// ChatProgress is the running size of a streaming reply. Characters, not
+// tokens: usage only arrives with the final chunk, but a growing count is
+// enough to show the run is alive and which phase it is in.
+type ChatProgress struct {
+	ReasoningChars int
+	ContentChars   int
 }
 
 // ChatResult is what came back, plus what it cost.

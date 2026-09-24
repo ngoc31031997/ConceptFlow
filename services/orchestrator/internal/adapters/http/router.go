@@ -96,6 +96,12 @@ type generateAuthoringUseCase interface {
 	Provider() string
 }
 
+// authoringProgressReader is the optional live-progress side of the generate
+// use case; a use case without it simply has no progress endpoint.
+type authoringProgressReader interface {
+	Progress(projectID, step string) application.AuthoringProgress
+}
+
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
@@ -360,6 +366,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
+	r.Get("/v1/projects/{project_id}/authoring/{step}/progress", rt.handleAuthoringProgress)
 	r.Put("/v1/projects/{project_id}/wizard-position", rt.handleSaveWizardPosition)
 	return r
 }
@@ -1315,6 +1322,16 @@ func (rt *Router) handleSaveWizardSettings(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleAuthoringProgress reports how far a running generate call has got.
+func (rt *Router) handleAuthoringProgress(w http.ResponseWriter, r *http.Request) {
+	pr, ok := rt.generateAuthoring.(authoringProgressReader)
+	if !ok {
+		writeError(w, http.StatusNotFound, "progress is not available")
+		return
+	}
+	writeJSON(w, http.StatusOK, pr.Progress(chi.URLParam(r, "project_id"), chi.URLParam(r, "step")))
 }
 
 // handleSaveWizardPosition remembers which wizard screen a draft was left on,

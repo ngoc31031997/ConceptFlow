@@ -50,8 +50,9 @@ type GenerateAuthoringUseCase struct {
 	// on purpose — the lock only has to outlive a single HTTP request, and a
 	// Postgres advisory lock would buy cross-replica correctness for a
 	// single-replica orchestrator.
-	mu      sync.Mutex
-	running map[string]bool
+	mu       sync.Mutex
+	running  map[string]bool
+	progress map[string]*AuthoringProgress
 }
 
 // authoringPromptRenderer is RenderPromptUseCase. Shared with the Copy path
@@ -104,7 +105,7 @@ func NewGenerateAuthoringUseCase(
 		projects: projects, models: models, story: story, storyboard: storyboard,
 		code: code,
 		maxInputChars: maxInputChars, maxOutputTokens: maxOutputTokens,
-		running: map[string]bool{},
+		running: map[string]bool{}, progress: map[string]*AuthoringProgress{},
 	}
 }
 
@@ -224,7 +225,10 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	}
 
 	started := time.Now()
+	uc.beginProgress(projectID, step, started)
+	defer uc.endProgress(projectID, step)
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
+		OnProgress: func(p ChatProgress) { uc.updateProgress(projectID, step, p) },
 		// The rendered template is the whole instruction. It goes in the
 		// system slot, with a minimal user turn, because the prompts are
 		// written as standing instructions ("bạn là Story Architect..."),
@@ -310,4 +314,59 @@ func (uc *GenerateAuthoringUseCase) acquire(projectID, step string) (func(), err
 		delete(uc.running, key)
 		uc.mu.Unlock()
 	}, nil
+}
+
+// AuthoringProgress is what the GUI polls while a run is in flight: which
+// phase the model is in and how much it has produced so far.
+type AuthoringProgress struct {
+	Running        bool   `json:"running"`
+	Phase          string `json:"phase"` // "idle" | "waiting" | "reasoning" | "writing"
+	ReasoningChars int    `json:"reasoning_chars"`
+	ContentChars   int    `json:"content_chars"`
+	ElapsedSeconds int    `json:"elapsed_seconds"`
+
+	started time.Time
+}
+
+func progressKey(projectID, step string) string { return projectID + "\x00" + step }
+
+func (uc *GenerateAuthoringUseCase) beginProgress(projectID, step string, started time.Time) {
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	uc.progress[progressKey(projectID, step)] = &AuthoringProgress{Running: true, Phase: "waiting", started: started}
+}
+
+func (uc *GenerateAuthoringUseCase) updateProgress(projectID, step string, p ChatProgress) {
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	st := uc.progress[progressKey(projectID, step)]
+	if st == nil {
+		return
+	}
+	st.ReasoningChars, st.ContentChars = p.ReasoningChars, p.ContentChars
+	if p.ContentChars > 0 {
+		st.Phase = "writing"
+	} else if p.ReasoningChars > 0 {
+		st.Phase = "reasoning"
+	}
+}
+
+func (uc *GenerateAuthoringUseCase) endProgress(projectID, step string) {
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	delete(uc.progress, progressKey(projectID, step))
+}
+
+// Progress returns the live state of a (project, step) run; Running is false
+// when nothing is in flight.
+func (uc *GenerateAuthoringUseCase) Progress(projectID, step string) AuthoringProgress {
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	st := uc.progress[progressKey(projectID, step)]
+	if st == nil {
+		return AuthoringProgress{Phase: "idle"}
+	}
+	out := *st
+	out.ElapsedSeconds = int(time.Since(st.started).Seconds())
+	return out
 }

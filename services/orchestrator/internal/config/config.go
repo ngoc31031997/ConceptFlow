@@ -136,7 +136,7 @@ func Load() (*Config, error) {
 	// Generous on purpose: a full Manim script runs to several hundred lines,
 	// and on a reasoning model part of this budget is spent before the first
 	// character of the answer is written (CR-027 D13).
-	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 48000)
+	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 128000)
 	if err != nil {
 		return nil, err
 	}

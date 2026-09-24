@@ -497,6 +497,19 @@ export function generateAuthoringStep(projectId: string, step: AuthoringStep): P
   });
 }
 
+/** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
+export interface AuthoringProgress {
+  running: boolean;
+  phase: "idle" | "waiting" | "reasoning" | "writing";
+  reasoning_chars: number;
+  content_chars: number;
+  elapsed_seconds: number;
+}
+
+export function getAuthoringProgress(projectId: string, step: AuthoringStep): Promise<AuthoringProgress> {
+  return apiFetch<AuthoringProgress>(`/v1/projects/${projectId}/authoring/${step}/progress`);
+}
+
 /** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
 export async function saveAuthoringStory(
   projectId: string,
