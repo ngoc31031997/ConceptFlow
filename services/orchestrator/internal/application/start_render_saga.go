@@ -42,6 +42,8 @@ type StartRenderSagaInput struct {
 	RenderEngine domain.RenderEngine
 	// CR-005 FR14.2 — 0 means DefaultBackgroundMusicVolume.
 	BackgroundMusicVolume float64
+	// Empty means DefaultVideoFont.
+	VideoFont string
 
 	// CR-023 FR67.1/FR67.2 — nil means "on", same reasoning as ReviewEnabled
 	// above: the zero value of a bool is false, and defaulting the channel
@@ -132,6 +134,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		RenderQuality:         quality,
 		RenderEngine:          engine,
 		BackgroundMusicVolume: input.BackgroundMusicVolume,
+		VideoFont:             input.VideoFont,
 		IntroEnabled:          input.IntroEnabled == nil || *input.IntroEnabled,
 		OutroEnabled:          input.OutroEnabled == nil || *input.OutroEnabled,
 		VideoOutputMode:       outputMode,

@@ -64,36 +64,46 @@ func RenderPromptTemplate(templateText string, values map[string]string) string 
 	return out
 }
 
-// PromptOverride is the Creator's own wording for one role/language
-// (CR-027 FR84.3). It lives in its own table, apart from the shipped
-// PromptTemplate, so that seeding can overwrite the shipped text on every
-// start without ever touching what the Creator wrote.
-type PromptOverride struct {
+// Prompt is one row of the prompt library (CR-031): a named wording for one
+// pipeline role. Each role owns a list of these.
+//
+// Exactly one row per role is active at a time and is what the pipeline
+// renders. The row with IsSystem set ships in the binary — seeded on every
+// start, read-only to everyone. Any other row was written by a Creator, who
+// may edit, delete and activate it. There is no version: a Creator's copy is
+// theirs, and the shipped row is simply whatever this binary carries.
+//
+// No language either. Prompts are written in Vietnamese; the language of the
+// narration a video ends up with comes from {{narration_language_rule}}.
+type Prompt struct {
+	ID           string     `json:"id"`
 	Role         PromptRole `json:"role"`
-	Language     string     `json:"language"`
+	Name         string     `json:"name"`
 	TemplateText string     `json:"template_text"`
-	// IsActive off keeps the wording but runs the shipped text instead. This
-	// is what replaced the old destructive reset: switching back on restores
-	// the Creator's version unchanged.
-	IsActive bool `json:"is_active"`
-	// BasedOnVersion is the shipped version this wording was written
-	// against, so the admin screen can flag an override that has fallen
-	// behind (FR84.7). 0 means "unknown" — a row created by the migration
-	// from a database that predates this column.
-	BasedOnVersion int    `json:"based_on_version"`
-	UpdatedAt      string `json:"updated_at"`
+	IsSystem     bool       `json:"is_system"`
+	IsActive     bool       `json:"is_active"`
+	CreatedAt    string     `json:"created_at"`
+	UpdatedAt    string     `json:"updated_at"`
 }
 
-// EffectivePromptTemplate is what the pipeline actually renders: the
-// override when one is switched on, otherwise the shipped text.
-//
-// FromOverride and SeedVersion are carried so the admin screen can say which
-// of the two is in force, and warn when the shipped wording has moved on
-// underneath an active override (FR84.7).
-type EffectivePromptTemplate struct {
-	Role         PromptRole `json:"role"`
-	Language     string     `json:"language"`
-	TemplateText string     `json:"template_text"`
-	FromOverride bool       `json:"from_override"`
-	SeedVersion  int        `json:"seed_version"`
+// SystemPromptID is the fixed id of a role's shipped row, so seeding can
+// upsert it in place across restarts.
+func SystemPromptID(role PromptRole) string { return "system-" + string(role) }
+
+// SystemPromptName is what the shipped row is called in the admin list.
+const SystemPromptName = "Mặc định của hệ thống"
+
+// SystemPrompts returns the shipped rows: one per role, Vietnamese wording.
+func SystemPrompts() []Prompt {
+	var out []Prompt
+	for _, t := range DefaultPromptTemplates() {
+		if t.Language != "vi" {
+			continue
+		}
+		out = append(out, Prompt{
+			ID: SystemPromptID(t.Role), Role: t.Role, Name: SystemPromptName,
+			TemplateText: t.TemplateText, IsSystem: true,
+		})
+	}
+	return out
 }

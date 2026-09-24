@@ -7,66 +7,6 @@ import (
 	"orchestrator/internal/domain"
 )
 
-// PromptTemplatePort is the persistence capability CR-025's prompt-template
-// use case needs — narrower than the full postgres.PromptTemplateRepository
-// so tests can fake just this.
-type PromptTemplatePort interface {
-	Get(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error)
-	List(ctx context.Context) ([]domain.PromptTemplate, error)
-	Update(ctx context.Context, role domain.PromptRole, language, templateText string) (domain.PromptTemplate, error)
-}
-
-// PromptTemplatesUseCase backs CR-025's prompt-template CRUD endpoints — the
-// admin screen edits wording here instead of in web-gui source, and web-gui's
-// wizard reads the current wording at runtime instead of a hardcoded string.
-type PromptTemplatesUseCase struct {
-	templates PromptTemplatePort
-}
-
-func NewPromptTemplatesUseCase(templates PromptTemplatePort) *PromptTemplatesUseCase {
-	return &PromptTemplatesUseCase{templates: templates}
-}
-
-func (uc *PromptTemplatesUseCase) Get(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error) {
-	return uc.templates.Get(ctx, role, language)
-}
-
-func (uc *PromptTemplatesUseCase) List(ctx context.Context) ([]domain.PromptTemplate, error) {
-	return uc.templates.List(ctx)
-}
-
-func (uc *PromptTemplatesUseCase) Update(ctx context.Context, role domain.PromptRole, language, templateText string) (domain.PromptTemplate, error) {
-	if !domain.ValidPromptRole(string(role)) {
-		return domain.PromptTemplate{}, fmt.Errorf("invalid role %q", role)
-	}
-	if language != "vi" && language != "en" {
-		return domain.PromptTemplate{}, fmt.Errorf("language must be 'vi' or 'en'")
-	}
-	if templateText == "" {
-		return domain.PromptTemplate{}, fmt.Errorf("template_text is required")
-	}
-	return uc.templates.Update(ctx, role, language, templateText)
-}
-
-// Reset overwrites a template with the default shipped in this binary.
-//
-// It goes through Update rather than a dedicated repository call, so a reset
-// bumps version and updated_at exactly like a manual save does — from the
-// audit trail's point of view a reset IS an edit, one that happens to paste
-// the shipped text. This is the deliberate counterpart to seeding staying
-// insert-if-absent: shipped wording reaches a running database only when
-// someone asks for it here.
-func (uc *PromptTemplatesUseCase) Reset(ctx context.Context, role domain.PromptRole, language string) (domain.PromptTemplate, error) {
-	if !domain.ValidPromptRole(string(role)) {
-		return domain.PromptTemplate{}, fmt.Errorf("invalid role %q", role)
-	}
-	def, ok := domain.DefaultPromptTemplate(role, language)
-	if !ok {
-		return domain.PromptTemplate{}, fmt.Errorf("no built-in default for role %q language %q", role, language)
-	}
-	return uc.templates.Update(ctx, role, language, def.TemplateText)
-}
-
 // AuthoringStoryPort persists CR-025 step 1's pasted story outline, and from
 // CR-027 D0 the topic it was written from.
 type AuthoringStoryPort interface {

@@ -12,8 +12,10 @@ import * as apiClient from "../../src/api/client";
 beforeEach(() => {
   vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
     role: "story_architect",
-    language: "vi",
-    version: 1,
+    id: "system-x",
+    name: "Mặc định",
+    is_system: true,
+    is_active: true,
     template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
   });
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
@@ -51,7 +53,7 @@ describe("ScriptOutlineStepPage", () => {
     Object.assign(navigator, { clipboard: { writeText } });
     renderPage();
 
-    await waitFor(() => expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("story_architect", "vi"));
+    await waitFor(() => expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("story_architect"));
     fireEvent.change(screen.getByTestId("script-outline-topic"), {
       target: { value: "Vòng lặp for trong Java" },
     });
@@ -337,7 +339,7 @@ describe("ScriptOutlineStepPage", () => {
       expandSettings();
 
       await waitFor(() =>
-        expect(screen.getByTestId("authoring-mode-bar")).toHaveTextContent("HIVE_API_KEY"),
+        expect(screen.getByTestId("authoring-mode-switch")).toHaveTextContent("HIVE_API_KEY"),
       );
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
 

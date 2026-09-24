@@ -26,11 +26,15 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
     scriptContent: project.script_content || state.code,
     voiceLanguage: project.voice_language,
     renderEngine: project.render_engine ?? "manim",
+    videoFont: project.video_font || "Be Vietnam Pro",
     ttsEnabled: project.tts_enabled ?? true,
     voiceId: project.voice_id || null,
     subtitleMode: (project.subtitle_mode as ProjectDraft["subtitleMode"]) || "track",
     subtitleStyle: style
       ? {
+          // Projects saved before the font choice existed rendered in DejaVu
+          // Sans; showing the new default here would misreport them.
+          fontFamily: style.font_family || "DejaVu Sans",
           fontSize: style.font_size,
           textColor: style.text_color,
           backgroundOpacity: style.background_opacity,

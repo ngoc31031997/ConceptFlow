@@ -1,24 +1,42 @@
 /**
- * conceptflow-mini/primitives — a deliberately tiny set of helpers so a
- * Creator can produce an actually-visible video without hand-rolling layout
- * every time. This is NOT an equivalent of the Manim side's design system
- * (conceptflow/*.py — TitleCard, Callout, CodePanel, StepList,
- * ComparisonSplit, Recap): those are explicitly out of scope for this first
- * cut of Remotion support. No theme system, no per-category styling — just
- * sane centered text with a default font/size/color, enough to render
- * something real while the fuller component library is a separate task.
+ * conceptflow-mini/primitives — the few things a Remotion composition must
+ * NOT decide for itself, because they belong to the channel or to the
+ * Creator's settings rather than to one video's storyboard:
  *
- * Uses "Be Vietnam Pro" — the same family the Manim side installs into the
- * image (see ../../Dockerfile's font step) — so Vietnamese diacritics render
- * correctly here too without needing a second font source.
+ *   - the background: fixed, the same #080E1C the Manim theme paints
+ *     (conceptflow/theme.py BRAND_BG), so both engines look like one channel.
+ *     The Visual Director picks every other colour against this background.
+ *   - the font: chosen per project in the settings step and handed in as the
+ *     `videoFont` input prop (remotion_renderer.py). Only fonts installed in
+ *     the rendering image (../../Dockerfile) are accepted.
+ *
+ * Everything else — colours, shapes, layout, motion — is the storyboard's,
+ * drawn by the generated script in plain JSX/SVG/CSS.
  */
 import React, {useState} from 'react';
-import {AbsoluteFill, continueRender, delayRender} from 'remotion';
+import {AbsoluteFill, continueRender, delayRender, getInputProps} from 'remotion';
 
-const FONT_NAME = 'Be Vietnam Pro';
-const FONT_FAMILY = `'${FONT_NAME}', sans-serif`;
-const DEFAULT_COLOR = '#F2F2F2';
-const BACKGROUND = '#0B1220';
+export const BACKGROUND = '#080E1C';
+export const WIDTH = 1920;
+export const HEIGHT = 1080;
+/** Minimum distance between anything meaningful and the frame edge. */
+export const SAFE_MARGIN = 96;
+
+const INSTALLED_FONTS = ['Be Vietnam Pro', 'Montserrat', 'Cormorant Garamond'];
+const DEFAULT_FONT = 'Be Vietnam Pro';
+const DEFAULT_INK = '#F2F7FF';
+
+function chosenFont(): string {
+  const {videoFont} = getInputProps() as {videoFont?: unknown};
+  return typeof videoFont === 'string' && INSTALLED_FONTS.includes(videoFont)
+    ? videoFont
+    : DEFAULT_FONT;
+}
+
+/** CSS font-family for the project's chosen font, with a safe fallback. */
+export function useVideoFont(): string {
+  return `'${chosenFont()}', sans-serif`;
+}
 
 // Hold the first frame until the system-installed font is actually loaded,
 // so frames aren't captured with the sans-serif fallback. Module-level so it
@@ -26,14 +44,15 @@ const BACKGROUND = '#0B1220';
 let fontReady: Promise<void> | null = null;
 function useFontLoaded() {
   useState(() => {
+    const font = chosenFont();
     fontReady ??= Promise.all(
-      [400, 700].map((weight) => document.fonts.load(`${weight} 36px '${FONT_NAME}'`)),
+      [400, 700].map((weight) => document.fonts.load(`${weight} 36px '${font}'`)),
     ).then((faces) => {
       if (faces.some((f) => f.length === 0)) {
-        console.warn(`conceptflow-mini: font '${FONT_NAME}' not found, falling back to sans-serif`);
+        console.warn(`conceptflow-mini: font '${font}' not found, falling back to sans-serif`);
       }
     });
-    const handle = delayRender(`Loading font ${FONT_NAME}`);
+    const handle = delayRender(`Loading font ${font}`);
     fontReady.then(
       () => continueRender(handle),
       () => continueRender(handle),
@@ -42,29 +61,43 @@ function useFontLoaded() {
   });
 }
 
+/**
+ * The root of every composition: paints the fixed background and sets the
+ * project's font as the inherited default, so no element has to repeat it.
+ */
+export function Stage({children}: {children: React.ReactNode}) {
+  useFontLoaded();
+  const fontFamily = useVideoFont();
+  return (
+    <AbsoluteFill style={{backgroundColor: BACKGROUND, fontFamily, color: DEFAULT_INK}}>
+      {children}
+    </AbsoluteFill>
+  );
+}
+
 function CenteredText({
   children,
   fontSize,
   fontWeight,
   paddingX,
   position,
+  color,
 }: {
   children: React.ReactNode;
   fontSize: number;
   fontWeight: number;
   paddingX: number;
   position: 'center' | 'bottom';
+  color?: string;
 }) {
   useFontLoaded();
+  const fontFamily = useVideoFont();
   const isBottom = position === 'bottom';
   return (
+    // Transparent: the background belongs to <Stage>. The old opaque fill
+    // here hid every illustration drawn underneath the text.
     <AbsoluteFill
       style={{
-        // Opaque when centered: AI-written illustrations are often full-frame
-        // absolute elements with no layout coordination, and stacking them
-        // under transparent text made it unreadable. 'bottom' instead keeps
-        // the frame free for the illustration and only backs the caption.
-        backgroundColor: isBottom ? undefined : BACKGROUND,
         justifyContent: isBottom ? 'flex-end' : 'center',
         alignItems: 'center',
         padding: isBottom ? `0 ${paddingX}px 60px` : `0 ${paddingX}px`,
@@ -72,19 +105,14 @@ function CenteredText({
     >
       <div
         style={{
-          fontFamily: FONT_FAMILY,
+          fontFamily,
           fontWeight,
           fontSize,
           lineHeight: 1.4,
-          color: DEFAULT_COLOR,
+          color: color ?? DEFAULT_INK,
           textAlign: 'center',
           overflowWrap: 'break-word',
           maxWidth: '100%',
-          ...(isBottom && {
-            backgroundColor: 'rgba(11, 18, 32, 0.8)',
-            padding: '16px 32px',
-            borderRadius: 12,
-          }),
         }}
       >
         {children}
@@ -93,19 +121,19 @@ function CenteredText({
   );
 }
 
-type TextProps = {children: React.ReactNode; position?: 'center' | 'bottom'};
+type TextProps = {children: React.ReactNode; position?: 'center' | 'bottom'; color?: string};
 
-export function TitleText({children, position = 'center'}: TextProps) {
+export function TitleText({children, position = 'center', color}: TextProps) {
   return (
-    <CenteredText fontSize={64} fontWeight={700} paddingX={120} position={position}>
+    <CenteredText fontSize={64} fontWeight={700} paddingX={120} position={position} color={color}>
       {children}
     </CenteredText>
   );
 }
 
-export function BodyText({children, position = 'center'}: TextProps) {
+export function BodyText({children, position = 'center', color}: TextProps) {
   return (
-    <CenteredText fontSize={36} fontWeight={400} paddingX={160} position={position}>
+    <CenteredText fontSize={36} fontWeight={400} paddingX={160} position={position} color={color}>
       {children}
     </CenteredText>
   );

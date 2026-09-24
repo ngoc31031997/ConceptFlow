@@ -131,6 +131,29 @@ class TestRender:
             {"startFrame": 0, "durationInFrames": 60},
             {"startFrame": 60, "durationInFrames": 90},
         ]
+        # No font chosen → the key is absent and conceptflow-mini keeps its default.
+        assert "videoFont" not in props
+
+    def test_render_passes_the_chosen_video_font(self, tmp_path, monkeypatch):
+        template_dir = tmp_path / "remotion_project"
+        (template_dir / "src").mkdir(parents=True)
+        media_root = tmp_path / "media"
+
+        def dispatch(cmd, *args, **kwargs):
+            if cmd[0] == "node":
+                with open(cmd[cmd.index("--out") + 1], "wb") as f:
+                    f.write(b"fake video bytes")
+                return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+            return type("R", (), {"returncode": 0, "stdout": "5.0", "stderr": ""})()
+
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", dispatch)
+        renderer = RemotionScriptRenderer(
+            project_template_dir=str(template_dir), cache_root=str(media_root)
+        )
+        renderer.render(make_request(tmp_path, video_font="Montserrat"), str(tmp_path / "out.mp4"))
+
+        props = json.loads(next(media_root.glob("*/cf_props.json")).read_text())
+        assert props["videoFont"] == "Montserrat"
 
     def test_render_raises_on_nonzero_exit(self, tmp_path, monkeypatch):
         template_dir = tmp_path / "remotion_project"

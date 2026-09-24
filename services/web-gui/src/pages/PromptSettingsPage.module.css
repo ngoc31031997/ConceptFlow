@@ -30,3 +30,56 @@
     position: static;
   }
 }
+
+.list {
+  list-style: none;
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--ink-faint);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.rowSelected {
+  border-color: currentColor;
+  font-weight: 600;
+}
+
+.rowName {
+  font-size: 14px;
+}
+
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  font-size: 11.5px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--ink-faint);
+  color: var(--ink-faint);
+}
+
+.badgeActive {
+  color: inherit;
+  border-color: currentColor;
+}

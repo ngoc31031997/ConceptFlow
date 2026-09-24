@@ -11,6 +11,8 @@ export interface RenderInput {
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
   /** feature/remotion-engine — "manim" (default) | "remotion". */
   render_engine?: "manim" | "remotion";
+  /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
+  video_font?: string;
   video_format_id?: string;
   background_music_volume?: number;
   /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
@@ -29,6 +31,7 @@ export interface RenderInput {
 }
 
 export interface SubtitleStylePayload {
+  font_family?: string;
   font_size: "small" | "medium" | "large";
   text_color: string;
   background_opacity: number;
@@ -103,6 +106,8 @@ export interface Project {
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
   /** feature/remotion-engine — "manim" (default) | "remotion". */
   render_engine?: "manim" | "remotion";
+  /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
+  video_font?: string;
   video_format_id?: string;
   /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
   video_output_mode?: "long" | "short" | "both";

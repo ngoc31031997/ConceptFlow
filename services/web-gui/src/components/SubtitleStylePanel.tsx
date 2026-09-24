@@ -24,6 +24,15 @@ const FONT_SIZES: { value: SubtitleStyle["fontSize"]; label: string }[] = [
   { value: "large", label: "Lớn" },
 ];
 
+// Must match the fonts the Video Assembly image installs
+// (services/video-assembly/adapters/assembly/subtitle_file.py SUBTITLE_FONTS);
+// anything else is burned in as DejaVu Sans.
+const FONT_FAMILIES: { value: string; label: string }[] = [
+  { value: "Be Vietnam Pro", label: "Be Vietnam Pro" },
+  { value: "Montserrat", label: "Montserrat" },
+  { value: "DejaVu Sans", label: "DejaVu Sans" },
+];
+
 const POSITIONS: { value: SubtitleStyle["position"]; label: string }[] = [
   { value: "bottom", label: "Dưới" },
   { value: "top", label: "Trên" },
@@ -46,6 +55,7 @@ export function SubtitleStyleFields({ value, onChange }: SubtitleStyleFieldsProp
           className={styles.previewText}
           style={{
             color: value.textColor,
+            fontFamily: `'${value.fontFamily}', sans-serif`,
             fontSize: PREVIEW_FONT_SIZE[value.fontSize],
             backgroundColor: `rgba(0, 0, 0, ${value.backgroundOpacity})`,
           }}
@@ -55,6 +65,22 @@ export function SubtitleStyleFields({ value, onChange }: SubtitleStyleFieldsProp
       </div>
 
       <div className={styles.fieldsGrid}>
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Font chữ</span>
+          <div className={selectable.row} role="radiogroup" aria-label="Font chữ">
+            {FONT_FAMILIES.map((option) => (
+              <SelectableOption
+                key={option.value}
+                selected={value.fontFamily === option.value}
+                onSelect={() => onChange({ fontFamily: option.value })}
+                label={option.label}
+                inline
+                compact
+              />
+            ))}
+          </div>
+        </div>
+
         <div className={styles.field}>
           <span className={styles.fieldLabel}>Cỡ chữ</span>
           <div className={selectable.row} role="radiogroup" aria-label="Cỡ chữ">

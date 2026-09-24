@@ -47,6 +47,10 @@ class ScriptRenderRequest:
     # Orchestrator only sends "engine" at all once a project actually picked
     # something other than the default (see handle_step_event.go).
     engine: str = "manim"
+    # Font for text drawn inside a Remotion video, handed to the composition
+    # as the `videoFont` input prop (conceptflow-mini's useVideoFont). None
+    # leaves conceptflow-mini on its own default. Manim ignores it.
+    video_font: str | None = None
 
     def __post_init__(self) -> None:
         # A browser clipboard on macOS hands out Vietnamese diacritics

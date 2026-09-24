@@ -49,22 +49,9 @@ func (f *fakeCalibration) GetVoiceCalibration(_ context.Context, _ string) (doma
 // which variables were substituted rather than on prompt prose.
 type templateStore struct{ text string }
 
-func (t *templateStore) GetEffective(_ context.Context, role domain.PromptRole, language string) (domain.EffectivePromptTemplate, error) {
-	return domain.EffectivePromptTemplate{Role: role, Language: language, TemplateText: t.text}, nil
+func (t *templateStore) GetActive(_ context.Context, role domain.PromptRole) (domain.Prompt, error) {
+	return domain.Prompt{ID: "p", Role: role, Name: "test", TemplateText: t.text, IsActive: true}, nil
 }
-func (t *templateStore) GetOverride(context.Context, domain.PromptRole, string) (domain.PromptOverride, error) {
-	return domain.PromptOverride{}, nil
-}
-func (t *templateStore) ListOverrides(context.Context) ([]domain.PromptOverride, error) {
-	return nil, nil
-}
-func (t *templateStore) SaveOverride(context.Context, domain.PromptRole, string, string) (domain.PromptOverride, error) {
-	return domain.PromptOverride{}, nil
-}
-func (t *templateStore) SetOverrideActive(context.Context, domain.PromptRole, string, bool) (domain.PromptOverride, error) {
-	return domain.PromptOverride{}, nil
-}
-func (t *templateStore) DeleteOverride(context.Context, domain.PromptRole, string) error { return nil }
 
 func newRenderer(tmpl string, ctxData *fakeRenderContext) *application.RenderPromptUseCase {
 	return application.NewRenderPromptUseCase(

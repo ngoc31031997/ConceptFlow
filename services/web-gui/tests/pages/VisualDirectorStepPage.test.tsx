@@ -12,8 +12,10 @@ import * as apiClient from "../../src/api/client";
 beforeEach(() => {
   vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
     role: "visual_director",
-    language: "vi",
-    version: 1,
+    id: "system-x",
+    name: "Mặc định",
+    is_system: true,
+    is_active: true,
     template_text: "DÀN Ý: {{previous_output}}",
   });
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });

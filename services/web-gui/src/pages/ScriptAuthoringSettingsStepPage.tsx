@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { RenderEnginePicker } from "../components/RenderEnginePicker";
+import { VideoFontPicker } from "../components/VideoFontPicker";
 import { AuthoringModeBar } from "../components/AuthoringModeBar";
 import { AuthoringModelPicker } from "../components/AuthoringModelPicker";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -70,12 +71,14 @@ export function ScriptAuthoringSettingsStepPage() {
       await saveWizardSettings(draft.projectId, {
         voiceLanguage: draft.voiceLanguage,
         renderEngine: draft.renderEngine,
+        videoFont: draft.videoFont,
         ttsEnabled: draft.ttsEnabled,
         voiceId: draft.voiceId,
         subtitleMode: draft.subtitleMode,
         subtitleStyle:
           draft.subtitleMode === "burn_in" || draft.subtitleMode === "both"
             ? {
+                font_family: draft.subtitleStyle.fontFamily,
                 font_size: draft.subtitleStyle.fontSize,
                 text_color: draft.subtitleStyle.textColor,
                 background_opacity: draft.subtitleStyle.backgroundOpacity,
@@ -116,6 +119,15 @@ export function ScriptAuthoringSettingsStepPage() {
         <div className={styles.settingsRow}>
           <RenderEnginePicker value={draft.renderEngine} onChange={handleEngineChange} />
         </div>
+
+        {isRemotion && (
+          <div className={styles.settingsRow}>
+            <VideoFontPicker
+              value={draft.videoFont}
+              onChange={(font) => dispatch({ type: "SET_VIDEO_FONT", payload: font })}
+            />
+          </div>
+        )}
 
         <div className={styles.settingsRow}>
           <AuthoringModeBar

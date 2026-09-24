@@ -112,7 +112,7 @@ export function ScriptOutlineStepPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate("story_architect", draft.voiceLanguage)
+    getPromptTemplate("story_architect")
       .then((t) => {
         if (!cancelled) setTemplate(t.template_text);
       })

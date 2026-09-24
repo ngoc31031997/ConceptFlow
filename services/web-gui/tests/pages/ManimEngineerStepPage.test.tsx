@@ -20,8 +20,10 @@ const VALID_CODE = [
 beforeEach(() => {
   vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
     role: "manim_engineer",
-    language: "vi",
-    version: 1,
+    id: "system-x",
+    name: "Mặc định",
+    is_system: true,
+    is_active: true,
     template_text: "TIEN DE: {{previous_output}}",
   });
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
@@ -120,8 +122,10 @@ describe("ManimEngineerStepPage", () => {
   it("fills {{topic}} in the engineer prompt instead of leaving the raw token", async () => {
     vi.mocked(apiClient.getPromptTemplate).mockResolvedValue({
       role: "remotion_engineer",
-      language: "vi",
-      version: 1,
+      id: "system-x",
+      name: "Mặc định",
+      is_system: true,
+      is_active: true,
       template_text: "CHU DE VIDEO: {{topic}}",
     });
 
@@ -161,6 +165,6 @@ describe("ManimEngineerStepPage", () => {
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
     expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("render-engine-remotion"));
-    expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer", "vi");
+    expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer");
   });
 });

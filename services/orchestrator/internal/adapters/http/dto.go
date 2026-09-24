@@ -35,6 +35,7 @@ type startRenderSagaRequest struct {
 	VideoFormatID         string  `json:"video_format_id,omitempty"`
 	ReviewEnabled         *bool   `json:"review_enabled,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
+	VideoFont             string  `json:"video_font,omitempty"`
 	// "long" | "short" | "both" — empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode string `json:"video_output_mode,omitempty"`
 	// CR-026 D1 — project_id of the companion video covering the same
@@ -148,6 +149,7 @@ type projectResponse struct {
 	ScriptContent         string  `json:"script_content"`
 	BackgroundMusicPath   *string `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
+	VideoFont             string  `json:"video_font,omitempty"`
 	// "long" | "short" | "both" (CR-007 follow-up) — which output(s) the
 	// Result screen should feature, and whether generate_clips ran at all.
 	VideoOutputMode string `json:"video_output_mode"`
@@ -275,6 +277,7 @@ type saveWizardSettingsRequest struct {
 	VideoOutputMode       string                `json:"video_output_mode,omitempty"`
 	BackgroundMusicPath   *string               `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
+	VideoFont             string                `json:"video_font,omitempty"`
 }
 
 // saveAuthoringModeRequest is the body of PUT
@@ -408,6 +411,7 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		ScriptContent:         p.ScriptContent,
 		BackgroundMusicPath:   p.BackgroundMusicPath,
 		BackgroundMusicVolume: p.BackgroundMusicVolume,
+		VideoFont:             p.VideoFont,
 		VideoOutputMode:       string(p.VideoOutputMode),
 		CompanionProjectID:    p.CompanionProjectID,
 		WizardStep:            domain.EffectiveWizardStep(p),

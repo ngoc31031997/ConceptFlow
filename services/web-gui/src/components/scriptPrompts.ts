@@ -178,8 +178,34 @@ export const NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
  */
 export const REMOTION_NARRATION_LANGUAGE_RULE: Record<"vi" | "en", string> = {
   vi: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.",
-  en: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (TitleText, BodyText, nhãn, tiêu đề) cũng phải bằng tiếng Anh.",
+  en: "Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (nhãn, con số, tiêu đề) cũng phải bằng tiếng Anh.",
 };
+
+// Mirrors orchestrator domain.SubtitleZone (narration.go) — this page fills the
+// remotion_engineer template in the browser, so {{subtitle_zone}} has to be
+// resolved here too. Band heights are Video Assembly's burn-in strip per size.
+const SUBTITLE_BAND_PX: Record<string, number> = { small: 200, medium: 240, large: 280 };
+
+export function buildSubtitleZone(
+  mode: string,
+  style: { fontSize: string; position: string },
+  language: "vi" | "en",
+): string {
+  if (mode !== "burn_in" && mode !== "both") {
+    return language === "vi"
+      ? "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+      : "this video has NO burned-in subtitles — the whole safe area is yours.";
+  }
+  const band = SUBTITLE_BAND_PX[style.fontSize] ?? SUBTITLE_BAND_PX.medium;
+  if (style.position === "top") {
+    return language === "vi"
+      ? `phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến ${band} px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = ${band + 24}.`
+      : `subtitles are burned in at the TOP of the frame — the strip from y = 0 to ${band} px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = ${band + 24}.`;
+  }
+  return language === "vi"
+    ? `phụ đề được in ở MÉP DƯỚI khung — dải y từ ${1080 - band} đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = ${1080 - band - 24}.`
+    : `subtitles are burned in at the BOTTOM of the frame — the strip from y = ${1080 - band} to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = ${1080 - band - 24}.`;
+}
 
 const NARRATION_PLACEHOLDER: Record<"vi" | "en", string> = {
   vi: "Nội dung lời thoại tiếng Việt cho đoạn này",
@@ -402,11 +428,11 @@ theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic 
 
 3. Component chính phải nhận prop \`segments\` (mảng hệ thống tự truyền vào lúc render) và dùng \`<Segments segments={segments}>{(index) => ...}</Segments>\` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ \`index\` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong \`narrations\`, theo đúng thứ tự.
 
-4. Import bắt buộc ở đầu file: \`import {registerRoot, Composition} from 'remotion';\`
+4. Import bắt buộc ở đầu file: \`import {registerRoot, Composition} from 'remotion';\` và \`import {Stage} from './conceptflow-mini/primitives';\` — bọc toàn bộ \`<Segments>\` trong \`<Stage>\` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt \`fontFamily\` hay \`backgroundColor\` phủ toàn khung. KHÔNG in câu thoại (\`narrations[index]\`) lên hình — phụ đề do hệ thống lo. Chỉ import từ \`react\`, \`remotion\` và \`./conceptflow-mini/*\`.
 
-5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ \`<TitleText>...</TitleText>\`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong \`narrations\` hay trong thuộc tính \`style={{...}}\`: KHÔNG được viết trần các ký tự \`<\`, \`>\`, \`{\`, \`}\` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự \`>\` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ "42 > 29"), diễn đạt lại bằng chữ ("42 lớn hơn 29") hoặc bọc riêng ký tự đó: \`{'>'}\` (ví dụ: \`42 {'>'} 29\`).
+5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ \`<div>...</div>\`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong \`narrations\` hay trong thuộc tính \`style={{...}}\`: KHÔNG được viết trần các ký tự \`<\`, \`>\`, \`{\`, \`}\` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự \`>\` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ "42 > 29"), diễn đạt lại bằng chữ ("42 lớn hơn 29") hoặc bọc riêng ký tự đó: \`{'>'}\` (ví dụ: \`42 {'>'} 29\`).
 
-6. KHÔNG xếp chồng hai khối full-khung-hình (hai \`<AbsoluteFill>\`, hoặc một hình minh hoạ tự vẽ đặt \`position: 'absolute'\` phủ cả khung) làm ANH EM CÙNG CẤP trong một \`index\` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Nếu một \`index\` cần VỪA hình minh hoạ VỪA lời thoại, gói cả hai vào CHUNG một \`<AbsoluteFill style={{flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>\` — hình ở trên (trong một \`<div>\` cỡ cố định, KHÔNG \`position: 'absolute'\` phủ hết khung), đoạn text ở dưới trong \`<div>\` thường (không dùng lại \`<BodyText>\` — nó tự phủ kín khung hình).
+6. KHÔNG xếp chồng hai khối full-khung-hình (hai \`<AbsoluteFill>\`, hoặc một hình minh hoạ tự vẽ đặt \`position: 'absolute'\` phủ cả khung) làm ANH EM CÙNG CẤP trong một \`index\` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi \`index\` trả về MỘT \`<AbsoluteFill>\` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.
 
 7. NGÔN NGỮ: ${REMOTION_NARRATION_LANGUAGE_RULE[language]}
 

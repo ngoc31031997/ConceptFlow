@@ -72,6 +72,9 @@ func (uc *SaveWizardSettingsUseCase) Execute(ctx context.Context, projectID stri
 	if s.BackgroundMusicVolume < 0 || s.BackgroundMusicVolume > 1 {
 		return fmt.Errorf("%w: background_music_volume must be between 0 and 1", domain.ErrInvalidWizardInput)
 	}
+	if !domain.ValidVideoFont(s.VideoFont) {
+		return fmt.Errorf("%w: unknown video_font", domain.ErrInvalidWizardInput)
+	}
 	s.VideoFormatID = formatOrDefault(s.VideoFormatID)
 
 	if err := requireDraft(ctx, uc.repo, projectID); err != nil {

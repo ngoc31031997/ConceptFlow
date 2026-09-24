@@ -85,3 +85,27 @@ def test_cue_timings_are_preserved(tmp_path):
 
     assert "0:00:00.00,0:00:02.00" in content
     assert "hello" in content
+
+
+def test_font_family_is_the_creator_choice(tmp_path):
+    path = str(tmp_path / "subs.ass")
+    write_subtitle_file(
+        [SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        SubtitleStyle(font_family="Be Vietnam Pro"),
+        path,
+    )
+    with open(path, encoding="utf-8") as f:
+        assert "Style: Default,Be Vietnam Pro," in f.read()
+
+
+def test_font_not_installed_falls_back_to_dejavu(tmp_path):
+    """libass substitutes a missing font silently, so an unknown name must not
+    reach it — the fallback is the font subtitles always used."""
+    path = str(tmp_path / "subs.ass")
+    write_subtitle_file(
+        [SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+        SubtitleStyle(font_family="Comic Sans MS"),
+        path,
+    )
+    with open(path, encoding="utf-8") as f:
+        assert "Style: Default,DejaVu Sans," in f.read()

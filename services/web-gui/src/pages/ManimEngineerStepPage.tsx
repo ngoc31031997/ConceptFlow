@@ -5,7 +5,11 @@ import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
-import { NARRATION_LANGUAGE_RULE, REMOTION_NARRATION_LANGUAGE_RULE } from "../components/scriptPrompts";
+import {
+  NARRATION_LANGUAGE_RULE,
+  REMOTION_NARRATION_LANGUAGE_RULE,
+  buildSubtitleZone,
+} from "../components/scriptPrompts";
 import { Card, Button, TextArea } from "../components/ui";
 import { Disclosure } from "../components/Disclosure";
 import { ScriptAssistant } from "../components/ScriptAssistant";
@@ -76,7 +80,7 @@ export function ManimEngineerStepPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate(engineerRole, draft.voiceLanguage)
+    getPromptTemplate(engineerRole)
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text
@@ -94,7 +98,9 @@ export function ManimEngineerStepPage() {
             isRemotion
               ? REMOTION_NARRATION_LANGUAGE_RULE[draft.voiceLanguage]
               : NARRATION_LANGUAGE_RULE[draft.voiceLanguage],
-          );
+          )
+          .split("{{subtitle_zone}}")
+          .join(buildSubtitleZone(draft.subtitleMode, draft.subtitleStyle, draft.voiceLanguage));
         setPrompt(filled);
       })
       .catch(() => {
@@ -104,7 +110,7 @@ export function ManimEngineerStepPage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.voiceLanguage, draft.authoringTopic, previousOutput, engineerRole]);
+  }, [draft.voiceLanguage, draft.authoringTopic, previousOutput, engineerRole, draft.subtitleMode, draft.subtitleStyle]);
 
   async function handleCopy() {
     try {
@@ -161,6 +167,7 @@ export function ManimEngineerStepPage() {
         subtitle_style:
           draft.subtitleMode === "burn_in" || draft.subtitleMode === "both"
             ? {
+                font_family: draft.subtitleStyle.fontFamily,
                 font_size: draft.subtitleStyle.fontSize,
                 text_color: draft.subtitleStyle.textColor,
                 background_opacity: draft.subtitleStyle.backgroundOpacity,
@@ -169,6 +176,7 @@ export function ManimEngineerStepPage() {
             : undefined,
         render_quality: draft.renderQuality,
         render_engine: draft.renderEngine,
+        video_font: draft.videoFont,
         video_output_mode: draft.videoOutputMode,
         video_format_id: draft.videoFormatId,
         background_music_volume: draft.backgroundMusicPath ? draft.backgroundMusicVolume : undefined,

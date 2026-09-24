@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Card, Button, FormField, Select, TextArea, CtaRow } from "../components/ui";
+import { Card, Button, FormField, Select, TextArea, TextInput, CtaRow } from "../components/ui";
 import {
-  listPromptTemplates,
-  listPromptOverrides,
-  savePromptOverride,
-  setPromptOverrideActive,
-  deletePromptOverride,
-  type PromptTemplate,
-  type PromptOverride,
+  listPrompts,
+  createPrompt,
+  copyPrompt,
+  updatePrompt,
+  activatePrompt,
+  deletePrompt,
+  type Prompt,
+  type PromptRole,
 } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./PromptSettingsPage.module.css";
 
-const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
+const ROLES: { value: PromptRole; label: string }[] = [
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "manim_engineer", label: "3. Manim Engineer — viết code" },
@@ -21,6 +22,8 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   // cho Manim Engineer. Hai bước đầu dùng chung cho mọi engine.
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
 ];
+
+const NEW_ROW = "new";
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
 const PREVIEW_SAMPLE: Record<string, string> = {
@@ -40,37 +43,33 @@ function renderPreview(templateText: string): string {
 }
 
 /**
- * CR-025 — màn admin sửa nội dung prompt của 4 vai trò trong pipeline soạn
- * kịch bản, không cần build lại web-gui. Cố tình để ngoài luồng wizard của
- * Creator (mục "Cài đặt" riêng) — đây là công cụ cho người vận hành kênh,
- * không phải bước Creator đi qua mỗi lần tạo video.
+ * CR-031 — thư viện prompt. Mỗi vai trò trong pipeline soạn kịch bản có một
+ * DANH SÁCH prompt; tại một thời điểm chỉ một dòng được bật và đó là dòng
+ * pipeline chạy.
  *
- * Dùng components/ui (Card/Button/FormField/Select/TextArea/CtaRow) thay vì
- * tự viết class/style — đây là màn tham chiếu cho DESIGN_SYSTEM.md.
+ * Dòng "Hệ thống" đi kèm bản build: chỉ xem và copy, không sửa/xoá. Copy ra
+ * thì được một dòng "Của bạn" — sửa, xoá, bật tuỳ ý. Không có version, không
+ * có ngôn ngữ riêng: ngôn ngữ lời thoại do `{{narration_language_rule}}` quyết
+ * định lúc render.
+ *
+ * Cố tình để ngoài luồng wizard của Creator (mục "Cài đặt" riêng) — đây là
+ * công cụ cho người vận hành kênh, không phải bước đi qua mỗi lần tạo video.
  */
 export function PromptSettingsPage() {
-  const [role, setRole] = useState<PromptTemplate["role"]>("story_architect");
-  const [language, setLanguage] = useState<"vi" | "en">("vi");
-
-  const [templates, setTemplates] = useState<PromptTemplate[]>([]);
-  const [overrides, setOverrides] = useState<PromptOverride[]>([]);
-  const [draft, setDraft] = useState("");
+  const [role, setRole] = useState<PromptRole>("story_architect");
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [draftName, setDraftName] = useState("");
+  const [draftText, setDraftText] = useState("");
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
 
-  /**
-   * Cả hai tầng tải cùng một lượt rồi ghép ở client. Hai danh sách đúng 12
-   * hàng mỗi bên, nên gọi thêm một endpoint chuyên dụng chỉ để tránh một
-   * phép ghép là không đáng.
-   */
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [t, o] = await Promise.all([listPromptTemplates(), listPromptOverrides()]);
-      setTemplates(t);
-      setOverrides(o);
+      setPrompts(await listPrompts());
     } catch {
       setStatus("Không tải được prompt — kiểm tra Orchestrator.");
     } finally {
@@ -82,37 +81,49 @@ export function PromptSettingsPage() {
     void reload();
   }, [reload]);
 
-  const seed = templates.find((t) => t.role === role && t.language === language) ?? null;
-  const override = overrides.find((o) => o.role === role && o.language === language) ?? null;
+  const rows = prompts.filter((p) => p.role === role);
+  const selected = rows.find((p) => p.id === selectedId) ?? null;
+  const creating = selectedId === NEW_ROW;
 
-  // Đổi vai trò/ngôn ngữ thì ô soạn thảo theo bản tuỳ chỉnh của đúng ô đó.
+  // Đổi vai trò, hoặc danh sách vừa tải xong mà chưa chọn dòng nào: nhảy tới
+  // dòng đang chạy của vai trò đó.
   useEffect(() => {
-    setDraft(override?.template_text ?? "");
+    if (creating) return;
+    if (selected === null) {
+      setSelectedId(rows.find((p) => p.is_active)?.id ?? rows[0]?.id ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role, prompts, selectedId]);
+
+  // Ô soạn thảo luôn theo dòng đang chọn.
+  useEffect(() => {
+    if (creating) return;
+    setDraftName(selected?.name ?? "");
+    setDraftText(selected?.template_text ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected?.id, selected?.name, selected?.template_text, creating]);
+
+  const readOnly = selected?.is_system === true;
+  const active = rows.find((p) => p.is_active) ?? null;
+
+  function chooseRole(next: PromptRole) {
+    setRole(next);
+    setSelectedId(null);
     setStatus(null);
-  }, [role, language, override?.template_text]);
+  }
 
   /**
-   * FR84.7 — bản gốc đã đi tiếp kể từ lúc bản tuỳ chỉnh này được viết.
-   * Chỉ báo, không tự làm gì: tự trộn vào nội dung Creator đã viết là đúng
-   * kiểu bất ngờ mà cả CR này sinh ra để dẹp. `based_on_version === 0` nghĩa
-   * là không rõ (hàng do di trú tạo ra), nên không kết luận gì.
+   * `action` có thể trả về id dòng cần chọn sau khi danh sách tải lại. Chọn
+   * TRƯỚC khi tải lại thì dòng mới chưa có trong danh sách, và effect tự chọn
+   * sẽ kéo lựa chọn về dòng cũ.
    */
-  const seedMovedOn =
-    override !== null &&
-    override.is_active &&
-    override.based_on_version > 0 &&
-    seed !== null &&
-    seed.version > override.based_on_version;
-
-  const inUse = override?.is_active ? "override" : "seed";
-  const effectiveText = inUse === "override" ? (override?.template_text ?? "") : (seed?.template_text ?? "");
-
-  async function run(action: () => Promise<void>, ok: string) {
+  async function run(action: () => Promise<string | void>, ok: string) {
     setBusy(true);
     setStatus(null);
     try {
-      await action();
+      const nextId = await action();
       await reload();
+      if (nextId) setSelectedId(nextId);
       setStatus(ok);
     } catch {
       setStatus("Thao tác thất bại, thử lại.");
@@ -121,48 +132,65 @@ export function PromptSettingsPage() {
     }
   }
 
+  const startNew = () => {
+    setSelectedId(NEW_ROW);
+    setDraftName("");
+    setDraftText("");
+    setStatus(null);
+  };
+
+  const handleCopy = (id: string) =>
+    run(async () => {
+      return (await copyPrompt(id)).id;
+    }, "Đã copy thành một prompt của bạn.");
+
   const handleSave = () =>
     run(async () => {
-      await savePromptOverride(role, language, draft);
-    }, "Đã lưu bản tuỳ chỉnh.");
+      if (creating) {
+        return (await createPrompt(role, draftName, draftText)).id;
+      } else if (selected) {
+        await updatePrompt(selected.id, draftName, draftText);
+      }
+    }, creating ? "Đã tạo prompt." : "Đã lưu.");
 
-  const handleStartFromSeed = () => setDraft(seed?.template_text ?? "");
-
-  const handleToggle = () =>
+  const handleActivate = (id: string) =>
     run(async () => {
-      await setPromptOverrideActive(role, language, !(override?.is_active ?? false));
-    }, override?.is_active ? "Đã tắt — đang chạy bản gốc." : "Đã bật bản tuỳ chỉnh.");
+      await activatePrompt(id);
+    }, "Đã bật — đây là prompt đang chạy của vai trò này.");
 
   /**
-   * Xoá là thao tác phá huỷ duy nhất còn lại ở màn này, nên vẫn hỏi xác nhận.
-   * Muốn tạm quay về bản gốc thì dùng công tắc bật/tắt — không mất gì.
+   * Xoá là thao tác phá huỷ duy nhất ở màn này, nên hỏi xác nhận. Xoá dòng
+   * đang chạy thì vai trò tự quay về prompt hệ thống.
    */
   const handleDelete = () => {
+    if (!selected) return;
     const okToDelete = window.confirm(
-      "Xoá hẳn bản tuỳ chỉnh này? Không khôi phục lại được. Nếu chỉ muốn tạm dùng bản gốc, hãy TẮT nó thay vì xoá.",
+      selected.is_active
+        ? "Xoá prompt này? Nó đang chạy, nên vai trò sẽ quay về prompt mặc định của hệ thống. Không khôi phục lại được."
+        : "Xoá prompt này? Không khôi phục lại được.",
     );
     if (!okToDelete) return;
     return run(async () => {
-      await deletePromptOverride(role, language);
-      setDraft("");
-    }, "Đã xoá bản tuỳ chỉnh — đang chạy bản gốc.");
+      await deletePrompt(selected.id);
+      setSelectedId(null);
+    }, "Đã xoá.");
   };
 
   return (
     <div data-testid="prompt-settings-page">
       <AppShell
         title="Cài đặt prompt soạn kịch bản"
-        subtitle="Prompt gốc của hệ thống là chỉ-đọc và tự cập nhật theo mỗi bản build. Bản tuỳ chỉnh của bạn nằm riêng, bật/tắt được bất cứ lúc nào."
+        subtitle="Mỗi vai trò có một danh sách prompt, chỉ một prompt được bật. Prompt hệ thống chỉ xem và copy được; copy ra để có bản của bạn."
         wide
       >
         <div className={styles.layout}>
           <div className={styles.controls}>
-            <Card title="Chọn prompt">
+            <Card title="Chọn vai trò">
               <FormField label="Vai trò">
                 <Select
                   data-testid="prompt-role-select"
                   value={role}
-                  onChange={(e) => setRole(e.target.value as PromptTemplate["role"])}
+                  onChange={(e) => chooseRole(e.target.value as PromptRole)}
                 >
                   {ROLES.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -171,33 +199,11 @@ export function PromptSettingsPage() {
                   ))}
                 </Select>
               </FormField>
-
-              <FormField label="Ngôn ngữ nội dung video" className={glass.mtSm}>
-                <Select
-                  data-testid="prompt-language-select"
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as "vi" | "en")}
-                >
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en">Tiếng Anh</option>
-                </Select>
-              </FormField>
-
               <p className={`${styles.versionRow} ${glass.mtSm}`} data-testid="prompt-in-use">
-                {inUse === "override"
-                  ? "Đang chạy: BẢN TUỲ CHỈNH của bạn"
-                  : "Đang chạy: bản gốc của hệ thống"}
-                {seed !== null && ` (bản gốc phiên bản ${seed.version})`}
+                {active
+                  ? `Đang chạy: ${active.name}${active.is_system ? " (hệ thống)" : ""}`
+                  : "Chưa có prompt nào đang chạy"}
               </p>
-
-              {seedMovedOn && (
-                <p className={`${glass.cardHint} ${glass.mtXs}`} data-testid="prompt-seed-moved-on">
-                  ⚠ Bản gốc đã cập nhật lên phiên bản {seed?.version} kể từ khi bạn viết bản tuỳ chỉnh
-                  này (dựa trên phiên bản {override?.based_on_version}). Hệ thống không tự trộn —
-                  bạn tự đối chiếu rồi quyết định.
-                </p>
-              )}
-
               {status && (
                 <p className={`${glass.cardHint} ${glass.mtXs}`} data-testid="prompt-settings-status">
                   {status}
@@ -205,93 +211,126 @@ export function PromptSettingsPage() {
               )}
             </Card>
 
-            <CtaRow>
-              <Button
-                variant="ghost"
-                onClick={() => setShowPreview((v) => !v)}
-                data-testid="prompt-preview-toggle"
-              >
-                {showPreview ? "Ẩn xem trước" : "Xem trước"}
-              </Button>
-              <Button
-                variant="ghost"
-                onClick={handleStartFromSeed}
-                disabled={busy || loading || seed === null}
-                data-testid="prompt-copy-seed-button"
-              >
-                Chép từ bản gốc
-              </Button>
-              <Button
-                onClick={handleSave}
-                disabled={busy || loading || draft.trim().length === 0}
-                data-testid="prompt-save-button"
-              >
-                {busy ? "Đang lưu..." : "Lưu bản tuỳ chỉnh"}
-              </Button>
-            </CtaRow>
-
-            {override !== null && (
+            <Card title="Danh sách prompt">
+              <ul className={styles.list} data-testid="prompt-list">
+                {rows.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className={`${styles.row} ${p.id === selectedId ? styles.rowSelected : ""}`}
+                      onClick={() => {
+                        setSelectedId(p.id);
+                        setStatus(null);
+                      }}
+                      data-testid={`prompt-row-${p.id}`}
+                    >
+                      <span className={styles.rowName}>{p.name}</span>
+                      <span className={styles.badges}>
+                        <span className={styles.badge}>{p.is_system ? "Hệ thống" : "Của bạn"}</span>
+                        {p.is_active && (
+                          <span className={`${styles.badge} ${styles.badgeActive}`}>Đang dùng</span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
               <CtaRow>
-                <Button
-                  variant="ghost"
-                  onClick={handleToggle}
-                  disabled={busy || loading}
-                  data-testid="prompt-toggle-button"
-                >
-                  {override.is_active ? "Tắt (quay về bản gốc)" : "Bật bản tuỳ chỉnh"}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={handleDelete}
-                  disabled={busy || loading}
-                  data-testid="prompt-delete-button"
-                >
-                  Xoá bản tuỳ chỉnh
+                <Button variant="ghost" onClick={startNew} disabled={busy || loading} data-testid="prompt-new-button">
+                  + Thêm prompt mới
                 </Button>
               </CtaRow>
-            )}
+            </Card>
           </div>
 
           <div>
             <Card
-              title="Bản tuỳ chỉnh của bạn"
+              title={creating ? "Prompt mới" : (selected?.name ?? "Chưa chọn prompt")}
               hint={
-                override === null
-                  ? "Chưa có. Bấm 'Chép từ bản gốc' để lấy điểm khởi đầu."
-                  : override.is_active
-                    ? "Đang được dùng."
-                    : "Đang tắt — hệ thống chạy bản gốc. Nội dung vẫn được giữ."
+                readOnly
+                  ? "Prompt hệ thống — chỉ xem. Bấm 'Copy' để tạo bản của bạn rồi sửa."
+                  : creating
+                    ? "Viết nội dung rồi bấm Lưu. Prompt mới không tự bật."
+                    : selected?.is_active
+                      ? "Đang được dùng."
+                      : "Đang tắt."
               }
             >
-              <TextArea
-                data-testid="prompt-template-textarea"
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                disabled={loading}
-                rows={20}
-              />
-            </Card>
-
-            <div className={styles.previewBlock}>
-              <Card
-                title="Prompt gốc của hệ thống (chỉ đọc)"
-                hint="Tự cập nhật theo mỗi bản build. Không sửa và không xoá được — bản sửa của bạn nằm ở khung trên."
-              >
-                <TextArea
-                  data-testid="prompt-seed-textarea"
-                  value={seed?.template_text ?? ""}
-                  readOnly
-                  rows={14}
+              <FormField label="Tên">
+                <TextInput
+                  data-testid="prompt-name-input"
+                  value={draftName}
+                  onChange={(e) => setDraftName(e.target.value)}
+                  readOnly={readOnly}
+                  disabled={loading || (!creating && selected === null)}
                 />
-              </Card>
-            </div>
+              </FormField>
+              <FormField label="Nội dung" className={glass.mtSm}>
+                <TextArea
+                  data-testid="prompt-template-textarea"
+                  value={draftText}
+                  onChange={(e) => setDraftText(e.target.value)}
+                  readOnly={readOnly}
+                  disabled={loading || (!creating && selected === null)}
+                  rows={22}
+                />
+              </FormField>
+              <CtaRow>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowPreview((v) => !v)}
+                  data-testid="prompt-preview-toggle"
+                >
+                  {showPreview ? "Ẩn xem trước" : "Xem trước"}
+                </Button>
+                {selected !== null && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleCopy(selected.id)}
+                    disabled={busy || loading}
+                    data-testid="prompt-copy-button"
+                  >
+                    Copy
+                  </Button>
+                )}
+                {selected !== null && !selected.is_active && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleActivate(selected.id)}
+                    disabled={busy || loading}
+                    data-testid="prompt-activate-button"
+                  >
+                    Bật prompt này
+                  </Button>
+                )}
+                {!readOnly && selected !== null && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleDelete}
+                    disabled={busy || loading}
+                    data-testid="prompt-delete-button"
+                  >
+                    Xoá
+                  </Button>
+                )}
+                {!readOnly && (creating || selected !== null) && (
+                  <Button
+                    onClick={handleSave}
+                    disabled={busy || loading || draftName.trim() === "" || draftText.trim() === ""}
+                    data-testid="prompt-save-button"
+                  >
+                    {busy ? "Đang lưu..." : "Lưu"}
+                  </Button>
+                )}
+              </CtaRow>
+            </Card>
 
             {showPreview && (
               <div className={styles.previewBlock}>
-                <Card title="Xem trước nội dung ĐANG CHẠY" hint="Dữ liệu mẫu, không gửi server">
+                <Card title="Xem trước" hint="Dữ liệu mẫu, không gửi server">
                   <TextArea
                     data-testid="prompt-preview-textarea"
-                    value={renderPreview(effectiveText)}
+                    value={renderPreview(draftText)}
                     readOnly
                     rows={18}
                   />

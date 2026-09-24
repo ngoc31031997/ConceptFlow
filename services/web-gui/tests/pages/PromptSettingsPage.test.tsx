@@ -5,28 +5,26 @@ import { PromptSettingsPage } from "../../src/pages/PromptSettingsPage";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
-const SEED = {
-  role: "story_architect" as const,
-  language: "vi" as const,
-  version: 3,
-  template_text: "PROMPT GỐC CỦA HỆ THỐNG",
-};
-
-function stubLayers(overrides: apiClient.PromptOverride[]) {
-  vi.spyOn(apiClient, "listPromptTemplates").mockResolvedValue([SEED]);
-  vi.spyOn(apiClient, "listPromptOverrides").mockResolvedValue(overrides);
-}
-
-function anOverride(patch: Partial<apiClient.PromptOverride> = {}): apiClient.PromptOverride {
+function aPrompt(patch: Partial<apiClient.Prompt> = {}): apiClient.Prompt {
   return {
+    id: "system-story_architect",
     role: "story_architect",
-    language: "vi",
-    template_text: "BẢN TUỲ CHỈNH CỦA TÔI",
+    name: "Mặc định của hệ thống",
+    template_text: "PROMPT GỐC CỦA HỆ THỐNG",
+    is_system: true,
     is_active: true,
-    based_on_version: 3,
     ...patch,
   };
 }
+
+const SYSTEM = aPrompt();
+const MINE = aPrompt({
+  id: "u1",
+  name: "Bản của tôi",
+  template_text: "BẢN CỦA TÔI",
+  is_system: false,
+  is_active: false,
+});
 
 function renderPage() {
   return render(
@@ -38,9 +36,9 @@ function renderPage() {
   );
 }
 
-// CR-027 FR84 — màn admin giờ hiện hai tầng: bản gốc chỉ-đọc và bản tuỳ
-// chỉnh của Creator, bật/tắt được.
-describe("PromptSettingsPage — prompt hai tầng", () => {
+// CR-031 — mỗi vai trò một danh sách prompt, một dòng đang bật. Dòng hệ thống
+// chỉ xem/copy; dòng của người dùng sửa/xoá/bật được.
+describe("PromptSettingsPage — thư viện prompt", () => {
   beforeEach(() => {
     vi.stubGlobal("confirm", () => true);
   });
@@ -49,105 +47,100 @@ describe("PromptSettingsPage — prompt hai tầng", () => {
     vi.unstubAllGlobals();
   });
 
-  it("chưa có bản tuỳ chỉnh thì chạy bản gốc, và bản gốc là chỉ-đọc", async () => {
-    stubLayers([]);
+  it("mở lên thì chọn dòng đang chạy; prompt hệ thống là chỉ-đọc và không có Xoá/Lưu", async () => {
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
     renderPage();
 
     await waitFor(() =>
-      expect(screen.getByTestId("prompt-seed-textarea")).toHaveValue("PROMPT GỐC CỦA HỆ THỐNG"),
+      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("PROMPT GỐC CỦA HỆ THỐNG"),
     );
-    expect(screen.getByTestId("prompt-seed-textarea")).toHaveAttribute("readonly");
-    expect(screen.getByTestId("prompt-in-use")).toHaveTextContent("bản gốc của hệ thống");
-    expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("");
+    expect(screen.getByTestId("prompt-template-textarea")).toHaveAttribute("readonly");
+    expect(screen.getByTestId("prompt-name-input")).toHaveAttribute("readonly");
+    expect(screen.queryByTestId("prompt-delete-button")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("prompt-save-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("prompt-copy-button")).toBeInTheDocument();
+    expect(screen.getByTestId("prompt-in-use")).toHaveTextContent("Mặc định của hệ thống (hệ thống)");
   });
 
-  it("có bản tuỳ chỉnh đang bật thì nó là cái đang chạy", async () => {
-    stubLayers([anOverride()]);
+  it("Copy dòng hệ thống tạo dòng mới rồi chọn nó", async () => {
+    const list = vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM]);
+    const copy = vi.spyOn(apiClient, "copyPrompt").mockResolvedValue(MINE);
     renderPage();
 
+    await waitFor(() => expect(screen.getByTestId("prompt-copy-button")).toBeInTheDocument());
+    list.mockResolvedValue([SYSTEM, MINE]);
+    fireEvent.click(screen.getByTestId("prompt-copy-button"));
+
+    await waitFor(() => expect(copy).toHaveBeenCalledWith("system-story_architect"));
     await waitFor(() =>
-      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN TUỲ CHỈNH CỦA TÔI"),
+      expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN CỦA TÔI"),
     );
-    expect(screen.getByTestId("prompt-in-use")).toHaveTextContent("BẢN TUỲ CHỈNH");
-    // Bản gốc vẫn hiện bên cạnh để đối chiếu, không bị thay thế.
-    expect(screen.getByTestId("prompt-seed-textarea")).toHaveValue("PROMPT GỐC CỦA HỆ THỐNG");
+    expect(screen.getByTestId("prompt-template-textarea")).not.toHaveAttribute("readonly");
   });
 
-  // Đây là điểm khác cốt lõi so với nút "Khôi phục mặc định" cũ: tắt không
-  // phá huỷ gì, nên không cần hỏi xác nhận và bật lại là có nguyên.
-  it("tắt bản tuỳ chỉnh mà không xoá nội dung", async () => {
-    stubLayers([anOverride()]);
-    const setActive = vi.spyOn(apiClient, "setPromptOverrideActive").mockResolvedValue(anOverride({ is_active: false }));
+  it("dòng của người dùng sửa được, bật được và xoá được", async () => {
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
+    const update = vi.spyOn(apiClient, "updatePrompt").mockResolvedValue(MINE);
+    const activate = vi.spyOn(apiClient, "activatePrompt").mockResolvedValue({ ...MINE, is_active: true });
+    const del = vi.spyOn(apiClient, "deletePrompt").mockResolvedValue(undefined);
     renderPage();
 
-    await waitFor(() => expect(screen.getByTestId("prompt-toggle-button")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("prompt-toggle-button"));
+    await waitFor(() => expect(screen.getByTestId("prompt-row-u1")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("prompt-row-u1"));
+    await waitFor(() => expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN CỦA TÔI"));
 
-    await waitFor(() => expect(setActive).toHaveBeenCalledWith("story_architect", "vi", false));
-    // Không hỏi xác nhận, và không đụng tới đường xoá: tắt là thao tác có thể
-    // lùi lại được.
-    expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("BẢN TUỲ CHỈNH CỦA TÔI");
-  });
-
-  it("'Chép từ bản gốc' cho điểm khởi đầu thay vì bắt chép tay", async () => {
-    stubLayers([]);
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("prompt-copy-seed-button")).toBeEnabled());
-    fireEvent.click(screen.getByTestId("prompt-copy-seed-button"));
-
-    expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("PROMPT GỐC CỦA HỆ THỐNG");
-  });
-
-  it("lưu bản tuỳ chỉnh gửi đúng nội dung đang soạn", async () => {
-    stubLayers([]);
-    const save = vi.spyOn(apiClient, "savePromptOverride").mockResolvedValue(anOverride({ template_text: "chữ mới" }));
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("prompt-copy-seed-button")).toBeEnabled());
     fireEvent.change(screen.getByTestId("prompt-template-textarea"), { target: { value: "chữ mới" } });
     fireEvent.click(screen.getByTestId("prompt-save-button"));
+    await waitFor(() => expect(update).toHaveBeenCalledWith("u1", "Bản của tôi", "chữ mới"));
 
-    await waitFor(() => expect(save).toHaveBeenCalledWith("story_architect", "vi", "chữ mới"));
+    fireEvent.click(screen.getByTestId("prompt-activate-button"));
+    await waitFor(() => expect(activate).toHaveBeenCalledWith("u1"));
+
+    fireEvent.click(screen.getByTestId("prompt-delete-button"));
+    await waitFor(() => expect(del).toHaveBeenCalledWith("u1"));
   });
 
-  // FR84.7 — không có cảnh báo này thì Creator cứ chạy một bản đã tách ra từ
-  // hai đời prompt trước mà không biết.
-  it("báo khi bản gốc đã đi tiếp kể từ lúc viết bản tuỳ chỉnh", async () => {
-    stubLayers([anOverride({ based_on_version: 1 })]); // bản gốc đang ở version 3
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("prompt-seed-moved-on")).toBeInTheDocument());
-    expect(screen.getByTestId("prompt-seed-moved-on")).toHaveTextContent("phiên bản 3");
-  });
-
-  it("không báo khi bản tuỳ chỉnh vẫn khớp đời bản gốc", async () => {
-    stubLayers([anOverride({ based_on_version: 3 })]);
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("prompt-in-use")).toBeInTheDocument());
-    expect(screen.queryByTestId("prompt-seed-moved-on")).not.toBeInTheDocument();
-  });
-
-  // based_on_version = 0 là hàng do di trú CR-027 tạo ra: không biết nó dựa
-  // trên đời nào, nên không được đoán bừa là đã lỗi thời.
-  it("không báo khi không rõ bản tuỳ chỉnh dựa trên đời nào", async () => {
-    stubLayers([anOverride({ based_on_version: 0 })]);
-    renderPage();
-
-    await waitFor(() => expect(screen.getByTestId("prompt-in-use")).toBeInTheDocument());
-    expect(screen.queryByTestId("prompt-seed-moved-on")).not.toBeInTheDocument();
-  });
-
-  it("xoá hỏi xác nhận, huỷ thì không gọi server", async () => {
-    stubLayers([anOverride()]);
-    const del = vi.spyOn(apiClient, "deletePromptOverride");
+  it("không xoá khi người dùng từ chối xác nhận", async () => {
     vi.stubGlobal("confirm", () => false);
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
+    const del = vi.spyOn(apiClient, "deletePrompt");
     renderPage();
 
+    await waitFor(() => expect(screen.getByTestId("prompt-row-u1")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("prompt-row-u1"));
     await waitFor(() => expect(screen.getByTestId("prompt-delete-button")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("prompt-delete-button"));
-
     expect(del).not.toHaveBeenCalled();
+  });
+
+  it("thêm prompt mới: cần tên và nội dung rồi tạo theo vai trò đang chọn", async () => {
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM]);
+    const create = vi.spyOn(apiClient, "createPrompt").mockResolvedValue(MINE);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("prompt-new-button")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("prompt-new-button"));
+    expect(screen.getByTestId("prompt-save-button")).toBeDisabled();
+
+    fireEvent.change(screen.getByTestId("prompt-name-input"), { target: { value: "Bản mới" } });
+    fireEvent.change(screen.getByTestId("prompt-template-textarea"), { target: { value: "nội dung" } });
+    fireEvent.click(screen.getByTestId("prompt-save-button"));
+
+    await waitFor(() => expect(create).toHaveBeenCalledWith("story_architect", "Bản mới", "nội dung"));
+  });
+
+  it("đổi vai trò thì chỉ hiện các dòng của vai trò đó", async () => {
+    vi.spyOn(apiClient, "listPrompts").mockResolvedValue([
+      SYSTEM,
+      aPrompt({ id: "system-visual_director", role: "visual_director", template_text: "ĐẠO DIỄN" }),
+    ]);
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("prompt-row-system-story_architect")).toBeInTheDocument());
+    expect(screen.queryByTestId("prompt-row-system-visual_director")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByTestId("prompt-role-select"), { target: { value: "visual_director" } });
+    await waitFor(() => expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("ĐẠO DIỄN"));
+    expect(screen.queryByTestId("prompt-row-system-story_architect")).not.toBeInTheDocument();
   });
 });

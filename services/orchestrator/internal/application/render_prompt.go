@@ -44,31 +44,39 @@ type FormatLookupPort interface {
 // One renderer serves both paths. The Copy-prompt button and the Run-with-AI
 // button must send identical text to the model; two implementations would
 // let them drift on the same role with nothing in either output to show it.
+// PromptActivePort is the one read the renderer needs from the prompt library.
+type PromptActivePort interface {
+	GetActive(ctx context.Context, role domain.PromptRole) (domain.Prompt, error)
+}
+
 type RenderPromptUseCase struct {
-	overrides   PromptOverridePort
+	prompts     PromptActivePort
 	projects    PromptRenderContextPort
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
 }
 
 func NewRenderPromptUseCase(
-	overrides PromptOverridePort,
+	prompts PromptActivePort,
 	projects PromptRenderContextPort,
 	formats FormatLookupPort,
 	calibration VoiceCalibrationPort,
 ) *RenderPromptUseCase {
 	return &RenderPromptUseCase{
-		overrides: overrides, projects: projects,
+		prompts: prompts, projects: projects,
 		formats: formats, calibration: calibration,
 	}
 }
 
 // RenderedPrompt is one fully substituted prompt.
 type RenderedPrompt struct {
-	Role         domain.PromptRole `json:"role"`
-	Language     string            `json:"language"`
-	Prompt       string            `json:"prompt"`
-	FromOverride bool              `json:"from_override"`
+	Role     domain.PromptRole `json:"role"`
+	Language string            `json:"language"`
+	Prompt   string            `json:"prompt"`
+	// PromptID/PromptName say which library row this text came from.
+	PromptID   string `json:"prompt_id"`
+	PromptName string `json:"prompt_name"`
+	IsSystem   bool   `json:"is_system"`
 }
 
 // TopicPlaceholder is what {{topic}} becomes when the project has no topic
@@ -123,7 +131,7 @@ func (uc *RenderPromptUseCase) Execute(
 		language = "vi"
 	}
 
-	effective, err := uc.overrides.GetEffective(ctx, role, language)
+	effective, err := uc.prompts.GetActive(ctx, role)
 	if err != nil {
 		return RenderedPrompt{}, fmt.Errorf("load template: %w", err)
 	}
@@ -140,7 +148,7 @@ func (uc *RenderPromptUseCase) Execute(
 
 	return RenderedPrompt{
 		Role: role, Language: language,
-		Prompt: out, FromOverride: effective.FromOverride,
+		Prompt: out, PromptID: effective.ID, PromptName: effective.Name, IsSystem: effective.IsSystem,
 	}, nil
 }
 
@@ -167,6 +175,7 @@ func (uc *RenderPromptUseCase) variablesFor(
 		"narration_language_rule": domain.NarrationLanguageRule(language),
 		"previous_output":         previous,
 		"format_beats":            "",
+		"subtitle_zone":           domain.SubtitleZone(project, language),
 	}
 
 	// The beat sheet only means something for the step that writes the
