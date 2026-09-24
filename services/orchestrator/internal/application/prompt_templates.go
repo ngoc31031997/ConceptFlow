@@ -48,10 +48,9 @@ func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projec
 	if err != nil {
 		return err
 	}
-	// A project that stopped at parse/validate has rendered nothing, and its
-	// only way forward is to fix the script and resubmit, so it stays editable.
-	switch status {
-	case domain.StatusDraft, domain.StatusFailedParseScript, domain.StatusFailedValidateScript:
+	// A project that failed at any step is editable too: its way forward is to
+	// fix the inputs (prompt, script, settings) and re-run from any step.
+	if domain.IsAuthoringEditable(status) {
 		return nil
 	}
 	return domain.ErrInvalidStatus

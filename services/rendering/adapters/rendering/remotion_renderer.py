@@ -66,6 +66,20 @@ _NARRATIONS_HEADER_RE = re.compile(
 _STRING_LITERAL_RE = re.compile(r"""(['"`])((?:(?!\1)[^\\]|\\.)*)\1""")
 
 
+_FENCE_LINE_RE = re.compile(r"^[ \t]*`{3,}[ \t]*[A-Za-z]*[ \t]*$", re.MULTILINE)
+
+
+def _sanitize_script(script_content: str) -> str:
+    """Drops markdown code-fence lines (```tsx / ```) that an LLM left inside the
+    script — they are never valid TSX and make esbuild fail with
+    `Expected ";" but found "tsx"`. If the script holds a fenced block with
+    prose around it, keeps only the first block's content."""
+    fenced = re.search(r"^[ \t]*`{3,}[ \t]*[A-Za-z]*[ \t]*\n(.*?)^[ \t]*`{3,}[ \t]*$", script_content, re.MULTILINE | re.DOTALL)
+    if fenced:
+        script_content = fenced.group(1)
+    return _FENCE_LINE_RE.sub("", script_content)
+
+
 def _strip_comments(text: str) -> str:
     """Removes `//` and `/* */` comments, respecting string literals, so a
     comment can never be mistaken for the real narrations array."""
@@ -174,7 +188,7 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
         rendered_path = os.path.join(media_dir, "output.mp4")
         try:
             with open(entry_path, "w", encoding="utf-8") as f:
-                f.write(request.script_content)
+                f.write(_sanitize_script(request.script_content))
             with open(props_path, "w", encoding="utf-8") as f:
                 props: dict = {"segments": segments}
                 if request.video_font:
