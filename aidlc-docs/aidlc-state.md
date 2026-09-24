@@ -102,6 +102,7 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
   - INCONCLUSIVE (không phải lỗi): CR-023 — `channel_asset_pointers` rỗng trên stack test, chưa từng đăng ký sting Manim mặc định nào, nên chưa có gì để ghép; cần kích hoạt sting mặc định trước khi verify được nhánh này.
 - **Đã giao, chưa verify E2E**: CR-012 (chưa verify với Google thật).
 - **Backlog**: CR-022 (vòng phản hồi retention, hoãn ngoài phạm vi đợt).
+- **Backlog (2026-09-24)**: Bổ sung system prompt khi gọi Hive API theo từng role, từng bước — cần rà từng bước gọi LLM (story_architect, visual_director, script_reviewer, ...) để mỗi bước gửi đúng system prompt riêng của role đó (hiện `hive_client.go` chỉ thêm message `system` khi `req.System` không rỗng). Kèm rà `temperature` (đang 0.7 ở `generate_authoring.go:235`, đề xuất ~0.3 cho bước cần đúng cấu trúc) và `MaxTokens` theo từng bước. Bối cảnh: debug lỗi output bị cắt do reasoning dùng hết `max_tokens` (playground 4096; `HIVE_MAX_OUTPUT_TOKENS=0` không gửi trần tường minh).
 - **Next Stage**: chờ Creator chọn — (a) tự chạy lại E2E xác nhận 2 fix orchestrator, (b) hiệu chỉnh ngưỡng QC rồi bật `QC_ENFORCE` (CR-021) — cần video thật, (c) verify CR-012 với Google thật, hoặc (d) Change Request mới.
 
 ## Việc tồn đọng cần Creator làm (không phải việc code)
