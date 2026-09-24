@@ -92,6 +92,8 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
+  // Live progress of the run above (streamed reply size + phase), polled by the GUI.
+  router.get('/v1/projects/:id/authoring/:step/progress', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post(
     '/v1/projects/:id/authoring/:step/generate',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),

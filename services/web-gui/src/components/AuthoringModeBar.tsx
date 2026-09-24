@@ -1,8 +1,9 @@
 import { useContext, useState } from "react";
 import { Button } from "./ui";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { generateAuthoringStep, getAuthoringState, type AuthoringStep, type LlmStatus } from "../api/client";
+import { generateAuthoringStep, getAuthoringState, type AuthoringProgress, type AuthoringStep, type LlmStatus } from "../api/client";
 import type { AuthoringMode } from "../context/ProjectDraftContext";
+import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModeBar.module.css";
@@ -122,6 +123,8 @@ export function AuthoringModeBar({
   }
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const activeStep = run.running && run.currentIndex >= 0 ? run.steps[run.currentIndex] ?? null : null;
+  const live = useAuthoringProgress(projectId, activeStep);
 
   // Chưa biết trạng thái: chưa vẽ thẻ, để nó không nhấp nháy giữa hai hình
   // dạng ngay khi trang mở.
@@ -246,6 +249,11 @@ export function AuthoringModeBar({
               <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
                 <div className={styles.progressBar} />
               </div>
+              {live?.running && (
+                <p className={styles.status} data-testid="authoring-live-progress">
+                  {liveProgressText(live)}
+                </p>
+              )}
               {run.steps.length > 1 && (
                 <ol className={styles.stepper}>
                   {ALL_STEPS.map((step, index) => {
@@ -323,4 +331,16 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
       </button>
     </div>
   );
+}
+
+function formatChars(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
+
+/** Câu tiến độ từ luồng streaming: pha hiện tại, lượng chữ đã nhận, thời gian. */
+function liveProgressText(p: AuthoringProgress): string {
+  const time = `${p.elapsed_seconds}s`;
+  if (p.phase === "writing") return `AI đang viết kết quả… ${formatChars(p.content_chars)} ký tự · ${time}`;
+  if (p.phase === "reasoning") return `AI đang suy luận… ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
+  return `Đang chờ Hive phản hồi… ${time}`;
 }

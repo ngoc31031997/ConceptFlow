@@ -7,6 +7,7 @@
 package llm
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -60,6 +61,10 @@ type hiveRequest struct {
 	// left out and the provider applies its own ceiling.
 	MaxTokens   int     `json:"max_tokens,omitempty"`
 	Temperature float64 `json:"temperature"`
+	// Stream: Hive documents it as required. true → Server-Sent Events with
+	// usage in the last chunk; the reply is read chunk by chunk so progress can
+	// be reported and no hop sits idle for minutes waiting on one big body.
+	Stream bool `json:"stream"`
 }
 
 type hiveChoice struct {
@@ -180,7 +185,7 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 	}
 	body, err := json.Marshal(hiveRequest{
 		Model: requestModel, Messages: messages,
-		MaxTokens: req.MaxTokens, Temperature: req.Temperature,
+		MaxTokens: req.MaxTokens, Temperature: req.Temperature, Stream: true,
 	})
 	if err != nil {
 		return fail(application.ErrKindMalformed, application.TokenUsage{}, fmt.Errorf("marshal request: %w", err))
@@ -205,20 +210,30 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 	}
 	defer resp.Body.Close()
 
-	raw, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fail(application.ErrKindServer, application.TokenUsage{}, fmt.Errorf("read response: %w", err))
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fail(kindForStatus(resp.StatusCode), application.TokenUsage{},
-			fmt.Errorf("hive returned %d: %s", resp.StatusCode, snippet(raw)))
-	}
-
 	var parsed hiveResponse
-	if err := json.Unmarshal(raw, &parsed); err != nil {
-		return fail(application.ErrKindMalformed, application.TokenUsage{},
-			fmt.Errorf("decode response: %w", err))
+	if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
+		var serr error
+		parsed, serr = readHiveStream(resp.Body, req.OnProgress)
+		if serr != nil {
+			kind := application.ErrKindServer
+			if errors.Is(serr, context.DeadlineExceeded) || errors.Is(serr, context.Canceled) {
+				kind = application.ErrKindTimeout
+			}
+			return fail(kind, application.TokenUsage{}, fmt.Errorf("read stream: %w", serr))
+		}
+	} else {
+		raw, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return fail(application.ErrKindServer, application.TokenUsage{}, fmt.Errorf("read response: %w", err))
+		}
+		if resp.StatusCode != http.StatusOK {
+			return fail(kindForStatus(resp.StatusCode), application.TokenUsage{},
+				fmt.Errorf("hive returned %d: %s", resp.StatusCode, snippet(raw)))
+		}
+		if err := json.Unmarshal(raw, &parsed); err != nil {
+			return fail(application.ErrKindMalformed, application.TokenUsage{},
+				fmt.Errorf("decode response: %w", err))
+		}
 	}
 
 	model := parsed.Model
@@ -245,7 +260,11 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 
 	// D13 — "empty" and "ran out of room" are different problems with
 	// different fixes, and a reasoning model turns the second into the first.
-	if choice.FinishReason == "length" {
+	// DeepSeek reports finish_reason "stop" even when max_tokens ended the
+	// reply mid-reasoning (measured 2026-09-24): an empty answer that used the
+	// whole budget is a budget problem, not an "empty" one.
+	hitCap := req.MaxTokens > 0 && usage.CompletionTokens >= req.MaxTokens
+	if choice.FinishReason == "length" || (content == "" && hitCap) {
 		if content == "" {
 			return fail(application.ErrKindBudget, usage, fmt.Errorf(
 				"the whole token budget went on reasoning before any answer was written (%d reasoning tokens)",
@@ -284,4 +303,75 @@ func snippet(body []byte) string {
 		return s[:max] + "…"
 	}
 	return s
+}
+
+// streamChunk is one SSE "data:" payload. Reasoning models put their thinking
+// in delta.reasoning_content and the answer in delta.content; the final chunk
+// has no choices and carries usage.
+type streamChunk struct {
+	Model   string `json:"model"`
+	Choices []struct {
+		Delta struct {
+			Content          *string `json:"content"`
+			ReasoningContent *string `json:"reasoning_content"`
+		} `json:"delta"`
+		FinishReason string `json:"finish_reason"`
+	} `json:"choices"`
+	Usage *hiveUsage `json:"usage"`
+}
+
+// readHiveStream folds an SSE reply into the same hiveResponse the
+// non-streaming path decodes, reporting running sizes to onProgress.
+func readHiveStream(body io.Reader, onProgress func(application.ChatProgress)) (hiveResponse, error) {
+	var (
+		out       hiveResponse
+		content   strings.Builder
+		reasoning int
+		finish    string
+	)
+	rd := bufio.NewReaderSize(body, 64*1024)
+	for {
+		line, err := rd.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if payload, ok := strings.CutPrefix(line, "data:"); ok {
+			payload = strings.TrimSpace(payload)
+			if payload == "[DONE]" {
+				break
+			}
+			var chunk streamChunk
+			if jerr := json.Unmarshal([]byte(payload), &chunk); jerr == nil {
+				if chunk.Model != "" {
+					out.Model = chunk.Model
+				}
+				if chunk.Usage != nil {
+					out.Usage = *chunk.Usage
+				}
+				for _, ch := range chunk.Choices {
+					if ch.Delta.Content != nil {
+						content.WriteString(*ch.Delta.Content)
+					}
+					if ch.Delta.ReasoningContent != nil {
+						reasoning += len(*ch.Delta.ReasoningContent)
+					}
+					if ch.FinishReason != "" {
+						finish = ch.FinishReason
+					}
+				}
+				if onProgress != nil && len(chunk.Choices) > 0 {
+					onProgress(application.ChatProgress{ReasoningChars: reasoning, ContentChars: content.Len()})
+				}
+			}
+		}
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return hiveResponse{}, err
+		}
+	}
+	out.Choices = []hiveChoice{{
+		Message:      hiveMessage{Role: "assistant", Content: content.String()},
+		FinishReason: finish,
+	}}
+	return out, nil
 }
