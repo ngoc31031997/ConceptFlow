@@ -384,7 +384,7 @@ services:
       HIVE_TIMEOUT_SECONDS: ${HIVE_TIMEOUT_SECONDS:-0} # 0 = no timeout
       HIVE_MAX_RETRIES: ${HIVE_MAX_RETRIES:-3}
       HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
-      HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-16000}
+      HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-48000}
       # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
       #
       # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và

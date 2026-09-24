@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { RenderEnginePicker } from "./RenderEnginePicker";
 import { AuthoringModeBar, AuthoringModeSwitch } from "./AuthoringModeBar";
+import { AuthoringModelPicker } from "./AuthoringModelPicker";
+import { useAuthoringModels } from "../hooks/useAuthoringModels";
 import { useAuthoringRun } from "../context/AuthoringRunContext";
 import type { RenderEngine } from "../context/ProjectDraftContext";
 import type { AuthoringMode, AuthoringStep, LlmStatus } from "../api/client";
@@ -54,6 +56,8 @@ export function PipelineSettingsBar({
 }: PipelineSettingsBarProps) {
   const [expanded, setExpanded] = useState(false);
   const { running } = useAuthoringRun();
+  const { models, setModels } = useAuthoringModels(projectId);
+  const aiOn = mode === "ai" && !!llm?.enabled;
   const engineLabel = renderEngine === "remotion" ? "Remotion" : "Manim";
   const modeLabel = mode === "ai" && llm?.enabled ? "Gọi API trực tiếp" : "Copy prompt ra ngoài";
 
@@ -84,6 +88,15 @@ export function PipelineSettingsBar({
         <div className={styles.expanded}>
           {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} disabled={running} />}
           {llm && <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />}
+          {aiOn && (
+            <AuthoringModelPicker
+              models={models}
+              onChange={setModels}
+              options={llm?.models ?? []}
+              defaultModel={llm?.default_model ?? ""}
+              disabled={running}
+            />
+          )}
         </div>
       )}
 

@@ -42,10 +42,30 @@
 }
 
 .select {
-  padding: 7px 10px;
-  border-radius: 8px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  padding: 9px 34px 9px 12px;
+  border-radius: 10px;
   border: 1px solid rgba(22, 34, 46, 0.16);
-  background: var(--surface, #fff);
+  background-color: var(--surface, #fff);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2368778a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
   color: var(--ink);
-  font-size: 12.5px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(22, 34, 46, 0.05);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.select:hover {
+  border-color: rgba(22, 34, 46, 0.32);
+}
+
+.select:focus-visible {
+  outline: none;
+  border-color: var(--accent, #4f7cff);
+  box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.18);
 }

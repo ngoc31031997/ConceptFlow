@@ -144,6 +144,7 @@ export function ScriptAuthoringSettingsStepPage() {
               models={authoringModels}
               onChange={setAuthoringModels}
               options={llm.models ?? []}
+              defaultModel={llm.default_model ?? ""}
             />
           </div>
         )}

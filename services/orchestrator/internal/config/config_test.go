@@ -80,7 +80,7 @@ func TestLoad_HiveDefaults(t *testing.T) {
 	}
 	// Generous on purpose — a reasoning model spends part of this budget
 	// before writing the first character of the answer (CR-027 D13).
-	if cfg.HiveMaxOutputTokens != 16000 {
+	if cfg.HiveMaxOutputTokens != 48000 {
 		t.Fatalf("unexpected output budget %d", cfg.HiveMaxOutputTokens)
 	}
 	if cfg.HiveTimeout != 0 {

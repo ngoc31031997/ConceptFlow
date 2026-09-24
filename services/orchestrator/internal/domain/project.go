@@ -522,12 +522,12 @@ type AuthoringModelOption struct {
 	Label string `json:"label"`
 }
 
-// AuthoringModelCatalog is the fixed list the picker offers. "" is always
-// first and always valid: it means "use the server's configured default"
-// (HIVE_MODEL), which is what every project used before this picker existed
-// and what an empty/legacy project_authoring row still means today.
+// AuthoringModelCatalog is the fixed list the picker offers. "" is not listed
+// (the GUI shows the concrete model instead, via /v1/llm/status default_model)
+// but stays valid on the write path: it means "use the server's configured
+// default" (HIVE_MODEL), which is what an empty/legacy project_authoring row
+// still means today.
 var AuthoringModelCatalog = []AuthoringModelOption{
-	{ID: "", Label: "Mặc định máy chủ"},
 	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
 	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
 }
