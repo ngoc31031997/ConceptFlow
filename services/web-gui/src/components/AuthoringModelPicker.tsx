@@ -13,6 +13,9 @@ interface AuthoringModelPickerProps {
   onChange: (models: AuthoringStepModels) => void;
   /** Danh mục model server cho phép chọn (từ GET /v1/llm/status). */
   options: AuthoringModelOption[];
+  /** Model cụ thể mà giá trị rỗng ("") được máy chủ quy về. */
+  defaultModel?: string;
+  disabled?: boolean;
 }
 
 /**
@@ -27,8 +30,13 @@ interface AuthoringModelPickerProps {
  * useAuthoringModels), nên đổi ở đây rồi quay lại tab nào cũng thấy đúng model
  * vừa chọn, và lượt chạy AI tiếp theo dùng đúng nó.
  */
-export function AuthoringModelPicker({ models, onChange, options }: AuthoringModelPickerProps) {
+export function AuthoringModelPicker({ models, onChange, options, defaultModel = "", disabled }: AuthoringModelPickerProps) {
   if (options.length === 0) return null;
+
+  // "" nghĩa là "mặc định máy chủ" — luôn hiện tên model thật thay vì nhãn mơ hồ.
+  const shown = options.some((o) => o.id === defaultModel) || !defaultModel
+    ? options
+    : [...options, { id: defaultModel, label: defaultModel }];
 
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="authoring-model-picker">
@@ -44,11 +52,12 @@ export function AuthoringModelPicker({ models, onChange, options }: AuthoringMod
             <span className={styles.fieldLabel}>{label}</span>
             <select
               className={styles.select}
-              value={models[key]}
+              value={models[key] || defaultModel || shown[0].id}
               onChange={(event) => onChange({ ...models, [key]: event.target.value })}
+              disabled={disabled}
               data-testid={`authoring-model-${key}`}
             >
-              {options.map((option) => (
+              {shown.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
                 </option>

@@ -442,6 +442,8 @@ export type LlmStatus = {
   reason?: string;
   /** Danh mục model cho picker ở bước 1 — rỗng khi chế độ AI chưa khả dụng. */
   models?: AuthoringModelOption[];
+  /** Model cụ thể mà lựa chọn rỗng ("") được máy chủ quy về. */
+  default_model?: string;
 };
 
 export function getLlmStatus(): Promise<LlmStatus> {

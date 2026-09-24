@@ -176,6 +176,7 @@ type Router struct {
 	prompts                 promptsUseCase
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
+	defaultModel            string
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveWizardSettings      saveWizardSettingsUseCase
@@ -210,6 +211,13 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 // Left unwired (no API key), the route answers 404 and GET /v1/llm/status
 // reports disabled, so the GUI hides the button and says why instead of
 // offering one that fails on the first press (FR79.4).
+// WithDefaultModel tells GET /v1/llm/status which concrete model an empty
+// ("server default") choice resolves to, so the GUI can name it.
+func (rt *Router) WithDefaultModel(id string) *Router {
+	rt.defaultModel = id
+	return rt
+}
+
 func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
 	rt.generateAuthoring = generateAuthoring
 	return rt
@@ -1365,6 +1373,8 @@ type llmStatusResponse struct {
 	// (SaveAuthoringModelsUseCase) can never drift apart. Empty when the AI
 	// path itself is unavailable — nothing to pick a model for.
 	Models []domain.AuthoringModelOption `json:"models,omitempty"`
+	// DefaultModel is the concrete model id an empty choice resolves to.
+	DefaultModel string `json:"default_model,omitempty"`
 }
 
 func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
@@ -1377,7 +1387,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, llmStatusResponse{
 		Enabled: true, Provider: rt.generateAuthoring.Provider(),
-		Models: domain.AuthoringModelCatalog,
+		Models: domain.AuthoringModelCatalog, DefaultModel: rt.defaultModel,
 	})
 }
 

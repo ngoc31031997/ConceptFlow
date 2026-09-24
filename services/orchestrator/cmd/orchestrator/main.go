@@ -212,6 +212,7 @@ func main() {
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic).
+		WithDefaultModel(cfg.HiveModel).
 		WithWizard(saveWizardSettings)
 	if generateAuthoring != nil {
 		router = router.WithGenerateAuthoring(generateAuthoring)
