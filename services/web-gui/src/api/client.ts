@@ -357,8 +357,7 @@ export interface PromptTemplate {
     | "story_architect"
     | "visual_director"
     | "manim_engineer"
-    | "remotion_engineer"
-    | "remotion_visual_director";
+    | "remotion_engineer";
   language: "vi" | "en";
   template_text: string;
   version: number;

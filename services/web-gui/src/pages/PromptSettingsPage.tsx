@@ -17,11 +17,9 @@ const ROLES: { value: PromptTemplate["role"]; label: string }[] = [
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "manim_engineer", label: "3. Manim Engineer — viết code" },
-  // feature/remotion-engine — không thuộc chuỗi 3 bước Manim ở trên (Remotion
-  // chưa có pipeline nhiều bước), nhưng vẫn đánh số tiếp theo cho nhất quán
-  // với các lựa chọn khác trong danh sách.
-  { value: "remotion_visual_director", label: "4. Remotion Visual Director — storyboard cho engine Remotion" },
-  { value: "remotion_engineer", label: "5. Remotion Engineer — viết code Remotion" },
+  // Bước 3 rẽ theo engine render: dự án chọn Remotion dùng prompt này thay
+  // cho Manim Engineer. Hai bước đầu dùng chung cho mọi engine.
+  { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
 ];
 
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */

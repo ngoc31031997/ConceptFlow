@@ -108,18 +108,14 @@ func TestRoleFor_ReviewIsNoLongerAStep(t *testing.T) {
 	}
 }
 
-// TestRoleFor_StoryboardBranchesByEngine is the CR-027 D4 rule that is easy
-// to get wrong: the pipeline forks at the STORYBOARD, not at the code step.
-// A storyboard hands the engineer a visual vocabulary, and Manim's design
-// system has components and a camera that conceptflow-mini does not — so a
-// storyboard written in Manim's words makes the Remotion engineer invent
-// imports that do not exist.
-func TestRoleFor_StoryboardBranchesByEngine(t *testing.T) {
-	if got, _ := application.RoleFor("storyboard", "manim"); got != domain.RoleVisualDirector {
-		t.Fatalf("manim: want visual_director, got %q", got)
-	}
-	if got, _ := application.RoleFor("storyboard", "remotion"); got != domain.RoleRemotionVisualDirector {
-		t.Fatalf("remotion: want remotion_visual_director, got %q", got)
+// TestRoleFor_StoryboardIsSharedAcrossEngines: there is one Visual Director.
+// It writes an engine-agnostic shooting script, and only the code step forks
+// by render engine.
+func TestRoleFor_StoryboardIsSharedAcrossEngines(t *testing.T) {
+	for _, engine := range []string{"manim", "remotion"} {
+		if got, _ := application.RoleFor("storyboard", engine); got != domain.RoleVisualDirector {
+			t.Fatalf("%s: want visual_director, got %q", engine, got)
+		}
 	}
 }
 

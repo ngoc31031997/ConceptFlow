@@ -48,13 +48,9 @@ export function VisualDirectorStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
-  // feature/remotion-engine: the storyboard is the one pre-code step that is
-  // NOT engine agnostic — the Manim wording hands the engineer a vocabulary
-  // (TitleCard/FlowDiagram/BarChart, camera zoom, cross-beat morphs) that
-  // conceptflow-mini does not have, so a Remotion project gets its own
-  // storyboard role. Tab 1a (story_architect) stays shared: it decides the
-  // story, not the pixels.
-  const directorRole = draft.renderEngine === "remotion" ? "remotion_visual_director" : "visual_director";
+  // One director for every render engine: the shooting script is engine
+  // agnostic, and only the code step forks (manim_engineer / remotion_engineer).
+  const directorRole = "visual_director";
 
   useEffect(() => {
     let cancelled = false;
@@ -142,8 +138,8 @@ export function VisualDirectorStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnStoryboard
-            ? `1b. Dán storyboard sẵn có của bạn (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`
-            : `1b. Dựng storyboard hình ảnh từ dàn ý câu chuyện (engine ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}).`
+            ? "1b. Dán kịch bản phân cảnh sẵn có của bạn."
+            : "1b. Dựng kịch bản phân cảnh từ dàn ý câu chuyện."
         }
         wide
       >

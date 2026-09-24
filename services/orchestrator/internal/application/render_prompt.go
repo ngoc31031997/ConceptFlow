@@ -90,12 +90,8 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 		// Shared: this step decides the story, not the pixels.
 		return domain.RoleStoryArchitect, nil
 	case "storyboard":
-		// NOT shared: a storyboard hands the engineer a visual vocabulary,
-		// and Manim's design system has components and a camera that
-		// conceptflow-mini does not.
-		if remotion {
-			return domain.RoleRemotionVisualDirector, nil
-		}
+		// Shared: the director writes an engine-agnostic shooting script;
+		// translating it into what the engine can render is the code step's job.
 		return domain.RoleVisualDirector, nil
 	case "code":
 		if remotion {
@@ -221,7 +217,7 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 	switch role {
 	case domain.RoleStoryArchitect:
 		// Nothing comes before step 1.
-	case domain.RoleVisualDirector, domain.RoleRemotionVisualDirector:
+	case domain.RoleVisualDirector:
 		add(story)
 	case domain.RoleManimEngineer, domain.RoleRemotionEngineer:
 		add(story)
