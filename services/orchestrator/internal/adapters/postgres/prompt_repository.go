@@ -28,50 +28,20 @@ func scanPrompt(row pgx.Row) (domain.Prompt, error) {
 	return p, nil
 }
 
-// MigrateLegacyPrompts carries the Vietnamese rows of the old override table
-// into the library as Creator-owned prompts, keeping whether each was switched
-// on, so behaviour after the upgrade matches behaviour before it. English
-// overrides and rows of roles the binary no longer ships are left behind in
-// the renamed table rather than deleted.
-//
-// MUST run before SeedPrompts: an active migrated row has to claim its role
-// first, or the seed would activate the system row and the Creator's prompt
-// would silently stop being used.
-//
-// Renaming the old tables is what makes this run once — with the table gone
-// there is nothing to migrate on the next start, so a prompt the Creator
-// later deletes does not come back.
-func (r *PromptTemplateRepository) MigrateLegacyPrompts(ctx context.Context) (int, error) {
-	var legacy *string
-	if err := r.pool.QueryRow(ctx, `SELECT to_regclass('prompt_overrides')::text`).Scan(&legacy); err != nil {
-		return 0, err
-	}
-	if legacy == nil {
-		return 0, nil
-	}
-	tx, err := r.pool.Begin(ctx)
+// PurgeLegacyPrompts removes what the pre-library override system left
+// behind: the "migrated-*" Creator rows it produced and the renamed *_legacy
+// tables. Idempotent — with nothing left it is a no-op.
+func (r *PromptTemplateRepository) PurgeLegacyPrompts(ctx context.Context) (int, error) {
+	tag, err := r.pool.Exec(ctx, `DELETE FROM prompts WHERE id LIKE 'migrated-%' AND NOT is_system`)
 	if err != nil {
 		return 0, err
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
-
-	tag, err := tx.Exec(ctx, `
-		INSERT INTO prompts (id, role, name, template_text, is_system, is_active, updated_at)
-		SELECT 'migrated-' || role, role, 'Bản của bạn (chuyển từ cài đặt cũ)', template_text, false, is_active, updated_at
-		FROM prompt_overrides
-		WHERE language = 'vi' AND role IN ('story_architect','visual_director','manim_engineer','remotion_engineer')
-		ON CONFLICT (id) DO NOTHING
-	`)
-	if err != nil {
-		return 0, err
+	for _, t := range []string{"prompt_overrides_legacy", "prompt_templates_legacy", "prompt_overrides", "prompt_templates"} {
+		if _, err := r.pool.Exec(ctx, `DROP TABLE IF EXISTS `+t); err != nil {
+			return int(tag.RowsAffected()), err
+		}
 	}
-	if _, err := tx.Exec(ctx, `ALTER TABLE prompt_overrides RENAME TO prompt_overrides_legacy`); err != nil {
-		return 0, err
-	}
-	if _, err := tx.Exec(ctx, `ALTER TABLE IF EXISTS prompt_templates RENAME TO prompt_templates_legacy`); err != nil {
-		return 0, err
-	}
-	return int(tag.RowsAffected()), tx.Commit(ctx)
+	return int(tag.RowsAffected()), nil
 }
 
 // SeedPrompts writes the system prompts, overwriting their wording on every

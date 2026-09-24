@@ -413,8 +413,7 @@ CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DES
 -- CR-031: the prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active. A row with is_system ships in the binary
 -- (seeded on every start, read-only); the rest belong to the Creator. This
--- replaces prompt_templates + prompt_overrides, which are renamed *_legacy by
--- MigrateLegacyPrompts rather than dropped.
+-- replaces prompt_templates + prompt_overrides, which PurgeLegacyPrompts drops.
 CREATE TABLE IF NOT EXISTS prompts (
     id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     role          TEXT NOT NULL,

@@ -245,6 +245,68 @@ export function PromptSettingsPage() {
 
           <div>
             <Card
+              headerAction={
+                (selected !== null || creating) ? (
+                  <div className={styles.actions} role="toolbar" aria-label="Thao tác prompt">
+                    <button
+                      type="button"
+                      className={styles.actionBtn}
+                      onClick={() => setShowPreview((v) => !v)}
+                      data-testid="prompt-preview-toggle"
+                      aria-pressed={showPreview}
+                    >
+                      <span aria-hidden="true">👁</span> {showPreview ? "Ẩn xem trước" : "Xem trước"}
+                    </button>
+                    {selected !== null && !creating && !selected.is_active && (
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionPrimary}`}
+                        onClick={() => handleActivate(selected.id)}
+                        disabled={busy || loading}
+                        data-testid="prompt-activate-button"
+                        title="Bật prompt này cho vai trò"
+                      >
+                        <span aria-hidden="true">⏻</span> Bật
+                      </button>
+                    )}
+                    {selected !== null && !creating && (
+                    <button
+                      type="button"
+                      className={styles.actionBtn}
+                      onClick={() => handleCopy(selected.id)}
+                      disabled={busy || loading}
+                      data-testid="prompt-copy-button"
+                      title="Nhân bản thành prompt của bạn"
+                    >
+                      <span aria-hidden="true">⧉</span> Copy
+                    </button>
+                    )}
+                    {!readOnly && selected !== null && !creating && (
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionDanger}`}
+                        onClick={handleDelete}
+                        disabled={busy || loading}
+                        data-testid="prompt-delete-button"
+                        title="Xoá prompt này"
+                      >
+                        <span aria-hidden="true">🗑</span> Xoá
+                      </button>
+                    )}
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        className={`${styles.actionBtn} ${styles.actionSave}`}
+                        onClick={handleSave}
+                        disabled={busy || loading || draftName.trim() === "" || draftText.trim() === ""}
+                        data-testid="prompt-save-button"
+                      >
+                        <span aria-hidden="true">💾</span> {busy ? "Đang lưu..." : "Lưu"}
+                      </button>
+                    )}
+                  </div>
+                ) : undefined
+              }
               title={creating ? "Prompt mới" : (selected?.name ?? "Chưa chọn prompt")}
               hint={
                 readOnly
@@ -275,54 +337,6 @@ export function PromptSettingsPage() {
                   rows={22}
                 />
               </FormField>
-              <CtaRow>
-                <Button
-                  variant="ghost"
-                  onClick={() => setShowPreview((v) => !v)}
-                  data-testid="prompt-preview-toggle"
-                >
-                  {showPreview ? "Ẩn xem trước" : "Xem trước"}
-                </Button>
-                {selected !== null && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleCopy(selected.id)}
-                    disabled={busy || loading}
-                    data-testid="prompt-copy-button"
-                  >
-                    Copy
-                  </Button>
-                )}
-                {selected !== null && !selected.is_active && (
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleActivate(selected.id)}
-                    disabled={busy || loading}
-                    data-testid="prompt-activate-button"
-                  >
-                    Bật prompt này
-                  </Button>
-                )}
-                {!readOnly && selected !== null && (
-                  <Button
-                    variant="ghost"
-                    onClick={handleDelete}
-                    disabled={busy || loading}
-                    data-testid="prompt-delete-button"
-                  >
-                    Xoá
-                  </Button>
-                )}
-                {!readOnly && (creating || selected !== null) && (
-                  <Button
-                    onClick={handleSave}
-                    disabled={busy || loading || draftName.trim() === "" || draftText.trim() === ""}
-                    data-testid="prompt-save-button"
-                  >
-                    {busy ? "Đang lưu..." : "Lưu"}
-                  </Button>
-                )}
-              </CtaRow>
             </Card>
 
             {showPreview && (

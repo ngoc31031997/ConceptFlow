@@ -61,14 +61,13 @@ func main() {
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
 		logger.Warn("could not seed video formats", "error", err)
 	}
-	// CR-031: the prompt library. Order is load-bearing — the legacy override
-	// migration must run before seeding, so a migrated active prompt claims its
-	// role before the seed would otherwise activate the system row.
+	// CR-031: the prompt library. Legacy override rows/tables are purged first
+	// so none of them can hold an active slot when the system rows are seeded.
 	promptTemplateRepo := postgres.NewPromptTemplateRepository(pool)
-	if n, err := promptTemplateRepo.MigrateLegacyPrompts(ctx); err != nil {
-		logger.Warn("could not migrate legacy prompt overrides", "error", err)
+	if n, err := promptTemplateRepo.PurgeLegacyPrompts(ctx); err != nil {
+		logger.Warn("could not purge legacy prompts", "error", err)
 	} else if n > 0 {
-		logger.Warn("CR-031: moved legacy prompt overrides into the prompt library", "count", n)
+		logger.Warn("purged legacy prompts", "count", n)
 	}
 	if err := promptTemplateRepo.SeedPrompts(ctx); err != nil {
 		logger.Warn("could not seed system prompts", "error", err)
