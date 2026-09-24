@@ -19,6 +19,7 @@ import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
+import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
@@ -39,6 +40,7 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * client-side lint yet) actually depend on which engine renders the video.
  */
 export function ManimEngineerStepPage() {
+  useWizardPosition("/create/script/code");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();

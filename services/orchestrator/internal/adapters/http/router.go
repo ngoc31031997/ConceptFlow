@@ -138,6 +138,11 @@ type saveWizardSettingsUseCase interface {
 	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
 }
 
+// saveWizardPositionUseCase backs PUT /v1/projects/{id}/wizard-position.
+type saveWizardPositionUseCase interface {
+	SaveWizardPosition(ctx context.Context, projectID string, step int, route string) error
+}
+
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -177,6 +182,7 @@ type Router struct {
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	defaultModel            string
+	saveWizardPosition      saveWizardPositionUseCase
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveWizardSettings      saveWizardSettingsUseCase
@@ -274,6 +280,12 @@ func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase) *Router {
 	return rt
 }
 
+// WithWizardPosition enables PUT /v1/projects/{project_id}/wizard-position.
+func (rt *Router) WithWizardPosition(save saveWizardPositionUseCase) *Router {
+	rt.saveWizardPosition = save
+	return rt
+}
+
 // WithQCReports attaches the QC report store, enabling
 // GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
 // the route answers 404, the same way the CR-023 routes do when unwired.
@@ -348,6 +360,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
+	r.Put("/v1/projects/{project_id}/wizard-position", rt.handleSaveWizardPosition)
 	return r
 }
 
@@ -1298,6 +1311,33 @@ func (rt *Router) handleSaveWizardSettings(w http.ResponseWriter, r *http.Reques
 		VideoFont:             req.VideoFont,
 	})
 	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleSaveWizardPosition remembers which wizard screen a draft was left on,
+// so reopening the project returns to it. Idempotent: the GUI sends it on
+// every screen change.
+func (rt *Router) handleSaveWizardPosition(w http.ResponseWriter, r *http.Request) {
+	if rt.saveWizardPosition == nil {
+		writeError(w, http.StatusNotFound, "wizard position is not enabled")
+		return
+	}
+	var req struct {
+		Route string `json:"route"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	step, ok := domain.WizardStepForRoute(req.Route)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "unknown wizard route")
+		return
+	}
+	if err := rt.saveWizardPosition.SaveWizardPosition(r.Context(), chi.URLParam(r, "project_id"), step, req.Route); err != nil {
 		writeUseCaseError(w, err)
 		return
 	}

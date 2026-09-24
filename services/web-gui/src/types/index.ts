@@ -70,6 +70,8 @@ export interface Project {
   status: string;
   /** Bước wizard (1-7) nên mở lại: bước đã xác nhận xa nhất hoặc bước saga đang ở. */
   wizard_step?: number;
+  /** Màn wizard mở lần cuối trên draft; "" / vắng mặt nếu chưa ghi. */
+  wizard_route?: string;
   /**
    * The project's content language. The wire name is historical (CR-008 §C2):
    * it now drives subtitles, metadata and prompts, not just the TTS voice.

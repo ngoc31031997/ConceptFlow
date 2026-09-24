@@ -87,6 +87,8 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // Wizard: "Tiếp tục" lưu dữ liệu của bước và bước đã tới. settings = bước 2
   // (Cấu hình).
   router.put('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Records which wizard screen a draft was left on, so "Chi tiết" reopens there.
+  router.put('/v1/projects/:id/wizard-position', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.

@@ -59,8 +59,13 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
 
     await waitFor(() => expect(screen.getByTestId("landed-on-settings")).toBeInTheDocument());
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    // Ghi vị trí wizard (PUT .../wizard-position) là lệnh phụ, không tính vào
+    // "đúng một lệnh POST tạo project".
+    const creates = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(
+      ([u]) => !u.includes("/wizard-position"),
+    );
+    expect(creates).toHaveLength(1);
+    const [url, init] = creates[0];
     expect(url).toMatch(/\/v1\/projects$/);
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toMatchObject({ topic: "Vòng lặp for trong Java" });

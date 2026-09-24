@@ -24,6 +24,7 @@ import {
 } from "../context/ProjectDraftContext";
 import { createProjectDraft, saveWizardSettings } from "../api/client";
 import styles from "./WizardSteps.module.css";
+import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const RENDER_QUALITY_LABELS: Record<string, string> = {
   "480p15": "Test (480p15)",
@@ -41,6 +42,7 @@ const RENDER_QUALITY_LABELS: Record<string, string> = {
  * chỉ cần echo lại, không cần await.
  */
 export function ScriptAuthoringSettingsStepPage() {
+  useWizardPosition("/create/script/settings");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
