@@ -83,3 +83,72 @@
   color: inherit;
   border-color: currentColor;
 }
+
+.actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.actionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--ink-faint);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.actionBtn:hover:not(:disabled) {
+  background: rgba(127, 127, 127, 0.14);
+  border-color: currentColor;
+}
+
+.actionBtn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.actionBtn:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.actionBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.actionPrimary {
+  border-color: #2e9e6b;
+  color: #2e9e6b;
+}
+
+.actionDanger {
+  color: #d64545;
+  border-color: rgba(214, 69, 69, 0.55);
+}
+
+.actionDanger:hover:not(:disabled) {
+  background: rgba(214, 69, 69, 0.12);
+  border-color: #d64545;
+}
+
+.actionSave {
+  background: #2e6fd6;
+  border-color: #2e6fd6;
+  color: #fff;
+}
+
+.actionSave:hover:not(:disabled) {
+  background: #2560bd;
+  border-color: #2560bd;
+}
