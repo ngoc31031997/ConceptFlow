@@ -23,7 +23,7 @@ func requireDraft(ctx context.Context, repo WizardPort, projectID string) error 
 	if err != nil {
 		return err
 	}
-	if status != domain.StatusDraft {
+	if !domain.IsAuthoringEditable(status) {
 		return domain.ErrInvalidStatus
 	}
 	return nil

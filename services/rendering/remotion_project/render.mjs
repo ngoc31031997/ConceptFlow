@@ -16,6 +16,7 @@
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import {readFileSync} from 'node:fs';
+import {transform} from 'esbuild';
 
 function parseArgs(argv) {
   const out = {};
@@ -28,6 +29,22 @@ function parseArgs(argv) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const inputProps = JSON.parse(readFileSync(args.props, 'utf-8'));
+
+  // Fast syntax check before the (slow) bundle: a broken script fails here with
+  // a precise, LLM-readable message instead of a webpack stack trace.
+  try {
+    await transform(readFileSync(args.entry, 'utf-8'), {
+      loader: 'tsx',
+      sourcefile: 'CreatorEntry.tsx',
+    });
+  } catch (err) {
+    const msgs = (err.errors ?? []).map(
+      (e) => `CreatorEntry.tsx:${e.location?.line}:${e.location?.column}: ${e.text}` +
+        (e.location?.lineText ? `\n    ${e.location.lineText}` : ''),
+    );
+    console.error(`Script syntax error (esbuild):\n${msgs.join('\n') || err.message}`);
+    process.exit(1);
+  }
 
   const serveUrl = await bundle({entryPoint: args.entry});
 

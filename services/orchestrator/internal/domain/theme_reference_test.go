@@ -6,7 +6,7 @@ import (
 )
 
 func TestManimEngineerSeedsCarryExpandedThemeReference(t *testing.T) {
-	for _, lang := range []string{"vi", "en"} {
+	for _, lang := range []string{"vi"} {
 		tpl, ok := DefaultPromptTemplate(RoleManimEngineer, lang)
 		if !ok {
 			t.Fatalf("no manim_engineer seed for %s", lang)

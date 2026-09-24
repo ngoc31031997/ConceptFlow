@@ -4,7 +4,10 @@
 // or chi — adapters depend on domain, never the reverse.
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // ProjectStatus is the state machine driving both the Render Saga (5 steps)
 // and the Publish Saga (1 step). It has 9 happy-path values plus 6
@@ -76,6 +79,18 @@ const (
 	StepGenerateClips StepName = "generate_clips"
 	StepPublishVideo  StepName = "publish_video"
 )
+
+// IsFailedStatus reports whether s is any failed_at_<step> status.
+func IsFailedStatus(s ProjectStatus) bool {
+	return strings.HasPrefix(string(s), "failed_at_")
+}
+
+// IsAuthoringEditable is true while a Creator may still change the inputs of a
+// project: a draft, or one that failed at ANY step — so a failed project can be
+// fixed (topic, settings, prompts, script) and re-run from whichever step.
+func IsAuthoringEditable(s ProjectStatus) bool {
+	return s == StatusDraft || IsFailedStatus(s)
+}
 
 // FailedStatusForStep returns the failed_at_<step> ProjectStatus
 // corresponding to a given StepName (business-rules.md Rule 4).

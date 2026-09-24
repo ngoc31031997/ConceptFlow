@@ -187,7 +187,7 @@ func (uc *UpdateProjectTopicUseCase) Execute(ctx context.Context, input UpdatePr
 	if err != nil {
 		return nil, err
 	}
-	if status != domain.StatusDraft {
+	if !domain.IsAuthoringEditable(status) {
 		return nil, domain.ErrInvalidStatus
 	}
 

@@ -118,7 +118,7 @@ func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *G
 // clearDownstream is best-effort: the run's own error is what the Creator
 // needs to see, and a failed cleanup must not replace it.
 func (uc *GenerateAuthoringUseCase) clearDownstream(ctx context.Context, project *domain.Project, step string) {
-	if uc.clearer == nil || project.Status != domain.StatusDraft {
+	if uc.clearer == nil || !domain.IsAuthoringEditable(project.Status) {
 		return
 	}
 	var steps []AuthoringStep
