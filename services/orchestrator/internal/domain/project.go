@@ -424,6 +424,9 @@ type Project struct {
 	// SaveWizardSettings does, so a full-row upsert from the saga can never
 	// move a Creator backwards.
 	WizardStep int
+	// WizardRoute is the wizard screen the Creator last had open on this draft
+	// (see ValidWizardRoute); "" when never recorded.
+	WizardRoute string
 }
 
 // ClipResult is one (name, preset) outcome of the generate_clips step

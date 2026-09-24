@@ -160,6 +160,8 @@ type projectResponse struct {
 	// WizardStep (1-7) is where the Creator should resume: the furthest step
 	// confirmed with "Tiếp tục", or the one the saga status implies.
 	WizardStep int `json:"wizard_step"`
+	// WizardRoute is the wizard screen last open on a draft ("" if unknown).
+	WizardRoute string `json:"wizard_route,omitempty"`
 	// SubtitleStyle/BackgroundMusic* above already round-trip step 2 settings.
 }
 
@@ -415,5 +417,6 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		VideoOutputMode:       string(p.VideoOutputMode),
 		CompanionProjectID:    p.CompanionProjectID,
 		WizardStep:            domain.EffectiveWizardStep(p),
+		WizardRoute:           p.WizardRoute,
 	}
 }

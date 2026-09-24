@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useContext } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { ThemeToggle } from "./ThemeToggle";
 import styles from "./AppShell.module.css";
 
@@ -67,6 +69,14 @@ function CheckIcon() {
 
 export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
   const navigate = useNavigate();
+  const draft = useContext(ProjectDraftContext);
+  const routeProjectId = useParams().id;
+  // Tên project (chủ đề) từ bước 2 trở đi, để biết đang theo dõi project nào.
+  // Trên màn có :id thì chỉ hiện khi bản nháp đang nạp đúng project đó.
+  const projectName =
+    currentStep && currentStep >= 2 && draft.projectId && (!routeProjectId || routeProjectId === draft.projectId)
+      ? draft.authoringTopic.trim()
+      : "";
 
   const handleStepClick = (stepNumber: number) => {
     // Only allow navigation to completed steps
@@ -141,6 +151,12 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
 
         <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>
           <div className={styles.heading}>
+            {projectName && (
+              <div className={styles.projectChip} title={projectName} data-testid="project-name-chip">
+                <span className={styles.projectChipLabel}>Project</span>
+                <span className={styles.projectChipName}>{projectName}</span>
+              </div>
+            )}
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>

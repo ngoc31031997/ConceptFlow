@@ -31,7 +31,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine, wizard_step, video_font
+		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine, wizard_step, video_font, wizard_route
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -60,7 +60,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
 		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON, &p.CaptionPath, &subtitleMode, &p.CaptionStatus,
 		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID, &layoutMarksJSON,
-		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep, &p.VideoFont)
+		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep, &p.VideoFont, &p.WizardRoute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -609,4 +609,20 @@ func (r *ProjectRepository) SaveVideoFormat(ctx context.Context, format domain.V
 	}
 	format.Version = version
 	return format, nil
+}
+
+// SaveWizardPosition records which wizard screen a draft project is on, and
+// lifts wizard_step to at least step (never lowers it). Drafts only: once the
+// saga has started, status decides where the Creator lands.
+func (r *ProjectRepository) SaveWizardPosition(ctx context.Context, projectID string, step int, route string) error {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE projects SET wizard_route = $1, wizard_step = GREATEST(wizard_step, $2), updated_at = now()
+		WHERE project_id = $3 AND status = 'draft'`, route, step, projectID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
 }

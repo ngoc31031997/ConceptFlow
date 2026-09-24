@@ -25,6 +25,7 @@ import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
 import styles from "./WizardSteps.module.css";
+import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
@@ -44,6 +45,7 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * the right engine instead of always defaulting to Manim.
  */
 export function ScriptOutlineStepPage() {
+  useWizardPosition("/create/script/outline");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();

@@ -10,6 +10,7 @@ import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
+import { useWizardPosition } from "../hooks/useWizardPosition";
 
 /**
  * Bước 1b (Visual Director) — second tab of the "Bước 3 — Script"
@@ -18,6 +19,7 @@ import styles from "./WizardSteps.module.css";
  * paste the AI's storyboard back, then save it server-side and advance.
  */
 export function VisualDirectorStepPage() {
+  useWizardPosition("/create/script/storyboard");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();

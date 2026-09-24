@@ -212,6 +212,11 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_engine TEXT NOT NULL DEFAUL
 -- tục". Steps 4-7 are derived from status, so they are never stored here.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS wizard_step INTEGER NOT NULL DEFAULT 1;
 
+-- Wizard position: the last wizard screen (route) the Creator had open while the
+-- project was a draft, so "Chi tiết" reopens exactly there rather than at the
+-- furthest screen that happens to have content. '' = never recorded.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS wizard_route TEXT NOT NULL DEFAULT '';
+
 -- CR-021 D6/FR61.1: one row per automated QC pass.
 --
 -- findings is JSONB, not text: FR61.1 asks for machine-readable data and the

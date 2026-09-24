@@ -87,7 +87,7 @@ export function ResumeProjectPage() {
         if (cancelled) return;
         dispatch({ type: "LOAD_PROJECT", payload: draftFromServer(project, state) });
         const step = project.wizard_step ?? 1;
-        const target = editAfterFailure ? scriptTabPath(state) : step <= 1 ? "/" : step === 2 ? "/create/script/settings" : scriptTabPath(state);
+        const target = !editAfterFailure && project.wizard_route ? project.wizard_route : editAfterFailure ? scriptTabPath(state) : step <= 1 ? "/" : step === 2 ? "/create/script/settings" : scriptTabPath(state);
         navigate(target, { replace: true });
       } catch {
         if (!cancelled) setError("Không mở lại được project — có thể nó đã bị xoá hoặc mất kết nối.");

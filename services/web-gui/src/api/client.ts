@@ -590,6 +590,18 @@ export async function saveAuthoringModels(projectId: string, models: AuthoringSt
   });
 }
 
+/**
+ * Ghi màn wizard đang mở của draft lên server để "Chi tiết" mở lại đúng chỗ dừng.
+ * Best-effort: lỗi mạng hay project không còn ở trạng thái draft đều bỏ qua.
+ */
+export async function saveWizardPosition(projectId: string, route: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/wizard-position`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ route }),
+  });
+}
+
 /** CR-028 FR85 — một project khác (cùng ngôn ngữ) có chủ đề trùng sau khi chuẩn hoá. */
 export interface SimilarProject {
   projectId: string;
