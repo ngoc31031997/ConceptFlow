@@ -118,7 +118,7 @@ func Load() (*Config, error) {
 	if hiveModel == "" {
 		hiveModel = "deepseek-ai/deepseek-v4.1-flash"
 	}
-	hiveTimeoutSeconds, err := intEnvOrDefault("HIVE_TIMEOUT_SECONDS", 180)
+	hiveTimeoutSeconds, err := intEnvOrDefault("HIVE_TIMEOUT_SECONDS", 0) // 0 = no timeout
 	if err != nil {
 		return nil, err
 	}

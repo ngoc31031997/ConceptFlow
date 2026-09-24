@@ -37,7 +37,8 @@ class UpstreamUnavailableError extends Error {
  * }) => Promise<{ status: number, headers: Headers, body: any, redirected: boolean }> }}
  */
 function createHttpClient(baseUrl, options = {}) {
-  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+  // timeoutMs: 0 means "no timeout" (wait for upstream indefinitely).
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const fetchImpl = options.fetchImpl || fetch;
 
   async function request({ method, path, headers = {}, body, query }) {
@@ -49,7 +50,7 @@ function createHttpClient(baseUrl, options = {}) {
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const timer = timeoutMs > 0 ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
     try {
       const fetchOptions = {
@@ -76,7 +77,7 @@ function createHttpClient(baseUrl, options = {}) {
         cause: err,
       });
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
     }
   }
 
