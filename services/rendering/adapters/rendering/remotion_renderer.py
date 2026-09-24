@@ -176,7 +176,10 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
             with open(entry_path, "w", encoding="utf-8") as f:
                 f.write(request.script_content)
             with open(props_path, "w", encoding="utf-8") as f:
-                json.dump({"segments": segments}, f)
+                props: dict = {"segments": segments}
+                if request.video_font:
+                    props["videoFont"] = request.video_font
+                json.dump(props, f)
 
             self._run_node(
                 [

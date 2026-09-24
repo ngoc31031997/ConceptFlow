@@ -148,6 +148,7 @@ def _parse_subtitle_style(raw: dict | None) -> SubtitleStyle | None:
         text_color=raw.get("text_color", "#FFFFFF"),
         background_opacity=raw.get("background_opacity", 0.6),
         position=raw.get("position", "bottom"),
+        font_family=raw.get("font_family") or "DejaVu Sans",
     )
 
 

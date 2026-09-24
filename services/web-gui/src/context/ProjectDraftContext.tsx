@@ -2,6 +2,7 @@ import { createContext, useEffect, useReducer, type Dispatch, type ReactNode } f
 import type { AuthoringMode, AuthoringStepModels } from "../api/client";
 
 export interface SubtitleStyle {
+  fontFamily: string;
   fontSize: "small" | "medium" | "large";
   textColor: string;
   backgroundOpacity: number;
@@ -73,6 +74,8 @@ export interface ProjectDraft {
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
   renderEngine: RenderEngine;
+  /** Font for text drawn inside a Remotion video (not the subtitles). */
+  videoFont: string;
   videoFormatId: string;
   backgroundMusicVolume: number;
   videoOutputMode: VideoOutputMode;
@@ -153,6 +156,7 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
   | { type: "SET_RENDER_ENGINE"; payload: RenderEngine }
+  | { type: "SET_VIDEO_FONT"; payload: string }
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
   | { type: "SET_BACKGROUND_MUSIC_VOLUME"; payload: number }
@@ -168,6 +172,7 @@ export type ProjectDraftAction =
   | { type: "RESET" };
 
 export const defaultSubtitleStyle: SubtitleStyle = {
+  fontFamily: "Be Vietnam Pro",
   fontSize: "medium",
   textColor: "#FFFFFF",
   backgroundOpacity: 0.6,
@@ -189,6 +194,7 @@ const initialDraft: ProjectDraft = {
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
   renderEngine: "manim",
+  videoFont: "Be Vietnam Pro",
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
@@ -272,6 +278,7 @@ type LastUsedSettings = Pick<
   | "subtitleStyle"
   | "renderQuality"
   | "renderEngine"
+  | "videoFont"
   | "videoFormatId"
   | "backgroundMusicPath"
   | "backgroundMusicVolume"
@@ -302,6 +309,7 @@ export function saveLastUsedSettings(draft: ProjectDraft): void {
       subtitleStyle: draft.subtitleStyle,
       renderQuality: draft.renderQuality,
       renderEngine: draft.renderEngine,
+      videoFont: draft.videoFont,
       videoFormatId: draft.videoFormatId,
       backgroundMusicPath: draft.backgroundMusicPath,
       backgroundMusicVolume: draft.backgroundMusicVolume,
@@ -352,6 +360,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, renderQuality: action.payload };
     case "SET_RENDER_ENGINE":
       return { ...state, renderEngine: action.payload };
+    case "SET_VIDEO_FONT":
+      return { ...state, videoFont: action.payload };
     case "SET_VIDEO_OUTPUT_MODE":
       return { ...state, videoOutputMode: action.payload };
     case "SET_VIDEO_FORMAT":

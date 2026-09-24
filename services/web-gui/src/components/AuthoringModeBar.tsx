@@ -59,8 +59,6 @@ interface AuthoringModeBarProps {
    * gọn, để Creator bấm chạy luôn mà không phải mở "Đổi".
    */
   showSwitch?: boolean;
-  /** Nằm trong thẻ khác (PipelineSettingsBar): không vẽ thẻ glass lồng nhau. */
-  embedded?: boolean;
 }
 
 const MODE_LABELS: Record<AuthoringMode, string> = {
@@ -101,7 +99,6 @@ export function AuthoringModeBar({
   runDisabled,
   runDisabledReason,
   showSwitch = true,
-  embedded = false,
 }: AuthoringModeBarProps) {
   // Trạng thái "đang chạy" sống ở AuthoringRunContext, ngoài component này —
   // dùng chung cho cả 3 tab 1a/1b/1c, để tab vừa mở thấy đúng một chuỗi đang
@@ -181,142 +178,149 @@ export function AuthoringModeBar({
 
   const runLabel = isChain ? `Chạy cả bước 3 bằng AI (1a → 1b → 1c)` : `Chạy ${what} bằng AI`;
 
+  const modeHint = !llm.enabled
+    ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
+    : `Áp dụng cho cả 3 tab 1a–1c: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
+  const showRunRow = aiMode && canRun;
+
   return (
-    <div
-      className={embedded ? `${styles.embedded} ${showSwitch ? styles.embeddedOpen : ""}` : showSwitch ? `${glass.card} ${styles.card}` : styles.flat}
-      data-testid="authoring-mode-bar"
-    >
+    <div className={styles.stack} data-testid="authoring-mode-bar">
       {showSwitch && (
-        <div className={styles.text}>
+        <div className={`${glass.card} ${styles.card}`}>
           <div className={glass.cardTitle}>Cách làm bước 3</div>
-          <p className={styles.hint}>
-            {!llm.enabled
-              ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-              : aiMode
-                ? `Áp dụng cho cả 3 tab 1a–1c: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`
-                : "Áp dụng cho cả 3 tab 1a–1c: bạn copy prompt, dán vào ChatGPT/Claude/Gemini rồi dán kết quả về. Đổi sang 'Gọi API' bất cứ lúc nào."}
-          </p>
+          <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />
         </div>
       )}
 
-      <div className={showSwitch ? styles.right : styles.rightFlat}>
-        {showSwitch && (
-          <div className={styles.switchRow}>
-            <button
-              type="button"
-              data-testid="authoring-mode-manual"
-              className={`${styles.switchLabelBtn} ${!aiMode ? styles.switchLabelActive : ""}`}
-              disabled={running}
-              onClick={() => onModeChange("manual")}
-            >
-              {MODE_LABELS.manual}
-            </button>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={aiMode}
-              aria-label="Cách làm bước 3"
-              data-testid="authoring-mode-switch"
-              className={`${styles.switch} ${aiMode ? styles.switchOn : ""}`}
-              disabled={!llm.enabled || running}
-              title={!llm.enabled ? llm.reason || "Chưa cấu hình API key" : undefined}
-              onClick={() => onModeChange(mode === "ai" ? "manual" : "ai")}
-            >
-              <span className={styles.switchKnob} aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              data-testid="authoring-mode-ai"
-              className={`${styles.switchLabelBtn} ${aiMode ? styles.switchLabelActive : ""}`}
-              disabled={!llm.enabled || running}
-              title={!llm.enabled ? llm.reason || "Chưa cấu hình API key" : undefined}
-              onClick={() => {
-                if (llm.enabled) onModeChange("ai");
-              }}
-            >
-              {MODE_LABELS.ai}
-            </button>
-          </div>
-        )}
+      {(showRunRow || running) && (
+        <div className={`${glass.card} ${styles.card}`} data-testid="authoring-run-card">
+          {showRunRow && (
+            <>
+              <div className={styles.run}>
+                <Button
+                  onClick={handleRun}
+                  disabled={running || runDisabled}
+                  data-testid={`run-with-ai-${steps[0]}`}
+                  title={
+                    runningElsewhere
+                      ? "Một chuỗi khác đang chạy — chờ xong đã"
+                      : runDisabled
+                        ? runDisabledReason
+                        : `Gọi trực tiếp ${llm.provider}`
+                  }
+                >
+                  {running ? "AI đang chạy…" : runLabel}
+                </Button>
+                {running && <span className={styles.spinner} role="status" aria-label="AI đang chạy" />}
+                {running && (
+                  <p className={styles.status} data-testid="run-with-ai-running">
+                    {runningElsewhere
+                      ? `Đang chạy ở tab khác: ${
+                          run.currentIndex >= 0 ? STEP_LABELS[run.steps[run.currentIndex]] : "..."
+                        }. Chờ xong rồi mới chạy tiếp được.`
+                      : run.currentIndex >= 0 && isChain
+                        ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút, đừng đóng trang.`
+                        : "Có thể mất vài chục giây, đừng đóng trang."}
+                  </p>
+                )}
+              </div>
+              {!running && <p className={styles.hint}>{modeHint}</p>}
+              {!running && runDisabled && runDisabledReason && (
+                <p className={styles.status}>{runDisabledReason}</p>
+              )}
+              {error && (
+                <p className={styles.error} data-testid="run-with-ai-error">
+                  {error}
+                </p>
+              )}
+              {note && <p className={styles.status}>{note}</p>}
+            </>
+          )}
 
-        {aiMode && canRun && (
-          <div className={styles.run}>
-            <Button
-              onClick={handleRun}
-              disabled={running || runDisabled}
-              data-testid={`run-with-ai-${steps[0]}`}
-              title={
-                runningElsewhere
-                  ? "Một chuỗi khác đang chạy — chờ xong đã"
-                  : runDisabled
-                    ? runDisabledReason
-                    : `Gọi trực tiếp ${llm.provider}`
-              }
-            >
-              {running && <span className={styles.spinner} aria-hidden="true" />}
-              {running ? "AI đang chạy…" : runLabel}
-            </Button>
-            {running && (
-              <p className={styles.status} data-testid="run-with-ai-running">
-                {runningElsewhere
-                  ? `Đang chạy ở tab khác: ${
-                      run.currentIndex >= 0 ? STEP_LABELS[run.steps[run.currentIndex]] : "..."
-                    }. Chờ xong rồi mới chạy tiếp được.`
-                  : run.currentIndex >= 0 && isChain
-                    ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút, đừng đóng trang.`
-                    : "Có thể mất vài chục giây, đừng đóng trang."}
-              </p>
-            )}
-            {!running && runDisabled && runDisabledReason && (
-              <p className={styles.status}>{runDisabledReason}</p>
-            )}
-            {error && (
-              <p className={styles.error} data-testid="run-with-ai-error">
-                {error}
-              </p>
-            )}
-            {note && <p className={styles.status}>{note}</p>}
-          </div>
-        )}
-      </div>
-
-      {/* Chạy cả chuỗi (1a → 1b → 1c) đụng đúng chỗ Creator từng bị lạc: bấm
-          chạy ở 1a rồi lỡ chuyển sang 1b/1c xem tiến độ, màn đó trước đây
-          không biết gì về chuỗi đang chạy. Giờ panel này hiện trên CẢ BA tab
-          bất cứ khi nào một chuỗi nhiều bước đang chạy, nên đứng ở tab nào
-          cũng thấy đủ ba prompt và biết đang chờ đúng bước nào. */}
-      {running && (
-        <div className={styles.runPanel} data-testid="authoring-run-panel">
-          <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
-            <div className={styles.progressBar} />
-          </div>
-          {run.steps.length > 1 && (
-            <ol className={styles.stepper}>
-              {ALL_STEPS.map((step, index) => {
-                const status = index < run.currentIndex ? "done" : index === run.currentIndex ? "running" : "pending";
-                return (
-                  <li
-                    key={step}
-                    className={`${styles.stepItem} ${styles[`stepItem_${status}`]}`}
-                    data-testid={`authoring-run-panel-${step}`}
-                    aria-current={status === "running" ? "step" : undefined}
-                  >
-                    <span className={styles.stepIcon} aria-hidden="true">
-                      {status === "done" ? "✓" : status === "running" ? <span className={styles.spinnerSm} /> : index + 1}
-                    </span>
-                    <span className={styles.stepText}>
-                      <span className={styles.stepName}>{STEP_LABELS[step]}</span>
-                      <span className={styles.stepNote}>
-                        {status === "done" ? "Xong" : status === "running" ? "Đang chạy" : "Chờ"}
-                      </span>
-                    </span>
-                  </li>
-                );
-              })}
-            </ol>
+          {/* Chạy cả chuỗi (1a → 1b → 1c) đụng đúng chỗ Creator từng bị lạc: bấm
+              chạy ở 1a rồi lỡ chuyển sang 1b/1c xem tiến độ. Panel này hiện trên
+              CẢ BA tab bất cứ khi nào một chuỗi đang chạy, nên đứng ở tab nào
+              cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
+          {running && (
+            <div className={styles.runPanel} data-testid="authoring-run-panel">
+              <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
+                <div className={styles.progressBar} />
+              </div>
+              {run.steps.length > 1 && (
+                <ol className={styles.stepper}>
+                  {ALL_STEPS.map((step, index) => {
+                    const status = index < run.currentIndex ? "done" : index === run.currentIndex ? "running" : "pending";
+                    return (
+                      <li
+                        key={step}
+                        className={`${styles.stepItem} ${styles[`stepItem_${status}`]}`}
+                        data-testid={`authoring-run-panel-${step}`}
+                        aria-current={status === "running" ? "step" : undefined}
+                      >
+                        <span className={styles.stepIcon} aria-hidden="true">
+                          {status === "done" ? "✓" : status === "running" ? <span className={styles.spinnerSm} /> : index + 1}
+                        </span>
+                        <span className={styles.stepText}>
+                          <span className={styles.stepName}>{STEP_LABELS[step]}</span>
+                          <span className={styles.stepNote}>
+                            {status === "done" ? "Xong" : status === "running" ? "Đang chạy" : "Chờ"}
+                          </span>
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ol>
+              )}
+            </div>
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+interface AuthoringModeSwitchProps {
+  llm: LlmStatus;
+  mode: AuthoringMode;
+  onModeChange: (mode: AuthoringMode) => void;
+  disabled?: boolean;
+}
+
+/** Hai lựa chọn cách làm dạng thẻ — chỉ để chọn; nút chạy nằm ở thẻ riêng. */
+export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: AuthoringModeSwitchProps) {
+  const aiMode = mode === "ai" && llm.enabled;
+  const aiOff = !llm.enabled;
+  return (
+    <div className={styles.options} data-testid="authoring-mode-switch" role="radiogroup" aria-label="Cách làm bước 3">
+      <button
+        type="button"
+        role="radio"
+        aria-checked={!aiMode}
+        data-testid="authoring-mode-manual"
+        className={`${styles.option} ${!aiMode ? styles.optionOn : ""}`}
+        disabled={disabled}
+        onClick={() => onModeChange("manual")}
+      >
+        <b>{MODE_LABELS.manual}</b>
+        <span>Bạn copy prompt, dán vào ChatGPT/Claude/Gemini rồi dán kết quả về. Đổi sang “Gọi API” bất cứ lúc nào.</span>
+      </button>
+      <button
+        type="button"
+        role="radio"
+        aria-checked={aiMode}
+        data-testid="authoring-mode-ai"
+        className={`${styles.option} ${aiMode ? styles.optionOn : ""}`}
+        disabled={aiOff || disabled}
+        title={aiOff ? llm.reason || "Chưa cấu hình API key" : undefined}
+        onClick={() => onModeChange("ai")}
+      >
+        <b>{MODE_LABELS.ai}</b>
+        <span>
+          {aiOff
+            ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
+            : `Hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo.`}
+        </span>
+      </button>
     </div>
   );
 }

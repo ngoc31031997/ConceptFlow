@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestEstimateNarrationDuration_ScalesWithWordCountAndLanguage(t *testing.T) {
 	// 150 words at 150 wpm (English) is exactly one minute; Vietnamese reads
@@ -61,5 +64,22 @@ func TestSubtitleModeFromLegacy(t *testing.T) {
 	}
 	if got := SubtitleModeFromLegacy(false); got != SubtitleModeOff {
 		t.Fatalf("expected legacy false to map to off, got %q", got)
+	}
+}
+
+func TestSubtitleZoneFollowsBurnInSettings(t *testing.T) {
+	track := &Project{SubtitleMode: SubtitleModeTrack}
+	if got := SubtitleZone(track, "en"); !strings.Contains(got, "NO burned-in subtitles") {
+		t.Fatalf("a caption track paints nothing on the frame, got %q", got)
+	}
+
+	bottom := &Project{SubtitleMode: SubtitleModeBurnIn}
+	if got := SubtitleZone(bottom, "en"); !strings.Contains(got, "from y = 840 to 1080") {
+		t.Fatalf("default burn-in is medium at the bottom, got %q", got)
+	}
+
+	top := &Project{SubtitleMode: SubtitleModeBoth, SubtitleStyle: &SubtitleStyle{FontSize: "large", Position: "top"}}
+	if got := SubtitleZone(top, "vi"); !strings.Contains(got, "MÉP TRÊN") || !strings.Contains(got, "từ 0 đến 280") {
+		t.Fatalf("large top subtitles reserve the top strip, got %q", got)
 	}
 }

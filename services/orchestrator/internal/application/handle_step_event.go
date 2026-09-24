@@ -621,6 +621,15 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 		"render_quality":   string(quality),
 		"engine":           string(engine),
 	}
+	if engine == domain.RenderEngineRemotion {
+		// Only Remotion reads it (conceptflow-mini's useVideoFont); Manim's
+		// fonts come from its theme.
+		font := project.VideoFont
+		if font == "" {
+			font = domain.DefaultVideoFont
+		}
+		payload["video_font"] = font
+	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err
 	}

@@ -61,6 +61,9 @@ class SubtitleStyle:
     text_color: str = "#FFFFFF"
     background_opacity: float = 0.6  # 0.0 = no box behind the text
     position: str = "bottom"  # bottom | top
+    # One of adapters/assembly/subtitle_file.SUBTITLE_FONTS. The default is the
+    # font every subtitle used before this field existed.
+    font_family: str = "DejaVu Sans"
 
 
 @dataclass(frozen=True)

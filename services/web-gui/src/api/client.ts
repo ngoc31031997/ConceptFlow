@@ -351,125 +351,75 @@ export async function completeYoutubeAuthCallback(
   return response.json() as Promise<YoutubeAuthCallbackResult>;
 }
 
-/** CR-025 — one role/language row of the DB-backed prompt-template store. */
-export interface PromptTemplate {
-  role:
-    | "story_architect"
-    | "visual_director"
-    | "manim_engineer"
-    | "remotion_engineer";
-  language: "vi" | "en";
-  template_text: string;
-  version: number;
-  updated_at?: string;
-  /** CR-027 FR84.4 — true khi nội dung trả về là bản tuỳ chỉnh đang bật. */
-  from_override?: boolean;
-}
+export type PromptRole =
+  | "story_architect"
+  | "visual_director"
+  | "manim_engineer"
+  | "remotion_engineer";
 
 /**
- * CR-027 FR84 — bản prompt do Creator tự viết, sống ở bảng riêng
- * `prompt_overrides`, tách hẳn khỏi bản gốc ship trong binary.
+ * CR-031 — một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
+ * một thời điểm chỉ MỘT dòng `is_active` và đó là dòng pipeline chạy.
  *
- * `is_active` tắt thì giữ nguyên nội dung nhưng chạy bản gốc — đây là bản
- * thay thế không phá huỷ cho nút "Khôi phục mặc định" cũ, vốn xoá hẳn bản đã
- * sửa và không lấy lại được.
+ * `is_system` là bản mặc định đi kèm hệ thống: chỉ xem và copy được, không
+ * sửa/xoá. Mọi dòng khác do người dùng tạo. Không có version, không có ngôn
+ * ngữ — ngôn ngữ lời thoại do `{{narration_language_rule}}` quyết định.
  */
-export interface PromptOverride {
-  role: PromptTemplate["role"];
-  language: "vi" | "en";
+export interface Prompt {
+  id: string;
+  role: PromptRole;
+  name: string;
   template_text: string;
+  is_system: boolean;
   is_active: boolean;
-  /** Version của bản gốc mà bản tuỳ chỉnh này được viết dựa trên (0 = không rõ). */
-  based_on_version: number;
+  created_at?: string;
   updated_at?: string;
 }
 
-/** Đọc wording hiện tại của một vai trò (chạy lúc runtime, không hardcode nữa). */
-export function getPromptTemplate(role: PromptTemplate["role"], language: "vi" | "en"): Promise<PromptTemplate> {
-  return apiFetch<PromptTemplate>(`/v1/prompts/${role}?language=${language}`);
+/** Prompt đang chạy của một vai trò (wizard đọc lúc runtime, không hardcode). */
+export function getPromptTemplate(role: PromptRole): Promise<Prompt> {
+  return apiFetch<Prompt>(`/v1/prompts/${role}`);
 }
 
-/** Toàn bộ template (mọi vai trò/ngôn ngữ) — cho màn admin sửa prompt. */
-export async function listPromptTemplates(): Promise<PromptTemplate[]> {
-  const result = await apiFetch<{ templates: PromptTemplate[] }>("/v1/admin/prompts");
-  return result.templates;
+/** Toàn bộ thư viện prompt (mọi vai trò) cho màn cài đặt. */
+export async function listPrompts(): Promise<Prompt[]> {
+  const result = await apiFetch<{ prompts: Prompt[] }>("/v1/admin/prompts");
+  return result.prompts;
 }
 
-/** Lưu nội dung một template mới, tăng version (CR-025). */
-export function updatePromptTemplate(
-  role: PromptTemplate["role"],
-  language: "vi" | "en",
-  templateText: string,
-): Promise<PromptTemplate> {
-  return apiFetch<PromptTemplate>(`/v1/admin/prompts/${role}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language, template_text: templateText }),
-  });
-}
+const JSON_HEADERS = { "Content-Type": "application/json" };
 
-/** CR-027 — mọi bản tuỳ chỉnh của Creator, cho màn admin hai tầng. */
-export async function listPromptOverrides(): Promise<PromptOverride[]> {
-  const result = await apiFetch<{ overrides: PromptOverride[] }>("/v1/admin/prompt-overrides");
-  return result.overrides;
-}
-
-/** Lưu bản tuỳ chỉnh. Sửa nội dung KHÔNG tự bật một bản đang tắt. */
-export function savePromptOverride(
-  role: PromptTemplate["role"],
-  language: "vi" | "en",
-  templateText: string,
-): Promise<PromptOverride> {
-  return apiFetch<PromptOverride>(`/v1/admin/prompt-overrides/${role}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language, template_text: templateText }),
-  });
-}
-
-/**
- * Bật/tắt bản tuỳ chỉnh (FR84.5).
- *
- * Tắt là quay về bản gốc mà KHÔNG mất nội dung đã viết — bật lại là có
- * nguyên. Khác hẳn `resetPromptTemplate` bên dưới, vốn xoá vĩnh viễn.
- */
-export function setPromptOverrideActive(
-  role: PromptTemplate["role"],
-  language: "vi" | "en",
-  active: boolean,
-): Promise<PromptOverride> {
-  return apiFetch<PromptOverride>(`/v1/admin/prompt-overrides/${role}/active`, {
+/** Tạo prompt mới của người dùng (không tự bật). */
+export function createPrompt(role: PromptRole, name: string, templateText: string): Promise<Prompt> {
+  return apiFetch<Prompt>("/v1/admin/prompts", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ language, active }),
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ role, name, template_text: templateText }),
   });
 }
 
-/** Xoá hẳn bản tuỳ chỉnh, trả quyền cho bản gốc. */
-export async function deletePromptOverride(
-  role: PromptTemplate["role"],
-  language: "vi" | "en",
-): Promise<void> {
-  await apiFetch<undefined>(`/v1/admin/prompt-overrides/${role}?language=${language}`, {
-    method: "DELETE",
+/** Copy một dòng (kể cả dòng hệ thống) thành dòng mới của người dùng. */
+export function copyPrompt(id: string): Promise<Prompt> {
+  return apiFetch<Prompt>(`/v1/admin/prompts/${id}/copy`, { method: "POST" });
+}
+
+/** Sửa prompt của người dùng. Dòng hệ thống trả 403. */
+export function updatePrompt(id: string, name: string, templateText: string): Promise<Prompt> {
+  return apiFetch<Prompt>(`/v1/admin/prompts/${id}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, template_text: templateText }),
   });
 }
 
-/**
- * CR-025 legacy — khôi phục prompt mặc định, xoá bản người vận hành đã sửa.
- *
- * Seeding ở Orchestrator là insert-if-absent — nó cố ý KHÔNG đè lên bản sửa
- * tay khi service khởi động lại. Nên khi prompt trong source được cải tiến,
- * đây là đường duy nhất để bản mới vào được một DB đã bootstrap, và nó xảy ra
- * vì người vận hành bấm nút, không phải vì một tiến trình vừa restart.
- */
-export function resetPromptTemplate(
-  role: PromptTemplate["role"],
-  language: "vi" | "en",
-): Promise<PromptTemplate> {
-  return apiFetch<PromptTemplate>(`/v1/admin/prompts/${role}/reset?language=${language}`, {
-    method: "POST",
-  });
+/** Bật một dòng làm prompt chạy của vai trò — dòng đang bật trước đó tự tắt. */
+export function activatePrompt(id: string): Promise<Prompt> {
+  return apiFetch<Prompt>(`/v1/admin/prompts/${id}/activate`, { method: "POST" });
+}
+
+/** Xoá prompt của người dùng. Xoá dòng đang bật thì vai trò quay về bản hệ thống. */
+export async function deletePrompt(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/admin/prompts/${id}`, { method: "DELETE" });
 }
 
 /**
@@ -699,10 +649,11 @@ export async function createProjectDraft(
 export interface WizardSettingsInput {
   voiceLanguage: "vi" | "en";
   renderEngine: "manim" | "remotion";
+  videoFont: string;
   ttsEnabled: boolean;
   voiceId: string | null;
   subtitleMode: string;
-  subtitleStyle?: { font_size: string; text_color: string; background_opacity: number; position: string };
+  subtitleStyle?: { font_family?: string; font_size: string; text_color: string; background_opacity: number; position: string };
   renderQuality: string;
   videoFormatId: string;
   videoOutputMode: string;
@@ -722,6 +673,7 @@ export async function saveWizardSettings(projectId: string, s: WizardSettingsInp
     body: JSON.stringify({
       voice_language: s.voiceLanguage,
       render_engine: s.renderEngine,
+      video_font: s.videoFont,
       tts_enabled: s.ttsEnabled,
       voice_id: s.ttsEnabled ? (s.voiceId ?? undefined) : undefined,
       subtitle_mode: s.subtitleMode,

@@ -1,6 +1,9 @@
 package domain
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // LanguageProfile carries everything that varies per content language
 // (CR-008 FR21.6). Adding a language is a matter of adding a row here plus a
@@ -81,6 +84,10 @@ func countWords(text string) int {
 // (CR-001 FR9.4). It is persisted on Project and passed through to Video
 // Assembly unchanged; the zero value is not meaningful, use DefaultSubtitleStyle.
 type SubtitleStyle struct {
+	// FontFamily is one of SubtitleFontFamilies. Empty on every row saved
+	// before the field existed; Video Assembly treats that as the font it
+	// always used (DejaVu Sans), so old projects render unchanged.
+	FontFamily        string  `json:"font_family,omitempty"`
 	FontSize          string  `json:"font_size"`          // small | medium | large
 	TextColor         string  `json:"text_color"`         // hex, e.g. "#FFFFFF"
 	BackgroundOpacity float64 `json:"background_opacity"` // 0.0 (no box) .. 1.0
@@ -91,11 +98,85 @@ type SubtitleStyle struct {
 // never opened the style panel.
 func DefaultSubtitleStyle() SubtitleStyle {
 	return SubtitleStyle{
+		FontFamily:        "DejaVu Sans",
 		FontSize:          "medium",
 		TextColor:         "#FFFFFF",
 		BackgroundOpacity: 0.6,
 		Position:          "bottom",
 	}
+}
+
+// SubtitleFontFamilies are the fonts the Video Assembly image installs for
+// burn-in (services/video-assembly/Dockerfile). libass silently substitutes a
+// font it cannot find, so offering one that is not installed would render in
+// something else with nothing to say so.
+var SubtitleFontFamilies = []string{"DejaVu Sans", "Be Vietnam Pro", "Montserrat"}
+
+// VideoFontFamilies are the fonts a Creator can pick for text drawn INSIDE a
+// Remotion video (labels, numbers, titles — not the subtitles, which have
+// their own SubtitleStyle.FontFamily). Every one is installed in the
+// rendering image (services/rendering/Dockerfile) and covers Vietnamese
+// diacritics; headless Chrome would otherwise fall back to a generic sans
+// without a word.
+var VideoFontFamilies = []string{"Be Vietnam Pro", "Montserrat", "Cormorant Garamond"}
+
+// DefaultVideoFont is what an empty Project.VideoFont means — the font
+// conceptflow-mini hardcoded before the choice existed.
+const DefaultVideoFont = "Be Vietnam Pro"
+
+// ValidVideoFont reports whether font is "" (use the default) or one of
+// VideoFontFamilies.
+func ValidVideoFont(font string) bool {
+	if font == "" {
+		return true
+	}
+	for _, f := range VideoFontFamilies {
+		if f == font {
+			return true
+		}
+	}
+	return false
+}
+
+// subtitleBandPx is how tall a strip, measured from the frame edge, burned-in
+// subtitles can occupy on a 1920x1080 frame: Video Assembly's vertical margin
+// (60) + two wrapped lines at its font size (subtitle_file.py FONT_SIZES) +
+// the background box's padding.
+var subtitleBandPx = map[string]int{"small": 200, "medium": 240, "large": 280}
+
+// SubtitleZone renders {{subtitle_zone}} for the Remotion Engineer: which band
+// of the frame burned-in subtitles will cover, so the composition keeps its
+// own drawing out of it. Only burn-in paints over the frame; a caption track
+// is drawn by the player, off the video, and needs no room.
+func SubtitleZone(project *Project, language string) string {
+	mode := project.SubtitleMode
+	if !mode.IsValid() {
+		mode = SubtitleModeFromLegacy(project.SubtitlesEnabled)
+	}
+	if mode != SubtitleModeBurnIn && mode != SubtitleModeBoth {
+		if language == "vi" {
+			return "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+		}
+		return "this video has NO burned-in subtitles — the whole safe area is yours."
+	}
+	style := DefaultSubtitleStyle()
+	if project.SubtitleStyle != nil {
+		style = *project.SubtitleStyle
+	}
+	band, ok := subtitleBandPx[style.FontSize]
+	if !ok {
+		band = subtitleBandPx["medium"]
+	}
+	if style.Position == "top" {
+		if language == "vi" {
+			return fmt.Sprintf("phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến %d px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = %d.", band, band+24)
+		}
+		return fmt.Sprintf("subtitles are burned in at the TOP of the frame — the strip from y = 0 to %d px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = %d.", band, band+24)
+	}
+	if language == "vi" {
+		return fmt.Sprintf("phụ đề được in ở MÉP DƯỚI khung — dải y từ %d đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = %d.", 1080-band, 1080-band-24)
+	}
+	return fmt.Sprintf("subtitles are burned in at the BOTTOM of the frame — the strip from y = %d to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = %d.", 1080-band, 1080-band-24)
 }
 
 // SubtitleMode is how subtitle_cues get delivered to the viewer (CR-015,

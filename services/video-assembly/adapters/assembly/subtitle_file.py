@@ -21,6 +21,13 @@ DEFAULT_PLAY_RES_Y = 1080
 
 FONT_SIZES = {"small": 42, "medium": 56, "large": 72}
 
+# Fonts the Dockerfile installs — every one covers Vietnamese diacritics. Must
+# match domain.SubtitleFontFamilies on the orchestrator side. Anything else
+# falls back to DejaVu Sans: libass would otherwise substitute a font of its
+# own choosing without a word.
+SUBTITLE_FONTS = ("DejaVu Sans", "Be Vietnam Pro", "Montserrat")
+DEFAULT_FONT = "DejaVu Sans"
+
 # ASS alignment codes (numpad layout): 2 = bottom-centre, 8 = top-centre.
 ALIGNMENT = {"bottom": 2, "top": 8}
 
@@ -51,6 +58,7 @@ def _render(cues: list[SubtitleCue], style: SubtitleStyle, play_res: tuple[int, 
     # after 1-2 words and covering nearly the whole picture (bug report).
     scale = play_res[0] / DEFAULT_PLAY_RES_X
     font_size = round(FONT_SIZES.get(style.font_size, FONT_SIZES["medium"]) * scale)
+    font_name = style.font_family if style.font_family in SUBTITLE_FONTS else DEFAULT_FONT
     alignment = ALIGNMENT.get(style.position, ALIGNMENT["bottom"])
     primary = _to_ass_colour(style.text_color, opacity=1.0)
     back = _to_ass_colour("#000000", opacity=style.background_opacity)
@@ -67,7 +75,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,DejaVu Sans,{font_size},{primary},&H00000000,{back},0,{border_style},{round(2 * scale)},0,{alignment},{round(80 * scale)},{round(80 * scale)},{round(MARGIN_VERTICAL * scale)},1
+Style: Default,{font_name},{font_size},{primary},&H00000000,{back},0,{border_style},{round(2 * scale)},0,{alignment},{round(80 * scale)},{round(80 * scale)},{round(MARGIN_VERTICAL * scale)},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

@@ -61,27 +61,17 @@ func main() {
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
 		logger.Warn("could not seed video formats", "error", err)
 	}
-	// CR-025/CR-027: the authoring-pipeline prompts, now in two layers.
-	//
-	// Order is load-bearing. MigrateEditsToOverrides reads the text that
-	// seeding is about to replace, so running it second would find the
-	// shipped wording already in place and silently discard whatever the
-	// Creator had written (FR84.8).
+	// CR-031: the prompt library. Order is load-bearing — the legacy override
+	// migration must run before seeding, so a migrated active prompt claims its
+	// role before the seed would otherwise activate the system row.
 	promptTemplateRepo := postgres.NewPromptTemplateRepository(pool)
-	if migrated, err := promptTemplateRepo.MigrateEditsToOverrides(ctx); err != nil {
-		logger.Warn("could not migrate edited prompts to overrides", "error", err)
-	} else if len(migrated) > 0 {
-		for _, m := range migrated {
-			logger.Warn("CR-027: moved an edited prompt into prompt_overrides and switched it on",
-				"role", m.Role, "language", m.Language)
-		}
+	if n, err := promptTemplateRepo.MigrateLegacyPrompts(ctx); err != nil {
+		logger.Warn("could not migrate legacy prompt overrides", "error", err)
+	} else if n > 0 {
+		logger.Warn("CR-031: moved legacy prompt overrides into the prompt library", "count", n)
 	}
-	// Unlike SeedVideoFormats above, this now overwrites: after FR84 nobody
-	// can edit prompt_templates, so there is nothing of the Creator's here to
-	// protect, and overwriting ends the trap where a rebuilt binary left the
-	// running database on the old wording without a word (FR84.2).
-	if err := promptTemplateRepo.SeedPromptTemplates(ctx); err != nil {
-		logger.Warn("could not seed prompt templates", "error", err)
+	if err := promptTemplateRepo.SeedPrompts(ctx); err != nil {
+		logger.Warn("could not seed system prompts", "error", err)
 	}
 	inboxRepo := postgres.NewInboxRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
@@ -160,7 +150,7 @@ func main() {
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
 	// CR-025: prompt-template CRUD (admin editor + web-gui runtime read) and
 	// step 1's story-save endpoint.
-	promptTemplates := application.NewPromptTemplatesUseCase(promptTemplateRepo)
+	prompts := application.NewPromptsUseCase(promptTemplateRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (project
 	// must still be status=draft), and clears the steps built on the one it
 	// overwrote — both live on promptTemplateRepo, right alongside the
@@ -214,8 +204,7 @@ func main() {
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
-		WithPromptTemplates(promptTemplates).
-		WithPromptOverrides(application.NewPromptOverridesUseCase(promptTemplateRepo)).
+		WithPrompts(prompts).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).

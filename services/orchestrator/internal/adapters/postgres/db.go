@@ -115,6 +115,8 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_quality TEXT NOT NULL DEFAU
 -- CR-005: Creator-chosen background music level. 0 means unset, which assembly
 -- reads as the 0.2 the level was fixed at before this was adjustable.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS background_music_volume DOUBLE PRECISION NOT NULL DEFAULT 0;
+-- Font for text drawn inside a Remotion video. '' means DefaultVideoFont.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_font TEXT NOT NULL DEFAULT '';
 -- CR-006: chapter markers from the script. Timestamps are not stored — they are
 -- derived from wait_offsets, so a re-render moves the chapters with the video.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS chapters JSONB;
@@ -259,22 +261,6 @@ CREATE TABLE IF NOT EXISTS outbox_events (
 CREATE TABLE IF NOT EXISTS processed_messages (
     message_id UUID PRIMARY KEY,
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- CR-025: prompt wording for the 4-role authoring pipeline (Story Architect →
--- Visual Director → Manim Engineer; CR-030 bỏ bước Script Reviewer), moved out of
--- web-gui's scriptPrompts.ts so an editor can fix wording without a frontend
--- rebuild. version increments on every update (mirrors video_formats'
--- versioning intent, though templates are edited in place rather than
--- appended as new rows — history is not needed here the way it is for
--- rendered projects).
-CREATE TABLE IF NOT EXISTS prompt_templates (
-    role TEXT NOT NULL,
-    language TEXT NOT NULL,
-    template_text TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 1,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (role, language)
 );
 
 -- CR-025 step 1 (Story Architect): the pasted story outline a Creator gets
@@ -424,37 +410,25 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 -- index matches the only access pattern there is.
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
 
--- CR-027 FR84: the Creator's own wording, kept apart from the shipped
--- wording in prompt_templates.
---
--- Until now one row carried both jobs, and that forced SeedPromptTemplates to
--- be insert-if-absent: overwriting on startup would have wiped an editor's
--- saved text. Its own docstring records that version-aware seeding was tried
--- and removed for exactly that reason. The cost of that compromise was a
--- silent trap — edit the wording in Go, rebuild, restart, and the running
--- database keeps the old text with nothing to say so.
---
--- Splitting the two jobs dissolves the conflict instead of balancing it.
--- prompt_templates becomes read-only to humans and is overwritten from the
--- binary on every start; edits live here and seeding never touches them.
--- Switching is_active off keeps the row but falls back to the shipped
--- wording, which replaces the old reset endpoint: reset destroyed the edit,
--- this does not.
-CREATE TABLE IF NOT EXISTS prompt_overrides (
+-- CR-031: the prompt library. Each pipeline role owns a list of prompts and
+-- exactly one of them is active. A row with is_system ships in the binary
+-- (seeded on every start, read-only); the rest belong to the Creator. This
+-- replaces prompt_templates + prompt_overrides, which are renamed *_legacy by
+-- MigrateLegacyPrompts rather than dropped.
+CREATE TABLE IF NOT EXISTS prompts (
+    id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
     role          TEXT NOT NULL,
-    language      TEXT NOT NULL,
+    name          TEXT NOT NULL,
     template_text TEXT NOT NULL,
+    is_system     BOOLEAN NOT NULL DEFAULT false,
     is_active     BOOLEAN NOT NULL DEFAULT false,
-    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (role, language)
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
--- CR-027 FR84.7: which shipped version this wording was written against.
--- Without a baseline there is no way to notice that the shipped prompt has
--- moved on underneath an active override — the Creator would keep running
--- their own copy, unaware it was forked from a version two improvements ago.
--- Nothing is done automatically; the admin screen just says so.
-ALTER TABLE prompt_overrides ADD COLUMN IF NOT EXISTS based_on_version INTEGER NOT NULL DEFAULT 0;
+-- The database itself refuses a second active row, or a second shipped row,
+-- for one role — application code only has to switch them in the right order.
+CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
+CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

@@ -18,6 +18,7 @@ const BASE_DRAFT: ProjectDraft = {
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
   renderEngine: "manim",
+  videoFont: "Be Vietnam Pro",
   videoFormatId: "visual_first_7min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",

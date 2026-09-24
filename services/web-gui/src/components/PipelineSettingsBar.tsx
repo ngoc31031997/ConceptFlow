@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { RenderEnginePicker } from "./RenderEnginePicker";
-import { AuthoringModeBar } from "./AuthoringModeBar";
+import { AuthoringModeBar, AuthoringModeSwitch } from "./AuthoringModeBar";
 import { useAuthoringRun } from "../context/AuthoringRunContext";
 import type { RenderEngine } from "../context/ProjectDraftContext";
 import type { AuthoringMode, AuthoringStep, LlmStatus } from "../api/client";
@@ -58,6 +58,7 @@ export function PipelineSettingsBar({
   const modeLabel = mode === "ai" && llm?.enabled ? "Gọi API trực tiếp" : "Copy prompt ra ngoài";
 
   return (
+    <div className={styles.stack}>
     <div className={`${glass.card} ${styles.card}`} data-testid="pipeline-settings-bar">
       <div className={styles.summaryRow}>
         <div className={styles.summaryText}>
@@ -82,11 +83,13 @@ export function PipelineSettingsBar({
       {expanded && (
         <div className={styles.expanded}>
           {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} disabled={running} />}
+          {llm && <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />}
         </div>
       )}
 
-      {/* Một instance duy nhất, không mount lại khi thu gọn/mở rộng — nút chạy
-          và lỗi/tiến độ phải còn nguyên; chỉ công tắc chế độ ẩn theo `expanded`. */}
+    </div>
+
+      {/* Thẻ chạy nằm ngoài thẻ chọn: chỉ hiện khi chọn "Gọi API trực tiếp". */}
       <AuthoringModeBar
         llm={llm}
         mode={mode}
@@ -98,8 +101,7 @@ export function PipelineSettingsBar({
         runDisabledReason={runDisabledReason}
         beforeRun={beforeRun}
         onGenerated={onGenerated}
-        showSwitch={expanded}
-        embedded
+        showSwitch={false}
       />
     </div>
   );

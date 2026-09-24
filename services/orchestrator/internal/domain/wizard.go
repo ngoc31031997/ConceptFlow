@@ -33,6 +33,7 @@ type WizardSettings struct {
 	VideoOutputMode       VideoOutputMode
 	BackgroundMusicPath   *string
 	BackgroundMusicVolume float64
+	VideoFont             string
 }
 
 // WizardStepForStatus is the wizard step a saga status belongs to. A draft

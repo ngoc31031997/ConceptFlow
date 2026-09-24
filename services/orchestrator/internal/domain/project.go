@@ -270,6 +270,9 @@ type Project struct {
 	// CR-005 FR14.2 — music level, 0.0-1.0. Zero means "unset"; assembly
 	// substitutes its own default so an old project keeps the previous 0.2.
 	BackgroundMusicVolume float64
+	// Font for text drawn inside a Remotion video. Empty means
+	// DefaultVideoFont. Manim ignores it: its fonts come from the theme.
+	VideoFont string
 
 	// CR-001 — narration and subtitles are independently switchable per project.
 	// When TTSEnabled is false the synthesize_speech step is skipped entirely and

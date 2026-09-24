@@ -42,6 +42,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
        "https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-Bold.ttf" \
     && curl -fsSL -o BeVietnamPro-SemiBold.ttf \
        "https://raw.githubusercontent.com/google/fonts/main/ofl/bevietnampro/BeVietnamPro-SemiBold.ttf" \
+    && curl -fsSL -o Montserrat.ttf \
+       "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf" \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 

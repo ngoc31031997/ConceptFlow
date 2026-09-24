@@ -54,7 +54,7 @@ export function VisualDirectorStepPage() {
 
   useEffect(() => {
     let cancelled = false;
-    getPromptTemplate(directorRole, draft.voiceLanguage)
+    getPromptTemplate(directorRole)
       .then((template) => {
         if (cancelled) return;
         const filled = template.template_text.split("{{previous_output}}").join(
