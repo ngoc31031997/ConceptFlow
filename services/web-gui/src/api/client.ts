@@ -207,6 +207,24 @@ export function getProject(id: string): Promise<Project> {
   return apiFetch<Project>(`/v1/projects/${id}`);
 }
 
+/** One row of the project's project_errors trace. */
+export interface ProjectErrorEntry {
+  at: string;
+  source: string;
+  step?: string;
+  kind?: string;
+  provider?: string;
+  message: string;
+  detail?: string;
+  partial_chars?: number;
+  elapsed_seconds?: number;
+  usage?: { model?: string; prompt_tokens: number; completion_tokens: number; reasoning_tokens: number };
+}
+
+export function listProjectErrors(id: string): Promise<ProjectErrorEntry[]> {
+  return apiFetch<ProjectErrorEntry[]>(`/v1/projects/${id}/errors`);
+}
+
 export function retryProject(id: string): Promise<SagaStartedResponse> {
   return apiFetch<SagaStartedResponse>(`/v1/projects/${id}/retry`, { method: "POST" });
 }

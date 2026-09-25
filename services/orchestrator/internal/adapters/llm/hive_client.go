@@ -115,6 +115,7 @@ type hiveResponse struct {
 	Model   string       `json:"model"`
 	Choices []hiveChoice `json:"choices"`
 	Usage   hiveUsage    `json:"usage"`
+	diag    *streamDiag  // set by readHiveStream only
 }
 
 // Chat runs one completion, retrying only the failures that retrying can fix.
@@ -163,10 +164,58 @@ func backoff(attempt int) time.Duration {
 	return base + time.Duration(rand.Int63n(int64(250*time.Millisecond)))
 }
 
+// hiveDiag accumulates what is known about one call as it progresses, so that
+// whichever way it fails the error carries the API's own account of it — HTTP
+// status, request id, finish_reason, the raw body — not just our summary.
+type hiveDiag struct {
+	started      time.Time
+	model        string
+	maxTokens    int
+	temperature  float64
+	systemChars  int
+	userChars    int
+	status       int
+	requestID    string
+	contentType  string
+	finishReason string
+	body         string // raw error body, or the last stream payload
+	stream       *streamDiag
+}
+
+func (d *hiveDiag) String() string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "request: model=%s max_tokens=%d temperature=%g system_chars=%d user_chars=%d",
+		d.model, d.maxTokens, d.temperature, d.systemChars, d.userChars)
+	fmt.Fprintf(&b, "\nelapsed: %s", time.Since(d.started).Round(time.Millisecond))
+	if d.status != 0 {
+		fmt.Fprintf(&b, "\nresponse: http=%d content_type=%q request_id=%q", d.status, d.contentType, d.requestID)
+	} else {
+		b.WriteString("\nresponse: none (no HTTP response received)")
+	}
+	if d.finishReason != "" {
+		fmt.Fprintf(&b, "\nfinish_reason: %s", d.finishReason)
+	}
+	if st := d.stream; st != nil {
+		fmt.Fprintf(&b, "\nstream: chunks=%d done_marker=%t reasoning_chars=%d content_chars=%d",
+			st.chunks, st.sawDone, st.reasoningChars, st.contentChars)
+		if st.errorPayload != "" {
+			fmt.Fprintf(&b, "\nstream_error: %s", st.errorPayload)
+		}
+	}
+	if d.body != "" {
+		fmt.Fprintf(&b, "\nbody: %s", d.body)
+	}
+	return b.String()
+}
+
 func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) (application.ChatResult, error) {
+	diag := &hiveDiag{
+		started: time.Now(), maxTokens: req.MaxTokens, temperature: req.Temperature,
+		systemChars: len(req.System), userChars: len(req.User),
+	}
 	fail := func(kind application.LLMErrorKind, usage application.TokenUsage, err error) (application.ChatResult, error) {
 		return application.ChatResult{}, &application.LLMError{
-			Kind: kind, Provider: c.Name(), Usage: usage, Err: err,
+			Kind: kind, Provider: c.Name(), Usage: usage, Diag: diag.String(), Err: err,
 		}
 	}
 
@@ -183,6 +232,7 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 	if req.Model != "" {
 		requestModel = req.Model
 	}
+	diag.model = requestModel
 	body, err := json.Marshal(hiveRequest{
 		Model: requestModel, Messages: messages,
 		MaxTokens: req.MaxTokens, Temperature: req.Temperature, Stream: true,
@@ -209,11 +259,18 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 		return fail(kind, application.TokenUsage{}, fmt.Errorf("call hive: %w", err))
 	}
 	defer resp.Body.Close()
+	diag.status = resp.StatusCode
+	diag.contentType = resp.Header.Get("Content-Type")
+	diag.requestID = firstHeader(resp.Header, "X-Request-Id", "X-Request-ID", "Request-Id", "Cf-Ray")
 
 	var parsed hiveResponse
 	if resp.StatusCode == http.StatusOK && strings.Contains(resp.Header.Get("Content-Type"), "text/event-stream") {
 		var serr error
 		parsed, serr = readHiveStream(resp.Body, req.OnProgress)
+		diag.stream = parsed.diag
+		if parsed.diag != nil {
+			diag.body = parsed.diag.lastPayload
+		}
 		if serr != nil {
 			kind := application.ErrKindServer
 			if errors.Is(serr, context.DeadlineExceeded) || errors.Is(serr, context.Canceled) {
@@ -227,6 +284,7 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 			return fail(application.ErrKindServer, application.TokenUsage{}, fmt.Errorf("read response: %w", err))
 		}
 		if resp.StatusCode != http.StatusOK {
+			diag.body = snippetN(raw, 4000)
 			return fail(kindForStatus(resp.StatusCode), application.TokenUsage{},
 				fmt.Errorf("hive returned %d: %s", resp.StatusCode, snippet(raw)))
 		}
@@ -252,10 +310,15 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 		CachedTokens:     parsed.Usage.cached(),
 	}
 
+	if parsed.diag != nil && parsed.diag.errorPayload != "" && parsed.diag.contentChars == 0 {
+		return fail(application.ErrKindServer, usage,
+			fmt.Errorf("hive sent an error inside the stream: %s", parsed.diag.errorPayload))
+	}
 	if len(parsed.Choices) == 0 {
 		return fail(application.ErrKindEmpty, usage, errors.New("no choices in response"))
 	}
 	choice := parsed.Choices[0]
+	diag.finishReason = choice.FinishReason
 	content := strings.TrimSpace(choice.Message.Content)
 
 	// D13 — "empty" and "ran out of room" are different problems with
@@ -270,7 +333,10 @@ func (c *HiveClient) chatOnce(ctx context.Context, req application.ChatRequest) 
 				"the whole token budget went on reasoning before any answer was written (%d reasoning tokens)",
 				usage.ReasoningTokens))
 		}
-		return fail(application.ErrKindTruncated, usage, errors.New("response was cut off at max_tokens"))
+		return application.ChatResult{}, &application.LLMError{
+			Kind: application.ErrKindTruncated, Provider: c.Name(), Usage: usage,
+			Partial: content, Diag: diag.String(), Err: errors.New("response was cut off at max_tokens"),
+		}
 	}
 	if content == "" {
 		return fail(application.ErrKindEmpty, usage, errors.New("model returned empty content"))
@@ -296,13 +362,23 @@ func kindForStatus(status int) application.LLMErrorKind {
 
 // snippet keeps a provider error body short enough to log without dumping an
 // HTML error page into the logs.
-func snippet(body []byte) string {
-	const max = 300
+func snippet(body []byte) string { return snippetN(body, 300) }
+
+func snippetN(body []byte, max int) string {
 	s := strings.TrimSpace(string(body))
 	if len(s) > max {
 		return s[:max] + "…"
 	}
 	return s
+}
+
+func firstHeader(h http.Header, names ...string) string {
+	for _, n := range names {
+		if v := h.Get(n); v != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // streamChunk is one SSE "data:" payload. Reasoning models put their thinking
@@ -318,6 +394,20 @@ type streamChunk struct {
 		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage *hiveUsage `json:"usage"`
+	// Error is set by an API that fails mid-stream: it answers 200 and then
+	// sends {"error": ...} as an ordinary data chunk. Ignoring it turns a
+	// provider fault into a mysterious empty answer.
+	Error json.RawMessage `json:"error"`
+}
+
+// streamDiag is what a stream looked like, for the error log.
+type streamDiag struct {
+	chunks         int
+	sawDone        bool
+	reasoningChars int
+	contentChars   int
+	errorPayload   string
+	lastPayload    string
 }
 
 // readHiveStream folds an SSE reply into the same hiveResponse the
@@ -329,6 +419,8 @@ func readHiveStream(body io.Reader, onProgress func(application.ChatProgress)) (
 		reasoning int
 		finish    string
 	)
+	sd := &streamDiag{}
+	out.diag = sd
 	rd := bufio.NewReaderSize(body, 64*1024)
 	for {
 		line, err := rd.ReadString('\n')
@@ -336,10 +428,22 @@ func readHiveStream(body io.Reader, onProgress func(application.ChatProgress)) (
 		if payload, ok := strings.CutPrefix(line, "data:"); ok {
 			payload = strings.TrimSpace(payload)
 			if payload == "[DONE]" {
+				sd.sawDone = true
 				break
 			}
+			sd.chunks++
+			// Keep the last payload that was not a plain delta: usage chunks and
+			// error chunks are the interesting ones, and deltas are the bulk.
 			var chunk streamChunk
-			if jerr := json.Unmarshal([]byte(payload), &chunk); jerr == nil {
+			if jerr := json.Unmarshal([]byte(payload), &chunk); jerr != nil {
+				sd.lastPayload = snippetN([]byte(payload), 1000)
+			} else {
+				if len(chunk.Error) > 0 && string(chunk.Error) != "null" {
+					sd.errorPayload = snippetN(chunk.Error, 2000)
+					sd.lastPayload = snippetN([]byte(payload), 2000)
+				} else if len(chunk.Choices) == 0 {
+					sd.lastPayload = snippetN([]byte(payload), 1000)
+				}
 				if chunk.Model != "" {
 					out.Model = chunk.Model
 				}
@@ -369,6 +473,7 @@ func readHiveStream(body io.Reader, onProgress func(application.ChatProgress)) (
 			return hiveResponse{}, err
 		}
 	}
+	sd.reasoningChars, sd.contentChars = reasoning, content.Len()
 	out.Choices = []hiveChoice{{
 		Message:      hiveMessage{Role: "assistant", Content: content.String()},
 		FinishReason: finish,

@@ -38,6 +38,8 @@ type GenerateAuthoringUseCase struct {
 	// storyboard/code is not left standing on an outline that never landed.
 	// Optional: nil leaves downstream output alone.
 	clearer AuthoringClearerPort
+	// errorLog receives a row for every failed run; nil disables it.
+	errorLog ProjectErrorLogPort
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
@@ -115,6 +117,13 @@ func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *G
 	return uc
 }
 
+// WithErrorLog makes every failed run leave a row in the project's
+// project_errors column.
+func (uc *GenerateAuthoringUseCase) WithErrorLog(log ProjectErrorLogPort) *GenerateAuthoringUseCase {
+	uc.errorLog = log
+	return uc
+}
+
 // clearDownstream is best-effort: the run's own error is what the Creator
 // needs to see, and a failed cleanup must not replace it.
 func (uc *GenerateAuthoringUseCase) clearDownstream(ctx context.Context, project *domain.Project, step string) {
@@ -175,6 +184,66 @@ func (uc *GenerateAuthoringUseCase) Provider() string {
 func (uc *GenerateAuthoringUseCase) Execute(
 	ctx context.Context, projectID, step string,
 ) (GeneratedStep, error) {
+	started := time.Now()
+	out, info, err := uc.run(ctx, projectID, step)
+	if err != nil {
+		uc.logError(ctx, projectID, step, err, info, started)
+	} else if out.SaveError != "" {
+		uc.logError(ctx, projectID, step, errors.New(out.SaveError), info, started)
+	}
+	return out, err
+}
+
+// runInfo is what run learned that the error log wants but the return value
+// does not carry.
+type runInfo struct {
+	partialChars  int
+	usage         TokenUsage
+}
+
+// logError never fails the run: it is a trace, and losing a trace must not
+// turn one problem into two. WithoutCancel because the usual reason for a
+// failed run is that the caller went away, which cancels ctx too.
+func (uc *GenerateAuthoringUseCase) logError(
+	ctx context.Context, projectID, step string, err error, info runInfo, started time.Time,
+) {
+	if uc.errorLog == nil || projectID == "" {
+		return
+	}
+	// Not failures: a double click, and a deployment with no key.
+	if errors.Is(err, ErrGenerateBusy) || errors.Is(err, ErrLLMNotConfigured) {
+		return
+	}
+	e := ProjectError{
+		At: time.Now().UTC(), Source: "authoring", Step: step,
+		Kind: string(LLMErrorKindOf(err)), Message: err.Error(), Detail: errorDetail(err),
+		PartialChars: info.partialChars,
+		ElapsedSeconds: int(time.Since(started).Seconds()),
+	}
+	var llmErr *LLMError
+	if errors.As(err, &llmErr) {
+		e.Provider = llmErr.Provider
+	}
+	if info.usage.PromptTokens+info.usage.CompletionTokens > 0 {
+		e.Usage = &TokenUsageJSON{
+			Model: info.usage.Model, PromptTokens: info.usage.PromptTokens,
+			CompletionTokens: info.usage.CompletionTokens, ReasoningTokens: info.usage.ReasoningTokens,
+		}
+	}
+	_ = uc.errorLog.AppendProjectError(context.WithoutCancel(ctx), projectID, e)
+}
+
+func (uc *GenerateAuthoringUseCase) run(
+	ctx context.Context, projectID, step string,
+) (GeneratedStep, runInfo, error) {
+	var info runInfo
+	out, err := uc.runInner(ctx, projectID, step, &info)
+	return out, info, err
+}
+
+func (uc *GenerateAuthoringUseCase) runInner(
+	ctx context.Context, projectID, step string, info *runInfo,
+) (GeneratedStep, error) {
 	if projectID == "" {
 		return GeneratedStep{}, fmt.Errorf("project_id is required")
 	}
@@ -227,6 +296,7 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	started := time.Now()
 	uc.beginProgress(projectID, step, started)
 	defer uc.endProgress(projectID, step)
+
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		OnProgress: func(p ChatProgress) { uc.updateProgress(projectID, step, p) },
 		// The rendered template is the whole instruction. It goes in the
@@ -243,9 +313,12 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		uc.provider.Name(), string(role), step, projectID, result.Usage, started, chatErr,
 	))
 	if chatErr != nil {
+		info.usage = billedUsage(chatErr)
+		info.partialChars = len(partialOf(chatErr))
 		uc.clearDownstream(ctx, project, step)
 		return GeneratedStep{}, chatErr
 	}
+	info.usage = result.Usage
 
 	content := strings.TrimSpace(result.Content)
 	if content == "" {
@@ -369,4 +442,15 @@ func (uc *GenerateAuthoringUseCase) Progress(projectID, step string) AuthoringPr
 	out := *st
 	out.ElapsedSeconds = int(time.Since(st.started).Seconds())
 	return out
+}
+
+// errorDetail is the raw error chain plus, when the provider attached one, its
+// diagnostics (HTTP status, request id, finish_reason, response body...) —
+// what a developer needs to see exactly what the API said.
+func errorDetail(err error) string {
+	var llmErr *LLMError
+	if errors.As(err, &llmErr) && llmErr.Diag != "" {
+		return err.Error() + "\n" + llmErr.Diag
+	}
+	return err.Error()
 }
