@@ -97,7 +97,8 @@ func main() {
 	// handle_step_event.go), not by calling video-assembly over HTTP.
 	channelAssetPointers := postgres.NewChannelAssetPointerRepository(pool)
 	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger).
-		WithQCReports(qcReportRepo)
+		WithQCReports(qcReportRepo).
+		WithErrorLog(projectRepo)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	ollamaClient := llm.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
@@ -197,12 +198,13 @@ func main() {
 			promptTemplateRepo,
 			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-		).WithClearer(promptTemplateRepo)
+		).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo)
 	}
 
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
+		WithProjectErrors(projectRepo).
 		WithPrompts(prompts).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).

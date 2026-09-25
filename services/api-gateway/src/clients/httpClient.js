@@ -1,6 +1,15 @@
 'use strict';
 
+const { Agent } = require('undici');
+
 const DEFAULT_TIMEOUT_MS = 30_000;
+
+// Node's built-in fetch gives up after 300s without response headers
+// (UND_ERR_HEADERS_TIMEOUT) no matter what AbortController does. A
+// timeoutMs of 0 promises "wait indefinitely", so that client must switch
+// undici's own timeouts off too — otherwise a long LLM call is reported as
+// 502 while the orchestrator keeps running it and holds its per-step lock.
+const NO_TIMEOUT_DISPATCHER = new Agent({ headersTimeout: 0, bodyTimeout: 0 });
 
 /**
  * Error thrown when the downstream service could not be reached at all
@@ -59,6 +68,7 @@ function createHttpClient(baseUrl, options = {}) {
         signal: controller.signal,
         redirect: 'manual', // forward 3xx verbatim instead of following server-side (Flow 2)
       };
+      if (timeoutMs === 0) fetchOptions.dispatcher = NO_TIMEOUT_DISPATCHER;
       if (body !== undefined && body !== null && method !== 'GET' && method !== 'HEAD') {
         fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
       }
@@ -73,7 +83,11 @@ function createHttpClient(baseUrl, options = {}) {
       };
     } catch (err) {
       if (err.name === 'UpstreamUnavailableError') throw err;
-      throw new UpstreamUnavailableError(`Failed to reach upstream at ${baseUrl}: ${err.message}`, {
+      // fetch reports every network failure as "fetch failed"; the real reason
+      // (timeout, refused, reset) is only on err.cause.
+      const reason = err.cause && (err.cause.code || err.cause.message);
+      const detail = reason ? `${err.message} (${reason})` : err.message;
+      throw new UpstreamUnavailableError(`Failed to reach upstream at ${baseUrl}: ${detail}`, {
         cause: err,
       });
     } finally {

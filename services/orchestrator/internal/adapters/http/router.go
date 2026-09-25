@@ -187,6 +187,7 @@ type Router struct {
 	prompts                 promptsUseCase
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
+	projectErrors           application.ProjectErrorLogPort
 	defaultModel            string
 	saveWizardPosition      saveWizardPositionUseCase
 	saveAuthoringMode       saveAuthoringModeUseCase
@@ -228,6 +229,26 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 func (rt *Router) WithDefaultModel(id string) *Router {
 	rt.defaultModel = id
 	return rt
+}
+
+// WithProjectErrors enables GET /v1/projects/{id}/errors, the read side of the
+// project_errors trace.
+func (rt *Router) WithProjectErrors(log application.ProjectErrorLogPort) *Router {
+	rt.projectErrors = log
+	return rt
+}
+
+func (rt *Router) handleListProjectErrors(w http.ResponseWriter, r *http.Request) {
+	if rt.projectErrors == nil {
+		writeJSON(w, http.StatusOK, []application.ProjectError{})
+		return
+	}
+	errs, err := rt.projectErrors.ListProjectErrors(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "không đọc được nhật ký lỗi")
+		return
+	}
+	writeJSON(w, http.StatusOK, errs)
 }
 
 func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
@@ -361,6 +382,7 @@ func (rt *Router) Handler() http.Handler {
 	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether
 	// that option exists at all before it draws the button.
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
+	r.Get("/v1/projects/{project_id}/errors", rt.handleListProjectErrors)
 	r.Get("/v1/llm/status", rt.handleLLMStatus)
 	// CR-027 FR79 — the step-1 working mode, remembered per project.
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
@@ -1504,7 +1526,7 @@ func writeGenerateError(w http.ResponseWriter, err error) {
 		status = http.StatusGatewayTimeout
 		message = "AI không trả lời trong thời gian cho phép — thử lại, hoặc tăng HIVE_TIMEOUT_SECONDS."
 	case application.ErrKindBudget, application.ErrKindTruncated:
-		message = "Câu trả lời bị cắt vì hết hạn mức token — tăng HIVE_MAX_OUTPUT_TOKENS rồi chạy lại."
+		message = "Câu trả lời bị cắt vì hết hạn mức token — tăng HIVE_MAX_OUTPUT_TOKENS rồi chạy lại. Chi tiết API trả về được lưu ở nhật ký lỗi của project."
 	case application.ErrKindEmpty:
 		message = "AI trả về rỗng — thử chạy lại, hoặc sửa lời prompt ở trang Prompt."
 	case application.ErrKindMalformed:

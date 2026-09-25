@@ -134,6 +134,9 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_mode TEXT NOT NULL DEFAUL
 -- CR-015 FR39.4: mirrors the Publisher's PublishResult.caption_status, so a
 -- silently skipped or failed caption upload is visible on the project.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_status TEXT;
+-- Append-only trace of failures (authoring runs today), newest 100 kept. A log
+-- for humans: nothing reads it to make a decision. See application.ProjectError.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_errors JSONB NOT NULL DEFAULT '[]';
 
 -- CR-023 D7/FR67.1/FR67.2: whether the fixed channel intro/outro is attached
 -- at assemble_video. Default TRUE for both — channel identity is opt-out, so

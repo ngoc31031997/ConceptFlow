@@ -51,6 +51,8 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.patch('/v1/projects/:id/topic', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-028 FR84.3 — read-only history of every authoring field overwrite.
   router.get('/v1/projects/:id/authoring/history', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Append-only trace of failed runs (project_errors column).
+  router.get('/v1/projects/:id/errors', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
   // lúc soạn khớp với giọng Creator thực sự dùng.
   router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));

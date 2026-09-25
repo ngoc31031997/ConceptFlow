@@ -244,7 +244,16 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 		nackWithBackoff(ctx, d)
 		return
 	}
+	c.logSagaFailure(ctx, envelope.ProjectID, stepName, errMsg, "command DLQ, saga_id="+envelope.SagaID)
 	_ = d.Ack(false)
+}
+
+// logSagaFailure records a dead-lettered step in project_errors when the repo
+// supports it (the Postgres one does).
+func (c *Consumer) logSagaFailure(ctx context.Context, projectID string, step domain.StepName, message, detail string) {
+	if log, ok := c.repo.(application.ProjectErrorLogPort); ok {
+		application.LogSagaFailure(ctx, log, projectID, step, message, detail)
+	}
 }
 
 // handleEventsDLQDelivery handles an orchestrator.events message that has
@@ -288,5 +297,6 @@ func (c *Consumer) handleEventsDLQDelivery(ctx context.Context, d amqp.Delivery)
 		nackWithBackoff(ctx, d)
 		return
 	}
+	c.logSagaFailure(ctx, envelope.ProjectID, stepName, errMsg, "events DLQ, saga_id="+envelope.SagaID)
 	_ = d.Ack(false)
 }

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -74,6 +75,9 @@ var failureEvents = map[string]bool{
 // ProgressMessage (Rule 7).
 type HandleStepEventUseCase struct {
 	repo      domain.ProjectRepositoryPort
+	// errorLog receives a project_errors row for every failed saga step; nil
+	// disables it.
+	errorLog ProjectErrorLogPort
 	publisher domain.CommandPublisherPort
 	progress  domain.ProgressPublisherPort
 	// qcReports stores the automated QC report (CR-021 D6). Optional/nil-checked
@@ -98,6 +102,28 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 		logger = slog.Default()
 	}
 	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, channelAssets: channelAssets, logger: logger}
+}
+
+// WithErrorLog makes every failed saga step leave a row in the project's
+// project_errors column.
+func (uc *HandleStepEventUseCase) WithErrorLog(log ProjectErrorLogPort) *HandleStepEventUseCase {
+	uc.errorLog = log
+	return uc
+}
+
+// LogSagaFailure appends one saga-step failure to the project's error log. It
+// never fails the caller: the step is already marked failed by then, and a
+// lost trace must not turn that into a redelivery loop.
+func LogSagaFailure(ctx context.Context, log ProjectErrorLogPort, projectID string, step domain.StepName, message, detail string) {
+	if log == nil || projectID == "" {
+		return
+	}
+	if len(detail) > 4000 {
+		detail = detail[:4000] + "…"
+	}
+	_ = log.AppendProjectError(context.WithoutCancel(ctx), projectID, ProjectError{
+		At: time.Now().UTC(), Source: "saga", Step: string(step), Message: message, Detail: detail,
+	})
 }
 
 // WithQCReports attaches the QC report store (CR-021 D6).
@@ -230,6 +256,11 @@ func (uc *HandleStepEventUseCase) handleFailure(ctx context.Context, event StepE
 	if err := uc.repo.UpdateStep(ctx, step); err != nil {
 		return err
 	}
+	// The whole payload, not just error_message: a worker may send more
+	// (exception type, stderr tail) than the one field the saga keeps.
+	rawPayload, _ := json.Marshal(event.Payload)
+	LogSagaFailure(ctx, uc.errorLog, event.ProjectID, stepName, errMsg,
+		fmt.Sprintf("event_type=%s saga_id=%s payload=%s", event.EventType, event.SagaID, rawPayload))
 	// No compensating rollback (Rule 8) — only the status transition happens here.
 	if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.FailedStatusForStep(stepName)); err != nil {
 		return err
@@ -456,6 +487,7 @@ func (uc *HandleStepEventUseCase) failValidationForBeats(ctx context.Context, ev
 	if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusFailedValidateScript); err != nil {
 		return err
 	}
+	LogSagaFailure(ctx, uc.errorLog, event.ProjectID, domain.StepValidateScript, errMsg, "beat validation")
 	if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
 		ProjectID:    event.ProjectID,
 		Step:         string(domain.StepValidateScript),
@@ -560,6 +592,7 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 		if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusFailedRenderScenes); err != nil {
 			return err
 		}
+		LogSagaFailure(ctx, uc.errorLog, event.ProjectID, domain.StepRenderScenes, errMsg, "aggregation check")
 		if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
 			ProjectID:    event.ProjectID,
 			Step:         string(domain.StepRenderScenes),
@@ -664,6 +697,7 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 		if err := uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusFailedRenderScenes); err != nil {
 			return err
 		}
+		LogSagaFailure(ctx, uc.errorLog, event.ProjectID, domain.StepRenderScenes, errMsg, "aggregation check")
 		if err := uc.progress.PublishProgress(ctx, domain.ProgressMessage{
 			ProjectID:    event.ProjectID,
 			Step:         string(domain.StepRenderScenes),

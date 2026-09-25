@@ -117,7 +117,14 @@ type LLMError struct {
 	// Usage is filled in when the provider billed us despite the failure —
 	// a truncated answer still costs tokens, and llm_usage must record it.
 	Usage TokenUsage
-	Err   error
+	// Partial is the text that did arrive before a ErrKindTruncated cut-off.
+	// Empty for every other kind.
+	Partial string
+	// Diag is the provider's own account of the failed call — HTTP status,
+	// request id, finish_reason, the response body — for the error log. Not
+	// shown to the Creator.
+	Diag string
+	Err  error
 }
 
 func (e *LLMError) Error() string {
@@ -141,6 +148,15 @@ func LLMErrorKindOf(err error) LLMErrorKind {
 	var llmErr *LLMError
 	if errors.As(err, &llmErr) {
 		return llmErr.Kind
+	}
+	return ""
+}
+
+// partialOf returns the text a truncated call managed to write, or "".
+func partialOf(err error) string {
+	var llmErr *LLMError
+	if errors.As(err, &llmErr) {
+		return llmErr.Partial
 	}
 	return ""
 }

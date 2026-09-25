@@ -3,6 +3,7 @@ import { useContext } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { ThemeToggle } from "./ThemeToggle";
+import { ProjectErrorBadge } from "./ProjectErrorBadge";
 import styles from "./AppShell.module.css";
 
 /*
@@ -137,6 +138,9 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
 
           <div className={styles.headerActions}>
             <ThemeToggle />
+            {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
+              <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
+            )}
             {headerAction}
             <Link to="/videos" className={styles.headerLink}>
               Danh sách video
