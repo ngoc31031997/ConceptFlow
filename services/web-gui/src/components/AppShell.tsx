@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useContext } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { ThemeToggle } from "./ThemeToggle";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
@@ -68,6 +68,9 @@ function CheckIcon() {
   );
 }
 
+const navCls = ({ isActive }: { isActive: boolean }) =>
+  [styles.sideLink, isActive ? styles.sideLinkActive : ""].filter(Boolean).join(" ");
+
 export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
   const navigate = useNavigate();
   const draft = useContext(ProjectDraftContext);
@@ -92,21 +95,30 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       <div className={`${styles.blob} ${styles.blob2}`} />
       <div className={`${styles.blob} ${styles.blob3}`} />
 
+      <aside className={styles.sidebar}>
+        <Link to="/" className={styles.logo} style={{ textDecoration: "none" }}>
+          <img
+            className={styles.logoMark}
+            src="/icon-192.png"
+            alt=""
+            width={34}
+            height={34}
+            /* Trang trí thuần tuý: tên kênh đã nằm ngay cạnh ở logoName,
+               nên alt rỗng để trình đọc màn hình không đọc lặp hai lần. */
+          />
+          <div className={styles.logoName}>ConceptFlow</div>
+        </Link>
+
+        <nav className={styles.sideNav}>
+          <NavLink to="/" end className={navCls}>Tạo video mới</NavLink>
+          <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
+          {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}
+          <NavLink to="/settings/prompts" className={navCls}>Cài đặt prompt</NavLink>
+        </nav>
+      </aside>
+
       <div className={styles.content}>
         <div className={styles.topbar}>
-          <Link to="/" className={styles.logo} style={{ textDecoration: "none" }}>
-            <img
-              className={styles.logoMark}
-              src="/icon-192.png"
-              alt=""
-              width={34}
-              height={34}
-              /* Trang trí thuần tuý: tên kênh đã nằm ngay cạnh ở logoName,
-                 nên alt rỗng để trình đọc màn hình không đọc lặp hai lần. */
-            />
-            <div className={styles.logoName}>ConceptFlow</div>
-          </Link>
-
           {currentStep && (
             <div className={styles.stepsPill}>
               {STEP_LABELS.map((label, index) => {
@@ -142,14 +154,6 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
               <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
             )}
             {headerAction}
-            <Link to="/videos" className={styles.headerLink}>
-              Danh sách video
-            </Link>
-            {/* CR-025 — admin entry to edit the authoring pipeline's prompt
-                wording, deliberately outside the Creator's step pill above. */}
-            <Link to="/settings/prompts" className={styles.headerLink}>
-              Cài đặt prompt
-            </Link>
           </div>
         </div>
 
