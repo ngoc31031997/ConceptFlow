@@ -305,14 +305,24 @@ class ConceptFlowScene(MovingCameraScene):
 
     # --- Lời thoại (CR-018) ---------------------------------------------------
 
-    def narrate(self, text: str) -> None:
+    # Ambient drift (CR-042 FR123.3): tắt mặc định. Bật cho cả scene bằng
+    # `ambient_drift = True` hoặc từng câu bằng `narrate(..., drift=True)`.
+    ambient_drift = False
+
+    def narrate(self, text: str, *animations, drift: bool | None = None) -> None:
         """Phát một đoạn lời thoại ngay tại đây.
+
+        Animation truyền kèm chạy TRONG lúc đọc, `run_time` = thời lượng câu
+        (CR-042): `self.narrate("Một nửa khả năng biến mất.", half.animate.fade(0.9))`.
+        Không kèm animation thì khung đứng yên, trừ khi bật `drift`.
 
         Dùng được bên trong vòng lặp, nhánh điều kiện và hàm helper — đó là
         điểm khác biệt với `# NARRATION` + `self.wait(AUTO)` mà nó thay thế, và
         là thứ cho phép hook/CTA trở thành component thật (CR-019).
         """
-        narration_runtime.narrate(self, text)
+        narration_runtime.narrate(
+            self, text, *animations, drift=self.ambient_drift if drift is None else drift
+        )
 
     def beat(self, beat_id: str) -> None:
         """Mở một beat của beat sheet (CR-019). Gắn vào lời thoại kế tiếp."""
@@ -341,8 +351,19 @@ class ConceptFlowScene(MovingCameraScene):
     # thể nằm trong một hàm — đúng lý do CR-006 §Quyết định #2 phải lùi FR17
     # xuống thành snippet Creator tự chép.
 
-    def hook(self, question: str, subtitle: str | None = None) -> None:
-        """Mở đầu: một câu hỏi hoặc nghịch lý, hiện bằng hình rồi mới nói.
+    def hook(self, question: str, *animations) -> None:
+        """Mở đầu bằng hình: frame đầu đã có thứ chuyển động, không phải thẻ tiêu đề.
+
+        Dựng cảnh mở màn (vật, nhân vật) TRƯỚC khi gọi, rồi truyền animation
+        kèm theo để chúng chạy trong lúc câu hỏi được đọc. Muốn thẻ tiêu đề thì
+        gọi `hook_card()` (CR-042 FR124).
+        """
+        self.beat("hook")
+        self.restore_view()
+        self.narrate(question, *[a for a in animations if not isinstance(a, str)])
+
+    def hook_card(self, question: str, subtitle: str | None = None) -> None:
+        """Mở đầu bằng thẻ tiêu đề chứa câu hỏi (hành vi cũ của `hook`).
 
         Nội dung do Creator truyền vào, KHÔNG tự sinh từ tiêu đề video: tiêu đề
         được soạn ở bước publish, sau khi render, nên tại đây nó chưa tồn tại
@@ -355,8 +376,22 @@ class ConceptFlowScene(MovingCameraScene):
         self.narrate(question)
         self.dismiss(card)
 
-    def recap(self, points: list[str], title: str = "Tóm lại", narration: str | None = None) -> None:
-        """Màn tóm tắt: nhắc lại bằng hình, không phải danh sách gạch đầu dòng."""
+    def recap(self, points: list[str] | None = None, title: str = "Tóm lại",
+              narration: str | None = None, *animations) -> None:
+        """Tóm tắt bằng cách quay lại toàn cảnh với nhân vật chính ở trạng thái cuối.
+
+        Không hiện bảng gạch đầu dòng: những gì đang trên màn hình LÀ phần tóm
+        tắt, khung chỉ lùi ra toàn cảnh và đẩy vào chậm trong lúc đọc. `points`
+        chỉ còn để ghép thành lời thoại khi không truyền `narration`; `title`
+        giữ cho tương thích. Muốn bảng thì gọi `recap_card()` (CR-042 FR124.2).
+        """
+        self.beat("recap")
+        self.restore_view()
+        text = narration or ". ".join(points or [])
+        self.narrate(text, *animations, drift=None if animations else True)
+
+    def recap_card(self, points: list[str], title: str = "Tóm lại", narration: str | None = None) -> None:
+        """Màn tóm tắt dạng bảng gạch đầu dòng (hành vi cũ của `recap`)."""
         self.beat("recap")
         self.restore_view()
         panel = Recap(points, title=title, theme=self.theme)

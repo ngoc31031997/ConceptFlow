@@ -116,8 +116,40 @@ def reset() -> None:
     _recorder = _Recorder()
 
 
-def narrate(scene, text: str) -> None:
-    """Phát một đoạn lời thoại tại đúng vị trí này trong dòng chảy của scene."""
+# Lượt dry chưa có audio nên chưa có thời lượng thật (CR-042 FR123.2): animation
+# kèm theo vẫn phải chạy để trạng thái màn hình sau câu thoại giống lượt render,
+# nhưng thời lượng chỉ là ước lượng theo số từ.
+_DRY_SECONDS_PER_WORD = 0.35
+_DRY_MIN_SECONDS = 1.0
+# Ambient drift: đẩy khung vào rất nhẹ, đủ để khung không "chết" mà không đổi
+# bố cục đã dựng (CR-042 FR123.3). Tắt mặc định.
+DRIFT_SCALE = 0.97
+
+
+def _estimate_seconds(text: str) -> float:
+    return max(_DRY_MIN_SECONDS, len(text.split()) * _DRY_SECONDS_PER_WORD)
+
+
+def _play_during(scene, seconds: float, animations: tuple, drift: bool) -> None:
+    """Chạy animation kèm lời thoại sao cho kéo dài đúng `seconds`.
+
+    `run_time` của animation bị ép bằng `seconds`: chuyển động khớp với giọng nói.
+    """
+    if animations:
+        scene.play(*animations, run_time=seconds)
+    elif drift:
+        scene.play(scene.camera.frame.animate.scale(DRIFT_SCALE), run_time=seconds)
+    else:
+        scene.wait(seconds)
+
+
+def narrate(scene, text: str, *animations, drift: bool = False) -> None:
+    """Phát một đoạn lời thoại, cho animation kèm theo chạy TRONG lúc đọc.
+
+    `narrate(text)` một tham số giữ nguyên hành vi cũ (đứng yên đúng thời lượng
+    câu). Có animation thì `run_time` của chúng = thời lượng câu (CR-042 FR123).
+    `drift=True` (chỉ có tác dụng khi không có animation) đẩy camera vào nhẹ.
+    """
     cleaned = text.strip()
     if not cleaned:
         raise NarrationError("narrate() nhận chuỗi rỗng")
@@ -134,6 +166,8 @@ def narrate(scene, text: str) -> None:
             # đọc được lời thoại là duyệt đúng nửa ít quan trọng hơn.
             "visual": _describe_stage(scene),
         })
+        if animations or drift:
+            _play_during(scene, _estimate_seconds(cleaned), animations, drift)
         return
 
     durations = _recorder.durations()
@@ -153,7 +187,7 @@ def narrate(scene, text: str) -> None:
     _recorder.write({"kind": "layout", "index": index, "t": now,
                      "mobjects": _describe_layout(scene),
                      "frame": _describe_frame(scene)})
-    scene.wait(durations[index])
+    _play_during(scene, durations[index], animations, drift)
 
 
 @contextlib.contextmanager
