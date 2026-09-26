@@ -190,7 +190,7 @@ export function ManimEngineerStepPage() {
   return (
     <div data-testid="manim-engineer-step-page">
       <AppShell
-        currentStep={3}
+        currentStep={5}
         title="Bước 3 — Script"
         subtitle={
           hasOwnCode

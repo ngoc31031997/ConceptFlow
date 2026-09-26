@@ -128,7 +128,7 @@ export function VisualDirectorStepPage() {
   return (
     <div data-testid="visual-director-step-page">
       <AppShell
-        currentStep={3}
+        currentStep={4}
         title="Bước 3 — Script"
         subtitle={
           hasOwnStoryboard
