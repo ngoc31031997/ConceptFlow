@@ -98,10 +98,34 @@ def remotion_frame_text(sb: Storyboard) -> dict[str, str]:
     return {"palette": palette, "head": _REMOTION_HEAD.strip()}
 
 
-def merge_remotion(sb: Storyboard, layout: str, shots: dict[str, str]) -> Merged:
+def _layout_number(v: int | float) -> str:
+    return str(int(v)) if float(v).is_integer() else repr(float(v))
+
+
+def layout_from_storyboard(sb: Storyboard) -> str | None:
+    """`const LAYOUT = {...};` built from the storyboard's own `layout`, or None
+    when the storyboard has none (the pipeline then asks a model for it)."""
+    if sb.layout is None:
+        return None
+    rows = [
+        f"  {key}: {{" + ", ".join(f"{f}: {_layout_number(v)}" for f, v in entry.items()) + "},"
+        for key, entry in sb.layout.items()
+    ]
+    return "const LAYOUT = {\n" + "".join(r + "\n" for r in rows) + "};"
+
+
+def remotion_stub(shot_id: str) -> str:
+    """Placeholder for a shot another chunk owns, so one chunk can be
+    type-checked on its own before the rest exist."""
+    return f"function {remotion_fn(shot_id)}({{duration}}: ShotProps) {{\n  return null;\n}}"
+
+
+def merge_remotion(
+    sb: Storyboard, layout: str, shots: dict[str, str], *, stub_missing: bool = False
+) -> Merged:
     ordered = [sh.id for _, sh in sb.all_shots()]
     missing = [i for i in ordered if i not in shots]
-    if missing:
+    if missing and not stub_missing:
         raise ValueError(f"cannot merge: no code for shots {missing}")
 
     layout = layout.strip()
@@ -119,7 +143,7 @@ def merge_remotion(sb: Storyboard, layout: str, shots: dict[str, str]) -> Merged
     text = "\n".join(parts) + "\n"
     line = text.count("\n") + 1
     for sid in ordered:
-        code = shots[sid].strip("\n")
+        code = shots[sid].strip("\n") if sid in shots else remotion_stub(sid)
         n = code.count("\n") + 1
         lines[sid] = (line, line + n - 1)
         text += code + "\n\n"

@@ -59,3 +59,39 @@ def test_prose_uses_the_readable_shot_format_and_roundtrips_through_dumps():
     assert '1.1 | MÁY: trung cảnh | HÌNH: mọc lên | THOẠI: "Câu một."' in prose
     assert prose.startswith("NHÂN VẬT CHÍNH: Hình vuông") and "#F5B841" in prose
     assert sbm.parse(sbm.dumps(sb)) == sb
+
+
+# --- optional layout (visual_director_ai v3) ---------------------------------------
+
+def with_layout(layout):
+    data = json.loads(json.dumps(GOOD))
+    data["layout"] = layout
+    return json.dumps(data)
+
+
+def test_layout_is_optional_and_a_storyboard_without_it_serialises_as_before():
+    sb = sbm.parse(json.dumps(GOOD))
+    assert sb.layout is None and '"layout"' not in sbm.dumps(sb)
+
+
+def test_a_valid_layout_round_trips_and_shows_in_the_prose():
+    sb = sbm.parse(with_layout({"hero": {"x": 960, "y": 480, "size": 320}, "counter": {"x": 1500.5, "y": 300}}))
+    assert sb.layout["counter"]["x"] == 1500.5
+    assert json.loads(sbm.dumps(sb))["layout"]["hero"] == {"x": 960, "y": 480, "size": 320}
+    assert "hero: x=960, y=480, size=320" in sbm.to_prose(sb)
+
+
+def test_layout_problems_are_all_reported():
+    with pytest.raises(sbm.StoryboardError) as exc:
+        sbm.parse(with_layout({
+            "Hero Box": {"x": 1, "y": 2},
+            "noY": {"x": 5},
+            "outside": {"x": 2500, "y": 10},
+            "flag": {"x": 1, "y": 1, "big": True},
+            "text": {"x": "960", "y": 1},
+        }))
+    text = "; ".join(exc.value.problems)
+    for want in ("layout.Hero Box: key must be camelCase", "layout.noY: needs numeric x and y",
+                 "layout.outside: centre (2500, 10) is outside", "layout.flag.big: must be a number",
+                 "layout.text.x: must be a number"):
+        assert want in text

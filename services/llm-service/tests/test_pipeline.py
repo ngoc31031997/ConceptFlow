@@ -191,3 +191,102 @@ async def test_manim_pipeline_uses_cast_and_maps_tracebacks_to_shots():
     assert res.check_ok and res.repair_rounds == 1
     assert res.calls[0].phase == "cast" and res.scene_class_name == "ChuDeScene"
     assert "class ChuDeScene(ConceptFlowScene):" in res.code and "self.narrate('fixed')" in res.code
+
+
+# --- storyboard layout (B) and per-chunk check (C) --------------------------------
+
+def storyboard_with_layout(n_shots: int, layout=None) -> str:
+    data = json.loads(storyboard(n_shots))
+    data["layout"] = layout if layout is not None else {"hero": {"x": 960, "y": 480, "size": 320}}
+    return json.dumps(data)
+
+
+async def test_a_storyboard_layout_replaces_the_layout_call():
+    prov, chk = FakeProvider(), FakeChecker()
+    events = []
+
+    async def emit(ev):
+        events.append(ev)
+
+    res = await pipeline(prov, chk, chunk=10).run(req(storyboard_with_layout(5)), emit)
+    assert res.check_ok
+    assert not any("LAYOUT (bước 1/2" in c.user for c in prov.calls)
+    assert [c.phase for c in res.calls] == ["chunk"]
+    assert "const LAYOUT = {\n  hero: {x: 960, y: 480, size: 320},\n};" in res.code
+    chunk_turn = next(c.user for c in prov.calls if "VIẾT CODE CHO SHOT" in c.user)
+    assert "hero: {x: 960, y: 480, size: 320}" in chunk_turn
+    assert {"type": "phase", "phase": "layout", "source": "storyboard"} in events
+
+
+async def test_manim_still_writes_its_cast_when_the_storyboard_has_a_layout():
+    prov = FakeProvider(engine="manim")
+    res = await pipeline(prov, FakeChecker()).run(req(storyboard_with_layout(2), engine="manim"), emit_none)
+    assert res.check_ok and [c.phase for c in res.calls][0] == "cast"
+
+
+async def test_each_remotion_chunk_is_checked_against_stubs_and_repaired_before_the_merge():
+    prov, chk = FakeProvider(broken={"1.4"}), FakeChecker()
+    events = []
+
+    async def emit(ev):
+        events.append(ev)
+
+    res = await pipeline(prov, chk, chunk=3).run(req(storyboard(7)), emit)
+    assert res.check_ok and res.repair_rounds == 1
+    # 3 chunk checks + the recheck of the repaired chunk + the final full-file check
+    assert len(chk.codes) == 5
+    early = chk.codes[:4]
+    assert all(c.count("function Shot") == 7 for c in early)  # every shot present, as code or stub
+    assert all(c.count("// Shot 1.") < 7 for c in early)  # ...and the ones this chunk does not own are stubs
+    repairs = [c for c in prov.calls if "SỬA LỖI" in c.user]
+    assert len(repairs) == 1 and "trong shot 1.4" in repairs[0].user
+    assert any(ev.get("type") == "chunk_repair" and ev["index"] == 2 and ev["targets"] == ["1.4"] for ev in events)
+    assert not any(ev.get("phase") == "repair" for ev in events)  # nothing was left for the final loop
+    assert "BROKEN" not in res.code
+
+
+async def test_a_chunk_is_repaired_while_a_later_chunk_is_still_being_written():
+    import asyncio
+
+    release = asyncio.Event()
+
+    class SlowSecondChunk(FakeProvider):
+        async def chat(self, req, on_progress=None):
+            if "VIẾT CODE CHO SHOT 1.3 → 1.4" in req.user:
+                await asyncio.wait_for(release.wait(), timeout=5)  # only a repair of chunk 1 releases it
+            if "SỬA LỖI" in req.user:
+                release.set()
+            return await super().chat(req, on_progress)
+
+    prov = SlowSecondChunk(broken={"1.1"})
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard(4)), emit_none)
+    assert res.check_ok and res.repair_rounds == 1
+
+
+async def test_rounds_spent_on_a_chunk_count_against_the_same_cap():
+    prov, chk = FakeProvider(broken={"1.2"}, fail_repair=True), FakeChecker()
+    res = await pipeline(prov, chk, chunk=2, rounds=2).run(req(storyboard(4)), emit_none)
+    assert not res.check_ok and res.repair_rounds == 2
+    assert sum(1 for c in prov.calls if "SỬA LỖI" in c.user) == 2 * 2  # 2 rounds x 2 extraction attempts
+    assert any("still fails" in w for w in res.warnings)
+
+
+async def test_an_unreachable_checker_during_chunks_leaves_the_decision_to_the_final_check():
+    from app.pipeline.checker import CheckerUnavailable
+
+    class FlakyChecker(FakeChecker):
+        async def check(self, engine, code, scene_class_name):
+            if "return null;\n}" in code and code.count("function Shot") != code.count("// Shot"):
+                raise CheckerUnavailable("rendering is restarting")  # only the stubbed per-chunk files
+            return await super().check(engine, code, scene_class_name)
+
+    prov, chk = FakeProvider(broken={"1.3"}), FlakyChecker()
+    res = await pipeline(prov, chk, chunk=2).run(req(storyboard(4)), emit_none)
+    assert res.check_ok and res.repair_rounds == 1
+    assert len(chk.codes) == 2  # only full-file checks reached the checker
+
+
+async def test_one_chunk_is_checked_once():
+    chk = FakeChecker()
+    res = await pipeline(FakeProvider(), chk, chunk=10).run(req(storyboard(4)), emit_none)
+    assert res.check_ok and len(chk.codes) == 1

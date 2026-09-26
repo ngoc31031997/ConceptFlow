@@ -65,3 +65,27 @@ def test_manim_scene_calls_every_shot_in_order_with_beats():
         if sid == merger.CAST_KEY:
             continue
         assert lines[a - 1].startswith(f"    def shot_{sid.replace('.', '_')}(self)")
+
+
+def test_layout_from_storyboard_is_a_plain_ts_declaration():
+    assert merger.layout_from_storyboard(SB) is None
+    sb = sbm.parse(json.dumps({**json.loads(sbm.dumps(SB)), "layout": {
+        "hero": {"x": 960, "y": 480.0, "size": 320}, "dot": {"x": 10.5, "y": 20}}}))
+    assert merger.layout_from_storyboard(sb) == (
+        "const LAYOUT = {\n  hero: {x: 960, y: 480, size: 320},\n  dot: {x: 10.5, y: 20},\n};")
+    assert merger.layout_from_storyboard(sb.model_copy(update={"layout": {}})) == "const LAYOUT = {\n};"
+
+
+def test_remotion_stubs_the_shots_a_chunk_does_not_own():
+    only = {"1.2": TSX["1.2"]}
+    try:
+        merger.merge_remotion(SB, "const LAYOUT = {};", only)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("missing shots must still be refused without stub_missing")
+    m = merger.merge_remotion(SB, "const LAYOUT = {};", only, stub_missing=True)
+    assert "function Shot1_1({duration}: ShotProps) {\n  return null;\n}" in m.code
+    assert "const SHOTS: React.FC<ShotProps>[] = [Shot1_1, Shot1_2, Shot2_1];" in m.code
+    a, b = m.lines["1.2"]
+    assert m.code.splitlines()[a - 1] == "// Shot 1.2"

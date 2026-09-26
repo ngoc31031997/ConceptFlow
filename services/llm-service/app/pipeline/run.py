@@ -3,6 +3,12 @@
 layout/cast -> chunks of N shots in parallel -> deterministic merge ->
 compile check -> repair only the shots that failed -> check again.
 
+Remotion takes two shortcuts off the critical path: a storyboard that already
+carries `layout` skips the LAYOUT call, and each chunk is compiled (against
+stubs for the shots it does not own) and repaired as soon as it is written,
+while the other chunks are still being generated. The full-file check at the
+end stays the gate.
+
 Nothing here pretends: a chunk that cannot be produced fails the run with its
 error; a repair round that changes nothing is counted; a script that still
 fails the check after the last round is returned as check_failed with the
@@ -21,7 +27,13 @@ from dataclasses import dataclass, field
 from app import errors
 from app.errors import LLMError, Usage
 from app.pipeline import extract, merger, prompts
-from app.pipeline.checker import CheckerPort, CheckResult, Diagnostic, shots_from_manim_trace
+from app.pipeline.checker import (
+    CheckerPort,
+    CheckerUnavailable,
+    CheckResult,
+    Diagnostic,
+    shots_from_manim_trace,
+)
 from app.provider import ChatRequest, Provider
 from app.storyboard import Storyboard, StoryboardError
 from app.storyboard import parse as parse_storyboard
@@ -234,14 +246,19 @@ class CodePipeline:
         ordered = [sh.id for _, sh in all_shots]
 
         # 1. shared frame: LAYOUT (Remotion) / cast (Manim)
-        await emit({"type": "phase", "phase": "layout" if remotion else "cast"})
         frame_key = _key(req.engine, "frame", req.system, req.model, req.storyboard)
         used_keys.append(frame_key)
-        if remotion:
-            frame: str = await self._ask(
+        given = merger.layout_from_storyboard(sb) if remotion else None
+        if given is not None:
+            await emit({"type": "phase", "phase": "layout", "source": "storyboard"})
+            frame: str = given
+        elif remotion:
+            await emit({"type": "phase", "phase": "layout"})
+            frame = await self._ask(
                 req, "layout", "LAYOUT", lambda r: prompts.remotion_layout(sb, r),
                 self._parse_layout, calls, frame_key)
         else:
+            await emit({"type": "phase", "phase": "cast"})
             frame = await self._ask(
                 req, "cast", "setup_cast", lambda r: prompts.manim_cast(sb, r),
                 self._parse_cast, calls, frame_key)
@@ -253,6 +270,9 @@ class CodePipeline:
         sem = asyncio.Semaphore(self._concurrency)
         done = 0
         results: dict[int, dict[str, str]] = {}
+        # One chunk's check is the final check when there is only one chunk.
+        early_check = remotion and len(chunks) > 1
+        chunk_rounds = [0] * len(chunks)
 
         async def do_chunk(n: int, ids: list[str]) -> None:
             nonlocal done
@@ -272,8 +292,13 @@ class CodePipeline:
                 results[n] = await self._ask(
                     req, "chunk", f"{ids[0]}-{ids[-1]}", build,
                     lambda text: self._parse_shots(req.engine, ids, text), calls, key)
-                done += 1
-                await emit({"type": "chunk_done", "index": n + 1, "total": len(chunks), "done": done})
+            if early_check:
+                # Outside the semaphore: the check does not hold a generation slot;
+                # its repair calls take one each, like any other call.
+                chunk_rounds[n] = await self._settle_chunk(
+                    req, sb, frame, n, len(chunks), results[n], calls, sem, emit)
+            done += 1
+            await emit({"type": "chunk_done", "index": n + 1, "total": len(chunks), "done": done})
 
         await emit({"type": "phase", "phase": "chunks", "total": len(chunks)})
         tasks = [asyncio.create_task(do_chunk(n, ids)) for n, ids in enumerate(chunks)]
@@ -297,7 +322,9 @@ class CodePipeline:
 
         await emit({"type": "phase", "phase": "merge"})
         merged = merge()
-        rounds = 0
+        # Rounds spent on a chunk before the merge count against the same cap:
+        # the cap bounds how many repair turns a shot can wait for.
+        rounds = max(chunk_rounds, default=0)
         check: CheckResult
         while True:
             await emit({"type": "phase", "phase": "check", "round": rounds})
@@ -324,6 +351,32 @@ class CodePipeline:
         return CodeResult(
             code=merged.code, check_ok=check.ok, diagnostics=check.diagnostics, repair_rounds=rounds,
             calls=calls, warnings=warnings, scene_class_name=merged.scene_class_name)
+
+    async def _settle_chunk(
+        self, req: CodeRequest, sb: Storyboard, frame: str, index: int, total: int,
+        shots: dict[str, str], calls: list[Call], sem: asyncio.Semaphore, emit: Emit,
+    ) -> int:
+        """Compile one Remotion chunk (`shots` holds exactly its shots) against stubs
+        for every other shot and repair its own failing shots, up to the repair cap. Returns the rounds
+        used. What it cannot settle here (an error in LAYOUT or outside the chunk,
+        the checker being unreachable) is left to the full-file check."""
+        rounds = 0
+        while True:
+            merged = merger.merge_remotion(sb, frame, shots, stub_missing=True)
+            try:
+                check = await self._checker.check("remotion", merged.code, merged.scene_class_name)
+            except CheckerUnavailable:
+                return rounds
+            if check.ok:
+                return rounds
+            targets, _ = _map_failures("remotion", merged, check)
+            mine = {k: v for k, v in targets.items() if k in shots}
+            if not mine or rounds >= self._repair_rounds:
+                return rounds
+            rounds += 1
+            await emit({"type": "chunk_repair", "index": index + 1, "total": total, "round": rounds,
+                        "max": self._repair_rounds, "targets": sorted(mine)})
+            await self._repair(req, sb, True, frame, shots, mine, check, calls, sem)
 
     async def _repair(
         self, req: CodeRequest, sb: Storyboard, remotion: bool, frame: str, shots: dict[str, str],
