@@ -234,7 +234,7 @@ export function ScriptOutlineStepPage() {
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            steps={["story", "storyboard", "code"]}
+            steps={["story"]}
             what="dàn ý"
             runDisabled={topicIsEmpty}
             runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."

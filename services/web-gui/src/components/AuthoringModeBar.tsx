@@ -314,7 +314,7 @@ export function AuthoringModeBar({
 
   const modeHint = !llm.enabled
     ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-    : `Áp dụng cho các bước Kịch bản, Visual, Code: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
+    : `Áp dụng cho cả bước 3 (Kịch bản, Visual, Code), mỗi bước chạy riêng: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
   const showRunRow = aiMode && canRun;
 
   return (

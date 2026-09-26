@@ -266,7 +266,7 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
       await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-      expect(start.mock.calls[0][1]).toEqual(["story", "storyboard", "code"]);
+      expect(start.mock.calls[0][1]).toEqual(["story"]);
       await waitFor(() =>
         expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?"),
       );
@@ -299,12 +299,10 @@ describe("ScriptOutlineStepPage", () => {
       expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument();
     });
 
-    // Một bước hỏng giữa chừng không được xoá mất những bước đã xong: Creator
-    // sửa tay rồi chạy lại đúng bước đó ở tab của nó.
-    it("dừng chuỗi ở bước hỏng, giữ nguyên kết quả bước trước", async () => {
+    it("báo lỗi khi bước chạy hỏng, giữ nguyên nội dung ô soạn thảo", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      mockServerChain({ error: "Tài khoản Hive hết số dư.", error_step: "storyboard" });
+      mockServerChain({ error: "Tài khoản Hive hết số dư.", error_step: "story" });
       // Sau mỗi lượt chạy, bản nháp đọc lại ba kết quả từ server — mô phỏng
       // server đã lưu dàn ý của bước 1a.
       vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
@@ -321,7 +319,7 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
       await waitFor(() => expect(screen.getByTestId("run-with-ai-error")).toBeInTheDocument());
-      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Visual");
+      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("hết số dư");
       // Bước 1a đã xong vẫn còn nguyên trong ô soạn thảo.
       expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?");
     });

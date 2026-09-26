@@ -46,7 +46,7 @@
 
 .topbar {
   box-sizing: border-box;
-  width: min(98vw, 1680px);
+  width: min(100%, 1680px);
   margin: 0 auto;
   display: flex;
   align-items: center;
@@ -218,7 +218,7 @@
 
 .mainCol {
   box-sizing: border-box;
-  width: min(96vw, 860px);
+  width: min(100%, 860px);
   margin: 0 auto;
   padding: 24px 16px 24px;
   display: flex;
@@ -227,7 +227,7 @@
 }
 
 .mainColWide {
-  width: min(98vw, 1680px);
+  width: min(100%, 1680px);
 }
 
 .heading h1 {
