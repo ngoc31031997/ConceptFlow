@@ -7,7 +7,7 @@ import { useStepNav } from "../hooks/useStepNav";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
 import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
-import { FLOW_LABELS, readOnlyReason } from "../utils/flow";
+import { readOnlyReason } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
 import { AccentPicker } from "./AccentPicker";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
@@ -28,14 +28,6 @@ interface AppShellProps {
   /** Page-specific action rendered at the right of the top bar. */
   headerAction?: ReactNode;
   children: ReactNode;
-}
-
-function CheckIcon() {
-  return (
-    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 13l4 4L19 7" />
-    </svg>
-  );
 }
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
@@ -114,47 +106,6 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           .join(" ")}
       >
         <div className={styles.topbar}>
-          {currentStep && (
-            <div className={`${styles.stepsPill} ${showRail ? styles.stepsPillDup : ""}`}>
-              {FLOW_LABELS.map((label, index) => {
-                const stepNumber = index + 1;
-                const isActive = stepNumber === currentStep;
-                const status = nav.status(stepNumber);
-                const isClickable = nav.isClickable(stepNumber);
-                const className = [
-                  styles.stepItem,
-                  isActive ? styles.active : "",
-                  status === "done" && !isActive ? styles.done : "",
-                  status === "running" ? styles.running : "",
-                  status === "failed" ? styles.failed : "",
-                  status === "cancelled" ? styles.cancelled : "",
-                  status === "skipped" ? styles.skipped : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ");
-                return (
-                  <button
-                    key={label}
-                    type="button"
-                    className={className}
-                    onClick={() => nav.go(stepNumber)}
-                    disabled={!isClickable}
-                    aria-current={isActive ? "step" : undefined}
-                    title={isClickable ? `Xem lại: ${label}` : undefined}
-                    data-testid={`flow-step-${stepNumber}`}
-                    data-status={status}
-                    style={{ cursor: isClickable ? "pointer" : "default" }}
-                  >
-                    <span className={styles.stepNum}>
-                      {status === "done" && !isActive ? <CheckIcon /> : status === "running" ? <span className={styles.runDot} /> : stepNumber}
-                    </span>
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
           <div className={styles.headerActions}>
             <AccentPicker />
             <ThemeToggle />

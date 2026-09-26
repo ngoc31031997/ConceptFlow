@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 type Theme = "light" | "dark";
-export const ACCENTS = ["mustard", "coral", "mint", "sky", "lilac"] as const;
+export const ACCENTS = [
+  "mustard", "orange", "coral", "rose", "lilac", "indigo", "sky", "teal", "mint", "lime",
+] as const;
 export type Accent = (typeof ACCENTS)[number];
 const ACCENT_KEY = "conceptflow-accent";
 

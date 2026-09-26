@@ -487,7 +487,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     const story = await screen.findByTestId("last-run-story");
     expect(story).toHaveTextContent("Kịch bản");
     expect(story).toHaveTextContent("1m 12s");
-    expect(story).toHaveTextContent("10.2k ký tự");
+    expect(story).toHaveTextContent("10,2k ký tự");
     expect(story).toHaveTextContent("4.000 token");
     expect(screen.getByTestId("last-run-storyboard")).toHaveAttribute("data-state", "failed");
     expect(screen.queryByTestId("last-run-code")).not.toBeInTheDocument();

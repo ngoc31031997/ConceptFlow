@@ -49,16 +49,14 @@ describe("StepRail — second-layer vertical menu", () => {
     expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "skipped");
   });
 
-  it("agrees with the horizontal bar about who can be opened", async () => {
+  it("lets the Creator open only the steps the project has reached", async () => {
     renderRail(rendering);
     await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
     for (const step of [2, 8, 9]) {
       expect(screen.getByTestId(`rail-step-${step}`)).not.toBeDisabled();
-      expect(screen.getByTestId(`flow-step-${step}`)).not.toBeDisabled();
     }
     for (const step of [10, 13]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
-      expect(screen.getByTestId(`flow-step-${step}`)).toBeDisabled();
     }
   });
 
@@ -79,7 +77,9 @@ describe("StepRail — second-layer vertical menu", () => {
 
   it("is absent before the server knows the project (a brand-new idea)", async () => {
     renderRail(null, 1);
-    await waitFor(() => expect(screen.getByTestId("flow-step-1")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("T")).toBeInTheDocument());
     expect(screen.queryByTestId("step-rail")).not.toBeInTheDocument();
+    // The old horizontal step bar is gone for good.
+    expect(screen.queryByTestId("flow-step-1")).not.toBeInTheDocument();
   });
 });

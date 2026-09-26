@@ -221,10 +221,16 @@
   }
 }
 
-/* Điện thoại: menu chính đã đổi thành thanh ngang, không còn chỗ cho tầng
-   thứ hai — thanh bước ngang phía trên nội dung thay vai trò của nó. */
+/* Điện thoại: sidebar chính thành thanh ngang, rail bước xếp thành khối tĩnh
+   ngay dưới nó (cuộn được) để vẫn còn đường chuyển bước. */
 @media (max-width: 640px) {
-  .rail {
-    display: none;
+  .rail,
+  .railCollapsed {
+    position: static;
+    width: auto;
+    max-height: 40vh;
+    border-right: 0;
+    border-bottom: var(--border-w) solid var(--border-color);
+    box-shadow: none;
   }
 }
