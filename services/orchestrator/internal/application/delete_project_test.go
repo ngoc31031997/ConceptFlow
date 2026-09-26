@@ -50,3 +50,27 @@ func TestDeleteProject_BusyProjectSendsNothing(t *testing.T) {
 		t.Fatal("no command may be sent for a busy project")
 	}
 }
+
+func TestDeleteProject_ProgressCountsConfirmedOwners(t *testing.T) {
+	repo := newFakeRepo()
+	repo.projects["p1"] = &domain.Project{ProjectID: "p1", SagaID: "s1"}
+	uc := NewDeleteProjectUseCase(fakeDeleteStore{sagaID: "s1"}, repo, &fakePublisher{})
+	ctx := context.Background()
+
+	_ = repo.UpdateStep(ctx, &domain.SagaStep{SagaID: "s1", StepName: domain.PurgeTargets[0].Step, Status: domain.SagaStepCompleted})
+	_ = repo.UpdateStep(ctx, &domain.SagaStep{SagaID: "s1", StepName: domain.PurgeTargets[1].Step, Status: domain.SagaStepInProgress})
+
+	p, err := uc.Progress(ctx, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Done != 1 || p.Total != len(domain.PurgeTargets) || p.Gone || p.Failed != "" {
+		t.Fatalf("unexpected progress %+v", p)
+	}
+
+	delete(repo.projects, "p1")
+	p, err = uc.Progress(ctx, "p1")
+	if err != nil || !p.Gone || p.Done != p.Total {
+		t.Fatalf("a removed project means the saga finished, got %+v err=%v", p, err)
+	}
+}

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
+import { DeleteProgressCard } from "../components/DeleteProgressCard";
 import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
 import type { ProjectSummary } from "../types";
@@ -117,19 +118,28 @@ export function VideoListPage() {
     setError(null); // Clear previous errors
     setDeletingId(projectId);
     try {
+      // 202: the delete saga runs on; the row goes when DeleteProgressCard
+      // reports every service has cleaned up (FR116.2).
       await deleteProject(projectId);
-      setProjects((current) => current?.filter((p) => p.project_id !== projectId) ?? null);
-      setSelected((current) => {
-        const next = new Set(current);
-        next.delete(projectId);
-        return next;
-      });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
-    } finally {
       setDeletingId(null);
     }
   }
+
+  const handleDeleteDone = useCallback(() => {
+    setDeletingId((id) => {
+      if (id) {
+        setProjects((current) => current?.filter((p) => p.project_id !== id) ?? null);
+        setSelected((current) => {
+          const next = new Set(current);
+          next.delete(id);
+          return next;
+        });
+      }
+      return null;
+    });
+  }, []);
 
   async function handleBulkDelete() {
     const ids = Array.from(selected);
@@ -298,6 +308,11 @@ export function VideoListPage() {
                       {deletingId === project.project_id ? "Đang xoá..." : "Xoá"}
                     </button>
                   </div>
+                  {deletingId === project.project_id && (
+                    <div style={{ gridColumn: "1 / -1", width: "100%" }}>
+                      <DeleteProgressCard projectId={project.project_id} onDone={handleDeleteDone} />
+                    </div>
+                  )}
                 </div>
               ))}
             </Card>

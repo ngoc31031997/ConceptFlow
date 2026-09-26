@@ -16,7 +16,7 @@ function corsMiddleware(allowedOrigin) {
   return (req, res, next) => {
     res.set('Access-Control-Allow-Origin', allowedOrigin);
     res.set('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
-    res.set('Access-Control-Allow-Headers', 'Content-Type,X-Request-ID');
+    res.set('Access-Control-Allow-Headers', 'Content-Type,X-Request-ID,X-Operation-ID');
     if (req.method === 'OPTIONS') {
       res.status(204).end();
       return;

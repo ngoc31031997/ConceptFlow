@@ -305,6 +305,36 @@ func (c *Client) Chat(ctx context.Context, req application.ChatRequest) (applica
 
 // --- MetadataSuggesterPort / ShortScriptSuggesterPort ------------------------
 
+// suggestCall posts a suggestion request. When ctx carries a progress callback
+// (CR-040 FR116) it asks llm-service to stream and forwards the reply's size as
+// it grows; otherwise it is the plain one-shot call.
+func (c *Client) suggestCall(ctx context.Context, path string, body map[string]any, out any) error {
+	report := application.ProgressFrom(ctx)
+	if report == nil {
+		return c.post(ctx, path, body, out)
+	}
+	body["stream"] = true
+	raw, err := c.stream(ctx, path, body, func(kind string, ev json.RawMessage) {
+		if kind != "progress" {
+			return
+		}
+		var p struct {
+			ReasoningChars int `json:"reasoning_chars"`
+			ContentChars   int `json:"content_chars"`
+		}
+		if json.Unmarshal(ev, &p) == nil {
+			report(application.ChatProgress{ReasoningChars: p.ReasoningChars, ContentChars: p.ContentChars})
+		}
+	})
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(raw, out); err != nil {
+		return &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service", Err: fmt.Errorf("decode response: %w", err)}
+	}
+	return nil
+}
+
 func (c *Client) Suggest(
 	ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage,
 ) (string, string, []string, error) {
@@ -313,7 +343,7 @@ func (c *Client) Suggest(
 		Description string   `json:"description"`
 		Tags        []string `json:"tags"`
 	}
-	err := c.post(ctx, "/v1/suggest-metadata", map[string]any{
+	err := c.suggestCall(ctx, "/v1/suggest-metadata", map[string]any{
 		"script_content": scriptContent, "category_hint": categoryHint, "language": string(language),
 	}, &out)
 	if err != nil {
@@ -331,7 +361,7 @@ func (c *Client) SuggestShortScript(
 	var out struct {
 		Script string `json:"script"`
 	}
-	err := c.post(ctx, "/v1/suggest-short-script", map[string]any{
+	err := c.suggestCall(ctx, "/v1/suggest-short-script", map[string]any{
 		"topic": topic, "source_script_content": sourceScriptContent, "language": string(language),
 	}, &out)
 	if err != nil {

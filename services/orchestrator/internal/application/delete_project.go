@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"orchestrator/internal/domain"
@@ -54,4 +55,46 @@ func (uc *DeleteProjectUseCase) Execute(ctx context.Context, projectID string) e
 		}
 	}
 	return nil
+}
+
+// DeleteProgress is how far the delete saga has got (CR-040 FR116.2): how many
+// of the purge owners have confirmed. Gone means the project row is already
+// removed, i.e. the saga finished.
+type DeleteProgress struct {
+	Done   int
+	Total  int
+	Gone   bool
+	Failed string
+}
+
+// Progress reads the delete saga's state for the GUI's progress card.
+func (uc *DeleteProjectUseCase) Progress(ctx context.Context, projectID string) (DeleteProgress, error) {
+	out := DeleteProgress{Total: len(domain.PurgeTargets)}
+	project, err := uc.repo.Get(ctx, projectID)
+	if errors.Is(err, domain.ErrProjectNotFound) {
+		out.Done, out.Gone = out.Total, true
+		return out, nil
+	}
+	if err != nil {
+		return out, err
+	}
+	for _, t := range domain.PurgeTargets {
+		step, err := uc.repo.GetStep(ctx, project.SagaID, t.Step)
+		if errors.Is(err, domain.ErrSagaStepNotFound) {
+			continue
+		}
+		if err != nil {
+			return out, err
+		}
+		switch step.Status {
+		case domain.SagaStepCompleted:
+			out.Done++
+		case domain.SagaStepFailed:
+			out.Failed = t.Service
+			if step.ErrorMessage != nil {
+				out.Failed += ": " + *step.ErrorMessage
+			}
+		}
+	}
+	return out, nil
 }

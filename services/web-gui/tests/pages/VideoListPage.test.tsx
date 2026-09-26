@@ -10,9 +10,17 @@ describe("VideoListPage", () => {
   });
 
   it("lists both successful and failed videos, and deletes one on confirm", async () => {
-    global.fetch = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
       if (init?.method === "DELETE") {
         return Promise.resolve({ ok: true, status: 204 });
+      }
+      // FR116.2: the row goes once the delete saga reports it has finished.
+      if (String(url).includes("/v1/operations/delete:p1")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ kind: "delete_project", phase: "purge", done: 3, total: 3, status: "succeeded" }),
+        });
       }
       return Promise.resolve({
         ok: true,
@@ -47,6 +55,40 @@ describe("VideoListPage", () => {
       expect.stringContaining("/v1/projects/p1"),
       expect.objectContaining({ method: "DELETE" }),
     );
+  });
+
+  it("keeps the row with a k/N progress card while the delete saga runs", async () => {
+    global.fetch = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (init?.method === "DELETE") return Promise.resolve({ ok: true, status: 202 });
+      if (String(url).includes("/v1/operations/delete:p1")) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ kind: "delete_project", phase: "purge", done: 1, total: 3, status: "running" }),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ projects: [{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }] }),
+      });
+    }) as unknown as typeof fetch;
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <VideoListPage />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("delete-button-p1"));
+
+    await waitFor(() => expect(screen.getByText("1/3 service đã dọn xong")).toBeInTheDocument());
+    expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
   });
 
   it("does not delete when the user cancels the confirmation", async () => {

@@ -44,12 +44,14 @@ class MetadataBody(BaseModel):
     script_content: str
     category_hint: str = ""
     language: str = "en"
+    stream: bool = False  # CR-040 FR116: emit `progress` events like /v1/chat
 
 
 class ShortScriptBody(BaseModel):
     topic: str = ""
     source_script_content: str = ""
     language: str = "en"
+    stream: bool = False
 
 
 class StoryboardBody(BaseModel):
@@ -119,6 +121,24 @@ def _stream(work: Callable[[Callable[[dict], Awaitable[None]]], Awaitable[dict]]
     return StreamingResponse(body(), media_type="application/x-ndjson")
 
 
+async def _suggestion(stream: bool, run):
+    """One-shot JSON by default; with `stream` the same work is streamed as
+    `progress` events plus the final result, so the GUI can show a live card."""
+    if not stream:
+        try:
+            return await run()
+        except LLMError as err:
+            return _error_response(err)
+
+    async def work(emit):
+        async def progress(reasoning: int, content: int) -> None:
+            await emit({"type": "progress", "reasoning_chars": reasoning, "content_chars": content})
+
+        return await run(progress)
+
+    return _stream(work)
+
+
 def create_app(
     config: Config | None = None, providers: Providers | None = None, checker: CheckerPort | None = None
 ) -> FastAPI:
@@ -158,20 +178,21 @@ def create_app(
 
     @app.post("/v1/suggest-metadata")
     async def suggest_metadata(body: MetadataBody):
-        try:
-            out = await tasks.suggest_metadata(providers.light, body.script_content, body.category_hint, body.language)
-        except LLMError as err:
-            return _error_response(err)
-        return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
+        async def run(on_progress=None):
+            out = await tasks.suggest_metadata(
+                providers.light, body.script_content, body.category_hint, body.language, on_progress)
+            return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
+
+        return await _suggestion(body.stream, run)
 
     @app.post("/v1/suggest-short-script")
     async def suggest_short_script(body: ShortScriptBody):
-        try:
+        async def run(on_progress=None):
             out = await tasks.suggest_short_script(
-                providers.light, body.topic, body.source_script_content, body.language)
-        except LLMError as err:
-            return _error_response(err)
-        return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
+                providers.light, body.topic, body.source_script_content, body.language, on_progress)
+            return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
+
+        return await _suggestion(body.stream, run)
 
     @app.post("/v1/storyboard/finalize")
     async def storyboard_finalize(body: StoryboardBody):

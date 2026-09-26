@@ -39,6 +39,8 @@ describe('routing between orchestrator and authoring-service', () => {
     ['get', '/v1/prompts/story_architect', 'authoring'],
     ['get', '/v1/admin/prompts', 'authoring'],
     ['get', '/v1/llm/status', 'authoring'],
+    ['get', '/v1/operations/op-1', 'authoring'],
+    ['get', '/v1/operations/delete:p1', 'orchestrator'],
     ['get', '/v1/projects/p1', 'orchestrator'],
     ['post', '/v1/projects', 'orchestrator'],
     ['put', '/v1/projects/p1/settings', 'orchestrator'],

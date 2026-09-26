@@ -23,9 +23,16 @@ function mockFetch(overrides: {
   onDelete?: () => { ok: boolean; status: number };
   project?: Record<string, unknown>;
 } = {}) {
-  return vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+  return vi.fn().mockImplementation((url: string, init?: RequestInit) => {
     if (init?.method === "DELETE") {
       return Promise.resolve(overrides.onDelete ? overrides.onDelete() : { ok: true, status: 204 });
+    }
+    if (String(url).includes("/v1/operations/delete:")) {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ kind: "delete_project", phase: "purge", done: 3, total: 3, status: "succeeded" }),
+      });
     }
     return Promise.resolve({
       ok: true,

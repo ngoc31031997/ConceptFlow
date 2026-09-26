@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { AppShell } from "../components/AppShell";
@@ -10,6 +10,7 @@ import { ProjectInputPanel } from "../components/ProjectInputPanel";
 import { ClipsPanel } from "../components/ClipsPanel";
 import { ShortScriptAssistant } from "../components/ShortScriptAssistant";
 import { CompanionProjectCard } from "../components/CompanionProjectCard";
+import { DeleteProgressCard } from "../components/DeleteProgressCard";
 import { Disclosure } from "../components/Disclosure";
 import { startRenderSaga, deleteProject, getProjectVideoUrl, ApiError } from "../api/client";
 import type { RenderQuality, VideoOutputMode } from "../context/ProjectDraftContext";
@@ -88,13 +89,16 @@ export function ResultPage() {
     setError(null);
     setIsDeleting(true);
     try {
+      // 202: stay on the page with the progress card until the saga finishes
+      // (FR116.2); DeleteProgressCard's onDone navigates away.
       await deleteProject(projectId);
-      navigate("/videos");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
       setIsDeleting(false);
     }
   }
+
+  const handleDeleteDone = useCallback(() => navigate("/videos"), [navigate]);
 
   if (!project) return null;
 
@@ -248,6 +252,11 @@ export function ResultPage() {
           >
             {isDeleting ? "Đang xoá..." : "Xoá video"}
           </Button>
+          {isDeleting && (
+            <div style={{ flexBasis: "100%" }}>
+              <DeleteProgressCard projectId={projectId} onDone={handleDeleteDone} />
+            </div>
+          )}
         </div>
       </AppShell>
 

@@ -91,6 +91,7 @@ func main() {
 
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithShortScriptSuggester(suggestShortScript).
+		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).

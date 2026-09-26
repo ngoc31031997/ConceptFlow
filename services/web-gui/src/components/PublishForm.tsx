@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { suggestPublishMetadata, ApiError } from "../api/client";
+import { useOperationRun } from "../hooks/useOperationRun";
+import { AiOperationCard } from "./AiOperationCard";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishForm.module.css";
@@ -60,11 +62,14 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
     if (suggestError) setSuggestError(null);
   };
 
+  const suggestRun = useOperationRun();
+
   async function handleSuggestAI() {
     setSuggestError(null); // Clear previous error
     setIsSuggesting(true);
     try {
-      const suggestion = await suggestPublishMetadata(projectId);
+      const suggestion = await suggestPublishMetadata(projectId, suggestRun.begin());
+      suggestRun.end();
       // Normalised rather than trusted: this is a model-generated payload
       // crossing a service boundary, and a missing tags array used to throw
       // "Cannot read properties of null" instead of showing an error.
@@ -114,6 +119,7 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
           {isSuggesting ? "Đang tạo gợi ý..." : "✨ Gợi ý AI (tiêu đề, mô tả, tags)"}
         </button>
       </div>
+      <AiOperationCard run={suggestRun} active={isSuggesting} testId="publish-form-suggest-progress" />
       {suggestError && (
         <p role="alert" className={glass.helperText}>
           {suggestError}

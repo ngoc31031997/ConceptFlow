@@ -45,6 +45,7 @@ type Router struct {
 	saveAuthoringCode       saveAuthoringCodeUseCase
 	getAuthoringState       getAuthoringStateUseCase
 	internal                InternalAuthoring
+	operations              *application.Operations
 }
 
 // NewRouter constructs the router; every capability is attached with a With* method.
@@ -56,6 +57,7 @@ func NewRouter(suggestPublishMetadata suggestPublishMetadataUseCase, internal In
 func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/health", rt.handleHealth)
+	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
 	// CR-025: prompt wording lives in the DB. Public read (the wizard fetches the
@@ -400,6 +402,41 @@ func (rt *Router) WithShortScriptSuggester(suggestShortScript suggestShortScript
 	return rt
 }
 
+// WithOperations attaches the registry behind GET /v1/operations/{id}
+// (CR-040 FR116.3). Without it suggestions still work, just without a live
+// progress card.
+func (rt *Router) WithOperations(ops *application.Operations) *Router {
+	rt.operations = ops
+	return rt
+}
+
+// trackOperation registers the operation id the GUI sent in X-Operation-Id (so
+// it can poll while this request is still open) and hands back a context that
+// streams the model's progress into it. finish must be called with the
+// outcome. A request without the header is simply not tracked.
+func (rt *Router) trackOperation(r *http.Request, kind string) (context.Context, func(error)) {
+	id := r.Header.Get("X-Operation-Id")
+	if rt.operations == nil || id == "" {
+		return r.Context(), func(error) {}
+	}
+	rt.operations.Start(id, kind)
+	ctx := application.WithProgress(r.Context(), func(p application.ChatProgress) { rt.operations.Progress(id, p) })
+	return ctx, func(err error) { rt.operations.Finish(id, err) }
+}
+
+func (rt *Router) handleGetOperation(w http.ResponseWriter, r *http.Request) {
+	if rt.operations == nil {
+		writeError(w, http.StatusNotFound, "operations are not available")
+		return
+	}
+	op, ok := rt.operations.Get(chi.URLParam(r, "operation_id"))
+	if !ok {
+		writeError(w, http.StatusNotFound, "operation not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, op)
+}
+
 func (rt *Router) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte(`{"status":"ok"}`))
@@ -407,7 +444,9 @@ func (rt *Router) handleHealth(w http.ResponseWriter, r *http.Request) {
 
 func (rt *Router) handleSuggestMetadata(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
-	out, err := rt.suggestPublishMetadata.Execute(r.Context(), projectID)
+	ctx, finish := rt.trackOperation(r, "suggest_metadata")
+	out, err := rt.suggestPublishMetadata.Execute(ctx, projectID)
+	finish(err)
 	if err != nil {
 		slog.Error("suggest-metadata failed", "project_id", projectID, "error", err.Error())
 		writeUseCaseError(w, err)
@@ -437,7 +476,9 @@ func (rt *Router) handleSuggestShortScript(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	script, err := rt.suggestShortScript.Execute(r.Context(), req.Topic, req.SourceScriptContent, lang)
+	ctx, finish := rt.trackOperation(r, "suggest_short_script")
+	script, err := rt.suggestShortScript.Execute(ctx, req.Topic, req.SourceScriptContent, lang)
+	finish(err)
 	if err != nil {
 		slog.Error("suggest-short-script failed", "error", err.Error())
 		writeError(w, http.StatusBadRequest, err.Error())

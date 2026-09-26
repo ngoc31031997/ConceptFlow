@@ -136,6 +136,14 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/music', musicUpload.single('music'), musicUploadHandler(sharedDir));
   router.get('/v1/projects/:id/music/info', musicInfoHandler(sharedDir));
   router.get('/v1/projects/:id/music', musicServeHandler(sharedDir));
+  // CR-040 FR116.3 — one progress endpoint for every long call. The delete saga
+  // (`delete:<project_id>`) is the orchestrator's; everything else is a
+  // suggestion running in authoring-service.
+  const toAuthoring = proxyHandler(authoring, 'authoring-service');
+  const toOrchestrator = proxyHandler(orchestratorClient, 'orchestrator');
+  router.get('/v1/operations/:operationId', (req, res, next) =>
+    (req.params.operationId.startsWith('delete:') ? toOrchestrator : toAuthoring)(req, res, next),
+  );
   router.delete('/v1/projects/:id', deleteProjectHandler(orchestratorClient, sharedDir));
   return router;
 }

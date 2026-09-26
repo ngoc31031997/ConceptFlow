@@ -75,6 +75,24 @@ async def test_suggest_metadata_goes_to_the_light_provider_ollama(client):
 
 
 @respx.mock
+async def test_suggest_metadata_can_stream_progress(client):
+    respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=stream_response(
+        chunk('{"title":"T","description":"d","tags":["a"]}', finish="stop"), usage_chunk({})))
+    r = await client.post("/v1/suggest-metadata", json={"script_content": "s", "language": "vi", "stream": True})
+    ev = events(r)
+    assert any(e["type"] == "progress" and e["content_chars"] > 0 for e in ev)
+    assert ev[-1]["type"] == "result" and ev[-1]["title"] == "T"
+
+
+@respx.mock
+async def test_suggest_stream_reports_the_error_kind(client):
+    respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=httpx.Response(500, json={}))
+    r = await client.post("/v1/suggest-short-script", json={"topic": "t", "stream": True})
+    ev = events(r)
+    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "server"
+
+
+@respx.mock
 async def test_suggest_error_is_a_502_with_the_kind(client):
     respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=httpx.Response(500, json={}))
     r = await client.post("/v1/suggest-short-script", json={"topic": "t"})

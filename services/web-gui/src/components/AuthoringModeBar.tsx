@@ -13,6 +13,8 @@ import {
   type LlmStatus,
 } from "../api/client";
 import type { AuthoringMode } from "../context/ProjectDraftContext";
+import { OperationProgressCard } from "./OperationProgressCard";
+import { formatChars, formatClock } from "../lib/formatProgress";
 import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import glass from "../styles/glass.module.css";
@@ -413,14 +415,11 @@ export function AuthoringModeBar({
             <div className={styles.runPanel} data-testid="authoring-run-panel">
               {run.steps.length <= 1 && (
                 <>
-                  <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
-                    <div className={styles.progressBar} />
-                  </div>
-                  {live?.running && (
-                    <p className={styles.status} data-testid="authoring-live-progress">
-                      {liveProgressText(live)}
-                    </p>
-                  )}
+                  <OperationProgressCard
+                    subtitle={live?.running ? liveProgressText(live) : null}
+                    {...liveCounts(live)}
+                    testId="authoring-live-progress"
+                  />
                 </>
               )}
               {run.steps.length > 1 && (
@@ -445,9 +444,7 @@ export function AuthoringModeBar({
                             : "chờ"}
                         </span>
                         {status === "running" && (
-                          <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
-                            <div className={styles.progressBar} />
-                          </div>
+                          <OperationProgressCard variant="step" {...liveCounts(live)} />
                         )}
                       </li>
                     );
@@ -508,14 +505,15 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
   );
 }
 
-function formatChars(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
-}
-
-/** 125 → "2m05s", 42 → "42s": dạng gọn cho dòng phụ của thẻ bước. */
-function formatClock(totalSeconds: number): string {
-  const s = Math.max(0, Math.round(totalSeconds));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+/**
+ * Chỉ pha biết tổng mới có phần trăm (FR116.4): các lô của 1c và vòng sửa lỗi
+ * biên dịch. Pha suy luận/viết không biết tổng nên thanh chạy không xác định.
+ */
+function liveCounts(p: AuthoringProgress | null): { done?: number; total?: number } {
+  if (!p?.running) return {};
+  if (p.phase === "chunks" && p.chunks_total) return { done: p.chunks_done ?? 0, total: p.chunks_total };
+  if (p.phase === "repair" && p.repair_max) return { done: p.repair_round ?? 0, total: p.repair_max };
+  return {};
 }
 
 /** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m05s". */

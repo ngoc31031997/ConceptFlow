@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -317,6 +318,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/reject", rt.handleRejectOutline)
 	r.Post("/v1/projects/{project_id}/narration", rt.handleEditNarration)
 	r.Delete("/v1/projects/{project_id}", rt.handleDeleteProject)
+	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
 	r.Post("/v1/channel-assets/{kind}", rt.handleNormalizeChannelAsset)
 	r.Get("/v1/channel-assets/preview", rt.handleChannelAssetPreview)
 	r.Get("/v1/projects/{project_id}/qc-report", rt.handleQCReport)
@@ -552,6 +554,44 @@ func (rt *Router) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// deleteProgressReader is the optional progress side of the delete saga.
+type deleteProgressReader interface {
+	Progress(ctx context.Context, projectID string) (application.DeleteProgress, error)
+}
+
+// handleGetOperation serves GET /v1/operations/{id} (CR-040 FR116.3) for the
+// operations the orchestrator owns: `delete:<project_id>` is the delete saga,
+// reported as done/total purge owners. Anything else is authoring-service's.
+func (rt *Router) handleGetOperation(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "operation_id")
+	projectID, ok := strings.CutPrefix(id, "delete:")
+	reader, hasReader := rt.deleteProject.(deleteProgressReader)
+	if !ok || !hasReader {
+		writeError(w, http.StatusNotFound, "operation not found")
+		return
+	}
+	p, err := reader.Progress(r.Context(), projectID)
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	status := "running"
+	switch {
+	case p.Gone:
+		status = "succeeded"
+	case p.Failed != "":
+		status = "failed"
+	}
+	body := map[string]any{
+		"kind": "delete_project", "phase": "purge", "reasoning_chars": 0, "content_chars": 0,
+		"done": p.Done, "total": p.Total, "elapsed_ms": 0, "status": status, "error": nil,
+	}
+	if p.Failed != "" {
+		body["error"] = p.Failed
+	}
+	writeJSON(w, http.StatusOK, body)
 }
 
 func (rt *Router) handleRetry(w http.ResponseWriter, r *http.Request) {

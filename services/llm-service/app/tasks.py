@@ -112,7 +112,7 @@ class TaskOutcome:
 
 
 async def suggest_metadata(
-    provider: Provider, script_content: str, category_hint: str, language: str
+    provider: Provider, script_content: str, category_hint: str, language: str, on_progress=None
 ) -> TaskOutcome:
     """A small local model asked only for "valid JSON" sometimes returns a
     well-formed object with an empty title. That parses fine, so it is checked
@@ -123,7 +123,7 @@ async def suggest_metadata(
     total = Usage()
     for _ in range(SUGGEST_MAX_ATTEMPTS):
         try:
-            res = await provider.chat(ChatRequest(user=prompt, json_mode=True))
+            res = await provider.chat(ChatRequest(user=prompt, json_mode=True), on_progress)
         except LLMError as err:
             last = err
             total = total + err.usage
@@ -157,7 +157,7 @@ async def suggest_metadata(
 
 
 async def suggest_short_script(
-    provider: Provider, topic: str, source_script_content: str, language: str
+    provider: Provider, topic: str, source_script_content: str, language: str, on_progress=None
 ) -> TaskOutcome:
     # No JSON mode: the output is multi-line Python, and forcing JSON would make
     # the model escape every newline and quote — an easier way to get invalid
@@ -167,7 +167,7 @@ async def suggest_short_script(
     total = Usage()
     for _ in range(SUGGEST_MAX_ATTEMPTS):
         try:
-            res = await provider.chat(ChatRequest(user=prompt))
+            res = await provider.chat(ChatRequest(user=prompt), on_progress)
         except LLMError as err:
             last = err
             total = total + err.usage

@@ -125,9 +125,16 @@ export interface ThumbnailUploadResult {
   thumbnail_path: string;
 }
 
-export async function uploadThumbnail(projectId: string, file: File): Promise<ThumbnailUploadResult> {
+export async function uploadThumbnail(
+  projectId: string,
+  file: File,
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<ThumbnailUploadResult> {
   const formData = new FormData();
   formData.append("thumbnail", file);
+  if (onProgress && typeof XMLHttpRequest !== "undefined") {
+    return uploadWithProgress<ThumbnailUploadResult>(`/v1/projects/${projectId}/thumbnail`, formData, onProgress);
+  }
   return apiFetch<ThumbnailUploadResult>(`/v1/projects/${projectId}/thumbnail`, {
     method: "POST",
     body: formData,
@@ -190,6 +197,37 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     return undefined as T;
   }
   return response.json() as Promise<T>;
+}
+
+/** POST multipart bằng XHR — fetch chưa báo được số byte đã gửi (FR116.2, tải ảnh lên). */
+function uploadWithProgress<T>(
+  path: string,
+  body: FormData,
+  onProgress: (loaded: number, total: number) => void,
+): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", `${GATEWAY_URL}${path}`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total);
+    };
+    xhr.onerror = () => reject(new ApiError(GENERIC_CONNECTION_ERROR));
+    xhr.onload = () => {
+      let parsed: unknown;
+      try {
+        parsed = xhr.responseText ? JSON.parse(xhr.responseText) : undefined;
+      } catch {
+        parsed = undefined;
+      }
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve(parsed as T);
+        return;
+      }
+      const err = (parsed as { message?: string; error?: string } | undefined) ?? {};
+      reject(new ApiError(err.message ?? err.error ?? GENERIC_CONNECTION_ERROR, err.error));
+    };
+    xhr.send(body);
+  });
 }
 
 export function startRenderSaga(input: RenderInput): Promise<SagaStartedResponse> {
@@ -293,8 +331,18 @@ export interface SuggestedMetadata {
   tags: string[];
 }
 
-export function suggestPublishMetadata(id: string): Promise<SuggestedMetadata> {
-  return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, { method: "POST" });
+/** Id do GUI tự cấp cho một lượt gọi chạy lâu để poll tiến độ trong lúc request còn mở (FR116.3). */
+export function newOperationId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `op-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+const OPERATION_ID_HEADER = "X-Operation-Id";
+
+export function suggestPublishMetadata(id: string, operationId?: string): Promise<SuggestedMetadata> {
+  return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, {
+    method: "POST",
+    ...(operationId ? { headers: { [OPERATION_ID_HEADER]: operationId } } : {}),
+  });
 }
 
 export interface SuggestShortScriptInput {
@@ -305,10 +353,13 @@ export interface SuggestShortScriptInput {
 }
 
 /** CR-026 FR71 — soạn nháp script Shorts/TikTok bằng AI nội bộ (Ollama). */
-export function suggestShortScript(input: SuggestShortScriptInput): Promise<{ script_content: string }> {
+export function suggestShortScript(
+  input: SuggestShortScriptInput,
+  operationId?: string,
+): Promise<{ script_content: string }> {
   return apiFetch<{ script_content: string }>("/v1/short-script-suggestions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}) },
     body: JSON.stringify(input),
   });
 }
@@ -849,4 +900,21 @@ export function forkProject(id: string, fromStep: number): Promise<ForkResult> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ from_step: fromStep }),
   });
+}
+
+/** FR116.3 — tiến độ chung của một lượt gọi chạy lâu. */
+export interface OperationProgress {
+  kind: string;
+  phase: string;
+  reasoning_chars: number;
+  content_chars: number;
+  done: number | null;
+  total: number | null;
+  elapsed_ms: number;
+  status: "pending" | "running" | "succeeded" | "failed";
+  error: string | null;
+}
+
+export function getOperation(operationId: string): Promise<OperationProgress> {
+  return apiFetch<OperationProgress>(`/v1/operations/${operationId}`);
 }

@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ApiError, startRenderSaga, suggestShortScript } from "../api/client";
+import { useOperationRun } from "../hooks/useOperationRun";
+import { AiOperationCard } from "./AiOperationCard";
 import { buildShortScriptSystemPrompt } from "./scriptPrompts";
 import { Button, CtaRow, TextArea, TextInput } from "./ui";
 import glass from "../styles/glass.module.css";
@@ -58,15 +60,21 @@ export function ShortScriptAssistant({
     }
   }
 
+  const suggestRun = useOperationRun();
+
   async function handleSuggestWithLocalAI() {
     setIsSuggesting(true);
     setSuggestError(null);
     try {
-      const result = await suggestShortScript({
-        topic,
-        language: contentLanguage,
-        source_script_content: sourceScriptContent,
-      });
+      const result = await suggestShortScript(
+        {
+          topic,
+          language: contentLanguage,
+          source_script_content: sourceScriptContent,
+        },
+        suggestRun.begin(),
+      );
+      suggestRun.end();
       // Nháp AI, không tự nộp — Creator vẫn sửa được trước khi bấm nộp
       // (FR71.3), cùng nguyên tắc với "Copy prompt".
       setDraftScript(result.script_content);
@@ -147,6 +155,7 @@ export function ShortScriptAssistant({
               {isFilled ? "Đã gắn chủ đề của bạn" : "Chưa nhập chủ đề"}
             </span>
           </div>
+          <AiOperationCard run={suggestRun} active={isSuggesting} testId="short-script-suggest-progress" />
           {suggestError && (
             <p role="alert" className={glass.helperText} style={{ marginTop: 8 }}>
               {suggestError}
