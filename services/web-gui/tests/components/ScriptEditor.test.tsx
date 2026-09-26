@@ -27,26 +27,15 @@ describe("ScriptEditor", () => {
       expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("Hợp lệ");
 
       rerender(
-        <ScriptEditor value={"x = 1"} onChange={vi.fn()} contentLanguage="vi" />,
+        <ScriptEditor value={"```python\nx = 1"} onChange={vi.fn()} contentLanguage="vi" />,
       );
       act(() => {
         vi.advanceTimersByTime(500);
       });
-      expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("class Scene");
+      expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("```");
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("warns when the script still uses the pre-CR-018 markers", () => {
-    render(
-      <ScriptEditor
-        value={'class A(Scene):\n    def construct(self):\n        # NARRATION: "x"\n        self.wait(AUTO)'}
-        onChange={vi.fn()}
-        contentLanguage="vi"
-      />,
-    );
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("chuẩn cũ");
   });
 
   it("shows the estimated narration length before anything is rendered", () => {
@@ -117,12 +106,12 @@ describe("ScriptEditor", () => {
   it("runs Remotion's own structural lint instead of accepting any non-empty text", () => {
     render(
       <ScriptEditor
-        value={'export const narrations: string[] = ["xin chào"];'}
+        value={'export const narrations: string[] = ["xin chào"];\n<Composition id="creator" />'}
         onChange={vi.fn()}
         contentLanguage="vi"
         renderEngine="remotion"
       />,
     );
-    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent('id="creator"');
+    expect(screen.getByTestId("script-editor-validation")).toHaveTextContent("calculateMetadata");
   });
 });

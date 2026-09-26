@@ -48,7 +48,7 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByTestId("manim-engineer-step-next")).toBeDisabled();
 
     fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
-      target: { value: "not valid python at all" },
+      target: { value: "```python\nnot valid python at all" },
     });
     expect(screen.getByTestId("manim-engineer-step-next")).toBeDisabled();
 

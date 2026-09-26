@@ -58,7 +58,7 @@ describe("useRequireScript", () => {
     const draft: ProjectDraft = {
       ...BASE_DRAFT,
       renderEngine: "manim",
-      scriptContent: "not a valid manim script",
+      scriptContent: "```python\nfrom conceptflow import *",
     };
     const { result } = renderHook(() => useRequireScript(), { wrapper: wrapperFor(draft) });
     expect(result.current).toBe(false);

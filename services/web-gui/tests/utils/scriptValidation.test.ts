@@ -19,14 +19,6 @@ describe("validateScript", () => {
     ).toBe(1);
   });
 
-  it("báo script còn dùng chuẩn trước CR-018", () => {
-    const legacy =
-      'class A(Scene):\n    def construct(self):\n        # NARRATION: "x"\n        self.wait(AUTO)';
-    const result = validateScript(legacy, "vi");
-    expect(result.isValid).toBe(false);
-    expect(result.message).toContain("chuẩn cũ");
-  });
-
   it("báo còn dính dòng markdown ``` thay vì lỗi cú pháp Python mơ hồ", () => {
     // Bug report 2026-09-12: Creator copy nguyên khối ```python ... ``` từ AI
     // vào ScriptEditor. ScriptEditor tự gỡ khối trọn vẹn qua
@@ -38,8 +30,12 @@ describe("validateScript", () => {
     expect(result.message).toContain("```");
   });
 
-  it("báo khi thiếu class Scene", () => {
-    expect(validateScript("x = 1", "vi").isValid).toBe(false);
+  // CR-040 FR113.3: what rendering already rejects (script_locator, dry_run) is no
+  // longer second-guessed here, and the pre-CR-018 markers are simply not a thing.
+  it("không còn chặn những gì server đã bắt: thiếu class Scene, thiếu narrations/Composition id", () => {
+    expect(validateScript("x = 1", "vi").isValid).toBe(true);
+    expect(validateRemotionScript(VALID_REMOTION.replace("export const narrations", "const narrations")).narrationCount).toBe(0);
+    expect(validateRemotionScript(VALID_REMOTION.replace('id="creator"', 'id="other"')).isValid).toBe(true);
   });
 
   it("script rỗng không bị coi là sai", () => {
@@ -120,26 +116,6 @@ describe("validateRemotionScript", () => {
     const result = validateRemotionScript(VALID_REMOTION);
     expect(result.isValid).toBe(true);
     expect(result.narrationCount).toBe(2);
-  });
-
-  it("báo thiếu export const narrations", () => {
-    const result = validateRemotionScript(VALID_REMOTION.replace("export const narrations", "const narrations"));
-    expect(result.isValid).toBe(false);
-    expect(result.message).toContain("narrations");
-  });
-
-  it("báo narrations rỗng", () => {
-    const result = validateRemotionScript(
-      VALID_REMOTION.replace('["một hai", "ba bốn"]', "[]"),
-    );
-    expect(result.isValid).toBe(false);
-    expect(result.message).toContain("rỗng");
-  });
-
-  it("báo thiếu id=\"creator\" trên Composition", () => {
-    const result = validateRemotionScript(VALID_REMOTION.replace('id="creator"', 'id="other"'));
-    expect(result.isValid).toBe(false);
-    expect(result.message).toContain("creator");
   });
 
   it("báo thiếu calculateMetadata", () => {

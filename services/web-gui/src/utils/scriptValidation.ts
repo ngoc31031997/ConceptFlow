@@ -8,6 +8,12 @@
  * gộp hai thứ làm một, nên lớp lỗi đó biến mất theo cấu trúc và không còn gì
  * để đếm khớp.
  *
+ * CR-040 FR113.3: kết luận "hợp lệ" là của `rendering` (`validate_script`,
+ * `script_locator`, `dry_run`). Những gì server đã bắt đúng — thiếu class Scene,
+ * thiếu `<Composition id>` / `narrations` — đã bị xoá khỏi đây; chuẩn cũ
+ * `# NARRATION` + `self.wait(AUTO)` đã bị gỡ khỏi hệ thống nên cũng không còn
+ * được nhắc tới. Ở lại là những gì server không báo trước lúc render.
+ *
  * Việc còn lại của file này là **cho Creator thấy trước video sẽ dài bao nhiêu**
  * (CR-016 FR42). Con số đó vốn chỉ lộ ra ở bước 3 của Saga, sau khi TTS đã chạy.
  *
@@ -25,7 +31,6 @@ import {
 
 /** Khớp `self.narrate("...")` và `self.narrate('...')` trên một dòng. */
 const NARRATE_RE = /self\.narrate\(\s*(["'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)/g;
-const SCENE_CLASS_RE = /^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:/;
 
 /**
  * Toàn bộ nội dung được bọc trong một khối markdown ```python ... ``` (hoặc
@@ -60,10 +65,6 @@ export function stripMarkdownCodeFence(script: string): string {
   return script;
 }
 
-/** Dấu hiệu script còn viết theo chuẩn trước CR-018. */
-const LEGACY_NARRATION_RE = /^\s*#\s*NARRATION:/m;
-const LEGACY_AUTO_WAIT_RE = /self\.wait\(\s*AUTO\s*\)/;
-
 /**
  * Dấu hiệu còn sót dòng backtick mở đầu dù không khớp trọn khối (ví dụ
  * Creator xoá mất dòng ``` đóng, hoặc dán thêm chữ phía trước). ScriptEditor
@@ -81,7 +82,6 @@ export interface NarrationEstimate {
 
 export interface ScriptValidation {
   narrationCount: number;
-  hasSceneClass: boolean;
   isValid: boolean;
   message: string | null;
   /** Từng đoạn lời thoại tìm thấy, kèm ước lượng thời lượng (FR42.4). */
@@ -99,13 +99,9 @@ export function validateScript(
   const narrations = extractNarrations(script, language, wordsPerMinute);
   const totalWords = narrations.reduce((sum, n) => sum + n.words, 0);
   const estimatedNarrationSeconds = narrations.reduce((sum, n) => sum + n.seconds, 0);
-  const hasSceneClass = script
-    .split("\n")
-    .some((line) => SCENE_CLASS_RE.test(line.trim()));
 
   const base = {
     narrationCount: narrations.length,
-    hasSceneClass,
     narrations,
     totalWords,
     estimatedNarrationSeconds,
@@ -121,23 +117,6 @@ export function validateScript(
       isValid: false,
       message:
         'Script còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có) — script phải bắt đầu ngay bằng from conceptflow import *.',
-    };
-  }
-
-  if (LEGACY_NARRATION_RE.test(script) || LEGACY_AUTO_WAIT_RE.test(script)) {
-    return {
-      ...base,
-      isValid: false,
-      message:
-        'Script đang dùng chuẩn cũ (# NARRATION và self.wait(AUTO)). Chuẩn hiện tại là self.narrate("..."), và script phải bắt đầu bằng from conceptflow import *.',
-    };
-  }
-
-  if (!hasSceneClass) {
-    return {
-      ...base,
-      isValid: false,
-      message: "Chưa tìm thấy class Scene (cần dạng class TenScene(ConceptFlowScene):).",
     };
   }
 
@@ -165,7 +144,6 @@ export function validateScript(
 // array.
 const REMOTION_NARRATIONS_HEADER_RE = /export\s+const\s+narrations\s*(?::\s*string\s*\[\s*\]\s*)?=\s*\[/;
 const REMOTION_STRING_LITERAL_RE = /(["'`])(?:(?!\1)[^\\]|\\.)*\1/g;
-const REMOTION_COMPOSITION_ID_RE = /<Composition\b[^>]*\bid\s*=\s*["']creator["']/;
 const REMOTION_CALCULATE_METADATA_RE = /calculateMetadata\s*=\s*\{\s*calculateMetadataFromSegments\s*\}/;
 const REMOTION_SEGMENTS_USAGE_RE = /<Segments\b/;
 const REMOTION_IMPORT_RE = /import\s*\{[^}]*\bregisterRoot\b[^}]*\}\s*from\s*['"]remotion['"]/;
@@ -281,26 +259,6 @@ export function validateRemotionScript(script: string): RemotionScriptValidation
       isValid: false,
       message:
         "Code còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có).",
-    };
-  }
-
-  if (extractNarrationsBody(script) === null) {
-    return {
-      ...base,
-      isValid: false,
-      message: 'Thiếu `export const narrations: string[] = [...]` — hệ thống lấy lời thoại TTS từ đây, không đọc từ đâu khác.',
-    };
-  }
-
-  if (narrationCount === 0) {
-    return { ...base, isValid: false, message: "`narrations` đang rỗng — cần ít nhất một câu lời thoại." };
-  }
-
-  if (!REMOTION_COMPOSITION_ID_RE.test(script)) {
-    return {
-      ...base,
-      isValid: false,
-      message: 'Thiếu `<Composition id="creator" ...>` hoặc `id` không đúng chuỗi "creator".',
     };
   }
 
