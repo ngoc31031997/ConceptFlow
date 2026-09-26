@@ -373,7 +373,12 @@ export type PromptRole =
   | "story_architect"
   | "visual_director"
   | "manim_engineer"
-  | "remotion_engineer";
+  | "remotion_engineer"
+  // CR-039 — luồng "Chạy bằng AI" có prompt riêng (storyboard xuất JSON, code
+  // chỉ viết các hàm shot); luồng Copy giữ bốn vai trò trên nguyên vẹn.
+  | "visual_director_ai"
+  | "manim_engineer_ai"
+  | "remotion_engineer_ai";
 
 /**
  * CR-031 — một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
@@ -499,6 +504,16 @@ export type GeneratedStep = {
     CompletionTokens?: number;
   };
   save_error?: string;
+  /**
+   * CR-039 — chỉ bước 1c. `check_failed`: code đã được lưu nhưng vẫn không qua
+   * kiểm tra biên dịch sau `repair_rounds` vòng sửa; `diagnostics` là danh sách
+   * lỗi để Creator tự sửa. `model_calls` là số lượt gọi model của cả lượt chạy.
+   */
+  check_failed?: boolean;
+  diagnostics?: string[];
+  repair_rounds?: number;
+  warnings?: string[];
+  model_calls?: number;
 };
 
 /**
@@ -518,10 +533,15 @@ export function generateAuthoringStep(projectId: string, step: AuthoringStep): P
 /** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
 export interface AuthoringProgress {
   running: boolean;
-  phase: "idle" | "waiting" | "reasoning" | "writing";
+  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair";
   reasoning_chars: number;
   content_chars: number;
   elapsed_seconds: number;
+  // CR-039 — tiến độ riêng của bước 1c: số lô đã xong / tổng, vòng sửa hiện tại / tối đa.
+  chunks_done?: number;
+  chunks_total?: number;
+  repair_round?: number;
+  repair_max?: number;
 }
 
 export function getAuthoringProgress(projectId: string, step: AuthoringStep): Promise<AuthoringProgress> {

@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import aio_pika
+import uvicorn
 
 from adapters.messaging.consumer import (
     RenderChannelAssetCommandHandler,
@@ -37,6 +38,9 @@ from adapters.rendering.manim_renderer import (
     ManimScriptRenderer,
 )
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer
+from adapters.rendering.typescript_checker import TypeScriptChecker
+from adapters.http.check_server import create_check_app
+from application.check_script import CheckScriptUseCase
 from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
@@ -130,6 +134,21 @@ async def run() -> None:
 
     consumer_tag = await queue.consume(command_handler.handle)
 
+    # CR-039 FR104: the compile check the llm-service calls before a generated
+    # script is saved. Same process, same event loop; internal network only.
+    check_use_case = CheckScriptUseCase(
+        ValidateScriptUseCase(renderer, approved_lottie_ids),
+        TypeScriptChecker(
+            Path(__file__).parent / "remotion_project",
+            timeout_seconds=int(os.environ.get("TSC_TIMEOUT_SECONDS", "90")),
+        ),
+    )
+    check_server = uvicorn.Server(uvicorn.Config(
+        create_check_app(check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2"))),
+        host="0.0.0.0", port=int(os.environ.get("CHECK_HTTP_PORT", "8000")), log_level="warning",
+    ))
+    check_server_task = asyncio.create_task(check_server.serve())
+
     with open(READY_SENTINEL_PATH, "w") as f:
         f.write("ready")
     logger.info("Rendering Service ready — consuming '%s'", COMMANDS_QUEUE)
@@ -137,6 +156,8 @@ async def run() -> None:
     try:
         await asyncio.Future()  # run forever
     finally:
+        check_server.should_exit = True
+        await check_server_task
         await queue.cancel(consumer_tag)
         await relay.stop()
         await connection.close()

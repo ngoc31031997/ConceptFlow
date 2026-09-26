@@ -188,6 +188,11 @@ services:
       # ./services/rendering, so docs/brand/ cannot enter the image without
       # widening the context for every service (H1, cr-016-024-execution-plan).
       BRAND_ASSETS_DIR: "/brand"
+      # CR-039 — the compile check llm-service calls (POST /v1/check/*). Same
+      # process as the queue consumer, reachable on the backend network only.
+      CHECK_HTTP_PORT: "8000"
+      CHECK_CONCURRENCY: "${CHECK_CONCURRENCY:-2}"
+      TSC_TIMEOUT_SECONDS: "${TSC_TIMEOUT_SECONDS:-90}"
     # Manim renders on every core it can get (Phase 0 measured CPU-time at
     # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
     # the Postgres instances on the same host. 5G sits just above the 4 GiB
@@ -372,17 +377,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@orchestrator-db:5432/orchestrator
       OUTBOX_POLL_INTERVAL_MS: "500"
       DATABASE_MAX_CONNS: "10"
-      OLLAMA_URL: http://ollama:11434
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
-      OLLAMA_TIMEOUT_SECONDS: "120"
-      # CR-027 — Hive is the primary LLM provider. Leave HIVE_API_KEY unset
-      # and the orchestrator starts normally on Ollama, exactly as before.
-      LLM_PROVIDER: ${LLM_PROVIDER:-}
-      HIVE_API_KEY: ${HIVE_API_KEY:-}
-      HIVE_BASE_URL: ${HIVE_BASE_URL:-https://api-cdn.thehive.ai/api/v3}
+      # CR-039 — every language-model call goes through llm-service, which
+      # alone holds HIVE_API_KEY and the Ollama address. The orchestrator keeps
+      # only where to reach it and the two cost ceilings it enforces.
+      LLM_SERVICE_URL: http://llm-service:8000
+      LLM_SERVICE_TIMEOUT_SECONDS: ${LLM_SERVICE_TIMEOUT_SECONDS:-0} # 0 = no timeout
       HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
-      HIVE_TIMEOUT_SECONDS: ${HIVE_TIMEOUT_SECONDS:-0} # 0 = no timeout
-      HIVE_MAX_RETRIES: ${HIVE_MAX_RETRIES:-3}
       HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
       HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
       # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
@@ -411,15 +411,50 @@ services:
     networks:
       - backend
 
+  # CR-039 — the only service that talks to a language model. Hive and Ollama
+  # are both called through the OpenAI SDK (Ollama via its /v1 endpoint). It
+  # also runs the chunked code pipeline: layout/cast, shots in parallel, merge,
+  # compile check (rendering), repair.
+  llm-service:
+    build: ./services/llm-service
+    container_name: llm-service
+    environment:
+      HIVE_API_KEY: ${HIVE_API_KEY:-}
+      HIVE_BASE_URL: ${HIVE_BASE_URL:-https://api-cdn.thehive.ai/api/v3}
+      HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
+      HIVE_TIMEOUT_SECONDS: ${HIVE_TIMEOUT_SECONDS:-0} # 0 = no timeout
+      HIVE_MAX_RETRIES: ${HIVE_MAX_RETRIES:-3}
+      HIVE_RATE_PER_SECOND: ${HIVE_RATE_PER_SECOND:-5} # Hive's documented default ceiling
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
+      OLLAMA_TIMEOUT_SECONDS: "120"
+      LIGHT_TASKS_PROVIDER: ${LIGHT_TASKS_PROVIDER:-ollama}
+      CODE_CHUNK_SHOTS: ${CODE_CHUNK_SHOTS:-10}
+      CODE_CHUNK_CONCURRENCY: ${CODE_CHUNK_CONCURRENCY:-3}
+      CODE_REPAIR_MAX_ROUNDS: ${CODE_REPAIR_MAX_ROUNDS:-3}
+      RENDERING_URL: http://rendering:8000
+      RENDERING_CHECK_TIMEOUT_SECONDS: ${RENDERING_CHECK_TIMEOUT_SECONDS:-2100}
+    deploy:
+      resources:
+        limits:
+          memory: ${LLM_SERVICE_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
   ollama:
     image: ollama/ollama:latest
     container_name: ollama
     volumes:
       - ollama_data:/root/.ollama
     # A loaded model sits in RAM for the life of the container — llama3.2 (the
-    # default model) needs a few GB. Only relevant when LLM_PROVIDER leaves
-    # orchestrator on Ollama instead of Hive; raise this if OLLAMA_MODEL is
-    # swapped for a larger one.
+    # default model) needs a few GB. llm-service uses it for the light tasks
+    # (suggest-metadata, suggest-short-script — LIGHT_TASKS_PROVIDER=ollama);
+    # raise this if OLLAMA_MODEL is swapped for a larger one.
     deploy:
       resources:
         limits:

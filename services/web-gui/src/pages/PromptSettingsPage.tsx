@@ -21,6 +21,10 @@ const ROLES: { value: PromptRole; label: string }[] = [
   // Bước 3 rẽ theo engine render: dự án chọn Remotion dùng prompt này thay
   // cho Manim Engineer. Hai bước đầu dùng chung cho mọi engine.
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
+  // CR-039 — ba prompt của luồng "Chạy bằng AI" (không dùng cho nút Copy).
+  { value: "visual_director_ai", label: "AI 2. Visual Director — storyboard dạng JSON" },
+  { value: "manim_engineer_ai", label: "AI 3. Manim Engineer — chỉ viết các hàm shot" },
+  { value: "remotion_engineer_ai", label: "AI 3. Remotion Engineer — chỉ viết các hàm shot" },
 ];
 
 const NEW_ROW = "new";

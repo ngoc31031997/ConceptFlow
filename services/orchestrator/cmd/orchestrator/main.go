@@ -100,27 +100,16 @@ func main() {
 		WithQCReports(qcReportRepo).
 		WithErrorLog(projectRepo)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
-	ollamaClient := llm.NewOllamaClient(cfg.OllamaURL, cfg.OllamaModel, cfg.OllamaTimeout)
-	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, ollamaClient)
-	suggestShortScript := application.NewSuggestShortScriptUseCase(ollamaClient)
+	// CR-039 — the one path to a language model. llm-service owns Hive and
+	// Ollama; the same client serves the light tasks, the authoring steps and
+	// the chunked code pipeline.
+	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
+	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, llmClient)
+	suggestShortScript := application.NewSuggestShortScriptUseCase(llmClient)
+	var llmProvider application.LLMProviderPort = llmClient
+	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
 
-	// CR-027 — the LLM provider the authoring pipeline talks to. Both
-	// adapters are built regardless of LLM_PROVIDER: the Ollama one is the
-	// declared fallback for the light tasks, and building it costs an http
-	// client. Without a Hive key the provider is Ollama and the pipeline's
-	// generate endpoints simply stay unavailable, which is how the system
-	// ran before CR-027 (FR83.2).
-	ollamaProvider := llm.NewOllamaProvider(ollamaClient)
-	var llmProvider application.LLMProviderPort = ollamaProvider
-	if cfg.LLMProvider == "hive" && cfg.HiveAPIKey != "" {
-		llmProvider = llm.NewHiveClient(cfg.HiveBaseURL, cfg.HiveAPIKey, cfg.HiveModel, cfg.HiveTimeout, cfg.HiveMaxRetries)
-	}
-	logger.Info("llm provider selected", "provider", llmProvider.Name(), "model", cfg.HiveModel)
-
-	// CR-027 FR82 — the usage ledger. Constructed before the first billable
-	// call can happen, so no call ever runs unmeasured.
 	llmUsageRecorder := application.NewLLMUsageRecorder(postgres.NewLLMUsageRepository(pool), logger)
-
 
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
@@ -186,20 +175,18 @@ func main() {
 	renderPrompt := application.NewRenderPromptUseCase(
 		promptTemplateRepo, promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo}, projectRepo, projectRepo)
 
-	// CR-027 FR78/FR79 — the API option, beside the copy-out one. Without a
-	// Hive key llmProvider is the Ollama fallback, whose models are not up to
-	// writing a Manim scene, so the option is simply not offered and the GUI
-	// says so (FR79.4/FR83.2) rather than serving a button that fails.
-	var generateAuthoring *application.GenerateAuthoringUseCase
-	if cfg.LLMProvider == "hive" && cfg.HiveAPIKey != "" {
-		generateAuthoring = application.NewGenerateAuthoringUseCase(
-			renderPrompt, llmProvider, llmUsageRecorder,
-			promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
-			promptTemplateRepo,
-			saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
-			cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-		).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo)
-	}
+	// CR-027 FR78/FR79 — the API option, beside the copy-out one. Whether it is
+	// offered is decided per request (Available → llm-service reachable and
+	// holding a Hive key), so a key added or an outage ending needs no restart of
+	// this service, and the GUI says so (FR79.4/FR83.2) instead of serving a
+	// button that fails.
+	generateAuthoring := application.NewGenerateAuthoringUseCase(
+		renderPrompt, llmProvider, llmUsageRecorder,
+		promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
+		promptTemplateRepo,
+		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
+		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
+	).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo).WithPipeline(llmClient, llmClient)
 
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
@@ -217,9 +204,7 @@ func main() {
 		WithDefaultModel(cfg.HiveModel).
 		WithWizardPosition(projectRepo).
 		WithWizard(saveWizardSettings)
-	if generateAuthoring != nil {
-		router = router.WithGenerateAuthoring(generateAuthoring)
-	}
+	router = router.WithGenerateAuthoring(generateAuthoring)
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

@@ -1460,7 +1460,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 	if rt.generateAuthoring == nil || !rt.generateAuthoring.Available() {
 		writeJSON(w, http.StatusOK, llmStatusResponse{
 			Enabled: false,
-			Reason:  "Chưa cấu hình HIVE_API_KEY (hoặc LLM_PROVIDER không phải hive) — dùng nút Copy prompt như cũ.",
+			Reason:  "Chưa cấu hình HIVE_API_KEY cho llm-service (hoặc llm-service không chạy) — dùng nút Copy prompt như cũ.",
 		})
 		return
 	}
@@ -1492,6 +1492,16 @@ func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, result)
 }
 
+// errorCause is the underlying reason of an LLMError without its
+// "provider: kind:" prefix, which the Creator has no use for.
+func errorCause(err error) string {
+	var llmErr *application.LLMError
+	if errors.As(err, &llmErr) && llmErr.Err != nil {
+		return llmErr.Err.Error()
+	}
+	return err.Error()
+}
+
 // writeGenerateError maps a failed run onto a status code and a Vietnamese
 // sentence that says what to do about it (FR76.6/FR79.3). "AI failed" would
 // send a Creator with an empty Hive balance to go rewrite their prompt.
@@ -1504,7 +1514,7 @@ func writeGenerateError(w http.ResponseWriter, err error) {
 		return
 	case errors.Is(err, application.ErrLLMNotConfigured):
 		writeError(w, http.StatusServiceUnavailable,
-			"Chưa cấu hình HIVE_API_KEY trong .env nên không gọi được AI."+fallback)
+			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI."+fallback)
 		return
 	case errors.Is(err, domain.ErrProjectNotFound):
 		writeError(w, http.StatusNotFound, "project not found")
@@ -1516,7 +1526,7 @@ func writeGenerateError(w http.ResponseWriter, err error) {
 	switch application.LLMErrorKindOf(err) {
 	case application.ErrKindAuth:
 		status = http.StatusBadGateway
-		message = "API key bị từ chối — kiểm tra lại HIVE_API_KEY trong .env."
+		message = "API key bị từ chối — kiểm tra lại HIVE_API_KEY trong .env (llm-service)."
 	case application.ErrKindBalance:
 		message = "Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive."
 	case application.ErrKindRateLimit:
@@ -1524,15 +1534,22 @@ func writeGenerateError(w http.ResponseWriter, err error) {
 		message = "Hive đang chặn vì gọi quá nhanh — chờ một lát rồi thử lại."
 	case application.ErrKindTimeout:
 		status = http.StatusGatewayTimeout
-		message = "AI không trả lời trong thời gian cho phép — thử lại, hoặc tăng HIVE_TIMEOUT_SECONDS."
+		message = "AI không trả lời trong thời gian cho phép — thử lại, hoặc tăng HIVE_TIMEOUT_SECONDS / LLM_SERVICE_TIMEOUT_SECONDS."
 	case application.ErrKindBudget, application.ErrKindTruncated:
 		message = "Câu trả lời bị cắt vì hết hạn mức token — tăng HIVE_MAX_OUTPUT_TOKENS rồi chạy lại. Chi tiết API trả về được lưu ở nhật ký lỗi của project."
 	case application.ErrKindEmpty:
 		message = "AI trả về rỗng — thử chạy lại, hoặc sửa lời prompt ở trang Prompt."
 	case application.ErrKindMalformed:
-		message = "Phản hồi của nhà cung cấp không đúng định dạng mong đợi."
+		// CR-039: llm-service says what was wrong (an unusable storyboard, code
+		// the model could not get into shape) — that is what the Creator needs.
+		message = "Kết quả AI không dùng được: " + errorCause(err)
 	case application.ErrKindServer:
-		message = "Nhà cung cấp AI đang lỗi phía họ — thử lại sau."
+		var llmErr *application.LLMError
+		if errors.As(err, &llmErr) && llmErr.Provider == "llm-service" {
+			message = "Không gọi được llm-service (" + errorCause(err) + ") — kiểm tra container llm-service."
+		} else {
+			message = "Nhà cung cấp AI đang lỗi phía họ — thử lại sau."
+		}
 	default:
 		// Not a provider failure: a bad step name, a locked project, a failed
 		// save. Those already carry their own message.

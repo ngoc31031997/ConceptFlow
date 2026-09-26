@@ -7,8 +7,8 @@ import (
 )
 
 // LLMProviderPort is the one way the application talks to a large language
-// model (CR-027 FR76.1). Two adapters implement it: the Hive client, and a
-// thin wrapper over the existing Ollama client.
+// model (CR-027 FR76.1). One adapter implements it: the llm-service client
+// (CR-039), which is the only thing that talks to Hive or Ollama.
 //
 // Deliberately narrower than either adapter's own surface. The CR-014/CR-026
 // use cases keep their task-shaped ports (MetadataSuggesterPort,
@@ -108,6 +108,9 @@ const (
 	ErrKindMalformed LLMErrorKind = "malformed"
 	// ErrKindNotConfigured — no provider is available (no API key).
 	ErrKindNotConfigured LLMErrorKind = "not_configured"
+	// ErrKindCheckFailed — the code pipeline finished and saved the script, but
+	// it still fails the compile check after the last repair round (CR-039).
+	ErrKindCheckFailed LLMErrorKind = "check_failed"
 )
 
 // LLMError carries the kind alongside the underlying cause.
@@ -124,7 +127,10 @@ type LLMError struct {
 	// request id, finish_reason, the response body — for the error log. Not
 	// shown to the Creator.
 	Diag string
-	Err  error
+	// Calls lists the model calls a multi-call run made before it failed, so
+	// each can still be billed (CR-039). Empty for a single-call failure.
+	Calls []CodeCall
+	Err   error
 }
 
 func (e *LLMError) Error() string {

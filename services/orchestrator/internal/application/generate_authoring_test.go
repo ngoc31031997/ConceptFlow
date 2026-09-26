@@ -124,13 +124,14 @@ func TestGenerateAuthoringStorySendsRenderedPromptAndSaves(t *testing.T) {
 func TestGenerateAuthoringMapsStepToEngineRole(t *testing.T) {
 	provider := &stubProvider{content: "storyboard"}
 	uc, storyboard := newGenerateFixture(t, provider, &recordingSaver{}, 0)
+	uc.WithPipeline(&stubFinalizer{out: "CANON"}, &stubCodegen{})
 
 	got, err := uc.Execute(context.Background(), "p1", "storyboard")
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	if got.Role != string(domain.RoleVisualDirector) {
-		t.Errorf("role = %q, want visual_director for a manim project", got.Role)
+	if got.Role != string(domain.RoleVisualDirectorAI) {
+		t.Errorf("role = %q, want visual_director_ai — the AI flow has its own prompts", got.Role)
 	}
 	if storyboard.calls != 1 {
 		t.Errorf("storyboard saver calls = %d, want 1 (and no other step touched)", storyboard.calls)

@@ -20,9 +20,11 @@ export interface Segment {
   durationInFrames: number;
 }
 
-export interface SegmentsProps {
+// A type alias, not an interface: only aliases get an implicit index signature,
+// which <Composition>'s `Props extends Record<string, unknown>` needs for tsc (CR-039).
+export type SegmentsProps = {
   segments?: Segment[];
-}
+};
 
 const FALLBACK_DURATION_IN_FRAMES = 150;
 

@@ -13,6 +13,12 @@ When implementing:
 - Keep production-ready quality.
 - Explain design decisions before coding.
 
+## No fake code, no silent skipping
+- Never write placeholder/stub/mock implementations in production code, hard-coded fake outputs, `TODO: implement` bodies, or code paths that pretend to succeed (e.g. returning canned data, swallowing an error and continuing as if it worked).
+- Never silently skip a requirement, a step of an approved plan, a failing test, or an error. If something in the plan is not done, say so explicitly in the report.
+- If you cannot continue for any reason (missing information, missing credentials/tools, a design conflict, an ambiguity that changes behaviour, a test you cannot make pass honestly), STOP and ask the user instead of guessing or working around it.
+- Report outcomes faithfully: tests that fail are reported as failing with their output; checks that were not run are reported as not run.
+
 ## Docker rebuild policy
 - Whenever code is changed to fix a bug or implement/patch a Change Request, rebuild the Docker image(s) for every affected service and restart the container(s) via `docker compose build <service>` + `docker compose up -d <service>`, then confirm it reports healthy — do this immediately, without waiting to be asked, so the Creator can check the change live at any time.
 - Only rebuild the services whose code actually changed (check `git status`/diff to scope it) — no need to rebuild the whole stack for a one-service fix.
