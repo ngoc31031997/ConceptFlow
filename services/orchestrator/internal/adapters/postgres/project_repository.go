@@ -600,6 +600,71 @@ func (r *ProjectRepository) SaveWizardSettings(ctx context.Context, projectID st
 	return nil
 }
 
+// PatchWizardSettings writes only the wizard step 2 fields present in p; every
+// other column keeps its stored value (COALESCE on NULL). subtitles_enabled
+// follows subtitle_mode. An empty background_music_path clears the track.
+// wizard_step only advances when p.Confirm is set.
+func (r *ProjectRepository) PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
+	var subtitleStyleJSON []byte
+	if p.SubtitleStyle != nil {
+		var err error
+		if subtitleStyleJSON, err = json.Marshal(p.SubtitleStyle); err != nil {
+			return err
+		}
+	}
+	var mode *string
+	var subtitlesEnabled *bool
+	if p.SubtitleMode != nil {
+		m := string(*p.SubtitleMode)
+		mode = &m
+		n := p.SubtitleMode.NeedsCues()
+		subtitlesEnabled = &n
+	}
+	step := 0
+	if p.Confirm {
+		step = domain.WizardStepScript
+	}
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE projects SET
+		    voice_language = COALESCE($1::text, voice_language),
+		    render_engine = COALESCE($2::text, render_engine),
+		    tts_enabled = COALESCE($3::boolean, tts_enabled),
+		    voice_id = COALESCE($4::text, voice_id),
+		    subtitle_mode = COALESCE($5::text, subtitle_mode),
+		    subtitles_enabled = COALESCE($6::boolean, subtitles_enabled),
+		    subtitle_style = COALESCE($7::jsonb, subtitle_style),
+		    render_quality = COALESCE($8::text, render_quality),
+		    video_format_id = COALESCE($9::text, video_format_id),
+		    video_output_mode = COALESCE($10::text, video_output_mode),
+		    background_music_path = CASE WHEN $11::text IS NULL THEN background_music_path
+		                                 WHEN $11::text = '' THEN NULL ELSE $11::text END,
+		    background_music_volume = COALESCE($12::double precision, background_music_volume),
+		    video_font = COALESCE($13::text, video_font),
+		    wizard_step = GREATEST(wizard_step, $14::int), updated_at = now()
+		WHERE project_id = $15`,
+		enumStr(p.ContentLanguage), enumStr(p.RenderEngine), p.TTSEnabled, p.VoiceID,
+		mode, subtitlesEnabled, subtitleStyleJSON,
+		enumStr(p.RenderQuality), p.VideoFormatID, enumStr(p.VideoOutputMode),
+		p.BackgroundMusicPath, p.BackgroundMusicVolume, p.VideoFont,
+		step, projectID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
+}
+
+// enumStr turns an optional string-typed enum into the *string pgx binds as NULL.
+func enumStr[T ~string](v *T) *string {
+	if v == nil {
+		return nil
+	}
+	s := string(*v)
+	return &s
+}
+
 // GetStep loads a SagaStep by (saga_id, step_name), or domain.ErrSagaStepNotFound.
 func (r *ProjectRepository) GetStep(ctx context.Context, sagaID string, stepName domain.StepName) (*domain.SagaStep, error) {
 	row := r.pool.QueryRow(ctx, `SELECT saga_id, step_name, status, error_message FROM saga_steps WHERE saga_id = $1 AND step_name = $2`,

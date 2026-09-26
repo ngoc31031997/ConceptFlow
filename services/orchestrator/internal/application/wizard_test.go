@@ -10,50 +10,55 @@ import (
 )
 
 type fakeWizardRepo struct {
-	status   domain.ProjectStatus
-	settings *domain.WizardSettings
-	step     int
+	status domain.ProjectStatus
+	patch  *domain.WizardSettingsPatch
 }
 
 func (f *fakeWizardRepo) GetStatus(context.Context, string) (domain.ProjectStatus, error) {
 	return f.status, nil
 }
-func (f *fakeWizardRepo) SaveWizardSettings(_ context.Context, _ string, s domain.WizardSettings) error {
-	f.settings = &s
-	f.step = domain.WizardStepScript
+func (f *fakeWizardRepo) PatchWizardSettings(_ context.Context, _ string, p domain.WizardSettingsPatch) error {
+	f.patch = &p
 	return nil
 }
 
-func TestSaveWizardSettings_DefaultsAndAdvancesToScript(t *testing.T) {
+func TestPatchWizardSettings_PassesOnlyGivenFields(t *testing.T) {
 	repo := &fakeWizardRepo{status: domain.StatusDraft}
-	uc := application.NewSaveWizardSettingsUseCase(repo)
+	uc := application.NewPatchWizardSettingsUseCase(repo)
+	q := domain.RenderQuality("720p30")
 
-	err := uc.Execute(context.Background(), "p1", domain.WizardSettings{ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true})
-	if err != nil {
+	if err := uc.Execute(context.Background(), "p1", domain.WizardSettingsPatch{RenderQuality: &q}); err != nil {
 		t.Fatal(err)
 	}
-	if repo.settings.RenderQuality != domain.DefaultRenderQuality || repo.settings.RenderEngine != domain.DefaultRenderEngine ||
-		repo.settings.SubtitleMode != domain.SubtitleModeOff || repo.settings.VideoFormatID != domain.DefaultVideoFormatID {
-		t.Errorf("defaults not applied: %+v", repo.settings)
+	if repo.patch.RenderQuality == nil || *repo.patch.RenderQuality != q {
+		t.Errorf("quality not passed: %+v", repo.patch)
 	}
-	if repo.step != domain.WizardStepScript {
-		t.Errorf("step = %d, want %d", repo.step, domain.WizardStepScript)
+	if repo.patch.ContentLanguage != nil || repo.patch.RenderEngine != nil || repo.patch.VideoFormatID != nil || repo.patch.Confirm {
+		t.Errorf("absent fields must stay nil: %+v", repo.patch)
 	}
 }
 
-func TestSaveWizardSettings_RejectsBadInputAndStartedProjects(t *testing.T) {
-	uc := application.NewSaveWizardSettingsUseCase(&fakeWizardRepo{status: domain.StatusDraft})
-	err := uc.Execute(context.Background(), "p1", domain.WizardSettings{ContentLanguage: "fr"})
+func TestPatchWizardSettings_RejectsBadInputAndStartedProjects(t *testing.T) {
+	uc := application.NewPatchWizardSettingsUseCase(&fakeWizardRepo{status: domain.StatusDraft})
+	fr := domain.ContentLanguage("fr")
+	err := uc.Execute(context.Background(), "p1", domain.WizardSettingsPatch{ContentLanguage: &fr})
 	if !errors.Is(err, domain.ErrInvalidWizardInput) {
 		t.Errorf("bad language: err = %v", err)
 	}
-	err = uc.Execute(context.Background(), "p1", domain.WizardSettings{ContentLanguage: "vi", RenderQuality: "8k"})
+	bad := domain.RenderQuality("8k")
+	err = uc.Execute(context.Background(), "p1", domain.WizardSettingsPatch{RenderQuality: &bad})
 	if !errors.Is(err, domain.ErrInvalidWizardInput) {
 		t.Errorf("bad quality: err = %v", err)
 	}
+	vol := 1.5
+	err = uc.Execute(context.Background(), "p1", domain.WizardSettingsPatch{BackgroundMusicVolume: &vol})
+	if !errors.Is(err, domain.ErrInvalidWizardInput) {
+		t.Errorf("bad volume: err = %v", err)
+	}
 
-	started := application.NewSaveWizardSettingsUseCase(&fakeWizardRepo{status: domain.StatusRendering})
-	err = started.Execute(context.Background(), "p1", domain.WizardSettings{ContentLanguage: "vi"})
+	started := application.NewPatchWizardSettingsUseCase(&fakeWizardRepo{status: domain.StatusRendering})
+	vi := domain.LanguageVietnamese
+	err = started.Execute(context.Background(), "p1", domain.WizardSettingsPatch{ContentLanguage: &vi})
 	if !errors.Is(err, domain.ErrInvalidStatus) {
 		t.Errorf("started project: err = %v, want ErrInvalidStatus", err)
 	}

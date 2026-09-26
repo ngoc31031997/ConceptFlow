@@ -36,6 +36,25 @@ type WizardSettings struct {
 	VideoFont             string
 }
 
+// WizardSettingsPatch is a partial update of WizardSettings: a nil field is
+// left as stored. BackgroundMusicPath "" clears the track. Confirm also moves
+// the project on to step 3 (the Creator pressed "Tiếp tục").
+type WizardSettingsPatch struct {
+	ContentLanguage       *ContentLanguage
+	RenderEngine          *RenderEngine
+	TTSEnabled            *bool
+	VoiceID               *string
+	SubtitleMode          *SubtitleMode
+	SubtitleStyle         *SubtitleStyle
+	RenderQuality         *RenderQuality
+	VideoFormatID         *string
+	VideoOutputMode       *VideoOutputMode
+	BackgroundMusicPath   *string
+	BackgroundMusicVolume *float64
+	VideoFont             *string
+	Confirm               bool
+}
+
 // WizardStepForStatus is the wizard step a saga status belongs to. A draft
 // says nothing here (0) — its step is whatever was stored.
 func WizardStepForStatus(status ProjectStatus) int {

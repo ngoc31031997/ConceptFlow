@@ -134,7 +134,7 @@ func main() {
 	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
 	// Wizard steps 1-2: "Tiếp tục" stores the step's data and how far the
 	// Creator got, so a reload or another browser resumes in place.
-	saveWizardSettings := application.NewSaveWizardSettingsUseCase(wizardAdapter{projects: projectRepo})
+	saveWizardSettings := application.NewPatchWizardSettingsUseCase(wizardAdapter{projects: projectRepo})
 
 	deleteProject := application.NewDeleteProjectUseCase(projectRepo, projectRepo, outboxRepo)
 	// The list needs each project's topic and what a draft holds, both of which
@@ -274,6 +274,6 @@ func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.
 	return a.projects.GetStatus(ctx, projectID)
 }
 
-func (a wizardAdapter) SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error {
-	return a.projects.SaveWizardSettings(ctx, projectID, s)
+func (a wizardAdapter) PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
+	return a.projects.PatchWizardSettings(ctx, projectID, p)
 }

@@ -277,22 +277,25 @@ type errorResponse struct {
 	Code  string `json:"code,omitempty"`
 }
 
-// saveWizardSettingsRequest is the body of PUT /v1/projects/{id}/settings —
-// wizard step 2 ("Cấu hình"), sent when the Creator presses "Tiếp tục".
-// Field names match POST /v1/sagas/render so the two never drift.
-type saveWizardSettingsRequest struct {
-	ContentLanguage       string                `json:"voice_language"`
-	RenderEngine          string                `json:"render_engine,omitempty"`
+// patchWizardSettingsRequest is the body of PATCH /v1/projects/{id}/settings —
+// wizard step 2 ("Cấu hình"), sent per field as the Creator changes it. Only
+// the fields present are written. Field names match POST /v1/sagas/render so
+// the two never drift. background_music_path "" clears the track; confirm
+// (the "Tiếp tục" press) moves the project on to step 3.
+type patchWizardSettingsRequest struct {
+	ContentLanguage       *string               `json:"voice_language,omitempty"`
+	RenderEngine          *string               `json:"render_engine,omitempty"`
 	TTSEnabled            *bool                 `json:"tts_enabled,omitempty"`
-	VoiceID               string                `json:"voice_id,omitempty"`
-	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
+	VoiceID               *string               `json:"voice_id,omitempty"`
+	SubtitleMode          *string               `json:"subtitle_mode,omitempty"`
 	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
-	RenderQuality         string                `json:"render_quality,omitempty"`
-	VideoFormatID         string                `json:"video_format_id,omitempty"`
-	VideoOutputMode       string                `json:"video_output_mode,omitempty"`
+	RenderQuality         *string               `json:"render_quality,omitempty"`
+	VideoFormatID         *string               `json:"video_format_id,omitempty"`
+	VideoOutputMode       *string               `json:"video_output_mode,omitempty"`
 	BackgroundMusicPath   *string               `json:"background_music_path,omitempty"`
-	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
-	VideoFont             string                `json:"video_font,omitempty"`
+	BackgroundMusicVolume *float64              `json:"background_music_volume,omitempty"`
+	VideoFont             *string               `json:"video_font,omitempty"`
+	Confirm               bool                  `json:"confirm,omitempty"`
 }
 
 // saveAuthoringModeRequest is the body of PUT

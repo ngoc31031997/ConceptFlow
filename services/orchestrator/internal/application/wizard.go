@@ -7,10 +7,10 @@ import (
 	"orchestrator/internal/domain"
 )
 
-// WizardPort is the persistence the wizard's "Tiếp tục" saves need.
+// WizardPort is the persistence the wizard's step 2 saves need.
 type WizardPort interface {
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
-	SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error
+	PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error
 }
 
 // requireDraft is the same lock the authoring saves use (CR-028 FR84.2): once
@@ -29,56 +29,48 @@ func requireDraft(ctx context.Context, repo WizardPort, projectID string) error 
 	return nil
 }
 
-// SaveWizardSettingsUseCase persists wizard step 2 ("Cấu hình") when the
-// Creator presses "Tiếp tục", and moves the project on to step 3.
-type SaveWizardSettingsUseCase struct {
+// PatchWizardSettingsUseCase persists wizard step 2 ("Cấu hình") field by
+// field as the Creator changes it; a patch with Confirm set (the "Tiếp tục"
+// press) also moves the project on to step 3.
+type PatchWizardSettingsUseCase struct {
 	repo WizardPort
 }
 
-func NewSaveWizardSettingsUseCase(repo WizardPort) *SaveWizardSettingsUseCase {
-	return &SaveWizardSettingsUseCase{repo: repo}
+func NewPatchWizardSettingsUseCase(repo WizardPort) *PatchWizardSettingsUseCase {
+	return &PatchWizardSettingsUseCase{repo: repo}
 }
 
-// Execute validates s, fills defaults for omitted fields the way the render
-// saga does, and stores it. A project past draft answers ErrInvalidStatus.
-func (uc *SaveWizardSettingsUseCase) Execute(ctx context.Context, projectID string, s domain.WizardSettings) error {
-	if s.ContentLanguage != domain.LanguageVietnamese && s.ContentLanguage != domain.LanguageEnglish {
+// Execute validates only the fields present in p and stores them. A project
+// past draft answers ErrInvalidStatus.
+func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
+	if p.ContentLanguage != nil && *p.ContentLanguage != domain.LanguageVietnamese && *p.ContentLanguage != domain.LanguageEnglish {
 		return fmt.Errorf("%w: voice_language must be 'vi' or 'en'", domain.ErrInvalidWizardInput)
 	}
-	if s.RenderEngine == "" {
-		s.RenderEngine = domain.DefaultRenderEngine
-	}
-	if !s.RenderEngine.IsValid() {
+	if p.RenderEngine != nil && !p.RenderEngine.IsValid() {
 		return fmt.Errorf("%w: render_engine must be 'manim' or 'remotion'", domain.ErrInvalidWizardInput)
 	}
-	if s.RenderQuality == "" {
-		s.RenderQuality = domain.DefaultRenderQuality
-	}
-	if !s.RenderQuality.IsValid() {
+	if p.RenderQuality != nil && !p.RenderQuality.IsValid() {
 		return fmt.Errorf("%w: unknown render_quality", domain.ErrInvalidWizardInput)
 	}
-	if s.VideoOutputMode == "" {
-		s.VideoOutputMode = domain.DefaultVideoOutputMode
-	}
-	if !s.VideoOutputMode.IsValid() {
+	if p.VideoOutputMode != nil && !p.VideoOutputMode.IsValid() {
 		return fmt.Errorf("%w: unknown video_output_mode", domain.ErrInvalidWizardInput)
 	}
-	if s.SubtitleMode == "" {
-		s.SubtitleMode = domain.SubtitleModeOff
-	}
-	if !s.SubtitleMode.IsValid() {
+	if p.SubtitleMode != nil && !p.SubtitleMode.IsValid() {
 		return fmt.Errorf("%w: unknown subtitle_mode", domain.ErrInvalidWizardInput)
 	}
-	if s.BackgroundMusicVolume < 0 || s.BackgroundMusicVolume > 1 {
+	if p.BackgroundMusicVolume != nil && (*p.BackgroundMusicVolume < 0 || *p.BackgroundMusicVolume > 1) {
 		return fmt.Errorf("%w: background_music_volume must be between 0 and 1", domain.ErrInvalidWizardInput)
 	}
-	if !domain.ValidVideoFont(s.VideoFont) {
+	if p.VideoFont != nil && !domain.ValidVideoFont(*p.VideoFont) {
 		return fmt.Errorf("%w: unknown video_font", domain.ErrInvalidWizardInput)
 	}
-	s.VideoFormatID = formatOrDefault(s.VideoFormatID)
+	if p.VideoFormatID != nil {
+		f := formatOrDefault(*p.VideoFormatID)
+		p.VideoFormatID = &f
+	}
 
 	if err := requireDraft(ctx, uc.repo, projectID); err != nil {
 		return err
 	}
-	return uc.repo.SaveWizardSettings(ctx, projectID, s)
+	return uc.repo.PatchWizardSettings(ctx, projectID, p)
 }
