@@ -38,6 +38,7 @@ const NEW_ROW = "new";
 const PREVIEW_SAMPLE: Record<string, string> = {
   topic: "Vì sao bầu trời có màu xanh",
   channel_identity: "(khối bản sắc kênh — do server dựng theo ngôn ngữ — sẽ hiện ở đây)",
+  video_archetypes: "(danh sách kiểu video và playbook từng kiểu — lấy từ mục Kiểu video — sẽ hiện ở đây)",
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",
   previous_output: "(nội dung bước trước — dàn ý/storyboard/code — sẽ hiện ở đây)",

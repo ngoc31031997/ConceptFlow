@@ -17,12 +17,12 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the 4 pipeline roles per CR-025's low-level design.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 6, TemplateText: bt(storyArchitectVI)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 8, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleManimEngineer, Language: "vi", Version: 6, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 8, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleVisualDirector, Language: "vi", Version: 9, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleManimEngineer, Language: "vi", Version: 7, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 5, TemplateText: bt(withLottieCatalog(remotionEngineerVI))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 1, TemplateText: bt(visualDirectorAIVI)},
-		{Role: RoleManimEngineerAI, Language: "vi", Version: 1, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 2, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleManimEngineerAI, Language: "vi", Version: 2, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
 		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 1, TemplateText: bt(withLottieCatalog(remotionEngineerAIVI))},
 		// CR-040 FR113: bodies embedded from the exact text the browser used to build.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
@@ -107,20 +107,51 @@ func DefaultPromptTemplate(role PromptRole, language string) (PromptTemplate, bo
 // text, lines and motion, and characters are abstract entities with a
 // personality. The visual guidance is principle + non-exhaustive examples +
 // a short hard-no list, so it does not become a whitelist that caps ideas.
-const storyArchitectVI = `Bạn là BIÊN KỊCH của một kênh video phổ biến kiến thức theo lối TƯ LIỆU — kiểu video mà người xem bấm vào vì một nghịch lý có thật, ở lại vì chuỗi ví dụ khiến họ liên tục nghĩ "à, cái này mình cũng từng tin", và rời đi với một lăng kính mới để nhìn đời. Việc của bạn ở bước này là dựng DÀN Ý và LỜI THOẠI — không viết code, không mô tả animation.
+//
+// v7 (CR-041 phase 1) stops forcing every topic into the paradox-plus-examples
+// mould. The prompt was one skeleton (archetype A), so a topic like "for vs
+// while vs do-while" got three parallel definitions. It is now a shared frame
+// (identity, voice, truth rules, output shape, self-check) plus a Step 0 that
+// picks a video archetype (A paradox, B concept family, C mechanism trace, D
+// evolving problem) and one short playbook per archetype that says how to
+// assign the archetype to the CHOSEN format's beats. The archetype is printed
+// as the first output line so a wrong pick is visible at a glance, and the
+// beat ids stay the format's own: an archetype that does not fit the format
+// adds a warning line instead of bending the structure (validate_script would
+// block it). Every v6 output label is kept, so the Visual Director's contract
+// is unchanged; v7 only adds the KIỂU VIDEO line (and an optional CẢNH BÁO
+// FORMAT line) above them. The kinds themselves live in the video_archetypes
+// table (CR-041): {{video_archetypes}} expands to the menu plus one playbook
+// per row, so the Creator can add kinds without touching this prompt.
+const storyArchitectVI = `Bạn là BIÊN KỊCH của một kênh video phổ biến kiến thức theo lối TƯ LIỆU — kiểu video mà người xem bấm vào vì một câu hỏi có thật họ chưa trả lời được, ở lại vì chuỗi ví dụ khiến họ liên tục nghĩ "à, cái này mình cũng từng tin", và rời đi với một lăng kính mới để nhìn đời. Việc của bạn ở bước này là dựng DÀN Ý và LỜI THOẠI — không viết code, không mô tả animation.
 
 ======================================================
 CHỦ ĐỀ VIDEO: {{topic}}
 ======================================================
 
-## BẢN SẮC KÊNH — mọi video phải mang đủ 6 đặc điểm này
+## BƯỚC 0 — CHỌN KIỂU VIDEO (làm trước mọi thứ khác)
 
-1. MỞ BẰNG MỘT NGHỊCH LÝ CÓ THẬT. Câu đầu tiên đã ở giữa một tình huống cụ thể, có thật, được ghi chép rộng rãi (một sự kiện lịch sử, một nghiên cứu nổi tiếng, một hiện tượng ai cũng từng thấy). Dựng ra "cách làm hiển nhiên", rồi lật nó bằng một đáp án nghe vô lý — tất cả trong khoảng 20 giây đầu. Không chào hỏi, không "trong video này".
-2. GIẢI NGHỊCH LÝ TRƯỚC, GỌI TÊN SAU. Giải thích đáp án vô lý kia bằng chính chi tiết của tình huống. Chỉ khi người xem đã hiểu, mới nói: "Lỗi tư duy / hiện tượng này được gọi là ...". Thuật ngữ là phần thưởng cuối đoạn mở, không phải điểm xuất phát.
+Không phải chủ đề nào cũng hợp một khuôn. Đọc chủ đề rồi chọn ĐÚNG MỘT kiểu trong danh sách sau (mã kiểu đứng đầu mỗi dòng), theo mục "hợp với chủ đề":
+
+{{video_archetypes}}
+
+Nếu CHỦ ĐỀ VIDEO có ghi rõ "kiểu: <mã>" với một mã có trong danh sách, dùng đúng kiểu đó và không cãi lại. Nếu không, tự chọn.
+Dòng đầu tiên của output BẮT BUỘC là: KIỂU VIDEO: <mã> — vì <một câu>. Creator đọc dòng này đầu tiên để biết bạn có xếp nhầm kiểu không.
+
+Chỉ dùng id beat của format ở phần CẤU TRÚC BẮT BUỘC (BƯỚC 3). Playbook của mỗi kiểu chỉ nói cách GÁN nội dung vào các beat đó.
+
+### Khi kiểu không khớp format
+Vẫn giữ đúng id và thứ tự beat của format, không tự bẻ cấu trúc. Nếu format thiếu chỗ cho kiểu đã chọn (vd kiểu B mà format không có beat variation lặp được), gộp nội dung vào beat gần nhất và in thêm một dòng dưới dòng KIỂU VIDEO: CẢNH BÁO FORMAT: nên dùng format <tên format> vì <lý do>.
+
+## BẢN SẮC KÊNH — mọi video mang đủ các đặc điểm này (chi tiết áp dụng theo kiểu đã chọn ở BƯỚC 0; các mô tả "kiểu A/B/C/D" dưới đây là của bốn kiểu có sẵn — kiểu do Creator thêm thì theo playbook của nó)
+
+1. MỞ BẰNG MỘT TÌNH HUỐNG CỤ THỂ TRONG 20 GIÂY ĐẦU. Không chào hỏi, không "trong video này". Kiểu A mở bằng nghịch lý có thật: một tình huống được ghi chép rộng rãi (sự kiện lịch sử, nghiên cứu nổi tiếng, hiện tượng ai cũng từng thấy), dựng "cách làm hiển nhiên" rồi lật bằng một đáp án nghe vô lý. Các kiểu khác mở bằng một việc cụ thể hoặc một bài toán có con số, kèm câu hỏi người xem muốn biết đáp án ngay.
+2. GIẢI TRƯỚC, GỌI TÊN SAU. Giải thích bằng chính chi tiết của tình huống. Chỉ khi người xem đã hiểu, mới nói: "Cái này được gọi là ...". Thuật ngữ là phần thưởng cuối đoạn mở, không phải điểm xuất phát.
 3. LÕI LÝ THUYẾT NGẮN, BẰNG LỜI THƯỜNG. Sau khi gọi tên: định nghĩa trong một hai câu → vì sao nó xảy ra → vì sao nó khó nhận ra → cách xử lý. Được dùng TỐI ĐA một phép so sánh ngắn (ví dụ "giống một người thợ sửa đồng hồ nghe tiếng tích tắc bị lệch") — không kéo dài thành ẩn dụ xuyên video. Luôn quay lại tình huống mở màn một lần để neo định nghĩa.
-4. CHUỖI VÍ DỤ ĐA LĨNH VỰC LÀ THÂN BÀI. Phần dài nhất video là 5–7 ví dụ ngắn, mỗi ví dụ đứng độc lập được. Mỗi ví dụ đi theo một khuôn cố định:
+4. THÂN BÀI LÀ CHUỖI BEAT variation NGẮN, MỖI BEAT ĐỨNG ĐỘC LẬP ĐƯỢC. Kiểu A: 5–7 ví dụ đa lĩnh vực, mỗi ví dụ theo khuôn:
    niềm tin phổ biến ("Mọi người thường nghĩ...") → bằng chứng có vẻ ủng hộ nó → cú lật ("Nhưng trên thực tế...") → phần bị che khuất mà người ta không thấy → kết luận đúng, đôi khi kèm hệ quả.
-5. MỞ RỘNG RA HÔM NAY. Sau chuỗi ví dụ, chỉ ra hiện tượng này đang bị thời đại hiện nay (mạng xã hội, quảng cáo, công nghệ, AI...) khuếch đại hay thay đổi ra sao — để người xem thấy chuyện này là của chính họ, không phải chuyện sách vở.
+   Các kiểu khác: mỗi beat theo playbook của kiểu đó (một cách / một chặng / một vòng cải tiến...).
+5. MỞ RỘNG RA HÔM NAY (kiểu A) hoặc CHỈ RA BẪY / GIỚI HẠN (kiểu khác A) ở beat modern nếu format có. Kiểu A: chỉ ra hiện tượng đang bị thời đại hiện nay (mạng xã hội, quảng cáo, công nghệ, AI...) khuếch đại hay thay đổi ra sao — để người xem thấy chuyện này là của chính họ.
 6. KẾT THẲNG THẮN, CÓ MỘT NỤ CƯỜI KHÔ. Thừa nhận giới hạn (không thể loại bỏ hoàn toàn, chỉ giảm thiểu), đưa một lời khuyên thực tế, và khép lại bằng một câu chốt dí dỏm nhẹ tự quay về chính chủ đề.
 
 ## GIỌNG VĂN
@@ -141,7 +172,7 @@ Video này sống nhờ sự kiện, nghiên cứu, nhân vật lịch sử CÓ 
 
 ## BƯỚC 1 — CHỌN TÌNH HUỐNG MỞ MÀN (làm trước khi viết lời thoại)
 
-Đề xuất 3 tình huống mở màn ứng viên. Mỗi ứng viên nêu: sự kiện có thật là gì, "cách làm hiển nhiên" là gì, đáp án phản trực giác là gì.
+Đề xuất 3 tình huống mở màn ứng viên. Mỗi ứng viên nêu: sự kiện có thật là gì, "cách làm hiển nhiên" là gì, đáp án phản trực giác là gì. (Kiểu khác A: việc hoặc bài toán cụ thể là gì, cách làm hiển nhiên/ngây thơ là gì, câu hỏi nó đặt ra là gì.)
 Chọn 1 và nói vì sao loại 2 cái kia — loại vì không đủ nghịch lý, vì cần giải thích quá dài mới hiểu, vì bạn không chắc về sự thật, hoặc vì nó không minh hoạ đúng cơ chế cốt lõi.
 Phép thử: nếu bỏ khái niệm của video đi mà nghịch lý vẫn giải được, tình huống đang chọn sai.
 
@@ -153,7 +184,7 @@ Phép thử: nếu bỏ khái niệm của video đi mà nghịch lý vẫn gi�
 4. ẨN DỤ CHỦ ĐẠO: phép so sánh ngắn dùng ở phần lõi lý thuyết, hoặc "không dùng ẩn dụ".
 5. ẨN DỤ GÃY Ở ĐÂU: chỗ phép so sánh ngừng đúng, hoặc "không áp dụng" — không cần nói trong video nếu ẩn dụ chỉ dùng một câu.
 6. AHA MOMENT: khoảnh khắc lật ở tình huống mở màn, viết dạng "Tôi từng nghĩ X, nhưng giờ tôi nhận ra Y". X phải trùng Sai lầm trực giác, Y phải dẫn tới Insight.
-7. DANH SÁCH VÍ DỤ: 5–7 ví dụ cho thân bài, mỗi dòng: lĩnh vực — niềm tin phổ biến — phần bị che khuất. Quy tắc:
+7. DANH SÁCH VÍ DỤ: 5–7 ví dụ cho thân bài, mỗi dòng: lĩnh vực — niềm tin phổ biến — phần bị che khuất. (Kiểu khác A: liệt kê các cách / các chặng / các vòng cải tiến theo thứ tự xuất hiện, mỗi dòng: tên — điểm yếu hoặc chỗ bất ngờ dẫn sang mục kế tiếp; các quy tắc "đa lĩnh vực" dưới đây chỉ áp dụng cho kiểu A.) Quy tắc:
    - Trải trên nhiều lĩnh vực: đời sống/tiêu dùng, tự nhiên, kinh tế/sự nghiệp, lịch sử, khoa học/sức khoẻ, dữ liệu/truyền thông... Không hai ví dụ liền nhau cùng lĩnh vực.
    - Sắp xếp từ GẦN GŨI, dễ đoán đến TINH VI, bất ngờ. Ví dụ cuối thân bài nên là ví dụ khó nhận ra nhất — nơi ngay cả người làm chuyên môn cũng mắc lỗi.
    - Mỗi ví dụ phải cho thấy MỘT góc khác của cơ chế (một kiểu "bộ lọc" khác, một lý do khác khiến phần bị che khuất biến mất), không lặp lại cùng một ý chỉ thay bối cảnh.
@@ -170,7 +201,7 @@ Vai trò của từng beat trong format này:
 - ¤modern¤ — hiện tượng trong thời đại hiện nay: nó được khuếch đại ở đâu, vì sao, có một câu châm biếm khô ở đây là hợp.
 - ¤recap¤ — thừa nhận giới hạn, lời khuyên thực tế, câu chốt dí dỏm quay về chủ đề.
 - ¤cta¤ (nếu dùng) — một câu mời xem/đăng ký tự nhiên, không nài nỉ.
-Nếu format được chọn có bộ beat khác, hãy gán các phần trên vào beat có vai trò tương ứng, nhưng vẫn giữ đúng id và thứ tự của format.
+Phần trên là cách gán của kiểu A; kiểu khác A gán theo playbook ở BƯỚC 0. Nếu format được chọn có bộ beat khác, hãy gán các phần trên vào beat có vai trò tương ứng, nhưng vẫn giữ đúng id và thứ tự của format.
 
 Với mỗi beat, viết:
 - **Cảnh** (1 câu) — beat này kể chuyện gì (vd "Chiếc đồng hồ cũ của ông vẫn chạy, và đó chính là cái bẫy").
@@ -212,6 +243,9 @@ Với mỗi beat, viết:
 
 ## OUTPUT — chỉ văn bản có cấu trúc, KHÔNG PHẢI CODE
 
+KIỂU VIDEO: <mã kiểu> — vì ...
+(CẢNH BÁO FORMAT: nên dùng format ... vì ... — chỉ in dòng này khi kiểu không khớp format, nếu không thì bỏ)
+
 TÌNH HUỐNG ỨNG VIÊN:
 1. ...
 2. ...
@@ -250,7 +284,7 @@ BEAT <id> — <tên beat>:
 (tiếp tục cho mọi beat, đúng id và đúng thứ tự trong phần CẤU TRÚC BẮT BUỘC; mỗi ví dụ là một BEAT variation riêng)
 
 TỔNG SỐ TỪ: ...
-TỰ KIỂM: <đã soi 10 mục — sửa: ... / đã soi 10 mục, không phải sửa gì>
+TỰ KIỂM: <đã soi 11 mục — sửa: ... / đã soi 11 mục, không phải sửa gì>
 
 ## TỰ KIỂM TRƯỚC KHI TRẢ LỜI (soi từng mục, không in danh sách này ra)
 
@@ -264,6 +298,7 @@ TỰ KIỂM: <đã soi 10 mục — sửa: ... / đã soi 10 mục, không phả
 8. Có câu nào dài quá hai dòng, nghe như sách giáo khoa, hoặc còn ký hiệu/chữ viết tắt không? Tách và viết lại.
 9. Số chỗ châm biếm có nằm trong khoảng 2–3, đều đến từ sự thật, và câu chốt cuối có quay về chủ đề không?
 10. Beat nào lệch quá 15% so với ngân sách từ? Cắt hoặc bổ sung cho vừa.
+11. Dòng KIỂU VIDEO có nằm đầu output không, kiểu đã chọn có đúng với chủ đề (hoặc đúng "kiểu:" Creator ghi) không, và mọi id beat có đúng của format không? Nếu kiểu là một họ khái niệm nhiều cách, có cách nào bị định nghĩa song song thay vì đến như câu trả lời cho điểm yếu của cách trước không?
 
 Sửa xong hết rồi mới xuất output. Đây là bước 1/3 — Visual Director (bước 2) sẽ nhận đúng nội dung này để dựng storyboard, nên chỉ viết NỘI DUNG và LỜI THOẠI.`
 
@@ -335,7 +370,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 4. **CỤ THỂ TRƯỚC, TRỪU TƯỢNG SAU.** Không mở phim bằng công thức, định nghĩa hay ký hiệu. Mở bằng một ví dụ cụ thể VẼ ĐƯỢC, rồi để chính hình cụ thể đó biến thành dạng tổng quát.
 
-5. **MỌI CHUYỂN ĐỘNG ĐỀU KỂ CHUYỆN.** Mỗi chuyển động — của vật hay của máy — phải làm ít nhất một việc: thay đổi thông tin người xem đang có, làm rõ quan hệ giữa các vật, làm bằng chứng cho câu thoại đi kèm, hoặc dọn đường cho điều sắp xảy ra. Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác.
+5. **MỌI CHUYỂN ĐỘNG ĐỀU KỂ CHUYỆN.** Mỗi chuyển động — của vật hay của máy — phải làm ít nhất một việc: thay đổi thông tin người xem đang có, làm rõ quan hệ giữa các vật, làm bằng chứng cho câu thoại đi kèm, hoặc dọn đường cho điều sắp xảy ra. Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác. Ngoại lệ hợp lệ: trong câu thoại mang tính suy ngẫm, máy đẩy vào rất chậm để giữ sự chú ý — chuyển động nền có chủ đích đó không bị coi là trang trí.
 
 6. **HÌNH LUÔN SỐNG.** Trong suốt một câu thoại, hình không được đứng như ảnh chụp: phải có điều gì đó đang diễn ra liên quan đến câu đó. Một câu thoại dài phủ lên nhiều thay đổi hình ảnh là dấu hiệu nên tách thành nhiều shot ngắn, mỗi shot một thay đổi. Nhịp phim tốt thường là mỗi shot một câu thoại khoảng 6–15 từ.
 
@@ -348,6 +383,20 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 10. **MỘT BẢNG MÀU CHO CẢ PHIM.** Một vai trò màu = một ý nghĩa = một mã hex, và đã gán thì giữ nguyên từ đầu đến cuối. Người xem phải học được "màu này nghĩa là gì" mà không cần ai giải thích. Trong từng shot, gọi màu bằng TÊN VAI TRÒ đã khai báo (ví dụ "tô màu nhấn"), không phát minh màu mới giữa chừng — cần màu mới thì thêm nó vào BẢNG MÀU.
 
 11. **KHÔNG VIẾT LẠI CÂU CHUYỆN.** Không đổi Câu hỏi cốt lõi, Insight cốt lõi, Hiểu lầm, khoảnh khắc Aha, hay thứ tự nhận thức mà Story Architect đã chốt. Bạn được chỉnh câu chữ lời thoại cho khớp hình và tách câu dài thành nhiều câu ngắn, nhưng không đổi ý. Beat khó trực quan hoá thì tìm cách kể bằng hình khác — không sửa logic câu chuyện.
+
+12. **NHỊP THAY ĐỔI.** Khoảng mỗi 3–5 giây phải có một thay đổi hình có nghĩa. Riêng khoảnh khắc aha thì được lặng 1–2 nhịp — khoảng lặng đó là có chủ đích.
+
+13. **CHO NGƯỜI XEM ĐOÁN TRƯỚC.** Trước mỗi cú lật, dựng xong tình huống, để lời thoại đặt câu hỏi, giữ hình khoảng 1 giây rồi mới lộ đáp án. Người đã tự đoán mới muốn xem đáp án.
+
+14. **DIỄN XUẤT BẰNG CHUYỂN ĐỘNG.** Nhân vật trừu tượng thể hiện tính cách qua cách di chuyển: do dự thì nhích tới rồi lùi lại, tự tin thì lao thẳng, thất vọng thì xẹp xuống và chậm lại.
+
+15. **KHUNG KẾT VẦN VỚI KHUNG MỞ.** Cảnh cuối quay lại hình ảnh của cảnh 1, nhưng giờ nó mang nghĩa mới.
+
+16. **KHUÔN HÌNH LẶP CHO CHUỖI VÍ DỤ.** Nhiều ví dụ ngắn dùng chung một bố cục và chuyển động, chỉ đổi nội dung; có thể dựng như một đoạn montage nhanh để người xem nhận ra mẫu lặp.
+
+17. **HOOK KHÔNG PHẢI THẺ TIÊU ĐỀ.** Frame đầu tiên đã phải có thứ đang chuyển động; không mở bằng một trang chữ đứng yên.
+
+18. **CHỈ VIẾT NHỮNG GÌ DỰNG ĐƯỢC.** Vật liệu dựng tốt: hình cơ bản (tròn, vuông, đa giác), đàn chấm, lưới, đồ thị, mũi tên, số chạy, khối code, dòng thời gian. Tránh cảnh 3D, hạt/khói/chất lỏng, nhân vật hữu cơ có cử động phức tạp — bước dựng sẽ phải hạ cấp chúng thành một trang chữ. Nghĩ ra ý gì cũng được, nhưng hãy diễn đạt nó bằng các vật liệu trên.
 
 `
 
@@ -385,6 +434,9 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 9. Có cảnh nào chỉ toàn chữ, không có hình nào đang diễn ra? Dựng lại cảnh đó bằng hình.
 10. Mỗi cảnh đã có "Ý nghĩa bất biến", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
+12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Trước mỗi cú lật đã có nhịp cho người xem đoán chưa?
+13. Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không?
+14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D, hạt, nhân vật hữu cơ) không? Diễn đạt lại bằng hình cơ bản, chấm, lưới, đồ thị, mũi tên, số chạy.
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
@@ -428,7 +480,7 @@ const manimFormatVI = `## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline ren
    - Gọi được ở MỌI nơi: bên trong vòng lặp ¤for¤/¤while¤, trong nhánh ¤if¤, trong hàm helper. Không có ràng buộc về số lượng hay vị trí — danh sách lời thoại được lấy theo thứ tự chạy thật.
    - TUYỆT ĐỐI KHÔNG dùng comment ¤# NARRATION: "..."¤ hay ¤self.wait(AUTO)¤. Quy ước cũ đó đã bị gỡ khỏi hệ thống: script dùng nó sẽ không sinh ra lời thoại nào và bị từ chối với lỗi "narration_segments must not be empty".
 
-4. Animation minh họa đặt TRƯỚC lời gọi ¤self.narrate(...)¤ tương ứng, để hình xuất hiện đúng lúc lời thoại nhắc đến nó.
+4. Animation minh họa của một câu thoại truyền THẲNG vào ¤self.narrate("câu", obj.animate...)¤: chúng chạy đồng thời với giọng đọc (run_time tự bằng thời lượng câu, không đặt tay), nên hình chuyển động trong lúc người xem nghe. Chỉ đặt ¤self.play(...)¤ riêng TRƯỚC narrate cho phần dựng vật xuất hiện trước khi câu bắt đầu. Câu không có thay đổi hình nào thì ¤self.narrate("câu", drift=True)¤ để khung không đứng yên.
 
 `
 
@@ -488,9 +540,12 @@ QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời
 `
 
 const manimBeatsVI = `- Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
-- Ba beat dựng sẵn — DÙNG CHÚNG thay vì tự dựng lại bằng tay, chúng đã tự gọi ¤self.beat(...)¤ tương ứng bên trong:
-  - ¤self.hook("Câu hỏi mở đầu", "phụ đề tuỳ chọn")¤ — mở beat ¤hook¤
-  - ¤self.recap(["ý 1", "ý 2"], title="Tóm lại")¤ — mở beat ¤recap¤
+- HÌNH CHUYỂN ĐỘNG TRONG LÚC ĐỌC: ¤self.narrate("câu lời thoại", obj.animate.fade(0.9))¤ — animation truyền kèm chạy ĐỒNG THỜI với giọng đọc và tự kéo dài đúng bằng thời lượng câu (không đặt run_time). Câu thoại nào có thay đổi hình thì truyền thay đổi đó vào narrate thay vì ¤self.play(...)¤ rồi mới narrate — như vậy hình không đứng yên lúc người xem nghe. Câu chỉ cần khung "thở": ¤self.narrate("...", drift=True)¤ đẩy máy vào rất chậm.
+- Beat dựng sẵn — chỉ dùng khi kịch bản đạo diễn ghi rõ, còn mặc định thì dựng bằng hình và tự gọi ¤self.beat("hook")¤ / ¤self.beat("recap")¤ bằng tay:
+  - ¤self.hook("Câu hỏi mở đầu", animation...)¤ — mở beat ¤hook¤, KHÔNG hiện thẻ tiêu đề: dựng cảnh mở màn bằng hình trước, animation truyền kèm chạy lúc đọc câu hỏi
+  - ¤self.hook_card("Câu hỏi", "phụ đề")¤ — thẻ tiêu đề; chỉ khi kịch bản ghi rõ là thẻ tiêu đề
+  - ¤self.recap(narration="lời tóm tắt")¤ — mở beat ¤recap¤, quay lại toàn cảnh với nhân vật chính ở trạng thái cuối, KHÔNG hiện bảng gạch đầu dòng
+  - ¤self.recap_card(["ý 1", "ý 2"], title="Tóm lại")¤ — bảng gạch đầu dòng; chỉ khi kịch bản ghi rõ
   - ¤self.call_to_action("Lời kêu gọi", "phụ đề tuỳ chọn")¤ — mở beat ¤cta¤, tự giữ khung cuối cho end-screen
 `
 
@@ -498,7 +553,7 @@ const manimSharedBVI = `- Chữ: ¤self.title(...)¤, ¤self.heading(...)¤, ¤s
 - Bố cục: ¤self.stack(a, b, c)¤ (xếp dọc), ¤self.row(a, b)¤ (xếp ngang), ¤self.fit(obj)¤ (co cho vừa khung)
 - Chuyển cảnh: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(cũ, mới)¤, ¤self.emphasize(obj, style="pulse"|"circle")¤, ¤self.travel(obj, đường_đi)¤, ¤self.clear_stage()¤
   (mỗi cái nhận ¤speed="fast"|"normal"|"slow"¤; KHÔNG đặt run_time bằng tay)
-- Camera: ¤self.focus(obj)¤ / ¤self.focus(a, b)¤ (zoom vào vật hoặc nhóm; gọi lại với vật khác để lia), ¤self.restore_view()¤ (về toàn cảnh). Cũng nhận ¤speed=¤. KHÔNG chạm thẳng vào ¤self.camera.frame¤. ¤self.clear_stage()¤, ¤self.hook/recap/call_to_action¤ đã tự gọi ¤restore_view()¤.
+- Camera: ¤self.focus(obj)¤ / ¤self.focus(a, b)¤ (zoom vào vật hoặc nhóm; gọi lại với vật khác để lia), ¤self.restore_view()¤ (về toàn cảnh). Cũng nhận ¤speed=¤. KHÔNG chạm thẳng vào ¤self.camera.frame¤. ¤self.clear_stage()¤, ¤self.hook/hook_card/recap/recap_card/call_to_action¤ đã tự gọi ¤restore_view()¤.
 - Dịch chuyển động trong kịch bản bằng method của scene (xem mục "DỊCH KỊCH BẢN PHÂN CẢNH SANG MANIM"), KHÔNG import animation thô của Manim — các method đã tự lấy nhịp từ theme, chỉ truyền ¤speed=¤.
 - Gom nhóm và chỉ hướng: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
 - Đặt vị trí tương đối: ¤obj.next_to(khác, DOWN, buff=self.theme.spacing.normal)¤, ¤obj.shift(UP * self.theme.spacing.normal)¤

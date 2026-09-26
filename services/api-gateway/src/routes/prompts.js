@@ -48,6 +48,12 @@ function promptsRouter(authoringClient) {
   router.put('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/admin/prompts/:id/activate', proxyHandler(authoringClient, 'authoring-service'));
   router.delete('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
+  // CR-041 — the table of video kinds the Story Architect chooses from.
+  router.get('/v1/video-archetypes', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/admin/video-archetypes', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/admin/video-archetypes/:id/copy', proxyHandler(authoringClient, 'authoring-service'));
+  router.put('/v1/admin/video-archetypes/:id', proxyHandler(authoringClient, 'authoring-service'));
+  router.delete('/v1/admin/video-archetypes/:id', proxyHandler(authoringClient, 'authoring-service'));
   return router;
 }
 

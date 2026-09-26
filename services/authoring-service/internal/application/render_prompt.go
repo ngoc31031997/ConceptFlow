@@ -54,6 +54,28 @@ type RenderPromptUseCase struct {
 	projects    PromptRenderContextPort
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
+	archetypes  ArchetypeListPort // optional (CR-041); nil renders {{video_archetypes}} empty
+}
+
+// ArchetypeListPort is the one read the renderer needs from the archetype table.
+type ArchetypeListPort interface {
+	ListArchetypes(ctx context.Context) ([]domain.VideoArchetype, error)
+}
+
+// WithArchetypes lets the renderer fill {{video_archetypes}} from the table.
+func (uc *RenderPromptUseCase) WithArchetypes(p ArchetypeListPort) *RenderPromptUseCase {
+	uc.archetypes = p
+	return uc
+}
+
+// archetypeSection is {{video_archetypes}}. A failed read renders the "no kinds"
+// text rather than failing the prompt over a missing nicety.
+func (uc *RenderPromptUseCase) archetypeSection(ctx context.Context) string {
+	var list []domain.VideoArchetype
+	if uc.archetypes != nil {
+		list, _ = uc.archetypes.ListArchetypes(ctx)
+	}
+	return domain.BuildVideoArchetypesSection(list)
 }
 
 func NewRenderPromptUseCase(
@@ -194,12 +216,16 @@ func (uc *RenderPromptUseCase) variablesFor(
 		"narration_language_rule": domain.NarrationLanguageRuleFor(language, engineOf(role)),
 		"previous_output":         previous,
 		"format_beats":            "",
+		"video_archetypes":        "",
 		"subtitle_zone":           domain.SubtitleZone(project, language),
 	}
 
 	// The beat sheet only means something for the step that writes the
 	// outline; fetching a format for the others would be work whose result
 	// nothing reads.
+	if role == domain.RoleStoryArchitect {
+		vars["video_archetypes"] = uc.archetypeSection(ctx)
+	}
 	if role == domain.RoleStoryArchitect && project.VideoFormatID != "" {
 		format, err := uc.formats.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)
 		if err == nil {

@@ -72,6 +72,20 @@ CREATE TABLE IF NOT EXISTS prompts (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
+
+-- CR-041: video archetypes the Story Architect can be told to make. System rows
+-- ship in the binary (read-only); the Creator adds their own.
+CREATE TABLE IF NOT EXISTS video_archetypes (
+    id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    code        TEXT NOT NULL,
+    name        TEXT NOT NULL,
+    when_to_use TEXT NOT NULL,
+    playbook    TEXT NOT NULL,
+    is_system   BOOLEAN NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS video_archetypes_code_key ON video_archetypes (upper(code));
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

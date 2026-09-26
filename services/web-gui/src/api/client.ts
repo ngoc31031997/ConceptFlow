@@ -549,6 +549,58 @@ export async function deletePrompt(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/prompts/${id}`, { method: "DELETE" });
 }
 
+/** CR-041 — một kiểu video mà prompt Biên kịch có thể được bảo dựng. */
+export interface VideoArchetype {
+  id: string;
+  /** Mã ngắn (A, B, ...) — Creator gõ "kiểu: B" vào chủ đề để ép kiểu. */
+  code: string;
+  name: string;
+  /** Chủ đề nào hợp — model chọn kiểu dựa vào đây. */
+  when_to_use: string;
+  /** Cách gán kiểu này vào các beat của format đang chọn. */
+  playbook: string;
+  is_system: boolean;
+}
+
+export interface VideoArchetypeInput {
+  /** Để trống khi tạo mới thì server lấy chữ cái còn trống kế tiếp. */
+  code: string;
+  name: string;
+  when_to_use: string;
+  playbook: string;
+}
+
+export async function listVideoArchetypes(): Promise<VideoArchetype[]> {
+  const result = await apiFetch<{ video_archetypes: VideoArchetype[] }>("/v1/video-archetypes");
+  return result.video_archetypes;
+}
+
+export function createVideoArchetype(input: VideoArchetypeInput): Promise<VideoArchetype> {
+  return apiFetch<VideoArchetype>("/v1/admin/video-archetypes", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+/** Copy một dòng (kể cả dòng hệ thống) thành dòng của người dùng. */
+export function copyVideoArchetype(id: string): Promise<VideoArchetype> {
+  return apiFetch<VideoArchetype>(`/v1/admin/video-archetypes/${id}/copy`, { method: "POST" });
+}
+
+/** Dòng hệ thống trả 403. */
+export function updateVideoArchetype(id: string, input: VideoArchetypeInput): Promise<VideoArchetype> {
+  return apiFetch<VideoArchetype>(`/v1/admin/video-archetypes/${id}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteVideoArchetype(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/admin/video-archetypes/${id}`, { method: "DELETE" });
+}
+
 /**
  * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
  * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
