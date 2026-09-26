@@ -34,6 +34,7 @@ type Router struct {
 	suggestPublishMetadata  suggestPublishMetadataUseCase
 	suggestShortScript      suggestShortScriptUseCase
 	prompts                 promptsUseCase
+	archetypes              archetypesUseCase
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	authoringChain          authoringChainUseCase
@@ -62,6 +63,11 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
 	// CR-025: prompt wording lives in the DB. Public read (the wizard fetches the
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
+	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
+	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
+	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
+	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
+	r.Delete("/v1/admin/video-archetypes/{id}", rt.handleDeleteArchetype)
 	r.Get("/v1/prompts/{role}", rt.handleGetActivePrompt)
 	r.Get("/v1/admin/prompts", rt.handleListPrompts)
 	r.Post("/v1/admin/prompts", rt.handleCreatePrompt)

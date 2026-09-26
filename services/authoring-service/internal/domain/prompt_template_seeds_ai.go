@@ -71,7 +71,8 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 9. Có cảnh nào chỉ toàn chữ, không có hình nào đang diễn ra? Dựng lại cảnh đó bằng hình.
 10. Mỗi cảnh đã có "invariant", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
-12. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
+12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (hình cơ bản, chấm, lưới, đồ thị, mũi tên, số chạy, code, dòng thời gian) không?
+13. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video theo từng shot, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
@@ -207,7 +208,7 @@ const manimFormatAIVI = `## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline r
    - Nội dung trong ngoặc kép là câu hoàn chỉnh, nghe tự nhiên khi đọc thành tiếng, không chứa dấu ngoặc kép bên trong, không xuống dòng, dùng dấu ngoặc kép thẳng " (không phải " " kiểu chữ nghiêng).
    - ¤self.wait(số giây cụ thể)¤ chỉ dùng cho khoảng lặng KHÔNG có lời thoại.
    - TUYỆT ĐỐI KHÔNG dùng comment ¤# NARRATION: "..."¤ hay ¤self.wait(AUTO)¤: quy ước cũ đó đã bị gỡ, script dùng nó bị từ chối.
-4. Animation minh họa đặt TRƯỚC lời gọi ¤self.narrate(...)¤ tương ứng, để hình xuất hiện đúng lúc lời thoại nhắc đến nó.
+4. Animation minh họa của một câu thoại truyền THẲNG vào ¤self.narrate("câu", obj.animate...)¤: chúng chạy đồng thời với giọng đọc (run_time tự bằng thời lượng câu, không đặt tay), nên hình chuyển động trong lúc người xem nghe. Chỉ đặt ¤self.play(...)¤ riêng TRƯỚC narrate cho phần dựng vật xuất hiện trước khi câu bắt đầu. Câu không có thay đổi hình nào thì ¤self.narrate("câu", drift=True)¤ để khung không đứng yên.
 5. KHÔNG gọi ¤self.beat(...)¤, ¤self.chapter(...)¤, ¤self.hook(...)¤, ¤self.recap(...)¤ hay ¤self.call_to_action(...)¤: hệ thống đã gọi ¤self.beat(<id cảnh>)¤ ở đầu mỗi cảnh, và ba beat dựng sẵn kia tự gọi thêm một ¤self.beat¤ nữa bên trong (sẽ đánh dấu beat hai lần). Dựng cùng ý bằng các component (¤TitleCard¤, ¤Callout¤, ¤Recap([...])¤...) và ¤self.title/heading/body/caption¤ như mọi shot khác.
 6. Các shot chạy nối tiếp nhau trên CÙNG một khung hình: shot không tự dọn khung trừ khi kịch bản nói "cắt thẳng sang cảnh trống". Vật xuyên suốt do ¤setup_cast¤ dựng sẵn (chỉ tạo, chưa hiện) — shot nào cần thì tự ¤self.reveal(...)¤.
 
@@ -217,7 +218,7 @@ const manimCheckAIVI = `## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TR
 
 1. Trả về đúng các method được giao — không thiếu, không thừa, đúng tên ¤shot_N_M¤ — và đúng định dạng mà tin nhắn của người dùng yêu cầu?
 2. Có còn chuỗi ¤# NARRATION¤ hoặc ¤wait(AUTO)¤ nào không? Nếu CÓ, thay bằng ¤self.narrate("...")¤.
-3. Mỗi lời thoại có phải một lời gọi ¤self.narrate("...")¤ đặt ngay SAU animation minh họa cho nó không? Có ¤self.wait(...)¤ nào thừa ngay sau một lời gọi narrate không?
+3. Mỗi lời thoại có phải một lời gọi ¤self.narrate("...")¤, với animation minh họa của câu đó truyền kèm để chạy trong lúc đọc, không phải dựng xong rồi mới đứng yên nghe? Có ¤self.wait(...)¤ nào thừa ngay sau một lời gọi narrate không?
 4. Code có bám đúng "visual" và "camera" của shot không, và "narration" có nguyên văn trong các lời gọi narrate không? Có câu thoại dài phủ lên nhiều thay đổi hình mà chưa tách thành nhiều ¤self.narrate(...)¤ không?
 5. Chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không màu hex viết thẳng, không font_size đặt tay, không ¤from manim import *¤, không toạ độ tuyệt đối hardcode?
 6. Có tham số nào của ¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤, ¤self.title/heading/body/caption¤ đang nhận một component/Mobject thay vì chuỗi ¤str¤ không?
@@ -232,7 +233,7 @@ Trả lời đúng theo định dạng mà tin nhắn của người dùng yêu 
 
 // The manual prompt lists self.beat / self.chapter and the three prebuilt beats
 // here; in the AI flow the system emits the beats, so they are withdrawn.
-const manimBeatsAIVI = `- Lời thoại: ¤self.narrate("câu lời thoại")¤. (Cấu trúc beat do hệ thống lo — xem ràng buộc số 5 ở trên; KHÔNG gọi ¤self.beat¤, ¤self.chapter¤, ¤self.hook¤, ¤self.recap¤, ¤self.call_to_action¤.)
+const manimBeatsAIVI = `- Lời thoại: ¤self.narrate("câu lời thoại")¤; kèm hình chuyển động trong lúc đọc: ¤self.narrate("câu lời thoại", obj.animate.fade(0.9))¤; hoặc ¤drift=True¤ để đẩy máy rất chậm. (Cấu trúc beat do hệ thống lo — xem ràng buộc số 5 ở trên; KHÔNG gọi ¤self.beat¤, ¤self.chapter¤, ¤self.hook¤, ¤self.recap¤, ¤self.call_to_action¤.)
 `
 
 const manimEngineerAIVI = manimIntroAIVI + manimStoryAIVI + manimFormatAIVI + manimSharedAVI + manimBeatsAIVI + manimSharedBVI + manimCheckAIVI + manimOutputAIVI

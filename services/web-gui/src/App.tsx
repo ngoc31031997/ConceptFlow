@@ -17,6 +17,7 @@ import { VideoListPage } from "./pages/VideoListPage";
 import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
+import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
 
@@ -47,6 +48,7 @@ export function App() {
             {/* CR-025 — admin screen to edit pipeline prompt wording, outside
                 the Creator wizard flow. */}
             <Route path="/settings/prompts" element={<PromptSettingsPage />} />
+            <Route path="/settings/video-archetypes" element={<VideoArchetypeSettingsPage />} />
 
             {/* CR-031 — bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng

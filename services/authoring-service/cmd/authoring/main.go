@@ -67,6 +67,11 @@ func main() {
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient)
 	suggestShortScript := application.NewSuggestShortScriptUseCase(llmClient)
 
+	if err := authoringRepo.SeedVideoArchetypes(ctx); err != nil {
+		logger.Warn("could not seed system video archetypes", "error", err)
+	}
+	archetypes := application.NewVideoArchetypesUseCase(authoringRepo)
+
 	prompts := application.NewPromptsUseCase(authoringRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (the project
 	// must still be a draft, read from the orchestrator), and clears the steps
@@ -80,7 +85,7 @@ func main() {
 
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
 	// CR-027 FR77.1 — ONE renderer, shared by the Copy button and the generate endpoint.
-	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects)
+	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).WithArchetypes(authoringRepo)
 	generateAuthoring := application.NewGenerateAuthoringUseCase(
 		renderPrompt, llmProvider, llmUsageRecorder,
 		renderContext,
@@ -93,6 +98,7 @@ func main() {
 		WithShortScriptSuggester(suggestShortScript).
 		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
+		WithArchetypes(archetypes).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).

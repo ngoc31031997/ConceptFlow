@@ -10,13 +10,15 @@ import (
 
 var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 
+// story_architect was re-baselined on purpose by CR-041 (video archetypes).
+//
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "7cb68a65d178d43d07dca1afe9a38ea326af2b0752c421fa64fbbb5517aca3c7",
-	RoleVisualDirector:   "ae8ab5ebde484ca67ed63db3301e5d125954aa06d37c37aa1a86918abf09e7f6",
-	RoleManimEngineer:    "16ae08523e73434ddd775ef13edf47b5ba3dc1584a2e102e52ca8ccbf9000ddd",
+	RoleStoryArchitect:   "c7263faacab4a6d964dad521602534119ecc1e14abe72d8c19a0cb5a538624ba",
+	RoleVisualDirector:   "5fb59d05fbdbb3e45d6985c20dab2ae5484064a39c170b4b2fea7f6c20558e36",
+	RoleManimEngineer:    "85ff46357c76b59556b6a4c2e5298c57e5bcda13589071a4d72101efcae10fff",
 	RoleRemotionEngineer: "04e157efbf7c67934879797aa8273b146a425f98558a37a128ad37884c45b141",
 }
 
@@ -48,7 +50,7 @@ func aiTemplate(t *testing.T, role PromptRole) string {
 func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 	known := map[string]bool{
 		"topic": true, "previous_output": true, "narration_language_rule": true,
-		"channel_identity": true, "format_beats": true, "subtitle_zone": true,
+		"channel_identity": true, "format_beats": true, "subtitle_zone": true, "video_archetypes": true,
 	}
 	for _, role := range []PromptRole{RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI} {
 		text := aiTemplate(t, role)
@@ -102,5 +104,54 @@ func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 	}
 	if strings.Contains(manim, "{{theme_reference}}") || strings.Contains(remo, "{{lottie_catalog}}") {
 		t.Error("seed-time placeholders must be expanded")
+	}
+}
+
+// CR-042: the director gets rules 12–18 and a list of buildable materials; the
+// Manim engineer animates during narration and no longer defaults to title cards.
+func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
+	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
+		text := aiTemplate(t, role)
+		for _, want := range []string{"NHỊP THAY ĐỔI", "CHO NGƯỜI XEM ĐOÁN TRƯỚC", "DIỄN XUẤT BẰNG CHUYỂN ĐỘNG",
+			"KHUNG KẾT VẦN VỚI KHUNG MỞ", "HOOK KHÔNG PHẢI THẺ TIÊU ĐỀ", "vật liệu dựng tốt", "suy ngẫm"} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s lacks %q", role, want)
+			}
+		}
+		if strings.Contains(text, "Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác.\n") {
+			t.Errorf("%s rule 5 still bans all ambient motion", role)
+		}
+	}
+	for _, role := range []PromptRole{RoleManimEngineer, RoleManimEngineerAI} {
+		text := aiTemplate(t, role)
+		if !strings.Contains(text, `self.narrate("`) || !strings.Contains(text, "drift=True") {
+			t.Errorf("%s does not teach narrate(text, animation...) / drift", role)
+		}
+		if strings.Contains(text, "đặt TRƯỚC lời gọi") {
+			t.Errorf("%s still tells the model to play before narrating", role)
+		}
+	}
+	manual := aiTemplate(t, RoleManimEngineer)
+	for _, want := range []string{"hook_card", "recap_card", "KHÔNG hiện thẻ tiêu đề"} {
+		if !strings.Contains(manual, want) {
+			t.Errorf("manual manim engineer lacks %q", want)
+		}
+	}
+}
+
+// CR-041: the Story Architect picks a video archetype and says so first, while
+// every beat id still comes from the chosen format.
+func TestStoryArchitectAsksForAnArchetypeAndKeepsTheFormatsBeats(t *testing.T) {
+	text := aiTemplate(t, RoleStoryArchitect)
+	for _, want := range []string{
+		"KIỂU VIDEO: <mã kiểu>", "CẢNH BÁO FORMAT", "{{format_beats}}",
+		"{{video_archetypes}}", "kiểu: <mã>",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("story_architect lacks %q", want)
+		}
+	}
+	if strings.LastIndex(text, "KIỂU VIDEO: <mã kiểu>") > strings.LastIndex(text, "TÌNH HUỐNG ỨNG VIÊN:") {
+		t.Error("the KIỂU VIDEO line must come before the rest of the output")
 	}
 }

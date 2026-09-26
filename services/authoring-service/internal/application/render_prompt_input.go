@@ -106,6 +106,11 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		beats = uc.beatsFor(ctx, in, language)
 	}
 
+	archetypes := ""
+	if in.Role == domain.RoleStoryArchitect {
+		archetypes = uc.archetypeSection(ctx)
+	}
+
 	r := strings.NewReplacer(
 		"{{topic}}", topic,
 		"{{script}}", script,
@@ -115,6 +120,7 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		"{{narrate_example}}", domain.NarrateExample(language),
 		"{{thumbnail_audience}}", domain.ThumbnailAudience(language),
 		"{{format_beats}}", beats,
+		"{{video_archetypes}}", archetypes,
 		"{{subtitle_zone}}", domain.SubtitleZoneFor(domain.SubtitleMode(in.SubtitleMode), style, language),
 	)
 	return RenderedPrompt{
