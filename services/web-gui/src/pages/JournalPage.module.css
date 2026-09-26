@@ -36,7 +36,7 @@
 
 .projectId {
   display: block;
-  font-family: ui-monospace, monospace;
+  font-family: var(--font-mono);
   font-size: 11.5px;
   color: var(--ink-soft);
 }
@@ -55,6 +55,9 @@
 }
 
 .table th {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   text-align: left;
   color: var(--ink-faint);
   font-weight: 500;
@@ -63,6 +66,7 @@
 }
 
 .table td {
+  font-variant-numeric: tabular-nums;
   padding: 8px;
   border-bottom: var(--border-w) solid var(--surface-border);
   vertical-align: top;
@@ -138,10 +142,11 @@
   min-width: 90px;
 }
 .hb {
-  height: 8px;
-  border-radius: var(--radius);
+  height: 14px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: 2px;
   background: var(--accent);
 }
 .hot {
-  background: var(--warn, #c7811a);
+  background: var(--warn);
 }
