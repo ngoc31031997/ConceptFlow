@@ -15,22 +15,22 @@
 .icon {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(16, 28, 40, 0.65);
+  color: var(--ink-soft);
   flex-shrink: 0;
 }
 
 .toggle {
   width: 44px;
   height: 26px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   position: relative;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  background: var(--accent);
   flex-shrink: 0;
   border: none;
   padding: 0;
@@ -42,12 +42,12 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 6px rgba(31, 58, 90, 0.25);
+  background: var(--card);
+  box-shadow: var(--shadow);
   transition: left 0.15s ease, right 0.15s ease;
 }
 .toggle.off {
-  background: rgba(22, 34, 46, 0.12);
+  background: var(--muted);
 }
 .toggle.off .knob {
   right: auto;
@@ -64,12 +64,12 @@
 
 .uploadBtn {
   padding: 9px 16px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 12.5px;
   font-weight: 600;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
 }
 
 .uploadBtn:disabled {

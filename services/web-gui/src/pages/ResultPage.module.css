@@ -46,8 +46,8 @@
   gap: 12px;
   margin-top: var(--space-sm);
   padding: 14px 20px;
-  border-radius: 18px;
-  border: 1px dashed rgba(224, 67, 47, 0.3);
+  border-radius: var(--radius);
+  border: 1px dashed var(--danger);
 }
 
 @media (max-width: 900px) {

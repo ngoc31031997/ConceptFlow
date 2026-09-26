@@ -1,9 +1,9 @@
 .frame {
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: 18px;
+  border-radius: var(--radius);
   overflow: hidden;
-  background: linear-gradient(160deg, #1c1f33, #0e0f1c);
+  background: var(--accent-soft);
 }
 
 .video {

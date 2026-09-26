@@ -48,13 +48,13 @@
   row-gap: 2px;
   align-items: start;
   padding: 10px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
   cursor: pointer;
 }
 .option.on {
   border-color: var(--accent);
-  background: rgba(47, 143, 224, 0.1);
+  background: var(--accent-soft);
 }
 .option input {
   grid-row: 1 / span 2;

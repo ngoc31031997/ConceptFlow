@@ -1,11 +1,9 @@
 .card {
   background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 22px;
+  border: var(--border-w) solid var(--glass-border);
+  border-radius: var(--radius);
   padding: 20px;
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: var(--glass-shadow);
+  box-shadow: var(--shadow);
 }
 
 .cardHeader {
@@ -15,9 +13,12 @@
   margin-bottom: 16px;
 }
 .cardTitle {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
   font-size: 14px;
-  font-weight: 600;
-  color: rgba(16, 28, 40, 0.85);
+  font-weight: 700;
+  color: var(--ink);
 }
 .cardHint {
   font-size: 12.5px;
@@ -26,19 +27,20 @@
 }
 
 .ghostBtn {
+  background: var(--card);
   display: flex;
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  color: rgba(16, 28, 40, 0.75);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  color: var(--ink);
   font-size: 12.5px;
   font-weight: 500;
 }
 .ghostBtn:hover {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--card);
 }
 .ghostBtn:focus-visible {
   outline: 2px solid var(--accent);
@@ -54,9 +56,9 @@
   align-items: center;
   gap: 7px;
   padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(224, 67, 47, 0.25);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--danger);
   color: var(--danger);
   font-size: 12.5px;
   font-weight: 500;
@@ -64,7 +66,7 @@
 }
 .dangerGhostBtn:hover:not(:disabled) {
   background: var(--danger-soft);
-  border-color: rgba(224, 67, 47, 0.45);
+  border-color: var(--danger);
 }
 .dangerGhostBtn:focus-visible {
   outline: 2px solid var(--danger);
@@ -80,29 +82,29 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  border-radius: 13px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, var(--danger), #ff6b52);
-  box-shadow: 0 8px 20px rgba(224, 67, 47, 0.3);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--accent-ink);
+  background: var(--danger);
+  box-shadow: var(--shadow);
+  border: var(--border-w) solid var(--border-color);
   transition: box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 .dangerBtn:hover:not(:disabled) {
-  box-shadow: 0 10px 24px rgba(224, 67, 47, 0.4);
+  box-shadow: var(--shadow);
   transform: translateY(-1px);
 }
 .dangerBtn:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--border-color);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(224, 67, 47, 0.35);
+  box-shadow: var(--shadow);
 }
 .dangerBtn:disabled {
-  background: rgba(22, 34, 46, 0.08);
+  background: var(--muted);
   box-shadow: none;
-  color: rgba(22, 34, 46, 0.35);
-  border-color: rgba(22, 34, 46, 0.08);
+  color: var(--ink-faint);
+  border-color: var(--border-color);
   cursor: not-allowed;
 }
 
@@ -123,29 +125,29 @@
   align-items: center;
   gap: 8px;
   padding: 14px 26px;
-  border-radius: 16px;
+  border-radius: var(--radius);
   font-size: 14.5px;
   font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  box-shadow: 0 10px 26px rgba(47, 143, 224, 0.35);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: var(--shadow);
+  border: var(--border-w) solid var(--border-color);
   transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 .btnPrimary:hover:not(:disabled) {
-  box-shadow: 0 12px 30px rgba(47, 143, 224, 0.45);
+  box-shadow: var(--shadow);
   transform: translateY(-1px);
 }
 .btnPrimary:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--border-color);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(47, 143, 224, 0.35);
+  box-shadow: var(--shadow);
 }
 .btnPrimary:disabled {
-  background: rgba(22, 34, 46, 0.08);
+  background: var(--muted);
   box-shadow: none;
-  color: rgba(22, 34, 46, 0.35);
-  border-color: rgba(22, 34, 46, 0.08);
+  color: var(--ink-faint);
+  border-color: var(--border-color);
   cursor: not-allowed;
 }
 
@@ -154,10 +156,10 @@
 .select {
   width: 100%;
   padding: 13px 15px;
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.85);
-  border: 1.5px solid rgba(22, 34, 46, 0.16);
-  color: rgba(16, 28, 40, 0.9);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  color: var(--ink);
   font-size: 14.5px;
 }
 .textInput:focus,
@@ -165,15 +167,15 @@
 .select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(47, 143, 224, 0.15);
+  box-shadow: var(--shadow);
 }
 .textInput::placeholder,
 .textArea::placeholder {
-  color: rgba(22, 34, 46, 0.4);
+  color: var(--ink-faint);
 }
 .textArea {
   resize: vertical;
-  font: 13.5px/1.7 "SF Mono", ui-monospace, Menlo, monospace;
+  font: 13.5px/1.7 var(--font-mono);
 }
 
 /*
@@ -220,7 +222,7 @@
   flex: none;
   margin-left: 10px;
   transition: transform 0.15s ease;
-  color: rgba(16, 28, 40, 0.55);
+  color: var(--ink-soft);
 }
 .discloseChevron[data-open="true"] {
   transform: rotate(180deg);
@@ -237,7 +239,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 11.5px;
   font-weight: 600;
 }
@@ -252,7 +254,7 @@
   color: var(--success);
 }
 .badgeProgress {
-  background: rgba(47, 143, 224, 0.12);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 .badgeFailed {
@@ -260,7 +262,7 @@
   color: var(--danger);
 }
 .badgeNeutral {
-  background: rgba(22, 34, 46, 0.08);
+  background: var(--muted);
   color: var(--ink-soft);
 }
 
@@ -280,9 +282,9 @@
   max-height: 420px;
   overflow: auto;
   padding: 10px 12px;
-  border: 1px solid var(--surface-border);
-  border-radius: 10px;
-  background: rgba(127, 127, 127, 0.06);
+  border: var(--border-w) solid var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--muted);
   font-size: 13px;
 }
 .readOnlyEmpty {

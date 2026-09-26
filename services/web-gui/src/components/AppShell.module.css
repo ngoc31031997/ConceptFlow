@@ -9,33 +9,28 @@
 }
 
 .blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(100px);
-  opacity: 0.4;
-  pointer-events: none;
-  z-index: 0;
+  display: none;
 }
 .blob1 {
   width: 620px;
   height: 620px;
   top: -220px;
   left: -160px;
-  background: radial-gradient(circle at 30% 30%, var(--blob1-color), transparent 70%);
+  background: var(--accent-soft);
 }
 .blob2 {
   width: 560px;
   height: 560px;
   top: 120px;
   right: -220px;
-  background: radial-gradient(circle at 60% 40%, var(--blob2-color), transparent 70%);
+  background: var(--accent-soft);
 }
 .blob3 {
   width: 480px;
   height: 480px;
   bottom: -240px;
   left: 30%;
-  background: radial-gradient(circle at 50% 50%, #ffffff, transparent 70%);
+  background: var(--accent-soft);
   opacity: var(--blob3-opacity);
 }
 
@@ -70,14 +65,16 @@
 .logoMark {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   /* Ảnh tự mang nền xanh đen của nó, nên không còn gradient giả phía sau.
      object-fit: cover phòng khi ảnh không vuông tuyệt đối. */
   object-fit: cover;
-  box-shadow: 0 4px 16px rgba(47, 143, 224, 0.35);
+  box-shadow: var(--shadow);
   flex-shrink: 0;
 }
 .logoName {
+  font-family: var(--font-display);
+  font-weight: 700;
   font-size: 18px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -90,11 +87,10 @@
   max-width: 100%;
   overflow-x: auto;
   padding: 5px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 6px 20px rgba(31, 58, 90, 0.08);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  box-shadow: var(--shadow);
 }
 .stepItem {
   display: flex;
@@ -102,7 +98,7 @@
   gap: 6px;
   padding: 8px 10px;
   white-space: nowrap;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 500;
   color: var(--ink-faint);
@@ -111,19 +107,21 @@
   transition: background 0.15s ease, transform 0.15s ease;
 }
 .stepItem:not(:disabled):hover {
-  background: rgba(47, 143, 224, 0.08);
+  background: var(--accent-soft);
   transform: scale(1.02);
 }
 .stepItem:disabled {
   cursor: default;
 }
 .stepItem.active {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff;
-  box-shadow: 0 4px 14px rgba(47, 143, 224, 0.35);
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow);
+  border: var(--border-w) solid var(--border-color);
+  box-shadow: var(--shadow-sm);
 }
 .stepItem.done {
-  color: rgba(22, 34, 46, 0.7);
+  color: var(--ink);
 }
 /* Trạng thái của chính bước đó, tách khỏi "đang xem" (.active): bước đang
    chạy tím, lỗi đỏ, đã huỷ cam, bị bỏ qua mờ và gạch. */
@@ -132,7 +130,7 @@
   color: var(--run, #7a5cd6);
 }
 .stepItem.failed {
-  background: var(--danger-soft, rgba(217, 59, 69, 0.12));
+  background: var(--danger-soft, var(--danger-soft));
   color: var(--danger, #d93b45);
 }
 .stepItem.cancelled {
@@ -170,7 +168,7 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  border: 1.4px solid currentColor;
+  border: var(--border-w) solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,10 +176,10 @@
   flex-shrink: 0;
 }
 .stepItem.active .stepNum {
-  border-color: rgba(255, 255, 255, 0.85);
+  border-color: var(--border-color);
 }
 .stepItem.done .stepNum {
-  background: rgba(22, 34, 46, 0.12);
+  background: var(--muted);
   border-color: transparent;
 }
 
@@ -202,9 +200,9 @@
 
 .headerLink {
   padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
   color: var(--ink-soft);
   font-size: 12.5px;
   font-weight: 500;
@@ -212,7 +210,7 @@
   white-space: nowrap;
 }
 .headerLink:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: var(--card);
   color: var(--ink);
 }
 
@@ -283,16 +281,16 @@
   max-width: 100%;
   margin-bottom: 8px;
   padding: 4px 12px 4px 4px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
   font-size: 12.5px;
 }
 .projectChipLabel {
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--accent, #4f7cff);
-  color: #fff;
+  color: var(--accent-ink);
   font-weight: 600;
   font-size: 11px;
 }
@@ -317,9 +315,8 @@
   flex-direction: column;
   gap: 24px;
   z-index: 2;
-  background: rgba(255, 255, 255, 0.45);
-  border-right: 1px solid rgba(255, 255, 255, 0.8);
-  backdrop-filter: blur(20px);
+  background: var(--card);
+  border-right: var(--border-w) solid var(--border-color);
 }
 .sidebar .logo {
   flex: 0 0 auto;
@@ -332,18 +329,18 @@
 }
 .sideLink {
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   color: var(--ink-soft);
   font-size: 13.5px;
   font-weight: 500;
   text-decoration: none;
 }
 .sideLink:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--card);
   color: var(--ink);
 }
 .sideLinkActive {
-  background: rgba(47, 143, 224, 0.12);
+  background: var(--accent-soft);
   color: var(--ink);
   font-weight: 600;
 }
@@ -407,9 +404,9 @@
 .readOnlyBanner {
   margin: 0 0 12px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 13px;
   color: var(--ink-soft);
-  border: 1px solid var(--surface-border);
-  background: rgba(255, 255, 255, 0.5);
+  border: var(--border-w) solid var(--surface-border);
+  background: var(--card);
 }

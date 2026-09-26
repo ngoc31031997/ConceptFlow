@@ -3,7 +3,7 @@
   bottom: 0;
   z-index: 5;
   padding: 8px 16px 14px;
-  background: linear-gradient(to top, rgba(240, 248, 255, 0.98) 55%, rgba(240, 248, 255, 0));
+  background: var(--accent-soft);
 }
 
 .inner {
@@ -14,12 +14,10 @@
   align-items: center;
   gap: 14px;
   padding: 10px 16px;
-  border-radius: 20px;
+  border-radius: var(--radius);
   background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  backdrop-filter: blur(28px) saturate(160%);
-  -webkit-backdrop-filter: blur(28px) saturate(160%);
-  box-shadow: 0 12px 34px rgba(31, 58, 90, 0.14);
+  border: var(--border-w) solid var(--glass-border);
+  box-shadow: var(--shadow);
 }
 
 .hint {

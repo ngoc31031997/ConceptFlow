@@ -7,7 +7,7 @@
 }
 
 .toggleRow + .toggleRow {
-  border-top: 1px solid var(--surface-border);
+  border-top: var(--border-w) solid var(--surface-border);
 }
 
 .toggleLabel {
@@ -26,9 +26,9 @@
   flex: 0 0 auto;
   width: 46px;
   height: 26px;
-  border-radius: 999px;
-  border: 1px solid rgba(22, 34, 46, 0.2);
-  background: rgba(22, 34, 46, 0.16);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--border-color);
+  background: var(--muted);
   padding: 2px;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -44,8 +44,8 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 2px 6px rgba(31, 58, 90, 0.45);
+  background: var(--card);
+  box-shadow: var(--shadow);
   transition: transform 0.15s ease;
 }
 
@@ -69,8 +69,8 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
   background: var(--surface);
   text-align: left;
   cursor: pointer;
@@ -78,8 +78,8 @@
 
 .voiceCard.selected {
   border-color: var(--accent, #2f6dd0);
-  box-shadow: 0 4px 12px rgba(31, 58, 90, 0.12);
-  background: #ffffff;
+  box-shadow: var(--shadow);
+  background: var(--card);
 }
 
 .voiceInfo {
@@ -104,8 +104,8 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  border: 1px solid var(--surface-border);
-  background: #ffffff;
+  border: var(--border-w) solid var(--surface-border);
+  background: var(--card);
   color: var(--ink);
   display: flex;
   align-items: center;
@@ -131,7 +131,7 @@
 .nested {
   margin: 2px 0 6px 12px;
   padding: 12px 0 12px 14px;
-  border-left: 2px solid rgba(47, 143, 224, 0.25);
+  border-left: 2px solid var(--border-color);
 }
 
 /*
@@ -150,16 +150,16 @@
 .engineBadge {
   flex: 0 0 auto;
   padding: 1px 7px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  background: rgba(22, 34, 46, 0.07);
+  background: var(--muted);
   color: var(--ink-faint);
 }
 
 .engineBadge[data-engine="azure"] {
-  background: rgba(47, 143, 224, 0.15);
+  background: var(--accent-soft);
   color: #1c6cb0;
 }
 

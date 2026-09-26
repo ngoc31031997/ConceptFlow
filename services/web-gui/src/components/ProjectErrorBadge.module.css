@@ -15,11 +15,10 @@
   max-height: 60vh;
   overflow: auto;
   padding: var(--space-sm);
-  border-radius: 14px;
+  border-radius: var(--radius);
   background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(16px);
+  border: var(--border-w) solid var(--glass-border);
+  box-shadow: var(--shadow);
   color: var(--ink);
   font-size: 12.5px;
 }
@@ -38,7 +37,7 @@
 }
 .item {
   padding: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: var(--danger-soft);
 }
 .meta {
@@ -63,10 +62,10 @@
   color: var(--ink-soft);
 }
 .copy {
-  border: 1px solid var(--surface-border);
+  border: var(--border-w) solid var(--surface-border);
   background: var(--surface);
   color: var(--ink);
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 2px 8px;
   font-size: 11px;
   cursor: pointer;

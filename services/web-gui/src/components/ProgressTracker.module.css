@@ -13,17 +13,18 @@
 }
 
 .bar {
+  border: var(--border-w) solid var(--border-color);
   width: 100%;
-  height: 8px;
-  border-radius: 999px;
-  background: rgba(22, 34, 46, 0.1);
+  height: 14px;
+  border-radius: var(--radius);
+  background: var(--muted);
   overflow: hidden;
 }
 
 .barFill {
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius: var(--radius);
+  background: var(--accent);
   transition: width 0.3s ease;
 }
 
@@ -37,7 +38,7 @@
   margin: 6px 0 0;
   padding: 16px 0 0;
   width: 100%;
-  border-top: 1px solid var(--surface-border);
+  border-top: var(--border-w) solid var(--surface-border);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -48,7 +49,7 @@
   align-items: center;
   gap: 10px;
   padding: 7px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   font-size: 13px;
   color: var(--ink-faint);
 }
@@ -60,7 +61,7 @@
 .stepListItem[data-state="active"] {
   color: var(--ink);
   font-weight: 600;
-  background: rgba(47, 143, 224, 0.1);
+  background: var(--accent-soft);
 }
 
 .stepListItem[data-state="failed"] {
@@ -74,7 +75,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 1.4px solid currentColor;
+  border: var(--border-w) solid currentColor;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,12 +84,12 @@
 }
 
 .stepListItem[data-state="done"] .stepDot {
-  background: rgba(22, 34, 46, 0.12);
+  background: var(--muted);
   border-color: transparent;
 }
 
 .stepListItem[data-state="active"] .stepDot {
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  background: var(--accent);
   border-color: transparent;
-  color: #fff;
+  color: var(--accent-ink);
 }

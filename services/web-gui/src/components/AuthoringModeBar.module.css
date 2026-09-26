@@ -66,8 +66,8 @@
 
 .progressTrack {
   height: 4px;
-  border-radius: 999px;
-  background: rgba(22, 34, 46, 0.08);
+  border-radius: var(--radius);
+  background: var(--muted);
   overflow: hidden;
 }
 
@@ -75,7 +75,7 @@
   width: 40%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent2, var(--accent)));
+  background: var(--accent);
   animation: amb-slide 1.4s ease-in-out infinite;
 }
 
@@ -93,21 +93,21 @@
   align-items: center;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(22, 34, 46, 0.08);
-  background: rgba(22, 34, 46, 0.03);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--border-color);
+  background: var(--muted);
   color: var(--ink-faint);
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .stepItem_running {
-  border-color: rgba(47, 143, 224, 0.4);
-  background: rgba(47, 143, 224, 0.1);
+  border-color: var(--border-color);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 
 .stepItem_done {
-  border-color: rgba(31, 157, 85, 0.3);
+  border-color: var(--border-color);
   background: rgba(31, 157, 85, 0.08);
   color: var(--success, #1f9d55);
 }
@@ -122,7 +122,7 @@
   border-radius: 50%;
   font-size: 12px;
   font-weight: 700;
-  background: rgba(22, 34, 46, 0.08);
+  background: var(--muted);
 }
 
 .stepItem_running .stepIcon,
@@ -131,11 +131,11 @@
 }
 
 .stepItem_running .stepIcon > span {
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .stepItem_done .stepIcon {
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .stepItem_done .stepIcon {
@@ -144,7 +144,7 @@
 
 .stepItem_running .stepIcon {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .stepText {
@@ -217,9 +217,9 @@
   text-align: left;
   font: inherit;
   color: var(--ink);
-  border-radius: 12px;
-  border: 1px solid rgba(22, 34, 46, 0.12);
-  background: rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--border-color);
+  background: var(--card);
   cursor: pointer;
 }
 
@@ -231,7 +231,7 @@
 
 .optionOn {
   border-color: var(--accent);
-  background: rgba(47, 143, 224, 0.1);
+  background: var(--accent-soft);
 }
 
 .option:disabled {

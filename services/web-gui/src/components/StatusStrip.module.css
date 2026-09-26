@@ -4,9 +4,9 @@
   align-items: center;
   gap: 8px 14px;
   padding: 10px 14px;
-  border-radius: 12px;
-  background: rgba(127, 127, 127, 0.1);
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--muted);
+  border: var(--border-w) solid var(--surface-border);
   font-size: 13px;
 }
 .pill {
@@ -14,7 +14,7 @@
   align-items: center;
   gap: 6px;
   padding: 3px 10px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
@@ -28,7 +28,7 @@
   color: var(--warn, #c7811a);
 }
 .bad {
-  background: var(--danger-soft, rgba(217, 59, 69, 0.14));
+  background: var(--danger-soft, var(--danger-soft));
   color: var(--danger, #d93b45);
 }
 .ok {
@@ -36,7 +36,7 @@
   color: var(--ok, #1f9d6b);
 }
 .idle {
-  background: rgba(47, 143, 224, 0.14);
+  background: var(--accent-soft);
   color: var(--accent);
 }
 .dot {
