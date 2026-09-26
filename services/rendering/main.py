@@ -153,13 +153,13 @@ async def run() -> None:
 
     # CR-039 FR104: the compile check the llm-service calls before a generated
     # script is saved. Same process, same event loop; internal network only.
-    check_use_case = CheckScriptUseCase(
-        ValidateScriptUseCase(renderer, approved_lottie_ids),
-        TypeScriptChecker(
-            Path(__file__).parent / "remotion_project",
-            timeout_seconds=int(os.environ.get("TSC_TIMEOUT_SECONDS", "90")),
-        ),
+    typescript = TypeScriptChecker(
+        Path(__file__).parent / "remotion_project",
+        timeout_seconds=int(os.environ.get("TSC_TIMEOUT_SECONDS", "90")),
     )
+    # Load React/Remotion's type declarations now, not on the first check.
+    warm_typescript = asyncio.create_task(asyncio.to_thread(typescript.warm))
+    check_use_case = CheckScriptUseCase(ValidateScriptUseCase(renderer, approved_lottie_ids), typescript)
     check_server = uvicorn.Server(uvicorn.Config(
         create_check_app(
             check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2")), metrics=check_metrics,
@@ -177,6 +177,8 @@ async def run() -> None:
     finally:
         check_server.should_exit = True
         await check_server_task
+        await warm_typescript
+        typescript.close()
         await queue.cancel(consumer_tag)
         await relay.stop()
         await connection.close()

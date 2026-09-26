@@ -165,3 +165,16 @@ STORY ─▶ Story Architect (1a) ─▶ Visual Director (1b) ─▶ Storyboard 
 
 Chưa kiểm chứng: engine Manim với Hive thật (chỉ có test đơn vị và kiểm tra lượt dry qua fake); lô > 10 shot chạy song song với Hive thật; vòng Repair với lỗi thật do model sinh ra.
 Chưa làm: hiển thị bản văn xuôi dựng lại từ JSON storyboard (editor 1b hiện JSON).
+
+## Tối ưu thời gian bước Code (2026-09-26)
+
+Creator báo bước 5 (Code) chạy quá lâu. Đường găng của một lượt là `Layout → ⌈số lô / trần song song⌉ × thời gian một lô → kiểm tra → các vòng repair`. Bốn thay đổi:
+
+| # | Thay đổi | Ở đâu |
+|---|---|---|
+| A | Mặc định `CODE_CHUNK_SHOTS=5` (trước 10), `CODE_CHUNK_CONCURRENCY=10` (trước 3). Lô nhỏ hơn thì lô chậm nhất xong sớm hơn; video thường gặp chạy mọi lô cùng lúc. Trần 5 req/s của FR100.5 giữ nguyên, 429 vẫn được retry. | `docker-compose.yml`, `llm-service/app/config.py`, `.env.example` |
+| B | `visual_director_ai` v3 xuất thêm `"layout"` (toạ độ tâm px của các vật xuyên suốt, trong vùng an toàn và ngoài `{{subtitle_zone}}`). Storyboard có `layout` hợp lệ thì Remotion **bỏ qua lượt gọi LAYOUT**, và Merger ghi `const LAYOUT` thẳng từ JSON. Storyboard cũ không có `layout` vẫn đi đường cũ. Manim vẫn cần lượt `setup_cast`, vì đó là code Python. | `storyboard.py` (validate `layout`), `merger.layout_from_storyboard`, seed `visual_director_ai` v3 |
+| C | Remotion: mỗi lô viết xong được kiểm tra ngay (các shot của lô khác thay bằng stub `return null`) và sửa ngay các shot lỗi **trong lúc các lô khác còn đang sinh**. Số vòng đã dùng ở lô được tính vào cùng trần `CODE_REPAIR_MAX_ROUNDS`. Lượt kiểm tra cả file cuối cùng vẫn là cổng. Checker không liên lạc được ở bước lô thì bỏ qua, để lượt cuối quyết định. Sự kiện tiến độ mới: `chunk_repair`. Manim giữ kiểm tra cả file, vì lượt dry của một shot phụ thuộc trạng thái khung hình do các shot trước để lại. | `pipeline/run.py` (`_settle_chunk`), `merger.merge_remotion(stub_missing=True)` |
+| D | `tsc` không còn khởi động lại mỗi lần kiểm tra. Một process Node chạy nền (`remotion_project/tscheck.mjs`) giữ sẵn khai báo kiểu của React/Remotion/lib, và chỉ kiểm tra script (không ghi file ra đĩa). Đo trên file 30 shot: khoảng 1,1s/lần xuống 0,13–0,19s/lần (lần đầu ~1,3s, được làm nóng lúc service khởi động). Kết quả lỗi trùng với `tsc --noEmit`. Process chết hoặc treo thì báo lỗi (không bao giờ PASS) và được khởi động lại ở lần sau. | `rendering/adapters/rendering/typescript_checker.py`, `main.py` |
+
+Sau khi triển khai: rebuild `llm-service`, `rendering`, `authoring-service` (vì seed prompt đổi), restart. Kiểm tra `prompt_overrides` có đang che `visual_director_ai` không; nếu có, bản mới sẽ không có `layout` và bước Code quay về lượt gọi LAYOUT (vẫn đúng, chỉ chậm hơn).

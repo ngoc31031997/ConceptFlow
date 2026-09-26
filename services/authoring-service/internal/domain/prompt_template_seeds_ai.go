@@ -45,7 +45,10 @@ Cấu trúc:
         }
       ]
     }
-  ]
+  ],
+  "layout": {
+    "<khoáCamelCase>": {"x": <px>, "y": <px>, "size": <px>}
+  }
 }
 
 Quy tắc của cấu trúc:
@@ -55,6 +58,7 @@ Quy tắc của cấu trúc:
 - "id" của shot có dạng "<số cảnh>.<số thứ tự shot>" (ví dụ "1.1", "1.2", "2.1"), duy nhất trong toàn phim, đánh số theo thứ tự xuất hiện. Số shot do lượng thay đổi hình quyết định, không thêm cho đủ số.
 - "transition_in" của cảnh 1 là null. Mọi trường chuỗi khác không được để trống.
 - Trong chuỗi JSON, dấu ngoặc kép thẳng phải viết \", xuống dòng viết \n; câu thoại không chứa xuống dòng.
+- "layout": chỗ đứng cố định của mọi vật SỐNG QUA NHIỀU SHOT (nhân vật chính, khối lặp lại, nhãn cố định). Các shot được dựng SONG SONG bởi nhiều người, mỗi người chỉ thấy vài shot, nên đây là thứ duy nhất giữ cho một vật đứng đúng một chỗ từ shot này sang shot khác. Mỗi mục: khoá camelCase ASCII mô tả vai trò (ví dụ "hero", "counterLabel"), giá trị là toạ độ TÂM "x", "y" và kích thước "size" (hoặc "w" và "h"), tính bằng px trên khung 1920x1080, chỉ là số. Cả vật (tâm cộng nửa kích thước) phải nằm trọn trong vùng an toàn từ (96, 96) đến (1824, 984). Vùng phụ đề: {{subtitle_zone}} Vật chỉ xuất hiện trong một shot thì không ghi. Không có vật nào xuyên suốt thì ghi "layout": {}.
 
 `
 
@@ -72,7 +76,8 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 10. Mỗi cảnh đã có "invariant", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
 12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (hình cơ bản, chấm, lưới, đồ thị, mũi tên, số chạy, code, dòng thời gian) không?
-13. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
+13. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
+14. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video theo từng shot, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 

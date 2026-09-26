@@ -67,7 +67,7 @@ func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 
 func TestVisualDirectorAIAsksForJSONAndKeepsTheCreativeBrief(t *testing.T) {
 	ai, manual := aiTemplate(t, RoleVisualDirectorAI), aiTemplate(t, RoleVisualDirector)
-	for _, want := range []string{`"scenes"`, `"palette"`, `"narration"`, "#RRGGBB", "JSON"} {
+	for _, want := range []string{`"scenes"`, `"palette"`, `"narration"`, "#RRGGBB", "JSON", `"layout"`, "{{subtitle_zone}}"} {
 		if !strings.Contains(ai, want) {
 			t.Errorf("visual_director_ai lacks %q", want)
 		}

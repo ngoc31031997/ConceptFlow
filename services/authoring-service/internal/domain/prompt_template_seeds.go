@@ -21,7 +21,7 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleVisualDirector, Language: "vi", Version: 9, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 7, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 5, TemplateText: bt(withLottieCatalog(remotionEngineerVI))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 2, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 3, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 2, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
 		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 1, TemplateText: bt(withLottieCatalog(remotionEngineerAIVI))},
 		// CR-040 FR113: bodies embedded from the exact text the browser used to build.
