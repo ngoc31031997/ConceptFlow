@@ -327,3 +327,36 @@
   background: var(--card);
 }
 
+
+.topbarCenter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  max-width: calc(100% - 420px);
+}
+.topbarCenter h1 {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.topbarCenter .projectRow {
+  justify-content: center;
+  margin-bottom: 0;
+}
+.topbar .headerActions {
+  position: absolute;
+  right: 16px;
+  top: 30px;
+}
+@media (max-width: 640px) {
+  .topbarCenter {
+    max-width: 100%;
+    padding-top: 44px;
+  }
+  .topbar .headerActions {
+    top: 20px;
+  }
+}
