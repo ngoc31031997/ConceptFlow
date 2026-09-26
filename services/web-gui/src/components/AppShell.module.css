@@ -80,109 +80,6 @@
   letter-spacing: -0.01em;
 }
 
-.stepsPill {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  max-width: 100%;
-  overflow-x: auto;
-  padding: 5px;
-  border-radius: var(--radius);
-  background: var(--card);
-  border: var(--border-w) solid var(--border-color);
-  box-shadow: var(--shadow);
-}
-.stepItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  white-space: nowrap;
-  border-radius: var(--radius);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink-faint);
-  background: transparent;
-  border: none;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-.stepItem:not(:disabled):hover {
-  background: var(--accent-soft);
-  transform: scale(1.02);
-}
-.stepItem:disabled {
-  cursor: default;
-}
-.stepItem.active {
-  background: var(--accent);
-  color: var(--accent-ink);
-  box-shadow: var(--shadow);
-  border: var(--border-w) solid var(--border-color);
-  box-shadow: var(--shadow-sm);
-}
-.stepItem.done {
-  color: var(--ink);
-}
-/* Trạng thái của chính bước đó, tách khỏi "đang xem" (.active): bước đang
-   chạy tím, lỗi đỏ, đã huỷ cam, bị bỏ qua mờ và gạch. */
-.stepItem.running {
-  background: var(--run-soft, rgba(122, 92, 214, 0.14));
-  color: var(--run, #7a5cd6);
-}
-.stepItem.failed {
-  background: var(--danger-soft, var(--danger-soft));
-  color: var(--danger, #d93b45);
-}
-.stepItem.cancelled {
-  background: var(--warn-soft, rgba(199, 129, 26, 0.14));
-  color: var(--warn, #c7811a);
-}
-.stepItem.skipped {
-  opacity: 0.45;
-  text-decoration: line-through;
-}
-.stepItem.active.running,
-.stepItem.active.failed,
-.stepItem.active.cancelled {
-  outline: 2px solid currentColor;
-  outline-offset: -2px;
-}
-.runDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: currentColor;
-  animation: runPulse 1.2s ease-in-out infinite;
-}
-@keyframes runPulse {
-  50% {
-    opacity: 0.25;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .runDot {
-    animation: none;
-  }
-}
-.stepNum {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: var(--border-w) solid currentColor;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  flex-shrink: 0;
-}
-.stepItem.active .stepNum {
-  border-color: var(--border-color);
-}
-.stepItem.done .stepNum {
-  background: var(--muted);
-  border-color: transparent;
-}
-
 /* Both sides flex so the step pill stays centred no matter how wide the
    page-specific action is; nowrap keeps that action on one line. */
 .headerActions {
@@ -325,12 +222,12 @@
   flex-direction: column;
   gap: 24px;
   z-index: 2;
-  background: var(--accent);
+  background: var(--accent-soft);
   border-right: var(--border-w) solid var(--border-color);
 }
 .sidebar .logo,
 .sidebar .logo:hover {
-  color: var(--accent-ink);
+  color: var(--ink);
 }
 .sidebar .logo {
   flex: 0 0 auto;
@@ -345,7 +242,7 @@
   padding: 10px 14px;
   border: var(--border-w) solid transparent;
   border-radius: var(--radius);
-  color: var(--accent-ink);
+  color: var(--ink);
   font-size: 13.5px;
   font-weight: 600;
   text-decoration: none;
@@ -357,10 +254,10 @@
 }
 .sideLinkActive,
 .sideLinkActive:hover {
-  background: var(--card);
+  background: var(--accent);
   border-color: var(--border-color);
   box-shadow: var(--shadow-sm);
-  color: var(--ink);
+  color: var(--accent-ink);
   font-weight: 700;
 }
 .content {
@@ -430,10 +327,3 @@
   background: var(--card);
 }
 
-/* Sidebar (StepRail) đã có cùng danh sách bước; thanh ngang chỉ giữ lại khi
-   sidebar không hiện: điện thoại, hoặc màn chưa có project. */
-@media (min-width: 641px) {
-  .stepsPillDup {
-    display: none;
-  }
-}

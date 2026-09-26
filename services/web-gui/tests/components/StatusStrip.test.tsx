@@ -123,7 +123,7 @@ describe("StatusStrip", () => {
 
   it("stays quiet for a draft: nothing running, nothing to say", async () => {
     renderStrip(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await waitFor(() => expect(screen.getByTestId("flow-step-3")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("rail-step-3")).toBeInTheDocument());
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
   });
