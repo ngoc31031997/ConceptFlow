@@ -13,7 +13,7 @@
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: var(--rail-bg, var(--card));
+  background: var(--accent-soft);
   border-right: var(--border-w) solid var(--surface-border);
   box-shadow: var(--shadow);
   transition: width 0.18s ease;
@@ -109,7 +109,8 @@
   gap: 10px;
   padding: 7px 8px;
   border-radius: var(--radius);
-  border: 0;
+  border: var(--border-w) solid transparent;
+  box-shadow: none;
   background: transparent;
   color: var(--ink-faint);
   text-align: left;
@@ -124,11 +125,20 @@
   cursor: default;
 }
 .item:not(:disabled):hover {
-  background: var(--accent-soft);
+  background: var(--card);
+  border-color: var(--border-color);
+  transform: none;
+  box-shadow: none;
 }
-.viewing {
-  background: var(--accent-soft);
-  color: var(--ink);
+.viewing,
+.item.viewing:not(:disabled):hover {
+  background: var(--accent);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
+  color: var(--accent-ink);
+}
+.viewing .state {
+  color: var(--accent-ink);
 }
 
 .mark {
@@ -165,7 +175,7 @@
   color: var(--accent-ink);
 }
 .s_waiting {
-  color: var(--accent);
+  color: var(--ink);
 }
 .s_running {
   color: var(--run, #7a5cd6);

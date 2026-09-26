@@ -274,6 +274,16 @@
   }
 }
 
+.projectRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 8px;
+}
+.projectRow .projectChip {
+  margin-bottom: 0;
+}
 .projectChip {
   display: inline-flex;
   align-items: center;
@@ -315,8 +325,12 @@
   flex-direction: column;
   gap: 24px;
   z-index: 2;
-  background: var(--card);
+  background: var(--accent);
   border-right: var(--border-w) solid var(--border-color);
+}
+.sidebar .logo,
+.sidebar .logo:hover {
+  color: var(--accent-ink);
 }
 .sidebar .logo {
   flex: 0 0 auto;
@@ -329,20 +343,25 @@
 }
 .sideLink {
   padding: 10px 14px;
+  border: var(--border-w) solid transparent;
   border-radius: var(--radius);
-  color: var(--ink-soft);
+  color: var(--accent-ink);
   font-size: 13.5px;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
 }
 .sideLink:hover {
   background: var(--card);
+  border-color: var(--border-color);
   color: var(--ink);
 }
-.sideLinkActive {
-  background: var(--accent-soft);
+.sideLinkActive,
+.sideLinkActive:hover {
+  background: var(--card);
+  border-color: var(--border-color);
+  box-shadow: var(--shadow-sm);
   color: var(--ink);
-  font-weight: 600;
+  font-weight: 700;
 }
 .content {
   margin-left: 208px;
@@ -409,4 +428,12 @@
   color: var(--ink-soft);
   border: var(--border-w) solid var(--surface-border);
   background: var(--card);
+}
+
+/* Sidebar (StepRail) đã có cùng danh sách bước; thanh ngang chỉ giữ lại khi
+   sidebar không hiện: điện thoại, hoặc màn chưa có project. */
+@media (min-width: 641px) {
+  .stepsPillDup {
+    display: none;
+  }
 }
