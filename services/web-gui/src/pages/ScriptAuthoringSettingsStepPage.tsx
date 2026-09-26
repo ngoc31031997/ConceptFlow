@@ -24,7 +24,6 @@ import {
 } from "../context/ProjectDraftContext";
 import { createProjectDraft, saveWizardSettings } from "../api/client";
 import styles from "./WizardSteps.module.css";
-import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const RENDER_QUALITY_LABELS: Record<string, string> = {
   "480p15": "Test (480p15)",
@@ -42,7 +41,6 @@ const RENDER_QUALITY_LABELS: Record<string, string> = {
  * chỉ cần echo lại, không cần await.
  */
 export function ScriptAuthoringSettingsStepPage() {
-  useWizardPosition("/create/script/settings");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
@@ -210,12 +208,12 @@ export function ScriptAuthoringSettingsStepPage() {
         hint={
           saveError ??
           (authoringMode === "ai" && llm?.enabled
-            ? "Chế độ gọi API đang bật — các tab 1a–1c sẽ có nút chạy bằng AI."
+            ? "Chế độ gọi API đang bật — các bước Kịch bản, Visual, Code sẽ có nút chạy bằng AI."
             : "Chế độ copy prompt ra ngoài — đổi sang gọi API ở đây hoặc ở bất kỳ tab nào.")
         }
         onBack={() => navigate("/")}
         onNext={handleContinue}
-        nextLabel={saving ? "Đang lưu..." : "Sang 1a. Dàn ý"}
+        nextLabel={saving ? "Đang lưu..." : "Sang Kịch bản"}
         nextTestId="script-authoring-settings-next"
       />
     </div>

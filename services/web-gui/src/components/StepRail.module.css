@@ -1,0 +1,221 @@
+/*
+  Lớp menu thứ hai: đứng ngay cạnh sidebar chính (208px) và xếp lên trên nó một
+  chút — đổ bóng về phía nội dung, mép trái chồng vào sidebar 8px — để đọc ra là
+  "một tầng khác" chứ không phải thêm mục vào cùng danh sách.
+*/
+.rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 200px;
+  width: 232px;
+  box-sizing: border-box;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  background: var(--rail-bg, rgba(255, 255, 255, 0.78));
+  border-right: 1px solid var(--surface-border);
+  box-shadow: 8px 0 28px rgba(31, 58, 90, 0.1);
+  backdrop-filter: blur(24px);
+  transition: width 0.18s ease;
+}
+.railCollapsed {
+  width: 64px;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 22px 10px 10px 22px;
+}
+.railCollapsed .head {
+  justify-content: center;
+  padding-inline: 8px;
+}
+.title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.titleLabel {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.titleName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.toggle {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.toggle:focus-visible,
+.item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 10px 24px 22px;
+  display: grid;
+  gap: 14px;
+  align-content: start;
+}
+.railCollapsed .scroll {
+  padding-inline: 8px;
+  gap: 8px;
+}
+.phase {
+  display: grid;
+  gap: 4px;
+}
+.phaseName {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.railCollapsed .item {
+  justify-content: center;
+  padding-inline: 0;
+}
+.item:disabled {
+  cursor: default;
+}
+.item:not(:disabled):hover {
+  background: rgba(47, 143, 224, 0.08);
+}
+.viewing {
+  background: rgba(47, 143, 224, 0.14);
+  color: var(--ink);
+}
+
+.mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.text {
+  display: grid;
+  min-width: 0;
+}
+.label {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+}
+.state {
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+.s_done {
+  color: var(--ink-soft);
+}
+.s_done .mark {
+  background: var(--ok, #1f9d6b);
+  border-color: var(--ok, #1f9d6b);
+  color: #fff;
+}
+.s_waiting {
+  color: var(--accent);
+}
+.s_running {
+  color: var(--run, #7a5cd6);
+}
+.s_failed {
+  color: var(--danger, #d93b45);
+}
+.s_failed .mark {
+  background: var(--danger, #d93b45);
+  border-color: var(--danger, #d93b45);
+  color: #fff;
+}
+.s_cancelled {
+  color: var(--warn, #c7811a);
+}
+.s_pending {
+  color: var(--ink-faint);
+  opacity: 0.7;
+}
+.s_skipped {
+  color: var(--ink-faint);
+  opacity: 0.45;
+}
+.s_skipped .label {
+  text-decoration: line-through;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}
+
+/* Điện thoại: menu chính đã đổi thành thanh ngang, không còn chỗ cho tầng
+   thứ hai — thanh bước ngang phía trên nội dung thay vai trò của nó. */
+@media (max-width: 640px) {
+  .rail {
+    display: none;
+  }
+}

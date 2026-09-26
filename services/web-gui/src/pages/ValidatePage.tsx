@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
 import { OutlineActions } from "../components/OutlineActions";
@@ -11,6 +11,7 @@ import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { statusToStep, projectPhase, projectPath, VALIDATE_STEPS } from "../utils/pipelineLabels";
+import { FLOW_REVIEW, FLOW_VALIDATE } from "../utils/flow";
 import type { Project } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./ValidatePage.module.css";
@@ -41,6 +42,11 @@ export function ValidatePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
+  // ?view=1: mở chỉ để XEM lại bước 6/7 của một dự án đã đi xa hơn — không đẩy
+  // sang màn đang sở hữu dự án, và không có nút hành động nào.
+  const [search] = useSearchParams();
+  const viewOnly = search.get("view") === "1";
+  const viewStep = Number(search.get("step")) === FLOW_VALIDATE ? FLOW_VALIDATE : FLOW_REVIEW;
   const progressState = useSSE(projectId);
   const { project, refetch } = useProject(projectId);
   const dispatchDraft = useContext(ProjectDraftDispatchContext);
@@ -68,14 +74,17 @@ export function ValidatePage() {
   // cổng duyệt tắt, hay Creator mở lại một bookmark cũ của bước 4.
   const phase = project ? projectPhase(project.status) : null;
   useEffect(() => {
-    if (project && phase !== "validate") {
+    if (project && phase !== "validate" && !viewOnly) {
       navigate(projectPath(projectId, project.status), { replace: true });
     }
-  }, [project, phase, projectId, navigate]);
+  }, [project, phase, viewOnly, projectId, navigate]);
+  // Đang xem lại một bước đã qua (dự án đã sang phần sau): mọi thứ ở đây xong rồi.
+  const reviewingPast = viewOnly && phase !== "validate";
 
   const isFailed =
     progressState.status === "failed" || Boolean(project?.status.startsWith("failed_at_"));
   const errorMessage = progressState.errorMessage ?? project?.error_message ?? "";
+  const isCancelled = project?.run_state === "cancelled";
 
   // Mọi lỗi dừng ở bước này đều là lỗi đầu vào: parse_script và validate_script
   // chỉ đọc và chạy thử chính cái script Creator đưa vào. Thử lại y nguyên sẽ
@@ -109,29 +118,33 @@ export function ValidatePage() {
   return (
     <div data-testid="validate-page">
       <AppShell
-        currentStep={4}
-        wide={isAwaitingReview}
+        currentStep={viewOnly ? viewStep : isAwaitingReview ? FLOW_REVIEW : FLOW_VALIDATE}
+        wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }
         title={
-          isFailed
+          isCancelled
+            ? "Đã huỷ kiểm tra"
+            : isFailed
             ? "Kịch bản không chạy được"
             : isAwaitingReview
               ? "Duyệt dàn ý trước khi sản xuất"
               : "Đang kiểm tra kịch bản"
         }
         subtitle={
-          isFailed
+          isCancelled
+            ? "Bạn đã dừng bước này. Chạy tiếp từ dải trạng thái phía trên."
+            : isFailed
             ? "Lượt chạy thử dừng lại. Chưa có gì được render nên sửa script rồi chạy lại là xong."
             : isAwaitingReview
               ? "Chưa tạo giọng đọc, chưa render — sửa gì cũng không tốn gì. Duyệt xong mới sang bước 5 và bắt đầu tốn tiền/thời gian."
               : "Hệ thống đang đọc và chạy thử kịch bản. Chưa tốn giọng đọc hay render."
         }
       >
-        {isAwaitingReview && project ? (
+        {(isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
           /*
             Two columns only while there is an outline to review: it can run
             to dozens of lines, and stacking it above the tracker used to push
@@ -146,30 +159,33 @@ export function ValidatePage() {
           <div className={styles.layout}>
             <OutlineReview project={project} outline={outline} />
             <div className={styles.tracker}>
-              <OutlineActions outline={outline} />
+              {isAwaitingReview && <OutlineActions outline={outline} />}
               <div className={glass.mtSm}>
                 <ProgressTracker
                   progressState={displayProgressState}
                   steps={VALIDATE_STEPS}
                   isFailed={isFailed}
+                  allDone={reviewingPast}
                 />
               </div>
             </div>
           </div>
         ) : (
           <>
-            {isFailed && (
+            {isFailed && !isCancelled && (
               <ErrorBanner
                 errorMessage={retryError ?? errorMessage}
                 onRetry={handleRetry}
                 isRetrying={isRetrying}
-                onBack={() => navigate(`/projects/${projectId}/resume?edit=1`)}
+                projectId={projectId}
+                step={progressState.currentStep ?? project?.status.replace("failed_at_", "")}
               />
             )}
             <ProgressTracker
               progressState={displayProgressState}
               steps={VALIDATE_STEPS}
               isFailed={isFailed}
+              allDone={reviewingPast}
             />
           </>
         )}

@@ -2,7 +2,6 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
-import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
@@ -25,7 +24,6 @@ import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
 import styles from "./WizardSteps.module.css";
-import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
@@ -45,7 +43,6 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * the right engine instead of always defaulting to Manim.
  */
 export function ScriptOutlineStepPage() {
-  useWizardPosition("/create/script/outline");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
@@ -179,7 +176,7 @@ export function ScriptOutlineStepPage() {
       const changed = saved !== null && saved.story !== "" && saved.story !== draft.authoringStory;
       if (changed && (saved.storyboard || saved.code)) {
         const ok = window.confirm(
-          "Dàn ý đã đổi. Storyboard (1b) và code (1c) dựng từ dàn ý cũ sẽ bị xoá để làm lại. Tiếp tục?",
+          "Dàn ý đã đổi. Storyboard và code dựng từ dàn ý cũ sẽ bị xoá để làm lại. Tiếp tục?",
         );
         if (!ok) return;
       }
@@ -214,17 +211,10 @@ export function ScriptOutlineStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnOutline
-            ? "1a. Dán dàn ý sẵn có của bạn vào ô bên phải — không cần chạy Story Architect."
-            : "1a. Dựng dàn ý câu chuyện với Story Architect."
+            ? "Dán dàn ý sẵn có của bạn vào ô bên phải — không cần chạy Story Architect."
+            : "Dựng dàn ý câu chuyện với Story Architect."
         }
       >
-        <ScriptPipelineTabs
-          active="outline"
-          outlineDone={!storyIsEmpty}
-          storyboardDone={draft.authoringStoryboard.trim().length > 0}
-          codeDone={draft.scriptContent.trim().length > 0}
-        />
-
         {/* CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
             huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
             chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
@@ -326,10 +316,10 @@ export function ScriptOutlineStepPage() {
             title={hasOwnOutline ? "Dàn ý của bạn" : aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
             hint={
               hasOwnOutline
-                ? "Dán dàn ý sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                ? "Dán dàn ý sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước Visual."
                 : aiMode
-                  ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
-                  : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1b (Storyboard)."
+                  ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước Visual."
+                  : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước Visual."
             }
           >
             <TextArea

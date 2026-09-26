@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ProjectDraftProvider } from "./context/ProjectDraftContext";
 import { AuthoringRunProvider } from "./context/AuthoringRunContext";
+import { ProjectFlowProvider } from "./context/ProjectFlowContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationLoader } from "./components/NavigationLoader";
 import { KeyboardShortcutsHelp } from "./components/KeyboardShortcutsHelp";
@@ -17,6 +18,7 @@ import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
+import { JournalPage } from "./pages/JournalPage";
 
 export function App() {
   return (
@@ -24,6 +26,7 @@ export function App() {
       <ProjectDraftProvider>
         <AuthoringRunProvider>
         <BrowserRouter>
+          <ProjectFlowProvider>
           <NavigationLoader />
           <KeyboardShortcutsHelp />
           <Routes>
@@ -55,7 +58,9 @@ export function App() {
             <Route path="/projects/:id/publish" element={<PublishPage />} />
             <Route path="/oauth/youtube/callback" element={<OAuthCallbackPage />} />
             <Route path="/videos" element={<VideoListPage />} />
+            <Route path="/journal" element={<JournalPage />} />
           </Routes>
+          </ProjectFlowProvider>
         </BrowserRouter>
         </AuthoringRunProvider>
       </ProjectDraftProvider>

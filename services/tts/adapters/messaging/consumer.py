@@ -18,6 +18,7 @@ from typing import Protocol
 import asyncpg
 
 from adapters.logging.correlation import set_correlation_id
+from adapters.messaging.cancellation import REGISTRY
 from adapters.messaging.producer import failure_envelope, success_envelope
 from adapters.messaging.progress import ProgressPublisher
 from adapters.persistence.inbox import InboxRepository
@@ -57,6 +58,24 @@ class SynthesizeSpeechCommandHandler:
         self._progress = progress
 
     async def handle(self, message: AckableMessage) -> None:
+        """Gate on cancellation, then process. A command the Creator cancelled
+        while it waited in the queue is acked and never run; one that is running
+        sees the cancel through REGISTRY (checked between scenes) and its events
+        are dropped by CancelAwareOutbox."""
+        try:
+            envelope = json.loads(message.body)
+            project_id, command_ts = envelope["project_id"], envelope.get("timestamp")
+        except (ValueError, TypeError, KeyError):
+            await self._handle(message)  # let the normal path report the malformed body
+            return
+        if REGISTRY.is_cancelled(project_id, command_ts):
+            logger.info("Bỏ lệnh synthesize_speech của project_id=%s vì đã bị huỷ", project_id)
+            await message.ack()
+            return
+        with REGISTRY.command(project_id, command_ts):
+            await self._handle(message)
+
+    async def _handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)
         message_id = envelope["message_id"]
         saga_id = envelope["saga_id"]
@@ -79,18 +98,26 @@ class SynthesizeSpeechCommandHandler:
             for s in payload["scenes"]
         ]
 
+        # The batch runs in a worker thread: synthesis blocks for minutes, and on
+        # the event loop that would also stop it from hearing a cancel.
+        loop = asyncio.get_running_loop()
+
         def on_scene_done(scene_index: int, scene_total: int) -> None:
             if self._progress is None:
                 return
-            # Fire-and-forget from sync code: handle() is already running
-            # inside the event loop, so scheduling a task here does not block
-            # the batch loop waiting on RabbitMQ I/O (CR-029 — same posture as
-            # rendering's heartbeat: progress must never slow down real work).
-            asyncio.ensure_future(
-                self._progress.publish_scene_progress(project_id, scene_index, scene_total)
+            # From the worker thread back onto the loop; fire-and-forget so
+            # progress never slows the real work (CR-029).
+            asyncio.run_coroutine_threadsafe(
+                self._progress.publish_scene_progress(project_id, scene_index, scene_total), loop
             )
 
-        outcome = self._batch_use_case.execute(project_id, scenes, on_scene_done=on_scene_done)
+        outcome = await asyncio.to_thread(
+            self._batch_use_case.execute,
+            project_id,
+            scenes,
+            on_scene_done=on_scene_done,
+            should_stop=REGISTRY.current_cancelled,
+        )
 
         if isinstance(outcome, BatchSynthesisFailure):
             logger.warning(

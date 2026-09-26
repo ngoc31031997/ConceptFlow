@@ -128,3 +128,24 @@ async def test_skips_reprocessing_duplicate_message_id(shared_volume_root) -> No
 
     assert message.acked is True
     assert len(pool.store.outbox_events) == 0
+
+
+@pytest.mark.asyncio
+async def test_drops_a_command_the_creator_already_cancelled(shared_volume_root) -> None:
+    """Cancelled while queued: acked, nothing synthesised, nothing reported."""
+    import json
+    from datetime import UTC, datetime
+
+    from adapters.messaging.cancellation import REGISTRY
+
+    handler, pool = _build_handler(FakeTTSEngine())
+    envelope = json.loads(make_envelope())
+    envelope["timestamp"] = "2026-08-07T00:00:00Z"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+    REGISTRY.cancel(envelope["project_id"], datetime(2026, 8, 7, 0, 0, 5, tzinfo=UTC))
+    try:
+        await handler.handle(message)
+        assert message.acked is True
+        assert not pool.store.outbox_events
+    finally:
+        REGISTRY._cancelled_at.pop(envelope["project_id"], None)

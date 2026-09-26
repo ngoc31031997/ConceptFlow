@@ -100,6 +100,11 @@ func main() {
 		WithQCReports(qcReportRepo).
 		WithErrorLog(projectRepo)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
+	// Cancel goes straight to the broker (a fanout to every worker), not through
+	// the outbox: it must reach a worker that is busy right now, and there is no
+	// state to keep consistent with it if the publish fails (the use case then
+	// leaves the project untouched).
+	cancelStep := application.NewCancelStepUseCase(projectRepo, realPublisher)
 	// CR-039 — the one path to a language model. llm-service owns Hive and
 	// Ollama; the same client serves the light tasks, the authoring steps and
 	// the chunked code pipeline.
@@ -186,12 +191,13 @@ func main() {
 		promptTemplateRepo,
 		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-	).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo).WithPipeline(llmClient, llmClient)
+	).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo).WithEvents(projectRepo).WithPipeline(llmClient, llmClient)
 
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
 		WithQCReports(qcReportRepo).
 		WithShortScriptSuggester(suggestShortScript).
 		WithProjectErrors(projectRepo).
+		WithProjectEvents(projectRepo).
 		WithPrompts(prompts).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
@@ -202,9 +208,14 @@ func main() {
 		WithAuthoringModels(saveAuthoringModels).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic).
 		WithDefaultModel(cfg.HiveModel).
-		WithWizardPosition(projectRepo).
 		WithWizard(saveWizardSettings)
 	router = router.WithGenerateAuthoring(generateAuthoring)
+	router = router.WithCancelStep(cancelStep)
+	router = router.WithForkProject(application.NewForkProjectUseCase(projectRepo, promptTemplateRepo))
+	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
+		_, msg := httpadapter.DescribeGenerateError(err)
+		return msg
+	}))
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).

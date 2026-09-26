@@ -152,7 +152,7 @@ export function PublishPage() {
   return (
     <div data-testid="publish-page">
       <AppShell
-        currentStep={7}
+        currentStep={13}
         wide
         title="Đăng video"
         subtitle="Kết nối YouTube và điền thông tin để xuất bản."

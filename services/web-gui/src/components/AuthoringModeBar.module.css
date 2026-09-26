@@ -243,3 +243,25 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+.lastRuns {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.lastRuns li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+.lastRuns li b {
+  min-width: 84px;
+  color: var(--ink);
+}
+.lastRuns li[data-state="failed"] {
+  color: var(--danger, #d93b45);
+}

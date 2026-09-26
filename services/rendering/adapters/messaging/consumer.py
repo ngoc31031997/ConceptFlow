@@ -27,6 +27,7 @@ from adapters.messaging.producer import (
     validation_failed_envelope,
 )
 from adapters.messaging.progress import ProgressPublisher
+from adapters.messaging.cancellation import REGISTRY
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.render_channel_asset import ChannelAssetRenderError, RenderChannelAssetUseCase
@@ -325,6 +326,16 @@ class RenderingCommandDispatcher:
             await message.reject(requeue=False)
             return
 
+        project_id = envelope.get("project_id", "")
+        command_ts = envelope.get("timestamp")
+        if REGISTRY.is_cancelled(project_id, command_ts):
+            # Creator cancelled this step while the command still waited in the
+            # queue (or a retry has not been sent yet): do nothing, and do not
+            # report — the Orchestrator already marked the step cancelled.
+            logger.info("Bỏ lệnh %r của project_id=%s vì đã bị huỷ", command, project_id)
+            await message.ack()
+            return
+
         handler = self._handlers.get(command)
         if handler is None:
             # Ack chứ không nack: một lệnh không hiểu được sẽ không tự hiểu được
@@ -334,10 +345,15 @@ class RenderingCommandDispatcher:
             return
 
         try:
-            await handler(message)
+            with REGISTRY.command(project_id, command_ts):
+                await handler(message)
         except Exception:
             # Lưới cuối. Handler đã tự lo payload sai (thành event *_failed),
-            # nên tới đây chỉ còn lỗi hạ tầng — nack để thử lại, và quan trọng
+            # nên tới đây chỉ còn lỗi hạ tầng — reject không requeue, và quan trọng
             # nhất là message không bao giờ bị bỏ lửng ở trạng thái unacked.
-            logger.exception("Lệnh %r thất bại ngoài dự kiến, nack để thử lại", command)
-            await message.reject(requeue=True)
+            logger.exception("Lệnh %r thất bại ngoài dự kiến, chuyển sang DLQ (không tự thử lại)", command)
+            # requeue=False: dead-letter thẳng sang *.commands.dlq, nơi
+            # Orchestrator đánh dấu bước thất bại để Creator tự bấm thử lại.
+            # Requeue trước đây lặp vô hạn (không backoff) tới TTL 24h, và
+            # chạy lại một lệnh tốn vài phút mà Creator không hề biết.
+            await message.reject(requeue=False)

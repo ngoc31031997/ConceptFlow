@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
@@ -7,6 +7,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
+import { FLOW_TTS } from "../utils/flow";
 import glass from "../styles/glass.module.css";
 
 /**
@@ -25,6 +26,10 @@ export function RenderPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
+  // ?view=1&step=N: mở chỉ để XEM lại bước 8-11 của dự án đã chạy xong.
+  const [search] = useSearchParams();
+  const viewOnly = search.get("view") === "1";
+  const viewStep = Number(search.get("step")) || FLOW_TTS;
   const progressState = useSSE(projectId);
   const { project } = useProject(projectId);
   const [isRetrying, setIsRetrying] = useState(false);
@@ -36,14 +41,18 @@ export function RenderPage() {
   // hiển thị ngoài bốn ô "pending" bất động.
   const phase = project ? projectPhase(project.status) : null;
   useEffect(() => {
-    if (project && phase !== "process") {
+    if (project && phase !== "process" && !viewOnly) {
       navigate(projectPath(projectId, project.status), { replace: true });
     }
-  }, [project, phase, projectId, navigate]);
+  }, [project, phase, viewOnly, projectId, navigate]);
+  const reviewingPast = viewOnly && phase !== "process";
 
   const isFailed =
     progressState.status === "failed" || Boolean(project?.status.startsWith("failed_at_"));
   const errorMessage = progressState.errorMessage ?? project?.error_message ?? "";
+  // Creator stopped it on purpose: not an error to explain, and the strip above
+  // carries the one action ("Chạy tiếp"). Only a real failure gets the banner.
+  const isCancelled = project?.run_state === "cancelled";
 
   // Bug report: navigating away mid-render and back showed "Đang khởi
   // tạo..." with no sign of progress, or of whether it was even still
@@ -66,6 +75,12 @@ export function RenderPage() {
         }
       : progressState;
 
+  // Bước 8-11 theo bước saga đang chạy: TTS, render, merge (kèm QC), cắt short.
+  const activeFlowStep =
+    { synthesize_speech: 8, render_scenes: 9, assemble_video: 10, qc_video: 10, generate_clips: 11 }[
+      displayStep ?? ""
+    ] ?? FLOW_TTS;
+
   async function handleRetry() {
     setIsRetrying(true);
     setRetryError(null);
@@ -81,15 +96,17 @@ export function RenderPage() {
   return (
     <div data-testid="render-page">
       <AppShell
-        currentStep={5}
+        currentStep={viewOnly ? viewStep : activeFlowStep}
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }
-        title={isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
+        title={isCancelled ? "Đã huỷ" : isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
         subtitle={
-          isFailed
+          isCancelled
+            ? "Bạn đã dừng bước này. Chạy tiếp từ dải trạng thái phía trên."
+            : isFailed
             ? "Một bước trong quá trình sản xuất không hoàn tất."
             : "Dàn ý đã duyệt — hệ thống đang tạo giọng đọc, render hoạt hình và ghép video."
         }
@@ -99,17 +116,20 @@ export function RenderPage() {
           hid how far the pipeline actually got, which is the first thing
           you want to know when deciding whether to retry.
         */}
-        {isFailed && (
+        {isFailed && !isCancelled && (
           <ErrorBanner
             errorMessage={retryError ?? errorMessage}
             onRetry={handleRetry}
             isRetrying={isRetrying}
+            projectId={projectId}
+            step={displayStep ?? undefined}
           />
         )}
         <ProgressTracker
           progressState={displayProgressState}
           steps={PROCESS_STEPS}
           isFailed={isFailed}
+          allDone={reviewingPast}
         />
       </AppShell>
     </div>

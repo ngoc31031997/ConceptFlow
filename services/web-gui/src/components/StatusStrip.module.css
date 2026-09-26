@@ -1,0 +1,70 @@
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.1);
+  border: 1px solid var(--surface-border);
+  font-size: 13px;
+}
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.run {
+  background: var(--run-soft, rgba(122, 92, 214, 0.14));
+  color: var(--run, #7a5cd6);
+}
+.warn {
+  background: var(--warn-soft, rgba(199, 129, 26, 0.16));
+  color: var(--warn, #c7811a);
+}
+.bad {
+  background: var(--danger-soft, rgba(217, 59, 69, 0.14));
+  color: var(--danger, #d93b45);
+}
+.ok {
+  background: var(--ok-soft, rgba(31, 157, 107, 0.14));
+  color: var(--ok, #1f9d6b);
+}
+.idle {
+  background: rgba(47, 143, 224, 0.14);
+  color: var(--accent);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+  }
+}
+.message {
+  flex: 1 1 260px;
+  min-width: 0;
+  color: var(--ink-soft);
+  line-height: 1.4;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}

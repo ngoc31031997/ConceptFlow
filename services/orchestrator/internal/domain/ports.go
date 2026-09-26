@@ -28,6 +28,23 @@ type ProgressPublisherPort interface {
 	PublishProgress(ctx context.Context, msg ProgressMessage) error
 }
 
+// CancelRequest tells every worker to stop what it is doing for a project.
+// At is compared with a command's own timestamp: a command sent at or before
+// it is dead, one sent after it (a retry) runs normally.
+type CancelRequest struct {
+	ProjectID string `json:"project_id"`
+	SagaID    string `json:"saga_id"`
+	Step      string `json:"step"`
+	At        string `json:"at"` // RFC3339, UTC
+}
+
+// ControlPublisherPort broadcasts control messages (today: cancel) to all
+// workers. A fanout, not a command queue: a worker busy with a long render has
+// prefetch 1, so a cancel queued behind its own command would never arrive.
+type ControlPublisherPort interface {
+	PublishCancel(ctx context.Context, req CancelRequest) error
+}
+
 // ProjectRepositoryPort abstracts persistence of Project and SagaStep so
 // application/ use cases never depend on pgx directly (module-structure.md
 // Dependency Direction).

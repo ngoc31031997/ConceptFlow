@@ -122,8 +122,33 @@ func LogSagaFailure(ctx context.Context, log ProjectErrorLogPort, projectID stri
 		detail = detail[:4000] + "…"
 	}
 	_ = log.AppendProjectError(context.WithoutCancel(ctx), projectID, ProjectError{
-		At: time.Now().UTC(), Source: "saga", Step: string(step), Message: message, Detail: detail,
+		At: time.Now().UTC(), Source: "saga", Step: string(step), Kind: ClassifySagaFailure(step, message),
+		Message: message, Detail: detail,
 	})
+}
+
+// ClassifySagaFailure guesses what kind of failure a saga step reported, to help
+// the Creator decide whether retrying can help. It only ever says what the text
+// supports: "" (unknown) is the honest answer for anything else, never a guess.
+//
+//	"đầu vào"     the script itself is the problem — retrying repeats it
+//	"hết thời gian" a timeout — a retry may fit, or the script is too heavy
+//	"hết hạn mức"   a quota or rate limit — wait, then retry
+//	"hạ tầng"       a connection, disk or memory problem — retry once it is fixed
+func ClassifySagaFailure(step domain.StepName, message string) string {
+	m := strings.ToLower(message)
+	switch {
+	case strings.Contains(m, "timed out") || strings.Contains(m, "timeout"):
+		return "hết thời gian"
+	case strings.Contains(m, "quota") || strings.Contains(m, "rate limit") || strings.Contains(m, "429"):
+		return "hết hạn mức"
+	case strings.Contains(m, "connection refused") || strings.Contains(m, "no space left") ||
+		strings.Contains(m, "out of memory") || strings.Contains(m, "unreachable") || strings.Contains(m, "lỗi hạ tầng"):
+		return "hạ tầng"
+	case step == domain.StepParseScript || step == domain.StepValidateScript:
+		return "đầu vào"
+	}
+	return ""
 }
 
 // WithQCReports attaches the QC report store (CR-021 D6).

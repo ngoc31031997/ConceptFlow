@@ -64,6 +64,7 @@ import threading
 import time
 from collections.abc import Callable
 
+from adapters.messaging.cancellation import REGISTRY
 from domain.errors import AnimationEngineError
 from domain.models import (
     ChannelAssetRenderRequest,
@@ -485,7 +486,10 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             stderr=subprocess.PIPE,
             text=True,
             preexec_fn=self._limit_child_resources,
+            # Own process group: a cancel kills Manim AND the ffmpeg it started.
+            start_new_session=True,
         )
+        REGISTRY.register(process)
 
         started = time.monotonic()
         collected: list[str] = []
@@ -524,6 +528,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
                 f"{label} timed out after {timeout or self._timeout_seconds}s"
             ) from exc
         finally:
+            REGISTRY.unregister(process)
             done.set()
             reader.join(timeout=5)
             if heartbeat is not None:

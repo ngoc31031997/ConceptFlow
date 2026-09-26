@@ -185,7 +185,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     const { message, code } = await parseError(response);
     throw new ApiError(message, code);
   }
-  if (response.status === 204) {
+  // 202 (a job accepted) carries no body either.
+  if (response.status === 204 || response.status === 202) {
     return undefined as T;
   }
   return response.json() as Promise<T>;
@@ -530,6 +531,36 @@ export function generateAuthoringStep(projectId: string, step: AuthoringStep): P
   });
 }
 
+/**
+ * Chuỗi các bước 1a/1b/1c chạy ở server, không phụ thuộc trình duyệt: POST
+ * bắt đầu (trả về ngay), GET cho biết đang chạy hay kết cục lần chạy gần nhất.
+ */
+export interface AuthoringChainState {
+  running: boolean;
+  steps: AuthoringStep[];
+  current_index: number;
+  finished: boolean;
+  /** Lý do dừng (đã dịch sẵn cho Creator) và bước dừng. */
+  error?: string;
+  error_step?: AuthoringStep;
+  /** Dừng nhưng không phải lỗi: code còn lỗi biên dịch, hoặc không lưu được. */
+  note?: string;
+  started_at?: string;
+  finished_at?: string;
+}
+
+export function startAuthoringChain(projectId: string, steps: AuthoringStep[]): Promise<void> {
+  return apiFetch<void>(`/v1/projects/${projectId}/authoring/chain`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ steps }),
+  });
+}
+
+export function getAuthoringChain(projectId: string): Promise<AuthoringChainState> {
+  return apiFetch<AuthoringChainState>(`/v1/projects/${projectId}/authoring/chain`);
+}
+
 /** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
 export interface AuthoringProgress {
   running: boolean;
@@ -638,18 +669,6 @@ export async function saveAuthoringModels(projectId: string, models: AuthoringSt
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(models),
-  });
-}
-
-/**
- * Ghi màn wizard đang mở của draft lên server để "Chi tiết" mở lại đúng chỗ dừng.
- * Best-effort: lỗi mạng hay project không còn ở trạng thái draft đều bỏ qua.
- */
-export async function saveWizardPosition(projectId: string, route: string): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/wizard-position`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ route }),
   });
 }
 
@@ -780,4 +799,54 @@ export function subscribeProgress(
     onMessage(JSON.parse(event.data) as ProgressMessage);
   };
   return () => source.close();
+}
+
+/** One line of a project's journey through the 13-step flow (project_events). */
+export interface ProjectEvent {
+  id: number;
+  project_id: string;
+  at: string;
+  flow_step: number;
+  step_label: string;
+  run_state: "idle" | "running" | "done" | "failed" | "cancelled";
+  source: "authoring" | "saga";
+  from_status?: string;
+  to_status?: string;
+  /** Bước dự án vừa rời; với dòng saga, duration_ms là thời gian ở bước này. */
+  from_flow_step?: number;
+  /** authoring: how long the run took; saga: time spent in from_status. */
+  duration_ms?: number;
+  detail?: string;
+  content_chars?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+}
+
+export function listProjectEvents(id: string): Promise<ProjectEvent[]> {
+  return apiFetch<ProjectEvent[]>(`/v1/projects/${id}/events`);
+}
+
+export function listRecentEvents(limit = 500): Promise<ProjectEvent[]> {
+  return apiFetch<ProjectEvent[]>(`/v1/events?limit=${limit}`);
+}
+
+/** Dừng bước đang chạy; dự án ở lại bước đó (đã huỷ) để thử lại. */
+export function cancelProject(id: string): Promise<{ step: string; status: string }> {
+  return apiFetch<{ step: string; status: string }>(`/v1/projects/${id}/cancel`, { method: "POST" });
+}
+
+export interface ForkResult {
+  project_id: string;
+  from_step: number;
+  /** Nhạc nền không được mang sang bản mới — chọn lại ở bước Cấu hình. */
+  needs_music_reselect: boolean;
+}
+
+/** Tạo project mới từ project này, làm lại từ bước `fromStep` (2-5). Bản gốc không đổi. */
+export function forkProject(id: string, fromStep: number): Promise<ForkResult> {
+  return apiFetch<ForkResult>(`/v1/projects/${id}/fork`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ from_step: fromStep }),
+  });
 }

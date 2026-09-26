@@ -51,18 +51,55 @@
   cursor: not-allowed;
 }
 
-.backBtn {
+/* The red "?" beside the short message: opens the full detail. */
+.helpBtn {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 11px 20px;
-  border-radius: 14px;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 8px;
+  border-radius: 50%;
+  border: none;
+  background: var(--danger, #e5484d);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  vertical-align: middle;
 }
-.backBtn:hover {
-  background: rgba(255, 255, 255, 0.85);
+
+.detail {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  max-height: 260px;
+  overflow: auto;
+  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  background: rgba(127, 127, 127, 0.08);
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--ink-soft);
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 8px;
+  font: 12px ui-monospace, Menlo, monospace;
+  color: var(--ink-faint);
+}
+.copyBtn {
+  margin: 0 0 14px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 12px;
+  cursor: pointer;
 }

@@ -467,6 +467,13 @@ type ProjectSummary struct {
 	RenderEngine RenderEngine
 	// WizardStep is the stored (raw) step; use EffectiveWizardStep for display.
 	WizardStep int
+	// Topic is the Creator's idea, so the list can name a project by it.
+	Topic string
+	// FlowStep/RunState place it in the 13-step flow (see FlowStateFor).
+	FlowStep int
+	RunState RunState
+	// ForkedFrom is the project this one was forked from, "" if none.
+	ForkedFrom string
 }
 
 // SagaStep tracks the processing state of a single step within one Saga

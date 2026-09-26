@@ -83,6 +83,33 @@ class TestDryRun:
             renderer.dry_run(request)
 
 
+
+class _FakeNode:
+    """Stands in for the `node render.mjs` Popen: the renderer starts it in its
+    own process group and registers it for cancellation, then collects output."""
+
+    def __init__(self, returncode=0, stderr="", on_start=None):
+        self.returncode = returncode
+        self._stderr = stderr
+        self._on_start = on_start
+        self.pid = 0
+
+    def factory(self, cmd, *args, **kwargs):
+        if self._on_start:
+            self._on_start(cmd)
+        return self
+
+    def communicate(self, timeout=None):
+        return "", self._stderr
+
+    def kill(self):
+        pass
+
+
+def _ffprobe(stdout):
+    return lambda *a, **k: type("R", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+
 class TestRender:
     def test_render_invokes_node_and_moves_output(self, tmp_path, monkeypatch):
         template_dir = tmp_path / "remotion_project"
@@ -91,18 +118,16 @@ class TestRender:
 
         captured_cmd = {}
 
-        def dispatch(cmd, *a, **k):
-            if cmd[0] == "node":
-                captured_cmd["cmd"] = cmd
-                # Simulate the Node driver writing the output file it was told to.
-                out_index = cmd.index("--out") + 1
-                with open(cmd[out_index], "wb") as f:
-                    f.write(b"fake video bytes")
-                return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-            # ffprobe
-            return type("R", (), {"returncode": 0, "stdout": "12.3", "stderr": ""})()
+        def start_node(cmd):
+            captured_cmd["cmd"] = cmd
+            # Simulate the Node driver writing the output file it was told to.
+            with open(cmd[cmd.index("--out") + 1], "wb") as f:
+                f.write(b"fake video bytes")
 
-        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", dispatch)
+        monkeypatch.setattr(
+            "adapters.rendering.remotion_renderer.subprocess.Popen", _FakeNode(on_start=start_node).factory
+        )
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", _ffprobe("12.3"))
 
         renderer = RemotionScriptRenderer(
             project_template_dir=str(template_dir), cache_root=str(media_root)
@@ -139,14 +164,14 @@ class TestRender:
         (template_dir / "src").mkdir(parents=True)
         media_root = tmp_path / "media"
 
-        def dispatch(cmd, *args, **kwargs):
-            if cmd[0] == "node":
-                with open(cmd[cmd.index("--out") + 1], "wb") as f:
-                    f.write(b"fake video bytes")
-                return type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})()
-            return type("R", (), {"returncode": 0, "stdout": "5.0", "stderr": ""})()
+        def start_node(cmd):
+            with open(cmd[cmd.index("--out") + 1], "wb") as f:
+                f.write(b"fake video bytes")
 
-        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", dispatch)
+        monkeypatch.setattr(
+            "adapters.rendering.remotion_renderer.subprocess.Popen", _FakeNode(on_start=start_node).factory
+        )
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", _ffprobe("5.0"))
         renderer = RemotionScriptRenderer(
             project_template_dir=str(template_dir), cache_root=str(media_root)
         )
@@ -159,8 +184,8 @@ class TestRender:
         template_dir = tmp_path / "remotion_project"
         (template_dir / "src").mkdir(parents=True)
         monkeypatch.setattr(
-            "adapters.rendering.remotion_renderer.subprocess.run",
-            lambda *a, **k: type("R", (), {"returncode": 1, "stdout": "", "stderr": "boom"})(),
+            "adapters.rendering.remotion_renderer.subprocess.Popen",
+            _FakeNode(returncode=1, stderr="boom").factory,
         )
         renderer = RemotionScriptRenderer(
             project_template_dir=str(template_dir), cache_root=str(tmp_path / "media")

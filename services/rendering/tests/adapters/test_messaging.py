@@ -237,3 +237,33 @@ async def test_dispatcher_rejects_undecodable_envelope(shared_volume_root) -> No
     # on redelivery either, so requeueing it only builds a loop.
     assert message.rejected is False
     assert message.acked is False
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_drops_a_command_the_creator_already_cancelled():
+    """A cancel that lands while the command still waits in the queue: the worker
+    acks it and runs nothing — the step is already marked cancelled upstream."""
+    from datetime import UTC, datetime
+
+    from adapters.messaging.cancellation import REGISTRY
+    from adapters.messaging.consumer import RenderingCommandDispatcher
+
+    ran = []
+
+    class Recorder:
+        async def handle(self, message):
+            ran.append(message)
+
+    REGISTRY.cancel("project-1", datetime(2026, 8, 7, 0, 0, 5, tzinfo=UTC))  # after the command's stamp
+    try:
+        dispatcher = RenderingCommandDispatcher(validate=Recorder(), render=Recorder())
+        body = json.loads(make_envelope())
+        body["event_type"] = "render_scenes"
+        message = FakeMessage(json.dumps(body).encode("utf-8"))
+
+        await dispatcher.handle(message)
+
+        assert message.acked is True
+        assert ran == []
+    finally:
+        REGISTRY._cancelled_at.pop("project-1", None)

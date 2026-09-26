@@ -86,7 +86,9 @@
 .stepsPill {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
   padding: 5px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.55);
@@ -97,10 +99,11 @@
 .stepItem {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 9px 16px;
+  gap: 6px;
+  padding: 8px 10px;
+  white-space: nowrap;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--ink-faint);
   background: transparent;
@@ -121,6 +124,47 @@
 }
 .stepItem.done {
   color: rgba(22, 34, 46, 0.7);
+}
+/* Trạng thái của chính bước đó, tách khỏi "đang xem" (.active): bước đang
+   chạy tím, lỗi đỏ, đã huỷ cam, bị bỏ qua mờ và gạch. */
+.stepItem.running {
+  background: var(--run-soft, rgba(122, 92, 214, 0.14));
+  color: var(--run, #7a5cd6);
+}
+.stepItem.failed {
+  background: var(--danger-soft, rgba(217, 59, 69, 0.12));
+  color: var(--danger, #d93b45);
+}
+.stepItem.cancelled {
+  background: var(--warn-soft, rgba(199, 129, 26, 0.14));
+  color: var(--warn, #c7811a);
+}
+.stepItem.skipped {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.stepItem.active.running,
+.stepItem.active.failed,
+.stepItem.active.cancelled {
+  outline: 2px solid currentColor;
+  outline-offset: -2px;
+}
+.runDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: runPulse 1.2s ease-in-out infinite;
+}
+@keyframes runPulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .runDot {
+    animation: none;
+  }
 }
 .stepNum {
   width: 18px;
@@ -306,6 +350,14 @@
 .content {
   margin-left: 208px;
 }
+/* Có menu dọc thứ hai (xem StepRail): nội dung lùi thêm đúng bề rộng của nó
+   (232px, hoặc 64px khi thu gọn), trừ 8px chồng lên sidebar chính. */
+.contentRail {
+  margin-left: 432px;
+}
+.contentRailCollapsed {
+  margin-left: 264px;
+}
 .topbar {
   justify-content: center;
   position: relative;
@@ -337,7 +389,27 @@
     flex-direction: row;
     flex-wrap: wrap;
   }
-  .content {
+  .content,
+  .contentRail,
+  .contentRailCollapsed {
     margin-left: 0;
   }
+}
+
+/* Màn soạn ở chế độ chỉ xem: fieldset disabled khoá ô nhập/nút; bỏ khung mặc
+   định của fieldset để bố cục không đổi. */
+.readOnlyFieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+.readOnlyBanner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  border: 1px solid var(--surface-border);
+  background: rgba(255, 255, 255, 0.5);
 }

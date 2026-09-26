@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { useKeyboardShortcuts, formatShortcut } from "../hooks/useKeyboardShortcuts";
 import { Button } from "./ui";
+import { useProjectFlow } from "../context/ProjectFlowContext";
 import styles from "./WizardNav.module.css";
 
 interface WizardNavProps {
@@ -48,6 +49,16 @@ export function WizardNav({
   nextTestId,
   extraAction,
 }: WizardNavProps) {
+  // Màn soạn ở chế độ chỉ xem (server sẽ từ chối sửa): nút tiếp tục có thể gọi
+  // lưu hoặc chạy render, nên khoá nó thay vì để bấm rồi mới báo lỗi.
+  const flow = useProjectFlow();
+  const viewOnly = flow.project !== null && !flow.editable;
+  if (viewOnly) {
+    nextDisabled = true;
+    hint = "Chỉ xem — dự án này không còn sửa được ở bước soạn.";
+    isBlocked = false;
+  }
+
   // Keyboard shortcut for Next button (Ctrl+Enter or ⌘+Enter)
   useKeyboardShortcuts([
     {

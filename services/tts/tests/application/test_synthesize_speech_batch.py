@@ -99,3 +99,24 @@ def test_batch_reports_unsupported_language_error(shared_volume_root):
 
     assert isinstance(outcome, BatchSynthesisFailure)
     assert "unsupported_language" in outcome.error_message
+
+
+def test_batch_stops_between_scenes_when_asked(shared_volume_root):
+    from application.synthesize_speech_batch import BatchSynthesisFailure
+
+    engine = FakeTTSEngine()
+    batch_use_case = SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine))
+    scenes = [
+        SceneSpeechRequest(scene_index=0, narration_text="one", language="en"),
+        SceneSpeechRequest(scene_index=1, narration_text="two", language="en"),
+        SceneSpeechRequest(scene_index=2, narration_text="three", language="en"),
+    ]
+    spoken = []
+
+    outcome = batch_use_case.execute(
+        "proj-1", scenes, on_scene_done=lambda i, n: spoken.append(i), should_stop=lambda: len(spoken) >= 1
+    )
+
+    assert isinstance(outcome, BatchSynthesisFailure)
+    assert outcome.error_message == "cancelled"
+    assert len(engine.calls) == 1, "scenes after the cancel must not be spoken"

@@ -36,6 +36,7 @@ from adapters.assembly.ffmpeg_assembler import (
 )
 from adapters.clips.vertical_clip import ClipRequest, generate_clip
 from adapters.logging.correlation import set_correlation_id
+from adapters.messaging.cancellation import REGISTRY
 from adapters.messaging.producer import (
     assembly_failed_envelope,
     channel_asset_normalized_envelope,
@@ -964,12 +965,26 @@ class VideoAssemblyCommandDispatcher:
             await message.ack()
             return
 
+        project_id = envelope.get("project_id", "")
+        command_ts = envelope.get("timestamp")
+        if REGISTRY.is_cancelled(project_id, command_ts):
+            # Cancelled while still queued: run nothing and report nothing — the
+            # Orchestrator already marked the step cancelled.
+            logger.info("Bỏ lệnh %r của project_id=%s vì đã bị huỷ", command, project_id)
+            await message.ack()
+            return
+
         try:
-            await handler(message)
+            with REGISTRY.command(project_id, command_ts):
+                await handler(message)
         except Exception:
             # Last resort. Each handler already turns a malformed payload
             # into its own *_failed event (or acks it, where none exists) —
-            # anything reaching here is infra-level, so nack to retry. This
+            # anything reaching here is infra-level, so dead-letter it (no retry). This
             # is what keeps a delivery from ever being left unacked.
-            logger.exception("Lệnh %r thất bại ngoài dự kiến, nack để thử lại", command)
-            await message.reject(requeue=True)
+            logger.exception("Lệnh %r thất bại ngoài dự kiến, chuyển sang DLQ (không tự thử lại)", command)
+            # requeue=False: dead-letter thẳng sang *.commands.dlq, nơi
+            # Orchestrator đánh dấu bước thất bại để Creator tự bấm thử lại.
+            # Requeue trước đây lặp vô hạn (không backoff) tới TTL 24h, và
+            # chạy lại một lệnh tốn vài phút mà Creator không hề biết.
+            await message.reject(requeue=False)

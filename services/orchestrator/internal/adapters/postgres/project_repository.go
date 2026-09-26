@@ -147,15 +147,39 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		}
 		p.SubtitleStyle = &style
 	}
+	// The error a Creator sees is the failed saga step's own message, read fresh:
+	// projects.error_message was written only by Save and could outlive the
+	// failure it described (a cancelled step, retried and then failing for a real
+	// reason, would still read "cancelled"). Not failed means no error to show.
+	if domain.IsFailedStatus(p.Status) {
+		var msg *string
+		err := r.pool.QueryRow(ctx, `
+			SELECT error_message FROM saga_steps
+			WHERE saga_id = $1 AND status = 'failed' ORDER BY updated_at DESC LIMIT 1`, p.SagaID).Scan(&msg)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		p.ErrorMessage = msg
+	} else {
+		p.ErrorMessage = nil
+	}
 	return &p, nil
 }
 
 // List returns every project as a lightweight ProjectSummary (no
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
+	// error: the failed saga step's own message (see Get for why the column is
+	// not trusted). authoring: what the draft holds, to place it among steps 3-5.
 	rows, err := r.pool.Query(ctx, `
-		SELECT project_id, status, video_path, error_message, updated_at, render_engine, wizard_step
-		FROM projects ORDER BY updated_at DESC`)
+		SELECT p.project_id, p.status, p.video_path,
+		       (SELECT s.error_message FROM saga_steps s
+		         WHERE s.saga_id = p.saga_id AND s.status = 'failed' ORDER BY s.updated_at DESC LIMIT 1),
+		       p.updated_at, p.render_engine, p.wizard_step, p.forked_from,
+		       COALESCE(a.topic, ''),
+		       COALESCE(a.story_content, '') <> '', COALESCE(a.storyboard_content, '') <> '', COALESCE(a.code_content, '') <> ''
+		FROM projects p LEFT JOIN project_authoring a ON a.project_id = p.project_id
+		ORDER BY p.updated_at DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -165,14 +189,37 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 	for rows.Next() {
 		var s domain.ProjectSummary
 		var status, renderEngine string
-		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine, &s.WizardStep); err != nil {
+		var content domain.AuthoredContent
+		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine,
+			&s.WizardStep, &s.ForkedFrom, &s.Topic, &content.Story, &content.Storyboard, &content.Code); err != nil {
 			return nil, err
 		}
 		s.Status = domain.ProjectStatus(status)
 		s.RenderEngine = domain.RenderEngine(renderEngine)
+		if !domain.IsFailedStatus(s.Status) {
+			s.ErrorMessage = nil
+		}
+		s.FlowStep = domain.FlowStateFor(s.Status, s.WizardStep, content).Step
+		s.RunState = domain.RunStateOf(s.Status, s.ErrorMessage)
 		summaries = append(summaries, s)
 	}
 	return summaries, rows.Err()
+}
+
+// SetForkedFrom records which project this one was forked from.
+func (r *ProjectRepository) SetForkedFrom(ctx context.Context, projectID, from string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE projects SET forked_from = $1 WHERE project_id = $2`, from, projectID)
+	return err
+}
+
+// ForkedFrom returns the source project id, "" when the project is not a fork.
+func (r *ProjectRepository) ForkedFrom(ctx context.Context, projectID string) (string, error) {
+	var from string
+	err := r.pool.QueryRow(ctx, `SELECT forked_from FROM projects WHERE project_id = $1`, projectID).Scan(&from)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrProjectNotFound
+	}
+	return from, err
 }
 
 // Delete removes a project and everything derived from it — the projects
@@ -201,6 +248,9 @@ func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error 
 		return err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM outbox_events WHERE payload->>'project_id' = $1`, projectID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM project_events WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
 
@@ -358,16 +408,106 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	return err
 }
 
-// UpdateStatus updates only Project.Status.
+// UpdateStatus updates only Project.Status, and journals the move in
+// project_events (in the same transaction, so the log never disagrees with the
+// row). A write that does not change the status logs nothing.
 func (r *ProjectRepository) UpdateStatus(ctx context.Context, projectID string, status domain.ProjectStatus) error {
-	tag, err := r.pool.Exec(ctx, `UPDATE projects SET status = $1, updated_at = now() WHERE project_id = $2`, string(status), projectID)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	var from string
+	var sinceMS int64
+	err = tx.QueryRow(ctx, `
+		SELECT status, (EXTRACT(EPOCH FROM (now() - updated_at)) * 1000)::bigint
+		FROM projects WHERE project_id = $1 FOR UPDATE`, projectID).Scan(&from, &sinceMS)
+	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrProjectNotFound
 	}
-	return nil
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE projects SET status = $1, updated_at = now() WHERE project_id = $2`,
+		string(status), projectID); err != nil {
+		return err
+	}
+	if from != string(status) {
+		fs := domain.FlowStateFor(status, 0, domain.AuthoredContent{})
+		detail := ""
+		if fs.State == domain.RunFailed {
+			// Best-effort: the saga step that just failed carries the reason.
+			_ = tx.QueryRow(ctx, `
+				SELECT COALESCE(error_message, '') FROM saga_steps
+				WHERE saga_id = (SELECT saga_id FROM projects WHERE project_id = $1) AND status = 'failed'
+				ORDER BY updated_at DESC LIMIT 1`, projectID).Scan(&detail)
+		}
+		if detail == domain.CancelledErrorMessage {
+			fs.State = domain.RunCancelled
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO project_events (project_id, flow_step, run_state, source, from_status, to_status, duration_ms, detail, from_flow_step)
+			VALUES ($1,$2,$3,'saga',$4,$5,$6,$7,$8)`,
+			projectID, fs.Step, string(fs.State), from, string(status), sinceMS, detail,
+			domain.FlowStateFor(domain.ProjectStatus(from), 0, domain.AuthoredContent{}).Step); err != nil {
+			return err
+		}
+	}
+	return tx.Commit(ctx)
+}
+
+// AppendProjectEvent records one journey line (authoring runs write theirs
+// through this; saga moves are written by UpdateStatus itself).
+func (r *ProjectRepository) AppendProjectEvent(ctx context.Context, e domain.ProjectEvent) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_events (project_id, flow_step, run_state, source, from_status, to_status, duration_ms, detail,
+		                            content_chars, prompt_tokens, completion_tokens)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+		e.ProjectID, e.FlowStep, string(e.RunState), e.Source, e.FromStatus, e.ToStatus, e.DurationMS, e.Detail,
+		e.ContentChars, e.PromptTokens, e.CompletionTokens)
+	return err
+}
+
+const projectEventColumns = `id, project_id, at, flow_step, run_state, source, from_status, to_status,
+	duration_ms, detail, content_chars, prompt_tokens, completion_tokens, from_flow_step`
+
+func scanProjectEvents(rows pgx.Rows) ([]domain.ProjectEvent, error) {
+	defer rows.Close()
+	out := make([]domain.ProjectEvent, 0)
+	for rows.Next() {
+		var e domain.ProjectEvent
+		var state string
+		if err := rows.Scan(&e.ID, &e.ProjectID, &e.At, &e.FlowStep, &state, &e.Source, &e.FromStatus, &e.ToStatus,
+			&e.DurationMS, &e.Detail, &e.ContentChars, &e.PromptTokens, &e.CompletionTokens, &e.FromFlowStep); err != nil {
+			return nil, err
+		}
+		e.RunState = domain.RunState(state)
+		e.StepLabel = domain.FlowStepLabel[e.FlowStep]
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// ListProjectEvents returns one project's journey, oldest first.
+func (r *ProjectRepository) ListProjectEvents(ctx context.Context, projectID string) ([]domain.ProjectEvent, error) {
+	rows, err := r.pool.Query(ctx, `SELECT `+projectEventColumns+` FROM project_events WHERE project_id = $1 ORDER BY at, id`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	return scanProjectEvents(rows)
+}
+
+// ListRecentProjectEvents returns the newest events across all projects.
+func (r *ProjectRepository) ListRecentProjectEvents(ctx context.Context, limit int) ([]domain.ProjectEvent, error) {
+	if limit <= 0 || limit > 1000 {
+		limit = 200
+	}
+	rows, err := r.pool.Query(ctx, `SELECT `+projectEventColumns+` FROM project_events ORDER BY at DESC, id DESC LIMIT $1`, limit)
+	if err != nil {
+		return nil, err
+	}
+	return scanProjectEvents(rows)
 }
 
 // SaveRenderEngine updates only Project.RenderEngine (CR-030 — the wizard
@@ -609,20 +749,4 @@ func (r *ProjectRepository) SaveVideoFormat(ctx context.Context, format domain.V
 	}
 	format.Version = version
 	return format, nil
-}
-
-// SaveWizardPosition records which wizard screen a draft project is on, and
-// lifts wizard_step to at least step (never lowers it). Drafts only: once the
-// saga has started, status decides where the Creator lands.
-func (r *ProjectRepository) SaveWizardPosition(ctx context.Context, projectID string, step int, route string) error {
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE projects SET wizard_route = $1, wizard_step = GREATEST(wizard_step, $2), updated_at = now()
-		WHERE project_id = $3 AND status = 'draft'`, route, step, projectID)
-	if err != nil {
-		return err
-	}
-	if tag.RowsAffected() == 0 {
-		return domain.ErrProjectNotFound
-	}
-	return nil
 }

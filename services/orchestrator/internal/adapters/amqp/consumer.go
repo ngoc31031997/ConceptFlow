@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -29,6 +30,33 @@ import (
 // handleEventsDLQDelivery below fails the saga step instead of looping
 // forever.
 const requeueBackoff = 2 * time.Second
+
+// maxEventAttempts bounds how often one event is retried before its saga step
+// is failed for the Creator to see. Failures here are mostly a database that
+// is restarting, which a few short retries cover; more than that is a real
+// problem and looping silently for the queue's 24h TTL hides it. The counter
+// is in memory: a restart resets it, which only ever grants a few extra tries.
+const maxEventAttempts = 3
+
+var (
+	eventAttemptsMu sync.Mutex
+	eventAttempts   = map[string]int{}
+)
+
+// bumpEventAttempt returns how many times messageID has failed so far,
+// including this one.
+func bumpEventAttempt(messageID string) int {
+	eventAttemptsMu.Lock()
+	defer eventAttemptsMu.Unlock()
+	eventAttempts[messageID]++
+	return eventAttempts[messageID]
+}
+
+func clearEventAttempts(messageID string) {
+	eventAttemptsMu.Lock()
+	defer eventAttemptsMu.Unlock()
+	delete(eventAttempts, messageID)
+}
 
 // nackWithBackoff pauses, then returns the delivery to the queue. The pause
 // respects ctx so shutdown is not held up by it.
@@ -207,10 +235,22 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 		Payload:   envelope.Payload,
 	})
 	if err != nil {
-		c.logger.ErrorContext(ctx, "event processing failed, nacking for redelivery", "error", err, "event_type", eventType)
+		attempt := bumpEventAttempt(envelope.MessageID)
+		if attempt >= maxEventAttempts {
+			c.logger.ErrorContext(ctx, "event processing failed, giving up and failing the step",
+				"error", err, "event_type", eventType, "attempts", attempt, "project_id", envelope.ProjectID)
+			errMsg := fmt.Sprintf("orchestrator không xử lý được event %s sau %d lần: %v", eventType, attempt, err)
+			if c.failStepFromEvent(ctx, d, envelope, errMsg) {
+				clearEventAttempts(envelope.MessageID)
+			}
+			return
+		}
+		c.logger.ErrorContext(ctx, "event processing failed, nacking for redelivery",
+			"error", err, "event_type", eventType, "attempt", attempt, "max_attempts", maxEventAttempts)
 		nackWithBackoff(ctx, d)
 		return
 	}
+	clearEventAttempts(envelope.MessageID)
 
 	if err := c.inbox.MarkProcessed(ctx, envelope.MessageID); err != nil {
 		c.logger.ErrorContext(ctx, "failed to mark message processed", "error", err, "message_id", envelope.MessageID)
@@ -231,7 +271,7 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 	}
 
 	stepName := domain.StepName(envelope.EventType)
-	errMsg := "message dead-lettered: exceeded delivery limit"
+	errMsg := deadLetterMessage(d)
 	if err := c.repo.UpdateStep(ctx, &domain.SagaStep{
 		SagaID: envelope.SagaID, StepName: stepName, Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
 	}); err != nil {
@@ -246,6 +286,24 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 	}
 	c.logSagaFailure(ctx, envelope.ProjectID, stepName, errMsg, "command DLQ, saga_id="+envelope.SagaID)
 	_ = d.Ack(false)
+}
+
+// deadLetterMessage says why a command landed in a DLQ, read from the broker's
+// x-death header: "rejected" is the worker giving up on an unexpected error
+// (it no longer requeues), "expired" is nobody picking the command up within
+// the queue TTL. Nothing retries either automatically — the Creator decides.
+func deadLetterMessage(d amqp.Delivery) string {
+	if deaths, ok := d.Headers["x-death"].([]interface{}); ok && len(deaths) > 0 {
+		if first, ok := deaths[0].(amqp.Table); ok {
+			switch first["reason"] {
+			case "rejected":
+				return "worker gặp lỗi hạ tầng bất ngờ khi xử lý lệnh (đã dừng, không tự thử lại) — xem log của worker rồi bấm thử lại"
+			case "expired":
+				return "lệnh không được worker nhận trong thời hạn 24 giờ (đã dừng, không tự thử lại)"
+			}
+		}
+	}
+	return "lệnh bị dead-letter (không tự thử lại)"
 }
 
 // logSagaFailure records a dead-lettered step in project_errors when the repo
@@ -276,8 +334,7 @@ func (c *Consumer) handleEventsDLQDelivery(ctx context.Context, d amqp.Delivery)
 	}
 
 	eventType := resolveEventType(envelope)
-	stepName, known := application.StepForEventType(eventType)
-	if !known {
+	if _, known := application.StepForEventType(eventType); !known {
 		c.logger.WarnContext(ctx, "dead-lettered event has no saga step, dropping",
 			"event_type", eventType, "saga_id", envelope.SagaID, "project_id", envelope.ProjectID)
 		_ = d.Ack(false)
@@ -285,18 +342,31 @@ func (c *Consumer) handleEventsDLQDelivery(ctx context.Context, d amqp.Delivery)
 	}
 
 	errMsg := fmt.Sprintf("event dead-lettered after exceeding TTL: event_type=%s", eventType)
+	c.failStepFromEvent(ctx, d, envelope, errMsg)
+}
+
+// failStepFromEvent fails the saga step an event belongs to and acks the
+// delivery. It reports false (after nacking with backoff) when the failure
+// could not be recorded, so the caller keeps its retry state.
+func (c *Consumer) failStepFromEvent(ctx context.Context, d amqp.Delivery, envelope domain.Envelope, errMsg string) bool {
+	stepName, known := application.StepForEventType(resolveEventType(envelope))
+	if !known {
+		_ = d.Ack(false)
+		return true
+	}
 	if err := c.repo.UpdateStep(ctx, &domain.SagaStep{
 		SagaID: envelope.SagaID, StepName: stepName, Status: domain.SagaStepFailed, ErrorMessage: &errMsg,
 	}); err != nil {
-		c.logger.ErrorContext(ctx, "failed to update saga step for events DLQ delivery", "error", err)
+		c.logger.ErrorContext(ctx, "failed to update saga step for failed event", "error", err)
 		nackWithBackoff(ctx, d)
-		return
+		return false
 	}
 	if err := c.repo.UpdateStatus(ctx, envelope.ProjectID, domain.FailedStatusForStep(stepName)); err != nil {
-		c.logger.ErrorContext(ctx, "failed to update project status for events DLQ delivery", "error", err)
+		c.logger.ErrorContext(ctx, "failed to update project status for failed event", "error", err)
 		nackWithBackoff(ctx, d)
-		return
+		return false
 	}
-	c.logSagaFailure(ctx, envelope.ProjectID, stepName, errMsg, "events DLQ, saga_id="+envelope.SagaID)
+	c.logSagaFailure(ctx, envelope.ProjectID, stepName, errMsg, "event failure, saga_id="+envelope.SagaID)
 	_ = d.Ack(false)
+	return true
 }

@@ -41,7 +41,7 @@ export function OAuthCallbackPage() {
     // Nối YouTube bắt đầu từ màn kết quả, nên đây là bước 6 ("Kết quả") —
     // Creator sẽ quay lại đúng chỗ đó sau khi nối xong.
     <AppShell
-      currentStep={6}
+      currentStep={13}
       title={connectedChannel ? `Đã nối kênh ${connectedChannel}` : "Đang kết nối YouTube..."}
       subtitle="Vui lòng chờ trong giây lát."
     >
