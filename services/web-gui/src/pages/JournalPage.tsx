@@ -122,6 +122,7 @@ export function JournalPage() {
   );
 
   const overview = useMemo(() => aggregateByStep(events ?? []), [events]);
+  const maxMs = Math.max(1, ...overview.map((o) => o.maxMs));
   const slowestAvg = Math.max(1, ...overview.map((o) => (o.runs ? o.totalMs / o.runs : 0)));
 
   // Tổng thời gian và token theo bước: chỗ nào tốn nhất hiện ra ngay.
@@ -172,38 +173,32 @@ export function JournalPage() {
 
         {projects.length > 0 && view === "overview" && (
           <Card title="Bước nào chậm, tốn, hay lỗi nhất" hint={`Tính trên ${projects.length} dự án, ${events?.length ?? 0} sự kiện gần nhất. Thời gian chờ bạn thao tác không được tính.`}>
-            <div className={styles.tbl}>
-              <table className={styles.table} data-testid="journal-overview">
-                <thead>
-                  <tr>
-                    <th>Bước</th>
-                    <th className={styles.num}>Lượt</th>
-                    <th className={styles.num}>Trung bình</th>
-                    <th className={styles.barcell} />
-                    <th className={styles.num}>Lâu nhất</th>
-                    <th className={styles.num}>Token</th>
-                    <th className={styles.num}>Lỗi</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {overview.map((o) => {
-                    const avg = o.runs ? o.totalMs / o.runs : 0;
-                    return (
-                      <tr key={o.step} data-testid={`overview-row-${o.step}`}>
-                        <td>{o.step}. {o.label}</td>
-                        <td className={styles.num}>{o.runs}</td>
-                        <td className={styles.num}>{formatDuration(avg)}</td>
-                        <td className={styles.barcell}>
-                          <div className={`${styles.hb} ${avg >= slowestAvg ? styles.hot : ""}`} style={{ width: `${Math.round((avg / slowestAvg) * 100)}%` }} />
-                        </td>
-                        <td className={styles.num}>{formatDuration(o.maxMs)}</td>
-                        <td className={styles.num}>{o.tokens ? o.tokens.toLocaleString("vi-VN") : "—"}</td>
-                        <td className={styles.num}>{o.failures}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className={styles.chart} data-testid="journal-overview">
+              <div className={styles.legend}>
+                <span><i className={styles.swAvg} /> Trung bình</span>
+                <span><i className={styles.swMax} /> Lâu nhất</span>
+              </div>
+              {overview.map((o) => {
+                const avg = o.runs ? o.totalMs / o.runs : 0;
+                const pct = (ms: number) => `${Math.round((ms / maxMs) * 100)}%`;
+                return (
+                  <div key={o.step} className={styles.crow} data-testid={`overview-row-${o.step}`}>
+                    <div className={styles.clabel}>{o.step}. {o.label}</div>
+                    <div className={styles.ctrack}>
+                      <div className={styles.cmax} style={{ width: pct(o.maxMs) }} />
+                      <div className={`${styles.cavg} ${avg >= slowestAvg ? styles.hot : ""}`} style={{ width: pct(avg) }} />
+                    </div>
+                    <div className={styles.cval}>
+                      <b>{formatDuration(avg)}</b>
+                      <span>tối đa {formatDuration(o.maxMs)} · {o.runs} lượt</span>
+                      <span>
+                        {o.tokens ? `${o.tokens.toLocaleString("vi-VN")} token` : "— token"}
+                        {o.failures > 0 && <em className={styles.fail}> · {o.failures} lỗi</em>}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         )}
