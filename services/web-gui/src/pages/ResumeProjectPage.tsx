@@ -36,7 +36,7 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
         }
       : defaultSubtitleStyle,
     renderQuality: project.render_quality ?? "1080p60",
-    videoFormatId: project.video_format_id ?? "visual_first_7min",
+    videoFormatId: project.video_format_id ?? "case_study_essay_8min",
     videoOutputMode: project.video_output_mode ?? "long",
     backgroundMusicPath: project.background_music_path ?? null,
     backgroundMusicVolume: project.background_music_volume || DEFAULT_MUSIC_VOLUME,

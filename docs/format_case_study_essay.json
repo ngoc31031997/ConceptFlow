@@ -1,0 +1,15 @@
+{
+  "id": "case_study_essay_8min",
+  "name": "Nghịch lý có thật + chuỗi ví dụ — 7 đến 9 phút",
+  "min_seconds": 420,
+  "max_seconds": 560,
+  "beats": [
+    { "id": "hook",      "role": "hook",        "min_seconds": 15, "max_seconds": 25,  "required": true,  "max_repeat": 1 },
+    { "id": "concrete",  "role": "example",     "min_seconds": 30, "max_seconds": 45,  "required": true,  "max_repeat": 1 },
+    { "id": "pattern",   "role": "explain",     "min_seconds": 80, "max_seconds": 120, "required": true,  "max_repeat": 1 },
+    { "id": "variation", "role": "example",     "min_seconds": 25, "max_seconds": 40,  "required": true,  "max_repeat": 7 },
+    { "id": "modern",    "role": "implication", "min_seconds": 45, "max_seconds": 80,  "required": false, "max_repeat": 1 },
+    { "id": "recap",     "role": "summary",     "min_seconds": 15, "max_seconds": 30,  "required": true,  "max_repeat": 1 },
+    { "id": "cta",       "role": "cta",         "min_seconds": 5,  "max_seconds": 12,  "required": false, "max_repeat": 1 }
+  ]
+}

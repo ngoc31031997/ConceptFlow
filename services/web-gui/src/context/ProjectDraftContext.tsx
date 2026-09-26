@@ -195,7 +195,7 @@ const initialDraft: ProjectDraft = {
   renderQuality: "1080p60",
   renderEngine: "manim",
   videoFont: "Be Vietnam Pro",
-  videoFormatId: "visual_first_7min",
+  videoFormatId: "case_study_essay_8min",
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
   authoringMode: "manual",
