@@ -106,6 +106,20 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           .join(" ")}
       >
         <div className={styles.topbar}>
+          <div className={styles.topbarCenter}>
+            <div className={styles.projectRow}>
+                {projectName && (
+                  <div className={styles.projectChip} title={projectName} data-testid="project-name-chip">
+                    <span className={styles.projectChipLabel}>Project</span>
+                    <span className={styles.projectChipName}>{projectName}</span>
+                  </div>
+                )}
+                {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
+                  <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
+                )}
+              </div>
+              <h1>{title}</h1>
+          </div>
           <div className={styles.headerActions}>
             <AccentPicker />
             <ThemeToggle />
@@ -115,18 +129,6 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
 
         <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>
           <div className={styles.heading}>
-            <div className={styles.projectRow}>
-              {projectName && (
-                <div className={styles.projectChip} title={projectName} data-testid="project-name-chip">
-                  <span className={styles.projectChipLabel}>Project</span>
-                  <span className={styles.projectChipName}>{projectName}</span>
-                </div>
-              )}
-              {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
-                <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
-              )}
-            </div>
-            <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
           {showRail && currentStep && <StatusStrip currentStep={currentStep} />}
