@@ -1,0 +1,87 @@
+"""Bộ avatar mèo `cat.*` (CR-038): dựng lại được, hợp lệ, và khớp manifest."""
+
+import importlib.util
+import json
+from pathlib import Path
+
+import pytest
+
+from domain import lottie_catalog as catalog
+
+ROOT = Path(__file__).resolve().parents[2]
+SPEC = importlib.util.spec_from_file_location("build_avatar", ROOT / "tools" / "build_avatar.py")
+build_avatar = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(build_avatar)
+
+PUBLIC = ROOT / "remotion_project" / "public" / "lottie"
+MANIFEST = ROOT / "remotion_project" / "lottie" / "manifest.json"
+
+
+@pytest.fixture(scope="module")
+def rig():
+    return build_avatar.build_rig()
+
+
+@pytest.mark.parametrize("state", list(build_avatar.STATES))
+def test_moi_trang_thai_la_lottie_hop_le(rig, state):
+    data = build_avatar.STATES[state][0](rig)
+    assert all(k in data for k in ("v", "fr", "ip", "op", "layers"))
+    assert data["op"] > 0
+    assert all(layer["op"] == data["op"] for layer in data["layers"])
+    json.dumps(data)  # tuần tự hoá được
+
+
+@pytest.mark.parametrize("state", list(build_avatar.STATES))
+def test_moi_trang_thai_co_ba_soc_muop(rig, state):
+    data = build_avatar.STATES[state][0](rig)
+    stripes = next(layer for layer in data["layers"] if layer["nm"] == "Stripes")
+    lines = [i for i in stripes["shapes"][0]["it"] if i["ty"] == "sh"]
+    assert len(lines) == 3
+
+
+def test_chi_push_co_chan_va_ly(rig):
+    for state, (fn, _, _) in build_avatar.STATES.items():
+        names = {layer["nm"] for layer in fn(rig)["layers"]}
+        assert ({"Lapa", "cup"} <= names) == (state == "push")
+
+
+def test_duoi_nam_duoi_than_va_moi_lop_co_cha_null(rig):
+    data = build_avatar.STATES["idle"][0](rig)
+    order = [layer["nm"] for layer in data["layers"]]
+    assert order.index("body") < order.index("tale")
+    movers = [layer for layer in data["layers"] if layer["ty"] == 3]
+    assert len(movers) == 1
+    assert all(layer.get("parent") == movers[0]["ind"] for layer in data["layers"] if layer["ty"] != 3)
+
+
+def test_dung_lai_cho_ket_qua_giong_nhau():
+    a = build_avatar.STATES["happy"][0](build_avatar.build_rig())
+    b = build_avatar.STATES["happy"][0](build_avatar.build_rig())
+    assert a == b
+
+
+def test_khong_sua_ban_goc_rig(rig):
+    before = json.dumps(rig, sort_keys=True)
+    for fn, _, _ in build_avatar.STATES.values():
+        fn(rig)
+    assert json.dumps(rig, sort_keys=True) == before
+
+
+def test_file_da_commit_khop_trinh_dung(rig):
+    """File trong public/lottie phải là đúng thứ trình dựng sinh ra (không bị sửa tay)."""
+    for state, (fn, _, _) in build_avatar.STATES.items():
+        expected = json.dumps(fn(rig), separators=(",", ":"))
+        assert (PUBLIC / f"cat.{state}.json").read_text(encoding="utf-8") == expected, state
+
+
+def test_manifest_that_hop_le_va_khop_bo_avatar():
+    assets = catalog.load_manifest(MANIFEST)
+    assert catalog.validate(assets, PUBLIC) == []
+    assert {a.id for a in assets if a.id.startswith("cat.")} == {f"cat.{s}" for s in build_avatar.STATES}
+
+
+def test_avatar_chua_duyet_thi_khong_vao_prompt():
+    """Giấy phép riêng của clip gốc chưa xác minh: chưa clip nào được `approved`."""
+    assets = catalog.load_manifest(MANIFEST)
+    assert catalog.approved(assets) == []
+    assert "Chưa có clip" in catalog.render_prompt_block(assets)

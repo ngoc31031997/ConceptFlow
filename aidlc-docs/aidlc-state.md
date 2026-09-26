@@ -80,6 +80,7 @@
 | CR-026 | Kịch bản riêng cho bản Shorts/TikTok, hỗ trợ bằng AI | P1 | **Requirements Analysis** | Đã viết requirements, chờ Creator duyệt trước khi sang Low-Level Design |
 | CR-027 | Gọi LLM trong app qua Hive (OpenAI-compatible), bỏ copy-paste ra AI ngoài | P1 | **Low-Level Design — chờ duyệt** | Requirements **đã được Creator duyệt (2026-09-21)**. Lật lại quyết định "copy tay / không gọi API trả phí" của CR-025 — context 1M của Hive gỡ nút thắt `num_ctx` (CR-014). Chốt: Hive chính/Ollama fallback, cả 6 vai trò, chạy từng bước, prompt hai tầng (`prompt_overrides` bảng riêng). LLD: `cr-027-low-level-design.md` (D0–D11). Cần ADR-0029. Key Hive đã xác minh 2026-09-21 (chỉ cần Secret Key, vùng `api-cdn`; `api-va1` trả 500). `HIVE_MODEL` = `deepseek-ai/deepseek-v4.1-flash` (chốt 2026-09-21, D14). **LLD đủ để bắt đầu mốc 1** |
 | CR-029 | Gộp `parse_script`+`validate_script` thành 1 bước, bỏ `qc_video` khỏi luồng chính (đưa backlog), thêm % tiến trình cho `synthesize_speech`/`assemble_video`/`generate_clips` | P1 | **Requirements Analysis → Implementation** | Quyết định 2026-09-22: `validate_script` là dry-run thật (sinh `Beats[]`), không phải static check, nên gộp cùng `parse_script` thành 1 điểm dừng/sửa lỗi. `qc_video` chạy sau `assemble_video` và không có nhánh fail nên không gate được gì — tắt khỏi saga, giữ code lại cho lần thiết kế sau. Progress event tái dùng pattern `scene_rendered`/`progress.fanout`, bắn theo đơn vị hoàn thành, không theo tick thời gian. Nhánh: `feature/cr-029-render-saga-consolidation` |
+| CR-038 | Thư viện minh hoạ Lottie cho engine Remotion (`LottieClip`, catalog có cổng giấy phép, công cụ duyệt clip) + bộ avatar mèo mướp `cat.*` (10 biểu cảm/hành động) | P2 | **Đã implement + verify render; chờ Creator xác minh giấy phép clip gốc** | Lottie thay vì Rive vì chỉ cần phát animation, `@remotion/lottie` chính thức và xác định theo frame. LLM chỉ CHỌN clip theo id, không sinh/sửa Lottie. Chỉ Remotion Engineer nhận catalog (Visual Director giữ trung lập engine). Clip `candidate` cho tới khi Creator điền `license_checked`. Nhánh: `feature/cr-038-lottie-illustration-library` |
 
 Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`,
 `cr-016-024-execution-plan.md`, `cr-023-low-level-design.md`,
@@ -103,6 +104,7 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 - **Đã giao, chưa verify E2E**: CR-012 (chưa verify với Google thật).
 - **Backlog**: CR-022 (vòng phản hồi retention, hoãn ngoài phạm vi đợt).
 - **Backlog (2026-09-24)**: Bổ sung system prompt khi gọi Hive API theo từng role, từng bước — cần rà từng bước gọi LLM (story_architect, visual_director, script_reviewer, ...) để mỗi bước gửi đúng system prompt riêng của role đó (hiện `hive_client.go` chỉ thêm message `system` khi `req.System` không rỗng). Kèm rà `temperature` (đang 0.7 ở `generate_authoring.go:235`, đề xuất ~0.3 cho bước cần đúng cấu trúc) và `MaxTokens` theo từng bước. Bối cảnh: debug lỗi output bị cắt do reasoning dùng hết `max_tokens` (playground 4096; `HIVE_MAX_OUTPUT_TOKENS=0` không gửi trần tường minh).
+- **Backlog (2026-09-26)**: Ghép avatar Mướp vào video (CR-038 để lại) — vai trò linh vật/nhân vật, ai chọn trạng thái theo lời thoại, overlay cho engine Manim ở `video-assembly`, bố cục và vùng phụ đề, viền theo nền. Chi tiết: `inception/requirements/cr-038-lottie-illustration-library.md` mục "Backlog".
 - **Next Stage**: chờ Creator chọn — (a) tự chạy lại E2E xác nhận 2 fix orchestrator, (b) hiệu chỉnh ngưỡng QC rồi bật `QC_ENFORCE` (CR-021) — cần video thật, (c) verify CR-012 với Google thật, hoặc (d) Change Request mới.
 
 ## Việc tồn đọng cần Creator làm (không phải việc code)
@@ -112,6 +114,7 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 | Chọn và upload nhạc hiệu intro/outro | CR-023 Quyết định #4 | Chưa chọn nguồn; khe nhận file và chuẩn hoá -14 LUFS đã sẵn |
 | Hiệu chỉnh ngưỡng QC trên video thật rồi bật `QC_ENFORCE=true` | CR-021 Quyết định #3 | Ngưỡng hiện là ước lượng nới rộng. Bật cổng trước khi biết tỉ lệ báo động giả là cách làm Creator mất niềm tin vào báo cáo. Cần đo trên video thật sau khi fix LayoutMarks đã lên stack |
 | Verify CR-012 với tài khoản Google thật (đăng nhập OAuth thật qua web-gui) | CR-012 | Cần Creator tự đăng nhập, không có quyền tạo/đăng nhập tài khoản Google thay |
+| Xác minh giấy phép RIÊNG của clip Bad Cat gốc (tác giả, có cho chỉnh sửa và phân phối lại không), rồi duyệt bộ `cat.*` | CR-038 | File chỉ ghi "LottieFiles" (tên công cụ tạo file). Tôi không có cách biết giấy phép của một clip cụ thể; điền `license_checked` và đổi `status` sang `approved` trong `remotion_project/lottie/manifest.json` |
 
 ## Nợ kỹ thuật đã biết
 | Mục | Ghi nhận | Trạng thái |

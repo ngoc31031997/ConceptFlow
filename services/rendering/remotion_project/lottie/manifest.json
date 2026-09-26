@@ -1,0 +1,230 @@
+{
+  "assets": [
+    {
+      "id": "cat.angry",
+      "title": "Mèo angry",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo tức giận, mắt xếch, cả người rung, hiện dấu giận đỏ. Dùng khi kết quả sai hoặc bị làm phiền.",
+      "tags": [
+        "avatar",
+        "giận",
+        "bực"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FF4D4D",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.happy",
+      "title": "Mèo happy",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo vui, mắt cười, nảy nhẹ, đuôi vẫy nhanh, bay ra trái tim. Dùng khi hiểu ra hoặc kết thúc tốt.",
+      "tags": [
+        "avatar",
+        "vui",
+        "ăn mừng"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FF78D6",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.idle",
+      "title": "Mèo idle",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo ngồi lườm người xem, đuôi vẫy chậm, thỉnh thoảng chớp mắt. Trạng thái mặc định.",
+      "tags": [
+        "avatar",
+        "mặc định",
+        "lườm"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.look",
+      "title": "Mèo look",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo đảo mắt trái rồi phải rồi về giữa. Dùng khi kể chuyện có hai vế hoặc khi nghi ngờ.",
+      "tags": [
+        "avatar",
+        "đảo mắt",
+        "nghi ngờ"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.push",
+      "title": "Mèo push",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo dùng chân đẩy cái ly khỏi mép bàn, mắt lườm. Gag đặc trưng: cách làm sai leo thang.",
+      "tags": [
+        "avatar",
+        "hành động",
+        "gag",
+        "đẩy ly"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.sad",
+      "title": "Mèo sad",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo buồn, mắt sụp, cúi xuống, giọt mồ hôi rơi. Dùng khi thất bại hoặc tình huống xấu đi.",
+      "tags": [
+        "avatar",
+        "buồn",
+        "thất bại"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#8FD3FF",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.sleep",
+      "title": "Mèo sleep",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo ngủ, thở đều, chữ z bay lên. Dùng khi chờ, khi lời thoại kéo dài hoặc khi nội dung tẻ nhạt.",
+      "tags": [
+        "avatar",
+        "ngủ",
+        "chờ"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.smug",
+      "title": "Mèo smug",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo nheo mắt tự mãn, ánh mắt liếc về phía người xem. Dùng sau khi nhân vật làm chuyện dại dột.",
+      "tags": [
+        "avatar",
+        "tự mãn",
+        "gian"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.surprised",
+      "title": "Mèo surprised",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo giật mình, mắt tròn to, nảy lên và hiện dấu chấm than. Dùng ở cú xoay hoặc khoảnh khắc Aha.",
+      "tags": [
+        "avatar",
+        "giật mình",
+        "bất ngờ"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFD215",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    },
+    {
+      "id": "cat.thinking",
+      "title": "Mèo thinking",
+      "license": "Lottie Simple License",
+      "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
+      "author": "Chưa rõ",
+      "status": "candidate",
+      "license_checked": "",
+      "description": "Mèo ngước mắt suy nghĩ, dấu hỏi nhấp nhô trên đầu. Dùng khi đặt câu hỏi cho người xem.",
+      "tags": [
+        "avatar",
+        "suy nghĩ",
+        "câu hỏi"
+      ],
+      "loop": true,
+      "palette": [
+        "#000000",
+        "#EDEDED",
+        "#FFD215",
+        "#FFFFFF"
+      ],
+      "notes": "Dựng từ lottie/source/bad-cat.lottie bằng tools/build_avatar.py."
+    }
+  ]
+}

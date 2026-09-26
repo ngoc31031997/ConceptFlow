@@ -1936,3 +1936,18 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 
 ---
 
+
+## CR-038 — Thư viện Lottie cho Remotion và bộ avatar mèo mướp
+**Timestamp**: 2026-09-26T04:30:00Z
+**User Input**: Chuỗi yêu cầu 2026-09-25..26: đổi prompt Story Architect hài hơn và bớt cảnh khó minh hoạ; tích hợp Lottie vào Remotion "reuse hoặc custom lại từ kho miễn phí, không để LLM sinh"; dùng clip Bad Cat làm avatar, thêm 3 sọc mướp, thêm viền nhiều màu chống chìm nền, bỏ viền ở chỗ đuôi nối thân; "làm bộ biểu cảm hoạt động cho nó, check rồi commit build push merge main luôn, thêm backlog phần ghép avatar vào video".
+**AI Response**:
+1. **Lottie**: `LottieClip` (frame-driven qua `@remotion/lottie`, đổi màu tất định, `outline` chống chìm), catalog + manifest có cổng giấy phép, `tools/lottie_catalog.py` (validate/gallery/prompt/credits), lint id trong `validate_script`, `{{lottie_catalog}}` chỉ vào prompt Remotion Engineer (Visual Director giữ trung lập engine).
+2. **Giấy phép**: đối chiếu LottieFiles Help — Lottie Simple License cho dùng thương mại không cần ghi công nhưng MỖI animation có giấy phép riêng ⇒ clip `approved` bắt buộc có `license_checked`.
+3. **Avatar**: `tools/build_avatar.py` dựng 10 clip `cat.*` (idle, smug, surprised, angry, happy, sleep, thinking, sad, look, push) từ `lottie/source/bad-cat.lottie`. Tất cả để `candidate` vì giấy phép riêng của clip gốc chưa xác minh và bộ này là bản chỉnh sửa của nó.
+4. **Prompt Story Architect v5**: comedy plan (running gag + callback), kỹ thuật hài phân vai, phép thử hình ảnh cho Bước 1–2 (nguyên tắc + ví dụ + danh sách cấm ngắn, không phải whitelist). Nằm chung commit với CR-038 vì cùng file seeds với Remotion Engineer v5.
+5. **Backlog**: ghép avatar vào video (vai trò, chọn trạng thái theo lời thoại, overlay cho Manim, bố cục, viền theo nền).
+**Impact Assessment**: Không đổi saga hay hợp đồng giữa service. Catalog rỗng ("Chưa có clip") cho tới khi Creator duyệt clip, nên hành vi mặc định của Remotion Engineer không đổi. Verify: pytest rendering, `go test ./internal/domain`, render Remotion thật cho cả 10 clip và các biến thể viền/nền.
+**Còn tồn đọng**: Creator xác minh giấy phép clip gốc; sau đó duyệt `cat.*` và chạy `tools/lottie_catalog.py prompt`.
+**Artifacts Affected**: `services/rendering/{domain/lottie_catalog.py,tools/lottie_catalog.py,tools/build_avatar.py,remotion_project/**,application/validate_script.py,main.py}`, `services/orchestrator/internal/domain/{prompt_template_seeds.go,prompt_vars.go,prompts/lottie_catalog_vi.txt}`, `aidlc-docs/inception/requirements/cr-038-lottie-illustration-library.md`, `aidlc-docs/aidlc-state.md`
+
+---
