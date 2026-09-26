@@ -25,13 +25,13 @@ describe("RenderQualityPicker", () => {
   it("warns that a draft render is not meant for publishing", () => {
     render(<RenderQualityPicker value="720p30" onChange={vi.fn()} />);
 
-    expect(screen.getByRole("status").textContent).toContain("không nên dùng để đăng");
+    expect(screen.getByRole("status").textContent).toContain("Không nên đăng bản nháp");
   });
 
   it("warns that 4K is rarely worth its cost", () => {
     render(<RenderQualityPicker value="4k60" onChange={vi.fn()} />);
 
-    expect(screen.getByRole("status").textContent).toContain("nặng hơn");
+    expect(screen.getByRole("status").textContent).toContain("mất nhiều thời gian hơn");
   });
 
   it("shows no warning for the recommended preset", () => {

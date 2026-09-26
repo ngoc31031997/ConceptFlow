@@ -5,10 +5,10 @@ import { operationSubtitle, operationErrorLabel } from "../../src/lib/formatProg
 
 describe("OperationProgressCard", () => {
   it("runs indeterminate, without a made-up percentage, when the total is unknown (FR116.4)", () => {
-    render(<OperationProgressCard subtitle="AI đang suy luận · 1,2k ký tự · 5s" />);
+    render(<OperationProgressCard subtitle="AI đang phân tích · 1,2k ký tự · 5s" />);
     const bar = screen.getByRole("progressbar");
     expect(bar).not.toHaveAttribute("aria-valuenow");
-    expect(screen.getByText(/AI đang suy luận/)).toBeInTheDocument();
+    expect(screen.getByText(/AI đang phân tích/)).toBeInTheDocument();
   });
 
   it("shows a percentage only when total is known", () => {
@@ -27,7 +27,7 @@ describe("operationSubtitle", () => {
   const base = { reasoning_chars: 0, content_chars: 0, elapsed_ms: 125_000, done: null, total: null };
   it("formats phase, chars and clock like step 1b", () => {
     expect(operationSubtitle({ ...base, phase: "writing", content_chars: 14300 })).toBe("AI đang viết · 14,3k ký tự · 2m05s");
-    expect(operationSubtitle({ ...base, phase: "reasoning", reasoning_chars: 900 })).toBe("AI đang suy luận · 900 ký tự · 2m05s");
+    expect(operationSubtitle({ ...base, phase: "reasoning", reasoning_chars: 900 })).toBe("AI đang phân tích · 900 ký tự · 2m05s");
   });
   it("prefers done/total when the operation knows its size", () => {
     expect(operationSubtitle({ ...base, phase: "purge", done: 1, total: 3 })).toBe("1/3 · 2m05s");

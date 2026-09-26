@@ -366,7 +366,7 @@ describe("ScriptOutlineStepPage", () => {
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       vi.spyOn(apiClient, "getAuthoringChain").mockResolvedValue({ running: false, steps: [], current_index: 0, finished: false });
       vi.spyOn(apiClient, "startAuthoringChain").mockRejectedValue(
-        new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Copy prompt như cũ."),
+        new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Sao chÃ©p prompt như cũ."),
       );
       renderPage();
       expandSettings();
@@ -379,7 +379,7 @@ describe("ScriptOutlineStepPage", () => {
       await waitFor(() =>
         expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("hết số dư"),
       );
-      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Copy prompt");
+      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Sao chÃ©p prompt");
     });
 
     // FR79 — chế độ nằm ở project trong DB, không chỉ localStorage: đó là cái

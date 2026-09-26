@@ -77,7 +77,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     typeTopic("Đệ quy");
     fireEvent.click(screen.getByTestId("script-step-next"));
 
-    await waitFor(() => expect(screen.getByText(/Không tạo được project/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Không tạo được dự án/)).toBeInTheDocument());
     expect(screen.queryByTestId("landed-on-settings")).not.toBeInTheDocument();
     // Lỗi xong thì Creator thử lại được, không bị kẹt ở trạng thái "Đang tạo".
     expect(screen.getByTestId("script-step-next")).not.toBeDisabled();

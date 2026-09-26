@@ -149,7 +149,7 @@
 
 .statusOn {
   background: var(--accent-soft);
-  color: #1c6cb0;
+  color: var(--info);
 }
 
 .statusOff {

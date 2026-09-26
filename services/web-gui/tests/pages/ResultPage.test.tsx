@@ -185,7 +185,7 @@ describe("render lại ở chất lượng khác", () => {
     fireEvent.click(screen.getByTestId("rerender-submit"));
 
     await waitFor(() =>
-      expect(screen.getByText(/Thiếu script gốc/)).toBeInTheDocument(),
+      expect(screen.getByText(/thiếu script gốc/)).toBeInTheDocument(),
     );
     expect(global.fetch).not.toHaveBeenCalledWith(
       expect.stringContaining("/v1/sagas/render"),

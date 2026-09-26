@@ -83,7 +83,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
 
   async function handleDisconnect(account: YoutubeAccount) {
     const name = account.channel_title || account.channel_id;
-    if (!window.confirm(`Ngắt kết nối kênh "${name}"? Bạn sẽ phải cấp quyền lại nếu muốn đăng lên kênh này.`)) {
+    if (!window.confirm(`Ngắt kết nối kênh "${name}"? Bạn cần cấp quyền lại nếu muốn đăng lên kênh này.`)) {
       return;
     }
     setError(null);
@@ -134,8 +134,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
       {choosingApp && (
         <div className={styles.appPicker} data-testid="youtube-app-picker">
           <p className={styles.appPickerHint}>
-            Chọn OAuth client để nối kênh. Mỗi client là một GCP project với hạn mức riêng
-            (khoảng 6 video/ngày) — nối thêm kênh vào cùng một client không làm tăng hạn mức đó.
+            Chọn ứng dụng để kết nối kênh. Mỗi ứng dụng có giới hạn khoảng 6 video mỗi ngày.
           </p>
           {apps.map((app) => (
             <button
@@ -150,7 +149,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
             </button>
           ))}
           <button type="button" className={styles.linkBtn} onClick={() => setChoosingApp(false)}>
-            Huỷ
+            Hủy
           </button>
         </div>
       )}
@@ -205,7 +204,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
                   // from a video that quietly has no CC afterward.
                   <span
                     className={styles.captionBadge}
-                    title="Kênh này được nối trước khi tính năng phụ đề YouTube ra mắt — video vẫn đăng bình thường, chỉ không có phụ đề. Ngắt kết nối rồi nối lại để bật."
+                    title="Kênh chưa có quyền tải phụ đề. Video vẫn đăng bình thường. Ngắt kết nối rồi kết nối lại để bật phụ đề."
                   >
                     thiếu quyền phụ đề
                   </span>

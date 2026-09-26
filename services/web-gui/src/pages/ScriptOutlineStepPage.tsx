@@ -144,13 +144,13 @@ export function ScriptOutlineStepPage() {
       // CR-027 D0 — chủ đề đi kèm dàn ý trong cùng một lượt lưu. Trước đây
       // nó chỉ sống trong localStorage của trình duyệt, nên server không có
       // gì để điền vào {{topic}} lúc tự render prompt (FR77).
-      // Đổi dàn ý thì storyboard và code dựng từ bản cũ bị xoá ở server: hỏi
+      // Đổi dàn ý thì storyboard và code dựng từ bản cũ bị xóa ở server: hỏi
       // trước, rồi đọc lại để bản nháp không giữ thứ đã mất.
       const saved = await getAuthoringState(draft.projectId).catch(() => null);
       const changed = saved !== null && saved.story !== "" && saved.story !== draft.authoringStory;
       if (changed && (saved.storyboard || saved.code)) {
         const ok = window.confirm(
-          "Dàn ý đã đổi. Storyboard và code dựng từ dàn ý cũ sẽ bị xoá để làm lại. Tiếp tục?",
+          "Dàn ý đã thay đổi. Hình ảnh và code đã dựng từ dàn ý cũ sẽ bị xóa để làm lại. Tiếp tục?",
         );
         if (!ok) return;
       }
@@ -163,7 +163,7 @@ export function ScriptOutlineStepPage() {
       }
       navigate("/create/script/storyboard");
     } catch {
-      setSaveError("Không lưu được dàn ý, thử lại.");
+      setSaveError("Không lưu được dàn ý. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -174,8 +174,8 @@ export function ScriptOutlineStepPage() {
     : storyIsEmpty
       ? hasOwnOutline
         ? "Dán dàn ý sẵn có của bạn để tiếp tục"
-        : "Dán dàn ý câu chuyện AI trả về để tiếp tục"
-      : "Dàn ý đã sẵn sàng — bước tiếp theo sẽ dựng storyboard hình ảnh";
+        : "Dán dàn ý từ AI để tiếp tục"
+      : "Dàn ý đã sẵn sàng. Bước tiếp theo: dựng hình ảnh.";
 
   return (
     <div data-testid="script-outline-step-page">
@@ -185,8 +185,8 @@ export function ScriptOutlineStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnOutline
-            ? "Dán dàn ý sẵn có của bạn vào ô bên phải — không cần chạy Story Architect."
-            : "Dựng dàn ý câu chuyện với Story Architect."
+            ? "Dán dàn ý của bạn vào ô bên phải để bỏ qua bước này."
+            : "Dựng dàn ý cho video."
         }
       >
         {/* CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
@@ -211,7 +211,7 @@ export function ScriptOutlineStepPage() {
             steps={["story", "storyboard", "code"]}
             what="dàn ý"
             runDisabled={topicIsEmpty}
-            runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."
+            runDisabledReason="Nhập chủ đề trước."
             beforeRun={async () => {
               // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
               // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
@@ -237,13 +237,13 @@ export function ScriptOutlineStepPage() {
 
         <div className={styles.scriptLayout}>
           <Card
-            title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Copy prompt"}
+            title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Sao chÃ©p prompt"}
             hint={
               hasOwnOutline
-                ? "Đã có dàn ý rồi thì chủ đề chỉ để đặt tên và đối chiếu trùng lặp — prompt bên dưới bỏ qua được."
+                ? "Chủ đề chỉ dùng để đặt tên cho dự án."
                 : aiMode
-                  ? "Chủ đề là tất cả những gì bước này cần — server tự điền nó vào prompt khi gọi AI."
-                  : "Nhập chủ đề, copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
+                  ? "Chỉ cần chủ đề là AI có thể bắt đầu."
+                  : "Nhập chủ đề, sao chép prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
             }
           >
             <TextInput
@@ -256,7 +256,7 @@ export function ScriptOutlineStepPage() {
             />
             {similarProjects.length > 0 && (
               <div className={styles.topicCollisionBanner} data-testid="topic-collision-banner">
-                Chủ đề này trùng với {similarProjects.length} project khác:{" "}
+                Chủ đề này giống {similarProjects.length} dự án khác:{" "}
                 {similarProjects.map((p, i) => (
                   <span key={p.projectId}>
                     {i > 0 && ", "}
@@ -265,12 +265,12 @@ export function ScriptOutlineStepPage() {
                     </a>
                   </span>
                 ))}
-                . Bạn vẫn có thể tiếp tục — đây chỉ là cảnh báo.
+                . Bạn vẫn có thể tiếp tục.
               </div>
             )}
             {/* Ở chế độ AI, ô prompt để copy không còn việc gì: server tự
                 render đúng văn bản này rồi tự gọi. Đổi lại chế độ là nó quay
-                lại nguyên vẹn — không có gì bị xoá. */}
+                lại nguyên vẹn — không có gì bị xóa. */}
             {!aiMode && (
               <>
                 <TextArea
@@ -281,7 +281,7 @@ export function ScriptOutlineStepPage() {
                   data-testid="script-outline-prompt"
                 />
                 <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="script-outline-copy">
-                  {copied ? "Đã copy!" : "Copy prompt"}
+                  {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
                 </Button>
               </>
             )}
@@ -291,10 +291,10 @@ export function ScriptOutlineStepPage() {
             title={hasOwnOutline ? "Dàn ý của bạn" : aiMode ? "2. Dàn ý" : "2. Dán kết quả"}
             hint={
               hasOwnOutline
-                ? "Dán dàn ý sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước Visual."
+                ? "Dán dàn ý vào đây, rồi bấm Tiếp tục."
                 : aiMode
-                  ? "Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước Visual."
-                  : "Dán dàn ý AI trả về, rồi bấm Tiếp tục để chuyển sang bước Visual."
+                  ? "Kết quả của AI hiện ở đây để bạn chỉnh sửa, rồi bấm Tiếp tục."
+                  : "Dán dàn ý từ AI vào đây, rồi bấm Tiếp tục."
             }
           >
             <TextArea

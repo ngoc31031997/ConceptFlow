@@ -44,7 +44,7 @@ describe("ScriptEditor", () => {
     const estimate = screen.getByTestId("script-duration-estimate");
     expect(estimate).toHaveTextContent("giây");
     // Phải nói rõ chưa tính animation, thay vì im lặng báo thiếu (FR42.3).
-    expect(estimate).toHaveTextContent("Chưa tính thời gian animation");
+    expect(estimate).toHaveTextContent("Chưa gồm thời gian hoạt hình");
   });
 
   it("offers the snippets only once there is a script to append them to", async () => {

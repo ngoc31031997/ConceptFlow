@@ -105,7 +105,7 @@ export function ScriptEditor({
       onChange(stripMarkdownCodeFence(String(reader.result ?? "")));
       setImportError(null);
     };
-    reader.onerror = () => setImportError("Không đọc được file, thử lại hoặc dán trực tiếp");
+    reader.onerror = () => setImportError("Không đọc được file. Vui lòng thử lại hoặc dán trực tiếp.");
     reader.readAsText(file);
     event.target.value = "";
   }
@@ -218,10 +218,10 @@ export function ScriptEditor({
             ≈ {formatDuration(validation.estimatedNarrationSeconds)} lời thoại
           </div>
           <div className={styles.durationCaveat}>
-            Chưa tính thời gian animation, nên video thật sẽ dài hơn con số này.{" "}
+            Chưa gồm thời gian hoạt hình nên video thực tế sẽ dài hơn.{" "}
             {wordsPerMinute
-              ? "Tốc độ đọc lấy từ số đo thật của giọng bạn đang chọn."
-              : "Tốc độ đọc là mức trung bình; sau vài video hệ thống sẽ hiệu chỉnh theo giọng bạn chọn."}
+              ? "Tính theo tốc độ đọc thực tế của giọng đã chọn."
+              : "Tính theo tốc độ đọc trung bình, sẽ chính xác hơn sau vài video."}
           </div>
           <ol className={styles.durationBreakdown}>
             {validation.narrations.map((narration, index) => (

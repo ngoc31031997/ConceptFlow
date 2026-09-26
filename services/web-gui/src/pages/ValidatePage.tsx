@@ -127,7 +127,7 @@ export function ValidatePage() {
         }
         title={
           isCancelled
-            ? "Đã huỷ kiểm tra"
+            ? "Đã hủy kiểm tra"
             : isFailed
             ? "Kịch bản không chạy được"
             : isAwaitingReview
@@ -136,12 +136,12 @@ export function ValidatePage() {
         }
         subtitle={
           isCancelled
-            ? "Bạn đã dừng bước này. Chạy tiếp từ dải trạng thái phía trên."
+            ? "Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
             : isFailed
-            ? "Lượt chạy thử dừng lại. Chưa có gì được render nên sửa script rồi chạy lại là xong."
+            ? "Kịch bản chưa chạy được. Hãy sửa lại rồi chạy lại, chưa mất chi phí nào."
             : isAwaitingReview
-              ? "Chưa tạo giọng đọc, chưa render — sửa gì cũng không tốn gì. Duyệt xong mới sang bước 5 và bắt đầu tốn tiền/thời gian."
-              : "Hệ thống đang đọc và chạy thử kịch bản. Chưa tốn giọng đọc hay render."
+              ? "Bạn có thể chỉnh sửa thoải mái ở bước này. Sau khi duyệt, hệ thống bắt đầu tạo video."
+              : "Hệ thống đang kiểm tra kịch bản của bạn."
         }
       >
         {(isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (

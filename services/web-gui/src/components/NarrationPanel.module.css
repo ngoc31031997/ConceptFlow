@@ -160,10 +160,10 @@
 
 .engineBadge[data-engine="azure"] {
   background: var(--accent-soft);
-  color: #1c6cb0;
+  color: var(--info);
 }
 
 .engineBadge[data-engine="google"] {
-  background: rgba(224, 138, 47, 0.16);
-  color: #9c5a12;
+  background: var(--caution-soft);
+  color: var(--caution);
 }

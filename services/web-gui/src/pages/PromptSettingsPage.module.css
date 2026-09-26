@@ -128,23 +128,23 @@
 }
 
 .actionPrimary {
-  border-color: #2e9e6b;
-  color: #2e9e6b;
+  border-color: var(--ok);
+  color: var(--ok);
 }
 
 .actionDanger {
-  color: #d64545;
+  color: var(--danger);
   border-color: var(--danger);
 }
 
 .actionDanger:hover:not(:disabled) {
   background: var(--danger-soft);
-  border-color: #d64545;
+  border-color: var(--danger);
 }
 
 .actionSave {
-  background: #2e6fd6;
-  border-color: #2e6fd6;
+  background: var(--accent);
+  border-color: var(--accent);
   color: var(--accent-ink);
 }
 

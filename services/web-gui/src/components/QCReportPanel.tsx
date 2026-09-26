@@ -114,14 +114,14 @@ export function QCReportPanel({ projectId, onSeek }: QCReportPanelProps) {
     >
       {report.status === "not_scored" && (
         <p className={glass.cardHint} data-testid="qc-not-scored">
-          Không chấm được lần này{report.reason ? `: ${report.reason}` : "."} Video vẫn đăng được
+          Chưa kiểm tra được lần này{report.reason ? `: ${report.reason}` : "."} Video vẫn đăng được
           bình thường.
         </p>
       )}
 
       {report.status === "passed" && (
         <p className={glass.cardHint} data-testid="qc-passed">
-          Đã kiểm tra, không phát hiện vấn đề nào.
+          Không phát hiện vấn đề nào.
         </p>
       )}
 

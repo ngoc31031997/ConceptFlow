@@ -125,7 +125,7 @@ describe("NarrationPanel", () => {
   it("warns when the video would have neither narration nor subtitles", () => {
     renderPanel({ ttsEnabled: false, subtitleMode: "off" });
 
-    expect(screen.getByRole("status")).toHaveTextContent("không có lời thoại lẫn phụ đề");
+    expect(screen.getByRole("status")).toHaveTextContent("không có lời thoại và phụ đề");
   });
 
   it("offers all four subtitle delivery modes", () => {
@@ -159,6 +159,6 @@ describe("NarrationPanel", () => {
   it("warns about doubled text only when both is selected", () => {
     renderPanel({ subtitleMode: "both" });
 
-    expect(screen.getByRole("status")).toHaveTextContent("trùng lên chữ ghi cứng");
+    expect(screen.getByRole("status")).toHaveTextContent("chữ bị trùng lặp");
   });
 });

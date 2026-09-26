@@ -20,7 +20,7 @@ export function OutlineActions({ outline }: OutlineActionsProps) {
     <Card data-testid="outline-actions">
       <div className={styles.actions} style={{ marginTop: 0 }}>
         <Button disabled={busy} onClick={approve} data-testid="outline-approve">
-          Bắt đầu sản xuất (TTS → render → ghép)
+          Duyệt và bắt đầu tạo video
         </Button>
         <Button variant="ghost" disabled={busy} onClick={reject} data-testid="outline-reject">
           Quay lại sửa script

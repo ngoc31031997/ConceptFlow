@@ -107,7 +107,7 @@ describe("PublishPage publish state", () => {
 
     renderPublishPage();
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("cần được nối lại"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("kênh thiếu quyền"));
   });
 
   it("warns when the caption upload failed", async () => {
@@ -119,7 +119,7 @@ describe("PublishPage publish state", () => {
 
     renderPublishPage();
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("tải phụ đề lên YouTube thất bại"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("chưa tải được phụ đề"));
   });
 
   it("shows no caption warning when the caption uploaded successfully", async () => {

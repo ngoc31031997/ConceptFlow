@@ -118,7 +118,7 @@ export function TranscriptViewer({ scenes, contentLanguage }: TranscriptViewerPr
           <div className={styles.toolbar}>
             <p className={styles.description}>
               {contentLanguage === "vi"
-                ? "Toàn bộ nội dung lời thoại trong video, giúp người dùng screen reader và công cụ tìm kiếm truy cập dễ dàng."
+                ? "Toàn bộ lời thoại trong video, hỗ trợ người dùng trình đọc màn hình và công cụ tìm kiếm."
                 : "Full narration content for screen readers and search accessibility."}
             </p>
             <Button variant="ghost" onClick={handleDownload} data-testid="transcript-download-button">

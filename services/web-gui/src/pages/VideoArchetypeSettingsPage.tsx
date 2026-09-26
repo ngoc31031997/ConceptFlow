@@ -20,7 +20,7 @@ const NEW_ROW = "new";
  * cách gán kiểu đó vào các beat của format.
  *
  * Cùng quy ước với thư viện prompt: dòng "Hệ thống" chỉ xem và copy, dòng "Của
- * bạn" sửa/xoá tự do. Thêm dòng nào là model thấy ngay ở lượt Biên kịch kế tiếp,
+ * bạn" sửa/xóa tự do. Thêm dòng nào là model thấy ngay ở lượt Biên kịch kế tiếp,
  * không cần build lại.
  */
 export function VideoArchetypeSettingsPage() {
@@ -39,7 +39,7 @@ export function VideoArchetypeSettingsPage() {
     try {
       setRows(await listVideoArchetypes());
     } catch {
-      setStatus("Không tải được bảng kiểu video — kiểm tra authoring-service.");
+      setStatus("Không tải được danh sách kiểu video. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -77,7 +77,7 @@ export function VideoArchetypeSettingsPage() {
       setStatus(ok);
     } catch (e) {
       // Lý do từ server (mã trùng, thiếu trường...) hữu ích hơn "thất bại".
-      setStatus(e instanceof Error && e.message ? e.message : "Thao tác thất bại, thử lại.");
+      setStatus(e instanceof Error && e.message ? e.message : "Thao tác không thành công. Vui lòng thử lại.");
     } finally {
       setBusy(false);
     }
@@ -101,15 +101,15 @@ export function VideoArchetypeSettingsPage() {
     }, creating ? "Đã thêm kiểu video." : "Đã lưu.");
 
   const handleCopy = (id: string) =>
-    run(async () => (await copyVideoArchetype(id)).id, "Đã copy thành một kiểu của bạn.");
+    run(async () => (await copyVideoArchetype(id)).id, "Đã sao chép thành một kiểu của bạn.");
 
   const handleDelete = () => {
     if (!selected) return;
-    if (!window.confirm("Xoá kiểu video này? Không khôi phục lại được.")) return;
+    if (!window.confirm("Xóa kiểu video này? Không khôi phục lại được.")) return;
     return run(async () => {
       await deleteVideoArchetype(selected.id);
       setSelectedId(null);
-    }, "Đã xoá.");
+    }, "Đã xóa.");
   };
 
   const incomplete = name.trim() === "" || whenToUse.trim() === "" || playbook.trim() === "";
@@ -189,7 +189,7 @@ export function VideoArchetypeSettingsPage() {
                       disabled={busy || loading}
                       data-testid="archetype-delete-button"
                     >
-                      <span aria-hidden="true">🗑</span> Xoá
+                      <span aria-hidden="true">🗑</span> Xóa
                     </button>
                   )}
                   {!readOnly && (

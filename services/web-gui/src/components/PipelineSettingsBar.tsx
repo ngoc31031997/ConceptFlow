@@ -37,7 +37,7 @@ interface PipelineSettingsBarProps {
  * được" và "phải nhìn lại từ đầu mỗi lần chuyển tab" là hai việc khác nhau.
  *
  * Ở 1a/1b/1c, control này mặc định thu gọn thành một dòng tóm tắt ("Manim ·
- * Copy prompt ra ngoài") — chỉ mở lại thành hai bộ chọn đầy đủ khi Creator
+ * Sao chÃ©p prompt ra ngoài") — chỉ mở lại thành hai bộ chọn đầy đủ khi Creator
  * bấm "Đổi". Màn chọn tình huống (ScriptStepPage) không dùng component này:
  * ở đó là lần chọn thật đầu tiên, nên vẫn mở sẵn.
  */
@@ -61,7 +61,7 @@ export function PipelineSettingsBar({
   const { models, setModels } = useAuthoringModels(projectId);
   const aiOn = mode === "ai" && !!llm?.enabled;
   const engineLabel = renderEngine === "remotion" ? "Remotion" : "Manim";
-  const modeLabel = mode === "ai" && llm?.enabled ? "Gọi API trực tiếp" : "Copy prompt ra ngoài";
+  const modeLabel = mode === "ai" && llm?.enabled ? "Để AI làm giúp" : "Tự làm với ChatGPT, Claude…";
 
   return (
     <div className={styles.stack}>

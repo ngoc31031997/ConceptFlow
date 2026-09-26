@@ -31,18 +31,18 @@ export function RenderEnginePicker({ value, onChange, disabled }: RenderEnginePi
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="render-engine-picker">
       <div className={styles.text}>
-        <div className={glass.cardTitle}>Công cụ render</div>
+        <div className={glass.cardTitle}>Công cụ dựng video</div>
         <p className={styles.hint}>
           {value === "remotion"
-            ? "Remotion còn ở giai đoạn đầu — chưa có design system/lint riêng, cần viết code Remotion (.tsx)."
-            : "Mặc định — có đầy đủ design system, lint, kiểm tra chồng lấn hình ảnh."}
+            ? "Remotion đang ở giai đoạn thử nghiệm và yêu cầu code TypeScript (.tsx)."
+            : "Mặc định, đầy đủ tính năng và kiểm tra chất lượng hình ảnh."}
         </p>
       </div>
 
       <div
         className={selectable.row}
         role="radiogroup"
-        aria-label="Công cụ render"
+        aria-label="Công cụ dựng video"
         aria-disabled={disabled}
         style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}
       >

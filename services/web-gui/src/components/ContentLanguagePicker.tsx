@@ -24,8 +24,7 @@ export function ContentLanguagePicker({ value, onChange }: ContentLanguagePicker
       <div className={styles.text}>
         <div className={glass.cardTitle}>Ngôn ngữ nội dung</div>
         <p className={styles.hint}>
-          Quyết định ngôn ngữ AI viết lời thoại, giọng đọc, phụ đề và tiêu đề/mô tả khi đăng YouTube.
-          Giao diện vẫn giữ tiếng Việt.
+          Áp dụng cho lời thoại, giọng đọc, phụ đề và nội dung đăng YouTube.
         </p>
       </div>
 

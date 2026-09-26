@@ -29,11 +29,11 @@ export function DeleteProgressCard({ projectId, onDone }: DeleteProgressCardProp
   return (
     <OperationProgressCard
       testId={`delete-progress-${projectId}`}
-      title="Đang dọn"
-      subtitle={`${op?.done ?? 0}/${op?.total ?? "?"} service đã dọn xong`}
+      title="Đang xóa"
+      subtitle={`Đã xóa ${op?.done ?? 0}/${op?.total ?? "?"} mục`}
       done={op?.done}
       total={op?.total}
-      error={status === "failed" ? `Không dọn được: ${op?.error ?? "lỗi không rõ"}. Bấm Xoá để thử lại.` : null}
+      error={status === "failed" ? `Không xóa được: ${op?.error ?? "lỗi không xác định"}. Bấm Xóa để thử lại.` : null}
     />
   );
 }

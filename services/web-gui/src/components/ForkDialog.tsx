@@ -51,7 +51,7 @@ export function ForkDialog({ projectId, onClose }: ForkDialogProps) {
           Tạo bản mới từ video này
         </h2>
         <p className={styles.lead}>
-          Video gốc giữ nguyên. Bản mới bắt đầu làm lại từ bước bạn chọn; các bước trước nó được sao chép sang.
+          Video gốc được giữ nguyên. Bản mới làm lại từ bước bạn chọn, các bước trước được sao chép sang.
         </p>
         <fieldset className={styles.options}>
           <legend className={styles.legend}>Làm lại từ</legend>
@@ -72,7 +72,7 @@ export function ForkDialog({ projectId, onClose }: ForkDialogProps) {
           ))}
         </fieldset>
         <p className={styles.note}>
-          Nhạc nền không được mang sang (file nằm trong thư mục của video gốc): chọn lại ở bước Cấu hình nếu cần.
+          Nhạc nền không được sao chép sang. Hãy chọn lại ở bước Cấu hình nếu cần.
         </p>
         {error && (
           <p role="alert" className={styles.error} data-testid="fork-error">

@@ -26,7 +26,7 @@ const STATUS_TEXT: Record<StepStatus, string> = {
   waiting: "Đang chờ bạn",
   running: "Đang chạy",
   failed: "Lỗi",
-  cancelled: "Đã huỷ",
+  cancelled: "Đã hủy",
   pending: "Chưa tới",
   skipped: "Không dùng",
 };

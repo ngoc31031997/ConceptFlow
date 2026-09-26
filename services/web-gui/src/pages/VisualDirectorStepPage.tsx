@@ -76,7 +76,6 @@ export function VisualDirectorStepPage() {
   }
 
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
-  const engineerLabel = draft.renderEngine === "remotion" ? "Remotion Engineer" : "Manim Engineer";
   // CR-031 — "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
   // ở 1a có thể trống hẳn trong trường hợp đó, và đấy là hợp lệ: storyboard là
   // thứ duy nhất bước 1c cần đọc.
@@ -86,11 +85,11 @@ export function VisualDirectorStepPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      // Đổi storyboard thì code dựng từ bản cũ bị xoá ở server: hỏi trước.
+      // Đổi storyboard thì code dựng từ bản cũ bị xóa ở server: hỏi trước.
       const saved = await getAuthoringState(draft.projectId).catch(() => null);
       const changed = saved !== null && saved.storyboard !== "" && saved.storyboard !== draft.authoringStoryboard;
       if (changed && saved.code) {
-        const ok = window.confirm("Storyboard đã đổi. Code dựng từ storyboard cũ sẽ bị xoá để làm lại. Tiếp tục?");
+        const ok = window.confirm("Hình ảnh đã thay đổi. Code đã dựng từ bản cũ sẽ bị xóa để làm lại. Tiếp tục?");
         if (!ok) return;
       }
       await saveAuthoringStoryboard(draft.projectId, draft.authoringStoryboard);
@@ -102,7 +101,7 @@ export function VisualDirectorStepPage() {
       }
       navigate("/create/script/code");
     } catch {
-      setSaveError("Không lưu được storyboard, thử lại.");
+      setSaveError("Không lưu được. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -122,8 +121,8 @@ export function VisualDirectorStepPage() {
     ? saveError
     : storyboardIsEmpty
       ? hasOwnStoryboard
-        ? "Dán storyboard sẵn có của bạn để tiếp tục"
-        : "Dán storyboard AI trả về để tiếp tục"
+        ? "Dán storyboard của bạn để tiếp tục"
+        : "Dán storyboard từ AI để tiếp tục"
       : `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`;
 
   return (
@@ -133,8 +132,8 @@ export function VisualDirectorStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnStoryboard
-            ? "Dán kịch bản phân cảnh sẵn có của bạn."
-            : "Dựng kịch bản phân cảnh từ dàn ý câu chuyện."
+            ? "Dán storyboard của bạn vào ô bên phải."
+            : "Dựng storyboard hình ảnh từ dàn ý."
         }
         wide
       >
@@ -151,7 +150,7 @@ export function VisualDirectorStepPage() {
             steps={["storyboard"]}
             what="storyboard"
             runDisabled={draft.authoringStory.trim().length === 0}
-            runDisabledReason="Cần dàn ý ở bước Kịch bản trước — server đọc nó làm {{previous_output}}."
+            runDisabledReason="Cần hoàn thành bước Kịch bản trước."
             onGenerated={(step, content) => {
               if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
             }}
@@ -164,8 +163,8 @@ export function VisualDirectorStepPage() {
               văn bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn. */}
           {!aiMode && (
             <Card
-              title="1. Copy prompt"
-              hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+              title="1. Sao chÃ©p prompt"
+              hint="Xem lại nội dung, sao chép rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
               <TextArea
                 readOnly
@@ -175,7 +174,7 @@ export function VisualDirectorStepPage() {
                 data-testid="visual-director-prompt"
               />
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="visual-director-copy">
-                {copied ? "Đã copy!" : "Copy prompt"}
+                {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
               </Button>
             </Card>
           )}
@@ -184,10 +183,10 @@ export function VisualDirectorStepPage() {
             title={hasOwnStoryboard ? "Storyboard của bạn" : aiMode ? "Storyboard" : "2. Dán kết quả"}
             hint={
               hasOwnStoryboard
-                ? `Dán storyboard sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
+                ? "Dán storyboard vào đây, rồi bấm Tiếp tục."
                 : aiMode
-                  ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
-                  : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
+                  ? "Kết quả của AI hiện ở đây để bạn chỉnh sửa, rồi bấm Tiếp tục."
+                  : "Dán storyboard từ AI vào đây, rồi bấm Tiếp tục."
             }
           >
             <TextArea

@@ -442,7 +442,7 @@ export type PromptRole =
  * một thời điểm chỉ MỘT dòng `is_active` và đó là dòng pipeline chạy.
  *
  * `is_system` là bản mặc định đi kèm hệ thống: chỉ xem và copy được, không
- * sửa/xoá. Mọi dòng khác do người dùng tạo. Không có version, không có ngôn
+ * sửa/xóa. Mọi dòng khác do người dùng tạo. Không có version, không có ngôn
  * ngữ — ngôn ngữ lời thoại do `{{narration_language_rule}}` quyết định.
  */
 export interface Prompt {
@@ -544,7 +544,7 @@ export function activatePrompt(id: string): Promise<Prompt> {
   return apiFetch<Prompt>(`/v1/admin/prompts/${id}/activate`, { method: "POST" });
 }
 
-/** Xoá prompt của người dùng. Xoá dòng đang bật thì vai trò quay về bản hệ thống. */
+/** Xóa prompt của người dùng. Xóa dòng đang bật thì vai trò quay về bản hệ thống. */
 export async function deletePrompt(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/prompts/${id}`, { method: "DELETE" });
 }
@@ -676,7 +676,7 @@ export type GeneratedStep = {
  * CR-027 FR78.1 — chạy một bước bằng API: server tự render prompt (cùng một
  * hàm với nút Copy), gọi provider, lưu kết quả, trả nội dung về.
  *
- * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Copy prompt vẫn là
+ * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Sao chÃ©p prompt vẫn là
  * đường đi khi chưa có key, hết số dư, hoặc Creator muốn dùng AI khác.
  */
 export function generateAuthoringStep(projectId: string, step: AuthoringStep): Promise<GeneratedStep> {
@@ -985,7 +985,7 @@ export function listRecentEvents(limit = 500): Promise<ProjectEvent[]> {
   return apiFetch<ProjectEvent[]>(`/v1/events?limit=${limit}`);
 }
 
-/** Dừng bước đang chạy; dự án ở lại bước đó (đã huỷ) để thử lại. */
+/** Dừng bước đang chạy; dự án ở lại bước đó (đã hủy) để thử lại. */
 export function cancelProject(id: string): Promise<{ step: string; status: string }> {
   return apiFetch<{ step: string; status: string }>(`/v1/projects/${id}/cancel`, { method: "POST" });
 }

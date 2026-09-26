@@ -379,8 +379,8 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
     // Mở lại một draft đã lưu trên server (ResumeProjectPage): thay cả bản nháp
     // đang giữ, không trộn — trường nào server không có thì về mặc định chứ
     // không mang giá trị của project khác sang.
-    // Server là nguồn thật của ba kết quả: lưu một bước có thể đã xoá các bước
-    // dựng trên nó (đổi 1a xoá 1b/1c, đổi 1b xoá 1c), nên bản nháp ở client
+    // Server là nguồn thật của ba kết quả: lưu một bước có thể đã xóa các bước
+    // dựng trên nó (đổi 1a xóa 1b/1c, đổi 1b xóa 1c), nên bản nháp ở client
     // phải đọc lại chứ không tự đoán.
     case "SYNC_AUTHORING":
       return {

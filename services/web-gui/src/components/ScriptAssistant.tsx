@@ -81,7 +81,7 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
         <div className={styles.step}>
           <span className={styles.stepNum}>2</span>
           <div className={styles.stepBody}>
-            <div className={styles.stepLabel}>Copy prompt rồi dán vào ChatGPT, Claude hoặc Gemini</div>
+            <div className={styles.stepLabel}>Sao chép prompt rồi dán vào ChatGPT, Claude hoặc Gemini</div>
             <div className={styles.copyRow}>
               <button
                 type="button"
@@ -91,7 +91,7 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
                 onClick={handleCopy}
               >
                 <CopyIcon />
-                {copied ? "Đã copy!" : "Copy prompt"}
+                {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
               </button>
               <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
                 <span className={styles.copyStatusDot} aria-hidden="true" />
@@ -114,11 +114,11 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
         <div className={styles.step}>
           <span className={styles.stepNum}>3</span>
           <div className={styles.stepBody}>
-            <div className={styles.stepLabel}>Copy đoạn code AI trả về, dán vào ô soạn thảo bên cạnh</div>
+            <div className={styles.stepLabel}>Sao chép code từ AI, dán vào ô soạn thảo bên cạnh</div>
             <p className={styles.stepHint}>
               {renderEngine === "remotion"
-                ? "Chỉ lấy phần code TypeScript, không lấy phần AI giải thích."
-                : "Chỉ lấy phần code Python, không lấy phần AI giải thích. Dán xong hệ thống sẽ tự kiểm tra định dạng."}
+                ? "Chỉ lấy phần code TypeScript, bỏ phần giải thích của AI."
+                : "Chỉ lấy phần code Python, bỏ phần giải thích của AI. Hệ thống sẽ tự kiểm tra sau khi dán."}
             </p>
           </div>
         </div>

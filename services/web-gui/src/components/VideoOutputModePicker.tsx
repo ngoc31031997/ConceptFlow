@@ -25,13 +25,13 @@ interface VideoOutputModePickerProps {
  * publishes to Shorts/TikTok.
  */
 const OPTIONS: { value: VideoOutputMode; label: string; hint: string }[] = [
-  { value: "long", label: "Chỉ video dài", hint: "Video 16:9 chuẩn, không cắt thêm bản dọc nào" },
+  { value: "long", label: "Chỉ video dài", hint: "Video ngang 16:9 chuẩn" },
   {
     value: "short",
     label: "Chỉ video ngắn (Shorts/TikTok)",
-    hint: "Vẫn render đủ video dài làm nguồn, nhưng bước Đăng chỉ nổi bật khu tải clip dọc",
+    hint: "Tập trung vào clip dọc để đăng Shorts/TikTok",
   },
-  { value: "both", label: "Cả hai", hint: "Video dài để đăng YouTube, cộng thêm clip dọc để đăng Shorts/TikTok" },
+  { value: "both", label: "Cả hai", hint: "Video dài cho YouTube, kèm clip dọc cho Shorts/TikTok" },
 ];
 
 export function VideoOutputModePicker({ value, onChange, bare = false }: VideoOutputModePickerProps) {
@@ -62,8 +62,7 @@ export function VideoOutputModePicker({ value, onChange, bare = false }: VideoOu
 
       {(value === "short" || value === "both") && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Clip dọc chỉ cắt được từ đoạn script có đánh dấu <code>with self.clip(&quot;tên&quot;):</code> — không
-          đánh dấu thì không có gì để cắt.
+          Clip dọc chỉ được cắt từ phần script có đánh dấu <code>with self.clip(&quot;tên&quot;):</code> .
         </p>
       )}
     </div>

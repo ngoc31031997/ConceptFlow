@@ -83,7 +83,7 @@ describe("ManimEngineerStepPage", () => {
     fireEvent.click(screen.getByTestId("manim-engineer-step-next"));
 
     await waitFor(() => {
-      expect(screen.getByText("Không lưu được code, thử lại.")).toBeInTheDocument();
+      expect(screen.getByText("Không lưu được code. Vui lòng thử lại.")).toBeInTheDocument();
     });
   });
 

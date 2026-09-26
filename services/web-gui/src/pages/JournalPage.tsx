@@ -10,7 +10,7 @@ const STATE_LABEL: Record<ProjectEvent["run_state"], string> = {
   idle: "Chờ",
   running: "Đang chạy",
   done: "Xong",
-  cancelled: "Đã huỷ",
+  cancelled: "Đã hủy",
   failed: "Lỗi",
 };
 
@@ -147,7 +147,7 @@ export function JournalPage() {
       <AppShell
         wide
         title="Nhật ký sản xuất"
-        subtitle="Hành trình của từng dự án qua 13 bước: bước nào, mất bao lâu, tốn bao nhiêu token, lỗi ở đâu."
+        subtitle="Theo dõi từng dự án qua các bước: thời gian, chi phí và lỗi phát sinh."
       >
         {error && (
           <p role="alert" className={glass.helperText}>
@@ -156,7 +156,7 @@ export function JournalPage() {
         )}
         {events === null && !error && <p className={glass.helperText}>Đang tải nhật ký...</p>}
         {events !== null && projects.length === 0 && (
-          <p className={glass.helperText}>Chưa có sự kiện nào. Nhật ký bắt đầu ghi từ khi cập nhật này chạy.</p>
+          <p className={glass.helperText}>Chưa có hoạt động nào được ghi lại.</p>
         )}
 
         {projects.length > 0 && (
@@ -171,7 +171,7 @@ export function JournalPage() {
         )}
 
         {projects.length > 0 && view === "overview" && (
-          <Card title="Bước nào chậm, tốn, hay lỗi nhất" hint={`Tính trên ${projects.length} dự án, ${events?.length ?? 0} sự kiện gần nhất. Thời gian chờ người (Review, Kết quả) không tính.`}>
+          <Card title="Bước nào chậm, tốn, hay lỗi nhất" hint={`Tính trên ${projects.length} dự án, ${events?.length ?? 0} sự kiện gần nhất. Thời gian chờ bạn thao tác không được tính.`}>
             <div className={styles.tbl}>
               <table className={styles.table} data-testid="journal-overview">
                 <thead>

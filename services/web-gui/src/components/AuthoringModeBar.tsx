@@ -139,8 +139,8 @@ interface AuthoringModeBarProps {
 }
 
 const MODE_LABELS: Record<AuthoringMode, string> = {
-  manual: "Copy prompt ra ngoài",
-  ai: "Gọi API trực tiếp",
+  manual: "Tự làm với ChatGPT, Claude…",
+  ai: "Để AI làm giúp",
 };
 
 /**
@@ -185,7 +185,7 @@ export function AuthoringModeBar({
   const dispatchRun = useAuthoringRunDispatch();
   const dispatchDraft = useContext(ProjectDraftDispatchContext);
 
-  // Một lượt chạy ghi đè bước của nó và xoá các bước dựng trên nó (cả khi hỏng),
+  // Một lượt chạy ghi đè bước của nó và xóa các bước dựng trên nó (cả khi hỏng),
   // nên đọc lại cả ba từ server thay vì để bản nháp ở client lệch đi.
   async function syncFromServer(chainSteps: AuthoringStep[] = []) {
     try {
@@ -195,7 +195,7 @@ export function AuthoringModeBar({
         payload: { story: state.story, storyboard: state.storyboard, code: state.code },
       });
       // Nhét kết quả từng bước vào ô soạn thảo (FR78.2). Bước chưa chạy tới thì
-      // server đã xoá nội dung, nên rỗng và bị bỏ qua. Chỉ nạp bước thuộc tab
+      // server đã xóa nội dung, nên rỗng và bị bỏ qua. Chỉ nạp bước thuộc tab
       // này: chuỗi vừa xong có thể do tab khác chạy, và đẩy nội dung bước khác
       // vào ô của tab này (story vào ô storyboard/code) là lỗi từng xảy ra.
       const mine = steps.length > 0 ? chainSteps.filter((st) => steps.includes(st)) : chainSteps;
@@ -335,17 +335,17 @@ export function AuthoringModeBar({
       if (c) setChain(c);
     } catch (err) {
       dispatchRun({ type: "FINISH" });
-      setError(err instanceof Error ? err.message : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.");
+      setError(err instanceof Error ? err.message : "AI chưa chạy được. Bạn có thể thử lại hoặc chuyển sang cách tự làm.");
     } finally {
       starting.current = false;
     }
   }
 
-  const runLabel = isChain ? `Chạy Kịch bản → Visual → Code bằng AI` : `Chạy ${what} bằng AI`;
+  const runLabel = isChain ? `Chạy cả 3 bước bằng AI` : `Chạy ${what} bằng AI`;
 
   const modeHint = !llm.enabled
-    ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-    : `Áp dụng cho cả bước 3 (Kịch bản, Visual, Code), mỗi bước chạy riêng: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Chạy cả chuỗi thì tự chuyển tab theo bước đang chạy; không tự nộp render.`;
+    ? llm.reason || "Chưa bật AI. Bạn có thể tự làm bằng cách sao chép prompt."
+    : "AI viết sẵn nội dung vào ô soạn thảo để bạn chỉnh sửa. Có thể chạy từng bước hoặc cả chuỗi.";
   const showRunRow = aiMode && canRun;
 
   return (
@@ -388,10 +388,10 @@ export function AuthoringModeBar({
                   data-testid={`run-with-ai-${steps[0]}`}
                   title={
                     runningElsewhere
-                      ? "Một chuỗi khác đang chạy — chờ xong đã"
+                      ? "Một lượt chạy khác đang diễn ra, vui lòng chờ"
                       : runDisabled
                         ? runDisabledReason
-                        : `Gọi trực tiếp ${llm.provider}`
+                        : "Chạy bằng AI"
                   }
                 >
                   {running ? "AI đang chạy…" : runLabel}
@@ -400,12 +400,12 @@ export function AuthoringModeBar({
                 {running && (
                   <p className={styles.status} data-testid="run-with-ai-running">
                     {runningElsewhere
-                      ? `Đang chạy ở tab khác: ${
+                      ? `Đang chạy ở bước khác: ${
                           run.currentIndex >= 0 ? STEP_LABELS[run.steps[run.currentIndex]] : "..."
-                        }. Chờ xong rồi mới chạy tiếp được.`
+                        }. Vui lòng chờ hoàn tất.`
                       : run.currentIndex >= 0 && isChain
-                        ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút, đừng đóng trang.`
-                        : "Có thể mất vài chục giây, đừng đóng trang."}
+                        ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút. Vui lòng không đóng trang.`
+                        : "Có thể mất vài chục giây. Vui lòng không đóng trang."}
                   </p>
                 )}
               </div>
@@ -430,7 +430,7 @@ export function AuthoringModeBar({
               )}
               {outcome && !outcomeError && !outcomeNote && !running && !error && (
                 <p className={styles.status} data-testid="run-with-ai-done">
-                  Lượt chạy gần nhất đã xong — kết quả đã nạp vào ô soạn thảo.
+                  Hoàn tất. Kết quả đã được điền vào ô soạn thảo.
                 </p>
               )}
             </>
@@ -511,7 +511,7 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
         onClick={() => onModeChange("manual")}
       >
         <b>{MODE_LABELS.manual}</b>
-        <span>Bạn copy prompt, dán vào ChatGPT/Claude/Gemini rồi dán kết quả về. Đổi sang “Gọi API” bất cứ lúc nào.</span>
+        <span>Sao chép prompt, dán vào ChatGPT, Claude hoặc Gemini rồi dán kết quả về đây.</span>
       </button>
       <button
         type="button"
@@ -520,14 +520,14 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
         data-testid="authoring-mode-ai"
         className={`${styles.option} ${aiMode ? styles.optionOn : ""}`}
         disabled={aiOff || disabled}
-        title={aiOff ? llm.reason || "Chưa cấu hình API key" : undefined}
+        title={aiOff ? llm.reason || "Chưa bật AI" : undefined}
         onClick={() => onModeChange("ai")}
       >
         <b>{MODE_LABELS.ai}</b>
         <span>
           {aiOff
-            ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-            : `Hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo.`}
+            ? llm.reason || "Chưa bật AI. Bạn có thể tự làm bằng cách sao chép prompt."
+            : "AI viết sẵn nội dung để bạn chỉnh sửa."}
         </span>
       </button>
     </div>
@@ -550,7 +550,7 @@ function stepLiveNote(p: AuthoringProgress | null): string {
   if (!p?.running) return "đang chạy";
   const time = formatClock(p.elapsed_seconds);
   if (p.phase === "writing") return `AI đang viết · ${formatChars(p.content_chars)} ký tự · ${time}`;
-  if (p.phase === "reasoning") return `AI đang suy luận · ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
+  if (p.phase === "reasoning") return `AI đang phân tích · ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
   return `${liveProgressText(p).replace(/….*$/, "").replace(/:.*$/, "")} · ${time}`;
 }
 
@@ -558,15 +558,15 @@ function stepLiveNote(p: AuthoringProgress | null): string {
 function liveProgressText(p: AuthoringProgress): string {
   const time = `${p.elapsed_seconds}s`;
   if (p.phase === "layout" || p.phase === "cast") {
-    return `Đang dựng bảng ${p.phase === "layout" ? "toạ độ chung (LAYOUT)" : "vật xuyên suốt (cast)"}… ${time}`;
+    return `Đang chuẩn bị bố cục… ${time}`;
   }
-  if (p.phase === "chunks") return `Đang viết code theo lô: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} lô xong · ${time}`;
+  if (p.phase === "chunks") return `Đang viết code: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} phần · ${time}`;
   if (p.phase === "merge") return `Đang ghép code… ${time}`;
-  if (p.phase === "check") return `Đang kiểm tra biên dịch… ${time}`;
+  if (p.phase === "check") return `Đang kiểm tra code… ${time}`;
   if (p.phase === "repair") {
-    return `Đang sửa lỗi biên dịch: vòng ${p.repair_round ?? "?"}/${p.repair_max ?? "?"} · ${time}`;
+    return `Đang tự sửa lỗi (lần ${p.repair_round ?? "?"}/${p.repair_max ?? "?"}) · ${time}`;
   }
   if (p.phase === "writing") return `AI đang viết kết quả… ${formatChars(p.content_chars)} ký tự · ${time}`;
-  if (p.phase === "reasoning") return `AI đang suy luận… ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
-  return `Đang chờ Hive phản hồi… ${time}`;
+  if (p.phase === "reasoning") return `AI đang phân tích… ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
+  return `Đang chờ AI phản hồi… ${time}`;
 }

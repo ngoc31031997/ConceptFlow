@@ -33,17 +33,17 @@ const SUBTITLE_MODE_OPTIONS: { value: SubtitleMode; label: string; hint: string 
   {
     value: "track",
     label: "Phụ đề YouTube (khuyên dùng)",
-    hint: "Track CC riêng — người xem tự bật/tắt, YouTube lập chỉ mục và tự dịch được, không che hình",
+    hint: "Người xem tự bật/tắt, YouTube hỗ trợ tìm kiếm và dịch tự động",
   },
   {
     value: "burn_in",
     label: "Ghi cứng vào hình",
-    hint: "Chữ vẽ thẳng lên khung hình — hợp khi đăng lại lên nền tảng không nhận track CC",
+    hint: "Chữ nằm cố định trên hình, phù hợp nền tảng không hỗ trợ phụ đề rời",
   },
   {
     value: "both",
     label: "Cả hai",
-    hint: "Vừa có track CC vừa ghi cứng — người bật CC sẽ thấy chữ trùng hai lớp",
+    hint: "Có cả phụ đề rời và phụ đề cố định trên hình",
   },
 ];
 
@@ -57,9 +57,9 @@ const GENDER_LABEL: Record<string, string> = { female: "Nữ", male: "Nam" };
   will be used, not one that would quietly fall back.
 */
 const ENGINE_BADGE: Record<string, { text: string; title: string }> = {
-  edge: { text: "Edge", title: "Microsoft Edge Read Aloud — miễn phí, không cần tài khoản" },
-  azure: { text: "Azure", title: "Azure AI Speech — dùng key của bạn, có SLA và quyền thương mại" },
-  google: { text: "Google", title: "Google Cloud WaveNet — dùng credential của bạn, tính phí" },
+  edge: { text: "Edge", title: "Microsoft Edge · Miễn phí" },
+  azure: { text: "Azure", title: "Azure AI Speech · Dùng tài khoản của bạn" },
+  google: { text: "Google", title: "Google Cloud · Dùng tài khoản của bạn, có tính phí" },
 };
 
 function Toggle({
@@ -130,7 +130,7 @@ export function NarrationPanel({
         if (!cancelled) setVoices(Array.isArray(result) ? result : []);
       })
       .catch(() => {
-        if (!cancelled) setLoadError("Không tải được danh sách giọng đọc");
+        if (!cancelled) setLoadError("Không tải được danh sách giọng đọc. Vui lòng thử lại.");
       });
     return () => {
       cancelled = true;
@@ -156,7 +156,7 @@ export function NarrationPanel({
     if (audioRef.current) audioRef.current.pause();
     const audio = new Audio(voice.sample_audio_url);
     audioRef.current = audio;
-    void audio.play().catch(() => setLoadError("Không phát được audio mẫu"));
+    void audio.play().catch(() => setLoadError("Không phát được âm thanh mẫu"));
   }
 
   useEffect(() => () => audioRef.current?.pause(), []);
@@ -164,8 +164,8 @@ export function NarrationPanel({
   return (
     <Card title="Giọng đọc & phụ đề" data-testid="narration-panel">
       <Toggle
-        label="Giọng đọc TTS"
-        hint={ttsEnabled ? "Video sẽ có giọng đọc tự động" : "Video sẽ không có giọng đọc"}
+        label="Giọng đọc"
+        hint={ttsEnabled ? "Video sẽ có giọng đọc" : "Video sẽ không có giọng đọc"}
         checked={ttsEnabled}
         onChange={onTtsEnabledChange}
         testId="narration-tts-toggle"
@@ -210,7 +210,7 @@ export function NarrationPanel({
                       </span>
                     </span>
                     <span className={selectable.hint}>
-                      {GENDER_LABEL[voice.gender] ?? voice.gender} · chất lượng {voice.quality}
+                      {GENDER_LABEL[voice.gender] ?? voice.gender} · {voice.quality}
                     </span>
                   </span>
                   <button
@@ -263,7 +263,7 @@ export function NarrationPanel({
         // FR41.3: "both" is a valid choice (e.g. repost target without a
         // caption-track upload path) — flagged, not blocked.
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Người xem bật CC sẽ thấy chữ phụ đề trùng lên chữ ghi cứng trong hình.
+          Người xem bật phụ đề sẽ thấy chữ bị trùng lặp.
         </p>
       )}
 
@@ -275,7 +275,7 @@ export function NarrationPanel({
 
       {!ttsEnabled && subtitleMode === "off" && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Video sẽ không có lời thoại lẫn phụ đề — người xem chỉ thấy hình ảnh.
+          Video sẽ không có lời thoại và phụ đề.
         </p>
       )}
     </Card>

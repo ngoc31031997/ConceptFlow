@@ -108,12 +108,12 @@ export function isAuthoringEditable(status: string | undefined): boolean {
 /** Why the inputs are read-only, in words for the banner. */
 export function readOnlyReason(status: string): string {
   if (status === "awaiting_review") {
-    return "Dự án đang chờ duyệt dàn ý — chỉ xem. Muốn sửa, chọn “Từ chối / quay lại sửa” ở bước Review.";
+    return "Dự án đang chờ duyệt, chỉ có thể xem. Muốn sửa, chọn “Quay lại sửa script” ở bước Kiểm tra.";
   }
   if (status === "ready_to_publish" || status === "publishing" || status === "published") {
-    return "Video đã render xong — các bước trước chỉ để xem. Muốn thay đổi, tạo bản mới từ video này.";
+    return "Video đã hoàn tất, các bước trước chỉ để xem. Muốn thay đổi, hãy tạo bản mới.";
   }
-  return "Dự án đang chạy — các bước trước chỉ để xem, không sửa được cho tới khi chạy xong.";
+  return "Dự án đang chạy, các bước trước chỉ để xem cho đến khi hoàn tất.";
 }
 
 /** Bước nào có worker để dừng (khớp runningStatusToStep của orchestrator). */
@@ -121,17 +121,17 @@ export function isCancellableStep(step: number): boolean {
   return step === FLOW_VALIDATE || step === FLOW_TTS || step === FLOW_TTS + 1 || step === FLOW_TTS + 2;
 }
 
-/** Điều gì được giữ / mất khi huỷ bước này — nói thật, không hứa hơn hệ thống làm. */
+/** Điều gì được giữ / mất khi hủy bước này — nói thật, không hứa hơn hệ thống làm. */
 export function cancelExplain(step: number): string {
   switch (step) {
     case FLOW_VALIDATE:
-      return "Kiểm tra kịch bản dừng ngay. Chưa tốn giọng đọc hay render nên không mất gì.";
+      return "Kiểm tra kịch bản sẽ dừng ngay, không mất chi phí.";
     case FLOW_TTS:
-      return "Tạo giọng đọc dừng ngay. Khi chạy tiếp, bước này làm lại từ đầu.";
+      return "Tạo giọng đọc sẽ dừng ngay. Khi chạy tiếp, bước này bắt đầu lại từ đầu.";
     case FLOW_TTS + 1:
-      return "Render dừng ngay. Phần hình đã dựng được lưu đệm nên lần chạy tiếp nhanh hơn.";
+      return "Dựng hình sẽ dừng ngay. Phần đã dựng được giữ lại nên lần chạy tiếp sẽ nhanh hơn.";
     default:
-      return "Ghép video dừng ngay, phần ghép dở bị bỏ. Khi chạy tiếp, bước này ghép lại từ đầu.";
+      return "Ghép video sẽ dừng ngay. Khi chạy tiếp, bước này bắt đầu lại từ đầu.";
   }
 }
 

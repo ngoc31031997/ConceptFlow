@@ -51,7 +51,7 @@ export function VideoFormatPicker({ formats, value, onChange }: VideoFormatPicke
             {format.beats
               .map((beat) => (beat.required ? `${beat.id}*` : beat.id))
               .join(" → ")}
-            . Beat có dấu * là bắt buộc — thiếu thì hệ thống dừng trước khi tạo giọng đọc.
+            . Phần có dấu * là bắt buộc.
           </p>
         ))}
     </div>

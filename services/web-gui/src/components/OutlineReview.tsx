@@ -77,7 +77,7 @@ export function OutlineReview({ project, outline }: OutlineReviewProps) {
                         Lưu và kiểm lại
                       </Button>
                       <Button variant="ghost" onClick={cancelEdit}>
-                        Huỷ
+                        Hủy
                       </Button>
                     </div>
                   </>

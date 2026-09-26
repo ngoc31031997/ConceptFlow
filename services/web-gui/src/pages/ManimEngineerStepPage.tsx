@@ -164,7 +164,7 @@ export function ManimEngineerStepPage() {
       dispatch({ type: "MARK_SUBMITTED" });
       navigate(`/projects/${projectId}/validate`);
     } catch (err) {
-      setSaveError(err instanceof ApiError ? err.message : "Không lưu được code, thử lại.");
+      setSaveError(err instanceof ApiError ? err.message : "Không lưu được code. Vui lòng thử lại.");
     } finally {
       setSaving(false);
     }
@@ -173,7 +173,7 @@ export function ManimEngineerStepPage() {
   const hint = saveError
     ? saveError
     : isEmpty
-      ? `Dán code ${engineerLabel} AI trả về để tiếp tục`
+      ? `Dán code ${engineerLabel} từ AI để tiếp tục`
       : validation.isValid
         ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
         : validation.message;
@@ -194,8 +194,8 @@ export function ManimEngineerStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnCode
-            ? `Dán code ${isRemotion ? "Remotion" : "Manim"} sẵn có của bạn — hệ thống kiểm tra ngay.`
-            : `Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
+            ? `Dán code ${isRemotion ? "Remotion" : "Manim"} của bạn, hệ thống sẽ kiểm tra ngay.`
+            : `Tạo code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
         }
         wide
       >
@@ -219,7 +219,7 @@ export function ManimEngineerStepPage() {
             steps={["code"]}
             what={`code ${isRemotion ? "Remotion" : "Manim"}`}
             runDisabled={draft.authoringStoryboard.trim().length === 0}
-            runDisabledReason="Cần storyboard ở bước Visual trước — server đọc dàn ý + storyboard làm {{previous_output}}."
+            runDisabledReason="Cần hoàn thành bước Visual trước."
             onGenerated={(step, content) => {
               if (step === "code") setCode(content);
             }}
@@ -235,8 +235,8 @@ export function ManimEngineerStepPage() {
         {hasOwnCode && (
           <div className={styles.settingsRow}>
             <Disclosure
-              title={`Code sẵn có chưa đúng chuẩn? Lấy prompt chuẩn hoá ${isRemotion ? "Remotion" : "Manim"}`}
-              hint="Dán code cũ vào đây để nhận một prompt yêu cầu AI sửa nó về đúng quy ước của hệ thống."
+              title={`Code chưa đúng chuẩn? Nhờ AI chỉnh lại code ${isRemotion ? "Remotion" : "Manim"}`}
+              hint="Dán code cũ vào đây để nhận prompt giúp AI sửa lại cho đúng chuẩn."
               defaultOpen={isEmpty}
               testId="existing-code-assistant"
             >
@@ -260,8 +260,8 @@ export function ManimEngineerStepPage() {
               bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn. */}
           {!aiMode && (
             <Card
-              title="1. Copy prompt"
-              hint="Dán vào ChatGPT, Claude hoặc Gemini — đọc lại nội dung, đúng rồi thì copy."
+              title="1. Sao chÃ©p prompt"
+              hint="Xem lại nội dung, sao chép rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
               <TextArea
                 readOnly
@@ -271,7 +271,7 @@ export function ManimEngineerStepPage() {
                 data-testid="manim-engineer-prompt"
               />
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="manim-engineer-copy">
-                {copied ? "Đã copy!" : "Copy prompt"}
+                {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
               </Button>
             </Card>
           )}
@@ -280,8 +280,8 @@ export function ManimEngineerStepPage() {
             title={aiMode ? `Code ${isRemotion ? "Remotion" : "Manim"}` : "2. Dán kết quả"}
             hint={
               aiMode
-                ? `Kết quả AI sinh ra hiện ở đây để bạn sửa — lint bên dưới vẫn chạy như khi dán tay. Bấm Tiếp tục để sang phần cấu hình giọng đọc.`
-                : `Dán code ${isRemotion ? "Remotion" : "Manim"} AI trả về, rồi bấm Tiếp tục để sang phần cấu hình giọng đọc.`
+                ? `Kết quả của AI hiện ở đây để bạn chỉnh sửa. Hệ thống tự kiểm tra code bên dưới.`
+                : `Dán code ${isRemotion ? "Remotion" : "Manim"} từ AI vào đây, rồi bấm Tiếp tục.`
             }
           >
             <TextArea
@@ -307,7 +307,7 @@ export function ManimEngineerStepPage() {
         onBack={() => navigate(hasOwnCode ? "/create/script/settings" : "/create/script/storyboard")}
         backLabel={hasOwnCode ? "Quay lại cấu hình" : "Quay lại Storyboard"}
         onNext={handleContinue}
-        nextLabel={saving ? "Đang gửi..." : "Chạy kiểm tra kịch bản"}
+        nextLabel={saving ? "Đang gửi..." : "Kiểm tra kịch bản"}
         nextDisabled={!isValid || saving}
         nextTestId="manim-engineer-step-next"
       />

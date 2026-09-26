@@ -22,7 +22,7 @@ import styles from "./ResultPage.module.css";
  * Bước 5 — "Kết quả" (bug report, 2026-09-12): trước đây trang này vừa xem
  * lại video vừa đăng bài cùng lúc, nên "chỉ muốn xem/chỉnh sửa" và "chỉ muốn
  * đăng" luôn phải đi qua chung một trang dài. Tách ra: trang này CHỈ xem lại
- * và các thao tác khác (render lại, tạo bản Shorts, xem input, xoá) — đăng
+ * và các thao tác khác (render lại, tạo bản Shorts, xem input, xóa) — đăng
  * bài chuyển hẳn sang `PublishPage` (Bước 6), tới đây bằng nút "Tiếp tục để
  * đăng" hoặc link "Xem chi tiết" khi đã đăng rồi.
  */
@@ -54,7 +54,7 @@ export function ResultPage() {
   async function handleRerender() {
     if (!project) return;
     if (!project.script_content) {
-      setRerenderError("Thiếu script gốc của project này — không render lại tự động được.");
+      setRerenderError("Dự án này thiếu script gốc nên không thể dựng lại tự động.");
       return;
     }
     setIsRerendering(true);
@@ -116,7 +116,7 @@ export function ResultPage() {
         currentStep={12}
         wide
         title="Xem kết quả"
-        subtitle="Xem lại video, cắt clip, hoặc render lại — đăng bài chuyển sang bước tiếp theo."
+        subtitle="Xem lại video, cắt clip hoặc dựng lại. Đăng video ở bước tiếp theo."
         headerAction={
           <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
@@ -145,7 +145,7 @@ export function ResultPage() {
 
           <div className={styles.publishColumn}>
             {isPublished ? (
-              <Card title="Đã đăng thành công!" data-testid="result-published-banner">
+              <Card title="Đã đăng thành công" data-testid="result-published-banner">
                 <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
                 <div className={glass.mtSm}>
                   <Link
@@ -160,7 +160,7 @@ export function ResultPage() {
             ) : (
               <Card
                 title="Sẵn sàng đăng?"
-                hint="Xem lại video ổn rồi thì qua bước đăng — kết nối YouTube, điền tiêu đề/mô tả và xuất bản."
+                hint="Nếu video đã ổn, chuyển sang bước đăng lên YouTube."
                 data-testid="result-continue-to-publish"
               >
                 <div className={`${glass.ctaRow} ${glass.mtSm}`}>
@@ -196,8 +196,8 @@ export function ResultPage() {
 
           {project.video_path && (
             <Disclosure
-              title="Render lại ở chất lượng hoặc loại video khác"
-              hint="Chạy lại toàn bộ pipeline — tốn thời gian và (nếu có giọng đọc) tốn quota TTS lại như một lần render mới."
+              title="Dựng lại với chất lượng hoặc loại video khác"
+              hint="Video sẽ được tạo lại từ đầu, mất thời gian như lần đầu."
               testId="rerender"
             >
               <RenderQualityPicker value={rerenderQuality} onChange={setRerenderQuality} />
@@ -214,7 +214,7 @@ export function ResultPage() {
               )}
               <div className={`${glass.ctaRow} ${glass.mtSm}`}>
                 <Button disabled={isRerendering} onClick={handleRerender} data-testid="rerender-submit">
-                  {isRerendering ? "Đang bắt đầu..." : "Render lại"}
+                  {isRerendering ? "Đang bắt đầu..." : "Dựng lại"}
                 </Button>
               </div>
             </Disclosure>
@@ -223,7 +223,7 @@ export function ResultPage() {
           {!project.companion_project_id && project.video_path && (
             <Disclosure
               title="Tạo bản Shorts/TikTok riêng cho video này"
-              hint="Kịch bản riêng, không phải cắt từ video này — tự có hook, tự cô đọng, tự đứng được một mình."
+              hint="Một kịch bản riêng, ngắn gọn và tự hoàn chỉnh, không cắt từ video này."
               testId="short-companion"
             >
               <ShortScriptAssistant
@@ -243,14 +243,14 @@ export function ResultPage() {
           page, above the video it deletes. It sits after the work instead.
         */}
         <div className={styles.dangerZone}>
-          <span className={glass.cardHint}>Xoá vĩnh viễn video này và toàn bộ dữ liệu liên quan.</span>
+          <span className={glass.cardHint}>Xóa vĩnh viễn video này và dữ liệu liên quan.</span>
           <Button
             variant="dangerGhost"
             data-testid="result-delete-button"
             disabled={isDeleting}
             onClick={() => setShowDeleteModal(true)}
           >
-            {isDeleting ? "Đang xoá..." : "Xoá video"}
+            {isDeleting ? "Đang xóa..." : "Xóa video"}
           </Button>
           {isDeleting && (
             <div style={{ flexBasis: "100%" }}>
@@ -264,9 +264,9 @@ export function ResultPage() {
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onConfirm={handleDelete}
-        title="Xác nhận xoá video"
-        message="Bạn có chắc chắn muốn xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác."
-        confirmLabel="Xoá video"
+        title="Xác nhận xóa video"
+        message="Bạn có chắc chắn muốn xóa video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác."
+        confirmLabel="Xóa video"
         cancelLabel="Hủy"
         isDangerous
       />

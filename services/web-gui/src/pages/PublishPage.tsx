@@ -24,7 +24,7 @@ import styles from "./PublishPage.module.css";
  * Bước 6 — "Đăng" (bug report, 2026-09-12): tách khỏi ResultPage (Bước 5,
  * "Kết quả"), để trang này CHỈ làm một việc — kết nối YouTube, điền
  * tiêu đề/mô tả, xem báo cáo QC, và đăng. Mọi thứ khác (render lại, tạo bản
- * Shorts, xem input, xoá) ở lại ResultPage.
+ * Shorts, xem input, xóa) ở lại ResultPage.
  */
 export function PublishPage() {
   const { id } = useParams<{ id: string }>();
@@ -102,8 +102,8 @@ export function PublishPage() {
     if (
       qcBlocked &&
       window.confirm(
-        "Kiểm tra chất lượng phát hiện lỗi nghiêm trọng. Vẫn đăng video này? " +
-          "Lần bỏ qua sẽ được ghi lại.",
+        "Phát hiện lỗi nghiêm trọng khi kiểm tra chất lượng. Bạn vẫn muốn đăng video này? " +
+          "Lựa chọn của bạn sẽ được ghi lại.",
       )
     ) {
       await handlePublish(metadata, true);
@@ -155,7 +155,7 @@ export function PublishPage() {
         currentStep={13}
         wide
         title="Đăng video"
-        subtitle="Kết nối YouTube và điền thông tin để xuất bản."
+        subtitle="Kết nối YouTube và điền thông tin để đăng video."
         headerAction={
           <Link to={`/projects/${projectId}/result`} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Quay lại xem kết quả
@@ -168,14 +168,12 @@ export function PublishPage() {
             <a href={project.youtube_video_url ?? undefined}>{project.youtube_video_url}</a>
             {project.caption_status === "skipped_no_scope" && (
               <p role="alert" className={`${glass.helperText} ${glass.mtSm}`}>
-                Video không có phụ đề YouTube: kênh này cần được nối lại để cấp thêm quyền. Vào mục
-                Kênh YouTube ở lần đăng sau, ngắt rồi nối lại kênh này.
+                Video chưa có phụ đề YouTube vì kênh thiếu quyền. Vào mục Kênh YouTube, ngắt rồi kết nối lại kênh này.
               </p>
             )}
             {project.caption_status === "failed" && (
               <p role="alert" className={`${glass.helperText} ${glass.mtSm}`}>
-                Video đã đăng nhưng tải phụ đề lên YouTube thất bại — thử đăng lại, hoặc tải phụ đề
-                lên thủ công trong YouTube Studio.
+                Video đã đăng nhưng chưa tải được phụ đề. Hãy thử lại hoặc tải phụ đề lên trong YouTube Studio.
               </p>
             )}
             {project.video_path && (
@@ -220,8 +218,7 @@ export function PublishPage() {
                   <div>
                     <p className={styles.publishStatusText}>Đang tải video lên YouTube...</p>
                     <p className={styles.publishStatusHint}>
-                      Quá trình này có thể mất vài phút. Bạn không cần bấm lại — trang sẽ tự cập nhật
-                      khi đăng xong.
+                      Quá trình này có thể mất vài phút. Trang sẽ tự cập nhật khi hoàn tất.
                     </p>
                   </div>
                 </div>

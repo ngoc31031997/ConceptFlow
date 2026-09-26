@@ -41,9 +41,9 @@ export function AuthoringModelPicker({ models, onChange, options, defaultModel =
   return (
     <div className={`${glass.card} ${styles.card}`} data-testid="authoring-model-picker">
       <div className={styles.text}>
-        <div className={glass.cardTitle}>Model cho từng bước</div>
+        <div className={glass.cardTitle}>Model AI</div>
         <p className={styles.hint}>
-          Chọn model Hive riêng cho mỗi tab — áp dụng khi hệ thống tự gọi AI ở đúng tab đó.
+          Chọn model AI cho từng bước.
         </p>
       </div>
       <div className={styles.selects}>

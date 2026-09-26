@@ -158,28 +158,28 @@ export function ThumbnailUpload({
           onClick={() => setPromptPanelOpen((open) => !open)}
         >
           <WandIcon />
-          System Prompt (tạo ảnh)
+          Prompt tạo thumbnail
         </Button>
       </div>
 
       {promptPanelOpen && (
         <div className={styles.promptPanel} data-testid="thumbnail-system-prompt-panel">
           <div className={styles.promptPanelHeader}>
-            <span>System prompt để nhờ AI sinh ảnh (Midjourney/DALL-E/...) tạo thumbnail cho video</span>
+            <span>Prompt để nhờ AI tạo thumbnail (Midjourney, DALL-E…)</span>
             <Button variant="ghost" disabled={topicState === "loading" || renderedPrompt.prompt === null || renderedPrompt.stale} onClick={handleCopyPrompt}>
               <CopyIcon />
-              {promptCopied ? "Đã copy!" : "Copy"}
+              {promptCopied ? "Đã sao chép" : "Sao chÃ©p"}
             </Button>
           </div>
           <AiOperationCard
             run={topicRun}
             active={topicState === "loading"}
             testId="thumbnail-topic-progress"
-            title="Đang lấy chủ đề video từ AI để điền sẵn vào prompt"
+            title="Đang lấy chủ đề video"
           />
           {topicState === "error" && (
             <p role="alert" className={glass.helperText} style={{ marginTop: 0, fontSize: 12 }}>
-              Không lấy được chủ đề video tự động — dán chủ đề vào prompt bên dưới trước khi dùng.
+              Chưa lấy được chủ đề video. Hãy dán chủ đề vào prompt bên dưới.
             </p>
           )}
           <TextArea
@@ -202,7 +202,7 @@ export function ThumbnailUpload({
                 style={{ marginRight: 0, marginTop: 6, fontSize: 12 }}
                 data-testid="thumbnail-auto-generated-note"
               >
-                Ảnh gợi ý tự động lấy từ video. Thumbnail tự thiết kế thường có tỉ lệ click cao hơn nhiều — nên thay bằng ảnh riêng.
+                Ảnh gợi ý được lấy từ video. Thumbnail thiết kế riêng thường thu hút nhiều lượt xem hơn.
               </p>
             )}
           </div>
@@ -235,7 +235,7 @@ export function ThumbnailUpload({
       {uploadState === "uploading" && uploadBytes && (
         <OperationProgressCard
           testId="thumbnail-upload-progress"
-          subtitle={`Đang tải lên · ${formatChars(uploadBytes.loaded)}/${formatChars(uploadBytes.total)} byte`}
+          subtitle={`Đang tải lên · ${formatChars(uploadBytes.loaded)}/${formatChars(uploadBytes.total)}`}
           done={uploadBytes.loaded}
           total={uploadBytes.total}
         />

@@ -27,7 +27,7 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "Tất cả" },
   { key: "running", label: "Đang chạy" },
   { key: "waiting", label: "Chờ bạn" },
-  { key: "problem", label: "Lỗi / đã huỷ" },
+  { key: "problem", label: "Lỗi / đã hủy" },
   { key: "done", label: "Xong" },
 ];
 
@@ -112,7 +112,7 @@ export function VideoListPage() {
   }
 
   async function handleDelete(projectId: string) {
-    if (!window.confirm("Xoá video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
+    if (!window.confirm("Xóa video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
       return;
     }
     setError(null); // Clear previous errors
@@ -146,7 +146,7 @@ export function VideoListPage() {
     if (ids.length === 0) return;
     if (
       !window.confirm(
-        `Xoá ${ids.length} video đã chọn và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`,
+        `Xóa ${ids.length} video đã chọn và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`,
       )
     ) {
       return;
@@ -159,7 +159,7 @@ export function VideoListPage() {
     setProjects((current) => current?.filter((p) => !ids.includes(p.project_id) || failedIds.includes(p.project_id)) ?? null);
     setSelected(new Set(failedIds));
     if (failedIds.length > 0) {
-      setError(`Không thể xoá ${failedIds.length}/${ids.length} video. Vui lòng thử lại.`);
+      setError(`Không thể xóa ${failedIds.length}/${ids.length} video. Vui lòng thử lại.`);
     }
     setIsBulkDeleting(false);
   }
@@ -169,7 +169,7 @@ export function VideoListPage() {
       <AppShell
         wide
         title="Danh sách video"
-        subtitle="Tất cả video đã tạo, kể cả những video render thất bại. Xoá video không dùng nữa để giảm dung lượng."
+        subtitle="Tất cả video đã tạo, kể cả video bị lỗi. Xóa video không dùng để giải phóng dung lượng."
         headerAction={
           <Link to="/" className={glass.btnPrimary} style={{ textDecoration: "none", padding: "9px 16px", fontSize: 13 }}>
             Tạo video mới
@@ -229,7 +229,7 @@ export function VideoListPage() {
                 onClick={handleBulkDelete}
               >
                 <TrashIcon />
-                {isBulkDeleting ? "Đang xoá..." : `Xoá đã chọn${selected.size > 0 ? ` (${selected.size})` : ""}`}
+                {isBulkDeleting ? "Đang xóa..." : `Xóa đã chọn${selected.size > 0 ? ` (${selected.size})` : ""}`}
               </button>
             </div>
 
@@ -305,7 +305,7 @@ export function VideoListPage() {
                       onClick={() => handleDelete(project.project_id)}
                     >
                       <TrashIcon />
-                      {deletingId === project.project_id ? "Đang xoá..." : "Xoá"}
+                      {deletingId === project.project_id ? "Đang xóa..." : "Xóa"}
                     </button>
                   </div>
                   {deletingId === project.project_id && (

@@ -145,7 +145,7 @@ export function BackgroundMusicPicker({
                 onChange={(event) => onVolumeChange(Number(event.target.value))}
               />
               <span className={styles.volumeHint}>
-                Nhạc tự động hạ xuống khi có giọng đọc, nên không cần để quá nhỏ.
+                Nhạc tự động nhỏ đi khi có giọng đọc.
               </span>
             </label>
           )}

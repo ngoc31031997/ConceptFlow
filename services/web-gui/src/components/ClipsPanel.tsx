@@ -40,7 +40,7 @@ export function ClipsPanel({ projectId, clips, videoOutputMode }: ClipsPanelProp
       ) : (
         <>
           <p className={glass.cardHint} style={{ marginBottom: 12 }}>
-            Tải clip về rồi đăng tay lên YouTube Shorts/TikTok — hệ thống chưa tự đăng thay được.
+            Tải clip về và đăng lên YouTube Shorts hoặc TikTok.
           </p>
           <ul className={styles.list}>
             {okClips.map((clip) => (
@@ -77,7 +77,7 @@ export function ClipsPanel({ projectId, clips, videoOutputMode }: ClipsPanelProp
                     <span className={styles.name}>{clip.name}</span>
                     <span className={styles.preset}>{PRESET_LABELS[clip.preset] ?? clip.preset}</span>
                   </div>
-                  <span className={glass.cardHint}>{clip.error_message ?? "Cắt clip thất bại"}</span>
+                  <span className={glass.cardHint}>{clip.error_message ?? "Không cắt được clip"}</span>
                 </li>
               ))}
             </ul>

@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ProjectDraftProvider } from "./context/ProjectDraftContext";
 import { AuthoringRunProvider } from "./context/AuthoringRunContext";
 import { ProjectFlowProvider } from "./context/ProjectFlowContext";
@@ -21,6 +22,22 @@ import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
 
+/**
+ * The wizard draft lives only in memory (see ProjectDraftContext), so a page
+ * load that lands on a /create/* step has no draft behind it — send it back
+ * to step 1 instead of showing an empty step. Runs once per page load; in-app
+ * navigation never remounts App.
+ */
+function RedirectStaleWizardLoad() {
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    if (pathname.startsWith("/create/")) navigate("/", { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return null;
+}
+
 export function App() {
   return (
     <ThemeProvider>
@@ -28,6 +45,7 @@ export function App() {
         <AuthoringRunProvider>
         <BrowserRouter>
           <ProjectFlowProvider>
+          <RedirectStaleWizardLoad />
           <NavigationLoader />
           <KeyboardShortcutsHelp />
           <Routes>

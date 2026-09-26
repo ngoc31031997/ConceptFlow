@@ -78,7 +78,7 @@ export function ShortScriptAssistant({
       );
       suggestRun.end();
       // Nháp AI, không tự nộp — Creator vẫn sửa được trước khi bấm nộp
-      // (FR71.3), cùng nguyên tắc với "Copy prompt".
+      // (FR71.3), cùng nguyên tắc với "Sao chÃ©p prompt".
       setDraftScript(result.script_content);
     } catch (err) {
       setSuggestError(err instanceof ApiError ? err.message : String(err));
@@ -117,7 +117,7 @@ export function ShortScriptAssistant({
         <span className={styles.stepNum}>1</span>
         <div className={styles.stepBody}>
           <label className={styles.stepLabel} htmlFor="short-script-topic">
-            Chủ đề bản ngắn (có thể khác trọng tâm video dài — chọn lát cắt hay nhất)
+            Chủ đề bản ngắn (có thể khác video dài)
           </label>
           <TextInput
             id="short-script-topic"
@@ -133,7 +133,7 @@ export function ShortScriptAssistant({
       <div className={styles.step}>
         <span className={styles.stepNum}>2</span>
         <div className={styles.stepBody}>
-          <div className={styles.stepLabel}>Chọn một cách để có script</div>
+          <div className={styles.stepLabel}>Chọn cách tạo script</div>
           <div className={styles.copyRow}>
             <button
               type="button"
@@ -143,7 +143,7 @@ export function ShortScriptAssistant({
               onClick={handleCopy}
             >
               <CopyIcon />
-              {copied ? "Đã copy!" : "Copy prompt (dán vào ChatGPT/Claude/Gemini)"}
+              {copied ? "Đã sao chép" : "Sao chép prompt (dán vào ChatGPT, Claude hoặc Gemini)"}
             </button>
             <Button
               variant="ghost"
@@ -151,7 +151,7 @@ export function ShortScriptAssistant({
               onClick={handleSuggestWithLocalAI}
               disabled={isSuggesting}
             >
-              {isSuggesting ? "Đang soạn..." : "Hoặc soạn bằng AI nội bộ"}
+              {isSuggesting ? "Đang soạn..." : "Hoặc để AI soạn giúp"}
             </Button>
             <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
               <span className={styles.copyStatusDot} aria-hidden="true" />
@@ -181,7 +181,7 @@ export function ShortScriptAssistant({
         <span className={styles.stepNum}>3</span>
         <div className={styles.stepBody}>
           <label className={styles.stepLabel} htmlFor="short-script-draft">
-            Dán (hoặc sửa) script ngắn ở đây rồi nộp
+            Dán hoặc chỉnh sửa script ngắn tại đây
           </label>
           <TextArea
             id="short-script-draft"
@@ -203,7 +203,7 @@ export function ShortScriptAssistant({
               onClick={handleSubmit}
               disabled={isSubmitting || draftScript.trim().length === 0}
             >
-              {isSubmitting ? "Đang bắt đầu..." : "Bắt đầu render bản ngắn"}
+              {isSubmitting ? "Đang bắt đầu..." : "Bắt đầu tạo bản ngắn"}
             </Button>
           </CtaRow>
         </div>

@@ -6,7 +6,7 @@ import * as client from "../../src/api/client";
 // Bug thật: bước 1 có 4 tab, mỗi tab tự mount useLlmStatus(). Không cache,
 // mỗi lần đổi tab (remount) status rơi về null trong lúc chờ API trả lời —
 // modeLabel/aiMode ở mọi nơi đọc `llm?.enabled` coi null là "chưa bật", nên
-// một project đã chọn "Gọi API trực tiếp" chớp qua "Copy prompt ra ngoài"
+// một project đã chọn "Gọi API trực tiếp" chớp qua "Sao chÃ©p prompt ra ngoài"
 // mỗi khi chuyển tab. Test này mô phỏng đúng chuỗi mount → unmount → mount
 // (chuyển tab) và khẳng định lần mount thứ hai không còn thấy null.
 describe("useLlmStatus", () => {
@@ -35,7 +35,7 @@ describe("useLlmStatus", () => {
     expect(second.result.current?.enabled).toBe(true);
   });
 
-  it("một request lỗi thoáng qua không xoá status đã biết từ trước", async () => {
+  it("một request lỗi thoáng qua không xóa status đã biết từ trước", async () => {
     vi.spyOn(client, "getLlmStatus").mockResolvedValueOnce({
       enabled: true,
       provider: "hive",

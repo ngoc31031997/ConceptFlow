@@ -109,7 +109,7 @@
 }
 
 .copyStatusOn {
-  color: #1c6cb0;
+  color: var(--info);
 }
 
 .preview {

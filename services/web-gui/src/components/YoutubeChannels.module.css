@@ -96,8 +96,8 @@
 }
 
 .defaultBadge {
-  color: #1a7f4b;
-  background: rgba(26, 127, 75, 0.12);
+  color: var(--ok);
+  background: var(--ok-soft);
 }
 
 .appTag {
@@ -111,8 +111,8 @@
   padding: 3px 8px;
   border-radius: var(--radius);
   flex-shrink: 0;
-  color: #a15c00;
-  background: rgba(212, 132, 0, 0.14);
+  color: var(--warn);
+  background: var(--warn-soft);
 }
 
 .itemActions {
@@ -138,7 +138,7 @@
 }
 
 .dangerLink {
-  color: #b4342c;
+  color: var(--danger);
 }
 
 .linkBtn:hover,
@@ -195,7 +195,7 @@
   margin: 0 24px 18px;
   padding: 12px 14px;
   border-radius: var(--radius);
-  background: rgba(196, 132, 16, 0.1);
+  background: var(--warn-soft);
   border: var(--border-w) solid var(--border-color);
 }
 
@@ -203,7 +203,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.65;
-  color: rgba(120, 78, 8, 0.95);
+  color: var(--warn);
 }
 
 .warning code {

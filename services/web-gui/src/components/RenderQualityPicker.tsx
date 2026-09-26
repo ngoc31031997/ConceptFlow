@@ -14,10 +14,10 @@ interface RenderQualityPickerProps {
  * works, and only the upload pass needs to be worth publishing.
  */
 const OPTIONS: { value: RenderQuality; label: string; hint: string }[] = [
-  { value: "480p15", label: "Test", hint: "480p15 — nhanh nhất, chỉ để kiểm nội dung/thời lượng, không dùng để xem thật" },
-  { value: "720p30", label: "Nháp", hint: "720p30 — xem thử hình ảnh rõ hơn, vẫn chưa nên đăng" },
-  { value: "1080p60", label: "Chuẩn", hint: "1080p60 — mức nên dùng khi đăng YouTube" },
-  { value: "4k60", label: "Cao", hint: "4K60 — rất nặng, chỉ dùng khi thật sự cần" },
+  { value: "480p15", label: "Test", hint: "480p15 · Nhanh nhất, chỉ để kiểm tra nội dung" },
+  { value: "720p30", label: "Nháp", hint: "720p30 · Xem thử, chưa nên đăng" },
+  { value: "1080p60", label: "Chuẩn", hint: "1080p60 · Khuyên dùng khi đăng YouTube" },
+  { value: "4k60", label: "Cao", hint: "4K60 · Rất nặng, chỉ dùng khi thật sự cần" },
 ];
 
 /**
@@ -48,12 +48,12 @@ export function RenderQualityPicker({ value, onChange }: RenderQualityPickerProp
 
       {(value === "480p15" || value === "720p30") && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Bản nháp không nên dùng để đăng — YouTube sẽ nén lại một lần nữa, nên nguồn cần dư chất lượng.
+          Không nên đăng bản nháp vì YouTube sẽ nén lại, làm giảm chất lượng.
         </p>
       )}
       {value === "4k60" && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Render 4K nặng hơn 1080p nhiều lần và hiếm khi tăng lượt xem — cân nhắc kỹ trước khi dùng.
+          4K mất nhiều thời gian hơn 1080p đáng kể và ít khi cần thiết.
         </p>
       )}
     </div>

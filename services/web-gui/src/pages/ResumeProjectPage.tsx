@@ -92,7 +92,7 @@ export function ResumeProjectPage() {
         const step = stepParam || (flowStep > 5 ? 5 : flowStep);
         navigate(authoringRoute(step), { replace: true });
       } catch {
-        if (!cancelled) setError("Không mở lại được project — có thể nó đã bị xoá hoặc mất kết nối.");
+        if (!cancelled) setError("Không mở lại được dự án. Dự án có thể đã bị xóa hoặc kết nối bị gián đoạn.");
       }
     })();
     return () => {
@@ -101,7 +101,7 @@ export function ResumeProjectPage() {
   }, [id, dispatch, navigate, editAfterFailure, viewOnly, stepParam]);
 
   return (
-    <AppShell title="Đang mở lại project" subtitle="Nạp lại những gì bạn đã lưu ở các bước trước.">
+    <AppShell title="Đang mở dự án" subtitle="Đang tải lại nội dung bạn đã lưu.">
       {error ? (
         <p role="alert" className={glass.helperText}>
           {error} <Link to="/videos">Về danh sách video</Link>

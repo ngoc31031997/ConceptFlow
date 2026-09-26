@@ -22,7 +22,7 @@ describe("RenderEnginePicker", () => {
   it("warns that Remotion has no design system yet", () => {
     render(<RenderEnginePicker value="remotion" onChange={vi.fn()} />);
 
-    expect(screen.getByTestId("render-engine-picker").textContent).toContain("giai đoạn đầu");
+    expect(screen.getByTestId("render-engine-picker").textContent).toContain("giai đoạn thử nghiệm");
   });
 
   it("describes Manim as the full-featured default", () => {

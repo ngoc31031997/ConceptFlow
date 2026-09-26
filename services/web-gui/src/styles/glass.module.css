@@ -251,7 +251,7 @@
 }
 .badgeSuccess {
   border: var(--border-w) solid var(--border-color);
-  background: rgba(31, 157, 85, 0.12);
+  background: var(--ok-soft);
   color: var(--success);
 }
 .badgeProgress {

@@ -102,13 +102,13 @@ export function RenderPage() {
             Tạo video mới
           </Link>
         }
-        title={isCancelled ? "Đã huỷ" : isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
+        title={isCancelled ? "Đã hủy" : isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
         subtitle={
           isCancelled
-            ? "Bạn đã dừng bước này. Chạy tiếp từ dải trạng thái phía trên."
+            ? "Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
             : isFailed
-            ? "Một bước trong quá trình sản xuất không hoàn tất."
-            : "Dàn ý đã duyệt — hệ thống đang tạo giọng đọc, render hoạt hình và ghép video."
+            ? "Một bước trong quá trình tạo video chưa hoàn tất."
+            : "Hệ thống đang tạo giọng đọc, dựng hoạt hình và ghép video."
         }
       >
         {/*

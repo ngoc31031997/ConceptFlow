@@ -66,7 +66,7 @@ describe("StatusStrip", () => {
     await waitFor(() => expect(screen.getByTestId("strip-cancel")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("strip-cancel"));
     expect(cancel).not.toHaveBeenCalled();
-    expect(screen.getByTestId("confirm-modal")).toHaveTextContent("lưu đệm");
+    expect(screen.getByTestId("confirm-modal")).toHaveTextContent("được giữ lại");
 
     fireEvent.click(screen.getByTestId("confirm-modal-confirm"));
     await waitFor(() => expect(cancel).toHaveBeenCalledWith("p1"));
@@ -92,7 +92,7 @@ describe("StatusStrip", () => {
     const retry = vi.spyOn(apiClient, "retryProject").mockResolvedValue({ saga_id: "s", status: "rendering" } as never);
     renderStrip(project({ status: "failed_at_render_scenes", flow_step: 9, run_state: "cancelled" }), 9);
 
-    await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đã huỷ"));
+    await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đã hủy"));
     fireEvent.click(screen.getByTestId("strip-resume"));
     await waitFor(() => expect(retry).toHaveBeenCalledWith("p1"));
   });

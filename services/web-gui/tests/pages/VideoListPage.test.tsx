@@ -86,7 +86,7 @@ describe("VideoListPage", () => {
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("delete-button-p1"));
 
-    await waitFor(() => expect(screen.getByText("1/3 service đã dọn xong")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Đã xóa 1/3 mục")).toBeInTheDocument());
     expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "33");
   });

@@ -33,7 +33,7 @@ export function useLlmStatus(): LlmStatus | null {
         if (!cancelled) setStatus(s);
       })
       .catch(() => {
-        // Một request lỗi tạm thời không nên xoá cache đúng đã có (ngắt mạng
+        // Một request lỗi tạm thời không nên xóa cache đúng đã có (ngắt mạng
         // giữa hai tab không có nghĩa là LLM vừa bị tắt) — chỉ hạ về
         // "disabled" khi chưa từng biết gì.
         if (cancelled) return;

@@ -11,12 +11,12 @@ export function formatClock(totalSeconds: number): string {
 const ERROR_LABELS: Record<string, string> = {
   balance: "Hết số dư tài khoản AI",
   budget: "Vượt ngân sách",
-  auth: "Sai hoặc thiếu API key",
-  rate_limit: "Bị giới hạn tốc độ",
+  auth: "Khóa API không hợp lệ",
+  rate_limit: "Đã vượt giới hạn yêu cầu",
   timeout: "Quá thời gian chờ",
-  malformed: "AI trả kết quả không đọc được",
+  malformed: "AI trả về kết quả không hợp lệ",
   empty: "AI trả về rỗng",
-  server: "Lỗi phía máy chủ AI",
+  server: "Dịch vụ AI đang gặp sự cố",
 };
 
 /** Lỗi đã phân loại của một lượt gọi → câu ngắn cho Creator (FR116.5). */
@@ -42,6 +42,6 @@ export function operationSubtitle(op: SubtitleSource | null, waitingLabel = "Đa
   const time = formatClock(op.elapsed_ms / 1000);
   if (op.total != null && op.total > 0) return `${op.done ?? 0}/${op.total} · ${time}`;
   if (op.phase === "writing") return `AI đang viết · ${formatChars(op.content_chars)} ký tự · ${time}`;
-  if (op.phase === "reasoning") return `AI đang suy luận · ${formatChars(op.reasoning_chars)} ký tự · ${time}`;
+  if (op.phase === "reasoning") return `AI đang phân tích · ${formatChars(op.reasoning_chars)} ký tự · ${time}`;
   return `${waitingLabel} · ${time}`;
 }

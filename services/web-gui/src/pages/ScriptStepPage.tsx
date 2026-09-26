@@ -35,7 +35,7 @@ export function ScriptStepPage() {
       await createProjectDraft(draft.projectId, topic.trim(), draft.voiceLanguage, draft.renderEngine);
       navigate("/create/script/settings");
     } catch {
-      setError("Không tạo được project — kiểm tra kết nối rồi thử lại.");
+      setError("Không tạo được dự án. Vui lòng kiểm tra kết nối và thử lại.");
     } finally {
       setCreating(false);
     }
@@ -47,11 +47,11 @@ export function ScriptStepPage() {
         currentStep={1}
         wide
         title="Bước 1 — Ý tưởng"
-        subtitle="Bạn đang có sẵn tới đâu? Hiện tại chỉ hỗ trợ bắt đầu từ ý tưởng."
+        subtitle="Bắt đầu video mới từ một ý tưởng."
       >
         <Card
           title="Chưa có gì, chỉ có ý tưởng"
-          hint="Nhập chủ đề rồi dựng dàn ý → storyboard → code cùng AI, từng bước một."
+          hint="Nhập chủ đề, sau đó cùng AI dựng dàn ý, hình ảnh và code."
         >
           <TextArea
             value={topic}
@@ -67,9 +67,9 @@ export function ScriptStepPage() {
         hint={
           error ??
           (creating
-            ? "Đang tạo project..."
+            ? "Đang tạo dự án..."
             : topic.trim()
-              ? "Sẵn sàng khi bạn bấm Tiếp tục."
+              ? "Sẵn sàng."
               : "Nhập ý tưởng để tiếp tục.")
         }
         isBlocked={!!error}

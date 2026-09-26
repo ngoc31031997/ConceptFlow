@@ -69,7 +69,7 @@ describe("VisualDirectorStepPage", () => {
     fireEvent.click(screen.getByTestId("visual-director-step-next"));
 
     await waitFor(() => {
-      expect(screen.getByText("Không lưu được storyboard, thử lại.")).toBeInTheDocument();
+      expect(screen.getByText("Không lưu được. Vui lòng thử lại.")).toBeInTheDocument();
     });
   });
 

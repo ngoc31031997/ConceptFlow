@@ -18,8 +18,8 @@ const RENDER_QUALITY_LABELS: Record<string, string> = {
 
 const SUBTITLE_MODE_LABELS: Record<string, string> = {
   off: "Tắt",
-  track: "Track (CC riêng trên YouTube)",
-  burn_in: "Burn-in (khắc thẳng vào hình)",
+  track: "Phụ đề rời (YouTube)",
+  burn_in: "Ghi cứng vào hình",
   both: "Cả hai",
 };
 
@@ -55,8 +55,8 @@ export function ProjectInputPanel({ project }: ProjectInputPanelProps) {
 
   return (
     <Disclosure
-      title="Toàn bộ input đã dùng"
-      hint="Xem lại kịch bản và cấu hình gốc để tối ưu hoặc dùng lại cho video sau."
+      title="Thông tin đã dùng"
+      hint="Kịch bản và cấu hình gốc, để bạn dùng lại cho video sau."
       testId="project-input"
     >
       <dl className={styles.grid}>
@@ -95,7 +95,7 @@ export function ProjectInputPanel({ project }: ProjectInputPanelProps) {
         <span className={styles.scriptLabel}>Script gốc</span>
         {project.script_content && (
           <Button variant="ghost" onClick={handleCopyScript}>
-            {copied ? "Đã copy!" : "Copy script"}
+            {copied ? "Đã sao chép" : "Sao chÃ©p script"}
           </Button>
         )}
       </div>
@@ -109,8 +109,7 @@ export function ProjectInputPanel({ project }: ProjectInputPanelProps) {
         />
       ) : (
         <p className={glass.helperText} role="alert">
-          Project này không còn lưu script gốc — có thể được tạo trước khi trường này được ghi lại,
-          hoặc dữ liệu đã bị dọn.
+          Dự án này không còn lưu script gốc.
         </p>
       )}
     </Disclosure>

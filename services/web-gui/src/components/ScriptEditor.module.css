@@ -103,8 +103,8 @@
 }
 
 .validationOk {
-  color: #1a7f4c;
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--ok);
+  background: var(--ok-soft);
   border: var(--border-w) solid var(--border-color);
 }
 
@@ -178,7 +178,7 @@
   margin-top: 0.75rem;
   padding: 0.75rem 0.9rem;
   border-radius: var(--radius);
-  background: rgba(143, 199, 239, 0.08);
+  background: var(--info-soft);
   border: var(--border-w) solid var(--border-color);
 }
 

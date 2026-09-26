@@ -75,7 +75,7 @@
 .error {
   margin-top: 0.8rem;
   font-size: 0.86rem;
-  color: #f38ba8;
+  color: var(--danger);
 }
 
 .actions {

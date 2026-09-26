@@ -53,6 +53,6 @@ describe("PipelineSettingsBar", () => {
     renderBar({ renderEngine: "remotion", mode: "ai" });
 
     expect(screen.getByTestId("pipeline-settings-bar")).toHaveTextContent("Remotion");
-    expect(screen.getByTestId("pipeline-settings-bar")).toHaveTextContent("Gọi API trực tiếp");
+    expect(screen.getByTestId("pipeline-settings-bar")).toHaveTextContent("Để AI làm giúp");
   });
 });

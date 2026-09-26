@@ -95,7 +95,7 @@ export function ScriptAuthoringSettingsStepPage() {
       saveLastUsedSettings(draft);
       navigate("/create/script/outline");
     } catch {
-      setSaveError("Không lưu được cấu hình — kiểm tra kết nối rồi thử lại.");
+      setSaveError("Không lưu được cấu hình. Vui lòng kiểm tra kết nối và thử lại.");
     } finally {
       setSaving(false);
     }
@@ -107,7 +107,7 @@ export function ScriptAuthoringSettingsStepPage() {
         currentStep={2}
         wide
         title={isRemotion ? "Bước 2 — Cấu hình Remotion" : "Bước 2 — Cấu hình Manim"}
-        subtitle="Chốt ngôn ngữ, công cụ render, giọng đọc và hình ảnh trước khi vào dàn ý. Mọi mục đã có sẵn lựa chọn hợp lý — bấm Tiếp tục ngay cũng được."
+        subtitle="Chọn ngôn ngữ, giọng đọc và chất lượng video. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay."
       >
         <div className={styles.settingsRow}>
           <ContentLanguagePicker
@@ -208,8 +208,8 @@ export function ScriptAuthoringSettingsStepPage() {
         hint={
           saveError ??
           (authoringMode === "ai" && llm?.enabled
-            ? "Chế độ gọi API đang bật — các bước Kịch bản, Visual, Code sẽ có nút chạy bằng AI."
-            : "Chế độ copy prompt ra ngoài — đổi sang gọi API ở đây hoặc ở bất kỳ tab nào.")
+            ? "AI sẽ giúp bạn ở các bước Kịch bản, Visual và Code."
+            : "Bạn tự làm với ChatGPT, Claude… Có thể đổi sang AI làm giúp bất cứ lúc nào.")
         }
         onBack={() => navigate("/")}
         onNext={handleContinue}

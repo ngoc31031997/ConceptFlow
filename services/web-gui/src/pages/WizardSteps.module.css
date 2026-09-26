@@ -142,8 +142,8 @@
   margin-bottom: 12px;
   padding: 10px 12px;
   border-radius: var(--radius);
-  background: var(--warning-bg, #fff8e1);
-  border: var(--border-w) solid var(--warning-border, #f0c419);
+  background: var(--warn-soft);
+  border: var(--border-w) solid var(--warn);
   font-size: 13px;
   line-height: 1.5;
 }

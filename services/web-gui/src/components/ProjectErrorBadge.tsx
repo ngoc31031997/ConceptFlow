@@ -86,7 +86,7 @@ export function ProjectErrorBadge({ projectId }: { projectId: string }) {
               className={styles.copy}
               onClick={() => copy("all", newestFirst.map(formatProjectError).join("\n\n----\n\n"))}
             >
-              {copied === "all" ? "Đã copy" : "Copy tất cả"}
+              {copied === "all" ? "Đã sao chép" : "Sao chép tất cả"}
             </button>
           </div>
           <ul className={styles.list}>
@@ -97,7 +97,7 @@ export function ProjectErrorBadge({ projectId }: { projectId: string }) {
                   <div className={styles.meta}>
                     {new Date(e.at).toLocaleString()} · {[e.source, e.step, e.kind].filter(Boolean).join(" · ")}
                     <button type="button" className={styles.copy} onClick={() => copy(key, formatProjectError(e))}>
-                      {copied === key ? "Đã copy" : "Copy"}
+                      {copied === key ? "Đã sao chép" : "Sao chÃ©p"}
                     </button>
                   </div>
                   <div className={styles.message}>{e.message}</div>

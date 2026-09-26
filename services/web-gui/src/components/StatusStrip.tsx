@@ -15,12 +15,12 @@ interface StatusStripProps {
 
 /**
  * Một dòng luôn trả lời "dự án đang làm gì", trên mọi màn của một project: chạy,
- * lỗi, đã huỷ, chờ duyệt, xong. Đọc từ `run_state` của server nên không thể im
+ * lỗi, đã hủy, chờ duyệt, xong. Đọc từ `run_state` của server nên không thể im
  * lặng khi server đã làm xong (hoặc đã dừng).
  *
- * Hành động ở đây chỉ là những gì không thuộc về màn đang mở: huỷ bước đang
+ * Hành động ở đây chỉ là những gì không thuộc về màn đang mở: hủy bước đang
  * chạy (màn tiến độ không có nút đó), quay về bước đang chạy khi đang xem một
- * bước khác, chạy tiếp một bước đã huỷ, và tạo bản mới khi đã có kết quả. Thử
+ * bước khác, chạy tiếp một bước đã hủy, và tạo bản mới khi đã có kết quả. Thử
  * lại sau lỗi vẫn ở ErrorBanner của màn sở hữu bước đó.
  */
 export function StatusStrip({ currentStep }: StatusStripProps) {
@@ -62,19 +62,19 @@ export function StatusStrip({ currentStep }: StatusStripProps) {
 
   if (state === "running") {
     pill = { cls: styles.run, text: "Đang chạy" };
-    message = `${label} đang chạy trên server. Bạn có thể xem các bước trước, chạy không bị ảnh hưởng.`;
+    message = `${label} đang chạy. Bạn vẫn có thể xem các bước trước.`;
     actions = (
       <>
         {back}
         {isCancellableStep(step) && (
           <button type="button" className={glass.dangerGhostBtn} onClick={() => setConfirming(true)} disabled={busy} data-testid="strip-cancel">
-            Huỷ…
+            Hủy…
           </button>
         )}
       </>
     );
   } else if (state === "cancelled") {
-    pill = { cls: styles.warn, text: "Đã huỷ" };
+    pill = { cls: styles.warn, text: "Đã hủy" };
     message = `${label} đã dừng theo yêu cầu của bạn. Các bước trước giữ nguyên.`;
     actions = (
       <>
@@ -86,15 +86,15 @@ export function StatusStrip({ currentStep }: StatusStripProps) {
     );
   } else if (state === "failed") {
     pill = { cls: styles.bad, text: "Lỗi" };
-    message = `${label} dừng vì lỗi. Xem chi tiết ở dấu “?” trên màn của bước đó.`;
+    message = `${label} dừng vì lỗi. Xem chi tiết ở dấu “?” của bước đó.`;
     actions = back;
   } else if (step === FLOW_REVIEW) {
     pill = { cls: styles.idle, text: "Chờ bạn" };
-    message = "Kiểm tra xong. Duyệt để bắt đầu sản xuất (bước này chưa tốn giọng đọc hay render).";
+    message = "Kiểm tra xong. Duyệt để bắt đầu tạo video.";
     actions = back;
   } else if (step >= FLOW_RESULT) {
     pill = { cls: styles.ok, text: step === FLOW_RESULT ? "Xong" : state === "done" ? "Đã đăng" : "Xong" };
-    message = "Video đã có. Muốn thay đổi gì, tạo bản mới thay vì sửa bản này.";
+    message = "Video đã hoàn tất. Muốn thay đổi, hãy tạo bản mới.";
     actions = (
       <>
         {back}
@@ -122,13 +122,13 @@ export function StatusStrip({ currentStep }: StatusStripProps) {
         isOpen={confirming}
         onClose={() => setConfirming(false)}
         onConfirm={() => run(() => cancelProject(flow.projectId))}
-        title={`Huỷ bước ${label}?`}
+        title={`Hủy bước ${label}?`}
         message={
           <>
-            {cancelExplain(step)} Dự án ở lại bước này với trạng thái “đã huỷ”, bấm Chạy tiếp khi muốn làm tiếp.
+            {cancelExplain(step)} Dự án ở lại bước này với trạng thái “đã hủy”, bấm Chạy tiếp khi muốn làm tiếp.
           </>
         }
-        confirmLabel={`Huỷ ${label}`}
+        confirmLabel={`Hủy ${label}`}
         cancelLabel="Tiếp tục chạy"
         isDangerous
       />

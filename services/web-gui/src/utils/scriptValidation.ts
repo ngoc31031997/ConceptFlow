@@ -10,7 +10,7 @@
  *
  * CR-040 FR113.3: kết luận "hợp lệ" là của `rendering` (`validate_script`,
  * `script_locator`, `dry_run`). Những gì server đã bắt đúng — thiếu class Scene,
- * thiếu `<Composition id>` / `narrations` — đã bị xoá khỏi đây; chuẩn cũ
+ * thiếu `<Composition id>` / `narrations` — đã bị xóa khỏi đây; chuẩn cũ
  * `# NARRATION` + `self.wait(AUTO)` đã bị gỡ khỏi hệ thống nên cũng không còn
  * được nhắc tới. Ở lại là những gì server không báo trước lúc render.
  *
@@ -67,7 +67,7 @@ export function stripMarkdownCodeFence(script: string): string {
 
 /**
  * Dấu hiệu còn sót dòng backtick mở đầu dù không khớp trọn khối (ví dụ
- * Creator xoá mất dòng ``` đóng, hoặc dán thêm chữ phía trước). ScriptEditor
+ * Creator xóa mất dòng ``` đóng, hoặc dán thêm chữ phía trước). ScriptEditor
  * tự gỡ khối trọn vẹn qua `stripMarkdownCodeFence`; kiểm tra này chỉ để bắt
  * phần còn sót và nói đúng vấn đề thay vì để lỗi cú pháp Python mơ hồ ở
  * `ast.parse` (dòng 1: invalid syntax) là thứ đầu tiên Creator nhìn thấy.
@@ -116,7 +116,7 @@ export function validateScript(
       ...base,
       isValid: false,
       message:
-        'Script còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có) — script phải bắt đầu ngay bằng from conceptflow import *.',
+        'Script còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xóa dòng ``` (và dòng ``` đóng ở cuối nếu có) — script phải bắt đầu ngay bằng from conceptflow import *.',
     };
   }
 
@@ -258,7 +258,7 @@ export function validateRemotionScript(script: string): RemotionScriptValidation
       ...base,
       isValid: false,
       message:
-        "Code còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xoá dòng ``` (và dòng ``` đóng ở cuối nếu có).",
+        "Code còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xóa dòng ``` (và dòng ``` đóng ở cuối nếu có).",
     };
   }
 

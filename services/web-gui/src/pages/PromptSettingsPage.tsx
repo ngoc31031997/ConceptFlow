@@ -61,8 +61,8 @@ function renderPreview(templateText: string): string {
  * DANH SÁCH prompt; tại một thời điểm chỉ một dòng được bật và đó là dòng
  * pipeline chạy.
  *
- * Dòng "Hệ thống" đi kèm bản build: chỉ xem và copy, không sửa/xoá. Copy ra
- * thì được một dòng "Của bạn" — sửa, xoá, bật tuỳ ý. Không có version, không
+ * Dòng "Hệ thống" đi kèm bản build: chỉ xem và copy, không sửa/xóa. Copy ra
+ * thì được một dòng "Của bạn" — sửa, xóa, bật tuỳ ý. Không có version, không
  * có ngôn ngữ riêng: ngôn ngữ lời thoại do `{{narration_language_rule}}` quyết
  * định lúc render.
  *
@@ -85,7 +85,7 @@ export function PromptSettingsPage() {
     try {
       setPrompts(await listPrompts());
     } catch {
-      setStatus("Không tải được prompt — kiểm tra Orchestrator.");
+      setStatus("Không tải được prompt. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -140,7 +140,7 @@ export function PromptSettingsPage() {
       if (nextId) setSelectedId(nextId);
       setStatus(ok);
     } catch {
-      setStatus("Thao tác thất bại, thử lại.");
+      setStatus("Thao tác không thành công. Vui lòng thử lại.");
     } finally {
       setBusy(false);
     }
@@ -156,7 +156,7 @@ export function PromptSettingsPage() {
   const handleCopy = (id: string) =>
     run(async () => {
       return (await copyPrompt(id)).id;
-    }, "Đã copy thành một prompt của bạn.");
+    }, "Đã sao chép thành một prompt của bạn.");
 
   const handleSave = () =>
     run(async () => {
@@ -173,28 +173,28 @@ export function PromptSettingsPage() {
     }, "Đã bật — đây là prompt đang chạy của vai trò này.");
 
   /**
-   * Xoá là thao tác phá huỷ duy nhất ở màn này, nên hỏi xác nhận. Xoá dòng
+   * Xóa là thao tác phá hủy duy nhất ở màn này, nên hỏi xác nhận. Xóa dòng
    * đang chạy thì vai trò tự quay về prompt hệ thống.
    */
   const handleDelete = () => {
     if (!selected) return;
     const okToDelete = window.confirm(
       selected.is_active
-        ? "Xoá prompt này? Nó đang chạy, nên vai trò sẽ quay về prompt mặc định của hệ thống. Không khôi phục lại được."
-        : "Xoá prompt này? Không khôi phục lại được.",
+        ? "Xóa prompt này? Nó đang chạy, nên vai trò sẽ quay về prompt mặc định của hệ thống. Không khôi phục lại được."
+        : "Xóa prompt này? Không khôi phục lại được.",
     );
     if (!okToDelete) return;
     return run(async () => {
       await deletePrompt(selected.id);
       setSelectedId(null);
-    }, "Đã xoá.");
+    }, "Đã xóa.");
   };
 
   return (
     <div data-testid="prompt-settings-page">
       <AppShell
         title="Cài đặt prompt soạn kịch bản"
-        subtitle="Mỗi vai trò có một danh sách prompt, chỉ một prompt được bật. Prompt hệ thống chỉ xem và copy được; copy ra để có bản của bạn."
+        subtitle="Mỗi vai trò có nhiều prompt, chỉ một prompt được bật. Prompt hệ thống chỉ có thể xem và sao chép để tạo bản riêng."
         wide
       >
         <div className={styles.layout}>
@@ -302,9 +302,9 @@ export function PromptSettingsPage() {
                         onClick={handleDelete}
                         disabled={busy || loading}
                         data-testid="prompt-delete-button"
-                        title="Xoá prompt này"
+                        title="Xóa prompt này"
                       >
-                        <span aria-hidden="true">🗑</span> Xoá
+                        <span aria-hidden="true">🗑</span> Xóa
                       </button>
                     )}
                     {!readOnly && (
@@ -355,7 +355,7 @@ export function PromptSettingsPage() {
 
             {showPreview && (
               <div className={styles.previewBlock}>
-                <Card title="Xem trước" hint="Dữ liệu mẫu, không gửi server">
+                <Card title="Xem trước" hint="Dữ liệu mẫu">
                   <TextArea
                     data-testid="prompt-preview-textarea"
                     value={renderPreview(draftText)}

@@ -37,7 +37,7 @@ function renderPage() {
 }
 
 // CR-031 — mỗi vai trò một danh sách prompt, một dòng đang bật. Dòng hệ thống
-// chỉ xem/copy; dòng của người dùng sửa/xoá/bật được.
+// chỉ xem/copy; dòng của người dùng sửa/xóa/bật được.
 describe("PromptSettingsPage — thư viện prompt", () => {
   beforeEach(() => {
     vi.stubGlobal("confirm", () => true);
@@ -47,7 +47,7 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     vi.unstubAllGlobals();
   });
 
-  it("mở lên thì chọn dòng đang chạy; prompt hệ thống là chỉ-đọc và không có Xoá/Lưu", async () => {
+  it("mở lên thì chọn dòng đang chạy; prompt hệ thống là chỉ-đọc và không có Xóa/Lưu", async () => {
     vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
     renderPage();
 
@@ -78,7 +78,7 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     expect(screen.getByTestId("prompt-template-textarea")).not.toHaveAttribute("readonly");
   });
 
-  it("dòng của người dùng sửa được, bật được và xoá được", async () => {
+  it("dòng của người dùng sửa được, bật được và xóa được", async () => {
     vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
     const update = vi.spyOn(apiClient, "updatePrompt").mockResolvedValue(MINE);
     const activate = vi.spyOn(apiClient, "activatePrompt").mockResolvedValue({ ...MINE, is_active: true });
@@ -100,7 +100,7 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     await waitFor(() => expect(del).toHaveBeenCalledWith("u1"));
   });
 
-  it("không xoá khi người dùng từ chối xác nhận", async () => {
+  it("không xóa khi người dùng từ chối xác nhận", async () => {
     vi.stubGlobal("confirm", () => false);
     vi.spyOn(apiClient, "listPrompts").mockResolvedValue([SYSTEM, MINE]);
     const del = vi.spyOn(apiClient, "deletePrompt");
