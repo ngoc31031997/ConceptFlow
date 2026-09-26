@@ -114,6 +114,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   // is detached from the request.
   router.post('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
   router.get('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
+  router.delete('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
   router.post(
     '/v1/projects/:id/authoring/:step/generate',
     proxyHandler(authoringAi, 'authoring-service'),

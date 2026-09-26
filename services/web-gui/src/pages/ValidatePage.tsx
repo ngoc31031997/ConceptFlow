@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
 import { OutlineActions } from "../components/OutlineActions";
@@ -121,7 +122,7 @@ export function ValidatePage() {
         currentStep={viewOnly ? viewStep : isAwaitingReview ? FLOW_REVIEW : FLOW_VALIDATE}
         wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
         headerAction={
-          <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
+          <Link to="/" state={NEW_VIDEO_STATE} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }

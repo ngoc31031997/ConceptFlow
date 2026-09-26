@@ -700,6 +700,8 @@ export interface AuthoringChainState {
   error_step?: AuthoringStep;
   /** Dừng nhưng không phải lỗi: code còn lỗi biên dịch, hoặc không lưu được. */
   note?: string;
+  /** Creator bấm Dừng (hoặc dự án bị xoá): không phải lỗi, `error` để trống. */
+  cancelled?: boolean;
   started_at?: string;
   finished_at?: string;
 }
@@ -710,6 +712,14 @@ export function startAuthoringChain(projectId: string, steps: AuthoringStep[]): 
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ steps }),
   });
+}
+
+/**
+ * Dừng chuỗi đang chạy: server huỷ lời gọi model đang dở nên nhà cung cấp
+ * ngừng sinh (và tính) thêm token. 404 nếu không có chuỗi nào đang chạy.
+ */
+export async function cancelAuthoringChain(projectId: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/chain`, { method: "DELETE" });
 }
 
 export function getAuthoringChain(projectId: string): Promise<AuthoringChainState> {

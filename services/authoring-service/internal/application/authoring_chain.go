@@ -33,7 +33,10 @@ type ChainState struct {
 	ErrorStep string `json:"error_step,omitempty"`
 	// Note is a non-fatal stop: content saved but the compile check still
 	// fails, or the output could not be saved. Tokens were spent either way.
-	Note       string     `json:"note,omitempty"`
+	Note string `json:"note,omitempty"`
+	// Cancelled is set when the Creator stopped the chain (or the project was
+	// deleted). It is not an error: Error stays empty.
+	Cancelled  bool       `json:"cancelled,omitempty"`
 	StartedAt  time.Time  `json:"started_at"`
 	FinishedAt *time.Time `json:"finished_at,omitempty"`
 }
@@ -49,8 +52,9 @@ type AuthoringChainRunner struct {
 	runner  authoringStepRunner
 	errText func(error) string
 
-	mu     sync.Mutex
-	chains map[string]*ChainState
+	mu      sync.Mutex
+	chains  map[string]*ChainState
+	cancels map[string]context.CancelFunc
 }
 
 // NewAuthoringChainRunner builds the runner. errText turns a failed run into
@@ -59,7 +63,7 @@ func NewAuthoringChainRunner(runner authoringStepRunner, errText func(error) str
 	if errText == nil {
 		errText = func(err error) string { return err.Error() }
 	}
-	return &AuthoringChainRunner{runner: runner, errText: errText, chains: map[string]*ChainState{}}
+	return &AuthoringChainRunner{runner: runner, errText: errText, chains: map[string]*ChainState{}, cancels: map[string]context.CancelFunc{}}
 }
 
 var chainSteps = map[string]bool{"story": true, "storyboard": true, "code": true}
@@ -82,10 +86,28 @@ func (c *AuthoringChainRunner) Start(projectID string, steps []string) error {
 	c.chains[projectID] = &ChainState{
 		Running: true, Steps: append([]string(nil), steps...), StartedAt: time.Now().UTC(),
 	}
+	// Detached from the caller's request on purpose (it ends the moment Start
+	// returns), but cancellable: Cancel aborts the in-flight model call, which
+	// is what stops the provider from generating — and billing — more tokens.
+	ctx, cancel := context.WithCancel(context.Background())
+	c.cancels[projectID] = cancel
 	c.mu.Unlock()
 
-	go c.run(projectID, append([]string(nil), steps...))
+	go c.run(ctx, projectID, append([]string(nil), steps...))
 	return nil
+}
+
+// Cancel stops a running chain for the project and reports whether there was
+// one. It returns at once; State shows Cancelled once the step has unwound.
+func (c *AuthoringChainRunner) Cancel(projectID string) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cancel := c.cancels[projectID]
+	if st := c.chains[projectID]; cancel == nil || st == nil || !st.Running {
+		return false
+	}
+	cancel()
+	return true
 }
 
 func (c *AuthoringChainRunner) update(projectID string, fn func(*ChainState)) {
@@ -104,9 +126,15 @@ func (c *AuthoringChainRunner) finish(projectID string, fn func(*ChainState)) {
 	})
 }
 
-func (c *AuthoringChainRunner) run(projectID string, steps []string) {
-	// Detached on purpose: the caller's request ends the moment Start returns.
-	ctx := context.Background()
+func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps []string) {
+	defer func() {
+		c.mu.Lock()
+		if cancel := c.cancels[projectID]; cancel != nil {
+			cancel()
+			delete(c.cancels, projectID)
+		}
+		c.mu.Unlock()
+	}()
 	defer func() {
 		if r := recover(); r != nil {
 			c.finish(projectID, func(st *ChainState) { st.Error = fmt.Sprintf("lỗi bất ngờ: %v", r) })
@@ -116,6 +144,11 @@ func (c *AuthoringChainRunner) run(projectID string, steps []string) {
 		c.update(projectID, func(st *ChainState) { st.CurrentIndex = i })
 		out, err := c.runner.Execute(ctx, projectID, step)
 		switch {
+		case ctx.Err() != nil:
+			// Cancelled: whatever the step returned (usually a wrapped
+			// "context canceled") is a consequence, not a failure to report.
+			c.finish(projectID, func(st *ChainState) { st.Cancelled, st.ErrorStep = true, step })
+			return
 		case err != nil:
 			c.finish(projectID, func(st *ChainState) { st.Error, st.ErrorStep = c.errText(err), step })
 			return

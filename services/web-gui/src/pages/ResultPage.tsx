@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { AppShell } from "../components/AppShell";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
@@ -118,7 +119,7 @@ export function ResultPage() {
         title="Xem kết quả"
         subtitle="Xem lại video, cắt clip hoặc dựng lại. Đăng video ở bước tiếp theo."
         headerAction={
-          <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
+          <Link to="/" state={NEW_VIDEO_STATE} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }

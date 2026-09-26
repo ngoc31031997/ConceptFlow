@@ -99,3 +99,44 @@ func TestChainValidatesSteps(t *testing.T) {
 		}
 	}
 }
+
+// blockingRunner holds Execute until its context is cancelled, like a model
+// call that is still streaming.
+type blockingRunner struct{ started chan struct{} }
+
+func (b *blockingRunner) Execute(ctx context.Context, _, _ string) (GeneratedStep, error) {
+	close(b.started)
+	<-ctx.Done()
+	return GeneratedStep{}, ctx.Err()
+}
+
+func TestChainCancelAbortsTheStepAndIsNotAnError(t *testing.T) {
+	b := &blockingRunner{started: make(chan struct{})}
+	c := NewAuthoringChainRunner(b, nil)
+	if err := c.Start("p", []string{"story", "storyboard"}); err != nil {
+		t.Fatal(err)
+	}
+	<-b.started
+	if !c.Cancel("p") {
+		t.Fatal("Cancel reported nothing running")
+	}
+	st := waitFinished(t, c, "p")
+	if !st.Cancelled || st.Error != "" || st.Running || st.ErrorStep != "story" {
+		t.Errorf("state %+v", st)
+	}
+	if c.Cancel("p") {
+		t.Error("second Cancel should report nothing running")
+	}
+	// The project can start a fresh chain afterwards.
+	f := &fakeStepRunner{}
+	c.runner = f
+	if err := c.Start("p", []string{"story"}); err != nil {
+		t.Fatalf("restart after cancel: %v", err)
+	}
+}
+
+func TestChainCancelUnknownProject(t *testing.T) {
+	if NewAuthoringChainRunner(&fakeStepRunner{}, nil).Cancel("nope") {
+		t.Error("Cancel of an unknown project must be false")
+	}
+}
