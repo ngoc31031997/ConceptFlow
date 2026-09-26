@@ -1,8 +1,8 @@
 :root {
   /* Neubrutalism: flat colour, thick black outline, hard offset shadow. */
-  --accent: #f7d55c;          /* yellow — primary action / active */
+  --accent: #e1ad01;          /* mustard yellow — primary action / active */
   --accent2: #ff9ec4;         /* pink   — secondary highlight */
-  --accent-soft: #fdf1c0;
+  --accent-soft: #f5e3a3;
   --accent-ink: #0a0a0a;      /* text that sits on --accent */
   --ink: #0a0a0a;
   --ink-soft: #3a3a36;
@@ -46,9 +46,9 @@
 
 /* Dark mode: same geometry, cream outline + cream hard shadow on near-black. */
 [data-theme="dark"] {
-  --accent: #f7d55c;
+  --accent: #e1ad01;
   --accent2: #ff9ec4;
-  --accent-soft: #3d3616;
+  --accent-soft: #3d3005;
   --accent-ink: #0a0a0a;
   --ink: #f5f0e6;
   --ink-soft: #cfc9ba;
@@ -69,6 +69,109 @@
   --ok-soft: #123822;
 
   --body-gradient: #0f0e0c;
+}
+
+/* Accent palettes: the accent recolours page background, tints, borders and
+   hard shadows too (light: deep shade of the hue; dark: the accent itself). */
+html[data-accent="mustard"] {
+  --accent: #e1ad01;
+  --accent2: #ff9ec4;
+  --accent-soft: #f5e3a3;
+  --body-gradient: #f6f0dc;
+  --muted: #efe4bd;
+  --card: #ffffff;
+  --border-color: #2a2000;
+  --shadow-color: #2a2000;
+  --ink: #2a2000;
+}
+html[data-theme="dark"][data-accent="mustard"] {
+  --accent-soft: #3d3005;
+  --body-gradient: #15110a;
+  --card: #211c0f;
+  --muted: #2f2812;
+  --border-color: #e1ad01;
+  --shadow-color: #e1ad01;
+  --ink: #f5f0e6;
+}
+html[data-accent="coral"] {
+  --accent: #ff6f59;
+  --accent2: #ffd166;
+  --accent-soft: #ffd9d1;
+  --body-gradient: #fbece8;
+  --muted: #f7d8d0;
+  --card: #ffffff;
+  --border-color: #3a0e07;
+  --shadow-color: #3a0e07;
+  --ink: #3a0e07;
+}
+html[data-theme="dark"][data-accent="coral"] {
+  --accent-soft: #4a221b;
+  --body-gradient: #1a0f0d;
+  --card: #2a1815;
+  --muted: #3a221d;
+  --border-color: #ff6f59;
+  --shadow-color: #ff6f59;
+  --ink: #f5f0e6;
+}
+html[data-accent="mint"] {
+  --accent: #4fd1a5;
+  --accent2: #ffd166;
+  --accent-soft: #c9f1e2;
+  --body-gradient: #e6f6ef;
+  --muted: #cdeadf;
+  --card: #ffffff;
+  --border-color: #052a1d;
+  --shadow-color: #052a1d;
+  --ink: #052a1d;
+}
+html[data-theme="dark"][data-accent="mint"] {
+  --accent-soft: #123a2d;
+  --body-gradient: #0b1512;
+  --card: #14241e;
+  --muted: #1d3a30;
+  --border-color: #4fd1a5;
+  --shadow-color: #4fd1a5;
+  --ink: #f5f0e6;
+}
+html[data-accent="sky"] {
+  --accent: #4da3ff;
+  --accent2: #ff9ec4;
+  --accent-soft: #cfe4ff;
+  --body-gradient: #e6f0fc;
+  --muted: #cfe1f7;
+  --card: #ffffff;
+  --border-color: #06203f;
+  --shadow-color: #06203f;
+  --ink: #06203f;
+}
+html[data-theme="dark"][data-accent="sky"] {
+  --accent-soft: #14304f;
+  --body-gradient: #0b1320;
+  --card: #14202f;
+  --muted: #1d3149;
+  --border-color: #4da3ff;
+  --shadow-color: #4da3ff;
+  --ink: #f5f0e6;
+}
+html[data-accent="lilac"] {
+  --accent: #b39dff;
+  --accent2: #ff9ec4;
+  --accent-soft: #e2d9ff;
+  --body-gradient: #efeafb;
+  --muted: #ded5f5;
+  --card: #ffffff;
+  --border-color: #1c1142;
+  --shadow-color: #1c1142;
+  --ink: #1c1142;
+}
+html[data-theme="dark"][data-accent="lilac"] {
+  --accent-soft: #2b2450;
+  --body-gradient: #120f1c;
+  --card: #1f1a2e;
+  --muted: #2c2545;
+  --border-color: #b39dff;
+  --shadow-color: #b39dff;
+  --ink: #f5f0e6;
 }
 
 * {
@@ -222,4 +325,31 @@ td {
 hr {
   border: 0;
   border-top: var(--border-w) solid var(--border-color);
+}
+
+/* Accent reaches form controls and small surfaces globally. */
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"],
+progress {
+  accent-color: var(--accent);
+}
+input:focus,
+select:focus,
+textarea:focus {
+  background: var(--accent-soft);
+}
+h1 {
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 0.28em;
+  text-underline-offset: -0.08em;
+  text-decoration-skip-ink: none;
+}
+code,
+kbd {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-color);
+  border-radius: 2px;
+  padding: 0 4px;
 }

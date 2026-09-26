@@ -1,0 +1,24 @@
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.swatch {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: none;
+}
+
+.swatch.on {
+  box-shadow: var(--shadow-sm);
+  transform: scale(1.15);
+}
+
+.mustard { background: #e1ad01; }
+.coral { background: #ff6f59; }
+.mint { background: #4fd1a5; }
+.sky { background: #4da3ff; }
+.lilac { background: #b39dff; }

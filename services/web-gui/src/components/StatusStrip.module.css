@@ -37,7 +37,7 @@
 }
 .idle {
   background: var(--accent-soft);
-  color: var(--accent);
+  color: var(--ink);
 }
 .dot {
   width: 7px;

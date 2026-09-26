@@ -9,6 +9,7 @@ import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
 import { FLOW_LABELS, readOnlyReason } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
+import { AccentPicker } from "./AccentPicker";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
 import styles from "./AppShell.module.css";
 
@@ -114,7 +115,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       >
         <div className={styles.topbar}>
           {currentStep && (
-            <div className={styles.stepsPill}>
+            <div className={`${styles.stepsPill} ${showRail ? styles.stepsPillDup : ""}`}>
               {FLOW_LABELS.map((label, index) => {
                 const stepNumber = index + 1;
                 const isActive = stepNumber === currentStep;
@@ -155,22 +156,25 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           )}
 
           <div className={styles.headerActions}>
+            <AccentPicker />
             <ThemeToggle />
-            {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
-              <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
-            )}
             {headerAction}
           </div>
         </div>
 
         <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>
           <div className={styles.heading}>
-            {projectName && (
-              <div className={styles.projectChip} title={projectName} data-testid="project-name-chip">
-                <span className={styles.projectChipLabel}>Project</span>
-                <span className={styles.projectChipName}>{projectName}</span>
-              </div>
-            )}
+            <div className={styles.projectRow}>
+              {projectName && (
+                <div className={styles.projectChip} title={projectName} data-testid="project-name-chip">
+                  <span className={styles.projectChipLabel}>Project</span>
+                  <span className={styles.projectChipName}>{projectName}</span>
+                </div>
+              )}
+              {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
+                <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
+              )}
+            </div>
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
