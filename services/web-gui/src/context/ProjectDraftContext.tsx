@@ -415,6 +415,14 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
   }
 }
 
+/**
+ * Router state của mọi lối vào "Tạo video mới". Bản nháp đang giữ một projectId
+ * đã có trên server (kèm chuỗi AI có thể đang chạy); vào "/" mà không reset thì
+ * chủ đề mới ghi đè lên project đó. Nút Quay lại từ bước 2 KHÔNG mang cờ này vì
+ * nó cố ý giữ bản nháp để Creator sửa chủ đề.
+ */
+export const NEW_VIDEO_STATE = { newVideo: true } as const;
+
 export const ProjectDraftContext = createContext<ProjectDraft>(initialDraft);
 export const ProjectDraftDispatchContext = createContext<Dispatch<ProjectDraftAction>>(() => {});
 

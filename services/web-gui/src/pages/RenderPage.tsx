@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
@@ -98,7 +99,7 @@ export function RenderPage() {
       <AppShell
         currentStep={viewOnly ? viewStep : activeFlowStep}
         headerAction={
-          <Link to="/" className={glass.ghostBtn} style={{ textDecoration: "none" }}>
+          <Link to="/" state={NEW_VIDEO_STATE} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
             Tạo video mới
           </Link>
         }

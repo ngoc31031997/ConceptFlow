@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { Card, TextArea } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
@@ -17,12 +17,22 @@ export function ScriptStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
+  const location = useLocation();
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (draft.hasSubmitted) dispatch({ type: "RESET" });
   }, [draft.hasSubmitted, dispatch]);
+
+  // "Tạo video mới" → projectId mới. Xoá cờ khỏi history để reload/Quay lại
+  // không reset thêm lần nữa và làm mất chủ đề vừa gõ.
+  useEffect(() => {
+    const st = location.state as { newVideo?: boolean } | null;
+    if (!st?.newVideo) return;
+    dispatch({ type: "RESET" });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const topic = draft.authoringTopic;
   const canContinue = topic.trim().length > 0 && !creating;

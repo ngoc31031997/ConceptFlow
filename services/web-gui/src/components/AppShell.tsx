@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useContext, useState } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
-import { ProjectDraftContext } from "../context/ProjectDraftContext";
+import { ProjectDraftContext, NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useStepNav } from "../hooks/useStepNav";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
@@ -66,7 +66,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       <div className={`${styles.blob} ${styles.blob3}`} />
 
       <aside className={styles.sidebar}>
-        <Link to="/" className={styles.logo} style={{ textDecoration: "none" }}>
+        <Link to="/" state={NEW_VIDEO_STATE} className={styles.logo} style={{ textDecoration: "none" }}>
           <img
             className={styles.logoMark}
             src="/icon-192.png"
@@ -80,7 +80,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
         </Link>
 
         <nav className={styles.sideNav}>
-          <NavLink to="/" end className={navCls}>Tạo video mới</NavLink>
+          <NavLink to="/" end state={NEW_VIDEO_STATE} className={navCls}>Tạo video mới</NavLink>
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
           <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
           {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}

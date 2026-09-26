@@ -91,6 +91,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
 	r.Post("/v1/projects/{project_id}/authoring/chain", rt.handleStartAuthoringChain)
 	r.Get("/v1/projects/{project_id}/authoring/chain", rt.handleGetAuthoringChain)
+	r.Delete("/v1/projects/{project_id}/authoring/chain", rt.handleCancelAuthoringChain)
 	r.Get("/v1/llm/status", rt.handleLLMStatus)
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
@@ -163,6 +164,10 @@ func (rt *Router) handleInternalPut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Router) handleInternalDelete(w http.ResponseWriter, r *http.Request) {
+	// A deleted project must not keep spending tokens on a chain nobody can see.
+	if rt.authoringChain != nil {
+		rt.authoringChain.Cancel(chi.URLParam(r, "project_id"))
+	}
 	if err := rt.internal.DeleteAuthoring(r.Context(), chi.URLParam(r, "project_id")); err != nil {
 		writeUseCaseError(w, err)
 		return
@@ -255,6 +260,8 @@ type generateAuthoringUseCase interface {
 type authoringChainUseCase interface {
 	Start(projectID string, steps []string) error
 	State(projectID string) (application.ChainState, bool)
+	// Cancel stops a running chain; false when none is running.
+	Cancel(projectID string) bool
 }
 
 // authoringProgressReader is the optional live-progress side of the generate
@@ -362,6 +369,20 @@ func (rt *Router) handleGetAuthoringChain(w http.ResponseWriter, r *http.Request
 		st = application.ChainState{Steps: []string{}}
 	}
 	writeJSON(w, http.StatusOK, st)
+}
+
+// handleCancelAuthoringChain stops the project's running chain. 204 when it was
+// asked to stop, 404 when nothing was running.
+func (rt *Router) handleCancelAuthoringChain(w http.ResponseWriter, r *http.Request) {
+	if rt.authoringChain == nil {
+		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
+		return
+	}
+	if !rt.authoringChain.Cancel(chi.URLParam(r, "project_id")) {
+		writeError(w, http.StatusNotFound, "Không có lượt chạy AI nào đang diễn ra.")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {

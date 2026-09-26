@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "./ui";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import {
+  cancelAuthoringChain,
   getAuthoringChain,
   listProjectEvents,
   type ProjectEvent,
@@ -210,6 +211,7 @@ export function AuthoringModeBar({
 
   const [error, setError] = useState<string | null>(null);
   const [chain, setChain] = useState<AuthoringChainState | null>(null);
+  const [cancelling, setCancelling] = useState(false);
   const [dismissedAt, setDismissedAt] = useState<string | null>(() => readDismissed(projectId));
   const [runs, setRuns] = useState<Partial<Record<AuthoringStep, LastRun>>>({});
   // Số đo từng bước đọc từ nhật ký: nạp lúc mở và mỗi khi một chuỗi vừa xong.
@@ -272,7 +274,7 @@ export function AuthoringModeBar({
       if (c.finished && c.finished_at && handledFinish.current !== c.finished_at) {
         handledFinish.current = c.finished_at;
         await syncFromServer(c.steps);
-        if (sawRunning.current && c.steps.length > 1 && !c.error) followRef.current?.("done");
+        if (sawRunning.current && c.steps.length > 1 && !c.error && !c.cancelled) followRef.current?.("done");
       }
     };
     void tick();
@@ -312,6 +314,17 @@ export function AuthoringModeBar({
     : null;
   const outcomeNote = outcome?.note ?? null;
   const shownError = error ?? outcomeError;
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      await cancelAuthoringChain(projectId);
+    } catch {
+      // 404: chuỗi vừa tự kết thúc — lượt poll kế tiếp sẽ cập nhật giao diện.
+    } finally {
+      setCancelling(false);
+    }
+  }
 
   function dismissOutcome() {
     if (!chain?.finished_at) return;
@@ -428,7 +441,12 @@ export function AuthoringModeBar({
                   Đóng thông báo
                 </button>
               )}
-              {outcome && !outcomeError && !outcomeNote && !running && !error && (
+              {outcome?.cancelled && !running && !error && (
+                <p className={styles.status} data-testid="run-with-ai-cancelled">
+                  Đã dừng lượt chạy AI. Bước đang dở không được lưu; các bước đã xong vẫn giữ nguyên.
+                </p>
+              )}
+              {outcome && !outcome.cancelled && !outcomeError && !outcomeNote && !running && !error && (
                 <p className={styles.status} data-testid="run-with-ai-done">
                   Hoàn tất. Kết quả đã được điền vào ô soạn thảo.
                 </p>
@@ -442,6 +460,9 @@ export function AuthoringModeBar({
               cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
           {running && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
+              <Button onClick={handleCancel} disabled={cancelling} data-testid="run-with-ai-cancel">
+                {cancelling ? "Đang dừng…" : "Dừng"}
+              </Button>
               {run.steps.length <= 1 && (
                 <>
                   <OperationProgressCard

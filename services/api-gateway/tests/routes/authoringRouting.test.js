@@ -33,6 +33,7 @@ describe('routing between orchestrator and authoring-service', () => {
     ['put', '/v1/projects/p1/authoring/mode', 'authoring'],
     ['get', '/v1/projects/p1/authoring/story/progress', 'authoring'],
     ['post', '/v1/projects/p1/authoring/chain', 'authoring'],
+    ['delete', '/v1/projects/p1/authoring/chain', 'authoring'],
     ['post', '/v1/projects/p1/authoring/story/generate', 'authoringAi'],
     ['post', '/v1/projects/p1/suggest-metadata', 'authoringAi'],
     ['post', '/v1/short-script-suggestions', 'authoringAi'],
