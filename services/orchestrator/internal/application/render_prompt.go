@@ -111,6 +111,25 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 	}
 }
 
+// AIRoleFor is RoleFor for the AI flow (CR-039): the story step is shared, the
+// storyboard step asks for JSON, and the code step asks for shot functions
+// only. The manual (Copy) flow keeps using RoleFor.
+func AIRoleFor(step string, renderEngine string) (domain.PromptRole, error) {
+	switch step {
+	case "story":
+		return domain.RoleStoryArchitect, nil
+	case "storyboard":
+		return domain.RoleVisualDirectorAI, nil
+	case "code":
+		if renderEngine == "remotion" {
+			return domain.RoleRemotionEngineerAI, nil
+		}
+		return domain.RoleManimEngineerAI, nil
+	default:
+		return "", fmt.Errorf("unknown step %q", step)
+	}
+}
+
 // Execute renders the prompt for one role of one project.
 //
 // CR-030 — không còn tham số lintResults: {{lint_results}} chỉ tồn tại cho
@@ -226,11 +245,15 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 	switch role {
 	case domain.RoleStoryArchitect:
 		// Nothing comes before step 1.
-	case domain.RoleVisualDirector:
+	case domain.RoleVisualDirector, domain.RoleVisualDirectorAI:
 		add(story)
 	case domain.RoleManimEngineer, domain.RoleRemotionEngineer:
 		add(story)
 		add(storyboard)
+	case domain.RoleManimEngineerAI, domain.RoleRemotionEngineerAI:
+		// The storyboard is not in the system prompt: llm-service hands each
+		// call its own slice of it, and the whole document only to the layout call.
+		add(story)
 	}
 
 	if len(parts) == 0 {

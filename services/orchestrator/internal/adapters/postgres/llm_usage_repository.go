@@ -38,12 +38,12 @@ func (r *LLMUsageRepository) RecordLLMUsage(ctx context.Context, rec application
 		INSERT INTO llm_usage (
 			provider, model, role, step, project_id,
 			prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens,
-			duration_ms, ok, error_kind
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+			duration_ms, ok, error_kind, phase
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 	`,
 		rec.Provider, rec.Model, rec.Role, rec.Step, projectID,
 		rec.PromptTokens, rec.CompletionTokens, rec.ReasoningTokens, rec.CachedTokens,
-		rec.Duration.Milliseconds(), rec.OK, string(rec.ErrorKind),
+		rec.Duration.Milliseconds(), rec.OK, string(rec.ErrorKind), rec.Phase,
 	)
 	return err
 }

@@ -1,3 +1,5 @@
 aio-pika==9.4.*
 asyncpg==0.30.*
 manim==0.18.*
+fastapi==0.141.*
+uvicorn==0.54.*

@@ -256,3 +256,56 @@ func TestRender_RequiresAProjectID(t *testing.T) {
 		t.Fatal("expected an error for an empty project_id")
 	}
 }
+
+// --- CR-039: the AI flow's own roles ----------------------------------------
+
+func TestAIRoleFor_UsesTheAIPromptsAndLeavesTheManualMappingAlone(t *testing.T) {
+	cases := []struct {
+		step, engine string
+		want         domain.PromptRole
+	}{
+		{"story", "manim", domain.RoleStoryArchitect},
+		{"story", "remotion", domain.RoleStoryArchitect},
+		{"storyboard", "manim", domain.RoleVisualDirectorAI},
+		{"storyboard", "remotion", domain.RoleVisualDirectorAI},
+		{"code", "manim", domain.RoleManimEngineerAI},
+		{"code", "remotion", domain.RoleRemotionEngineerAI},
+	}
+	for _, c := range cases {
+		got, err := application.AIRoleFor(c.step, c.engine)
+		if err != nil || got != c.want {
+			t.Errorf("AIRoleFor(%s,%s) = %q, %v; want %q", c.step, c.engine, got, err, c.want)
+		}
+	}
+	if _, err := application.AIRoleFor("review", "manim"); err == nil {
+		t.Error("an unknown step must be an error")
+	}
+	// The manual flow's mapping is unchanged.
+	if got, _ := application.RoleFor("storyboard", "manim"); got != domain.RoleVisualDirector {
+		t.Errorf("RoleFor(storyboard) = %q, want the manual visual_director", got)
+	}
+}
+
+func TestRender_AIEngineerPromptCarriesTheStoryButNotTheStoryboard(t *testing.T) {
+	ctx := &fakeRenderContext{project: aProject(), story: "STORY-TEXT", storyboard: `{"scenes":"STORYBOARD-JSON"}`}
+	r := newRenderer("PREV={{previous_output}}", ctx)
+
+	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI, domain.RoleManimEngineerAI} {
+		out, err := r.Execute(context.Background(), "p1", role)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(out.Prompt, "STORY-TEXT") || strings.Contains(out.Prompt, "STORYBOARD-JSON") {
+			t.Errorf("%s prompt = %q — llm-service hands each call its own slice of the storyboard", role, out.Prompt)
+		}
+	}
+	// …while the manual engineer prompt keeps both, exactly as before.
+	out, _ := r.Execute(context.Background(), "p1", domain.RoleRemotionEngineer)
+	if !strings.Contains(out.Prompt, "STORY-TEXT") || !strings.Contains(out.Prompt, "STORYBOARD-JSON") {
+		t.Errorf("manual engineer prompt = %q, want story and storyboard", out.Prompt)
+	}
+	out, _ = r.Execute(context.Background(), "p1", domain.RoleVisualDirectorAI)
+	if !strings.Contains(out.Prompt, "STORY-TEXT") || strings.Contains(out.Prompt, "STORYBOARD-JSON") {
+		t.Errorf("visual_director_ai prompt = %q, want the story only", out.Prompt)
+	}
+}

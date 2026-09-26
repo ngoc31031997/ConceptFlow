@@ -17,6 +17,9 @@ type LLMUsageRecord struct {
 	// no pipeline step, such as suggest-metadata.
 	Role string
 	Step string
+	// Phase breaks one step into its calls (CR-039): "layout", "cast",
+	// "chunk", "repair", "storyboard_fix". Empty when the step is one call.
+	Phase string
 	// ProjectID is empty for calls made before any project exists — a
 	// Creator can draft a short script from nothing (CR-026 FR71.1).
 	ProjectID        string

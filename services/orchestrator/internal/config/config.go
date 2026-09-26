@@ -19,17 +19,17 @@ type Config struct {
 	HTTPPort                      string
 	RabbitMQReconnectInitialDelay time.Duration
 	RabbitMQReconnectMaxDelay     time.Duration
-	OllamaURL                     string
-	OllamaModel                   string
-	OllamaTimeout                 time.Duration
-	// CR-027 — Hive is the primary LLM provider; Ollama stays as the
-	// fallback for the light tasks (see llm.OllamaProvider).
-	LLMProvider         string
-	HiveAPIKey          string
-	HiveBaseURL         string
+	// CR-039 — every language-model call goes through llm-service, which alone
+	// holds HIVE_API_KEY / OLLAMA_URL and the retry/rate-limit policy. The
+	// orchestrator keeps only where to reach it and the cost ceilings it
+	// enforces on what it sends.
+	LLMServiceURL string
+	// 0 = wait as long as llm-service does (Hive can take minutes on a
+	// reasoning model).
+	LLMServiceTimeout time.Duration
+	// HiveModel is the default the model picker shows; llm-service applies its
+	// own HIVE_MODEL when a call names none, and both read the same .env.
 	HiveModel           string
-	HiveTimeout         time.Duration
-	HiveMaxRetries      int
 	HiveMaxInputChars   int
 	HiveMaxOutputTokens int
 	// CR-023 D2: base URL of the video-assembly service, whose own database
@@ -82,49 +82,18 @@ func Load() (*Config, error) {
 		httpPort = "8000"
 	}
 
-	ollamaURL := os.Getenv("OLLAMA_URL")
-	if ollamaURL == "" {
-		ollamaURL = "http://ollama:11434"
+	llmServiceURL := os.Getenv("LLM_SERVICE_URL")
+	if llmServiceURL == "" {
+		llmServiceURL = "http://llm-service:8000"
 	}
-	ollamaModel := os.Getenv("OLLAMA_MODEL")
-	if ollamaModel == "" {
-		ollamaModel = "llama3.2"
-	}
-	ollamaTimeoutSeconds, err := intEnvOrDefault("OLLAMA_TIMEOUT_SECONDS", 120)
+	llmServiceTimeoutSeconds, err := intEnvOrDefault("LLM_SERVICE_TIMEOUT_SECONDS", 0) // 0 = no timeout
 	if err != nil {
 		return nil, err
 	}
 
-	// CR-027 FR83.2 — no key is a supported way to run: the app falls back to
-	// Ollama for the light tasks and every prompt stays copy-out-to-an-AI, as
-	// it was before CR-027. Refusing to start would turn an optional paid
-	// service into a hard dependency of the whole orchestrator.
-	hiveAPIKey := os.Getenv("HIVE_API_KEY")
-	llmProvider := os.Getenv("LLM_PROVIDER")
-	if llmProvider == "" {
-		if hiveAPIKey != "" {
-			llmProvider = "hive"
-		} else {
-			llmProvider = "ollama"
-		}
-	}
-	hiveBaseURL := os.Getenv("HIVE_BASE_URL")
-	if hiveBaseURL == "" {
-		// api-cdn, not api-va1: measured 2026-09-21, api-va1 answered 500
-		// even for a key carrying va1:* permissions.
-		hiveBaseURL = "https://api-cdn.thehive.ai/api/v3"
-	}
 	hiveModel := os.Getenv("HIVE_MODEL")
 	if hiveModel == "" {
 		hiveModel = "deepseek-ai/deepseek-v4.1-flash"
-	}
-	hiveTimeoutSeconds, err := intEnvOrDefault("HIVE_TIMEOUT_SECONDS", 0) // 0 = no timeout
-	if err != nil {
-		return nil, err
-	}
-	hiveMaxRetries, err := intEnvOrDefault("HIVE_MAX_RETRIES", 3)
-	if err != nil {
-		return nil, err
 	}
 	// Hive's context window is 1M tokens, so this is not a context limit —
 	// it is a blast radius. One broken project must not turn into one
@@ -164,15 +133,9 @@ func Load() (*Config, error) {
 		HTTPPort:                      httpPort,
 		RabbitMQReconnectInitialDelay: time.Duration(reconnectInitialMS) * time.Millisecond,
 		RabbitMQReconnectMaxDelay:     time.Duration(reconnectMaxMS) * time.Millisecond,
-		OllamaURL:                     ollamaURL,
-		OllamaModel:                   ollamaModel,
-		OllamaTimeout:                 time.Duration(ollamaTimeoutSeconds) * time.Second,
-		LLMProvider:                   llmProvider,
-		HiveAPIKey:                    hiveAPIKey,
-		HiveBaseURL:                   hiveBaseURL,
+		LLMServiceURL:                 llmServiceURL,
+		LLMServiceTimeout:             time.Duration(llmServiceTimeoutSeconds) * time.Second,
 		HiveModel:                     hiveModel,
-		HiveTimeout:                   time.Duration(hiveTimeoutSeconds) * time.Second,
-		HiveMaxRetries:                hiveMaxRetries,
 		HiveMaxInputChars:             hiveMaxInputChars,
 		HiveMaxOutputTokens:           hiveMaxOutputTokens,
 		VideoAssemblyURL:              videoAssemblyURL,

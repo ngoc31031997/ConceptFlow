@@ -158,6 +158,18 @@ export function AuthoringModeBar({
         const result = await generateAuthoringStep(projectId, step);
         await syncFromServer();
         onGenerated?.(step, result.content);
+        if (result.check_failed) {
+          // CR-039: code đã lưu nhưng vẫn lỗi biên dịch sau các vòng sửa. Không
+          // phải lỗi của lượt chạy — token đã tốn và Creator sửa tay được — nên
+          // báo bằng ghi chú kèm danh sách lỗi, không nuốt và không coi là xong sạch.
+          const shown = (result.diagnostics ?? []).slice(0, 5).join(" · ");
+          setNote(
+            `Đã sinh và lưu code nhưng vẫn lỗi biên dịch sau ${result.repair_rounds ?? 0} vòng sửa: ${shown}` +
+              ((result.diagnostics?.length ?? 0) > 5 ? ` (+${(result.diagnostics?.length ?? 0) - 5} lỗi nữa)` : "") +
+              ". Sửa tay trong ô soạn thảo, hoặc chạy lại.",
+          );
+          break;
+        }
         if (result.save_error) {
           // Nội dung sinh ra được nhưng không lưu được: bước sau sẽ render
           // prompt từ dữ liệu cũ trên server, tức là làm sai đề. Dừng chuỗi
@@ -340,6 +352,15 @@ function formatChars(n: number): string {
 /** Câu tiến độ từ luồng streaming: pha hiện tại, lượng chữ đã nhận, thời gian. */
 function liveProgressText(p: AuthoringProgress): string {
   const time = `${p.elapsed_seconds}s`;
+  if (p.phase === "layout" || p.phase === "cast") {
+    return `Đang dựng bảng ${p.phase === "layout" ? "toạ độ chung (LAYOUT)" : "vật xuyên suốt (cast)"}… ${time}`;
+  }
+  if (p.phase === "chunks") return `Đang viết code theo lô: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} lô xong · ${time}`;
+  if (p.phase === "merge") return `Đang ghép code… ${time}`;
+  if (p.phase === "check") return `Đang kiểm tra biên dịch… ${time}`;
+  if (p.phase === "repair") {
+    return `Đang sửa lỗi biên dịch: vòng ${p.repair_round ?? "?"}/${p.repair_max ?? "?"} · ${time}`;
+  }
   if (p.phase === "writing") return `AI đang viết kết quả… ${formatChars(p.content_chars)} ký tự · ${time}`;
   if (p.phase === "reasoning") return `AI đang suy luận… ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
   return `Đang chờ Hive phản hồi… ${time}`;

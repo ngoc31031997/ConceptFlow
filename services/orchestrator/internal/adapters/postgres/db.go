@@ -418,6 +418,11 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 -- index matches the only access pattern there is.
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
 
+-- CR-039: the code step is now several calls (layout/cast, one per chunk,
+-- repairs). phase says which, so a step's cost can be broken down; '' for every
+-- call that is one call for its step.
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS phase TEXT NOT NULL DEFAULT '';
+
 -- CR-031: the prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active. A row with is_system ships in the binary
 -- (seeded on every start, read-only); the rest belong to the Creator. This

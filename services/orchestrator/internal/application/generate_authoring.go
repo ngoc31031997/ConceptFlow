@@ -40,6 +40,11 @@ type GenerateAuthoringUseCase struct {
 	clearer AuthoringClearerPort
 	// errorLog receives a row for every failed run; nil disables it.
 	errorLog ProjectErrorLogPort
+	// finalizer validates the storyboard JSON; codegen runs the chunked code
+	// pipeline (CR-039). Both are llm-service; a run of the step that needs one
+	// fails loudly when it is missing rather than quietly doing something else.
+	finalizer StoryboardFinalizerPort
+	codegen   CodePipelinePort
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
@@ -105,7 +110,7 @@ func NewGenerateAuthoringUseCase(
 	return &GenerateAuthoringUseCase{
 		renderer: renderer, provider: provider, recorder: recorder,
 		projects: projects, models: models, story: story, storyboard: storyboard,
-		code: code,
+		code:          code,
 		maxInputChars: maxInputChars, maxOutputTokens: maxOutputTokens,
 		running: map[string]bool{}, progress: map[string]*AuthoringProgress{},
 	}
@@ -121,6 +126,13 @@ func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *G
 // project_errors column.
 func (uc *GenerateAuthoringUseCase) WithErrorLog(log ProjectErrorLogPort) *GenerateAuthoringUseCase {
 	uc.errorLog = log
+	return uc
+}
+
+// WithPipeline wires the two llm-service capabilities the AI flow's storyboard
+// and code steps need (CR-039).
+func (uc *GenerateAuthoringUseCase) WithPipeline(f StoryboardFinalizerPort, c CodePipelinePort) *GenerateAuthoringUseCase {
+	uc.finalizer, uc.codegen = f, c
 	return uc
 }
 
@@ -156,13 +168,29 @@ type GeneratedStep struct {
 	// tokens are already paid for, and the Creator can keep the text in the
 	// editor rather than buy it a second time.
 	SaveError string `json:"save_error,omitempty"`
+	// CR-039 — set by the code step. CheckFailed means the script was saved but
+	// still fails the compile check after the last repair round; the Creator can
+	// read Diagnostics and fix it by hand.
+	CheckFailed  bool     `json:"check_failed,omitempty"`
+	Diagnostics  []string `json:"diagnostics,omitempty"`
+	RepairRounds int      `json:"repair_rounds,omitempty"`
+	Warnings     []string `json:"warnings,omitempty"`
+	ModelCalls   int      `json:"model_calls,omitempty"`
 }
 
 // Available reports whether the AI path can be offered at all (FR79.4). The
 // GUI asks so it can explain a missing button instead of showing one that
 // fails when pressed.
 func (uc *GenerateAuthoringUseCase) Available() bool {
-	return uc != nil && uc.provider != nil
+	if uc == nil || uc.provider == nil {
+		return false
+	}
+	// The provider knows whether it can actually serve (llm-service reachable,
+	// Hive key set); one that does not say is taken at its word.
+	if r, ok := uc.provider.(interface{ Ready() bool }); ok {
+		return r.Ready()
+	}
+	return true
 }
 
 // Provider names the provider the GUI would be calling, for the same status
@@ -190,6 +218,12 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		uc.logError(ctx, projectID, step, err, info, started)
 	} else if out.SaveError != "" {
 		uc.logError(ctx, projectID, step, errors.New(out.SaveError), info, started)
+	} else if out.CheckFailed {
+		uc.logError(ctx, projectID, step, &LLMError{
+			Kind: ErrKindCheckFailed, Provider: "llm-service",
+			Diag: strings.Join(out.Diagnostics, "\n"),
+			Err:  fmt.Errorf("the script was saved but still fails the compile check after %d repair round(s)", out.RepairRounds),
+		}, info, started)
 	}
 	return out, err
 }
@@ -197,8 +231,8 @@ func (uc *GenerateAuthoringUseCase) Execute(
 // runInfo is what run learned that the error log wants but the return value
 // does not carry.
 type runInfo struct {
-	partialChars  int
-	usage         TokenUsage
+	partialChars int
+	usage        TokenUsage
 }
 
 // logError never fails the run: it is a trace, and losing a trace must not
@@ -217,7 +251,7 @@ func (uc *GenerateAuthoringUseCase) logError(
 	e := ProjectError{
 		At: time.Now().UTC(), Source: "authoring", Step: step,
 		Kind: string(LLMErrorKindOf(err)), Message: err.Error(), Detail: errorDetail(err),
-		PartialChars: info.partialChars,
+		PartialChars:   info.partialChars,
 		ElapsedSeconds: int(time.Since(started).Seconds()),
 	}
 	var llmErr *LLMError
@@ -257,7 +291,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	}
 	// FR78.5 — step → role is the server's decision, read off the project's
 	// engine. The GUI used to work this out, in two places.
-	role, err := RoleFor(step, string(project.RenderEngine))
+	role, err := AIRoleFor(step, string(project.RenderEngine))
 	if err != nil {
 		return GeneratedStep{}, err
 	}
@@ -297,6 +331,10 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	uc.beginProgress(projectID, step, started)
 	defer uc.endProgress(projectID, step)
 
+	if step == "code" {
+		return uc.runCode(ctx, project, rendered, role, model, info, started)
+	}
+
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		OnProgress: func(p ChatProgress) { uc.updateProgress(projectID, step, p) },
 		// The rendered template is the whole instruction. It goes in the
@@ -329,12 +367,36 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		}
 	}
 
+	usage := result.Usage
+	if step == "storyboard" {
+		// CR-039: the storyboard is JSON the code step splits by shot, so it is
+		// validated here — with one model repair turn if it is not — and saved in
+		// canonical form. An unusable storyboard is an error, never saved as-is.
+		if uc.finalizer == nil {
+			return GeneratedStep{}, errors.New("the storyboard finalizer is not wired")
+		}
+		fin, finErr := uc.finalizer.FinalizeStoryboard(ctx, content, model, uc.maxOutputTokens)
+		if finErr != nil {
+			fixed := billedUsage(finErr)
+			uc.recordPhase(ctx, string(role), step, "storyboard_fix", projectID, fixed, started, finErr)
+			info.usage = usageSum(result.Usage, fixed)
+			uc.clearDownstream(ctx, project, step)
+			return GeneratedStep{}, finErr
+		}
+		if fin.Repaired {
+			uc.recordPhase(ctx, string(role), step, "storyboard_fix", projectID, fin.Usage, started, nil)
+		}
+		content = fin.Storyboard
+		usage = usageSum(result.Usage, fin.Usage)
+		info.usage = usage
+	}
+
 	// FR78.3 — saving overwrites this step and only this step; the existing
 	// save use cases already carry the FR84.2 draft lock and the FR84.3
 	// history write, so an AI run is audited exactly like a paste.
 	out := GeneratedStep{
 		Step: step, Role: string(role), Content: content,
-		Provider: uc.provider.Name(), Usage: result.Usage,
+		Provider: uc.provider.Name(), Usage: usage,
 	}
 	if err := uc.save(ctx, projectID, step, content); err != nil {
 		out.SaveError = fmt.Sprintf("Đã sinh được nội dung nhưng chưa lưu được: %v", err)
@@ -393,10 +455,16 @@ func (uc *GenerateAuthoringUseCase) acquire(projectID, step string) (func(), err
 // phase the model is in and how much it has produced so far.
 type AuthoringProgress struct {
 	Running        bool   `json:"running"`
-	Phase          string `json:"phase"` // "idle" | "waiting" | "reasoning" | "writing"
+	Phase          string `json:"phase"` // "idle" | "waiting" | "reasoning" | "writing" | code step: "layout" | "cast" | "chunks" | "merge" | "check" | "repair"
 	ReasoningChars int    `json:"reasoning_chars"`
 	ContentChars   int    `json:"content_chars"`
 	ElapsedSeconds int    `json:"elapsed_seconds"`
+	// CR-039 — the code step's own progress: chunks finished of the total, and
+	// the current repair round of the maximum.
+	ChunksDone  int `json:"chunks_done,omitempty"`
+	ChunksTotal int `json:"chunks_total,omitempty"`
+	RepairRound int `json:"repair_round,omitempty"`
+	RepairMax   int `json:"repair_max,omitempty"`
 
 	started time.Time
 }

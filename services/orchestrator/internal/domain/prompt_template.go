@@ -24,13 +24,19 @@ const (
 	// whole story for now. Selected instead of story_architect when the
 	// Creator's project has render_engine=remotion (see ScriptAssistant.tsx).
 	RoleRemotionEngineer PromptRole = "remotion_engineer"
+
+	// CR-039 — the AI flow ("Chạy bằng AI") has its own prompts; the manual
+	// (Copy) flow keeps the four above untouched. See prompt_template_seeds_ai.go.
+	RoleVisualDirectorAI   PromptRole = "visual_director_ai"
+	RoleManimEngineerAI    PromptRole = "manim_engineer_ai"
+	RoleRemotionEngineerAI PromptRole = "remotion_engineer_ai"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
-		RoleRemotionEngineer:
+		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI:
 		return true
 	default:
 		return false

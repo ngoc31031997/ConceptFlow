@@ -265,6 +265,43 @@ describe("ScriptOutlineStepPage", () => {
       );
     });
 
+    // CR-039 — 1c có thể lưu code vẫn còn lỗi biên dịch sau các vòng sửa. Đó là
+    // ghi chú (code đã lưu, token đã tốn), nhưng phải nói rõ và kèm lỗi, không
+    // được im lặng như thể xong sạch.
+    it("báo code đã lưu nhưng còn lỗi biên dịch, kèm danh sách lỗi", async () => {
+      mockLlm(true);
+      vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      vi.spyOn(apiClient, "generateAuthoringStep").mockImplementation(async (_projectId, step) => ({
+        step,
+        role: step,
+        content: step === "code" ? "const broken = ;" : "nội dung",
+        provider: "hive",
+        usage: { model: "deepseek" },
+        ...(step === "code"
+          ? {
+              check_failed: true,
+              repair_rounds: 3,
+              diagnostics: ["dòng 41: TS2304: Cannot find name 'x'.", "dòng 50: TS1005: ';' expected."],
+            }
+          : {}),
+      }));
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+        topic: "Vòng lặp for", story: "s", storyboard: "sb", code: "const broken = ;",
+      });
+      renderPage();
+      expandSettings();
+
+      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+
+      const note = await screen.findByText(/vẫn lỗi biên dịch sau 3 vòng sửa/);
+      expect(note.textContent).toContain("TS2304");
+      expect(note.textContent).toContain("TS1005");
+      expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument();
+    });
+
     // Một bước hỏng giữa chừng không được xoá mất những bước đã xong: Creator
     // sửa tay rồi chạy lại đúng bước đó ở tab của nó.
     it("dừng chuỗi ở bước hỏng, giữ nguyên kết quả bước trước", async () => {
