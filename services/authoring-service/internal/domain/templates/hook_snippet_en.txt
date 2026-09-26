@@ -1,0 +1,4 @@
+        # ---------- HOOK (first 5 seconds — earn the watch) ----------
+        self.hook(
+            "Put the opening question or paradox here, concrete enough that the viewer wants the answer.",
+        )

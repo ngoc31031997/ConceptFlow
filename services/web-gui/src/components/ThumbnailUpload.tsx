@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   getProjectThumbnailUrl,
@@ -8,6 +8,7 @@ import {
 } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./ThumbnailUpload.module.css";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { useOperationRun } from "../hooks/useOperationRun";
 import { AiOperationCard } from "./AiOperationCard";
 import { OperationProgressCard } from "./OperationProgressCard";
@@ -45,43 +46,6 @@ function CopyIcon() {
   );
 }
 
-/**
- * `topic` comes from the same AI-suggested title/description the publish
- * form uses (suggestPublishMetadata) — filled in automatically so the
- * copied prompt is already specific to this video, not a template the
- * Creator has to hand-edit before it's usable.
- */
-const buildThumbnailSystemPrompt = (language: "vi" | "en", topic: string | null) => `Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).
-
-======================================================
-CHỦ ĐỀ VIDEO: ${topic ?? "[DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]"}
-======================================================
-
-## VAI TRÒ CỦA BẠN
-
-Với chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).
-
-## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH
-
-1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.
-2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).
-3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).
-4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.
-5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục "chừa chỗ trống cho tiêu đề" thay vì yêu cầu AI viết chữ).
-6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.
-
-## OUTPUT
-
-Chỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: "16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text".
-
-## KHÁN GIẢ
-
-${
-  language === "en"
-    ? "Video này hướng tới khán giả NÓI TIẾNG ANH. Nếu mô tả có yếu tố văn hoá/bối cảnh, chọn yếu tố trung tính hoặc phương Tây, đừng dùng yếu tố đặc thù Việt Nam."
-    : "Video này hướng tới khán giả NÓI TIẾNG VIỆT. Có thể dùng yếu tố văn hoá/bối cảnh gần gũi với người Việt nếu phù hợp chủ đề."
-}`;
-
 export function ThumbnailUpload({
   projectId,
   onThumbnailPathChange,
@@ -92,10 +56,6 @@ export function ThumbnailUpload({
   const topicRun = useOperationRun();
   const { begin: beginTopicRun, end: endTopicRun } = topicRun;
   const [uploadBytes, setUploadBytes] = useState<{ loaded: number; total: number } | null>(null);
-  const thumbnailSystemPrompt = useMemo(
-    () => buildThumbnailSystemPrompt(contentLanguage, topic),
-    [contentLanguage, topic],
-  );
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   // True while the preview is the frame Video Assembly extracted rather than
@@ -106,6 +66,14 @@ export function ThumbnailUpload({
   const [promptPanelOpen, setPromptPanelOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // CR-040 FR113: rendered by the server from the `thumbnail_design` role. `topic`
+  // is the AI-suggested title (the same one the publish form uses), so the copied
+  // prompt is already specific to this video. Only rendered while the panel is open.
+  const renderedPrompt = useRenderedPrompt(
+    promptPanelOpen ? { role: "thumbnail_design", language: contentLanguage, topic: topic ?? "" } : null,
+  );
+  const thumbnailSystemPrompt = renderedPrompt.prompt ?? (renderedPrompt.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
   useEffect(() => {
     // Fetched lazily on first open, not on mount — this hits the same
@@ -198,7 +166,7 @@ export function ThumbnailUpload({
         <div className={styles.promptPanel} data-testid="thumbnail-system-prompt-panel">
           <div className={styles.promptPanelHeader}>
             <span>System prompt để nhờ AI sinh ảnh (Midjourney/DALL-E/...) tạo thumbnail cho video</span>
-            <Button variant="ghost" disabled={topicState === "loading"} onClick={handleCopyPrompt}>
+            <Button variant="ghost" disabled={topicState === "loading" || renderedPrompt.prompt === null || renderedPrompt.stale} onClick={handleCopyPrompt}>
               <CopyIcon />
               {promptCopied ? "Đã copy!" : "Copy"}
             </Button>

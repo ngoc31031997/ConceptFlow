@@ -1,25 +1,21 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
+import { getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
-import {
-  NARRATION_LANGUAGE_RULE,
-  REMOTION_NARRATION_LANGUAGE_RULE,
-  buildSubtitleZone,
-} from "../components/scriptPrompts";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { Card, Button, TextArea } from "../components/ui";
 import { Disclosure } from "../components/Disclosure";
 import { ScriptAssistant } from "../components/ScriptAssistant";
-import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
+import { useScriptTemplates } from "../hooks/useScriptTemplates";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
 
-const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
 /**
  * Bước 1c (Engineer) — third tab of the "Bước 3 — Script" sub-wizard (see
@@ -41,10 +37,10 @@ export function ManimEngineerStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
+  const scriptTemplates = useScriptTemplates();
   const isRemotion = draft.renderEngine === "remotion";
   const engineerRole = isRemotion ? "remotion_engineer" : "manim_engineer";
   const engineerLabel = isRemotion ? "Remotion Engineer" : "Manim Engineer";
-  const [prompt, setPrompt] = useState("Đang tải...");
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -81,39 +77,18 @@ export function ManimEngineerStepPage() {
     .filter((part) => part.trim().length > 0)
     .join("\n\n---\n\n");
 
-  useEffect(() => {
-    let cancelled = false;
-    getPromptTemplate(engineerRole)
-      .then((template) => {
-        if (cancelled) return;
-        const filled = template.template_text
-          // feature/remotion-engine: the remotion_engineer prompt is a flat
-          // topic -> code prompt, so it carries {{topic}} instead of only
-          // {{previous_output}}. Without this substitution the Creator copies
-          // out a prompt that still literally says "paste your topic here"
-          // and the AI writes a video about nothing in particular.
-          .split("{{topic}}")
-          .join(draft.authoringTopic.trim() || TOPIC_PLACEHOLDER)
-          .split("{{previous_output}}")
-          .join(previousOutput || "(chưa có dàn ý/storyboard đã lưu ở các bước trước)")
-          .split("{{narration_language_rule}}")
-          .join(
-            isRemotion
-              ? REMOTION_NARRATION_LANGUAGE_RULE[draft.voiceLanguage]
-              : NARRATION_LANGUAGE_RULE[draft.voiceLanguage],
-          )
-          .split("{{subtitle_zone}}")
-          .join(buildSubtitleZone(draft.subtitleMode, draft.subtitleStyle, draft.voiceLanguage));
-        setPrompt(filled);
-      })
-      .catch(() => {
-        if (!cancelled) setPrompt(`Không tải được template ${engineerRole}.`);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft.voiceLanguage, draft.authoringTopic, previousOutput, engineerRole, draft.subtitleMode, draft.subtitleStyle]);
+  // CR-040 FR113: the server fills the template from the draft — no prompt text
+  // is assembled in the browser.
+  const rendered = useRenderedPrompt({
+    role: engineerRole,
+    language: draft.voiceLanguage,
+    topic: draft.authoringTopic,
+    previous_output: previousOutput,
+    subtitle_mode: draft.subtitleMode,
+    subtitle_font_size: draft.subtitleStyle.fontSize,
+    subtitle_position: draft.subtitleStyle.position,
+  });
+  const prompt = rendered.prompt ?? (rendered.failed ? `Không tải được template ${engineerRole}.` : "Đang tải...");
 
   async function handleCopy() {
     try {
@@ -245,7 +220,10 @@ export function ManimEngineerStepPage() {
             what={`code ${isRemotion ? "Remotion" : "Manim"}`}
             runDisabled={draft.authoringStoryboard.trim().length === 0}
             runDisabledReason="Cần storyboard ở bước Visual trước — server đọc dàn ý + storyboard làm {{previous_output}}."
-            onGenerated={(_step, content) => setCode(content)}
+            onGenerated={(step, content) => {
+              if (step === "code") setCode(content);
+            }}
+            onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
           />
         </div>
 
@@ -266,7 +244,8 @@ export function ManimEngineerStepPage() {
               {!isRemotion && (
                 <Button
                   variant="ghost"
-                  onClick={() => setCode(SCRIPT_TEMPLATES[draft.voiceLanguage])}
+                  disabled={!scriptTemplates}
+                  onClick={() => scriptTemplates && setCode(scriptTemplates.starter_script[draft.voiceLanguage])}
                   data-testid="script-assistant-template"
                 >
                   Hoặc dùng một script mẫu chạy được ngay
@@ -291,7 +270,7 @@ export function ManimEngineerStepPage() {
                 className={styles.promptTextarea}
                 data-testid="manim-engineer-prompt"
               />
-              <Button onClick={handleCopy} className={styles.copyButton} data-testid="manim-engineer-copy">
+              <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="manim-engineer-copy">
                 {copied ? "Đã copy!" : "Copy prompt"}
               </Button>
             </Card>

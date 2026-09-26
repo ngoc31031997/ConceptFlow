@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
@@ -7,25 +8,17 @@ import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import {
-  getPromptTemplate,
   getAuthoringState,
   saveAuthoringStory,
   createProjectDraft,
   type SimilarProject,
 } from "../api/client";
-import {
-  buildStoryBeatSheetSection,
-  CHANNEL_IDENTITY,
-  NARRATION_LANGUAGE_RULE,
-} from "../components/scriptPrompts";
 import { stripMarkdownCodeFence } from "../utils/scriptValidation";
-import { useVoiceCalibration, wordsPerMinuteFor } from "../hooks/useVoiceCalibration";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
 import styles from "./WizardSteps.module.css";
-
-const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
 /**
  * Bước 1a (Story Architect) — first tab of the "Bước 3 — Script" sub-wizard.
@@ -46,11 +39,9 @@ export function ScriptOutlineStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
-  const calibration = useVoiceCalibration();
   const formats = useVideoFormats();
   const format = formats.find((f) => f.id === draft.videoFormatId);
 
-  const [template, setTemplate] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -109,35 +100,18 @@ export function ScriptOutlineStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    getPromptTemplate("story_architect")
-      .then((t) => {
-        if (!cancelled) setTemplate(t.template_text);
-      })
-      .catch(() => {
-        if (!cancelled) setTemplate(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [draft.voiceLanguage]);
-
-  // buildStoryBeatSheetSection, không buildBeatSheetSection: bước 1 không viết
-  // code, nên khối beat ở đây phải bỏ hết cú pháp `self.beat(...)` — xem chú
-  // thích của hàm đó trong scriptPrompts.ts.
-  const formatBeats = format
-    ? buildStoryBeatSheetSection(format, draft.voiceLanguage, wordsPerMinuteFor(calibration, draft.voiceId))
-    : "";
-  const prompt = (template ?? "Đang tải prompt...")
-    .split("{{topic}}")
-    .join(draft.authoringTopic.trim() || TOPIC_PLACEHOLDER)
-    .split("{{channel_identity}}")
-    .join(CHANNEL_IDENTITY[draft.voiceLanguage])
-    .split("{{format_beats}}")
-    .join(formatBeats)
-    .split("{{narration_language_rule}}")
-    .join(NARRATION_LANGUAGE_RULE[draft.voiceLanguage]);
+  // CR-040 FR113: the server fills the template — channel identity, beat sheet
+  // at this voice's speaking rate, narration-language rule. The browser only
+  // says which topic, language, format and voice the Creator has picked.
+  const rendered = useRenderedPrompt({
+    role: "story_architect",
+    language: draft.voiceLanguage,
+    topic: draft.authoringTopic,
+    format_id: format?.id,
+    format_version: format?.version,
+    voice_id: draft.voiceId ?? undefined,
+  });
+  const prompt = rendered.prompt ?? (rendered.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
   async function handleCopy() {
     try {
@@ -234,7 +208,7 @@ export function ScriptOutlineStepPage() {
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            steps={["story"]}
+            steps={["story", "storyboard", "code"]}
             what="dàn ý"
             runDisabled={topicIsEmpty}
             runDisabledReason="Nhập chủ đề trước đã — server điền {{topic}} từ chủ đề đã lưu."
@@ -252,6 +226,7 @@ export function ScriptOutlineStepPage() {
                 draft.renderEngine,
               );
             }}
+            onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
             onGenerated={(step, content) => {
               if (step === "story") dispatch({ type: "SET_AUTHORING_STORY", payload: content });
               else if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
@@ -305,7 +280,7 @@ export function ScriptOutlineStepPage() {
                   className={styles.promptTextarea}
                   data-testid="script-outline-prompt"
                 />
-                <Button onClick={handleCopy} className={styles.copyButton} data-testid="script-outline-copy">
+                <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="script-outline-copy">
                   {copied ? "Đã copy!" : "Copy prompt"}
                 </Button>
               </>

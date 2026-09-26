@@ -153,15 +153,21 @@ func SubtitleZone(project *Project, language string) string {
 	if !mode.IsValid() {
 		mode = SubtitleModeFromLegacy(project.SubtitlesEnabled)
 	}
+	style := DefaultSubtitleStyle()
+	if project.SubtitleStyle != nil {
+		style = *project.SubtitleStyle
+	}
+	return SubtitleZoneFor(mode, style, language)
+}
+
+// SubtitleZoneFor is SubtitleZone for explicit settings — what the wizard has
+// in its draft before anything is saved to the project.
+func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) string {
 	if mode != SubtitleModeBurnIn && mode != SubtitleModeBoth {
 		if language == "vi" {
 			return "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
 		}
 		return "this video has NO burned-in subtitles — the whole safe area is yours."
-	}
-	style := DefaultSubtitleStyle()
-	if project.SubtitleStyle != nil {
-		style = *project.SubtitleStyle
 	}
 	band, ok := subtitleBandPx[style.FontSize]
 	if !ok {

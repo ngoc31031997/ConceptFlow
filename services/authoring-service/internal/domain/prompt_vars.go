@@ -52,6 +52,37 @@ var narrationRuleVI string
 //go:embed prompts/narration_rule_en.txt
 var narrationRuleEN string
 
+// Remotion has no self.narrate(...) call: its narration lives in the
+// `narrations` array, so its rule names that instead (feature/remotion-engine).
+//
+//go:embed prompts/narration_rule_remotion_vi.txt
+var narrationRuleRemotionVI string
+
+//go:embed prompts/narration_rule_remotion_en.txt
+var narrationRuleRemotionEN string
+
+// CR-040 FR113 — bodies of the prompts web-gui used to build in the browser.
+// Generated from the shipping TypeScript (see testdata/prompt_golden.json) and
+// held to it byte for byte by prompt_golden_test.go.
+//
+//go:embed prompts/manim_adjust.txt
+var manimAdjustTemplate string
+
+//go:embed prompts/remotion_adjust.txt
+var remotionAdjustTemplate string
+
+//go:embed prompts/short_script.txt
+var shortScriptTemplate string
+
+//go:embed prompts/thumbnail_design.txt
+var thumbnailDesignTemplate string
+
+//go:embed prompts/thumbnail_audience_vi.txt
+var thumbnailAudienceVI string
+
+//go:embed prompts/thumbnail_audience_en.txt
+var thumbnailAudienceEN string
+
 // wordsPerMinute is the fallback speaking rate per content language, used
 // when the project's voice has no measured calibration of its own (CR-016).
 var wordsPerMinute = map[string]float64{
@@ -103,6 +134,35 @@ func NarrationLanguageRule(language string) string {
 		return narrationRuleVI
 	}
 	return narrationRuleEN
+}
+
+// NarrationLanguageRuleFor is NarrationLanguageRule for a render engine: the
+// Remotion engine's rule talks about `narrations`, not self.narrate(...).
+func NarrationLanguageRuleFor(language, renderEngine string) string {
+	if renderEngine != "remotion" {
+		return NarrationLanguageRule(language)
+	}
+	if language == "vi" {
+		return narrationRuleRemotionVI
+	}
+	return narrationRuleRemotionEN
+}
+
+// ThumbnailAudience is {{thumbnail_audience}}: who the thumbnail is for.
+func ThumbnailAudience(language string) string {
+	if language == "vi" {
+		return thumbnailAudienceVI
+	}
+	return thumbnailAudienceEN
+}
+
+// NarrateExample is {{narrate_example}}: the sample line shown inside
+// self.narrate("...") in the Manim adjust prompt, in the video's language.
+func NarrateExample(language string) string {
+	if language == "vi" {
+		return "Nội dung lời thoại tiếng Việt cho đoạn này"
+	}
+	return "The English narration line for this beat"
 }
 
 // BuildStoryBeatSheetSection renders {{format_beats}}: the beats of the

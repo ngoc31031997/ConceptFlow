@@ -1,0 +1,4 @@
+        # ---------- END SCREEN (~20s cuối, chừa chỗ cho element của YouTube) ----------
+        self.call_to_action(
+            "Nếu thấy hữu ích, hãy đăng ký kênh để không bỏ lỡ phần tiếp theo.",
+        )

@@ -29,6 +29,13 @@ const STEP_LABELS: Record<AuthoringStep, string> = {
 
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "code"];
 
+/** Tab của từng bước, để chuỗi AI tự đưa Creator theo đúng bước đang chạy. */
+export const AUTHORING_STEP_PATHS: Record<AuthoringStep, string> = {
+  story: "/create/script",
+  storyboard: "/create/script/storyboard",
+  code: "/create/script/code",
+};
+
 /** Kết cục của một chuỗi đã xong còn hiện bao lâu (xem `outcome` bên dưới). */
 const OUTCOME_TTL_MS = 30 * 60 * 1000;
 
@@ -110,6 +117,11 @@ interface AuthoringModeBarProps {
   /** Kết quả từng bước, để trang nhét thẳng vào ô soạn thảo (FR78.2). */
   onGenerated?: (step: AuthoringStep, content: string) => void;
   /**
+   * Chỉ với chuỗi nhiều bước: gọi khi server chuyển sang bước mới, và một lần
+   * với `"done"` khi cả chuỗi xong thành công — trang dùng nó để chuyển tab.
+   */
+  onFollow?: (step: AuthoringStep | "done") => void;
+  /**
    * Việc phải xong trước khi gọi — lưu chủ đề/kết quả bước trước lên server,
    * vì server render prompt từ dữ liệu của nó, không từ state trình duyệt
    * (FR80.1).
@@ -160,6 +172,7 @@ export function AuthoringModeBar({
   steps = [],
   what = "",
   onGenerated,
+  onFollow,
   beforeRun,
   runDisabled,
   runDisabledReason,
@@ -182,8 +195,11 @@ export function AuthoringModeBar({
         payload: { story: state.story, storyboard: state.storyboard, code: state.code },
       });
       // Nhét kết quả từng bước vào ô soạn thảo (FR78.2). Bước chưa chạy tới thì
-      // server đã xoá nội dung, nên rỗng và bị bỏ qua.
-      for (const step of chainSteps) {
+      // server đã xoá nội dung, nên rỗng và bị bỏ qua. Chỉ nạp bước thuộc tab
+      // này: chuỗi vừa xong có thể do tab khác chạy, và đẩy nội dung bước khác
+      // vào ô của tab này (story vào ô storyboard/code) là lỗi từng xảy ra.
+      const mine = steps.length > 0 ? chainSteps.filter((st) => steps.includes(st)) : chainSteps;
+      for (const step of mine) {
         const content = step === "story" ? state.story : step === "storyboard" ? state.storyboard : state.code;
         if (content) onGenerated?.(step, content);
       }
@@ -220,6 +236,10 @@ export function AuthoringModeBar({
   const handledFinish = useRef<string | null>(null);
   const runRef = useRef(run);
   runRef.current = run;
+  const followRef = useRef(onFollow);
+  followRef.current = onFollow;
+  const lastFollowed = useRef<string | null>(null);
+  const sawRunning = useRef(false);
 
   useEffect(() => {
     if (!projectId || !llm) return;
@@ -237,6 +257,14 @@ export function AuthoringModeBar({
       if (c.running) {
         if (!cur.running) dispatchRun({ type: "START", steps: c.steps });
         if (cur.currentIndex !== c.current_index) dispatchRun({ type: "PROGRESS", index: c.current_index });
+        sawRunning.current = true;
+        const at = c.steps[c.current_index];
+        if (c.steps.length > 1 && at && lastFollowed.current !== at) {
+          // Lần đầu thấy chuỗi đang chạy (mở/tải lại trang) chỉ ghi nhận, không
+          // kéo Creator đi; chỉ những lần chuyển bước sau đó mới chuyển tab.
+          if (lastFollowed.current !== null) followRef.current?.(at);
+          lastFollowed.current = at;
+        }
       } else if (cur.running && !starting.current) {
         dispatchRun({ type: "FINISH" });
       }
@@ -244,6 +272,7 @@ export function AuthoringModeBar({
       if (c.finished && c.finished_at && handledFinish.current !== c.finished_at) {
         handledFinish.current = c.finished_at;
         await syncFromServer(c.steps);
+        if (sawRunning.current && c.steps.length > 1 && !c.error) followRef.current?.("done");
       }
     };
     void tick();
@@ -316,7 +345,7 @@ export function AuthoringModeBar({
 
   const modeHint = !llm.enabled
     ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-    : `Áp dụng cho cả bước 3 (Kịch bản, Visual, Code), mỗi bước chạy riêng: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
+    : `Áp dụng cho cả bước 3 (Kịch bản, Visual, Code), mỗi bước chạy riêng: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Chạy cả chuỗi thì tự chuyển tab theo bước đang chạy; không tự nộp render.`;
   const showRunRow = aiMode && canRun;
 
   return (

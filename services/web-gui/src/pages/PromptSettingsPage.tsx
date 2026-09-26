@@ -25,6 +25,11 @@ const ROLES: { value: PromptRole; label: string }[] = [
   { value: "visual_director_ai", label: "AI 2. Visual Director — storyboard dạng JSON" },
   { value: "manim_engineer_ai", label: "AI 3. Manim Engineer — chỉ viết các hàm shot" },
   { value: "remotion_engineer_ai", label: "AI 3. Remotion Engineer — chỉ viết các hàm shot" },
+  // CR-040 FR113 — các prompt trước đây ghép chuỗi ngay trong trình duyệt.
+  { value: "manim_adjust", label: "Phụ trợ — chuẩn hoá script Manim có sẵn" },
+  { value: "remotion_adjust", label: "Phụ trợ — chuẩn hoá code Remotion có sẵn" },
+  { value: "short_script", label: "Phụ trợ — soạn script Shorts/TikTok" },
+  { value: "thumbnail_design", label: "Phụ trợ — prompt sinh ảnh thumbnail" },
 ];
 
 const NEW_ROW = "new";
@@ -32,10 +37,14 @@ const NEW_ROW = "new";
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
 const PREVIEW_SAMPLE: Record<string, string> = {
   topic: "Vì sao bầu trời có màu xanh",
-  channel_identity: "(khối bản sắc kênh — CHANNEL_IDENTITY trong scriptPrompts.ts — sẽ hiện ở đây)",
+  channel_identity: "(khối bản sắc kênh — do server dựng theo ngôn ngữ — sẽ hiện ở đây)",
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",
   previous_output: "(nội dung bước trước — dàn ý/storyboard/code — sẽ hiện ở đây)",
+  script: "(code có sẵn Creator dán vào sẽ hiện ở đây)",
+  subtitle_zone: "(vùng phụ đề theo cấu hình của video sẽ hiện ở đây)",
+  narrate_example: "Nội dung lời thoại cho đoạn này",
+  thumbnail_audience: "(khán giả theo ngôn ngữ video sẽ hiện ở đây)",
 };
 
 function renderPreview(templateText: string): string {

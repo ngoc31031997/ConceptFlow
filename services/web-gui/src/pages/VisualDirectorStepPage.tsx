@@ -1,13 +1,15 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getPromptTemplate, getAuthoringState, saveAuthoringStoryboard } from "../api/client";
+import { getAuthoringState, saveAuthoringStoryboard } from "../api/client";
 import { Card, Button, TextArea } from "../components/ui";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import styles from "./WizardSteps.module.css";
 
 /**
@@ -20,7 +22,6 @@ export function VisualDirectorStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
-  const [prompt, setPrompt] = useState("Đang tải...");
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -56,23 +57,13 @@ export function VisualDirectorStepPage() {
   // agnostic, and only the code step forks (manim_engineer / remotion_engineer).
   const directorRole = "visual_director";
 
-  useEffect(() => {
-    let cancelled = false;
-    getPromptTemplate(directorRole)
-      .then((template) => {
-        if (cancelled) return;
-        const filled = template.template_text.split("{{previous_output}}").join(
-          draft.authoringStory || "(chưa có dàn ý câu chuyện đã lưu ở bước 3)",
-        );
-        setPrompt(filled);
-      })
-      .catch(() => {
-        if (!cancelled) setPrompt(`Không tải được template ${directorRole}.`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [draft.voiceLanguage, draft.authoringStory, directorRole]);
+  // CR-040 FR113: rendered by the server, not assembled here.
+  const rendered = useRenderedPrompt({
+    role: directorRole,
+    language: draft.voiceLanguage,
+    previous_output: draft.authoringStory,
+  });
+  const prompt = rendered.prompt ?? (rendered.failed ? `Không tải được template ${directorRole}.` : "Đang tải...");
 
   async function handleCopy() {
     try {
@@ -161,7 +152,10 @@ export function VisualDirectorStepPage() {
             what="storyboard"
             runDisabled={draft.authoringStory.trim().length === 0}
             runDisabledReason="Cần dàn ý ở bước Kịch bản trước — server đọc nó làm {{previous_output}}."
-            onGenerated={(_step, content) => dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content })}
+            onGenerated={(step, content) => {
+              if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
+            }}
+            onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
           />
         </div>
 
@@ -180,7 +174,7 @@ export function VisualDirectorStepPage() {
                 className={styles.promptTextarea}
                 data-testid="visual-director-prompt"
               />
-              <Button onClick={handleCopy} className={styles.copyButton} data-testid="visual-director-copy">
+              <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="visual-director-copy">
                 {copied ? "Đã copy!" : "Copy prompt"}
               </Button>
             </Card>

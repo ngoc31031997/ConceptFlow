@@ -288,3 +288,46 @@ func TestHandleSaveAuthoringMode_NotWired(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+// --- CR-040 FR113: POST /v1/prompt-renders ---
+
+type fakePromptRenderer struct{ got application.RenderInput }
+
+func (f *fakePromptRenderer) Execute(context.Context, string, domain.PromptRole) (application.RenderedPrompt, error) {
+	return application.RenderedPrompt{}, nil
+}
+
+func (f *fakePromptRenderer) Render(_ context.Context, in application.RenderInput) (application.RenderedPrompt, error) {
+	f.got = in
+	return application.RenderedPrompt{Role: in.Role, Prompt: "rendered:" + in.Topic}, nil
+}
+
+func TestHandlePromptRenders_PassesTheDraftThrough(t *testing.T) {
+	fake := &fakePromptRenderer{}
+	router := NewRouter(nil, nil).WithRenderPrompt(fake)
+
+	body, _ := json.Marshal(map[string]any{"role": "story_architect", "language": "en", "topic": "loops", "subtitle_mode": "burn_in"})
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", bytes.NewReader(body)))
+
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), "rendered:loops") {
+		t.Fatalf("unexpected %d: %s", rec.Code, rec.Body.String())
+	}
+	if fake.got.Role != domain.RoleStoryArchitect || fake.got.Language != "en" || fake.got.SubtitleMode != "burn_in" {
+		t.Fatalf("draft values were not forwarded: %+v", fake.got)
+	}
+}
+
+func TestHandlePromptRenders_RejectsAnUnknownRoleAnd404sWhenUnwired(t *testing.T) {
+	router := NewRouter(nil, nil).WithRenderPrompt(&fakePromptRenderer{})
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", strings.NewReader(`{"role":"nope"}`)))
+	if rec.Code != 400 {
+		t.Fatalf("unknown role: want 400, got %d", rec.Code)
+	}
+
+	rec = httptest.NewRecorder()
+	NewRouter(nil, nil).Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", strings.NewReader(`{"role":"story_architect"}`)))
+	if rec.Code != 404 {
+		t.Fatalf("unwired: want 404, got %d", rec.Code)
+	}
+}

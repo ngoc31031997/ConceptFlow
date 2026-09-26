@@ -1,0 +1,1 @@
+Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (nhãn, con số, tiêu đề) cũng phải bằng tiếng Anh.

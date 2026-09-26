@@ -1,5 +1,5 @@
 import { useMemo, useState, type ChangeEvent } from "react";
-import { END_SCREEN_SNIPPETS, HOOK_SNIPPETS } from "./scriptTemplates";
+import { useScriptTemplates } from "../hooks/useScriptTemplates";
 import { useDebounce } from "../hooks/useDebounce";
 import { Button, Card, TextArea } from "./ui";
 import glass from "../styles/glass.module.css";
@@ -93,6 +93,8 @@ export function ScriptEditor({
   );
   const remotionValidation = useMemo(() => validateRemotionScript(debouncedValue), [debouncedValue]);
   const [importError, setImportError] = useState<string | null>(null);
+  // CR-040 FR113: the snippets are served by authoring-service, not bundled here.
+  const templates = useScriptTemplates();
   const hasScript = value.trim().length > 0;
 
   function handleFileImport(event: ChangeEvent<HTMLInputElement>) {
@@ -120,7 +122,8 @@ export function ScriptEditor({
               <Button
                 variant="ghost"
                 data-testid="script-editor-insert-hook"
-                onClick={() => onChange(`${value}\n${HOOK_SNIPPETS[contentLanguage]}`)}
+                disabled={!templates}
+                onClick={() => templates && onChange(`${value}\n${templates.hook_snippet[contentLanguage]}`)}
               >
                 <TemplateIcon />
                 Chèn hook mở đầu
@@ -128,7 +131,8 @@ export function ScriptEditor({
               <Button
                 variant="ghost"
                 data-testid="script-editor-insert-end-screen"
-                onClick={() => onChange(`${value}\n${END_SCREEN_SNIPPETS[contentLanguage]}`)}
+                disabled={!templates}
+                onClick={() => templates && onChange(`${value}\n${templates.end_screen_snippet[contentLanguage]}`)}
               >
                 <TemplateIcon />
                 Chèn end screen

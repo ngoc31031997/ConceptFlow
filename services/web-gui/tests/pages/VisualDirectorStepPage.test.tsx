@@ -5,19 +5,13 @@ import { VisualDirectorStepPage } from "../../src/pages/VisualDirectorStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
+import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
-// CR-025 step 2: fetches the visual_director template and rehydrates saved
+// CR-025 step 2: renders the visual_director prompt (server-side, CR-040 FR113) and rehydrates saved
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring ScriptStepPage.test.tsx's story_architect stub.
 beforeEach(() => {
-  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
-    role: "visual_director",
-    id: "system-x",
-    name: "Mặc định",
-    is_system: true,
-    is_active: true,
-    template_text: "DÀN Ý: {{previous_output}}",
-  });
+  mockRenderPrompt();
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "saveAuthoringStoryboard").mockResolvedValue(undefined);
 });

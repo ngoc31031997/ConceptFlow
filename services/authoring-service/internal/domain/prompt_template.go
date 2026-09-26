@@ -30,13 +30,22 @@ const (
 	RoleVisualDirectorAI   PromptRole = "visual_director_ai"
 	RoleManimEngineerAI    PromptRole = "manim_engineer_ai"
 	RoleRemotionEngineerAI PromptRole = "remotion_engineer_ai"
+
+	// CR-040 FR113 — the prompts web-gui used to assemble in the browser, now
+	// library roles rendered by POST /v1/prompt-renders. None of them is a step
+	// of the authoring pipeline; each is a "copy this to an external AI" prompt.
+	RoleManimAdjust     PromptRole = "manim_adjust"     // fix an existing Manim script (narrate calls, design system)
+	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
+	RoleShortScript     PromptRole = "short_script"     // draft a Shorts/TikTok script
+	RoleThumbnailDesign PromptRole = "thumbnail_design" // write an image-generation prompt for the thumbnail
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
-		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI:
+		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI,
+		RoleManimAdjust, RoleRemotionAdjust, RoleShortScript, RoleThumbnailDesign:
 		return true
 	default:
 		return false

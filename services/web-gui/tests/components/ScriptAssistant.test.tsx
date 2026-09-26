@@ -1,6 +1,8 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ScriptAssistant } from "../../src/components/ScriptAssistant";
+import * as apiClient from "../../src/api/client";
+import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
 // CR-031 — ScriptAssistant chỉ còn một việc: biến code sẵn có thành một
 // prompt yêu cầu AI chuẩn hoá nó. Nhánh "ready" cũ (hướng dẫn + nút script
@@ -11,8 +13,11 @@ function renderAssistant(renderEngine: "manim" | "remotion" = "manim") {
 
 describe("ScriptAssistant", () => {
   afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => {
+    mockRenderPrompt();
+  });
 
-  it("substitutes the existing script into the Manim adjust prompt", async () => {
+  it("asks the server for the Manim adjust prompt with the pasted script, and copies its answer", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderAssistant();
@@ -20,15 +25,20 @@ describe("ScriptAssistant", () => {
     fireEvent.change(screen.getByTestId("script-assistant-existing"), {
       target: { value: "class OldScene(Scene): pass" },
     });
-    fireEvent.click(screen.getByTestId("script-assistant-copy"));
 
+    await waitFor(() =>
+      expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "manim_adjust", language: "vi", script: "class OldScene(Scene): pass" }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId("script-assistant-copy")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("script-assistant-copy"));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const copied = writeText.mock.calls[0][0] as string;
-    expect(copied).toContain("class OldScene(Scene): pass");
-    expect(copied).not.toContain("<dán script Manim của bạn vào đây>");
+    expect(writeText.mock.calls[0][0]).toContain("RENDERED[manim_adjust]");
+    expect(writeText.mock.calls[0][0]).toContain("class OldScene(Scene): pass");
   });
 
-  it("substitutes the existing script into the Remotion adjust prompt instead, when renderEngine is remotion", async () => {
+  it("uses the remotion_adjust role instead when renderEngine is remotion", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderAssistant("remotion");
@@ -36,15 +46,16 @@ describe("ScriptAssistant", () => {
     fireEvent.change(screen.getByTestId("script-assistant-existing"), {
       target: { value: "export const narrations = ['x'];" },
     });
-    fireEvent.click(screen.getByTestId("script-assistant-copy"));
 
+    await waitFor(() =>
+      expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "remotion_adjust", script: "export const narrations = ['x'];" }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId("script-assistant-copy")).toBeEnabled());
+    fireEvent.click(screen.getByTestId("script-assistant-copy"));
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const copied = writeText.mock.calls[0][0] as string;
-    // The Remotion adjust prompt talks about narrations/Composition
-    // id="creator", not self.narrate/ConceptFlowScene.
-    expect(copied).toContain("export const narrations = ['x'];");
-    expect(copied).toContain('Composition id="creator"');
-    expect(copied).not.toContain("self.narrate");
+    expect(writeText.mock.calls[0][0]).toContain("RENDERED[remotion_adjust]");
   });
 
   it("says when the prompt is still missing its input", () => {

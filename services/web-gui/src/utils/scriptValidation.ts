@@ -29,7 +29,7 @@ const SCENE_CLASS_RE = /^class\s+(\w+)\s*\([^)]*Scene[^)]*\)\s*:/;
 
 /**
  * Toàn bộ nội dung được bọc trong một khối markdown ```python ... ``` (hoặc
- * ``` trơn). Mọi prompt trong `scriptPrompts.ts` đều bảo AI trả lời đúng một
+ * ``` trơn). Mọi prompt trong thư viện prompt (authoring-service) đều bảo AI trả lời đúng một
  * khối như vậy — Creator copy nguyên cả khối, kể cả hai dòng backtick, là
  * đường dán phổ biến nhất từ một cửa sổ chat. Kết quả là script không còn bắt
  * đầu bằng `from conceptflow import *` mà bằng dòng "```python", nên

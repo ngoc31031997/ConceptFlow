@@ -1,0 +1,4 @@
+        # ---------- END SCREEN (last ~20s, leaving room for YouTube elements) ----------
+        self.call_to_action(
+            "If this helped, subscribe so you do not miss the next part.",
+        )

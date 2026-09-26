@@ -1,0 +1,62 @@
+Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.
+Hãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,
+theo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:
+
+0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và
+   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng
+   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có
+   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so
+   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ
+   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);
+   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và
+   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import
+   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng
+   `from manim import *`.
+
+   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: "..."` kèm
+   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ
+   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời
+   gọi hàm `self.narrate("...")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`
+   cũ (xem quy tắc 2 bên dưới).
+
+1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script
+   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class
+   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.
+
+2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay
+   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong
+   construct()):
+       self.narrate("{{narrate_example}}")
+   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —
+   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên
+   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.
+
+3. TUYỆT ĐỐI:
+   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình
+     thức nào — chúng không còn được hệ thống đọc.
+   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ
+     animation nội bộ, không liên quan đến giọng đọc.
+   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.
+   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng
+     self.narrate(...).
+
+4. Chia lời thoại theo từng "nhịp" animation hợp lý — mỗi lời gọi
+   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình
+   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.
+
+5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.
+
+6. NGÔN NGỮ: {{narration_language_rule}}
+
+7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):
+   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh
+     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài
+     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng
+     đầu.
+   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán
+     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.
+   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong
+     script gốc không (không thiếu, không thừa)?
+
+Script gốc:
+{{script}}

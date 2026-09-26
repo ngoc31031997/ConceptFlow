@@ -15,6 +15,10 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  * substitution, so the copy-out path and the server's own generate call
  * cannot drift apart on the same role.
  *
+ * `POST /v1/prompt-renders` — CR-040 FR113, the same substitution for what the
+ * browser has not saved yet (draft topic, pasted script, unapplied subtitle
+ * style). web-gui no longer assembles any prompt text itself.
+ *
  * CR-031 — the prompt library (a list of prompts per role, one active):
  * `GET /v1/admin/prompts[?role=]` — list. `POST /v1/admin/prompts` — create.
  * `POST /v1/admin/prompts/:id/copy` — duplicate any row into an editable one.
@@ -31,6 +35,9 @@ function promptsRouter(authoringClient) {
   const router = express.Router();
   router.get('/v1/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
   router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/prompt-renders', proxyHandler(authoringClient, 'authoring-service'));
+  // CR-040 FR113 — starter scripts and hook/end-screen snippets.
+  router.get('/v1/script-templates', proxyHandler(authoringClient, 'authoring-service'));
   // CR-027 FR79.4 — nút "Chạy bằng AI" có gọi được gì không: web-gui hỏi
   // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
   // nút bấm vào là lỗi.

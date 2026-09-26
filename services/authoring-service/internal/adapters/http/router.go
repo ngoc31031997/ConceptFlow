@@ -75,6 +75,11 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
 	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
 	r.Get("/v1/projects/{project_id}/prompts/{role}", rt.handleRenderPrompt)
+	// CR-040 FR113 — the same render for what the browser has in hand but has
+	// not saved (draft topic, pasted script, unapplied subtitle style).
+	r.Post("/v1/prompt-renders", rt.handlePromptRenders)
+	// CR-040 FR113 — starter scripts and hook/end-screen snippets (static text).
+	r.Get("/v1/script-templates", rt.handleScriptTemplates)
 	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether that
 	// option exists at all before it draws the button.
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
@@ -838,6 +843,61 @@ func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusNotFound, "project not found")
 			return
 		}
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, rendered)
+}
+
+func (rt *Router) handleScriptTemplates(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, domain.BuiltinScriptTemplates())
+}
+
+// promptRenderer is the stateless side of the prompt renderer.
+type promptRenderer interface {
+	Render(ctx context.Context, in application.RenderInput) (application.RenderedPrompt, error)
+}
+
+type promptRenderRequest struct {
+	Role             string `json:"role"`
+	Language         string `json:"language"`
+	Topic            string `json:"topic"`
+	Script           string `json:"script"`
+	PreviousOutput   string `json:"previous_output"`
+	SubtitleMode     string `json:"subtitle_mode"`
+	SubtitleFontSize string `json:"subtitle_font_size"`
+	SubtitlePosition string `json:"subtitle_position"`
+	FormatID         string `json:"format_id"`
+	FormatVersion    int    `json:"format_version"`
+	VoiceID          string `json:"voice_id"`
+}
+
+// handlePromptRenders serves POST /v1/prompt-renders (CR-040 FR113.1): the
+// prompt for one library role with the caller's draft values substituted. It
+// replaces the string assembly web-gui did in the browser, so the text a
+// Creator copies and the text the server sends to the model come from one place.
+func (rt *Router) handlePromptRenders(w http.ResponseWriter, r *http.Request) {
+	renderer, ok := rt.renderPrompt.(promptRenderer)
+	if !ok {
+		writeError(w, http.StatusNotFound, "prompt rendering is not enabled")
+		return
+	}
+	var req promptRenderRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if !domain.ValidPromptRole(req.Role) {
+		writeError(w, http.StatusBadRequest, "unknown role")
+		return
+	}
+	rendered, err := renderer.Render(r.Context(), application.RenderInput{
+		Role: domain.PromptRole(req.Role), Language: req.Language, Topic: req.Topic, Script: req.Script,
+		PreviousOutput: req.PreviousOutput, SubtitleMode: req.SubtitleMode,
+		SubtitleFontSize: req.SubtitleFontSize, SubtitlePosition: req.SubtitlePosition,
+		FormatID: req.FormatID, FormatVersion: req.FormatVersion, VoiceID: req.VoiceID,
+	})
+	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}

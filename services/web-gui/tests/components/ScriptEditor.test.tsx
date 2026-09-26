@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { render, screen, fireEvent, act, waitFor } from "@testing-library/react";
 import { ScriptEditor } from "../../src/components/ScriptEditor";
-import { HOOK_SNIPPETS } from "../../src/components/scriptTemplates";
 
 const VALID =
   'from conceptflow import *\n\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate("xin chào các bạn")';
@@ -59,14 +58,26 @@ describe("ScriptEditor", () => {
     expect(estimate).toHaveTextContent("Chưa tính thời gian animation");
   });
 
-  it("offers the snippets only once there is a script to append them to", () => {
+  it("offers the snippets only once there is a script to append them to", async () => {
+    // CR-040 FR113: the snippet text is served by authoring-service.
+    const HOOK = "        self.hook(\"...\")\n";
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        starter_script: { vi: "s", en: "s" },
+        hook_snippet: { vi: HOOK, en: HOOK },
+        end_screen_snippet: { vi: "e", en: "e" },
+      }),
+    }) as unknown as typeof fetch;
     const onChange = vi.fn();
     const { rerender } = render(<ScriptEditor value="" onChange={onChange} contentLanguage="vi" />);
     expect(screen.queryByTestId("script-editor-insert-hook")).not.toBeInTheDocument();
 
     rerender(<ScriptEditor value={VALID} onChange={onChange} contentLanguage="vi" />);
+    await waitFor(() => expect(screen.getByTestId("script-editor-insert-hook")).toBeEnabled());
     fireEvent.click(screen.getByTestId("script-editor-insert-hook"));
-    expect(onChange).toHaveBeenCalledWith(`${VALID}\n${HOOK_SNIPPETS.vi}`);
+    expect(onChange).toHaveBeenCalledWith(`${VALID}\n${HOOK}`);
   });
 
   const VALID_REMOTION_CODE = [

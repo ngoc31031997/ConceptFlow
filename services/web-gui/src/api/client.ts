@@ -430,7 +430,12 @@ export type PromptRole =
   // chỉ viết các hàm shot); luồng Copy giữ bốn vai trò trên nguyên vẹn.
   | "visual_director_ai"
   | "manim_engineer_ai"
-  | "remotion_engineer_ai";
+  | "remotion_engineer_ai"
+  // CR-040 FR113 — prompts that used to be assembled in the browser.
+  | "manim_adjust"
+  | "remotion_adjust"
+  | "short_script"
+  | "thumbnail_design";
 
 /**
  * CR-031 — một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
@@ -454,6 +459,53 @@ export interface Prompt {
 /** Prompt đang chạy của một vai trò (wizard đọc lúc runtime, không hardcode). */
 export function getPromptTemplate(role: PromptRole): Promise<Prompt> {
   return apiFetch<Prompt>(`/v1/prompts/${role}`);
+}
+
+/**
+ * CR-040 FR113 — what the caller has in hand but has not saved. Every field is
+ * optional; the server fills a blank one with the placeholder the browser used
+ * to show.
+ */
+export interface PromptRenderInput {
+  role: PromptRole;
+  language: "vi" | "en";
+  topic?: string;
+  /** The Creator's existing code, for `manim_adjust` / `remotion_adjust`. */
+  script?: string;
+  previous_output?: string;
+  subtitle_mode?: string;
+  subtitle_font_size?: string;
+  subtitle_position?: string;
+  format_id?: string;
+  format_version?: number;
+  voice_id?: string;
+}
+
+export interface RenderedPromptResult {
+  prompt: string;
+  prompt_id: string;
+  prompt_name: string;
+  is_system: boolean;
+}
+
+/** The prompt of one library role with every {{variable}} substituted by the server. */
+export function renderPrompt(input: PromptRenderInput): Promise<RenderedPromptResult> {
+  return apiFetch<RenderedPromptResult>("/v1/prompt-renders", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+/** CR-040 FR113 — starter scripts and insertable snippets, served by authoring-service. */
+export interface ScriptTemplates {
+  starter_script: Record<"vi" | "en", string>;
+  hook_snippet: Record<"vi" | "en", string>;
+  end_screen_snippet: Record<"vi" | "en", string>;
+}
+
+export function getScriptTemplates(): Promise<ScriptTemplates> {
+  return apiFetch<ScriptTemplates>("/v1/script-templates");
 }
 
 /** Toàn bộ thư viện prompt (mọi vai trò) cho màn cài đặt. */

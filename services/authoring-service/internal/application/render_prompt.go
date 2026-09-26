@@ -191,7 +191,7 @@ func (uc *RenderPromptUseCase) variablesFor(
 	vars := map[string]string{
 		"topic":                   topic,
 		"channel_identity":        domain.ChannelIdentity(language),
-		"narration_language_rule": domain.NarrationLanguageRule(language),
+		"narration_language_rule": domain.NarrationLanguageRuleFor(language, engineOf(role)),
 		"previous_output":         previous,
 		"format_beats":            "",
 		"subtitle_zone":           domain.SubtitleZone(project, language),
@@ -260,4 +260,12 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 		return "(chưa có dàn ý/storyboard/code đã lưu ở các bước trước)", nil
 	}
 	return strings.Join(parts, "\n\n---\n\n"), nil
+}
+
+// engineOf is the render engine a role writes for; only Remotion's roles differ.
+func engineOf(role domain.PromptRole) string {
+	if isRemotionRole(role) {
+		return "remotion"
+	}
+	return "manim"
 }

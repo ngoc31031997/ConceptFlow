@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { ShortScriptAssistant } from "../../src/components/ShortScriptAssistant";
+import * as apiClient from "../../src/api/client";
+import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
 function renderAssistant(onCreated = vi.fn()) {
   render(
@@ -17,7 +19,8 @@ function renderAssistant(onCreated = vi.fn()) {
 describe("ShortScriptAssistant", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it('copy prompt bọc sẵn chủ đề và yêu cầu with self.clip("short")', async () => {
+  it("copy prompt lấy văn bản từ server, kèm chủ đề Creator đã nhập", async () => {
+    mockRenderPrompt();
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderAssistant();
@@ -25,12 +28,18 @@ describe("ShortScriptAssistant", () => {
     fireEvent.change(screen.getByTestId("short-script-topic"), {
       target: { value: "Vì sao vòng lặp for chạy đúng 5 lần" },
     });
+    await waitFor(() =>
+      expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "short_script", language: "vi", topic: "Vì sao vòng lặp for chạy đúng 5 lần" }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId("short-script-copy")).toBeEnabled());
     fireEvent.click(screen.getByTestId("short-script-copy"));
 
     await waitFor(() => expect(writeText).toHaveBeenCalled());
     const copiedPrompt = writeText.mock.calls[0][0] as string;
+    expect(copiedPrompt).toContain("RENDERED[short_script]");
     expect(copiedPrompt).toContain("Vì sao vòng lặp for chạy đúng 5 lần");
-    expect(copiedPrompt).toContain('with self.clip("short"):');
   });
 
   it("soạn bằng AI nội bộ đổ kết quả vào ô nháp, không tự nộp", async () => {

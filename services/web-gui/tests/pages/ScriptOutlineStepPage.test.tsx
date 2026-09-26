@@ -6,19 +6,13 @@ import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { AuthoringRunProvider } from "../../src/context/AuthoringRunContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
+import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
 // Bước 1a: fetches the story_architect template and rehydrates saved
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring VisualDirectorStepPage.test.tsx's stub.
 beforeEach(() => {
-  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
-    role: "story_architect",
-    id: "system-x",
-    name: "Mặc định",
-    is_system: true,
-    is_active: true,
-    template_text: "CHỦ ĐỀ VIDEO: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
-  });
+  mockRenderPrompt();
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "saveAuthoringStory").mockResolvedValue(undefined);
 });
@@ -76,21 +70,26 @@ describe("ScriptOutlineStepPage", () => {
     window.localStorage.clear();
   });
 
-  it("copies a prompt with the Creator's topic already substituted in", async () => {
+  it("copies the server-rendered prompt for the topic the Creator typed", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
     renderPage();
 
-    await waitFor(() => expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("story_architect"));
     fireEvent.change(screen.getByTestId("script-outline-topic"), {
       target: { value: "Vòng lặp for trong Java" },
     });
+    await waitFor(() =>
+      expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+        expect.objectContaining({ role: "story_architect", topic: "Vòng lặp for trong Java" }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByTestId("script-outline-copy")).toBeEnabled());
     fireEvent.click(screen.getByTestId("script-outline-copy"));
 
     await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
     const copied = writeText.mock.calls[0][0] as string;
+    expect(copied).toContain("RENDERED[story_architect]");
     expect(copied).toContain("Vòng lặp for trong Java");
-    expect(copied).not.toContain("[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]");
   });
 
   it("blocks the step until a story outline is pasted, then saves and advances", async () => {
@@ -266,7 +265,7 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
       await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
-      expect(start.mock.calls[0][1]).toEqual(["story"]);
+      expect(start.mock.calls[0][1]).toEqual(["story", "storyboard", "code"]);
       await waitFor(() =>
         expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?"),
       );

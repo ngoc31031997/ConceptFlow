@@ -27,6 +27,7 @@ interface PipelineSettingsBarProps {
   runDisabledReason?: string;
   beforeRun?: () => Promise<void>;
   onGenerated?: (step: AuthoringStep, content: string) => void;
+  onFollow?: (step: AuthoringStep | "done") => void;
 }
 
 /**
@@ -53,6 +54,7 @@ export function PipelineSettingsBar({
   runDisabledReason,
   beforeRun,
   onGenerated,
+  onFollow,
 }: PipelineSettingsBarProps) {
   const [expanded, setExpanded] = useState(false);
   const { running } = useAuthoringRun();
@@ -114,6 +116,7 @@ export function PipelineSettingsBar({
         runDisabledReason={runDisabledReason}
         beforeRun={beforeRun}
         onGenerated={onGenerated}
+        onFollow={onFollow}
         showSwitch={false}
       />
     </div>

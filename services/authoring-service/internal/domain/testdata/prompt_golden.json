@@ -1,0 +1,630 @@
+{
+ "prompts": [
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "vi",
+    "script": ""
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"Nội dung lời thoại tiếng Việt cho đoạn này\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\n<dán script Manim của bạn vào đây>"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "vi",
+    "script": ""
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\n<dán code Remotion của bạn vào đây>"
+  },
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "vi",
+    "script": "   "
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"Nội dung lời thoại tiếng Việt cho đoạn này\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\n<dán script Manim của bạn vào đây>"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "vi",
+    "script": "   "
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\n<dán code Remotion của bạn vào đây>"
+  },
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "vi",
+    "script": "class A(Scene):\n    def construct(self):\n        pass"
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"Nội dung lời thoại tiếng Việt cho đoạn này\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\nclass A(Scene):\n    def construct(self):\n        pass"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "vi",
+    "script": "class A(Scene):\n    def construct(self):\n        pass"
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG VIỆT.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\nclass A(Scene):\n    def construct(self):\n        pass"
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "vi",
+    "topic": ""
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "vi",
+    "topic": "  "
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "vi",
+    "topic": "Vòng lặp for trong Java"
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: Vòng lặp for trong Java\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG VIỆT.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "en",
+    "script": ""
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"The English narration line for this beat\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\n<dán script Manim của bạn vào đây>"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "en",
+    "script": ""
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (nhãn, con số, tiêu đề) cũng phải bằng tiếng Anh.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\n<dán code Remotion của bạn vào đây>"
+  },
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "en",
+    "script": "   "
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"The English narration line for this beat\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\n<dán script Manim của bạn vào đây>"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "en",
+    "script": "   "
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (nhãn, con số, tiêu đề) cũng phải bằng tiếng Anh.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\n<dán code Remotion của bạn vào đây>"
+  },
+  {
+   "role": "manim_adjust",
+   "input": {
+    "language": "en",
+    "script": "class A(Scene):\n    def construct(self):\n        pass"
+   },
+   "expected": "Tôi có một script Manim (Python) dùng để tạo video giải thích lập trình.\nHãy chỉnh sửa script này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic animation nào khác:\n\n0. CHUYỂN SANG DESIGN SYSTEM: script phải dùng `from conceptflow import *` và\n   class kế thừa `ConceptFlowScene` thay vì `Scene`. Thay các mobject thô bằng\n   component tương đương khi có: TitleCard (thẻ tiêu đề), Callout (chú thích có\n   khung), CodePanel (khối code), StepList (danh sách bước), ComparisonSplit (so\n   sánh hai cột), Recap (tóm tắt), FlowDiagram (sơ đồ luồng), BarChart (biểu đồ\n   cột), FunctionPlot (đồ thị hàm số), DataTable (bảng), Timeline (dòng thời gian);\n   mũi tên nối hai vật thì dùng self.connect, khung khoanh vật thì self.outline. Bỏ mọi khai báo màu hex, font_size và\n   background — theme lo phần đó. Chỗ nào component không diễn đạt được thì import\n   đích danh từ manim (ví dụ `from manim import Arrow`), KHÔNG dùng\n   `from manim import *`.\n\n   Nếu script đang dùng quy ước CŨ (comment `# NARRATION: \"...\"` kèm\n   `self.wait(AUTO)`) — quy ước đó ĐÃ BỊ GỠ BỎ khỏi hệ thống, script dùng nó sẽ\n   không tạo được giọng đọc nào cả. Chuyển mỗi cặp comment+wait đó thành một lời\n   gọi hàm `self.narrate(\"...\")` duy nhất, đặt đúng vị trí `self.wait(AUTO)`\n   cũ (xem quy tắc 2 bên dưới).\n\n1. Hệ thống chỉ render CLASS SCENE ĐẦU TIÊN xuất hiện trong file. Nếu script\n   có nhiều class Scene, hãy hỏi tôi muốn giữ class nào, hoặc giữ lại class\n   đầu tiên và báo cho tôi biết các class còn lại sẽ bị bỏ qua.\n\n2. Với MỖI đoạn animation cần có lời thoại/giọng đọc (voice-over), gọi ngay\n   tại điểm đó (không phải comment — một lời gọi hàm bình thường trong\n   construct()):\n       self.narrate(\"The English narration line for this beat\")\n   Lời gọi này tự dừng animation lại đúng bằng độ dài audio giọng đọc thật —\n   không cần (và không được) thêm self.wait(...) ngay sau nó. Dùng được cả bên\n   trong vòng lặp for/while, nhánh điều kiện, hay hàm helper.\n\n3. TUYỆT ĐỐI:\n   - KHÔNG dùng comment `# NARRATION:` hay `self.wait(AUTO)` dưới bất kỳ hình\n     thức nào — chúng không còn được hệ thống đọc.\n   - Không đổi các run_time=... bên trong self.play(...) — đó là tốc độ\n     animation nội bộ, không liên quan đến giọng đọc.\n   - Không đổi tên biến, màu sắc, logic, hay bất kỳ animation nào khác.\n   - Giữ nguyên toàn bộ code, chỉ thay các điểm cần giọng đọc bằng\n     self.narrate(...).\n\n4. Chia lời thoại theo từng \"nhịp\" animation hợp lý — mỗi lời gọi\n   self.narrate(...) nên tương ứng với một hành động/animation trên màn hình\n   đang diễn ra lúc đó, không gộp toàn bộ nội dung vào một câu duy nhất.\n\n5. Trả lại cho tôi TOÀN BỘ script đã chỉnh sửa, giữ nguyên format code.\n\n6. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n7. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua):\n   - Tìm lại trong TOÀN BỘ script (kể cả bên trong vòng lặp, hàm helper, nhánh\n     if): còn sót chuỗi `# NARRATION` hay `wait(AUTO)` nào không? Script dài\n     rất dễ sót vài chỗ ở giữa hoặc cuối file — rà đến hết, không chỉ vài dòng\n     đầu.\n   - Nếu CÒN SÓT dù chỉ một chỗ — script sẽ bị hệ thống từ chối ngay khi dán\n     vào. Sửa hết trước khi trả lời, không trả lời một phần rồi hẹn sửa tiếp.\n   - Số lượng `self.narrate(...)` có khớp đúng số điểm cần giọng đọc trong\n     script gốc không (không thiếu, không thừa)?\n\nScript gốc:\nclass A(Scene):\n    def construct(self):\n        pass"
+  },
+  {
+   "role": "remotion_adjust",
+   "input": {
+    "language": "en",
+    "script": "class A(Scene):\n    def construct(self):\n        pass"
+   },
+   "expected": "Tôi có một component Remotion (React/TypeScript, https://remotion.dev) dùng để tạo video giải thích.\nHãy chỉnh sửa code này để tương thích với hệ thống render tự động của tôi,\ntheo đúng các quy tắc sau — KHÔNG được thay đổi bất kỳ logic hình ảnh/animation nào khác:\n\n1. Phải có `export const narrations: string[]` liệt kê đúng và đủ mọi câu lời thoại, theo ĐÚNG thứ tự sẽ đọc — hệ thống lấy giọng đọc TTS từ đây, KHÔNG đọc từ bất kỳ đâu khác trong code.\n\n2. Phải có `<Composition id=\"creator\" ...>` — `id` PHẢI đúng là chuỗi `\"creator\"` (không đổi tên khác), và PHẢI có `calculateMetadata={calculateMetadataFromSegments}` (import từ `./conceptflow-mini/segments`) — thiếu cái này thời lượng video sẽ sai.\n\n3. Component chính phải nhận prop `segments` (mảng hệ thống tự truyền vào lúc render) và dùng `<Segments segments={segments}>{(index) => ...}</Segments>` để hiển thị đúng hình ảnh khớp với đoạn lời thoại thứ `index` — mỗi lần gọi callback tương ứng ĐÚNG MỘT phần tử trong `narrations`, theo đúng thứ tự.\n\n4. Import bắt buộc ở đầu file: `import {registerRoot, Composition} from 'remotion';` và `import {Stage} from './conceptflow-mini/primitives';` — bọc toàn bộ `<Segments>` trong `<Stage>` (nó tô nền cố định và đặt font Creator đã chọn). KHÔNG tự đặt `fontFamily` hay `backgroundColor` phủ toàn khung. KHÔNG in câu thoại (`narrations[index]`) lên hình — phụ đề do hệ thống lo. Chỉ import từ `react`, `remotion` và `./conceptflow-mini/*`.\n\n5. KÝ TỰ CẤM VIẾT TRẦN TRONG PHẦN CHỮ HIỂN THỊ TRÊN MÀN HÌNH (bên trong bất kỳ thẻ JSX nào, ví dụ `<div>...</div>`) — chỉ áp dụng cho chữ NẰM GIỮA các thẻ JSX, KHÔNG áp dụng cho chuỗi trong `narrations` hay trong thuộc tính `style={{...}}`: KHÔNG được viết trần các ký tự `<`, `>`, `{`, `}` (trình biên dịch JSX đọc chúng như cú pháp, không phải chữ thường — dù chỉ một ký tự `>` lạc trong câu so sánh số cũng làm cả file build lỗi). Nếu nội dung cần so sánh (ví dụ \"42 > 29\"), diễn đạt lại bằng chữ (\"42 lớn hơn 29\") hoặc bọc riêng ký tự đó: `{'>'}` (ví dụ: `42 {'>'} 29`).\n\n6. KHÔNG xếp chồng hai khối full-khung-hình (hai `<AbsoluteFill>`, hoặc một hình minh hoạ tự vẽ đặt `position: 'absolute'` phủ cả khung) làm ANH EM CÙNG CẤP trong một `index` — cả hai đều canh giữa màn hình nên chữ và hình sẽ đè thẳng lên nhau, không đọc được. Mỗi `index` trả về MỘT `<AbsoluteFill>` duy nhất; bên trong, mọi vật và nhãn có toạ độ/kích thước rõ ràng và không giao nhau.\n\n7. NGÔN NGỮ: Toàn bộ lời thoại trong `narrations` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (nhãn, con số, tiêu đề) cũng phải bằng tiếng Anh.\n\n8. TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA:\n   - Có đúng MỘT dòng `export const narrations: string[]`, đủ và đúng thứ tự mọi câu lời thoại?\n   - `<Composition id=\"creator\" ...>` có đúng `id=\"creator\"` và có `calculateMetadata={calculateMetadataFromSegments}` không?\n   - Component chính có dùng `<Segments>` đúng cách, số phần tử render ra khớp đúng số câu trong `narrations` không (không thiếu, không thừa)?\n   - Rà lại MỌI đoạn chữ nằm giữa thẻ JSX (không phải trong `narrations` hay `style={{...}}`): có ký tự `<`, `>`, `{`, `}` nào bị viết trần không?\n   - Có `index` nào render hai khối full-khung-hình cùng lúc (đè chữ lên hình hoặc hình lên chữ) không? Nếu có, gộp lại theo mục 6.\n   - Code có phải TypeScript/TSX hợp lệ 100%, không cắt cụt không?\n\n9. Trả lại cho tôi TOÀN BỘ code đã chỉnh sửa, giữ nguyên phần hình ảnh/bố cục hiện có — chỉ thêm/sửa đúng phần cấu trúc bắt buộc ở trên.\n\nCode gốc:\nclass A(Scene):\n    def construct(self):\n        pass"
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "en",
+    "topic": ""
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "en",
+    "topic": "  "
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "short_script",
+   "input": {
+    "language": "en",
+    "topic": "Vòng lặp for trong Java"
+   },
+   "expected": "Bạn là một NHÀ SÁNG TẠO NỘI DUNG giáo dục, chuyên viết video ngắn (YouTube Shorts/TikTok) bằng Manim (Community Edition v0.18). Đây KHÔNG PHẢI bản rút gọn của một video dài — video này phải tự đứng được một mình, không cần xem gì khác trước đó.\n\n======================================================\nCHỦ ĐỀ VIDEO: Vòng lặp for trong Java\n======================================================\n\n## RÀNG BUỘC NỘI DUNG — khác hẳn video dài\n\n1. Độ dài mục tiêu: 30–60 giây lời thoại — ĐÚNG MỘT Ý, không có đoạn \"khởi\n   động\" hay hạ nhiệt giữa video như bản dài.\n2. Hook trong 2 GIÂY ĐẦU — câu đầu tiên phải khiến người xem dừng lướt, không\n   phải một câu giới thiệu chung chung.\n3. Không cố nhồi nhiều ý — một video dài có thể có nhiều phần, video ngắn\n   không có chỗ cho việc đó. Chọn ĐÚNG MỘT lát cắt hay nhất của chủ đề.\n\n## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)\n\n1. Dòng import luôn là:\n   from conceptflow import *\n\n2. Định nghĩa đúng MỘT class Scene chính, kế thừa `ConceptFlowScene`:\n   class <TênMôTảChủĐề>Scene(ConceptFlowScene):\n       def construct(self):\n           ...\n\n3. **BẮT BUỘC, khác bản dài**: TOÀN BỘ nội dung bên trong `construct()` phải\n   nằm trong ĐÚNG MỘT khối:\n       with self.clip(\"short\"):\n           ...toàn bộ animation và self.narrate(...) ở đây...\n   Đây là điều kiện DUY NHẤT để hệ thống nhận ra đây là một clip dọc\n   Shorts/TikTok — thiếu dòng này, video vẫn render được nhưng KHÔNG có clip\n   nào xuất ra, và không có cảnh báo nào khác ngoài \"Chưa có clip nào\" ở màn\n   kết quả.\n\n4. Lời thoại là một LỜI GỌI HÀM: `self.narrate(\"Câu lời thoại tự nhiên\")` —\n   không dùng comment, không thêm `self.wait(...)` ngay sau nó.\n\n5. NGÔN NGỮ: Toàn bộ lời thoại trong `self.narrate(\"...\")` phải viết bằng TIẾNG ANH (English) — video này hướng tới khán giả nói tiếng Anh. Mọi chữ hiển thị trên khung hình (Text, MathTex, nhãn, tiêu đề) cũng phải bằng tiếng Anh.\n\n## API ĐƯỢC PHÉP DÙNG (giống hệt bản dài — chỉ những thứ dưới đây)\n\nComponent: `TitleCard`, `Callout`, `CodePanel`, `StepList`, `ComparisonSplit`, `Recap`,\n`FlowDiagram`, `BarChart`, `FunctionPlot`, `DataTable`, `Timeline`.\nMethod: `self.narrate(...)`, `self.hook(...)`, `self.call_to_action(...)`,\n`self.title/heading/body/caption/formula/code(...)`, `self.stack/row/fit(...)`,\n`self.reveal/dismiss/swap/emphasize/clear_stage(...)`. KHÔNG đặt màu/font_size\nbằng tay — theme lo phần đó.\n\n## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA\n\n1. Toàn bộ `construct()` có nằm trong ĐÚNG MỘT `with self.clip(\"short\"):` không?\n2. Câu lời thoại đầu tiên có phải một hook thật sự, không phải câu giới thiệu chung chung?\n3. Tổng lời thoại có nằm trong khoảng 30–60 giây không (ước lượng theo tốc độ đọc bình thường)?\n4. Có đúng MỘT ý duy nhất, không lan man sang ý khác?\n\n## OUTPUT\n\nChỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong \\`\\`\\`python ... \\`\\`\\`), không giải thích thêm ở ngoài code."
+  },
+  {
+   "role": "thumbnail_design",
+   "input": {
+    "language": "vi",
+    "topic": ""
+   },
+   "expected": "Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## VAI TRÒ CỦA BẠN\n\nVới chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).\n\n## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH\n\n1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.\n2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).\n3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).\n4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.\n5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục \"chừa chỗ trống cho tiêu đề\" thay vì yêu cầu AI viết chữ).\n6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.\n\n## OUTPUT\n\nChỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: \"16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text\".\n\n## KHÁN GIẢ\n\nVideo này hướng tới khán giả NÓI TIẾNG VIỆT. Có thể dùng yếu tố văn hoá/bối cảnh gần gũi với người Việt nếu phù hợp chủ đề."
+  },
+  {
+   "role": "thumbnail_design",
+   "input": {
+    "language": "vi",
+    "topic": "Vì sao bầu trời xanh"
+   },
+   "expected": "Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).\n\n======================================================\nCHỦ ĐỀ VIDEO: Vì sao bầu trời xanh\n======================================================\n\n## VAI TRÒ CỦA BẠN\n\nVới chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).\n\n## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH\n\n1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.\n2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).\n3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).\n4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.\n5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục \"chừa chỗ trống cho tiêu đề\" thay vì yêu cầu AI viết chữ).\n6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.\n\n## OUTPUT\n\nChỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: \"16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text\".\n\n## KHÁN GIẢ\n\nVideo này hướng tới khán giả NÓI TIẾNG VIỆT. Có thể dùng yếu tố văn hoá/bối cảnh gần gũi với người Việt nếu phù hợp chủ đề."
+  },
+  {
+   "role": "thumbnail_design",
+   "input": {
+    "language": "en",
+    "topic": ""
+   },
+   "expected": "Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).\n\n======================================================\nCHỦ ĐỀ VIDEO: [DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]\n======================================================\n\n## VAI TRÒ CỦA BẠN\n\nVới chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).\n\n## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH\n\n1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.\n2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).\n3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).\n4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.\n5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục \"chừa chỗ trống cho tiêu đề\" thay vì yêu cầu AI viết chữ).\n6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.\n\n## OUTPUT\n\nChỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: \"16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text\".\n\n## KHÁN GIẢ\n\nVideo này hướng tới khán giả NÓI TIẾNG ANH. Nếu mô tả có yếu tố văn hoá/bối cảnh, chọn yếu tố trung tính hoặc phương Tây, đừng dùng yếu tố đặc thù Việt Nam."
+  },
+  {
+   "role": "thumbnail_design",
+   "input": {
+    "language": "en",
+    "topic": "Vì sao bầu trời xanh"
+   },
+   "expected": "Bạn là một NHÀ THIẾT KẾ THUMBNAIL chuyên nghiệp cho video YouTube giáo dục, tạo ảnh bằng công cụ AI sinh ảnh (Midjourney / DALL-E / Ideogram / Stable Diffusion...).\n\n======================================================\nCHỦ ĐỀ VIDEO: Vì sao bầu trời xanh\n======================================================\n\n## VAI TRÒ CỦA BẠN\n\nVới chủ đề trên, hãy TỰ MÌNH nghĩ ra một prompt sinh ảnh thumbnail YouTube thật bắt mắt, đúng phong cách các kênh giáo dục top đầu (rõ ràng, tương phản cao, click-bait vừa phải nhưng không sai lệch nội dung).\n\n## YÊU CẦU BẮT BUỘC CHO PROMPT SINH ẢNH\n\n1. Bố cục 16:9, chủ thể chính đặt lệch trái hoặc phải (theo quy tắc 1/3), chừa khoảng trống cho chữ tiêu đề.\n2. Mô tả rõ: đối tượng/nhân vật hoặc biểu tượng trung tâm minh hoạ đúng chủ đề, biểu cảm/hành động sinh động (ví dụ: ngạc nhiên, chỉ tay, so sánh hai bên).\n3. Bảng màu tương phản mạnh, nổi bật trên nền tối hoặc nền sáng rực (ưu tiên 2-3 màu chủ đạo, tránh loè loẹt quá 4 màu).\n4. Nếu chủ đề có tính so sánh/đối lập, gợi ý bố cục chia đôi (trái/phải hoặc trên/dưới) thể hiện rõ hai vế so sánh.\n5. Phong cách: flat illustration / 3D render sạch / phong cách kênh công nghệ-giáo dục hiện đại — không dùng ảnh thật của người nổi tiếng, không chữ nhỏ khó đọc (chữ trong ảnh do AI tạo thường bị lỗi, nên mô tả bố cục \"chừa chỗ trống cho tiêu đề\" thay vì yêu cầu AI viết chữ).\n6. Không chứa logo, watermark, hay nội dung vi phạm bản quyền của bên thứ ba.\n\n## OUTPUT\n\nChỉ trả lời bằng ĐÚNG MỘT đoạn prompt sinh ảnh (tiếng Anh, vì hầu hết công cụ sinh ảnh cho kết quả tốt hơn với prompt tiếng Anh), không giải thích thêm ở ngoài, không bọc trong code block. Cuối prompt thêm các từ khoá kỹ thuật: \"16:9 aspect ratio, YouTube thumbnail, high contrast, vibrant colors, clean composition, no text\".\n\n## KHÁN GIẢ\n\nVideo này hướng tới khán giả NÓI TIẾNG ANH. Nếu mô tả có yếu tố văn hoá/bối cảnh, chọn yếu tố trung tính hoặc phương Tây, đừng dùng yếu tố đặc thù Việt Nam."
+  }
+ ],
+ "subtitle_zones": [
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "small",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "large",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "off",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "small",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "large",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "track",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "small",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 200 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 224."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 880 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 856."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 240 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 264."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 840 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 816."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "large",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 280 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 304."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 800 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 776."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 240 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 264."
+  },
+  {
+   "language": "vi",
+   "mode": "burn_in",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 840 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 816."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "small",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 200 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 224."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 880 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 856."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 240 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 264."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 840 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 816."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "large",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 280 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 304."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 800 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 776."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến 240 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = 264."
+  },
+  {
+   "language": "vi",
+   "mode": "both",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "phụ đề được in ở MÉP DƯỚI khung — dải y từ 840 đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = 816."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "small",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "large",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "off",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "small",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "large",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "track",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "this video has NO burned-in subtitles — the whole safe area is yours."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "small",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 200 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 224."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 880 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 856."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 240 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 264."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 840 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 816."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "large",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 280 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 304."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 800 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 776."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 240 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 264."
+  },
+  {
+   "language": "en",
+   "mode": "burn_in",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 840 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 816."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "small",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 200 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 224."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "small",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 880 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 856."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "medium",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 240 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 264."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "medium",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 840 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 816."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "large",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 280 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 304."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "large",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 800 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 776."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "huge",
+   "position": "top",
+   "expected": "subtitles are burned in at the TOP of the frame — the strip from y = 0 to 240 px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = 264."
+  },
+  {
+   "language": "en",
+   "mode": "both",
+   "font_size": "huge",
+   "position": "bottom",
+   "expected": "subtitles are burned in at the BOTTOM of the frame — the strip from y = 840 to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = 816."
+  }
+ ]
+}

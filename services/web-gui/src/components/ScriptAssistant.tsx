@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { buildAdjustPromptFor, buildRemotionAdjustPromptFor } from "./scriptPrompts";
+import { useState } from "react";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { Card, TextArea } from "./ui";
 import styles from "./ScriptAssistant.module.css";
 
@@ -32,13 +32,14 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
-  const prompt = useMemo(
-    () =>
-      renderEngine === "remotion"
-        ? buildRemotionAdjustPromptFor(contentLanguage, existingScript)
-        : buildAdjustPromptFor(contentLanguage, existingScript),
-    [contentLanguage, existingScript, renderEngine],
-  );
+  // CR-040 FR113: the "fix my existing code" prompt is a library role rendered by
+  // the server; the pasted script travels as data and is never re-expanded.
+  const rendered = useRenderedPrompt({
+    role: renderEngine === "remotion" ? "remotion_adjust" : "manim_adjust",
+    language: contentLanguage,
+    script: existingScript,
+  });
+  const prompt = rendered.prompt ?? (rendered.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
   const isFilled = existingScript.trim().length > 0;
 
@@ -86,6 +87,7 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
                 type="button"
                 className={styles.copyButton}
                 data-testid="script-assistant-copy"
+                disabled={rendered.prompt === null || rendered.stale}
                 onClick={handleCopy}
               >
                 <CopyIcon />

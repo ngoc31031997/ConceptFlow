@@ -132,3 +132,33 @@ func TestNarrationLanguageRule_NamesTheRightLanguage(t *testing.T) {
 		t.Fatalf("English rule looks wrong: %q", NarrationLanguageRule("en"))
 	}
 }
+
+// CR-040 FR113.2: the subtitle-zone text web-gui used to build, for every
+// language × mode × size × position, including the unknown size that falls back to medium.
+func TestSubtitleZoneFor_MatchesTheTypeScriptCharacterForCharacter(t *testing.T) {
+	raw, err := os.ReadFile("testdata/prompt_golden.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var golden struct {
+		Zones []struct {
+			Language string `json:"language"`
+			Mode     string `json:"mode"`
+			FontSize string `json:"font_size"`
+			Position string `json:"position"`
+			Expected string `json:"expected"`
+		} `json:"subtitle_zones"`
+	}
+	if err := json.Unmarshal(raw, &golden); err != nil {
+		t.Fatal(err)
+	}
+	if len(golden.Zones) == 0 {
+		t.Fatal("golden file has no subtitle zones")
+	}
+	for _, z := range golden.Zones {
+		got := SubtitleZoneFor(SubtitleMode(z.Mode), SubtitleStyle{FontSize: z.FontSize, Position: z.Position}, z.Language)
+		if got != z.Expected {
+			t.Errorf("%s/%s/%s/%s:\n got: %s\nwant: %s", z.Language, z.Mode, z.FontSize, z.Position, got, z.Expected)
+		}
+	}
+}

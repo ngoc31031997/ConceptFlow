@@ -5,6 +5,7 @@ import { ManimEngineerStepPage } from "../../src/pages/ManimEngineerStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
+import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
 const VALID_CODE = [
   "from conceptflow import *",
@@ -18,14 +19,7 @@ const VALID_CODE = [
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring VisualDirectorStepPage.test.tsx's stub.
 beforeEach(() => {
-  vi.spyOn(apiClient, "getPromptTemplate").mockResolvedValue({
-    role: "manim_engineer",
-    id: "system-x",
-    name: "Mặc định",
-    is_system: true,
-    is_active: true,
-    template_text: "TIEN DE: {{previous_output}}",
-  });
+  mockRenderPrompt();
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
     topic: "",
     story: "",
@@ -116,19 +110,10 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
   });
 
-  // feature/remotion-engine: the remotion_engineer prompt is topic -> code,
-  // so it carries {{topic}}. Leaving it unsubstituted hands the Creator a
-  // prompt that still says "paste your topic here".
-  it("fills {{topic}} in the engineer prompt instead of leaving the raw token", async () => {
-    vi.mocked(apiClient.getPromptTemplate).mockResolvedValue({
-      role: "remotion_engineer",
-      id: "system-x",
-      name: "Mặc định",
-      is_system: true,
-      is_active: true,
-      template_text: "CHU DE VIDEO: {{topic}}",
-    });
-
+  // CR-040 FR113: the {{topic}} substitution lives on the server now (and is held
+  // to the old TypeScript output by its golden tests). This proves the wiring: the
+  // page sends the draft's values and shows what the server answers.
+  it("asks the server to render the engineer prompt and shows its answer", async () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -140,13 +125,16 @@ describe("ManimEngineerStepPage", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByTestId("manim-engineer-prompt")).toHaveValue(
-        "CHU DE VIDEO: [DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]",
+      expect((screen.getByTestId("manim-engineer-prompt") as HTMLTextAreaElement).value).toContain(
+        "RENDERED[manim_engineer]",
       );
     });
+    expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "manim_engineer", language: expect.stringMatching(/^(vi|en)$/) }),
+    );
   });
 
-  it("shows the render engine picker", () => {
+  it("shows the render engine picker", async () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -164,6 +152,8 @@ describe("ManimEngineerStepPage", () => {
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
     expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("render-engine-remotion"));
-    expect(apiClient.getPromptTemplate).toHaveBeenCalledWith("remotion_engineer");
+    await waitFor(() =>
+      expect(apiClient.renderPrompt).toHaveBeenCalledWith(expect.objectContaining({ role: "remotion_engineer" })),
+    );
   });
 });

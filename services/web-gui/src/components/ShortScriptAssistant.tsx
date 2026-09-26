@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { ApiError, startRenderSaga, suggestShortScript } from "../api/client";
+import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { useOperationRun } from "../hooks/useOperationRun";
 import { AiOperationCard } from "./AiOperationCard";
-import { buildShortScriptSystemPrompt } from "./scriptPrompts";
 import { Button, CtaRow, TextArea, TextInput } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ScriptAssistant.module.css";
@@ -48,7 +48,9 @@ export function ShortScriptAssistant({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const prompt = buildShortScriptSystemPrompt(contentLanguage, topic);
+  // CR-040 FR113: rendered by the server from the `short_script` library role.
+  const rendered = useRenderedPrompt({ role: "short_script", language: contentLanguage, topic });
+  const prompt = rendered.prompt ?? (rendered.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
   async function handleCopy() {
     try {
@@ -137,6 +139,7 @@ export function ShortScriptAssistant({
               type="button"
               className={styles.copyButton}
               data-testid="short-script-copy"
+              disabled={rendered.prompt === null || rendered.stale}
               onClick={handleCopy}
             >
               <CopyIcon />
