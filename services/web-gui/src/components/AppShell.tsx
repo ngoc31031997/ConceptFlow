@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useContext, useState } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
-import { ProjectDraftContext, NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
+import { ProjectDraftContext, ProjectDraftDispatchContext, NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useStepNav } from "../hooks/useStepNav";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
@@ -35,6 +35,10 @@ const navCls = ({ isActive }: { isActive: boolean }) =>
 
 export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
   const draft = useContext(ProjectDraftContext);
+  const dispatch = useContext(ProjectDraftDispatchContext);
+  // Reset ngay khi bấm, không chỉ dựa vào router state: bấm khi đang ở "/" thì
+  // location.state có thể không kích hoạt lại effect của ScriptStepPage.
+  const startNewVideo = () => dispatch({ type: "RESET" });
   const routeProjectId = useParams().id;
   // Tên project (chủ đề) từ bước 2 trở đi, để biết đang theo dõi project nào.
   // Trên màn có :id thì chỉ hiện khi bản nháp đang nạp đúng project đó.
@@ -66,7 +70,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       <div className={`${styles.blob} ${styles.blob3}`} />
 
       <aside className={styles.sidebar}>
-        <Link to="/" state={NEW_VIDEO_STATE} className={styles.logo} style={{ textDecoration: "none" }}>
+        <Link to="/" state={NEW_VIDEO_STATE} onClick={startNewVideo} className={styles.logo} style={{ textDecoration: "none" }}>
           <img
             className={styles.logoMark}
             src="/icon-192.png"
@@ -80,7 +84,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
         </Link>
 
         <nav className={styles.sideNav}>
-          <NavLink to="/" end state={NEW_VIDEO_STATE} className={navCls}>Tạo video mới</NavLink>
+          <NavLink to="/" end state={NEW_VIDEO_STATE} onClick={startNewVideo} className={navCls}>Tạo video mới</NavLink>
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
           <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
           {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}
