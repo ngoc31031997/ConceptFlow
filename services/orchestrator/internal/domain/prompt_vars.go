@@ -38,6 +38,14 @@ var themeReferenceVI string
 //go:embed prompts/theme_reference_en.txt
 var themeReferenceEN string
 
+// lottie_catalog_vi.txt is GENERATED from the approved clips in
+// rendering/remotion_project/lottie/manifest.json by
+// rendering/tools/lottie_catalog.py prompt (CR-038) — never edit it by hand.
+// It is Vietnamese only, like the seeded prompts that carry it.
+//
+//go:embed prompts/lottie_catalog_vi.txt
+var lottieCatalogVI string
+
 //go:embed prompts/narration_rule_vi.txt
 var narrationRuleVI string
 
@@ -80,6 +88,12 @@ func ThemeReference(language string) string {
 // literal placeholder.
 func withThemeReference(text, language string) string {
 	return strings.ReplaceAll(text, "{{theme_reference}}", ThemeReference(language))
+}
+
+// withLottieCatalog expands {{lottie_catalog}} at seed time, for the same reason
+// as withThemeReference: the copy-the-prompt flow reads the stored text as-is.
+func withLottieCatalog(text string) string {
+	return strings.ReplaceAll(text, "{{lottie_catalog}}", strings.TrimSpace(lottieCatalogVI))
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from application.validate_script import ScriptValidationError, ValidateScriptUseCase
@@ -74,3 +76,30 @@ def test_canh_bao_khong_chan_va_duoc_tra_ve():
 def test_tu_choi_script_rong():
     with pytest.raises(ScriptValidationError):
         ValidateScriptUseCase(FakeRenderer()).validate(make_request("   "))
+
+
+REMOTION_WITH_CLIP = (
+    "export const narrations: string[] = ['một'];\n"
+    "const A = () => <LottieClip id=\"cat.idle\" />;\n"
+)
+
+
+def make_remotion_request(script: str) -> ScriptRenderRequest:
+    return dataclasses.replace(make_request(script), engine="remotion")
+
+
+def test_remotion_chan_lottie_id_ngoai_danh_muc():
+    use_case = ValidateScriptUseCase(FakeRenderer(), lambda: {"cat.thinking"})
+    with pytest.raises(ScriptValidationError, match="cat.idle"):
+        use_case.validate(make_remotion_request(REMOTION_WITH_CLIP))
+
+
+def test_remotion_cho_qua_khi_id_da_duyet():
+    use_case = ValidateScriptUseCase(FakeRenderer(), lambda: {"cat.idle"})
+    assert use_case.validate(make_remotion_request(REMOTION_WITH_CLIP)).dry_run is not None
+
+
+def test_manim_khong_bi_lint_lottie():
+    # Script Manim không bao giờ chứa LottieClip; lint chỉ chạy cho engine remotion.
+    use_case = ValidateScriptUseCase(FakeRenderer(), lambda: set())
+    use_case.validate(make_request())
