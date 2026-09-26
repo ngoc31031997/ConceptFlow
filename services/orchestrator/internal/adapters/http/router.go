@@ -71,9 +71,9 @@ type updateProjectTopicUseCase interface {
 	Execute(ctx context.Context, input application.UpdateProjectTopicInput) (*application.UpdateProjectTopicOutput, error)
 }
 
-// saveWizardSettingsUseCase backs PUT /v1/projects/{id}/settings (wizard step 2).
-type saveWizardSettingsUseCase interface {
-	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
+// patchWizardSettingsUseCase backs PATCH /v1/projects/{id}/settings (wizard step 2).
+type patchWizardSettingsUseCase interface {
+	Execute(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error
 }
 
 // qcReportReader is the single read this router needs from the QC report
@@ -128,7 +128,7 @@ type Router struct {
 	projectEvents      domain.ProjectEventPort
 	cancelStep         cancelStepUseCase
 	forkProject        forkProjectUseCase
-	saveWizardSettings saveWizardSettingsUseCase
+	saveWizardSettings patchWizardSettingsUseCase
 	createProjectDraft createProjectDraftUseCase
 	updateProjectTopic updateProjectTopicUseCase
 	// authored says which authoring artefacts a draft holds — that lives in
@@ -270,8 +270,8 @@ func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase
 }
 
 // WithWizard attaches the wizard's per-step saves, enabling
-// PUT /v1/projects/{project_id}/settings.
-func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase) *Router {
+// PATCH /v1/projects/{project_id}/settings.
+func (rt *Router) WithWizard(saveSettings patchWizardSettingsUseCase) *Router {
 	rt.saveWizardSettings = saveSettings
 	return rt
 }
@@ -336,7 +336,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/events", rt.handleListProjectEvents)
 	r.Get("/v1/events", rt.handleListRecentEvents)
 	// CR-027 FR79 — the step-1 working mode, remembered per project.
-	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
+	r.Patch("/v1/projects/{project_id}/settings", rt.handlePatchWizardSettings)
 	return r
 }
 
@@ -1003,42 +1003,49 @@ func (rt *Router) handleEditNarration(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleSaveWizardSettings persists wizard step 2 when the Creator presses
-// "Tiếp tục". PUT: it replaces the whole settings set and is safe to repeat.
-// 409 once the render has started, the same lock the authoring saves use.
-func (rt *Router) handleSaveWizardSettings(w http.ResponseWriter, r *http.Request) {
+// handlePatchWizardSettings persists wizard step 2 one change at a time: only
+// the fields in the body are written. `confirm: true` (the "Tiếp tục" press)
+// also advances the project to step 3. 409 once the render has started, the
+// same lock the authoring saves use.
+func (rt *Router) handlePatchWizardSettings(w http.ResponseWriter, r *http.Request) {
 	if rt.saveWizardSettings == nil {
 		writeError(w, http.StatusNotFound, "wizard settings is not enabled")
 		return
 	}
-	var req saveWizardSettingsRequest
+	var req patchWizardSettingsRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	ttsEnabled := true
-	if req.TTSEnabled != nil {
-		ttsEnabled = *req.TTSEnabled
-	}
-	err := rt.saveWizardSettings.Execute(r.Context(), chi.URLParam(r, "project_id"), domain.WizardSettings{
-		ContentLanguage:       domain.ContentLanguage(req.ContentLanguage),
-		RenderEngine:          domain.RenderEngine(req.RenderEngine),
-		TTSEnabled:            ttsEnabled,
+	err := rt.saveWizardSettings.Execute(r.Context(), chi.URLParam(r, "project_id"), domain.WizardSettingsPatch{
+		ContentLanguage:       enumPtr[domain.ContentLanguage](req.ContentLanguage),
+		RenderEngine:          enumPtr[domain.RenderEngine](req.RenderEngine),
+		TTSEnabled:            req.TTSEnabled,
 		VoiceID:               req.VoiceID,
-		SubtitleMode:          domain.SubtitleMode(req.SubtitleMode),
+		SubtitleMode:          enumPtr[domain.SubtitleMode](req.SubtitleMode),
 		SubtitleStyle:         req.SubtitleStyle,
-		RenderQuality:         domain.RenderQuality(req.RenderQuality),
+		RenderQuality:         enumPtr[domain.RenderQuality](req.RenderQuality),
 		VideoFormatID:         req.VideoFormatID,
-		VideoOutputMode:       domain.VideoOutputMode(req.VideoOutputMode),
+		VideoOutputMode:       enumPtr[domain.VideoOutputMode](req.VideoOutputMode),
 		BackgroundMusicPath:   req.BackgroundMusicPath,
 		BackgroundMusicVolume: req.BackgroundMusicVolume,
 		VideoFont:             req.VideoFont,
+		Confirm:               req.Confirm,
 	})
 	if err != nil {
 		writeUseCaseError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// enumPtr converts an optional wire string to an optional string-typed enum.
+func enumPtr[T ~string](s *string) *T {
+	if s == nil {
+		return nil
+	}
+	v := T(*s)
+	return &v
 }
 
 // --- internal API for authoring-service (CR-040 FR111) ----------------------

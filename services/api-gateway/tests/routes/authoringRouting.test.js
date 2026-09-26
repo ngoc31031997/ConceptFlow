@@ -45,7 +45,7 @@ describe('routing between orchestrator and authoring-service', () => {
     ['get', '/v1/operations/delete:p1', 'orchestrator'],
     ['get', '/v1/projects/p1', 'orchestrator'],
     ['post', '/v1/projects', 'orchestrator'],
-    ['put', '/v1/projects/p1/settings', 'orchestrator'],
+    ['patch', '/v1/projects/p1/settings', 'orchestrator'],
     ['get', '/v1/projects/p1/errors', 'orchestrator'],
   ])('%s %s goes to %s', async (method, url, target) => {
     await request(buildApp(clients))[method](url).send({});

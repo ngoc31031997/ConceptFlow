@@ -896,33 +896,44 @@ export interface WizardSettingsInput {
   renderQuality: string;
   videoFormatId: string;
   videoOutputMode: string;
-  backgroundMusicPath: string | null;
+  /** "" xoá nhạc nền. */
+  backgroundMusicPath: string;
   backgroundMusicVolume: number;
 }
 
+/** Chỉ các field vừa đổi; `confirm` = Creator bấm "Tiếp tục" (sang bước 3). */
+export type WizardSettingsPatch = Partial<WizardSettingsInput> & { confirm?: boolean };
+
+const WIZARD_PATCH_WIRE_KEYS: Record<keyof WizardSettingsPatch, string> = {
+  voiceLanguage: "voice_language",
+  renderEngine: "render_engine",
+  videoFont: "video_font",
+  ttsEnabled: "tts_enabled",
+  voiceId: "voice_id",
+  subtitleMode: "subtitle_mode",
+  subtitleStyle: "subtitle_style",
+  renderQuality: "render_quality",
+  videoFormatId: "video_format_id",
+  videoOutputMode: "video_output_mode",
+  backgroundMusicPath: "background_music_path",
+  backgroundMusicVolume: "background_music_volume",
+  confirm: "confirm",
+};
+
 /**
- * Lưu bước 2 lên server khi Creator bấm "Tiếp tục" — giọng đọc, phụ đề, định
- * dạng, chất lượng, nhạc nền nằm trong hàng project chứ không chỉ trong
+ * Lưu bước 2 lên server từng field ngay khi Creator đổi — giọng đọc, phụ đề,
+ * định dạng, chất lượng, nhạc nền nằm trong hàng project chứ không chỉ trong
  * localStorage, nên mở lại ở máy khác vẫn còn. 409 nếu render đã bắt đầu.
  */
-export async function saveWizardSettings(projectId: string, s: WizardSettingsInput): Promise<void> {
+export async function patchWizardSettings(projectId: string, patch: WizardSettingsPatch): Promise<void> {
+  const body: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(patch)) {
+    if (value !== undefined) body[WIZARD_PATCH_WIRE_KEYS[key as keyof WizardSettingsPatch]] = value;
+  }
   await apiFetch<undefined>(`/v1/projects/${projectId}/settings`, {
-    method: "PUT",
+    method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      voice_language: s.voiceLanguage,
-      render_engine: s.renderEngine,
-      video_font: s.videoFont,
-      tts_enabled: s.ttsEnabled,
-      voice_id: s.ttsEnabled ? (s.voiceId ?? undefined) : undefined,
-      subtitle_mode: s.subtitleMode,
-      subtitle_style: s.subtitleStyle,
-      render_quality: s.renderQuality,
-      video_format_id: s.videoFormatId,
-      video_output_mode: s.videoOutputMode,
-      background_music_path: s.backgroundMusicPath ?? undefined,
-      background_music_volume: s.backgroundMusicPath ? s.backgroundMusicVolume : undefined,
-    }),
+    body: JSON.stringify(body),
   });
 }
 

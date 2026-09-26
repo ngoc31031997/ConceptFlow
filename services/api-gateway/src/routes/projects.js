@@ -100,9 +100,9 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/authoring/mode', proxyHandler(authoring, 'authoring-service'));
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
   router.put('/v1/projects/:id/authoring/models', proxyHandler(authoring, 'authoring-service'));
-  // Wizard: "Tiếp tục" lưu dữ liệu của bước và bước đã tới. settings = bước 2
-  // (Cấu hình).
-  router.put('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Wizard: settings = bước 2 (Cấu hình), PATCH từng field khi Creator đổi;
+  // "Tiếp tục" gửi confirm để sang bước 3.
+  router.patch('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
   // Records which wizard screen a draft was left on, so "Chi tiết" reopens there.
   // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
