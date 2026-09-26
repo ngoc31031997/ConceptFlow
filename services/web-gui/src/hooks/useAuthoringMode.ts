@@ -1,5 +1,5 @@
 import { useContext, useEffect } from "react";
-import { getAuthoringState, saveAuthoringMode, type AuthoringMode } from "../api/client";
+import { createProjectDraft, getAuthoringState, saveAuthoringMode, type AuthoringMode } from "../api/client";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 
 /**
@@ -64,9 +64,23 @@ export function useAuthoringMode(projectId: string): {
       dispatch({ type: "SET_AUTHORING_MODE", payload: mode });
       if (!projectId) return;
       writeVersion.set(projectId, (writeVersion.get(projectId) ?? 0) + 1);
-      void saveAuthoringMode(projectId, mode).catch(() => {
-        /* best-effort — see the docstring */
-      });
+      // The mode picker is reachable before the project row exists server-side
+      // (step 1, before a topic/engine ever triggered createProjectDraft), and
+      // project_authoring has an FK to projects — saving the mode first would
+      // fail against a row that isn't there yet, and that failure used to be
+      // swallowed, silently reverting the Creator's choice on next load.
+      // Ensuring the row exists first (idempotent upsert, same call used on
+      // engine change) makes the save land instead of quietly disappearing.
+      void createProjectDraft(projectId, "", draft.voiceLanguage, draft.renderEngine)
+        .catch(() => {
+          /* best-effort — the mode PUT below still tries even if this raced
+             with another creator of the same row */
+        })
+        .then(() => saveAuthoringMode(projectId, mode))
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.error("Không lưu được cách làm đã chọn lên máy chủ:", err);
+        });
     },
   };
 }
