@@ -411,13 +411,17 @@ export function AuthoringModeBar({
               cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
           {running && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
-              <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
-                <div className={styles.progressBar} />
-              </div>
-              {live?.running && (
-                <p className={styles.status} data-testid="authoring-live-progress">
-                  {liveProgressText(live)}
-                </p>
+              {run.steps.length <= 1 && (
+                <>
+                  <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
+                    <div className={styles.progressBar} />
+                  </div>
+                  {live?.running && (
+                    <p className={styles.status} data-testid="authoring-live-progress">
+                      {liveProgressText(live)}
+                    </p>
+                  )}
+                </>
               )}
               {run.steps.length > 1 && (
                 <ol className={styles.stepper}>
@@ -430,15 +434,21 @@ export function AuthoringModeBar({
                         data-testid={`authoring-run-panel-${step}`}
                         aria-current={status === "running" ? "step" : undefined}
                       >
-                        <span className={styles.stepIcon} aria-hidden="true">
-                          {status === "done" ? "✓" : status === "running" ? <span className={styles.spinnerSm} /> : index + 1}
+                        <span className={styles.stepName}>{STEP_LABELS[step]}</span>
+                        <span className={styles.stepNote}>
+                          {status === "done"
+                            ? ["xong", runs[step] ? formatClock(runs[step]!.durationMs / 1000) : null, runs[step]?.chars ? `${formatChars(runs[step]!.chars)} ký tự` : null]
+                                .filter(Boolean)
+                                .join(" · ")
+                            : status === "running"
+                            ? stepLiveNote(live)
+                            : "chờ"}
                         </span>
-                        <span className={styles.stepText}>
-                          <span className={styles.stepName}>{STEP_LABELS[step]}</span>
-                          <span className={styles.stepNote}>
-                            {status === "done" ? "Xong" : status === "running" ? "Đang chạy" : "Chờ"}
-                          </span>
-                        </span>
+                        {status === "running" && (
+                          <div className={styles.progressTrack} role="progressbar" aria-label="Tiến độ AI" aria-busy="true">
+                            <div className={styles.progressBar} />
+                          </div>
+                        )}
                       </li>
                     );
                   })}
@@ -499,7 +509,22 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
 }
 
 function formatChars(n: number): string {
-  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+  return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
+}
+
+/** 125 → "2m05s", 42 → "42s": dạng gọn cho dòng phụ của thẻ bước. */
+function formatClock(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+}
+
+/** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m05s". */
+function stepLiveNote(p: AuthoringProgress | null): string {
+  if (!p?.running) return "đang chạy";
+  const time = formatClock(p.elapsed_seconds);
+  if (p.phase === "writing") return `AI đang viết · ${formatChars(p.content_chars)} ký tự · ${time}`;
+  if (p.phase === "reasoning") return `AI đang suy luận · ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
+  return `${liveProgressText(p).replace(/….*$/, "").replace(/:.*$/, "")} · ${time}`;
 }
 
 /** Câu tiến độ từ luồng streaming: pha hiện tại, lượng chữ đã nhận, thời gian. */

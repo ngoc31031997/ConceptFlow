@@ -65,7 +65,7 @@
 }
 
 .progressTrack {
-  height: 4px;
+  height: 10px;
   border-radius: var(--radius);
   background: var(--muted);
   overflow: hidden;
@@ -90,82 +90,47 @@
 
 .stepItem {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
   border-radius: var(--radius);
   border: var(--border-w) solid var(--border-color);
-  background: var(--muted);
+  background: var(--card);
   color: var(--ink-faint);
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .stepItem_running {
-  border-color: var(--border-color);
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--run-soft);
+  box-shadow: var(--shadow);
 }
 
 .stepItem_done {
-  border-color: var(--border-color);
-  background: rgba(31, 157, 85, 0.08);
-  color: var(--success, #1f9d55);
-}
-
-.stepIcon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: 700;
-  background: var(--muted);
-}
-
-.stepItem_running .stepIcon,
-.stepItem_done .stepIcon {
-  background: currentColor;
-}
-
-.stepItem_running .stepIcon > span {
-  color: var(--accent-ink);
-}
-
-.stepItem_done .stepIcon {
-  color: var(--accent-ink);
-}
-
-.stepItem_done .stepIcon {
-  background: var(--success, #1f9d55);
-}
-
-.stepItem_running .stepIcon {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-
-.stepText {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  line-height: 1.3;
+  border-color: var(--ok);
+  box-shadow: var(--shadow-sm);
 }
 
 .stepName {
-  font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
   color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .stepNote {
-  font-size: 11.5px;
-  color: inherit;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.stepItem_running .progressTrack {
+  margin-top: 2px;
+  border: var(--border-w) solid var(--border-color);
+  background: var(--card);
+}
+
+.stepItem_running .progressBar {
+  background: var(--run);
 }
 
 @media (max-width: 640px) {
