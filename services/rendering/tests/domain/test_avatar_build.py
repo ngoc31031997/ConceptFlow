@@ -80,8 +80,24 @@ def test_manifest_that_hop_le_va_khop_bo_avatar():
     assert {a.id for a in assets if a.id.startswith("cat.")} == {f"cat.{s}" for s in build_avatar.STATES}
 
 
-def test_avatar_chua_duyet_thi_khong_vao_prompt():
-    """Giấy phép riêng của clip gốc chưa xác minh: chưa clip nào được `approved`."""
+def test_avatar_da_duyet_phai_ghi_ngay_kiem_giay_phep():
+    """Clip đã duyệt là do Creator xác nhận giấy phép riêng, có ngày kiểm."""
+    assets = [a for a in catalog.load_manifest(MANIFEST) if a.id.startswith("cat.")]
+    assert assets and all(a.is_approved and a.license_checked for a in assets)
+
+
+def test_avatar_da_duyet_vao_khoi_prompt():
     assets = catalog.load_manifest(MANIFEST)
-    assert catalog.approved(assets) == []
-    assert "Chưa có clip" in catalog.render_prompt_block(assets)
+    block = catalog.render_prompt_block(assets)
+    for state in build_avatar.STATES:
+        assert f"cat.{state}" in block
+
+
+def test_file_prompt_cua_orchestrator_khop_manifest():
+    """lottie_catalog_vi.txt là file SINH RA; sửa manifest mà quên chạy `tools/lottie_catalog.py prompt`
+    thì prompt đang chạy sẽ lệch danh mục thật."""
+    target = ROOT.parent / "orchestrator" / "internal" / "domain" / "prompts" / "lottie_catalog_vi.txt"
+    if not target.exists():  # trong image rendering không có mã orchestrator
+        pytest.skip("không có mã orchestrator bên cạnh")
+    expected = catalog.render_prompt_block(catalog.load_manifest(MANIFEST), "vi")
+    assert target.read_text(encoding="utf-8") == expected

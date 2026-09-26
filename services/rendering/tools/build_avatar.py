@@ -453,6 +453,12 @@ STATES = {
 }
 
 
+#: Khung clip là hình vuông 400x400 nhưng mèo không nằm giữa khung; `LottieClip` đặt theo tâm khung,
+#: nên LLM cần biết để không đặt mèo lệch chỗ.
+PLACEMENT_NOTE = (" Khung vuông; mèo nằm nửa dưới, hơi lệch trái, đuôi kéo sang phải"
+                  " (x, y là tâm khung chứ không phải tâm mèo; size 500-700 là cỡ vừa).")
+
+
 def sync_manifest(built: dict[str, dict]) -> None:
     raw = json.loads(MANIFEST.read_text(encoding="utf-8")) if MANIFEST.exists() else {"assets": []}
     by_id = {a["id"]: a for a in raw["assets"]}
@@ -463,7 +469,7 @@ def sync_manifest(built: dict[str, dict]) -> None:
             "id": f"cat.{state}", "title": f"Mèo {state}", "license": "Lottie Simple License",
             "source_url": "Creator cung cấp: clip Bad Cat (LottieFiles), chưa rõ trang nguồn",
             "author": "Chưa rõ", "status": catalog.CANDIDATE, "license_checked": ""})
-        entry["description"] = description
+        entry["description"] = description + PLACEMENT_NOTE
         entry["tags"] = tags
         entry["loop"] = True
         entry["palette"] = sorted(catalog.extract_palette(data))

@@ -18,6 +18,13 @@ func TestRemotionEngineerSeedExpandsLottieCatalog(t *testing.T) {
 		if !strings.Contains(tpl.TemplateText, "CLIP HOẠT HÌNH DỰNG SẴN") {
 			t.Fatal("remotion engineer prompt lost its Lottie section")
 		}
+		// The embedded catalog is generated from the approved clips; the avatar
+		// set is approved, so its ids must reach the model.
+		for _, id := range []string{"cat.idle", "cat.happy", "cat.push"} {
+			if !strings.Contains(tpl.TemplateText, id) {
+				t.Fatalf("approved clip %s missing from the remotion engineer prompt", id)
+			}
+		}
 		return
 	}
 	t.Fatal("no remotion_engineer seed found")

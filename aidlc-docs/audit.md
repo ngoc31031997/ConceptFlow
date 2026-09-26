@@ -1951,3 +1951,12 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **Artifacts Affected**: `services/rendering/{domain/lottie_catalog.py,tools/lottie_catalog.py,tools/build_avatar.py,remotion_project/**,application/validate_script.py,main.py}`, `services/orchestrator/internal/domain/{prompt_template_seeds.go,prompt_vars.go,prompts/lottie_catalog_vi.txt}`, `aidlc-docs/inception/requirements/cr-038-lottie-illustration-library.md`, `aidlc-docs/aidlc-state.md`
 
 ---
+
+## CR-038 — Duyệt bộ avatar `cat.*` sau khi Creator xác nhận giấy phép
+**Timestamp**: 2026-09-26T05:30:00Z
+**User Input**: "license đây Free to use under the Lottie Simple License"
+**AI Response**: Đối chiếu với LottieFiles Help (đã đọc ở bước trước): Lottie Simple License cho tải, chỉnh sửa, phân phối, dùng thương mại, không bắt buộc ghi công, nên bản chỉnh sửa của clip Bad Cat nằm trong giấy phép. Ghi nhận theo lời Creator (không tự truy cập được trang clip): mười clip `cat.*` chuyển `approved`, `license_checked` = 2026-09-26. Sinh lại `lottie_catalog_vi.txt`, thêm test khớp manifest với file prompt và test prompt nạp có id clip, rebuild orchestrator (bộ nạp ghi đè nội dung prompt mỗi lần khởi động) và rendering (lint id đọc manifest trong image).
+**Impact Assessment**: Remotion Engineer nay thấy mười clip trong prompt và được phép dùng khi HÌNH của shot nhắc đúng chủ thể. Visual Director không đổi. Avatar chưa tự chèn vào video (backlog).
+**Artifacts Affected**: `services/rendering/remotion_project/lottie/manifest.json`, `.../lottie/source/README.md`, `services/orchestrator/internal/domain/prompts/lottie_catalog_vi.txt`, `services/rendering/tests/domain/test_avatar_build.py`, `services/orchestrator/internal/domain/lottie_catalog_test.go`, `aidlc-docs/aidlc-state.md`, CR-038
+
+---
