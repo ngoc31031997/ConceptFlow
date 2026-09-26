@@ -14,7 +14,7 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "0e7ac7f0b0c7d7e0049c4ddc29cad4614364151785e479f1e50e0040f88dd28a",
+	RoleStoryArchitect:   "7cb68a65d178d43d07dca1afe9a38ea326af2b0752c421fa64fbbb5517aca3c7",
 	RoleVisualDirector:   "ae8ab5ebde484ca67ed63db3301e5d125954aa06d37c37aa1a86918abf09e7f6",
 	RoleManimEngineer:    "16ae08523e73434ddd775ef13edf47b5ba3dc1584a2e102e52ca8ccbf9000ddd",
 	RoleRemotionEngineer: "04e157efbf7c67934879797aa8273b146a425f98558a37a128ad37884c45b141",

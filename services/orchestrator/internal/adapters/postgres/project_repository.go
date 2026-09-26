@@ -689,10 +689,10 @@ func (r *ProjectRepository) GetVideoFormat(ctx context.Context, formatID string,
 		// A project pointing at a format that no longer exists still has to
 		// render. Falling back to the built-in default beats failing the saga
 		// over a bookkeeping problem the Creator cannot see.
-		return domain.FormatVisualFirst7Min, nil
+		return domain.FormatCaseStudyEssay8Min, nil
 	}
 	if err := json.Unmarshal(beats, &format.Beats); err != nil {
-		return domain.FormatVisualFirst7Min, nil
+		return domain.FormatCaseStudyEssay8Min, nil
 	}
 	return format, nil
 }

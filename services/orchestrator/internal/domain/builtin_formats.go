@@ -36,6 +36,26 @@ var FormatVisualFirst7Min = VideoFormat{
 	},
 }
 
+// FormatCaseStudyEssay8Min is the channel's main shape: a real paradox, solved
+// before it is named, then a chain of `variation` cases (up to 7) that all
+// follow the same mould. It replaces visual_first_7min as the default.
+var FormatCaseStudyEssay8Min = VideoFormat{
+	ID:         "case_study_essay_8min",
+	Name:       "Nghịch lý có thật + chuỗi ví dụ — 7 đến 9 phút",
+	Version:    1,
+	MinSeconds: 420,
+	MaxSeconds: 560,
+	Beats: []FormatBeat{
+		{ID: "hook", Role: "hook", MinSeconds: 15, MaxSeconds: 25, Required: true, MaxRepeat: 1},
+		{ID: "concrete", Role: "example", MinSeconds: 30, MaxSeconds: 45, Required: true, MaxRepeat: 1},
+		{ID: "pattern", Role: "explain", MinSeconds: 80, MaxSeconds: 120, Required: true, MaxRepeat: 1},
+		{ID: "variation", Role: "example", MinSeconds: 25, MaxSeconds: 40, Required: true, MaxRepeat: 7},
+		{ID: "modern", Role: "implication", MinSeconds: 45, MaxSeconds: 80, Required: false, MaxRepeat: 1},
+		{ID: "recap", Role: "summary", MinSeconds: 15, MaxSeconds: 30, Required: true, MaxRepeat: 1},
+		{ID: "cta", Role: "cta", MinSeconds: 5, MaxSeconds: 12, Required: false, MaxRepeat: 1},
+	},
+}
+
 // FormatQuickExplainer3Min is for a single idea that does not need building up.
 var FormatQuickExplainer3Min = VideoFormat{
 	ID:         "quick_explainer_3min",
@@ -53,12 +73,12 @@ var FormatQuickExplainer3Min = VideoFormat{
 }
 
 func BuiltinFormats() []VideoFormat {
-	return []VideoFormat{FormatVisualFirst7Min, FormatQuickExplainer3Min}
+	return []VideoFormat{FormatCaseStudyEssay8Min, FormatQuickExplainer3Min}
 }
 
 // DefaultVideoFormatID is what a project gets when the Creator did not choose,
 // including every project created before formats existed.
-const DefaultVideoFormatID = "visual_first_7min"
+const DefaultVideoFormatID = "case_study_essay_8min"
 
 // BeatBudget is how long one beat actually came out, against what the format
 // asked for (CR-019 FR52.4).
