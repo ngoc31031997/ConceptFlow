@@ -59,7 +59,7 @@ kho miễn phí, được Creator tuyển chọn thủ công, rồi để LLM ch
 - **Rig chung:** thêm viền cho đuôi, chân, ly (bản gốc chỉ thân có viền nên đuôi chìm trên nền tối); ba sọc mướp trên trán ở lớp riêng nằm trên mắt; đuôi nằm dưới thân và có miếng che ở gốc đuôi để thân và đuôi liền một khối; một lớp null làm cha để nảy, rung, thở cả nhân vật.
 - **Mười clip `cat.*`:** `idle` (mặc định), `smug`, `surprised`, `angry`, `happy`, `sleep`, `thinking`, `sad`, `look` (đảo mắt), `push` (đẩy ly, gag đặc trưng). Biểu cảm chỉ chỉnh mí mắt, con ngươi, vòng trắng của mắt; đạo cụ (chấm than, dấu hỏi, chữ z, giọt mồ hôi, trái tim, dấu giận) là các lớp hình thêm vào.
 - **Viền theo nền:** viền mảnh đổi màu bằng `colors` (thay #FFFFFF); viền dày kiểu miếng dán bằng `outline` của `LottieClip` (chống chìm trên nền bất kỳ).
-- **Trạng thái:** tất cả `candidate`. Tác giả và giấy phép riêng của clip gốc chưa xác minh (file chỉ ghi "LottieFiles", tên công cụ tạo file), và bộ này là bản CHỈNH SỬA của clip đó. Không clip nào vào prompt hay được dùng trong video cho tới khi Creator xác nhận giấy phép cho phép chỉnh sửa và phân phối lại, điền `license_checked`, đổi `status` sang `approved`.
+- **Trạng thái:** cả mười clip `approved` từ 2026-09-26. Creator xác nhận trên trang clip gốc: "Free to use under the Lottie Simple License" (đối chiếu với LottieFiles Help: cho tải, chỉnh sửa, phân phối, dùng thương mại, không bắt buộc ghi công). Bộ này là bản chỉnh sửa của clip đó, nên việc chỉnh sửa và phân phối lại nằm trong giấy phép. Tác giả và URL trang nguồn chưa ghi lại; ghi vào manifest khi có (không bắt buộc với giấy phép này).
 
 ## Đánh đổi đã cân nhắc
 - **Nhúng tĩnh JSON vào bundle** (import): đơn giản nhưng mọi render đều mang toàn bộ asset. Chọn `staticFile` để chỉ tải cái đang dùng.
@@ -72,12 +72,12 @@ kho miễn phí, được Creator tuyển chọn thủ công, rồi để LLM ch
 - Dung lượng Docker image tăng theo số asset → giới hạn kích thước mỗi file khi validate.
 
 ## Backlog: ghép avatar vào video (làm sau, ngoài phạm vi CR này)
-Ghép Mướp vào video thật chưa làm. Cần quyết định và làm:
+Ghép Mướp vào video thật chưa làm. Hiện Remotion Engineer chỉ dùng clip khi HÌNH của shot nhắc đúng chủ thể (ví dụ "chú mèo nghiêng đầu"); chưa có cơ chế tự chèn avatar. Cần quyết định và làm:
 1. **Vai trò:** linh vật phản ứng ở góc khung, hay nhân vật chính trong cảnh (đưa vào Bước 2 của Story Architect)?
 2. **Ai chọn trạng thái theo từng đoạn thoại:** Visual Director ghi dòng `AVATAR` cho mỗi shot, hay một bước phân loại cảm xúc của lời thoại? Kèm quy tắc chuyển trạng thái (idle → surprised) để không giật.
 3. **Hai engine:** Remotion dựng thẳng bằng `LottieClip`. Manim thì không nhúng được; cần một bước ghép phủ (overlay) ở `video-assembly`, ví dụ render avatar riêng có nền trong suốt rồi ghép bằng ffmpeg.
 4. **Bố cục:** vị trí, kích thước, vùng an toàn, tránh vùng phụ đề, viền tự chọn theo độ sáng của nền.
-5. **Điều kiện tiên quyết:** duyệt giấy phép clip gốc (mục 6), rồi catalog vào prompt của Remotion Engineer và (nếu chọn) của Visual Director.
+5. **Điều kiện tiên quyết:** giấy phép đã duyệt và catalog đã vào prompt của Remotion Engineer. Còn lại: quyết định có đưa catalog vào Visual Director không (hiện cố ý không, vì nó dùng chung cho cả Manim).
 6. **Kiểm thử:** render một video ngắn có avatar đổi ít nhất ba trạng thái, kiểm tra không lệch nhịp với lời thoại.
 
 ## Tiêu chí chấp nhận
