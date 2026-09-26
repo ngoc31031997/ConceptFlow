@@ -72,6 +72,7 @@ export function VideoListPage() {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
+  const [stepFilter, setStepFilter] = useState<Set<number>>(new Set());
 
   const refetch = useCallback(async () => {
     try {
@@ -87,7 +88,12 @@ export function VideoListPage() {
     refetch();
   }, [refetch]);
 
-  const visible = useMemo(() => (projects ?? []).filter((p) => matches(p, filter)), [projects, filter]);
+  const visible = useMemo(
+    () => (projects ?? []).filter(
+        (p) => matches(p, filter) && (stepFilter.size === 0 || stepFilter.has(p.flow_step ?? 0)),
+      ),
+    [projects, filter, stepFilter],
+  );
   const nameOf = useMemo(() => {
     const byId = new Map((projects ?? []).map((p) => [p.project_id, p.topic || p.project_id.slice(0, 8)]));
     return (id: string) => byId.get(id) ?? id.slice(0, 8);
@@ -97,6 +103,15 @@ export function VideoListPage() {
     () => visible.length > 0 && visible.every((p) => selected.has(p.project_id)),
     [visible, selected],
   );
+
+  function toggleStepFilter(step: number) {
+    setStepFilter((current) => {
+      const next = new Set(current);
+      if (next.has(step)) next.delete(step);
+      else next.add(step);
+      return next;
+    });
+  }
 
   function toggleSelectAll() {
     setSelected(allSelected ? new Set() : new Set(visible.map((p) => p.project_id)));
@@ -203,6 +218,29 @@ export function VideoListPage() {
                   <span className={styles.chipCount}>{(projects ?? []).filter((p) => matches(p, f.key)).length}</span>
                 </button>
               ))}
+              <details className={styles.stepFilter} data-testid="step-filter">
+                <summary className={`${styles.chip} ${stepFilter.size > 0 ? styles.chipOn : ""}`}>
+                  Bước{stepFilter.size > 0 ? ` (${stepFilter.size})` : ""}
+                </summary>
+                <div className={styles.stepMenu}>
+                  {FLOW_LABELS.map((label, i) => (
+                    <label key={label} className={styles.stepOption}>
+                      <input
+                        type="checkbox"
+                        checked={stepFilter.has(i + 1)}
+                        onChange={() => toggleStepFilter(i + 1)}
+                        data-testid={`step-filter-${i + 1}`}
+                      />
+                      {i + 1}. {label}
+                    </label>
+                  ))}
+                  {stepFilter.size > 0 && (
+                    <button type="button" className={styles.chip} onClick={() => setStepFilter(new Set())}>
+                      Bỏ chọn
+                    </button>
+                  )}
+                </div>
+              </details>
             </div>
 
             <div className={styles.toolbar}>

@@ -55,6 +55,7 @@
 }
 
 .table th {
+  white-space: nowrap;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -72,6 +73,7 @@
   vertical-align: top;
 }
 
+.table th.num,
 .num {
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -149,4 +151,66 @@
 }
 .hot {
   background: var(--warn);
+}
+
+.chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+.legend i {
+  display: inline-block;
+  width: 12px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+.swAvg { background: var(--accent); }
+.swMax { background: var(--muted); border: var(--border-w) solid var(--border-color); }
+.crow {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) 1fr minmax(150px, 220px);
+  gap: 14px;
+  align-items: center;
+  font-size: 12.5px;
+}
+.clabel { color: var(--ink); }
+.ctrack {
+  position: relative;
+  height: 18px;
+}
+.cmax, .cavg {
+  position: absolute;
+  left: 0;
+  border-radius: 2px;
+}
+.cmax {
+  top: 0;
+  height: 18px;
+  background: var(--muted);
+  border: var(--border-w) solid var(--border-color);
+}
+.cavg {
+  top: 4px;
+  height: 10px;
+  background: var(--accent);
+}
+.cavg.hot { background: var(--warn); }
+.cval {
+  display: flex;
+  flex-direction: column;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-soft);
+  font-size: 11.5px;
+}
+.cval b { color: var(--ink); font-size: 13px; }
+.fail { color: var(--danger); font-style: normal; }
+@media (max-width: 800px) {
+  .crow { grid-template-columns: 1fr; gap: 4px; }
 }
