@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+from pathlib import Path
 
 import aio_pika
 
@@ -39,6 +40,7 @@ from adapters.rendering.remotion_renderer import RemotionScriptRenderer
 from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
+from domain import lottie_catalog
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -47,6 +49,15 @@ COMMANDS_QUEUE = "rendering.commands"
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 READY_SENTINEL_PATH = "/tmp/ready"
 
+
+
+LOTTIE_MANIFEST = Path(__file__).parent / "remotion_project" / "lottie" / "manifest.json"
+
+
+def approved_lottie_ids() -> set[str]:
+    """CR-038: ids a Remotion script may pass to <LottieClip>; read per call so a
+    manifest fixed by hand is picked up without restarting the consumer."""
+    return {a.id for a in lottie_catalog.approved(lottie_catalog.load_manifest(LOTTIE_MANIFEST))}
 
 async def run() -> None:
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
@@ -100,7 +111,9 @@ async def run() -> None:
     command_handler = RenderingCommandDispatcher(
         # Cổng kiểm tra chạy trước TTS (CR-020): script sai bị chặn trước khi
         # tiêu quota giọng đọc.
-        ValidateScriptCommandHandler(ValidateScriptUseCase(renderer), pool, inbox, outbox),
+        ValidateScriptCommandHandler(
+            ValidateScriptUseCase(renderer, approved_lottie_ids), pool, inbox, outbox
+        ),
         RenderScriptCommandHandler(
             use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
         ),

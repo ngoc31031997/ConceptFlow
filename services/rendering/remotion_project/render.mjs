@@ -16,6 +16,7 @@
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import {readFileSync} from 'node:fs';
+import {fileURLToPath} from 'node:url';
 import {transform} from 'esbuild';
 
 function parseArgs(argv) {
@@ -46,7 +47,12 @@ async function main() {
     process.exit(1);
   }
 
-  const serveUrl = await bundle({entryPoint: args.entry});
+  // CR-038: Lottie clips are served from ./public/lottie via staticFile(); the
+  // entry file lives in src/, so the public dir has to be named explicitly.
+  const serveUrl = await bundle({
+    entryPoint: args.entry,
+    publicDir: fileURLToPath(new URL('./public', import.meta.url)),
+  });
 
   const composition = await selectComposition({
     serveUrl,

@@ -20,8 +20,10 @@ thì ngược lại — nó chỉ cần ffmpeg và file JSONL, nên sẽ sống 
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from domain.lottie_catalog import lint_lottie_ids
 from domain.models import DryRunResult, ScriptRenderRequest
 from domain.ports import ManimScriptRendererPort
 from domain.script_lint import LintIssue, blocking_issues, lint_manim_script
@@ -50,8 +52,16 @@ class ScriptValidationError(Exception):
 
 
 class ValidateScriptUseCase:
-    def __init__(self, renderer: ManimScriptRendererPort) -> None:
+    def __init__(
+        self,
+        renderer: ManimScriptRendererPort,
+        approved_lottie_ids: Callable[[], set[str]] | None = None,
+    ) -> None:
         self._renderer = renderer
+        # CR-038: ids of the approved Lottie catalog. None disables the check
+        # (tests that never touch Remotion), an empty set means "no clip is
+        # allowed" — which is exactly what an empty catalog should enforce.
+        self._approved_lottie_ids = approved_lottie_ids
 
     def validate(self, request: ScriptRenderRequest) -> ValidationResult:
         if not request.script_content.strip():
@@ -65,6 +75,11 @@ class ValidateScriptUseCase:
         # yet (explicitly out of scope for the first cut); its dry pass is
         # still the real check, same as Manim's.
         issues = lint_manim_script(request.script_content) if request.engine == "manim" else []
+        if request.engine == "remotion" and self._approved_lottie_ids is not None:
+            issues += [
+                LintIssue(line=line, message=message)
+                for line, message in lint_lottie_ids(request.script_content, self._approved_lottie_ids())
+            ]
         blocking = blocking_issues(issues)
         if blocking:
             # Dừng ở đây: chạy lượt dry cho một script đã biết là sai chỉ tốn

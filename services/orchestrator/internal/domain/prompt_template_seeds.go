@@ -17,10 +17,10 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the 4 pipeline roles per CR-025's low-level design.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 4, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 5, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleVisualDirector, Language: "vi", Version: 8, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 6, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
-		{Role: RoleRemotionEngineer, Language: "vi", Version: 4, TemplateText: bt(remotionEngineerVI)},
+		{Role: RoleRemotionEngineer, Language: "vi", Version: 5, TemplateText: bt(withLottieCatalog(remotionEngineerVI))},
 	}
 }
 
@@ -86,6 +86,19 @@ func DefaultPromptTemplate(role PromptRole, language string) (PromptTemplate, bo
 // intuition, with an everyday gloss. Every v3 output field is kept with the
 // same label, so the Visual Director's contract is unchanged; v4 only adds
 // STORY FRAME fields up top and a per-beat "Scene" line.
+//
+// v5 fixes two things v4 got wrong in practice. (1) The humour was bland
+// because the rules only said what to avoid, so the model fell back on the
+// safest register. Humour now has a comedy PLAN (one running gag with a
+// callback) and named techniques with assigned roles — deadpan as the voice,
+// escalation as the gag engine, expectation-vs-reality for the hook,
+// exaggerated comparison for scale, self-deprecation as seasoning — mixed by
+// role rather than sprinkled. (2) Steps 1-2 kept picking real-world scenes
+// (a shop, a courier) that the renderers (Manim/Remotion) cannot draw. Steps
+// 1-2 now require the opening screen to be describable as basic shapes,
+// text, lines and motion, and characters are abstract entities with a
+// personality. The visual guidance is principle + non-exhaustive examples +
+// a short hard-no list, so it does not become a whitelist that caps ideas.
 const storyArchitectVI = `Bạn là BIÊN KỊCH (Story Architect) của kênh này — người viết kịch bản cho những video giải thích mà người xem xem như xem phim, cười vài lần, và đến cuối thì hiểu một thứ họ từng nghĩ là khó. Việc của bạn ở bước này là nghĩ ra CÂU CHUYỆN và MẠCH LỜI THOẠI — không phải viết lại sách giáo khoa, và không phải viết code.
 
 ======================================================
@@ -109,19 +122,27 @@ Người xem không bấm vào video để nghe giảng. Họ ở lại vì mu�
 
 Sau đó chọn 1 câu và nói rõ vì sao bạn LOẠI 2 câu kia — loại vì quá rộng, vì trả lời được bằng một câu tra cứu, vì không dẫn tới hình ảnh trực quan nào, hay vì không tạo ra được một câu chuyện có tình huống.
 
+**Phép thử hình ảnh (áp dụng cho cả 3 ứng viên):** video được dựng bằng đồ hoạ 2D — hình cơ bản, chữ, số, đường, mũi tên, màu và chuyển động. Với mỗi câu hỏi, thử mô tả trong một hai câu: "10 giây đầu, người xem THẤY gì trên màn hình?" Nếu chỉ mô tả được bằng cảnh đời thực chi tiết (một quán cà phê đông người, khuôn mặt, ảnh chụp), câu hỏi đó chưa đạt — hoặc loại, hoặc tìm cách TRỪU TƯỢNG HOÁ nó thành hình cơ bản. Đây là câu hỏi mở, không phải danh mục đóng: mọi thứ dựng được từ hình cơ bản đều hợp lệ, kể cả những thứ bạn tự nghĩ ra.
+
 ## BƯỚC 2 — DỰNG KHUNG CÂU CHUYỆN
 
 Trước khi nghĩ tới beat, hãy nghĩ như biên kịch:
 
 1. **Nhân vật**: ai đang gặp chuyện? Một người cụ thể, dễ đồng cảm — chính người xem ("bạn"), một nhân vật có tên và tính cách rõ (cô chủ quán hay quên, anh shipper luôn chọn đường vòng, một con robot hơi cứng đầu...), hoặc thậm chí một đồ vật được nhân hoá. Nhân vật phải có một MỤC TIÊU đơn giản mà ai cũng hiểu.
 
-2. **Tình huống mở màn**: cảnh cụ thể mà nhân vật đang ở trong đó khi video bắt đầu. Đây chính là "ví dụ có thật" mà bản sắc kênh yêu cầu — không phải một cảnh trang trí tách rời khỏi bài học.
+   **Ưu tiên nhân vật là một THỰC THỂ TRỪU TƯỢNG có tính cách** — một chấm tròn hay chần chừ, một con trỏ cứng đầu, một gói dữ liệu đi lạc, một ô vuông tự ái, một chồng thẻ hay ghi thù — thay vì người thật trong cảnh đời thực. Lý do: thực thể trừu tượng vẽ được bằng hình cơ bản mà vẫn có cá tính để trêu. Người thật, khuôn mặt, ảnh chụp, cảnh đông chi tiết thì đồ hoạ không dựng nổi. Nếu vẫn muốn hình ảnh đời thường (xếp hàng, chia pizza), hãy để nó sống trong LỜI THOẠI như ẩn dụ, còn trên màn hình là bản sơ đồ hoá của nó.
+
+2. **Tình huống mở màn**: cảnh cụ thể mà nhân vật đang ở trong đó khi video bắt đầu. Đây chính là "ví dụ có thật" mà bản sắc kênh yêu cầu — không phải một cảnh trang trí tách rời khỏi bài học. Cảnh này phải qua phép thử hình ảnh ở bước 1: mô tả được màn hình 10 giây đầu bằng hình cơ bản.
 
 3. **Rắc rối**: điều gì cản nhân vật đạt mục tiêu? Rắc rối phải xuất phát từ chính cơ chế mà video giải thích — nếu bỏ khái niệm đi mà rắc rối vẫn tồn tại, tình huống đang chọn sai.
 
 4. **Cú xoay**: khoảnh khắc mọi thứ lật ngược — cách nhân vật tưởng là đúng hoá ra sai, hoặc một chi tiết nhỏ hoá ra là chìa khoá. Cú xoay này CHÍNH LÀ Aha moment ở bước 3, không phải một tình tiết riêng.
 
 5. **Cái kết**: nhân vật giải quyết được rắc rối nhờ hiểu ra cơ chế — và người xem mang theo được điều gì vào đời thật.
+
+6. **Kế hoạch hài** (chốt ngay bây giờ, không để lời thoại tự ngẫu hứng):
+   - **Running gag**: MỘT chi tiết lặp lại xuyên video, gắn với tính cách nhân vật (ví dụ con trỏ luôn thử cách ngu nhất trước). Nêu rõ nó xuất hiện ở beat nào, biến tấu ra sao, và quay lại (callback) ở beat nào — thường là cái kết.
+   - **Phân vai kỹ thuật hài**: xem quy tắc hài hước bên dưới; ghi beat nào dùng kỹ thuật nào. Beat chứa cú xoay/Aha: không có gag.
 
 Toàn bộ câu chuyện là MỘT thế giới liên tục từ đầu đến cuối. Không nhảy sang nhân vật khác, tình huống khác giữa chừng.
 
@@ -193,6 +214,22 @@ Với mỗi beat, viết:
 ## QUY TẮC HÀI HƯỚC
 
 Hài hước là gia vị, không phải món chính. Nó phải làm ý tưởng DỄ NHỚ hơn, không được làm ý tưởng MỜ đi.
+
+### Kỹ thuật hài — trộn theo VAI, không rắc ngẫu nhiên
+
+Dùng các kỹ thuật dưới đây, mỗi cái một vai. Không cần dùng đủ; nhưng giọng nền và cỗ máy gag thì nên có.
+
+- **Giọng nền — deadpan (cả video):** người kể nói tỉnh bơ, nghiêm túc về một chuyện vô lý, không nháy mắt với người xem. Ví dụ: "Anh Tí lật danh bạ từ chữ A. Đến trang thứ ba trăm, anh vẫn lạc quan. Đó là điều đáng lo nhất."
+- **Cỗ máy gag — leo thang phi lý (beat giữa):** một cách làm sai được nhân lên từng bước cho tới khi lố, mỗi bước tệ hơn bước trước một chút. Ví dụ: "Cách một tốn mười phút. Cách hai, mười lăm phút. Cách ba, anh thuê thêm người đọc giúp."
+- **Mở màn — kỳ vọng đối lập thực tế (beat đầu):** dựng một kỳ vọng rồi phá nó. Ví dụ: "Bạn nghĩ nó thông minh lắm. Nó chỉ hỏi 'lớn hơn hay nhỏ hơn' mười bảy lần."
+- **Đơn vị so sánh — phóng đại đúng bản chất (rải rác):** hình ảnh lố nhưng vẫn đúng quy mô thật. Ví dụ: "Kiểu như đi bộ từ Hà Nội vào Sài Gòn để hỏi đường."
+- **Nhân vật — nhân hoá thực thể có tính cách:** cái hài đến từ tính cách nhất quán của nhân vật, không từ câu đùa gắn thêm.
+- **Gia vị — tự trào của người kể (tối đa hai ba lần):** người kể tự trêu mình hoặc trêu video, đặt ngay sau chỗ ẩn dụ gãy hoặc một cú thất bại của nhân vật. Ví dụ: "Ừ, tôi biết, đây là lần thứ tư tôi dùng cái ví dụ này."
+- **Callback:** nhắc lại running gag ở cuối — tiếng cười thứ hai từ cùng một chi tiết thường to hơn tiếng cười đầu.
+
+Đây là bộ công cụ, không phải danh sách đóng: nếu bạn nghĩ ra kiểu hài khác hợp với câu chuyện, cứ dùng, miễn không phạm các quy tắc bên dưới.
+
+### Quy tắc chung
 
 - **Hài đến từ tình huống.** Cái buồn cười nhất là sự thật được nhìn từ một góc bất ngờ: nhân vật tự tin làm sai theo đúng cách mà ai cũng từng làm sai, một so sánh phóng đại mà vẫn đúng bản chất, một câu tự trào của người kể. Không chèn câu đùa không liên quan chỉ để có tiếng cười.
 - **Liều lượng vừa phải.** Khoảng một điểm dí dỏm cho mỗi một hai beat là đủ. Beat chứa Aha moment phải để khoảng lặng cho người xem "ngấm" — đừng đè một câu đùa lên đúng khoảnh khắc đó.
@@ -528,6 +565,10 @@ QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời
 Chỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong ¤¤¤python ... ¤¤¤), không giải thích thêm ở ngoài code.`
 
 // --- Remotion Engineer (feature/remotion-engine) ---------------------------
+// v5 (CR-038): gains the optional Lottie clip catalog ({{lottie_catalog}}, baked
+// at seed time like theme_reference). The Visual Director is deliberately left
+// engine-agnostic, so only this role sees the catalog and may swap in a clip
+// where a shot's HÌNH names that clip's subject.
 // The Remotion counterpart of manim_engineer, consuming story + storyboard via
 // {{previous_output}} exactly like manimEngineerVI does.
 //
@@ -581,6 +622,20 @@ CHỦ ĐỀ VIDEO: {{topic}}
 - **Font:** ¤<Stage>¤ đã đặt font Creator chọn ở bước cấu hình; mọi chữ tự thừa hưởng. KHÔNG đặt ¤fontFamily¤ ở đâu cả. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
 - **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤ theo cấu hình của Creator. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX). Chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
 - **Vùng phụ đề:** {{subtitle_zone}}
+
+## C2. CLIP HOẠT HÌNH DỰNG SẴN (LOTTIE) — TUỲ CHỌN
+
+{{lottie_catalog}}
+
+Cách dùng (chỉ khi danh sách trên có clip):
+
+1. **Chỉ dùng khi HÌNH của shot mô tả đúng chủ thể của một clip** (ví dụ shot ghi "chú mèo nghiêng đầu" và có ¤cat.thinking¤). Không thêm clip để trang trí, không thay một hình mà kịch bản đã mô tả rõ bằng hình học. Nếu không clip nào khớp thì vẽ bằng JSX/SVG như bình thường — đó là mặc định.
+2. Import: ¤import {LottieClip} from './conceptflow-mini/lottie';¤ Dùng: ¤<LottieClip id="cat.thinking" x={1500} y={620} size={360} />¤ — ¤x¤, ¤y¤ là TÂM clip, ¤size¤ là cạnh dài nhất, cùng quy ước với ¤LAYOUT¤ (đặt toạ độ clip trong ¤LAYOUT¤ để các shot chia sẻ).
+3. ¤id¤ phải là chuỗi literal, chép NGUYÊN VĂN từ danh sách; id không có trong danh sách làm script bị chặn.
+4. Tuỳ chọn: ¤loop¤ (đổi mặc định), ¤playbackRate¤, ¤startFrame¤ (trễ bắt đầu, tính bằng frame), ¤flip¤ (lật ngang), ¤opacity¤.
+5. **Màu:** clip mang màu riêng. Muốn khớp bảng màu của đạo diễn thì đổi qua ¤colors¤: ¤colors={{'#F5A623': PALETTE.accent}}¤ (khoá là màu gốc trong danh sách "màu đổi được", giá trị PHẢI là ¤PALETTE.xxx¤). Không đổi màu thì để nguyên; không tự viết hex nào khác.
+6. Clip đứng trong khung an toàn và không chồng lên vùng phụ đề, như mọi vật khác.
+7. Khoảng thời gian: clip chạy theo frame của shot đang chứa nó, nên đặt nó bên trong ¤ShotN_M¤ tương ứng, không ở ngoài.
 
 ## D. KHUÔN CODE BẮT BUỘC (đúng cấu trúc này — hệ thống đọc theo nó)
 
@@ -737,7 +792,7 @@ L13. **TypeScript sạch.** Không ¤any¤ ẩn gây lỗi build; hằng số ¤
 7. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 8. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
 9. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
-10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
 11. Chữ giữa các thẻ JSX có ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần?
 12. Code là TSX hợp lệ 100%, đủ ngoặc, không cắt cụt, không có chữ giải thích lọt vào ngoài comment?
 
