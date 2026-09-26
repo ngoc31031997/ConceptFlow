@@ -42,6 +42,7 @@ from adapters.rendering.manim_renderer import (
 )
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer
 from adapters.rendering.typescript_checker import TypeScriptChecker
+from adapters.http.check_metrics import CheckMetrics
 from adapters.http.check_server import create_check_app
 from application.check_script import CheckScriptUseCase
 from application.render_channel_asset import RenderChannelAssetUseCase
@@ -139,7 +140,14 @@ async def run() -> None:
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 
-    consumer_tag = await queue.consume(command_handler.handle)
+    # CR-040 FR115: how many render commands are in flight when a check starts.
+    check_metrics = CheckMetrics()
+
+    async def handle_counted(message):
+        with check_metrics.command_running():
+            await command_handler.handle(message)
+
+    consumer_tag = await queue.consume(handle_counted)
     # Cancel requests arrive on their own fanout, not behind the running render.
     await listen_for_cancels(channel)
 
@@ -153,7 +161,9 @@ async def run() -> None:
         ),
     )
     check_server = uvicorn.Server(uvicorn.Config(
-        create_check_app(check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2"))),
+        create_check_app(
+            check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2")), metrics=check_metrics,
+        ),
         host="0.0.0.0", port=int(os.environ.get("CHECK_HTTP_PORT", "8000")), log_level="warning",
     ))
     check_server_task = asyncio.create_task(check_server.serve())
