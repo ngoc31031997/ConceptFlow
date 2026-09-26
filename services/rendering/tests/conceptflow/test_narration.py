@@ -398,3 +398,87 @@ def test_loi_thu_bo_cuc_khong_lam_hong_luot_render():
             raise RuntimeError("scene lạ")
 
     assert narration._describe_layout(_NoMobjects()) == []
+
+
+# --- CR-042: hình chuyển động trong lúc đọc thoại ----------------------------
+
+
+@pytest.fixture
+def render(tmp_path, monkeypatch):
+    """Lượt render giả: thời lượng audio cố định, ghi lại các lần play/wait."""
+    marks = tmp_path / "cf_marks.jsonl"
+    durations = tmp_path / "d.json"
+    durations.write_text(json.dumps([2.0, 3.0]))
+    monkeypatch.setenv(narration.ENV_MARKS_PATH, str(marks))
+    monkeypatch.setenv(narration.ENV_MODE, narration.MODE_RENDER)
+    monkeypatch.setenv(narration.ENV_DURATIONS_PATH, str(durations))
+    narration.reset()
+    return marks
+
+
+class _FakeScene:
+    class renderer:
+        time = 0.0
+
+    def __init__(self):
+        self.calls = []
+
+    def play(self, *animations, run_time=None):
+        self.calls.append(("play", animations, run_time))
+
+    def wait(self, seconds):
+        self.calls.append(("wait", seconds))
+
+    class camera:
+        class frame:
+            class animate:
+                @staticmethod
+                def scale(factor):
+                    return ("scale", factor)
+
+
+def test_animation_chay_dung_bang_thoi_luong_cau(render, monkeypatch):
+    monkeypatch.setattr(narration, "_describe_layout", lambda s: [])
+    monkeypatch.setattr(narration, "_describe_frame", lambda s: {})
+    scene = _FakeScene()
+    narration.narrate(scene, "câu một", "anim")
+    assert scene.calls == [("play", ("anim",), 2.0)]
+
+
+def test_khong_animation_van_dung_yen_va_drift_tat_mac_dinh(render, monkeypatch):
+    monkeypatch.setattr(narration, "_describe_layout", lambda s: [])
+    monkeypatch.setattr(narration, "_describe_frame", lambda s: {})
+    scene = _FakeScene()
+    narration.narrate(scene, "câu một")
+    assert scene.calls == [("wait", 2.0)]
+
+
+def test_drift_day_may_vao_nhe_khi_khong_co_animation(render, monkeypatch):
+    monkeypatch.setattr(narration, "_describe_layout", lambda s: [])
+    monkeypatch.setattr(narration, "_describe_frame", lambda s: {})
+    scene = _FakeScene()
+    narration.narrate(scene, "câu một", drift=True)
+    assert scene.calls == [("play", (("scale", narration.DRIFT_SCALE),), 2.0)]
+
+
+def test_dry_van_choi_animation_de_trang_thai_khop_luot_render(dry):
+    played = []
+
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.narrate("một hai ba", "anim")
+
+        def play(self, *a, **k):
+            played.append((a, k))
+
+    records = dry(S)
+    assert _texts(records) == ["một hai ba"]
+    assert played and played[0][0] == ("anim",) and played[0][1]["run_time"] >= 1.0
+
+
+def test_recap_khong_hien_bang_va_recap_card_thi_co(dry):
+    class S(ConceptFlowScene):
+        def construct(self):
+            self.recap(narration="Tóm lại một nửa khả năng đã mất")
+
+    assert _texts(dry(S)) == ["Tóm lại một nửa khả năng đã mất"]
