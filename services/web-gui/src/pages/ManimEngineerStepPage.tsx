@@ -14,12 +14,10 @@ import { Card, Button, TextArea } from "../components/ui";
 import { Disclosure } from "../components/Disclosure";
 import { ScriptAssistant } from "../components/ScriptAssistant";
 import { SCRIPT_TEMPLATES } from "../components/scriptTemplates";
-import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
-import { useWizardPosition } from "../hooks/useWizardPosition";
 
 const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
 
@@ -40,7 +38,6 @@ const TOPIC_PLACEHOLDER = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]";
  * client-side lint yet) actually depend on which engine renders the video.
  */
 export function ManimEngineerStepPage() {
-  useWizardPosition("/create/script/code");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
@@ -55,7 +52,7 @@ export function ManimEngineerStepPage() {
   // Rehydrate the saved story/storyboard from the server on mount — mirrors
   // VisualDirectorStepPage's own rehydration effect.
   useEffect(() => {
-    if (!draft.projectId || (draft.authoringStory && draft.authoringStoryboard)) return;
+    if (!draft.projectId || (draft.authoringStory && draft.authoringStoryboard && draft.authoringTopic)) return;
     let cancelled = false;
     getAuthoringState(draft.projectId)
       .then((state) => {
@@ -65,6 +62,10 @@ export function ManimEngineerStepPage() {
         }
         if (state.storyboard && !draft.authoringStoryboard) {
           dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: state.storyboard });
+        }
+        // Chủ đề cũng phải nạp lại để AppShell hiện tên project sau reload.
+        if (state.topic && !draft.authoringTopic) {
+          dispatch({ type: "SET_AUTHORING_TOPIC", payload: state.topic });
         }
       })
       .catch(() => {
@@ -218,18 +219,11 @@ export function ManimEngineerStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnCode
-            ? `1c. Dán code ${isRemotion ? "Remotion" : "Manim"} sẵn có của bạn — hệ thống kiểm tra ngay.`
-            : `1c. Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
+            ? `Dán code ${isRemotion ? "Remotion" : "Manim"} sẵn có của bạn — hệ thống kiểm tra ngay.`
+            : `Sinh code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
         }
         wide
       >
-        <ScriptPipelineTabs
-          active="code"
-          outlineDone={draft.authoringStory.trim().length > 0}
-          storyboardDone={draft.authoringStoryboard.trim().length > 0}
-          codeDone={!isEmpty}
-        />
-
         <div className={styles.settingsRow}>
           <PipelineSettingsBar
             renderEngine={draft.renderEngine}
@@ -250,7 +244,7 @@ export function ManimEngineerStepPage() {
             steps={["code"]}
             what={`code ${isRemotion ? "Remotion" : "Manim"}`}
             runDisabled={draft.authoringStoryboard.trim().length === 0}
-            runDisabledReason="Cần storyboard ở tab 1b trước — server đọc dàn ý + storyboard làm {{previous_output}}."
+            runDisabledReason="Cần storyboard ở bước Visual trước — server đọc dàn ý + storyboard làm {{previous_output}}."
             onGenerated={(_step, content) => setCode(content)}
           />
         </div>

@@ -175,4 +175,54 @@ describe("VideoListPage", () => {
     expect(screen.getByText("Đã chọn 2 video")).toBeInTheDocument();
     expect(screen.getByTestId("bulk-delete-button")).not.toBeDisabled();
   });
+
+  describe("theo flow 13 bước", () => {
+    function renderList(projects: unknown[]) {
+      global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ projects }) }) as unknown as typeof fetch;
+      return render(
+        <ThemeProvider>
+          <MemoryRouter>
+            <VideoListPage />
+          </MemoryRouter>
+        </ThemeProvider>,
+      );
+    }
+
+    const base = { updated_at: "2026-01-01T00:00:00Z", render_engine: "manim" };
+    const rows = [
+      { ...base, project_id: "aaaaaaaa-1111", status: "rendering", topic: "thiên kiến sống sót", flow_step: 9, run_state: "running" },
+      { ...base, project_id: "bbbbbbbb-2222", status: "failed_at_render_scenes", topic: "Vòng lặp for", flow_step: 9, run_state: "cancelled" },
+      { ...base, project_id: "cccccccc-3333", status: "ready_to_publish", topic: "Cây nhị phân", flow_step: 12, run_state: "idle", forked_from: "aaaaaaaa-1111" },
+      { ...base, project_id: "dddddddd-4444", status: "draft", flow_step: 2, run_state: "idle" },
+    ];
+
+    it("names a project by its topic, shows where it is in the 13 steps, and links a fork to its source", async () => {
+      renderList(rows);
+      await waitFor(() => expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toBeInTheDocument());
+
+      expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toHaveTextContent("thiên kiến sống sót");
+      expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toHaveTextContent("Bước 9 — Render");
+      expect(screen.getAllByTestId("flow-mini")).toHaveLength(4);
+      expect(screen.getByTestId("video-row-cccccccc-3333")).toHaveTextContent("Bản mới từ “thiên kiến sống sót”");
+      // No topic yet: say so instead of showing only a UUID.
+      expect(screen.getByTestId("video-row-dddddddd-4444")).toHaveTextContent("chưa đặt chủ đề");
+    });
+
+    it("filters by what needs attention", async () => {
+      renderList(rows);
+      await waitFor(() => expect(screen.getByTestId("filter-problem")).toBeInTheDocument());
+
+      fireEvent.click(screen.getByTestId("filter-problem"));
+      expect(screen.getByTestId("video-row-bbbbbbbb-2222")).toBeInTheDocument();
+      expect(screen.queryByTestId("video-row-aaaaaaaa-1111")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("filter-running"));
+      expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toBeInTheDocument();
+      expect(screen.queryByTestId("video-row-bbbbbbbb-2222")).not.toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId("filter-done"));
+      expect(screen.getByTestId("video-row-cccccccc-3333")).toBeInTheDocument();
+      expect(screen.queryByTestId("video-row-aaaaaaaa-1111")).not.toBeInTheDocument();
+    });
+  });
 });

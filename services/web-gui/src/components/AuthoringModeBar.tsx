@@ -1,7 +1,17 @@
-import { useContext, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "./ui";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { generateAuthoringStep, getAuthoringState, type AuthoringProgress, type AuthoringStep, type LlmStatus } from "../api/client";
+import {
+  getAuthoringChain,
+  listProjectEvents,
+  type ProjectEvent,
+  getAuthoringState,
+  startAuthoringChain,
+  type AuthoringChainState,
+  type AuthoringProgress,
+  type AuthoringStep,
+  type LlmStatus,
+} from "../api/client";
 import type { AuthoringMode } from "../context/ProjectDraftContext";
 import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
@@ -10,12 +20,64 @@ import styles from "./AuthoringModeBar.module.css";
 
 /** Nhãn tiếng Việt của từng bước, để câu trạng thái nói đúng nó đang ở đâu. */
 const STEP_LABELS: Record<AuthoringStep, string> = {
-  story: "1a. Dàn ý",
-  storyboard: "1b. Storyboard",
-  code: "1c. Code",
+  story: "Kịch bản",
+  storyboard: "Visual",
+  code: "Code",
 };
 
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "code"];
+
+/** Kết cục của một chuỗi đã xong còn hiện bao lâu (xem `outcome` bên dưới). */
+const OUTCOME_TTL_MS = 30 * 60 * 1000;
+
+/** Kết quả lượt chạy gần nhất của từng bước, đọc từ nhật ký của dự án. */
+interface LastRun {
+  state: ProjectEvent["run_state"];
+  durationMs: number;
+  chars: number;
+  tokens: number;
+}
+
+function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun>> {
+  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "code" };
+  const out: Partial<Record<AuthoringStep, LastRun>> = {};
+  for (const e of [...events].sort((a, b) => a.id - b.id)) {
+    const step = byFlow[e.flow_step];
+    if (e.source !== "authoring" || !step || e.run_state === "running") continue;
+    out[step] = {
+      state: e.run_state,
+      durationMs: e.duration_ms ?? 0,
+      chars: e.content_chars ?? 0,
+      tokens: (e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0),
+    };
+  }
+  return out;
+}
+
+function formatMs(ms: number): string {
+  const s = Math.round(ms / 1000);
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+}
+
+function dismissKey(projectId: string): string {
+  return `authoring-chain-dismissed:${projectId}`;
+}
+
+function readDismissed(projectId: string): string | null {
+  try {
+    return window.localStorage.getItem(dismissKey(projectId));
+  } catch {
+    return null;
+  }
+}
+
+function writeDismissed(projectId: string, finishedAt: string): void {
+  try {
+    window.localStorage.setItem(dismissKey(projectId), finishedAt);
+  } catch {
+    /* per-viewer convenience only */
+  }
+}
 
 interface AuthoringModeBarProps {
   /**
@@ -110,19 +172,87 @@ export function AuthoringModeBar({
 
   // Một lượt chạy ghi đè bước của nó và xoá các bước dựng trên nó (cả khi hỏng),
   // nên đọc lại cả ba từ server thay vì để bản nháp ở client lệch đi.
-  async function syncFromServer() {
+  async function syncFromServer(chainSteps: AuthoringStep[] = []) {
     try {
       const state = await getAuthoringState(projectId);
       dispatchDraft({
         type: "SYNC_AUTHORING",
         payload: { story: state.story, storyboard: state.storyboard, code: state.code },
       });
+      // Nhét kết quả từng bước vào ô soạn thảo (FR78.2). Bước chưa chạy tới thì
+      // server đã xoá nội dung, nên rỗng và bị bỏ qua.
+      for (const step of chainSteps) {
+        const content = step === "story" ? state.story : step === "storyboard" ? state.storyboard : state.code;
+        if (content) onGenerated?.(step, content);
+      }
     } catch {
       /* best-effort — lần mở lại sau vẫn đọc từ server */
     }
   }
+
   const [error, setError] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [chain, setChain] = useState<AuthoringChainState | null>(null);
+  const [dismissedAt, setDismissedAt] = useState<string | null>(() => readDismissed(projectId));
+  const [runs, setRuns] = useState<Partial<Record<AuthoringStep, LastRun>>>({});
+  // Số đo từng bước đọc từ nhật ký: nạp lúc mở và mỗi khi một chuỗi vừa xong.
+  const finishedAt = chain?.finished_at ?? null;
+  useEffect(() => {
+    if (!projectId) return;
+    let cancelled = false;
+    listProjectEvents(projectId)
+      .then((rows) => {
+        if (!cancelled && Array.isArray(rows)) setRuns(lastRuns(rows));
+      })
+      .catch(() => {
+        /* the journal is a nicety: the bar works without it */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, finishedAt]);
+  // Chuỗi chạy ở SERVER, độc lập với trang này: đóng tab, tải lại, sang máy
+  // khác thì nó vẫn chạy và lưu kết quả. Vì vậy trạng thái "đang chạy" và kết
+  // cục đều đọc từ server (poll), không giữ trong trình duyệt — giữ ở đây thì
+  // tải lại trang là mất, và Creator thấy một màn im lặng dù server đã xong.
+  const starting = useRef(false);
+  const handledFinish = useRef<string | null>(null);
+  const runRef = useRef(run);
+  runRef.current = run;
+
+  useEffect(() => {
+    if (!projectId || !llm) return;
+    let cancelled = false;
+    const tick = async () => {
+      let c: AuthoringChainState;
+      try {
+        c = await getAuthoringChain(projectId);
+      } catch {
+        return; // best-effort: chưa bật AI ở server, hoặc mạng chập chờn
+      }
+      if (cancelled) return;
+      setChain(c);
+      const cur = runRef.current;
+      if (c.running) {
+        if (!cur.running) dispatchRun({ type: "START", steps: c.steps });
+        if (cur.currentIndex !== c.current_index) dispatchRun({ type: "PROGRESS", index: c.current_index });
+      } else if (cur.running && !starting.current) {
+        dispatchRun({ type: "FINISH" });
+      }
+      // Kết cục mới: nạp kết quả về ô soạn thảo một lần.
+      if (c.finished && c.finished_at && handledFinish.current !== c.finished_at) {
+        handledFinish.current = c.finished_at;
+        await syncFromServer(c.steps);
+      }
+    };
+    void tick();
+    const id = window.setInterval(() => void tick(), 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, llm !== null]);
+
   const activeStep = run.running && run.currentIndex >= 0 ? run.steps[run.currentIndex] ?? null : null;
   const live = useAuthoringProgress(projectId, activeStep);
 
@@ -139,63 +269,52 @@ export function AuthoringModeBar({
   // chung khiến Creator tưởng máy đứng hình.
   const runningElsewhere = running && run.steps !== steps && run.steps.join() !== steps.join();
 
-  async function handleRun() {
-    dispatchRun({ type: "START", steps });
+  // Kết cục lần chạy gần nhất, còn hiện trong 30 phút hoặc tới khi Creator
+  // đóng — đủ để thấy kết quả khi mở lại trang, mà không treo mãi một lỗi cũ.
+  const outcome =
+    chain?.finished && !chain.running && chain.finished_at && chain.finished_at !== dismissedAt &&
+    Date.now() - new Date(chain.finished_at).getTime() < OUTCOME_TTL_MS
+      ? chain
+      : null;
+  const outcomeError = outcome?.error
+    ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${STEP_LABELS[outcome.error_step]})` : "")
+    : null;
+  const outcomeNote = outcome?.note ?? null;
+  const shownError = error ?? outcomeError;
+
+  function dismissOutcome() {
+    if (!chain?.finished_at) return;
+    setDismissedAt(chain.finished_at);
+    writeDismissed(projectId, chain.finished_at);
     setError(null);
-    setNote(null);
-    let at: AuthoringStep | null = null;
+  }
+
+  async function handleRun() {
+    setError(null);
+    starting.current = true;
+    dispatchRun({ type: "START", steps });
     try {
       // Server render prompt từ dữ liệu của chính nó, nên những gì Creator vừa
       // gõ phải lên server trước, không thì prompt thiếu dữ liệu bước này cần.
       if (beforeRun) await beforeRun();
-      for (let i = 0; i < steps.length; i += 1) {
-        const step = steps[i];
-        // Biến cục bộ chứ không đọc lại state `progress` ở khối catch: state
-        // vừa set chưa nhìn thấy được trong cùng một lượt chạy, nên câu lỗi sẽ
-        // chỉ sai tên bước.
-        at = step;
-        dispatchRun({ type: "PROGRESS", index: i });
-        const result = await generateAuthoringStep(projectId, step);
-        await syncFromServer();
-        onGenerated?.(step, result.content);
-        if (result.check_failed) {
-          // CR-039: code đã lưu nhưng vẫn lỗi biên dịch sau các vòng sửa. Không
-          // phải lỗi của lượt chạy — token đã tốn và Creator sửa tay được — nên
-          // báo bằng ghi chú kèm danh sách lỗi, không nuốt và không coi là xong sạch.
-          const shown = (result.diagnostics ?? []).slice(0, 5).join(" · ");
-          setNote(
-            `Đã sinh và lưu code nhưng vẫn lỗi biên dịch sau ${result.repair_rounds ?? 0} vòng sửa: ${shown}` +
-              ((result.diagnostics?.length ?? 0) > 5 ? ` (+${(result.diagnostics?.length ?? 0) - 5} lỗi nữa)` : "") +
-              ". Sửa tay trong ô soạn thảo, hoặc chạy lại.",
-          );
-          break;
-        }
-        if (result.save_error) {
-          // Nội dung sinh ra được nhưng không lưu được: bước sau sẽ render
-          // prompt từ dữ liệu cũ trên server, tức là làm sai đề. Dừng chuỗi
-          // ngay, giữ lại thứ vừa sinh trong ô soạn thảo.
-          setNote(result.save_error);
-          break;
-        }
-      }
+      await startAuthoringChain(projectId, steps);
+      setDismissedAt(null);
+      // Server đã ghi nhận chuỗi; từ đây poll là nguồn sự thật.
+      const c = await getAuthoringChain(projectId).catch(() => null);
+      if (c) setChain(c);
     } catch (err) {
-      await syncFromServer();
-      const where = at && isChain ? ` (dừng ở ${STEP_LABELS[at]})` : "";
-      setError(
-        (err instanceof Error
-          ? err.message
-          : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.") + where,
-      );
-    } finally {
       dispatchRun({ type: "FINISH" });
+      setError(err instanceof Error ? err.message : "Chạy bằng AI thất bại, hoặc chuyển về Copy prompt như cũ.");
+    } finally {
+      starting.current = false;
     }
   }
 
-  const runLabel = isChain ? `Chạy cả bước 3 bằng AI (1a → 1b → 1c)` : `Chạy ${what} bằng AI`;
+  const runLabel = isChain ? `Chạy Kịch bản → Visual → Code bằng AI` : `Chạy ${what} bằng AI`;
 
   const modeHint = !llm.enabled
     ? llm.reason || "Chưa cấu hình API key nên chỉ có đường copy tay."
-    : `Áp dụng cho cả 3 tab 1a–1c: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
+    : `Áp dụng cho các bước Kịch bản, Visual, Code: hệ thống tự gọi ${llm.provider}, điền kết quả vào ô soạn thảo để bạn sửa. Không tự chuyển bước, không tự nộp render.`;
   const showRunRow = aiMode && canRun;
 
   return (
@@ -204,6 +323,26 @@ export function AuthoringModeBar({
         <div className={`${glass.card} ${styles.card}`}>
           <div className={glass.cardTitle}>Cách làm bước 3</div>
           <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />
+        </div>
+      )}
+
+      {aiMode && !running && ALL_STEPS.some((st) => runs[st]) && (
+        <div className={`${glass.card} ${styles.card}`} data-testid="authoring-last-runs">
+          <div className={glass.cardTitle}>Lần chạy AI gần nhất</div>
+          <ul className={styles.lastRuns}>
+            {ALL_STEPS.filter((st) => runs[st]).map((st) => {
+              const r = runs[st] as LastRun;
+              return (
+                <li key={st} data-testid={`last-run-${st}`} data-state={r.state}>
+                  <b>{STEP_LABELS[st]}</b>
+                  <span>{r.state === "done" ? "xong" : r.state === "failed" ? "lỗi" : r.state}</span>
+                  <span>{formatMs(r.durationMs)}</span>
+                  {r.chars > 0 && <span>{formatChars(r.chars)} ký tự</span>}
+                  {r.tokens > 0 && <span>{r.tokens.toLocaleString("vi-VN")} token</span>}
+                </li>
+              );
+            })}
+          </ul>
         </div>
       )}
 
@@ -243,12 +382,26 @@ export function AuthoringModeBar({
               {!running && runDisabled && runDisabledReason && (
                 <p className={styles.status}>{runDisabledReason}</p>
               )}
-              {error && (
+              {shownError && (
                 <p className={styles.error} data-testid="run-with-ai-error">
-                  {error}
+                  {shownError}
                 </p>
               )}
-              {note && <p className={styles.status}>{note}</p>}
+              {outcomeNote && !error && (
+                <p className={styles.status} data-testid="run-with-ai-note">
+                  {outcomeNote}
+                </p>
+              )}
+              {(outcomeError || outcomeNote) && !running && (
+                <button type="button" className={styles.hint} onClick={dismissOutcome} data-testid="run-with-ai-dismiss">
+                  Đóng thông báo
+                </button>
+              )}
+              {outcome && !outcomeError && !outcomeNote && !running && !error && (
+                <p className={styles.status} data-testid="run-with-ai-done">
+                  Lượt chạy gần nhất đã xong — kết quả đã nạp vào ô soạn thảo.
+                </p>
+              )}
             </>
           )}
 

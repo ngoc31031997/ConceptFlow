@@ -5,12 +5,10 @@ import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getPromptTemplate, getAuthoringState, saveAuthoringStoryboard } from "../api/client";
 import { Card, Button, TextArea } from "../components/ui";
-import { ScriptPipelineTabs } from "../components/ScriptPipelineTabs";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
-import { useWizardPosition } from "../hooks/useWizardPosition";
 
 /**
  * Bước 1b (Visual Director) — second tab of the "Bước 3 — Script"
@@ -19,7 +17,6 @@ import { useWizardPosition } from "../hooks/useWizardPosition";
  * paste the AI's storyboard back, then save it server-side and advance.
  */
 export function VisualDirectorStepPage() {
-  useWizardPosition("/create/script/storyboard");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
@@ -33,12 +30,17 @@ export function VisualDirectorStepPage() {
   // if localStorage was also cleared, but the server copy is the one source
   // of truth the next pipeline step reads from anyway.
   useEffect(() => {
-    if (!draft.projectId || draft.authoringStory) return;
+    if (!draft.projectId || (draft.authoringStory && draft.authoringTopic)) return;
     let cancelled = false;
     getAuthoringState(draft.projectId)
       .then((state) => {
-        if (!cancelled && state.story) {
+        if (cancelled) return;
+        if (state.story && !draft.authoringStory) {
           dispatch({ type: "SET_AUTHORING_STORY", payload: state.story });
+        }
+        // Chủ đề cũng phải nạp lại để AppShell hiện tên project sau reload.
+        if (state.topic && !draft.authoringTopic) {
+          dispatch({ type: "SET_AUTHORING_TOPIC", payload: state.topic });
         }
       })
       .catch(() => {
@@ -97,7 +99,7 @@ export function VisualDirectorStepPage() {
       const saved = await getAuthoringState(draft.projectId).catch(() => null);
       const changed = saved !== null && saved.storyboard !== "" && saved.storyboard !== draft.authoringStoryboard;
       if (changed && saved.code) {
-        const ok = window.confirm("Storyboard đã đổi. Code (1c) dựng từ storyboard cũ sẽ bị xoá để làm lại. Tiếp tục?");
+        const ok = window.confirm("Storyboard đã đổi. Code dựng từ storyboard cũ sẽ bị xoá để làm lại. Tiếp tục?");
         if (!ok) return;
       }
       await saveAuthoringStoryboard(draft.projectId, draft.authoringStoryboard);
@@ -140,18 +142,11 @@ export function VisualDirectorStepPage() {
         title="Bước 3 — Script"
         subtitle={
           hasOwnStoryboard
-            ? "1b. Dán kịch bản phân cảnh sẵn có của bạn."
-            : "1b. Dựng kịch bản phân cảnh từ dàn ý câu chuyện."
+            ? "Dán kịch bản phân cảnh sẵn có của bạn."
+            : "Dựng kịch bản phân cảnh từ dàn ý câu chuyện."
         }
         wide
       >
-        <ScriptPipelineTabs
-          active="storyboard"
-          outlineDone={draft.authoringStory.trim().length > 0}
-          storyboardDone={!storyboardIsEmpty}
-          codeDone={draft.scriptContent.trim().length > 0}
-        />
-
         <div className={styles.settingsRow}>
           {/* Không truyền onEngineChange: storyboard đọc dàn ý, không đọc
               engine, nên đây không phải chỗ đổi nó — chỉ tóm tắt để Creator
@@ -165,7 +160,7 @@ export function VisualDirectorStepPage() {
             steps={["storyboard"]}
             what="storyboard"
             runDisabled={draft.authoringStory.trim().length === 0}
-            runDisabledReason="Cần dàn ý ở tab 1a trước — server đọc nó làm {{previous_output}}."
+            runDisabledReason="Cần dàn ý ở bước Kịch bản trước — server đọc nó làm {{previous_output}}."
             onGenerated={(_step, content) => dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content })}
           />
         </div>
@@ -195,10 +190,10 @@ export function VisualDirectorStepPage() {
             title={hasOwnStoryboard ? "Storyboard của bạn" : aiMode ? "Storyboard" : "2. Dán kết quả"}
             hint={
               hasOwnStoryboard
-                ? `Dán storyboard sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+                ? `Dán storyboard sẵn có vào đây, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
                 : aiMode
-                  ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
-                  : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước 1c (${engineerLabel}).`
+                  ? `Kết quả AI sinh ra hiện ở đây để bạn sửa, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
+                  : `Dán storyboard AI trả về, rồi bấm Tiếp tục để chuyển sang bước Code (${engineerLabel}).`
             }
           >
             <TextArea

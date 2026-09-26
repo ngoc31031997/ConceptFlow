@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ScriptOutlineStepPage } from "../../src/pages/ScriptOutlineStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
+import { AuthoringRunProvider } from "../../src/context/AuthoringRunContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
@@ -22,12 +23,39 @@ beforeEach(() => {
   vi.spyOn(apiClient, "saveAuthoringStory").mockResolvedValue(undefined);
 });
 
+
+// Chuỗi 1a→1b→1c chạy ở SERVER (POST .../authoring/chain trả về ngay, GET cho
+// biết kết cục). Helper này dựng một server giả: trước khi bấm chạy chưa có
+// chuỗi nào; sau khi bấm, server "đã xong" với kết cục do test quy định.
+function mockServerChain(outcome: Partial<apiClient.AuthoringChainState> = {}) {
+  let started: apiClient.AuthoringStep[] | null = null;
+  const start = vi.spyOn(apiClient, "startAuthoringChain").mockImplementation(async (_id, steps) => {
+    started = steps;
+  });
+  vi.spyOn(apiClient, "getAuthoringChain").mockImplementation(async () =>
+    started
+      ? {
+          running: false,
+          steps: started,
+          current_index: started.length,
+          finished: true,
+          started_at: new Date().toISOString(),
+          finished_at: new Date().toISOString(),
+          ...outcome,
+        }
+      : { running: false, steps: [], current_index: 0, finished: false },
+  );
+  return start;
+}
+
 function renderPage() {
   return render(
     <ThemeProvider>
       <MemoryRouter>
         <ProjectDraftProvider>
-          <ScriptOutlineStepPage />
+          <AuthoringRunProvider>
+            <ScriptOutlineStepPage />
+          </AuthoringRunProvider>
         </ProjectDraftProvider>
       </MemoryRouter>
     </ThemeProvider>,
@@ -131,14 +159,12 @@ describe("ScriptOutlineStepPage", () => {
     });
   });
 
-  it("shows the pipeline tab bar with 1a active", () => {
+  it("has no 1a/1b/1c tab bar: the three script steps are steps 3/4/5 of the flow", () => {
     renderPage();
 
-    expect(screen.getByTestId("script-tab-outline")).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByTestId("script-tab-storyboard")).not.toBeDisabled();
-    expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
-    // CR-030 — tab "1d. Duyệt" đã bị bỏ hẳn khỏi bước 1.
-    expect(screen.queryByTestId("script-tab-review")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("script-tab-outline")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("script-tab-code")).not.toBeInTheDocument();
   });
 
   // CR-030 — engine phải lên server ngay khi chọn, không phải chỉ lúc nộp
@@ -162,13 +188,7 @@ describe("ScriptOutlineStepPage", () => {
     it("gửi kèm engine hiện tại ngay trước khi chạy chuỗi AI", async () => {
       const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
-      vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
-        step: "story",
-        role: "story_architect",
-        content: "CÂU HỎI CỐT LÕI: ...",
-        provider: "hive",
-        usage: { model: "deepseek" },
-      });
+      mockServerChain();
       renderPage();
       expandSettings();
 
@@ -229,20 +249,7 @@ describe("ScriptOutlineStepPage", () => {
     it("chạy cả ba bước bằng API và điền kết quả vào đúng từng ô", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      const byStep: Record<string, string> = {
-        story: "CÂU HỎI CỐT LÕI: vì sao?",
-        storyboard: "SHOT 1 — ...",
-        code: "class Demo(ConceptFlowScene): pass",
-      };
-      const generate = vi
-        .spyOn(apiClient, "generateAuthoringStep")
-        .mockImplementation(async (_projectId, step) => ({
-          step,
-          role: step,
-          content: byStep[step],
-          provider: "hive",
-          usage: { model: "deepseek" },
-        }));
+      const start = mockServerChain();
       // Sau mỗi lượt chạy, bản nháp đọc lại ba kết quả từ server — mô phỏng
       // server đã lưu dàn ý của bước 1a.
       vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
@@ -258,8 +265,8 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
-      await waitFor(() => expect(generate).toHaveBeenCalledTimes(3));
-      expect(generate.mock.calls.map((call) => call[1])).toEqual(["story", "storyboard", "code"]);
+      await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+      expect(start.mock.calls[0][1]).toEqual(["story", "storyboard", "code"]);
       await waitFor(() =>
         expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?"),
       );
@@ -271,20 +278,10 @@ describe("ScriptOutlineStepPage", () => {
     it("báo code đã lưu nhưng còn lỗi biên dịch, kèm danh sách lỗi", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      vi.spyOn(apiClient, "generateAuthoringStep").mockImplementation(async (_projectId, step) => ({
-        step,
-        role: step,
-        content: step === "code" ? "const broken = ;" : "nội dung",
-        provider: "hive",
-        usage: { model: "deepseek" },
-        ...(step === "code"
-          ? {
-              check_failed: true,
-              repair_rounds: 3,
-              diagnostics: ["dòng 41: TS2304: Cannot find name 'x'.", "dòng 50: TS1005: ';' expected."],
-            }
-          : {}),
-      }));
+      mockServerChain({
+        note:
+          "Đã sinh và lưu code nhưng vẫn lỗi biên dịch sau 3 vòng sửa: dòng 41: TS2304: Cannot find name 'x'. · dòng 50: TS1005: ';' expected.. Sửa tay trong ô soạn thảo, hoặc chạy lại.",
+      });
       vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
         topic: "Vòng lặp for", story: "s", storyboard: "sb", code: "const broken = ;",
       });
@@ -307,18 +304,7 @@ describe("ScriptOutlineStepPage", () => {
     it("dừng chuỗi ở bước hỏng, giữ nguyên kết quả bước trước", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      const generate = vi
-        .spyOn(apiClient, "generateAuthoringStep")
-        .mockImplementation(async (_projectId, step) => {
-          if (step === "storyboard") throw new Error("Hive hết số dư.");
-          return {
-            step,
-            role: step,
-            content: "CÂU HỎI CỐT LÕI: vì sao?",
-            provider: "hive",
-            usage: { model: "deepseek" },
-          };
-        });
+      mockServerChain({ error: "Tài khoản Hive hết số dư.", error_step: "storyboard" });
       // Sau mỗi lượt chạy, bản nháp đọc lại ba kết quả từ server — mô phỏng
       // server đã lưu dàn ý của bước 1a.
       vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
@@ -335,10 +321,9 @@ describe("ScriptOutlineStepPage", () => {
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
       await waitFor(() => expect(screen.getByTestId("run-with-ai-error")).toBeInTheDocument());
-      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("1b. Storyboard");
+      expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Visual");
       // Bước 1a đã xong vẫn còn nguyên trong ô soạn thảo.
       expect(screen.getByTestId("script-outline-story-input")).toHaveValue("CÂU HỎI CỐT LÕI: vì sao?");
-      expect(generate).toHaveBeenCalledTimes(2);
     });
 
     it("lưu chủ đề lên server trước khi gọi, vì prompt được render ở server", async () => {
@@ -346,13 +331,7 @@ describe("ScriptOutlineStepPage", () => {
       const saveDraft = vi
         .spyOn(apiClient, "createProjectDraft")
         .mockResolvedValue({ similarProjects: [] });
-      vi.spyOn(apiClient, "generateAuthoringStep").mockResolvedValue({
-        step: "story",
-        role: "story_architect",
-        content: "dàn ý",
-        provider: "hive",
-        usage: { model: "deepseek" },
-      });
+      mockServerChain();
       renderPage();
       expandSettings();
 
@@ -388,7 +367,8 @@ describe("ScriptOutlineStepPage", () => {
     it("nói rõ nguyên nhân khi lượt chạy thất bại", async () => {
       mockLlm(true);
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-      vi.spyOn(apiClient, "generateAuthoringStep").mockRejectedValue(
+      vi.spyOn(apiClient, "getAuthoringChain").mockResolvedValue({ running: false, steps: [], current_index: 0, finished: false });
+      vi.spyOn(apiClient, "startAuthoringChain").mockRejectedValue(
         new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Copy prompt như cũ."),
       );
       renderPage();
@@ -444,5 +424,74 @@ describe("ScriptOutlineStepPage", () => {
       await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toBeInTheDocument());
       expect(screen.queryByTestId("script-outline-prompt")).not.toBeInTheDocument();
     });
+  });
+});
+
+// Chuỗi chạy ở server nên sống qua việc đóng/tải lại trang: mở lại phải thấy
+// nó đang chạy, hoặc kết cục của nó — không phải một màn im lặng.
+describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt chạy)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
+
+  function setup(chain: apiClient.AuthoringChainState) {
+    vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+    vi.spyOn(apiClient, "getAuthoringChain").mockResolvedValue(chain);
+    vi.spyOn(apiClient, "saveAuthoringMode").mockResolvedValue(undefined);
+    window.localStorage.setItem(
+      "conceptflow.draft.v1",
+      JSON.stringify({ projectId: "p-reopen", voiceLanguage: "vi", authoringMode: "ai", authoringTopic: "Vòng lặp for" }),
+    );
+    vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+      mode: "ai", topic: "Vòng lặp for", story: "", storyboard: "", code: "",
+    });
+  }
+
+  it("thấy chuỗi đang chạy dù trang này không bấm chạy, và nút chạy bị khoá", async () => {
+    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("run-with-ai-running")).toBeInTheDocument());
+    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Visual");
+    expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
+  });
+
+  it("hiện lỗi của lượt chạy đã dừng khi trang được mở lại, và đóng được", async () => {
+    setup({
+      running: false,
+      steps: ["story", "storyboard", "code"],
+      current_index: 1,
+      finished: true,
+      error: "Tài khoản Hive hết số dư.",
+      error_step: "storyboard",
+      finished_at: new Date().toISOString(),
+    });
+    renderPage();
+
+    const err = await screen.findByTestId("run-with-ai-error");
+    expect(err).toHaveTextContent("hết số dư");
+    expect(err).toHaveTextContent("Visual");
+
+    fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
+    await waitFor(() => expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument());
+  });
+
+  it("shows how the last AI run of each step went — time, size, tokens — from the journal", async () => {
+    setup({ running: false, steps: [], current_index: 0, finished: false });
+    vi.spyOn(apiClient, "listProjectEvents").mockResolvedValue([
+      { id: 1, project_id: "p-reopen", at: "t", flow_step: 3, step_label: "Kịch bản", run_state: "running", source: "authoring" },
+      { id: 2, project_id: "p-reopen", at: "t", flow_step: 3, step_label: "Kịch bản", run_state: "done", source: "authoring", duration_ms: 72000, content_chars: 10178, prompt_tokens: 900, completion_tokens: 3100 },
+      { id: 3, project_id: "p-reopen", at: "t", flow_step: 4, step_label: "Visual", run_state: "failed", source: "authoring", duration_ms: 15000, detail: "hết số dư" },
+    ]);
+    renderPage();
+
+    const story = await screen.findByTestId("last-run-story");
+    expect(story).toHaveTextContent("Kịch bản");
+    expect(story).toHaveTextContent("1m 12s");
+    expect(story).toHaveTextContent("10.2k ký tự");
+    expect(story).toHaveTextContent("4.000 token");
+    expect(screen.getByTestId("last-run-storyboard")).toHaveAttribute("data-state", "failed");
+    expect(screen.queryByTestId("last-run-code")).not.toBeInTheDocument();
   });
 });

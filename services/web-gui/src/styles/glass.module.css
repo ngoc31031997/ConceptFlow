@@ -263,3 +263,28 @@
   background: rgba(22, 34, 46, 0.08);
   color: var(--ink-soft);
 }
+
+
+/* Giá trị của ô nhập khi màn ở chế độ chỉ xem: chữ thường, chọn/sao chép được. */
+.readOnlyValue {
+  padding: 8px 2px;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+  border-bottom: 1px dashed var(--surface-border);
+}
+.readOnlyBlock {
+  max-height: 420px;
+  overflow: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.06);
+  font-size: 13px;
+}
+.readOnlyEmpty {
+  color: var(--ink-faint);
+}

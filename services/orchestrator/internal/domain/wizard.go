@@ -67,21 +67,3 @@ func EffectiveWizardStep(p *Project) int {
 	}
 	return step
 }
-
-// wizardRoutes maps every wizard screen a draft can be left on to the wizard
-// step it belongs to.
-var wizardRoutes = map[string]int{
-	"/":                         WizardStepIdea,
-	"/create/script/settings":   WizardStepConfig,
-	"/create/script/outline":    WizardStepScript,
-	"/create/script/storyboard": WizardStepScript,
-	"/create/script/code":       WizardStepScript,
-}
-
-// WizardStepForRoute returns the wizard step of a route and whether the route
-// is a known wizard screen. The client sends the route, so it is validated
-// here rather than stored blindly.
-func WizardStepForRoute(route string) (int, bool) {
-	step, ok := wizardRoutes[route]
-	return step, ok
-}

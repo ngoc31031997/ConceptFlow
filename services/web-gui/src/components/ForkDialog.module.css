@@ -1,0 +1,76 @@
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(15, 25, 40, 0.45);
+}
+.dialog {
+  width: min(480px, 100%);
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+}
+.title {
+  margin: 0;
+  font-size: 18px;
+}
+.lead,
+.note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+.note {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.options {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+.option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: start;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--surface-border);
+  cursor: pointer;
+}
+.option.on {
+  border-color: var(--accent);
+  background: rgba(47, 143, 224, 0.1);
+}
+.option input {
+  grid-row: 1 / span 2;
+}
+.option small {
+  grid-column: 2;
+  color: var(--ink-faint);
+  font-size: 12px;
+}
+.error {
+  margin: 0;
+  color: var(--danger, #d93b45);
+  font-size: 13px;
+}
+.actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}

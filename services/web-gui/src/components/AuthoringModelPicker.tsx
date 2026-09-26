@@ -3,9 +3,9 @@ import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModelPicker.module.css";
 
 const STEP_ORDER: { key: keyof AuthoringStepModels; label: string }[] = [
-  { key: "story", label: "1a. Dàn ý" },
-  { key: "storyboard", label: "1b. Storyboard" },
-  { key: "code", label: "1c. Code" },
+  { key: "story", label: "Kịch bản" },
+  { key: "storyboard", label: "Visual" },
+  { key: "code", label: "Code" },
 ];
 
 interface AuthoringModelPickerProps {

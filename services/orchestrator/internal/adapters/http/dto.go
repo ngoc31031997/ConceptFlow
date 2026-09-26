@@ -114,6 +114,13 @@ type sceneResponse struct {
 // projectResponse is the GET /v1/projects/{project_id} response
 // (interface-contracts.md).
 type projectResponse struct {
+	// FlowStep/RunState place the project in the 13-step flow (see
+	// domain.FlowStateFor); the GUI resumes and locks from these, not from
+	// wizard_route.
+	FlowStep int    `json:"flow_step"`
+	RunState string `json:"run_state"`
+	// ForkedFrom is the project this one was forked from ("" if none).
+	ForkedFrom       string                  `json:"forked_from,omitempty"`
 	ProjectID        string                  `json:"project_id"`
 	Status           string                  `json:"status"`
 	VideoPath        *string                 `json:"video_path,omitempty"`
@@ -178,6 +185,12 @@ type projectSummaryResponse struct {
 	// WizardStep (1-7) is the step the project is at, so the list can show
 	// "Bước N — …" next to the saga status.
 	WizardStep int `json:"wizard_step"`
+	// Topic names the project by its idea; FlowStep/RunState place it in the
+	// 13-step flow; ForkedFrom links a fork to its source.
+	Topic      string `json:"topic,omitempty"`
+	FlowStep   int    `json:"flow_step"`
+	RunState   string `json:"run_state"`
+	ForkedFrom string `json:"forked_from,omitempty"`
 }
 
 // projectListResponse is the GET /v1/projects response body.
@@ -364,6 +377,10 @@ func toProjectListResponse(summaries []domain.ProjectSummary) projectListRespons
 			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
 			RenderEngine: string(s.RenderEngine),
 			WizardStep:   domain.EffectiveWizardStep(&domain.Project{Status: s.Status, WizardStep: s.WizardStep}),
+			Topic:        s.Topic,
+			FlowStep:     s.FlowStep,
+			RunState:     string(s.RunState),
+			ForkedFrom:   s.ForkedFrom,
 		})
 	}
 	return projectListResponse{Projects: projects}

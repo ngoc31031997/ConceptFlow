@@ -19,6 +19,7 @@ forever.
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import subprocess
@@ -32,6 +33,7 @@ from adapters.assembly.subtitle_file import (
     DEFAULT_PLAY_RES_Y,
     write_subtitle_file,
 )
+from adapters.messaging.cancellation import run_cancellable
 from domain.errors import AssemblyEngineError
 from domain.models import (
     NarrationSegment,
@@ -134,7 +136,10 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         output_path: str,
         on_stage_done: Callable[[int, int], None] | None = None,
     ) -> str | None:
-        future = self._executor.submit(self._run_pipeline, request, output_path, on_stage_done)
+        # copy_context: the executor thread must see which command it works for,
+        # or the ffmpeg children it starts could never be found by a cancel.
+        ctx = contextvars.copy_context()
+        future = self._executor.submit(ctx.run, self._run_pipeline, request, output_path, on_stage_done)
         try:
             return future.result(timeout=self._timeout_seconds)
         except FutureTimeoutError as exc:
@@ -436,7 +441,8 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
 
     @staticmethod
     def _run_ffmpeg(args: list[str]) -> None:
-        result = subprocess.run([FFMPEG_BINARY, *args], capture_output=True, text=True)
+        # Cancellable: inside a command this child is killed if the Creator cancels.
+        result = run_cancellable([FFMPEG_BINARY, *args])
         if result.returncode != 0:
             raise AssemblyEngineError(f"ffmpeg exited with code {result.returncode}: {result.stderr}")
 

@@ -23,6 +23,7 @@ from adapters.messaging.consumer import (
     QCVideoCommandHandler,
     VideoAssemblyCommandDispatcher,
 )
+from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.channel_assets import ChannelAssetsRepository
@@ -57,7 +58,7 @@ async def run() -> None:
 
     pool = await create_pool()
     inbox = InboxRepository(pool)
-    outbox = OutboxRepository()
+    outbox = CancelAwareOutbox(OutboxRepository())
     channel_assets = ChannelAssetsRepository(pool)
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
@@ -98,6 +99,8 @@ async def run() -> None:
     relay.start()
 
     commands_consumer_tag = await commands_queue.consume(command_dispatcher.handle)
+    # Cancel requests arrive on their own fanout, not behind the running assembly.
+    await listen_for_cancels(channel)
     channel_asset_events_consumer_tag = await channel_asset_events_queue.consume(
         channel_asset_rendered_handler.handle
     )

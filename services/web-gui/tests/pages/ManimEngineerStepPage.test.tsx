@@ -146,7 +146,7 @@ describe("ManimEngineerStepPage", () => {
     });
   });
 
-  it("shows the pipeline tab bar (1c active) and the render engine picker", () => {
+  it("shows the render engine picker", () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -157,7 +157,6 @@ describe("ManimEngineerStepPage", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByTestId("script-tab-code")).toHaveAttribute("aria-selected", "true");
     // feature/remotion-engine: the engine choice lives on THIS tab now, not
     // on the situation-chooser page — switching it must fetch the matching
     // prompt role (remotion_engineer instead of manim_engineer).

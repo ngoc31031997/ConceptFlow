@@ -1,4 +1,3 @@
-import { wizardStepLabel } from "../utils/pipelineLabels";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
@@ -8,6 +7,7 @@ import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../ap
 import type { ProjectSummary } from "../types";
 
 import { projectPath } from "../utils/pipelineLabels";
+import { FLOW_LABELS, stepStatus } from "../utils/flow";
 import { Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
@@ -20,12 +20,57 @@ function TrashIcon() {
   );
 }
 
+type Filter = "all" | "running" | "waiting" | "problem" | "done";
+
+const FILTERS: { key: Filter; label: string }[] = [
+  { key: "all", label: "Tất cả" },
+  { key: "running", label: "Đang chạy" },
+  { key: "waiting", label: "Chờ bạn" },
+  { key: "problem", label: "Lỗi / đã huỷ" },
+  { key: "done", label: "Xong" },
+];
+
+function matches(p: ProjectSummary, filter: Filter): boolean {
+  const step = p.flow_step ?? 0;
+  switch (filter) {
+    case "running":
+      return p.run_state === "running";
+    case "problem":
+      return p.run_state === "failed" || p.run_state === "cancelled";
+    case "done":
+      return step >= 12 && p.run_state !== "failed";
+    case "waiting":
+      return p.run_state === "idle" && step > 0 && step < 12;
+    default:
+      return true;
+  }
+}
+
+/** 13 ô nhỏ, một ô một bước: dự án đi tới đâu, đang chạy hay lỗi ở ô nào. */
+function FlowMini({ project }: { project: ProjectSummary }) {
+  const flowStep = project.flow_step ?? 0;
+  if (!flowStep) return null;
+  return (
+    <span
+      className={styles.mini}
+      role="img"
+      aria-label={`Bước ${flowStep}/13: ${FLOW_LABELS[flowStep - 1]}`}
+      data-testid="flow-mini"
+    >
+      {FLOW_LABELS.map((label, i) => (
+        <i key={label} className={styles[`mini_${stepStatus(i + 1, flowStep, project.run_state)}`]} title={label} />
+      ))}
+    </span>
+  );
+}
+
 export function VideoListPage() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filter, setFilter] = useState<Filter>("all");
 
   const refetch = useCallback(async () => {
     try {
@@ -41,14 +86,19 @@ export function VideoListPage() {
     refetch();
   }, [refetch]);
 
+  const visible = useMemo(() => (projects ?? []).filter((p) => matches(p, filter)), [projects, filter]);
+  const nameOf = useMemo(() => {
+    const byId = new Map((projects ?? []).map((p) => [p.project_id, p.topic || p.project_id.slice(0, 8)]));
+    return (id: string) => byId.get(id) ?? id.slice(0, 8);
+  }, [projects]);
+
   const allSelected = useMemo(
-    () => !!projects && projects.length > 0 && projects.every((p) => selected.has(p.project_id)),
-    [projects, selected],
+    () => visible.length > 0 && visible.every((p) => selected.has(p.project_id)),
+    [visible, selected],
   );
 
   function toggleSelectAll() {
-    if (!projects) return;
-    setSelected(allSelected ? new Set() : new Set(projects.map((p) => p.project_id)));
+    setSelected(allSelected ? new Set() : new Set(visible.map((p) => p.project_id)));
   }
 
   function toggleSelect(projectId: string) {
@@ -128,6 +178,23 @@ export function VideoListPage() {
           <p className={glass.helperText}>Chưa có video nào.</p>
         ) : (
           <>
+            <div className={styles.filters} role="tablist" aria-label="Lọc theo trạng thái">
+              {FILTERS.map((f) => (
+                <button
+                  key={f.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={filter === f.key}
+                  className={`${styles.chip} ${filter === f.key ? styles.chipOn : ""}`}
+                  onClick={() => setFilter(f.key)}
+                  data-testid={`filter-${f.key}`}
+                >
+                  {f.label}
+                  <span className={styles.chipCount}>{(projects ?? []).filter((p) => matches(p, f.key)).length}</span>
+                </button>
+              ))}
+            </div>
+
             <div className={styles.toolbar}>
               <label className={styles.selectAllLabel}>
                 <input
@@ -157,7 +224,8 @@ export function VideoListPage() {
             </div>
 
             <Card>
-              {projects.map((project) => (
+              {visible.length === 0 && <p className={glass.helperText}>Không có video nào ở nhóm này.</p>}
+              {visible.map((project) => (
                 <div
                   key={project.project_id}
                   data-testid={`video-row-${project.project_id}`}
@@ -172,13 +240,22 @@ export function VideoListPage() {
                   />
 
                   <div className={styles.rowMain}>
-                    <div className={styles.projectId}>{project.project_id}</div>
+                    <div className={styles.name} data-testid="project-name">
+                      {project.topic || <span className={styles.unnamed}>(chưa đặt chủ đề)</span>}
+                      <span className={styles.projectId}>{project.project_id.slice(0, 8)}</span>
+                    </div>
+                    {project.forked_from && (
+                      <div className={styles.lineage} data-testid="lineage">
+                        Bản mới từ “{nameOf(project.forked_from)}”
+                      </div>
+                    )}
+                    <FlowMini project={project} />
                     <div className={styles.meta}>
-                      {wizardStepLabel(project.wizard_step) && (
+                      {project.flow_step ? (
                         <span className={glass.cardHint} data-testid="wizard-step">
-                          {wizardStepLabel(project.wizard_step)}
+                          Bước {project.flow_step} — {FLOW_LABELS[project.flow_step - 1]}
                         </span>
-                      )}
+                      ) : null}
                       <StatusBadge status={project.status} />
                       <RenderEngineBadge renderEngine={project.render_engine} />
                       {project.error_message && (

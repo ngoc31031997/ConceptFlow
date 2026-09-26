@@ -17,6 +17,7 @@ import os
 
 import aio_pika
 
+from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import SynthesizeSpeechCommandHandler
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
@@ -84,7 +85,7 @@ async def run() -> None:
 
     pool = await create_pool()
     inbox = InboxRepository(pool)
-    outbox = OutboxRepository()
+    outbox = CancelAwareOutbox(OutboxRepository())
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
@@ -102,6 +103,8 @@ async def run() -> None:
     relay.start()
 
     consumer_tag = await queue.consume(command_handler.handle)
+    # Cancel requests arrive on their own fanout, not behind the running batch.
+    await listen_for_cancels(channel)
 
     with open(READY_SENTINEL_PATH, "w") as f:
         f.write("ready")

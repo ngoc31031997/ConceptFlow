@@ -912,7 +912,7 @@ async def test_dispatcher_rejects_undecodable_envelope() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dispatcher_nacks_unexpected_handler_exception(shared_volume_root) -> None:
+async def test_dispatcher_dead_letters_unexpected_handler_exception(shared_volume_root) -> None:
     from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
 
     class ExplodingAssembler(VideoAssemblerPort):
@@ -928,7 +928,35 @@ async def test_dispatcher_nacks_unexpected_handler_exception(shared_volume_root)
     await dispatcher.handle(message)
 
     # RuntimeError is not one of the handler's own except clauses, so it
-    # escapes `handle` — the dispatcher's last-resort catch must nack it for
-    # retry rather than leave it unacked.
-    assert message.rejected is True
+    # escapes `handle` — the dispatcher's last-resort catch must reject it
+    # WITHOUT requeue (dead-letter, no automatic retry) rather than leave it
+    # unacked. The FakeMessage records the requeue flag in `rejected`.
+    assert message.rejected is False
     assert message.acked is False
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_drops_a_command_the_creator_already_cancelled(shared_volume_root) -> None:
+    """Cancelled while still queued: acked, nothing run, nothing reported."""
+    from datetime import UTC, datetime
+
+    from adapters.messaging.cancellation import REGISTRY
+    from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
+
+    ran = []
+
+    class Recorder:
+        async def handle(self, message):
+            ran.append(message)
+
+    envelope = json.loads(make_envelope(shared_volume_root=shared_volume_root))
+    envelope["event_type"] = "assemble_video"
+    envelope["timestamp"] = "2026-08-07T00:00:00Z"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+    REGISTRY.cancel(envelope["project_id"], datetime(2026, 8, 7, 0, 0, 5, tzinfo=UTC))
+    try:
+        await VideoAssemblyCommandDispatcher(assemble_video=Recorder()).handle(message)
+        assert message.acked is True
+        assert ran == []
+    finally:
+        REGISTRY._cancelled_at.pop(envelope["project_id"], None)

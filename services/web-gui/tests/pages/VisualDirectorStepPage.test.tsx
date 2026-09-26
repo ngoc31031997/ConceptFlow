@@ -79,7 +79,7 @@ describe("VisualDirectorStepPage", () => {
     });
   });
 
-  it("shows the pipeline tab bar with 1b active and lets the Creator jump to any other tab", () => {
+  it("has no tab bar: moving between script steps is the flow's step bar", () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -90,10 +90,7 @@ describe("VisualDirectorStepPage", () => {
       </ThemeProvider>,
     );
 
-    expect(screen.getByTestId("script-tab-storyboard")).toHaveAttribute("aria-selected", "true");
-    // Free navigation: every tab stays clickable regardless of progress.
-    // CR-030 — chỉ còn 3 tab, tab "1d. Duyệt" đã bị bỏ hẳn.
-    expect(screen.getByTestId("script-tab-outline")).not.toBeDisabled();
-    expect(screen.getByTestId("script-tab-code")).not.toBeDisabled();
+    expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
   });
+
 });

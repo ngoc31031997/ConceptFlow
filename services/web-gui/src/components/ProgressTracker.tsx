@@ -15,6 +15,8 @@ interface ProgressTrackerProps {
   steps: readonly string[];
   /** Dims the tracker and drops the live wording once the saga has failed. */
   isFailed?: boolean;
+  /** Xem lại một bước đã chạy xong: tất cả các ô là "xong", không có tiến độ sống. */
+  allDone?: boolean;
 }
 
 function CheckIcon() {
@@ -48,7 +50,7 @@ function unitProgress(
   return null;
 }
 
-export function ProgressTracker({ progressState, steps, isFailed = false }: ProgressTrackerProps) {
+export function ProgressTracker({ progressState, steps, isFailed = false, allDone = false }: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
   const unit = unitProgress(progressState);
   const hasSceneProgress = unit !== null;
@@ -64,7 +66,9 @@ export function ProgressTracker({ progressState, steps, isFailed = false }: Prog
     <Card>
       <div className={styles.wrap}>
         <p className={styles.stepLabel} data-testid="progress-tracker-step-label">
-          {currentStep
+          {allDone
+            ? "Đã chạy xong"
+            : currentStep
             ? isFailed
               ? `Dừng ở bước: ${stepLabel(currentStep)}`
               : `Đang xử lý: ${stepLabel(currentStep)}`
@@ -95,8 +99,8 @@ export function ProgressTracker({ progressState, steps, isFailed = false }: Prog
         */}
         <ol className={styles.stepList} data-testid="progress-tracker-steps">
           {steps.map((step, index) => {
-            const isDone = activeIndex >= 0 && index < activeIndex;
-            const isActive = index === activeIndex;
+            const isDone = allDone || (activeIndex >= 0 && index < activeIndex);
+            const isActive = !allDone && index === activeIndex;
             const state = isDone ? "done" : isActive ? (isFailed ? "failed" : "active") : "pending";
             return (
               <li key={step} className={styles.stepListItem} data-state={state}>

@@ -1,57 +1,26 @@
 import type { ReactNode } from "react";
-import { useContext } from "react";
-import { Link, NavLink, useNavigate, useParams } from "react-router-dom";
+import { useContext, useState } from "react";
+import { Link, NavLink, useParams } from "react-router-dom";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
+import { useProjectFlow } from "../context/ProjectFlowContext";
+import { useStepNav } from "../hooks/useStepNav";
+import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
+import { StatusStrip } from "./StatusStrip";
+import { ReadOnlyContext } from "../context/ReadOnlyContext";
+import { FLOW_LABELS, readOnlyReason } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
 import styles from "./AppShell.module.css";
 
 /*
-  The whole journey, one pill per screen the Creator actually passes through.
-  The old three-step version compressed all of the work into "Soạn nội dung"
-  and gave the two automatic phases equal billing, so it described the plumbing
-  rather than the path.
+  Hành trình 13 bước (xem utils/flow.ts): mỗi pill là một bước Creator đi qua.
+  Bấm được mọi bước đã tới (tới bước xa nhất server ghi nhận) — để XEM lại. Có
+  sửa được hay không là chuyện của server: chỉ draft hoặc dự án lỗi mới sửa
+  được; còn lại mở ở chế độ chỉ đọc (xem `readOnly` bên dưới).
 */
-/*
-  Chỉ 3 mục đầu là đích nhảy được — xem BACKTRACKABLE_STEPS. Các mục sau thuộc
-  về một project đã tồn tại, nên đường của chúng cần :id mà thanh này không
-  có; chúng ở đây để chỉ chỗ, không để bấm.
-*/
-const STEP_ROUTES = [
-  "/",
-  "/create/script/settings",
-  "/create/script/outline",
-  "/projects/:id/validate",
-  "/projects/:id/render",
-  "/projects/:id/result",
-  "/projects/:id/publish",
-];
-
-/*
-  CR-031 — bảy bước. "Cấu hình" (bước 2) gộp ngôn ngữ/engine/cách làm với giọng đọc/hình ảnh và đứng trước "Script" (chuỗi 1a-1b-1c); bước "Xem lại" đã bỏ, nút cuối của 1c chạy thẳng saga. "Script" cũ gộp cả tình huống, cấu hình ngôn ngữ/engine/
-  cách làm và chuỗi 1a-1b-1c vào một pill duy nhất; tách "Ý tưởng" (chọn tình
-  huống, nhập chủ đề) ra làm bước riêng để thanh tiến trình phản ánh đúng
-  màn hình Creator đang đứng, thay vì gộp hai việc khác hẳn nhau (chọn ý
-  tưởng vs. soạn script) vào một mục. "Xử lý" cũ cũng từng gộp hai việc rất
-  khác nhau vào một màn: chạy thử kịch bản (vài giây, miễn phí, sửa được) và
-  sản xuất thật (nhiều phút, tốn TTS/render, không dừng được) — tách thành
-  "Validate" rồi "Xử lý" để cổng duyệt dàn ý nằm đúng ranh giới đó.
-*/
-const STEP_LABELS = [
-  "Ý tưởng",
-  "Cấu hình",
-  "Script",
-  "Validate",
-  "Xử lý",
-  "Kết quả",
-  "Đăng",
-] as const;
-
-/** Số bước đầu tiên có URL không cần project id, nên nhảy ngược về được. */
-const BACKTRACKABLE_STEPS = 3;
-
 interface AppShellProps {
-  currentStep?: 1 | 2 | 3 | 4 | 5 | 6 | 7;
+  /** Bước trong flow 13 bước mà màn này đang hiển thị (1-13). */
+  currentStep?: number;
   title: string;
   subtitle: string;
   wide?: boolean;
@@ -72,7 +41,6 @@ const navCls = ({ isActive }: { isActive: boolean }) =>
   [styles.sideLink, isActive ? styles.sideLinkActive : ""].filter(Boolean).join(" ");
 
 export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
-  const navigate = useNavigate();
   const draft = useContext(ProjectDraftContext);
   const routeProjectId = useParams().id;
   // Tên project (chủ đề) từ bước 2 trở đi, để biết đang theo dõi project nào.
@@ -82,11 +50,20 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       ? draft.authoringTopic.trim()
       : "";
 
-  const handleStepClick = (stepNumber: number) => {
-    // Only allow navigation to completed steps
-    if (currentStep && stepNumber < currentStep && stepNumber <= BACKTRACKABLE_STEPS) {
-      navigate(STEP_ROUTES[stepNumber - 1]);
-    }
+  const flow = useProjectFlow();
+  const nav = useStepNav(currentStep);
+  const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
+  // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
+  // Áp cho các màn soạn (1-5); màn 6-13 tự quản lý hành động của chúng.
+  const readOnly = !!currentStep && currentStep <= 5 && nav.hasProject && !flow.editable;
+  // Menu dọc thứ hai chỉ có nghĩa khi đã có một project để đặt vào 13 bước.
+  const showRail = !!currentStep && nav.hasProject;
+
+  const toggleRail = () => {
+    setRailCollapsed((c) => {
+      writeRailCollapsed(!c);
+      return !c;
+    });
   };
 
   return (
@@ -112,21 +89,46 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
         <nav className={styles.sideNav}>
           <NavLink to="/" end className={navCls}>Tạo video mới</NavLink>
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
+          <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
           {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}
           <NavLink to="/settings/prompts" className={navCls}>Cài đặt prompt</NavLink>
         </nav>
       </aside>
 
-      <div className={styles.content}>
+      {showRail && currentStep && (
+        <StepRail
+          currentStep={currentStep}
+          title={projectName || flow.projectId.slice(0, 8)}
+          collapsed={railCollapsed}
+          onToggle={toggleRail}
+        />
+      )}
+
+      <div
+        className={[
+          styles.content,
+          showRail ? (railCollapsed ? styles.contentRailCollapsed : styles.contentRail) : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <div className={styles.topbar}>
           {currentStep && (
             <div className={styles.stepsPill}>
-              {STEP_LABELS.map((label, index) => {
+              {FLOW_LABELS.map((label, index) => {
                 const stepNumber = index + 1;
                 const isActive = stepNumber === currentStep;
-                const isDone = stepNumber < currentStep;
-                const isClickable = isDone && stepNumber <= BACKTRACKABLE_STEPS;
-                const className = [styles.stepItem, isActive ? styles.active : "", isDone ? styles.done : ""]
+                const status = nav.status(stepNumber);
+                const isClickable = nav.isClickable(stepNumber);
+                const className = [
+                  styles.stepItem,
+                  isActive ? styles.active : "",
+                  status === "done" && !isActive ? styles.done : "",
+                  status === "running" ? styles.running : "",
+                  status === "failed" ? styles.failed : "",
+                  status === "cancelled" ? styles.cancelled : "",
+                  status === "skipped" ? styles.skipped : "",
+                ]
                   .filter(Boolean)
                   .join(" ");
                 return (
@@ -134,13 +136,17 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
                     key={label}
                     type="button"
                     className={className}
-                    onClick={() => handleStepClick(stepNumber)}
+                    onClick={() => nav.go(stepNumber)}
                     disabled={!isClickable}
                     aria-current={isActive ? "step" : undefined}
-                    title={isClickable ? `Nhảy về ${label}` : undefined}
+                    title={isClickable ? `Xem lại: ${label}` : undefined}
+                    data-testid={`flow-step-${stepNumber}`}
+                    data-status={status}
                     style={{ cursor: isClickable ? "pointer" : "default" }}
                   >
-                    <span className={styles.stepNum}>{isDone ? <CheckIcon /> : stepNumber}</span>
+                    <span className={styles.stepNum}>
+                      {status === "done" && !isActive ? <CheckIcon /> : status === "running" ? <span className={styles.runDot} /> : stepNumber}
+                    </span>
                     {label}
                   </button>
                 );
@@ -168,7 +174,23 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
             <h1>{title}</h1>
             <p>{subtitle}</p>
           </div>
-          {children}
+          {showRail && currentStep && <StatusStrip currentStep={currentStep} />}
+          {readOnly && flow.status && (
+            <p className={styles.readOnlyBanner} role="status" data-testid="read-only-banner">
+              {readOnlyReason(flow.status)}
+            </p>
+          )}
+          {/* fieldset disabled khoá mọi ô nhập/nút bên trong mà không phải sửa
+              từng màn; điều hướng (thanh bước, tab) nằm ngoài nên vẫn bấm được. */}
+          {readOnly ? (
+            <ReadOnlyContext.Provider value={true}>
+              <fieldset disabled className={styles.readOnlyFieldset} data-testid="read-only-fieldset">
+                {children}
+              </fieldset>
+            </ReadOnlyContext.Provider>
+          ) : (
+            children
+          )}
         </div>
       </div>
     </div>

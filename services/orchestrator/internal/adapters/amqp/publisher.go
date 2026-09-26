@@ -12,6 +12,10 @@ import (
 const (
 	commandsExchange = "commands.direct"
 	progressExchange = "progress.fanout"
+	// controlExchange carries cancel requests to every worker. Declared here
+	// (idempotent) as well as by the workers, so it exists whichever side
+	// starts first and a running broker needs no definitions reload.
+	controlExchange = "control.fanout"
 )
 
 // Publisher implements both domain.CommandPublisherPort and
@@ -59,6 +63,25 @@ func (p *Publisher) PublishProgress(ctx context.Context, msg domain.ProgressMess
 		return err
 	}
 	return p.chans.Channel().PublishWithContext(ctx, progressExchange, "", false, false, amqp.Publishing{
+		ContentType: "application/json",
+		Body:        body,
+	})
+}
+
+// PublishCancel broadcasts a cancel request on control.fanout.
+func (p *Publisher) PublishCancel(ctx context.Context, req domain.CancelRequest) error {
+	body, err := json.Marshal(struct {
+		Type string `json:"type"`
+		domain.CancelRequest
+	}{Type: "cancel", CancelRequest: req})
+	if err != nil {
+		return err
+	}
+	ch := p.chans.Channel()
+	if err := ch.ExchangeDeclare(controlExchange, "fanout", true, false, false, false, nil); err != nil {
+		return err
+	}
+	return ch.PublishWithContext(ctx, controlExchange, "", false, false, amqp.Publishing{
 		ContentType: "application/json",
 		Body:        body,
 	})

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -40,6 +41,8 @@ type GenerateAuthoringUseCase struct {
 	clearer AuthoringClearerPort
 	// errorLog receives a row for every failed run; nil disables it.
 	errorLog ProjectErrorLogPort
+	// events receives one journal line per run start/end; nil disables it.
+	events domain.ProjectEventPort
 	// finalizer validates the storyboard JSON; codegen runs the chunked code
 	// pipeline (CR-039). Both are llm-service; a run of the step that needs one
 	// fails loudly when it is missing rather than quietly doing something else.
@@ -124,6 +127,13 @@ func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *G
 
 // WithErrorLog makes every failed run leave a row in the project's
 // project_errors column.
+// WithEvents attaches the project journey log: each finished authoring run
+// (1a/1b/1c) leaves one line with its duration, size and token use.
+func (uc *GenerateAuthoringUseCase) WithEvents(events domain.ProjectEventPort) *GenerateAuthoringUseCase {
+	uc.events = events
+	return uc
+}
+
 func (uc *GenerateAuthoringUseCase) WithErrorLog(log ProjectErrorLogPort) *GenerateAuthoringUseCase {
 	uc.errorLog = log
 	return uc
@@ -213,7 +223,24 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	ctx context.Context, projectID, step string,
 ) (GeneratedStep, error) {
 	started := time.Now()
+	// Flow trace: one start + one end line per run, keyed by project_id, so a
+	// project's journey (which step, how long, how big, how it ended) can be
+	// reconstructed from the logs alone.
+	slog.Info("authoring step start", "project_id", projectID, "step", step)
 	out, info, err := uc.run(ctx, projectID, step)
+	uc.traceEnd(projectID, step, out, info, err, started)
+	if errors.Is(err, ErrGenerateBusy) || errors.Is(err, ErrLLMNotConfigured) {
+		// Not a run: nothing started, so the journal gets no end line either.
+	} else if err != nil {
+		uc.recordEvent(ctx, projectID, step, domain.RunFailed, started, out, info, err.Error())
+	} else if out.SaveError != "" {
+		uc.recordEvent(ctx, projectID, step, domain.RunFailed, started, out, info, out.SaveError)
+	} else if out.CheckFailed {
+		uc.recordEvent(ctx, projectID, step, domain.RunFailed, started, out, info,
+			"code đã lưu nhưng vẫn lỗi biên dịch: "+strings.Join(out.Diagnostics, " · "))
+	} else {
+		uc.recordEvent(ctx, projectID, step, domain.RunDone, started, out, info, "")
+	}
 	if err != nil {
 		uc.logError(ctx, projectID, step, err, info, started)
 	} else if out.SaveError != "" {
@@ -226,6 +253,53 @@ func (uc *GenerateAuthoringUseCase) Execute(
 		}, info, started)
 	}
 	return out, err
+}
+
+// recordEvent journals a run's start or end. Best-effort, like logError: a lost
+// journal line must not fail a run the Creator waited minutes for.
+func (uc *GenerateAuthoringUseCase) recordEvent(
+	ctx context.Context, projectID, step string, state domain.RunState, started time.Time,
+	out GeneratedStep, info runInfo, detail string,
+) {
+	if uc.events == nil || projectID == "" {
+		return
+	}
+	fs := domain.FlowStepForAuthoring(step)
+	if fs == 0 {
+		return
+	}
+	e := domain.ProjectEvent{
+		ProjectID: projectID, FlowStep: fs, RunState: state, Source: "authoring", Detail: detail,
+	}
+	if state != domain.RunRunning {
+		e.DurationMS = time.Since(started).Milliseconds()
+		e.ContentChars = len(out.Content)
+		e.PromptTokens, e.CompletionTokens = info.usage.PromptTokens, info.usage.CompletionTokens
+	}
+	_ = uc.events.AppendProjectEvent(context.WithoutCancel(ctx), e)
+}
+
+// traceEnd logs how a run ended. Busy/not-configured are not failures but are
+// still worth a line: they explain a step that "did nothing".
+func (uc *GenerateAuthoringUseCase) traceEnd(
+	projectID, step string, out GeneratedStep, info runInfo, err error, started time.Time,
+) {
+	attrs := []any{
+		"project_id", projectID, "step", step,
+		"elapsed_ms", time.Since(started).Milliseconds(),
+		"content_chars", len(out.Content),
+		"prompt_tokens", info.usage.PromptTokens, "completion_tokens", info.usage.CompletionTokens,
+	}
+	switch {
+	case err != nil:
+		slog.Warn("authoring step failed", append(attrs, "partial_chars", info.partialChars, "error", err.Error())...)
+	case out.SaveError != "":
+		slog.Warn("authoring step generated but not saved", append(attrs, "error", out.SaveError)...)
+	case out.CheckFailed:
+		slog.Warn("authoring step saved with compile errors", append(attrs, "repair_rounds", out.RepairRounds)...)
+	default:
+		slog.Info("authoring step done", attrs...)
+	}
 }
 
 // runInfo is what run learned that the error log wants but the return value
@@ -301,6 +375,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		return GeneratedStep{}, err
 	}
 	defer release()
+	uc.recordEvent(ctx, projectID, step, domain.RunRunning, time.Now(), GeneratedStep{}, runInfo{}, "")
 
 	rendered, err := uc.renderer.Execute(ctx, projectID, role)
 	if err != nil {

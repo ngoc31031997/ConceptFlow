@@ -27,6 +27,7 @@ from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
+from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.engine_router import EngineRouterRenderer
 from adapters.rendering.manim_renderer import (
@@ -89,7 +90,7 @@ async def run() -> None:
 
     pool = await create_pool()
     inbox = InboxRepository(pool)
-    outbox = OutboxRepository()
+    outbox = CancelAwareOutbox(OutboxRepository())
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
@@ -133,6 +134,8 @@ async def run() -> None:
     relay.start()
 
     consumer_tag = await queue.consume(command_handler.handle)
+    # Cancel requests arrive on their own fanout, not behind the running render.
+    await listen_for_cancels(channel)
 
     # CR-039 FR104: the compile check the llm-service calls before a generated
     # script is saved. Same process, same event loop; internal network only.

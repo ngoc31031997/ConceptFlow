@@ -5,7 +5,6 @@ import { Card, TextArea } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { createProjectDraft } from "../api/client";
-import { useWizardPosition } from "../hooks/useWizardPosition";
 
 /**
  * Bước 1 — chỉ còn tình huống "chưa có gì, chỉ có ý tưởng" (các tình huống
@@ -15,7 +14,6 @@ import { useWizardPosition } from "../hooks/useWizardPosition";
  * để projectId sẵn sàng trước khi vào Bước 2.
  */
 export function ScriptStepPage() {
-  useWizardPosition("/");
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();

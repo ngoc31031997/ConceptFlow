@@ -35,6 +35,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 
+from adapters.messaging.cancellation import REGISTRY
 from domain.errors import AnimationEngineError
 from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
 from domain.ports import ManimScriptRendererPort
@@ -223,20 +224,29 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
     def _run_node(self, script_args: list[str], timeout: int) -> None:
         cmd = ["node", RENDER_SCRIPT] + script_args
 
+        # Popen rather than run so a cancel can kill node (and what it spawned):
+        # own process group, registered with the cancel registry.
+        process = subprocess.Popen(  # noqa: S603 — cmd is built here, not user input
+            cmd,
+            cwd=self._project_template_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+        )
+        REGISTRY.register(process)
         try:
-            result = subprocess.run(  # noqa: S603 — cmd is built here, not user input
-                cmd,
-                cwd=self._project_template_dir,
-                capture_output=True,
-                text=True,
-                timeout=timeout,
-            )
+            _stdout, stderr = process.communicate(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
+            process.kill()
+            process.communicate()
             raise AnimationEngineError(f"Remotion render timed out after {timeout}s") from exc
+        finally:
+            REGISTRY.unregister(process)
 
-        if result.returncode != 0:
-            logger.warning("Remotion render failed: %s", result.stderr)
-            raise AnimationEngineError(f"Remotion render failed:\n{result.stderr}")
+        if process.returncode != 0:
+            logger.warning("Remotion render failed: %s", stderr)
+            raise AnimationEngineError(f"Remotion render failed:\n{stderr}")
 
     def _entry_path(self) -> str:
         """Where the Creator's script gets written before bundle() reads it.

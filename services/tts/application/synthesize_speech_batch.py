@@ -53,15 +53,21 @@ class SynthesizeSpeechBatchUseCase:
         project_id: str,
         scenes: list[SceneSpeechRequest],
         on_scene_done: Callable[[int, int], None] | None = None,
+        should_stop: Callable[[], bool] | None = None,
     ) -> BatchSynthesisOutcome:
         """CR-029: on_scene_done(scene_index, scene_total), called right after
         each scene's audio is ready, lets the caller publish a progress ping
         without this use case knowing anything about RabbitMQ/asyncio — it
         stays synchronous and testable exactly as before.
+
+        should_stop, checked before each scene, lets the caller abandon the
+        batch (the Creator cancelled): the remaining scenes are not spoken.
         """
         results: list[SceneSpeechResult] = []
         total = len(scenes)
         for scene in scenes:
+            if should_stop is not None and should_stop():
+                return BatchSynthesisFailure(error_message="cancelled")
             request = SpeechRequest(
                 project_id=project_id,
                 scene_index=scene.scene_index,

@@ -70,8 +70,13 @@ export interface Project {
   status: string;
   /** Bước wizard (1-7) nên mở lại: bước đã xác nhận xa nhất hoặc bước saga đang ở. */
   wizard_step?: number;
-  /** Màn wizard mở lần cuối trên draft; "" / vắng mặt nếu chưa ghi. */
+  /** Màn wizard mở lần cuối trên draft; "" / vắng mặt nếu chưa ghi. Không còn dùng: vị trí lấy từ flow_step. */
   wizard_route?: string;
+  /** Vị trí trong flow 13 bước (server suy ra từ trạng thái + nội dung đã có). */
+  flow_step?: number;
+  run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
+  /** Project mà bản này được tạo từ đó (fork); vắng mặt nếu không phải bản fork. */
+  forked_from?: string;
   /**
    * The project's content language. The wire name is historical (CR-008 §C2):
    * it now drives subtitles, metadata and prompts, not just the TTS voice.
@@ -212,6 +217,12 @@ export interface ProjectSummary {
   render_engine: string;
   /** 1-7, bước wizard project đang ở. */
   wizard_step?: number;
+  /** Chủ đề (ý tưởng) — dùng làm tên project trong danh sách. */
+  topic?: string;
+  /** Vị trí trong flow 13 bước và trạng thái chạy. */
+  flow_step?: number;
+  run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
+  forked_from?: string;
 }
 
 

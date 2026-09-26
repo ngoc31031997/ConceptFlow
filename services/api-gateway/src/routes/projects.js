@@ -53,6 +53,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.get('/v1/projects/:id/authoring/history', proxyHandler(orchestratorClient, 'orchestrator'));
   // Append-only trace of failed runs (project_errors column).
   router.get('/v1/projects/:id/errors', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Journey log of the 13-step flow (project_events): one project, and the
+  // cross-project feed the "Nhật ký" screen reads.
+  router.get('/v1/projects/:id/events', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/events', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
   // lúc soạn khớp với giọng Creator thực sự dùng.
   router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -63,6 +67,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.get('/v1/projects/:id', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/video', videoHandler(orchestratorClient, sharedDir));
   router.post('/v1/projects/:id/retry', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Stop the step a project is running (workers are told over a fanout), and
+  // fork a project into a new one starting again at an earlier step.
+  router.post('/v1/projects/:id/cancel', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/fork', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-024 FR69.2/69.3 — hai lối ra khỏi cổng duyệt dàn ý.
   router.post('/v1/projects/:id/approve', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/reject', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -90,12 +98,16 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // (Cấu hình).
   router.put('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
   // Records which wizard screen a draft was left on, so "Chi tiết" reopens there.
-  router.put('/v1/projects/:id/wizard-position', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
   // Live progress of the run above (streamed reply size + phase), polled by the GUI.
   router.get('/v1/projects/:id/authoring/:step/progress', proxyHandler(orchestratorClient, 'orchestrator'));
+  // Server-side chain of 1a/1b/1c: POST starts it (202, returns at once), GET
+  // reports the running or last-finished chain. Short calls — the run itself
+  // is detached from the request.
+  router.post('/v1/projects/:id/authoring/chain', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:id/authoring/chain', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post(
     '/v1/projects/:id/authoring/:step/generate',
     proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),

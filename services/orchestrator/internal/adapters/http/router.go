@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -34,6 +35,19 @@ type reviewOutlineUseCase interface {
 
 type retryStepUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.RetryStepOutput, error)
+}
+
+type forkProjectUseCase interface {
+	Execute(ctx context.Context, sourceID string, fromStep int) (*application.ForkProjectOutput, error)
+}
+
+// forkedFromReader is the optional lineage read on the project store.
+type forkedFromReader interface {
+	ForkedFrom(ctx context.Context, projectID string) (string, error)
+}
+
+type cancelStepUseCase interface {
+	Execute(ctx context.Context, projectID string) (*application.CancelStepOutput, error)
 }
 
 type suggestPublishMetadataUseCase interface {
@@ -96,6 +110,13 @@ type generateAuthoringUseCase interface {
 	Provider() string
 }
 
+// authoringChainUseCase runs 1a/1b/1c in order on the server, so a run
+// survives the browser closing (see application.AuthoringChainRunner).
+type authoringChainUseCase interface {
+	Start(projectID string, steps []string) error
+	State(projectID string) (application.ChainState, bool)
+}
+
 // authoringProgressReader is the optional live-progress side of the generate
 // use case; a use case without it simply has no progress endpoint.
 type authoringProgressReader interface {
@@ -144,11 +165,6 @@ type saveWizardSettingsUseCase interface {
 	Execute(ctx context.Context, projectID string, s domain.WizardSettings) error
 }
 
-// saveWizardPositionUseCase backs PUT /v1/projects/{id}/wizard-position.
-type saveWizardPositionUseCase interface {
-	SaveWizardPosition(ctx context.Context, projectID string, step int, route string) error
-}
-
 // qcReportReader is the single read this router needs from the QC report
 // store — narrower than domain.QCReportPort on purpose, so the GET endpoint
 // cannot accidentally write.
@@ -188,8 +204,11 @@ type Router struct {
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	projectErrors           application.ProjectErrorLogPort
+	projectEvents           domain.ProjectEventPort
+	authoringChain          authoringChainUseCase
+	cancelStep              cancelStepUseCase
+	forkProject             forkProjectUseCase
 	defaultModel            string
-	saveWizardPosition      saveWizardPositionUseCase
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveWizardSettings      saveWizardSettingsUseCase
@@ -251,6 +270,146 @@ func (rt *Router) handleListProjectErrors(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, errs)
 }
 
+// WithProjectEvents enables the journey log endpoints (GET
+// /v1/projects/{id}/events and GET /v1/events).
+func (rt *Router) WithProjectEvents(events domain.ProjectEventPort) *Router {
+	rt.projectEvents = events
+	return rt
+}
+
+func (rt *Router) handleListProjectEvents(w http.ResponseWriter, r *http.Request) {
+	if rt.projectEvents == nil {
+		writeJSON(w, http.StatusOK, []domain.ProjectEvent{})
+		return
+	}
+	events, err := rt.projectEvents.ListProjectEvents(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "không đọc được nhật ký dự án")
+		return
+	}
+	writeJSON(w, http.StatusOK, events)
+}
+
+func (rt *Router) handleListRecentEvents(w http.ResponseWriter, r *http.Request) {
+	if rt.projectEvents == nil {
+		writeJSON(w, http.StatusOK, []domain.ProjectEvent{})
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	events, err := rt.projectEvents.ListRecentProjectEvents(r.Context(), limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "không đọc được nhật ký dự án")
+		return
+	}
+	writeJSON(w, http.StatusOK, events)
+}
+
+// WithForkProject enables POST /v1/projects/{id}/fork.
+func (rt *Router) WithForkProject(f forkProjectUseCase) *Router {
+	rt.forkProject = f
+	return rt
+}
+
+// handleFork creates a new project from this one, starting again at from_step
+// (2..5). The original is untouched.
+func (rt *Router) handleFork(w http.ResponseWriter, r *http.Request) {
+	if rt.forkProject == nil {
+		writeError(w, http.StatusNotFound, "fork is not enabled")
+		return
+	}
+	var req struct {
+		FromStep int `json:"from_step"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	out, err := rt.forkProject.Execute(r.Context(), chi.URLParam(r, "project_id"), req.FromStep)
+	if err != nil {
+		if errors.Is(err, application.ErrForkStepInvalid) {
+			writeError(w, http.StatusBadRequest, "Chỉ tạo bản mới được từ bước Cấu hình đến bước Code.")
+			return
+		}
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]interface{}{
+		"project_id": out.ProjectID, "from_step": out.FromStep, "needs_music_reselect": out.NeedsMusicReselect,
+	})
+}
+
+// WithCancelStep enables POST /v1/projects/{id}/cancel.
+func (rt *Router) WithCancelStep(c cancelStepUseCase) *Router {
+	rt.cancelStep = c
+	return rt
+}
+
+// handleCancel stops the step a project is running and leaves it at that step
+// (failed, marked cancelled) so the Creator can retry it.
+func (rt *Router) handleCancel(w http.ResponseWriter, r *http.Request) {
+	if rt.cancelStep == nil {
+		writeError(w, http.StatusNotFound, "cancel is not enabled")
+		return
+	}
+	out, err := rt.cancelStep.Execute(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		if errors.Is(err, domain.ErrInvalidStatus) {
+			writeError(w, http.StatusConflict, "Không có bước nào đang chạy để huỷ.")
+			return
+		}
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"step": string(out.Step), "status": string(out.Status)})
+}
+
+// WithAuthoringChain enables POST/GET /v1/projects/{id}/authoring/chain.
+func (rt *Router) WithAuthoringChain(chain authoringChainUseCase) *Router {
+	rt.authoringChain = chain
+	return rt
+}
+
+// handleStartAuthoringChain starts the chain and returns 202 at once; the GUI
+// polls GET .../authoring/chain (and .../{step}/progress for the live phase).
+func (rt *Router) handleStartAuthoringChain(w http.ResponseWriter, r *http.Request) {
+	if rt.authoringChain == nil {
+		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
+		return
+	}
+	var req struct {
+		Steps []string `json:"steps"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	err := rt.authoringChain.Start(chi.URLParam(r, "project_id"), req.Steps)
+	switch {
+	case errors.Is(err, application.ErrChainBusy):
+		writeError(w, http.StatusConflict, "Một lượt chạy AI cho dự án này đang diễn ra, chờ nó xong đã.")
+	case errors.Is(err, application.ErrChainInvalid):
+		writeError(w, http.StatusBadRequest, err.Error())
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "không bắt đầu được lượt chạy")
+	default:
+		w.WriteHeader(http.StatusAccepted)
+	}
+}
+
+// handleGetAuthoringChain reports the running or last-finished chain. 200 with
+// finished=false/running=false and no steps when none ever ran.
+func (rt *Router) handleGetAuthoringChain(w http.ResponseWriter, r *http.Request) {
+	if rt.authoringChain == nil {
+		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
+		return
+	}
+	st, ok := rt.authoringChain.State(chi.URLParam(r, "project_id"))
+	if !ok {
+		st = application.ChainState{Steps: []string{}}
+	}
+	writeJSON(w, http.StatusOK, st)
+}
+
 func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
 	rt.generateAuthoring = generateAuthoring
 	return rt
@@ -307,12 +466,6 @@ func (rt *Router) WithWizard(saveSettings saveWizardSettingsUseCase) *Router {
 	return rt
 }
 
-// WithWizardPosition enables PUT /v1/projects/{project_id}/wizard-position.
-func (rt *Router) WithWizardPosition(save saveWizardPositionUseCase) *Router {
-	rt.saveWizardPosition = save
-	return rt
-}
-
 // WithQCReports attaches the QC report store, enabling
 // GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
 // the route answers 404, the same way the CR-023 routes do when unwired.
@@ -350,6 +503,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/formats", rt.handleSaveFormat)
 	r.Get("/v1/projects/{project_id}", rt.handleGetProject)
 	r.Post("/v1/projects/{project_id}/retry", rt.handleRetry)
+	r.Post("/v1/projects/{project_id}/cancel", rt.handleCancel)
+	r.Post("/v1/projects/{project_id}/fork", rt.handleFork)
 	r.Post("/v1/projects/{project_id}/approve", rt.handleApproveOutline)
 	r.Post("/v1/projects/{project_id}/reject", rt.handleRejectOutline)
 	r.Post("/v1/projects/{project_id}/narration", rt.handleEditNarration)
@@ -382,14 +537,17 @@ func (rt *Router) Handler() http.Handler {
 	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether
 	// that option exists at all before it draws the button.
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
+	r.Post("/v1/projects/{project_id}/authoring/chain", rt.handleStartAuthoringChain)
+	r.Get("/v1/projects/{project_id}/authoring/chain", rt.handleGetAuthoringChain)
 	r.Get("/v1/projects/{project_id}/errors", rt.handleListProjectErrors)
+	r.Get("/v1/projects/{project_id}/events", rt.handleListProjectEvents)
+	r.Get("/v1/events", rt.handleListRecentEvents)
 	r.Get("/v1/llm/status", rt.handleLLMStatus)
 	// CR-027 FR79 — the step-1 working mode, remembered per project.
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Put("/v1/projects/{project_id}/settings", rt.handleSaveWizardSettings)
 	r.Get("/v1/projects/{project_id}/authoring/{step}/progress", rt.handleAuthoringProgress)
-	r.Put("/v1/projects/{project_id}/wizard-position", rt.handleSaveWizardPosition)
 	return r
 }
 
@@ -599,7 +757,27 @@ func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {
 		writeUseCaseError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toProjectResponse(project))
+	resp := toProjectResponse(project)
+	resp.FlowStep, resp.RunState = rt.flowFor(r.Context(), project)
+	if fr, ok := rt.projects.(forkedFromReader); ok {
+		resp.ForkedFrom, _ = fr.ForkedFrom(r.Context(), projectID)
+	}
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// flowFor places a project in the 13-step flow. Only a draft on the script
+// step needs the authoring content to tell 1a from 1b from 1c.
+func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) {
+	var content domain.AuthoredContent
+	if p.Status == domain.StatusDraft && p.WizardStep >= domain.WizardStepScript && rt.getAuthoringState != nil {
+		if st, err := rt.getAuthoringState.Execute(ctx, p.ProjectID); err == nil {
+			content = domain.AuthoredContent{
+				Story: st.Story != "", Storyboard: st.Storyboard != "", Code: st.Code != "",
+			}
+		}
+	}
+	fs := domain.FlowStateFor(p.Status, domain.EffectiveWizardStep(p), content)
+	return fs.Step, string(domain.RunStateOf(p.Status, p.ErrorMessage))
 }
 
 func (rt *Router) handleListProjects(w http.ResponseWriter, r *http.Request) {
@@ -1356,33 +1534,6 @@ func (rt *Router) handleAuthoringProgress(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, pr.Progress(chi.URLParam(r, "project_id"), chi.URLParam(r, "step")))
 }
 
-// handleSaveWizardPosition remembers which wizard screen a draft was left on,
-// so reopening the project returns to it. Idempotent: the GUI sends it on
-// every screen change.
-func (rt *Router) handleSaveWizardPosition(w http.ResponseWriter, r *http.Request) {
-	if rt.saveWizardPosition == nil {
-		writeError(w, http.StatusNotFound, "wizard position is not enabled")
-		return
-	}
-	var req struct {
-		Route string `json:"route"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	step, ok := domain.WizardStepForRoute(req.Route)
-	if !ok {
-		writeError(w, http.StatusBadRequest, "unknown wizard route")
-		return
-	}
-	if err := rt.saveWizardPosition.SaveWizardPosition(r.Context(), chi.URLParam(r, "project_id"), step, req.Route); err != nil {
-		writeUseCaseError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
 // handleSaveAuthoringMode stores how the Creator works step 1 (CR-027 FR79).
 //
 // PUT, not POST: it replaces one value, and sending it twice must mean the
@@ -1506,19 +1657,24 @@ func errorCause(err error) string {
 // sentence that says what to do about it (FR76.6/FR79.3). "AI failed" would
 // send a Creator with an empty Hive balance to go rewrite their prompt.
 func writeGenerateError(w http.ResponseWriter, err error) {
+	status, message := DescribeGenerateError(err)
+	writeError(w, status, message)
+}
+
+// DescribeGenerateError is the status code and Creator-facing sentence for a
+// failed run. Exported because the server-side chain runner reports the same
+// sentence the HTTP path would have.
+func DescribeGenerateError(err error) (int, string) {
 	const fallback = " Hoặc dùng nút Copy prompt như cũ."
 
 	switch {
 	case errors.Is(err, application.ErrGenerateBusy):
-		writeError(w, http.StatusConflict, "Một lượt chạy AI cho bước này đang diễn ra, chờ nó xong đã.")
-		return
+		return http.StatusConflict, "Một lượt chạy AI cho bước này đang diễn ra, chờ nó xong đã."
 	case errors.Is(err, application.ErrLLMNotConfigured):
-		writeError(w, http.StatusServiceUnavailable,
-			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI."+fallback)
-		return
+		return http.StatusServiceUnavailable,
+			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI." + fallback
 	case errors.Is(err, domain.ErrProjectNotFound):
-		writeError(w, http.StatusNotFound, "project not found")
-		return
+		return http.StatusNotFound, "project not found"
 	}
 
 	status := http.StatusBadGateway
@@ -1555,8 +1711,7 @@ func writeGenerateError(w http.ResponseWriter, err error) {
 		// save. Those already carry their own message.
 		// Not a provider failure: a bad step name, a locked project, a
 		// prompt over the input cap. Those already carry their own message.
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
+		return http.StatusBadRequest, err.Error()
 	}
-	writeError(w, status, message+fallback)
+	return status, message + fallback
 }

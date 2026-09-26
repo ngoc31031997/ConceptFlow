@@ -441,6 +441,31 @@ CREATE TABLE IF NOT EXISTS prompts (
 -- for one role — application code only has to switch them in the right order.
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
+
+-- Append-only journey of every project through the 13-step flow (a status
+-- change, or an authoring run finishing). Read by the "Nhật ký" screen; no
+-- code path makes a decision from it. duration_ms on a status change is the
+-- time the project spent in from_status.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS forked_from TEXT NOT NULL DEFAULT '';
+
+CREATE TABLE IF NOT EXISTS project_events (
+    id                BIGSERIAL PRIMARY KEY,
+    project_id        TEXT NOT NULL,
+    at                TIMESTAMPTZ NOT NULL DEFAULT now(),
+    flow_step         INT NOT NULL,
+    run_state         TEXT NOT NULL,
+    source            TEXT NOT NULL,
+    from_status       TEXT NOT NULL DEFAULT '',
+    to_status         TEXT NOT NULL DEFAULT '',
+    duration_ms       BIGINT NOT NULL DEFAULT 0,
+    detail            TEXT NOT NULL DEFAULT '',
+    content_chars     INT NOT NULL DEFAULT 0,
+    prompt_tokens     INT NOT NULL DEFAULT 0,
+    completion_tokens INT NOT NULL DEFAULT 0
+);
+ALTER TABLE project_events ADD COLUMN IF NOT EXISTS from_flow_step INT NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS project_events_project_at ON project_events (project_id, at);
+CREATE INDEX IF NOT EXISTS project_events_at ON project_events (at DESC);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

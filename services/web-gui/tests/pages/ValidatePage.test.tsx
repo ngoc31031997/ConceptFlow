@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { ValidatePage } from "../../src/pages/ValidatePage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
@@ -87,7 +87,7 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
     expect(screen.getByTestId("outline-approve")).toBeInTheDocument();
   });
 
-  it("luôn rủ quay về sửa script khi chạy thử hỏng, vì lỗi ở đây là lỗi đầu vào", async () => {
+  it("chỉ có nút thử lại khi chạy thử hỏng — quay về sửa là việc Creator tự chọn ở thanh bước", async () => {
     stubProject({
       project_id: "p1",
       status: "failed_at_validate_script",
@@ -97,10 +97,9 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
 
     renderValidatePage();
 
-    await waitFor(() => expect(screen.getByTestId("error-banner-back-button")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("error-banner-back-button"));
-    // Mở lại project từ server (?edit=1) thay vì về trang trống.
-    expect(screen.getByTestId("resume-page-stub")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("error-banner-retry-button")).toBeInTheDocument());
+    expect(screen.queryByTestId("error-banner-back-button")).not.toBeInTheDocument();
+    expect(screen.getByTestId("error-banner-detail-toggle")).toBeInTheDocument();
   });
 
   it("đi tiếp sang bước 5 khi saga đã qua cổng duyệt", async () => {
