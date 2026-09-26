@@ -19,7 +19,6 @@ type RetryStepOutput struct {
 // "in-progress" ProjectStatus used when each step was first dispatched —
 // reused here so retry re-enters the same state the original dispatch did.
 var stepRoutingKey = map[domain.StepName]string{
-	domain.StepParseScript:      "script_processing",
 	domain.StepValidateScript:   "rendering",
 	domain.StepSynthesizeSpeech: "tts",
 	domain.StepRenderScenes:     "rendering",
@@ -31,7 +30,6 @@ var stepRoutingKey = map[domain.StepName]string{
 }
 
 var stepInProgressStatus = map[domain.StepName]domain.ProjectStatus{
-	domain.StepParseScript:      domain.StatusParsingScript,
 	domain.StepValidateScript:   domain.StatusValidatingScript,
 	domain.StepSynthesizeSpeech: domain.StatusSynthesizingSpeech,
 	domain.StepRenderScenes:     domain.StatusRendering,
@@ -84,6 +82,12 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 		return nil, domain.ErrInvalidStatus
 	}
 
+	// CR-040 FR110: a project that failed at the retired parse_script step
+	// resumes at validate_script, which now finds the scene class itself.
+	if stepName == domain.StepParseScript {
+		stepName = domain.StepValidateScript
+	}
+
 	sagaID := project.SagaID
 	payload, err := rebuildPayload(stepName, project)
 	if err != nil {
@@ -118,8 +122,6 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 // Project's accumulated data (Rule 5).
 func rebuildPayload(stepName domain.StepName, project *domain.Project) (map[string]interface{}, error) {
 	switch stepName {
-	case domain.StepParseScript:
-		return map[string]interface{}{"script_content": project.ScriptContent}, nil
 	case domain.StepValidateScript:
 		// Must mirror the original dispatch in handle_step_event.go's
 		// onScriptParsed: rendering's consumer reads script_content and

@@ -182,7 +182,8 @@ class ValidateScriptCommandHandler:
             request = ScriptRenderRequest(
                 project_id=project_id,
                 script_content=payload["script_content"],
-                scene_class_name=payload["scene_class_name"],
+                # CR-040 FR110: rỗng nghĩa là để use case tự tìm trong script.
+                scene_class_name=payload.get("scene_class_name", ""),
                 # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
                 narration_segments=[],
                 render_quality=payload.get("render_quality"),
@@ -208,6 +209,8 @@ class ValidateScriptCommandHandler:
                     {"scene_index": w.narration_index, "description": w.description}
                     for w in result.dry_run.layout_warnings
                 ],
+                scene_class_name=result.scene_class_name,
+                engine=result.engine,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():
@@ -304,11 +307,14 @@ class RenderingCommandDispatcher:
         validate: ValidateScriptCommandHandler,
         render: RenderScriptCommandHandler,
         render_channel_asset: RenderChannelAssetCommandHandler | None = None,
+        purge_project_artifacts=None,
     ) -> None:
         self._handlers = {
             "validate_script": validate.handle,
             "render_scenes": render.handle,
         }
+        if purge_project_artifacts is not None:
+            self._handlers["purge_project_artifacts"] = purge_project_artifacts.handle
         if render_channel_asset is not None:
             self._handlers["render_channel_asset"] = render_channel_asset.handle
 

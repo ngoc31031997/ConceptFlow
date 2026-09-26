@@ -43,6 +43,9 @@ function main() {
   // still going to succeed, after the tokens were already billed.
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
   const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 0 });
+  // CR-040 FR111: prompts and the authoring chain are served by authoring-service.
+  const authoringClient = createHttpClient(config.authoringServiceUrl);
+  const authoringAiClient = createHttpClient(config.authoringServiceUrl, { timeoutMs: 0 });
   const publisherClient = createHttpClient(config.publisherUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.
@@ -63,9 +66,9 @@ function main() {
   // 5. Register routes.
   app.use(voicesRouter(config.sharedDir));
   app.use(sagasRouter(orchestratorClient));
-  app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient));
+  app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient, authoringClient, authoringAiClient));
   app.use(channelAssetsRouter(orchestratorClient, config.sharedDir));
-  app.use(promptsRouter(orchestratorClient));
+  app.use(promptsRouter(authoringClient));
   app.use(authRouter(publisherClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());

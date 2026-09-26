@@ -280,16 +280,15 @@ class AssembleVideoCommandHandler:
         await message.ack()
 
 
-class ChannelAssetRenderedEventHandler:
-    """Consumes rendering's `channel_asset_rendered` event off the
-    `video_assembly.channel_asset_events` queue (CR-023 correction —
-    infra/rabbitmq/definitions.json binds it to events.direct/"orchestrator",
-    the same routing key rendering already publishes that event under).
+class RegisterChannelAssetCommandHandler:
+    """Handles `register_channel_asset` (CR-040 FR112) — Orchestrator's command
+    after it receives rendering's `channel_asset_rendered` (it replaces the old
+    second binding of rendering.events onto this service).
 
     Registers the rendered file in `channel_assets` under the quality
-    rendering names in the event (FR65.5 — one asset per quality), then
-    re-announces it as `channel_asset_normalized` so Orchestrator's
-    channel_asset_pointers projection picks it up.
+    rendering names (FR65.5 — one asset per quality), then announces it as
+    `channel_asset_normalized` so Orchestrator's channel_asset_pointers
+    projection picks it up. Idempotent on message_id via the inbox.
     """
 
     def __init__(
@@ -307,13 +306,6 @@ class ChannelAssetRenderedEventHandler:
     async def handle(self, message: AckableMessage) -> None:
         envelope = json.loads(message.body)
         payload = envelope.get("payload", {})
-        if payload.get("event_type") != "channel_asset_rendered":
-            # channel_asset_render_failed and anything else on this queue is
-            # not this service's concern (Orchestrator's own subscription
-            # handles the failure event) — ack so it is not redelivered forever.
-            await message.ack()
-            return
-
         message_id = envelope["message_id"]
         saga_id = envelope["saga_id"]
         project_id = envelope["project_id"]
@@ -339,7 +331,7 @@ class ChannelAssetRenderedEventHandler:
             # delivery unacked (same reasoning as consumer.py's dispatcher
             # rejecting an undecodable envelope).
             logger.warning(
-                "channel_asset_rendered event malformed, dropping message_id=%s: %s",
+                "register_channel_asset command malformed, dropping message_id=%s: %s",
                 message_id,
                 exc,
             )
@@ -926,8 +918,14 @@ class VideoAssemblyCommandDispatcher:
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
         qc_video: QCVideoCommandHandler | None = None,
         generate_clips: GenerateClipsCommandHandler | None = None,
+        register_channel_asset: RegisterChannelAssetCommandHandler | None = None,
+        purge_project_artifacts=None,
     ) -> None:
         self._handlers = {"assemble_video": assemble_video.handle}
+        if register_channel_asset is not None:
+            self._handlers["register_channel_asset"] = register_channel_asset.handle
+        if purge_project_artifacts is not None:
+            self._handlers["purge_project_artifacts"] = purge_project_artifacts.handle
         if normalize_channel_asset is not None:
             self._handlers["normalize_channel_asset"] = normalize_channel_asset.handle
         if qc_video is not None:

@@ -4,20 +4,9 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"orchestrator/internal/domain"
 )
-
-// SimilarProject is one match CR-028 FR85 surfaces back to the Creator when
-// a topic collides (after normalization) with an existing project's saved
-// topic, in the same content_language.
-type SimilarProject struct {
-	ProjectID string
-	Topic     string
-	Status    domain.ProjectStatus
-	CreatedAt time.Time
-}
 
 // ProjectDraftPort is the persistence capability CR-028's early-draft use
 // cases need. Save reuses domain.ProjectRepositoryPort's existing upsert
@@ -31,7 +20,7 @@ type ProjectDraftPort interface {
 	// which FR83.2's re-check of FR85's collision list needs (comparison is
 	// scoped to "same language" — see NormalizeTopic's doc comment).
 	GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error)
-	SaveAuthoringTopic(ctx context.Context, projectID, topic string) error
+	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
 	FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]SimilarProject, error)
 	// SaveRenderEngine persists CR-030's engine choice as soon as the
 	// Creator makes it, instead of only at render-submit time — the
@@ -136,7 +125,7 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 	topic := strings.TrimSpace(input.Topic)
 	var similar []SimilarProject
 	if topic != "" {
-		if err := uc.repo.SaveAuthoringTopic(ctx, projectID, topic); err != nil {
+		if err := uc.repo.SaveAuthoringTopic(ctx, projectID, topic, input.ContentLanguage); err != nil {
 			return nil, err
 		}
 		var err error
@@ -191,7 +180,7 @@ func (uc *UpdateProjectTopicUseCase) Execute(ctx context.Context, input UpdatePr
 		return nil, domain.ErrInvalidStatus
 	}
 
-	if err := uc.repo.SaveAuthoringTopic(ctx, input.ProjectID, topic); err != nil {
+	if err := uc.repo.SaveAuthoringTopic(ctx, input.ProjectID, topic, language); err != nil {
 		return nil, err
 	}
 	similar, err := uc.repo.FindSimilarTopics(ctx, language, domain.NormalizeTopic(topic), input.ProjectID)

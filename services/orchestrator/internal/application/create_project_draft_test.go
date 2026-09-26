@@ -52,7 +52,7 @@ func (f *fakeDraftRepo) GetStatusAndLanguage(_ context.Context, projectID string
 	return p.Status, p.ContentLanguage, nil
 }
 
-func (f *fakeDraftRepo) SaveAuthoringTopic(_ context.Context, projectID, topic string) error {
+func (f *fakeDraftRepo) SaveAuthoringTopic(_ context.Context, projectID, topic string, _ domain.ContentLanguage) error {
 	f.topics[projectID] = topic
 	return nil
 }

@@ -17,7 +17,7 @@ import aio_pika
 from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS, FfmpegVideoAssembler
 from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
-    ChannelAssetRenderedEventHandler,
+    RegisterChannelAssetCommandHandler,
     GenerateClipsCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
@@ -27,7 +27,9 @@ from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancel
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.channel_assets import ChannelAssetsRepository
+from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
 from adapters.persistence.db import create_pool
+from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
@@ -39,10 +41,6 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 COMMANDS_QUEUE = "video_assembly.commands"
-# CR-023 correction: rendering.events' channel_asset_rendered fans out here
-# via events.direct/"orchestrator" (infra/rabbitmq/definitions.json) — this
-# queue exists solely so video-assembly, not just Orchestrator, gets a copy.
-CHANNEL_ASSET_EVENTS_QUEUE = "video_assembly.channel_asset_events"
 RABBITMQ_URL = os.environ["RABBITMQ_URL"]
 READY_SENTINEL_PATH = "/tmp/ready"
 
@@ -66,7 +64,6 @@ async def run() -> None:
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
     progress_exchange = await channel.get_exchange(PROGRESS_EXCHANGE)
     commands_queue = await channel.get_queue(COMMANDS_QUEUE)
-    channel_asset_events_queue = await channel.get_queue(CHANNEL_ASSET_EVENTS_QUEUE)
 
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
@@ -90,10 +87,15 @@ async def run() -> None:
     generate_clips_handler = GenerateClipsCommandHandler(
         pool, inbox, outbox, ClipThresholds.from_env(), progress
     )
+    register_channel_asset_handler = RegisterChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
     command_dispatcher = VideoAssemblyCommandDispatcher(
-        assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler
+        assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler,
+        register_channel_asset_handler,
+        # CR-040 FR114.2: dọn final.mp4/final.srt/clips của project bị xoá.
+        purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
+            purge_project_artifacts, pool, inbox, outbox
+        ),
     )
-    channel_asset_rendered_handler = ChannelAssetRenderedEventHandler(pool, channel_assets, inbox, outbox)
 
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
@@ -101,23 +103,15 @@ async def run() -> None:
     commands_consumer_tag = await commands_queue.consume(command_dispatcher.handle)
     # Cancel requests arrive on their own fanout, not behind the running assembly.
     await listen_for_cancels(channel)
-    channel_asset_events_consumer_tag = await channel_asset_events_queue.consume(
-        channel_asset_rendered_handler.handle
-    )
 
     with open(READY_SENTINEL_PATH, "w") as f:
         f.write("ready")
-    logger.info(
-        "Video Assembly Service ready — consuming '%s' and '%s'",
-        COMMANDS_QUEUE,
-        CHANNEL_ASSET_EVENTS_QUEUE,
-    )
+    logger.info("Video Assembly Service ready — consuming '%s'", COMMANDS_QUEUE)
 
     try:
         await asyncio.Future()  # run forever
     finally:
         await commands_queue.cancel(commands_consumer_tag)
-        await channel_asset_events_queue.cancel(channel_asset_events_consumer_tag)
         await relay.stop()
         await connection.close()
         await pool.close()

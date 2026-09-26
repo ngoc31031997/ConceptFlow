@@ -188,19 +188,22 @@ describe('routes/projects', () => {
       fs.rmSync(sharedDir, { recursive: true, force: true });
     });
 
-    test('deletes the project via orchestrator and removes its artifact directory', async () => {
+    test('deletes via orchestrator and removes only the gateway-owned upload dirs', async () => {
       fs.mkdirSync(path.join(sharedDir, 'p1', 'video'), { recursive: true });
       fs.writeFileSync(path.join(sharedDir, 'p1', 'video', 'final.mp4'), 'x');
-      const fakeClient = { request: jest.fn().mockResolvedValue({ status: 204, headers: new Map() }) };
+      fs.mkdirSync(path.join(sharedDir, 'p1', 'thumbnail'), { recursive: true });
+      const fakeClient = { request: jest.fn().mockResolvedValue({ status: 202, headers: new Map(), body: { status: 'deleting' } }) };
       const app = buildApp(fakeClient, sharedDir);
 
       const res = await request(app).delete('/v1/projects/p1');
 
-      expect(res.status).toBe(204);
+      expect(res.status).toBe(202);
       expect(fakeClient.request).toHaveBeenCalledWith(
         expect.objectContaining({ method: 'DELETE', path: '/v1/projects/p1' }),
       );
-      expect(fs.existsSync(path.join(sharedDir, 'p1'))).toBe(false);
+      expect(fs.existsSync(path.join(sharedDir, 'p1', 'thumbnail'))).toBe(false);
+      // tts/rendering/video-assembly purge their own files (CR-040 FR114.2)
+      expect(fs.existsSync(path.join(sharedDir, 'p1', 'video', 'final.mp4'))).toBe(true);
     });
 
     test('does not touch the filesystem when orchestrator returns 404', async () => {

@@ -7,6 +7,7 @@ the application/adapter layers rather than injected (dependency-injection.md).
 from __future__ import annotations
 
 import os
+import shutil
 
 SHARED_VOLUME_ROOT = "/shared"
 
@@ -69,3 +70,42 @@ def ensure_parent_dir(path: str) -> None:
 
 def file_exists(path: str) -> bool:
     return os.path.isfile(path)
+
+
+def _safe_project_id(project_id: str) -> str:
+    """A project id is a single path segment. Anything else could make the
+    purge delete outside the project's own directory."""
+    if not project_id or project_id in (".", "..") or "/" in project_id or "\\" in project_id:
+        raise ValueError(f"unsafe project_id {project_id!r}")
+    return project_id
+
+
+def _remove(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path, ignore_errors=True)
+    else:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def _rmdir_if_empty(path: str) -> None:
+    try:
+        os.rmdir(path)
+    except OSError:
+        pass  # not empty (another service's files) or already gone
+
+
+def purge_project_artifacts(project_id: str) -> None:
+    """CR-040 FR114.2: remove what Video Assembly owns for a deleted project —
+    final.mp4, final.srt and the clips directory. Never touches rendered.mp4 or
+    timing.json (rendering's) or audio (tts's). Idempotent."""
+    pid = _safe_project_id(project_id)
+    project_dir = os.path.join(SHARED_VOLUME_ROOT, pid)
+    video_dir = os.path.join(project_dir, "video")
+    _remove(os.path.join(video_dir, "final.mp4"))
+    _remove(os.path.join(video_dir, "final.srt"))
+    _remove(os.path.join(project_dir, "clips"))
+    _rmdir_if_empty(video_dir)
+    _rmdir_if_empty(project_dir)

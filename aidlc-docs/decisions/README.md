@@ -20,3 +20,4 @@
 - [ADR-0023](ADR-0023-cloud-tts-engine.md) — Google Cloud TTS làm engine giọng đọc chính, Piper làm fallback
 - [ADR-0024](ADR-0024-edge-tts-replaces-piper.md) — Edge Read Aloud thay Piper làm engine giọng đọc nền (thay thế ADR-0010)
 - [ADR-0025](ADR-0025-azure-and-edge-as-separate-voice-options.md) — Azure và Edge là hai lựa chọn giọng riêng, không thay thế ngầm cho nhau
+- [ADR-0029](ADR-0029-authoring-service-boundary.md) — Tách authoring-service khỏi orchestrator (DB riêng, hai service gọi nhau qua HTTP nội bộ)

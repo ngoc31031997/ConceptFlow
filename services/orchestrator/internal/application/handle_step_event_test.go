@@ -939,10 +939,10 @@ func TestHandleStepEvent_ChannelAssetNormalized_UpsertsPointer(t *testing.T) {
 	}
 }
 
-// channel_asset_rendered carries no asset_id/render_quality yet (rendering's
-// raw output, before video-assembly ingests and registers it) — it must be a
-// no-op, not an "unknown event_type" warning or a panic on missing fields.
-func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
+// channel_asset_rendered is forwarded to video-assembly as a
+// register_channel_asset command (CR-040 FR112.1); it must not touch the
+// pointers projection (only channel_asset_normalized does).
+func TestHandleStepEvent_ChannelAssetRendered_PublishesRegisterCommand(t *testing.T) {
 	repo := newFakeRepo()
 	pub := &fakePublisher{}
 	prog := &fakeProgress{}
@@ -952,11 +952,13 @@ func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
 	err := uc.Execute(context.Background(), StepEvent{
 		MessageID: "m2",
 		SagaID:    "s2",
+		ProjectID: "channel-asset-admin",
 		EventType: "channel_asset_rendered",
 		Payload: map[string]interface{}{
 			"kind":                   "outro",
 			"video_path":             "/data/renders/outro.mp4",
 			"video_duration_seconds": 3.0,
+			"render_quality":         "1080p60",
 		},
 	})
 	if err != nil {
@@ -964,6 +966,26 @@ func TestHandleStepEvent_ChannelAssetRendered_IsNoOp(t *testing.T) {
 	}
 	if len(pointers.pointers) != 0 {
 		t.Fatalf("channel_asset_rendered must not populate the projection, got %+v", pointers.pointers)
+	}
+	cmd := pub.last()
+	if cmd == nil || cmd.routingKey != "video_assembly" || cmd.envelope.EventType != "register_channel_asset" {
+		t.Fatalf("expected register_channel_asset to video_assembly, got %+v", cmd)
+	}
+	if cmd.envelope.MessageID != "register-m2" {
+		t.Errorf("message_id must derive from the event's for idempotency, got %q", cmd.envelope.MessageID)
+	}
+	if got := cmd.envelope.Payload["render_quality"]; got != "1080p60" {
+		t.Errorf("render_quality = %v", got)
+	}
+}
+
+func TestHandleStepEvent_ChannelAssetRendered_MalformedIsDropped(t *testing.T) {
+	pub := &fakePublisher{}
+	uc := NewHandleStepEventUseCase(newFakeRepo(), pub, &fakeProgress{}, newFakeChannelAssetPointers(), nil)
+	err := uc.Execute(context.Background(), StepEvent{MessageID: "m3", SagaID: "s3", EventType: "channel_asset_rendered",
+		Payload: map[string]interface{}{"kind": "outro"}})
+	if err != nil || len(pub.published) != 0 {
+		t.Fatalf("malformed event must be dropped without error, err=%v published=%d", err, len(pub.published))
 	}
 }
 

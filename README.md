@@ -46,7 +46,6 @@ docker compose up -d
 - RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
 - Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra. DB riêng: `content-plugin-db` (Postgres, Inbox/Outbox — ADR-0013)
 - TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
-- Script Processing Service: message-driven qua RabbitMQ (queue `script_processing.commands`), không có port HTTP nào — dùng `docker compose logs script-processing`. DB riêng: `script-processing-db` (Postgres, Inbox/Outbox — ADR-0013)
 - Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
 - Video Assembly Service: message-driven qua RabbitMQ (queue `video_assembly.commands`), ghép animation + audio + nhạc nền (ffmpeg), không có port HTTP nào — dùng `docker compose logs video-assembly`. DB riêng: `video-assembly-db` (Postgres, Inbox/Outbox — ADR-0013). Đọc animation/audio clip và ghi video hoàn chỉnh vào volume `shared_artifacts` (dùng chung với TTS/Rendering Service)
 - Publisher Service: REST (`/v1/auth/youtube/{start,callback}`, OAuth flow) + message-driven qua RabbitMQ (queue `publisher.commands`), đăng video lên YouTube — nội bộ (`publisher:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs publisher`. DB riêng: `publisher-db` (Postgres, Inbox/Outbox + `oauth_credentials` — ADR-0013, ADR-0016). Đọc video hoàn chỉnh (read-only) từ volume `shared_artifacts`. **Yêu cầu**: đăng ký Google OAuth Client trước khi dùng tính năng đăng video (xem `GOOGLE_OAUTH_*` ở mục Configuration)
@@ -65,7 +64,6 @@ pytest -q
 Tương tự cho TTS Service, Script Processing Service, và Rendering Service:
 ```bash
 cd services/tts && pip install -r requirements-dev.txt && pytest -q
-cd services/script-processing && pip install -r requirements-dev.txt && pytest -q
 cd services/rendering && pip install -r requirements-dev.txt && pytest -q
 cd services/video-assembly && pip install -r requirements-dev.txt && pytest -q
 cd services/publisher && pip install -r requirements-dev.txt && pytest -q
@@ -114,7 +112,6 @@ Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở 
 │   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
 │   ├── tts/                     # TTS Service (Python, Hexagonal, Edge TTS engine, message-driven — ADR-0014)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
-│   ├── script-processing/       # Script Processing Service (Python, Hexagonal, Markdown parser — ADR-0011)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
 │   ├── rendering/                # Rendering Service (Python, Hexagonal, Manim engine, dynamic templates — ADR-0015)
 │   │                             # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/

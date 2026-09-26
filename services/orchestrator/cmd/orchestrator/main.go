@@ -16,8 +16,8 @@ import (
 	amqplib "github.com/rabbitmq/amqp091-go"
 
 	"orchestrator/internal/adapters/amqp"
+	"orchestrator/internal/adapters/authoring"
 	httpadapter "orchestrator/internal/adapters/http"
-	"orchestrator/internal/adapters/llm"
 	"orchestrator/internal/adapters/postgres"
 	"orchestrator/internal/application"
 	"orchestrator/internal/config"
@@ -61,17 +61,6 @@ func main() {
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
 		logger.Warn("could not seed video formats", "error", err)
 	}
-	// CR-031: the prompt library. Legacy override rows/tables are purged first
-	// so none of them can hold an active slot when the system rows are seeded.
-	promptTemplateRepo := postgres.NewPromptTemplateRepository(pool)
-	if n, err := promptTemplateRepo.PurgeLegacyPrompts(ctx); err != nil {
-		logger.Warn("could not purge legacy prompts", "error", err)
-	} else if n > 0 {
-		logger.Warn("purged legacy prompts", "count", n)
-	}
-	if err := promptTemplateRepo.SeedPrompts(ctx); err != nil {
-		logger.Warn("could not seed system prompts", "error", err)
-	}
 	inboxRepo := postgres.NewInboxRepository(pool)
 	outboxRepo := postgres.NewOutboxRepository(pool)
 
@@ -95,27 +84,22 @@ func main() {
 	// channel_asset_pointers projection (kept current by subscribing to
 	// channel_asset_rendered/channel_asset_normalized events in
 	// handle_step_event.go), not by calling video-assembly over HTTP.
+	// CR-040 FR111: prompts, the 1a/1b/1c chain, LLM calls and usage live in
+	// authoring-service. The orchestrator reaches it only for the few things it
+	// still needs: the topic search, list summaries, a fork's copy and cleanup.
+	authoringClient := authoring.NewClient(cfg.AuthoringServiceURL, cfg.AuthoringServiceTimeout)
+
 	channelAssetPointers := postgres.NewChannelAssetPointerRepository(pool)
 	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger).
 		WithQCReports(qcReportRepo).
-		WithErrorLog(projectRepo)
+		WithErrorLog(projectRepo).
+		WithAuthoringCleanup(authoringClient)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	// Cancel goes straight to the broker (a fanout to every worker), not through
 	// the outbox: it must reach a worker that is busy right now, and there is no
 	// state to keep consistent with it if the publish fails (the use case then
 	// leaves the project untouched).
 	cancelStep := application.NewCancelStepUseCase(projectRepo, realPublisher)
-	// CR-039 — the one path to a language model. llm-service owns Hive and
-	// Ollama; the same client serves the light tasks, the authoring steps and
-	// the chunked code pipeline.
-	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
-	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projectRepo, llmClient)
-	suggestShortScript := application.NewSuggestShortScriptUseCase(llmClient)
-	var llmProvider application.LLMProviderPort = llmClient
-	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
-
-	llmUsageRecorder := application.NewLLMUsageRecorder(postgres.NewLLMUsageRepository(pool), logger)
-
 	// 7. Construct amqp.Consumer, register orchestrator.events + 6 DLQ queues,
 	// wire HandleStepEventUseCase. Re-run Start after every reconnect
 	// (ADR-0022) — a broker reconnect implicitly drops all consumers, and
@@ -142,80 +126,30 @@ func main() {
 	// Outbox (same durability guarantee as every other command), Preview
 	// reads the local channel_asset_pointers projection.
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
-	// CR-025: prompt-template CRUD (admin editor + web-gui runtime read) and
-	// step 1's story-save endpoint.
-	prompts := application.NewPromptsUseCase(promptTemplateRepo)
-	// CR-028 FR84.2: every authoring save shares the same lock check (project
-	// must still be status=draft), and clears the steps built on the one it
-	// overwrote — both live on promptTemplateRepo, right alongside the
-	// project_authoring table itself.
-	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	// CR-025 step 2: Visual Director's storyboard save, and the shared
-	// read-side use case both steps' rehydration relies on.
-	saveAuthoringStoryboard := application.NewSaveAuthoringStoryboardUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	// CR-025 step 3: Manim Engineer's code save, sharing the same read-side
-	// use case. CR-030 đã bỏ hẳn bước 4 (Script Reviewer).
-	saveAuthoringCode := application.NewSaveAuthoringCodeUseCase(promptTemplateRepo, promptTemplateRepo, promptTemplateRepo)
-	getAuthoringState := application.NewGetAuthoringStateUseCase(promptTemplateRepo)
-	// CR-027 FR79 — the step-1 working mode, stored per project so the choice
-	// survives a reload, another browser, and a restart of this service.
-	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(promptTemplateRepo)
-	// Model-per-step picker (follow-up to CR-027 FR79) — which Hive model
-	// each of 1a/1b/1c calls, stored the same place and the same way as the
-	// mode above.
-	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(promptTemplateRepo)
 	// CR-028 FR83: the project row is created here, at wizard step 1
-	// (POST /v1/projects), instead of at POST /v1/sagas/render — see
-	// projectDraftAdapter below for why this needs both repositories.
-	draftPort := projectDraftAdapter{projects: projectRepo, authoring: promptTemplateRepo}
+	// (POST /v1/projects); the topic and its collision search live in
+	// authoring-service (see projectDraftAdapter).
+	draftPort := projectDraftAdapter{projects: projectRepo, authoring: authoringClient}
 	createProjectDraft := application.NewCreateProjectDraftUseCase(draftPort)
 	updateProjectTopic := application.NewUpdateProjectTopicUseCase(draftPort)
 	// Wizard steps 1-2: "Tiếp tục" stores the step's data and how far the
 	// Creator got, so a reload or another browser resumes in place.
-	wizardPort := wizardAdapter{projects: projectRepo, authoring: promptTemplateRepo}
-	saveWizardSettings := application.NewSaveWizardSettingsUseCase(wizardPort)
-	// CR-027 FR77.1 — ONE renderer, shared by the Copy button (FR77.2) and the
-	// generate endpoint (FR78.1). Two instances would be two chances for the
-	// manual path and the API path to send different text for the same role.
-	renderPrompt := application.NewRenderPromptUseCase(
-		promptTemplateRepo, promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo}, projectRepo, projectRepo)
+	saveWizardSettings := application.NewSaveWizardSettingsUseCase(wizardAdapter{projects: projectRepo})
 
-	// CR-027 FR78/FR79 — the API option, beside the copy-out one. Whether it is
-	// offered is decided per request (Available → llm-service reachable and
-	// holding a Hive key), so a key added or an outage ending needs no restart of
-	// this service, and the GUI says so (FR79.4/FR83.2) instead of serving a
-	// button that fails.
-	generateAuthoring := application.NewGenerateAuthoringUseCase(
-		renderPrompt, llmProvider, llmUsageRecorder,
-		promptRenderContext{projects: projectRepo, authoring: promptTemplateRepo},
-		promptTemplateRepo,
-		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
-		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-	).WithClearer(promptTemplateRepo).WithErrorLog(projectRepo).WithEvents(projectRepo).WithPipeline(llmClient, llmClient)
-
-	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectRepo, suggestPublishMetadata, reviewOutline, channelAssets).
+	deleteProject := application.NewDeleteProjectUseCase(projectRepo, projectRepo, outboxRepo)
+	// The list needs each project's topic and what a draft holds, both of which
+	// authoring-service owns; the store below adds them to the repository's rows.
+	projectStore := projectStoreWithAuthoring{ProjectRepository: projectRepo, authoring: authoringClient}
+	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectStore, reviewOutline, channelAssets).
+		WithDeleteProject(deleteProject).
 		WithQCReports(qcReportRepo).
-		WithShortScriptSuggester(suggestShortScript).
 		WithProjectErrors(projectRepo).
 		WithProjectEvents(projectRepo).
-		WithPrompts(prompts).
-		WithRenderPrompt(renderPrompt).
-		WithAuthoringStory(saveAuthoringStory).
-		WithAuthoringStoryboard(saveAuthoringStoryboard).
-		WithAuthoringCode(saveAuthoringCode).
-		WithAuthoringState(getAuthoringState).
-		WithAuthoringMode(saveAuthoringMode).
-		WithAuthoringModels(saveAuthoringModels).
+		WithAuthoredContent(authoringClient).
 		WithProjectDrafts(createProjectDraft, updateProjectTopic).
-		WithDefaultModel(cfg.HiveModel).
 		WithWizard(saveWizardSettings)
-	router = router.WithGenerateAuthoring(generateAuthoring)
 	router = router.WithCancelStep(cancelStep)
-	router = router.WithForkProject(application.NewForkProjectUseCase(projectRepo, promptTemplateRepo))
-	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
-		_, msg := httpadapter.DescribeGenerateError(err)
-		return msg
-	}))
+	router = router.WithForkProject(application.NewForkProjectUseCase(projectRepo, authoringClient))
 
 	// 10. Start the HTTP server; the AMQP consumer loop is already running
 	// (started in step 7 via goroutines spawned inside consumer.Start).
@@ -242,25 +176,47 @@ func main() {
 	}
 }
 
-// promptRenderContext joins the two repositories CR-027's prompt renderer
-// reads from: the project itself lives in ProjectRepository, while the
-// authoring artefacts live in PromptTemplateRepository.
-//
-// A four-line struct here rather than a new method on either repository —
-// the split is an accident of which table each row sits in, and neither
-// repository should grow a dependency on the other to paper over it.
-// Embedding both would be shorter but the two repositories each have a Get,
-// so the selector is ambiguous — and forwarding explicitly says which store
-// each field of a prompt comes from.
-// projectDraftAdapter joins the two repositories CR-028's early-draft use
-// cases read/write: the projects row itself lives in ProjectRepository
-// (Save, the same upsert StartRenderSaga already calls), while the topic
-// and its collision search live in PromptTemplateRepository alongside the
-// rest of project_authoring — same split as promptRenderContext above, for
-// the same reason.
+// projectStoreWithAuthoring is the repository plus the two things the project
+// list takes from authoring-service: the topic to name a project by, and which
+// of the 1a/1b/1c outputs a draft holds (to place it among steps 3-5).
+type projectStoreWithAuthoring struct {
+	*postgres.ProjectRepository
+	authoring application.AuthoringLookupPort
+}
+
+func (s projectStoreWithAuthoring) List(ctx context.Context) ([]domain.ProjectSummary, error) {
+	summaries, err := s.ProjectRepository.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]string, 0, len(summaries))
+	for _, p := range summaries {
+		ids = append(ids, p.ProjectID)
+	}
+	// Best effort: a list without topics beats no list when authoring-service is down.
+	authored, err := s.authoring.Summaries(ctx, ids)
+	if err != nil {
+		slog.Warn("could not read authoring summaries for the project list", "error", err)
+		return summaries, nil
+	}
+	for i := range summaries {
+		a, ok := authored[summaries[i].ProjectID]
+		if !ok {
+			continue
+		}
+		summaries[i].Topic = a.Topic
+		content := domain.AuthoredContent{Story: a.Story, Storyboard: a.Storyboard, Code: a.Code}
+		summaries[i].FlowStep = domain.FlowStateFor(summaries[i].Status, summaries[i].WizardStep, content).Step
+	}
+	return summaries, nil
+}
+
+// projectDraftAdapter joins what CR-028's early-draft use cases read/write: the
+// projects row (this service) and the topic with its collision search
+// (authoring-service).
 type projectDraftAdapter struct {
 	projects  *postgres.ProjectRepository
-	authoring *postgres.PromptTemplateRepository
+	authoring application.AuthoringLookupPort
 }
 
 func (a projectDraftAdapter) Save(ctx context.Context, project *domain.Project) error {
@@ -268,62 +224,56 @@ func (a projectDraftAdapter) Save(ctx context.Context, project *domain.Project) 
 }
 
 func (a projectDraftAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
-	return a.authoring.GetStatus(ctx, projectID)
+	return a.projects.GetStatus(ctx, projectID)
 }
 
 func (a projectDraftAdapter) GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error) {
-	return a.authoring.GetStatusAndLanguage(ctx, projectID)
+	return a.projects.GetStatusAndLanguage(ctx, projectID)
 }
 
-func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, topic string) error {
-	return a.authoring.SaveAuthoringTopic(ctx, projectID, topic)
+func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error {
+	return a.authoring.SaveAuthoringTopic(ctx, projectID, topic, language)
 }
 
+// FindSimilarTopics asks authoring-service for the matches, then fills in each
+// one's current status from the projects it owns; a match whose project no
+// longer exists here is dropped.
 func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]application.SimilarProject, error) {
-	return a.authoring.FindSimilarTopics(ctx, language, normalizedTopic, excludeProjectID)
+	found, err := a.authoring.FindSimilarTopics(ctx, language, normalizedTopic, excludeProjectID)
+	if err != nil || len(found) == 0 {
+		return found, err
+	}
+	ids := make([]string, 0, len(found))
+	for _, f := range found {
+		ids = append(ids, f.ProjectID)
+	}
+	statuses, err := a.projects.GetStatuses(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	out := found[:0]
+	for _, f := range found {
+		if status, ok := statuses[f.ProjectID]; ok {
+			f.Status = status
+			out = append(out, f)
+		}
+	}
+	return out, nil
 }
 
 func (a projectDraftAdapter) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
 	return a.projects.SaveRenderEngine(ctx, projectID, engine)
 }
 
-// wizardAdapter joins the projects row (settings, wizard_step) with the
-// status lookup that lives beside project_authoring, same split as
-// projectDraftAdapter above.
+// wizardAdapter is the projects row's settings, plus its status lookup.
 type wizardAdapter struct {
-	projects  *postgres.ProjectRepository
-	authoring *postgres.PromptTemplateRepository
+	projects *postgres.ProjectRepository
 }
 
 func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
-	return a.authoring.GetStatus(ctx, projectID)
+	return a.projects.GetStatus(ctx, projectID)
 }
 
 func (a wizardAdapter) SaveWizardSettings(ctx context.Context, projectID string, s domain.WizardSettings) error {
 	return a.projects.SaveWizardSettings(ctx, projectID, s)
-}
-
-type promptRenderContext struct {
-	projects  *postgres.ProjectRepository
-	authoring *postgres.PromptTemplateRepository
-}
-
-func (c promptRenderContext) Get(ctx context.Context, projectID string) (*domain.Project, error) {
-	return c.projects.Get(ctx, projectID)
-}
-
-func (c promptRenderContext) GetAuthoringTopic(ctx context.Context, projectID string) (string, error) {
-	return c.authoring.GetAuthoringTopic(ctx, projectID)
-}
-
-func (c promptRenderContext) GetAuthoringStory(ctx context.Context, projectID string) (string, error) {
-	return c.authoring.GetAuthoringStory(ctx, projectID)
-}
-
-func (c promptRenderContext) GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error) {
-	return c.authoring.GetAuthoringStoryboard(ctx, projectID)
-}
-
-func (c promptRenderContext) GetAuthoringCode(ctx context.Context, projectID string) (string, error) {
-	return c.authoring.GetAuthoringCode(ctx, projectID)
 }

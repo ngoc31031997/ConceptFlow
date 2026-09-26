@@ -23,8 +23,12 @@ type ForkPort interface {
 // ForkAuthoringPort reads and writes the authoring artefacts directly (no
 // draft lock, no edit history: the copy is brand new).
 type ForkAuthoringPort interface {
-	AuthoringStateReaderPort
-	SaveAuthoringTopic(ctx context.Context, projectID, topic string) error
+	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
+	GetAuthoringMode(ctx context.Context, projectID string) (string, error)
+	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
+	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
+	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
+	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
 	SaveAuthoringStory(ctx context.Context, projectID, content, topic string) error
 	SaveAuthoringStoryboard(ctx context.Context, projectID, content string) error
 	SaveAuthoringMode(ctx context.Context, projectID, mode string) error
@@ -88,7 +92,7 @@ func (uc *ForkProjectUseCase) Execute(ctx context.Context, sourceID string, from
 		return nil, fmt.Errorf("link fork: %w", err)
 	}
 	if topic != "" {
-		if err := uc.authoring.SaveAuthoringTopic(ctx, dst.ProjectID, topic); err != nil {
+		if err := uc.authoring.SaveAuthoringTopic(ctx, dst.ProjectID, topic, dst.ContentLanguage); err != nil {
 			return nil, err
 		}
 	}

@@ -82,6 +82,8 @@ def script_validated_envelope(
     warnings: list[str],
     clip_marks: list[dict] | None = None,
     layout_warnings: list[dict] | None = None,
+    scene_class_name: str = "",
+    engine: str = "manim",
 ) -> dict:
     """CR-020 FR56 — kết quả cổng kiểm tra, chạy trước TTS.
 
@@ -103,6 +105,10 @@ def script_validated_envelope(
         project_id,
         {
             "event_type": "script_validated",
+            # CR-040 FR110: script_parsed no longer exists; Orchestrator stores
+            # these from here.
+            "scene_class_name": scene_class_name,
+            "engine": engine,
             "scenes": [
                 {
                     "scene_index": index,

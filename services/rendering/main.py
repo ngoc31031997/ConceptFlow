@@ -22,6 +22,8 @@ from adapters.messaging.consumer import (
     RenderScriptCommandHandler,
     ValidateScriptCommandHandler,
 )
+from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
+from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
@@ -128,6 +130,10 @@ async def run() -> None:
         # chỉ có ManimScriptRenderer implement — xem docstring remotion_renderer.py).
         RenderChannelAssetCommandHandler(
             RenderChannelAssetUseCase(manim_renderer), pool, inbox, outbox
+        ),
+        # CR-040 FR114.2: dọn video đã dựng và cache Manim của project bị xoá.
+        purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
+            lambda project_id: purge_project_artifacts(project_id, cache_root), pool, inbox, outbox
         ),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

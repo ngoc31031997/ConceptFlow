@@ -41,8 +41,14 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
  * @param {string} sharedDir
  * @param {import('../clients/httpClient').HttpClient} orchestratorAiClient
  */
-function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
+function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, authoringClient, authoringAiClient) {
   const router = express.Router();
+  // CR-040 FR111: authoring routes (prompts, the 1a/1b/1c artefacts, generate,
+  // chain, progress, suggestions) belong to authoring-service. Falling back to
+  // the orchestrator client keeps a gateway without AUTHORING_SERVICE_URL working
+  // against the old single-service layout (and the route tests simple).
+  const authoring = authoringClient || orchestratorClient;
+  const authoringAi = authoringAiClient || authoringClient || orchestratorAiClient || orchestratorClient;
   router.get('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-028 FR83.1/FR83.2 — the project row is created at wizard step 1
   // (topic entry), not at POST /v1/sagas/render, so authoring state written
@@ -50,7 +56,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.post('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
   router.patch('/v1/projects/:id/topic', proxyHandler(orchestratorClient, 'orchestrator'));
   // CR-028 FR84.3 — read-only history of every authoring field overwrite.
-  router.get('/v1/projects/:id/authoring/history', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:id/authoring/history', proxyHandler(authoring, 'authoring-service'));
   // Append-only trace of failed runs (project_errors column).
   router.get('/v1/projects/:id/errors', proxyHandler(orchestratorClient, 'orchestrator'));
   // Journey log of the 13-step flow (project_events): one project, and the
@@ -81,19 +87,19 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   router.get('/v1/projects/:id/clips/:name/:preset', clipHandler(orchestratorClient, sharedDir));
   // CR-025 step 1 — saves the Story Architect output a Creator pasted back
   // after the external-AI round trip.
-  router.post('/v1/projects/:id/authoring/story', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/authoring/story', proxyHandler(authoring, 'authoring-service'));
   // CR-025 step 2 — same shape, for the Visual Director's pasted storyboard.
-  router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(authoring, 'authoring-service'));
   // CR-025 step 3 — the Manim Engineer's pasted code.
-  router.post('/v1/projects/:id/authoring/code', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/authoring/code', proxyHandler(authoring, 'authoring-service'));
   // CR-025 — rehydrates every saved authoring output (story + storyboard +
   // code) so the wizard can restore state on reload/back-navigation.
-  router.get('/v1/projects/:id/authoring', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:id/authoring', proxyHandler(authoring, 'authoring-service'));
   // CR-027 FR79 — cách làm bước 1 (copy tay / gọi API), nhớ theo project nên
   // mở lại ở máy khác hay sau khi restart vẫn đúng chế độ đã chọn.
-  router.put('/v1/projects/:id/authoring/mode', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.put('/v1/projects/:id/authoring/mode', proxyHandler(authoring, 'authoring-service'));
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
-  router.put('/v1/projects/:id/authoring/models', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.put('/v1/projects/:id/authoring/models', proxyHandler(authoring, 'authoring-service'));
   // Wizard: "Tiếp tục" lưu dữ liệu của bước và bước đã tới. settings = bước 2
   // (Cấu hình).
   router.put('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -102,19 +108,19 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
   // Live progress of the run above (streamed reply size + phase), polled by the GUI.
-  router.get('/v1/projects/:id/authoring/:step/progress', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/projects/:id/authoring/:step/progress', proxyHandler(authoring, 'authoring-service'));
   // Server-side chain of 1a/1b/1c: POST starts it (202, returns at once), GET
   // reports the running or last-finished chain. Short calls — the run itself
   // is detached from the request.
-  router.post('/v1/projects/:id/authoring/chain', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.get('/v1/projects/:id/authoring/chain', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.post('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
   router.post(
     '/v1/projects/:id/authoring/:step/generate',
-    proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
+    proxyHandler(authoringAi, 'authoring-service'),
   );
   router.post(
     '/v1/projects/:id/suggest-metadata',
-    proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
+    proxyHandler(authoringAi, 'authoring-service'),
   );
   // CR-026 FR71 — same longer-timeout client as suggest-metadata: drafting a
   // whole script via the local model takes longer than a title/description.
@@ -122,7 +128,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient) {
   // short from a bare topic without an existing project.
   router.post(
     '/v1/short-script-suggestions',
-    proxyHandler(orchestratorAiClient || orchestratorClient, 'orchestrator'),
+    proxyHandler(authoringAi, 'authoring-service'),
   );
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import shutil
 import wave
 
 SHARED_VOLUME_ROOT = "/shared"
@@ -49,3 +50,36 @@ def read_duration_seconds(audio_path: str) -> float:
         frames = wav_file.getnframes()
         rate = wav_file.getframerate()
     return round(frames / float(rate), 2)
+
+
+def _safe_project_id(project_id: str) -> str:
+    """A project id is a single path segment. Anything else could make the
+    purge delete outside the project's own directory."""
+    if not project_id or project_id in (".", "..") or "/" in project_id or "\\" in project_id:
+        raise ValueError(f"unsafe project_id {project_id!r}")
+    return project_id
+
+
+def _remove(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path, ignore_errors=True)
+    else:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def _rmdir_if_empty(path: str) -> None:
+    try:
+        os.rmdir(path)
+    except OSError:
+        pass  # not empty (another service's files) or already gone
+
+
+def purge_project_artifacts(project_id: str) -> None:
+    """CR-040 FR114.2: remove what TTS owns for a deleted project
+    (/shared/{project_id}/audio) and nothing else. Idempotent."""
+    project_dir = os.path.join(SHARED_VOLUME_ROOT, _safe_project_id(project_id))
+    _remove(os.path.join(project_dir, "audio"))
+    _rmdir_if_empty(project_dir)

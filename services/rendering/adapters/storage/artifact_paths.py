@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 
 SHARED_VOLUME_ROOT = "/shared"
 
@@ -72,3 +73,43 @@ def compute_channel_asset_path(kind: str, render_quality: str) -> str:
     `source_hash`/`version`); Rendering only ever produces the file.
     """
     return os.path.join(SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, "rendered.mp4")
+
+
+def _safe_project_id(project_id: str) -> str:
+    """A project id is a single path segment. Anything else could make the
+    purge delete outside the project's own directory."""
+    if not project_id or project_id in (".", "..") or "/" in project_id or "\\" in project_id:
+        raise ValueError(f"unsafe project_id {project_id!r}")
+    return project_id
+
+
+def _remove(path: str) -> None:
+    if os.path.isdir(path) and not os.path.islink(path):
+        shutil.rmtree(path, ignore_errors=True)
+    else:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+
+
+def _rmdir_if_empty(path: str) -> None:
+    try:
+        os.rmdir(path)
+    except OSError:
+        pass  # not empty (another service's files) or already gone
+
+
+def purge_project_artifacts(project_id: str, cache_root: str | None = None) -> None:
+    """CR-040 FR114.2: remove what Rendering owns for a deleted project — its
+    rendered video and timing sidecar, and its Manim media cache
+    (`cache_root/{project_id}`, RENDER_CACHE_ROOT). Never touches final.mp4,
+    which belongs to video-assembly. Idempotent."""
+    pid = _safe_project_id(project_id)
+    video_dir = os.path.join(SHARED_VOLUME_ROOT, pid, "video")
+    _remove(os.path.join(video_dir, "rendered.mp4"))
+    _remove(os.path.join(video_dir, "timing.json"))
+    _rmdir_if_empty(video_dir)
+    _rmdir_if_empty(os.path.join(SHARED_VOLUME_ROOT, pid))
+    if cache_root:
+        _remove(os.path.join(cache_root, pid))

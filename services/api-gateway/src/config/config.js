@@ -14,11 +14,13 @@
  *   port: number,
  *   webGuiOrigin: string,
  *   sharedDir: string,
+ *   authoringServiceUrl: string,
  * }}
  */
 function loadConfig(env = process.env) {
   return {
     orchestratorUrl: env.ORCHESTRATOR_URL || 'http://orchestrator:8000',
+    authoringServiceUrl: env.AUTHORING_SERVICE_URL || 'http://authoring-service:8000',
     publisherUrl: env.PUBLISHER_URL || 'http://publisher:8000',
     rabbitmqUrl: env.RABBITMQ_URL || 'amqp://guest:guest@rabbitmq:5672/',
     port: Number(env.PORT) || 8080,

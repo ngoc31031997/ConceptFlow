@@ -74,12 +74,14 @@ var failureEvents = map[string]bool{
 // Project, dispatches the next command (or ends the Saga), and publishes a
 // ProgressMessage (Rule 7).
 type HandleStepEventUseCase struct {
-	repo      domain.ProjectRepositoryPort
+	repo domain.ProjectRepositoryPort
 	// errorLog receives a project_errors row for every failed saga step; nil
 	// disables it.
 	errorLog ProjectErrorLogPort
-	publisher domain.CommandPublisherPort
-	progress  domain.ProgressPublisherPort
+	// authoringCleanup, when set, runs after the project row is deleted.
+	authoringCleanup AuthoringCleanupPort
+	publisher        domain.CommandPublisherPort
+	progress         domain.ProgressPublisherPort
 	// qcReports stores the automated QC report (CR-021 D6). Optional/nil-checked
 	// at its call sites for the same reason channelAssets is: callers and tests
 	// written before CR-021 keep working, and a project simply ends up with no
@@ -102,6 +104,20 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 		logger = slog.Default()
 	}
 	return &HandleStepEventUseCase{repo: repo, publisher: publisher, progress: progress, channelAssets: channelAssets, logger: logger}
+}
+
+// AuthoringCleanupPort removes a deleted project's authoring row in
+// authoring-service (CR-040 FR111).
+type AuthoringCleanupPort interface {
+	DeleteAuthoring(ctx context.Context, projectID string) error
+}
+
+// WithAuthoringCleanup makes the delete saga also remove the project's
+// authoring artefacts once its files are gone. Best effort: an orphaned
+// authoring row is harmless, so a failure is logged, not retried.
+func (uc *HandleStepEventUseCase) WithAuthoringCleanup(c AuthoringCleanupPort) *HandleStepEventUseCase {
+	uc.authoringCleanup = c
+	return uc
 }
 
 // WithErrorLog makes every failed saga step leave a row in the project's
@@ -170,6 +186,10 @@ func (uc *HandleStepEventUseCase) WithQCReports(qcReports domain.QCReportPort) *
 func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) error {
 	if event.EventType == "scene_rendered" {
 		return uc.handleSceneRenderedProgress(ctx, event)
+	}
+
+	if event.EventType == "artifacts_purged" || event.EventType == "purge_failed" {
+		return uc.handlePurgeEvent(ctx, event)
 	}
 
 	// CR-023 correction: channel_asset_rendered/channel_asset_normalized are
@@ -245,19 +265,23 @@ func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Contex
 	return uc.progress.PublishProgress(ctx, msg)
 }
 
-// handleChannelAssetProjection upserts channel_asset_pointers from a
-// channel_asset_normalized event (video-assembly's authoritative record of a
-// newly-registered intro/outro, carrying asset_id + render_quality + version).
+// handleChannelAssetProjection handles the two channel-asset events.
 //
-// channel_asset_rendered (rendering's raw output, video_path only, no
-// asset_id/render_quality yet — see rendering/producer.py) is intentionally a
-// no-op here: video-assembly is the one that ingests it, transcodes per
-// RENDER_QUALITY and assigns an asset_id, and it re-announces the result as
-// channel_asset_normalized — the only event shaped enough for this
-// projection. Still explicitly matched (rather than falling into "unknown
-// event_type") so it is not logged as a warning on every render.
+// channel_asset_rendered (rendering's raw output: kind, video_path, duration,
+// render_quality) is turned into a register_channel_asset command to
+// video-assembly (CR-040 FR112.1) — the Orchestrator, not a second queue
+// binding on rendering.events, decides who ingests it. The command's
+// message_id is derived from the event's so a redelivered event yields the same
+// command and video-assembly's inbox drops the duplicate.
+//
+// channel_asset_normalized (video-assembly's authoritative record of the
+// registered asset, carrying asset_id + render_quality + version) upserts
+// channel_asset_pointers.
 func (uc *HandleStepEventUseCase) handleChannelAssetProjection(ctx context.Context, event StepEvent) error {
-	if uc.channelAssets == nil || event.EventType != "channel_asset_normalized" {
+	if event.EventType == "channel_asset_rendered" {
+		return uc.registerRenderedChannelAsset(ctx, event)
+	}
+	if uc.channelAssets == nil {
 		return nil
 	}
 	kind := stringFromPayload(event.Payload, "kind")
@@ -406,6 +430,11 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 // order the viewer will hear them — including narration produced inside loops,
 // which no amount of reading the source text could have counted correctly.
 func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event StepEvent, project *domain.Project) error {
+	// CR-040 FR110: rendering found the class/composition while validating.
+	// Empty (an older worker) leaves whatever a legacy script_parsed stored.
+	if name := stringFromPayload(event.Payload, "scene_class_name"); name != "" {
+		project.ManimSceneClassName = name
+	}
 	project.Scenes = parseInitialScenes(event.Payload)
 	beats := parseBeats(event.Payload)
 	// Bug report (2026-09-12): the dry pass already knows whether the script
@@ -1154,4 +1183,83 @@ func sortedScenes(scenes []domain.Scene) []domain.Scene {
 	copy(out, scenes)
 	sort.Slice(out, func(i, j int) bool { return out[i].SceneIndex < out[j].SceneIndex })
 	return out
+}
+
+// registerRenderedChannelAsset forwards a rendered intro/outro to
+// video-assembly as register_channel_asset (CR-040 FR112.1).
+func (uc *HandleStepEventUseCase) registerRenderedChannelAsset(ctx context.Context, event StepEvent) error {
+	kind := stringFromPayload(event.Payload, "kind")
+	videoPath := stringFromPayload(event.Payload, "video_path")
+	quality := stringFromPayload(event.Payload, "render_quality")
+	if kind == "" || videoPath == "" || quality == "" {
+		uc.logger.WarnContext(ctx, "channel_asset_rendered missing kind/video_path/render_quality, ignoring",
+			"saga_id", event.SagaID, "message_id", event.MessageID)
+		return nil
+	}
+	duration, _ := event.Payload["video_duration_seconds"].(float64)
+	return uc.publisher.PublishCommand(ctx, "video_assembly", domain.Envelope{
+		MessageID: "register-" + event.MessageID,
+		SagaID:    event.SagaID,
+		ProjectID: event.ProjectID,
+		EventType: "register_channel_asset",
+		Payload: map[string]interface{}{
+			"event_type":             "register_channel_asset",
+			"kind":                   kind,
+			"video_path":             videoPath,
+			"video_duration_seconds": duration,
+			"render_quality":         quality,
+		},
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+	})
+}
+
+// handlePurgeEvent advances the delete saga (CR-040 FR114.2). Each owner
+// answers once; when all of them have, the project and its saga rows are
+// deleted. A failure leaves the project `deleting` with the step failed, so
+// the Creator's next DELETE re-issues the purge.
+func (uc *HandleStepEventUseCase) handlePurgeEvent(ctx context.Context, event StepEvent) error {
+	service := stringFromPayload(event.Payload, "service")
+	var step domain.StepName
+	for _, t := range domain.PurgeTargets {
+		if t.Service == service {
+			step = t.Step
+		}
+	}
+	if step == "" {
+		uc.logger.WarnContext(ctx, "purge event from unknown service, ignoring", "service", service, "saga_id", event.SagaID)
+		return nil
+	}
+
+	if event.EventType == "purge_failed" {
+		msg := stringFromPayload(event.Payload, "error_message")
+		uc.logger.WarnContext(ctx, "project artifact purge failed", "service", service, "project_id", event.ProjectID, "error", msg)
+		return uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: step, Status: domain.SagaStepFailed, ErrorMessage: &msg})
+	}
+
+	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: event.SagaID, StepName: step, Status: domain.SagaStepCompleted}); err != nil {
+		return err
+	}
+	for _, t := range domain.PurgeTargets {
+		got, err := uc.repo.GetStep(ctx, event.SagaID, t.Step)
+		if errors.Is(err, domain.ErrSagaStepNotFound) {
+			// The project (and its steps) is already gone — a redelivered event.
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if got.Status != domain.SagaStepCompleted {
+			return nil
+		}
+	}
+	if err := uc.repo.Delete(ctx, event.ProjectID); err != nil && !errors.Is(err, domain.ErrProjectNotFound) {
+		return err
+	}
+	if uc.authoringCleanup != nil {
+		if err := uc.authoringCleanup.DeleteAuthoring(ctx, event.ProjectID); err != nil {
+			uc.logger.WarnContext(ctx, "could not remove the project's authoring row", "project_id", event.ProjectID, "error", err)
+		}
+	}
+	uc.logger.InfoContext(ctx, "project deleted after all artifact purges", "project_id", event.ProjectID)
+	return nil
 }

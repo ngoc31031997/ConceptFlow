@@ -81,7 +81,6 @@ const eventsDLQQueue = "orchestrator.events.dlq"
 // Unit 1's "*.commands.dlq" pattern) Orchestrator also consumes — a
 // dead-lettered command means a downstream service never picked it up.
 var dlqQueues = []string{
-	"script_processing.commands.dlq",
 	"tts.commands.dlq",
 	"rendering.commands.dlq",
 	"video_assembly.commands.dlq",
