@@ -13,10 +13,9 @@
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: var(--rail-bg, rgba(255, 255, 255, 0.78));
-  border-right: 1px solid var(--surface-border);
-  box-shadow: 8px 0 28px rgba(31, 58, 90, 0.1);
-  backdrop-filter: blur(24px);
+  background: var(--rail-bg, var(--card));
+  border-right: var(--border-w) solid var(--surface-border);
+  box-shadow: var(--shadow);
   transition: width 0.18s ease;
 }
 .railCollapsed {
@@ -57,8 +56,8 @@
   flex-shrink: 0;
   width: 28px;
   height: 28px;
-  border-radius: 8px;
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
@@ -109,7 +108,7 @@
   align-items: center;
   gap: 10px;
   padding: 7px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius);
   border: 0;
   background: transparent;
   color: var(--ink-faint);
@@ -125,10 +124,10 @@
   cursor: default;
 }
 .item:not(:disabled):hover {
-  background: rgba(47, 143, 224, 0.08);
+  background: var(--accent-soft);
 }
 .viewing {
-  background: rgba(47, 143, 224, 0.14);
+  background: var(--accent-soft);
   color: var(--ink);
 }
 
@@ -136,7 +135,7 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  border: 1.5px solid currentColor;
+  border: var(--border-w) solid currentColor;
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -163,7 +162,7 @@
 .s_done .mark {
   background: var(--ok, #1f9d6b);
   border-color: var(--ok, #1f9d6b);
-  color: #fff;
+  color: var(--accent-ink);
 }
 .s_waiting {
   color: var(--accent);
@@ -177,7 +176,7 @@
 .s_failed .mark {
   background: var(--danger, #d93b45);
   border-color: var(--danger, #d93b45);
-  color: #fff;
+  color: var(--accent-ink);
 }
 .s_cancelled {
   color: var(--warn, #c7811a);

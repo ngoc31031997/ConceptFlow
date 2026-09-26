@@ -19,9 +19,9 @@
 .promptPanel {
   margin-bottom: 14px;
   padding: 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--surface-border);
 }
 
 .promptPanelHeader {
@@ -53,7 +53,7 @@
   display: none;
 }
 .toolsMenu[open] > summary {
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--card);
 }
 
 .toolsDropdown {
@@ -63,10 +63,10 @@
   z-index: 20;
   min-width: 220px;
   padding: 6px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.92);
-  border: 1px solid var(--surface-border);
-  box-shadow: var(--glass-shadow);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--surface-border);
+  box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -78,15 +78,15 @@
   gap: 9px;
   width: 100%;
   padding: 9px 10px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 500;
-  color: rgba(16, 28, 40, 0.8);
+  color: var(--ink);
   text-align: left;
   background: transparent;
 }
 .toolsDropdownItem:hover {
-  background: rgba(47, 143, 224, 0.1);
+  background: var(--accent-soft);
 }
 
 .validationOk,
@@ -96,7 +96,7 @@
   gap: 8px;
   margin-top: 10px;
   padding: 10px 13px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   font-size: 12.5px;
   font-weight: 500;
   line-height: 1.5;
@@ -105,21 +105,21 @@
 .validationOk {
   color: #1a7f4c;
   background: rgba(34, 197, 94, 0.12);
-  border: 1px solid rgba(34, 197, 94, 0.25);
+  border: var(--border-w) solid var(--border-color);
 }
 
 .validationError {
   color: var(--danger);
   background: var(--danger-soft);
-  border: 1px solid rgba(224, 67, 47, 0.25);
+  border: var(--border-w) solid var(--danger);
 }
 
 .emptyState {
   margin-bottom: 14px;
   padding: 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--surface-border);
 }
 
 .emptyStateTitle {
@@ -141,9 +141,9 @@
   align-items: flex-start;
   gap: 5px;
   padding: 14px;
-  border-radius: 14px;
-  border: 1px solid var(--surface-border);
-  background: #fff;
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
+  background: var(--card);
   color: var(--ink-soft);
   text-align: left;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -151,7 +151,7 @@
 
 .emptyStateOption:hover {
   border-color: var(--accent);
-  box-shadow: 0 6px 16px rgba(31, 58, 90, 0.1);
+  box-shadow: var(--shadow);
 }
 
 .emptyStateLabel {
@@ -177,9 +177,9 @@
 .durationEstimate {
   margin-top: 0.75rem;
   padding: 0.75rem 0.9rem;
-  border-radius: 10px;
+  border-radius: var(--radius);
   background: rgba(143, 199, 239, 0.08);
-  border: 1px solid rgba(143, 199, 239, 0.22);
+  border: var(--border-w) solid var(--border-color);
 }
 
 .durationHeadline {

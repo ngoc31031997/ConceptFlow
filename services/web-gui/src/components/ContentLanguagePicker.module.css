@@ -30,8 +30,8 @@
   align-items: center;
   gap: 7px;
   padding: 10px 18px;
-  border-radius: 13px;
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
   background: var(--surface);
   color: var(--ink-soft);
   font-size: 13.5px;
@@ -40,8 +40,8 @@
 
 .option.selected {
   border-color: var(--accent);
-  background: #fff;
+  background: var(--card);
   color: var(--ink);
   font-weight: 600;
-  box-shadow: 0 4px 12px rgba(31, 58, 90, 0.12);
+  box-shadow: var(--shadow);
 }

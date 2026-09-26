@@ -14,13 +14,13 @@
 .icon {
   width: 38px;
   height: 38px;
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: rgba(16, 28, 40, 0.7);
+  color: var(--ink);
   flex-shrink: 0;
 }
 
@@ -34,12 +34,12 @@
   align-items: center;
   gap: 8px;
   padding: 10px 18px;
-  border-radius: 13px;
+  border-radius: var(--radius);
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  box-shadow: 0 8px 20px rgba(47, 143, 224, 0.3);
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: var(--shadow);
   border: none;
 }
 
@@ -47,7 +47,7 @@
   padding: 0 24px 20px;
   font-size: 13px;
   line-height: 1.6;
-  color: rgba(16, 28, 40, 0.62);
+  color: var(--ink-soft);
 }
 
 .list {
@@ -62,11 +62,11 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--card);
 }
 
 .itemMain {
@@ -91,7 +91,7 @@
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   flex-shrink: 0;
 }
 
@@ -101,15 +101,15 @@
 }
 
 .appTag {
-  color: rgba(16, 28, 40, 0.62);
-  background: rgba(16, 28, 40, 0.07);
+  color: var(--ink-soft);
+  background: var(--muted);
 }
 
 .captionBadge {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   flex-shrink: 0;
   color: #a15c00;
   background: rgba(212, 132, 0, 0.14);
@@ -127,7 +127,7 @@
   font-size: 12px;
   font-weight: 600;
   padding: 6px 10px;
-  border-radius: 9px;
+  border-radius: var(--radius);
   border: none;
   background: transparent;
   cursor: pointer;
@@ -143,7 +143,7 @@
 
 .linkBtn:hover,
 .dangerLink:hover {
-  background: rgba(16, 28, 40, 0.06);
+  background: var(--muted);
 }
 
 .appPicker {
@@ -156,7 +156,7 @@
 .appPickerHint {
   font-size: 12px;
   line-height: 1.6;
-  color: rgba(16, 28, 40, 0.62);
+  color: var(--ink-soft);
   margin: 0 0 4px;
 }
 
@@ -166,9 +166,9 @@
   justify-content: space-between;
   gap: 12px;
   padding: 11px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(16, 28, 40, 0.12);
-  background: rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--border-color);
+  background: var(--card);
   text-align: left;
   cursor: pointer;
 }
@@ -185,7 +185,7 @@
 
 .appFile {
   font-size: 11px;
-  color: rgba(16, 28, 40, 0.5);
+  color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -194,9 +194,9 @@
 .warning {
   margin: 0 24px 18px;
   padding: 12px 14px;
-  border-radius: 12px;
+  border-radius: var(--radius);
   background: rgba(196, 132, 16, 0.1);
-  border: 1px solid rgba(196, 132, 16, 0.28);
+  border: var(--border-w) solid var(--border-color);
 }
 
 .warning p {
@@ -209,7 +209,7 @@
 .warning code {
   font-size: 11px;
   padding: 2px 5px;
-  border-radius: 5px;
-  background: rgba(16, 28, 40, 0.09);
+  border-radius: var(--radius);
+  background: var(--muted);
   word-break: break-all;
 }

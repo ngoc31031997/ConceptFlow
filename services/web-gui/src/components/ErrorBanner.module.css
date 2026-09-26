@@ -7,13 +7,13 @@
 .icon {
   width: 44px;
   height: 44px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, #ff5f6d, #ff8a5b);
+  border-radius: var(--radius);
+  background: var(--accent-soft);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #fff;
+  color: var(--accent-ink);
 }
 
 .body {
@@ -38,12 +38,12 @@
   align-items: center;
   gap: 8px;
   padding: 11px 20px;
-  border-radius: 14px;
+  border-radius: var(--radius);
   font-size: 13.5px;
   font-weight: 600;
-  color: #fff;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  box-shadow: 0 10px 26px rgba(47, 143, 224, 0.35);
+  color: var(--accent-ink);
+  background: var(--accent);
+  box-shadow: var(--shadow);
   border: none;
 }
 .retryBtn:disabled {
@@ -62,7 +62,7 @@
   border-radius: 50%;
   border: none;
   background: var(--danger, #e5484d);
-  color: #fff;
+  color: var(--accent-ink);
   font-size: 12px;
   font-weight: 700;
   line-height: 1;
@@ -75,9 +75,9 @@
   padding: 10px 12px;
   max-height: 260px;
   overflow: auto;
-  border-radius: 10px;
-  border: 1px solid var(--surface-border);
-  background: rgba(127, 127, 127, 0.08);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
+  background: var(--muted);
   font-size: 12px;
   line-height: 1.5;
   white-space: pre-wrap;
@@ -96,8 +96,8 @@
 .copyBtn {
   margin: 0 0 14px;
   padding: 5px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--surface-border);
+  border-radius: var(--radius);
+  border: var(--border-w) solid var(--surface-border);
   background: transparent;
   color: var(--ink-soft);
   font-size: 12px;

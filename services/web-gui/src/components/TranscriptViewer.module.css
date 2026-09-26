@@ -17,7 +17,7 @@
 }
 
 .header:hover {
-  background: rgba(47, 143, 224, 0.05);
+  background: var(--accent-soft);
 }
 
 .headerLeft {
@@ -40,7 +40,7 @@
 
 .content {
   padding: 0 22px 22px;
-  border-top: 1px solid var(--glass-border);
+  border-top: var(--border-w) solid var(--glass-border);
 }
 
 .toolbar {
@@ -77,12 +77,12 @@
 }
 
 .list::-webkit-scrollbar-thumb {
-  background: rgba(47, 143, 224, 0.2);
-  border-radius: 6px;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
 }
 
 .list::-webkit-scrollbar-thumb:hover {
-  background: rgba(47, 143, 224, 0.3);
+  background: var(--accent-soft);
 }
 
 .item {
@@ -90,24 +90,17 @@
   gap: 12px;
   align-items: flex-start;
   padding: 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: var(--radius);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
   transition: background 0.15s ease;
 }
 
-[data-theme="dark"] .item {
-  background: rgba(30, 41, 54, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
 
 .item:hover {
-  background: rgba(255, 255, 255, 0.75);
+  background: var(--card);
 }
 
-[data-theme="dark"] .item:hover {
-  background: rgba(30, 41, 54, 0.6);
-}
 
 .itemNumber {
   flex-shrink: 0;
@@ -117,8 +110,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-ink);
   font-size: 11px;
   font-weight: 700;
 }
