@@ -170,15 +170,15 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
 	// error: the failed saga step's own message (see Get for why the column is
-	// not trusted). authoring: what the draft holds, to place it among steps 3-5.
+	// not trusted). The topic and what a draft holds live in authoring-service
+	// (CR-040 FR111); the caller fills them in from its summaries.
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.project_id, p.status, p.video_path,
 		       (SELECT s.error_message FROM saga_steps s
 		         WHERE s.saga_id = p.saga_id AND s.status = 'failed' ORDER BY s.updated_at DESC LIMIT 1),
-		       p.updated_at, p.render_engine, p.wizard_step, p.forked_from,
-		       COALESCE(a.topic, ''),
-		       COALESCE(a.story_content, '') <> '', COALESCE(a.storyboard_content, '') <> '', COALESCE(a.code_content, '') <> ''
-		FROM projects p LEFT JOIN project_authoring a ON a.project_id = p.project_id
+		       p.updated_at, p.render_engine, p.wizard_step, p.forked_from
+		FROM projects p
+		WHERE p.status <> 'deleting'
 		ORDER BY p.updated_at DESC`)
 	if err != nil {
 		return nil, err
@@ -189,9 +189,8 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 	for rows.Next() {
 		var s domain.ProjectSummary
 		var status, renderEngine string
-		var content domain.AuthoredContent
 		if err := rows.Scan(&s.ProjectID, &status, &s.VideoPath, &s.ErrorMessage, &s.UpdatedAt, &renderEngine,
-			&s.WizardStep, &s.ForkedFrom, &s.Topic, &content.Story, &content.Storyboard, &content.Code); err != nil {
+			&s.WizardStep, &s.ForkedFrom); err != nil {
 			return nil, err
 		}
 		s.Status = domain.ProjectStatus(status)
@@ -199,7 +198,7 @@ func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, 
 		if !domain.IsFailedStatus(s.Status) {
 			s.ErrorMessage = nil
 		}
-		s.FlowStep = domain.FlowStateFor(s.Status, s.WizardStep, content).Step
+		s.FlowStep = domain.FlowStateFor(s.Status, s.WizardStep, domain.AuthoredContent{}).Step
 		s.RunState = domain.RunStateOf(s.Status, s.ErrorMessage)
 		summaries = append(summaries, s)
 	}
@@ -222,12 +221,47 @@ func (r *ProjectRepository) ForkedFrom(ctx context.Context, projectID string) (s
 	return from, err
 }
 
+// BeginDelete starts the delete saga (CR-040 FR114.2): under a row lock it
+// refuses a project with a step in flight and marks it `deleting`. A project
+// already `deleting` is accepted again (retry after a failed purge).
+func (r *ProjectRepository) BeginDelete(ctx context.Context, projectID string) (string, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+
+	var sagaID, status string
+	err = tx.QueryRow(ctx, `SELECT saga_id, status FROM projects WHERE project_id = $1 FOR UPDATE`, projectID).Scan(&sagaID, &status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	if domain.ProjectStatus(status).IsInFlight() {
+		return "", domain.ErrProjectBusy
+	}
+	// A draft that never rendered has no saga id, and every such project would
+	// share the empty one — their purge steps would collide and one project's
+	// final delete would wipe another's steps. Give it its own.
+	if sagaID == "" {
+		if err := tx.QueryRow(ctx, `UPDATE projects SET saga_id = gen_random_uuid()::text WHERE project_id = $1 RETURNING saga_id`, projectID).Scan(&sagaID); err != nil {
+			return "", err
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE projects SET status = $2, updated_at = now() WHERE project_id = $1`, projectID, string(domain.StatusDeleting)); err != nil {
+		return "", err
+	}
+	return sagaID, tx.Commit(ctx)
+}
+
 // Delete removes a project and everything derived from it — the projects
 // row itself, its saga_steps (matched by saga_id), and any outbox_events
 // still queued for it (matched by the project_id embedded in the command
 // payload) — so a deleted video leaves no residual rows behind to bloat the
-// database. File cleanup on the shared volume is the caller's (Gateway's)
-// responsibility, not the Orchestrator's (it has no mount of that volume).
+// database. File cleanup on the shared volume is done beforehand by each owning
+// service (the delete saga, CR-040 FR114.2); this is only the final row removal.
 func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -235,12 +269,20 @@ func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error 
 	}
 	defer tx.Rollback(ctx)
 
-	var sagaID string
-	err = tx.QueryRow(ctx, `DELETE FROM projects WHERE project_id = $1 RETURNING saga_id`, projectID).Scan(&sagaID)
+	// CR-040 FR114.3: lock the row and refuse while a saga step is executing,
+	// otherwise a worker could recreate files after the project is gone.
+	var sagaID, status string
+	err = tx.QueryRow(ctx, `SELECT saga_id, status FROM projects WHERE project_id = $1 FOR UPDATE`, projectID).Scan(&sagaID, &status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrProjectNotFound
 	}
 	if err != nil {
+		return err
+	}
+	if domain.ProjectStatus(status).IsInFlight() {
+		return domain.ErrProjectBusy
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM projects WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
 
@@ -749,4 +791,54 @@ func (r *ProjectRepository) SaveVideoFormat(ctx context.Context, format domain.V
 	}
 	format.Version = version
 	return format, nil
+}
+
+// GetStatus is the narrow read the authoring lock (CR-028 FR84.2) needs — just
+// enough to decide draft-vs-locked without the full Project scan Get does.
+func (r *ProjectRepository) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
+	var status string
+	err := r.pool.QueryRow(ctx, `SELECT status FROM projects WHERE project_id = $1`, projectID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return domain.ProjectStatus(status), nil
+}
+
+// GetStatusAndLanguage is GetStatus plus the content language, for FR83.2's
+// re-scan of the topic-collision list (scoped to the project's own language).
+func (r *ProjectRepository) GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error) {
+	var status, language string
+	err := r.pool.QueryRow(ctx, `SELECT status, voice_language FROM projects WHERE project_id = $1`, projectID).Scan(&status, &language)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return domain.ProjectStatus(status), domain.ContentLanguage(language), nil
+}
+
+// GetStatuses returns the current status of each project id that exists, so the
+// topic-collision list can show them (authoring-service does not know statuses).
+func (r *ProjectRepository) GetStatuses(ctx context.Context, projectIDs []string) (map[string]domain.ProjectStatus, error) {
+	out := map[string]domain.ProjectStatus{}
+	if len(projectIDs) == 0 {
+		return out, nil
+	}
+	rows, err := r.pool.Query(ctx, `SELECT project_id, status FROM projects WHERE project_id = ANY($1)`, projectIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, status string
+		if err := rows.Scan(&id, &status); err != nil {
+			return nil, err
+		}
+		out[id] = domain.ProjectStatus(status)
+	}
+	return out, rows.Err()
 }

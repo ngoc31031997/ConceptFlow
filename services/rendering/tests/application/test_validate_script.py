@@ -103,3 +103,26 @@ def test_manim_khong_bi_lint_lottie():
     # Script Manim không bao giờ chứa LottieClip; lint chỉ chạy cho engine remotion.
     use_case = ValidateScriptUseCase(FakeRenderer(), lambda: set())
     use_case.validate(make_request())
+
+
+def test_tu_tim_ten_class_khi_request_de_trong():
+    """CR-040 FR110: không còn bước parse_script, nên tên class rỗng là bình thường."""
+    renderer = FakeRenderer()
+
+    result = ValidateScriptUseCase(renderer).validate(
+        dataclasses.replace(make_request(), scene_class_name="")
+    )
+
+    assert result.scene_class_name and result.engine == "manim"
+    assert renderer.dry_runs[0].scene_class_name == result.scene_class_name
+
+
+def test_khong_tim_thay_class_la_loi_validate():
+    renderer = FakeRenderer()
+
+    with pytest.raises(ScriptValidationError, match="không tìm thấy class Scene"):
+        ValidateScriptUseCase(renderer).validate(
+            dataclasses.replace(make_request("x = 1\n"), scene_class_name="")
+        )
+
+    assert renderer.dry_runs == []

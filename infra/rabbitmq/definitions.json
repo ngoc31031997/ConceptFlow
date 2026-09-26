@@ -73,17 +73,6 @@
   ],
   "queues": [
     {
-      "name": "script_processing.commands",
-      "vhost": "/",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-message-ttl": 86400000,
-        "x-dead-letter-exchange": "dlx.direct",
-        "x-dead-letter-routing-key": "script_processing.commands.dlq"
-      }
-    },
-    {
       "name": "tts.commands",
       "vhost": "/",
       "durable": true,
@@ -146,13 +135,6 @@
       "arguments": {}
     },
     {
-      "name": "script_processing.commands.dlq",
-      "vhost": "/",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {}
-    },
-    {
       "name": "tts.commands.dlq",
       "vhost": "/",
       "durable": true,
@@ -179,26 +161,9 @@
       "durable": true,
       "auto_delete": false,
       "arguments": {}
-    },
-    {
-      "name": "video_assembly.channel_asset_events",
-      "vhost": "/",
-      "durable": true,
-      "auto_delete": false,
-      "arguments": {
-        "x-message-ttl": 86400000
-      }
     }
   ],
   "bindings": [
-    {
-      "source": "commands.direct",
-      "vhost": "/",
-      "destination": "script_processing.commands",
-      "destination_type": "queue",
-      "routing_key": "script_processing",
-      "arguments": {}
-    },
     {
       "source": "commands.direct",
       "vhost": "/",
@@ -242,14 +207,6 @@
     {
       "source": "dlx.direct",
       "vhost": "/",
-      "destination": "script_processing.commands.dlq",
-      "destination_type": "queue",
-      "routing_key": "script_processing.commands.dlq",
-      "arguments": {}
-    },
-    {
-      "source": "dlx.direct",
-      "vhost": "/",
       "destination": "tts.commands.dlq",
       "destination_type": "queue",
       "routing_key": "tts.commands.dlq",
@@ -285,14 +242,6 @@
       "destination": "orchestrator.events.dlq",
       "destination_type": "queue",
       "routing_key": "orchestrator.events.dlq",
-      "arguments": {}
-    },
-    {
-      "source": "events.direct",
-      "vhost": "/",
-      "destination": "video_assembly.channel_asset_events",
-      "destination_type": "queue",
-      "routing_key": "orchestrator",
       "arguments": {}
     }
   ]

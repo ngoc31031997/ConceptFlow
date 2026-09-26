@@ -92,50 +92,6 @@ services:
     networks:
       - backend
 
-  script-processing-db:
-    image: postgres:16-alpine
-    container_name: script-processing-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASS}
-      POSTGRES_DB: script_processing
-    volumes:
-      - script_processing_db_data:/var/lib/postgresql/data
-    deploy:
-      resources:
-        limits:
-          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d script_processing"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - backend
-
-  script-processing:
-    build: ./services/script-processing
-    container_name: script-processing
-    environment:
-      RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@script-processing-db:5432/script_processing
-    deploy:
-      resources:
-        limits:
-          memory: ${SCRIPT_PROCESSING_MEMORY_LIMIT:-512M}
-    healthcheck:
-      test: ["CMD", "test", "-f", "/tmp/ready"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-      script-processing-db:
-        condition: service_healthy
-    networks:
-      - backend
-
   rendering-db:
     image: postgres:16-alpine
     container_name: rendering-db
@@ -377,14 +333,11 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@orchestrator-db:5432/orchestrator
       OUTBOX_POLL_INTERVAL_MS: "500"
       DATABASE_MAX_CONNS: "10"
-      # CR-039 — every language-model call goes through llm-service, which
-      # alone holds HIVE_API_KEY and the Ollama address. The orchestrator keeps
-      # only where to reach it and the two cost ceilings it enforces.
-      LLM_SERVICE_URL: http://llm-service:8000
-      LLM_SERVICE_TIMEOUT_SECONDS: ${LLM_SERVICE_TIMEOUT_SECONDS:-0} # 0 = no timeout
-      HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
-      HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
-      HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
+      # CR-040 FR111 — prompts, the 1a/1b/1c chain and every language-model call
+      # live in authoring-service. The orchestrator reaches it only for the topic
+      # search, list summaries, a fork's copy and cleanup after a delete.
+      AUTHORING_SERVICE_URL: http://authoring-service:8000
+      AUTHORING_SERVICE_TIMEOUT_SECONDS: ${AUTHORING_SERVICE_TIMEOUT_SECONDS:-10}
       # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
       #
       # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và
@@ -407,6 +360,59 @@ services:
       rabbitmq:
         condition: service_healthy
       orchestrator-db:
+        condition: service_healthy
+    networks:
+      - backend
+
+  # CR-040 FR111 — the prompt library, the 1a/1b/1c authoring chain, metadata and
+  # short-script suggestions, and the LLM usage log. Own database; project data
+  # (status, settings, formats, journal) is read from the orchestrator over HTTP.
+  authoring-service-db:
+    image: postgres:16-alpine
+    container_name: authoring-service-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: authoring
+    volumes:
+      - authoring_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d authoring"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  authoring-service:
+    build: ./services/authoring-service
+    container_name: authoring-service
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@authoring-service-db:5432/authoring
+      DATABASE_MAX_CONNS: "10"
+      ORCHESTRATOR_URL: http://orchestrator:8000
+      LLM_SERVICE_URL: http://llm-service:8000
+      LLM_SERVICE_TIMEOUT_SECONDS: ${LLM_SERVICE_TIMEOUT_SECONDS:-0} # 0 = no timeout
+      HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
+      HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
+      HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
+    deploy:
+      resources:
+        limits:
+          memory: ${AUTHORING_SERVICE_MEMORY_LIMIT:-512M}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # No depends_on the orchestrator: they call each other over HTTP and each
+    # degrades on its own when the other is down.
+    depends_on:
+      authoring-service-db:
         condition: service_healthy
     networks:
       - backend
@@ -493,6 +499,7 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       ORCHESTRATOR_URL: http://orchestrator:8000
+      AUTHORING_SERVICE_URL: http://authoring-service:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000
@@ -512,6 +519,8 @@ services:
       rabbitmq:
         condition: service_healthy
       orchestrator:
+        condition: service_healthy
+      authoring-service:
         condition: service_healthy
       publisher:
         condition: service_healthy
@@ -601,11 +610,11 @@ volumes:
       o: bind
       device: ${VIDEO_OUTPUT_HOST_DIR:-./data/shared_artifacts}
   tts_db_data:
-  script_processing_db_data:
   rendering_db_data:
   video_assembly_db_data:
   publisher_db_data:
   orchestrator_db_data:
+  authoring_db_data:
   loki_data:
   grafana_data:
   ollama_data:

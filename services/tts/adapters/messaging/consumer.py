@@ -136,3 +136,23 @@ class SynthesizeSpeechCommandHandler:
             await self._inbox.mark_processed(conn, message_id)
 
         await message.ack()
+
+
+class TtsCommandDispatcher:
+    """`tts.commands` carries synthesize_speech and, since CR-040 FR114.2,
+    purge_project_artifacts. Anything without an event_type is the original
+    synthesize_speech shape."""
+
+    def __init__(self, synthesize: SynthesizeSpeechCommandHandler, purge=None) -> None:
+        self._synthesize = synthesize
+        self._purge = purge
+
+    async def handle(self, message: AckableMessage) -> None:
+        try:
+            command = json.loads(message.body).get("event_type")
+        except (ValueError, TypeError, AttributeError):
+            command = None
+        if command == "purge_project_artifacts" and self._purge is not None:
+            await self._purge.handle(message)
+            return
+        await self._synthesize.handle(message)

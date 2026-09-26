@@ -42,7 +42,7 @@ func (a *forkAuthoring) GetAuthoringCode(context.Context, string) (string, error
 func (a *forkAuthoring) GetAuthoringModels(context.Context, string) (domain.AuthoringStepModels, error) {
 	return domain.AuthoringStepModels{}, nil
 }
-func (a *forkAuthoring) SaveAuthoringTopic(_ context.Context, _, t string) error {
+func (a *forkAuthoring) SaveAuthoringTopic(_ context.Context, _, t string, _ domain.ContentLanguage) error {
 	a.saved["topic"] = t
 	return nil
 }

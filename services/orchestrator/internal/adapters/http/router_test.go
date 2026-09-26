@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"math"
 	"net/http/httptest"
 	"strings"
@@ -98,19 +97,10 @@ func (f *fakeProjectReader) Save(_ context.Context, project *domain.Project) err
 	return nil
 }
 
-type fakeSuggestMetadata struct {
-	out *application.SuggestPublishMetadataOutput
-	err error
-}
-
-func (f *fakeSuggestMetadata) Execute(_ context.Context, _ string) (*application.SuggestPublishMetadataOutput, error) {
-	return f.out, f.err
-}
-
 func TestHandleStartRenderSaga_Created(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{out: &application.StartRenderSagaOutput{SagaID: "saga-1", Status: domain.StatusParsingScript}},
-		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"project_id": "p1", "script_content": "s", "plugin_id": "plugin", "category_hint": "concept", "voice_language": "en",
@@ -130,7 +120,7 @@ func TestHandleStartRenderSaga_Created(t *testing.T) {
 }
 
 func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/sagas/render", bytes.NewReader([]byte(`{"project_id":""}`)))
 	rec := httptest.NewRecorder()
@@ -143,7 +133,7 @@ func TestHandleStartRenderSaga_InvalidBody(t *testing.T) {
 
 func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{err: domain.ErrInvalidStatus}, &fakeRetryStep{}, &fakeProjectReader{}, nil, nil)
 
 	body, _ := json.Marshal(map[string]interface{}{"project_id": "p1", "youtube_title": "t", "visibility": "public"})
 	req := httptest.NewRequest("POST", "/v1/sagas/publish", bytes.NewReader(body))
@@ -158,7 +148,7 @@ func TestHandleStartPublishSaga_Conflict(t *testing.T) {
 func TestHandleGetProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{err: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeProjectReader{err: domain.ErrProjectNotFound}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -172,7 +162,7 @@ func TestHandleGetProject_NotFound(t *testing.T) {
 func TestHandleGetProject_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeProjectReader{project: &domain.Project{ProjectID: "p1", Status: domain.StatusDraft}}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -195,7 +185,7 @@ func TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality(t *testi
 			ProjectID: "p1", Status: domain.StatusPublished,
 			ScriptContent: "from conceptflow import *\n...", BackgroundMusicPath: &musicPath,
 			BackgroundMusicVolume: 0.3,
-		}}, &fakeSuggestMetadata{}, nil, nil)
+		}}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -220,7 +210,7 @@ func TestHandleRetry_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{},
 		&fakeRetryStep{out: &application.RetryStepOutput{SagaID: "saga-1", Status: domain.StatusRendering}},
-		&fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeProjectReader{}, nil, nil)
 
 	req := httptest.NewRequest("POST", "/v1/projects/p1/retry", nil)
 	rec := httptest.NewRecorder()
@@ -234,7 +224,7 @@ func TestHandleRetry_OK(t *testing.T) {
 func TestHandleListProjects_OK(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeProjectReader{listOut: []domain.ProjectSummary{{ProjectID: "p1", Status: domain.StatusFailedRenderScenes}}}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/projects", nil)
 	rec := httptest.NewRecorder()
@@ -252,7 +242,7 @@ func TestHandleListProjects_OK(t *testing.T) {
 
 func TestHandleDeleteProject_NoContent(t *testing.T) {
 	router := NewRouter(
-		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/p1", nil)
 	rec := httptest.NewRecorder()
@@ -266,7 +256,7 @@ func TestHandleDeleteProject_NoContent(t *testing.T) {
 func TestHandleDeleteProject_NotFound(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
-		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound}, &fakeSuggestMetadata{}, nil, nil)
+		&fakeProjectReader{deleteErr: domain.ErrProjectNotFound}, nil, nil)
 
 	req := httptest.NewRequest("DELETE", "/v1/projects/unknown", nil)
 	rec := httptest.NewRecorder()
@@ -278,7 +268,7 @@ func TestHandleDeleteProject_NotFound(t *testing.T) {
 }
 
 func TestHandleHealth(t *testing.T) {
-	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
+	router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, nil, nil)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()
@@ -297,7 +287,7 @@ func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 		{VoiceID: "vi-Enough", SampleCount: domain.MinCalibrationSamples, TotalWords: 900, TotalSecond: 360},
 		{VoiceID: "vi-TooFew", SampleCount: 1, TotalWords: 300, TotalSecond: 120},
 	}}
-	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil)
 
 	req := httptest.NewRequest("GET", "/v1/voice-calibration", nil)
 	rec := httptest.NewRecorder()
@@ -322,7 +312,7 @@ func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 
 func TestHandleSaveFormat_RejectsAFormatWithNoBeats(t *testing.T) {
 	reader := &fakeProjectReader{}
-	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil)
 
 	body := []byte(`{"id":"x","name":"X","min_seconds":60,"max_seconds":120,"beats":[]}`)
 	req := httptest.NewRequest("POST", "/v1/formats", bytes.NewReader(body))
@@ -341,7 +331,7 @@ func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
 	// FR51.6: không bao giờ ghi đè — project dựng theo version 3 phải tiếp tục
 	// báo đúng beat của version 3.
 	reader := &fakeProjectReader{}
-	router := NewRouter(nil, nil, nil, reader, nil, nil, nil)
+	router := NewRouter(nil, nil, nil, reader, nil, nil)
 
 	body := []byte(`{"id":"visual_first_7min","name":"Của tôi","min_seconds":300,"max_seconds":480,
 	                 "beats":[{"id":"hook","role":"hook","min_seconds":5,"max_seconds":12,"required":true,"max_repeat":1}]}`)
@@ -362,7 +352,7 @@ func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
 }
 
 func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil)
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil)
 	req := httptest.NewRequest("GET", "/v1/formats", nil)
 	rec := httptest.NewRecorder()
 	router.Handler().ServeHTTP(rec, req)
@@ -385,7 +375,7 @@ func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
 // call to video-assembly.
 func TestHandleNormalizeChannelAsset_QueuesAndReturnsAccepted(t *testing.T) {
 	fake := &fakeChannelAssets{}
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, fake)
 
 	body := []byte(`{"file_path":"/data/uploads/intro.mp4","source_hash":"abc123"}`)
 	req := httptest.NewRequest("POST", "/v1/channel-assets/intro", bytes.NewReader(body))
@@ -408,7 +398,7 @@ func TestHandleNormalizeChannelAsset_QueuesAndReturnsAccepted(t *testing.T) {
 // only by asset_role.
 func TestHandleNormalizeChannelAsset_PassesMusicAssetRoleThrough(t *testing.T) {
 	fake := &fakeChannelAssets{}
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, fake)
 
 	body := []byte(`{"file_path":"/data/uploads/music.mp3","source_hash":"m1","asset_role":"music"}`)
 	req := httptest.NewRequest("POST", "/v1/channel-assets/outro", bytes.NewReader(body))
@@ -424,7 +414,7 @@ func TestHandleNormalizeChannelAsset_PassesMusicAssetRoleThrough(t *testing.T) {
 }
 
 func TestHandleNormalizeChannelAsset_RejectsUnknownAssetRole(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, &fakeChannelAssets{})
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, &fakeChannelAssets{})
 
 	body := []byte(`{"file_path":"/data/uploads/x.mp4","asset_role":"subtitle"}`)
 	req := httptest.NewRequest("POST", "/v1/channel-assets/intro", bytes.NewReader(body))
@@ -437,7 +427,7 @@ func TestHandleNormalizeChannelAsset_RejectsUnknownAssetRole(t *testing.T) {
 }
 
 func TestHandleNormalizeChannelAsset_RejectsUnknownKind(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, &fakeChannelAssets{})
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, &fakeChannelAssets{})
 
 	req := httptest.NewRequest("POST", "/v1/channel-assets/bogus", bytes.NewReader([]byte(`{"file_path":"x"}`)))
 	rec := httptest.NewRecorder()
@@ -452,7 +442,7 @@ func TestHandleChannelAssetPreview_ServesPointers(t *testing.T) {
 	fake := &fakeChannelAssets{pointers: []domain.ChannelAssetPointer{
 		{Kind: "intro", RenderQuality: domain.Quality1080p60, AssetID: "asset-1", Version: 3},
 	}}
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, fake)
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, fake)
 
 	req := httptest.NewRequest("GET", "/v1/channel-assets/preview", nil)
 	rec := httptest.NewRecorder()
@@ -475,268 +465,35 @@ func TestHandleChannelAssetPreview_ServesPointers(t *testing.T) {
 	}
 }
 
-// --- CR-026: POST /v1/short-script-suggestions ---
-
-type fakeSuggestShortScript struct {
-	script string
-	err    error
+func (f *fakeProjectReader) GetStatus(_ context.Context, _ string) (domain.ProjectStatus, error) {
+	if f.project != nil {
+		return f.project.Status, nil
+	}
+	return "", domain.ErrProjectNotFound
 }
 
-func (f *fakeSuggestShortScript) Execute(_ context.Context, _, _ string, _ domain.ContentLanguage) (string, error) {
-	return f.script, f.err
+func (f *fakeProjectReader) GetVideoFormat(_ context.Context, id string, _ int) (domain.VideoFormat, error) {
+	return domain.VideoFormat{ID: id}, nil
 }
 
-func TestHandleSuggestShortScript_404WhenUnwired(t *testing.T) {
-	// Same "unwired means absent, not broken" posture as qc-report (CR-021).
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil)
+func (f *fakeProjectReader) GetVoiceCalibration(_ context.Context, _ string) (domain.VoiceCalibration, error) {
+	return domain.VoiceCalibration{}, nil
+}
 
-	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "vi"})
-	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+// The internal endpoints authoring-service reads (CR-040 FR111).
+func TestInternalProjectStatus(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{project: &domain.Project{Status: domain.StatusDraft}}, nil, nil)
 	rec := httptest.NewRecorder()
-	router.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != 404 {
-		t.Fatalf("expected 404 when unwired, got %d: %s", rec.Code, rec.Body.String())
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/internal/v1/projects/p1/status", nil))
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"status":"draft"`) {
+		t.Fatalf("unexpected response %d %s", rec.Code, rec.Body.String())
 	}
 }
 
-func TestHandleSuggestShortScript_ReturnsTheDraft(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
-		WithShortScriptSuggester(&fakeSuggestShortScript{script: "from conceptflow import *\n"})
-
-	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "vi"})
-	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
+func TestInternalGetProject_NotFoundIs404(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{err: domain.ErrProjectNotFound}, nil, nil)
 	rec := httptest.NewRecorder()
-	router.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != 200 {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	var resp suggestShortScriptResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
-	if resp.ScriptContent != "from conceptflow import *\n" {
-		t.Fatalf("unexpected response: %+v", resp)
-	}
-}
-
-func TestHandleSuggestShortScript_InvalidLanguage(t *testing.T) {
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
-		WithShortScriptSuggester(&fakeSuggestShortScript{script: "x"})
-
-	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "fr"})
-	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
-	rec := httptest.NewRecorder()
-	router.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != 400 {
-		t.Fatalf("expected 400 for an unsupported language, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-func TestHandleSuggestShortScript_UseCaseErrorIs400(t *testing.T) {
-	// No project involved (unlike suggest-metadata) — every failure here is
-	// either a bad request (blank topic+source) or an upstream model error,
-	// neither of which is a 404/409 domain sentinel.
-	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil, nil).
-		WithShortScriptSuggester(&fakeSuggestShortScript{err: errors.New("topic or source_script_content is required")})
-
-	body, _ := json.Marshal(map[string]string{"topic": "", "language": "vi"})
-	req := httptest.NewRequest("POST", "/v1/short-script-suggestions", bytes.NewReader(body))
-	rec := httptest.NewRecorder()
-	router.Handler().ServeHTTP(rec, req)
-
-	if rec.Code != 400 {
-		t.Fatalf("expected 400, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-// fakeGenerateAuthoring stands in for CR-027 FR78's use case.
-type fakeGenerateAuthoring struct {
-	out       application.GeneratedStep
-	err       error
-	available bool
-	gotStep   string
-}
-
-func (f *fakeGenerateAuthoring) Execute(_ context.Context, _, step string) (application.GeneratedStep, error) {
-	f.gotStep = step
-	return f.out, f.err
-}
-func (f *fakeGenerateAuthoring) Available() bool  { return f.available }
-func (f *fakeGenerateAuthoring) Provider() string { return "hive" }
-
-func newGenerateRouter(gen generateAuthoringUseCase) *Router {
-	rt := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
-	if gen != nil {
-		rt = rt.WithGenerateAuthoring(gen)
-	}
-	return rt
-}
-
-func TestHandleGenerateAuthoring_OK(t *testing.T) {
-	gen := &fakeGenerateAuthoring{
-		available: true,
-		out: application.GeneratedStep{
-			Step: "story", Role: "story_architect", Content: "BEAT 1", Provider: "hive",
-		},
-	}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 200 {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if gen.gotStep != "story" {
-		t.Errorf("step = %q, want story", gen.gotStep)
-	}
-	var out application.GeneratedStep
-	_ = json.Unmarshal(rec.Body.Bytes(), &out)
-	if out.Content != "BEAT 1" {
-		t.Errorf("content = %q, want the generated text", out.Content)
-	}
-}
-
-// CR-030 — bước duyệt đã bị bỏ, nên "review" không còn là một step hợp lệ:
-// route vẫn khớp, nhưng use case từ chối nó.
-func TestHandleGenerateAuthoring_ForwardsStepVerbatim(t *testing.T) {
-	gen := &fakeGenerateAuthoring{available: true}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/code/generate", nil))
-
-	if gen.gotStep != "code" {
-		t.Errorf("step = %q, want code", gen.gotStep)
-	}
-}
-
-// Unwired means absent, not broken: without a key the route 404s and the
-// Copy-prompt path is the one that works (FR83.2).
-func TestHandleGenerateAuthoring_NotWired(t *testing.T) {
-	rec := httptest.NewRecorder()
-	newGenerateRouter(nil).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 404 {
-		t.Fatalf("expected 404, got %d", rec.Code)
-	}
-}
-
-func TestHandleGenerateAuthoring_BusyIsConflict(t *testing.T) {
-	gen := &fakeGenerateAuthoring{available: true, err: application.ErrGenerateBusy}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 409 {
-		t.Fatalf("expected 409 for a double click, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-// FR79.3 — each provider failure names its own cause AND the copy-out way
-// through. "AI failed" would send a Creator with an empty balance to go
-// rewrite their prompt.
-func TestHandleGenerateAuthoring_ProviderErrorsAreClassified(t *testing.T) {
-	cases := []struct {
-		kind       application.LLMErrorKind
-		wantStatus int
-		wantIn     string
-	}{
-		{application.ErrKindAuth, 502, "HIVE_API_KEY"},
-		{application.ErrKindBalance, 502, "số dư"},
-		{application.ErrKindRateLimit, 429, "quá nhanh"},
-		{application.ErrKindTimeout, 504, "HIVE_TIMEOUT_SECONDS"},
-		{application.ErrKindTruncated, 502, "HIVE_MAX_OUTPUT_TOKENS"},
-	}
-	for _, tc := range cases {
-		gen := &fakeGenerateAuthoring{
-			available: true,
-			err:       &application.LLMError{Kind: tc.kind, Provider: "hive", Err: errors.New("boom")},
-		}
-		rec := httptest.NewRecorder()
-		newGenerateRouter(gen).Handler().ServeHTTP(rec,
-			httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-		if rec.Code != tc.wantStatus {
-			t.Errorf("%s: status = %d, want %d", tc.kind, rec.Code, tc.wantStatus)
-		}
-		body := rec.Body.String()
-		if !strings.Contains(body, tc.wantIn) {
-			t.Errorf("%s: body %q, want it to mention %q", tc.kind, body, tc.wantIn)
-		}
-		if !strings.Contains(body, "Copy prompt") {
-			t.Errorf("%s: body %q, want it to point at the copy-out fallback", tc.kind, body)
-		}
-	}
-}
-
-func TestHandleLLMStatus(t *testing.T) {
-	rec := httptest.NewRecorder()
-	newGenerateRouter(&fakeGenerateAuthoring{available: true}).Handler().ServeHTTP(rec,
-		httptest.NewRequest("GET", "/v1/llm/status", nil))
-	var enabled llmStatusResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &enabled)
-	if !enabled.Enabled || enabled.Provider != "hive" {
-		t.Errorf("status = %+v, want enabled hive", enabled)
-	}
-
-	rec = httptest.NewRecorder()
-	newGenerateRouter(nil).Handler().ServeHTTP(rec,
-		httptest.NewRequest("GET", "/v1/llm/status", nil))
-	var disabled llmStatusResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &disabled)
-	if disabled.Enabled {
-		t.Error("want disabled when no provider is wired")
-	}
-	if disabled.Reason == "" {
-		t.Error("want a reason so the GUI can explain the missing button (FR79.4)")
-	}
-}
-
-// fakeSaveAuthoringMode backs CR-027 FR79's mode endpoint.
-type fakeSaveAuthoringMode struct {
-	gotMode string
-	err     error
-}
-
-func (f *fakeSaveAuthoringMode) Execute(_ context.Context, _, mode string) error {
-	f.gotMode = mode
-	return f.err
-}
-
-func TestHandleSaveAuthoringMode(t *testing.T) {
-	save := &fakeSaveAuthoringMode{}
-	rt := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil).
-		WithAuthoringMode(save)
-
-	rec := httptest.NewRecorder()
-	rt.Handler().ServeHTTP(rec, httptest.NewRequest("PUT", "/v1/projects/p1/authoring/mode",
-		bytes.NewReader([]byte(`{"mode":"ai"}`))))
-
-	if rec.Code != 204 {
-		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if save.gotMode != "ai" {
-		t.Errorf("mode = %q, want ai", save.gotMode)
-	}
-
-	// A rejected mode is a 400 the GUI can show, not a 500.
-	save.err = errors.New(`mode must be "manual" or "ai"`)
-	rec = httptest.NewRecorder()
-	rt.Handler().ServeHTTP(rec, httptest.NewRequest("PUT", "/v1/projects/p1/authoring/mode",
-		bytes.NewReader([]byte(`{"mode":"sometimes"}`))))
-	if rec.Code != 400 {
-		t.Errorf("expected 400 for an unknown mode, got %d", rec.Code)
-	}
-}
-
-// Unwired means absent: a deployment without this use case 404s rather than
-// pretending to remember the choice.
-func TestHandleSaveAuthoringMode_NotWired(t *testing.T) {
-	rt := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{}, &fakeProjectReader{}, &fakeSuggestMetadata{}, nil, nil)
-	rec := httptest.NewRecorder()
-	rt.Handler().ServeHTTP(rec, httptest.NewRequest("PUT", "/v1/projects/p1/authoring/mode",
-		bytes.NewReader([]byte(`{"mode":"ai"}`))))
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/internal/v1/projects/nope", nil))
 	if rec.Code != 404 {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}

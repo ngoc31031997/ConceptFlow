@@ -104,3 +104,25 @@ func TestRetryStepUseCase_RebuildsValidateScriptPayload(t *testing.T) {
 		t.Fatalf("expected the project's script content, got %v", last.envelope.Payload["script_content"])
 	}
 }
+
+// CR-040 FR110: a project that failed at the retired parse_script step resumes
+// at validate_script on rendering.
+func TestRetryStepUseCase_LegacyFailedParseScriptResumesAtValidate(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+	uc := NewRetryStepUseCase(repo, pub)
+	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", SagaID: "saga-1",
+		Status: domain.StatusFailedParseScript, ScriptContent: "class A(ConceptFlowScene): pass"}
+
+	out, err := uc.Execute(context.Background(), "proj-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Status != domain.StatusValidatingScript {
+		t.Fatalf("expected validating_script, got %s", out.Status)
+	}
+	last := pub.last()
+	if last == nil || last.routingKey != "rendering" || last.envelope.EventType != "validate_script" {
+		t.Fatalf("expected validate_script to rendering, got %+v", last)
+	}
+}

@@ -48,7 +48,7 @@ class CheckScriptUseCase:
         diags: list[CheckDiagnostic] = []
         raw = ""
         try:
-            self._validate.validate(self._request(engine, code, scene_class_name or "Scene"))
+            self._validate.validate(self._request(engine, code, scene_class_name))
         except ScriptValidationError as exc:
             if exc.issues:
                 diags += [CheckDiagnostic(i.message, i.line) for i in exc.issues]

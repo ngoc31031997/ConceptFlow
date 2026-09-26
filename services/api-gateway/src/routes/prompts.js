@@ -23,22 +23,24 @@ const { proxyHandler } = require('../handlers/proxyHandler');
  * `DELETE /v1/admin/prompts/:id` — delete (system rows answer 403).
  * `GET /v1/prompts/:role` serves the role's active prompt.
  *
- * @param {import('../clients/httpClient').HttpClient} orchestratorClient
+ * Since CR-040 FR111 these are served by authoring-service, not the orchestrator.
+ *
+ * @param {import('../clients/httpClient').HttpClient} authoringClient
  */
-function promptsRouter(orchestratorClient) {
+function promptsRouter(authoringClient) {
   const router = express.Router();
-  router.get('/v1/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
+  router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
   // CR-027 FR79.4 — nút "Chạy bằng AI" có gọi được gì không: web-gui hỏi
   // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
   // nút bấm vào là lỗi.
-  router.get('/v1/llm/status', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.get('/v1/admin/prompts', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.post('/v1/admin/prompts', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.post('/v1/admin/prompts/:id/copy', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.put('/v1/admin/prompts/:id', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.post('/v1/admin/prompts/:id/activate', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.delete('/v1/admin/prompts/:id', proxyHandler(orchestratorClient, 'orchestrator'));
+  router.get('/v1/llm/status', proxyHandler(authoringClient, 'authoring-service'));
+  router.get('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/admin/prompts/:id/copy', proxyHandler(authoringClient, 'authoring-service'));
+  router.put('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
+  router.post('/v1/admin/prompts/:id/activate', proxyHandler(authoringClient, 'authoring-service'));
+  router.delete('/v1/admin/prompts/:id', proxyHandler(authoringClient, 'authoring-service'));
   return router;
 }
 

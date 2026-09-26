@@ -18,7 +18,7 @@ from adapters.messaging.consumer import (
     QC_STATUS_NOT_SCORED,
     QC_STATUS_PASSED,
     AssembleVideoCommandHandler,
-    ChannelAssetRenderedEventHandler,
+    RegisterChannelAssetCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
 )
@@ -506,8 +506,9 @@ def make_channel_asset_rendered_envelope(
         "project_id": "channel-asset-admin",
         "schema_version": "1.0",
         "timestamp": "2026-09-10T00:00:00Z",
+        "event_type": "register_channel_asset",
         "payload": {
-            "event_type": "channel_asset_rendered",
+            "event_type": "register_channel_asset",
             "kind": kind,
             "video_path": video_path,
             "video_duration_seconds": video_duration_seconds,
@@ -517,12 +518,12 @@ def make_channel_asset_rendered_envelope(
     return json.dumps(envelope).encode("utf-8")
 
 
-def _build_rendered_handler() -> tuple[ChannelAssetRenderedEventHandler, FakePool]:
+def _build_rendered_handler() -> tuple[RegisterChannelAssetCommandHandler, FakePool]:
     pool = FakePool()
     inbox = InboxRepository(pool)
     outbox = OutboxRepository()
     channel_assets = ChannelAssetsRepository(pool)
-    handler = ChannelAssetRenderedEventHandler(pool, channel_assets, inbox, outbox)
+    handler = RegisterChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
     return handler, pool
 
 
@@ -578,23 +579,6 @@ async def test_channel_asset_rendered_is_idempotent_on_duplicate_message_id() ->
 
     assert len(pool.store.channel_assets) == 1
     assert len(pool.store.outbox_events) == 1
-
-
-@pytest.mark.asyncio
-async def test_channel_asset_render_failed_event_is_ignored() -> None:
-    """This queue also carries channel_asset_render_failed (Orchestrator's
-    own concern) — video-assembly has nothing to register for a failed
-    render, and must not choke on it."""
-    handler, pool = _build_rendered_handler()
-    envelope = json.loads(make_channel_asset_rendered_envelope())
-    envelope["payload"]["event_type"] = "channel_asset_render_failed"
-    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
-
-    await handler.handle(message)
-
-    assert message.acked is True
-    assert len(pool.store.channel_assets) == 0
-    assert len(pool.store.outbox_events) == 0
 
 
 # --- qc_video (CR-021 FR59/FR60/FR61.4) --------------------------------------

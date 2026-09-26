@@ -19,12 +19,14 @@ thì ngược lại — nó chỉ cần ffmpeg và file JSONL, nên sẽ sống 
 
 from __future__ import annotations
 
+import dataclasses
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from domain.lottie_catalog import lint_lottie_ids
 from domain.models import DryRunResult, ScriptRenderRequest
+from domain.script_locator import SceneNotFoundError, locate_scene
 from domain.ports import ManimScriptRendererPort
 from domain.script_lint import LintIssue, blocking_issues, lint_manim_script
 
@@ -40,6 +42,10 @@ class ValidationResult:
     """
 
     dry_run: DryRunResult
+    # CR-040 FR110: the class/composition the saga will render, found here
+    # (before the dry pass needs it) instead of by a separate parse step.
+    scene_class_name: str = ""
+    engine: str = "manim"
     warnings: list[LintIssue] = field(default_factory=list)
 
 
@@ -67,7 +73,13 @@ class ValidateScriptUseCase:
         if not request.script_content.strip():
             raise ScriptValidationError("script_content rỗng")
         if not request.scene_class_name:
-            raise ScriptValidationError("thiếu scene_class_name")
+            try:
+                located = locate_scene(request.script_content)
+            except SceneNotFoundError as exc:
+                raise ScriptValidationError(str(exc)) from exc
+            request = dataclasses.replace(
+                request, scene_class_name=located.scene_class_name, engine=located.engine
+            )
 
         # feature/remotion-engine: this lint parses Python via `ast` — running
         # it against a Remotion script's TypeScript would fail immediately on
@@ -92,4 +104,9 @@ class ValidateScriptUseCase:
         for issue in warnings:
             logger.warning("lint script (%s): %s", request.project_id, issue)
 
-        return ValidationResult(dry_run=self._renderer.dry_run(request), warnings=warnings)
+        return ValidationResult(
+            dry_run=self._renderer.dry_run(request),
+            scene_class_name=request.scene_class_name,
+            engine=request.engine,
+            warnings=warnings,
+        )

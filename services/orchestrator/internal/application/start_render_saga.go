@@ -68,8 +68,8 @@ type StartRenderSagaOutput struct {
 }
 
 // StartRenderSagaUseCase implements Saga step 1 (business-logic-model.md
-// "Bước 1 — Parse Script"): creates the Project, opens the first SagaStep,
-// and dispatches the parse_script command via the Outbox.
+// "Bước 1"): creates the Project, opens the first SagaStep, and dispatches
+// the validate_script command to rendering via the Outbox (CR-040 FR110).
 type StartRenderSagaUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
@@ -83,8 +83,8 @@ func NewStartRenderSagaUseCase(repo domain.ProjectRepositoryPort, publisher doma
 
 // Execute creates a new Project (status=draft), generates a fresh saga_id
 // (a new saga_id per Saga instance — interface-contracts.md Question 9),
-// opens the parse_script SagaStep as in_progress, enqueues the parse_script
-// command, and advances the Project to parsing_script.
+// opens the validate_script SagaStep as in_progress, enqueues the command, and
+// advances the Project to validating_script.
 func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRenderSagaInput) (*StartRenderSagaOutput, error) {
 	sagaID := newUUID()
 
@@ -159,9 +159,12 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		}
 	}
 
+	// CR-040 FR110: there is no parse_script step any more. Rendering finds the
+	// scene class itself at the top of validate_script (it needs it before the
+	// dry pass anyway) and reports it back on script_validated.
 	step := &domain.SagaStep{
 		SagaID:   sagaID,
-		StepName: domain.StepParseScript,
+		StepName: domain.StepValidateScript,
 		Status:   domain.SagaStepInProgress,
 	}
 	if err := uc.repo.UpdateStep(ctx, step); err != nil {
@@ -172,21 +175,24 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		MessageID: newUUID(),
 		SagaID:    sagaID,
 		ProjectID: input.ProjectID,
-		EventType: string(domain.StepParseScript),
+		EventType: string(domain.StepValidateScript),
 		Payload: map[string]interface{}{
-			"script_content": input.ScriptContent,
+			"script_content":   input.ScriptContent,
+			"scene_class_name": "",
+			"render_quality":   string(project.RenderQuality),
+			"engine":           string(engine),
 		},
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 	}
-	if err := uc.publisher.PublishCommand(ctx, "script_processing", envelope); err != nil {
+	if err := uc.publisher.PublishCommand(ctx, "rendering", envelope); err != nil {
 		return nil, err
 	}
 
-	if err := uc.repo.UpdateStatus(ctx, input.ProjectID, domain.StatusParsingScript); err != nil {
+	if err := uc.repo.UpdateStatus(ctx, input.ProjectID, domain.StatusValidatingScript); err != nil {
 		return nil, err
 	}
 
-	return &StartRenderSagaOutput{SagaID: sagaID, Status: domain.StatusParsingScript}, nil
+	return &StartRenderSagaOutput{SagaID: sagaID, Status: domain.StatusValidatingScript}, nil
 }
 
 // formatOrDefault keeps every project pointing at a real format, including the

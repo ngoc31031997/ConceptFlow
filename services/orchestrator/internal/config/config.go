@@ -19,19 +19,10 @@ type Config struct {
 	HTTPPort                      string
 	RabbitMQReconnectInitialDelay time.Duration
 	RabbitMQReconnectMaxDelay     time.Duration
-	// CR-039 — every language-model call goes through llm-service, which alone
-	// holds HIVE_API_KEY / OLLAMA_URL and the retry/rate-limit policy. The
-	// orchestrator keeps only where to reach it and the cost ceilings it
-	// enforces on what it sends.
-	LLMServiceURL string
-	// 0 = wait as long as llm-service does (Hive can take minutes on a
-	// reasoning model).
-	LLMServiceTimeout time.Duration
-	// HiveModel is the default the model picker shows; llm-service applies its
-	// own HIVE_MODEL when a call names none, and both read the same .env.
-	HiveModel           string
-	HiveMaxInputChars   int
-	HiveMaxOutputTokens int
+	// CR-040 FR111: prompts, the authoring chain and the LLM calls live in
+	// authoring-service; this is where to reach it.
+	AuthoringServiceURL     string
+	AuthoringServiceTimeout time.Duration
 	// CR-023 D2: base URL of the video-assembly service, whose own database
 	// owns channel_assets — Orchestrator reads it synchronously to attach the
 	// channel intro/outro to assemble_video.
@@ -82,30 +73,11 @@ func Load() (*Config, error) {
 		httpPort = "8000"
 	}
 
-	llmServiceURL := os.Getenv("LLM_SERVICE_URL")
-	if llmServiceURL == "" {
-		llmServiceURL = "http://llm-service:8000"
+	authoringServiceURL := os.Getenv("AUTHORING_SERVICE_URL")
+	if authoringServiceURL == "" {
+		authoringServiceURL = "http://authoring-service:8000"
 	}
-	llmServiceTimeoutSeconds, err := intEnvOrDefault("LLM_SERVICE_TIMEOUT_SECONDS", 0) // 0 = no timeout
-	if err != nil {
-		return nil, err
-	}
-
-	hiveModel := os.Getenv("HIVE_MODEL")
-	if hiveModel == "" {
-		hiveModel = "deepseek-ai/deepseek-v4.1-flash"
-	}
-	// Hive's context window is 1M tokens, so this is not a context limit —
-	// it is a blast radius. One broken project must not turn into one
-	// enormous billable call.
-	hiveMaxInputChars, err := intEnvOrDefault("HIVE_MAX_INPUT_CHARS", 120000)
-	if err != nil {
-		return nil, err
-	}
-	// Generous on purpose: a full Manim script runs to several hundred lines,
-	// and on a reasoning model part of this budget is spent before the first
-	// character of the answer is written (CR-027 D13).
-	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 128000)
+	authoringServiceTimeoutSeconds, err := intEnvOrDefault("AUTHORING_SERVICE_TIMEOUT_SECONDS", 10)
 	if err != nil {
 		return nil, err
 	}
@@ -133,11 +105,8 @@ func Load() (*Config, error) {
 		HTTPPort:                      httpPort,
 		RabbitMQReconnectInitialDelay: time.Duration(reconnectInitialMS) * time.Millisecond,
 		RabbitMQReconnectMaxDelay:     time.Duration(reconnectMaxMS) * time.Millisecond,
-		LLMServiceURL:                 llmServiceURL,
-		LLMServiceTimeout:             time.Duration(llmServiceTimeoutSeconds) * time.Second,
-		HiveModel:                     hiveModel,
-		HiveMaxInputChars:             hiveMaxInputChars,
-		HiveMaxOutputTokens:           hiveMaxOutputTokens,
+		AuthoringServiceURL:           authoringServiceURL,
+		AuthoringServiceTimeout:       time.Duration(authoringServiceTimeoutSeconds) * time.Second,
 		VideoAssemblyURL:              videoAssemblyURL,
 		VideoAssemblyTimeout:          time.Duration(videoAssemblyTimeoutSeconds) * time.Second,
 	}, nil

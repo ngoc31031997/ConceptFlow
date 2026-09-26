@@ -18,7 +18,9 @@ import os
 import aio_pika
 
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
-from adapters.messaging.consumer import SynthesizeSpeechCommandHandler
+from adapters.messaging.consumer import SynthesizeSpeechCommandHandler, TtsCommandDispatcher
+from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
+from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.persistence.db import create_pool
@@ -99,10 +101,15 @@ async def run() -> None:
     command_handler = SynthesizeSpeechCommandHandler(
         batch_use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
     )
+    dispatcher = TtsCommandDispatcher(
+        command_handler,
+        # CR-040 FR114.2: dọn thư mục audio của project bị xoá.
+        PurgeProjectArtifactsCommandHandler(purge_project_artifacts, pool, inbox, outbox),
+    )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 
-    consumer_tag = await queue.consume(command_handler.handle)
+    consumer_tag = await queue.consume(dispatcher.handle)
     # Cancel requests arrive on their own fanout, not behind the running batch.
     await listen_for_cancels(channel)
 
