@@ -679,7 +679,7 @@ export type GeneratedStep = {
  * CR-027 FR78.1 — chạy một bước bằng API: server tự render prompt (cùng một
  * hàm với nút Copy), gọi provider, lưu kết quả, trả nội dung về.
  *
- * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Sao chÃ©p prompt vẫn là
+ * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Sao chép prompt vẫn là
  * đường đi khi chưa có key, hết số dư, hoặc Creator muốn dùng AI khác.
  */
 export function generateAuthoringStep(projectId: string, step: AuthoringStep): Promise<GeneratedStep> {

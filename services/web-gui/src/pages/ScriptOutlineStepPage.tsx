@@ -239,7 +239,7 @@ export function ScriptOutlineStepPage() {
 
         <div className={styles.scriptLayout}>
           <Card
-            title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Sao chÃ©p prompt"}
+            title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Sao chép prompt"}
             hint={
               hasOwnOutline
                 ? "Chủ đề chỉ dùng để đặt tên cho dự án."
@@ -295,7 +295,7 @@ export function ScriptOutlineStepPage() {
                   data-testid="script-outline-prompt"
                 />
                 <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="script-outline-copy">
-                  {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
+                  {copied ? "Đã sao chép" : "Sao chép prompt"}
                 </Button>
               </>
             )}

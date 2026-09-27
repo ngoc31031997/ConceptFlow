@@ -78,7 +78,7 @@ export function ShortScriptAssistant({
       );
       suggestRun.end();
       // Nháp AI, không tự nộp — Creator vẫn sửa được trước khi bấm nộp
-      // (FR71.3), cùng nguyên tắc với "Sao chÃ©p prompt".
+      // (FR71.3), cùng nguyên tắc với "Sao chép prompt".
       setDraftScript(result.script_content);
     } catch (err) {
       setSuggestError(err instanceof ApiError ? err.message : String(err));

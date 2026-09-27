@@ -168,7 +168,7 @@ export function ThumbnailUpload({
             <span>Prompt để nhờ AI tạo thumbnail (Midjourney, DALL-E…)</span>
             <Button variant="ghost" disabled={topicState === "loading" || renderedPrompt.prompt === null || renderedPrompt.stale} onClick={handleCopyPrompt}>
               <CopyIcon />
-              {promptCopied ? "Đã sao chép" : "Sao chÃ©p"}
+              {promptCopied ? "Đã sao chép" : "Sao chép"}
             </Button>
           </div>
           <AiOperationCard

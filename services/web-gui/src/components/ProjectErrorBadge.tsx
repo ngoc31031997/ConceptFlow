@@ -97,7 +97,7 @@ export function ProjectErrorBadge({ projectId }: { projectId: string }) {
                   <div className={styles.meta}>
                     {new Date(e.at).toLocaleString()} · {[e.source, e.step, e.kind].filter(Boolean).join(" · ")}
                     <button type="button" className={styles.copy} onClick={() => copy(key, formatProjectError(e))}>
-                      {copied === key ? "Đã sao chép" : "Sao chÃ©p"}
+                      {copied === key ? "Đã sao chép" : "Sao chép"}
                     </button>
                   </div>
                   <div className={styles.message}>{e.message}</div>

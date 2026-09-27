@@ -95,7 +95,7 @@ export function ProjectInputPanel({ project }: ProjectInputPanelProps) {
         <span className={styles.scriptLabel}>Script gốc</span>
         {project.script_content && (
           <Button variant="ghost" onClick={handleCopyScript}>
-            {copied ? "Đã sao chép" : "Sao chÃ©p script"}
+            {copied ? "Đã sao chép" : "Sao chép script"}
           </Button>
         )}
       </div>

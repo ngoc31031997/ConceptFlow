@@ -91,7 +91,7 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
                 onClick={handleCopy}
               >
                 <CopyIcon />
-                {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
+                {copied ? "Đã sao chép" : "Sao chép prompt"}
               </button>
               <span className={`${styles.copyStatus} ${isFilled ? styles.copyStatusOn : ""}`}>
                 <span className={styles.copyStatusDot} aria-hidden="true" />

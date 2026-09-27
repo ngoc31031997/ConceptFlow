@@ -260,7 +260,7 @@ export function ManimEngineerStepPage() {
               bản này rồi tự gọi. Đổi lại chế độ là nó quay lại nguyên vẹn. */}
           {!aiMode && (
             <Card
-              title="1. Sao chÃ©p prompt"
+              title="1. Sao chép prompt"
               hint="Xem lại nội dung, sao chép rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
               <TextArea
@@ -271,7 +271,7 @@ export function ManimEngineerStepPage() {
                 data-testid="manim-engineer-prompt"
               />
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="manim-engineer-copy">
-                {copied ? "Đã sao chép" : "Sao chÃ©p prompt"}
+                {copied ? "Đã sao chép" : "Sao chép prompt"}
               </Button>
             </Card>
           )}

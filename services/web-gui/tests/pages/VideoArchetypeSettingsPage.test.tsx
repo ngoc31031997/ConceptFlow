@@ -40,7 +40,8 @@ describe("VideoArchetypeSettingsPage (CR-041)", () => {
   it("adds a new kind, leaving the code blank for the server to assign", async () => {
     const create = vi.spyOn(apiClient, "createVideoArchetype").mockResolvedValue({ ...MINE, id: "u2" });
     renderPage();
-    await waitFor(() => screen.getByTestId("archetype-new-button"));
+    // Nút "Thêm" bị khóa trong lúc tải danh sách — đợi tải xong rồi mới bấm.
+    await waitFor(() => expect(screen.getByTestId("archetype-new-button")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("archetype-new-button"));
     expect(screen.getByTestId("archetype-save-button")).toBeDisabled();
     fireEvent.change(screen.getByTestId("archetype-name-input"), { target: { value: "Gỡ lỗi" } });
