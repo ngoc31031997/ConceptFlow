@@ -26,7 +26,7 @@
 .selectedCount {
   font-size: 12.5px;
   color: var(--ink-faint);
-  margin-right: auto;
+  margin: 0;
 }
 
 .row {
@@ -211,4 +211,16 @@
   font-size: 12.5px;
   color: var(--ink-soft);
   cursor: pointer;
+}
+
+.stepFilter[open] .stepMenu {
+  animation: step-menu-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: top left;
+}
+@keyframes step-menu-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stepFilter[open] .stepMenu { animation: none; }
 }

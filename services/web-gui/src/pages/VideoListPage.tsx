@@ -256,10 +256,6 @@ export function VideoListPage() {
                 Chọn tất cả
               </label>
 
-              {selected.size > 0 && (
-                <span className={styles.selectedCount}>Đã chọn {selected.size} video</span>
-              )}
-
               <button
                 type="button"
                 data-testid="bulk-delete-button"
@@ -270,6 +266,9 @@ export function VideoListPage() {
                 <TrashIcon />
                 {isBulkDeleting ? "Đang xóa..." : `Xóa đã chọn${selected.size > 0 ? ` (${selected.size})` : ""}`}
               </button>
+              {selected.size > 0 && (
+                <span className={`${styles.selectedCount} ${glass.reveal}`}>Đã chọn {selected.size} video</span>
+              )}
             </div>
 
             <Card>

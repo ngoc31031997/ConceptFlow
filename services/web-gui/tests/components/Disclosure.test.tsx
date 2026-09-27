@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Disclosure } from "../../src/components/Disclosure";
 
 describe("Disclosure", () => {
@@ -37,7 +37,7 @@ describe("Disclosure", () => {
     expect(screen.getByText("Nội dung")).toBeInTheDocument();
   });
 
-  it("bấm lần hai thì thu gọn lại", () => {
+  it("bấm lần hai thì thu gọn lại", async () => {
     render(
       <Disclosure title="Tiêu đề" testId="d1">
         <p onClick={vi.fn()}>Nội dung</p>
@@ -46,6 +46,8 @@ describe("Disclosure", () => {
 
     fireEvent.click(screen.getByTestId("d1-toggle"));
     fireEvent.click(screen.getByTestId("d1-toggle"));
-    expect(screen.queryByText("Nội dung")).not.toBeInTheDocument();
+    // Nội dung còn ở lại một nhịp để chạy hiệu ứng thu lại, rồi mới gỡ.
+    expect(screen.getByTestId("d1-toggle")).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(screen.queryByText("Nội dung")).not.toBeInTheDocument());
   });
 });
