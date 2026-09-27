@@ -1,0 +1,105 @@
+Ba hình mẫu CHUẨN của kênh. Mọi hình mới phải cùng cách dựng: bọc trong Figure, màu chính là prop color, một mảng bóng bên phải bằng shadeOf, GroundShadow dưới vật đứng trên sàn, mặt bằng Face, chuyển động nhỏ theo frame và tắt được bằng still.
+
+=== SchoolBus — phương tiện được nhân hoá: nhìn ngang, đầu xe bên phải, bánh xe quay, thân nảy khi chạy ===
+```tsx
+import React from 'react';
+import {useCurrentFrame} from 'remotion';
+import {Figure, Face, GroundShadow, useBlink, phaseOf, shadeOf, WHITE, type FigureProps, type Mood} from './conceptflow-mini/illustration';
+
+// Xe buýt nhìn ngang, đầu xe bên phải. Hộp 320 x 210.
+export function SchoolBus({color = '#FFC72C', mood = 'happy', moving = true, ...fig}: FigureProps & {color?: string; mood?: Mood; moving?: boolean}) {
+  const frame = useCurrentFrame();
+  const blink = useBlink(!!fig.still, phaseOf(fig.x ?? 960, fig.y ?? 540));
+  const run = !fig.still && moving;
+  const bob = run ? Math.sin(frame / 3) * 1.5 : 0; // thân xe nảy nhẹ khi chạy
+  const spin = run ? frame * 12 : 0; // bánh xe quay
+  return (
+    <Figure {...fig} size={fig.size ?? 320} vw={320} vh={210}>
+      <GroundShadow cx={160} cy={200} rx={140} />
+      <g transform={`translate(0 ${bob})`}>
+        <rect x={12} y={30} width={296} height={140} rx={30} fill={color} />
+        <rect x={214} y={30} width={94} height={140} rx={30} fill={shadeOf(color, -0.12)} />
+        {[34, 92, 150].map((x) => (
+          <rect key={x} x={x} y={50} width={46} height={42} rx={10} fill="#8FD3FF" />
+        ))}
+        <rect x={232} y={50} width={60} height={40} rx={12} fill="#8FD3FF" />
+        <rect x={36} y={56} width={10} height={24} rx={5} fill={WHITE} opacity={0.5} />
+        <rect x={12} y={118} width={202} height={12} rx={6} fill={shadeOf(color, -0.25)} />
+        <Face mood={mood} blink={blink} talking={false} frame={frame} cx={262} cy={112} glasses={false} />
+      </g>
+      {[78, 248].map((cx) => (
+        <g key={cx} transform={`rotate(${spin} ${cx} 176)`}>
+          <circle cx={cx} cy={176} r={24} fill="#2B2140" />
+          <circle cx={cx} cy={176} r={10} fill="#DDE3EC" />
+          <rect x={cx - 2} y={158} width={4} height={10} rx={2} fill="#DDE3EC" />
+        </g>
+      ))}
+    </Figure>
+  );
+}
+```
+
+=== Cat — con vật: khối tròn, đầu to, thở và vẫy đuôi, mặt dùng Face ===
+```tsx
+import React from 'react';
+import {useCurrentFrame} from 'remotion';
+import {Figure, Face, GroundShadow, useBlink, phaseOf, shadeOf, type FigureProps, type Mood} from './conceptflow-mini/illustration';
+
+// Con mèo ngồi nhìn thẳng. Hộp 220 x 240.
+export function Cat({color = '#FF9F43', mood = 'happy', ...fig}: FigureProps & {color?: string; mood?: Mood}) {
+  const frame = useCurrentFrame();
+  const phase = phaseOf(fig.x ?? 960, fig.y ?? 540);
+  const blink = useBlink(!!fig.still, phase);
+  const breathe = fig.still ? 0 : Math.sin((frame + phase) / 14) * 2; // thở
+  const wag = fig.still ? 0 : Math.sin((frame + phase) / 6) * 10; // vẫy đuôi
+  const dark = shadeOf(color, -0.15);
+  return (
+    <Figure {...fig} size={fig.size ?? 240} vw={220} vh={240}>
+      <GroundShadow cx={110} cy={232} rx={80} />
+      <path
+        d="M160,200 C200,196 204,150 186,130"
+        stroke={dark}
+        strokeWidth={16}
+        strokeLinecap="round"
+        fill="none"
+        transform={`rotate(${wag} 160 200)`}
+      />
+      <ellipse cx={110} cy={180 - breathe / 2} rx={62} ry={54 + breathe / 2} fill={color} />
+      <ellipse cx={132} cy={184} rx={30} ry={44} fill={dark} opacity={0.5} />
+      <ellipse cx={86} cy={228} rx={18} ry={9} fill={dark} />
+      <ellipse cx={134} cy={228} rx={18} ry={9} fill={dark} />
+      <g transform={`translate(0 ${-breathe})`}>
+        <path d="M56,70 L62,18 L96,52 Z" fill={color} />
+        <path d="M164,70 L158,18 L124,52 Z" fill={dark} />
+        <path d="M66,56 L68,34 L84,50 Z" fill="#FF7AB6" opacity={0.7} />
+        <rect x={46} y={40} width={128} height={100} rx={46} fill={color} />
+        <rect x={120} y={46} width={50} height={90} rx={30} fill={dark} opacity={0.35} />
+        <Face mood={mood} blink={blink} talking={false} frame={frame} cx={110} cy={92} glasses={false} />
+      </g>
+    </Figure>
+  );
+}
+```
+
+=== Microscope — đồ vật không sống: đứng yên, không mặt ===
+```tsx
+import React from 'react';
+import {Figure, GroundShadow, shadeOf, WHITE, type FigureProps} from './conceptflow-mini/illustration';
+
+// Kính hiển vi nhìn ngang, thị kính trên cùng. Vật không sống: đứng yên. Hộp 180 x 240.
+export function Microscope({color = '#3D7BFF', ...fig}: FigureProps & {color?: string}) {
+  const dark = shadeOf(color, -0.2);
+  return (
+    <Figure {...fig} size={fig.size ?? 240} vw={180} vh={240}>
+      <GroundShadow cx={90} cy={232} rx={78} />
+      <rect x={20} y={206} width={140} height={24} rx={12} fill={dark} />
+      <path d="M120,210 C150,170 150,110 118,80" stroke={color} strokeWidth={22} strokeLinecap="round" fill="none" />
+      <rect x={40} y={150} width={90} height={14} rx={7} fill="#8F9BB3" />
+      <rect x={70} y={30} width={34} height={110} rx={14} fill={color} transform="rotate(-18 87 85)" />
+      <rect x={60} y={16} width={34} height={26} rx={8} fill={dark} transform="rotate(-18 77 29)" />
+      <rect x={98} y={130} width={20} height={26} rx={6} fill="#8F9BB3" />
+      <rect x={82} y={52} width={8} height={48} rx={4} fill={WHITE} opacity={0.4} transform="rotate(-18 86 76)" />
+    </Figure>
+  );
+}
+```

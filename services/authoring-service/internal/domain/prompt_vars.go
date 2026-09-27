@@ -46,6 +46,14 @@ var themeReferenceEN string
 //go:embed prompts/lottie_catalog_vi.txt
 var lottieCatalogVI string
 
+// illustration_kit_vi.txt is the API of remotion_project/src/conceptflow-mini/
+// illustration.tsx as the Remotion Engineer reads it (CR-043). It is written by
+// hand, and rendering/tests/domain/test_illustration_kit.py fails when a
+// component is exported but not documented here, or documented but gone.
+//
+//go:embed prompts/illustration_kit_vi.txt
+var illustrationKitVI string
+
 //go:embed prompts/narration_rule_vi.txt
 var narrationRuleVI string
 
@@ -125,6 +133,12 @@ func withThemeReference(text, language string) string {
 // as withThemeReference: the copy-the-prompt flow reads the stored text as-is.
 func withLottieCatalog(text string) string {
 	return strings.ReplaceAll(text, "{{lottie_catalog}}", strings.TrimSpace(lottieCatalogVI))
+}
+
+// withIllustrationKit expands {{illustration_kit}} at seed time, for the same
+// reason as withLottieCatalog.
+func withIllustrationKit(text string) string {
+	return strings.ReplaceAll(text, "{{illustration_kit}}", strings.TrimSpace(illustrationKitVI))
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language

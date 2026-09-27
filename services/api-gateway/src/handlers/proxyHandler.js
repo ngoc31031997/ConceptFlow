@@ -39,6 +39,14 @@ function proxyHandler(client, serviceName) {
       const location = upstreamRes.headers && upstreamRes.headers.get && upstreamRes.headers.get('location');
       if (location) res.set('Location', location);
 
+      // Binary bodies (CR-044 illustration previews) keep their type and caching.
+      if (Buffer.isBuffer(upstreamRes.body) && upstreamRes.headers && upstreamRes.headers.get) {
+        for (const name of ['content-type', 'cache-control']) {
+          const value = upstreamRes.headers.get(name);
+          if (value) res.set(name, value);
+        }
+      }
+
       if (upstreamRes.body === undefined) {
         res.status(upstreamRes.status).end();
       } else {

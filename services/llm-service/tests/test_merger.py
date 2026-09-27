@@ -28,6 +28,9 @@ def test_remotion_narrations_shots_and_order_come_from_the_storyboard():
     assert "mauNhan: '#F5B841'" in m.code and 'id="creator"' in m.code
     # The prompt tells the model LottieClip is already imported, so the frame must import it.
     assert "import {LottieClip} from './conceptflow-mini/lottie';" in m.code
+    # CR-043: likewise the whole illustration kit.
+    assert "import {Backdrop, Panel, Person, Tooth, Germ," in m.code
+    assert "} from './conceptflow-mini/illustration';" in m.code
     assert m.code.index("const LAYOUT") < m.code.index("function Shot1_1")
 
 

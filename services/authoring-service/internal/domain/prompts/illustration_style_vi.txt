@@ -1,0 +1,44 @@
+# LUẬT STYLE HÌNH MINH HOẠ CỦA KÊNH
+
+Mọi hình trong thư viện phải trông như do CÙNG MỘT NGƯỜI vẽ: tranh vector phẳng kiểu truyện tranh thiếu nhi được làm động, giống kênh "Vẽ Chuyện". Luật dưới đây áp dụng cho hình AI vẽ, hình bạn tự viết code và hình SVG tải lên. Mã [S..] là mã luật mà bộ kiểm tra tự động dùng khi báo lỗi hay cảnh báo.
+
+## 1. Hình khối
+- [S1] PHẲNG: mỗi mảng là một màu đặc. KHÔNG gradient (linearGradient, radialGradient), KHÔNG pattern, KHÔNG filter (blur, drop-shadow, glow), KHÔNG ảnh nhúng (<image>), KHÔNG chữ vẽ trong hình (<text>, foreignObject). → LỖI, chặn lưu.
+- [S2] KHÔNG VIỀN quanh khối: khối có màu (fill) không có stroke. Nét (stroke) chỉ dùng cho chi tiết mảnh: mắt nhắm, miệng, lông mày, que, dây, tia sáng, lông bàn chải. → cảnh báo.
+- [S3] BO TRÒN: góc chữ nhật có rx ≥ 6 (khối lớn rx 20–40); đầu nét strokeLinecap="round", góc nét strokeLinejoin="round". Tránh góc nhọn trừ khi vật thật sự nhọn (gai, mũi tên, mái nhà). → cảnh báo.
+- [S4] ÍT CHI TIẾT: một vật 5–25 hình con là đủ. Không vẽ hoạ tiết nhỏ hơn 1/40 cạnh hộp, vì chúng biến mất khi hình nhỏ trên màn hình. → cảnh báo khi quá 60 hình con.
+- [S5] HÌNH KHỐI TO, RÕ SILHOUETTE: nhìn bóng đen của hình vẫn đoán được là vật gì. Ưu tiên góc nhìn thẳng hoặc nhìn ngang, không phối cảnh 3D, không nghiêng xa gần.
+
+## 2. Tô bóng
+- [S6] MỘT MẢNG BÓNG cho mỗi khối lớn, cùng phía PHẢI (hoặc phải-dưới) cho cả kênh: màu thân tối đi 10–20% bằng shadeOf(màu, -0.12), hoặc một hình màu đen opacity 0.06–0.12 đè lên. Không tô bóng hai phía.
+- [S7] ĐIỂM SÁNG tuỳ chọn: một vệt trắng opacity 0.3–0.5 ở phía TRÁI-TRÊN cho vật bóng (táo, kẹo, kính).
+- [S8] BÓNG ĐỔ dưới vật đứng trên sàn: <GroundShadow cx cy rx /> (elip đen opacity 0.12) ở đáy hộp. Vật bay/lơ lửng thì không có.
+
+## 3. Màu
+- [S9] DÙNG BẢNG MÀU KÊNH cho mặc định của hình (xem danh sách dưới). Màu tối/sáng dẫn xuất bằng shadeOf từ màu trong bảng thì hợp lệ. Màu ngoài bảng → cảnh báo.
+- [S10] TỐI ĐA 6 MÀU gốc trong một hình (không tính màu dẫn xuất bằng shadeOf và đen/trắng dùng làm bóng/sáng). → cảnh báo.
+- [S11] KHÔNG ĐEN THUẦN làm mảng lớn: nét và mắt dùng INK (#3A1F4B), không #000000; đen chỉ dùng làm bóng với opacity thấp.
+- [S12] Màu chính của vật phải đổi được qua prop color (và các prop màu phụ nếu cần), để Kỹ sư gán đúng màu vai trò của Đạo diễn.
+
+Bảng màu kênh (mặc định cho hình):
+  vàng #FFC857, #FFD23F, #FFC72C · cam #FF9F43, #FF7A45, #E07A5F · đỏ #E8453C, #FF4D6D · hồng #FF5C8A, #FF7AB6, #FF78D6 · tím #7B3FC4, #6C3FC5, #5B2C6F · xanh dương #2D5BFF, #3D7BFF, #8FD3FF · xanh ngọc #2BB6A8, #2EC4B6 · xanh lá #2BB673, #4CAF50, #8BC34A, #B6E34A · nâu #8A5A3C, #D9975B, #9A6A45 · da #F9C4B4 · trung tính #FFFFFF, #F3F6FB, #DDE3EC, #8F9BB3, #2B2140 · mực #3A1F4B · nền đêm #140B3A, #1B1650.
+
+## 4. Nhân vật và khuôn mặt
+- [S13] Vật được nhân hoá (răng, xe, giọt nước, con vật...) dùng <Face mood blink talking frame cx cy glasses /> của bộ minh hoạ: mắt chấm, má hồng, miệng đơn giản. KHÔNG tự vẽ mắt kiểu khác (mắt to long lanh, mắt có tròng màu, lông mi).
+- [S14] Người: dùng <Person> có sẵn. Chỉ vẽ người mới khi cần trang phục/dáng mà Person không có, và giữ tỉ lệ đầu to (đầu ≈ 1/3 chiều cao), đầu vuông bo tròn, tóc là một mảng.
+- [S15] Con vật: thân khối tròn/bầu dục, chân ngắn, đầu to, mặt dùng Face; không vẽ lông từng sợi, móng, răng nanh chi tiết.
+
+## 5. Khung và toạ độ
+- [S16] Hình là MỘT component export function TênPascalCase(props) bọc trong <Figure {...fig} size={fig.size ?? <cỡ mặc định>} vw={..} vh={..}>. vw × vh là hộp vẽ, tỉ lệ đúng với vật; mọi nét nằm TRONG hộp (trừ bóng đổ sát đáy và tia/gai nhỏ).
+- [S17] Nhận FigureProps (x, y, size, rotate, flip, scale, opacity, still) và truyền nguyên cho Figure. Không tự đặt vị trí tuyệt đối trên khung 1920×1080.
+- [S18] Vật nhìn ngang thì đầu/mũi quay sang PHẢI (flip để quay trái), giống Airplane, Toothbrush.
+
+## 6. Chuyển động
+- [S19] Vật sống hoặc có năng lượng CÓ chuyển động tự thân theo frame: thở/nhún (sin(frame/14) biên độ 1–3), chớp mắt (useBlink), lắc/rung (sin(frame/4)), quay (xoay tia, bánh xe), nhấp nháy (đèn). Vật chết (bàn, sách) thì đứng yên. Cảnh báo khi hình có mặt mà không có chuyển động nào.
+- [S20] Chuyển động NHỎ và ĐỀU: không quá 5% cạnh hộp, lặp liền mạch, không giật. Mọi chuyển động tắt được bằng prop still.
+- [S21] Trạng thái mang nghĩa là PROP, không phải chuyển động tự động: mood, open, decay, on, level... để Kỹ sư điều khiển theo câu thoại.
+- [S22] Chỉ dùng useCurrentFrame, interpolate, spring của remotion. KHÔNG Math.random, Date.now, CSS animation, setTimeout. → LỖI.
+
+## 7. Đặt tên và mô tả
+- [S23] Tên component tiếng Anh PascalCase, là danh từ của vật (SchoolBus, Microscope, Cat) — không mang màu hay trạng thái (không RedCar, SadCat).
+- [S24] Tên hiển thị tiếng Việt ngắn; thẻ là các từ người ta sẽ tìm; dòng "Cách gọi" liệt kê mọi prop và tỉ lệ hộp: <SchoolBus color mood /> — 320×200.

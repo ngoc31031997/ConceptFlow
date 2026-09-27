@@ -1,0 +1,72 @@
+Import: ¤import {Backdrop, Panel, Person, Tooth, Germ, ...} from './conceptflow-mini/illustration';¤ — chỉ import tên bạn dùng.
+
+Quy ước chung của mọi hình (giống ¤LottieClip¤ và ¤LAYOUT¤): ¤x¤, ¤y¤ là TÂM hộp bao của hình trên khung 1920×1080; ¤size¤ là CẠNH DÀI của hộp bao, tính bằng px; tỉ lệ hộp (rộng × cao) cố định theo từng hình, ghi ở dưới — dùng nó để tính hộp bao khi kiểm tra đè nhau. Mọi hình nhận thêm ¤rotate¤ (độ), ¤flip¤ (lật ngang), ¤scale¤, ¤opacity¤ — là số bạn nội suy theo frame để làm hình xuất hiện, trượt, nảy, xoay. Người, vi khuẩn, cây, mặt trời... tự thở/chớp mắt/lắc nhẹ; ¤still¤ tắt chuyển động tự thân đó.
+
+Màu: mỗi hình đã có màu mặc định hài hoà (da, tóc, men răng...) — cứ để nguyên. Tham số màu (¤color¤, ¤shirt¤, ¤pants¤, ¤hair¤, ¤skin¤, ¤lips¤, ¤frameColor¤, ¤handColor¤, ¤pot¤, ¤roof¤, ¤textColor¤) chỉ dùng khi kịch bản gán vai trò màu cho vật đó, và giá trị PHẢI là ¤PALETTE.xxx¤.
+
+### Nền và bố cục cảnh
+- ¤<Backdrop color={PALETTE.nenPhong} floor={PALETTE.sanNha} floorY={830} />¤ — nền màu phẳng phủ cả khung, tuỳ chọn một dải sàn từ ¤floorY¤ trở xuống. Đặt ĐẦU TIÊN trong ¤<AbsoluteFill>¤ của shot. Không có Backdrop thì nền là ¤#080E1C¤ mặc định.
+- ¤<Panel x={990} y={0} w={930} h={1080} color={PALETTE.nenDem}>...</Panel>¤ — một mảng màu chữ nhật: nửa khung của màn chia đôi, vạch ngăn giữa hai mảng, một ô cửa nhìn sang nơi khác. RIÊNG Panel thì ¤x¤, ¤y¤ là GÓC TRÊN-TRÁI. Hình đặt bên trong Panel tính toạ độ theo góc của Panel và bị cắt ở mép Panel.
+
+### Người
+- ¤<Person x y size pose mood age outfit hairStyle talking glasses shirt pants skin hair />¤ — người nhìn thẳng, đầu to thân nhỏ kiểu truyện tranh. Tỉ lệ 260 × 420 (rộng ≈ 0.62 × size). Chân chạm đáy hộp, có bóng dưới chân.
+  - ¤pose¤: ¤'stand'¤ đứng | ¤'sit'¤ ngồi trên ghế đẩu nhỏ (ghế vẽ sẵn) | ¤'wave'¤ vẫy tay | ¤'point'¤ chỉ tay sang phải người xem (¤flip¤ để chỉ sang trái) | ¤'think'¤ tay chống cằm | ¤'cheer'¤ giơ hai tay mừng | ¤'ouch'¤ tay ôm má (đau răng, đau đầu) | ¤'shrug'¤ nhún vai | ¤'walk'¤ đi bộ tại chỗ (dời ¤x¤ để đi thật).
+  - ¤mood¤: ¤'neutral'¤ | ¤'happy'¤ | ¤'sad'¤ (có giọt nước mắt) | ¤'worried'¤ (có giọt mồ hôi) | ¤'surprised'¤ | ¤'pain'¤ (mắt nhắm chặt, nghiến răng) | ¤'angry'¤.
+  - ¤age¤: ¤'child'¤ | ¤'adult'¤ | ¤'elder'¤ (tóc bạc hai bên, đeo kính). ¤outfit¤: ¤'shirt'¤ | ¤'coat'¤ (áo blouse trắng — bác sĩ, nhà khoa học) | ¤'dress'¤. ¤hairStyle¤: ¤'short'¤ | ¤'long'¤ | ¤'bald'¤ | ¤'bun'¤.
+  - ¤talking¤: miệng mấp máy — bật khi người đó đang là người nói trong câu thoại.
+
+### Cơ thể và sức khoẻ
+- ¤<Tooth decay={0..1} mood shine face />¤ — chiếc răng hàm có mặt. Tỉ lệ 200 × 220. ¤decay¤: 0 trắng khoẻ, 0.3 đốm nâu, 0.6 lỗ sâu đen, 1 lỗ lớn + nứt + ố vàng — nội suy ¤decay¤ theo frame để thấy sâu răng LAN DẦN. Nét mặt tự đi theo ¤decay¤ (vui → lo → buồn → đau) trừ khi đặt ¤mood¤. ¤shine¤ thêm tia lấp lánh khi răng sạch. ¤face={false}¤ bỏ mặt.
+- ¤<Germ color mood variant />¤ — vi khuẩn: khối mềm lúc nhúc có gai, mắt và miệng. Tỉ lệ 1 : 1. ¤mood¤: ¤'evil'¤ (mặc định — kẻ xấu, cười nhe răng) | ¤'happy'¤ | ¤'sad'¤. ¤variant¤ 0–3 đổi hình dạng để một đám vi khuẩn không giống hệt nhau.
+- ¤<OpenMouth decayed={[1, 8]} decay={0.6} lips />¤ — miệng há nhìn thẳng: môi, hàm trên (răng 0–5, trái sang phải), hàm dưới (răng 6–11), lưỡi. ¤decayed¤: răng nào bị sâu; ¤decay¤: sâu tới đâu. Tỉ lệ 400 × 260.
+- ¤<Drop color face />¤ — giọt chất lỏng (axit, nước, mồ hôi, nước mắt); ¤face¤ thêm mặt gian. Tỉ lệ 140 × 180.
+- ¤<Shield color check />¤ — khiên bảo vệ (flo bảo vệ men răng, hệ miễn dịch...), ¤check¤ có dấu tích. Tỉ lệ 160 × 190.
+- ¤<Heart color beat />¤ — trái tim, ¤beat¤ đập nhịp. Tỉ lệ 200 × 180.
+
+### Đồ ăn
+- ¤<Candy color />¤ kẹo gói, tỉ lệ 240 × 110. ¤<Lollipop color />¤ kẹo mút, 140 × 260. ¤<Soda color />¤ ly nước ngọt có ống hút, 160 × 260. ¤<Donut color />¤ bánh donut, 1 : 1. ¤<Apple color />¤ quả táo, 1 : 1.
+
+### Đồ vật và bối cảnh
+- ¤<Toothbrush color paste bristlesDown />¤ — bàn chải nằm ngang, đầu bên phải; ¤bristlesDown¤ quay lông bàn chải xuống (chải một chiếc răng nằm dưới). Nội suy ¤x¤ qua lại để chải. Tỉ lệ 400 × 100.
+- ¤<Toothpaste color />¤ tuýp kem đánh răng, 300 × 120.
+- ¤<Clock hour minute frameColor handColor />¤ — đồng hồ treo tường vuông; nội suy ¤minute¤ để kim chạy (thời gian trôi). 1 : 1.
+- ¤<Table color />¤ bàn nhìn chính diện, 400 × 200. ¤<Chair color />¤ ghế, 200 × 260. ¤<Window time="day"|"night" />¤ cửa sổ có trời, 220 × 260. ¤<Plant />¤ chậu cây, 160 × 240. ¤<House />¤ ngôi nhà, 240 × 220. ¤<Tree />¤ cái cây, 180 × 260.
+- ¤<Sun />¤ mặt trời, 1 : 1. ¤<Cloud />¤ đám mây, 260 × 140. ¤<Lightbulb on />¤ bóng đèn (ý tưởng, hiểu ra), 160 × 240.
+- ¤<Coin />¤ đồng xu, 1 : 1. ¤<Book />¤ quyển sách, 200 × 160. ¤<Phone glow />¤ điện thoại, 120 × 220. ¤<Magnifier />¤ kính lúp (soi kỹ), 1 : 1.
+- ¤<Mark kind="check"|"cross" />¤ huy hiệu đúng / sai, 1 : 1. ¤<Sparkle />¤ tia lấp lánh bốn cánh, 1 : 1. ¤<Airplane color />¤ máy bay cánh quạt nhìn ngang, mũi bên phải, 320 × 120.
+
+### Bong bóng thoại
+- ¤<Bubble x y w h thought flip textColor fontSize>Nhãn ngắn</Bubble>¤ — bong bóng thoại (¤thought¤: bong bóng suy nghĩ), đuôi chỉ xuống-trái về phía người nói (¤flip¤: xuống-phải). ¤x¤, ¤y¤ là tâm, ¤w¤ × ¤h¤ là kích thước px. Bên trong chỉ một NHÃN tối đa ~4 từ hoặc một hình — không bao giờ là câu thoại.
+
+Cách dùng:
+1. **Vật nào trong HÌNH có trong bộ này thì BẮT BUỘC dùng component của bộ**, không tự vẽ lại bằng ¤<svg>¤/¤<path>¤. Chỉ vẽ tay bằng SVG/JSX những thứ bộ này không có — và vẽ theo cùng lối: hình phẳng, không viền, góc bo tròn.
+2. Dùng ĐÚNG vật kịch bản nói: kịch bản ghi "em bé ngồi bên bàn ăn kẹo" → ¤<Person pose="sit" age="child" mood="happy" />¤ + ¤<Table />¤ + ¤<Candy />¤, không thay bằng hình tròn có nhãn "em bé".
+3. Hình cùng có mặt vẫn tuân luật bố cục ở mục F: tính hộp bao từ ¤size¤ và tỉ lệ ở trên, không để hai hình đè nhau ngoài ý đồ (người NGỒI SAU bàn, kẹo NẰM TRÊN mặt bàn là ý đồ).
+4. Vật sống qua nhiều shot (nhân vật chính) lấy ¤x¤, ¤y¤, ¤size¤ từ cùng một mục ¤LAYOUT¤ — viết ¤<Person {...LAYOUT.kid} pose="sit" />¤.
+5. Cảm xúc đổi giữa shot (răng từ vui sang đau, người từ vui sang ôm má) → đổi ¤mood¤/¤pose¤/¤decay¤ tại một mốc theo ¤duration¤, hoặc nội suy ¤decay¤ liên tục.
+
+Ví dụ một shot minh hoạ:
+
+¤¤¤tsx
+// Shot 2.1 — MÁY: toàn cảnh | HÌNH: nền phòng vàng; em bé ngồi bên bàn, viên kẹo nảy lên mặt bàn; nửa phải nền đêm, vi khuẩn trượt vào vây quanh chiếc răng, răng chuyển sang lo lắng
+function Shot2_1({duration}: ShotProps) {
+  const frame = useCurrentFrame();
+  const {fps} = useVideoConfig();
+  const candyIn = spring({frame: frame - duration * 0.15, fps, config: {damping: 14}});
+  const germIn = interpolate(frame, [duration * 0.3, duration * 0.7], [0, 1], {...clamp, easing: Easing.out(Easing.back(1.4))});
+  return (
+    <AbsoluteFill>
+      <Backdrop color={PALETTE.nenPhong} floor={PALETTE.sanNha} floorY={830} />
+      <Table x={560} y={740} size={420} />
+      <Person {...LAYOUT.kid} pose="sit" age="child" mood="happy" />
+      <Candy x={600} y={600} size={150} scale={candyIn} />
+      <Panel x={930} y={0} w={60} h={1080} color={PALETTE.vachNgan} />
+      <Panel x={990} y={0} w={930} h={1080} color={PALETTE.nenDem}>
+        <Tooth x={390} y={520} size={360} decay={0} mood={germIn > 0.5 ? 'worried' : 'happy'} />
+        <Germ x={170 + (1 - germIn) * 700} y={330} size={140} color={PALETTE.viKhuan} opacity={germIn} />
+        <Germ x={620 + (1 - germIn) * 700} y={700} size={120} variant={2} color={PALETTE.viKhuan} opacity={germIn} />
+      </Panel>
+    </AbsoluteFill>
+  );
+}
+¤¤¤

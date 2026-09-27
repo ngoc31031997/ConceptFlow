@@ -20,6 +20,7 @@ import (
 	"authoring/internal/adapters/llm"
 	"authoring/internal/adapters/orchestrator"
 	"authoring/internal/adapters/postgres"
+	"authoring/internal/adapters/rendering"
 	"authoring/internal/application"
 	"authoring/internal/config"
 )
@@ -72,6 +73,14 @@ func main() {
 	}
 	archetypes := application.NewVideoArchetypesUseCase(authoringRepo)
 
+	// CR-044 — the illustration library, previews rendered by the rendering service.
+	if err := authoringRepo.SeedIllustrations(ctx); err != nil {
+		logger.Warn("could not seed the illustration library", "error", err)
+	}
+	illustrations := application.NewIllustrationsUseCase(
+		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
+		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+
 	prompts := application.NewPromptsUseCase(authoringRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (the project
 	// must still be a draft, read from the orchestrator), and clears the steps
@@ -99,6 +108,7 @@ func main() {
 		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
 		WithArchetypes(archetypes).
+		WithIllustrations(illustrations).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).

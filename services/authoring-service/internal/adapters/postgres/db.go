@@ -87,6 +87,42 @@ CREATE TABLE IF NOT EXISTS video_archetypes (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS video_archetypes_code_key ON video_archetypes (upper(code));
 ALTER TABLE video_archetypes ADD COLUMN IF NOT EXISTS recommended_format_id TEXT NOT NULL DEFAULT '';
+
+-- CR-044: the illustration library. Folders are shelves; each drawing lives in
+-- exactly one. Built-in rows (the CR-043 kit) carry no code: it ships in the
+-- rendering image. The preview is stored for the version it was rendered from,
+-- so a stale one is never served after the code changes.
+CREATE TABLE IF NOT EXISTS illustration_folders (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    position    INTEGER NOT NULL DEFAULT 1000,
+    is_system   BOOLEAN NOT NULL DEFAULT false
+);
+CREATE TABLE IF NOT EXISTS illustrations (
+    id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    name            TEXT NOT NULL,
+    title           TEXT NOT NULL,
+    folder_id       TEXT NOT NULL REFERENCES illustration_folders(id),
+    tags            TEXT[] NOT NULL DEFAULT '{}',
+    description     TEXT NOT NULL DEFAULT '',
+    usage           TEXT NOT NULL DEFAULT '',
+    code            TEXT NOT NULL DEFAULT '',
+    builtin         BOOLEAN NOT NULL DEFAULT false,
+    status          TEXT NOT NULL DEFAULT 'draft',
+    version         INTEGER NOT NULL DEFAULT 1,
+    preview_version INTEGER NOT NULL DEFAULT 0,
+    preview_png     BYTEA,
+    preview_gif     BYTEA,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS illustrations_name_key ON illustrations (name);
+CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id);
+-- Style exemplars are read-only rows that carry their code; warnings are the
+-- style findings of the current version that did not block saving.
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

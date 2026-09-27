@@ -18,12 +18,12 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 9, TemplateText: bt(storyArchitectVI)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 9, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleManimEngineer, Language: "vi", Version: 7, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
-		{Role: RoleRemotionEngineer, Language: "vi", Version: 5, TemplateText: bt(withLottieCatalog(remotionEngineerVI))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 3, TemplateText: bt(visualDirectorAIVI)},
-		{Role: RoleManimEngineerAI, Language: "vi", Version: 2, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
-		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 1, TemplateText: bt(withLottieCatalog(remotionEngineerAIVI))},
+		{Role: RoleVisualDirector, Language: "vi", Version: 10, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleManimEngineer, Language: "vi", Version: 8, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
+		{Role: RoleRemotionEngineer, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 4, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleManimEngineerAI, Language: "vi", Version: 3, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
+		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 2, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// CR-040 FR113: bodies embedded from the exact text the browser used to build.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
@@ -355,14 +355,14 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
   - kéo ra — cảnh cũ thu nhỏ lại, trở thành một phần của cảnh mới lớn hơn.
   - cắt thẳng sang cảnh trống — chỉ khi muốn tạo cú ngắt có chủ đích (đổi hẳn góc nhìn, một câu hỏi mới).
 - **Màu và ánh sáng:** nói theo VAI TRÒ và CẢM XÚC — "màu nhấn cho thứ đang được chú ý", "phần còn lại chìm về tông mờ", "màu cảnh báo khi hiểu lầm lộ ra", "màu thứ hai cho phe đối lập" — VÀ ghi luôn MÃ MÀU HEX cụ thể cho từng vai trò (ví dụ ¤#F5B841¤). Bạn là người duy nhất quyết định màu: bước dựng chỉ chép đúng mã bạn ghi, không tự chọn thêm màu nào.
-- **Nền video CỐ ĐỊNH:** ¤#080E1C¤ (xanh đen gần như đen), bạn không đổi được. Mọi màu bạn chọn phải nổi rõ trên nền này: màu cho chữ/nhãn phải sáng (độ tương phản với nền tối thiểu 4.5:1), màu "chìm về nền" vẫn phải còn nhìn thấy (đừng chọn gần ¤#080E1C¤). Không dùng quá 5–6 màu cho cả phim.
+- **Nền:** mặc định là ¤#080E1C¤ (xanh đen gần như đen). Cảnh minh hoạ được phép có NỀN MÀU PHẲNG riêng — một bức tường vàng ấm cho căn phòng, một mảng xanh đêm cho thế giới bên trong cơ thể — và được chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, một vạch cam ngăn giữa, nửa phải là thế giới vi mô). Mỗi màu nền là một vai trò trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"). Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 7–8 màu cho cả phim (tính cả màu nền).
 - **Font chữ và phụ đề:** do bước cấu hình chọn — đừng mô tả font, cỡ font hay phụ đề.
 - **Nhịp:** nhanh, bình thường hay chậm — ghi rõ khi nhịp mang nghĩa.
 - **Chữ trên màn hình:** là NHÃN gắn vào hình (tên một đại lượng, một con số, một kết luận ngắn), không phải câu văn.
 
 ## QUY TẮC ĐẠO DIỄN
 
-1. **CÓ MỘT NHÂN VẬT CHÍNH BẰNG HÌNH.** Chọn một vật hoặc cấu trúc sống xuyên suốt phim và biến đổi theo câu chuyện (ví dụ: một hình vuông → vỡ thành lưới → lưới kéo giãn thành đồ thị). Mỗi cảnh cho biết nhân vật chính đang ở hình dạng nào. Nếu chủ đề không có vật nào biến đổi tự nhiên (một giao thức, một vòng đời hệ thống...), hãy chọn một THẾ GIỚI xuyên suốt (một sơ đồ, một bản đồ, một không gian) để mọi cảnh diễn ra bên trong nó. Đừng ép một ẩn dụ gượng — ẩn dụ gượng còn tệ hơn không có.
+1. **CÓ MỘT NHÂN VẬT CHÍNH BẰNG HÌNH.** Chọn một vật hoặc nhân vật sống xuyên suốt phim và biến đổi theo câu chuyện (ví dụ: một chiếc răng khoẻ đang cười → bị vi khuẩn vây quanh → sâu dần và đau → được bàn chải cứu; hoặc một hình vuông → vỡ thành lưới → lưới kéo giãn thành đồ thị khi chủ đề thật sự trừu tượng). Mỗi cảnh cho biết nhân vật chính đang ở hình dạng nào. Nếu chủ đề không có vật nào biến đổi tự nhiên (một giao thức, một vòng đời hệ thống...), hãy chọn một THẾ GIỚI xuyên suốt (một sơ đồ, một bản đồ, một không gian) để mọi cảnh diễn ra bên trong nó. Đừng ép một ẩn dụ gượng — ẩn dụ gượng còn tệ hơn không có.
 
 2. **MỘT MẠCH HÌNH LIỀN.** Mỗi cảnh bắt đầu từ thứ cảnh trước để lại. Ghi rõ cách chuyển cảnh. Xoá sạch khung rồi bắt đầu lại là ngoại lệ, phải có lý do kể chuyện.
 
@@ -388,7 +388,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 13. **CHO NGƯỜI XEM ĐOÁN TRƯỚC.** Trước mỗi cú lật, dựng xong tình huống, để lời thoại đặt câu hỏi, giữ hình khoảng 1 giây rồi mới lộ đáp án. Người đã tự đoán mới muốn xem đáp án.
 
-14. **DIỄN XUẤT BẰNG CHUYỂN ĐỘNG.** Nhân vật trừu tượng thể hiện tính cách qua cách di chuyển: do dự thì nhích tới rồi lùi lại, tự tin thì lao thẳng, thất vọng thì xẹp xuống và chậm lại.
+14. **DIỄN XUẤT BẰNG NÉT MẶT, DÁNG VÀ CHUYỂN ĐỘNG.** Người và vật có mặt (răng, vi khuẩn, giọt nước...) thể hiện cảm xúc bằng nét mặt — vui, buồn, lo, ngạc nhiên, đau, giận — và bằng dáng: vẫy tay, chỉ tay, ôm má, chống cằm suy nghĩ, giơ hai tay mừng, nhún vai. Cách di chuyển cũng là diễn xuất: do dự thì nhích tới rồi lùi lại, tự tin thì lao thẳng, thất vọng thì xẹp xuống và chậm lại. Ghi rõ nét mặt và dáng trong HÌNH khi chúng mang nghĩa.
 
 15. **KHUNG KẾT VẦN VỚI KHUNG MỞ.** Cảnh cuối quay lại hình ảnh của cảnh 1, nhưng giờ nó mang nghĩa mới.
 
@@ -396,7 +396,15 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 17. **HOOK KHÔNG PHẢI THẺ TIÊU ĐỀ.** Frame đầu tiên đã phải có thứ đang chuyển động; không mở bằng một trang chữ đứng yên.
 
-18. **CHỈ VIẾT NHỮNG GÌ DỰNG ĐƯỢC.** Vật liệu dựng tốt: hình cơ bản (tròn, vuông, đa giác), đàn chấm, lưới, đồ thị, mũi tên, số chạy, khối code, dòng thời gian. Tránh cảnh 3D, hạt/khói/chất lỏng, nhân vật hữu cơ có cử động phức tạp — bước dựng sẽ phải hạ cấp chúng thành một trang chữ. Nghĩ ra ý gì cũng được, nhưng hãy diễn đạt nó bằng các vật liệu trên.
+18. **CHỈ VIẾT NHỮNG GÌ DỰNG ĐƯỢC — NHƯNG ĐỪNG TỰ HẠ CẤP THÀNH HÌNH TRỪU TƯỢNG.** Phim được vẽ theo lối TRANH PHẲNG KỂ CHUYỆN: hình vector phẳng, không viền, mảng màu tươi, dáng tròn, mắt chấm — như một cuốn truyện tranh thiếu nhi được làm động. Vật liệu dựng tốt:
+    - NGƯỜI (trẻ em, người lớn, người già; áo sơ mi, áo blouse bác sĩ, váy) với dáng đứng, ngồi, vẫy tay, chỉ tay, chống cằm, giơ tay mừng, ôm má, nhún vai, đi bộ, và nét mặt vui / buồn / lo / ngạc nhiên / đau / giận / bình thường; nói chuyện được (miệng mấp máy).
+    - CƠ THỂ VÀ SỨC KHOẺ: chiếc răng có mặt (từ khoẻ trắng → đốm nâu → lỗ sâu → vỡ, đổi dần được), vi khuẩn có mặt (ác, vui, buồn), miệng há thấy hai hàm răng (chỉ định răng nào bị sâu), giọt nước/axit, khiên bảo vệ, trái tim đập.
+    - ĐỒ ĂN: kẹo, kẹo mút, ly nước ngọt, bánh donut, quả táo.
+    - ĐỒ VẬT VÀ BỐI CẢNH: bàn chải (có kem), tuýp kem đánh răng, đồng hồ treo tường (kim quay được), bàn, ghế, cửa sổ (ngày/đêm), chậu cây, ngôi nhà, cái cây, mặt trời, đám mây, bóng đèn (sáng/tắt), đồng xu, quyển sách, điện thoại, kính lúp, dấu đúng/sai, tia lấp lánh, máy bay, bong bóng thoại / bong bóng suy nghĩ chứa một nhãn ngắn.
+    - HÌNH HỌC CHO Ý TRỪU TƯỢNG: hình cơ bản, đàn chấm, lưới, đồ thị, mũi tên, số chạy, khối code, dòng thời gian — dùng khi chính ý đó là trừu tượng (một con số, một tỉ lệ, một quan hệ), không dùng để thay cho một vật cụ thể.
+    Vật cụ thể chưa có trong danh sách thì mô tả nó như một hình phẳng đơn giản ghép từ vài khối (một chiếc xe buýt = thân chữ nhật bo góc + cửa sổ vuông + hai bánh tròn). Tránh cảnh 3D, hạt/khói, ảnh chụp, và cử động phức tạp như nhảy múa hay đánh nhau.
+
+19. **MINH HOẠ ĐÚNG CÁI ĐANG NÓI.** Đây là luật quan trọng nhất về nội dung hình. Khi THOẠI nhắc tới một người, một vật, một bộ phận cơ thể, một món ăn, một nơi chốn hay một việc đang xảy ra, HÌNH phải cho thấy CHÍNH thứ đó — hoặc một hình ảnh mà người xem nhận ra ngay là nó — chứ không phải một hình tròn hay mũi tên tượng trưng. Nói về sâu răng thì thấy chiếc răng, vi khuẩn, viên kẹo, bàn chải; nói về một ông cụ ngồi chờ thì thấy ông cụ ngồi bên bàn và chiếc đồng hồ. Phép thử: tắt tiếng, chỉ nhìn hình — người xem có đoán được câu thoại đang nói về cái gì không? Nếu không, vẽ lại shot đó. Hình trừu tượng chỉ dành cho ý tự nó trừu tượng, và ngay cả khi đó, gắn nó vào vật cụ thể đã có trên màn hình (con số hiện cạnh chiếc răng, không trôi giữa khung trống).
 
 `
 
@@ -404,8 +412,8 @@ const visualDirectorOutputProseVI = `## OUTPUT — KỊCH BẢN PHÂN CẢNH (KH
 
 Mở đầu bằng đúng hai dòng:
 
-NHÂN VẬT CHÍNH: <vật/cấu trúc sống xuyên suốt, và hành trình biến đổi của nó qua cả phim> (hoặc "THẾ GIỚI: <sơ đồ/không gian xuyên suốt>" nếu chủ đề không có vật biến đổi tự nhiên)
-BẢNG MÀU: <mỗi dòng một vai trò, dạng "tên vai trò — #RRGGBB — ý nghĩa trong phim này"; nền cố định #080E1C, không khai báo lại>
+NHÂN VẬT CHÍNH: <người/vật sống xuyên suốt, và hành trình biến đổi của nó qua cả phim> (hoặc "THẾ GIỚI: <sơ đồ/không gian xuyên suốt>" nếu chủ đề không có vật biến đổi tự nhiên)
+BẢNG MÀU: <mỗi dòng một vai trò, dạng "tên vai trò — #RRGGBB — ý nghĩa trong phim này"; màu nền riêng của cảnh cũng là một vai trò; nền mặc định #080E1C không khai báo lại>
 
 Rồi với mỗi beat:
 
@@ -414,7 +422,7 @@ CẢNH <n> — <tên beat, giữ đúng id beat của Story Architect>
 Chuyển cảnh vào: <hình nào của cảnh trước trở thành gì ở cảnh này, bằng kiểu chuyển cảnh nào> (bỏ qua ở cảnh 1)
 Không khí: <cảm xúc và nhịp của cảnh — tò mò, căng dần, vỡ lẽ, lắng lại...>
 Các shot:
-  <n>.1 | MÁY: <cỡ cảnh + chuyển động máy> | HÌNH: <cái gì xuất hiện / biến đổi / di chuyển, nằm đâu so với vật khác, màu theo vai trò, nhịp> | THOẠI: "<câu thoại>"
+  <n>.1 | MÁY: <cỡ cảnh + chuyển động máy> | HÌNH: <nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp> | THOẠI: "<câu thoại>"
   <n>.2 | MÁY: ... | HÌNH: ... | THOẠI: "..."
   (tiếp tục tới khi hết ý của cảnh — số shot do lượng thay đổi quyết định, không thêm cho đủ số)
 Kết cảnh: <hình còn lại trên màn hình — cũng là điểm khởi đầu của cảnh sau>
@@ -430,13 +438,14 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 5. Có câu thoại nào chỉ đang tả lại hình thay vì nói ý nghĩa? Viết lại.
 6. Mỗi cảnh từ 2 trở đi đã có "Chuyển cảnh vào" chưa, và nó có nối từ hình cảnh trước thay vì cắt sạch không?
 7. Nhân vật chính (hoặc thế giới) có thật sự xuất hiện và biến đổi qua các cảnh, hay chỉ được nêu ở dòng đầu rồi bỏ quên?
-8. Màu có được dùng nhất quán theo BẢNG MÀU đã khai báo không? Mọi vai trò đều có mã hex ¤#RRGGBB¤ chưa, và có màu nào trong các shot nằm ngoài BẢNG MÀU không? Có màu nào gần như lẫn vào nền ¤#080E1C¤ không?
+8. Màu có được dùng nhất quán theo BẢNG MÀU đã khai báo không? Mọi vai trò (kể cả màu nền của từng cảnh) đều có mã hex ¤#RRGGBB¤ chưa, và có màu nào trong các shot nằm ngoài BẢNG MÀU không? Có vật hay chữ nào gần như lẫn vào nền của mảng nó nằm trên không?
 9. Có cảnh nào chỉ toàn chữ, không có hình nào đang diễn ra? Dựng lại cảnh đó bằng hình.
 10. Mỗi cảnh đã có "Ý nghĩa bất biến", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
 12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Trước mỗi cú lật đã có nhịp cho người xem đoán chưa?
 13. Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không?
-14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D, hạt, nhân vật hữu cơ) không? Diễn đạt lại bằng hình cơ bản, chấm, lưới, đồ thị, mũi tên, số chạy.
+14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D, hạt/khói, ảnh chụp, cử động phức tạp) không? Diễn đạt lại bằng tranh phẳng đơn giản.
+15. Tắt tiếng và chỉ nhìn HÌNH từng shot: có shot nào mà THOẠI nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng HÌNH lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
@@ -495,6 +504,7 @@ Kịch bản ở trên do Đạo diễn viết bằng ngôn ngữ điện ảnh 
 - Một đại lượng chạy liên tục → ¤số = self.readout(a, label="...")¤ rồi ¤self.count(số, b)¤.
 - Chiếu sáng / khoanh vùng → ¤self.emphasize(obj, style="circle")¤; nhấn vào một vật → ¤self.emphasize(obj)¤; chìm vào nền → ¤self.play(obj.animate.set_color(self.theme.muted))¤ hoặc ¤self.dismiss¤.
 - Cắt thẳng sang cảnh trống → ¤self.clear_stage()¤ — chỉ khi kịch bản ghi rõ.
+- Người, bộ phận cơ thể, món ăn, đồ vật mà kịch bản vẽ theo lối tranh phẳng → engine này không có bộ hình minh hoạ: dựng một hình gợi dáng từ ¤self.shape(...)¤ (vd. chiếc răng = hình chữ nhật bo góc trắng + hai chân) và gắn NHÃN tên vật ngắn cạnh nó bằng ¤self.caption(...).next_to(...)¤, để người xem vẫn biết hình đang là cái gì. Nền màu riêng của cảnh → bỏ qua (nền do theme lo).
 - Nhịp nhanh / bình thường / chậm → ¤speed="fast"|"normal"|"slow"¤.
 - Màu theo vai trò trong BẢNG MÀU → ¤self.theme.accent¤, ¤self.theme.muted¤, ¤self.theme.ink¤, ¤self.theme.series_color(i)¤. Giữ đúng một vai trò = một màu như kịch bản khai báo. Mã hex đạo diễn ghi cạnh mỗi vai trò chỉ để bạn biết vai trò đó là tông gì — chọn màu theme gần nhất, KHÔNG chép mã hex vào code (theme của kênh mới là nguồn màu bên Manim).
 
@@ -640,7 +650,7 @@ const remoAVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG T�
 const remoBVI = `## B. MÀU — CHÉP NGUYÊN BẢNG MÀU CỦA ĐẠO DIỄN
 
 1. Chép BẢNG MÀU thành hằng ¤PALETTE¤ ở đầu file: một khoá cho mỗi vai trò (tên khoá camelCase theo tên vai trò), giá trị là ĐÚNG mã hex đạo diễn ghi, kèm comment ý nghĩa.
-2. MỌI màu trong code (fill, stroke, color, background của vật, border, boxShadow) phải là ¤PALETTE.xxx¤. Không viết mã hex/rgb/tên màu nào khác ở bất kỳ đâu. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu mới.
+2. MỌI màu trong code (fill, stroke, color, background của vật, border, boxShadow) phải là ¤PALETTE.xxx¤. Không viết mã hex/rgb/tên màu nào khác ở bất kỳ đâu. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu mới. (Màu mặc định BÊN TRONG các hình của bộ minh hoạ ở mục C3 — da, tóc, men răng... — không tính: chúng thuộc bộ hình, bạn không viết chúng.)
 3. Shot nói "tô màu nhấn", "chìm về tông mờ"... → dùng đúng khoá vai trò đó. Một vai trò = một màu từ đầu đến cuối.
 4. Chuyển màu theo nghĩa (vd. "đổi sang màu cảnh báo khi hiểu lầm lộ ra") → ¤interpolateColors(frame, [a, b], [PALETTE.x, PALETTE.y])¤.
 5. Nếu kịch bản thiếu mã hex cho một vai trò (lỗi của bước trước): chọn một màu sáng đọc rõ trên nền ¤#080E1C¤, khai báo nó trong ¤PALETTE¤ kèm comment ¤// thiếu mã trong storyboard¤ — không im lặng bịa màu rải rác.
@@ -649,7 +659,7 @@ const remoBVI = `## B. MÀU — CHÉP NGUYÊN BẢNG MÀU CỦA ĐẠO DIỄN
 
 const remoCVI = `## C. NHỮNG THỨ CỐ ĐỊNH — KHÔNG ĐƯỢC TỰ ĐẶT
 
-- **Nền:** ¤<Stage>¤ đã tô nền ¤#080E1C¤ cho toàn video. KHÔNG tô nền cho khung hình hay cho ¤AbsoluteFill¤ nào (không ¤backgroundColor¤ phủ toàn khung). Vật cụ thể (một ô, một thanh) thì có màu nền của nó từ ¤PALETTE¤.
+- **Nền:** ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤ cho toàn video. Cảnh mà kịch bản cho một nền màu riêng hay chia khung thành nhiều mảng màu → dùng ¤<Backdrop>¤ và ¤<Panel>¤ của bộ minh hoạ (mục C3), màu lấy từ ¤PALETTE¤. Ngoài hai component đó, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) thì có màu nền của nó từ ¤PALETTE¤.
 - **Font:** ¤<Stage>¤ đã đặt font Creator chọn ở bước cấu hình; mọi chữ tự thừa hưởng. KHÔNG đặt ¤fontFamily¤ ở đâu cả. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
 - **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤ theo cấu hình của Creator. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX). Chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
 - **Vùng phụ đề:** {{subtitle_zone}}
@@ -672,6 +682,18 @@ Cách dùng (chỉ khi danh sách trên có clip):
 
 `
 
+// C3 (CR-043): the flat illustration kit. {{illustration_kit}} is baked at seed
+// time from prompts/illustration_kit_vi.txt, which the rendering test suite
+// holds to the components remotion_project/src/conceptflow-mini/illustration.tsx
+// actually exports.
+const remoC3VI = `## C3. BỘ MINH HOẠ PHẲNG — NGƯỜI, VẬT, BỐI CẢNH VẼ SẴN (DÙNG TRƯỚC TIÊN)
+
+Video của kênh được vẽ theo lối tranh phẳng kể chuyện. Mọi người, bộ phận cơ thể, món ăn, đồ vật và bối cảnh mà kịch bản nói tới được dựng bằng bộ hình vẽ sẵn dưới đây — đã được thiết kế cùng một nét vẽ, có nét mặt và dáng, tự chớp mắt/thở — thay vì vẽ lại từ ¤<path>¤. Clip Lottie (mục C2) chỉ là phần thêm; bộ này là mặc định.
+
+{{illustration_kit}}
+
+`
+
 const remoDVI = `## D. KHUÔN CODE BẮT BUỘC (đúng cấu trúc này — hệ thống đọc theo nó)
 
 ¤¤¤tsx
@@ -679,6 +701,7 @@ import React from 'react';
 import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
 import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
 import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
+import {Backdrop, Person} from './conceptflow-mini/illustration';
 
 // BẢNG MÀU — chép nguyên từ kịch bản của Đạo diễn.
 const PALETTE = {
@@ -776,6 +799,7 @@ const remoEVI = `## E. THƯ VIỆN ĐƯỢC IMPORT
 - ¤remotion¤ — mọi API của nó, hay dùng nhất: ¤AbsoluteFill¤, ¤interpolate¤, ¤interpolateColors¤, ¤spring¤, ¤Easing¤, ¤useCurrentFrame¤, ¤useVideoConfig¤, ¤random¤ (ngẫu nhiên có seed).
 - ¤./conceptflow-mini/segments¤: ¤Segments¤, ¤calculateMetadataFromSegments¤.
 - ¤./conceptflow-mini/primitives¤: ¤Stage¤, ¤SAFE_MARGIN¤ (96), ¤WIDTH¤ (1920), ¤HEIGHT¤ (1080), ¤BACKGROUND¤.
+- ¤./conceptflow-mini/illustration¤: bộ minh hoạ phẳng ở mục C3.
 - KHÔNG import package nào khác (chưa được cài — build lỗi ngay). KHÔNG ảnh/video/font/âm thanh từ file hay URL (không ¤<Img>¤, ¤staticFile¤, ¤fetch¤). Hình vẽ bằng JSX + CSS hoặc SVG inline (¤<svg>¤, ¤<path>¤, ¤<circle>¤, ¤<line>¤, ¤<rect>¤, ¤<polygon>¤, ¤<text>¤).
 
 `
@@ -833,7 +857,8 @@ const remoGVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mụ
 7. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 8. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
 9. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
-10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤, ¤illustration¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+10b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong HÌNH mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như HÌNH mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
 11. Chữ giữa các thẻ JSX có ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần?
 12. Code là TSX hợp lệ 100%, đủ ngoặc, không cắt cụt, không có chữ giải thích lọt vào ngoài comment?
 
@@ -847,4 +872,4 @@ BÊN TRONG khối code chỉ có mã TSX thuần: TUYỆT ĐỐI không để l�
 
 QUY TẮC CỨNG: câu trả lời của bạn được đưa thẳng cho trình biên dịch. KHÔNG có lời chào, KHÔNG có câu dẫn ("Dưới đây là code…"), KHÔNG có lời giải thích hay tóm tắt sau code, KHÔNG có chữ nào ngoài khối code. Ký tự đầu tiên sau ¤¤¤tsx là ¤import¤ và code kết thúc ngay ở ¤¤¤ đóng.`
 
-const remotionEngineerVI = remoIntroVI + remoAVI + remoBVI + remoCVI + remoC2VI + remoDVI + remoEVI + remoFVI + remoGVI + remoOutputVI
+const remotionEngineerVI = remoIntroVI + remoAVI + remoBVI + remoCVI + remoC2VI + remoC3VI + remoDVI + remoEVI + remoFVI + remoGVI + remoOutputVI

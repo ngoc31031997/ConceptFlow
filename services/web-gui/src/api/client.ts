@@ -22,11 +22,19 @@ export class ApiError extends Error {
    * thứ hai mới có đường đi tiếp — dò theo câu chữ sẽ vỡ ngay khi đổi từ ngữ.
    */
   readonly code?: string;
+  /** CR-044 — lỗi code của một hình minh hoạ, kèm số dòng để trình sửa chỉ ra. */
+  readonly diagnostics?: CodeDiagnostic[];
 
-  constructor(message: string, code?: string) {
+  constructor(message: string, code?: string, diagnostics?: CodeDiagnostic[]) {
     super(message);
     this.code = code;
+    this.diagnostics = diagnostics;
   }
+}
+
+export interface CodeDiagnostic {
+  message: string;
+  line: number | null;
 }
 
 /** CR-021 FR61.3 — mã 409 mà `acknowledge_qc: true` đi qua được. */
@@ -167,11 +175,14 @@ export async function uploadMusic(projectId: string, file: File): Promise<MusicU
   });
 }
 
-async function parseError(response: Response): Promise<{ message: string; code?: string }> {
+async function parseError(
+  response: Response,
+): Promise<{ message: string; code?: string; diagnostics?: CodeDiagnostic[] }> {
   try {
     const body = await response.json();
     const code = typeof body?.code === "string" ? body.code : undefined;
-    if (typeof body?.error === "string") return { message: body.error, code };
+    const diagnostics = Array.isArray(body?.diagnostics) ? (body.diagnostics as CodeDiagnostic[]) : undefined;
+    if (typeof body?.error === "string") return { message: body.error, code, diagnostics };
     return {
       message: body?.error?.message ?? body?.error_message ?? GENERIC_CONNECTION_ERROR,
       code,
@@ -189,8 +200,8 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(GENERIC_CONNECTION_ERROR);
   }
   if (!response.ok) {
-    const { message, code } = await parseError(response);
-    throw new ApiError(message, code);
+    const { message, code, diagnostics } = await parseError(response);
+    throw new ApiError(message, code, diagnostics);
   }
   // 202 (a job accepted) carries no body either.
   if (response.status === 204 || response.status === 202) {
@@ -602,6 +613,154 @@ export function updateVideoArchetype(id: string, input: VideoArchetypeInput): Pr
 
 export async function deleteVideoArchetype(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/video-archetypes/${id}`, { method: "DELETE" });
+}
+
+/** CR-044 — một ngăn của thư viện hình minh hoạ. */
+export interface IllustrationFolder {
+  id: string;
+  name: string;
+  description: string;
+  position: number;
+  is_system: boolean;
+}
+
+export type IllustrationStatus = "draft" | "approved";
+
+/** CR-044 — một hình của thư viện: có sẵn trong bộ minh hoạ, hoặc do AI/Creator vẽ. */
+export interface Illustration {
+  id: string;
+  /** Tên component (PascalCase) mà Kỹ sư Remotion gọi. */
+  name: string;
+  title: string;
+  folder_id: string;
+  tags: string[];
+  description: string;
+  /** Một dòng API: tham số và tỉ lệ khung. */
+  usage: string;
+  code?: string;
+  builtin: boolean;
+  /** Hình mẫu chuẩn của luật style (chỉ xem). */
+  exemplar: boolean;
+  /** Cảnh báo style của phiên bản hiện tại — không chặn lưu. */
+  warnings: CodeDiagnostic[];
+  status: IllustrationStatus;
+  version: number;
+  has_preview: boolean;
+}
+
+export interface IllustrationInput {
+  name: string;
+  title: string;
+  folder_id: string;
+  tags: string[];
+  description: string;
+  usage: string;
+  code: string;
+}
+
+/** Ảnh xem trước dạng base64, cho nút "Xem trước" trong trình sửa (chưa lưu gì). */
+export interface IllustrationTry {
+  png: string;
+  gif: string;
+  warnings?: CodeDiagnostic[];
+}
+
+/** Luật style của kênh và id các hình mẫu chuẩn (CR-044). */
+export interface IllustrationStyle {
+  rules: string;
+  exemplar_ids: string[];
+}
+
+export function getIllustrationStyle(): Promise<IllustrationStyle> {
+  return apiFetch<IllustrationStyle>("/v1/illustration-style");
+}
+
+/** AI vẽ một hình mới theo luật style; lưu ở "Chờ duyệt". Có thể mất vài phút. */
+export function drawIllustration(input: { description: string; folder_id: string; name?: string }): Promise<Illustration> {
+  return apiFetch<Illustration>("/v1/admin/illustrations/draw", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+/** AI vẽ lại một hình của bạn theo ghi chú; giữ tên, ra phiên bản mới ở "Chờ duyệt". */
+export function redrawIllustration(id: string, note: string): Promise<Illustration> {
+  return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/redraw`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function listIllustrationFolders(): Promise<IllustrationFolder[]> {
+  return (await apiFetch<{ folders: IllustrationFolder[] }>("/v1/illustration-folders")).folders;
+}
+
+export function createIllustrationFolder(input: { id: string; name: string; description?: string }): Promise<IllustrationFolder> {
+  return apiFetch<IllustrationFolder>("/v1/admin/illustration-folders", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function deleteIllustrationFolder(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/admin/illustration-folders/${id}`, { method: "DELETE" });
+}
+
+export async function listIllustrations(filter: { folder?: string; q?: string; status?: IllustrationStatus } = {}): Promise<Illustration[]> {
+  const params = new URLSearchParams();
+  for (const [k, v] of Object.entries(filter)) if (v) params.set(k, v);
+  const qs = params.toString();
+  return (await apiFetch<{ illustrations: Illustration[] }>(`/v1/illustrations${qs ? `?${qs}` : ""}`)).illustrations;
+}
+
+/** URL ảnh xem trước; có số phiên bản để trình duyệt cache đúng bản. */
+export function illustrationPreviewUrl(ill: Pick<Illustration, "id" | "version">, kind: "png" | "gif" = "png"): string {
+  return `${GATEWAY_URL}/v1/illustrations/${ill.id}/preview.${kind}?v=${ill.version}`;
+}
+
+/** Dựng thử code mà không lưu. Code hỏng → ApiError có `diagnostics`. */
+export function tryIllustration(name: string, code: string): Promise<IllustrationTry> {
+  return apiFetch<IllustrationTry>("/v1/illustration-tries", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name, code }),
+  });
+}
+
+export function createIllustration(input: IllustrationInput): Promise<Illustration> {
+  return apiFetch<Illustration>("/v1/admin/illustrations", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+/** Sửa code thì hình quay về "chờ duyệt" với phiên bản mới. Hình có sẵn trả 403. */
+export function updateIllustration(id: string, input: IllustrationInput): Promise<Illustration> {
+  return apiFetch<Illustration>(`/v1/admin/illustrations/${id}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+export function setIllustrationStatus(id: string, status: IllustrationStatus): Promise<Illustration> {
+  return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/status`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function rerenderIllustration(id: string): Promise<IllustrationTry> {
+  return apiFetch<IllustrationTry>(`/v1/admin/illustrations/${id}/rerender`, { method: "POST" });
+}
+
+export async function deleteIllustration(id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/admin/illustrations/${id}`, { method: "DELETE" });
 }
 
 /**

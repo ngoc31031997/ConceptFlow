@@ -400,6 +400,9 @@ services:
       HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
       HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
       HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
+      # CR-044 — library drawings are checked and previewed by rendering.
+      RENDERING_URL: http://rendering:8000
+      RENDERING_TIMEOUT_SECONDS: ${RENDERING_TIMEOUT_SECONDS:-240}
     deploy:
       resources:
         limits:

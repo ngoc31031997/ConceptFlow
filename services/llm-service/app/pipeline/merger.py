@@ -54,12 +54,28 @@ def palette_keys(sb: Storyboard) -> dict[str, str]:
     return {p.role: k for p, k in zip(sb.palette, keys, strict=True)}
 
 
+# CR-043: every component of conceptflow-mini/illustration.tsx. The prompt
+# tells the model the whole kit is already imported, so the frame imports all
+# of it; rendering/tests/domain/test_illustration_kit.py holds this list to the
+# file's real exports.
+ILLUSTRATION_KIT = (
+    "Backdrop", "Panel", "Person", "Tooth", "Germ", "OpenMouth", "Toothbrush", "Toothpaste",
+    "Drop", "Shield", "Heart", "Candy", "Lollipop", "Soda", "Donut", "Apple", "Clock", "Table",
+    "Chair", "Window", "Plant", "House", "Tree", "Sun", "Cloud", "Lightbulb", "Coin", "Book",
+    "Phone", "Magnifier", "Mark", "Sparkle", "Airplane", "Bubble",
+)
+# CR-044: the building blocks a library drawing (pasted into the script) uses.
+ILLUSTRATION_HELPERS = (
+    "Figure", "Face", "GroundShadow", "useBlink", "phaseOf", "shadeOf", "useSvgId",
+    "INK", "SHADE", "BLUSH", "WHITE",
+)
+
 _REMOTION_HEAD = """import React from 'react';
 import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
 import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
 import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
 import {LottieClip} from './conceptflow-mini/lottie';
-"""
+""" + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n"
 
 _REMOTION_TAIL = """
 function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number}[]}) {

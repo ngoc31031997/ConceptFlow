@@ -14,6 +14,7 @@ const { sagasRouter } = require('./routes/sagas');
 const { projectsRouter } = require('./routes/projects');
 const { channelAssetsRouter } = require('./routes/channelAssets');
 const { promptsRouter } = require('./routes/prompts');
+const { illustrationsRouter } = require('./routes/illustrations');
 const { authRouter } = require('./routes/auth');
 const { progressRouter } = require('./routes/progress');
 const { healthRouter } = require('./routes/health');
@@ -69,6 +70,7 @@ function main() {
   app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient, authoringClient, authoringAiClient));
   app.use(channelAssetsRouter(orchestratorClient, config.sharedDir));
   app.use(promptsRouter(authoringClient));
+  app.use(illustrationsRouter(authoringClient, authoringAiClient));
   app.use(authRouter(publisherClient));
   app.use(progressRouter(progress));
   app.use(healthRouter());
