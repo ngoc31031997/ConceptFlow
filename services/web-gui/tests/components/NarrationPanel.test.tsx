@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NarrationPanel } from "../../src/components/NarrationPanel";
-import { defaultSubtitleStyle } from "../../src/context/ProjectDraftContext";
 import * as client from "../../src/api/client";
 
 const VOICES = [
@@ -51,10 +50,6 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof NarrationPan
     onTtsEnabledChange: vi.fn(),
     voiceId: "vi-VN-HoaiMyNeural",
     onVoiceIdChange: vi.fn(),
-    subtitleMode: "off" as const,
-    onSubtitleModeChange: vi.fn(),
-    subtitleStyle: defaultSubtitleStyle,
-    onSubtitleStyleChange: vi.fn(),
     ...overrides,
   };
   render(<NarrationPanel {...props} />);
@@ -120,45 +115,5 @@ describe("NarrationPanel", () => {
 
     await waitFor(() => expect(screen.getByText("Azure")).toBeInTheDocument());
     expect(screen.getAllByText("Edge")).toHaveLength(2);
-  });
-
-  it("warns when the video would have neither narration nor subtitles", () => {
-    renderPanel({ ttsEnabled: false, subtitleMode: "off" });
-
-    expect(screen.getByRole("status")).toHaveTextContent("không có lời thoại và phụ đề");
-  });
-
-  it("offers all four subtitle delivery modes", () => {
-    renderPanel();
-
-    expect(screen.getByTestId("narration-subtitle-mode-off")).toBeInTheDocument();
-    expect(screen.getByTestId("narration-subtitle-mode-track")).toBeInTheDocument();
-    expect(screen.getByTestId("narration-subtitle-mode-burn_in")).toBeInTheDocument();
-    expect(screen.getByTestId("narration-subtitle-mode-both")).toBeInTheDocument();
-  });
-
-  it("selecting a mode reports it to the caller", () => {
-    const props = renderPanel();
-
-    fireEvent.click(screen.getByTestId("narration-subtitle-mode-track"));
-
-    expect(props.onSubtitleModeChange).toHaveBeenCalledWith("track");
-  });
-
-  it("hides the subtitle style panel for track-only (SRT carries no styling)", () => {
-    renderPanel({ subtitleMode: "track" });
-
-    expect(screen.queryByTestId("subtitle-style-panel")).not.toBeInTheDocument();
-  });
-
-  it("shows the subtitle style panel for burn_in and both", () => {
-    renderPanel({ subtitleMode: "burn_in" });
-    expect(screen.getByTestId("subtitle-style-panel")).toBeInTheDocument();
-  });
-
-  it("warns about doubled text only when both is selected", () => {
-    renderPanel({ subtitleMode: "both" });
-
-    expect(screen.getByRole("status")).toHaveTextContent("chữ bị trùng lặp");
   });
 });

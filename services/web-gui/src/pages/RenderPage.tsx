@@ -2,12 +2,24 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { ProductionSettingsPanel, type ProductionStage } from "../components/ProductionSettingsPanel";
 import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
 import { FLOW_TTS } from "../utils/flow";
+
+/**
+ * Settings that may still change after a stop at this saga step: the ones read
+ * by this step or a later one (mirrors the server's domain.WizardPatchAllowed).
+ * A retry re-runs the failed step and everything after it, so it picks them up.
+ */
+const EDITABLE_AFTER_STOP: Record<string, ProductionStage[]> = {
+  synthesize_speech: ["render", "merge"],
+  render_scenes: ["render", "merge"],
+  assemble_video: ["merge"],
+};
 
 /**
  * Bước 5 của 7 — "Xử lý": phần đắt, chạy sau khi Creator duyệt dàn ý ở bước 4.
@@ -80,6 +92,9 @@ export function RenderPage() {
       displayStep ?? ""
     ] ?? FLOW_TTS;
 
+  const stopped = (isFailed || isCancelled) && !viewOnly;
+  const editableStages = stopped ? (EDITABLE_AFTER_STOP[displayStep ?? ""] ?? []) : [];
+
   async function handleRetry() {
     setIsRetrying(true);
     setRetryError(null);
@@ -110,6 +125,20 @@ export function RenderPage() {
           hid how far the pipeline actually got, which is the first thing
           you want to know when deciding whether to retry.
         */}
+        {/*
+          Fix-then-retry: the settings this step (or a later one) reads sit
+          right above the retry action that will use them.
+        */}
+        {project && editableStages.length > 0 && (
+          <div style={{ marginBottom: "var(--space-sm)" }}>
+            <ProductionSettingsPanel
+              key={project.project_id}
+              project={project}
+              stages={editableStages}
+              hint="Đổi cấu hình ở đây rồi bấm Thử lại (hoặc Chạy tiếp): bước bị dừng và các bước sau sẽ dùng giá trị mới."
+            />
+          </div>
+        )}
         {isFailed && !isCancelled && (
           <ErrorBanner
             errorMessage={retryError ?? errorMessage}
