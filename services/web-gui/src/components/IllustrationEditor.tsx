@@ -1,0 +1,221 @@
+import { useEffect, useState } from "react";
+import {
+  ApiError,
+  createIllustration,
+  deleteIllustration,
+  tryIllustration,
+  updateIllustration,
+  type CodeDiagnostic,
+  type Illustration,
+  type IllustrationFolder,
+  type IllustrationInput,
+  type IllustrationTry,
+} from "../api/client";
+import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "./ui";
+import glass from "../styles/glass.module.css";
+import styles from "./IllustrationEditor.module.css";
+
+/** Khung code mặc định cho một hình mới: dùng lại Figure/Face để cùng nét với bộ có sẵn. */
+export const NEW_ILLUSTRATION_TEMPLATE = `import React from 'react';
+import {useCurrentFrame} from 'remotion';
+import {Figure, Face, shadeOf, type FigureProps} from './conceptflow-mini/illustration';
+
+// Hộp vẽ 240 x 200: sửa vw/vh cho đúng tỉ lệ hình của bạn.
+export function MyFigure({color = '#FFC72C', ...fig}: FigureProps & {color?: string}) {
+  const frame = useCurrentFrame();
+  const bob = fig.still ? 0 : Math.sin(frame / 8) * 3; // chuyển động tự thân
+  return (
+    <Figure {...fig} size={fig.size ?? 280} vw={240} vh={200}>
+      <g transform={\`translate(0 \${bob})\`}>
+        <rect x={20} y={40} width={200} height={140} rx={40} fill={color} />
+        <rect x={140} y={40} width={80} height={140} rx={40} fill={shadeOf(color, -0.12)} />
+        <Face mood="happy" blink={false} talking={false} frame={frame} cx={120} cy={110} glasses={false} />
+      </g>
+    </Figure>
+  );
+}
+`;
+
+interface IllustrationEditorProps {
+  /** null = a new drawing. */
+  illustration: Illustration | null;
+  folders: IllustrationFolder[];
+  defaultFolderId?: string;
+  onSaved: (saved: Illustration) => void;
+  onDeleted?: () => void;
+  onClose: () => void;
+}
+
+function toInput(ill: Illustration | null, folderId: string): IllustrationInput {
+  return {
+    name: ill?.name ?? "MyFigure",
+    title: ill?.title ?? "",
+    folder_id: ill?.folder_id ?? folderId,
+    tags: ill?.tags ?? [],
+    description: ill?.description ?? "",
+    usage: ill?.usage ?? "",
+    code: ill?.code ?? NEW_ILLUSTRATION_TEMPLATE,
+  };
+}
+
+/**
+ * CR-044 — edit one library drawing by hand: its details and its TSX. "Xem
+ * trước" renders the code as it is in the box without saving; saving renders
+ * it again and keeps the preview. Code the renderer refuses comes back with
+ * line numbers, listed under the box.
+ */
+export function IllustrationEditor({ illustration, folders, defaultFolderId, onSaved, onDeleted, onClose }: IllustrationEditorProps) {
+  const creating = illustration === null;
+  const readOnly = illustration?.builtin === true;
+  const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, defaultFolderId ?? folders[0]?.id ?? ""));
+  const [tagsText, setTagsText] = useState(form.tags.join(", "));
+  const [busy, setBusy] = useState<"" | "try" | "save" | "delete">("");
+  const [diagnostics, setDiagnostics] = useState<CodeDiagnostic[]>([]);
+  const [message, setMessage] = useState<string | null>(null);
+  const [tried, setTried] = useState<IllustrationTry | null>(null);
+
+  useEffect(() => {
+    const next = toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "");
+    setForm(next);
+    setTagsText(next.tags.join(", "));
+    setDiagnostics([]);
+    setMessage(null);
+    setTried(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [illustration?.id, illustration?.version]);
+
+  const set = <K extends keyof IllustrationInput>(key: K, value: IllustrationInput[K]) =>
+    setForm((f) => ({ ...f, [key]: value }));
+
+  const input = (): IllustrationInput => ({
+    ...form,
+    tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
+  });
+
+  async function run(kind: "try" | "save" | "delete", action: () => Promise<void>) {
+    setBusy(kind);
+    setDiagnostics([]);
+    setMessage(null);
+    try {
+      await action();
+    } catch (e) {
+      if (e instanceof ApiError && e.diagnostics?.length) setDiagnostics(e.diagnostics);
+      setMessage(e instanceof Error && e.message ? e.message : "Thao tác không thành công.");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const handleTry = () =>
+    run("try", async () => {
+      setTried(await tryIllustration(form.name, form.code));
+    });
+
+  const handleSave = () =>
+    run("save", async () => {
+      const saved = creating ? await createIllustration(input()) : await updateIllustration(illustration.id, input());
+      onSaved(saved);
+      setMessage(creating ? "Đã thêm vào thư viện — chờ duyệt." : "Đã lưu.");
+    });
+
+  const handleDelete = () => {
+    if (!illustration || !window.confirm(`Xoá "${illustration.title}" khỏi thư viện? Không khôi phục được.`)) return;
+    return run("delete", async () => {
+      await deleteIllustration(illustration.id);
+      onDeleted?.();
+    });
+  };
+
+  const folderOptions = folders.map((f) => ({ value: f.id, label: f.name, hint: f.description }));
+
+  return (
+    <Card
+      title={creating ? "Hình mới" : readOnly ? `${illustration.title} (có sẵn)` : `Sửa: ${illustration.title}`}
+      hint={
+        readOnly
+          ? "Hình có sẵn của bộ minh hoạ: chỉ xem. Code nằm trong conceptflow-mini/illustration.tsx."
+          : "Sửa code rồi bấm Xem trước để dựng thử — chưa lưu gì. Lưu thì hình quay về 'Chờ duyệt'."
+      }
+      headerAction={
+        <Button variant="ghost" onClick={onClose} data-testid="illustration-editor-close">
+          Đóng
+        </Button>
+      }
+      data-testid="illustration-editor"
+    >
+      <div className={styles.fields}>
+        <FormField label="Tên component (PascalCase)">
+          <TextInput
+            value={form.name}
+            onChange={(e) => set("name", e.target.value)}
+            readOnly={readOnly}
+            data-testid="illustration-name-input"
+          />
+        </FormField>
+        <FormField label="Tên hiển thị">
+          <TextInput value={form.title} onChange={(e) => set("title", e.target.value)} readOnly={readOnly} data-testid="illustration-title-input" />
+        </FormField>
+        <FormField label="Thư mục">
+          <Dropdown
+            value={form.folder_id}
+            options={folderOptions}
+            onChange={(v) => set("folder_id", v)}
+            disabled={readOnly}
+            data-testid="illustration-folder-input"
+          />
+        </FormField>
+        <FormField label="Thẻ (cách nhau bằng dấu phẩy)">
+          <TextInput value={tagsText} onChange={(e) => setTagsText(e.target.value)} readOnly={readOnly} data-testid="illustration-tags-input" />
+        </FormField>
+      </div>
+      <FormField label="Mô tả — trông ra sao, dùng khi nào" className={glass.mtSm}>
+        <TextArea rows={2} value={form.description} onChange={(e) => set("description", e.target.value)} readOnly={readOnly} />
+      </FormField>
+      <FormField label="Cách gọi (tham số, tỉ lệ khung) — Kỹ sư Remotion đọc dòng này" className={glass.mtSm}>
+        <TextInput value={form.usage} onChange={(e) => set("usage", e.target.value)} readOnly={readOnly} data-testid="illustration-usage-input" />
+      </FormField>
+      {!readOnly && (
+        <FormField label="Code TSX" className={glass.mtSm}>
+          <TextArea
+            rows={20}
+            spellCheck={false}
+            className={styles.code}
+            value={form.code}
+            onChange={(e) => set("code", e.target.value)}
+            data-testid="illustration-code-input"
+          />
+        </FormField>
+      )}
+      {diagnostics.length > 0 && (
+        <ul className={styles.diagnostics} data-testid="illustration-diagnostics">
+          {diagnostics.map((d, i) => (
+            <li key={i}>
+              {d.line != null && <span className={styles.line}>dòng {d.line}</span>} {d.message}
+            </li>
+          ))}
+        </ul>
+      )}
+      {tried && (
+        <div className={styles.tried} data-testid="illustration-tried">
+          <img src={`data:image/png;base64,${tried.png}`} alt="Ảnh tĩnh" />
+          {tried.gif && <img src={`data:image/gif;base64,${tried.gif}`} alt="Chuyển động" />}
+        </div>
+      )}
+      {!readOnly && (
+        <CtaRow helperText={message ?? undefined}>
+          {!creating && (
+            <Button variant="dangerGhost" onClick={handleDelete} disabled={busy !== ""} data-testid="illustration-delete-button">
+              {busy === "delete" ? "Đang xoá…" : "Xoá"}
+            </Button>
+          )}
+          <Button variant="ghost" onClick={handleTry} disabled={busy !== ""} data-testid="illustration-try-button">
+            {busy === "try" ? "Đang dựng…" : "Xem trước"}
+          </Button>
+          <Button onClick={handleSave} disabled={busy !== "" || !form.folder_id} data-testid="illustration-save-button">
+            {busy === "save" ? "Đang lưu…" : creating ? "Thêm vào thư viện" : "Lưu"}
+          </Button>
+        </CtaRow>
+      )}
+    </Card>
+  );
+}

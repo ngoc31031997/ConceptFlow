@@ -19,6 +19,7 @@ import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
 import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
+import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
 
@@ -67,6 +68,8 @@ export function App() {
                 the Creator wizard flow. */}
             <Route path="/settings/prompts" element={<PromptSettingsPage />} />
             <Route path="/settings/video-archetypes" element={<VideoArchetypeSettingsPage />} />
+            {/* CR-044 — the illustration library, folders of reviewed drawings. */}
+            <Route path="/settings/illustrations" element={<IllustrationLibraryPage />} />
 
             {/* CR-031 — bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng

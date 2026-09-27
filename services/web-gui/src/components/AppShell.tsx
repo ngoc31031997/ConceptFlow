@@ -91,6 +91,8 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           <NavLink to="/settings/prompts" className={navCls}>Cài đặt prompt</NavLink>
           {/* CR-041 — the table of video kinds the Story Architect chooses from. */}
           <NavLink to="/settings/video-archetypes" className={navCls}>Kiểu video</NavLink>
+          {/* CR-044 — the illustration library the Remotion Engineer draws from. */}
+          <NavLink to="/settings/illustrations" className={navCls}>Thư viện hình</NavLink>
         </nav>
       </aside>
 
