@@ -15,7 +15,11 @@ describe("JournalPage", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("groups events by project and shows per-step time and tokens", async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => events }) as unknown as typeof fetch;
+    global.fetch = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (String(url).includes("/v1/projects") ? { projects: [{ project_id: "aaaaaaaa-1", topic: "Định lý Pytago" }] } : events),
+    })) as unknown as typeof fetch;
     render(
       <ThemeProvider>
         <MemoryRouter>
@@ -29,11 +33,14 @@ describe("JournalPage", () => {
     fireEvent.click(screen.getByTestId("journal-tab-project"));
     // Newest project first; its failure detail is visible.
     await waitFor(() => expect(screen.getByTestId("journal-project-bbbbbbbb-1")).toBeInTheDocument());
-    expect(screen.getByText("boom")).toBeInTheDocument();
+    expect(screen.getByText(/boom/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("journal-project-aaaaaaaa-1"));
     await waitFor(() => expect(screen.getAllByTestId("journal-row")).toHaveLength(2));
     expect(screen.getByTestId("journal-summary")).toHaveTextContent("Code: 1m 30s, 500 token");
+    // Topic names the project in the list and the timeline title.
+    expect(screen.getByTestId("journal-project-aaaaaaaa-1")).toHaveTextContent("Định lý Pytago");
+    expect(screen.getByText("Dòng thời gian Định lý Pytago")).toBeInTheDocument();
   });
 
   it("overview: attributes a saga move's time to the step it LEFT, and skips waiting on the Creator", async () => {
