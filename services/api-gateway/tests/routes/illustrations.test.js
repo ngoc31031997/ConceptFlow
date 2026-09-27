@@ -37,6 +37,8 @@ describe('illustration library routing', () => {
     ['get', '/v1/illustration-style', 'fast'],
     ['post', '/v1/admin/illustrations/draw', 'slow'],
     ['post', '/v1/admin/illustrations/i1/redraw', 'slow'],
+    ['get', '/v1/admin/illustrations/export', 'slow'],
+    ['post', '/v1/admin/illustrations/import', 'slow'],
     ['get', '/v1/projects/p1/illustrations', 'fast'],
     ['post', '/v1/projects/p1/illustrations/plan', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
@@ -57,5 +59,41 @@ describe('illustration library routing', () => {
     expect(res.headers['content-type']).toBe('image/png');
     expect(res.headers['cache-control']).toBe('private, max-age=86400');
     expect(Buffer.compare(res.body, png)).toBe(0);
+  });
+
+  test('the library backup downloads as bytes with its file name', async () => {
+    const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff]);
+    const headers = new Map([
+      ['content-type', 'application/zip'],
+      ['content-disposition', 'attachment; filename="conceptflow-thu-vien-hinh-20260927-1530.zip"'],
+    ]);
+    const slow = client({ status: 200, headers, body: zip });
+    const res = await request(buildApp(client(), slow))
+      .get('/v1/admin/illustrations/export')
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks = [];
+        r.on('data', (c) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toBe('application/zip');
+    expect(res.headers['content-disposition']).toContain('conceptflow-thu-vien-hinh-');
+    expect(Buffer.compare(res.body, zip)).toBe(0);
+  });
+
+  test('an uploaded backup reaches authoring-service as the raw ZIP, with its conflict mode', async () => {
+    const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00, 0xff]);
+    const slow = client({ status: 200, headers: new Map(), body: { items: [] } });
+    const res = await request(buildApp(client(), slow))
+      .post('/v1/admin/illustrations/import?on_conflict=replace')
+      .set('Content-Type', 'application/zip')
+      .send(zip);
+    expect(res.status).toBe(200);
+    const sent = slow.request.mock.calls[0][0];
+    expect(Buffer.isBuffer(sent.body)).toBe(true);
+    expect(Buffer.compare(sent.body, zip)).toBe(0);
+    expect(sent.query).toEqual({ on_conflict: 'replace' });
+    expect(sent.headers['content-type']).toBe('application/zip');
   });
 });

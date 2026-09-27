@@ -5,8 +5,11 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -30,7 +33,13 @@ type illustrationsUseCase interface {
 	Rerender(ctx context.Context, id string) (png, gif []byte, err error)
 	Draw(ctx context.Context, req application.DrawRequest) (domain.Illustration, error)
 	Redraw(ctx context.Context, id, note, model string) (domain.Illustration, error)
+	Export(ctx context.Context, now time.Time) (application.LibraryExport, error)
+	Import(ctx context.Context, file []byte, opts application.ImportOptions) (application.LibraryImportReport, error)
 }
+
+// maxLibraryBackupBytes caps an uploaded backup: its drawings' code plus the
+// PNG and GIF of each, which the file carries for browsing by hand.
+const maxLibraryBackupBytes = 256 << 20
 
 // WithIllustrations enables the illustration library routes.
 func (rt *Router) WithIllustrations(u illustrationsUseCase) *Router {
@@ -53,6 +62,8 @@ func (rt *Router) illustrationRoutes(r chi.Router) {
 	r.Post("/v1/admin/illustrations/{id}/status", rt.handleIllustrationStatus)
 	r.Post("/v1/admin/illustrations/{id}/rerender", rt.handleRerenderIllustration)
 	r.Post("/v1/admin/illustrations/draw", rt.handleDrawIllustration)
+	r.Get("/v1/admin/illustrations/export", rt.handleExportIllustrations)
+	r.Post("/v1/admin/illustrations/import", rt.handleImportIllustrations)
 	r.Post("/v1/admin/illustrations/{id}/redraw", rt.handleRedrawIllustration)
 	r.Delete("/v1/admin/illustrations/{id}", rt.handleDeleteIllustration)
 }
@@ -61,6 +72,8 @@ func illustrationError(w http.ResponseWriter, err error) {
 	var invalid *application.InvalidIllustrationError
 	var llmErr *application.LLMError
 	switch {
+	case errors.Is(err, application.ErrBackupInvalid):
+		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, application.ErrDrawerDisabled):
 		writeError(w, http.StatusServiceUnavailable, err.Error())
 	case errors.As(err, &llmErr), errors.Is(err, application.ErrLLMNotConfigured):
@@ -358,4 +371,58 @@ func (rt *Router) handleRedrawIllustration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// handleExportIllustrations downloads the whole library as one ZIP (CR-044).
+func (rt *Router) handleExportIllustrations(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	now := time.Now()
+	out, err := rt.illustrations.Export(r.Context(), now)
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	name := fmt.Sprintf("conceptflow-thu-vien-hinh-%s.zip", now.Format("20060102-1504"))
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	w.Header().Set("Content-Length", strconv.Itoa(len(out.Zip)))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(out.Zip)
+}
+
+// handleImportIllustrations restores a backup sent as the raw ZIP body.
+// ?on_conflict=replace overwrites Creator drawings of the same name; the
+// default keeps them.
+func (rt *Router) handleImportIllustrations(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	mode := r.URL.Query().Get("on_conflict")
+	if mode != "" && mode != "skip" && mode != "replace" {
+		writeError(w, http.StatusBadRequest, "on_conflict phải là skip hoặc replace")
+		return
+	}
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxLibraryBackupBytes))
+	var tooBig *http.MaxBytesError
+	if errors.As(err, &tooBig) {
+		writeError(w, http.StatusRequestEntityTooLarge, fmt.Sprintf("file sao lưu lớn quá (tối đa %d MB)", maxLibraryBackupBytes>>20))
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "không đọc được file sao lưu")
+		return
+	}
+	if len(body) == 0 {
+		writeError(w, http.StatusBadRequest, "chưa gửi file sao lưu")
+		return
+	}
+	report, err := rt.illustrations.Import(r.Context(), body, application.ImportOptions{Replace: mode == "replace"})
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, report)
 }

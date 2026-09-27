@@ -1,0 +1,66 @@
+.restore {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: var(--border-w) dashed var(--ink-faint);
+}
+
+.label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.fileName {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.hint {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.error {
+  margin: var(--space-xs) 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.report {
+  margin-top: var(--space-sm);
+  padding: var(--space-xs);
+  font-size: 13px;
+  background: var(--muted);
+  border-radius: var(--radius);
+}
+
+.report p {
+  margin: 0 0 4px;
+}
+
+.summary {
+  font-weight: 600;
+}
+
+.notes {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  max-height: 240px;
+  overflow: auto;
+}

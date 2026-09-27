@@ -47,6 +47,13 @@ Không thêm service mới. `authoring-service`: bảng `illustration_assets`, A
 - **Ba cách thêm hình**: (1) Viết code; (2) Tải SVG lên — chuyển thành component ngay trong trình duyệt, mở trình sửa để xem trước, cảnh báo style hiện ngay; hình tải lên đứng yên cho tới khi thêm chuyển động; (3) AI vẽ theo mô tả — luật + linh kiện + hình mẫu vào prompt, tự sửa theo lỗi có số dòng tối đa 3 lượt, lưu "Chờ duyệt". Hình của Creator có thêm "Vẽ lại bằng AI" kèm ghi chú.
 - **Chưa kiểm chứng**: chất lượng hình AI vẽ với model thật (môi trường thử không có HIVE key). Prompt vẽ là file cố định, chưa sửa được trên màn Cài đặt prompt.
 
+## Sao lưu và khôi phục thư viện (Creator yêu cầu 2026-09-27)
+Mục đích: không mất hình khi mất cơ sở dữ liệu. Trang Thư viện hình, ô "Sao lưu" bên trái.
+- **Xuất** `GET /v1/admin/illustrations/export` → một file `conceptflow-thu-vien-hinh-<ngày>-<giờ>.zip`: `manifest.json` (định dạng `conceptflow-illustration-library` v1: mọi thư mục; mọi hình của Creator với tên, tiêu đề, thư mục, thẻ, mô tả, cách dùng, trạng thái duyệt, phiên bản) và `hinh/<thư-mục>/<Tên>.tsx|.png|.gif` để mở xem bằng tay. Chỉ đọc cơ sở dữ liệu, không dựng lại gì.
+- Hình có sẵn (34 hình CR-043) và 3 hình mẫu **không** nằm trong file: chúng đi kèm phần mềm và được nạp lại mỗi lần khởi động.
+- **Nhập** `POST /v1/admin/illustrations/import?on_conflict=skip|replace`, thân là file ZIP (tối đa 256 MB): tạo lại thư mục còn thiếu theo đúng thứ tự, đưa mỗi hình về đúng thư mục của nó, giữ trạng thái duyệt. Hình trùng tên: mặc định bỏ qua; chọn "Ghi đè hình trùng tên" thì ghi đè thành phiên bản mới của hình đang có. Không bao giờ ghi đè hình có sẵn.
+- Như lúc tạo hình, mỗi hình được nhập đều phải qua kiểm tra và dựng lại của rendering (thư viện không giữ hình không dựng được với bộ linh kiện hiện tại); ảnh xem trước lưu là ảnh vừa dựng, ảnh trong file chỉ để xem. Hình không qua kiểm tra được báo lỗi kèm số dòng, các hình khác vẫn nhập tiếp. Nếu rendering hay cơ sở dữ liệu hỏng giữa chừng thì dừng, báo còn bao nhiêu hình chưa nhập; nhập lại cùng file sẽ làm tiếp (hình đã nhập được bỏ qua).
+
 ## Mốc 3 — hình minh hoạ trong luồng làm video (2026-09-27)
 Cách làm khác bản đề xuất ở một điểm: không thêm bước mới vào luồng 1–13 (đánh số bước dùng chung ở orchestrator, web-gui, nhật ký). Giai đoạn hình chạy ở ĐẦU bước Code, chỉ với engine Remotion:
 1. **Lập danh sách** (`planner_prompt_vi.txt`, một lượt model): đọc storyboard đối chiếu danh mục thư viện (hình có sẵn + hình đã duyệt, kèm thẻ) → `reuse` (tên phải có thật trong thư viện, nếu không bị bỏ) và `draw` (tối đa 10; tên trùng hình đã có được đổi thành dùng lại; thư mục lạ về `do-vat`). Lưu ở bảng `project_illustrations`.
