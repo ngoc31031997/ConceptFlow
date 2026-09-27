@@ -1,10 +1,39 @@
 package domain
 
 import (
+	_ "embed"
 	"fmt"
 	"regexp"
 	"strings"
 )
+
+// The channel's illustration style rules, the building blocks a drawing may
+// use, and three reference drawings (CR-044). The rules are what the AI drawer
+// is held to and what web-gui shows; rendering/domain/illustration_style.py
+// checks the [S..] rules it can check mechanically, and the rendering test
+// suite holds the reference drawings to zero findings.
+//
+//go:embed prompts/illustration_style_vi.txt
+var illustrationStyleVI string
+
+//go:embed prompts/illustration_helpers_vi.txt
+var illustrationHelpersVI string
+
+//go:embed prompts/illustration_exemplars_vi.txt
+var illustrationExemplarsVI string
+
+// IllustrationStyleGuide is the rule text, as shown to the Creator and the model.
+func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyleVI) }
+
+// IllustrationHelpers documents the kit's building blocks for a new drawing.
+func IllustrationHelpers() string { return strings.TrimSpace(illustrationHelpersVI) }
+
+// CodeFinding is one problem found in a drawing's code: a check failure that
+// blocks saving, or a style warning that does not (CR-044).
+type CodeFinding struct {
+	Message string `json:"message"`
+	Line    *int   `json:"line"`
+}
 
 // CR-044: the illustration library. Every drawing the Remotion Engineer may
 // place in a shot is a row here, filed in exactly one folder so the Creator and
@@ -34,20 +63,24 @@ const (
 
 // Illustration is one drawing of the library.
 type Illustration struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"` // the exported component, PascalCase
-	Title       string             `json:"title"`
-	FolderID    string             `json:"folder_id"`
-	Tags        []string           `json:"tags"`
-	Description string             `json:"description"` // what it looks like and when to use it
-	Usage       string             `json:"usage"`       // one-line API: props and box aspect
-	Code        string             `json:"code,omitempty"`
-	Builtin     bool               `json:"builtin"`
-	Status      IllustrationStatus `json:"status"`
-	Version     int                `json:"version"`
-	HasPreview  bool               `json:"has_preview"`
-	CreatedAt   string             `json:"created_at"`
-	UpdatedAt   string             `json:"updated_at"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"` // the exported component, PascalCase
+	Title       string   `json:"title"`
+	FolderID    string   `json:"folder_id"`
+	Tags        []string `json:"tags"`
+	Description string   `json:"description"` // what it looks like and when to use it
+	Usage       string   `json:"usage"`       // one-line API: props and box aspect
+	Code        string   `json:"code,omitempty"`
+	// Builtin rows are read-only: the CR-043 kit (code ships in the image,
+	// Code is empty) and the style exemplars (Exemplar, code in the row).
+	Builtin    bool               `json:"builtin"`
+	Exemplar   bool               `json:"exemplar"`
+	Warnings   []CodeFinding      `json:"warnings"`
+	Status     IllustrationStatus `json:"status"`
+	Version    int                `json:"version"`
+	HasPreview bool               `json:"has_preview"`
+	CreatedAt  string             `json:"created_at"`
+	UpdatedAt  string             `json:"updated_at"`
 }
 
 var illustrationNameRe = regexp.MustCompile(`^[A-Z][A-Za-z0-9]{1,40}$`)
@@ -159,4 +192,31 @@ func BuiltinIllustrations() []Illustration {
 		b("Toothbrush", "Bàn chải đánh răng", "co-the-suc-khoe", "bàn chải,đánh răng,vệ sinh", "Bàn chải có kem, lông quay lên hoặc xuống.", "<Toothbrush color paste bristlesDown /> — 400×100"),
 		b("Toothpaste", "Kem đánh răng", "co-the-suc-khoe", "kem đánh răng,vệ sinh", "Tuýp kem đánh răng.", "<Toothpaste color /> — 300×120"),
 	}
+}
+
+var exemplarRe = regexp.MustCompile("(?s)=== (\\w+) — ([^=]*?) ===\n```tsx\n(.*?)```")
+
+// ExemplarIllustrations are the reference drawings of the style guide, seeded
+// as read-only library rows so the Creator sees them rendered and videos can
+// use them. Their code is the text the AI drawer is shown.
+func ExemplarIllustrations() []Illustration {
+	meta := map[string]struct{ title, folder, tags, usage string }{
+		"SchoolBus":  {"Xe buýt", "phuong-tien", "xe,xe buýt,trường học,giao thông", "<SchoolBus color mood moving /> — 320×210"},
+		"Cat":        {"Con mèo", "dong-vat", "mèo,thú cưng,con vật", "<Cat color mood /> — 220×240"},
+		"Microscope": {"Kính hiển vi", "khoa-hoc-cong-nghe", "kính hiển vi,khoa học,phòng thí nghiệm", "<Microscope color /> — 180×240"},
+	}
+	var out []Illustration
+	for _, m := range exemplarRe.FindAllStringSubmatch(illustrationExemplarsVI, -1) {
+		info, ok := meta[m[1]]
+		if !ok {
+			continue
+		}
+		out = append(out, Illustration{
+			ID: "exemplar-" + m[1], Name: m[1], Title: info.title, FolderID: info.folder,
+			Tags: NormalizeTags(strings.Split(info.tags, ",")), Description: "Hình mẫu chuẩn của luật style: " + strings.TrimSpace(m[2]) + ".",
+			Usage: info.usage, Code: strings.TrimSpace(m[3]) + "\n",
+			Builtin: true, Exemplar: true, Status: IllustrationApproved, Version: 1,
+		})
+	}
+	return out
 }

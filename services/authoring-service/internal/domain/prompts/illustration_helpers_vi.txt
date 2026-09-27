@@ -1,0 +1,13 @@
+Linh kiện dùng chung, import từ './conceptflow-mini/illustration' (KHÔNG import gì khác ngoài 'react' và 'remotion'):
+
+- <Figure {...fig} size={fig.size ?? <cỡ mặc định px>} vw={<rộng hộp>} vh={<cao hộp>}>...</Figure> — BẮT BUỘC bọc toàn bộ hình. Tự đặt hình theo x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity. Toạ độ bên trong là toạ độ của hộp vw × vh.
+- type FigureProps — { x?, y?, size?, rotate?, flip?, scale?, opacity?, still? }. Component nhận ...fig: FigureProps và truyền nguyên cho Figure.
+- <Face mood={mood} blink={blink} talking={false} frame={frame} cx={..} cy={..} glasses={false} /> — khuôn mặt chuẩn của kênh (mắt chấm, lông mày, má hồng, miệng theo mood; mood 'pain'/'worried' có giọt mồ hôi). Mặt rộng khoảng 80 đơn vị, cao khoảng 50, tâm tại (cx, cy).
+- type Mood — 'neutral' | 'happy' | 'sad' | 'worried' | 'surprised' | 'pain' | 'angry'.
+- <GroundShadow cx={..} cy={..} rx={..} /> — bóng đổ elip dưới vật đứng trên sàn.
+- useBlink(still: boolean, phase: number): boolean — true trong vài frame mỗi khoảng 3 giây (chớp mắt).
+- phaseOf(x, y): number — độ lệch pha theo vị trí, để hai hình cùng loại không chớp/nhún cùng lúc. Dùng: phaseOf(fig.x ?? 960, fig.y ?? 540).
+- shadeOf(hex, amount): string — màu tối hơn (amount âm, vd -0.12) hoặc sáng hơn (dương). Dùng cho mảng bóng.
+- useSvgId(prefix): string — id duy nhất cho clipPath (nếu cần cắt hình).
+- Hằng màu: INK (#3A1F4B, nét và mắt), WHITE, SHADE (đen dùng cho bóng với opacity thấp), BLUSH.
+- Từ 'remotion' chỉ dùng: useCurrentFrame, interpolate, spring, Easing.

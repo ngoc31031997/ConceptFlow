@@ -33,8 +33,23 @@ func TestIllustrationRepositoryAgainstPostgres(t *testing.T) {
 		}
 	}
 	all, _ := r.ListIllustrations(ctx, application.IllustrationFilter{})
-	if len(all) != len(domain.BuiltinIllustrations()) {
-		t.Fatalf("seeded %d rows, want %d", len(all), len(domain.BuiltinIllustrations()))
+	want := len(domain.BuiltinIllustrations()) + len(domain.ExemplarIllustrations())
+	if len(all) != want {
+		t.Fatalf("seeded %d rows, want %d", len(all), want)
+	}
+	cat, err := r.GetIllustration(ctx, "exemplar-Cat")
+	if err != nil || !cat.Exemplar || cat.Code == "" || cat.Version != 1 {
+		t.Fatalf("exemplar row: %+v %v", cat, err)
+	}
+	// An exemplar whose code changed in a new image gets a new version on seed.
+	if _, err := pool.Exec(ctx, `UPDATE illustrations SET code = 'old' WHERE id = 'exemplar-Cat'`); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SeedIllustrations(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if cat, _ = r.GetIllustration(ctx, "exemplar-Cat"); cat.Version != 2 {
+		t.Fatalf("exemplar code change did not bump the version: v%d", cat.Version)
 	}
 	health, _ := r.ListIllustrations(ctx, application.IllustrationFilter{FolderID: "co-the-suc-khoe"})
 	byTag, _ := r.ListIllustrations(ctx, application.IllustrationFilter{Query: "SÂU RĂNG"})
@@ -42,10 +57,15 @@ func TestIllustrationRepositoryAgainstPostgres(t *testing.T) {
 		t.Fatalf("folder/tag filters: %d health, %v", len(health), byTag)
 	}
 
+	line := 7
 	bus, err := r.CreateIllustration(ctx, domain.Illustration{Name: "Bus", Title: "Xe buýt", FolderID: "phuong-tien",
-		Tags: []string{"xe"}, Code: "export function Bus() {}", Status: domain.IllustrationDraft, Version: 1})
+		Tags: []string{"xe"}, Code: "export function Bus() {}", Status: domain.IllustrationDraft, Version: 1,
+		Warnings: []domain.CodeFinding{{Message: "[S9] màu #123456", Line: &line}}})
 	if err != nil || bus.HasPreview {
 		t.Fatalf("create: %+v %v", bus, err)
+	}
+	if len(bus.Warnings) != 1 || *bus.Warnings[0].Line != 7 {
+		t.Fatalf("warnings not stored: %+v", bus.Warnings)
 	}
 	if _, err := r.CreateIllustration(ctx, domain.Illustration{Name: "Tooth", Title: "x", FolderID: "do-vat", Code: "x", Status: "draft", Version: 1}); !errors.Is(err, application.ErrIllustrationNameTaken) {
 		t.Fatalf("duplicate name: %v", err)

@@ -39,3 +39,27 @@ func TestBuiltinIllustrationsMatchTheKitAndLiveInSystemFolders(t *testing.T) {
 		}
 	}
 }
+
+func TestExemplarsAreParsedFromTheStyleGuideAndFiledInSystemFolders(t *testing.T) {
+	ex := ExemplarIllustrations()
+	if len(ex) != 3 {
+		t.Fatalf("want 3 exemplars, got %d", len(ex))
+	}
+	folders := map[string]bool{}
+	for _, f := range SystemIllustrationFolders() {
+		folders[f.ID] = true
+	}
+	for _, e := range ex {
+		if !folders[e.FolderID] || !e.Builtin || !e.Exemplar || e.Status != IllustrationApproved {
+			t.Errorf("bad exemplar row %+v", e)
+		}
+		if !regexp.MustCompile(`(?m)^export function ` + e.Name + `\(`).MatchString(e.Code) {
+			t.Errorf("%s: code does not export the component", e.Name)
+		}
+	}
+	for _, rule := range []string{"[S1]", "[S9]", "[S13]", "[S19]", "[S24]"} {
+		if !regexp.MustCompile(regexp.QuoteMeta(rule)).MatchString(IllustrationStyleGuide()) {
+			t.Errorf("style guide lost rule %s", rule)
+		}
+	}
+}

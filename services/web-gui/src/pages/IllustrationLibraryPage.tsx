@@ -1,18 +1,23 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { AppShell } from "../components/AppShell";
-import { Button, Card, TextInput } from "../components/ui";
+import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "../components/ui";
+import { Disclosure } from "../components/Disclosure";
 import { IllustrationTile } from "../components/IllustrationTile";
 import { IllustrationEditor } from "../components/IllustrationEditor";
 import {
   createIllustrationFolder,
   deleteIllustrationFolder,
+  drawIllustration,
+  getIllustrationStyle,
   listIllustrationFolders,
   listIllustrations,
   rerenderIllustration,
   setIllustrationStatus,
   type Illustration,
   type IllustrationFolder,
+  type IllustrationInput,
 } from "../api/client";
+import { componentNameFromFile, svgToComponent } from "../utils/svgToComponent";
 import glass from "../styles/glass.module.css";
 import styles from "./IllustrationLibraryPage.module.css";
 
@@ -35,6 +40,14 @@ export function IllustrationLibraryPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [newFolderId, setNewFolderId] = useState("");
   const [newFolderName, setNewFolderName] = useState("");
+  const [rules, setRules] = useState("");
+  const [exemplarIds, setExemplarIds] = useState<string[]>([]);
+  const [draft, setDraft] = useState<Partial<IllustrationInput> | undefined>(undefined);
+  const [drawOpen, setDrawOpen] = useState(false);
+  const [drawText, setDrawText] = useState("");
+  const [drawFolder, setDrawFolder] = useState("");
+  const [drawing, setDrawing] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
     try {
@@ -48,7 +61,61 @@ export function IllustrationLibraryPage() {
 
   useEffect(() => {
     void reload();
+    getIllustrationStyle()
+      .then((st) => {
+        setRules(st.rules);
+        setExemplarIds(st.exemplar_ids);
+      })
+      .catch(() => setRules(""));
   }, [reload]);
+
+  // 2.1 — viết code: mở trình sửa với khung code mẫu.
+  const startCode = () => {
+    setDraft(undefined);
+    setDrawOpen(false);
+    setOpenId(NEW);
+  };
+
+  // 2.2 — tải SVG lên: chuyển thành code ngay trong trình duyệt, mở trình sửa để xem trước rồi lưu.
+  async function onSvgFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setStatus(null);
+    try {
+      const name = componentNameFromFile(file.name);
+      const converted = svgToComponent(await file.text(), name);
+      setDraft({
+        name,
+        title: file.name.replace(/\.svg$/i, ""),
+        code: converted.code,
+        usage: `<${name} /> — ${converted.width}×${converted.height}`,
+        folder_id: folder || undefined,
+      });
+      setDrawOpen(false);
+      setOpenId(NEW);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Không đọc được file SVG.");
+    }
+  }
+
+  // 2.3 — AI vẽ theo luật style.
+  async function draw() {
+    setDrawing(true);
+    setStatus(null);
+    try {
+      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawFolder || folder || folders[0]?.id || "" });
+      setItems((list) => [...list, made]);
+      setDrawText("");
+      setDrawOpen(false);
+      setDraft(undefined);
+      setOpenId(made.id);
+    } catch (err) {
+      setStatus(err instanceof Error && err.message ? err.message : "AI chưa vẽ được hình này.");
+    } finally {
+      setDrawing(false);
+    }
+  }
 
   const folderName = useMemo(() => Object.fromEntries(folders.map((f) => [f.id, f.name])), [folders]);
   const counts = useMemo(() => {
@@ -175,10 +242,73 @@ export function IllustrationLibraryPage() {
               <span className={styles.summary}>
                 {visible.length} hình{pending > 0 ? ` · ${pending} chờ duyệt` : ""}
               </span>
-              <Button onClick={() => setOpenId(NEW)} data-testid="illustration-new-button">
-                Thêm hình
-              </Button>
+              <div className={styles.addRow}>
+                <Button variant="ghost" onClick={startCode} data-testid="illustration-new-button">
+                  Viết code
+                </Button>
+                <Button variant="ghost" onClick={() => fileInput.current?.click()} data-testid="illustration-upload-button">
+                  Tải SVG lên
+                </Button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept=".svg,image/svg+xml"
+                  className={styles.hiddenInput}
+                  onChange={onSvgFile}
+                  data-testid="illustration-upload-input"
+                />
+                <Button onClick={() => setDrawOpen((v) => !v)} data-testid="illustration-draw-open">
+                  AI vẽ
+                </Button>
+              </div>
             </div>
+            <div className={glass.mtSm}>
+              <Disclosure
+                title="Luật style của kênh"
+                hint="AI vẽ phải theo đúng luật này; hình tải lên hay tự viết code được kiểm tra theo nó. Vi phạm nặng chặn lưu, vi phạm nhẹ chỉ cảnh báo."
+                testId="illustration-style"
+              >
+                <ul className={styles.exemplars}>
+                  {items
+                    .filter((i) => exemplarIds.includes(i.id))
+                    .map((ill) => (
+                      <IllustrationTile key={ill.id} illustration={ill} onOpen={() => setOpenId(ill.id)} />
+                    ))}
+                </ul>
+                <pre className={styles.rules} data-testid="illustration-style-rules">{rules}</pre>
+              </Disclosure>
+            </div>
+            {drawOpen && (
+              <Card
+                className={glass.mtSm}
+                title="AI vẽ hình mới"
+                hint="Mô tả vật cần vẽ. AI theo luật style và học theo hình mẫu cùng hình bạn đã duyệt trong thư mục; hình vẽ xong nằm ở 'Chờ duyệt'."
+                data-testid="illustration-draw-card"
+              >
+                <FormField label="Vẽ gì">
+                  <TextArea
+                    rows={2}
+                    placeholder="vd: xe máy màu đỏ nhìn ngang, có mặt cười"
+                    value={drawText}
+                    onChange={(e) => setDrawText(e.target.value)}
+                    data-testid="illustration-draw-text"
+                  />
+                </FormField>
+                <FormField label="Thư mục" className={glass.mtSm}>
+                  <Dropdown
+                    value={drawFolder || folder || folders[0]?.id || ""}
+                    options={folders.map((f) => ({ value: f.id, label: f.name, hint: f.description }))}
+                    onChange={setDrawFolder}
+                    data-testid="illustration-draw-folder"
+                  />
+                </FormField>
+                <CtaRow helperText={drawing ? "AI đang vẽ và tự kiểm tra — thường mất 1–3 phút." : undefined}>
+                  <Button onClick={draw} disabled={drawing || drawText.trim() === ""} data-testid="illustration-draw-button">
+                    {drawing ? "Đang vẽ…" : "Vẽ"}
+                  </Button>
+                </CtaRow>
+              </Card>
+            )}
             {status && (
               <p className={styles.status} role="status">
                 {status}
@@ -188,6 +318,7 @@ export function IllustrationLibraryPage() {
               <div className={glass.mtSm}>
                 <IllustrationEditor
                   illustration={opened}
+                  draft={openId === NEW ? draft : undefined}
                   folders={folders}
                   defaultFolderId={folder || undefined}
                   onSaved={(saved) => {
@@ -229,8 +360,8 @@ export function IllustrationLibraryPage() {
                         Dựng lại
                       </Button>
                       {!ill.builtin && (
-                        <Button variant="ghost" onClick={() => setOpenId(ill.id)}>
-                          Sửa code
+                        <Button variant="ghost" onClick={() => setOpenId(ill.id)} data-testid={`edit-${ill.name}`}>
+                          Sửa code / Vẽ lại
                         </Button>
                       )}
                     </>

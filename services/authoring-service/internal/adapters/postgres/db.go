@@ -119,6 +119,10 @@ CREATE TABLE IF NOT EXISTS illustrations (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS illustrations_name_key ON illustrations (name);
 CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id);
+-- Style exemplars are read-only rows that carry their code; warnings are the
+-- style findings of the current version that did not block saving.
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

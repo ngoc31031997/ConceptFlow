@@ -639,6 +639,10 @@ export interface Illustration {
   usage: string;
   code?: string;
   builtin: boolean;
+  /** Hình mẫu chuẩn của luật style (chỉ xem). */
+  exemplar: boolean;
+  /** Cảnh báo style của phiên bản hiện tại — không chặn lưu. */
+  warnings: CodeDiagnostic[];
   status: IllustrationStatus;
   version: number;
   has_preview: boolean;
@@ -658,6 +662,35 @@ export interface IllustrationInput {
 export interface IllustrationTry {
   png: string;
   gif: string;
+  warnings?: CodeDiagnostic[];
+}
+
+/** Luật style của kênh và id các hình mẫu chuẩn (CR-044). */
+export interface IllustrationStyle {
+  rules: string;
+  exemplar_ids: string[];
+}
+
+export function getIllustrationStyle(): Promise<IllustrationStyle> {
+  return apiFetch<IllustrationStyle>("/v1/illustration-style");
+}
+
+/** AI vẽ một hình mới theo luật style; lưu ở "Chờ duyệt". Có thể mất vài phút. */
+export function drawIllustration(input: { description: string; folder_id: string; name?: string }): Promise<Illustration> {
+  return apiFetch<Illustration>("/v1/admin/illustrations/draw", {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(input),
+  });
+}
+
+/** AI vẽ lại một hình của bạn theo ghi chú; giữ tên, ra phiên bản mới ở "Chờ duyệt". */
+export function redrawIllustration(id: string, note: string): Promise<Illustration> {
+  return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/redraw`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ note }),
+  });
 }
 
 export async function listIllustrationFolders(): Promise<IllustrationFolder[]> {

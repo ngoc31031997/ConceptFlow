@@ -76,3 +76,12 @@
   padding: 4px 10px;
   font-size: 12.5px;
 }
+
+.warn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-soft);
+  padding: 1px 6px;
+  border-radius: var(--radius);
+}

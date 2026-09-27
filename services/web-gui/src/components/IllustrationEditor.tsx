@@ -3,6 +3,7 @@ import {
   ApiError,
   createIllustration,
   deleteIllustration,
+  redrawIllustration,
   tryIllustration,
   updateIllustration,
   type CodeDiagnostic,
@@ -39,6 +40,8 @@ export function MyFigure({color = '#FFC72C', ...fig}: FigureProps & {color?: str
 interface IllustrationEditorProps {
   /** null = a new drawing. */
   illustration: Illustration | null;
+  /** Prefill for a new drawing (an uploaded SVG converted to code). */
+  draft?: Partial<IllustrationInput>;
   folders: IllustrationFolder[];
   defaultFolderId?: string;
   onSaved: (saved: Illustration) => void;
@@ -46,15 +49,15 @@ interface IllustrationEditorProps {
   onClose: () => void;
 }
 
-function toInput(ill: Illustration | null, folderId: string): IllustrationInput {
+function toInput(ill: Illustration | null, folderId: string, draft?: Partial<IllustrationInput>): IllustrationInput {
   return {
-    name: ill?.name ?? "MyFigure",
-    title: ill?.title ?? "",
-    folder_id: ill?.folder_id ?? folderId,
-    tags: ill?.tags ?? [],
-    description: ill?.description ?? "",
-    usage: ill?.usage ?? "",
-    code: ill?.code ?? NEW_ILLUSTRATION_TEMPLATE,
+    name: ill?.name ?? draft?.name ?? "MyFigure",
+    title: ill?.title ?? draft?.title ?? "",
+    folder_id: ill?.folder_id ?? draft?.folder_id ?? folderId,
+    tags: ill?.tags ?? draft?.tags ?? [],
+    description: ill?.description ?? draft?.description ?? "",
+    usage: ill?.usage ?? draft?.usage ?? "",
+    code: ill?.code ?? draft?.code ?? NEW_ILLUSTRATION_TEMPLATE,
   };
 }
 
@@ -64,25 +67,26 @@ function toInput(ill: Illustration | null, folderId: string): IllustrationInput 
  * it again and keeps the preview. Code the renderer refuses comes back with
  * line numbers, listed under the box.
  */
-export function IllustrationEditor({ illustration, folders, defaultFolderId, onSaved, onDeleted, onClose }: IllustrationEditorProps) {
+export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose }: IllustrationEditorProps) {
   const creating = illustration === null;
   const readOnly = illustration?.builtin === true;
-  const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, defaultFolderId ?? folders[0]?.id ?? ""));
+  const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft));
   const [tagsText, setTagsText] = useState(form.tags.join(", "));
-  const [busy, setBusy] = useState<"" | "try" | "save" | "delete">("");
+  const [busy, setBusy] = useState<"" | "try" | "save" | "delete" | "redraw">("");
+  const [note, setNote] = useState("");
   const [diagnostics, setDiagnostics] = useState<CodeDiagnostic[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [tried, setTried] = useState<IllustrationTry | null>(null);
 
   useEffect(() => {
-    const next = toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "");
+    const next = toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft);
     setForm(next);
     setTagsText(next.tags.join(", "));
     setDiagnostics([]);
     setMessage(null);
     setTried(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [illustration?.id, illustration?.version]);
+  }, [illustration?.id, illustration?.version, draft]);
 
   const set = <K extends keyof IllustrationInput>(key: K, value: IllustrationInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -92,7 +96,7 @@ export function IllustrationEditor({ illustration, folders, defaultFolderId, onS
     tags: tagsText.split(",").map((t) => t.trim()).filter(Boolean),
   });
 
-  async function run(kind: "try" | "save" | "delete", action: () => Promise<void>) {
+  async function run(kind: "try" | "save" | "delete" | "redraw", action: () => Promise<void>) {
     setBusy(kind);
     setDiagnostics([]);
     setMessage(null);
@@ -116,6 +120,15 @@ export function IllustrationEditor({ illustration, folders, defaultFolderId, onS
       const saved = creating ? await createIllustration(input()) : await updateIllustration(illustration.id, input());
       onSaved(saved);
       setMessage(creating ? "Đã thêm vào thư viện — chờ duyệt." : "Đã lưu.");
+    });
+
+  const handleRedraw = () =>
+    run("redraw", async () => {
+      if (!illustration) return;
+      const saved = await redrawIllustration(illustration.id, note);
+      setNote("");
+      onSaved(saved);
+      setMessage("AI đã vẽ lại — phiên bản mới đang chờ duyệt.");
     });
 
   const handleDelete = () => {
@@ -195,10 +208,32 @@ export function IllustrationEditor({ illustration, folders, defaultFolderId, onS
           ))}
         </ul>
       )}
+      {(tried?.warnings ?? illustration?.warnings ?? []).length > 0 && (
+        <ul className={styles.warnings} data-testid="illustration-style-warnings">
+          {(tried?.warnings ?? illustration?.warnings ?? []).map((d, i) => (
+            <li key={i}>
+              {d.line != null && <span className={styles.line}>dòng {d.line}</span>} {d.message}
+            </li>
+          ))}
+        </ul>
+      )}
       {tried && (
         <div className={styles.tried} data-testid="illustration-tried">
           <img src={`data:image/png;base64,${tried.png}`} alt="Ảnh tĩnh" />
           {tried.gif && <img src={`data:image/gif;base64,${tried.gif}`} alt="Chuyển động" />}
+        </div>
+      )}
+      {!readOnly && !creating && (
+        <div className={`${styles.redraw} ${glass.mtSm}`}>
+          <TextInput
+            placeholder="Ghi chú cho AI, vd: bánh xe to hơn, mặt vui hơn (có thể để trống)"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            data-testid="illustration-redraw-note"
+          />
+          <Button variant="ghost" onClick={handleRedraw} disabled={busy !== ""} data-testid="illustration-redraw-button">
+            {busy === "redraw" ? "AI đang vẽ lại… (1–3 phút)" : "Vẽ lại bằng AI"}
+          </Button>
         </div>
       )}
       {!readOnly && (

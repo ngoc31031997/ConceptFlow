@@ -61,6 +61,15 @@ export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0
           <span className={glass.badgeDot} aria-hidden="true" />
           {illustrationStatusLabel(ill)}
         </span>
+        {ill.warnings?.length > 0 && (
+          <span
+            className={styles.warn}
+            title={ill.warnings.map((w) => w.message).join("\n")}
+            data-testid={`illustration-warnings-${ill.name}`}
+          >
+            ⚠ {ill.warnings.length} cảnh báo style
+          </span>
+        )}
       </div>
       {actions && <div className={styles.actions}>{actions}</div>}
     </li>

@@ -48,3 +48,24 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+.warnings {
+  margin: var(--space-sm) 0 0;
+  padding: 10px 12px;
+  list-style: none;
+  font-size: 13px;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: var(--border-w) solid var(--warn);
+  border-radius: var(--radius);
+}
+
+.redraw {
+  display: flex;
+  gap: var(--space-xs);
+  align-items: center;
+}
+
+.redraw > :first-child {
+  flex: 1;
+}

@@ -43,3 +43,24 @@ def test_dung_hinh_moi_hinh_co_san_va_bao_loi_code_hong():
     finally:
         ts.close()
         previewer.close()
+
+
+@needs_browser
+def test_hinh_mau_chuan_dung_duoc_va_canh_bao_di_kem_ket_qua():
+    from tests.domain.test_illustration_style import EXEMPLARS, exemplars
+
+    if not EXEMPLARS.exists():
+        pytest.skip("authoring-service không có trong cây này")
+    ts = TypeScriptChecker(PROJECT, timeout_seconds=90)
+    previewer = IllustrationPreviewer(PROJECT, timeout_seconds=240)
+    uc = PreviewIllustrationUseCase(ts, previewer)
+    try:
+        for name, code in exemplars():
+            out = uc.run(name, code, gif=False)
+            assert out.ok and out.warnings == [], (name, out.diagnostics, out.warnings)
+        # Màu ngoài bảng: vẫn dựng được, chỉ cảnh báo [S9].
+        off = uc.run("SchoolBus", GOOD.replace("#FFC72C", "#123456"), gif=False)
+        assert off.ok and any("[S9]" in w["message"] for w in off.warnings)
+    finally:
+        ts.close()
+        previewer.close()

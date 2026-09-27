@@ -50,15 +50,14 @@ type IllustrationRepoPort interface {
 }
 
 // PreviewDiagnostic is one problem the renderer found in a drawing's code.
-type PreviewDiagnostic struct {
-	Message string `json:"message"`
-	Line    *int   `json:"line"`
-}
+type PreviewDiagnostic = domain.CodeFinding
 
-// IllustrationPreview is the renderer's answer for one drawing.
+// IllustrationPreview is the renderer's answer for one drawing. Warnings are
+// style findings that do not block saving (CR-044, agreed with the Creator).
 type IllustrationPreview struct {
 	OK          bool
 	Diagnostics []PreviewDiagnostic
+	Warnings    []PreviewDiagnostic
 	PNG, GIF    []byte
 }
 
@@ -89,6 +88,7 @@ func (e *InvalidIllustrationError) Unwrap() error { return ErrIllustrationInvali
 type IllustrationsUseCase struct {
 	repo     IllustrationRepoPort
 	renderer IllustrationRendererPort
+	drawer   *illustrationDrawer // nil = AI drawing disabled
 }
 
 func NewIllustrationsUseCase(repo IllustrationRepoPort, renderer IllustrationRendererPort) *IllustrationsUseCase {
@@ -211,7 +211,8 @@ func (uc *IllustrationsUseCase) Create(ctx context.Context, i domain.Illustratio
 	if err != nil {
 		return i, err
 	}
-	i.Builtin, i.Status, i.Version = false, domain.IllustrationDraft, 1
+	i.Builtin, i.Exemplar, i.Status, i.Version = false, false, domain.IllustrationDraft, 1
+	i.Warnings = preview.Warnings
 	saved, err := uc.repo.CreateIllustration(ctx, i)
 	if err != nil {
 		return saved, err
@@ -249,14 +250,14 @@ func (uc *IllustrationsUseCase) Update(ctx context.Context, id string, i domain.
 		return i, err
 	}
 	i.ID, i.Builtin = id, false
-	i.Status, i.Version = existing.Status, existing.Version
+	i.Status, i.Version, i.Warnings = existing.Status, existing.Version, existing.Warnings
 	codeChanged := i.Code != existing.Code || i.Name != existing.Name
 	var preview IllustrationPreview
 	if codeChanged {
 		if preview, err = uc.render(ctx, i.Name, i.Code); err != nil {
 			return i, err
 		}
-		i.Status, i.Version = domain.IllustrationDraft, existing.Version+1
+		i.Status, i.Version, i.Warnings = domain.IllustrationDraft, existing.Version+1, preview.Warnings
 	}
 	saved, err := uc.repo.UpdateIllustration(ctx, i)
 	if err != nil {
@@ -314,11 +315,8 @@ func (uc *IllustrationsUseCase) Rerender(ctx context.Context, id string) (png, g
 	if err != nil {
 		return nil, nil, err
 	}
-	code := existing.Code
-	if existing.Builtin {
-		code = ""
-	}
-	out, err := uc.render(ctx, existing.Name, code)
+	// Kit built-ins have no code (it ships in the image); exemplars carry theirs.
+	out, err := uc.render(ctx, existing.Name, existing.Code)
 	if err != nil {
 		return nil, nil, err
 	}

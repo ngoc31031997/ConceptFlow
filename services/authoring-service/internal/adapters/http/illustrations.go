@@ -28,6 +28,8 @@ type illustrationsUseCase interface {
 	Delete(ctx context.Context, id string) error
 	Preview(ctx context.Context, id string) (png, gif []byte, err error)
 	Rerender(ctx context.Context, id string) (png, gif []byte, err error)
+	Draw(ctx context.Context, req application.DrawRequest) (domain.Illustration, error)
+	Redraw(ctx context.Context, id, note, model string) (domain.Illustration, error)
 }
 
 // WithIllustrations enables the illustration library routes.
@@ -40,6 +42,7 @@ func (rt *Router) illustrationRoutes(r chi.Router) {
 	r.Get("/v1/illustration-folders", rt.handleListIllustrationFolders)
 	r.Post("/v1/admin/illustration-folders", rt.handleCreateIllustrationFolder)
 	r.Delete("/v1/admin/illustration-folders/{id}", rt.handleDeleteIllustrationFolder)
+	r.Get("/v1/illustration-style", rt.handleIllustrationStyle)
 	r.Get("/v1/illustrations", rt.handleListIllustrations)
 	r.Get("/v1/illustrations/{id}", rt.handleGetIllustration)
 	r.Get("/v1/illustrations/{id}/preview.png", rt.handleIllustrationPreview("png"))
@@ -49,12 +52,20 @@ func (rt *Router) illustrationRoutes(r chi.Router) {
 	r.Put("/v1/admin/illustrations/{id}", rt.handleUpdateIllustration)
 	r.Post("/v1/admin/illustrations/{id}/status", rt.handleIllustrationStatus)
 	r.Post("/v1/admin/illustrations/{id}/rerender", rt.handleRerenderIllustration)
+	r.Post("/v1/admin/illustrations/draw", rt.handleDrawIllustration)
+	r.Post("/v1/admin/illustrations/{id}/redraw", rt.handleRedrawIllustration)
 	r.Delete("/v1/admin/illustrations/{id}", rt.handleDeleteIllustration)
 }
 
 func illustrationError(w http.ResponseWriter, err error) {
 	var invalid *application.InvalidIllustrationError
+	var llmErr *application.LLMError
 	switch {
+	case errors.Is(err, application.ErrDrawerDisabled):
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+	case errors.As(err, &llmErr), errors.Is(err, application.ErrLLMNotConfigured):
+		status, msg := DescribeGenerateError(err)
+		writeError(w, status, msg)
 	case errors.As(err, &invalid):
 		writeJSON(w, http.StatusUnprocessableEntity, map[string]any{"error": invalid.Error(), "diagnostics": invalid.Diagnostics})
 	case errors.Is(err, application.ErrIllustrationNotFound), errors.Is(err, application.ErrFolderNotFound):
@@ -216,7 +227,9 @@ func (rt *Router) handleTryIllustration(w http.ResponseWriter, r *http.Request) 
 		illustrationError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, previewJSON(out.PNG, out.GIF))
+	body := previewJSON(out.PNG, out.GIF)
+	body["warnings"] = out.Warnings
+	writeJSON(w, http.StatusOK, body)
 }
 
 func (rt *Router) handleCreateIllustration(w http.ResponseWriter, r *http.Request) {
@@ -291,4 +304,58 @@ func (rt *Router) handleDeleteIllustration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleIllustrationStyle serves the channel's style rules and the ids of the
+// reference drawings, which web-gui shows with their previews (CR-044).
+func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, _ *http.Request) {
+	ids := []string{}
+	for _, e := range domain.ExemplarIllustrations() {
+		ids = append(ids, e.ID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rules": domain.IllustrationStyleGuide(), "exemplar_ids": ids})
+}
+
+func (rt *Router) handleDrawIllustration(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	var b struct {
+		Description string `json:"description"`
+		FolderID    string `json:"folder_id"`
+		Name        string `json:"name"`
+		Model       string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	out, err := rt.illustrations.Draw(r.Context(), application.DrawRequest{
+		Description: b.Description, FolderID: b.FolderID, Name: b.Name, Model: b.Model,
+	})
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (rt *Router) handleRedrawIllustration(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	var b struct {
+		Note  string `json:"note"`
+		Model string `json:"model"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	out, err := rt.illustrations.Redraw(r.Context(), chi.URLParam(r, "id"), b.Note, b.Model)
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }

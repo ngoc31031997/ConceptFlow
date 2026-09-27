@@ -39,3 +39,10 @@ Không thêm service mới. `authoring-service`: bảng `illustration_assets`, A
 ## Rủi ro
 - Vật phức tạp (xe máy, cơ quan nội tạng) có thể phải vẽ lại nhiều lần hoặc sửa tay — đây là lý do có nút Sửa code.
 - Thêm thời gian cho video đầu của mỗi chủ đề; giảm dần khi thư viện lớn lên.
+
+## Luật style và ba cách làm giàu thư viện (Creator yêu cầu 2026-09-27)
+- **Luật style** `authoring-service/internal/domain/prompts/illustration_style_vi.txt`: 24 luật [S1]–[S24] (hình khối, tô bóng, màu + bảng màu kênh, khuôn mặt, khung, chuyển động, đặt tên). Hiện trên trang Thư viện, đưa nguyên văn cho AI vẽ.
+- **Hình mẫu**: 3 hình chuẩn (SchoolBus, Cat, Microscope) trong `illustration_exemplars_vi.txt`, nạp vào thư viện dạng chỉ-xem "Hình mẫu". Model hiện dùng chỉ đọc chữ, nên AI tham chiếu CODE của hình mẫu (cộng tối đa 2 hình Creator đã duyệt cùng thư mục); Creator xem ẢNH của chính các hình đó.
+- **Kiểm tra style tự động** (`rendering/domain/illustration_style.py`), chạy ở mọi lần xem trước/lưu/AI vẽ: gradient, filter, ảnh, chữ, thiếu Figure, Math.random/Date.now/CSS animation là LỖI chặn lưu; viền quanh khối, góc không bo, màu ngoài bảng, quá 6 màu, quá chi tiết, màu không đổi được qua prop, có mặt mà không chuyển động, chuyển động không tắt được là CẢNH BÁO (lưu vào hình, hiện ⚠ trên ô). Ba hình mẫu có test giữ ở mức không lỗi, không cảnh báo.
+- **Ba cách thêm hình**: (1) Viết code; (2) Tải SVG lên — chuyển thành component ngay trong trình duyệt, mở trình sửa để xem trước, cảnh báo style hiện ngay; hình tải lên đứng yên cho tới khi thêm chuyển động; (3) AI vẽ theo mô tả — luật + linh kiện + hình mẫu vào prompt, tự sửa theo lỗi có số dòng tối đa 3 lượt, lưu "Chờ duyệt". Hình của Creator có thêm "Vẽ lại bằng AI" kèm ghi chú.
+- **Chưa kiểm chứng**: chất lượng hình AI vẽ với model thật (môi trường thử không có HIVE key). Prompt vẽ là file cố định, chưa sửa được trên màn Cài đặt prompt.

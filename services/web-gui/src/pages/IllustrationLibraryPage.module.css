@@ -99,3 +99,35 @@
     position: static;
   }
 }
+
+.addRow {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.exemplars {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+  margin: var(--space-sm) 0 0;
+}
+
+.rules {
+  margin: var(--space-sm) 0 0;
+  padding: var(--space-sm);
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--muted);
+  border-radius: var(--radius);
+}

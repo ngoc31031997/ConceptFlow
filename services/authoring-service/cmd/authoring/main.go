@@ -78,7 +78,8 @@ func main() {
 		logger.Warn("could not seed the illustration library", "error", err)
 	}
 	illustrations := application.NewIllustrationsUseCase(
-		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout))
+		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
+		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 
 	prompts := application.NewPromptsUseCase(authoringRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (the project

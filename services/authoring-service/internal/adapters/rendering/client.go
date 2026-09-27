@@ -35,6 +35,7 @@ type previewRequest struct {
 type previewResponse struct {
 	OK          bool                            `json:"ok"`
 	Diagnostics []application.PreviewDiagnostic `json:"diagnostics"`
+	Warnings    []application.PreviewDiagnostic `json:"warnings"`
 	PNG         string                          `json:"png"`
 	GIF         string                          `json:"gif"`
 	Error       string                          `json:"error"`
@@ -65,7 +66,7 @@ func (c *Client) PreviewIllustration(
 	if res.StatusCode != http.StatusOK {
 		return application.IllustrationPreview{}, fmt.Errorf("rendering answered %d: %s", res.StatusCode, out.Error)
 	}
-	preview := application.IllustrationPreview{OK: out.OK, Diagnostics: out.Diagnostics}
+	preview := application.IllustrationPreview{OK: out.OK, Diagnostics: out.Diagnostics, Warnings: out.Warnings}
 	if preview.PNG, err = base64.StdEncoding.DecodeString(out.PNG); err != nil {
 		return application.IllustrationPreview{}, fmt.Errorf("rendering sent a broken PNG: %w", err)
 	}

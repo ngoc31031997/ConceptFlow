@@ -15,7 +15,7 @@ import (
 
 // CR-044 — the illustration library's tables.
 
-const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, status, version,
+const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, warnings, status, version,
 	(preview_png IS NOT NULL AND preview_version = version), created_at, updated_at`
 
 func scanIllustration(row pgx.Row) (domain.Illustration, error) {
@@ -23,7 +23,7 @@ func scanIllustration(row pgx.Row) (domain.Illustration, error) {
 	var status string
 	var created, updated time.Time
 	if err := row.Scan(&i.ID, &i.Name, &i.Title, &i.FolderID, &i.Tags, &i.Description, &i.Usage, &i.Code,
-		&i.Builtin, &status, &i.Version, &i.HasPreview, &created, &updated); err != nil {
+		&i.Builtin, &i.Exemplar, &i.Warnings, &status, &i.Version, &i.HasPreview, &created, &updated); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Illustration{}, application.ErrIllustrationNotFound
 		}
@@ -32,6 +32,9 @@ func scanIllustration(row pgx.Row) (domain.Illustration, error) {
 	i.Status = domain.IllustrationStatus(status)
 	if i.Tags == nil {
 		i.Tags = []string{}
+	}
+	if i.Warnings == nil {
+		i.Warnings = []domain.CodeFinding{}
 	}
 	i.CreatedAt = created.Format(time.RFC3339)
 	i.UpdatedAt = updated.Format(time.RFC3339)
@@ -67,14 +70,18 @@ func (r *PromptTemplateRepository) SeedIllustrations(ctx context.Context) error 
 			return err
 		}
 	}
-	for _, b := range domain.BuiltinIllustrations() {
+	// Kit built-ins and style exemplars. A changed exemplar's code bumps its
+	// version, so its stored preview is re-rendered instead of served stale.
+	for _, b := range append(domain.BuiltinIllustrations(), domain.ExemplarIllustrations()...) {
 		if _, err := r.pool.Exec(ctx, `
-			INSERT INTO illustrations (id, name, title, folder_id, tags, description, usage, builtin, status, version)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, true, 'approved', 1)
+			INSERT INTO illustrations (id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, status, version)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, 'approved', 1)
 			ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, folder_id = EXCLUDED.folder_id,
 			    tags = EXCLUDED.tags, description = EXCLUDED.description, usage = EXCLUDED.usage,
+			    exemplar = EXCLUDED.exemplar, code = EXCLUDED.code,
+			    version = illustrations.version + (illustrations.code IS DISTINCT FROM EXCLUDED.code)::int,
 			    updated_at = now()
-		`, b.ID, b.Name, b.Title, b.FolderID, b.Tags, b.Description, b.Usage); err != nil {
+		`, b.ID, b.Name, b.Title, b.FolderID, b.Tags, b.Description, b.Usage, b.Code, b.Exemplar); err != nil {
 			if errors.Is(mapIllustrationErr(err), application.ErrIllustrationNameTaken) {
 				continue
 			}
@@ -146,10 +153,10 @@ func (r *PromptTemplateRepository) GetIllustration(ctx context.Context, id strin
 
 func (r *PromptTemplateRepository) CreateIllustration(ctx context.Context, i domain.Illustration) (domain.Illustration, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, status, version)
-		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, $8, $9)
+		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, status, version, warnings)
+		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, $8, $9, $10)
 		RETURNING `+illustrationColumns, i.Name, i.Title, i.FolderID, i.Tags, i.Description, i.Usage, i.Code,
-		string(i.Status), i.Version)
+		string(i.Status), i.Version, findings(i.Warnings))
 	out, err := scanIllustration(row)
 	return out, mapIllustrationErr(err)
 }
@@ -157,10 +164,10 @@ func (r *PromptTemplateRepository) CreateIllustration(ctx context.Context, i dom
 func (r *PromptTemplateRepository) UpdateIllustration(ctx context.Context, i domain.Illustration) (domain.Illustration, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE illustrations SET name = $2, title = $3, folder_id = $4, tags = COALESCE($5::text[], '{}'), description = $6, usage = $7,
-		    code = $8, status = $9, version = $10, updated_at = now()
+		    code = $8, status = $9, version = $10, warnings = $11, updated_at = now()
 		WHERE id = $1 AND NOT builtin
 		RETURNING `+illustrationColumns, i.ID, i.Name, i.Title, i.FolderID, i.Tags, i.Description, i.Usage, i.Code,
-		string(i.Status), i.Version)
+		string(i.Status), i.Version, findings(i.Warnings))
 	out, err := scanIllustration(row)
 	return out, mapIllustrationErr(err)
 }
@@ -190,4 +197,12 @@ func (r *PromptTemplateRepository) GetIllustrationPreview(ctx context.Context, i
 		return nil, nil, err
 	}
 	return png, gif, nil
+}
+
+// findings stores a nil slice as [] so the column's NOT NULL holds.
+func findings(f []domain.CodeFinding) []domain.CodeFinding {
+	if f == nil {
+		return []domain.CodeFinding{}
+	}
+	return f
 }

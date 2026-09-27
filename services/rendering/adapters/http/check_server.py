@@ -114,6 +114,9 @@ def create_check_app(
             except (IllustrationPreviewError, TypeScriptCheckError) as exc:
                 logger.error("illustration preview could not run: %s", exc)
                 return JSONResponse({"error": str(exc)}, status_code=503)
-        return {"ok": out.ok, "diagnostics": out.diagnostics, "png": out.png, "gif": out.gif}
+        return {
+            "ok": out.ok, "diagnostics": out.diagnostics, "warnings": out.warnings,
+            "png": out.png, "gif": out.gif,
+        }
 
     return app
