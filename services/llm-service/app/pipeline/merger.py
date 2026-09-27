@@ -64,13 +64,18 @@ ILLUSTRATION_KIT = (
     "Chair", "Window", "Plant", "House", "Tree", "Sun", "Cloud", "Lightbulb", "Coin", "Book",
     "Phone", "Magnifier", "Mark", "Sparkle", "Airplane", "Bubble",
 )
+# CR-044: the building blocks a library drawing (pasted into the script) uses.
+ILLUSTRATION_HELPERS = (
+    "Figure", "Face", "GroundShadow", "useBlink", "phaseOf", "shadeOf", "useSvgId",
+    "INK", "SHADE", "BLUSH", "WHITE",
+)
 
 _REMOTION_HEAD = """import React from 'react';
 import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
 import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
 import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
 import {LottieClip} from './conceptflow-mini/lottie';
-""" + "import {" + ", ".join(ILLUSTRATION_KIT) + "} from './conceptflow-mini/illustration';\n"
+""" + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n"
 
 _REMOTION_TAIL = """
 function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number}[]}) {

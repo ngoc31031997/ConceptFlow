@@ -31,10 +31,13 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 
 // --- shared ------------------------------------------------------------------
 
-const INK = '#3A1F4B';
-const SHADE = '#000000';
-const BLUSH = '#FF7A9A';
-const WHITE = '#FFFFFF';
+// Exported, with the helpers below, for the library's own figures (CR-044):
+// a drawing added through the review screen reuses the same box, face, blink
+// and shading, so it is drawn by the same hand as the built-in kit.
+export const INK = '#3A1F4B';
+export const SHADE = '#000000';
+export const BLUSH = '#FF7A9A';
+export const WHITE = '#FFFFFF';
 
 export interface FigureProps {
   /** Centre of the figure's box. Defaults to the frame centre. */
@@ -50,7 +53,7 @@ export interface FigureProps {
   still?: boolean;
 }
 
-function Figure({
+export function Figure({
   x = 960,
   y = 540,
   size,
@@ -86,22 +89,22 @@ function Figure({
 }
 
 /** Deterministic per-instance phase so two figures do not blink in unison. */
-function phaseOf(x: number, y: number): number {
+export function phaseOf(x: number, y: number): number {
   return Math.abs(Math.round(x * 7 + y * 13)) % 97;
 }
 
-function useBlink(still: boolean, phase: number): boolean {
+export function useBlink(still: boolean, phase: number): boolean {
   const frame = useCurrentFrame();
   if (still) return false;
   return (frame + phase) % 96 < 5;
 }
 
 /** An id usable inside url(#...): React's useId contains colons. */
-function useSvgId(prefix: string): string {
+export function useSvgId(prefix: string): string {
   return prefix + React.useId().replace(/[^a-zA-Z0-9_-]/g, '');
 }
 
-function shadeOf(hex: string, amount: number): string {
+export function shadeOf(hex: string, amount: number): string {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
   if (!m) return hex;
   const n = parseInt(m[1], 16);
@@ -111,7 +114,7 @@ function shadeOf(hex: string, amount: number): string {
   return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('');
 }
 
-function GroundShadow({cx, cy, rx}: {cx: number; cy: number; rx: number}) {
+export function GroundShadow({cx, cy, rx}: {cx: number; cy: number; rx: number}) {
   return <ellipse cx={cx} cy={cy} rx={rx} ry={rx * 0.16} fill={SHADE} opacity={0.12} />;
 }
 
@@ -208,7 +211,7 @@ export interface PersonProps extends FigureProps {
 
 type Pt = [number, number];
 
-function Face({
+export function Face({
   mood,
   blink,
   talking,

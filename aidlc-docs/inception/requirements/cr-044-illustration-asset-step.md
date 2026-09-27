@@ -4,7 +4,7 @@
 2026-09-27
 
 ## Stage
-Requirements Analysis — **chờ Creator duyệt**, chưa code.
+Requirements Analysis — **Creator đã duyệt 2026-09-27** (lưu trong DB, Drive tách CR sau; bước Kỹ sư chờ mọi hình được duyệt hoặc bỏ qua). Đang code.
 
 ## Bối cảnh
 CR-043 thêm 34 hình vẽ sẵn, nhưng mỗi chủ đề mới sẽ thiếu vật riêng. Creator đề xuất: sau bước Đạo diễn, dựng riêng từng vật được nhắc tới, duyệt từng ô, vẽ lại ô không ưng, sửa tay code SVG khi AI không vẽ được, và hình có animation.
@@ -21,8 +21,16 @@ CR-043 thêm 34 hình vẽ sẵn, nhưng mỗi chủ đề mới sẽ thiếu v�
 - **FR5 — Thư viện dùng lại.** Hình đã duyệt được lưu (tên, thẻ, mô tả, code, phiên bản, ảnh xem trước) và có trong danh sách "hình có sẵn" cho mọi video sau. Có trang Thư viện để xem/sửa/xoá.
 - **FR6 — Kỹ sư dùng hình.** Prompt Kỹ sư Remotion nhận thêm API của các hình mới trong video này; khung code import chúng.
 
-## Lưu trữ — quyết định cần Creator chốt
-- **Đề xuất:** code SVG và ảnh xem trước lưu trong Postgres của `authoring-service` (một hình chỉ vài KB–vài chục KB), không cần mạng, có phiên bản, dựng lại tức thì.
+## Thư mục thư viện (Creator yêu cầu 2026-09-27)
+Mỗi hình thuộc đúng MỘT thư mục, có thêm thẻ tự do để tìm. Thư mục cố định lúc đầu (Creator thêm được):
+`con-nguoi` (người, nghề nghiệp), `dong-vat`, `thuc-vat`, `co-the-suc-khoe` (bộ phận cơ thể, vi khuẩn, thuốc), `do-an-thuc-uong`, `phuong-tien` (xe, tàu, máy bay), `do-vat` (đồ gia dụng, dụng cụ, thiết bị), `cong-trinh-noi-chon` (nhà, trường, bệnh viện, cảnh), `thien-nhien-thoi-tiet` (mặt trời, mây, núi, nước), `tien-kinh-te`, `khoa-hoc-cong-nghe`, `bieu-tuong` (dấu tích, tim, bóng đèn, lấp lánh, bong bóng thoại), `boi-canh` (nền, mảng màu).
+- 34 hình của CR-043 được xếp sẵn vào các thư mục này.
+- Bước vẽ: LLM gán thư mục + thẻ cho hình mới; Creator đổi được ở màn duyệt.
+- Đối chiếu FR1 tìm theo tên, thẻ và mô tả trong đúng thư mục trước, rồi mới toàn thư viện — tránh vẽ lại thứ đã có.
+- Trang Thư viện: cây thư mục bên trái, lưới ô bên phải, ô tìm kiếm.
+
+## Lưu trữ — đã chốt
+- **Chốt:** code SVG và ảnh xem trước lưu trong Postgres của `authoring-service` (một hình chỉ vài KB–vài chục KB), không cần mạng, có phiên bản, dựng lại tức thì.
 - **Google Drive cá nhân (Creator đề xuất):** hợp để **sao lưu/xuất** video thành phẩm và bộ thư viện hình, không nên là nơi lưu chính của hình (mỗi lần dựng phải tải qua mạng, phụ thuộc token hết hạn). Đã có sẵn OAuth Google (YouTube, CR-012) nên có thể dùng lại client với quyền `drive.file`. Đề xuất tách thành CR riêng sau CR này.
 
 ## Phạm vi kỹ thuật

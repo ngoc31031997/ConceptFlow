@@ -17,9 +17,18 @@ from pydantic import BaseModel
 
 from adapters.rendering.typescript_checker import TypeScriptCheckError
 from adapters.http.check_metrics import CheckMetrics
+from adapters.rendering.illustration_previewer import IllustrationPreviewError
 from application.check_script import CheckScriptUseCase
+from application.preview_illustration import PreviewIllustrationUseCase
 
 logger = logging.getLogger(__name__)
+
+
+class IllustrationBody(BaseModel):
+    name: str
+    code: str = ""  # trống = hình dựng sẵn của bộ minh hoạ
+    props: dict = {}
+    gif: bool = True
 
 
 class CheckBody(BaseModel):
@@ -28,7 +37,8 @@ class CheckBody(BaseModel):
 
 
 def create_check_app(
-    use_case: CheckScriptUseCase, concurrency: int = 2, metrics: CheckMetrics | None = None
+    use_case: CheckScriptUseCase, concurrency: int = 2, metrics: CheckMetrics | None = None,
+    illustrations: PreviewIllustrationUseCase | None = None,
 ) -> FastAPI:
     metrics = metrics or CheckMetrics()
     app = FastAPI(title="rendering-check")
@@ -89,5 +99,21 @@ def create_check_app(
     @app.post("/v1/check/manim")
     async def check_manim(body: CheckBody):
         return await run("manim", body)
+
+    # CR-044: xem trước một hình của thư viện minh hoạ. Hàng đợi riêng, một
+    # yêu cầu một lúc — bộ dựng xem trước chỉ mở một tab trình duyệt.
+    preview_gate = asyncio.Semaphore(1)
+
+    @app.post("/v1/illustrations/preview")
+    async def preview_illustration(body: IllustrationBody):
+        if illustrations is None:
+            return JSONResponse({"error": "illustration preview is not enabled"}, status_code=404)
+        async with preview_gate:
+            try:
+                out = await asyncio.to_thread(illustrations.run, body.name, body.code, body.props, body.gif)
+            except (IllustrationPreviewError, TypeScriptCheckError) as exc:
+                logger.error("illustration preview could not run: %s", exc)
+                return JSONResponse({"error": str(exc)}, status_code=503)
+        return {"ok": out.ok, "diagnostics": out.diagnostics, "png": out.png, "gif": out.gif}
 
     return app

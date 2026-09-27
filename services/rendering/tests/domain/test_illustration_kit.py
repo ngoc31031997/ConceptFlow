@@ -26,8 +26,17 @@ MERGER = SERVICES / "llm-service" / "app" / "pipeline" / "merger.py"
 NOT_KIT_TAGS = {"AbsoluteFill"}
 
 
+# Linh kiện để vẽ hình mới (CR-044), không phải hình để đặt lên khung.
+HELPERS = {"Figure", "Face", "GroundShadow"}
+
+
+def all_exports() -> set[str]:
+    text = KIT.read_text(encoding="utf-8")
+    return set(re.findall(r"^export (?:function|const) (\w+)", text, re.M))
+
+
 def kit_exports() -> set[str]:
-    return set(re.findall(r"^export function ([A-Z]\w*)", KIT.read_text(encoding="utf-8"), re.M))
+    return {n for n in all_exports() if n[0].isupper() and not n.isupper()} - HELPERS
 
 
 def test_bo_minh_hoa_co_du_cac_hinh_toi_thieu():
@@ -51,6 +60,10 @@ def test_khung_code_cua_merger_import_dung_bo_minh_hoa():
     assert block, "merger.py không còn ILLUSTRATION_KIT"
     imported = set(re.findall(r'"(\w+)"', block.group(1)))
     assert imported == kit_exports()
+    helpers = re.search(r"ILLUSTRATION_HELPERS = \((.*?)\)", text, re.S)
+    assert helpers, "merger.py không còn ILLUSTRATION_HELPERS"
+    # Mọi thứ còn lại mà bộ minh hoạ xuất ra: hình của thư viện được dán vào script cần chúng.
+    assert set(re.findall(r'"(\w+)"', helpers.group(1))) == all_exports() - kit_exports()
 
 
 REAL = RENDERING / "remotion_project"
