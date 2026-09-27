@@ -262,9 +262,9 @@ function saveLastVoiceId(voiceId: string | null): void {
 
 /**
  * CR-028 FR86 — "một bộ cấu hình lần cuối dùng" toàn cục: engine, quality,
- * TTS, giọng, sub, nhạc nền, output mode, hình dạng video. Saved once when
- * the Creator finishes wizard step 6 (SettingsStepPage's onNext calls
- * saveLastUsedSettings), read back to prefill every new draft from then on
+ * TTS, giọng, sub, nhạc nền, output mode, hình dạng video. Step 2's fields are
+ * saved when the Creator leaves step 2 (saveLastUsedSettings), the render/merge
+ * ones whenever they are saved on a project (rememberProductionSettings); read back to prefill every new draft from then on
  * — same client-only posture as LAST_VOICE_KEY above (a browser-level
  * convenience, not business data that needs to sync across devices).
  */
@@ -294,31 +294,43 @@ function loadLastUsedSettings(): Partial<LastUsedSettings> {
   }
 }
 
-/**
- * Call once a project's step-6 settings are final (SettingsStepPage's
- * "Tiếp tục"). Deliberately not saved on every keystroke while still
- * editing — a half-finished change to one project's settings must not leak
- * into the next project's defaults before the Creator confirms it (FR86.2).
- */
-export function saveLastUsedSettings(draft: ProjectDraft): void {
+function writeLastUsedSettings(patch: Partial<LastUsedSettings>): void {
   try {
-    const settings: LastUsedSettings = {
-      ttsEnabled: draft.ttsEnabled,
-      voiceId: draft.voiceId,
-      subtitleMode: draft.subtitleMode,
-      subtitleStyle: draft.subtitleStyle,
-      renderQuality: draft.renderQuality,
-      renderEngine: draft.renderEngine,
-      videoFont: draft.videoFont,
-      videoFormatId: draft.videoFormatId,
-      backgroundMusicPath: draft.backgroundMusicPath,
-      backgroundMusicVolume: draft.backgroundMusicVolume,
-      videoOutputMode: draft.videoOutputMode,
-    };
-    window.localStorage.setItem(LAST_SETTINGS_KEY, JSON.stringify(settings));
+    window.localStorage.setItem(LAST_SETTINGS_KEY, JSON.stringify({ ...loadLastUsedSettings(), ...patch }));
   } catch {
     /* storage unavailable or full — the preference simply will not persist */
   }
+}
+
+/**
+ * Call once a project's step-2 settings are final (the "Tiếp tục" press).
+ * Deliberately not saved on every keystroke while still editing — a
+ * half-finished change to one project's settings must not leak into the next
+ * project's defaults before the Creator confirms it (FR86.2).
+ *
+ * Only the fields step 2 still shows are written: quality, video font,
+ * subtitles and music are chosen later (review gate / failure panel) and saved
+ * by rememberProductionSettings — writing this draft's copy of them here could
+ * overwrite a newer choice made on another project since this draft loaded.
+ */
+export function saveLastUsedSettings(draft: ProjectDraft): void {
+  writeLastUsedSettings({
+    ttsEnabled: draft.ttsEnabled,
+    voiceId: draft.voiceId,
+    renderEngine: draft.renderEngine,
+    videoFormatId: draft.videoFormatId,
+    videoOutputMode: draft.videoOutputMode,
+  });
+}
+
+/** The render/merge settings, remembered as defaults once saved on a project. */
+export type ProductionSettings = Pick<
+  LastUsedSettings,
+  "renderQuality" | "videoFont" | "subtitleMode" | "subtitleStyle" | "backgroundMusicPath" | "backgroundMusicVolume"
+>;
+
+export function rememberProductionSettings(patch: Partial<ProductionSettings>): void {
+  writeLastUsedSettings(patch);
 }
 
 /**

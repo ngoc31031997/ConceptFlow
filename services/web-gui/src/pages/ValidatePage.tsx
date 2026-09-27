@@ -4,6 +4,7 @@ import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
 import { OutlineActions } from "../components/OutlineActions";
 import { ErrorBanner } from "../components/ErrorBanner";
+import { ProductionSettingsPanel } from "../components/ProductionSettingsPanel";
 import { AppShell } from "../components/AppShell";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
@@ -154,6 +155,22 @@ export function ValidatePage() {
           <div className={styles.layout}>
             <OutlineReview project={project} outline={outline} />
             <div className={styles.tracker}>
+              {/*
+                Render/merge settings are chosen here, not in step 2: only the
+                production steps read them, and this is the last stop before
+                anything costly runs. Above the approve button, which starts
+                the steps that consume them (docs/ux-ui-design-rules.md §1).
+              */}
+              {isAwaitingReview && (
+                <div style={{ marginBottom: "var(--space-sm)" }}>
+                  <ProductionSettingsPanel
+                    key={project.project_id}
+                    project={project}
+                    stages={["render", "merge"]}
+                    hint="Dùng ở bước Render và Merge. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
+                  />
+                </div>
+              )}
               {isAwaitingReview && <OutlineActions outline={outline} />}
               <div className={glass.mtSm}>
                 <ProgressTracker

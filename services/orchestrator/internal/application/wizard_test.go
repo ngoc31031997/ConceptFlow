@@ -84,3 +84,67 @@ func TestEffectiveWizardStep(t *testing.T) {
 		}
 	}
 }
+
+// Render settings stay editable until render_scenes has run, merge settings
+// until assemble_video has run — so a failure there can be fixed and retried —
+// while authoring/TTS settings keep their old lock (draft or any failure).
+func TestPatchWizardSettings_LocksEachSettingAtItsReadingStep(t *testing.T) {
+	q := domain.RenderQuality("1080p60")
+	font := "Montserrat"
+	mode := domain.SubtitleMode("track")
+	music := ""
+	vol := 0.3
+	voice := "vi-VN-HoaiMyNeural"
+
+	render := domain.WizardSettingsPatch{RenderQuality: &q, VideoFont: &font}
+	merge := domain.WizardSettingsPatch{SubtitleMode: &mode, BackgroundMusicPath: &music, BackgroundMusicVolume: &vol}
+	tts := domain.WizardSettingsPatch{VoiceID: &voice}
+
+	cases := []struct {
+		status             domain.ProjectStatus
+		render, merge, tts bool
+	}{
+		{domain.StatusDraft, true, true, true},
+		{domain.StatusAwaitingReview, true, true, false},
+		{domain.StatusFailedValidateScript, true, true, true},
+		{domain.StatusFailedSynthesizeSpeech, true, true, true},
+		{domain.StatusFailedRenderScenes, true, true, true},
+		{domain.StatusFailedAssembleVideo, false, true, true},
+		{domain.StatusFailedQCVideo, false, false, true},
+		{domain.StatusSynthesizingSpeech, false, false, false},
+		{domain.StatusRendering, false, false, false},
+		{domain.StatusReadyToPublish, false, false, false},
+	}
+	for _, c := range cases {
+		for _, g := range []struct {
+			name  string
+			patch domain.WizardSettingsPatch
+			want  bool
+		}{{"render", render, c.render}, {"merge", merge, c.merge}, {"tts", tts, c.tts}} {
+			repo := &fakeWizardRepo{status: c.status}
+			err := application.NewPatchWizardSettingsUseCase(repo).Execute(context.Background(), "p1", g.patch)
+			if g.want && err != nil {
+				t.Errorf("%s at %s: err = %v, want allowed", g.name, c.status, err)
+			}
+			if !g.want && !errors.Is(err, domain.ErrInvalidStatus) {
+				t.Errorf("%s at %s: err = %v, want ErrInvalidStatus", g.name, c.status, err)
+			}
+			if !g.want && repo.patch != nil {
+				t.Errorf("%s at %s: refused patch was still stored", g.name, c.status)
+			}
+		}
+	}
+}
+
+// A patch mixing groups is refused whole when any group is locked: storing the
+// allowed half would leave the Creator believing the rest was saved too.
+func TestPatchWizardSettings_MixedPatchRefusedWhole(t *testing.T) {
+	q := domain.RenderQuality("1080p60")
+	mode := domain.SubtitleMode("track")
+	repo := &fakeWizardRepo{status: domain.StatusFailedAssembleVideo}
+	err := application.NewPatchWizardSettingsUseCase(repo).Execute(context.Background(), "p1",
+		domain.WizardSettingsPatch{RenderQuality: &q, SubtitleMode: &mode})
+	if !errors.Is(err, domain.ErrInvalidStatus) || repo.patch != nil {
+		t.Errorf("err = %v, stored = %v; want refused and nothing stored", err, repo.patch != nil)
+	}
+}

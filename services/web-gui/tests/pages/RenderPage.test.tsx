@@ -103,4 +103,38 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
 
     await waitFor(() => expect(screen.getByTestId("result-page-stub")).toBeInTheDocument());
   });
+
+  it("hiện cấu hình dựng & ghép ngay trên nút thử lại khi Render lỗi", async () => {
+    stubProject({ project_id: "p1", status: "failed_at_render_scenes", scenes: [], error_message: "Render timeout" });
+
+    renderRenderPage();
+
+    await waitFor(() => expect(screen.getByTestId("production-settings")).toBeInTheDocument());
+    expect(screen.getByTestId("production-render-quality")).toBeInTheDocument();
+    expect(screen.getByTestId("production-subtitles")).toBeInTheDocument();
+    expect(screen.getByTestId("production-background-music")).toBeInTheDocument();
+    // Cấu hình đứng trước hành động dùng nó (docs/ux-ui-design-rules.md §1).
+    const settings = screen.getByTestId("production-settings");
+    const retry = screen.getByRole("alert");
+    expect(settings.compareDocumentPosition(retry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("khi Merge lỗi chỉ cho sửa phụ đề và nhạc nền — Render đã chạy xong", async () => {
+    stubProject({ project_id: "p1", status: "failed_at_assemble_video", scenes: [], error_message: "ffmpeg" });
+
+    renderRenderPage();
+
+    await waitFor(() => expect(screen.getByTestId("production-settings")).toBeInTheDocument());
+    expect(screen.queryByTestId("production-render-quality")).not.toBeInTheDocument();
+    expect(screen.getByTestId("production-subtitles")).toBeInTheDocument();
+  });
+
+  it("không hiện cấu hình khi đang chạy", async () => {
+    stubProject({ project_id: "p1", status: "rendering", scenes: [] });
+
+    renderRenderPage();
+
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toBeInTheDocument());
+    expect(screen.queryByTestId("production-settings")).not.toBeInTheDocument();
+  });
 });

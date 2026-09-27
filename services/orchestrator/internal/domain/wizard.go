@@ -5,7 +5,7 @@ package domain
 // or a restart of the stack resumes in the right place.
 const (
 	WizardStepIdea     = 1 // Ý tưởng — topic / situation
-	WizardStepConfig   = 2 // Cấu hình — language, engine, authoring mode, voice, format, quality, music
+	WizardStepConfig   = 2 // Cấu hình — language, engine, authoring mode, voice, format, output mode
 	WizardStepScript   = 3 // Script — 1a outline, 1b storyboard, 1c code
 	WizardStepValidate = 4 // Validate — parse + dry run, then the outline gate
 	WizardStepProcess  = 5 // Xử lý — TTS, render, assemble, clips
@@ -53,6 +53,76 @@ type WizardSettingsPatch struct {
 	BackgroundMusicVolume *float64
 	VideoFont             *string
 	Confirm               bool
+}
+
+// failedStageOrder ranks each failed_at_<step> status by how far the saga got,
+// in saga order. A status that is not here (qc, clips, publish) is past every
+// step a wizard setting feeds.
+var failedStageOrder = map[ProjectStatus]int{
+	StatusFailedParseScript:      0,
+	StatusFailedValidateScript:   1,
+	StatusFailedSynthesizeSpeech: 2,
+	StatusFailedRenderScenes:     3,
+	StatusFailedAssembleVideo:    4,
+}
+
+// editableUntil reports whether a setting whose first real reader is the saga
+// step ranked `stage` may still change: before the saga starts, at the review
+// gate (nothing costly has run), or after a failure at or before that step —
+// then a retry of the failed step, and every step after it, reads the new
+// value. After the reader has run, a change would only relabel output that was
+// made with the old value, so it is refused.
+func editableUntil(status ProjectStatus, stage int) bool {
+	if status == StatusDraft || status == StatusAwaitingReview {
+		return true
+	}
+	order, ok := failedStageOrder[status]
+	return ok && order <= stage
+}
+
+// renderStage and assembleStage are the failedStageOrder ranks of the steps
+// that read the render settings (quality, video font) and the merge settings
+// (subtitles, background music).
+const (
+	renderStage   = 3
+	assembleStage = 4
+)
+
+// touchesAuthoring reports whether p changes anything the authoring steps
+// (script, visual, code) or TTS read, or confirms step 2.
+func (p WizardSettingsPatch) touchesAuthoring() bool {
+	return p.ContentLanguage != nil || p.RenderEngine != nil || p.TTSEnabled != nil ||
+		p.VoiceID != nil || p.VideoFormatID != nil || p.VideoOutputMode != nil || p.Confirm
+}
+
+func (p WizardSettingsPatch) touchesRender() bool {
+	return p.RenderQuality != nil || p.VideoFont != nil
+}
+
+func (p WizardSettingsPatch) touchesAssemble() bool {
+	return p.SubtitleMode != nil || p.SubtitleStyle != nil ||
+		p.BackgroundMusicPath != nil || p.BackgroundMusicVolume != nil
+}
+
+// WizardPatchAllowed decides whether p may be stored on a project in status.
+//
+// Each group of settings stays editable up to the saga step that first reads
+// it, so a failure there can be fixed in place and retried:
+//   - authoring/TTS settings (language, engine, voice, format, output mode):
+//     a draft or any failed project — unchanged from before;
+//   - render settings (quality, video font): until render_scenes has run;
+//   - merge settings (subtitles, background music): until assemble_video has run.
+func WizardPatchAllowed(status ProjectStatus, p WizardSettingsPatch) bool {
+	if p.touchesAuthoring() && !IsAuthoringEditable(status) {
+		return false
+	}
+	if p.touchesRender() && !editableUntil(status, renderStage) {
+		return false
+	}
+	if p.touchesAssemble() && !editableUntil(status, assembleStage) {
+		return false
+	}
+	return true
 }
 
 // WizardStepForStatus is the wizard step a saga status belongs to. A draft

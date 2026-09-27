@@ -87,6 +87,19 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
     expect(screen.getByTestId("outline-approve")).toBeInTheDocument();
   });
 
+  it("chọn cấu hình dựng & ghép ở màn duyệt, phía trên nút duyệt", async () => {
+    stubProject({ project_id: "p1", status: "awaiting_review", scenes: [], beats: [] });
+
+    renderValidatePage();
+
+    await waitFor(() => expect(screen.getByTestId("production-settings")).toBeInTheDocument());
+    expect(screen.getByTestId("production-render-quality")).toBeInTheDocument();
+    expect(screen.getByTestId("production-subtitles")).toBeInTheDocument();
+    const settings = screen.getByTestId("production-settings");
+    const approve = screen.getByTestId("outline-approve");
+    expect(settings.compareDocumentPosition(approve) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("chỉ có nút thử lại khi chạy thử hỏng — quay về sửa là việc Creator tự chọn ở thanh bước", async () => {
     stubProject({
       project_id: "p1",
