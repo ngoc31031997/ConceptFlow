@@ -44,8 +44,8 @@ func valid() domain.VideoArchetype {
 func TestArchetypeCreate_BlankCodeGetsNextFreeLetter(t *testing.T) {
 	uc, _ := newArchetypeUC()
 	got, err := uc.Create(context.Background(), valid())
-	if err != nil || got.Code != "E" {
-		t.Fatalf("want code E, got %q err %v", got.Code, err)
+	if err != nil || got.Code != "A" {
+		t.Fatalf("want code A, got %q err %v", got.Code, err)
 	}
 }
 
@@ -76,7 +76,7 @@ func TestArchetype_SystemRowsAreReadOnlyButCopyable(t *testing.T) {
 		t.Errorf("delete: want read-only, got %v", err)
 	}
 	cp, err := uc.Copy(ctx, "system-B")
-	if err != nil || cp.Code != "E" || cp.IsSystem {
+	if err != nil || cp.Code != "A" || cp.IsSystem {
 		t.Errorf("copy: got %+v err %v", cp, err)
 	}
 }

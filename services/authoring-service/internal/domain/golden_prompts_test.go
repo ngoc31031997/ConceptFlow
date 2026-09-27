@@ -10,13 +10,14 @@ import (
 
 var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 
-// story_architect was re-baselined on purpose by CR-041 (video archetypes).
+// story_architect was re-baselined on purpose by CR-041 (video archetypes) and
+// again when the system kinds got semantic codes (NGHỊCH-LÝ/SO-SÁNH/DẤU-VẾT/TIẾN-HOÁ).
 //
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "c7263faacab4a6d964dad521602534119ecc1e14abe72d8c19a0cb5a538624ba",
+	RoleStoryArchitect:   "0b6ccd46e1ab94af765e22ece2d3ce36adf506921d1415a90cf64c94bfe6071f",
 	RoleVisualDirector:   "5fb59d05fbdbb3e45d6985c20dab2ae5484064a39c170b4b2fea7f6c20558e36",
 	RoleManimEngineer:    "85ff46357c76b59556b6a4c2e5298c57e5bcda13589071a4d72101efcae10fff",
 	RoleRemotionEngineer: "04e157efbf7c67934879797aa8273b146a425f98558a37a128ad37884c45b141",

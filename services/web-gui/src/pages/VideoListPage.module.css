@@ -53,6 +53,7 @@
 .rowMain {
   flex: 1;
   min-width: 0;
+  order: 2;
 }
 
 .projectId {
@@ -87,6 +88,7 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  order: 1; /* nằm bên trái, ngay sau checkbox, trước phần tên video */
 }
 
 /*

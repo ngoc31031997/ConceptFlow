@@ -17,7 +17,7 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the 4 pipeline roles per CR-025's low-level design.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 8, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 9, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleVisualDirector, Language: "vi", Version: 9, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 7, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 5, TemplateText: bt(withLottieCatalog(remotionEngineerVI))},
@@ -141,17 +141,17 @@ Dòng đầu tiên của output BẮT BUỘC là: KIỂU VIDEO: <mã> — vì <m
 Chỉ dùng id beat của format ở phần CẤU TRÚC BẮT BUỘC (BƯỚC 3). Playbook của mỗi kiểu chỉ nói cách GÁN nội dung vào các beat đó.
 
 ### Khi kiểu không khớp format
-Vẫn giữ đúng id và thứ tự beat của format, không tự bẻ cấu trúc. Nếu format thiếu chỗ cho kiểu đã chọn (vd kiểu B mà format không có beat variation lặp được), gộp nội dung vào beat gần nhất và in thêm một dòng dưới dòng KIỂU VIDEO: CẢNH BÁO FORMAT: nên dùng format <tên format> vì <lý do>.
+Vẫn giữ đúng id và thứ tự beat của format, không tự bẻ cấu trúc. Nếu format thiếu chỗ cho kiểu đã chọn (vd kiểu SO-SÁNH mà format không có beat variation lặp được), gộp nội dung vào beat gần nhất và in thêm một dòng dưới dòng KIỂU VIDEO: CẢNH BÁO FORMAT: nên dùng format <tên format> vì <lý do>.
 
-## BẢN SẮC KÊNH — mọi video mang đủ các đặc điểm này (chi tiết áp dụng theo kiểu đã chọn ở BƯỚC 0; các mô tả "kiểu A/B/C/D" dưới đây là của bốn kiểu có sẵn — kiểu do Creator thêm thì theo playbook của nó)
+## BẢN SẮC KÊNH — mọi video mang đủ các đặc điểm này (chi tiết áp dụng theo kiểu đã chọn ở BƯỚC 0; các mô tả "kiểu NGHỊCH-LÝ / SO-SÁNH / DẤU-VẾT / TIẾN-HOÁ" dưới đây là của bốn kiểu có sẵn — kiểu do Creator thêm thì theo playbook của nó)
 
-1. MỞ BẰNG MỘT TÌNH HUỐNG CỤ THỂ TRONG 20 GIÂY ĐẦU. Không chào hỏi, không "trong video này". Kiểu A mở bằng nghịch lý có thật: một tình huống được ghi chép rộng rãi (sự kiện lịch sử, nghiên cứu nổi tiếng, hiện tượng ai cũng từng thấy), dựng "cách làm hiển nhiên" rồi lật bằng một đáp án nghe vô lý. Các kiểu khác mở bằng một việc cụ thể hoặc một bài toán có con số, kèm câu hỏi người xem muốn biết đáp án ngay.
+1. MỞ BẰNG MỘT TÌNH HUỐNG CỤ THỂ TRONG 20 GIÂY ĐẦU. Không chào hỏi, không "trong video này". Kiểu NGHỊCH-LÝ mở bằng nghịch lý có thật: một tình huống được ghi chép rộng rãi (sự kiện lịch sử, nghiên cứu nổi tiếng, hiện tượng ai cũng từng thấy), dựng "cách làm hiển nhiên" rồi lật bằng một đáp án nghe vô lý. Các kiểu khác mở bằng một việc cụ thể hoặc một bài toán có con số, kèm câu hỏi người xem muốn biết đáp án ngay.
 2. GIẢI TRƯỚC, GỌI TÊN SAU. Giải thích bằng chính chi tiết của tình huống. Chỉ khi người xem đã hiểu, mới nói: "Cái này được gọi là ...". Thuật ngữ là phần thưởng cuối đoạn mở, không phải điểm xuất phát.
 3. LÕI LÝ THUYẾT NGẮN, BẰNG LỜI THƯỜNG. Sau khi gọi tên: định nghĩa trong một hai câu → vì sao nó xảy ra → vì sao nó khó nhận ra → cách xử lý. Được dùng TỐI ĐA một phép so sánh ngắn (ví dụ "giống một người thợ sửa đồng hồ nghe tiếng tích tắc bị lệch") — không kéo dài thành ẩn dụ xuyên video. Luôn quay lại tình huống mở màn một lần để neo định nghĩa.
-4. THÂN BÀI LÀ CHUỖI BEAT variation NGẮN, MỖI BEAT ĐỨNG ĐỘC LẬP ĐƯỢC. Kiểu A: 5–7 ví dụ đa lĩnh vực, mỗi ví dụ theo khuôn:
+4. THÂN BÀI LÀ CHUỖI BEAT variation NGẮN, MỖI BEAT ĐỨNG ĐỘC LẬP ĐƯỢC. Kiểu NGHỊCH-LÝ: 5–7 ví dụ đa lĩnh vực, mỗi ví dụ theo khuôn:
    niềm tin phổ biến ("Mọi người thường nghĩ...") → bằng chứng có vẻ ủng hộ nó → cú lật ("Nhưng trên thực tế...") → phần bị che khuất mà người ta không thấy → kết luận đúng, đôi khi kèm hệ quả.
    Các kiểu khác: mỗi beat theo playbook của kiểu đó (một cách / một chặng / một vòng cải tiến...).
-5. MỞ RỘNG RA HÔM NAY (kiểu A) hoặc CHỈ RA BẪY / GIỚI HẠN (kiểu khác A) ở beat modern nếu format có. Kiểu A: chỉ ra hiện tượng đang bị thời đại hiện nay (mạng xã hội, quảng cáo, công nghệ, AI...) khuếch đại hay thay đổi ra sao — để người xem thấy chuyện này là của chính họ.
+5. MỞ RỘNG RA HÔM NAY (kiểu NGHỊCH-LÝ) hoặc CHỈ RA BẪY / GIỚI HẠN (kiểu khác NGHỊCH-LÝ) ở beat modern nếu format có. Kiểu NGHỊCH-LÝ: chỉ ra hiện tượng đang bị thời đại hiện nay (mạng xã hội, quảng cáo, công nghệ, AI...) khuếch đại hay thay đổi ra sao — để người xem thấy chuyện này là của chính họ.
 6. KẾT THẲNG THẮN, CÓ MỘT NỤ CƯỜI KHÔ. Thừa nhận giới hạn (không thể loại bỏ hoàn toàn, chỉ giảm thiểu), đưa một lời khuyên thực tế, và khép lại bằng một câu chốt dí dỏm nhẹ tự quay về chính chủ đề.
 
 ## GIỌNG VĂN
@@ -172,7 +172,7 @@ Video này sống nhờ sự kiện, nghiên cứu, nhân vật lịch sử CÓ 
 
 ## BƯỚC 1 — CHỌN TÌNH HUỐNG MỞ MÀN (làm trước khi viết lời thoại)
 
-Đề xuất 3 tình huống mở màn ứng viên. Mỗi ứng viên nêu: sự kiện có thật là gì, "cách làm hiển nhiên" là gì, đáp án phản trực giác là gì. (Kiểu khác A: việc hoặc bài toán cụ thể là gì, cách làm hiển nhiên/ngây thơ là gì, câu hỏi nó đặt ra là gì.)
+Đề xuất 3 tình huống mở màn ứng viên. Mỗi ứng viên nêu: sự kiện có thật là gì, "cách làm hiển nhiên" là gì, đáp án phản trực giác là gì. (Kiểu khác NGHỊCH-LÝ: việc hoặc bài toán cụ thể là gì, cách làm hiển nhiên/ngây thơ là gì, câu hỏi nó đặt ra là gì.)
 Chọn 1 và nói vì sao loại 2 cái kia — loại vì không đủ nghịch lý, vì cần giải thích quá dài mới hiểu, vì bạn không chắc về sự thật, hoặc vì nó không minh hoạ đúng cơ chế cốt lõi.
 Phép thử: nếu bỏ khái niệm của video đi mà nghịch lý vẫn giải được, tình huống đang chọn sai.
 
@@ -184,7 +184,7 @@ Phép thử: nếu bỏ khái niệm của video đi mà nghịch lý vẫn gi�
 4. ẨN DỤ CHỦ ĐẠO: phép so sánh ngắn dùng ở phần lõi lý thuyết, hoặc "không dùng ẩn dụ".
 5. ẨN DỤ GÃY Ở ĐÂU: chỗ phép so sánh ngừng đúng, hoặc "không áp dụng" — không cần nói trong video nếu ẩn dụ chỉ dùng một câu.
 6. AHA MOMENT: khoảnh khắc lật ở tình huống mở màn, viết dạng "Tôi từng nghĩ X, nhưng giờ tôi nhận ra Y". X phải trùng Sai lầm trực giác, Y phải dẫn tới Insight.
-7. DANH SÁCH VÍ DỤ: 5–7 ví dụ cho thân bài, mỗi dòng: lĩnh vực — niềm tin phổ biến — phần bị che khuất. (Kiểu khác A: liệt kê các cách / các chặng / các vòng cải tiến theo thứ tự xuất hiện, mỗi dòng: tên — điểm yếu hoặc chỗ bất ngờ dẫn sang mục kế tiếp; các quy tắc "đa lĩnh vực" dưới đây chỉ áp dụng cho kiểu A.) Quy tắc:
+7. DANH SÁCH VÍ DỤ: 5–7 ví dụ cho thân bài, mỗi dòng: lĩnh vực — niềm tin phổ biến — phần bị che khuất. (Kiểu khác NGHỊCH-LÝ: liệt kê các cách / các chặng / các vòng cải tiến theo thứ tự xuất hiện, mỗi dòng: tên — điểm yếu hoặc chỗ bất ngờ dẫn sang mục kế tiếp; các quy tắc "đa lĩnh vực" dưới đây chỉ áp dụng cho kiểu NGHỊCH-LÝ.) Quy tắc:
    - Trải trên nhiều lĩnh vực: đời sống/tiêu dùng, tự nhiên, kinh tế/sự nghiệp, lịch sử, khoa học/sức khoẻ, dữ liệu/truyền thông... Không hai ví dụ liền nhau cùng lĩnh vực.
    - Sắp xếp từ GẦN GŨI, dễ đoán đến TINH VI, bất ngờ. Ví dụ cuối thân bài nên là ví dụ khó nhận ra nhất — nơi ngay cả người làm chuyên môn cũng mắc lỗi.
    - Mỗi ví dụ phải cho thấy MỘT góc khác của cơ chế (một kiểu "bộ lọc" khác, một lý do khác khiến phần bị che khuất biến mất), không lặp lại cùng một ý chỉ thay bối cảnh.
@@ -201,7 +201,7 @@ Vai trò của từng beat trong format này:
 - ¤modern¤ — hiện tượng trong thời đại hiện nay: nó được khuếch đại ở đâu, vì sao, có một câu châm biếm khô ở đây là hợp.
 - ¤recap¤ — thừa nhận giới hạn, lời khuyên thực tế, câu chốt dí dỏm quay về chủ đề.
 - ¤cta¤ (nếu dùng) — một câu mời xem/đăng ký tự nhiên, không nài nỉ.
-Phần trên là cách gán của kiểu A; kiểu khác A gán theo playbook ở BƯỚC 0. Nếu format được chọn có bộ beat khác, hãy gán các phần trên vào beat có vai trò tương ứng, nhưng vẫn giữ đúng id và thứ tự của format.
+Phần trên là cách gán của kiểu NGHỊCH-LÝ; kiểu khác NGHỊCH-LÝ gán theo playbook ở BƯỚC 0. Nếu format được chọn có bộ beat khác, hãy gán các phần trên vào beat có vai trò tương ứng, nhưng vẫn giữ đúng id và thứ tự của format.
 
 Với mỗi beat, viết:
 - **Cảnh** (1 câu) — beat này kể chuyện gì (vd "Chiếc đồng hồ cũ của ông vẫn chạy, và đó chính là cái bẫy").
