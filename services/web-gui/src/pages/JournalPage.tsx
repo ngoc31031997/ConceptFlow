@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Card } from "../components/ui";
-import { listRecentEvents, ApiError, type ProjectEvent } from "../api/client";
+import { listRecentEvents, listProjects, ApiError, type ProjectEvent } from "../api/client";
 import { FLOW_LABELS } from "../utils/flow";
 import glass from "../styles/glass.module.css";
 import styles from "./JournalPage.module.css";
@@ -89,6 +89,21 @@ export function JournalPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<"overview" | "project">("overview");
+  const [topics, setTopics] = useState<Record<string, string>>({});
+
+  // Tên chủ đề để nhận ra dự án thay vì chỉ mã; lỗi thì vẫn hiện mã.
+  useEffect(() => {
+    let cancelled = false;
+    listProjects()
+      .then((rows) => {
+        if (cancelled || !Array.isArray(rows)) return;
+        setTopics(Object.fromEntries(rows.filter((r) => r.topic).map((r) => [r.project_id, r.topic as string])));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,6 +230,7 @@ export function JournalPage() {
                     onClick={() => setSelected(p.id)}
                     data-testid={`journal-project-${p.id}`}
                   >
+                    {topics[p.id] && <span className={styles.projectTopic}>{topics[p.id]}</span>}
                     <span className={styles.projectId}>{p.id.slice(0, 8)}</span>
                     <span className={styles.projectMeta}>
                       {p.last.step_label} · {STATE_LABEL[p.last.run_state]} · {p.count} sự kiện
@@ -224,7 +240,10 @@ export function JournalPage() {
               </div>
             </Card>
 
-            <Card title={`Dòng thời gian ${activeId ? activeId.slice(0, 8) : ""}`}>
+            <Card
+              title={`Dòng thời gian ${activeId ? (topics[activeId] ?? activeId.slice(0, 8)) : ""}`}
+              hint={activeId && topics[activeId] ? activeId.slice(0, 8) : undefined}
+            >
               {perStep.length > 0 && (
                 <div className={styles.summary} data-testid="journal-summary">
                   {perStep.map((s) => (
@@ -235,47 +254,115 @@ export function JournalPage() {
                   ))}
                 </div>
               )}
-              <table className={styles.table}>
-                <thead>
-                  <tr>
-                    <th>Thời điểm</th>
-                    <th>Bước</th>
-                    <th>Trạng thái</th>
-                    <th className={styles.num}>Thời gian</th>
-                    <th className={styles.num}>Ký tự</th>
-                    <th className={styles.num}>Token</th>
-                    <th>Ghi chú</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {timeline.map((e) => (
-                    <tr key={e.id} data-testid="journal-row">
-                      <td>{formatTime(e.at)}</td>
-                      <td>{e.step_label}</td>
-                      <td>
-                        <span className={`${styles.state} ${styles[`state_${e.run_state}`] ?? ""}`}>
-                          {STATE_LABEL[e.run_state]}
-                        </span>
-                      </td>
-                      <td className={styles.num}>
-                        {formatDuration(e.duration_ms)}
-                        {e.source === "saga" && e.duration_ms ? " (ở bước trước)" : ""}
-                      </td>
-                      <td className={styles.num}>{e.content_chars ? e.content_chars.toLocaleString("vi-VN") : "—"}</td>
-                      <td className={styles.num}>
-                        {e.prompt_tokens || e.completion_tokens
-                          ? ((e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0)).toLocaleString("vi-VN")
-                          : "—"}
-                      </td>
-                      <td className={e.run_state === "failed" ? styles.detail : undefined}>{e.detail || ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <TimelineChart events={timeline} />
             </Card>
           </div>
         )}
       </AppShell>
+    </div>
+  );
+}
+
+interface Segment {
+  event: ProjectEvent;
+  start: number;
+  end: number;
+}
+
+/**
+ * Biểu đồ Gantt của một dự án: mỗi bước một hàng, mỗi sự kiện là một đoạn kéo
+ * dài tới sự kiện kế tiếp (sự kiện cuối đang chạy thì kéo tới hiện tại). Màu
+ * theo trạng thái; di chuột để xem chi tiết.
+ */
+function TimelineChart({ events }: { events: ProjectEvent[] }) {
+  if (events.length === 0) return null;
+  const times = events.map((e) => new Date(e.at).getTime());
+  const last = events[events.length - 1];
+  const t0 = times[0];
+  const tEnd = Math.max(times[times.length - 1] + 1000, last.run_state === "running" ? Date.now() : 0);
+  const span = Math.max(1, tEnd - t0);
+  const segs: Segment[] = events.map((e, i) => ({
+    event: e,
+    start: times[i],
+    end: i + 1 < events.length ? times[i + 1] : e.run_state === "running" ? tEnd : times[i],
+  }));
+
+  const rows: { label: string; segs: Segment[]; tokens: number }[] = [];
+  for (const sg of segs) {
+    let row = rows.find((r) => r.label === sg.event.step_label);
+    if (!row) {
+      row = { label: sg.event.step_label, segs: [], tokens: 0 };
+      rows.push(row);
+    }
+    row.segs.push(sg);
+    row.tokens += (sg.event.prompt_tokens ?? 0) + (sg.event.completion_tokens ?? 0);
+  }
+
+  const pct = (t: number) => `${((t - t0) / span) * 100}%`;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => t0 + f * span);
+  const failures = events.filter((e) => e.run_state === "failed" && e.detail);
+
+  return (
+    <div className={styles.gantt} data-testid="journal-timeline">
+      <div className={styles.legend}>
+        {(["running", "done", "idle", "failed"] as const).map((st) => (
+          <span key={st}>
+            <i className={`${styles.seg} ${styles[`seg_${st}`]}`} /> {STATE_LABEL[st]}
+          </span>
+        ))}
+      </div>
+      <div className={styles.grow}>
+        <div />
+        <div className={styles.axis}>
+          {ticks.map((t, i) => (
+            <span key={i} style={{ left: pct(t) }}>
+              {new Date(t).toLocaleTimeString("vi-VN", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+            </span>
+          ))}
+        </div>
+        <div />
+      </div>
+      {rows.map((r) => (
+        <div key={r.label} className={styles.grow}>
+          <div className={styles.clabel}>{r.label}</div>
+          <div className={styles.gtrack}>
+            {r.segs.map((sg) => {
+              const e = sg.event;
+              const tokens = (e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0);
+              const tip = [
+                `${e.step_label} · ${STATE_LABEL[e.run_state]}`,
+                formatTime(e.at),
+                e.duration_ms ? `Thời gian: ${formatDuration(e.duration_ms)}${e.source === "saga" ? " (ở bước trước)" : ""}` : "",
+                e.content_chars ? `Ký tự: ${e.content_chars.toLocaleString("vi-VN")}` : "",
+                tokens ? `Token: ${tokens.toLocaleString("vi-VN")}` : "",
+                e.detail ?? "",
+              ].filter(Boolean).join("\n");
+              return (
+                <div
+                  key={e.id}
+                  data-testid="journal-row"
+                  title={tip}
+                  className={`${styles.seg} ${styles[`seg_${e.run_state}`] ?? ""}`}
+                  style={{ left: pct(sg.start), width: `max(4px, ${((sg.end - sg.start) / span) * 100}%)` }}
+                />
+              );
+            })}
+          </div>
+          <div className={styles.cval}>
+            <b>{formatDuration(r.segs.reduce((a, sg) => a + (sg.end - sg.start), 0))}</b>
+            <span>{r.tokens ? `${r.tokens.toLocaleString("vi-VN")} token` : "— token"}</span>
+          </div>
+        </div>
+      ))}
+      {failures.length > 0 && (
+        <ul className={styles.failList}>
+          {failures.map((e) => (
+            <li key={e.id} className={styles.detail}>
+              {formatTime(e.at)} · {e.step_label}: {e.detail}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
