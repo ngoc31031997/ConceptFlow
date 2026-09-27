@@ -13,6 +13,8 @@ interface ProgressTrackerProps {
    * Creator không biết mình đang ở đâu.
    */
   steps: readonly string[];
+  /** Number shown in each row's dot, matching the sidebar; rows not listed fall back to their position. */
+  stepNumbers?: Record<string, number>;
   /** Dims the tracker and drops the live wording once the saga has failed. */
   isFailed?: boolean;
   /** Xem lại một bước đã chạy xong: tất cả các ô là "xong", không có tiến độ sống. */
@@ -50,7 +52,7 @@ function unitProgress(
   return null;
 }
 
-export function ProgressTracker({ progressState, steps, isFailed = false, allDone = false }: ProgressTrackerProps) {
+export function ProgressTracker({ progressState, steps, stepNumbers, isFailed = false, allDone = false }: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
   const unit = unitProgress(progressState);
   const hasSceneProgress = unit !== null;
@@ -104,7 +106,7 @@ export function ProgressTracker({ progressState, steps, isFailed = false, allDon
             const state = isDone ? "done" : isActive ? (isFailed ? "failed" : "active") : "pending";
             return (
               <li key={step} className={styles.stepListItem} data-state={state}>
-                <span className={styles.stepDot}>{isDone ? <CheckIcon /> : index + 1}</span>
+                <span className={styles.stepDot}>{isDone ? <CheckIcon /> : (stepNumbers?.[step] ?? index + 1)}</span>
                 {stepLabel(step)}
               </li>
             );

@@ -37,13 +37,14 @@ type ForkAuthoringPort interface {
 
 // ForkProjectUseCase makes a NEW project from an existing one, to change a
 // video without touching the original. The Creator picks the step to start
-// again from (2..5); everything before it is copied, everything from it on is
-// left empty to be redone:
+// again from (2, 3, 4 or 6 — 5/Illustrations is excluded, see Execute);
+// everything before it is copied, everything from it on is left empty to be
+// redone:
 //
 //	from 2 Cấu hình → topic
 //	from 3 Kịch bản → topic + settings
 //	from 4 Visual   → topic + settings + story
-//	from 5 Code     → topic + settings + story + storyboard
+//	from 6 Code     → topic + settings + story + storyboard
 //
 // Nothing produced by the render (scenes, audio, video, clips, YouTube data) is
 // copied, and the original is never modified.
@@ -68,7 +69,9 @@ type ForkProjectOutput struct {
 }
 
 func (uc *ForkProjectUseCase) Execute(ctx context.Context, sourceID string, fromStep int) (*ForkProjectOutput, error) {
-	if fromStep < domain.FlowConfig || fromStep > domain.FlowCode {
+	// FlowIllustrations (5) sits between Visual and Code but is excluded: forking
+	// has no way to copy illustration assets yet (no ForkAuthoringPort method).
+	if fromStep < domain.FlowConfig || fromStep > domain.FlowCode || fromStep == domain.FlowIllustrations {
 		return nil, ErrForkStepInvalid
 	}
 	src, err := uc.repo.Get(ctx, sourceID)

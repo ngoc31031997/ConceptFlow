@@ -12,8 +12,8 @@ const (
 	FlowConfig        = 2  // Cấu hình
 	FlowStory         = 3  // Kịch bản
 	FlowVisual        = 4  // Visual
-	FlowCode          = 5  // Code
-	FlowIllustrations = 6  // Hình minh hoạ (CR-046: promoted from a source="illustrations" sub-state of Code)
+	FlowIllustrations = 5  // Hình minh hoạ (CR-046: promoted from a source="illustrations" sub-state of Code; runs BEFORE Code, whose output Code reads)
+	FlowCode          = 6  // Code
 	FlowValidate      = 7  // Validate (parse + dry run)
 	FlowReview        = 8  // Review — screen only
 	FlowTTS           = 9  // TTS

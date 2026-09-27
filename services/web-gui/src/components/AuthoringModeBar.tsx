@@ -58,7 +58,7 @@ interface LastRun {
 }
 
 function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun>> {
-  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "code", 6: "illustrations" };
+  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "illustrations", 6: "code" };
   const out: Partial<Record<AuthoringStep, LastRun>> = {};
   for (const e of [...events].sort((a, b) => a.id - b.id)) {
     // CR-046: illustrations now journals under its own flow number (6). Old rows from

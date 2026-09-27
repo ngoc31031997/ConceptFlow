@@ -21,6 +21,15 @@ const EDITABLE_AFTER_STOP: Record<string, ProductionStage[]> = {
   assemble_video: ["merge"],
 };
 
+/** Saga step → its number in the 14-step sidebar (TTS, Render, Merge + QC, Cắt short). */
+const SAGA_FLOW_STEP: Record<string, number> = {
+  synthesize_speech: FLOW_TTS,
+  render_scenes: FLOW_TTS + 1,
+  assemble_video: FLOW_TTS + 2,
+  qc_video: FLOW_TTS + 2,
+  generate_clips: FLOW_TTS + 3,
+};
+
 /**
  * Bước 5 của 7 — "Xử lý": phần đắt, chạy sau khi Creator duyệt dàn ý ở bước 4.
  *
@@ -86,11 +95,7 @@ export function RenderPage() {
         }
       : progressState;
 
-  // Bước 9-12 theo bước saga đang chạy: TTS, render, merge (kèm QC), cắt short.
-  const activeFlowStep =
-    { synthesize_speech: 9, render_scenes: 10, assemble_video: 11, qc_video: 11, generate_clips: 12 }[
-      displayStep ?? ""
-    ] ?? FLOW_TTS;
+  const activeFlowStep = SAGA_FLOW_STEP[displayStep ?? ""] ?? FLOW_TTS;
 
   const stopped = (isFailed || isCancelled) && !viewOnly;
   const editableStages = stopped ? (EDITABLE_AFTER_STOP[displayStep ?? ""] ?? []) : [];
@@ -151,6 +156,7 @@ export function RenderPage() {
         <ProgressTracker
           progressState={displayProgressState}
           steps={PROCESS_STEPS}
+          stepNumbers={SAGA_FLOW_STEP}
           isFailed={isFailed}
           allDone={reviewingPast}
         />

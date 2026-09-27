@@ -1318,7 +1318,7 @@ export interface ForkResult {
   needs_music_reselect: boolean;
 }
 
-/** Tạo project mới từ project này, làm lại từ bước `fromStep` (2-5). Bản gốc không đổi. */
+/** Tạo project mới từ project này, làm lại từ bước `fromStep` (2, 3, 4 hoặc 6 — xem FORK_STEPS). Bản gốc không đổi. */
 export function forkProject(id: string, fromStep: number): Promise<ForkResult> {
   return apiFetch<ForkResult>(`/v1/projects/${id}/fork`, {
     method: "POST",

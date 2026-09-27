@@ -8,16 +8,17 @@
  * `awaiting_review` and nothing runs until the Creator presses start.
  *
  * CR-046 (2026-09-27, reverses CR-045 FR9): "Hình minh hoạ" is now its own
- * numbered step 6, shown disabled ("Không dùng") when renderEngine !== "remotion"
- * instead of being folded, invisibly, under Code.
+ * numbered step, shown disabled ("Không dùng") when renderEngine !== "remotion"
+ * instead of being folded, invisibly, under Code. It sits at step 5, BEFORE
+ * Code (6): illustrations run first and Code reads what they drew.
  */
 export const FLOW_LABELS = [
   "Khởi tạo",
   "Cấu hình",
   "Kịch bản",
   "Visual",
-  "Code",
   "Hình minh hoạ",
+  "Code",
   "Validate",
   "Review",
   "TTS",
@@ -29,8 +30,8 @@ export const FLOW_LABELS = [
 ] as const;
 
 export const FLOW_INIT = 1;
-export const FLOW_CODE = 5;
-export const FLOW_ILLUSTRATIONS = 6;
+export const FLOW_ILLUSTRATIONS = 5;
+export const FLOW_CODE = 6;
 export const FLOW_VALIDATE = 7;
 export const FLOW_REVIEW = 8;
 export const FLOW_TTS = 9;
@@ -44,7 +45,7 @@ export function flowRoute(step: number, projectId: string, opts: { view?: boolea
   // `step` tells a view-only screen which of its steps was asked for (validate
   // and review share a screen; so do TTS/render/merge/split).
   const q = opts.view ? `?view=1&step=${step}` : "";
-  if (step <= FLOW_ILLUSTRATIONS) return `/projects/${projectId}/resume?step=${step}&view=1`;
+  if (step <= FLOW_CODE) return `/projects/${projectId}/resume?step=${step}&view=1`;
   if (step === FLOW_VALIDATE || step === FLOW_REVIEW) return `/projects/${projectId}/validate${q}`;
   if (step >= FLOW_TTS && step < FLOW_RESULT) return `/projects/${projectId}/render${q}`;
   if (step === FLOW_RESULT) return `/projects/${projectId}/result`;
@@ -57,8 +58,8 @@ export function authoringRoute(step: number): string {
   if (step === 2) return "/create/script/settings";
   if (step === 3) return "/create/script/outline";
   if (step === 4) return "/create/script/storyboard";
-  if (step === 5) return "/create/script/code";
-  return "/create/script/illustrations";
+  if (step === 5) return "/create/script/illustrations";
+  return "/create/script/code";
 }
 
 /** Giai đoạn của từng bước: nhóm theo ranh giới chi phí và khả năng sửa. */
@@ -147,13 +148,14 @@ export function cancelExplain(step: number): string {
 
 /**
  * Các bước có thể "làm lại từ đây" khi tạo bản mới (khớp ForkProjectUseCase).
- * Dừng ở bước 5 (Code): ForkProjectUseCase chưa có cách sao chép hình minh hoạ
- * (file ảnh + trạng thái vẽ) sang dự án mới, nên bước 6 chưa vào danh sách này —
- * làm nửa vời (cho chọn rồi báo lỗi ở backend) còn tệ hơn không cho chọn.
+ * Bước 5 (Hình minh hoạ) không vào danh sách này: ForkProjectUseCase chưa có
+ * cách sao chép hình đã vẽ (file ảnh + trạng thái vẽ) sang dự án mới — làm
+ * nửa vời (cho chọn rồi báo lỗi ở backend) còn tệ hơn không cho chọn. Dừng ở
+ * bước 6 (Code).
  */
 export const FORK_STEPS: { step: number; keeps: string }[] = [
   { step: 2, keeps: "Giữ chủ đề" },
   { step: 3, keeps: "Giữ chủ đề và cấu hình" },
   { step: 4, keeps: "Giữ chủ đề, cấu hình, kịch bản" },
-  { step: 5, keeps: "Giữ chủ đề, cấu hình, kịch bản, visual" },
+  { step: 6, keeps: "Giữ chủ đề, cấu hình, kịch bản, visual" },
 ];

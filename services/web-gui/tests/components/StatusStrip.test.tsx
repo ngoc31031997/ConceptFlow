@@ -114,11 +114,13 @@ describe("StatusStrip", () => {
     expect(screen.getByTestId("fork-dialog")).toBeInTheDocument();
     // Default: redo from Visual (keeps topic, config, script).
     expect(screen.getByTestId("fork-from-4")).toBeChecked();
-    fireEvent.click(screen.getByTestId("fork-from-5"));
+    // Step 5 (Hình minh hoạ) is excluded from FORK_STEPS (no asset-copy support
+    // yet); the next option after Visual is step 6 (Code).
+    fireEvent.click(screen.getByTestId("fork-from-6"));
     fireEvent.click(screen.getByTestId("fork-confirm"));
 
-    await waitFor(() => expect(fork).toHaveBeenCalledWith("p1", 5));
-    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/projects/new-1/resume?step=5"));
+    await waitFor(() => expect(fork).toHaveBeenCalledWith("p1", 6));
+    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/projects/new-1/resume?step=6"));
   });
 
   it("stays quiet for a draft: nothing running, nothing to say", async () => {

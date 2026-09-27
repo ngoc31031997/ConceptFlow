@@ -12,7 +12,8 @@ interface ForkDialogProps {
 }
 
 /**
- * Tạo project MỚI từ video này, làm lại từ một bước trong 1-5. Bản gốc không
+ * Tạo project MỚI từ video này, làm lại từ một bước trong 1-6 (trừ bước 5,
+ * Hình minh hoạ — xem FORK_STEPS). Bản gốc không
  * đổi. Bước nào giữ, bước nào làm lại hiện ngay bên cạnh lựa chọn, để chọn
  * xong là biết mình sẽ có gì.
  */

@@ -489,6 +489,20 @@ BEGIN
         INSERT INTO schema_migrations (id) VALUES ('cr046_illustrations_flow_step');
     END IF;
 END $$;
+
+-- CR-046 follow-up: illustrations runs BEFORE Code (Code reads its drawings),
+-- so the two numbers swap: Illustrations=5, Code=6. A CASE swaps both in one
+-- pass, so 5->6 and 6->5 never collide.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE id = 'cr046b_swap_code_illustrations') THEN
+        UPDATE project_events SET flow_step = CASE flow_step WHEN 5 THEN 6 WHEN 6 THEN 5 ELSE flow_step END
+            WHERE flow_step IN (5, 6);
+        UPDATE project_events SET from_flow_step = CASE from_flow_step WHEN 5 THEN 6 WHEN 6 THEN 5 ELSE from_flow_step END
+            WHERE from_flow_step IN (5, 6);
+        INSERT INTO schema_migrations (id) VALUES ('cr046b_swap_code_illustrations');
+    END IF;
+END $$;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

@@ -138,7 +138,7 @@ func TestForkDropsEverythingTheRenderProduced(t *testing.T) {
 }
 
 func TestForkRejectsStepsItCannotStartAt(t *testing.T) {
-	for _, step := range []int{0, 1, 6, 13} {
+	for _, step := range []int{0, 1, 5, 13} {
 		if _, err := NewForkProjectUseCase(&forkRepo{source: rendered()}, &forkAuthoring{saved: map[string]string{}}).Execute(context.Background(), "src", step); !errors.Is(err, ErrForkStepInvalid) {
 			t.Errorf("step %d: got %v", step, err)
 		}
