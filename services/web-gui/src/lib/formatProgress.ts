@@ -2,10 +2,13 @@ export function formatChars(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")}k` : String(n);
 }
 
-/** 125 → "2m05s", 42 → "42s": dạng gọn cho dòng phụ của thẻ tiến độ. */
+/** 125 → "2m 5s", 42 → "42s", 3725 → "1h 2m 5s": cùng dạng với màn Nhật ký. */
 export function formatClock(totalSeconds: number): string {
   const s = Math.max(0, Math.round(totalSeconds));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${String(s % 60).padStart(2, "0")}s`;
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  return `${Math.floor(m / 60)}h ${m % 60}m ${s % 60}s`;
 }
 
 const ERROR_LABELS: Record<string, string> = {

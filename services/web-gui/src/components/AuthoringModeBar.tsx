@@ -65,8 +65,7 @@ function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun
 }
 
 function formatMs(ms: number): string {
-  const s = Math.round(ms / 1000);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+  return formatClock(ms / 1000);
 }
 
 function dismissKey(projectId: string): string {
@@ -467,7 +466,7 @@ export function AuthoringModeBar({
               chạy ở 1a rồi lỡ chuyển sang 1b/1c xem tiến độ. Panel này hiện trên
               CẢ BA tab bất cứ khi nào một chuỗi đang chạy, nên đứng ở tab nào
               cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
-          {running && (
+          {running && steps.length > 0 && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
               <Button onClick={handleCancel} disabled={cancelling} data-testid="run-with-ai-cancel">
                 {cancelling ? "Đang dừng…" : "Dừng"}
@@ -575,7 +574,7 @@ function liveCounts(p: AuthoringProgress | null): { done?: number; total?: numbe
   return {};
 }
 
-/** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m05s". */
+/** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m 5s". */
 function stepLiveNote(p: AuthoringProgress | null): string {
   if (!p?.running) return "đang chạy";
   const time = formatClock(p.elapsed_seconds);
@@ -586,7 +585,7 @@ function stepLiveNote(p: AuthoringProgress | null): string {
 
 /** Câu tiến độ từ luồng streaming: pha hiện tại, lượng chữ đã nhận, thời gian. */
 function liveProgressText(p: AuthoringProgress): string {
-  const time = `${p.elapsed_seconds}s`;
+  const time = formatClock(p.elapsed_seconds);
   if (p.phase === "layout" || p.phase === "cast") {
     return `Đang chuẩn bị bố cục… ${time}`;
   }

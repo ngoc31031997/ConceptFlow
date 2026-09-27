@@ -69,12 +69,6 @@ export function PipelineSettingsBar({
     <div className={styles.stack}>
     <div className={`${glass.card} ${styles.card}`} data-testid="pipeline-settings-bar">
       <div className={styles.summaryRow}>
-        <div className={styles.summaryText}>
-          <span>Đã chọn:</span>
-          <span className={styles.summaryLabel}>{engineLabel}</span>
-          <span className={styles.dot}>·</span>
-          <span className={styles.summaryLabel}>{modeLabel}</span>
-        </div>
         <button
           type="button"
           className={styles.toggle}
@@ -86,6 +80,12 @@ export function PipelineSettingsBar({
         >
           {expanded ? "Xong" : "Đổi"}
         </button>
+        <div className={styles.summaryText}>
+          <span>Đã chọn:</span>
+          <span className={styles.summaryLabel}>{engineLabel}</span>
+          <span className={styles.dot}>·</span>
+          <span className={styles.summaryLabel}>{modeLabel}</span>
+        </div>
       </div>
 
       {showPickers && (
