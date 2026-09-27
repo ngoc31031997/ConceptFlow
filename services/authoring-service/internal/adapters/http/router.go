@@ -1028,6 +1028,9 @@ func DescribeGenerateError(err error) (int, string) {
 	if errors.As(err, &pending) {
 		return http.StatusConflict, pending.Error()
 	}
+	if errors.Is(err, application.ErrIllustrationsNotPlanned) {
+		return http.StatusConflict, err.Error()
+	}
 
 	status := http.StatusBadGateway
 	var message string

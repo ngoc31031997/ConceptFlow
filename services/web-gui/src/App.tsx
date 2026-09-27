@@ -18,6 +18,7 @@ import { VideoListPage } from "./pages/VideoListPage";
 import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
+import { IllustrationsStepPage } from "./pages/IllustrationsStepPage";
 import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
@@ -60,6 +61,8 @@ export function App() {
             <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
+            {/* CR-045 — Remotion only: the video's drawings, between Visual and Code. */}
+            <Route path="/create/script/illustrations" element={<IllustrationsStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
             <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />

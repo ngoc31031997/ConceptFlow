@@ -188,6 +188,10 @@ type GeneratedStep struct {
 	RepairRounds int      `json:"repair_rounds,omitempty"`
 	Warnings     []string `json:"warnings,omitempty"`
 	ModelCalls   int      `json:"model_calls,omitempty"`
+	// CR-045 — set by the illustrations step when it finished drawing but some
+	// drawings still wait for the Creator; Message says which.
+	AwaitingReview bool   `json:"awaiting_review,omitempty"`
+	Message        string `json:"message,omitempty"`
 }
 
 // Available reports whether the AI path can be offered at all (FR79.4). The
@@ -266,12 +270,20 @@ func (uc *GenerateAuthoringUseCase) recordEvent(
 	if uc.events == nil || projectID == "" {
 		return
 	}
-	fs := domain.FlowStepForAuthoring(step)
+	fs, source := domain.FlowStepForAuthoring(step), "authoring"
+	if step == StepIllustrations {
+		// CR-045: no flow number of its own (1–13 is shared with the
+		// orchestrator); it is the lead-in to Code, told apart by its source.
+		fs, source = domain.FlowCode, "illustrations"
+	}
 	if fs == 0 {
 		return
 	}
+	if detail == "" && out.AwaitingReview {
+		detail = out.Message
+	}
 	e := domain.ProjectEvent{
-		ProjectID: projectID, FlowStep: fs, RunState: state, Source: "authoring", Detail: detail,
+		ProjectID: projectID, FlowStep: fs, RunState: state, Source: source, Detail: detail,
 	}
 	if state != domain.RunRunning {
 		e.DurationMS = time.Since(started).Milliseconds()
@@ -364,6 +376,9 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	project, err := uc.projects.Get(ctx, projectID)
 	if err != nil {
 		return GeneratedStep{}, fmt.Errorf("load project: %w", err)
+	}
+	if step == StepIllustrations {
+		return uc.runIllustrations(ctx, project)
 	}
 	// FR78.5 — step → role is the server's decision, read off the project's
 	// engine. The GUI used to work this out, in two places.
@@ -531,8 +546,10 @@ func (uc *GenerateAuthoringUseCase) acquire(projectID, step string) (func(), err
 // AuthoringProgress is what the GUI polls while a run is in flight: which
 // phase the model is in and how much it has produced so far.
 type AuthoringProgress struct {
-	Running        bool   `json:"running"`
-	Phase          string `json:"phase"` // "idle" | "waiting" | "reasoning" | "writing" | code step: "layout" | "cast" | "chunks" | "merge" | "check" | "repair"
+	Running bool `json:"running"`
+	// "idle" | "waiting" | "reasoning" | "writing" | code step: "layout" | "cast" |
+	// "chunks" | "merge" | "check" | "repair" | illustrations step: "plan" | "draw"
+	Phase          string `json:"phase"`
 	ReasoningChars int    `json:"reasoning_chars"`
 	ContentChars   int    `json:"content_chars"`
 	ElapsedSeconds int    `json:"elapsed_seconds"`
@@ -542,6 +559,13 @@ type AuthoringProgress struct {
 	ChunksTotal int `json:"chunks_total,omitempty"`
 	RepairRound int `json:"repair_round,omitempty"`
 	RepairMax   int `json:"repair_max,omitempty"`
+	// CR-045 — the illustrations step: drawings to draw in this run, finished
+	// (drawn or failed), failed, served by the library, and the list's size.
+	DrawingsTotal   int `json:"drawings_total,omitempty"`
+	DrawingsDone    int `json:"drawings_done,omitempty"`
+	DrawingsFailed  int `json:"drawings_failed,omitempty"`
+	DrawingsReused  int `json:"drawings_reused,omitempty"`
+	DrawingsPlanned int `json:"drawings_planned,omitempty"`
 
 	started time.Time
 }

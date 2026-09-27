@@ -77,11 +77,14 @@
   font-size: 12.5px;
 }
 
-.warn {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--warn);
-  background: var(--warn-soft);
-  padding: 1px 6px;
-  border-radius: var(--radius);
+/* CR-045 — the tile widens while its style warnings are open, so the list stays readable. */
+@media (min-width: 720px) {
+  .wide {
+    grid-column: span 2;
+  }
+
+  /* Only the text widens; the picture keeps its one-column size. */
+  .wide .picture {
+    width: calc(50% - 7px);
+  }
 }

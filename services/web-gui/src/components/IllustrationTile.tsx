@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { illustrationPreviewUrl, type Illustration } from "../api/client";
 import { illustrationStatusLabel } from "../utils/illustrationLabels";
+import { StyleWarnings } from "./StyleWarnings";
 import glass from "../styles/glass.module.css";
 import styles from "./IllustrationTile.module.css";
 
@@ -14,6 +15,8 @@ interface IllustrationTileProps {
   onOpen?: () => void;
   /** Extra buttons under the picture (Duyệt, Dựng lại, Vẽ lại bằng AI...). */
   actions?: ReactNode;
+  /** CR-045 — "Nhờ AI sửa các cảnh báo này": opens the redraw with this note filled in. */
+  onFixWarnings?: (note: string) => void;
 }
 
 function badgeClass(ill: Illustration): string {
@@ -25,13 +28,14 @@ function badgeClass(ill: Illustration): string {
  * CR-044 — one drawing of the library as a tile: the PNG still, which turns
  * into its GIF (the figure's own motion) while hovered or focused.
  */
-export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0, selected, onOpen, actions }: IllustrationTileProps) {
+export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0, selected, onOpen, actions, onFixWarnings }: IllustrationTileProps) {
   const [moving, setMoving] = useState(false);
   const [broken, setBroken] = useState(false);
+  const [warningsOpen, setWarningsOpen] = useState(false);
   const src = `${illustrationPreviewUrl(ill, moving ? "gif" : "png")}&b=${bust}`;
   return (
     <li
-      className={`${styles.tile} ${selected ? styles.selected : ""}`}
+      className={`${styles.tile} ${selected ? styles.selected : ""} ${warningsOpen ? styles.wide : ""}`}
       data-testid={`illustration-tile-${ill.name}`}
       onMouseEnter={() => setMoving(true)}
       onMouseLeave={() => setMoving(false)}
@@ -62,13 +66,12 @@ export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0
           {illustrationStatusLabel(ill)}
         </span>
         {ill.warnings?.length > 0 && (
-          <span
-            className={styles.warn}
-            title={ill.warnings.map((w) => w.message).join("\n")}
-            data-testid={`illustration-warnings-${ill.name}`}
-          >
-            ⚠ {ill.warnings.length} cảnh báo style
-          </span>
+          <StyleWarnings
+            warnings={ill.warnings}
+            name={ill.name}
+            onFix={!ill.builtin && !ill.exemplar ? onFixWarnings : undefined}
+            onToggle={setWarningsOpen}
+          />
         )}
       </div>
       {actions && <div className={styles.actions}>{actions}</div>}

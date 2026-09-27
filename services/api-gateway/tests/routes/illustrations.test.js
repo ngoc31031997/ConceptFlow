@@ -43,6 +43,7 @@ describe('illustration library routing', () => {
     ['post', '/v1/projects/p1/illustrations/plan', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
+    ['delete', '/v1/projects/p1/illustrations/r1/drawing', 'fast'],
   ])('%s %s -> %s client', async (method, path, which) => {
     const clients = { fast: client(), slow: client() };
     await request(buildApp(clients.fast, clients.slow))[method](path).send({});

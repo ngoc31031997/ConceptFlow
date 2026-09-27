@@ -70,13 +70,18 @@ def test_thieu_figure_la_loi():
 @pytest.mark.parametrize("change, replacement, rule", [
     ('rx={40} fill={color}', 'rx={40} fill={color} stroke="#3A1F4B"', "S2"),
     ('rx={40} fill={color}', 'fill={color}', "S3"),
-    ("'#FF9F43'", "'#123456'", "S9"),
     ("fig.still ? 0 : ", "", "S20"),
 ])
 def test_canh_bao_khong_chan(change, replacement, rule):
     errors, warnings = rules(CLEAN.replace(change, replacement, 1))
     assert errors == []
     assert rule in warnings
+
+
+def test_mau_ngoai_bang_mau_kenh_khong_canh_bao():
+    # CR-045: hình minh hoạ dùng màu của chính vật; bảng màu kênh chỉ là gợi ý.
+    errors, warnings = rules(CLEAN.replace("'#FF9F43'", "'#123456'", 1))
+    assert errors == [] and warnings == []
 
 
 def test_qua_nhieu_mau_va_mau_khong_doi_duoc():

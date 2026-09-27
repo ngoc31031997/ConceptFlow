@@ -403,6 +403,8 @@ services:
       # CR-044 — library drawings are checked and previewed by rendering.
       RENDERING_URL: http://rendering:8000
       RENDERING_TIMEOUT_SECONDS: ${RENDERING_TIMEOUT_SECONDS:-240}
+      # CR-045 — drawings the illustrations step draws at once.
+      ILLUSTRATION_DRAW_CONCURRENCY: ${ILLUSTRATION_DRAW_CONCURRENCY:-4}
     deploy:
       resources:
         limits:

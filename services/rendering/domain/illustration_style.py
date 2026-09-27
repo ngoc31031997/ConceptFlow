@@ -3,7 +3,8 @@
 Luật đầy đủ nằm ở authoring-service/.../prompts/illustration_style_vi.txt;
 mã [S..] ở đây là mã luật trong file đó. Vi phạm làm hỏng style của cả kênh
 (gradient, filter, ảnh, chữ, ngẫu nhiên theo đồng hồ) là LỖI và chặn lưu; phần
-còn lại là CẢNH BÁO — Creator quyết định (đã chốt 2026-09-27).
+còn lại là CẢNH BÁO — Creator quyết định (đã chốt 2026-09-27). Màu ngoài bảng
+màu kênh (S9) không bị kiểm tra (CR-045).
 
 Kiểm tra trên mã nguồn TSX, không trên ảnh: rẻ, tất định, và chỉ được đúng dòng.
 """
@@ -12,16 +13,6 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-
-#: Bảng màu kênh (luật S9). Chữ hoa, không dấu #.
-CHANNEL_PALETTE = {
-    c.upper().lstrip("#") for c in (
-        "#FFC857 #FFD23F #FFC72C #FF9F43 #FF7A45 #E07A5F #E8453C #FF4D6D #FF5C8A #FF7AB6 #FF78D6 "
-        "#7B3FC4 #6C3FC5 #5B2C6F #2D5BFF #3D7BFF #8FD3FF #2BB6A8 #2EC4B6 #2BB673 #4CAF50 #8BC34A "
-        "#B6E34A #8A5A3C #D9975B #9A6A45 #F9C4B4 #FFFFFF #F3F6FB #DDE3EC #8F9BB3 #2B2140 #3A1F4B "
-        "#140B3A #1B1650 #000000"
-    ).split()
-}
 
 ERROR_TAGS = {
     "linearGradient": "S1", "radialGradient": "S1", "pattern": "S1", "filter": "S1",
@@ -105,9 +96,8 @@ def check_style(code: str) -> tuple[list[StyleFinding], list[StyleFinding]]:
     colours: dict[str, int] = {}
     for m in HEX_RE.finditer(code):
         colours.setdefault(_expand(m.group(1)), _line(code, m.start()))
-    off = {c: ln for c, ln in colours.items() if c not in CHANNEL_PALETTE}
-    for c, ln in off.items():
-        warnings.append(StyleFinding("S9", f"màu #{c} không có trong bảng màu kênh", ln))
+    # S9 (bảng màu kênh) không còn là cảnh báo (CR-045): hình minh hoạ được
+    # dùng màu của chính vật, bảng màu chỉ là gợi ý cho AI vẽ.
     base = {c for c in colours if c not in {"FFFFFF", "000000", "3A1F4B"}}
     if len(base) > 6:
         warnings.append(StyleFinding(

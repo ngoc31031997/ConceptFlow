@@ -25,17 +25,25 @@ import styles from "./AuthoringModeBar.module.css";
 const STEP_LABELS: Record<AuthoringStep, string> = {
   story: "Kịch bản",
   storyboard: "Visual",
+  illustrations: "Hình minh hoạ",
   code: "Code",
 };
 
-const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "code"];
+/** Thứ tự các bước; "illustrations" chỉ có ở video Remotion (CR-045). */
+const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "illustrations", "code"];
 
 /** Tab của từng bước, để chuỗi AI tự đưa Creator theo đúng bước đang chạy. */
 export const AUTHORING_STEP_PATHS: Record<AuthoringStep, string> = {
   story: "/create/script",
   storyboard: "/create/script/storyboard",
+  illustrations: "/create/script/illustrations",
   code: "/create/script/code",
 };
+
+/** Chuỗi "chạy cả pipeline" của tab Kịch bản: Remotion có thêm bước Hình minh hoạ. */
+export function authoringChainSteps(renderEngine: string): AuthoringStep[] {
+  return renderEngine === "remotion" ? ["story", "storyboard", "illustrations", "code"] : ["story", "storyboard", "code"];
+}
 
 /** Kết cục của một chuỗi đã xong còn hiện bao lâu (xem `outcome` bên dưới). */
 const OUTCOME_TTL_MS = 30 * 60 * 1000;
@@ -52,8 +60,9 @@ function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun
   const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "code" };
   const out: Partial<Record<AuthoringStep, LastRun>> = {};
   for (const e of [...events].sort((a, b) => a.id - b.id)) {
-    const step = byFlow[e.flow_step];
-    if (e.source !== "authoring" || !step || e.run_state === "running") continue;
+    // CR-045: the illustrations step journals under Code's flow number, told apart by its source.
+    const step = e.source === "illustrations" ? "illustrations" : byFlow[e.flow_step];
+    if ((e.source !== "authoring" && e.source !== "illustrations") || !step || e.run_state === "running") continue;
     out[step] = {
       state: e.run_state,
       durationMs: e.duration_ms ?? 0,
@@ -208,6 +217,8 @@ export function AuthoringModeBar({
       // vào ô của tab này (story vào ô storyboard/code) là lỗi từng xảy ra.
       const mine = steps.length > 0 ? chainSteps.filter((st) => steps.includes(st)) : chainSteps;
       for (const step of mine) {
+        // The illustrations step writes no editor content: its result is the drawing list.
+        if (step === "illustrations") continue;
         const content = step === "story" ? state.story : step === "storyboard" ? state.storyboard : state.code;
         if (content) onGenerated?.(step, content);
       }
@@ -281,7 +292,11 @@ export function AuthoringModeBar({
       if (c.finished && c.finished_at && handledFinish.current !== c.finished_at) {
         handledFinish.current = c.finished_at;
         await syncFromServer(c.steps);
-        if (sawRunning.current && c.steps.length > 1 && !c.error && !c.cancelled) followRef.current?.("done");
+        // CR-045: a chain that stopped for drawing review takes the Creator to
+        // the review; one that ran through goes to its last tab.
+        if (sawRunning.current && c.steps.length > 1 && !c.error && !c.cancelled) {
+          followRef.current?.(c.waiting && c.waiting_step ? c.waiting_step : "done");
+        }
       }
     };
     void tick();
@@ -320,6 +335,7 @@ export function AuthoringModeBar({
     ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${STEP_LABELS[outcome.error_step]})` : "")
     : null;
   const outcomeNote = outcome?.note ?? null;
+  const outcomeWaiting = outcome?.waiting ?? null;
   const shownError = error ?? outcomeError;
 
   async function handleCancel() {
@@ -361,7 +377,7 @@ export function AuthoringModeBar({
     }
   }
 
-  const runLabel = isChain ? `Chạy cả 3 bước bằng AI` : `Chạy ${what} bằng AI`;
+  const runLabel = isChain ? `Chạy cả ${steps.length} bước bằng AI` : `Chạy ${what} bằng AI`;
 
   const modeHint = !llm.enabled
     ? llm.reason || "Chưa bật AI. Bạn có thể tự làm bằng cách sao chép prompt."
@@ -445,7 +461,17 @@ export function AuthoringModeBar({
                   {outcomeNote}
                 </p>
               )}
-              {(outcomeError || outcomeNote) && !running && (
+              {outcomeWaiting && !error && !running && (
+                <div className={styles.waitingRow} data-testid="run-with-ai-waiting">
+                  <p className={styles.status}>{outcomeWaiting}</p>
+                  {onFollow && !(steps.length === 1 && steps[0] === "illustrations") && (
+                    <Button variant="ghost" onClick={() => onFollow("illustrations")} data-testid="run-with-ai-open-review">
+                      Mở bước Hình minh hoạ
+                    </Button>
+                  )}
+                </div>
+              )}
+              {(outcomeError || outcomeNote || outcomeWaiting) && !running && (
                 <button type="button" className={styles.hint} onClick={dismissOutcome} data-testid="run-with-ai-dismiss">
                   Đóng thông báo
                 </button>
@@ -455,9 +481,11 @@ export function AuthoringModeBar({
                   Đã dừng lượt chạy AI. Bước đang dở không được lưu; các bước đã xong vẫn giữ nguyên.
                 </p>
               )}
-              {outcome && !outcome.cancelled && !outcomeError && !outcomeNote && !running && !error && (
+              {outcome && !outcome.cancelled && !outcomeError && !outcomeNote && !outcomeWaiting && !running && !error && (
                 <p className={styles.status} data-testid="run-with-ai-done">
-                  Hoàn tất. Kết quả đã được điền vào ô soạn thảo.
+                  {outcome.steps.length === 1 && outcome.steps[0] === "illustrations"
+                    ? "Hoàn tất. Mọi hình minh hoạ đã sẵn sàng — có thể chạy bước Code."
+                    : "Hoàn tất. Kết quả đã được điền vào ô soạn thảo."}
                 </p>
               )}
             </>
@@ -483,7 +511,7 @@ export function AuthoringModeBar({
               )}
               {run.steps.length > 1 && (
                 <ol className={styles.stepper}>
-                  {ALL_STEPS.map((step, index) => {
+                  {run.steps.map((step, index) => {
                     const status = index < run.currentIndex ? "done" : index === run.currentIndex ? "running" : "pending";
                     return (
                       <li
@@ -572,7 +600,22 @@ function liveCounts(p: AuthoringProgress | null): { done?: number; total?: numbe
   if (!p?.running) return {};
   if (p.phase === "chunks" && p.chunks_total) return { done: p.chunks_done ?? 0, total: p.chunks_total };
   if (p.phase === "repair" && p.repair_max) return { done: p.repair_round ?? 0, total: p.repair_max };
+  if (p.phase === "draw" && p.drawings_total) return { done: p.drawings_done ?? 0, total: p.drawings_total };
   return {};
+}
+
+/** CR-045 — "Đang vẽ 3/7 hình · 1 lỗi · 4 hình dùng lại". */
+function drawingText(p: AuthoringProgress): string {
+  if (p.phase === "plan") return "Đang lập danh sách hình từ storyboard";
+  const total = p.drawings_total ?? 0;
+  if (total === 0) return `Không có hình nào cần vẽ${p.drawings_reused ? ` · ${p.drawings_reused} hình dùng lại` : ""}`;
+  return [
+    `Đang vẽ ${p.drawings_done ?? 0}/${total} hình`,
+    p.drawings_failed ? `${p.drawings_failed} lỗi` : null,
+    p.drawings_reused ? `${p.drawings_reused} hình dùng lại` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 /** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m05s". */
@@ -581,6 +624,7 @@ function stepLiveNote(p: AuthoringProgress | null): string {
   const time = formatClock(p.elapsed_seconds);
   if (p.phase === "writing") return `AI đang viết · ${formatChars(p.content_chars)} ký tự · ${time}`;
   if (p.phase === "reasoning") return `AI đang phân tích · ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
+  if (p.phase === "plan" || p.phase === "draw") return `${drawingText(p)} · ${time}`;
   return `${liveProgressText(p).replace(/….*$/, "").replace(/:.*$/, "")} · ${time}`;
 }
 
@@ -590,8 +634,9 @@ function liveProgressText(p: AuthoringProgress): string {
   if (p.phase === "layout" || p.phase === "cast") {
     return `Đang chuẩn bị bố cục… ${time}`;
   }
-  // CR-044 — Remotion: the video's drawings are planned and drawn before any code.
-  if (p.phase === "illustrations") return `Đang lập danh sách và vẽ hình minh hoạ… ${time}`;
+  // CR-045 — the illustrations step: planning, then drawing with counts.
+  if (p.phase === "plan") return `${drawingText(p)}… ${time}`;
+  if (p.phase === "draw") return `${drawingText(p)} · ${time}`;
   if (p.phase === "chunks") return `Đang viết code: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} phần · ${time}`;
   if (p.phase === "merge") return `Đang ghép code… ${time}`;
   if (p.phase === "check") return `Đang kiểm tra code… ${time}`;

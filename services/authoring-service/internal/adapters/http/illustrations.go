@@ -86,7 +86,7 @@ func illustrationError(w http.ResponseWriter, err error) {
 	case errors.Is(err, application.ErrIllustrationReadOnly), errors.Is(err, application.ErrFolderReadOnly):
 		writeError(w, http.StatusForbidden, err.Error())
 	case errors.Is(err, application.ErrIllustrationNameTaken), errors.Is(err, application.ErrFolderTaken),
-		errors.Is(err, application.ErrFolderNotEmpty):
+		errors.Is(err, application.ErrFolderNotEmpty), errors.Is(err, application.ErrIllustrationNotDeletable):
 		writeError(w, http.StatusConflict, err.Error())
 	default:
 		writeError(w, http.StatusBadRequest, err.Error())

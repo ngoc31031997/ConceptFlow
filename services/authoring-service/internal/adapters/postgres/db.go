@@ -140,6 +140,15 @@ CREATE TABLE IF NOT EXISTS project_illustrations (
     illustration_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustrations (project_id, position);
+-- CR-045: when the video's drawing list was last planned, so the code step can
+-- tell "planned, needs no drawing" from "never planned".
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at TIMESTAMPTZ;
+-- CR-045: colours outside the channel palette (S9) are no longer a warning;
+-- drop the ones stored before, so old drawings do not keep showing them.
+UPDATE illustrations SET warnings = COALESCE((
+    SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
+), '[]'::jsonb)
+WHERE warnings::text LIKE '%[S9]%';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

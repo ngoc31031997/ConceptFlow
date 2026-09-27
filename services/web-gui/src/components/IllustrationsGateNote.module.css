@@ -1,0 +1,22 @@
+.note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 600;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  background: var(--card);
+}
+
+.ok {
+  color: var(--ok);
+}
+
+.waiting {
+  color: var(--warn);
+}

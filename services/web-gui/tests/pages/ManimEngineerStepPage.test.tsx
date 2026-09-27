@@ -156,4 +156,29 @@ describe("ManimEngineerStepPage", () => {
       expect(apiClient.renderPrompt).toHaveBeenCalledWith(expect.objectContaining({ role: "remotion_engineer" })),
     );
   });
+
+  // CR-045 — the drawings moved to their own step; the Code tab only says where they stand.
+  it("a Remotion video's Code tab shows how many drawings are ready and leads back to the drawings step", async () => {
+    window.localStorage.setItem("conceptflow.lastUsedSettings.v1", JSON.stringify({ renderEngine: "remotion" }));
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({
+      illustrations: [
+        { id: "r1", position: 1, name: "Candy", description: "", folder_id: "do-vat", shots: [], state: "skipped" },
+        { id: "r2", position: 2, name: "Cat", description: "", folder_id: "dong-vat", shots: [], state: "planned" },
+      ],
+      ready: false,
+    });
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+    expect(await screen.findByTestId("illustrations-gate-note")).toHaveTextContent("1/2 hình sẵn sàng");
+    expect(screen.queryByTestId("project-illustrations")).not.toBeInTheDocument();
+    expect(screen.getByText("Quay lại Hình minh hoạ")).toBeInTheDocument();
+    window.localStorage.clear();
+  });
 });

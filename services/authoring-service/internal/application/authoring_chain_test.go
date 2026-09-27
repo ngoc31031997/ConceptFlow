@@ -140,3 +140,28 @@ func TestChainCancelUnknownProject(t *testing.T) {
 		t.Error("Cancel of an unknown project must be false")
 	}
 }
+
+// CR-045: drawings waiting for review stop the chain before Code — not an error.
+func TestChainStopsForReviewAfterTheIllustrationsStep(t *testing.T) {
+	f := &fakeStepRunner{result: map[string]GeneratedStep{
+		StepIllustrations: {AwaitingReview: true, Message: "Còn 2 hình chờ bạn duyệt"},
+	}}
+	c := NewAuthoringChainRunner(f, nil)
+	if err := c.Start("p", []string{"story", "storyboard", StepIllustrations, "code"}); err != nil {
+		t.Fatal(err)
+	}
+	st := waitFinished(t, c, "p")
+	if st.Error != "" || st.Waiting != "Còn 2 hình chờ bạn duyệt" || st.WaitingStep != StepIllustrations || len(f.ran) != 3 {
+		t.Errorf("state %+v ran %v", st, f.ran)
+	}
+}
+
+func TestChainGoesOnToCodeWhenNoDrawingWaits(t *testing.T) {
+	f := &fakeStepRunner{}
+	c := NewAuthoringChainRunner(f, nil)
+	_ = c.Start("p", []string{StepIllustrations, "code"})
+	st := waitFinished(t, c, "p")
+	if st.Waiting != "" || len(f.ran) != 2 || f.ran[1] != "code" {
+		t.Errorf("state %+v ran %v", st, f.ran)
+	}
+}

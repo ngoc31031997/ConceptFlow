@@ -16,6 +16,7 @@ type projectIllustrationsUseCase interface {
 	Plan(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error)
 	Draw(ctx context.Context, projectID, rowID, model string) (domain.ProjectIllustration, error)
 	SetSkipped(ctx context.Context, projectID, rowID string, skipped bool) (domain.ProjectIllustration, error)
+	DeleteDrawing(ctx context.Context, projectID, rowID string) (domain.ProjectIllustration, error)
 }
 
 // WithProjectIllustrations enables /v1/projects/{id}/illustrations.
@@ -29,6 +30,7 @@ func (rt *Router) projectIllustrationRoutes(r chi.Router) {
 	r.Post("/v1/projects/{project_id}/illustrations/plan", rt.handlePlanProjectIllustrations)
 	r.Post("/v1/projects/{project_id}/illustrations/{row_id}/draw", rt.handleDrawProjectIllustration)
 	r.Post("/v1/projects/{project_id}/illustrations/{row_id}/skip", rt.handleSkipProjectIllustration)
+	r.Delete("/v1/projects/{project_id}/illustrations/{row_id}/drawing", rt.handleDeleteProjectIllustrationDrawing)
 }
 
 func (rt *Router) projectIllustrationsEnabled(w http.ResponseWriter) bool {
@@ -105,6 +107,20 @@ func (rt *Router) handleSkipProjectIllustration(w http.ResponseWriter, r *http.R
 		return
 	}
 	row, err := rt.projectIllustrations.SetSkipped(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "row_id"), b.Skipped)
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+// handleDeleteProjectIllustrationDrawing removes the row's unapproved AI drawing
+// from the library and skips the row (CR-045).
+func (rt *Router) handleDeleteProjectIllustrationDrawing(w http.ResponseWriter, r *http.Request) {
+	if !rt.projectIllustrationsEnabled(w) {
+		return
+	}
+	row, err := rt.projectIllustrations.DeleteDrawing(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "row_id"))
 	if err != nil {
 		illustrationError(w, err)
 		return

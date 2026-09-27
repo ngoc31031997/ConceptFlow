@@ -204,6 +204,25 @@ describe("ScriptOutlineStepPage", () => {
         expect(createDraft).toHaveBeenCalledWith(expect.any(String), "Vòng lặp for", "vi", "remotion"),
       );
     });
+
+    // CR-045 — a Remotion video gets its drawings between Visual and Code.
+    it("chuỗi của video Remotion có thêm bước Hình minh hoạ trước Code; Manim thì không", async () => {
+      vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
+      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+      const start = mockServerChain();
+      renderPage();
+      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      expandSettings();
+      await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+      expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy cả 3 bước bằng AI");
+      fireEvent.click(screen.getByTestId("render-engine-remotion"));
+      await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy cả 4 bước bằng AI"));
+      fireEvent.click(screen.getByTestId("run-with-ai-story"));
+      await waitFor(() =>
+        expect(start).toHaveBeenCalledWith(expect.any(String), ["story", "storyboard", "illustrations", "code"]),
+      );
+    });
   });
 
   // CR-027 FR79 — chế độ làm việc là lựa chọn cho CẢ bước 1, không phải một

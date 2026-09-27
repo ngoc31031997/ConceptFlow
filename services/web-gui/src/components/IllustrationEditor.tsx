@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   createIllustration,
@@ -13,6 +13,9 @@ import {
   type IllustrationTry,
 } from "../api/client";
 import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "./ui";
+import { StyleWarningList } from "./StyleWarnings";
+import { useStyleWarnings } from "../hooks/useStyleRuleNames";
+import { fixWarningsNote } from "../utils/styleRules";
 import glass from "../styles/glass.module.css";
 import styles from "./IllustrationEditor.module.css";
 
@@ -47,6 +50,12 @@ interface IllustrationEditorProps {
   onSaved: (saved: Illustration) => void;
   onDeleted?: () => void;
   onClose: () => void;
+  /**
+   * CR-045 — a note to put in the "Vẽ lại bằng AI" box (from "Nhờ AI sửa các
+   * cảnh báo này"). `n` changes on every request, so the same note can be
+   * filled in again after the Creator cleared it.
+   */
+  redrawNote?: { text: string; n: number };
 }
 
 function toInput(ill: Illustration | null, folderId: string, draft?: Partial<IllustrationInput>): IllustrationInput {
@@ -67,7 +76,7 @@ function toInput(ill: Illustration | null, folderId: string, draft?: Partial<Ill
  * it again and keeps the preview. Code the renderer refuses comes back with
  * line numbers, listed under the box.
  */
-export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose }: IllustrationEditorProps) {
+export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose, redrawNote }: IllustrationEditorProps) {
   const creating = illustration === null;
   const readOnly = illustration?.builtin === true;
   const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft));
@@ -77,6 +86,8 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const [diagnostics, setDiagnostics] = useState<CodeDiagnostic[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [tried, setTried] = useState<IllustrationTry | null>(null);
+  const noteBox = useRef<HTMLTextAreaElement>(null);
+  const shownWarnings = useStyleWarnings(tried?.warnings ?? illustration?.warnings ?? []);
 
   useEffect(() => {
     const next = toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft);
@@ -87,6 +98,13 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
     setTried(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [illustration?.id, illustration?.version, draft]);
+
+  useEffect(() => {
+    if (!redrawNote) return;
+    setNote(redrawNote.text);
+    noteBox.current?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    noteBox.current?.focus();
+  }, [redrawNote]);
 
   const set = <K extends keyof IllustrationInput>(key: K, value: IllustrationInput[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -208,14 +226,23 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
           ))}
         </ul>
       )}
-      {(tried?.warnings ?? illustration?.warnings ?? []).length > 0 && (
-        <ul className={styles.warnings} data-testid="illustration-style-warnings">
-          {(tried?.warnings ?? illustration?.warnings ?? []).map((d, i) => (
-            <li key={i}>
-              {d.line != null && <span className={styles.line}>dòng {d.line}</span>} {d.message}
-            </li>
-          ))}
-        </ul>
+      {shownWarnings.length > 0 && (
+        <div className={styles.warnings}>
+          <StyleWarningList items={shownWarnings} testId="illustration-style-warnings" />
+          {!readOnly && !creating && (
+            <Button
+              variant="ghost"
+              className={glass.mtSm}
+              onClick={() => {
+                setNote(fixWarningsNote(shownWarnings));
+                noteBox.current?.focus();
+              }}
+              data-testid="illustration-fix-warnings"
+            >
+              Nhờ AI sửa các cảnh báo này
+            </Button>
+          )}
+        </div>
       )}
       {tried && (
         <div className={styles.tried} data-testid="illustration-tried">
@@ -225,7 +252,9 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
       )}
       {!readOnly && !creating && (
         <div className={`${styles.redraw} ${glass.mtSm}`}>
-          <TextInput
+          <TextArea
+            ref={noteBox}
+            rows={note.includes("\n") ? Math.min(8, note.split("\n").length + 1) : 1}
             placeholder="Ghi chú cho AI, vd: bánh xe to hơn, mặt vui hơn (có thể để trống)"
             value={note}
             onChange={(e) => setNote(e.target.value)}

@@ -27,6 +27,22 @@ type ProjectIllustration struct {
 	Error          string                   `json:"error,omitempty"`
 	IllustrationID string                   `json:"illustration_id,omitempty"`
 	Illustration   *Illustration            `json:"illustration,omitempty"`
+	// Progress is the live state of a drawing in flight (CR-045); in memory
+	// only, never stored — nil when the row is not being drawn right now.
+	Progress *DrawProgress `json:"progress,omitempty"`
+}
+
+// DrawProgress is how far the AI drawer has got on one drawing (CR-045): which
+// attempt of how many, and what it is doing in that attempt.
+type DrawProgress struct {
+	Attempt     int `json:"attempt"`
+	MaxAttempts int `json:"max_attempts"`
+	// Phase: "waiting" (call sent) | "reasoning" | "writing" | "checking"
+	// (the renderer checks the code and draws the preview).
+	Phase          string `json:"phase"`
+	ReasoningChars int    `json:"reasoning_chars"`
+	ContentChars   int    `json:"content_chars"`
+	ElapsedSeconds int    `json:"elapsed_seconds"`
 }
 
 // Ready reports whether the code step may go ahead past this row.

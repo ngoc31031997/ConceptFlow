@@ -30,6 +30,8 @@ type DrawRequest struct {
 	FolderID    string
 	Name        string // optional; the model proposes one otherwise
 	Model       string // optional model override
+	// OnProgress, when set, hears each attempt's phase as it happens (CR-045).
+	OnProgress func(domain.DrawProgress)
 }
 
 type illustrationDrawer struct {
@@ -124,16 +126,33 @@ func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skip
 
 // draw runs the model until the renderer accepts the drawing. user is the
 // first turn; each failed attempt adds the code it produced and the errors.
-func (uc *IllustrationsUseCase) draw(ctx context.Context, system, user, model string) (drawnReply, IllustrationPreview, error) {
+func (uc *IllustrationsUseCase) draw(
+	ctx context.Context, system, user, model string, onProgress func(domain.DrawProgress),
+) (drawnReply, IllustrationPreview, error) {
 	if uc.drawer == nil {
 		return drawnReply{}, IllustrationPreview{}, ErrDrawerDisabled
 	}
 	turn := user
 	var lastErr error
+	report := func(p domain.DrawProgress) {
+		if onProgress != nil {
+			p.MaxAttempts = maxDrawAttempts
+			onProgress(p)
+		}
+	}
 	for attempt := 1; attempt <= maxDrawAttempts; attempt++ {
 		started := time.Now()
+		report(domain.DrawProgress{Attempt: attempt, Phase: "waiting"})
 		res, err := uc.drawer.llm.Chat(ctx, ChatRequest{
 			System: system, User: turn, MaxTokens: uc.drawer.maxTokens, Temperature: 0.5, Model: model,
+			OnProgress: func(p ChatProgress) {
+				phase := "reasoning"
+				if p.ContentChars > 0 {
+					phase = "writing"
+				}
+				report(domain.DrawProgress{Attempt: attempt, Phase: phase,
+					ReasoningChars: p.ReasoningChars, ContentChars: p.ContentChars})
+			},
 		})
 		if uc.drawer.recorder != nil {
 			rec := RecordFor(uc.drawer.llm.Name(), drawerRole, "illustration", "", res.Usage, started, err)
@@ -154,6 +173,7 @@ func (uc *IllustrationsUseCase) draw(ctx context.Context, system, user, model st
 			turn = user + "\n\nLần trước câu trả lời sai khuôn: " + perr.Error() + ". Trả lời lại đúng khuôn."
 			continue
 		}
+		report(domain.DrawProgress{Attempt: attempt, Phase: "checking", ContentChars: len(res.Content)})
 		preview, rerr := uc.render(ctx, reply.Name, reply.Code)
 		if rerr == nil {
 			return reply, preview, nil
@@ -178,7 +198,7 @@ func (uc *IllustrationsUseCase) Draw(ctx context.Context, req DrawRequest) (doma
 	if n := strings.TrimSpace(req.Name); n != "" {
 		user += "\nTên component bắt buộc: " + n
 	}
-	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, req.FolderID, ""), user, req.Model)
+	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, req.FolderID, ""), user, req.Model, req.OnProgress)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
@@ -218,7 +238,7 @@ func (uc *IllustrationsUseCase) Redraw(ctx context.Context, id, note, model stri
 	} else {
 		user += "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn."
 	}
-	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, existing.FolderID, existing.ID), user, model)
+	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, existing.FolderID, existing.ID), user, model, nil)
 	if err != nil {
 		return existing, err
 	}

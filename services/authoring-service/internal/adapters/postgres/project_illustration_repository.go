@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 
 	"github.com/jackc/pgx/v5"
 
@@ -94,4 +95,25 @@ func (r *PromptTemplateRepository) UpdateProjectIllustration(ctx context.Context
 func (r *PromptTemplateRepository) DeleteProjectIllustrations(ctx context.Context, projectID string) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM project_illustrations WHERE project_id = $1`, projectID)
 	return err
+}
+
+// MarkIllustrationsPlanned records that the video's drawing list was made (CR-045).
+func (r *PromptTemplateRepository) MarkIllustrationsPlanned(ctx context.Context, projectID string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO project_authoring (project_id, illustrations_planned_at) VALUES ($1, now())
+		ON CONFLICT (project_id) DO UPDATE SET illustrations_planned_at = now()
+	`, projectID)
+	return err
+}
+
+// IllustrationsPlanned reports whether the video's drawing list was ever made.
+func (r *PromptTemplateRepository) IllustrationsPlanned(ctx context.Context, projectID string) (bool, error) {
+	var planned bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT illustrations_planned_at IS NOT NULL FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&planned)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return planned, err
 }
