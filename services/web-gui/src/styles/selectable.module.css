@@ -105,6 +105,12 @@
   justify-content: center;
   text-align: center;
   white-space: nowrap;
+  overflow: hidden;
+}
+
+.row > .option > .label {
+  min-width: 0;
+  overflow: hidden;
 }
 
 /* Compact segmented pickers (subtitle size/position) sit in narrower cells

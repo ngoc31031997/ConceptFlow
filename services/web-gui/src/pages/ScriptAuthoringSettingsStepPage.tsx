@@ -236,13 +236,16 @@ export function ScriptAuthoringSettingsStepPage() {
               hint={`Hiện tại: ${RENDER_QUALITY_LABELS[draft.renderQuality] ?? draft.renderQuality}`}
               testId="settings-render-quality"
             >
-              <RenderQualityPicker
-                value={draft.renderQuality}
-                onChange={(quality) => {
-                  dispatch({ type: "SET_RENDER_QUALITY", payload: quality });
-                  void send({ renderQuality: quality });
-                }}
-              />
+              {(close) => (
+                <RenderQualityPicker
+                  value={draft.renderQuality}
+                  onChange={(quality) => {
+                    dispatch({ type: "SET_RENDER_QUALITY", payload: quality });
+                    void send({ renderQuality: quality });
+                    close();
+                  }}
+                />
+              )}
             </Disclosure>
 
             <VideoOutputModePicker

@@ -191,52 +191,6 @@ export function ScriptOutlineStepPage() {
             : "Dựng dàn ý cho video."
         }
       >
-        {/* CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
-            huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
-            chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
-            mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
-            "chạy cả bước 3" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
-            xong TRƯỚC khi bấm chạy, không phải ở 1c lúc đã muộn). */}
-        <div className={styles.settingsRow} style={{ marginBottom: 16 }}>
-          <PipelineSettingsBar
-            renderEngine={draft.renderEngine}
-            onEngineChange={(engine) => {
-              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
-              if (draft.projectId) {
-                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
-              }
-            }}
-            llm={llm}
-            mode={authoringMode}
-            onModeChange={setAuthoringMode}
-            projectId={draft.projectId}
-            steps={["story", "storyboard", "code"]}
-            what="dàn ý"
-            runDisabled={topicIsEmpty}
-            runDisabledReason="Nhập chủ đề trước."
-            beforeRun={async () => {
-              // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
-              // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
-              // thiếu đúng cái thứ duy nhất bước này cần. Engine đi kèm ở đây
-              // nữa, làm lưới an toàn cho lượt lưu ở onChange phía trên —
-              // chuỗi 1b/1c phải thấy đúng engine trước khi chạy, không phải
-              // sau.
-              await createProjectDraft(
-                draft.projectId,
-                draft.authoringTopic.trim(),
-                draft.voiceLanguage,
-                draft.renderEngine,
-              );
-            }}
-            onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
-            onGenerated={(step, content) => {
-              if (step === "story") dispatch({ type: "SET_AUTHORING_STORY", payload: content });
-              else if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
-              else dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(content) });
-            }}
-          />
-        </div>
-
         <div className={styles.scriptLayout}>
           <Card
             title={hasOwnOutline ? "Chủ đề" : aiMode ? "1. Chủ đề" : "1. Sao chép prompt"}
@@ -321,6 +275,52 @@ export function ScriptOutlineStepPage() {
               data-testid="script-outline-story-input"
             />
           </Card>
+        </div>
+        {/* Đặt SAU chủ đề và dàn ý: nút chạy phải nằm dưới dữ liệu nó dùng
+            (quy tắc luồng UI trong CLAUDE.MD). CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
+            huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
+            chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
+            mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
+            "chạy cả bước 3" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
+            xong TRƯỚC khi bấm chạy, không phải ở 1c lúc đã muộn). */}
+        <div className={styles.settingsRow} style={{ marginTop: 16 }}>
+          <PipelineSettingsBar
+            renderEngine={draft.renderEngine}
+            onEngineChange={(engine) => {
+              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
+              if (draft.projectId) {
+                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
+              }
+            }}
+            llm={llm}
+            mode={authoringMode}
+            onModeChange={setAuthoringMode}
+            projectId={draft.projectId}
+            steps={["story", "storyboard", "code"]}
+            what="dàn ý"
+            runDisabled={topicIsEmpty}
+            runDisabledReason="Nhập chủ đề trước."
+            beforeRun={async () => {
+              // Chủ đề bình thường được lưu bởi effect debounce; nếu Creator
+              // bấm ngay sau khi gõ thì nó chưa kịp lên server, và prompt sẽ
+              // thiếu đúng cái thứ duy nhất bước này cần. Engine đi kèm ở đây
+              // nữa, làm lưới an toàn cho lượt lưu ở onChange phía trên —
+              // chuỗi 1b/1c phải thấy đúng engine trước khi chạy, không phải
+              // sau.
+              await createProjectDraft(
+                draft.projectId,
+                draft.authoringTopic.trim(),
+                draft.voiceLanguage,
+                draft.renderEngine,
+              );
+            }}
+            onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
+            onGenerated={(step, content) => {
+              if (step === "story") dispatch({ type: "SET_AUTHORING_STORY", payload: content });
+              else if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
+              else dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(content) });
+            }}
+          />
         </div>
       </AppShell>
 
