@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
+import { ConfirmModal } from "../components/ConfirmModal";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
 import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
@@ -73,6 +74,8 @@ export function VideoListPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [filter, setFilter] = useState<Filter>("all");
   const [stepFilter, setStepFilter] = useState<Set<number>>(new Set());
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const refetch = useCallback(async () => {
     try {
@@ -127,9 +130,6 @@ export function VideoListPage() {
   }
 
   async function handleDelete(projectId: string) {
-    if (!window.confirm("Xóa video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.")) {
-      return;
-    }
     setError(null); // Clear previous errors
     setDeletingId(projectId);
     try {
@@ -159,13 +159,6 @@ export function VideoListPage() {
   async function handleBulkDelete() {
     const ids = Array.from(selected);
     if (ids.length === 0) return;
-    if (
-      !window.confirm(
-        `Xóa ${ids.length} video đã chọn và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`,
-      )
-    ) {
-      return;
-    }
     setError(null); // Clear previous errors
     setIsBulkDeleting(true);
     const results = await Promise.allSettled(ids.map((id) => deleteProject(id)));
@@ -255,7 +248,7 @@ export function VideoListPage() {
                 data-testid="bulk-delete-button"
                 className={glass.dangerBtn}
                 disabled={selected.size === 0 || isBulkDeleting}
-                onClick={handleBulkDelete}
+                onClick={() => setConfirmBulkDelete(true)}
               >
                 <TrashIcon />
                 {isBulkDeleting ? "Đang xóa..." : `Xóa đã chọn${selected.size > 0 ? ` (${selected.size})` : ""}`}
@@ -334,7 +327,7 @@ export function VideoListPage() {
                       data-testid={`delete-button-${project.project_id}`}
                       className={glass.dangerGhostBtn}
                       disabled={deletingId === project.project_id || isBulkDeleting}
-                      onClick={() => handleDelete(project.project_id)}
+                      onClick={() => setConfirmDeleteId(project.project_id)}
                     >
                       <TrashIcon />
                       {deletingId === project.project_id ? "Đang xóa..." : "Xóa"}
@@ -351,6 +344,30 @@ export function VideoListPage() {
           </>
         )}
       </AppShell>
+
+      <ConfirmModal
+        isOpen={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        onConfirm={() => {
+          if (confirmDeleteId) handleDelete(confirmDeleteId);
+        }}
+        title="Xác nhận xóa video"
+        message="Xóa video này và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác."
+        confirmLabel="Xóa video"
+        cancelLabel="Hủy"
+        isDangerous
+      />
+
+      <ConfirmModal
+        isOpen={confirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        onConfirm={handleBulkDelete}
+        title="Xác nhận xóa nhiều video"
+        message={`Xóa ${selected.size} video đã chọn và toàn bộ dữ liệu liên quan? Hành động này không thể hoàn tác.`}
+        confirmLabel="Xóa đã chọn"
+        cancelLabel="Hủy"
+        isDangerous
+      />
     </div>
   );
 }
