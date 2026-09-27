@@ -2,12 +2,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { listVoices } from "../api/client";
 import type { Voice } from "../types";
 import { Card } from "./ui";
-import glass from "../styles/glass.module.css";
 import styles from "./NarrationPanel.module.css";
 import selectable from "../styles/selectable.module.css";
-import { SelectableOption } from "./SelectableOption";
-import { SubtitleStyleFields } from "./SubtitleStylePanel";
-import type { SubtitleMode, SubtitleStyle } from "../context/ProjectDraftContext";
 
 interface NarrationPanelProps {
   /** Set on the content-language picker; this panel only reads it. */
@@ -16,36 +12,7 @@ interface NarrationPanelProps {
   onTtsEnabledChange: (enabled: boolean) => void;
   voiceId: string | null;
   onVoiceIdChange: (voiceId: string | null) => void;
-  subtitleMode: SubtitleMode;
-  onSubtitleModeChange: (mode: SubtitleMode) => void;
-  subtitleStyle: SubtitleStyle;
-  onSubtitleStyleChange: (patch: Partial<SubtitleStyle>) => void;
 }
-
-/**
- * CR-015 FR41.1: replaces the old on/off toggle. Which delivery is right
- * depends on where the video will be watched (ADR-0027) — YouTube reads a
- * caption track, a short-form platform needs burned-in text — so the choice
- * is spelled out rather than collapsed back into a boolean.
- */
-const SUBTITLE_MODE_OPTIONS: { value: SubtitleMode; label: string; hint: string }[] = [
-  { value: "off", label: "Tắt", hint: "Không có phụ đề" },
-  {
-    value: "track",
-    label: "Phụ đề YouTube (khuyên dùng)",
-    hint: "Người xem tự bật/tắt, YouTube hỗ trợ tìm kiếm và dịch tự động",
-  },
-  {
-    value: "burn_in",
-    label: "Ghi cứng vào hình",
-    hint: "Chữ nằm cố định trên hình, phù hợp nền tảng không hỗ trợ phụ đề rời",
-  },
-  {
-    value: "both",
-    label: "Cả hai",
-    hint: "Có cả phụ đề rời và phụ đề cố định trên hình",
-  },
-];
 
 const GENDER_LABEL: Record<string, string> = { female: "Nữ", male: "Nam" };
 
@@ -97,14 +64,11 @@ function Toggle({
 }
 
 /**
- * Narration and subtitles, each toggle followed immediately by its own
- * settings.
+ * Narration: the on/off toggle followed immediately by the voice list.
  *
- * Both used to live elsewhere: the subtitle style was a sibling card that
- * appeared and disappeared from the sidebar — shifting everything below it,
- * including the submit button — and the content language sat between the two
- * toggles even though it drives the whole project (it is now its own card at
- * the top of the page).
+ * Subtitles used to share this card; they moved to SubtitleSettings, shown
+ * where the merge step that burns/attaches them runs (review gate and the
+ * merge failure panel), so a subtitle problem can be fixed next to its retry.
  */
 export function NarrationPanel({
   voiceLanguage,
@@ -112,10 +76,6 @@ export function NarrationPanel({
   onTtsEnabledChange,
   voiceId,
   onVoiceIdChange,
-  subtitleMode,
-  onSubtitleModeChange,
-  subtitleStyle,
-  onSubtitleStyleChange,
 }: NarrationPanelProps) {
   const [voices, setVoices] = useState<Voice[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -162,7 +122,7 @@ export function NarrationPanel({
   useEffect(() => () => audioRef.current?.pause(), []);
 
   return (
-    <Card title="Giọng đọc & phụ đề" data-testid="narration-panel">
+    <Card title="Giọng đọc" data-testid="narration-panel">
       <Toggle
         label="Giọng đọc"
         hint={ttsEnabled ? "Video sẽ có giọng đọc" : "Video sẽ không có giọng đọc"}
@@ -241,42 +201,6 @@ export function NarrationPanel({
             <p className={styles.status}>Chưa có giọng đọc nào cho ngôn ngữ này.</p>
           )}
         </div>
-      )}
-
-      <div className={styles.toggleLabel} style={{ marginTop: 18, marginBottom: 4 }}>
-        Phụ đề
-      </div>
-      <div className={selectable.stack} role="radiogroup" aria-label="Phụ đề" data-testid="narration-subtitle-mode">
-        {SUBTITLE_MODE_OPTIONS.map((option) => (
-          <SelectableOption
-            key={option.value}
-            selected={subtitleMode === option.value}
-            onSelect={() => onSubtitleModeChange(option.value)}
-            label={option.label}
-            hint={option.hint}
-            testId={`narration-subtitle-mode-${option.value}`}
-          />
-        ))}
-      </div>
-
-      {subtitleMode === "both" && (
-        // FR41.3: "both" is a valid choice (e.g. repost target without a
-        // caption-track upload path) — flagged, not blocked.
-        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Người xem bật phụ đề sẽ thấy chữ bị trùng lặp.
-        </p>
-      )}
-
-      {(subtitleMode === "burn_in" || subtitleMode === "both") && (
-        <div className={styles.nested} data-testid="subtitle-style-panel">
-          <SubtitleStyleFields value={subtitleStyle} onChange={onSubtitleStyleChange} />
-        </div>
-      )}
-
-      {!ttsEnabled && subtitleMode === "off" && (
-        <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Video sẽ không có lời thoại và phụ đề.
-        </p>
       )}
     </Card>
   );

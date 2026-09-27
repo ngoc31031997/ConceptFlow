@@ -24,11 +24,14 @@ export class ApiError extends Error {
   readonly code?: string;
   /** CR-044 — lỗi code của một hình minh hoạ, kèm số dòng để trình sửa chỉ ra. */
   readonly diagnostics?: CodeDiagnostic[];
+  /** HTTP status of the refusal, when there was a response at all. */
+  readonly status?: number;
 
-  constructor(message: string, code?: string, diagnostics?: CodeDiagnostic[]) {
+  constructor(message: string, code?: string, diagnostics?: CodeDiagnostic[], status?: number) {
     super(message);
     this.code = code;
     this.diagnostics = diagnostics;
+    this.status = status;
   }
 }
 
@@ -201,7 +204,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!response.ok) {
     const { message, code, diagnostics } = await parseError(response);
-    throw new ApiError(message, code, diagnostics);
+    throw new ApiError(message, code, diagnostics, response.status);
   }
   // 202 (a job accepted) carries no body either.
   if (response.status === 204 || response.status === 202) {
@@ -1186,7 +1189,11 @@ export async function createProjectDraft(
   return { similarProjects: fromWireSimilarProjects(res.similar_projects ?? []) };
 }
 
-/** Bước 2 (Cấu hình) — mọi thứ Creator chọn trước khi vào Script. */
+/**
+ * Cấu hình của project. Bước 2 lưu ngôn ngữ, engine, giọng, định dạng, kiểu đầu
+ * ra; chất lượng, font, phụ đề, nhạc nền được lưu ở màn Review hoặc khi bước
+ * đọc chúng lỗi (ProductionSettingsPanel).
+ */
 export interface WizardSettingsInput {
   voiceLanguage: "vi" | "en";
   renderEngine: "manim" | "remotion";
@@ -1223,9 +1230,9 @@ const WIZARD_PATCH_WIRE_KEYS: Record<keyof WizardSettingsPatch, string> = {
 };
 
 /**
- * Lưu bước 2 lên server từng field ngay khi Creator đổi — giọng đọc, phụ đề,
- * định dạng, chất lượng, nhạc nền nằm trong hàng project chứ không chỉ trong
- * localStorage, nên mở lại ở máy khác vẫn còn. 409 nếu render đã bắt đầu.
+ * Lưu cấu hình lên server từng field ngay khi Creator đổi — nằm trong hàng
+ * project chứ không chỉ trong localStorage, nên mở lại ở máy khác vẫn còn.
+ * 409 nếu bước đọc field đó đã chạy (hoặc đang chạy).
  */
 export async function patchWizardSettings(projectId: string, patch: WizardSettingsPatch): Promise<void> {
   const body: Record<string, unknown> = {};

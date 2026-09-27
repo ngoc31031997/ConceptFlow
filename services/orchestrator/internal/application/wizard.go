@@ -13,22 +13,6 @@ type WizardPort interface {
 	PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error
 }
 
-// requireDraft is the same lock the authoring saves use (CR-028 FR84.2): once
-// the saga has started, the wizard's inputs must not change under a render.
-func requireDraft(ctx context.Context, repo WizardPort, projectID string) error {
-	if projectID == "" {
-		return fmt.Errorf("%w: project_id is required", domain.ErrInvalidWizardInput)
-	}
-	status, err := repo.GetStatus(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	if !domain.IsAuthoringEditable(status) {
-		return domain.ErrInvalidStatus
-	}
-	return nil
-}
-
 // PatchWizardSettingsUseCase persists wizard step 2 ("Cấu hình") field by
 // field as the Creator changes it; a patch with Confirm set (the "Tiếp tục"
 // press) also moves the project on to step 3.
@@ -40,8 +24,10 @@ func NewPatchWizardSettingsUseCase(repo WizardPort) *PatchWizardSettingsUseCase 
 	return &PatchWizardSettingsUseCase{repo: repo}
 }
 
-// Execute validates only the fields present in p and stores them. A project
-// past draft answers ErrInvalidStatus.
+// Execute validates only the fields present in p and stores them. A field
+// whose reading step has already run answers ErrInvalidStatus
+// (domain.WizardPatchAllowed): render settings stay editable at the review gate
+// and after a failure up to render_scenes, merge settings up to assemble_video.
 func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
 	if p.ContentLanguage != nil && *p.ContentLanguage != domain.LanguageVietnamese && *p.ContentLanguage != domain.LanguageEnglish {
 		return fmt.Errorf("%w: voice_language must be 'vi' or 'en'", domain.ErrInvalidWizardInput)
@@ -69,8 +55,15 @@ func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID str
 		p.VideoFormatID = &f
 	}
 
-	if err := requireDraft(ctx, uc.repo, projectID); err != nil {
+	if projectID == "" {
+		return fmt.Errorf("%w: project_id is required", domain.ErrInvalidWizardInput)
+	}
+	status, err := uc.repo.GetStatus(ctx, projectID)
+	if err != nil {
 		return err
+	}
+	if !domain.WizardPatchAllowed(status, p) {
+		return domain.ErrInvalidStatus
 	}
 	return uc.repo.PatchWizardSettings(ctx, projectID, p)
 }

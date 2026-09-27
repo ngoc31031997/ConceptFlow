@@ -1003,10 +1003,10 @@ func (rt *Router) handleEditNarration(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handlePatchWizardSettings persists wizard step 2 one change at a time: only
-// the fields in the body are written. `confirm: true` (the "Tiếp tục" press)
-// also advances the project to step 3. 409 once the render has started, the
-// same lock the authoring saves use.
+// handlePatchWizardSettings persists the project's settings one change at a
+// time: only the fields in the body are written. `confirm: true` (the "Tiếp
+// tục" press) also advances the project to step 3. 409 once the saga step that
+// reads a field has run (domain.WizardPatchAllowed).
 func (rt *Router) handlePatchWizardSettings(w http.ResponseWriter, r *http.Request) {
 	if rt.saveWizardSettings == nil {
 		writeError(w, http.StatusNotFound, "wizard settings is not enabled")
