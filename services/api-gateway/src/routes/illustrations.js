@@ -3,6 +3,9 @@
 const express = require('express');
 const { proxyHandler } = require('../handlers/proxyHandler');
 
+// Same cap as authoring-service's maxLibraryBackupBytes.
+const BACKUP_LIMIT = '256mb';
+
 /**
  * CR-044 — the illustration library, served by authoring-service.
  *
@@ -34,6 +37,14 @@ function illustrationsRouter(authoringClient, authoringSlowClient) {
   // The AI drawer: a model call, then a check and render, up to three times.
   router.post('/v1/admin/illustrations/draw', slow);
   router.post('/v1/admin/illustrations/:id/redraw', slow);
+  // Backup: the whole library as one ZIP, and restoring it — every drawing is
+  // checked and rendered again, one at a time. The upload is the raw ZIP body.
+  router.get('/v1/admin/illustrations/export', slow);
+  router.post(
+    '/v1/admin/illustrations/import',
+    express.raw({ type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'], limit: BACKUP_LIMIT }),
+    slow,
+  );
   router.delete('/v1/admin/illustrations/:id', fast);
   return router;
 }

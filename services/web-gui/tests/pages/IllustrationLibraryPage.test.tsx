@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, onTestFinished } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { IllustrationLibraryPage } from "../../src/pages/IllustrationLibraryPage";
@@ -158,4 +158,81 @@ describe("IllustrationLibraryPage (CR-044)", () => {
     fireEvent.click(screen.getByTestId("illustration-redraw-button"));
     await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "bánh to hơn"));
   });
+
+  it("exports the whole library as a dated ZIP download", async () => {
+    const blob = new Blob(["PK"], { type: "application/zip" });
+    const exportIt = vi.spyOn(apiClient, "exportIllustrationLibrary").mockResolvedValue(blob);
+    const createUrl = vi.fn(() => "blob:backup");
+    const revokeUrl = vi.fn();
+    const original = { createObjectURL: URL.createObjectURL, revokeObjectURL: URL.revokeObjectURL };
+    Object.assign(URL, { createObjectURL: createUrl, revokeObjectURL: revokeUrl });
+    onTestFinished(() => {
+      Object.assign(URL, original);
+    });
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    renderPage();
+    fireEvent.click(await screen.findByTestId("illustration-export-button"));
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1));
+    expect(exportIt).toHaveBeenCalledTimes(1);
+    expect(createUrl).toHaveBeenCalledWith(blob);
+    const link = click.mock.contexts[0] as HTMLAnchorElement;
+    expect(link.download).toMatch(/^conceptflow-thu-vien-hinh-\d{8}-\d{4}\.zip$/);
+    expect(revokeUrl).toHaveBeenCalledWith("blob:backup");
+  });
+
+  it("restores a backup with the chosen conflict mode, reports each drawing and reloads the library", async () => {
+    const importIt = vi.spyOn(apiClient, "importIllustrationLibrary").mockResolvedValue({
+      exported_at: "2026-09-27T08:30:00Z",
+      folders_created: ["do-choi"],
+      folder_errors: [],
+      items: [
+        { name: "Ball", folder_id: "do-choi", result: "created" },
+        { name: "Bus", folder_id: "phuong-tien", result: "replaced" },
+        { name: "Kite", folder_id: "do-vat", result: "failed", reason: "dòng 3: TS2304" },
+      ],
+      not_processed: 0,
+    });
+    renderPage();
+    await screen.findByTestId("illustration-tile-Bus");
+    const list = vi.mocked(apiClient.listIllustrations);
+    const loads = list.mock.calls.length;
+    expect(screen.getByTestId("illustration-import-button")).toBeDisabled();
+
+    const file = new File(["PK"], "thu-vien.zip", { type: "application/zip" });
+    fireEvent.change(screen.getByTestId("illustration-import-input"), { target: { files: [file] } });
+    expect(screen.getByTestId("illustration-import-file")).toHaveTextContent("thu-vien.zip");
+    fireEvent.click(screen.getByTestId("illustration-import-replace"));
+    fireEvent.click(screen.getByTestId("illustration-import-button"));
+
+    const report = await screen.findByTestId("illustration-import-report");
+    expect(importIt).toHaveBeenCalledWith(file, true);
+    expect(report).toHaveTextContent("Đã thêm 1 · Ghi đè 1 · Bỏ qua 0 · Lỗi 1");
+    expect(report).toHaveTextContent("do-choi");
+    expect(report).toHaveTextContent("Kite — Lỗi: dòng 3: TS2304");
+    await waitFor(() => expect(list.mock.calls.length).toBeGreaterThan(loads));
+  });
+
+  it("says how many drawings were left when a restore stops midway", async () => {
+    vi.spyOn(apiClient, "importIllustrationLibrary").mockResolvedValue({
+      exported_at: "", folders_created: [], folder_errors: [], items: [],
+      aborted: "dừng ở hình Ball: rendering unreachable", not_processed: 5,
+    });
+    renderPage();
+    const file = new File(["PK"], "b.zip", { type: "application/zip" });
+    fireEvent.change(await screen.findByTestId("illustration-import-input"), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("illustration-import-button"));
+    expect(await screen.findByTestId("illustration-import-aborted")).toHaveTextContent("còn 5 hình chưa nhập");
+  });
+
+  it("shows why a file that is not a backup was refused", async () => {
+    vi.spyOn(apiClient, "importIllustrationLibrary").mockRejectedValue(
+      new apiClient.ApiError("illustration library backup is not valid: thiếu manifest.json"),
+    );
+    renderPage();
+    const file = new File(["x"], "anh.zip", { type: "application/zip" });
+    fireEvent.change(await screen.findByTestId("illustration-import-input"), { target: { files: [file] } });
+    fireEvent.click(screen.getByTestId("illustration-import-button"));
+    expect(await screen.findByRole("alert")).toHaveTextContent("thiếu manifest.json");
+  });
 });
+

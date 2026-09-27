@@ -763,6 +763,56 @@ export async function deleteIllustration(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/illustrations/${id}`, { method: "DELETE" });
 }
 
+/** CR-044 — kết quả nhập lại một hình từ file sao lưu. */
+export interface IllustrationImportItem {
+  name: string;
+  folder_id: string;
+  /** created: thêm mới · replaced: ghi đè hình cùng tên · skipped: để nguyên · failed: không nhập được. */
+  result: "created" | "replaced" | "skipped" | "failed";
+  reason?: string;
+  diagnostics?: CodeDiagnostic[];
+}
+
+/** CR-044 — báo cáo một lần khôi phục thư viện hình. */
+export interface IllustrationImportReport {
+  exported_at: string;
+  folders_created: string[];
+  folder_errors: string[];
+  items: IllustrationImportItem[];
+  /** Có khi bộ dựng/cơ sở dữ liệu hỏng giữa chừng: các hình từ đó trở đi chưa được thử. */
+  aborted?: string;
+  not_processed: number;
+}
+
+/** Giới hạn file sao lưu, khớp với api-gateway và authoring-service. */
+export const ILLUSTRATION_BACKUP_MAX_BYTES = 256 * 1024 * 1024;
+
+/** Tải toàn bộ thư viện hình (thư mục, code, ảnh PNG/GIF) về một file ZIP. */
+export async function exportIllustrationLibrary(): Promise<Blob> {
+  let response: Response;
+  try {
+    response = await fetch(`${GATEWAY_URL}/v1/admin/illustrations/export`);
+  } catch {
+    throw new ApiError(GENERIC_CONNECTION_ERROR);
+  }
+  if (!response.ok) {
+    const { message, code } = await parseError(response);
+    throw new ApiError(message, code);
+  }
+  return response.blob();
+}
+
+/**
+ * Khôi phục thư viện hình từ file ZIP đã xuất. Mỗi hình được kiểm tra và dựng
+ * lại, nên có thể mất vài phút. `replace`: ghi đè hình cùng tên đang có.
+ */
+export function importIllustrationLibrary(file: Blob, replace: boolean): Promise<IllustrationImportReport> {
+  return apiFetch<IllustrationImportReport>(
+    `/v1/admin/illustrations/import?on_conflict=${replace ? "replace" : "skip"}`,
+    { method: "POST", headers: { "Content-Type": "application/zip" }, body: file },
+  );
+}
+
 /**
  * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
  * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.

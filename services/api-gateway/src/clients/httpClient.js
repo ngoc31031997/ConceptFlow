@@ -70,7 +70,8 @@ function createHttpClient(baseUrl, options = {}) {
       };
       if (timeoutMs === 0) fetchOptions.dispatcher = NO_TIMEOUT_DISPATCHER;
       if (body !== undefined && body !== null && method !== 'GET' && method !== 'HEAD') {
-        fetchOptions.body = typeof body === 'string' ? body : JSON.stringify(body);
+        // Strings and raw bytes (CR-044 library backup upload) go as they are.
+        fetchOptions.body = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body);
       }
 
       const res = await fetchImpl(url, fetchOptions);
@@ -102,12 +103,14 @@ function createHttpClient(baseUrl, options = {}) {
  * Reads the response body, preserving JSON as parsed objects (needed so
  * `proxyHandler` can hand it straight to Express's `res.json`) while
  * falling back to raw text for non-JSON or empty bodies, and keeping image
- * bodies as bytes.
+ * and ZIP bodies as bytes.
  */
 async function readResponseBody(res) {
-  // CR-044: illustration previews are images; decoding them as text corrupts them.
+  // CR-044: illustration previews are images and the library backup is a ZIP;
+  // decoding them as text corrupts them.
   const type = (res.headers.get('content-type') || '').toLowerCase();
-  if (type.startsWith('image/') && typeof res.arrayBuffer === 'function') {
+  const binary = type.startsWith('image/') || type.startsWith('application/zip');
+  if (binary && typeof res.arrayBuffer === 'function') {
     return Buffer.from(await res.arrayBuffer());
   }
   const text = await res.text();

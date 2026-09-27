@@ -36,6 +36,25 @@ describe('httpClient', () => {
     expect(res.body).toEqual({ ok: true });
   });
 
+  test('sends a Buffer body as raw bytes and reads a ZIP answer as bytes (CR-044 backup)', async () => {
+    let capturedOptions;
+    const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xff]);
+    const fetchImpl = async (url, opts) => {
+      capturedOptions = opts;
+      return {
+        status: 200,
+        headers: new Map([['content-type', 'application/zip']]),
+        arrayBuffer: async () => zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.length),
+        text: async () => { throw new Error('a ZIP must not be read as text'); },
+      };
+    };
+    const client = createHttpClient('http://authoring:8080', { fetchImpl });
+    const res = await client.request({ method: 'POST', path: '/v1/admin/illustrations/import', body: zip });
+    expect(capturedOptions.body).toBe(zip);
+    expect(Buffer.isBuffer(res.body)).toBe(true);
+    expect(Buffer.compare(res.body, zip)).toBe(0);
+  });
+
   test('appends query params', async () => {
     let capturedUrl;
     const fetchImpl = async (url) => {

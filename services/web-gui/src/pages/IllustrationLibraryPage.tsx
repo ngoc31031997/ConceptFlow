@@ -4,6 +4,7 @@ import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "
 import { Disclosure } from "../components/Disclosure";
 import { IllustrationTile } from "../components/IllustrationTile";
 import { IllustrationEditor } from "../components/IllustrationEditor";
+import { IllustrationBackupCard } from "../components/IllustrationBackupCard";
 import {
   createIllustrationFolder,
   deleteIllustrationFolder,
@@ -235,6 +236,7 @@ export function IllustrationLibraryPage() {
                 </Button>
               )}
             </Card>
+            <IllustrationBackupCard onImported={() => void reload()} />
           </aside>
 
           <section className={styles.main}>
