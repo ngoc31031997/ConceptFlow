@@ -33,6 +33,8 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
+import time
 from collections.abc import Callable
 
 from adapters.messaging.cancellation import REGISTRY
@@ -44,6 +46,10 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
 FPS = 30
+# Shorter than Manim's 15s: this beat carries a real percentage, not just "alive".
+HEARTBEAT_INTERVAL_SECONDS = 2
+# Printed by render.mjs's renderMedia onProgress.
+_PROGRESS_LINE_RE = re.compile(r"^CF_PROGRESS (\d+)\s*$")
 
 # CR-047 — video review finding: shots were laid back to back with zero gap
 # (startFrame of shot N+1 == end of shot N), so the narration read as one
@@ -181,6 +187,7 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
         self._timeout_seconds = timeout_seconds
         self._cache_root = cache_root
         self._project_template_dir = project_template_dir
+        self._on_heartbeat: Callable[..., None] | None = None
 
     def dry_run(self, request: ScriptRenderRequest) -> DryRunResult:
         narrations = _extract_narrations(request.script_content)
@@ -237,6 +244,10 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
             video_duration_seconds=video_duration,
         )
 
+    def set_heartbeat(self, callback: Callable[..., None] | None) -> None:
+        """Set per command; called as callback(elapsed, None, percent)."""
+        self._on_heartbeat = callback
+
     def _run_node(self, script_args: list[str], timeout: int) -> None:
         cmd = ["node", RENDER_SCRIPT] + script_args
 
@@ -251,16 +262,59 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
             start_new_session=True,
         )
         REGISTRY.register(process)
+
+        started = time.monotonic()
+        stderr_lines: list[str] = []
+        # None until renderMedia starts: bundling comes first and reports nothing.
+        latest_percent: list[int | None] = [None]
+        done = threading.Event()
+
+        # Both pipes are drained on their own threads: reading one while node
+        # blocks writing the other would deadlock once a pipe buffer fills.
+        def drain_stdout() -> None:
+            for line in process.stdout:
+                match = _PROGRESS_LINE_RE.match(line)
+                if match:
+                    latest_percent[0] = min(100, int(match.group(1)))
+
+        def drain_stderr() -> None:
+            for line in process.stderr:
+                stderr_lines.append(line)
+
+        def beat() -> None:
+            while not done.wait(HEARTBEAT_INTERVAL_SECONDS):
+                try:
+                    self._on_heartbeat(time.monotonic() - started, None, latest_percent[0])
+                except Exception:  # noqa: BLE001 — progress is UX-only
+                    logger.exception("Heartbeat callback failed; continuing the render")
+
+        readers = [
+            threading.Thread(target=drain_stdout, daemon=True),
+            threading.Thread(target=drain_stderr, daemon=True),
+        ]
+        for reader in readers:
+            reader.start()
+        heartbeat = None
+        if self._on_heartbeat is not None:
+            heartbeat = threading.Thread(target=beat, daemon=True)
+            heartbeat.start()
+
         try:
-            _stdout, stderr = process.communicate(timeout=timeout)
+            returncode = process.wait(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
             process.kill()
-            process.communicate()
+            process.wait()
             raise AnimationEngineError(f"Remotion render timed out after {timeout}s") from exc
         finally:
             REGISTRY.unregister(process)
+            done.set()
+            for reader in readers:
+                reader.join(timeout=5)
+            if heartbeat is not None:
+                heartbeat.join(timeout=1)
 
-        if process.returncode != 0:
+        if returncode != 0:
+            stderr = "".join(stderr_lines)
             logger.warning("Remotion render failed: %s", stderr)
             raise AnimationEngineError(f"Remotion render failed:\n{stderr}")
 

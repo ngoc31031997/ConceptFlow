@@ -105,11 +105,13 @@ class RenderScriptCommandHandler:
             # is only safe to touch from the event loop — hence the hop back.
             loop = asyncio.get_running_loop()
 
-            def emit_heartbeat(elapsed: float, animation_index: int | None) -> None:
+            def emit_heartbeat(
+                elapsed: float, animation_index: int | None, percent: int | None = None
+            ) -> None:
                 if self._progress is None:
                     return
                 asyncio.run_coroutine_threadsafe(
-                    self._progress.publish_render_heartbeat(project_id, elapsed, animation_index),
+                    self._progress.publish_render_heartbeat(project_id, elapsed, animation_index, percent),
                     loop,
                 )
 

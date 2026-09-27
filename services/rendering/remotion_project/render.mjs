@@ -60,12 +60,22 @@ async function main() {
     inputProps,
   });
 
+  // One stdout line per whole-percent change, read by remotion_renderer.py and
+  // forwarded as the render's progress bar. `progress` is Remotion's own 0..1
+  // across rendering and encoding, so it ends at 1 only when the file is done.
+  let lastPercent = -1;
   await renderMedia({
     composition,
     serveUrl,
     codec: 'h264',
     outputLocation: args.out,
     inputProps,
+    onProgress: ({progress}) => {
+      const percent = Math.floor(progress * 100);
+      if (percent === lastPercent) return;
+      lastPercent = percent;
+      process.stdout.write(`CF_PROGRESS ${percent}\n`);
+    },
     // Recommended by Remotion's own Docker guide
     // (https://www.remotion.dev/docs/docker) for containers without a full
     // desktop compositor.

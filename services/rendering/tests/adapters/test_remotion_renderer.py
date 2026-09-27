@@ -7,7 +7,9 @@ Remotion.
 
 from __future__ import annotations
 
+import io
 import json
+import time
 
 import pytest
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer, _extract_narrations
@@ -86,12 +88,15 @@ class TestDryRun:
 
 class _FakeNode:
     """Stands in for the `node render.mjs` Popen: the renderer starts it in its
-    own process group and registers it for cancellation, then collects output."""
+    own process group and registers it for cancellation, then streams both
+    pipes line by line while it waits for the exit code."""
 
-    def __init__(self, returncode=0, stderr="", on_start=None):
+    def __init__(self, returncode=0, stderr="", stdout="", on_start=None, run_seconds=0.0):
         self.returncode = returncode
-        self._stderr = stderr
+        self.stdout = io.StringIO(stdout)
+        self.stderr = io.StringIO(stderr)
         self._on_start = on_start
+        self._run_seconds = run_seconds
         self.pid = 0
 
     def factory(self, cmd, *args, **kwargs):
@@ -99,8 +104,9 @@ class _FakeNode:
             self._on_start(cmd)
         return self
 
-    def communicate(self, timeout=None):
-        return "", self._stderr
+    def wait(self, timeout=None):
+        time.sleep(self._run_seconds)
+        return self.returncode
 
     def kill(self):
         pass
@@ -193,6 +199,30 @@ class TestRender:
         )
         with pytest.raises(AnimationEngineError, match="boom"):
             renderer.render(make_request(tmp_path), str(tmp_path / "out.mp4"))
+
+    def test_render_reports_renderMedia_percent_through_the_heartbeat(self, tmp_path, monkeypatch):
+        template_dir = tmp_path / "remotion_project"
+        (template_dir / "src").mkdir(parents=True)
+
+        def start_node(cmd):
+            with open(cmd[cmd.index("--out") + 1], "wb") as f:
+                f.write(b"fake video bytes")
+
+        # Unrelated stdout lines must be ignored; the last CF_PROGRESS wins.
+        node = _FakeNode(
+            stdout="Bundling...\nCF_PROGRESS 12\nCF_PROGRESS 57\n", on_start=start_node, run_seconds=0.2
+        )
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.Popen", node.factory)
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.subprocess.run", _ffprobe("5.0"))
+        monkeypatch.setattr("adapters.rendering.remotion_renderer.HEARTBEAT_INTERVAL_SECONDS", 0.05)
+
+        beats = []
+        renderer = RemotionScriptRenderer(project_template_dir=str(template_dir), cache_root=str(tmp_path / "media"))
+        renderer.set_heartbeat(lambda elapsed, animation_index, percent: beats.append((animation_index, percent)))
+        renderer.render(make_request(tmp_path), str(tmp_path / "out.mp4"))
+
+        assert beats, "a render longer than the interval must beat at least once"
+        assert beats[-1] == (None, 57)
 
     def test_render_raises_with_no_segments(self, tmp_path):
         renderer = RemotionScriptRenderer(project_template_dir=str(tmp_path))

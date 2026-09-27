@@ -30,9 +30,9 @@ class EngineRouterRenderer(ManimScriptRendererPort):
     ) -> None:
         self._renderers = {"manim": manim, "remotion": remotion}
 
-    def set_heartbeat(self, callback: Callable[[float, int | None], None] | None) -> None:
-        # Only ManimScriptRenderer implements this (heartbeat during a long
-        # `manim` subprocess); RemotionScriptRenderer has no such hook yet.
+    def set_heartbeat(self, callback: Callable[..., None] | None) -> None:
+        # Manim beats (elapsed, animation_index); Remotion beats
+        # (elapsed, None, percent) from renderMedia's own frame progress.
         # RenderScriptUseCase.set_heartbeat() already tolerates a renderer
         # with none (`getattr(..., "set_heartbeat", None)`), so forward it to
         # every renderer that has one rather than picking just the active one

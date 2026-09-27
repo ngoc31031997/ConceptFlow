@@ -32,25 +32,27 @@ function CheckIcon() {
 }
 
 /**
- * CR-029: render_scenes reports elapsed time (no reliable total — see
- * ProgressMessage), but synthesize_speech/assemble_video/generate_clips
+ * CR-029: a Manim render_scenes reports elapsed time only (no reliable total);
+ * a Remotion one carries render_percent. synthesize_speech/assemble_video/generate_clips
  * each report a real (index, total) pair now, just under different field
  * names per step. This picks whichever one the current message actually
  * carries and gives it the right Vietnamese unit word for the bar's label.
  */
-function unitProgress(
-  progressState: ProgressState
-): { index: number; total: number; word: string } | null {
-  const { sceneIndex, sceneTotal, stageIndex, stageTotal, clipIndex, clipTotal } = progressState;
-  if (sceneIndex !== null && sceneTotal !== null && sceneTotal > 0) {
-    return { index: sceneIndex, total: sceneTotal, word: "Cảnh" };
+function unitProgress(progressState: ProgressState): { percent: number; label: string } | null {
+  const { sceneIndex, sceneTotal, stageIndex, stageTotal, clipIndex, clipTotal, renderPercent, elapsedSeconds } =
+    progressState;
+  const counted = (index: number, total: number, word: string) => ({
+    percent: Math.round((index / total) * 100),
+    label: `${word} ${index}/${total}`,
+  });
+  // Remotion only: renderMedia's own frame progress. Manim sends none and keeps the elapsed text.
+  if (renderPercent !== null) {
+    const elapsed = elapsedSeconds !== null ? ` · ${formatElapsed(elapsedSeconds)}` : "";
+    return { percent: renderPercent, label: `Đã render ${renderPercent}%${elapsed}` };
   }
-  if (stageIndex !== null && stageTotal !== null && stageTotal > 0) {
-    return { index: stageIndex, total: stageTotal, word: "Giai đoạn" };
-  }
-  if (clipIndex !== null && clipTotal !== null && clipTotal > 0) {
-    return { index: clipIndex, total: clipTotal, word: "Clip" };
-  }
+  if (sceneIndex !== null && sceneTotal !== null && sceneTotal > 0) return counted(sceneIndex, sceneTotal, "Cảnh");
+  if (stageIndex !== null && stageTotal !== null && stageTotal > 0) return counted(stageIndex, stageTotal, "Giai đoạn");
+  if (clipIndex !== null && clipTotal !== null && clipTotal > 0) return counted(clipIndex, clipTotal, "Clip");
   return null;
 }
 
@@ -64,10 +66,8 @@ export function ProgressTracker({
 }: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
   const unit = allDone || waitingLabel ? null : unitProgress(progressState);
-  const hasSceneProgress = unit !== null;
-  const percent = hasSceneProgress ? Math.round((unit.index / unit.total) * 100) : null;
-  // A render reports elapsed time rather than a percentage — see ProgressMessage.
-  const isRendering = !allDone && !waitingLabel && !hasSceneProgress && elapsedSeconds !== null;
+  // A Manim render (or Remotion still bundling) reports elapsed time, not a percentage.
+  const isRendering = !allDone && !waitingLabel && unit === null && elapsedSeconds !== null;
 
   // Một bước không thuộc màn này (saga đã chạy qua, hoặc chưa tới) cho -1 —
   // và -1 vẽ ra danh sách toàn "pending", đúng nghĩa "màn này chưa tới lượt".
@@ -96,11 +96,9 @@ export function ProgressTracker({
         {unit && (
           <>
             <div className={styles.bar}>
-              <div className={styles.barFill} style={{ width: `${percent}%` }} data-testid="progress-tracker-bar" />
+              <div className={styles.barFill} style={{ width: `${unit.percent}%` }} data-testid="progress-tracker-bar" />
             </div>
-            <span className={styles.sceneLabel}>
-              {unit.word} {unit.index}/{unit.total}
-            </span>
+            <span className={styles.sceneLabel}>{unit.label}</span>
           </>
         )}
 

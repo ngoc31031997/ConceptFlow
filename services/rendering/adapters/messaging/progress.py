@@ -31,12 +31,17 @@ class ProgressPublisher:
         self._exchange = exchange
 
     async def publish_render_heartbeat(
-        self, project_id: str, elapsed_seconds: float, animation_index: int | None
+        self,
+        project_id: str,
+        elapsed_seconds: float,
+        animation_index: int | None,
+        percent: int | None = None,
     ) -> None:
         """Reports that a render is still running.
 
-        There is no percentage here on purpose: Manim gives no reliable total
-        animation count (animations inside loops make a static count of
+        `render_percent` only comes from Remotion, whose renderMedia knows its
+        total frame count. Manim sends none on purpose: it gives no reliable
+        total animation count (animations inside loops make a static count of
         `self.play` calls wrong), and a made-up percentage that stalls or jumps
         backwards is worse than an honest elapsed time.
         """
@@ -48,6 +53,8 @@ class ProgressPublisher:
         }
         if animation_index is not None:
             message["animation_index"] = animation_index
+        if percent is not None:
+            message["render_percent"] = percent
 
         try:
             await self._exchange.publish(

@@ -8,6 +8,7 @@ export interface ProgressState {
   sceneTotal: number | null;
   elapsedSeconds: number | null;
   animationIndex: number | null;
+  renderPercent: number | null;
   // CR-029
   stageIndex: number | null;
   stageTotal: number | null;
@@ -23,6 +24,7 @@ const initialState: ProgressState = {
   sceneTotal: null,
   elapsedSeconds: null,
   animationIndex: null,
+  renderPercent: null,
   stageIndex: null,
   stageTotal: null,
   clipIndex: null,
@@ -42,6 +44,7 @@ export function useSSE(projectId: string): ProgressState {
         sceneTotal: msg.scene_total ?? null,
         elapsedSeconds: msg.elapsed_seconds ?? null,
         animationIndex: msg.animation_index ?? null,
+        renderPercent: msg.render_percent ?? null,
         stageIndex: msg.stage_index ?? null,
         stageTotal: msg.stage_total ?? null,
         clipIndex: msg.clip_index ?? null,
