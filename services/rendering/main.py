@@ -16,22 +16,24 @@ from pathlib import Path
 import aio_pika
 import uvicorn
 
+from adapters.http.check_metrics import CheckMetrics
+from adapters.http.check_server import create_check_app
+from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
     RenderChannelAssetCommandHandler,
     RenderingCommandDispatcher,
     RenderScriptCommandHandler,
     ValidateScriptCommandHandler,
 )
-from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
-from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
+from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
-from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.engine_router import EngineRouterRenderer
+from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.manim_renderer import (
     CACHE_ROOT,
     DEFAULT_DRY_RUN_TIMEOUT_SECONDS,
@@ -42,11 +44,9 @@ from adapters.rendering.manim_renderer import (
 )
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer
 from adapters.rendering.typescript_checker import TypeScriptChecker
-from adapters.http.check_metrics import CheckMetrics
-from adapters.http.check_server import create_check_app
-from adapters.rendering.illustration_previewer import IllustrationPreviewer
-from application.preview_illustration import PreviewIllustrationUseCase
+from adapters.storage.artifact_paths import purge_project_artifacts
 from application.check_script import CheckScriptUseCase
+from application.preview_illustration import PreviewIllustrationUseCase
 from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase

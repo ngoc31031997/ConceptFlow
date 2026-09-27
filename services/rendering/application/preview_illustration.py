@@ -27,14 +27,17 @@ class PreviewIllustrationUseCase:
         self._ts = typescript
         self._preview = previewer
 
-    def run(self, name: str, code: str = "", props: dict | None = None, gif: bool = True) -> IllustrationPreview:
+    def run(
+        self, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+    ) -> IllustrationPreview:
         if code:
             issues = validate_asset_code(name, code)
             if issues:
                 return IllustrationPreview(False, [{"message": i.message, "line": i.line} for i in issues])
             diags = self._ts.check(code)
             if diags:
-                return IllustrationPreview(False, [{"message": f"{d.code}: {d.message}", "line": d.line} for d in diags])
+                found = [{"message": f"{d.code}: {d.message}", "line": d.line} for d in diags]
+                return IllustrationPreview(False, found)
         out = self._preview.preview(name, code, props, gif)
         if not out.ok:
             return IllustrationPreview(False, [{"message": out.error, "line": None}])

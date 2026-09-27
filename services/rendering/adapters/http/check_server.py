@@ -15,9 +15,9 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
-from adapters.rendering.typescript_checker import TypeScriptCheckError
 from adapters.http.check_metrics import CheckMetrics
 from adapters.rendering.illustration_previewer import IllustrationPreviewError
+from adapters.rendering.typescript_checker import TypeScriptCheckError
 from application.check_script import CheckScriptUseCase
 from application.preview_illustration import PreviewIllustrationUseCase
 

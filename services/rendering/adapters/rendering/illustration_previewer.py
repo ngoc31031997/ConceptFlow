@@ -58,7 +58,9 @@ class IllustrationPreviewer:
         )
         threading.Thread(target=_pump, args=(self._proc.stdout, self._replies.put), daemon=True).start()
         threading.Thread(
-            target=_pump, args=(self._proc.stderr, lambda s: s is not None and self._stderr.append(s)), daemon=True,
+            target=_pump,
+            args=(self._proc.stderr, lambda s: s is not None and self._stderr.append(s)),
+            daemon=True,
         ).start()
         self._await(lambda reply: reply.get("ready") is True)
 
@@ -94,7 +96,9 @@ class IllustrationPreviewer:
             if match(reply):
                 return reply
 
-    def preview(self, name: str, code: str = "", props: dict | None = None, gif: bool = True) -> PreviewResult:
+    def preview(
+        self, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+    ) -> PreviewResult:
         with self._lock:
             if self._proc is None or self._proc.poll() is not None:
                 self._start()

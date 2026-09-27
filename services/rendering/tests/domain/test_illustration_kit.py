@@ -1,4 +1,5 @@
-"""Bộ minh hoạ phẳng (CR-043): code, tài liệu trong prompt, và danh sách import của Code Merger phải khớp nhau.
+"""Bộ minh hoạ phẳng (CR-043): code, tài liệu trong prompt và danh sách import
+của Code Merger phải khớp nhau.
 
 Ba nơi cùng mô tả một bộ component:
   - remotion_project/src/conceptflow-mini/illustration.tsx — code thật;
@@ -85,7 +86,8 @@ const LAYOUT = {{kid: {{x: 400, y: 610, size: 440}}}};
 
 export function Shot1_1({{duration}}: {{duration: number}}) {{
   const frame = useCurrentFrame();
-  const decay = interpolate(frame, [0, duration], [0, 1], {{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}});
+  const decay = interpolate(frame, [0, duration], [0, 1],
+    {{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}});
   return (
     <AbsoluteFill>
       <Backdrop color={{PALETTE.room}} floor={{PALETTE.night}} floorY={{830}} />
