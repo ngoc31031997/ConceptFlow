@@ -29,7 +29,7 @@ func SystemVideoArchetypes() []VideoArchetype {
 	return []VideoArchetype{
 		{
 			ID: "system-A", Code: "NGHỊCH-LÝ", RecommendedFormatID: "case_study_essay_8min", Name: "Nghịch lý + chuỗi ví dụ", IsSystem: true,
-			WhenToUse: "chủ đề là một lỗi tư duy, thiên kiến hay hiện tượng phản trực giác, có ví dụ đời thật ở nhiều lĩnh vực.",
+			WhenToUse: "chủ đề là một lỗi tư duy, thiên kiến hay hiện tượng phản trực giác, có ví dụ đời thật ở NHIỀU LĨNH VỰC THẬT SỰ KHÁC NHAU (không phải cùng một vật/hệ thống chỉ đổi bối cảnh). KHÔNG chọn kiểu này nếu chủ đề thực chất là một cơ chế/quy trình đơn nhất dạng \"X thực sự là gì\" hay \"X hoạt động thế nào\" mà mọi ví dụ đều quay lại đúng một vật — chủ đề đó hợp DẤU-VẾT hơn.",
 			Playbook: `Xem "BẢN SẮC KÊNH": mở bằng nghịch lý có thật → giải trước, gọi tên sau → lõi ngắn → chuỗi 5–7 ví dụ đa lĩnh vực.
 Gán: hook = nghịch lý; concrete = giải nghịch lý + gọi tên; pattern = lõi lý thuyết; variation = mỗi ví dụ một beat; modern = hiện tượng hôm nay; recap.
 Hợp với format có beat variation lặp được. Với format ngắn không có variation: gộp 2–3 ví dụ ngắn nhất vào pattern.`,
@@ -42,7 +42,7 @@ Gán: hook = một việc duy nhất mà mọi cách đều làm được, và c
 		},
 		{
 			ID: "system-C", Code: "DẤU-VẾT", RecommendedFormatID: "visual_first_7min", Name: "Cơ chế theo dấu vết", IsSystem: true,
-			WhenToUse: "chủ đề là một quy trình hay hệ thống chạy qua nhiều chặng (vd điều gì xảy ra từ lúc gõ địa chỉ web đến lúc trang hiện ra).",
+			WhenToUse: "chủ đề là một quy trình hay hệ thống chạy qua nhiều chặng (vd điều gì xảy ra từ lúc gõ địa chỉ web đến lúc trang hiện ra) — KỂ CẢ khi chủ đề chỉ có MỘT thế giới/vật xuyên suốt và câu hỏi dạng \"X thực sự là gì\" hay \"X hoạt động thế nào\" (vd sâu răng thực sự là gì, vì sao ngủ lại cần thiết): không cần nhiều lĩnh vực, mỗi chặng là một bước của CHÍNH cơ chế đó, không phải một ví dụ ở lĩnh vực khác.",
 			Playbook: `Chọn MỘT đầu vào cụ thể (một địa chỉ, một tin nhắn, một tệp) và đi theo nó qua từng chặng; mọi beat quay lại đúng đầu vào đó.
 Gán: hook = hai đầu của chuỗi (đầu vào → kết quả ai cũng thấy) và câu hỏi "giữa hai đầu chuyện gì xảy ra?"; concrete = đi theo đầu vào qua cả chuỗi ở mức thô, chỉ đường đi; pattern = gọi tên các chặng và vai trò của từng chặng; variation = mỗi chặng bất ngờ nhất đào sâu một beat; modern = chuỗi hỏng ở chặng nào thì người dùng thấy gì; recap = chạy lại cả chuỗi trong một hai câu.`,
 		},

@@ -10,19 +10,23 @@ import (
 
 var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 
-// story_architect was re-baselined on purpose by CR-041 (video archetypes) and
-// again when the system kinds got semantic codes (NGHỊCH-LÝ/SO-SÁNH/DẤU-VẾT/TIẾN-HOÁ);
-// visual_director, manim_engineer and remotion_engineer by CR-043 (flat
-// illustration kit, "illustrate what is being said").
+// story_architect was re-baselined on purpose by CR-041 (video archetypes),
+// again when the system kinds got semantic codes (NGHỊCH-LÝ/SO-SÁNH/DẤU-VẾT/TIẾN-HOÁ),
+// and again by CR-047 (video review: forbid reading scaffold labels aloud,
+// forbid repeating the pattern beat's conclusion in a variation, cap shots
+// per scene, minimum on-screen object size); visual_director and
+// remotion_engineer also re-baselined by CR-047 for the shot-count-cap and
+// minimum-size rules (manim_engineer's shared text was not touched by CR-047,
+// so it keeps its CR-043 hash).
 //
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "0b6ccd46e1ab94af765e22ece2d3ce36adf506921d1415a90cf64c94bfe6071f",
-	RoleVisualDirector:   "6ec41216875badf8ffe8596c23324b07cfbbcf56a4aa1034cec9474c29555d3f",
+	RoleStoryArchitect:   "69ff2c7f3cc90a37043dd81a9945573594e4ffa50c7c1eabf3a538741bd20d38",
+	RoleVisualDirector:   "527d54b9790f1a14b8121775b6ccfbf33e3090daa43279eb36be6b0dc1386853",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
-	RoleRemotionEngineer: "256f82c0504ae7b25acbfed7a67f10e7d9467d39d9dfe4c72d19fca32f8328f0",
+	RoleRemotionEngineer: "4004796be72d3d260877c22708511d55c5ce8bb12d0b58505da64f79214776a6",
 }
 
 func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {

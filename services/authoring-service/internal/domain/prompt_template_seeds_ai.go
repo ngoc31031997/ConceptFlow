@@ -66,7 +66,7 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 
 1. Xem lướt cả kịch bản như xem phim: có chỗ nào giống lật slide — hình đứng yên, chữ hiện ra, rồi xoá đi làm lại — không? Viết lại thành một thay đổi liền mạch.
 2. Có shot nào mà trong lúc đọc thoại, hình không có gì diễn ra ("vẫn hiển thị", "giữ nguyên", "cho thấy")? Thêm một thay đổi có nghĩa, hoặc tách/gộp shot.
-3. Có câu thoại nào dài và phủ lên nhiều thay đổi hình? Tách thành nhiều shot.
+3. Có câu thoại nào dài và phủ lên nhiều thay đổi hình? Tách thành nhiều shot. Ngược lại, có cảnh nào đang vượt khoảng 8 shot vì tách một câu ngắn thành một shot riêng không? Gộp các câu liền ý, cùng một thay đổi hình nhỏ, vào chung một shot.
 4. Có chuyển động nào — của vật hay của máy — không đổi thông tin, không làm rõ quan hệ, không làm bằng chứng và không dọn đường cho điều gì? Bỏ đi.
 5. Có câu thoại nào chỉ đang tả lại hình thay vì nói ý nghĩa? Viết lại.
 6. Mỗi cảnh từ 2 trở đi đã có "transition_in", và nó có nối từ hình cảnh trước thay vì cắt sạch không?
@@ -170,6 +170,7 @@ const remoGAIVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng m�
 5. Có ¤fontFamily¤ nào, ¤backgroundColor¤ phủ toàn khung nào, hay in câu thoại lên hình không? Nếu có → xoá.
 6. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 7. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
+7b. Theo L14: vật trọng tâm của từng shot có đạt kích thước tối thiểu (khoảng 30% chiều khung, ~320px trở lên ở trung/cận cảnh) không, hay phần lớn khung đang là nền phẳng trống với một vật nhỏ lọt thỏm? Nếu ¤LAYOUT¤ ghi size nhỏ hơn mức đó cho vật đang vẽ, đã phóng to nó lên khi dựng thay vì chép nguyên số chưa?
 8. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
 9. Không viết dòng import nào (khung đã import sẵn)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
 9b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong "visual" mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như "visual" mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
