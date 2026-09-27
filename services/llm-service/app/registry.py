@@ -28,3 +28,15 @@ class Providers:
         if name == "ollama":
             return self.ollama
         raise KeyError(name)
+
+    def for_model(self, default: Provider, model: str) -> tuple[Provider, str]:
+        """Routes a model id picked in the GUI to its provider.
+
+        "ollama" (OLLAMA_MODEL) and "ollama/<model>" go to the local Ollama;
+        anything else stays on `default` with the id unchanged.
+        """
+        if model == "ollama":
+            return self.ollama, self.ollama.default_model
+        if model.startswith("ollama/"):
+            return self.ollama, model.removeprefix("ollama/")
+        return default, model

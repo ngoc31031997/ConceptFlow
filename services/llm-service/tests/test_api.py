@@ -148,3 +148,14 @@ def _fake_hive(req):
         text = "\n\n".join(
             f"function Shot1_{i}({{duration}}: ShotProps) {{\n  return null;\n}}" for i in (1, 2))
     return stream_response(chunk(text, finish="stop"), usage_chunk({"prompt_tokens": 1, "completion_tokens": 1}))
+
+
+def test_for_model_routes_ollama_ids():
+    from app.config import Config
+    from app.registry import Providers
+
+    cfg = Config.from_env()
+    p = Providers(cfg)
+    assert p.for_model(p.hive, "ollama") == (p.ollama, cfg.ollama_model)
+    assert p.for_model(p.hive, "ollama/qwen2.5") == (p.ollama, "qwen2.5")
+    assert p.for_model(p.hive, "zai-org/glm-5.3-flash") == (p.hive, "zai-org/glm-5.3-flash")
