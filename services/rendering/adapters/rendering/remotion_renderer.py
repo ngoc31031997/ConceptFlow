@@ -45,6 +45,22 @@ logger = logging.getLogger(__name__)
 DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
 FPS = 30
 
+# CR-047 — video review finding: shots were laid back to back with zero gap
+# (startFrame of shot N+1 == end of shot N), so the narration read as one
+# unbroken stream with no breathing room between lines, even across beats.
+# A uniform pause after every shot but the last fixes that without touching
+# the render contract: wait_offsets (below) is derived from these same
+# startFrame values, so video-assembly's `adelay` placement of each
+# narration's audio automatically shifts by the same gap — video and audio
+# stay in sync, just with a silent hold on background between shots.
+#
+# Deliberately uniform (not larger at beat boundaries): NarrationSegment only
+# carries a flat scene_index, not a beat id, so a bigger inter-beat pause
+# would need that plumbed through orchestrator -> message schema ->
+# llm-service -> here. Tracked as backlog in cr-047-video-quality-fixes.md
+# instead of half-implementing it here.
+INTER_SHOT_GAP_SECONDS = 0.3
+
 CACHE_ROOT = "/shared/.remotion-media"
 ENTRY_FILENAME = "CreatorEntry.tsx"
 PROPS_FILENAME = "cf_props.json"
@@ -281,15 +297,18 @@ def _extract_narrations(script_content: str) -> list[str]:
 
 def _segments_from(narration_segments) -> list[dict]:
     ordered = sorted(narration_segments, key=lambda s: s.scene_index)
+    gap_frames = round(INTER_SHOT_GAP_SECONDS * FPS)
     segments = []
     frame_cursor = 0
-    for seg in ordered:
+    for index, seg in enumerate(ordered):
         duration_frames = max(1, round(seg.duration_seconds * FPS))
         segments.append({
             "startFrame": frame_cursor,
             "durationInFrames": duration_frames,
         })
         frame_cursor += duration_frames
+        if index < len(ordered) - 1:
+            frame_cursor += gap_frames
     return segments
 
 

@@ -141,8 +141,9 @@ class TestRender:
         assert "creator" in captured_cmd["cmd"]
         assert result.video_path == output_path
         assert result.video_duration_seconds == 12.3
-        # segment 0 starts at frame 0 (t=0s); segment 1 starts after 2s * 30fps = 60 frames = 2.0s
-        assert result.wait_offsets == [0.0, 2.0]
+        # segment 0 starts at frame 0 (t=0s); segment 1 starts after 2s * 30fps = 60
+        # frames plus the CR-047 inter-shot gap (0.3s = 9 frames) = 69 frames = 2.3s
+        assert result.wait_offsets == [0.0, 2.3]
 
         # The entry file lands at the fixed src/ path, not the media dir —
         # see RemotionScriptRenderer._entry_path()'s docstring.
@@ -154,7 +155,7 @@ class TestRender:
         props = json.loads(props_files[0].read_text())
         assert props["segments"] == [
             {"startFrame": 0, "durationInFrames": 60},
-            {"startFrame": 60, "durationInFrames": 90},
+            {"startFrame": 69, "durationInFrames": 90},
         ]
         # No font chosen → the key is absent and conceptflow-mini keeps its default.
         assert "videoFont" not in props

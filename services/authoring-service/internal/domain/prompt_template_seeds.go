@@ -197,7 +197,7 @@ Vai trò của từng beat trong format này:
 - ¤hook¤ — dựng tình huống có thật + cách làm hiển nhiên + đáp án phản trực giác. Kết beat ngay tại đáp án vô lý, chưa giải thích.
 - ¤concrete¤ — giải nghịch lý bằng chi tiết của tình huống, cho thấy phần bị che khuất, nêu kết quả thực tế, rồi GỌI TÊN khái niệm ở câu cuối.
 - ¤pattern¤ — định nghĩa bằng lời thường → vì sao xảy ra → neo lại vào tình huống mở màn → vì sao khó nhận ra → cách xử lý (+ phép so sánh ngắn nếu có) → câu chuyển sang chuỗi ví dụ.
-- ¤variation¤ — MỖI ví dụ là MỘT beat ¤variation¤ riêng, lặp theo số ví dụ đã chốt ở bước 2, đúng khuôn: niềm tin → bằng chứng bề ngoài → "nhưng trên thực tế" → phần bị che khuất → kết luận.
+- ¤variation¤ — MỖI ví dụ là MỘT beat ¤variation¤ riêng, lặp theo số ví dụ đã chốt ở bước 2, đúng khuôn Ý: niềm tin phổ biến → bằng chứng bề ngoài → cú lật → phần bị che khuất → kết luận. Đây là khuôn Ý để bạn theo khi NGHĨ, không phải khuôn CHỮ để đọc thành lời: lời thoại KHÔNG được chứa nguyên văn các nhãn của khuôn (không viết "Phần bị che khuất:", "Bằng chứng bề ngoài:", "Niềm tin phổ biến:"...) — diễn đạt ý đó bằng câu văn tự nhiên. Mỗi ví dụ mở đầu bằng một cách khác với ví dụ ngay trước (đổi từ nối, đổi cấu trúc câu, đừng lặp "Mọi người thường nghĩ..." y hệt lần nào cũng vậy). Câu kết luận của một ví dụ không được lặp lại nguyên câu hay nguyên ý đã nói ở beat ¤pattern¤ — ví dụ chỉ minh hoạ lại đúng kết luận của pattern là ví dụ thừa, thay bằng góc khác của cơ chế.
 - ¤modern¤ — hiện tượng trong thời đại hiện nay: nó được khuếch đại ở đâu, vì sao, có một câu châm biếm khô ở đây là hợp.
 - ¤recap¤ — thừa nhận giới hạn, lời khuyên thực tế, câu chốt dí dỏm quay về chủ đề.
 - ¤cta¤ (nếu dùng) — một câu mời xem/đăng ký tự nhiên, không nài nỉ.
@@ -238,6 +238,9 @@ Với mỗi beat, viết:
 - Nhân vật hư cấu, running gag, giọng tấu hài, câu hỏi tu từ rỗng.
 - Bịa số liệu, năm, tên người, tên nghiên cứu, trích dẫn.
 - Hai ví dụ cùng lĩnh vực đứng liền nhau, hoặc hai ví dụ minh hoạ cùng một góc của cơ chế.
+- Hai ví dụ chỉ là CÙNG một đối tượng/tình huống của tình huống mở màn được đổi nhãn lĩnh vực (vd 6 ví dụ đều xoay quanh đúng cái răng của hook, chỉ đổi tên "Tiêu dùng", "Lịch sử"...) — lĩnh vực phải thật sự khác, không phải nhãn khác của cùng một chuyện.
+- Đọc thành lời các nhãn cấu trúc nội bộ của khuôn ví dụ (chữ "Phần bị che khuất:", "Bằng chứng bề ngoài:", "Niềm tin phổ biến:"...) — đó là tên các bước để bạn theo khi viết, không phải chữ để máy đọc thành tiếng.
+- Một câu kết luận hoặc một ý đã nói ở beat ¤pattern¤ được lặp lại gần như nguyên văn ở một beat ¤variation¤.
 - Giọng sách giáo khoa: câu bị động dài, chuỗi thuật ngữ chưa giải nghĩa.
 - Mô tả animation, camera, màu sắc, timing hay cách implement.
 
@@ -292,8 +295,8 @@ TỰ KIỂM: <đã soi 11 mục — sửa: ... / đã soi 11 mục, không phả
 2. Tên khái niệm có xuất hiện SAU khi nghịch lý đã được giải không?
 3. SAI LẦM TRỰC GIÁC, AHA MOMENT, INSIGHT có tạo thành một chuỗi không?
 4. Phần lõi lý thuyết có đủ: định nghĩa → vì sao xảy ra → vì sao khó nhận ra → cách xử lý, và có neo lại tình huống mở màn không?
-5. Mỗi ví dụ có đúng khuôn niềm tin → bằng chứng bề ngoài → "nhưng trên thực tế" → phần bị che khuất → kết luận không?
-6. Các ví dụ có trải đủ lĩnh vực, sắp từ gần gũi đến tinh vi, và mỗi cái cho thấy một góc khác của cơ chế không?
+5. Mỗi ví dụ có đúng khuôn Ý niềm tin → bằng chứng bề ngoài → "nhưng trên thực tế" → phần bị che khuất → kết luận không — và có câu lời thoại nào ĐỌC THÀNH LỜI nguyên văn nhãn của khuôn (chữ "Phần bị che khuất:" hay tương tự) thay vì diễn đạt tự nhiên không? Các ví dụ có mở đầu khác nhau, không lặp cùng một cụm mở màn không? Có ví dụ nào kết luận trùng gần như nguyên văn một câu đã nói ở beat pattern không?
+6. Các ví dụ có trải đủ lĩnh vực THẬT SỰ khác nhau — không phải cùng một đối tượng/tình huống của hook chỉ đổi nhãn lĩnh vực — sắp từ gần gũi đến tinh vi, và mỗi cái cho thấy một góc khác của cơ chế không?
 7. Có chi tiết nào (số, năm, tên, trích dẫn) bạn không chắc mà vẫn khẳng định không? Chuyển sang diễn đạt định tính, và ghi rõ trong trường Kiểm chứng.
 8. Có câu nào dài quá hai dòng, nghe như sách giáo khoa, hoặc còn ký hiệu/chữ viết tắt không? Tách và viết lại.
 9. Số chỗ châm biếm có nằm trong khoảng 2–3, đều đến từ sự thật, và câu chốt cuối có quay về chủ đề không?
@@ -372,7 +375,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 5. **MỌI CHUYỂN ĐỘNG ĐỀU KỂ CHUYỆN.** Mỗi chuyển động — của vật hay của máy — phải làm ít nhất một việc: thay đổi thông tin người xem đang có, làm rõ quan hệ giữa các vật, làm bằng chứng cho câu thoại đi kèm, hoặc dọn đường cho điều sắp xảy ra. Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác. Ngoại lệ hợp lệ: trong câu thoại mang tính suy ngẫm, máy đẩy vào rất chậm để giữ sự chú ý — chuyển động nền có chủ đích đó không bị coi là trang trí.
 
-6. **HÌNH LUÔN SỐNG.** Trong suốt một câu thoại, hình không được đứng như ảnh chụp: phải có điều gì đó đang diễn ra liên quan đến câu đó. Một câu thoại dài phủ lên nhiều thay đổi hình ảnh là dấu hiệu nên tách thành nhiều shot ngắn, mỗi shot một thay đổi. Nhịp phim tốt thường là mỗi shot một câu thoại khoảng 6–15 từ.
+6. **HÌNH LUÔN SỐNG, NHƯNG MỘT CẢNH KHÔNG VỠ VỤN THÀNH QUÁ NHIỀU SHOT.** Trong suốt một câu thoại, hình không được đứng như ảnh chụp: phải có điều gì đó đang diễn ra liên quan đến câu đó. Một câu thoại dài phủ lên nhiều thay đổi hình ảnh là dấu hiệu nên tách thành nhiều shot ngắn, mỗi shot một thay đổi. Nhịp phim tốt thường là mỗi shot một câu thoại khoảng 6–15 từ — NHƯNG đây không phải quy tắc "1 câu = 1 shot" cứng: một cảnh có ngân sách lời thoại dài (nhiều câu ngắn liền ý, cùng một chủ đề nhỏ) nên GỘP vài câu liền ý vào chung một shot, cho hình có vài thay đổi nhỏ nối tiếp nhau trong shot đó, thay vì mỗi câu một shot riêng. Một cảnh không nên vượt quá khoảng 8 shot — cảnh nào tính ra hơn con số đó, hãy gộp bớt trước khi viết, không chỉ tách theo dấu câu.
 
 7. **HÌNH KHÔNG ĐỌC LẠI LỜI.** Chữ trên màn hình tại một thời điểm tối đa khoảng 8 từ, và là nhãn cho hình. Lời thoại đã nói rồi.
 
@@ -433,7 +436,7 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 
 1. Xem lướt cả kịch bản như xem phim: có chỗ nào giống lật slide — hình đứng yên, chữ hiện ra, rồi xoá đi làm lại — không? Viết lại thành một thay đổi liền mạch.
 2. Có shot nào mà trong lúc đọc thoại, hình không có gì diễn ra ("vẫn hiển thị", "giữ nguyên", "cho thấy")? Thêm một thay đổi có nghĩa, hoặc tách/gộp shot.
-3. Có câu thoại nào dài và phủ lên nhiều thay đổi hình? Tách thành nhiều shot.
+3. Có câu thoại nào dài và phủ lên nhiều thay đổi hình? Tách thành nhiều shot. Ngược lại, có cảnh nào đang vượt khoảng 8 shot vì tách một câu ngắn thành một shot riêng không? Gộp các câu liền ý, cùng một thay đổi hình nhỏ, vào chung một shot.
 4. Có chuyển động nào — của vật hay của máy — không đổi thông tin, không làm rõ quan hệ, không làm bằng chứng và không dọn đường cho điều gì? Bỏ đi.
 5. Có câu thoại nào chỉ đang tả lại hình thay vì nói ý nghĩa? Viết lại.
 6. Mỗi cảnh từ 2 trở đi đã có "Chuyển cảnh vào" chưa, và nó có nối từ hình cảnh trước thay vì cắt sạch không?
@@ -844,6 +847,8 @@ L12. **Ký tự cấm trong chữ JSX.** Chữ nằm GIỮA hai thẻ JSX không
 
 L13. **TypeScript sạch.** Không ¤any¤ ẩn gây lỗi build; hằng số ¤as const¤ khi cần kiểu literal; không biến khai báo mà không dùng tới trong import (bỏ import thừa).
 
+L14. **Kích thước tối thiểu — chống khung trống.** Vật đang là TRỌNG TÂM của shot (vật gắn với mục ¤LAYOUT¤ chính của shot, hoặc vật lớn nhất khi shot chỉ có một vật) phải có ¤size¤/¤width¤ hoặc ¤height¤ tối thiểu khoảng 30% chiều tương ứng của khung (≥ khoảng 320px chiều cao cho trung cảnh/cận cảnh trên khung 1080px cao) — trừ khi kịch bản ghi rõ đây là toàn cảnh nhiều vật nhỏ, hoặc vật đang "trượt vào/trượt ra khỏi khung". Không dựng một shot mà phần lớn khung 1920×1080 chỉ là nền phẳng một màu với một vật nhỏ lọt thỏm giữa khoảng trống — nếu ¤LAYOUT¤ ghi ¤size¤ nhỏ hơn mức này cho vật trọng tâm của shot đang viết, phóng to nó lên khi vẽ (giữ tâm ¤x, y¤, chỉ đổi kích thước hiển thị), không chép nguyên số nhỏ.
+
 `
 
 const remoGVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mục, sửa hết rồi mới trả lời)
@@ -856,6 +861,7 @@ const remoGVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mụ
 6. Có ¤fontFamily¤ nào, ¤backgroundColor¤ phủ toàn khung nào, hay ¤{narrations[...]}¤ nào trong JSX không? Nếu có → xoá.
 7. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 8. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
+8b. Theo L14: vật trọng tâm của từng shot có đạt kích thước tối thiểu (khoảng 30% chiều khung, ~320px trở lên ở trung/cận cảnh) không, hay phần lớn khung đang là nền phẳng trống với một vật nhỏ lọt thỏm? Nếu ¤LAYOUT¤ ghi size nhỏ hơn mức đó cho vật đang vẽ, đã phóng to nó lên khi dựng thay vì chép nguyên số chưa?
 9. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
 10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤, ¤illustration¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
 10b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong HÌNH mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như HÌNH mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
