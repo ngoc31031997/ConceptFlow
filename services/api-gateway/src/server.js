@@ -76,9 +76,24 @@ function main() {
   app.use(healthRouter());
 
   // 6. Start HTTP server (AMQP consumer loop was already started in step 3).
-  app.listen(config.port, () => {
+  const httpServer = app.listen(config.port, () => {
     logger.info({ port: config.port }, 'API Gateway listening');
   });
+
+  // Without this, `docker stop` (SIGTERM) kills the process outright: the
+  // AMQP connection drops uncleanly instead of amqpClient.stop() closing it,
+  // and in-flight HTTP requests are cut instead of allowed to finish.
+  let shuttingDown = false;
+  async function shutdown(signal) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, 'Shutdown signal received — draining API Gateway');
+    httpServer.close();
+    await amqpClient.stop();
+    process.exit(0);
+  }
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 
   return app;
 }

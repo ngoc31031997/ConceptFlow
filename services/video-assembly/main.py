@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import signal
 
 import aio_pika
 
@@ -108,8 +109,18 @@ async def run() -> None:
         f.write("ready")
     logger.info("Video Assembly Service ready — consuming '%s'", COMMANDS_QUEUE)
 
+    # SIGTERM's default disposition terminates the process immediately,
+    # unlike SIGINT (KeyboardInterrupt) — without a handler, `docker stop`
+    # kills us before the `finally` below ever runs, and the AMQP connection
+    # / DB pool are torn down uncleanly instead of closed.
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        loop.add_signal_handler(sig, stop_event.set)
+
     try:
-        await asyncio.Future()  # run forever
+        await stop_event.wait()
+        logger.info("Shutdown signal received — draining Video Assembly Service")
     finally:
         await commands_queue.cancel(commands_consumer_tag)
         await relay.stop()
