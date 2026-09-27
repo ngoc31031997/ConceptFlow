@@ -4,7 +4,10 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: var(--muted);
+  /* A translucent dark scrim, not var(--muted) (an opaque theme color) — the
+     app behind must stay visible-but-dimmed, or the modal reads as a separate
+     blank screen rather than an overlay on top of the current page. */
+  background: rgba(15, 23, 25, 0.55);
   display: flex;
   align-items: center;
   justify-content: center;
