@@ -1,11 +1,15 @@
 /**
- * The 13-step production flow, as the Creator sees it. The server decides where
+ * The 14-step production flow, as the Creator sees it. The server decides where
  * a project stands (`flow_step` + `run_state` on GET /v1/projects/:id, derived
  * by domain.FlowStateFor); this file only names the steps, says which screen
  * shows each, and whether the inputs behind a screen may still be edited.
  *
- * Review (7) is a screen, not a saved state: validate (6) finishes at
+ * Review (8) is a screen, not a saved state: validate (7) finishes at
  * `awaiting_review` and nothing runs until the Creator presses start.
+ *
+ * CR-046 (2026-09-27, reverses CR-045 FR9): "Hình minh hoạ" is now its own
+ * numbered step 6, shown disabled ("Không dùng") when renderEngine !== "remotion"
+ * instead of being folded, invisibly, under Code.
  */
 export const FLOW_LABELS = [
   "Khởi tạo",
@@ -13,6 +17,7 @@ export const FLOW_LABELS = [
   "Kịch bản",
   "Visual",
   "Code",
+  "Hình minh hoạ",
   "Validate",
   "Review",
   "TTS",
@@ -25,11 +30,12 @@ export const FLOW_LABELS = [
 
 export const FLOW_INIT = 1;
 export const FLOW_CODE = 5;
-export const FLOW_VALIDATE = 6;
-export const FLOW_REVIEW = 7;
-export const FLOW_TTS = 8;
-export const FLOW_RESULT = 12;
-export const FLOW_PUBLISH = 13;
+export const FLOW_ILLUSTRATIONS = 6;
+export const FLOW_VALIDATE = 7;
+export const FLOW_REVIEW = 8;
+export const FLOW_TTS = 9;
+export const FLOW_RESULT = 13;
+export const FLOW_PUBLISH = 14;
 
 export type RunState = "idle" | "running" | "failed" | "done";
 
@@ -38,28 +44,29 @@ export function flowRoute(step: number, projectId: string, opts: { view?: boolea
   // `step` tells a view-only screen which of its steps was asked for (validate
   // and review share a screen; so do TTS/render/merge/split).
   const q = opts.view ? `?view=1&step=${step}` : "";
-  if (step <= FLOW_CODE) return `/projects/${projectId}/resume?step=${step}&view=1`;
+  if (step <= FLOW_ILLUSTRATIONS) return `/projects/${projectId}/resume?step=${step}&view=1`;
   if (step === FLOW_VALIDATE || step === FLOW_REVIEW) return `/projects/${projectId}/validate${q}`;
   if (step >= FLOW_TTS && step < FLOW_RESULT) return `/projects/${projectId}/render${q}`;
   if (step === FLOW_RESULT) return `/projects/${projectId}/result`;
   return `/projects/${projectId}/publish`;
 }
 
-/** Wizard route for authoring steps 1-5 (the screens that hold a draft). */
+/** Wizard route for authoring steps 1-6 (the screens that hold a draft). */
 export function authoringRoute(step: number): string {
   if (step <= 1) return "/";
   if (step === 2) return "/create/script/settings";
   if (step === 3) return "/create/script/outline";
   if (step === 4) return "/create/script/storyboard";
-  return "/create/script/code";
+  if (step === 5) return "/create/script/code";
+  return "/create/script/illustrations";
 }
 
 /** Giai đoạn của từng bước: nhóm theo ranh giới chi phí và khả năng sửa. */
 export const FLOW_PHASES = [
-  { name: "Soạn", steps: [1, 2, 3, 4, 5] },
-  { name: "Kiểm tra", steps: [6, 7] },
-  { name: "Sản xuất", steps: [8, 9, 10, 11] },
-  { name: "Đầu ra", steps: [12, 13] },
+  { name: "Soạn", steps: [1, 2, 3, 4, 5, 6] },
+  { name: "Kiểm tra", steps: [7, 8] },
+  { name: "Sản xuất", steps: [9, 10, 11, 12] },
+  { name: "Đầu ra", steps: [13, 14] },
 ] as const;
 
 /** Hiển thị của một bước trong thanh bước / menu dọc. */
@@ -68,15 +75,18 @@ export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled"
 /**
  * Trạng thái của bước `step` cho dự án ở (flowStep, runState). Bước trước bước
  * hiện tại là xong, bước hiện tại mang trạng thái chạy của nó, các bước sau
- * chưa tới. Bước cắt short bị bỏ qua khi dự án không làm video dọc.
+ * chưa tới. Bước cắt short bị bỏ qua khi dự án không làm video dọc. Bước Hình
+ * minh hoạ (CR-046) bị bỏ qua ("Không dùng") khi dự án không dùng Remotion.
  */
 export function stepStatus(
   step: number,
   flowStep: number,
   runState: string | undefined,
   outputMode?: string,
+  renderEngine?: string,
 ): StepStatus {
-  if (step === 11 && outputMode === "long") return "skipped";
+  if (step === 12 && outputMode === "long") return "skipped";
+  if (step === FLOW_ILLUSTRATIONS && renderEngine !== undefined && renderEngine !== "remotion") return "skipped";
   if (!flowStep || step > flowStep) return "pending";
   if (step < flowStep) return "done";
   switch (runState) {
@@ -135,7 +145,12 @@ export function cancelExplain(step: number): string {
   }
 }
 
-/** Các bước có thể "làm lại từ đây" khi tạo bản mới (khớp ForkProjectUseCase). */
+/**
+ * Các bước có thể "làm lại từ đây" khi tạo bản mới (khớp ForkProjectUseCase).
+ * Dừng ở bước 5 (Code): ForkProjectUseCase chưa có cách sao chép hình minh hoạ
+ * (file ảnh + trạng thái vẽ) sang dự án mới, nên bước 6 chưa vào danh sách này —
+ * làm nửa vời (cho chọn rồi báo lỗi ở backend) còn tệ hơn không cho chọn.
+ */
 export const FORK_STEPS: { step: number; keeps: string }[] = [
   { step: 2, keeps: "Giữ chủ đề" },
   { step: 3, keeps: "Giữ chủ đề và cấu hình" },

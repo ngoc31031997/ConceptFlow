@@ -53,3 +53,20 @@ CR-044 chạy việc lập danh sách và vẽ hình minh hoạ ở ĐẦU bư�
 - Chưa chạy với model thật (môi trường này không có HIVE key) — thời gian vẽ song song thực tế và việc Hive có chặn vì gọi dồn (rate limit) ở 4 luồng hay không chưa đo. Rendering dựng ảnh xem trước từng ảnh một (`preview_gate`), nên phần dựng ảnh vẫn tuần tự.
 - Chưa rebuild/khởi động lại Docker (môi trường này không có Docker daemon).
 - Thanh 13 bước bên trái không có mục riêng cho Hình minh hoạ (tab nằm dưới bước 5 — Code); vào tab qua nút Tiếp tục ở Visual, nút Quay lại ở Code, chuỗi AI, hoặc ghi chú trên tab Code.
+
+---
+
+## Bản sửa đổi (CR-046, 2026-09-27) — FR9 đã bị đảo ngược
+
+**FR9 của CR-045 (nhật ký chạy dưới số bước của Code, không thêm số bước riêng vào luồng 1–13) đã bị đảo ngược bởi CR-046, theo yêu cầu tường minh của Creator (chủ dự án).**
+
+Lý do đảo ngược: sau khi dùng thử, Creator thấy bước Hình minh hoạ "vô hình" trên thanh bước bên trái — nằm lọt dưới bước Code khiến khó theo dõi tiến độ tổng thể và dễ nhầm là một phần của bước Code. Creator xác nhận muốn có mục riêng, có số, trên thanh bước, dù biết điều này đảo ngược thiết kế đã duyệt của CR-045.
+
+Thay đổi cụ thể:
+- Hình minh hoạ giờ là **bước 6** có số riêng trong luồng dùng chung giữa orchestrator, authoring-service và web-gui — luồng đổi từ 13 bước thành **14 bước**.
+- Mọi bước từ Validate trở đi lùi lại một số: Validate 6→7, Review 7→8, TTS 8→9, Render 9→10, Merge 10→11, Cắt short 11→12, Kết quả 12→13, Publish 13→14.
+- Nhật ký (`project_events`) của lượt chạy Hình minh hoạ giờ ghi thẳng `flow_step = 6`, thay vì workaround cũ (`flow_step = 5` tức số của Code, phân biệt bằng `source = "illustrations"`).
+- Trên thanh bước, bước 6 hiện trạng thái "Không dùng" (bị vô hiệu hoá, không bấm được) khi `renderEngine !== "remotion"` — vì bước này chỉ áp dụng cho video Remotion.
+- Xem chi tiết đầy đủ ở `aidlc-docs/inception/requirements/cr-046-illustration-step-promoted.md`.
+
+Các phần khác của CR-045 (FR1–FR8: bước riêng trong wizard, không giới hạn số hình, vẽ song song, tiến độ từng hình, xoá hình nháp, cảnh báo style) **không đổi** — chỉ FR9 bị đảo ngược.

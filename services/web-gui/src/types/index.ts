@@ -72,7 +72,7 @@ export interface Project {
   wizard_step?: number;
   /** Màn wizard mở lần cuối trên draft; "" / vắng mặt nếu chưa ghi. Không còn dùng: vị trí lấy từ flow_step. */
   wizard_route?: string;
-  /** Vị trí trong flow 13 bước (server suy ra từ trạng thái + nội dung đã có). */
+  /** Vị trí trong flow 14 bước (server suy ra từ trạng thái + nội dung đã có). */
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   /** Project mà bản này được tạo từ đó (fork); vắng mặt nếu không phải bản fork. */
@@ -219,7 +219,7 @@ export interface ProjectSummary {
   wizard_step?: number;
   /** Chủ đề (ý tưởng) — dùng làm tên project trong danh sách. */
   topic?: string;
-  /** Vị trí trong flow 13 bước và trạng thái chạy. */
+  /** Vị trí trong flow 14 bước và trạng thái chạy. */
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   forked_from?: string;

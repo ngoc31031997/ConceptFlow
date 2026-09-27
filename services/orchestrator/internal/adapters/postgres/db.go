@@ -442,7 +442,7 @@ CREATE TABLE IF NOT EXISTS prompts (
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
 
--- Append-only journey of every project through the 13-step flow (a status
+-- Append-only journey of every project through the 14-step flow (a status
 -- change, or an authoring run finishing). Read by the "Nhật ký" screen; no
 -- code path makes a decision from it. duration_ms on a status change is the
 -- time the project spent in from_status.
@@ -466,6 +466,29 @@ CREATE TABLE IF NOT EXISTS project_events (
 ALTER TABLE project_events ADD COLUMN IF NOT EXISTS from_flow_step INT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS project_events_project_at ON project_events (project_id, at);
 CREATE INDEX IF NOT EXISTS project_events_at ON project_events (at DESC);
+
+-- One-off data migrations that CREATE/ALTER above cannot express (they only
+-- add structure, never reshape existing rows). Each is guarded by an id in
+-- this table so it runs exactly once no matter how many times the schema
+-- string above is re-executed at startup.
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    id         TEXT PRIMARY KEY,
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- CR-046: illustrations gets its own numbered flow step (6), reversing
+-- CR-045 FR9. Every step from Validate (was 6) through Publish (was 13)
+-- shifts up by one to make room, so historical project_events rows must
+-- shift the same way. A DO block is one statement, hence one transaction,
+-- and the schema_migrations guard keeps a second run from shifting twice.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE id = 'cr046_illustrations_flow_step') THEN
+        UPDATE project_events SET flow_step = flow_step + 1 WHERE flow_step >= 6;
+        UPDATE project_events SET from_flow_step = from_flow_step + 1 WHERE from_flow_step >= 6;
+        INSERT INTO schema_migrations (id) VALUES ('cr046_illustrations_flow_step');
+    END IF;
+END $$;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

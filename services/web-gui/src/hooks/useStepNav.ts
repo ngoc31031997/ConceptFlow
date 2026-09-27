@@ -18,7 +18,7 @@ export interface StepNav {
 }
 
 /**
- * Điều hướng theo 13 bước, dùng chung cho thanh bước ngang và menu dọc: cùng
+ * Điều hướng theo 14 bước, dùng chung cho thanh bước ngang và menu dọc: cùng
  * một luật "bấm được bước nào" và "bước này đang ở trạng thái gì", để hai chỗ
  * không bao giờ nói khác nhau.
  */
@@ -45,7 +45,7 @@ export function useStepNav(currentStep: number | undefined): StepNav {
     }
     // Bản nháp đang mở đúng project này và còn sửa được: đi thẳng, giữ những gì
     // đang gõ dở. Ngược lại (xem project khác / đã khoá) nạp lại từ server.
-    if (step <= 5 && draft.projectId === projectId && flow.editable) {
+    if (step <= 6 && draft.projectId === projectId && flow.editable) {
       navigate(authoringRoute(step));
       return;
     }
@@ -62,6 +62,7 @@ export function useStepNav(currentStep: number | undefined): StepNav {
         flow.runState,
         // Empty means "long" (a video with no vertical clips).
         flow.project ? flow.project.video_output_mode || "long" : undefined,
+        flow.project ? flow.project.render_engine : draft.renderEngine,
       ),
     isClickable,
     go,

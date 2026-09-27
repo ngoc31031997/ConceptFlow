@@ -386,7 +386,7 @@ func TestIllustrationsStepDrawsReportsProgressAndWaitsForReview(t *testing.T) {
 	if p := uc.Progress("p1", application.StepIllustrations); p.Running {
 		t.Error("progress still running after the step")
 	}
-	if len(events.events) != 2 || events.events[1].Source != "illustrations" || events.events[1].FlowStep != domain.FlowCode ||
+	if len(events.events) != 2 || events.events[1].Source != "authoring" || events.events[1].FlowStep != domain.FlowIllustrations ||
 		events.events[1].RunState != domain.RunDone || !strings.Contains(events.events[1].Detail, "Motorbike") {
 		t.Errorf("journal = %+v", events.events)
 	}

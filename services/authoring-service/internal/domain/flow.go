@@ -1,27 +1,28 @@
 package domain
 
-// The 13-step production flow the Creator sees. It is derived from the saga
+// The 14-step production flow the Creator sees. It is derived from the saga
 // status plus what the draft already holds, never stored: one function decides
 // where a project is, so the wizard, the project list and the event log cannot
 // disagree the way wizard_route and the real content used to.
 //
-// Review (7) is a screen, not a saga state: validate finishes at
+// Review (8) is a screen, not a saga state: validate finishes at
 // awaiting_review and nothing runs until the Creator presses "start render".
 const (
-	FlowInit       = 1  // Khởi tạo — topic, project row
-	FlowConfig     = 2  // Cấu hình
-	FlowStory      = 3  // Kịch bản
-	FlowVisual     = 4  // Visual
-	FlowCode       = 5  // Code
-	FlowValidate   = 6  // Validate (parse + dry run)
-	FlowReview     = 7  // Review — screen only
-	FlowTTS        = 8  // TTS
-	FlowRender     = 9  // Render hoạt hình
-	FlowMerge      = 10 // Merge (+ QC)
-	FlowSplit      = 11 // Cắt video short
-	FlowResult     = 12 // Kết quả
-	FlowPublish    = 13 // Publish
-	FlowStepsTotal = 13
+	FlowInit          = 1  // Khởi tạo — topic, project row
+	FlowConfig        = 2  // Cấu hình
+	FlowStory         = 3  // Kịch bản
+	FlowVisual        = 4  // Visual
+	FlowCode          = 5  // Code
+	FlowIllustrations = 6  // Hình minh hoạ (CR-046: promoted from a source="illustrations" sub-state of Code)
+	FlowValidate      = 7  // Validate (parse + dry run)
+	FlowReview        = 8  // Review — screen only
+	FlowTTS           = 9  // TTS
+	FlowRender        = 10 // Render hoạt hình
+	FlowMerge         = 11 // Merge (+ QC)
+	FlowSplit         = 12 // Cắt video short
+	FlowResult        = 13 // Kết quả
+	FlowPublish       = 14 // Publish
+	FlowStepsTotal    = 14
 )
 
 // RunState is what is happening at the current flow step.
@@ -56,7 +57,7 @@ type AuthoredContent struct {
 	Story, Storyboard, Code bool
 }
 
-// FlowState is where a project stands in the 13-step flow.
+// FlowState is where a project stands in the 14-step flow.
 type FlowState struct {
 	Step  int      `json:"step"`
 	State RunState `json:"run_state"`
@@ -137,7 +138,7 @@ func FlowStepForAuthoring(step string) int {
 // FlowStepLabel is the Creator-facing name of a flow step.
 var FlowStepLabel = map[int]string{
 	FlowInit: "Khởi tạo", FlowConfig: "Cấu hình", FlowStory: "Kịch bản", FlowVisual: "Visual",
-	FlowCode: "Code", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "TTS",
+	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "TTS",
 	FlowRender: "Render hoạt hình", FlowMerge: "Merge", FlowSplit: "Cắt video short",
 	FlowResult: "Kết quả", FlowPublish: "Publish",
 }

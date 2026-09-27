@@ -20,8 +20,9 @@ import styles from "./WizardSteps.module.css";
  * (nhiều hình cùng lúc, mỗi hình một thanh tiến độ), Creator duyệt / sửa / bỏ
  * qua / xoá ngay tại đây, rồi mới sang Code.
  *
- * Không có số bước riêng trên thanh 13 bước: con số đó dùng chung với
- * orchestrator và nhật ký, nên tab này nằm dưới bước 5 (Code) như phần mở đầu.
+ * CR-046 (2026-09-27, đảo ngược FR9 của CR-045): giờ có số bước riêng (6) trên
+ * thanh bước, hiện "Không dùng" khi renderEngine không phải Remotion, thay vì
+ * ẩn hoàn toàn dưới bước Code như trước.
  */
 export function IllustrationsStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -66,7 +67,7 @@ export function IllustrationsStepPage() {
   return (
     <div data-testid="illustrations-step-page">
       <AppShell
-        currentStep={5}
+        currentStep={6}
         title="Bước 3 — Script"
         subtitle="Hình minh hoạ của video: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt trước khi viết code."
         wide

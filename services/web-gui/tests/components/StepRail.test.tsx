@@ -27,7 +27,7 @@ function renderRail(p: Project | null, currentStep = 3) {
   );
 }
 
-const rendering = { project_id: "p1", status: "rendering", voice_language: "vi", scenes: [], flow_step: 9, run_state: "running", video_output_mode: "long" } as Project;
+const rendering = { project_id: "p1", status: "rendering", voice_language: "vi", scenes: [], flow_step: 10, run_state: "running", video_output_mode: "long" } as Project;
 
 describe("StepRail — second-layer vertical menu", () => {
   afterEach(() => {
@@ -35,34 +35,34 @@ describe("StepRail — second-layer vertical menu", () => {
     window.localStorage.clear();
   });
 
-  it("lists the 13 steps grouped in four phases, each with its own state", async () => {
+  it("lists the 14 steps grouped in four phases, each with its own state", async () => {
     renderRail(rendering);
     await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
 
-    for (let i = 1; i <= 13; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    for (let i = 1; i <= 14; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
     for (const phase of ["Soạn", "Kiểm tra", "Sản xuất", "Đầu ra"]) expect(screen.getByText(phase)).toBeInTheDocument();
 
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("data-status", "done");
-    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-status", "running");
-    expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "pending");
+    expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "running");
+    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "pending");
     // No vertical clips for this project: the split step is marked unused.
-    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "skipped");
+    expect(screen.getByTestId("rail-step-12")).toHaveAttribute("data-status", "skipped");
   });
 
   it("lets the Creator open only the steps the project has reached", async () => {
     renderRail(rendering);
     await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
-    for (const step of [2, 8, 9]) {
+    for (const step of [2, 9, 10]) {
       expect(screen.getByTestId(`rail-step-${step}`)).not.toBeDisabled();
     }
-    for (const step of [10, 13]) {
+    for (const step of [11, 14]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
     }
   });
 
   it("marks a cancelled and a failed step differently", async () => {
     renderRail({ ...rendering, status: "failed_at_render_scenes", run_state: "cancelled" } as Project);
-    await waitFor(() => expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-status", "cancelled"));
+    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "cancelled"));
   });
 
   it("collapses to a strip and remembers it", async () => {
@@ -72,7 +72,7 @@ describe("StepRail — second-layer vertical menu", () => {
     expect(screen.getByTestId("step-rail")).toHaveAttribute("data-collapsed", "true");
     expect(window.localStorage.getItem("conceptflow.stepRail.collapsed")).toBe("1");
     // Labels go, the numbered marks stay and still say what they are on hover.
-    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("title", expect.stringContaining("Render"));
+    expect(screen.getByTestId("rail-step-10")).toHaveAttribute("title", expect.stringContaining("Render"));
   });
 
   it("is absent before the server knows the project (a brand-new idea)", async () => {

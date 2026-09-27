@@ -15,13 +15,13 @@ import { ProjectErrorBadge } from "./ProjectErrorBadge";
 import styles from "./AppShell.module.css";
 
 /*
-  Hành trình 13 bước (xem utils/flow.ts): mỗi pill là một bước Creator đi qua.
+  Hành trình 14 bước (xem utils/flow.ts): mỗi pill là một bước Creator đi qua.
   Bấm được mọi bước đã tới (tới bước xa nhất server ghi nhận) — để XEM lại. Có
   sửa được hay không là chuyện của server: chỉ draft hoặc dự án lỗi mới sửa
   được; còn lại mở ở chế độ chỉ đọc (xem `readOnly` bên dưới).
 */
 interface AppShellProps {
-  /** Bước trong flow 13 bước mà màn này đang hiển thị (1-13). */
+  /** Bước trong flow 14 bước mà màn này đang hiển thị (1-14). */
   currentStep?: number;
   title: string;
   subtitle: string;
@@ -54,9 +54,9 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
   const nav = useStepNav(currentStep);
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
-  // Áp cho các màn soạn (1-5); màn 6-13 tự quản lý hành động của chúng.
-  const readOnly = !!currentStep && currentStep <= 5 && nav.hasProject && !flow.editable;
-  // Menu dọc thứ hai chỉ có nghĩa khi đã có một project để đặt vào 13 bước.
+  // Áp cho các màn soạn (1-6); màn 7-14 tự quản lý hành động của chúng.
+  const readOnly = !!currentStep && currentStep <= 6 && nav.hasProject && !flow.editable;
+  // Menu dọc thứ hai chỉ có nghĩa khi đã có một project để đặt vào 14 bước.
   const showRail = !!currentStep && nav.hasProject;
 
   const toggleRail = () => {
@@ -97,7 +97,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
             >
               <span className={styles.resumeLabel}>
                 ▶ Tiếp tục{recent.run_state === "running" ? " · đang chạy" : ""}
-                {recent.flow_step ? ` · bước ${recent.flow_step}/13` : ""}
+                {recent.flow_step ? ` · bước ${recent.flow_step}/14` : ""}
               </span>
               <span className={styles.resumeName}>{recentName}</span>
             </NavLink>

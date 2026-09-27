@@ -58,10 +58,12 @@ interface LastRun {
 }
 
 function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun>> {
-  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "code" };
+  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "code", 6: "illustrations" };
   const out: Partial<Record<AuthoringStep, LastRun>> = {};
   for (const e of [...events].sort((a, b) => a.id - b.id)) {
-    // CR-045: the illustrations step journals under Code's flow number, told apart by its source.
+    // CR-046: illustrations now journals under its own flow number (6). Old rows from
+    // before CR-046 journaled under Code's flow number (5) with source "illustrations" —
+    // keep reading those the old way so historical logs still show up correctly.
     const step = e.source === "illustrations" ? "illustrations" : byFlow[e.flow_step];
     if ((e.source !== "authoring" && e.source !== "illustrations") || !step || e.run_state === "running") continue;
     out[step] = {

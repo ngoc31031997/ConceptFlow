@@ -513,7 +513,7 @@ func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, resp)
 }
 
-// flowFor places a project in the 13-step flow. Only a draft on the script
+// flowFor places a project in the 14-step flow. Only a draft on the script
 // step needs the authoring content to tell 1a from 1b from 1c.
 func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) {
 	var content domain.AuthoredContent

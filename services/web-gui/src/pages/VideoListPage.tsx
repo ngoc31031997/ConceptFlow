@@ -9,7 +9,7 @@ import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../ap
 import type { ProjectSummary } from "../types";
 
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_LABELS, stepStatus } from "../utils/flow";
+import { FLOW_LABELS, FLOW_RESULT, stepStatus } from "../utils/flow";
 import { Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
@@ -40,15 +40,15 @@ function matches(p: ProjectSummary, filter: Filter): boolean {
     case "problem":
       return p.run_state === "failed" || p.run_state === "cancelled";
     case "done":
-      return step >= 12 && p.run_state !== "failed";
+      return step >= FLOW_RESULT && p.run_state !== "failed";
     case "waiting":
-      return p.run_state === "idle" && step > 0 && step < 12;
+      return p.run_state === "idle" && step > 0 && step < FLOW_RESULT;
     default:
       return true;
   }
 }
 
-/** 13 ô nhỏ, một ô một bước: dự án đi tới đâu, đang chạy hay lỗi ở ô nào. */
+/** 14 ô nhỏ, một ô một bước: dự án đi tới đâu, đang chạy hay lỗi ở ô nào. */
 function FlowMini({ project }: { project: ProjectSummary }) {
   const flowStep = project.flow_step ?? 0;
   if (!flowStep) return null;
@@ -56,7 +56,7 @@ function FlowMini({ project }: { project: ProjectSummary }) {
     <span
       className={styles.mini}
       role="img"
-      aria-label={`Bước ${flowStep}/13: ${FLOW_LABELS[flowStep - 1]}`}
+      aria-label={`Bước ${flowStep}/${FLOW_LABELS.length}: ${FLOW_LABELS[flowStep - 1]}`}
       data-testid="flow-mini"
     >
       {FLOW_LABELS.map((label, i) => (

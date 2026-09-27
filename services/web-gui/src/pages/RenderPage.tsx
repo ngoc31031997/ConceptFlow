@@ -37,7 +37,7 @@ export function RenderPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
-  // ?view=1&step=N: mở chỉ để XEM lại bước 8-11 của dự án đã chạy xong.
+  // ?view=1&step=N: mở chỉ để XEM lại bước 9-12 của dự án đã chạy xong.
   const [search] = useSearchParams();
   const viewOnly = search.get("view") === "1";
   const viewStep = Number(search.get("step")) || FLOW_TTS;
@@ -86,9 +86,9 @@ export function RenderPage() {
         }
       : progressState;
 
-  // Bước 8-11 theo bước saga đang chạy: TTS, render, merge (kèm QC), cắt short.
+  // Bước 9-12 theo bước saga đang chạy: TTS, render, merge (kèm QC), cắt short.
   const activeFlowStep =
-    { synthesize_speech: 8, render_scenes: 9, assemble_video: 10, qc_video: 10, generate_clips: 11 }[
+    { synthesize_speech: 9, render_scenes: 10, assemble_video: 11, qc_video: 11, generate_clips: 12 }[
       displayStep ?? ""
     ] ?? FLOW_TTS;
 
