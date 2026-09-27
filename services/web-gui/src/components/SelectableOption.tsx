@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import selectable from "../styles/selectable.module.css";
 
 interface SelectableOptionProps {
@@ -23,6 +23,29 @@ function CheckIcon() {
   );
 }
 
+/** Shrinks the font until the text fits its box instead of overflowing it. */
+function useShrinkToFit<T extends HTMLElement>(dep: unknown, enabled: boolean) {
+  const ref = useRef<T>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !enabled) return;
+    const fit = () => {
+      el.style.fontSize = "";
+      const base = parseFloat(getComputedStyle(el).fontSize);
+      let size = base;
+      while (el.scrollWidth > el.clientWidth && size > 8) {
+        size -= 0.5;
+        el.style.fontSize = `${size}px`;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [dep, enabled]);
+  return ref;
+}
+
 /**
  * One choice among several, with the selected state spelled out rather than
  * implied: a tinted fill, an accent ring and a check badge, plus aria-checked
@@ -39,6 +62,7 @@ export function SelectableOption({
   testId,
   ariaLabel,
 }: SelectableOptionProps) {
+  const labelRef = useShrinkToFit<HTMLSpanElement>(label, !!inline);
   const className = [
     selectable.option,
     selected ? selectable.selected : "",
@@ -64,7 +88,7 @@ export function SelectableOption({
       </span>
       {leading}
       {inline ? (
-        <span className={selectable.label}>{label}</span>
+        <span ref={labelRef} className={selectable.label}>{label}</span>
       ) : (
         <span className={selectable.body}>
           <span className={selectable.label}>{label}</span>
