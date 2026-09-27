@@ -1276,7 +1276,7 @@ export function subscribeProgress(
   return () => source.close();
 }
 
-/** One line of a project's journey through the 13-step flow (project_events). */
+/** One line of a project's journey through the 14-step flow (project_events). */
 export interface ProjectEvent {
   id: number;
   project_id: string;

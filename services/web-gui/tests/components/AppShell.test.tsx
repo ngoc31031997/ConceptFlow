@@ -50,29 +50,29 @@ function renderShell(p: Project | null, currentStep: number) {
   );
 }
 
-describe("AppShell — 13-step flow", () => {
+describe("AppShell — 14-step flow", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
-  it("shows all 13 steps, with the current one marked", async () => {
+  it("shows all 14 steps, with the current one marked", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
     await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
-    for (let i = 1; i <= 13; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    for (let i = 1; i <= 14; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step");
   });
 
   it("lets the Creator open any step the project has reached, but not one it has not", async () => {
-    renderShell(project({ status: "rendering", flow_step: 9, run_state: "running" }), 5);
-    await waitFor(() => expect(screen.getByTestId("rail-step-8")).not.toBeDisabled());
-    expect(screen.getByTestId("rail-step-9")).not.toBeDisabled();
-    expect(screen.getByTestId("rail-step-10")).toBeDisabled();
-    expect(screen.getByTestId("rail-step-13")).toBeDisabled();
+    renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 5);
+    await waitFor(() => expect(screen.getByTestId("rail-step-9")).not.toBeDisabled());
+    expect(screen.getByTestId("rail-step-10")).not.toBeDisabled();
+    expect(screen.getByTestId("rail-step-11")).toBeDisabled();
+    expect(screen.getByTestId("rail-step-14")).toBeDisabled();
   });
 
   it("locks the authoring screens read-only while the project is rendering, and says why", async () => {
-    renderShell(project({ status: "rendering", flow_step: 9, run_state: "running" }), 3);
+    renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 3);
 
     await waitFor(() => expect(screen.getByTestId("read-only-banner")).toBeInTheDocument());
     expect(screen.getByTestId("read-only-banner")).toHaveTextContent("đang chạy");
@@ -84,7 +84,7 @@ describe("AppShell — 13-step flow", () => {
   });
 
   it("shows a locked project's fields as plain text you can read and copy, not greyed-out boxes", async () => {
-    renderShell(project({ status: "ready_to_publish", flow_step: 12, run_state: "idle" }), 3);
+    renderShell(project({ status: "ready_to_publish", flow_step: 13, run_state: "idle" }), 3);
 
     await waitFor(() => expect(screen.getByTestId("read-only-banner")).toBeInTheDocument());
     const story = screen.getByTestId("story");
@@ -113,15 +113,15 @@ describe("AppShell — 13-step flow", () => {
   });
 
   it("keeps a project that failed at render editable, so the Creator can go fix an earlier step", async () => {
-    renderShell(project({ status: "failed_at_render_scenes", flow_step: 9, run_state: "failed" }), 5);
-    await waitFor(() => expect(screen.getByTestId("rail-step-9")).not.toBeDisabled());
+    renderShell(project({ status: "failed_at_render_scenes", flow_step: 10, run_state: "failed" }), 5);
+    await waitFor(() => expect(screen.getByTestId("rail-step-10")).not.toBeDisabled());
     expect(screen.queryByTestId("read-only-banner")).not.toBeInTheDocument();
     expect(screen.getByTestId("an-input")).not.toBeDisabled();
   });
 
   it("opens a past step of a locked project through resume (no API write on the way)", async () => {
     const put = vi.spyOn(globalThis, "fetch");
-    renderShell(project({ status: "ready_to_publish", flow_step: 12, run_state: "idle" }), 12);
+    renderShell(project({ status: "ready_to_publish", flow_step: 13, run_state: "idle" }), 13);
     await waitFor(() => expect(screen.getByTestId("rail-step-3")).not.toBeDisabled());
     put.mockClear();
     fireEvent.click(screen.getByTestId("rail-step-3"));

@@ -51,7 +51,7 @@ describe("StatusStrip", () => {
   });
 
   it("says a step is running even while the Creator looks at an earlier one, and offers the way back", async () => {
-    renderStrip(project({ status: "rendering", flow_step: 9, run_state: "running" }), 3);
+    renderStrip(project({ status: "rendering", flow_step: 10, run_state: "running" }), 3);
 
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đang chạy"));
     expect(screen.getByTestId("status-strip")).toHaveTextContent("Render");
@@ -61,7 +61,7 @@ describe("StatusStrip", () => {
 
   it("cancels only after the Creator confirms, and says what is kept", async () => {
     const cancel = vi.spyOn(apiClient, "cancelProject").mockResolvedValue({ step: "render_scenes", status: "failed_at_render_scenes" });
-    renderStrip(project({ status: "rendering", flow_step: 9, run_state: "running" }), 9);
+    renderStrip(project({ status: "rendering", flow_step: 10, run_state: "running" }), 10);
 
     await waitFor(() => expect(screen.getByTestId("strip-cancel")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("strip-cancel"));
@@ -74,7 +74,7 @@ describe("StatusStrip", () => {
 
   it("does not cancel when the Creator backs out", async () => {
     const cancel = vi.spyOn(apiClient, "cancelProject").mockResolvedValue({ step: "", status: "" });
-    renderStrip(project({ status: "rendering", flow_step: 9, run_state: "running" }), 9);
+    renderStrip(project({ status: "rendering", flow_step: 10, run_state: "running" }), 10);
 
     await waitFor(() => expect(screen.getByTestId("strip-cancel")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("strip-cancel"));
@@ -83,14 +83,14 @@ describe("StatusStrip", () => {
   });
 
   it("offers no cancel for a step with no worker to stop (cắt short, publish)", async () => {
-    renderStrip(project({ status: "generating_clips", flow_step: 11, run_state: "running" }), 11);
+    renderStrip(project({ status: "generating_clips", flow_step: 12, run_state: "running" }), 12);
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đang chạy"));
     expect(screen.queryByTestId("strip-cancel")).not.toBeInTheDocument();
   });
 
   it("a cancelled step is shown as cancelled, not failed, and can be resumed", async () => {
     const retry = vi.spyOn(apiClient, "retryProject").mockResolvedValue({ saga_id: "s", status: "rendering" } as never);
-    renderStrip(project({ status: "failed_at_render_scenes", flow_step: 9, run_state: "cancelled" }), 9);
+    renderStrip(project({ status: "failed_at_render_scenes", flow_step: 10, run_state: "cancelled" }), 10);
 
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đã hủy"));
     fireEvent.click(screen.getByTestId("strip-resume"));
@@ -98,7 +98,7 @@ describe("StatusStrip", () => {
   });
 
   it("a failed step points to the error detail instead of duplicating the retry button", async () => {
-    renderStrip(project({ status: "failed_at_merge", flow_step: 10, run_state: "failed" }), 3);
+    renderStrip(project({ status: "failed_at_merge", flow_step: 11, run_state: "failed" }), 3);
 
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Lỗi"));
     expect(screen.queryByTestId("strip-resume")).not.toBeInTheDocument();
@@ -107,7 +107,7 @@ describe("StatusStrip", () => {
 
   it("forks from the chosen step and opens the new project there", async () => {
     const fork = vi.spyOn(apiClient, "forkProject").mockResolvedValue({ project_id: "new-1", from_step: 4, needs_music_reselect: false });
-    renderStrip(project({ status: "ready_to_publish", flow_step: 12, run_state: "idle" }), 12);
+    renderStrip(project({ status: "ready_to_publish", flow_step: 13, run_state: "idle" }), 13);
 
     await waitFor(() => expect(screen.getByTestId("strip-fork")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("strip-fork"));

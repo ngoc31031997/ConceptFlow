@@ -272,9 +272,10 @@ func (uc *GenerateAuthoringUseCase) recordEvent(
 	}
 	fs, source := domain.FlowStepForAuthoring(step), "authoring"
 	if step == StepIllustrations {
-		// CR-045: no flow number of its own (1–13 is shared with the
-		// orchestrator); it is the lead-in to Code, told apart by its source.
-		fs, source = domain.FlowCode, "illustrations"
+		// CR-046: illustrations now has its own numbered flow step, reversing
+		// the CR-045 workaround that logged it under Code with source
+		// "illustrations" to avoid adding a number to the shared 1–13 flow.
+		fs = domain.FlowIllustrations
 	}
 	if fs == 0 {
 		return

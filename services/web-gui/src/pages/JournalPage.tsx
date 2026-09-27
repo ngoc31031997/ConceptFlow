@@ -37,8 +37,8 @@ export interface StepStat {
 }
 
 /** Bước saga chạy thật (có worker): thời gian ở đó là chi phí của bước. Review
- *  (7) và Kết quả (12) là thời gian chờ người, không tính vào chi phí. */
-const SAGA_WORK_STEPS = new Set([6, 8, 9, 10, 11]);
+ *  (8) và Kết quả (13) là thời gian chờ người, không tính vào chi phí. */
+const SAGA_WORK_STEPS = new Set([7, 9, 10, 11, 12]);
 
 /**
  * Gom cả nhật ký theo BƯỚC để thấy bước nào chậm/tốn/hay lỗi nhất. Dòng
@@ -57,7 +57,9 @@ export function aggregateByStep(events: ProjectEvent[]): StepStat[] {
     return cur;
   };
   for (const e of events) {
-    // CR-045: the illustrations step is an authoring run too, counted under Code.
+    // CR-046: the illustrations step is an authoring run too, now counted under its own
+    // flow number (6) via e.flow_step; source "illustrations" still tells it apart from
+    // "authoring" rows for historical events recorded before CR-046.
     if (e.source === "authoring" || e.source === "illustrations") {
       if (e.run_state === "running") continue; // dòng bắt đầu không có số đo
       const st = at(e.flow_step);
