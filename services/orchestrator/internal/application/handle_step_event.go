@@ -8,10 +8,49 @@ import (
 	"log/slog"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"orchestrator/internal/domain"
 )
+
+// synthesisAutoRetryBackoff is the fixed backoff schedule for automatically
+// retrying a transient tts_engine_failure (Edge TTS refused/timeouts — see
+// services/tts/domain/errors.go's TTSEngineError doc comment) without ever
+// surfacing the step as failed to the Creator. The engine's own doc comment
+// on edge_adapter.py measured 1/8 successes under back-to-back scene bursts
+// but 5/5 once spaced out, so three spaced retries covers the common case;
+// total added latency tops out around 1m45s (15s+30s+60s) worst case, which
+// is well inside a single saga step's expected runtime.
+var synthesisAutoRetryBackoff = []time.Duration{15 * time.Second, 30 * time.Second, 60 * time.Second}
+
+var (
+	synthesisRetriesMu sync.Mutex
+	// synthesisRetries counts transient-retry attempts per sagaID. In-memory
+	// only — same tradeoff as amqp.eventAttempts: a restart resets the count,
+	// which only ever grants a saga a few extra automatic tries before it
+	// falls back to the existing manual-retry path.
+	synthesisRetries = map[string]int{}
+)
+
+// clearSynthesisRetries resets sagaID's budget. Called wherever
+// synthesize_speech starts a fresh run (startSynthesizeSpeech) or finishes
+// one, successfully or by exhausting the budget, so a later run of the same
+// saga always gets the full three tries again.
+func clearSynthesisRetries(sagaID string) {
+	synthesisRetriesMu.Lock()
+	defer synthesisRetriesMu.Unlock()
+	delete(synthesisRetries, sagaID)
+}
+
+// bumpSynthesisRetry returns how many transient retries sagaID has used so
+// far, including this one.
+func bumpSynthesisRetry(sagaID string) int {
+	synthesisRetriesMu.Lock()
+	defer synthesisRetriesMu.Unlock()
+	synthesisRetries[sagaID]++
+	return synthesisRetries[sagaID]
+}
 
 // StepEvent is the already-parsed representation of one orchestrator.events
 // message, handed to HandleStepEventUseCase by adapters/amqp/consumer.go
@@ -301,6 +340,12 @@ func (uc *HandleStepEventUseCase) handleChannelAssetProjection(ctx context.Conte
 func (uc *HandleStepEventUseCase) handleFailure(ctx context.Context, event StepEvent, stepName domain.StepName) error {
 	errMsg := stringFromPayload(event.Payload, "error_message")
 
+	if stepName == domain.StepSynthesizeSpeech {
+		if handled, err := uc.retryTransientSynthesisFailure(ctx, event, errMsg); handled || err != nil {
+			return err
+		}
+	}
+
 	step := &domain.SagaStep{SagaID: event.SagaID, StepName: stepName, Status: domain.SagaStepFailed, ErrorMessage: &errMsg}
 	if err := uc.repo.UpdateStep(ctx, step); err != nil {
 		return err
@@ -321,6 +366,61 @@ func (uc *HandleStepEventUseCase) handleFailure(ctx context.Context, event StepE
 		Status:       "failed",
 		ErrorMessage: &errMsg,
 	})
+}
+
+// retryTransientSynthesisFailure is the automated half of synthesize_speech
+// failure handling: a tts_engine_failure (TTSEngineError in the tts
+// service — engine refused/timed out, e.g. Edge TTS's burst rate-limiting)
+// is a transient problem with the engine, not the script, so it gets up to
+// len(synthesisAutoRetryBackoff) silent retries here before ever becoming a
+// failed_at_synthesize_speech the Creator has to notice and retry by hand.
+// empty_text and unsupported_language never reach this branch — they are
+// permanent (bad input) and always fail the step immediately, exactly as
+// every other step's failure does.
+//
+// Returns handled=true when it re-dispatched the step itself (the normal
+// fail-the-step path in handleFailure must then be skipped) or when the
+// retry budget was just exhausted (in which case handled=false lets that
+// path run, but the budget has already been cleared for next time).
+func (uc *HandleStepEventUseCase) retryTransientSynthesisFailure(ctx context.Context, event StepEvent, errMsg string) (handled bool, err error) {
+	if event.EventType != "synthesis_failed" || !strings.HasPrefix(errMsg, "tts_engine_failure:") {
+		return false, nil
+	}
+
+	attempt := bumpSynthesisRetry(event.SagaID)
+	if attempt > len(synthesisAutoRetryBackoff) {
+		// Budget exhausted: fall through to the normal fail-the-step path so
+		// the Creator sees failed_at_synthesize_speech and can retry by hand.
+		clearSynthesisRetries(event.SagaID)
+		uc.logger.WarnContext(ctx, "synthesis_failed exhausted its automatic retry budget, failing the step",
+			"saga_id", event.SagaID, "project_id", event.ProjectID, "attempts", attempt-1, "error", errMsg)
+		return false, nil
+	}
+
+	backoff := synthesisAutoRetryBackoff[attempt-1]
+	uc.logger.WarnContext(ctx, "synthesis_failed is transient, auto-retrying after backoff",
+		"saga_id", event.SagaID, "project_id", event.ProjectID, "attempt", attempt, "backoff", backoff, "error", errMsg)
+
+	select {
+	case <-time.After(backoff):
+	case <-ctx.Done():
+		return false, ctx.Err()
+	}
+
+	project, err := uc.repo.Get(ctx, event.ProjectID)
+	if err != nil {
+		return false, err
+	}
+	payload := map[string]interface{}{
+		"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID),
+	}
+	// The step never left in_progress — the fail-the-step transition in
+	// handleFailure never ran for this event — so only the command needs
+	// re-dispatching, with a fresh message_id.
+	if err := uc.dispatch(ctx, event.SagaID, event.ProjectID, "tts", string(domain.StepSynthesizeSpeech), payload); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepEvent, stepName domain.StepName) error {
@@ -618,6 +718,10 @@ func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, saga
 // onScriptParsed since classify_scenes no longer runs as a separate
 // dispatched step.
 func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
+	// A fresh run of this step always gets the full automatic-retry budget,
+	// whether this is the saga's first attempt or a Creator-triggered manual
+	// retry after a previous run exhausted it.
+	clearSynthesisRetries(sagaID)
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: domain.StepSynthesizeSpeech, Status: domain.SagaStepInProgress}); err != nil {
 		return err
 	}
@@ -634,6 +738,7 @@ func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sag
 // enforces Rule 1's scene_index set integrity, and — if it holds —
 // dispatches render_scenes (Bước 4).
 func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event StepEvent, project *domain.Project) error {
+	clearSynthesisRetries(event.SagaID)
 	incoming := parseSynthesizedScenes(event.Payload)
 
 	if mismatch := validateSceneIndexSets(project.Scenes, incoming); mismatch != "" {

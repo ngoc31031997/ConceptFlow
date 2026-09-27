@@ -93,6 +93,12 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 	if err != nil {
 		return nil, err
 	}
+	if stepName == domain.StepSynthesizeSpeech {
+		// A manual retry is a fresh run of the step — give it the full
+		// automatic tts_engine_failure retry budget again (see
+		// handle_step_event.go's retryTransientSynthesisFailure).
+		clearSynthesisRetries(sagaID)
+	}
 
 	if err := uc.repo.UpdateStep(ctx, &domain.SagaStep{SagaID: sagaID, StepName: stepName, Status: domain.SagaStepInProgress}); err != nil {
 		return nil, err
