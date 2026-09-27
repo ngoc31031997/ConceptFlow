@@ -33,3 +33,6 @@ When implementing:
 ## CR completion policy
 - When a Change Request is finished (implemented, verified, and its stage approved per the policy above), automatically commit and push its `feature/cr-<NNN>-<slug>` branch, then merge it into `main` and push `main` — no need to ask again.
 - Before merging, pull the latest `main` so the merge is fast and conflict-free; if the merge conflicts, stop and report instead of resolving blindly.
+
+## Web UI / UX design rules
+- Any UI task must follow `docs/ux-ui-design-rules.md` (screen flow order, etc.). Read it before changing or adding a screen.

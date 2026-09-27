@@ -7,7 +7,8 @@ interface DisclosureProps {
   hint?: string;
   /** Mở sẵn khi lần đầu mount — dùng khi nội dung ít khả năng cần thu gọn. */
   defaultOpen?: boolean;
-  children: ReactNode;
+  /** A function child receives `close`, for single-choice content that should fold away once picked. */
+  children: ReactNode | ((close: () => void) => ReactNode);
   testId?: string;
 }
 
@@ -40,7 +41,7 @@ export function Disclosure({ title, hint, defaultOpen = false, children, testId 
       </button>
 
       {mounted && (
-        <div className={`${glass.mtSm} ${closing ? glass.revealOut : glass.reveal}`}>{children}</div>
+        <div className={`${glass.mtSm} ${closing ? glass.revealOut : glass.reveal}`}>{typeof children === "function" ? children(() => setIsOpen(false)) : children}</div>
       )}
     </div>
   );
