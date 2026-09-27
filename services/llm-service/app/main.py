@@ -60,7 +60,16 @@ class StoryboardBody(BaseModel):
     max_tokens: int = Field(0, ge=0)
 
 
+class IllustrationIn(BaseModel):
+    """CR-044 — one approved library drawing the code step may use."""
+    name: str
+    usage: str = ""
+    description: str = ""
+    code: str
+
+
 class CodeBody(BaseModel):
+    illustrations: list[IllustrationIn] = []
     engine: str
     topic: str = ""
     storyboard: str
@@ -231,7 +240,8 @@ def create_app(
         async def work(emit):
             res = await pipeline.run(CodeRequest(
                 engine=body.engine, topic=body.topic, storyboard=body.storyboard, system=body.system,
-                model=body.model, max_tokens=body.max_tokens, temperature=body.temperature), emit)
+                model=body.model, max_tokens=body.max_tokens, temperature=body.temperature,
+                illustrations=[i.model_dump() for i in body.illustrations]), emit)
             return res.to_dict()
 
         return _stream(work)

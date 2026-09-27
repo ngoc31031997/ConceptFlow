@@ -75,7 +75,9 @@ import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors,
 import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
 import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
 import {LottieClip} from './conceptflow-mini/lottie';
-""" + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n"
+""" + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n" + (
+    "import type {FigureProps, Mood, PersonPose} from './conceptflow-mini/illustration';\n"
+)
 
 _REMOTION_TAIL = """
 function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number}[]}) {
@@ -136,8 +138,29 @@ def remotion_stub(shot_id: str) -> str:
     return f"function {remotion_fn(shot_id)}({{duration}}: ShotProps) {{\n  return null;\n}}"
 
 
+_IMPORT_LINE = re.compile(r"^\s*import\b[^;]*;?\s*$", re.M)
+_TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b")
+
+
+def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
+    """CR-044: the library drawings the shots actually use, pasted into the
+    script so it renders without any file beside it. Their imports are the
+    frame's own (react, remotion, the illustration kit), so they are dropped;
+    `export` is dropped so the only exports stay the frame's."""
+    used = set()
+    for code in shots.values():
+        used.update(_TAG.findall(code))
+    blocks = []
+    for name in sorted(n for n in library if n in used):
+        code = _IMPORT_LINE.sub("", library[name])
+        code = re.sub(r"^export\s+function\s+", "function ", code, flags=re.M).strip("\n")
+        blocks.append(f"// Hình thư viện: {name}\n{code}\n")
+    return "\n".join(blocks)
+
+
 def merge_remotion(
-    sb: Storyboard, layout: str, shots: dict[str, str], *, stub_missing: bool = False
+    sb: Storyboard, layout: str, shots: dict[str, str], *, stub_missing: bool = False,
+    library: dict[str, str] | None = None,
 ) -> Merged:
     ordered = [sh.id for _, sh in sb.all_shots()]
     missing = [i for i in ordered if i not in shots]
@@ -155,6 +178,9 @@ def merge_remotion(
     narrations = ",\n".join("  " + json.dumps(sh.narration, ensure_ascii=False) for _, sh in sb.all_shots())
     parts.append(f"export const narrations: string[] = [\n{narrations},\n];\n")
     parts.append("type ShotProps = {duration: number};\n")
+    drawings = library_block(library or {}, shots)
+    if drawings:
+        parts.append(drawings)
 
     text = "\n".join(parts) + "\n"
     line = text.count("\n") + 1

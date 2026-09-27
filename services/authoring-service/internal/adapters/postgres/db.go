@@ -123,6 +123,23 @@ CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id)
 -- style findings of the current version that did not block saving.
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
+
+-- CR-044: the drawings one video needs, planned from its storyboard. No FK to
+-- the project (it lives in the orchestrator); deleting the project deletes
+-- these rows with its authoring row.
+CREATE TABLE IF NOT EXISTS project_illustrations (
+    id              TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+    project_id      TEXT NOT NULL,
+    position        INTEGER NOT NULL,
+    name            TEXT NOT NULL DEFAULT '',
+    description     TEXT NOT NULL DEFAULT '',
+    folder_id       TEXT NOT NULL DEFAULT '',
+    shots           TEXT[] NOT NULL DEFAULT '{}',
+    state           TEXT NOT NULL DEFAULT 'planned',
+    error           TEXT NOT NULL DEFAULT '',
+    illustration_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustrations (project_id, position);
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

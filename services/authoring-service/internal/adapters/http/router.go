@@ -36,6 +36,7 @@ type Router struct {
 	prompts                 promptsUseCase
 	archetypes              archetypesUseCase
 	illustrations           illustrationsUseCase
+	projectIllustrations    projectIllustrationsUseCase
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	authoringChain          authoringChainUseCase
@@ -66,6 +67,7 @@ func (rt *Router) Handler() http.Handler {
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
 	rt.illustrationRoutes(r)
+	rt.projectIllustrationRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
@@ -1020,6 +1022,11 @@ func DescribeGenerateError(err error) (int, string) {
 			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI." + fallback
 	case errors.Is(err, domain.ErrProjectNotFound):
 		return http.StatusNotFound, "project not found"
+	}
+	// CR-044: not a failure — the code step waits for the Creator's review.
+	var pending *application.ErrIllustrationsPending
+	if errors.As(err, &pending) {
+		return http.StatusConflict, pending.Error()
 	}
 
 	status := http.StatusBadGateway

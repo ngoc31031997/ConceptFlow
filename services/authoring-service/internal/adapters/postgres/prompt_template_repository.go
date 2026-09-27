@@ -297,6 +297,10 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 
 // DeleteAuthoring removes a deleted project's authoring row. Idempotent.
 func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectID string) error {
+	// CR-044: the video's drawing list goes with it (the drawings stay in the library).
+	if err := r.DeleteProjectIllustrations(ctx, projectID); err != nil {
+		return err
+	}
 	_, err := r.pool.Exec(ctx, `DELETE FROM project_authoring WHERE project_id = $1`, projectID)
 	return err
 }

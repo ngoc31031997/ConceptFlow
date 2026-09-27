@@ -37,6 +37,10 @@ describe('illustration library routing', () => {
     ['get', '/v1/illustration-style', 'fast'],
     ['post', '/v1/admin/illustrations/draw', 'slow'],
     ['post', '/v1/admin/illustrations/i1/redraw', 'slow'],
+    ['get', '/v1/projects/p1/illustrations', 'fast'],
+    ['post', '/v1/projects/p1/illustrations/plan', 'slow'],
+    ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
+    ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
   ])('%s %s -> %s client', async (method, path, which) => {
     const clients = { fast: client(), slow: client() };
     await request(buildApp(clients.fast, clients.slow))[method](path).send({});

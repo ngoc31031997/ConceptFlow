@@ -39,9 +39,27 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		return GeneratedStep{}, fmt.Errorf("load topic: %w", err)
 	}
 
+	// CR-044: a Remotion video gets its drawings first — planned from the
+	// storyboard, drawn by the AI drawer — and the code step waits until the
+	// Creator has approved or skipped every one of them.
+	var drawings []LibraryDrawing
+	if project.RenderEngine == domain.RenderEngineRemotion && uc.illustrations != nil {
+		uc.updateCodeProgress(projectID, step, CodeEvent{Type: "phase", Phase: "illustrations"})
+		pending, err := uc.illustrations.Ensure(ctx, projectID, model)
+		if err != nil {
+			return GeneratedStep{}, err
+		}
+		if len(pending) > 0 {
+			return GeneratedStep{}, &ErrIllustrationsPending{Rows: pending}
+		}
+		if drawings, err = uc.illustrations.ForCode(ctx, projectID); err != nil {
+			return GeneratedStep{}, fmt.Errorf("load library drawings: %w", err)
+		}
+	}
+
 	result, genErr := uc.codegen.GenerateCode(ctx, CodeGenRequest{
 		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
-		System: rendered.Prompt, Model: model, MaxTokens: uc.maxOutputTokens,
+		System: rendered.Prompt, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
 	}, func(ev CodeEvent) { uc.updateCodeProgress(projectID, step, ev) })
 
 	var calls []CodeCall
@@ -93,6 +111,18 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		out.SaveError = fmt.Sprintf("Đã sinh được nội dung nhưng chưa lưu được: %v", err)
 	}
 	return out, nil
+}
+
+// IllustrationStagePort is the per-video drawing list as the code step needs it.
+type IllustrationStagePort interface {
+	Ensure(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error)
+	ForCode(ctx context.Context, projectID string) ([]LibraryDrawing, error)
+}
+
+// WithIllustrations turns on the CR-044 drawing stage for Remotion projects.
+func (uc *GenerateAuthoringUseCase) WithIllustrations(stage IllustrationStagePort) *GenerateAuthoringUseCase {
+	uc.illustrations = stage
+	return uc
 }
 
 // recordCall writes one llm_usage row for one model call of a run.

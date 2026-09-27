@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
+import { ProjectIllustrationsPanel } from "../components/ProjectIllustrationsPanel";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
@@ -252,6 +253,13 @@ export function ManimEngineerStepPage() {
                 </Button>
               )}
             </Disclosure>
+          </div>
+        )}
+
+        {/* CR-044 — Remotion: the drawings the video needs, reviewed before code. */}
+        {isRemotion && draft.projectId && (
+          <div className={styles.settingsRow}>
+            <ProjectIllustrationsPanel projectId={draft.projectId} />
           </div>
         )}
 
