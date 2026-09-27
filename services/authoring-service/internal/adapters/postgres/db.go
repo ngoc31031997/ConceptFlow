@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS video_archetypes (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE UNIQUE INDEX IF NOT EXISTS video_archetypes_code_key ON video_archetypes (upper(code));
+ALTER TABLE video_archetypes ADD COLUMN IF NOT EXISTS recommended_format_id TEXT NOT NULL DEFAULT '';
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

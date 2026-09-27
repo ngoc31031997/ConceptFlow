@@ -139,7 +139,8 @@ describe("PromptSettingsPage — thư viện prompt", () => {
     await waitFor(() => expect(screen.getByTestId("prompt-row-system-story_architect")).toBeInTheDocument());
     expect(screen.queryByTestId("prompt-row-system-visual_director")).not.toBeInTheDocument();
 
-    fireEvent.change(screen.getByTestId("prompt-role-select"), { target: { value: "visual_director" } });
+    fireEvent.click(screen.getByTestId("prompt-role-select"));
+    fireEvent.click(screen.getByTestId("prompt-role-select-option-visual_director"));
     await waitFor(() => expect(screen.getByTestId("prompt-template-textarea")).toHaveValue("ĐẠO DIỄN"));
     expect(screen.queryByTestId("prompt-row-system-story_architect")).not.toBeInTheDocument();
   });

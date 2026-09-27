@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Card, Button, FormField, Select, TextArea, TextInput, CtaRow } from "../components/ui";
+import { Card, Button, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
 import {
   listPrompts,
   createPrompt,
@@ -201,17 +201,16 @@ export function PromptSettingsPage() {
           <div className={styles.controls}>
             <Card title="Chọn vai trò">
               <FormField label="Vai trò">
-                <Select
+                <Dropdown
                   data-testid="prompt-role-select"
+                  aria-label="Vai trò"
                   value={role}
-                  onChange={(e) => chooseRole(e.target.value as PromptRole)}
-                >
-                  {ROLES.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </Select>
+                  onChange={(v) => chooseRole(v as PromptRole)}
+                  options={ROLES.map((r) => {
+                    const [label, hint] = r.label.split(" — ");
+                    return { value: r.value, label, hint };
+                  })}
+                />
               </FormField>
               <p className={`${styles.versionRow} ${glass.mtSm}`} data-testid="prompt-in-use">
                 {active

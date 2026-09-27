@@ -1,4 +1,5 @@
 import type { AuthoringModelOption, AuthoringStepModels } from "../api/client";
+import { Dropdown } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModelPicker.module.css";
 
@@ -48,22 +49,21 @@ export function AuthoringModelPicker({ models, onChange, options, defaultModel =
       </div>
       <div className={styles.selects}>
         {STEP_ORDER.map(({ key, label }) => (
-          <label key={key} className={styles.field}>
+          <div key={key} className={styles.field}>
             <span className={styles.fieldLabel}>{label}</span>
-            <select
-              className={styles.select}
+            <Dropdown
+              aria-label={`Model AI cho bước ${label}`}
               value={models[key] || defaultModel || shown[0].id}
-              onChange={(event) => onChange({ ...models, [key]: event.target.value })}
+              onChange={(value) => onChange({ ...models, [key]: value })}
               disabled={disabled}
               data-testid={`authoring-model-${key}`}
-            >
-              {shown.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              options={shown.map((option) => ({
+                value: option.id,
+                label: option.label,
+                badge: option.id === defaultModel ? "Mặc định" : undefined,
+              }))}
+            />
+          </div>
         ))}
       </div>
     </div>

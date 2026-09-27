@@ -559,6 +559,8 @@ export interface VideoArchetype {
   when_to_use: string;
   /** Cách gán kiểu này vào các beat của format đang chọn. */
   playbook: string;
+  /** Format hợp nhất với kiểu này — wizard gợi ý khi chọn kiểu. "" = không gợi ý. */
+  recommended_format_id: string;
   is_system: boolean;
 }
 
@@ -568,6 +570,7 @@ export interface VideoArchetypeInput {
   name: string;
   when_to_use: string;
   playbook: string;
+  recommended_format_id?: string;
 }
 
 export async function listVideoArchetypes(): Promise<VideoArchetype[]> {

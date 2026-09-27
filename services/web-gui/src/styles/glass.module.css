@@ -162,6 +162,19 @@
   color: var(--ink);
   font-size: 14.5px;
 }
+/* <select> gốc còn sót lại: bỏ mũi tên của trình duyệt, dùng chevron cùng
+   kiểu với Dropdown. Chỗ nào cần danh sách đẹp thì dùng ui/Dropdown. */
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%2368778a' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
 .textInput:focus,
 .textArea:focus,
 .select:focus {

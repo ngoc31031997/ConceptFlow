@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
+import { VideoArchetypePicker } from "../components/VideoArchetypePicker";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
@@ -11,6 +12,7 @@ import {
   getAuthoringState,
   saveAuthoringStory,
   createProjectDraft,
+  patchWizardSettings,
   type SimilarProject,
 } from "../api/client";
 import { stripMarkdownCodeFence } from "../utils/scriptValidation";
@@ -254,6 +256,18 @@ export function ScriptOutlineStepPage() {
               placeholder="Ví dụ: Vòng lặp for trong Java, khi nào dùng while thay thế"
               style={{ marginBottom: 12 }}
             />
+            {!hasOwnOutline && (
+              <VideoArchetypePicker
+                topic={draft.authoringTopic}
+                onTopicChange={(topic) => dispatch({ type: "SET_AUTHORING_TOPIC", payload: topic })}
+                formats={formats}
+                formatId={draft.videoFormatId}
+                onFormatChange={(formatId) => {
+                  dispatch({ type: "SET_VIDEO_FORMAT", payload: formatId });
+                  if (draft.projectId) void patchWizardSettings(draft.projectId, { videoFormatId: formatId }).catch(() => {});
+                }}
+              />
+            )}
             {similarProjects.length > 0 && (
               <div className={styles.topicCollisionBanner} data-testid="topic-collision-banner">
                 Chủ đề này giống {similarProjects.length} dự án khác:{" "}

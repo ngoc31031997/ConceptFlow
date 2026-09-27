@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Card, Button, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
+import { Card, Button, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
 import {
   listVideoArchetypes,
   createVideoArchetype,
@@ -9,6 +9,7 @@ import {
   deleteVideoArchetype,
   type VideoArchetype,
 } from "../api/client";
+import { useVideoFormats } from "../hooks/useVideoFormats";
 import glass from "../styles/glass.module.css";
 import styles from "./PromptSettingsPage.module.css";
 
@@ -30,6 +31,8 @@ export function VideoArchetypeSettingsPage() {
   const [name, setName] = useState("");
   const [whenToUse, setWhenToUse] = useState("");
   const [playbook, setPlaybook] = useState("");
+  const [formatId, setFormatId] = useState("");
+  const formats = useVideoFormats();
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -63,6 +66,7 @@ export function VideoArchetypeSettingsPage() {
     setName(selected.name);
     setWhenToUse(selected.when_to_use);
     setPlaybook(selected.playbook);
+    setFormatId(selected.recommended_format_id ?? "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rows, selectedId]);
 
@@ -89,10 +93,11 @@ export function VideoArchetypeSettingsPage() {
     setName("");
     setWhenToUse("");
     setPlaybook("");
+    setFormatId("");
     setStatus(null);
   };
 
-  const input = { code, name, when_to_use: whenToUse, playbook };
+  const input = { code, name, when_to_use: whenToUse, playbook, recommended_format_id: formatId };
 
   const handleSave = () =>
     run(async () => {
@@ -234,6 +239,20 @@ export function VideoArchetypeSettingsPage() {
                 readOnly={readOnly}
                 disabled={editorDisabled}
                 rows={3}
+              />
+            </FormField>
+            <FormField label="Format khuyến nghị (wizard gợi ý khi chọn kiểu này)" className={glass.mtSm}>
+              <Dropdown
+                aria-label="Format khuyến nghị"
+                data-testid="archetype-format-select"
+                value={formatId}
+                onChange={setFormatId}
+                disabled={editorDisabled || readOnly}
+                options={[
+                  { value: "", label: "Không gợi ý", hint: "Dùng format Creator đang chọn." },
+                  ...formats.map((f) => ({ value: f.id, label: f.name })),
+                  ...(formatId && !formats.some((f) => f.id === formatId) ? [{ value: formatId, label: formatId }] : []),
+                ]}
               />
             </FormField>
             <FormField label="Playbook — cách gán vào các beat của format" className={glass.mtSm}>

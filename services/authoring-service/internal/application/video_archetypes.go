@@ -44,6 +44,7 @@ func normalize(a domain.VideoArchetype) (domain.VideoArchetype, error) {
 	a.Name = strings.TrimSpace(a.Name)
 	a.WhenToUse = strings.TrimSpace(a.WhenToUse)
 	a.Playbook = strings.TrimSpace(a.Playbook)
+	a.RecommendedFormatID = strings.TrimSpace(a.RecommendedFormatID)
 	switch {
 	case a.Name == "":
 		return a, fmt.Errorf("name is required")

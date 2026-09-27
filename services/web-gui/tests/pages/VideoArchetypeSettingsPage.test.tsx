@@ -6,10 +6,10 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
 const SYSTEM: apiClient.VideoArchetype = {
-  id: "system-A", code: "A", name: "Nghịch lý", when_to_use: "lỗi tư duy", playbook: "PB-A", is_system: true,
+  id: "system-A", code: "A", name: "Nghịch lý", when_to_use: "lỗi tư duy", playbook: "PB-A", recommended_format_id: "", is_system: true,
 };
 const MINE: apiClient.VideoArchetype = {
-  id: "u1", code: "E", name: "Của tôi", when_to_use: "hợp x", playbook: "PB-E", is_system: false,
+  id: "u1", code: "E", name: "Của tôi", when_to_use: "hợp x", playbook: "PB-E", recommended_format_id: "", is_system: false,
 };
 
 function renderPage() {
@@ -48,7 +48,7 @@ describe("VideoArchetypeSettingsPage (CR-041)", () => {
     fireEvent.change(screen.getByTestId("archetype-playbook-input"), { target: { value: "hook = lỗi" } });
     fireEvent.click(screen.getByTestId("archetype-save-button"));
     await waitFor(() =>
-      expect(create).toHaveBeenCalledWith({ code: "", name: "Gỡ lỗi", when_to_use: "đoạn code sai", playbook: "hook = lỗi" }),
+      expect(create).toHaveBeenCalledWith({ code: "", name: "Gỡ lỗi", when_to_use: "đoạn code sai", playbook: "hook = lỗi", recommended_format_id: "" }),
     );
   });
 

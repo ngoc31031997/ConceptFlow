@@ -5,3 +5,4 @@ export { Select } from "./Select";
 export { TextArea } from "./TextArea";
 export { TextInput } from "./TextInput";
 export { CtaRow } from "./CtaRow";
+export { Dropdown, type DropdownOption } from "./Dropdown";

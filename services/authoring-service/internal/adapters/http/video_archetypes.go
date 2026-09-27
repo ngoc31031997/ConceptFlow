@@ -54,12 +54,14 @@ func decodeArchetype(w http.ResponseWriter, r *http.Request) (domain.VideoArchet
 		Name      string `json:"name"`
 		WhenToUse string `json:"when_to_use"`
 		Playbook  string `json:"playbook"`
+		// RecommendedFormatID is optional; "" means no suggested format.
+		RecommendedFormatID string `json:"recommended_format_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return domain.VideoArchetype{}, false
 	}
-	return domain.VideoArchetype{Code: req.Code, Name: req.Name, WhenToUse: req.WhenToUse, Playbook: req.Playbook}, true
+	return domain.VideoArchetype{Code: req.Code, Name: req.Name, WhenToUse: req.WhenToUse, Playbook: req.Playbook, RecommendedFormatID: req.RecommendedFormatID}, true
 }
 
 func (rt *Router) handleListArchetypes(w http.ResponseWriter, r *http.Request) {

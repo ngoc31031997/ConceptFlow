@@ -12,12 +12,12 @@ import (
 	"authoring/internal/domain"
 )
 
-const archetypeColumns = `id, code, name, when_to_use, playbook, is_system, created_at, updated_at`
+const archetypeColumns = `id, code, name, when_to_use, playbook, recommended_format_id, is_system, created_at, updated_at`
 
 func scanArchetype(row pgx.Row) (domain.VideoArchetype, error) {
 	var a domain.VideoArchetype
 	var created, updated time.Time
-	if err := row.Scan(&a.ID, &a.Code, &a.Name, &a.WhenToUse, &a.Playbook, &a.IsSystem, &created, &updated); err != nil {
+	if err := row.Scan(&a.ID, &a.Code, &a.Name, &a.WhenToUse, &a.Playbook, &a.RecommendedFormatID, &a.IsSystem, &created, &updated); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.VideoArchetype{}, application.ErrArchetypeNotFound
 		}
@@ -43,13 +43,14 @@ func mapArchetypeErr(err error) error {
 func (r *PromptTemplateRepository) SeedVideoArchetypes(ctx context.Context) error {
 	for _, a := range domain.SystemVideoArchetypes() {
 		if _, err := r.pool.Exec(ctx, `
-			INSERT INTO video_archetypes (id, code, name, when_to_use, playbook, is_system, updated_at)
-			VALUES ($1, $2, $3, $4, $5, true, now())
+			INSERT INTO video_archetypes (id, code, name, when_to_use, playbook, recommended_format_id, is_system, updated_at)
+			VALUES ($1, $2, $3, $4, $5, $6, true, now())
 			ON CONFLICT (id) DO UPDATE SET
 			    code = EXCLUDED.code, name = EXCLUDED.name,
 			    when_to_use = EXCLUDED.when_to_use, playbook = EXCLUDED.playbook,
+			    recommended_format_id = EXCLUDED.recommended_format_id,
 			    updated_at = now()
-		`, a.ID, a.Code, a.Name, a.WhenToUse, a.Playbook); err != nil {
+		`, a.ID, a.Code, a.Name, a.WhenToUse, a.Playbook, a.RecommendedFormatID); err != nil {
 			if errors.Is(mapArchetypeErr(err), application.ErrArchetypeCodeTaken) {
 				continue
 			}
@@ -85,17 +86,17 @@ func (r *PromptTemplateRepository) GetArchetype(ctx context.Context, id string) 
 
 func (r *PromptTemplateRepository) CreateArchetype(ctx context.Context, a domain.VideoArchetype) (domain.VideoArchetype, error) {
 	out, err := scanArchetype(r.pool.QueryRow(ctx, `
-		INSERT INTO video_archetypes (code, name, when_to_use, playbook) VALUES ($1, $2, $3, $4)
-		RETURNING `+archetypeColumns, a.Code, a.Name, a.WhenToUse, a.Playbook))
+		INSERT INTO video_archetypes (code, name, when_to_use, playbook, recommended_format_id) VALUES ($1, $2, $3, $4, $5)
+		RETURNING `+archetypeColumns, a.Code, a.Name, a.WhenToUse, a.Playbook, a.RecommendedFormatID))
 	return out, mapArchetypeErr(err)
 }
 
 // UpdateArchetype refuses system rows in SQL as well as in the use case.
 func (r *PromptTemplateRepository) UpdateArchetype(ctx context.Context, a domain.VideoArchetype) (domain.VideoArchetype, error) {
 	out, err := scanArchetype(r.pool.QueryRow(ctx, `
-		UPDATE video_archetypes SET code = $2, name = $3, when_to_use = $4, playbook = $5, updated_at = now()
+		UPDATE video_archetypes SET code = $2, name = $3, when_to_use = $4, playbook = $5, recommended_format_id = $6, updated_at = now()
 		WHERE id = $1 AND NOT is_system
-		RETURNING `+archetypeColumns, a.ID, a.Code, a.Name, a.WhenToUse, a.Playbook))
+		RETURNING `+archetypeColumns, a.ID, a.Code, a.Name, a.WhenToUse, a.Playbook, a.RecommendedFormatID))
 	return out, mapArchetypeErr(err)
 }
 
