@@ -192,7 +192,7 @@ export function ManimEngineerStepPage() {
     <div data-testid="manim-engineer-step-page">
       <AppShell
         currentStep={6}
-        title="Bước 3 — Script"
+        title="Bước 6 — Code"
         subtitle={
           hasOwnCode
             ? `Dán code ${isRemotion ? "Remotion" : "Manim"} của bạn, hệ thống sẽ kiểm tra ngay.`

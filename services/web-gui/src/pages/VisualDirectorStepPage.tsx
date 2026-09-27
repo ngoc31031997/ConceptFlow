@@ -130,7 +130,7 @@ export function VisualDirectorStepPage() {
     <div data-testid="visual-director-step-page">
       <AppShell
         currentStep={4}
-        title="Bước 3 — Script"
+        title="Bước 4 — Visual"
         subtitle={
           hasOwnStoryboard
             ? "Dán storyboard của bạn vào ô bên phải."

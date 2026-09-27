@@ -68,7 +68,7 @@ export function IllustrationsStepPage() {
     <div data-testid="illustrations-step-page">
       <AppShell
         currentStep={5}
-        title="Bước 3 — Script"
+        title="Bước 5 — Hình minh hoạ"
         subtitle="Hình minh hoạ của video: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt trước khi viết code."
         wide
       >

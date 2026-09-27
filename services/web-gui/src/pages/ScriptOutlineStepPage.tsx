@@ -184,7 +184,7 @@ export function ScriptOutlineStepPage() {
       <AppShell
         currentStep={3}
         wide
-        title="Bước 3 — Script"
+        title="Bước 3 — Kịch bản"
         subtitle={
           hasOwnOutline
             ? "Dán dàn ý của bạn vào ô bên phải để bỏ qua bước này."
