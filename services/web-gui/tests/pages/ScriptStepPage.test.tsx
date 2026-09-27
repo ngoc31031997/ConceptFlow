@@ -62,7 +62,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     // Ghi vị trí wizard (PUT .../wizard-position) là lệnh phụ, không tính vào
     // "đúng một lệnh POST tạo project".
     const creates = (fetchMock.mock.calls as unknown as [string, RequestInit][]).filter(
-      ([u]) => !u.includes("/wizard-position"),
+      ([u, init]) => !u.includes("/wizard-position") && init?.method === "POST",
     );
     expect(creates).toHaveLength(1);
     const [url, init] = creates[0];

@@ -4,6 +4,7 @@ import { Link, NavLink, useParams } from "react-router-dom";
 import { ProjectDraftContext, ProjectDraftDispatchContext, NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useStepNav } from "../hooks/useStepNav";
+import { useRecentProject } from "../hooks/useRecentProject";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
 import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
@@ -48,6 +49,8 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       : "";
 
   const flow = useProjectFlow();
+  const recent = useRecentProject(routeProjectId || draft.projectId);
+  const recentName = recent ? recent.topic?.trim() || recent.project_id.slice(0, 8) : "";
   const nav = useStepNav(currentStep);
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
@@ -85,6 +88,20 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
 
         <nav className={styles.sideNav}>
           <NavLink to="/" end state={NEW_VIDEO_STATE} onClick={startNewVideo} className={navCls}>Tạo video mới</NavLink>
+          {recent && (
+            <NavLink
+              to={`/projects/${recent.project_id}/resume`}
+              className={styles.sideLink}
+              title={recentName}
+              data-testid="resume-recent-project"
+            >
+              <span className={styles.resumeLabel}>
+                ▶ Tiếp tục{recent.run_state === "running" ? " · đang chạy" : ""}
+                {recent.flow_step ? ` · bước ${recent.flow_step}/13` : ""}
+              </span>
+              <span className={styles.resumeName}>{recentName}</span>
+            </NavLink>
+          )}
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
           <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
           {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}

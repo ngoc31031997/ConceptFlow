@@ -113,7 +113,8 @@ describe("VideoListPage", () => {
     fireEvent.click(screen.getByTestId("delete-button-p1"));
 
     expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls;
+    expect(calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
   });
 
   it("selects multiple videos via checkboxes and bulk-deletes them", async () => {
