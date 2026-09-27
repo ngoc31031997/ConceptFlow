@@ -55,19 +55,16 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     vi.restoreAllMocks();
   });
 
-  it("chỉ hiện các bước sản xuất, không hiện lại phần chạy thử của bước 4", async () => {
+  it("mỗi bước 9-12 là một màn riêng: đang render thì chỉ hiện bước Render", async () => {
     stubProject({ project_id: "p1", status: "rendering", scenes: [] });
 
     renderRenderPage();
 
-    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toHaveTextContent("Render hoạt hình"));
     const steps = screen.getByTestId("progress-tracker-steps");
-    expect(steps).toHaveTextContent("Tạo giọng đọc");
-    expect(steps).toHaveTextContent("Render hoạt hình");
-    // Hai bước này thuộc bước 4; lặp lại chúng ở đây thì thanh tiến trình của
-    // hai màn giống hệt nhau và không màn nào nói được mình đang ở đâu.
+    expect(steps).not.toHaveTextContent("Tạo giọng đọc");
+    expect(steps).not.toHaveTextContent("Ghép video hoàn chỉnh");
     expect(steps).not.toHaveTextContent("Phân tích kịch bản");
-    expect(steps).not.toHaveTextContent("Chạy thử & kiểm tra");
   });
 
   it("cho thử lại khi một bước sản xuất hỏng, và không rủ quay về sửa script", async () => {

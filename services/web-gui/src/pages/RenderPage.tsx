@@ -8,7 +8,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
-import { FLOW_TTS } from "../utils/flow";
+import { FLOW_LABELS, FLOW_TTS } from "../utils/flow";
 
 /**
  * Settings that may still change after a stop at this saga step: the ones read
@@ -96,6 +96,12 @@ export function RenderPage() {
       : progressState;
 
   const activeFlowStep = SAGA_FLOW_STEP[displayStep ?? ""] ?? FLOW_TTS;
+  // Each sidebar step (9-12) is its own screen: it shows only its saga step(s).
+  const shownFlowStep = viewOnly ? viewStep : activeFlowStep;
+  const shownSteps = PROCESS_STEPS.filter((s) => SAGA_FLOW_STEP[s] === shownFlowStep);
+  const isShownActive = !reviewingPast && shownFlowStep === activeFlowStep;
+  const isShownDone = reviewingPast || shownFlowStep < activeFlowStep;
+  const stepTitle = FLOW_LABELS[shownFlowStep - 1] ?? "Xử lý";
 
   const stopped = (isFailed || isCancelled) && !viewOnly;
   const editableStages = stopped ? (EDITABLE_AFTER_STOP[displayStep ?? ""] ?? []) : [];
@@ -115,14 +121,18 @@ export function RenderPage() {
   return (
     <div data-testid="render-page">
       <AppShell
-        currentStep={viewOnly ? viewStep : activeFlowStep}
-        title={isCancelled ? "Đã hủy" : isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
+        currentStep={shownFlowStep}
+        title={`Bước ${shownFlowStep} — ${stepTitle}`}
         subtitle={
-          isCancelled
+          !isShownActive
+            ? isShownDone
+              ? "Bước này đã chạy xong."
+              : "Bước này chưa tới lượt."
+            : isCancelled
             ? "Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
             : isFailed
-            ? "Một bước trong quá trình tạo video chưa hoàn tất."
-            : "Hệ thống đang tạo giọng đọc, dựng hoạt hình và ghép video."
+            ? "Bước này chưa hoàn tất."
+            : "Hệ thống đang chạy bước này."
         }
       >
         {/*
@@ -134,7 +144,7 @@ export function RenderPage() {
           Fix-then-retry: the settings this step (or a later one) reads sit
           right above the retry action that will use them.
         */}
-        {project && editableStages.length > 0 && (
+        {isShownActive && project && editableStages.length > 0 && (
           <div style={{ marginBottom: "var(--space-sm)" }}>
             <ProductionSettingsPanel
               key={project.project_id}
@@ -144,7 +154,7 @@ export function RenderPage() {
             />
           </div>
         )}
-        {isFailed && !isCancelled && (
+        {isShownActive && isFailed && !isCancelled && (
           <ErrorBanner
             errorMessage={retryError ?? errorMessage}
             onRetry={handleRetry}
@@ -155,10 +165,11 @@ export function RenderPage() {
         )}
         <ProgressTracker
           progressState={displayProgressState}
-          steps={PROCESS_STEPS}
+          steps={shownSteps}
           stepNumbers={SAGA_FLOW_STEP}
-          isFailed={isFailed}
-          allDone={reviewingPast}
+          isFailed={isShownActive && isFailed}
+          allDone={isShownDone}
+          waitingLabel={!isShownActive && !isShownDone ? "Chưa tới lượt" : undefined}
         />
       </AppShell>
     </div>

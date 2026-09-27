@@ -19,6 +19,8 @@ interface ProgressTrackerProps {
   isFailed?: boolean;
   /** Xem lại một bước đã chạy xong: tất cả các ô là "xong", không có tiến độ sống. */
   allDone?: boolean;
+  /** Set when these steps haven't started: replaces the live wording, which describes another step. */
+  waitingLabel?: string;
 }
 
 function CheckIcon() {
@@ -52,13 +54,20 @@ function unitProgress(
   return null;
 }
 
-export function ProgressTracker({ progressState, steps, stepNumbers, isFailed = false, allDone = false }: ProgressTrackerProps) {
+export function ProgressTracker({
+  progressState,
+  steps,
+  stepNumbers,
+  isFailed = false,
+  allDone = false,
+  waitingLabel,
+}: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
-  const unit = unitProgress(progressState);
+  const unit = allDone || waitingLabel ? null : unitProgress(progressState);
   const hasSceneProgress = unit !== null;
   const percent = hasSceneProgress ? Math.round((unit.index / unit.total) * 100) : null;
   // A render reports elapsed time rather than a percentage — see ProgressMessage.
-  const isRendering = !hasSceneProgress && elapsedSeconds !== null;
+  const isRendering = !allDone && !waitingLabel && !hasSceneProgress && elapsedSeconds !== null;
 
   // Một bước không thuộc màn này (saga đã chạy qua, hoặc chưa tới) cho -1 —
   // và -1 vẽ ra danh sách toàn "pending", đúng nghĩa "màn này chưa tới lượt".
@@ -70,6 +79,8 @@ export function ProgressTracker({ progressState, steps, stepNumbers, isFailed = 
         <p className={styles.stepLabel} data-testid="progress-tracker-step-label">
           {allDone
             ? "Đã chạy xong"
+            : waitingLabel
+            ? waitingLabel
             : currentStep
             ? isFailed
               ? `Dừng ở bước: ${stepLabel(currentStep)}`
