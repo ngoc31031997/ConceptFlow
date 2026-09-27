@@ -281,12 +281,24 @@ func (p *progressSpy) GenerateCode(ctx context.Context, req application.CodeGenR
 type stubStage struct {
 	pending  []domain.ProjectIllustration
 	drawings []application.LibraryDrawing
-	ensured  int
+	planned  bool
+	prepared int
+	gated    int
+	reports  []application.StageReport
+	model    string
 }
 
-func (s *stubStage) Ensure(context.Context, string, string) ([]domain.ProjectIllustration, error) {
-	s.ensured++
+func (s *stubStage) Prepare(_ context.Context, _ string, model string, report func(application.StageReport)) ([]domain.ProjectIllustration, error) {
+	s.prepared++
+	s.model = model
+	for _, r := range s.reports {
+		report(r)
+	}
 	return s.pending, nil
+}
+func (s *stubStage) Gate(context.Context, string) ([]domain.ProjectIllustration, bool, error) {
+	s.gated++
+	return s.pending, s.planned, nil
 }
 func (s *stubStage) ForCode(context.Context, string) ([]application.LibraryDrawing, error) {
 	return s.drawings, nil
@@ -296,7 +308,7 @@ func (s *stubStage) ForCode(context.Context, string) ([]application.LibraryDrawi
 func TestCodeStepWaitsForTheVideosDrawingsThenHandsThemOver(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
 	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
-	st := &stubStage{pending: []domain.ProjectIllustration{{Name: "Motorbike", State: domain.PIDrawn}}}
+	st := &stubStage{planned: true, pending: []domain.ProjectIllustration{{Name: "Motorbike", State: domain.PIDrawn}}}
 	uc.WithPipeline(&stubFinalizer{}, gen).WithIllustrations(st)
 
 	_, err := uc.Execute(context.Background(), "p1", "code")
@@ -319,7 +331,91 @@ func TestManimCodeStepSkipsTheDrawingStage(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
 	st := &stubStage{pending: []domain.ProjectIllustration{{Name: "X"}}}
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}).WithIllustrations(st)
-	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil || st.ensured != 0 {
-		t.Fatalf("manim must not wait for drawings: %v, ensured %d", err, st.ensured)
+	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil || st.gated != 0 {
+		t.Fatalf("manim must not wait for drawings: %v, gated %d", err, st.gated)
+	}
+}
+
+// CR-045: the code step no longer draws; a list never planned sends the Creator
+// to the illustrations step instead.
+func TestCodeStepRefusesAVideoWhoseDrawingsWereNeverPlanned(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
+	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
+	st := &stubStage{}
+	uc.WithPipeline(&stubFinalizer{}, gen).WithIllustrations(st)
+	_, err := uc.Execute(context.Background(), "p1", "code")
+	if !errors.Is(err, application.ErrIllustrationsNotPlanned) || gen.calls != 0 || st.prepared != 0 {
+		t.Fatalf("err=%v codegen=%d prepared=%d", err, gen.calls, st.prepared)
+	}
+}
+
+type eventLog struct {
+	mu     sync.Mutex
+	events []domain.ProjectEvent
+}
+
+func (e *eventLog) AppendProjectEvent(_ context.Context, ev domain.ProjectEvent) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.events = append(e.events, ev)
+	return nil
+}
+
+func TestIllustrationsStepDrawsReportsProgressAndWaitsForReview(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
+	events := &eventLog{}
+	st := &stubStage{
+		pending: []domain.ProjectIllustration{{Name: "Motorbike", State: domain.PIDrawn}},
+		reports: []application.StageReport{{Phase: "plan"}, {Phase: "draw", Total: 3, Done: 2, Failed: 1, Reused: 4, Planned: 7}},
+	}
+	var seen application.AuthoringProgress
+	st.reports = append(st.reports, application.StageReport{Phase: "draw", Total: 3, Done: 3, Failed: 1, Reused: 4, Planned: 7})
+	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{}).WithIllustrations(&progressPeek{stubStage: st, uc: uc, seen: &seen}).WithEvents(events)
+
+	out, err := uc.Execute(context.Background(), "p1", application.StepIllustrations)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !out.AwaitingReview || !strings.Contains(out.Message, "Motorbike") {
+		t.Fatalf("want an awaiting-review result naming the drawing, got %+v", out)
+	}
+	if seen.Phase != "draw" || seen.DrawingsTotal != 3 || seen.DrawingsDone != 3 || seen.DrawingsFailed != 1 ||
+		seen.DrawingsReused != 4 || seen.DrawingsPlanned != 7 || !seen.Running {
+		t.Errorf("progress = %+v", seen)
+	}
+	if p := uc.Progress("p1", application.StepIllustrations); p.Running {
+		t.Error("progress still running after the step")
+	}
+	if len(events.events) != 2 || events.events[1].Source != "illustrations" || events.events[1].FlowStep != domain.FlowCode ||
+		events.events[1].RunState != domain.RunDone || !strings.Contains(events.events[1].Detail, "Motorbike") {
+		t.Errorf("journal = %+v", events.events)
+	}
+
+	st.pending = nil
+	if out, err = uc.Execute(context.Background(), "p1", application.StepIllustrations); err != nil || out.AwaitingReview {
+		t.Fatalf("all reviewed: want a plain finish, got %+v, %v", out, err)
+	}
+}
+
+// progressPeek reads the step's live progress as the stage reports it.
+type progressPeek struct {
+	*stubStage
+	uc   *application.GenerateAuthoringUseCase
+	seen *application.AuthoringProgress
+}
+
+func (p *progressPeek) Prepare(ctx context.Context, pid, model string, report func(application.StageReport)) ([]domain.ProjectIllustration, error) {
+	return p.stubStage.Prepare(ctx, pid, model, func(r application.StageReport) {
+		report(r)
+		*p.seen = p.uc.Progress(pid, application.StepIllustrations)
+	})
+}
+
+func TestIllustrationsStepIsForRemotionOnly(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
+	st := &stubStage{}
+	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{}).WithIllustrations(st)
+	if _, err := uc.Execute(context.Background(), "p1", application.StepIllustrations); err == nil || st.prepared != 0 {
+		t.Fatalf("a Manim video must not run the illustrations step: %v", err)
 	}
 }

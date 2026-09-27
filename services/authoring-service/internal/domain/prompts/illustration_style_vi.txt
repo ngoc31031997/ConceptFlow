@@ -15,7 +15,7 @@ Mọi hình trong thư viện phải trông như do CÙNG MỘT NGƯỜI vẽ: t
 - [S8] BÓNG ĐỔ dưới vật đứng trên sàn: <GroundShadow cx cy rx /> (elip đen opacity 0.12) ở đáy hộp. Vật bay/lơ lửng thì không có.
 
 ## 3. Màu
-- [S9] DÙNG BẢNG MÀU KÊNH cho mặc định của hình (xem danh sách dưới). Màu tối/sáng dẫn xuất bằng shadeOf từ màu trong bảng thì hợp lệ. Màu ngoài bảng → cảnh báo.
+- [S9] ƯU TIÊN BẢNG MÀU KÊNH cho mặc định của hình (xem danh sách dưới); màu tối/sáng dẫn xuất bằng shadeOf. Vật có màu riêng dễ nhận ra (lá cây, quả chuối, cảnh sát...) được dùng đúng màu của nó — màu ngoài bảng không bị cảnh báo.
 - [S10] TỐI ĐA 6 MÀU gốc trong một hình (không tính màu dẫn xuất bằng shadeOf và đen/trắng dùng làm bóng/sáng). → cảnh báo.
 - [S11] KHÔNG ĐEN THUẦN làm mảng lớn: nét và mắt dùng INK (#3A1F4B), không #000000; đen chỉ dùng làm bóng với opacity thấp.
 - [S12] Màu chính của vật phải đổi được qua prop color (và các prop màu phụ nếu cần), để Kỹ sư gán đúng màu vai trò của Đạo diễn.

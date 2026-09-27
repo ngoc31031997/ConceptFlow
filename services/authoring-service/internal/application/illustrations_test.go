@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
 	"authoring/internal/domain"
 )
 
 type fakeIllustrationRepo struct {
+	mu      sync.Mutex // CR-045: the illustrations step draws several at once
 	folders []domain.IllustrationFolder
 	rows    map[string]domain.Illustration
 	png     map[string][]byte
@@ -28,14 +30,20 @@ func newFakeIllustrationRepo() *fakeIllustrationRepo {
 }
 
 func (r *fakeIllustrationRepo) ListIllustrationFolders(context.Context) ([]domain.IllustrationFolder, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return r.folders, nil
 }
 func (r *fakeIllustrationRepo) CreateIllustrationFolder(_ context.Context, f domain.IllustrationFolder) (domain.IllustrationFolder, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.folders = append(r.folders, f)
 	return f, nil
 }
 func (r *fakeIllustrationRepo) DeleteIllustrationFolder(context.Context, string) error { return nil }
 func (r *fakeIllustrationRepo) ListIllustrations(_ context.Context, f IllustrationFilter) ([]domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	var out []domain.Illustration
 	for _, i := range r.rows {
 		if f.FolderID == "" || i.FolderID == f.FolderID {
@@ -45,6 +53,8 @@ func (r *fakeIllustrationRepo) ListIllustrations(_ context.Context, f Illustrati
 	return out, nil
 }
 func (r *fakeIllustrationRepo) GetIllustration(_ context.Context, id string) (domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	i, ok := r.rows[id]
 	if !ok {
 		return i, ErrIllustrationNotFound
@@ -52,6 +62,8 @@ func (r *fakeIllustrationRepo) GetIllustration(_ context.Context, id string) (do
 	return i, nil
 }
 func (r *fakeIllustrationRepo) CreateIllustration(_ context.Context, i domain.Illustration) (domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	for _, e := range r.rows {
 		if e.Name == i.Name {
 			return i, ErrIllustrationNameTaken
@@ -63,18 +75,26 @@ func (r *fakeIllustrationRepo) CreateIllustration(_ context.Context, i domain.Il
 	return i, nil
 }
 func (r *fakeIllustrationRepo) UpdateIllustration(_ context.Context, i domain.Illustration) (domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.rows[i.ID] = i
 	return i, nil
 }
 func (r *fakeIllustrationRepo) DeleteIllustration(_ context.Context, id string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	delete(r.rows, id)
 	return nil
 }
 func (r *fakeIllustrationRepo) SaveIllustrationPreview(_ context.Context, id string, v int, png, _ []byte) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.png[id], r.pv[id] = png, v
 	return nil
 }
 func (r *fakeIllustrationRepo) GetIllustrationPreview(_ context.Context, id string) ([]byte, []byte, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	if r.pv[id] != r.rows[id].Version {
 		return nil, nil, nil
 	}
@@ -82,11 +102,14 @@ func (r *fakeIllustrationRepo) GetIllustrationPreview(_ context.Context, id stri
 }
 
 type fakeRenderer struct {
+	mu    sync.Mutex
 	calls []string
 	fail  bool
 }
 
 func (f *fakeRenderer) PreviewIllustration(_ context.Context, name, code string, _ map[string]any, _ bool) (IllustrationPreview, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calls = append(f.calls, name+"|"+code)
 	if f.fail || strings.Contains(code, "BROKEN") {
 		line := 3

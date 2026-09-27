@@ -39,15 +39,17 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		return GeneratedStep{}, fmt.Errorf("load topic: %w", err)
 	}
 
-	// CR-044: a Remotion video gets its drawings first — planned from the
-	// storyboard, drawn by the AI drawer — and the code step waits until the
-	// Creator has approved or skipped every one of them.
+	// CR-044/045: a Remotion video's drawings are planned and drawn by the
+	// illustrations step before this one; the code step only checks that the
+	// list exists and that the Creator approved or skipped every drawing.
 	var drawings []LibraryDrawing
 	if project.RenderEngine == domain.RenderEngineRemotion && uc.illustrations != nil {
-		uc.updateCodeProgress(projectID, step, CodeEvent{Type: "phase", Phase: "illustrations"})
-		pending, err := uc.illustrations.Ensure(ctx, projectID, model)
+		pending, planned, err := uc.illustrations.Gate(ctx, projectID)
 		if err != nil {
-			return GeneratedStep{}, err
+			return GeneratedStep{}, fmt.Errorf("check the video's drawings: %w", err)
+		}
+		if !planned {
+			return GeneratedStep{}, ErrIllustrationsNotPlanned
 		}
 		if len(pending) > 0 {
 			return GeneratedStep{}, &ErrIllustrationsPending{Rows: pending}
@@ -113,9 +115,11 @@ func (uc *GenerateAuthoringUseCase) runCode(
 	return out, nil
 }
 
-// IllustrationStagePort is the per-video drawing list as the code step needs it.
+// IllustrationStagePort is the per-video drawing list as the illustrations and
+// code steps need it.
 type IllustrationStagePort interface {
-	Ensure(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error)
+	Prepare(ctx context.Context, projectID, model string, report func(StageReport)) ([]domain.ProjectIllustration, error)
+	Gate(ctx context.Context, projectID string) ([]domain.ProjectIllustration, bool, error)
 	ForCode(ctx context.Context, projectID string) ([]LibraryDrawing, error)
 }
 
@@ -185,4 +189,66 @@ func (uc *GenerateAuthoringUseCase) updateCodeProgress(projectID, step string, e
 	case "chunk_done":
 		st.ChunksDone, st.ChunksTotal = ev.Done, ev.Total
 	}
+}
+
+// StepIllustrations is the CR-045 authoring step between Visual and Code: plan
+// the video's drawings from the storyboard and draw the missing ones. Remotion only.
+const StepIllustrations = "illustrations"
+
+// runIllustrations is the illustrations step. It is not a prompt-and-save step:
+// the planner and the drawer record their own model calls, and the result is
+// the list itself. It ends "awaiting review" while any drawing still needs the
+// Creator — not an error, the chain simply stops there.
+func (uc *GenerateAuthoringUseCase) runIllustrations(ctx context.Context, project *domain.Project) (GeneratedStep, error) {
+	const step = StepIllustrations
+	projectID := project.ProjectID
+	if project.RenderEngine != domain.RenderEngineRemotion {
+		return GeneratedStep{}, errors.New("bước Hình minh hoạ chỉ dùng cho video Remotion")
+	}
+	if uc.illustrations == nil {
+		return GeneratedStep{}, errors.New("the illustrations stage is not wired")
+	}
+	release, err := uc.acquire(projectID, step)
+	if err != nil {
+		return GeneratedStep{}, err
+	}
+	defer release()
+	uc.recordEvent(ctx, projectID, step, domain.RunRunning, time.Now(), GeneratedStep{}, runInfo{}, "")
+
+	// The drawings are code, so they use the code step's model.
+	var model string
+	if uc.models != nil {
+		stepModels, err := uc.models.GetAuthoringModels(ctx, projectID)
+		if err != nil {
+			return GeneratedStep{}, fmt.Errorf("load authoring models: %w", err)
+		}
+		model = stepModels.ModelFor("code")
+	}
+
+	uc.beginProgress(projectID, step, time.Now())
+	defer uc.endProgress(projectID, step)
+	pending, err := uc.illustrations.Prepare(ctx, projectID, model, func(r StageReport) {
+		uc.updateIllustrationProgress(projectID, r)
+	})
+	if err != nil {
+		return GeneratedStep{}, err
+	}
+	out := GeneratedStep{Step: step, Role: plannerRole, Provider: uc.provider.Name()}
+	if len(pending) > 0 {
+		out.AwaitingReview = true
+		out.Message = AwaitingReviewMessage(pending)
+	}
+	return out, nil
+}
+
+func (uc *GenerateAuthoringUseCase) updateIllustrationProgress(projectID string, r StageReport) {
+	uc.mu.Lock()
+	defer uc.mu.Unlock()
+	st := uc.progress[progressKey(projectID, StepIllustrations)]
+	if st == nil {
+		return
+	}
+	st.Phase = r.Phase
+	st.DrawingsTotal, st.DrawingsDone, st.DrawingsFailed = r.Total, r.Done, r.Failed
+	st.DrawingsReused, st.DrawingsPlanned = r.Reused, r.Planned
 }

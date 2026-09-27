@@ -82,7 +82,8 @@ func main() {
 		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	// CR-044 — each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
-		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
+		WithDrawConcurrency(cfg.IllustrationDrawConcurrency)
 
 	prompts := application.NewPromptsUseCase(authoringRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (the project

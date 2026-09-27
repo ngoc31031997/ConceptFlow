@@ -63,7 +63,7 @@
 .redraw {
   display: flex;
   gap: var(--space-xs);
-  align-items: center;
+  align-items: flex-start;
 }
 
 .redraw > :first-child {

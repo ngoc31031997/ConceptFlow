@@ -74,4 +74,53 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     await waitFor(() => expect(plan).toHaveBeenCalledWith("p1"));
     expect(await screen.findByTestId("pi-draw-Dentist")).toHaveTextContent("Vẽ");
   });
+
+  // CR-045 — each drawing in flight has its own progress bar.
+  it("shows a progress bar with the drawer's attempt and phase on each drawing being drawn", async () => {
+    const drawing: apiClient.ProjectIllustration = {
+      ...DENTIST, state: "drawing", error: undefined,
+      progress: { attempt: 2, max_attempts: 3, phase: "writing", reasoning_chars: 0, content_chars: 3200, elapsed_seconds: 42 },
+    };
+    const queued: apiClient.ProjectIllustration = { ...DENTIST, id: "r4", name: "Candy", state: "drawing", error: undefined };
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [TOOTH, drawing, queued], ready: false });
+    renderPanel();
+    const bar = await screen.findByTestId("pi-progress-Dentist");
+    expect(bar).toHaveTextContent("Lần 2/3 · AI đang viết code · 3,2k ký tự · 42s");
+    expect(bar.querySelector('[role="progressbar"]')).not.toBeNull();
+    expect(screen.getByTestId("pi-progress-Candy")).toHaveTextContent("Đang bắt đầu…");
+  });
+
+  it("'Vẽ N hình còn thiếu' starts the illustrations step on the server", async () => {
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [TOOTH, MOTO, DENTIST], ready: false });
+    const start = vi.spyOn(apiClient, "startAuthoringChain").mockResolvedValue(undefined);
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("pi-draw-all"));
+    await waitFor(() => expect(start).toHaveBeenCalledWith("p1", ["illustrations"]));
+  });
+
+  it("deletes this video's AI draft from the library after confirming, and keeps library drawings", async () => {
+    vi.spyOn(apiClient, "listProjectIllustrations")
+      .mockResolvedValueOnce({ illustrations: [TOOTH, MOTO], ready: false })
+      .mockResolvedValue({ illustrations: [TOOTH, { ...MOTO, state: "skipped", illustration: undefined, illustration_id: undefined }], ready: true });
+    const del = vi.spyOn(apiClient, "deleteProjectIllustrationDrawing").mockResolvedValue({ ...MOTO, state: "skipped" });
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("pi-delete-Motorbike"));
+    expect(confirm).toHaveBeenCalled();
+    await waitFor(() => expect(del).toHaveBeenCalledWith("p1", "r2"));
+    await waitFor(() => expect(screen.getByTestId("pi-summary")).toHaveTextContent("Đủ 2 hình"));
+    expect(screen.queryByTestId("pi-delete-Tooth")).not.toBeInTheDocument();
+  });
+
+  it("'Nhờ AI sửa' on a tile opens the editor with the warnings in the redraw note", async () => {
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "- [S3] BO TRÒN: góc bo.", exemplar_ids: [] });
+    const warned = { ...MOTO, illustration: ill({ id: "m1", name: "Motorbike", title: "Xe máy", warnings: [{ message: "[S3] <rect> không bo góc (thêm rx)", line: 7 }] }) };
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [warned], ready: false });
+    renderPanel();
+    fireEvent.click(await screen.findByTestId("illustration-warnings-Motorbike"));
+    await waitFor(() => expect(screen.getByTestId("illustration-warnings-panel-Motorbike")).toHaveTextContent("Bo tròn"));
+    fireEvent.click(screen.getByTestId("illustration-warnings-fix-Motorbike"));
+    const note = await screen.findByTestId("illustration-redraw-note");
+    await waitFor(() => expect((note as HTMLTextAreaElement).value).toContain("- S3 · Bo tròn — dòng 7: <rect> không bo góc (thêm rx)"));
+  });
 });

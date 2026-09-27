@@ -81,7 +81,9 @@
 
 .stepper {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  /* One row whatever the chain's length: 3 steps, or 4 with Hình minh hoạ (CR-045). */
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   gap: 10px;
   margin: 0;
   padding: 0;
@@ -135,6 +137,7 @@
 
 @media (max-width: 640px) {
   .stepper {
+    grid-auto-flow: row;
     grid-template-columns: 1fr;
   }
 }
@@ -271,4 +274,12 @@
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px dashed var(--surface-border);
+}
+
+/* CR-045 — the chain stopped for drawing review: a sentence and a way there. */
+.waitingRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
 }

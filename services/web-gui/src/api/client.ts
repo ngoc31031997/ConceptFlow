@@ -827,6 +827,19 @@ export interface ProjectIllustration {
   error?: string;
   illustration_id?: string;
   illustration?: Illustration;
+  /** CR-045 — tiến độ sống khi hình đang được vẽ; không có khi không vẽ. */
+  progress?: DrawProgress;
+}
+
+/** CR-045 — AI vẽ một hình tới đâu: lượt thử thứ mấy, đang làm gì trong lượt đó. */
+export interface DrawProgress {
+  attempt: number;
+  max_attempts: number;
+  /** "waiting" đã gửi · "reasoning" AI đang nghĩ · "writing" AI đang viết code · "checking" đang kiểm tra và dựng ảnh. */
+  phase: "waiting" | "reasoning" | "writing" | "checking";
+  reasoning_chars: number;
+  content_chars: number;
+  elapsed_seconds: number;
 }
 
 export interface ProjectIllustrations {
@@ -846,6 +859,14 @@ export function planProjectIllustrations(projectId: string): Promise<ProjectIllu
 
 export function drawProjectIllustration(projectId: string, rowId: string): Promise<ProjectIllustration> {
   return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/draw`, { method: "POST" });
+}
+
+/**
+ * CR-045 — xoá hình nháp AI vẽ cho video này khỏi thư viện (tránh rác) và bỏ
+ * qua hình đó cho video. Hình đã duyệt hoặc dùng lại từ thư viện không xoá được.
+ */
+export function deleteProjectIllustrationDrawing(projectId: string, rowId: string): Promise<ProjectIllustration> {
+  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/drawing`, { method: "DELETE" });
 }
 
 export function skipProjectIllustration(projectId: string, rowId: string, skipped: boolean): Promise<ProjectIllustration> {
@@ -896,8 +917,11 @@ export type AuthoringMode = "manual" | "ai";
  *
  * CR-030 — bước "review" (Script Reviewer) đã bị bỏ hẳn khỏi sản phẩm; server
  * cũng không còn nhận nó nữa.
+ *
+ * CR-045 — "illustrations" (chỉ Remotion): lập danh sách hình từ storyboard và
+ * vẽ hình còn thiếu, nằm giữa Visual và Code. Không sinh nội dung soạn thảo.
  */
-export type AuthoringStep = "story" | "storyboard" | "code";
+export type AuthoringStep = "story" | "storyboard" | "illustrations" | "code";
 
 /**
  * CR-027 FR78 — kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
@@ -925,6 +949,9 @@ export type GeneratedStep = {
   repair_rounds?: number;
   warnings?: string[];
   model_calls?: number;
+  /** CR-045 — bước Hình minh hoạ đã vẽ xong nhưng còn hình chờ duyệt; `message` nói hình nào. */
+  awaiting_review?: boolean;
+  message?: string;
 };
 
 /**
@@ -957,6 +984,9 @@ export interface AuthoringChainState {
   note?: string;
   /** Creator bấm Dừng (hoặc dự án bị xoá): không phải lỗi, `error` để trống. */
   cancelled?: boolean;
+  /** CR-045 — dừng chờ Creator duyệt hình minh hoạ (không phải lỗi); `waiting_step` là bước dừng. */
+  waiting?: string;
+  waiting_step?: AuthoringStep;
   started_at?: string;
   finished_at?: string;
 }
@@ -984,7 +1014,7 @@ export function getAuthoringChain(projectId: string): Promise<AuthoringChainStat
 /** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
 export interface AuthoringProgress {
   running: boolean;
-  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair" | "illustrations";
+  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair" | "plan" | "draw";
   reasoning_chars: number;
   content_chars: number;
   elapsed_seconds: number;
@@ -993,6 +1023,13 @@ export interface AuthoringProgress {
   chunks_total?: number;
   repair_round?: number;
   repair_max?: number;
+  // CR-045 — bước Hình minh hoạ: số hình cần vẽ ở lượt này, đã xong (kể cả lỗi),
+  // lỗi, dùng lại từ thư viện, và tổng số hình trong danh sách.
+  drawings_total?: number;
+  drawings_done?: number;
+  drawings_failed?: number;
+  drawings_reused?: number;
+  drawings_planned?: number;
 }
 
 export function getAuthoringProgress(projectId: string, step: AuthoringStep): Promise<AuthoringProgress> {
@@ -1240,7 +1277,8 @@ export interface ProjectEvent {
   flow_step: number;
   step_label: string;
   run_state: "idle" | "running" | "done" | "failed" | "cancelled";
-  source: "authoring" | "saga";
+  /** CR-045: "illustrations" = bước Hình minh hoạ, ghi dưới số bước của Code. */
+  source: "authoring" | "saga" | "illustrations";
   from_status?: string;
   to_status?: string;
   /** Bước dự án vừa rời; với dòng saga, duration_ms là thời gian ở bước này. */

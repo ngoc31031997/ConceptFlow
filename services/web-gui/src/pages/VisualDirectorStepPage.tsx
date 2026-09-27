@@ -99,7 +99,8 @@ export function VisualDirectorStepPage() {
           payload: { story: draft.authoringStory, storyboard: draft.authoringStoryboard, code: "" },
         });
       }
-      navigate("/create/script/code");
+      // CR-045: a Remotion video gets its drawings before its code.
+      navigate(draft.renderEngine === "remotion" ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS.code);
     } catch {
       setSaveError("Không lưu được. Vui lòng thử lại.");
     } finally {

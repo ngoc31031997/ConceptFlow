@@ -1,6 +1,6 @@
 import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
+import { AUTHORING_STEP_PATHS, authoringChainSteps } from "../components/AuthoringModeBar";
 import { VideoArchetypePicker } from "../components/VideoArchetypePicker";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
@@ -296,7 +296,7 @@ export function ScriptOutlineStepPage() {
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            steps={["story", "storyboard", "code"]}
+            steps={authoringChainSteps(draft.renderEngine)}
             what="dàn ý"
             runDisabled={topicIsEmpty}
             runDisabledReason="Nhập chủ đề trước."

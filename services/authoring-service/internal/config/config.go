@@ -34,6 +34,9 @@ type Config struct {
 	// CR-044 — the rendering service checks and previews library drawings.
 	RenderingURL     string
 	RenderingTimeout time.Duration
+
+	// CR-045 — how many drawings the illustrations step draws at once.
+	IllustrationDrawConcurrency int
 }
 
 // Load reads Config from the environment, failing fast if DATABASE_URL is unset.
@@ -93,19 +96,28 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	drawConcurrency, err := intEnvOrDefault("ILLUSTRATION_DRAW_CONCURRENCY", 4)
+	if err != nil {
+		return nil, err
+	}
+	if drawConcurrency < 1 {
+		return nil, fmt.Errorf("ILLUSTRATION_DRAW_CONCURRENCY must be at least 1")
+	}
+
 	return &Config{
-		RenderingURL:        renderingURL,
-		RenderingTimeout:    time.Duration(renderingTimeout) * time.Second,
-		DatabaseURL:         databaseURL,
-		DatabaseMaxConns:    int32(maxConns),
-		HTTPPort:            httpPort,
-		OrchestratorURL:     orchestratorURL,
-		OrchestratorTimeout: time.Duration(orchestratorTimeout) * time.Second,
-		LLMServiceURL:       llmServiceURL,
-		LLMServiceTimeout:   time.Duration(llmServiceTimeoutSeconds) * time.Second,
-		HiveModel:           hiveModel,
-		HiveMaxInputChars:   hiveMaxInputChars,
-		HiveMaxOutputTokens: hiveMaxOutputTokens,
+		IllustrationDrawConcurrency: drawConcurrency,
+		RenderingURL:                renderingURL,
+		RenderingTimeout:            time.Duration(renderingTimeout) * time.Second,
+		DatabaseURL:                 databaseURL,
+		DatabaseMaxConns:            int32(maxConns),
+		HTTPPort:                    httpPort,
+		OrchestratorURL:             orchestratorURL,
+		OrchestratorTimeout:         time.Duration(orchestratorTimeout) * time.Second,
+		LLMServiceURL:               llmServiceURL,
+		LLMServiceTimeout:           time.Duration(llmServiceTimeoutSeconds) * time.Second,
+		HiveModel:                   hiveModel,
+		HiveMaxInputChars:           hiveMaxInputChars,
+		HiveMaxOutputTokens:         hiveMaxOutputTokens,
 	}, nil
 }
 

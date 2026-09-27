@@ -2,7 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
-import { ProjectIllustrationsPanel } from "../components/ProjectIllustrationsPanel";
+import { IllustrationsGateNote } from "../components/IllustrationsGateNote";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
@@ -256,10 +256,10 @@ export function ManimEngineerStepPage() {
           </div>
         )}
 
-        {/* CR-044 — Remotion: the drawings the video needs, reviewed before code. */}
+        {/* CR-045 — the drawings have their own step now; this only says where they stand. */}
         {isRemotion && draft.projectId && (
           <div className={styles.settingsRow}>
-            <ProjectIllustrationsPanel projectId={draft.projectId} />
+            <IllustrationsGateNote projectId={draft.projectId} onOpen={() => navigate(AUTHORING_STEP_PATHS.illustrations)} />
           </div>
         )}
 
@@ -312,8 +312,16 @@ export function ManimEngineerStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
-        onBack={() => navigate(hasOwnCode ? "/create/script/settings" : "/create/script/storyboard")}
-        backLabel={hasOwnCode ? "Quay lại cấu hình" : "Quay lại Storyboard"}
+        onBack={() =>
+          navigate(
+            hasOwnCode
+              ? "/create/script/settings"
+              : isRemotion
+                ? AUTHORING_STEP_PATHS.illustrations
+                : AUTHORING_STEP_PATHS.storyboard,
+          )
+        }
+        backLabel={hasOwnCode ? "Quay lại cấu hình" : isRemotion ? "Quay lại Hình minh hoạ" : "Quay lại Storyboard"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang gửi..." : "Kiểm tra kịch bản"}
         nextDisabled={!isValid || saving}

@@ -1,0 +1,111 @@
+/* CR-045 — style warnings on a drawing tile: hover tooltip, click-open panel. */
+.wrap {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.badge {
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn);
+  background: var(--warn-soft);
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  padding: 1px 6px;
+  cursor: pointer;
+}
+
+.badge:hover,
+.badge:focus-visible {
+  border-color: var(--warn);
+}
+
+/* Shown at once on hover/focus — the native title tooltip was slow and easy to miss. */
+.tooltip {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 6px);
+  left: 0;
+  width: min(300px, 80vw);
+  padding: 8px 10px;
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-4px);
+  transition: opacity 0.12s ease, transform 0.12s ease, visibility 0.12s;
+  pointer-events: none;
+}
+
+.wrap:hover .tooltip,
+.badge:focus-visible + .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+@media (hover: none) {
+  .tooltip {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+  }
+}
+
+.tipHint {
+  display: block;
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+.panel {
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--warn-soft);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  transform-origin: top;
+}
+
+.list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.list li + li {
+  margin-top: 4px;
+}
+
+.rule {
+  font-weight: 700;
+}
+
+.line {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.actions button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}

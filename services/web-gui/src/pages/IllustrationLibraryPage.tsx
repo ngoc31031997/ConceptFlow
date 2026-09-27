@@ -36,6 +36,8 @@ export function IllustrationLibraryPage() {
   const [folder, setFolder] = useState(ALL);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
+  // CR-045 — "Nhờ AI sửa các cảnh báo này" on a tile: open that drawing with the redraw note filled in.
+  const [fixNote, setFixNote] = useState<{ id: string; text: string; n: number } | null>(null);
   const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
   const [bust, setBust] = useState<Record<string, number>>({});
   const [status, setStatus] = useState<string | null>(null);
@@ -333,6 +335,7 @@ export function IllustrationLibraryPage() {
                     setOpenId(null);
                   }}
                   onClose={() => setOpenId(null)}
+                  redrawNote={fixNote && fixNote.id === openId ? fixNote : undefined}
                 />
               </div>
             )}
@@ -346,6 +349,10 @@ export function IllustrationLibraryPage() {
                   bust={bust[ill.id]}
                   selected={ill.id === openId}
                   onOpen={() => setOpenId(ill.id)}
+                  onFixWarnings={(text) => {
+                    setOpenId(ill.id);
+                    setFixNote({ id: ill.id, text, n: Date.now() });
+                  }}
                   actions={
                     <>
                       {!ill.builtin && ill.status === "draft" && (

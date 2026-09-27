@@ -57,7 +57,8 @@ export function aggregateByStep(events: ProjectEvent[]): StepStat[] {
     return cur;
   };
   for (const e of events) {
-    if (e.source === "authoring") {
+    // CR-045: the illustrations step is an authoring run too, counted under Code.
+    if (e.source === "authoring" || e.source === "illustrations") {
       if (e.run_state === "running") continue; // dòng bắt đầu không có số đo
       const st = at(e.flow_step);
       if (e.run_state === "failed") st.failures += 1;
@@ -148,12 +149,13 @@ export function JournalPage() {
       // Saga: duration_ms là thời gian nằm ở from_status, tính cho bước của
       // trạng thái đó — nhưng dòng này ghi theo bước ĐÍCH nên chỉ cộng cho
       // authoring; thời gian saga hiện ở cột riêng trong bảng.
-      if (e.source !== "authoring") continue;
-      const cur = by.get(e.step_label) ?? { label: e.step_label, ms: 0, tokens: 0, failed: 0 };
+      if (e.source !== "authoring" && e.source !== "illustrations") continue;
+      const label = e.source === "illustrations" ? "Hình minh hoạ" : e.step_label;
+      const cur = by.get(label) ?? { label, ms: 0, tokens: 0, failed: 0 };
       cur.ms += e.duration_ms ?? 0;
       cur.tokens += (e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0);
       if (e.run_state === "failed") cur.failed += 1;
-      by.set(e.step_label, cur);
+      by.set(label, cur);
     }
     return Array.from(by.values());
   }, [timeline]);

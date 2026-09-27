@@ -13,7 +13,7 @@ import (
 var ErrChainBusy = errors.New("a chain is already running for this project")
 
 // ErrChainInvalid is returned for an empty or unknown step list.
-var ErrChainInvalid = errors.New("chain steps must be a non-empty list of story, storyboard, code")
+var ErrChainInvalid = errors.New("chain steps must be a non-empty list of story, storyboard, illustrations, code")
 
 type authoringStepRunner interface {
 	Execute(ctx context.Context, projectID, step string) (GeneratedStep, error)
@@ -36,9 +36,14 @@ type ChainState struct {
 	Note string `json:"note,omitempty"`
 	// Cancelled is set when the Creator stopped the chain (or the project was
 	// deleted). It is not an error: Error stays empty.
-	Cancelled  bool       `json:"cancelled,omitempty"`
-	StartedAt  time.Time  `json:"started_at"`
-	FinishedAt *time.Time `json:"finished_at,omitempty"`
+	Cancelled bool `json:"cancelled,omitempty"`
+	// Waiting is a stop for the Creator (CR-045): the illustrations step drew
+	// what it could and some drawings wait for review. Not an error; the
+	// Creator reviews them, then runs Code. WaitingStep is where it stopped.
+	Waiting     string     `json:"waiting,omitempty"`
+	WaitingStep string     `json:"waiting_step,omitempty"`
+	StartedAt   time.Time  `json:"started_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
 }
 
 // AuthoringChainRunner runs authoring steps in order on the server, detached
@@ -66,7 +71,7 @@ func NewAuthoringChainRunner(runner authoringStepRunner, errText func(error) str
 	return &AuthoringChainRunner{runner: runner, errText: errText, chains: map[string]*ChainState{}, cancels: map[string]context.CancelFunc{}}
 }
 
-var chainSteps = map[string]bool{"story": true, "storyboard": true, "code": true}
+var chainSteps = map[string]bool{"story": true, "storyboard": true, StepIllustrations: true, "code": true}
 
 // Start launches the chain and returns at once.
 func (c *AuthoringChainRunner) Start(projectID string, steps []string) error {
@@ -165,6 +170,9 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 			return
 		case out.SaveError != "":
 			c.finish(projectID, func(st *ChainState) { st.Note, st.ErrorStep = out.SaveError, step })
+			return
+		case out.AwaitingReview:
+			c.finish(projectID, func(st *ChainState) { st.Waiting, st.WaitingStep = out.Message, step })
 			return
 		}
 	}

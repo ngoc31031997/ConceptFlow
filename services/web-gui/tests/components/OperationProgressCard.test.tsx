@@ -17,7 +17,7 @@ describe("OperationProgressCard", () => {
   });
 
   it("keeps the subtitle and shows the classified error on failure (FR116.5)", () => {
-    render(<OperationProgressCard subtitle="AI đang viết · 14,3k ký tự · 2m05s" error={operationErrorLabel("balance")} />);
+    render(<OperationProgressCard subtitle="AI đang viết · 14,3k ký tự · 2m 5s" error={operationErrorLabel("balance")} />);
     expect(screen.getByText(/14,3k ký tự/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("balance");
   });
@@ -26,10 +26,10 @@ describe("OperationProgressCard", () => {
 describe("operationSubtitle", () => {
   const base = { reasoning_chars: 0, content_chars: 0, elapsed_ms: 125_000, done: null, total: null };
   it("formats phase, chars and clock like step 1b", () => {
-    expect(operationSubtitle({ ...base, phase: "writing", content_chars: 14300 })).toBe("AI đang viết · 14,3k ký tự · 2m05s");
-    expect(operationSubtitle({ ...base, phase: "reasoning", reasoning_chars: 900 })).toBe("AI đang phân tích · 900 ký tự · 2m05s");
+    expect(operationSubtitle({ ...base, phase: "writing", content_chars: 14300 })).toBe("AI đang viết · 14,3k ký tự · 2m 5s");
+    expect(operationSubtitle({ ...base, phase: "reasoning", reasoning_chars: 900 })).toBe("AI đang phân tích · 900 ký tự · 2m 5s");
   });
   it("prefers done/total when the operation knows its size", () => {
-    expect(operationSubtitle({ ...base, phase: "purge", done: 1, total: 3 })).toBe("1/3 · 2m05s");
+    expect(operationSubtitle({ ...base, phase: "purge", done: 1, total: 3 })).toBe("1/3 · 2m 5s");
   });
 });
