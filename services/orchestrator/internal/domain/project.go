@@ -594,6 +594,10 @@ type AuthoringModelOption struct {
 var AuthoringModelCatalog = []AuthoringModelOption{
 	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
 	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
+	// Local model served by the `ollama` container. llm-service routes any id
+	// "ollama" or "ollama/<model>" to Ollama instead of Hive; bare "ollama"
+	// means whatever OLLAMA_MODEL is set to.
+	{ID: "ollama", Label: "Ollama (local AI)"},
 }
 
 // ValidAuthoringModel reports whether id is "" (server default) or one of

@@ -171,13 +171,14 @@ def create_app(
             provider = providers.get(body.provider)
         except KeyError:
             return _error_response(f"unknown provider {body.provider!r}", status=400)
+        provider, model = providers.for_model(provider, body.model)
 
         async def work(emit):
             async def progress(reasoning: int, content: int) -> None:
                 await emit({"type": "progress", "reasoning_chars": reasoning, "content_chars": content})
 
             res = await provider.chat(
-                ChatRequest(user=body.user, system=body.system, model=body.model, max_tokens=body.max_tokens,
+                ChatRequest(user=body.user, system=body.system, model=model, max_tokens=body.max_tokens,
                             temperature=body.temperature, json_mode=body.json_mode),
                 on_progress=progress,
             )
@@ -209,6 +210,7 @@ def create_app(
         not valid. Returns the canonical (re-serialised) JSON."""
         total = Usage()
         content = body.content
+        provider, model = providers.for_model(providers.hive, body.model)
         for attempt in range(2):
             try:
                 sb = sbm.parse(content)
@@ -218,8 +220,8 @@ def create_app(
                         f"the storyboard is still invalid after one repair turn: {exc}", status=422,
                         usage=total.to_dict(), problems=exc.problems)
                 try:
-                    res = await providers.hive.chat(ChatRequest(
-                        user=sbm.fix_prompt(content, exc.problems), model=body.model,
+                    res = await provider.chat(ChatRequest(
+                        user=sbm.fix_prompt(content, exc.problems), model=model,
                         max_tokens=body.max_tokens, temperature=0.0))
                 except LLMError as err:
                     err.usage = total + err.usage
@@ -232,15 +234,16 @@ def create_app(
 
     @app.post("/v1/code/generate")
     async def code_generate(body: CodeBody):
+        provider, model = providers.for_model(providers.hive, body.model)
         pipeline = CodePipeline(
-            providers.hive, checker,
+            provider, checker,
             chunk_shots=config.code_chunk_shots, concurrency=config.code_chunk_concurrency,
             repair_rounds=config.code_repair_max_rounds, cache=cache)
 
         async def work(emit):
             res = await pipeline.run(CodeRequest(
                 engine=body.engine, topic=body.topic, storyboard=body.storyboard, system=body.system,
-                model=body.model, max_tokens=body.max_tokens, temperature=body.temperature,
+                model=model, max_tokens=body.max_tokens, temperature=body.temperature,
                 illustrations=[i.model_dump() for i in body.illustrations]), emit)
             return res.to_dict()
 
