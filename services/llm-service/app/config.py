@@ -37,7 +37,7 @@ class Config:
 
     @classmethod
     def from_env(cls) -> Config:
-        light = os.environ.get("LIGHT_TASKS_PROVIDER", "ollama")
+        light = os.environ.get("LIGHT_TASKS_PROVIDER", "hive")
         if light not in ("ollama", "hive"):
             raise ValueError(f"LIGHT_TASKS_PROVIDER must be ollama or hive, got {light!r}")
         return cls(

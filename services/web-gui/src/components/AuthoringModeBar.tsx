@@ -1,5 +1,6 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { Button } from "./ui";
+import { ConfirmModal } from "./ConfirmModal";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import {
   cancelAuthoringChain,
@@ -229,6 +230,7 @@ export function AuthoringModeBar({
   const [error, setError] = useState<string | null>(null);
   const [chain, setChain] = useState<AuthoringChainState | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const [dismissedAt, setDismissedAt] = useState<string | null>(() => readDismissed(projectId));
   const [runs, setRuns] = useState<Partial<Record<AuthoringStep, LastRun>>>({});
   // Số đo từng bước đọc từ nhật ký: nạp lúc mở và mỗi khi một chuỗi vừa xong.
@@ -338,6 +340,7 @@ export function AuthoringModeBar({
   const shownError = error ?? outcomeError;
 
   async function handleCancel() {
+    setConfirmingCancel(false);
     setCancelling(true);
     try {
       await cancelAuthoringChain(projectId);
@@ -496,9 +499,19 @@ export function AuthoringModeBar({
               cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
           {running && steps.length > 0 && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
-              <Button onClick={handleCancel} disabled={cancelling} data-testid="run-with-ai-cancel">
+              <Button onClick={() => setConfirmingCancel(true)} disabled={cancelling} data-testid="run-with-ai-cancel">
                 {cancelling ? "Đang dừng…" : "Dừng"}
               </Button>
+              <ConfirmModal
+                isOpen={confirmingCancel}
+                onClose={() => setConfirmingCancel(false)}
+                onConfirm={handleCancel}
+                title="Dừng lượt chạy AI?"
+                message="Bước đang dở sẽ không được lưu; các bước đã xong vẫn giữ nguyên."
+                confirmLabel="Dừng"
+                cancelLabel="Tiếp tục chạy"
+                isDangerous
+              />
               {run.steps.length <= 1 && (
                 <>
                   <OperationProgressCard
