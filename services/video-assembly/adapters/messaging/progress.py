@@ -11,7 +11,7 @@ NOT routed through the Outbox — progress is UX-only, never part of the
 durable, exactly-once state Outbox/Inbox exist to protect
 (messaging-design.md).
 
-publish_stage_progress/publish_clip_progress are called from a worker thread
+publish_merge_progress/publish_clip_progress are called from a worker thread
 (the assembler/clip loop runs via asyncio.to_thread), so they schedule the
 actual publish onto the event loop with run_coroutine_threadsafe rather than
 awaiting directly — there is no running loop in that thread to await on.
@@ -37,17 +37,15 @@ class ProgressPublisher:
         self._exchange = exchange
         self._loop = loop
 
-    def publish_stage_progress(self, project_id: str, stage_index: int, stage_total: int) -> None:
-        """One event per completed ffmpeg pass (main mux, then intro/outro
-        concat when the project has one) — CR-029: by unit of work done, not
-        by tick, so at most 2 pings per assembly."""
+    def publish_merge_progress(self, project_id: str, percent: int) -> None:
+        """One event per whole-percent the encoder advances (ffmpeg -progress),
+        so at most ~100 pings per assembly."""
         self._schedule(
             {
                 "project_id": project_id,
                 "step": ASSEMBLE_VIDEO_STEP,
                 "status": "in_progress",
-                "stage_index": stage_index,
-                "stage_total": stage_total,
+                "merge_percent": percent,
             }
         )
 

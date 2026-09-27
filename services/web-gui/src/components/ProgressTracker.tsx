@@ -33,13 +33,14 @@ function CheckIcon() {
 
 /**
  * CR-029: a Manim render_scenes reports elapsed time only (no reliable total);
- * a Remotion one carries render_percent. synthesize_speech/assemble_video/generate_clips
+ * a Remotion one carries render_percent, assemble_video merge_percent.
+ * synthesize_speech/generate_clips
  * each report a real (index, total) pair now, just under different field
  * names per step. This picks whichever one the current message actually
  * carries and gives it the right Vietnamese unit word for the bar's label.
  */
 function unitProgress(progressState: ProgressState): { percent: number; label: string } | null {
-  const { sceneIndex, sceneTotal, stageIndex, stageTotal, clipIndex, clipTotal, renderPercent, elapsedSeconds } =
+  const { sceneIndex, sceneTotal, clipIndex, clipTotal, renderPercent, mergePercent, elapsedSeconds } =
     progressState;
   const counted = (index: number, total: number, word: string) => ({
     percent: Math.round((index / total) * 100),
@@ -51,7 +52,7 @@ function unitProgress(progressState: ProgressState): { percent: number; label: s
     return { percent: renderPercent, label: `Đã render ${renderPercent}%${elapsed}` };
   }
   if (sceneIndex !== null && sceneTotal !== null && sceneTotal > 0) return counted(sceneIndex, sceneTotal, "Cảnh");
-  if (stageIndex !== null && stageTotal !== null && stageTotal > 0) return counted(stageIndex, stageTotal, "Giai đoạn");
+  if (mergePercent !== null) return { percent: mergePercent, label: `Đã ghép ${mergePercent}%` };
   if (clipIndex !== null && clipTotal !== null && clipTotal > 0) return counted(clipIndex, clipTotal, "Clip");
   return null;
 }

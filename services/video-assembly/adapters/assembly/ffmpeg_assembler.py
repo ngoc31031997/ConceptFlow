@@ -33,7 +33,7 @@ from adapters.assembly.subtitle_file import (
     DEFAULT_PLAY_RES_Y,
     write_subtitle_file,
 )
-from adapters.messaging.cancellation import run_cancellable
+from adapters.messaging.cancellation import run_cancellable, run_cancellable_streaming
 from domain.errors import AssemblyEngineError
 from domain.models import (
     NarrationSegment,
@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 DEFAULT_ASSEMBLY_TIMEOUT_SECONDS = 900
 FFMPEG_BINARY = "ffmpeg"
 DEFAULT_BACKGROUND_MUSIC_VOLUME = 0.2
+# With an intro/outro to splice in, the main pass is this share of the bar and
+# the (much faster, stream-copy) concat pass is the rest.
+MAIN_PASS_SHARE_WITH_CHANNEL_ASSETS = 90
 
 # Sidechain ducking (CR-005 FR14.1). A flat mix leaves music competing with the
 # narration when it is loud and leaves silence when it is not; ducking pulls the
@@ -134,12 +137,12 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         self,
         request: VideoAssemblyRequest,
         output_path: str,
-        on_stage_done: Callable[[int, int], None] | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> str | None:
         # copy_context: the executor thread must see which command it works for,
         # or the ffmpeg children it starts could never be found by a cancel.
         ctx = contextvars.copy_context()
-        future = self._executor.submit(ctx.run, self._run_pipeline, request, output_path, on_stage_done)
+        future = self._executor.submit(ctx.run, self._run_pipeline, request, output_path, on_progress)
         try:
             return future.result(timeout=self._timeout_seconds)
         except FutureTimeoutError as exc:
@@ -154,7 +157,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         self,
         request: VideoAssemblyRequest,
         output_path: str,
-        on_stage_done: Callable[[int, int], None] | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> str | None:
         segments = sorted(request.narration_segments, key=lambda s: s.start_time)
         n = len(segments)
@@ -307,20 +310,22 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         # this pass's output IS the final file, exactly as before this CR.
         main_target = _main_segment_path(output_path) if has_channel_assets else output_path
         cmd += [main_target]
-        self._run_ffmpeg(cmd)
 
-        # CR-029: report progress by completed unit of work, not by tick —
-        # each ffmpeg pass here can run for minutes, and with only one giant
-        # subprocess call, "which pass just finished" is the finest-grained
-        # signal available without parsing ffmpeg's own -progress stream.
-        total_stages = 2 if has_channel_assets else 1
-        if on_stage_done is not None:
-            on_stage_done(1, total_stages)
+        # The main pass is the slow one (filters + re-encode): its share of the
+        # bar comes from ffmpeg's own -progress position over the target length.
+        main_share = MAIN_PASS_SHARE_WITH_CHANNEL_ASSETS if has_channel_assets else 100
+        expected_seconds = target_duration or request.video_duration_seconds
+        if on_progress is not None and expected_seconds > 0:
+            self._run_ffmpeg_with_progress(cmd, expected_seconds, main_share, on_progress)
+        else:
+            self._run_ffmpeg(cmd)
+        if on_progress is not None:
+            on_progress(main_share)
 
         if has_channel_assets:
             self._concat_channel_assets(request, main_target, output_path)
-            if on_stage_done is not None:
-                on_stage_done(2, total_stages)
+            if on_progress is not None:
+                on_progress(100)
 
         self._write_thumbnail_candidate(output_path, target_duration)
         return caption_path
@@ -443,6 +448,29 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
     def _run_ffmpeg(args: list[str]) -> None:
         # Cancellable: inside a command this child is killed if the Creator cancels.
         result = run_cancellable([FFMPEG_BINARY, *args])
+        if result.returncode != 0:
+            raise AssemblyEngineError(f"ffmpeg exited with code {result.returncode}: {result.stderr}")
+
+    @staticmethod
+    def _run_ffmpeg_with_progress(
+        args: list[str], expected_seconds: float, share: int, on_progress: Callable[[int], None]
+    ) -> None:
+        """Runs ffmpeg with `-progress pipe:1`, calling on_progress once per
+        whole-percent change of `share`. Held below `share` until ffmpeg exits:
+        the caller reports `share` itself only after a successful exit."""
+        last = [-1]
+
+        def on_line(line: str) -> None:
+            key, _, value = line.strip().partition("=")
+            # out_time_us and (despite its name) out_time_ms are both microseconds.
+            if key not in ("out_time_us", "out_time_ms") or not value.isdigit():
+                return
+            percent = min(share - 1, int(int(value) / 1_000_000 / expected_seconds * share))
+            if percent > last[0]:
+                last[0] = percent
+                on_progress(percent)
+
+        result = run_cancellable_streaming([FFMPEG_BINARY, "-progress", "pipe:1", "-nostats", *args], on_line)
         if result.returncode != 0:
             raise AssemblyEngineError(f"ffmpeg exited with code {result.returncode}: {result.stderr}")
 

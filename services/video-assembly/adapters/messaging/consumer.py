@@ -253,10 +253,10 @@ class AssembleVideoCommandHandler:
                 intro_duration_seconds=intro_duration_seconds,
                 outro_video_path=outro_video_path,
             )
-            on_stage_done = None
+            on_progress = None
             if self._progress is not None:
-                on_stage_done = lambda i, t: self._progress.publish_stage_progress(project_id, i, t)  # noqa: E731
-            result = await asyncio.to_thread(self._use_case.assemble, request, on_stage_done)
+                on_progress = lambda p: self._progress.publish_merge_progress(project_id, p)  # noqa: E731
+            result = await asyncio.to_thread(self._use_case.assemble, request, on_progress)
         except (MissingArtifactError, AssemblyEngineError, KeyError, TypeError, ValueError) as exc:
             logger.warning("assemble_video failed for project_id=%s: %s", project_id, exc)
             event_type = "assembly_failed"

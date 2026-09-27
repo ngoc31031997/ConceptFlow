@@ -155,10 +155,9 @@ export interface ProgressMessage {
   animation_index?: number;
   /** 0-100, Remotion renders only (renderMedia knows its frame total); Manim sends none. */
   render_percent?: number;
-  // CR-029: assemble_video reports by ffmpeg pass completed (main mux, then
-  // intro/outro concat when present — at most 2), generate_clips by clip cut.
-  stage_index?: number;
-  stage_total?: number;
+  /** 0-100, assemble_video: ffmpeg's own -progress position over the target length. */
+  merge_percent?: number;
+  // CR-029: generate_clips reports by clip cut.
   clip_index?: number;
   clip_total?: number;
   error_message?: string;

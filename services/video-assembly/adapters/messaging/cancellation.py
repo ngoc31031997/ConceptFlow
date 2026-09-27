@@ -27,6 +27,7 @@ import os
 import signal
 import subprocess
 import threading
+from collections.abc import Callable
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -135,6 +136,49 @@ def run_cancellable(cmd: list[str], *, timeout: float | None = None) -> subproce
     finally:
         REGISTRY.unregister(proc)
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err)
+
+
+def run_cancellable_streaming(
+    cmd: list[str], on_stdout_line: Callable[[str], None], *, timeout: float | None = None
+) -> subprocess.CompletedProcess:
+    """`run_cancellable`, but each stdout line reaches on_stdout_line as the
+    child writes it (ffmpeg `-progress pipe:1`). Both pipes drain on their own
+    threads: reading one while the child blocks on a full other would deadlock.
+    The returned CompletedProcess carries stderr only."""
+    in_command = _current.get() is not None
+    proc = subprocess.Popen(
+        cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, start_new_session=in_command
+    )
+    if in_command:
+        REGISTRY.register(proc)
+    err_lines: list[str] = []
+
+    def drain_stdout() -> None:
+        for line in proc.stdout:
+            try:
+                on_stdout_line(line)
+            except Exception:  # noqa: BLE001 — progress is UX-only, never fail the child
+                logger.exception("stdout line handler failed; continuing")
+
+    def drain_stderr() -> None:
+        for line in proc.stderr:
+            err_lines.append(line)
+
+    readers = [threading.Thread(target=drain_stdout, daemon=True), threading.Thread(target=drain_stderr, daemon=True)]
+    for reader in readers:
+        reader.start()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill(proc)
+        proc.wait()
+        raise
+    finally:
+        if in_command:
+            REGISTRY.unregister(proc)
+        for reader in readers:
+            reader.join(timeout=5)
+    return subprocess.CompletedProcess(cmd, proc.returncode, "", "".join(err_lines))
 
 
 class CancelAwareOutbox:

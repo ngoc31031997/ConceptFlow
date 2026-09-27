@@ -10,8 +10,7 @@ export interface ProgressState {
   animationIndex: number | null;
   renderPercent: number | null;
   // CR-029
-  stageIndex: number | null;
-  stageTotal: number | null;
+  mergePercent: number | null;
   clipIndex: number | null;
   clipTotal: number | null;
   status: "in_progress" | "completed" | "failed" | null;
@@ -25,8 +24,7 @@ const initialState: ProgressState = {
   elapsedSeconds: null,
   animationIndex: null,
   renderPercent: null,
-  stageIndex: null,
-  stageTotal: null,
+  mergePercent: null,
   clipIndex: null,
   clipTotal: null,
   status: null,
@@ -45,8 +43,7 @@ export function useSSE(projectId: string): ProgressState {
         elapsedSeconds: msg.elapsed_seconds ?? null,
         animationIndex: msg.animation_index ?? null,
         renderPercent: msg.render_percent ?? null,
-        stageIndex: msg.stage_index ?? null,
-        stageTotal: msg.stage_total ?? null,
+        mergePercent: msg.merge_percent ?? null,
         clipIndex: msg.clip_index ?? null,
         clipTotal: msg.clip_total ?? null,
         status: msg.status,

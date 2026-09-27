@@ -23,15 +23,14 @@ class VideoAssemblerPort(ABC):
         self,
         request: VideoAssemblyRequest,
         output_path: str,
-        on_stage_done: Callable[[int, int], None] | None = None,
+        on_progress: Callable[[int], None] | None = None,
     ) -> str | None:
         """Assembles request.video_path + request.audio_segments (+
         optional background music) into a single video file at output_path.
 
-        on_stage_done(stage_index, stage_total), when given, is called once
-        per completed unit of assembly work (CR-029 progress reporting) —
-        never on a timer, so a caller can turn it into a UI ping without that
-        ping ever being able to lag or race actual progress.
+        on_progress(percent), when given, is called with a rising 0-100 as the
+        encoder actually advances (never on a timer), ending at 100 only once
+        the file is complete.
 
         Returns the path to a .srt caption-track file when request.subtitle_mode
         produced one (CR-015 FR38.4) — "track" or "both" with cues present —

@@ -26,14 +26,14 @@ class FakeVideoAssembler(VideoAssemblerPort):
         self._caption_path = caption_path
 
     def assemble(
-        self, request: VideoAssemblyRequest, output_path: str, on_stage_done=None
+        self, request: VideoAssemblyRequest, output_path: str, on_progress=None
     ) -> str | None:
         self.calls.append(request)
         _touch(output_path)
         if self._caption_path:
             _touch(self._caption_path)
-        if on_stage_done is not None:
-            on_stage_done(1, 1)
+        if on_progress is not None:
+            on_progress(100)
         return self._caption_path
 
 
