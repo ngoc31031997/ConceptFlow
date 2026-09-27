@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { AppShell } from "../components/AppShell";
@@ -9,7 +8,6 @@ import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
 import { FLOW_TTS } from "../utils/flow";
-import glass from "../styles/glass.module.css";
 
 /**
  * Bước 5 của 7 — "Xử lý": phần đắt, chạy sau khi Creator duyệt dàn ý ở bước 4.
@@ -98,11 +96,6 @@ export function RenderPage() {
     <div data-testid="render-page">
       <AppShell
         currentStep={viewOnly ? viewStep : activeFlowStep}
-        headerAction={
-          <Link to="/" state={NEW_VIDEO_STATE} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
-            Tạo video mới
-          </Link>
-        }
         title={isCancelled ? "Đã hủy" : isFailed ? "Đã xảy ra lỗi" : "Đang xử lý video"}
         subtitle={
           isCancelled

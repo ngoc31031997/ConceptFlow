@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
@@ -186,11 +185,6 @@ export function VideoListPage() {
         wide
         title="Danh sách video"
         subtitle="Tất cả video đã tạo, kể cả video bị lỗi. Xóa video không dùng để giải phóng dung lượng."
-        headerAction={
-          <Link to="/" state={NEW_VIDEO_STATE} className={glass.btnPrimary} style={{ textDecoration: "none", padding: "9px 16px", fontSize: 13 }}>
-            Tạo video mới
-          </Link>
-        }
       >
         {error && (
           <p role="alert" className={glass.helperText}>
