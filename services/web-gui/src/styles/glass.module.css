@@ -313,7 +313,7 @@
   ra từ chỗ bấm, thay vì bật phụt lên. Dùng chung cho mọi khối ẩn/hiện.
 */
 .reveal {
-  animation: reveal-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation: reveal-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
   transform-origin: top;
 }
 .revealOut {
