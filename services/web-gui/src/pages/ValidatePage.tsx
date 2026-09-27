@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { NEW_VIDEO_STATE } from "../context/ProjectDraftContext";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
 import { OutlineActions } from "../components/OutlineActions";
@@ -121,11 +120,6 @@ export function ValidatePage() {
       <AppShell
         currentStep={viewOnly ? viewStep : isAwaitingReview ? FLOW_REVIEW : FLOW_VALIDATE}
         wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
-        headerAction={
-          <Link to="/" state={NEW_VIDEO_STATE} className={glass.ghostBtn} style={{ textDecoration: "none" }}>
-            Tạo video mới
-          </Link>
-        }
         title={
           isCancelled
             ? "Đã hủy kiểm tra"
