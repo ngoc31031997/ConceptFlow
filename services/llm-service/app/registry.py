@@ -18,7 +18,7 @@ class Providers:
         # but the SDK insists on one: "ollama" is the documented placeholder.
         self.ollama = Provider(
             "ollama", config.ollama_url.rstrip("/") + "/v1", "ollama", config.ollama_model,
-            timeout=config.ollama_timeout, max_retries=1,
+            timeout=config.ollama_timeout or None, max_retries=1,
         )
         self.light = self.ollama if config.light_provider == "ollama" else self.hive
 

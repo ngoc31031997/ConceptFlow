@@ -438,8 +438,8 @@ services:
       HIVE_RATE_PER_SECOND: ${HIVE_RATE_PER_SECOND:-5} # Hive's documented default ceiling
       OLLAMA_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.2}
-      OLLAMA_TIMEOUT_SECONDS: "120"
-      LIGHT_TASKS_PROVIDER: ${LIGHT_TASKS_PROVIDER:-ollama}
+      OLLAMA_TIMEOUT_SECONDS: "0" # TEMP: no timeout while debugging chunk 2.5-2.9 stalls; restore to 120 afterward
+      LIGHT_TASKS_PROVIDER: ${LIGHT_TASKS_PROVIDER:-hive}
       CODE_CHUNK_SHOTS: ${CODE_CHUNK_SHOTS:-5}
       CODE_CHUNK_CONCURRENCY: ${CODE_CHUNK_CONCURRENCY:-10} # every chunk of a typical video at once
       CODE_REPAIR_MAX_ROUNDS: ${CODE_REPAIR_MAX_ROUNDS:-3}
@@ -463,9 +463,11 @@ services:
     volumes:
       - ollama_data:/root/.ollama
     # A loaded model sits in RAM for the life of the container — llama3.2 (the
-    # default model) needs a few GB. llm-service uses it for the light tasks
-    # (suggest-metadata, suggest-short-script — LIGHT_TASKS_PROVIDER=ollama);
-    # raise this if OLLAMA_MODEL is swapped for a larger one.
+    # default model) needs a few GB. llm-service now defaults the light tasks
+    # (suggest-metadata, suggest-short-script) to Hive/DeepSeek Flash
+    # (LIGHT_TASKS_PROVIDER=hive); this container only serves them when
+    # LIGHT_TASKS_PROVIDER is explicitly set back to ollama, or a project picks
+    # "ollama" for a step. Raise this if OLLAMA_MODEL is swapped for a larger one.
     deploy:
       resources:
         limits:
