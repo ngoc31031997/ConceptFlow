@@ -92,7 +92,7 @@ def remotion_chunk(
     return f"""NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]} ({len(shot_ids)} shot).
 
 Bạn chỉ viết {len(shot_ids)} hàm shot. Hệ thống tự ghép mọi thứ còn lại. ĐÃ CÓ SẴN trong file, TUYỆT ĐỐI KHÔNG viết lại:
-- các dòng import (react; remotion: registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig; ./conceptflow-mini/segments; ./conceptflow-mini/primitives: Stage, SAFE_MARGIN, WIDTH, HEIGHT; ./conceptflow-mini/lottie: LottieClip)
+- các dòng import (react; remotion: registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig; ./conceptflow-mini/segments; ./conceptflow-mini/primitives: Stage, SAFE_MARGIN, WIDTH, HEIGHT; ./conceptflow-mini/lottie: LottieClip; ./conceptflow-mini/illustration: {", ".join(merger.ILLUSTRATION_KIT)})
 - `const clamp = {{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}} as const;`
 - `type ShotProps = {{duration: number}};`
 - `export const narrations`, `SHOTS`, `CreatorComposition`, `registerRoot`

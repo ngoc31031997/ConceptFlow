@@ -23,7 +23,7 @@ Trả về ĐÚNG MỘT đối tượng JSON hợp lệ, không có gì ngoài n
 Cấu trúc:
 
 {
-  "hero": "<nhân vật chính bằng hình và hành trình biến đổi của nó qua cả phim>",
+  "hero": "<người/vật chính xuyên suốt và hành trình biến đổi của nó qua cả phim>",
   "world": null,
   "palette": [
     {"role": "<tên vai trò>", "hex": "#RRGGBB", "meaning": "<ý nghĩa của màu trong phim này>"}
@@ -40,7 +40,7 @@ Cấu trúc:
         {
           "id": "<n.m>",
           "camera": "<cỡ cảnh + chuyển động máy>",
-          "visual": "<cái gì xuất hiện / biến đổi / di chuyển, nằm đâu so với vật khác, màu theo vai trò, nhịp>",
+          "visual": "<nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp>",
           "narration": "<câu thoại>"
         }
       ]
@@ -53,7 +53,7 @@ Cấu trúc:
 
 Quy tắc của cấu trúc:
 - Đúng một trong hai: điền "hero" (và "world": null) HOẶC điền "world" (và "hero": null) khi chủ đề không có vật biến đổi tự nhiên.
-- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Nền cố định #080E1C không khai báo lại.
+- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Màu nền riêng của cảnh cũng là một vai trò; nền mặc định #080E1C không khai báo lại.
 - Trong "visual" gọi màu bằng TÊN VAI TRÒ đã khai báo trong "palette", không phát minh màu mới giữa chừng.
 - "id" của shot có dạng "<số cảnh>.<số thứ tự shot>" (ví dụ "1.1", "1.2", "2.1"), duy nhất trong toàn phim, đánh số theo thứ tự xuất hiện. Số shot do lượng thay đổi hình quyết định, không thêm cho đủ số.
 - "transition_in" của cảnh 1 là null. Mọi trường chuỗi khác không được để trống.
@@ -71,13 +71,14 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 5. Có câu thoại nào chỉ đang tả lại hình thay vì nói ý nghĩa? Viết lại.
 6. Mỗi cảnh từ 2 trở đi đã có "transition_in", và nó có nối từ hình cảnh trước thay vì cắt sạch không?
 7. Nhân vật chính (hoặc thế giới) có thật sự xuất hiện và biến đổi qua các cảnh, hay chỉ được nêu ở "hero" rồi bỏ quên?
-8. Màu có được dùng nhất quán theo "palette" đã khai báo không? Mọi vai trò đều có "hex" đúng dạng chưa, và có màu nào trong các shot nằm ngoài "palette" không? Có màu nào gần như lẫn vào nền #080E1C không?
+8. Màu có được dùng nhất quán theo "palette" đã khai báo không? Mọi vai trò (kể cả màu nền của từng cảnh) đều có "hex" đúng dạng chưa, và có màu nào trong các shot nằm ngoài "palette" không? Có vật hay chữ nào gần như lẫn vào nền của mảng nó nằm trên không?
 9. Có cảnh nào chỉ toàn chữ, không có hình nào đang diễn ra? Dựng lại cảnh đó bằng hình.
 10. Mỗi cảnh đã có "invariant", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
-12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (hình cơ bản, chấm, lưới, đồ thị, mũi tên, số chạy, code, dòng thời gian) không?
-13. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
-14. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
+12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
+13. Tắt tiếng và chỉ nhìn "visual" từng shot: có shot nào mà "narration" nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
+14. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
+15. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video theo từng shot, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
@@ -116,7 +117,7 @@ const remoAAIVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG 
 const remoBAIVI = `## B. MÀU — CHỈ DÙNG BẢNG MÀU CỦA ĐẠO DIỄN
 
 1. Bảng màu đã được hệ thống ghép thành hằng ¤PALETTE¤ ở đầu file, mỗi vai trò một khoá camelCase (tin nhắn của người dùng liệt kê đúng các khoá). Bạn KHÔNG khai báo lại ¤PALETTE¤.
-2. MỌI màu trong code (fill, stroke, color, background của vật, border, boxShadow) phải là ¤PALETTE.xxx¤ với khoá có trong danh sách. Không viết mã hex/rgb/tên màu nào khác ở bất kỳ đâu. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu mới.
+2. MỌI màu trong code (fill, stroke, color, background của vật, border, boxShadow) phải là ¤PALETTE.xxx¤ với khoá có trong danh sách. Không viết mã hex/rgb/tên màu nào khác ở bất kỳ đâu. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu mới. (Màu mặc định BÊN TRONG các hình của bộ minh hoạ ở mục C3 không tính: chúng thuộc bộ hình, bạn không viết chúng.)
 3. Shot nói "tô màu nhấn", "chìm về tông mờ"... → dùng đúng khoá của vai trò đó. Một vai trò = một màu từ đầu đến cuối.
 4. Chuyển màu theo nghĩa (vd. "đổi sang màu cảnh báo khi hiểu lầm lộ ra") → ¤interpolateColors(frame, [a, b], [PALETTE.x, PALETTE.y])¤.
 5. Nếu shot nhắc tới một vai trò không có khoá tương ứng: chọn khoá gần nghĩa nhất đang có — KHÔNG bịa màu mới.
@@ -126,9 +127,9 @@ const remoBAIVI = `## B. MÀU — CHỈ DÙNG BẢNG MÀU CỦA ĐẠO DIỄN
 const remoDAIVI = `## D. KHUNG CODE DO HỆ THỐNG DỰNG — bạn chỉ viết phần ruột của từng hàm shot
 
 Hệ thống đã có sẵn, bạn dùng được mà không cần khai báo:
-- các import: ¤react¤; ¤remotion¤ (registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig); ¤./conceptflow-mini/segments¤; ¤./conceptflow-mini/primitives¤ (Stage, SAFE_MARGIN, WIDTH, HEIGHT); ¤./conceptflow-mini/lottie¤ (LottieClip). Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤ và kiểu ¤ShotProps = {duration: number}¤.
+- các import: ¤react¤; ¤remotion¤ (registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig); ¤./conceptflow-mini/segments¤; ¤./conceptflow-mini/primitives¤ (Stage, SAFE_MARGIN, WIDTH, HEIGHT); ¤./conceptflow-mini/lottie¤ (LottieClip); ¤./conceptflow-mini/illustration¤ (MỌI component của bộ minh hoạ ở mục C3). Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤ và kiểu ¤ShotProps = {duration: number}¤.
 - ¤PALETTE¤ (mục B) và ¤LAYOUT¤ (toạ độ dùng chung giữa các shot).
-¤LottieClip¤ (mục C2) cũng đã được import sẵn từ ¤./conceptflow-mini/lottie¤ — dùng thẳng, không viết thêm dòng import nào.
+¤LottieClip¤ (mục C2) và toàn bộ bộ minh hoạ (mục C3: ¤Backdrop¤, ¤Panel¤, ¤Person¤, ¤Tooth¤, ¤Germ¤...) cũng đã được import sẵn — dùng thẳng, không viết thêm dòng import nào (câu "Import:" ở mục C3 là cho người viết cả file).
 
 Dạng của một hàm shot (đúng cấu trúc này):
 
@@ -170,7 +171,8 @@ const remoGAIVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng m�
 6. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 7. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
 8. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
-9. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+9. Không viết dòng import nào (khung đã import sẵn)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+9b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong "visual" mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như "visual" mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
 10. Chữ giữa các thẻ JSX có ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần?
 11. Code là TSX hợp lệ 100% để trình biên dịch TypeScript nhận (đủ ngoặc, không cắt cụt), không có chữ giải thích lọt vào ngoài comment?
 
@@ -182,7 +184,7 @@ Trả lời đúng theo định dạng mà tin nhắn của người dùng yêu 
 
 BÊN TRONG khối code chỉ có mã TSX thuần: TUYỆT ĐỐI không để lọt dòng ¤¤¤ hay bất kỳ ký hiệu markdown nào vào giữa, không chèn chữ giải thích trần (mọi ghi chú phải nằm trong comment ¤//¤ hoặc ¤/* */¤), và không viết hai khối code.`
 
-const remotionEngineerAIVI = remoIntroAIVI + remoAAIVI + remoBAIVI + remoCVI + remoC2VI + remoDAIVI + remoEVI + remoFVI + remoGAIVI + remoOutputAIVI
+const remotionEngineerAIVI = remoIntroAIVI + remoAAIVI + remoBAIVI + remoCVI + remoC2VI + remoC3VI + remoDAIVI + remoEVI + remoFVI + remoGAIVI + remoOutputAIVI
 
 // --- Manim Engineer (AI): shot methods only --------------------------------
 

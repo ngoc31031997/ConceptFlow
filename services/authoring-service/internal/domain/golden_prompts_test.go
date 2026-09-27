@@ -10,16 +10,18 @@ import (
 
 var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 
-// story_architect was re-baselined on purpose by CR-041 (video archetypes).
+// story_architect was re-baselined on purpose by CR-041 (video archetypes);
+// visual_director, manim_engineer and remotion_engineer by CR-043 (flat
+// illustration kit, "illustrate what is being said").
 //
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "c7263faacab4a6d964dad521602534119ecc1e14abe72d8c19a0cb5a538624ba",
-	RoleVisualDirector:   "5fb59d05fbdbb3e45d6985c20dab2ae5484064a39c170b4b2fea7f6c20558e36",
-	RoleManimEngineer:    "85ff46357c76b59556b6a4c2e5298c57e5bcda13589071a4d72101efcae10fff",
-	RoleRemotionEngineer: "04e157efbf7c67934879797aa8273b146a425f98558a37a128ad37884c45b141",
+	RoleVisualDirector:   "6ec41216875badf8ffe8596c23324b07cfbbcf56a4aa1034cec9474c29555d3f",
+	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
+	RoleRemotionEngineer: "256f82c0504ae7b25acbfed7a67f10e7d9467d39d9dfe4c72d19fca32f8328f0",
 }
 
 func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {
@@ -112,7 +114,7 @@ func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
 	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
 		text := aiTemplate(t, role)
-		for _, want := range []string{"NHỊP THAY ĐỔI", "CHO NGƯỜI XEM ĐOÁN TRƯỚC", "DIỄN XUẤT BẰNG CHUYỂN ĐỘNG",
+		for _, want := range []string{"NHỊP THAY ĐỔI", "CHO NGƯỜI XEM ĐOÁN TRƯỚC", "DIỄN XUẤT BẰNG NÉT MẶT, DÁNG VÀ CHUYỂN ĐỘNG",
 			"KHUNG KẾT VẦN VỚI KHUNG MỞ", "HOOK KHÔNG PHẢI THẺ TIÊU ĐỀ", "vật liệu dựng tốt", "suy ngẫm"} {
 			if !strings.Contains(text, want) {
 				t.Errorf("%s lacks %q", role, want)
