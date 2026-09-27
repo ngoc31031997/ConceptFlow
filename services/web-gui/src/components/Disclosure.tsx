@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import glass from "../styles/glass.module.css";
+import { usePresence } from "../hooks/usePresence";
 
 interface DisclosureProps {
   title: string;
@@ -18,6 +19,7 @@ interface DisclosureProps {
  */
 export function Disclosure({ title, hint, defaultOpen = false, children, testId }: DisclosureProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const { mounted, closing } = usePresence(isOpen);
 
   return (
     <div className={glass.card} data-testid={testId}>
@@ -37,7 +39,9 @@ export function Disclosure({ title, hint, defaultOpen = false, children, testId 
         </span>
       </button>
 
-      {isOpen && <div className={glass.mtSm}>{children}</div>}
+      {mounted && (
+        <div className={`${glass.mtSm} ${closing ? glass.revealOut : glass.reveal}`}>{children}</div>
+      )}
     </div>
   );
 }

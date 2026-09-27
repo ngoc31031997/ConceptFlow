@@ -137,6 +137,12 @@ interface AuthoringModeBarProps {
    * gọn, để Creator bấm chạy luôn mà không phải mở "Đổi".
    */
   showSwitch?: boolean;
+  /**
+   * Nằm gọn trong thẻ của PipelineSettingsBar: các khối không tự vẽ thẻ riêng
+   * mà chỉ là một phần ngăn cách bằng đường kẻ — một thẻ duy nhất cho cả
+   * "đã chọn gì" lẫn "chạy".
+   */
+  embedded?: boolean;
 }
 
 const MODE_LABELS: Record<AuthoringMode, string> = {
@@ -178,6 +184,7 @@ export function AuthoringModeBar({
   runDisabled,
   runDisabledReason,
   showSwitch = true,
+  embedded = false,
 }: AuthoringModeBarProps) {
   // Trạng thái "đang chạy" sống ở AuthoringRunContext, ngoài component này —
   // dùng chung cho cả 3 tab 1a/1b/1c, để tab vừa mở thấy đúng một chuỗi đang
@@ -361,8 +368,10 @@ export function AuthoringModeBar({
     : "AI viết sẵn nội dung vào ô soạn thảo để bạn chỉnh sửa. Có thể chạy từng bước hoặc cả chuỗi.";
   const showRunRow = aiMode && canRun;
 
+  const cardCls = embedded ? `${styles.section} ${styles.reveal}` : `${glass.card} ${styles.card} ${styles.reveal}`;
+
   return (
-    <div className={styles.stack} data-testid="authoring-mode-bar">
+    <div className={embedded ? styles.embedded : styles.stack} data-testid="authoring-mode-bar">
       {showSwitch && (
         <div className={`${glass.card} ${styles.card}`}>
           <div className={glass.cardTitle}>Cách làm bước 3</div>
@@ -371,7 +380,7 @@ export function AuthoringModeBar({
       )}
 
       {aiMode && !running && ALL_STEPS.some((st) => runs[st]) && (
-        <div className={`${glass.card} ${styles.card}`} data-testid="authoring-last-runs">
+        <div className={cardCls} data-testid="authoring-last-runs">
           <div className={glass.cardTitle}>Lần chạy AI gần nhất</div>
           <ul className={styles.lastRuns}>
             {ALL_STEPS.filter((st) => runs[st]).map((st) => {
@@ -391,7 +400,7 @@ export function AuthoringModeBar({
       )}
 
       {(showRunRow || running) && (
-        <div className={`${glass.card} ${styles.card}`} data-testid="authoring-run-card">
+        <div className={cardCls} data-testid="authoring-run-card">
           {showRunRow && (
             <>
               <div className={styles.run}>

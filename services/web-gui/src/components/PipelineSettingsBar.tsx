@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePresence } from "../hooks/usePresence";
 import { RenderEnginePicker } from "./RenderEnginePicker";
 import { AuthoringModeBar, AuthoringModeSwitch } from "./AuthoringModeBar";
 import { AuthoringModelPicker } from "./AuthoringModelPicker";
@@ -58,6 +59,7 @@ export function PipelineSettingsBar({
 }: PipelineSettingsBarProps) {
   const [expanded, setExpanded] = useState(false);
   const { running } = useAuthoringRun();
+  const { mounted: showPickers, closing } = usePresence(expanded);
   const { models, setModels } = useAuthoringModels(projectId);
   const aiOn = mode === "ai" && !!llm?.enabled;
   const engineLabel = renderEngine === "remotion" ? "Remotion" : "Manim";
@@ -86,8 +88,8 @@ export function PipelineSettingsBar({
         </button>
       </div>
 
-      {expanded && (
-        <div className={styles.expanded}>
+      {showPickers && (
+        <div className={`${styles.expanded} ${closing ? glass.revealOut : glass.reveal}`}>
           {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} disabled={running} />}
           {llm && <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />}
           {aiOn && (
@@ -102,9 +104,8 @@ export function PipelineSettingsBar({
         </div>
       )}
 
-    </div>
-
-      {/* Thẻ chạy nằm ngoài thẻ chọn: chỉ hiện khi chọn "Gọi API trực tiếp". */}
+      {/* Nút chạy AI nằm chung thẻ với dòng "Đã chọn": Đổi cách làm và chạy
+          là cùng một quyết định, tách hai thẻ khiến màn hình rời rạc. */}
       <AuthoringModeBar
         llm={llm}
         mode={mode}
@@ -118,7 +119,9 @@ export function PipelineSettingsBar({
         onGenerated={onGenerated}
         onFollow={onFollow}
         showSwitch={false}
+        embedded
       />
+    </div>
     </div>
   );
 }

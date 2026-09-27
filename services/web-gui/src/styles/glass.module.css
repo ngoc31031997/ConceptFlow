@@ -294,3 +294,28 @@
 .readOnlyEmpty {
   color: var(--ink-faint);
 }
+
+/*
+  Hiệu ứng "mở ra": khối vừa hiện thì trượt xuống + mờ dần vào, như được vẽ
+  ra từ chỗ bấm, thay vì bật phụt lên. Dùng chung cho mọi khối ẩn/hiện.
+*/
+.reveal {
+  animation: reveal-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: top;
+}
+.revealOut {
+  animation: reveal-out 0.18s ease-in both;
+  transform-origin: top;
+  pointer-events: none;
+}
+@keyframes reveal-in {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.96); clip-path: inset(0 0 100% 0); }
+  to { opacity: 1; transform: none; clip-path: inset(0 0 0 0); }
+}
+@keyframes reveal-out {
+  from { opacity: 1; transform: none; clip-path: inset(0 0 0 0); }
+  to { opacity: 0; transform: translateY(-6px) scaleY(0.96); clip-path: inset(0 0 100% 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .revealOut { animation: none; }
+}
