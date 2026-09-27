@@ -84,3 +84,18 @@ describe('httpClient', () => {
     );
   });
 });
+
+describe('httpClient binary bodies (CR-044)', () => {
+  test('keeps an image body as bytes instead of decoding it as text', async () => {
+    const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00]);
+    const fetchImpl = async () => ({
+      status: 200,
+      headers: new Map([['content-type', 'image/png']]),
+      arrayBuffer: async () => bytes.buffer,
+      text: async () => { throw new Error('must not be read as text'); },
+    });
+    const res = await createHttpClient('http://svc:8000', { fetchImpl }).request({ method: 'GET', path: '/x.png' });
+    expect(Buffer.isBuffer(res.body)).toBe(true);
+    expect([...res.body]).toEqual([...bytes]);
+  });
+});

@@ -1,0 +1,37 @@
+'use strict';
+
+const express = require('express');
+const { proxyHandler } = require('../handlers/proxyHandler');
+
+/**
+ * CR-044 — the illustration library, served by authoring-service.
+ *
+ * Reads and folder edits use the ordinary client. Anything that renders a
+ * preview (create, edit, try, rerender, and the first view of a preview image)
+ * waits on the rendering service and later on a model, so it goes through the
+ * client without a timeout.
+ *
+ * @param {import('../clients/httpClient').HttpClient} authoringClient
+ * @param {import('../clients/httpClient').HttpClient} authoringSlowClient
+ */
+function illustrationsRouter(authoringClient, authoringSlowClient) {
+  const router = express.Router();
+  const fast = proxyHandler(authoringClient, 'authoring-service');
+  const slow = proxyHandler(authoringSlowClient, 'authoring-service');
+  router.get('/v1/illustration-folders', fast);
+  router.post('/v1/admin/illustration-folders', fast);
+  router.delete('/v1/admin/illustration-folders/:id', fast);
+  router.get('/v1/illustrations', fast);
+  router.get('/v1/illustrations/:id', fast);
+  router.get('/v1/illustrations/:id/preview.png', slow);
+  router.get('/v1/illustrations/:id/preview.gif', slow);
+  router.post('/v1/illustration-tries', slow);
+  router.post('/v1/admin/illustrations', slow);
+  router.put('/v1/admin/illustrations/:id', slow);
+  router.post('/v1/admin/illustrations/:id/status', fast);
+  router.post('/v1/admin/illustrations/:id/rerender', slow);
+  router.delete('/v1/admin/illustrations/:id', fast);
+  return router;
+}
+
+module.exports = { illustrationsRouter };

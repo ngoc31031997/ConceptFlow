@@ -30,6 +30,10 @@ type Config struct {
 	HiveModel           string
 	HiveMaxInputChars   int
 	HiveMaxOutputTokens int
+
+	// CR-044 — the rendering service checks and previews library drawings.
+	RenderingURL     string
+	RenderingTimeout time.Duration
 }
 
 // Load reads Config from the environment, failing fast if DATABASE_URL is unset.
@@ -80,7 +84,18 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	renderingURL := os.Getenv("RENDERING_URL")
+	if renderingURL == "" {
+		renderingURL = "http://rendering:8000"
+	}
+	renderingTimeout, err := intEnvOrDefault("RENDERING_TIMEOUT_SECONDS", 240)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Config{
+		RenderingURL:        renderingURL,
+		RenderingTimeout:    time.Duration(renderingTimeout) * time.Second,
 		DatabaseURL:         databaseURL,
 		DatabaseMaxConns:    int32(maxConns),
 		HTTPPort:            httpPort,

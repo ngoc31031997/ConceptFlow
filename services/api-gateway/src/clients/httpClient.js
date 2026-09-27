@@ -101,9 +101,15 @@ function createHttpClient(baseUrl, options = {}) {
 /**
  * Reads the response body, preserving JSON as parsed objects (needed so
  * `proxyHandler` can hand it straight to Express's `res.json`) while
- * falling back to raw text for non-JSON or empty bodies.
+ * falling back to raw text for non-JSON or empty bodies, and keeping image
+ * bodies as bytes.
  */
 async function readResponseBody(res) {
+  // CR-044: illustration previews are images; decoding them as text corrupts them.
+  const type = (res.headers.get('content-type') || '').toLowerCase();
+  if (type.startsWith('image/') && typeof res.arrayBuffer === 'function') {
+    return Buffer.from(await res.arrayBuffer());
+  }
   const text = await res.text();
   if (text === '') return undefined;
   const contentType = res.headers.get('content-type') || '';
