@@ -590,6 +590,8 @@ function liveProgressText(p: AuthoringProgress): string {
   if (p.phase === "layout" || p.phase === "cast") {
     return `Đang chuẩn bị bố cục… ${time}`;
   }
+  // CR-044 — Remotion: the video's drawings are planned and drawn before any code.
+  if (p.phase === "illustrations") return `Đang lập danh sách và vẽ hình minh hoạ… ${time}`;
   if (p.phase === "chunks") return `Đang viết code: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} phần · ${time}`;
   if (p.phase === "merge") return `Đang ghép code… ${time}`;
   if (p.phase === "check") return `Đang kiểm tra code… ${time}`;

@@ -27,14 +27,16 @@ import (
 // renders, calls, saves that one step, and hands the text back for the
 // Creator to edit.
 type GenerateAuthoringUseCase struct {
-	renderer   authoringPromptRenderer
-	provider   LLMProviderPort
-	recorder   *LLMUsageRecorder
-	projects   PromptRenderContextPort
-	models     AuthoringModelsReaderPort
-	story      authoringStorySaver
-	storyboard authoringContentSaver
-	code       authoringContentSaver
+	renderer authoringPromptRenderer
+	// illustrations is the CR-044 drawing stage; nil = off (Manim, or not wired).
+	illustrations IllustrationStagePort
+	provider      LLMProviderPort
+	recorder      *LLMUsageRecorder
+	projects      PromptRenderContextPort
+	models        AuthoringModelsReaderPort
+	story         authoringStorySaver
+	storyboard    authoringContentSaver
+	code          authoringContentSaver
 	// clearer drops the steps built on this one when its run fails, so a stale
 	// storyboard/code is not left standing on an outline that never landed.
 	// Optional: nil leaves downstream output alone.

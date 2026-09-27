@@ -22,7 +22,7 @@ import hashlib
 import re
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from app import errors
 from app.errors import LLMError, Usage
@@ -52,6 +52,24 @@ class CodeRequest:
     model: str = ""
     max_tokens: int = 0
     temperature: float = 0.3
+    #: CR-044 — approved library drawings: {name, usage, description, code}.
+    illustrations: list[dict] = field(default_factory=list)
+
+
+def library_section(illustrations: list[dict]) -> str:
+    """The Remotion Engineer's list of library drawings beyond the built-in kit."""
+    rows = [
+        f"- {i['usage'] or '<' + i['name'] + ' />'} — {i.get('description', '').strip()}"
+        for i in illustrations if i.get("name") and i.get("code")
+    ]
+    if not rows:
+        return ""
+    return (
+        "\n\n## C4. HÌNH THƯ VIỆN ĐÃ DUYỆT CHO VIDEO NÀY — dùng như bộ minh hoạ ở mục C3\n\n"
+        "Các hình dưới đây đã được Creator duyệt; khung code tự đưa chúng vào file, bạn KHÔNG import và KHÔNG "
+        "viết lại chúng. Cùng quy ước x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity, still. "
+        "Vật nào trong \"visual\" có ở đây thì BẮT BUỘC dùng đúng component này.\n\n" + "\n".join(rows) + "\n"
+    )
 
 
 @dataclass
@@ -158,6 +176,7 @@ class CodePipeline:
         self._concurrency = concurrency
         self._repair_rounds = repair_rounds
         self._cache = cache or ChunkCache()
+        self._library: dict[str, str] = {}
 
     # -- one model call, with extraction retry ---------------------------------
 
@@ -242,6 +261,11 @@ class CodePipeline:
         warnings: list[str] = []
         used_keys: list[str] = []
         remotion = req.engine == "remotion"
+        library: dict[str, str] = {}
+        if remotion and req.illustrations:
+            library = {i["name"]: i["code"] for i in req.illustrations if i.get("name") and i.get("code")}
+            req = replace(req, system=req.system + library_section(req.illustrations))
+        self._library = library
         all_shots = sb.all_shots()
         ordered = [sh.id for _, sh in all_shots]
 
@@ -317,7 +341,7 @@ class CodePipeline:
         # 3. merge + check + repair
         def merge() -> merger.Merged:
             if remotion:
-                return merger.merge_remotion(sb, frame, shots)
+                return merger.merge_remotion(sb, frame, shots, library=library)
             return merger.merge_manim(sb, req.topic, frame, shots)
 
         await emit({"type": "phase", "phase": "merge"})
@@ -362,7 +386,7 @@ class CodePipeline:
         the checker being unreachable) is left to the full-file check."""
         rounds = 0
         while True:
-            merged = merger.merge_remotion(sb, frame, shots, stub_missing=True)
+            merged = merger.merge_remotion(sb, frame, shots, stub_missing=True, library=self._library)
             try:
                 check = await self._checker.check("remotion", merged.code, merged.scene_class_name)
             except CheckerUnavailable:

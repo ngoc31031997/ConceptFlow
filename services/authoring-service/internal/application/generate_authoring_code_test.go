@@ -277,3 +277,49 @@ func (p *progressSpy) GenerateCode(ctx context.Context, req application.CodeGenR
 	}
 	return p.inner.GenerateCode(ctx, req, wrapped)
 }
+
+type stubStage struct {
+	pending  []domain.ProjectIllustration
+	drawings []application.LibraryDrawing
+	ensured  int
+}
+
+func (s *stubStage) Ensure(context.Context, string, string) ([]domain.ProjectIllustration, error) {
+	s.ensured++
+	return s.pending, nil
+}
+func (s *stubStage) ForCode(context.Context, string) ([]application.LibraryDrawing, error) {
+	return s.drawings, nil
+}
+
+// CR-044: a Remotion video waits for its drawings; approved ones reach the pipeline.
+func TestCodeStepWaitsForTheVideosDrawingsThenHandsThemOver(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
+	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
+	st := &stubStage{pending: []domain.ProjectIllustration{{Name: "Motorbike", State: domain.PIDrawn}}}
+	uc.WithPipeline(&stubFinalizer{}, gen).WithIllustrations(st)
+
+	_, err := uc.Execute(context.Background(), "p1", "code")
+	var pending *application.ErrIllustrationsPending
+	if !errors.As(err, &pending) || gen.calls != 0 || !strings.Contains(err.Error(), "Motorbike") {
+		t.Fatalf("want the step held before any code call, got %v (codegen calls %d)", err, gen.calls)
+	}
+
+	st.pending = nil
+	st.drawings = []application.LibraryDrawing{{Name: "Motorbike", Code: "export function Motorbike() {}"}}
+	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil {
+		t.Fatal(err)
+	}
+	if len(gen.req.Illustrations) != 1 || gen.req.Illustrations[0].Name != "Motorbike" {
+		t.Fatalf("drawings not handed to the pipeline: %+v", gen.req.Illustrations)
+	}
+}
+
+func TestManimCodeStepSkipsTheDrawingStage(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
+	st := &stubStage{pending: []domain.ProjectIllustration{{Name: "X"}}}
+	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}).WithIllustrations(st)
+	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil || st.ensured != 0 {
+		t.Fatalf("manim must not wait for drawings: %v, ensured %d", err, st.ensured)
+	}
+}

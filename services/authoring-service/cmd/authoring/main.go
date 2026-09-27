@@ -80,6 +80,9 @@ func main() {
 	illustrations := application.NewIllustrationsUseCase(
 		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
 		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	// CR-044 — each Remotion video's drawings, gated before the code step.
+	projectIllustrations := application.NewProjectIllustrationsUseCase(
+		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 
 	prompts := application.NewPromptsUseCase(authoringRepo)
 	// CR-028 FR84.2: every authoring save shares the same lock check (the project
@@ -101,7 +104,8 @@ func main() {
 		authoringRepo,
 		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-	).WithClearer(authoringRepo).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient)
+	).WithClearer(authoringRepo).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
+		WithIllustrations(projectIllustrations)
 
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithShortScriptSuggester(suggestShortScript).
@@ -109,6 +113,7 @@ func main() {
 		WithPrompts(prompts).
 		WithArchetypes(archetypes).
 		WithIllustrations(illustrations).
+		WithProjectIllustrations(projectIllustrations).
 		WithRenderPrompt(renderPrompt).
 		WithAuthoringStory(saveAuthoringStory).
 		WithAuthoringStoryboard(saveAuthoringStoryboard).

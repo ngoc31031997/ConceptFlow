@@ -813,6 +813,49 @@ export function importIllustrationLibrary(file: Blob, replace: boolean): Promise
   );
 }
 
+/** CR-044 — một hình mà video cần: lập từ storyboard, rồi dùng lại hoặc vẽ mới. */
+export type ProjectIllustrationState = "planned" | "drawing" | "drawn" | "reused" | "failed" | "skipped";
+
+export interface ProjectIllustration {
+  id: string;
+  position: number;
+  name: string;
+  description: string;
+  folder_id: string;
+  shots: string[];
+  state: ProjectIllustrationState;
+  error?: string;
+  illustration_id?: string;
+  illustration?: Illustration;
+}
+
+export interface ProjectIllustrations {
+  illustrations: ProjectIllustration[];
+  /** Mọi hình đã duyệt hoặc bỏ qua — bước Code được chạy. */
+  ready: boolean;
+}
+
+export function listProjectIllustrations(projectId: string): Promise<ProjectIllustrations> {
+  return apiFetch<ProjectIllustrations>(`/v1/projects/${projectId}/illustrations`);
+}
+
+/** Lập lại danh sách từ storyboard (thay danh sách cũ; hình đã vẽ vẫn ở thư viện). */
+export function planProjectIllustrations(projectId: string): Promise<ProjectIllustrations> {
+  return apiFetch<ProjectIllustrations>(`/v1/projects/${projectId}/illustrations/plan`, { method: "POST" });
+}
+
+export function drawProjectIllustration(projectId: string, rowId: string): Promise<ProjectIllustration> {
+  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/draw`, { method: "POST" });
+}
+
+export function skipProjectIllustration(projectId: string, rowId: string, skipped: boolean): Promise<ProjectIllustration> {
+  return apiFetch<ProjectIllustration>(`/v1/projects/${projectId}/illustrations/${rowId}/skip`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ skipped }),
+  });
+}
+
 /**
  * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
  * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
@@ -941,7 +984,7 @@ export function getAuthoringChain(projectId: string): Promise<AuthoringChainStat
 /** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
 export interface AuthoringProgress {
   running: boolean;
-  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair";
+  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair" | "illustrations";
   reasoning_chars: number;
   content_chars: number;
   elapsed_seconds: number;

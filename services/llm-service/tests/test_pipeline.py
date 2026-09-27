@@ -290,3 +290,43 @@ async def test_one_chunk_is_checked_once():
     chk = FakeChecker()
     res = await pipeline(FakeProvider(), chk, chunk=10).run(req(storyboard(4)), emit_none)
     assert res.check_ok and len(chk.codes) == 1
+
+
+BUS = """import React from 'react';
+import {useCurrentFrame} from 'remotion';
+import {Figure, type FigureProps} from './conceptflow-mini/illustration';
+
+export function SchoolBus({color = '#FFC72C', ...fig}: FigureProps & {color?: string}) {
+  return <Figure {...fig} size={fig.size ?? 320} vw={320} vh={210}><rect width={10} height={10} rx={4} fill={color} /></Figure>;
+}
+"""
+
+
+class UsesBus(FakeProvider):
+    async def chat(self, req, on_progress=None):
+        res = await super().chat(req, on_progress)
+        return ChatResult(res.content.replace("return null;", "return <SchoolBus x={960} y={540} />;"), res.usage)
+
+
+async def test_library_drawings_reach_the_prompt_and_the_ones_used_are_pasted_into_the_script():
+    provider, checker = UsesBus(), FakeChecker()
+    r = req(storyboard(2))
+    r.illustrations = [
+        {"name": "SchoolBus", "usage": "<SchoolBus color /> — 320×210", "description": "Xe buýt vàng", "code": BUS},
+        {"name": "Cat", "usage": "<Cat /> — 220×240", "description": "Con mèo", "code": "export function Cat() { return null; }"},
+    ]
+    res = await pipeline(provider, checker).run(r, emit_none)
+    assert all("## C4. HÌNH THƯ VIỆN" in c.system and "<SchoolBus color /> — 320×210" in c.system for c in provider.calls)
+    code = res.code
+    assert "// Hình thư viện: SchoolBus\nfunction SchoolBus(" in code
+    assert "export function SchoolBus" not in code and "function Cat(" not in code  # only what is used
+    assert code.count("from './conceptflow-mini/illustration'") == 2  # the frame's own imports only
+    assert code.index("function SchoolBus(") < code.index("function Shot1_1(")
+
+
+async def test_manim_ignores_library_drawings():
+    provider, checker = FakeProvider(engine="manim"), FakeChecker()
+    r = req(storyboard(1), engine="manim")
+    r.illustrations = [{"name": "SchoolBus", "usage": "", "description": "", "code": BUS}]
+    await pipeline(provider, checker).run(r, emit_none)
+    assert all("C4." not in c.system for c in provider.calls)

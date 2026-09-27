@@ -46,6 +46,11 @@ function illustrationsRouter(authoringClient, authoringSlowClient) {
     slow,
   );
   router.delete('/v1/admin/illustrations/:id', fast);
+  // A video's own drawing list: planning and drawing call a model.
+  router.get('/v1/projects/:id/illustrations', fast);
+  router.post('/v1/projects/:id/illustrations/plan', slow);
+  router.post('/v1/projects/:id/illustrations/:rowId/draw', slow);
+  router.post('/v1/projects/:id/illustrations/:rowId/skip', fast);
   return router;
 }
 

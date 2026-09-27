@@ -400,6 +400,13 @@ func (c *Client) GenerateCode(
 		"engine": req.Engine, "topic": req.Topic, "storyboard": req.Storyboard, "system": req.System,
 		"model": req.Model, "max_tokens": req.MaxTokens,
 	}
+	if len(req.Illustrations) > 0 {
+		ills := make([]map[string]string, 0, len(req.Illustrations))
+		for _, d := range req.Illustrations {
+			ills = append(ills, map[string]string{"name": d.Name, "usage": d.Usage, "description": d.Description, "code": d.Code})
+		}
+		body["illustrations"] = ills
+	}
 	raw, err := c.stream(ctx, "/v1/code/generate", body, func(kind string, ev json.RawMessage) {
 		if onEvent == nil {
 			return

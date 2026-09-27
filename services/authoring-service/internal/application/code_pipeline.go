@@ -38,6 +38,10 @@ type CodeGenRequest struct {
 	System    string
 	Model     string
 	MaxTokens int
+	// Illustrations are the approved library drawings the Remotion Engineer
+	// may use; llm-service lists them in the prompt and pastes the used ones
+	// into the script (CR-044).
+	Illustrations []LibraryDrawing
 }
 
 // CodeEvent is one progress event of a run. Type is "phase", "chunk_start" or
