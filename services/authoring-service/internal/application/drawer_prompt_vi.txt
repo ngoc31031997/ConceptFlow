@@ -23,4 +23,4 @@ CÁCH GỌI: <<Tên prop1 prop2 /> — rộng×cao của hộp>
 <toàn bộ file: import từ 'react', 'remotion', './conceptflow-mini/illustration'; đúng MỘT export function Tên(...)>
 ```
 
-Trước khi trả lời, tự soát: bọc trong Figure; không gradient/filter/chữ/ảnh; khối không viền; góc bo tròn; một mảng bóng bên phải bằng shadeOf; màu mặc định ưu tiên bảng màu kênh (vật có màu riêng thì dùng đúng màu đó), tối đa 6 màu; màu chính là prop color; vật có mặt dùng Face; có chuyển động nhỏ theo frame nếu là vật sống và tắt được bằng still; mọi nét nằm trong hộp vw × vh.
+Trước khi trả lời, tự soát: bọc trong Figure; không gradient/filter/chữ/ảnh; khối không viền; góc bo tròn; một mảng bóng bên phải bằng shadeOf; màu mặc định ưu tiên bảng màu kênh (vật có màu riêng thì dùng đúng màu đó), tối đa 6 màu; màu chính là prop color; chỉ gắn Face khi mô tả yêu cầu vật có mặt/cảm xúc (đồ vật, công trình, thiên nhiên mặc định không mặt), con vật tự vẽ mặt đúng loài, không dùng Face; có chuyển động nhỏ theo frame nếu là vật sống và tắt được bằng still; mọi nét nằm trong hộp vw × vh.

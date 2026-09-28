@@ -77,8 +77,9 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
 12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
 13. Tắt tiếng và chỉ nhìn "visual" từng shot: có shot nào mà "narration" nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
-14. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
-15. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
+14. Mỗi vật cụ thể lần đầu xuất hiện trong "visual" đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
+15. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
+16. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video theo từng shot, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
