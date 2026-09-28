@@ -2,7 +2,7 @@
 # Canonical verification entry point, called by `make check` / `make check-all`.
 #
 #   scripts/check.sh changed   lint + unit tests for services changed vs $BASE (default: main)
-#   scripts/check.sh all       lint + unit tests for every service, plus contract tests
+#   scripts/check.sh all       lint + unit tests for every service, plus contract and hook tests
 #
 # A service's kind comes from the file at its root: go.mod (Go), pyproject.toml
 # (Python), package.json (Node). A directory with none of these is not a service.
@@ -44,6 +44,21 @@ changed_files() {
     git diff --name-only "$base_commit"
     git ls-files --others --exclude-standard
   } | sort -u
+}
+
+# Records that HEAD's tree passed, for the merge gate (scripts/hooks/guard_bash.py).
+# Keyed by tree, not commit: a merge of a branch already containing $BASE has
+# the branch tip's tree, so the pass carries over to the merge commit.
+# Only a clean working tree counts (otherwise the checked files are not HEAD's),
+# and in 'changed' mode only when HEAD differs from the base: on $BASE itself
+# nothing is compared, so a pass there proves nothing.
+record_pass() {
+  [ -z "$(git status --porcelain)" ] || return 0
+  if [ "$MODE" = changed ] && [ "$(git merge-base "$BASE" HEAD)" = "$(git rev-parse HEAD)" ]; then
+    return 0
+  fi
+  marks="$(git rev-parse --path-format=absolute --git-common-dir)/conceptflow/checked-trees"
+  mkdir -p "$marks" && touch "$marks/$(git rev-parse 'HEAD^{tree}')"
 }
 
 FAILED=""
@@ -127,23 +142,32 @@ check_contracts() {
   run_step "contracts: pytest" "$ROOT" "$py" -m pytest -q -p no:cacheprovider tests/contracts
 }
 
+check_hooks() {
+  # The Claude Code hooks are stdlib-only, like the system python3 that runs them.
+  run_step "hooks: unittest" "$ROOT" python3 -m unittest discover -s scripts/hooks -q
+}
+
 case "$MODE" in
   all)
     SERVICES="$(all_services)"
     RUN_CONTRACTS=1
+    RUN_HOOKS=1
     ;;
   changed)
     files="$(changed_files)" || exit 2
     SERVICES=""
     RUN_CONTRACTS=0
+    RUN_HOOKS=0
     for svc in $(all_services); do
       grep -q "^services/$svc/" <<<"$files" && SERVICES="$SERVICES $svc"
     done
     grep -qE '^(tests/contracts/|docs/contracts/)' <<<"$files" && RUN_CONTRACTS=1
+    grep -q '^scripts/hooks/' <<<"$files" && RUN_HOOKS=1
     # A change to the verification itself re-verifies everything.
     if grep -qE '^(Makefile|scripts/(check|setup|build)\.sh)$' <<<"$files"; then
       SERVICES="$(all_services)"
       RUN_CONTRACTS=1
+      RUN_HOOKS=1
     fi
     ;;
   *)
@@ -152,14 +176,16 @@ case "$MODE" in
     ;;
 esac
 
-if [ -z "$(echo "$SERVICES" | tr -d ' \n')" ] && [ "$RUN_CONTRACTS" = 0 ]; then
+if [ -z "$(echo "$SERVICES" | tr -d ' \n')" ] && [ "$RUN_CONTRACTS" = 0 ] && [ "$RUN_HOOKS" = 0 ]; then
   echo "check: nothing to verify (no service changed vs $BASE)"
+  record_pass
   exit 0
 fi
 
-echo "check ($MODE): $(echo $SERVICES | tr ' ' ',')$( [ "$RUN_CONTRACTS" = 1 ] && echo ' +contracts')"
+echo "check ($MODE): $(echo $SERVICES | tr ' ' ',')$( [ "$RUN_CONTRACTS" = 1 ] && echo ' +contracts')$( [ "$RUN_HOOKS" = 1 ] && echo ' +hooks')"
 for svc in $SERVICES; do check_service "$svc"; done
 [ "$RUN_CONTRACTS" = 1 ] && check_contracts
+[ "$RUN_HOOKS" = 1 ] && check_hooks
 
 if [ -n "$FAILED" ]; then
   echo
@@ -175,4 +201,5 @@ if [ -n "$FAILED" ]; then
   done
   exit 1
 fi
+record_pass
 echo "all $PASSED steps passed"

@@ -23,8 +23,8 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 | Modify application code | Agent | Default (edits prompt or not according to the session's permission mode) |
 | `make setup`, `make build`, `make check`, `make check-all` | Agent | `allow` |
 | Create / switch branches, `git add`, `git commit`, `git fetch`, `git pull` | Agent | `allow` |
-| `git merge` (including into `main`, D1) | Agent | `allow`. **Gate not enforced yet**: the "`make check` + review passed" hook is Phase 5 |
-| `git push` to `origin` (plain, no flags that rewrite or delete) | Agent | `allow` for `git push`, `git push origin *`, `git push -u origin *` |
+| `git merge` (including into `main`, D1) | Agent, gated | `allow`, plus the merge gate hook: into `main` only when `make check` passed on the branch's tree (review joins in Phase 7). See [`hooks.md`](hooks.md) |
+| `git push` to `origin` (plain, no flags that rewrite or delete) | Agent | `allow` for `git push`, `git push origin *`, `git push -u origin *`. A push updating `main` passes the merge gate |
 | Discard uncommitted work: `git checkout -- …`, `git checkout .`, `git restore`, `git reset --hard`, `git clean`, `git branch -D` | Ask | `ask` |
 | `docker exec` (can print container env, i.e. secrets) | Ask | `ask` |
 | Data migration (`scripts/migrate-authoring-data.sh`) | Ask | `ask` |
@@ -33,7 +33,8 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 | Delete remote refs (`--delete`, `-d`, `:branch`), `--mirror` | Deny | `deny` |
 | `rm -rf` / `rm -fr` / `rm -Rf` | Deny | `deny` |
 | Destroy Docker data: `docker compose down -v`/`--volumes`, `docker volume rm`, `docker volume prune`, `docker system prune` | Deny | `deny` |
-| Read or write secrets: `.env`, `.env.window`, `secrets/**`, `client_secret_*.json` | Deny | `deny` on `Read(…)` and `Edit(…)` |
+| Read or write secrets: `.env`, `.env.window`, `secrets/**`, `client_secret_*.json` | Deny | `deny` on `Read(…)` and `Edit(…)`; shell access blocked by the PreToolUse guard hook |
+| Finish a turn with `make check` failing | Deny (once) | Stop hook |
 | Change this policy or `.claude/settings.json` | Human approval | Prose only (`CLAUDE.md` commit policy). Changes go through a reviewed commit |
 | Enable/alter the GitHub ruleset `protect-main` | Human | Agents have no admin access. See [`branch-protection.md`](branch-protection.md) |
 | Production deployment, production data mutation | Human | Not applicable yet: the repo has no production environment or deploy credentials |
@@ -49,9 +50,9 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 
 These are real holes, not oversights. Each has a planned fix.
 
-1. **`Read` deny does not cover the shell.** `Read(**/.env)` stops the Read, Grep and Glob tools, but `cat .env`, `grep KEY .env` or `docker compose config` in Bash are not matched. Fix: a PreToolUse hook on Bash that rejects commands referencing the secret paths (Phase 5).
+1. **Shell access to secrets is matched by text.** Since Phase 5 the guard hook blocks commands that name the secret paths or run `docker compose config`, but a command that reads them without naming them (`grep -r KEY .`, a script, `sh -c "$VAR"`) is not caught. The reverse also happens: a Bash command whose *text* mentions `.env` (e.g. a heredoc editing this doc) is blocked; use the Edit/Write tools for such text.
 2. **Bash patterns are prefix/glob matches, not a parser.** Wrapped or chained commands (`sh -c "git push -f …"`, `cd x && rm -rf y`, variables) can slip past a pattern. Deny rules are a guard against accidents, not against a determined bypass. The server-side ruleset (`protect-main`) is the backstop for force-push/deletion of `main`.
-3. **Merge gate (D1) is not enforced yet.** An agent can merge a red branch into `main` today. Fix: Phase 5 hook blocking `git merge` into `main` and `git push origin main` unless a "check + review passed" marker matches `HEAD`.
+3. **Merge gate covers `make check` only.** Since Phase 5, merging or pushing an unchecked tree into `main` is blocked ([`hooks.md`](hooks.md)). Review is not required yet; Phase 7 adds it.
 4. **`protect-main` ruleset** must be created by the Creator. Until then nothing server-side stops a force push from a human or another tool.
 
 ## Verification
