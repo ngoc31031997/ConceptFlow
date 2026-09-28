@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 
@@ -340,3 +341,222 @@ async def test_manim_ignores_library_drawings():
     r.illustrations = [{"name": "SchoolBus", "usage": "", "description": "", "code": BUS}]
     await pipeline(provider, checker).run(r, emit_none)
     assert all("C4." not in c.system for c in provider.calls)
+
+
+# --- CR-048 T2: a failing chunk does not throw away the others; split on budget ----
+
+def chunk_ids(user: str) -> list[str] | None:
+    m = re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", user)
+    if not m:
+        return None
+    lo, hi = int(m.group(1).split(".")[1]), int(m.group(2).split(".")[1])
+    return [f"1.{i}" for i in range(lo, hi + 1)]
+
+
+class Scripted(FakeProvider):
+    """`fail(ids)` returns the LLMError a chunk call of those shots raises, or None.
+    `gate(ids)` returns an asyncio.Event the call waits for first, or None."""
+
+    def __init__(self, fail=None, gate=None, **kw):
+        super().__init__(**kw)
+        self.fail = fail or (lambda ids: None)
+        self.gate = gate or (lambda ids: None)
+        self.finished: list[list[str]] = []
+
+    async def chat(self, req, on_progress=None):
+        ids = chunk_ids(req.user)
+        if ids is not None:
+            if (ev := self.gate(ids)) is not None:
+                await ev.wait()
+                await asyncio.sleep(0.02)  # still streaming for a moment after the gate opens
+            if (err := self.fail(ids)) is not None:
+                self.calls.append(req)
+                raise err
+        res = await super().chat(req, on_progress)
+        if ids is not None:
+            self.finished.append(ids)
+        return res
+
+
+def llm_err(kind):
+    return LLMError(kind, "hive", f"{kind} failure", Usage(model="m", prompt_tokens=7, completion_tokens=3))
+
+
+def chunk_turns(prov):
+    return [ids for c in prov.calls if (ids := chunk_ids(c.user)) is not None]
+
+
+async def test_a_failing_chunk_lets_running_chunks_finish_into_the_cache_and_a_rerun_pays_only_for_it():
+    cache = ChunkCache()
+    others_in, release = asyncio.Event(), asyncio.Event()
+    arrived = []
+
+    def gate(ids):
+        if ids == ["1.2"]:
+            return others_in  # fails only once chunks 1 and 3 are talking to the model
+        arrived.append(ids)
+        if len(arrived) == 2:
+            others_in.set()
+        return release
+
+    def fail(ids):
+        if ids == ["1.2"]:
+            release.set()  # chunks 1 and 3 are still waiting on the model when this one fails
+            return llm_err(errors.SERVER)
+
+    prov1 = Scripted(fail=fail, gate=gate)
+    with pytest.raises(PipelineFailure) as e:
+        await pipeline(prov1, FakeChecker(), chunk=1, cache=cache).run(req(storyboard_with_layout(3)), emit_none)
+    assert e.value.kind == errors.SERVER
+    assert sorted(prov1.finished) == [["1.1"], ["1.3"]]  # chunks 1 and 3 were not thrown away
+    by_label = {c.label: c for c in e.value.calls}
+    assert by_label["1.1-1.1"].ok and by_label["1.3-1.3"].ok  # ...and their cost is reported
+    assert not by_label["1.2-1.2"].ok and by_label["1.2-1.2"].error_kind == errors.SERVER
+
+    prov2 = Scripted()
+    res = await pipeline(prov2, FakeChecker(), chunk=1, cache=cache).run(req(storyboard_with_layout(3)), emit_none)
+    assert res.check_ok
+    assert chunk_turns(prov2) == [["1.2"]]  # the re-run calls the model for chunk 2 only
+    assert sorted(c.label for c in res.calls if c.cached) == ["1.1-1.1", "1.3-1.3"]
+
+
+async def test_chunks_still_waiting_for_a_slot_do_not_start_after_a_failure():
+    release = asyncio.Event()
+
+    def fail(ids):
+        if ids == ["1.2"]:
+            release.set()
+            return llm_err(errors.SERVER)
+
+    prov = Scripted(fail=fail, gate=lambda ids: release if ids == ["1.1"] else None)
+    p = CodePipeline(prov, FakeChecker(), chunk_shots=1, concurrency=2, repair_rounds=1)
+    events = []
+
+    async def emit(ev):
+        events.append(ev)
+
+    with pytest.raises(PipelineFailure):
+        await p.run(req(storyboard_with_layout(4)), emit)
+    assert sorted(chunk_turns(prov)) == [["1.1"], ["1.2"]]  # 1.3 and 1.4 never reached the model
+    assert prov.finished == [["1.1"]]
+    assert sorted(ev["index"] for ev in events if ev["type"] == "chunk_start") == [1, 2]
+
+
+async def test_the_first_failure_is_raised_even_when_a_later_chunk_also_fails():
+    second_in, release = asyncio.Event(), asyncio.Event()
+
+    def gate(ids):
+        if ids == ["1.1"]:
+            return second_in
+        second_in.set()
+        return release
+
+    def fail(ids):
+        if ids == ["1.1"]:
+            release.set()
+            return llm_err(errors.SERVER)
+        if ids == ["1.2"]:
+            return llm_err(errors.TIMEOUT)
+
+    prov = Scripted(fail=fail, gate=gate)
+    with pytest.raises(PipelineFailure) as e:
+        await pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(2)), emit_none)
+    assert e.value.kind == errors.SERVER
+    assert sorted(c.error_kind for c in e.value.calls) == [errors.SERVER, errors.TIMEOUT]
+
+
+async def test_a_chunk_over_budget_is_split_in_two_and_the_run_succeeds():
+    prov = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 5 else None)
+    events = []
+
+    async def emit(ev):
+        events.append(ev)
+
+    res = await pipeline(prov, FakeChecker(), chunk=5).run(req(storyboard_with_layout(7)), emit)
+    assert res.check_ok and "function Shot1_5(" in res.code and "BROKEN" not in res.code
+    assert sorted(chunk_turns(prov)) == sorted([
+        ["1.1", "1.2", "1.3", "1.4", "1.5"], ["1.6", "1.7"], ["1.1", "1.2", "1.3"], ["1.4", "1.5"]])
+    chunk_calls = [(c.label, c.ok, c.error_kind) for c in res.calls if c.phase == "chunk"]
+    assert ("1.1-1.5", False, errors.BUDGET) in chunk_calls  # the failed call stays billed
+    assert ("1.1-1.3", True, "") in chunk_calls and ("1.4-1.5", True, "") in chunk_calls
+    assert next(c for c in res.calls if c.label == "1.1-1.5").usage.prompt_tokens == 7
+    split = [ev for ev in events if ev["type"] == "chunk_split"]
+    assert split == [{"type": "chunk_split", "index": 1, "total": 2, "shots": ["1.1", "1.2", "1.3", "1.4", "1.5"],
+                      "into": [["1.1", "1.2", "1.3"], ["1.4", "1.5"]]}]
+    assert sorted(ev["index"] for ev in events if ev["type"] == "chunk_start") == [1, 2]  # halves are not new chunks
+    assert sorted(ev["done"] for ev in events if ev["type"] == "chunk_done") == [1, 2]
+    # each half carries its own neighbours: the first half leads into 1.4, the second follows 1.3
+    first = next(c.user for c in prov.calls if "VIẾT CODE CHO SHOT 1.1 → 1.3" in c.user)
+    second = next(c.user for c in prov.calls if "VIẾT CODE CHO SHOT 1.4 → 1.5" in c.user)
+    before = lambda u: u.split("SHOT NGAY TRƯỚC lô này")[1].split("SHOT NGAY SAU lô này")[0]  # noqa: E731
+    after = lambda u: u.split("SHOT NGAY SAU lô này")[1]  # noqa: E731
+    assert "đây là lô đầu tiên" in before(first) and '"shot": "1.4"' in after(first)
+    assert '"shot": "1.3"' in before(second) and '"shot": "1.6"' in after(second)
+
+
+async def test_splitting_recurses_down_to_one_shot_on_truncation():
+    prov = Scripted(fail=lambda ids: llm_err(errors.TRUNCATED) if len(ids) > 1 else None)
+    res = await pipeline(prov, FakeChecker(), chunk=3).run(req(storyboard_with_layout(3)), emit_none)
+    assert res.check_ok
+    assert chunk_turns(prov) == [["1.1", "1.2", "1.3"], ["1.1", "1.2"], ["1.1"], ["1.2"], ["1.3"]]
+    assert [(c.label, c.ok) for c in res.calls] == [
+        ("1.1-1.3", False), ("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", True), ("1.3-1.3", True)]
+
+
+async def test_a_one_shot_chunk_over_budget_fails_the_run_with_budget():
+    prov = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if "1.2" in ids else None)
+    with pytest.raises(PipelineFailure) as e:
+        await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard_with_layout(2)), emit_none)
+    assert e.value.kind == errors.BUDGET
+    assert [(c.label, c.ok) for c in e.value.calls] == [("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", False)]
+
+
+async def test_other_error_kinds_are_not_split():
+    prov = Scripted(fail=lambda ids: llm_err(errors.EMPTY))
+    with pytest.raises(PipelineFailure) as e:
+        await pipeline(prov, FakeChecker(), chunk=4).run(req(storyboard_with_layout(4)), emit_none)
+    assert e.value.kind == errors.EMPTY and chunk_turns(prov) == [["1.1", "1.2", "1.3", "1.4"]]
+
+
+async def test_a_rerun_goes_straight_to_the_halves_of_a_chunk_that_was_over_budget():
+    cache = ChunkCache()
+    prov1 = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 4 or ids == ["1.5"] else None)
+    with pytest.raises(PipelineFailure):
+        await pipeline(prov1, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
+    prov2 = Scripted()
+    res = await pipeline(prov2, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
+    assert res.check_ok
+    assert chunk_turns(prov2) == [["1.5"]]  # neither the 4-shot chunk nor its cached halves are paid again
+    # a fully successful run drops the split marker with the rest of its cache
+    prov3 = Scripted()
+    await pipeline(prov3, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
+    assert sorted(chunk_turns(prov3)) == [["1.1", "1.2", "1.3", "1.4"], ["1.5"]]
+
+
+async def test_a_dead_key_cancels_the_other_chunks_at_once():
+    never = asyncio.Event()
+    prov = Scripted(fail=lambda ids: llm_err(errors.AUTH) if ids == ["1.2"] else None,
+                    gate=lambda ids: never if ids != ["1.2"] else None)
+    with pytest.raises(PipelineFailure) as e:
+        await asyncio.wait_for(
+            pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(3)), emit_none), timeout=2)
+    assert e.value.kind == errors.AUTH
+    assert prov.finished == [] and [c.label for c in e.value.calls] == ["1.2-1.2"]
+
+
+async def test_cancelling_the_run_cancels_every_chunk_at_once():
+    never = asyncio.Event()
+    started = asyncio.Event()
+
+    def gate(ids):
+        started.set()
+        return never
+
+    prov = Scripted(gate=gate)
+    run = asyncio.create_task(pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(3)), emit_none))
+    await asyncio.wait_for(started.wait(), timeout=2)
+    run.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.wait_for(run, timeout=2)
+    assert prov.finished == []
+    assert [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()] == []

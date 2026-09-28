@@ -188,6 +188,7 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 			`{"type":"phase","phase":"chunks","total":3}`,
 			`{"type":"chunk_done","index":1,"total":3,"done":1}`,
 			`{"type":"phase","phase":"repair","round":1,"total":3,"targets":["1.3"]}`,
+			`{"type":"chunk_split","index":2,"total":3,"shots":["1.4","1.5","1.6"],"into":[["1.4","1.5"],["1.6"]]}`,
 			`{"type":"result","code":"CODE","check_ok":false,"repair_rounds":3,"scene_class_name":"XScene","warnings":["w"],`+
 				`"diagnostics":[{"message":"boom","line":9},{"message":"no line","line":null}],`+
 				`"calls":[{"phase":"chunk","label":"1.1-1.10","ok":true,"cached":false,"duration_ms":1500,"usage":{"model":"m","prompt_tokens":5,"completion_tokens":6}}]}`)
@@ -199,7 +200,8 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCode: %v", err)
 	}
-	if len(events) != 4 || events[2].Type != "chunk_done" || events[2].Done != 1 || events[3].Round != 1 || events[3].Targets[0] != "1.3" {
+	if len(events) != 5 || events[2].Type != "chunk_done" || events[2].Done != 1 || events[3].Round != 1 || events[3].Targets[0] != "1.3" ||
+		events[4].Type != "chunk_split" || events[4].Index != 2 {
 		t.Errorf("events = %+v", events)
 	}
 	if res.Code != "CODE" || res.CheckOK || res.RepairRounds != 3 || res.SceneClassName != "XScene" || len(res.Warnings) != 1 {
