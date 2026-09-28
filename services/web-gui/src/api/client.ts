@@ -990,6 +990,12 @@ export interface AuthoringChainState {
   /** CR-045 — dừng chờ Creator duyệt hình minh hoạ (không phải lỗi); `waiting_step` là bước dừng. */
   waiting?: string;
   waiting_step?: AuthoringStep;
+  /**
+   * CR-048 T8/T9 — cảnh báo không chặn của từng bước đã xong, theo bước. Bước
+   * Visual (storyboard): cảnh nào lời thoại dài/ngắn so với ngân sách của
+   * format, shot nào lời thoại nhắc một vật mà HÌNH không có.
+   */
+  warnings?: Partial<Record<AuthoringStep, string[]>>;
   started_at?: string;
   finished_at?: string;
 }

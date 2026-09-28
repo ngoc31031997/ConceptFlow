@@ -165,3 +165,30 @@ func TestChainGoesOnToCodeWhenNoDrawingWaits(t *testing.T) {
 		t.Errorf("state %+v ran %v", st, f.ran)
 	}
 }
+
+// CR-048 T8/T9 — a step's warnings reach the polled state, and survive a later
+// step stopping the chain.
+func TestChainKeepsStepWarnings(t *testing.T) {
+	const warning = "Cảnh hook: ~20 giây, ngân sách 6–10 giây (+100%)"
+	f := &fakeStepRunner{
+		failAt: "code",
+		result: map[string]GeneratedStep{"storyboard": {Warnings: []string{warning}}},
+	}
+	c := NewAuthoringChainRunner(f, nil)
+	_ = c.Start("p", []string{"story", "storyboard", "code"})
+	st := waitFinished(t, c, "p")
+	if st.ErrorStep != "code" {
+		t.Fatalf("state %+v", st)
+	}
+	if got := st.Warnings["storyboard"]; len(got) != 1 || got[0] != warning {
+		t.Fatalf("storyboard warnings = %q", got)
+	}
+	if _, ok := st.Warnings["story"]; ok {
+		t.Error("a step with no warnings must not get an entry")
+	}
+	// State hands out a copy: editing it must not change the runner's state.
+	st.Warnings["storyboard"][0] = "changed"
+	if again, _ := c.State("p"); again.Warnings["storyboard"][0] != warning {
+		t.Error("State leaked its internal warnings slice")
+	}
+}

@@ -50,6 +50,10 @@ type GenerateAuthoringUseCase struct {
 	// fails loudly when it is missing rather than quietly doing something else.
 	finalizer StoryboardFinalizerPort
 	codegen   CodePipelinePort
+	// formats/calibration feed the post-1b narration length check (CR-048 T8);
+	// see WithStoryboardChecks. Nil formats = no length check.
+	formats     FormatLookupPort
+	calibration VoiceCalibrationPort
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
@@ -461,6 +465,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	}
 
 	usage := result.Usage
+	var warnings []string
 	if step == "storyboard" {
 		// CR-039: the storyboard is JSON the code step splits by shot, so it is
 		// validated here — with one model repair turn if it is not — and saved in
@@ -482,6 +487,9 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		content = fin.Storyboard
 		usage = usageSum(result.Usage, fin.Usage)
 		info.usage = usage
+		// CR-048 T8/T9 — cheap checks the Creator sees before the code step
+		// spends money on this storyboard. Warnings only; never block.
+		warnings = uc.storyboardWarnings(ctx, project, content)
 	}
 
 	// FR78.3 — saving overwrites this step and only this step; the existing
@@ -489,7 +497,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	// history write, so an AI run is audited exactly like a paste.
 	out := GeneratedStep{
 		Step: step, Role: string(role), Content: content,
-		Provider: uc.provider.Name(), Usage: usage,
+		Provider: uc.provider.Name(), Usage: usage, Warnings: warnings,
 	}
 	if err := uc.save(ctx, projectID, step, content); err != nil {
 		out.SaveError = fmt.Sprintf("Đã sinh được nội dung nhưng chưa lưu được: %v", err)

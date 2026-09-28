@@ -106,7 +106,10 @@ func main() {
 		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
 	).WithClearer(authoringRepo).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
-		WithIllustrations(projectIllustrations)
+		WithIllustrations(projectIllustrations).
+		// CR-048 T8 — the post-1b length check reads the same format and voice
+		// calibration the outline prompt's beat sheet is built from.
+		WithStoryboardChecks(projects, projects)
 
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithShortScriptSuggester(suggestShortScript).

@@ -40,10 +40,15 @@ type ChainState struct {
 	// Waiting is a stop for the Creator (CR-045): the illustrations step drew
 	// what it could and some drawings wait for review. Not an error; the
 	// Creator reviews them, then runs Code. WaitingStep is where it stopped.
-	Waiting     string     `json:"waiting,omitempty"`
-	WaitingStep string     `json:"waiting_step,omitempty"`
-	StartedAt   time.Time  `json:"started_at"`
-	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	Waiting     string `json:"waiting,omitempty"`
+	WaitingStep string `json:"waiting_step,omitempty"`
+	// Warnings are each finished step's non-blocking warnings, by step — e.g.
+	// the storyboard's narration length and illustration checks (CR-048
+	// T8/T9). Kept even when a later step stops the chain: they are about
+	// content that was saved.
+	Warnings   map[string][]string `json:"warnings,omitempty"`
+	StartedAt  time.Time           `json:"started_at"`
+	FinishedAt *time.Time          `json:"finished_at,omitempty"`
 }
 
 // AuthoringChainRunner runs authoring steps in order on the server, detached
@@ -148,6 +153,14 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 	for i, step := range steps {
 		c.update(projectID, func(st *ChainState) { st.CurrentIndex = i })
 		out, err := c.runner.Execute(ctx, projectID, step)
+		if err == nil && len(out.Warnings) > 0 {
+			c.update(projectID, func(st *ChainState) {
+				if st.Warnings == nil {
+					st.Warnings = map[string][]string{}
+				}
+				st.Warnings[step] = append([]string(nil), out.Warnings...)
+			})
+		}
 		switch {
 		case ctx.Err() != nil:
 			// Cancelled: whatever the step returned (usually a wrapped
@@ -189,5 +202,11 @@ func (c *AuthoringChainRunner) State(projectID string) (ChainState, bool) {
 	}
 	out := *st
 	out.Steps = append([]string(nil), st.Steps...)
+	if st.Warnings != nil {
+		out.Warnings = make(map[string][]string, len(st.Warnings))
+		for step, w := range st.Warnings {
+			out.Warnings[step] = append([]string(nil), w...)
+		}
+	}
 	return out, true
 }

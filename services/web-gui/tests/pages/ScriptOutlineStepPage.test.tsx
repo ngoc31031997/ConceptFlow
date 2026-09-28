@@ -493,6 +493,33 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     await waitFor(() => expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument());
   });
 
+  it("hiện cảnh báo của bước Visual (CR-048 T8/T9) cùng kết cục, và đóng được", async () => {
+    setup({
+      running: false,
+      steps: ["story", "storyboard", "code"],
+      current_index: 3,
+      finished: true,
+      warnings: {
+        storyboard: [
+          "Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)",
+          "Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có",
+        ],
+      },
+      finished_at: new Date().toISOString(),
+    });
+    renderPage();
+
+    const box = await screen.findByTestId("run-with-ai-storyboard-warnings");
+    expect(box).toHaveTextContent("Cảnh báo ở bước Visual (2)");
+    expect(box).toHaveTextContent("Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)");
+    expect(box).toHaveTextContent("Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có");
+    // Warnings do not turn a finished run into a failure.
+    expect(screen.getByTestId("run-with-ai-done")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
+    await waitFor(() => expect(screen.queryByTestId("run-with-ai-storyboard-warnings")).not.toBeInTheDocument());
+  });
+
   it("shows how the last AI run of each step went — time, size, tokens — from the journal", async () => {
     setup({ running: false, steps: [], current_index: 0, finished: false });
     vi.spyOn(apiClient, "listProjectEvents").mockResolvedValue([

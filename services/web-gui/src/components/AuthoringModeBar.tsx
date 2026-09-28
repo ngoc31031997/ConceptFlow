@@ -19,6 +19,7 @@ import { OperationProgressCard } from "./OperationProgressCard";
 import { formatChars, formatClock } from "../lib/formatProgress";
 import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
+import { usePresence } from "../hooks/usePresence";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
@@ -314,6 +315,20 @@ export function AuthoringModeBar({
   const activeStep = run.running && run.currentIndex >= 0 ? run.steps[run.currentIndex] ?? null : null;
   const live = useAuthoringProgress(projectId, activeStep);
 
+  // Kết cục lần chạy gần nhất, còn hiện trong 30 phút hoặc tới khi Creator
+  // đóng — đủ để thấy kết quả khi mở lại trang, mà không treo mãi một lỗi cũ.
+  const outcome =
+    chain?.finished && !chain.running && chain.finished_at && chain.finished_at !== dismissedAt &&
+    Date.now() - new Date(chain.finished_at).getTime() < OUTCOME_TTL_MS
+      ? chain
+      : null;
+  // CR-048 T8/T9 — cảnh báo của bước Visual, không chặn: xem trước khi tốn
+  // tiền cho bước Code. Giữ bản cuối để khối còn nội dung khi đang thu lại.
+  const storyboardWarnings = outcome?.warnings?.storyboard ?? [];
+  const shownWarnings = useRef<string[]>([]);
+  if (storyboardWarnings.length > 0) shownWarnings.current = storyboardWarnings;
+  const warningsPresence = usePresence(storyboardWarnings.length > 0 && !run.running);
+
   // Chưa biết trạng thái: chưa vẽ thẻ, để nó không nhấp nháy giữa hai hình
   // dạng ngay khi trang mở.
   if (!llm) return null;
@@ -326,14 +341,6 @@ export function AuthoringModeBar({
   // câu trạng thái phải nói rõ đang chờ cái gì, không chỉ "đang chạy" chung
   // chung khiến Creator tưởng máy đứng hình.
   const runningElsewhere = running && run.steps !== steps && run.steps.join() !== steps.join();
-
-  // Kết cục lần chạy gần nhất, còn hiện trong 30 phút hoặc tới khi Creator
-  // đóng — đủ để thấy kết quả khi mở lại trang, mà không treo mãi một lỗi cũ.
-  const outcome =
-    chain?.finished && !chain.running && chain.finished_at && chain.finished_at !== dismissedAt &&
-    Date.now() - new Date(chain.finished_at).getTime() < OUTCOME_TTL_MS
-      ? chain
-      : null;
   const outcomeError = outcome?.error
     ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${STEP_LABELS[outcome.error_step]})` : "")
     : null;
@@ -475,7 +482,22 @@ export function AuthoringModeBar({
                   )}
                 </div>
               )}
-              {(outcomeError || outcomeNote || outcomeWaiting) && !running && (
+              {warningsPresence.mounted && (
+                <div
+                  className={`${styles.warnings} ${warningsPresence.closing ? styles.revealOut : styles.reveal}`}
+                  data-testid="run-with-ai-storyboard-warnings"
+                >
+                  <p className={styles.warningsTitle}>
+                    Cảnh báo ở bước Visual ({shownWarnings.current.length}) — không chặn, nên xem trước khi chạy Code:
+                  </p>
+                  <ul>
+                    {shownWarnings.current.map((w, i) => (
+                      <li key={i}>{w}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {(outcomeError || outcomeNote || outcomeWaiting || storyboardWarnings.length > 0) && !running && (
                 <button type="button" className={styles.hint} onClick={dismissOutcome} data-testid="run-with-ai-dismiss">
                   Đóng thông báo
                 </button>
