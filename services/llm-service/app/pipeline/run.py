@@ -9,6 +9,12 @@ stubs for the shots it does not own) and repaired as soon as it is written,
 while the other chunks are still being generated. The full-file check at the
 end stays the gate.
 
+When a chunk fails, the chunks already talking to the model are allowed to
+finish so their billed output reaches the cache for the re-run, and no new chunk
+starts; a dead key, an empty balance or the Creator cancelling stops everything
+at once. A chunk that ran out of token budget is written again as two halves,
+down to one shot (CR-048 T2).
+
 Nothing here pretends: a chunk that cannot be produced fails the run with its
 error; a repair round that changes nothing is counted; a script that still
 fails the check after the last round is returned as check_failed with the
@@ -41,6 +47,16 @@ from app.storyboard import parse as parse_storyboard
 Emit = Callable[[dict], Awaitable[None]]
 
 EXTRACT_ATTEMPTS = 2
+
+# A chunk that failed with one of these is written again as two halves (CR-048 T2).
+SPLIT_KINDS = (errors.BUDGET, errors.TRUNCATED)
+# Errors that fail every other chunk the same way: the other chunks are cancelled
+# at once instead of being allowed to finish.
+STOP_NOW_KINDS = (errors.AUTH, errors.BALANCE, errors.NOT_CONFIGURED)
+
+
+class _NotStarted(Exception):
+    """A chunk (or half) that never reached the model because the run had already failed."""
 
 
 @dataclass
@@ -297,14 +313,21 @@ class CodePipeline:
         # One chunk's check is the final check when there is only one chunk.
         early_check = remotion and len(chunks) > 1
         chunk_rounds = [0] * len(chunks)
+        # Set once a chunk has failed: chunks already talking to the model finish
+        # (their billed output reaches the cache), nothing new starts.
+        stopping = False
 
-        async def do_chunk(n: int, ids: list[str]) -> None:
-            nonlocal done
+        async def write(n: int, ids: list[str], first: bool) -> dict[str, str]:
+            """One chunk's shots. A chunk the model could not finish within its
+            token budget is written again as two halves, down to one shot."""
             prev = by_id[ordered[ordered.index(ids[0]) - 1]] if ids[0] != ordered[0] else None
             nxt_i = ordered.index(ids[-1]) + 1
             nxt = by_id[ordered[nxt_i]] if nxt_i < len(ordered) else None
             key = _key(req.engine, "chunk", req.system, req.model, req.storyboard, frame, ",".join(ids))
-            used_keys.append(key)
+            # Remembers that this exact chunk already ran out of budget, so a
+            # re-run goes straight to the halves instead of paying for it again.
+            split_key = _key(key, "split")
+            used_keys.extend((key, split_key))
 
             def build(r: str | None) -> str:
                 if remotion:
@@ -312,27 +335,76 @@ class CodePipeline:
                 return prompts.manim_chunk(sb, frame, cast_names, ids, prev, nxt, r)
 
             async with sem:
-                await emit({"type": "chunk_start", "index": n + 1, "total": len(chunks), "shots": ids})
-                results[n] = await self._ask(
-                    req, "chunk", f"{ids[0]}-{ids[-1]}", build,
-                    lambda text: self._parse_shots(req.engine, ids, text), calls, key)
-            if early_check:
+                if stopping:
+                    raise _NotStarted
+                if first:
+                    await emit({"type": "chunk_start", "index": n + 1, "total": len(chunks), "shots": ids})
+                known_too_big = len(ids) > 1 and self._cache.get(split_key) is not None
+                if not known_too_big:
+                    try:
+                        return await self._ask(
+                            req, "chunk", f"{ids[0]}-{ids[-1]}", build,
+                            lambda text: self._parse_shots(req.engine, ids, text), calls, key)
+                    except PipelineFailure as exc:
+                        if exc.kind not in SPLIT_KINDS or len(ids) < 2:
+                            raise
+                        self._cache.put(split_key, exc.kind)
+            # Outside the semaphore: each half takes a slot of its own.
+            half = (len(ids) + 1) // 2
+            parts = [ids[:half], ids[half:]]
+            await emit({"type": "chunk_split", "index": n + 1, "total": len(chunks), "shots": ids, "into": parts})
+            out: dict[str, str] = {}
+            for part in parts:
+                out.update(await write(n, part, False))
+            return out
+
+        async def do_chunk(n: int, ids: list[str]) -> None:
+            nonlocal done, stopping
+            try:
+                results[n] = await write(n, ids, True)
+            except _NotStarted:
+                return
+            except BaseException:
+                # Set here, not when run() sees the error: the slot this chunk
+                # just freed may be handed to a waiting chunk first.
+                stopping = True
+                raise
+            if early_check and not stopping:
                 # Outside the semaphore: the check does not hold a generation slot;
                 # its repair calls take one each, like any other call.
                 chunk_rounds[n] = await self._settle_chunk(
-                    req, sb, frame, n, len(chunks), results[n], calls, sem, emit)
+                    req, sb, frame, n, len(chunks), results[n], calls, sem, emit, lambda: stopping)
             done += 1
             await emit({"type": "chunk_done", "index": n + 1, "total": len(chunks), "done": done})
 
         await emit({"type": "phase", "phase": "chunks", "total": len(chunks)})
-        tasks = [asyncio.create_task(do_chunk(n, ids)) for n, ids in enumerate(chunks)]
+        tasks = {asyncio.create_task(do_chunk(n, ids)): n for n, ids in enumerate(chunks)}
+        failure: PipelineFailure | None = None
+        pending = set(tasks)
         try:
-            await asyncio.gather(*tasks)
+            while pending:
+                finished, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_EXCEPTION)
+                for t in sorted(finished, key=tasks.__getitem__):
+                    exc = t.exception()
+                    if exc is None:
+                        continue
+                    if not isinstance(exc, PipelineFailure) or exc.kind in STOP_NOW_KINDS:
+                        # A dead key / no balance / no provider fails every other
+                        # chunk the same way, and an unexpected error is not a
+                        # chunk's fault: stop paying at once.
+                        raise exc
+                    if failure is None:
+                        failure = exc
         except BaseException:
+            # Also the Creator cancelling the run (CancelledError): stop at once.
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
+        if failure is not None:
+            # `calls` is the run's shared list, so it now also holds what the
+            # chunks that were allowed to finish spent.
+            raise failure
 
         shots: dict[str, str] = {}
         for n in range(len(chunks)):
@@ -379,13 +451,18 @@ class CodePipeline:
     async def _settle_chunk(
         self, req: CodeRequest, sb: Storyboard, frame: str, index: int, total: int,
         shots: dict[str, str], calls: list[Call], sem: asyncio.Semaphore, emit: Emit,
+        stopped: Callable[[], bool] = lambda: False,
     ) -> int:
         """Compile one Remotion chunk (`shots` holds exactly its shots) against stubs
         for every other shot and repair its own failing shots, up to the repair cap. Returns the rounds
         used. What it cannot settle here (an error in LAYOUT or outside the chunk,
-        the checker being unreachable) is left to the full-file check."""
+        the checker being unreachable) is left to the full-file check. Stops
+        before another repair round once `stopped()` says the run has failed:
+        repairs are not cached, so they would be paid for and thrown away."""
         rounds = 0
         while True:
+            if stopped():
+                return rounds
             merged = merger.merge_remotion(sb, frame, shots, stub_missing=True, library=self._library)
             try:
                 check = await self._checker.check("remotion", merged.code, merged.scene_class_name)

@@ -250,12 +250,18 @@ func TestCodeStepProgressReflectsChunksAndRepairRounds(t *testing.T) {
 	gen.events = []application.CodeEvent{
 		{Type: "phase", Phase: "chunks", Total: 4},
 		{Type: "chunk_done", Done: 3, Total: 4},
+		// CR-048 T2: a chunk written again as two halves is still one chunk of
+		// the progress; the event changes nothing here.
+		{Type: "chunk_split", Index: 4, Total: 4},
 		{Type: "phase", Phase: "repair", Round: 2, Total: 3},
 	}
 	uc.WithPipeline(&stubFinalizer{}, &progressSpy{inner: gen, uc: uc, out: &seen})
 
 	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil {
 		t.Fatal(err)
+	}
+	if seen[2] != seen[1] {
+		t.Errorf("chunk_split changed the progress: %+v -> %+v", seen[1], seen[2])
 	}
 	last := seen[len(seen)-1]
 	if last.Phase != "repair" || last.ChunksDone != 3 || last.ChunksTotal != 4 || last.RepairRound != 2 || last.RepairMax != 3 {

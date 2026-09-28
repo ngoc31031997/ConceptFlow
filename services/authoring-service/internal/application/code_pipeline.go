@@ -44,8 +44,10 @@ type CodeGenRequest struct {
 	Illustrations []LibraryDrawing
 }
 
-// CodeEvent is one progress event of a run. Type is "phase", "chunk_start" or
-// "chunk_done"; the other fields are filled as they apply.
+// CodeEvent is one progress event of a run. Type is "phase", "chunk_start",
+// "chunk_done", "chunk_repair" or "chunk_split" (a chunk the model ran out of
+// token budget on, written again as two halves; CR-048 T2); the other fields
+// are filled as they apply. Types the progress does not use are ignored.
 type CodeEvent struct {
 	Type    string
 	Phase   string // layout | cast | chunks | merge | check | repair
