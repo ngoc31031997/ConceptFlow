@@ -49,7 +49,7 @@ class DataTable(Component):
 
         def place(cells: list[Text]) -> VGroup:
             x = 0.0
-            for cell, width in zip(cells, widths):
+            for cell, width in zip(cells, widths, strict=False):
                 cell.move_to([x + cell.width / 2, 0, 0])
                 x += width + 2 * CELL_PAD_X
             return VGroup(*cells)

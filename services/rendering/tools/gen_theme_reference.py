@@ -4,8 +4,8 @@ Ghi vào `orchestrator/internal/domain/prompts/` — nơi Orchestrator embed. Ch
 mỗi khi sửa `conceptflow/theme.py` hoặc `conceptflow/api.py`.
 """
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))

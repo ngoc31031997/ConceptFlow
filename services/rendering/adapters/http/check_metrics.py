@@ -11,8 +11,8 @@ from __future__ import annotations
 
 import math
 from collections import deque
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 WINDOW = 500  # most recent checks kept for the percentile
 
@@ -47,7 +47,9 @@ class CheckMetrics:
         finally:
             self._active_commands -= 1
 
-    def record(self, *, wait_seconds: float, run_seconds: float, renders_running: int, timed_out: bool) -> None:
+    def record(
+        self, *, wait_seconds: float, run_seconds: float, renders_running: int, timed_out: bool
+    ) -> None:
         self.checks_total += 1
         self._waits.append(wait_seconds)
         self._runs.append(run_seconds)

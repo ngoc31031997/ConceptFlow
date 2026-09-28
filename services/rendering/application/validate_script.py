@@ -26,9 +26,9 @@ from dataclasses import dataclass, field
 
 from domain.lottie_catalog import lint_lottie_ids
 from domain.models import DryRunResult, ScriptRenderRequest
-from domain.script_locator import SceneNotFoundError, locate_scene
 from domain.ports import ManimScriptRendererPort
 from domain.script_lint import LintIssue, blocking_issues, lint_manim_script
+from domain.script_locator import SceneNotFoundError, locate_scene
 
 logger = logging.getLogger(__name__)
 

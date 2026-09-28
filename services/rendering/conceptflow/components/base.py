@@ -20,7 +20,7 @@ class Component(VGroup):
         super().__init__(**kwargs)
         self.theme = theme or DEFAULT
 
-    def finish(self) -> "Component":
+    def finish(self) -> Component:
         """Gọi ở cuối mỗi __init__ của component con.
 
         Tách thành bước riêng thay vì làm tự động vì component chỉ đo được kích

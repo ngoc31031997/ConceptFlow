@@ -7,3 +7,10 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# The template fixture mirrors the Creator-facing starter script, which uses
+# `from conceptflow import *` on purpose.
+"tests/fixtures/conceptflow_template.py" = ["F403", "F405", "E501"]
+# Offline asset generators: dense geometry/data tables, not service code.
+"tools/*" = ["E501", "E702"]

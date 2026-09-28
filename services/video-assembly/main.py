@@ -16,24 +16,24 @@ import signal
 import aio_pika
 
 from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS, FfmpegVideoAssembler
+from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
-    RegisterChannelAssetCommandHandler,
     GenerateClipsCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
+    RegisterChannelAssetCommandHandler,
     VideoAssemblyCommandDispatcher,
 )
-from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
-from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
+from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.db import create_pool
-from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
+from adapters.storage.artifact_paths import purge_project_artifacts
 from application.assemble_video import AssembleVideoUseCase
 from domain.clip_rules import ClipThresholds
 from domain.qc_rules import QCThresholds

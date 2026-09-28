@@ -1,5 +1,4 @@
 import httpx
-import pytest
 
 from adapters.http.check_server import create_check_app
 from adapters.rendering.typescript_checker import TypeScriptCheckError
@@ -38,7 +37,9 @@ async def test_manim_route_uses_manim():
 async def test_bad_input_is_400_and_a_broken_checker_is_503_never_ok():
     r = await client(Fake(raises=ValueError("code is empty"))).post("/v1/check/remotion", json={"code": ""})
     assert r.status_code == 400
-    r = await client(Fake(raises=TypeScriptCheckError("tsc not found"))).post("/v1/check/remotion", json={"code": "c"})
+    r = await client(Fake(raises=TypeScriptCheckError("tsc not found"))).post(
+        "/v1/check/remotion", json={"code": "c"}
+    )
     assert r.status_code == 503 and "ok" not in r.json()
 
 
@@ -52,7 +53,9 @@ async def test_metrics_report_wait_run_timeouts_and_overlap_with_render():
     await c.post("/v1/check/manim", json={"code": "c"})
     with metrics.command_running():
         await c.post("/v1/check/manim", json={"code": "c"})
-    app_broken = create_check_app(Fake(raises=TypeScriptCheckError("tsc timed out after 90s")), metrics=metrics)
+    app_broken = create_check_app(
+        Fake(raises=TypeScriptCheckError("tsc timed out after 90s")), metrics=metrics
+    )
     cb = httpx.AsyncClient(transport=httpx.ASGITransport(app=app_broken), base_url="http://r")
     await cb.post("/v1/check/remotion", json={"code": "c"})
 

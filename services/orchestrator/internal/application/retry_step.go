@@ -48,8 +48,8 @@ var failedStatusToStep = map[domain.ProjectStatus]domain.StepName{
 	domain.StatusFailedAssembleVideo:    domain.StepAssembleVideo,
 	// Only reachable when the qc_completed message itself was unusable — QC
 	// never reports a failure of its own (FR61.4).
-	domain.StatusFailedQCVideo: domain.StepQCVideo,
-	domain.StatusFailedPublishVideo:     domain.StepPublishVideo,
+	domain.StatusFailedQCVideo:      domain.StepQCVideo,
+	domain.StatusFailedPublishVideo: domain.StepPublishVideo,
 }
 
 // RetryStepUseCase implements Rule 5: reconstructs the failed step's command

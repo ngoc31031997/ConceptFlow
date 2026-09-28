@@ -68,7 +68,8 @@ def make_envelope(message_id: str = "msg-1", scenes: list | None = None) -> byte
         "payload": {
             "scenes": scenes,
             "script_content": (
-                "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate(\"xin chào\")\n"
+                "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
+                "    def construct(self):\n        self.narrate(\"xin chào\")\n"
             ),
             "scene_class_name": "DemoScene",
         },

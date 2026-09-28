@@ -33,7 +33,7 @@ class SubtitleCue:
     start_time: float
     end_time: float
 
-    def shifted_by(self, seconds: float) -> "SubtitleCue":
+    def shifted_by(self, seconds: float) -> SubtitleCue:
         """Returns a copy moved later in the timeline by `seconds` (ADR-0027).
 
         This is the ONLY place a subtitle timestamp gets shifted. The .ass and

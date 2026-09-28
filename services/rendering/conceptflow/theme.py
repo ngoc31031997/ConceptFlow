@@ -175,7 +175,7 @@ class Theme:
     shapes: Shapes = field(default_factory=Shapes)
     safe_margin: float = SAFE_MARGIN
 
-    def derive(self, name: str, **overrides: object) -> "Theme":
+    def derive(self, name: str, **overrides: object) -> Theme:
         """Theme con: giữ mọi thứ, chỉ đổi cái được nêu."""
         return replace(self, name=name, **overrides)  # type: ignore[arg-type]
 

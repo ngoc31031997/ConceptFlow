@@ -49,7 +49,6 @@ from .transitions import (
     travel_animation,
 )
 
-
 #: Ngưỡng chồng lấn (tỉ lệ diện tích giao nhau trên diện tích vật NHỎ HƠN
 #: trong cặp). Bug report (2026-09-12): một caption không định vị chồng khít
 #: lên một bảng/table đang hiện — cả hai không đọc được. 25% là ngưỡng cho

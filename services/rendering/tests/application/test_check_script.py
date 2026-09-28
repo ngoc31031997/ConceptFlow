@@ -51,7 +51,9 @@ def test_remotion_reports_tsc_diagnostics_with_lines():
 
 
 def test_gate_and_tsc_failures_are_both_reported():
-    validate = FakeValidate(ScriptValidationError("bad lottie", [LintIssue(line=7, message="unknown lottie id")]))
+    validate = FakeValidate(
+        ScriptValidationError("bad lottie", [LintIssue(line=7, message="unknown lottie id")])
+    )
     out = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")])).check("remotion", "code", "creator")
     assert [d.line for d in out.diagnostics] == [7, 3]
 

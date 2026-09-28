@@ -58,9 +58,9 @@ func (r *QCReportRepository) LatestQCReport(ctx context.Context, projectID strin
 		FROM qc_reports WHERE project_id = $1 ORDER BY created_at DESC LIMIT 1`, projectID)
 
 	var (
-		report                          domain.QCReport
-		status                          string
-		findingsJSON, overriddenJSON    []byte
+		report                       domain.QCReport
+		status                       string
+		findingsJSON, overriddenJSON []byte
 	)
 	err := row.Scan(&report.ProjectID, &status, &report.Reason, &findingsJSON,
 		&report.CreatedAt, &report.OverriddenAt, &overriddenJSON)

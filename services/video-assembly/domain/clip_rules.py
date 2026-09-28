@@ -40,7 +40,7 @@ class ClipThresholds:
     long_max_seconds: float = CLIP_PRESET_LONG_MAX_SECONDS
 
     @classmethod
-    def from_env(cls, env: dict | None = None) -> "ClipThresholds":
+    def from_env(cls, env: dict | None = None) -> ClipThresholds:
         source = os.environ if env is None else env
         get = source.get
         return cls(

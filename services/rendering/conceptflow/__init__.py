@@ -11,21 +11,21 @@ video tham vọng nhất thì nó đang làm hại chứ không giúp.
 
 from manim import DOWN, LEFT, ORIGIN, RIGHT, UP, VGroup
 
+from .api import PUBLIC_NAMES
 from .components import (
     BarChart,
+    Callout,
+    CodePanel,
+    ComparisonSplit,
     DataTable,
     FlowDiagram,
     FunctionPlot,
     Readout,
-    Timeline,
-    Callout,
-    CodePanel,
-    ComparisonSplit,
     Recap,
     StepList,
+    Timeline,
     TitleCard,
 )
-from .api import PUBLIC_NAMES
 from .layout import Box, contrast_ratio, overflow, overlaps, safe_area
 from .scene import ConceptFlowScene
 from .theme import Theme, available, get, register

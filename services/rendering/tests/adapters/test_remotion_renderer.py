@@ -12,6 +12,7 @@ import json
 import time
 
 import pytest
+
 from adapters.rendering.remotion_renderer import RemotionScriptRenderer, _extract_narrations
 from domain.errors import AnimationEngineError
 from domain.models import NarrationSegment, ScriptRenderRequest
@@ -217,8 +218,12 @@ class TestRender:
         monkeypatch.setattr("adapters.rendering.remotion_renderer.HEARTBEAT_INTERVAL_SECONDS", 0.05)
 
         beats = []
-        renderer = RemotionScriptRenderer(project_template_dir=str(template_dir), cache_root=str(tmp_path / "media"))
-        renderer.set_heartbeat(lambda elapsed, animation_index, percent: beats.append((animation_index, percent)))
+        renderer = RemotionScriptRenderer(
+            project_template_dir=str(template_dir), cache_root=str(tmp_path / "media")
+        )
+        renderer.set_heartbeat(
+            lambda elapsed, animation_index, percent: beats.append((animation_index, percent))
+        )
         renderer.render(make_request(tmp_path), str(tmp_path / "out.mp4"))
 
         assert beats, "a render longer than the interval must beat at least once"

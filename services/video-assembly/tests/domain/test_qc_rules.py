@@ -12,7 +12,6 @@ from domain.qc_rules import (
     FRAME_HEIGHT,
     FRAME_WIDTH,
     SEVERITY_BLOCKING,
-    SEVERITY_WARNING,
     QCThresholds,
     check_clipping,
     check_frame_overflow,

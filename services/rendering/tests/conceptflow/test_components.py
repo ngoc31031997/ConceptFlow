@@ -12,16 +12,16 @@ pytest.importorskip("manim", reason="component cần manim thật để đo boun
 from conceptflow import (  # noqa: E402
     BarChart,
     Callout,
+    CodePanel,
+    ComparisonSplit,
     ConceptFlowScene,
     DataTable,
     FlowDiagram,
     FunctionPlot,
     Readout,
-    Timeline,
-    CodePanel,
-    ComparisonSplit,
     Recap,
     StepList,
+    Timeline,
     TitleCard,
 )
 from conceptflow.api import PUBLIC_NAMES  # noqa: E402
