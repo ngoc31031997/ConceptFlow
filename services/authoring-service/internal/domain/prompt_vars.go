@@ -179,6 +179,21 @@ func NarrateExample(language string) string {
 	return "The English narration line for this beat"
 }
 
+// BeatSheetWordsPerMinute is the speaking rate the beat budgets are converted
+// at: the voice's measured rate when there is one (calibratedWPM > 0), else
+// the language default, else English. The outline prompt (words per beat) and
+// the storyboard length check (seconds per scene, CR-048 T8) both use it, so
+// the budget the model was given and the one it is checked against agree.
+func BeatSheetWordsPerMinute(language string, calibratedWPM float64) float64 {
+	if calibratedWPM > 0 && !math.IsInf(calibratedWPM, 0) {
+		return calibratedWPM
+	}
+	if wpm, ok := wordsPerMinute[language]; ok {
+		return wpm
+	}
+	return wordsPerMinute["en"]
+}
+
 // BuildStoryBeatSheetSection renders {{format_beats}}: the beats of the
 // chosen format with their budgets converted from seconds into words, at the
 // speaking rate of the voice this project will actually use.
@@ -193,13 +208,7 @@ func NarrateExample(language string) string {
 // required/optional wording — so it is a port, and prompt_vars_test.go holds
 // it to golden files generated from the TypeScript it replaces.
 func BuildStoryBeatSheetSection(format VideoFormat, language string, calibratedWPM float64) string {
-	wpm := calibratedWPM
-	if wpm == 0 {
-		var ok bool
-		if wpm, ok = wordsPerMinute[language]; !ok {
-			wpm = wordsPerMinute["en"]
-		}
-	}
+	wpm := BeatSheetWordsPerMinute(language, calibratedWPM)
 	// JavaScript's Math.round is half-up; Go's math.Round is
 	// half-away-from-zero. Budgets are always positive, so the two agree —
 	// the golden files are what prove it rather than this comment.

@@ -283,3 +283,28 @@
   flex-wrap: wrap;
   gap: var(--space-xs);
 }
+
+/* CR-048 T8/T9 — non-blocking warnings from the storyboard step: a bordered
+   box with a warning-coloured edge, left-aligned like the status lines. */
+.warnings {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--space-xs) var(--space-sm);
+  border: var(--border-w) solid var(--border-color);
+  border-left: 6px solid var(--warning);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  font-size: 12.5px;
+  color: var(--ink);
+  text-align: left;
+}
+.warnings ul {
+  margin: 4px 0 0;
+  padding-left: 1.2rem;
+  line-height: 1.5;
+}
+.warningsTitle {
+  margin: 0;
+  font-weight: 700;
+}
