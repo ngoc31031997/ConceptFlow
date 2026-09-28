@@ -7,13 +7,33 @@ Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as `/<na
 | `/cr-start <slug> [NNN]` | A new change request | Clean-tree check, sync `main`, next CR number (audit log, requirement docs, existing branches), `feature/cr-NNN-slug`, open AI-DLC Requirements Analysis, then wait for approval | git; `.ai-dlc/` rules |
 | `/cr-check [all]` | Before saying "done" | `make check` (or `make check-all`), failures as a table with cause and next action; separates branch-caused from pre-existing failures with evidence | `scripts/check.sh` |
 | `/rebuild [svc…]` | After service code changes (CLAUDE.md Docker rebuild policy) | Build + restart the changed (or named) compose services, wait for healthy, show logs on failure | `scripts/rebuild.sh` |
-| `/cr-review [NNN]` | Before merge | Code review, security review, QC of acceptance criteria vs implementation vs tests; PASS/FAIL | built-in `code-review`, `security-review` (interim, see below) |
+| `/cr-review [NNN]` | Before merge | Runs the read-only `reviewer`, `security-reviewer`, `tester` agents in parallel on the committed tree; PASS only if all three pass | `.claude/agents/`; verdicts recorded by the SubagentStop hook |
 | `/cr-finish` | After the Creator approves the final stage | Approval check → diff sanity → AI-DLC records → merge `origin/main` → `/cr-check` → `/cr-review` → merge `--no-ff` → separate push of `main` → watch CI | merge gate hook (`hooks.md`) |
 
 ## Deviations from the spec (§10)
 
 - `/cr-finish` merges locally and pushes `main` instead of opening a PR (decision D1). It cannot bypass the gate: the gate is a hook, not a step the skill chooses to run.
-- `/cr-review` is **not independent** yet: it runs in the session that wrote the code. Phase 7 moves it to the role agents.
+- Since Phase 7, `/cr-review` delegates to independent read-only agents; the Phase 6 interim version (built-in `code-review`/`security-review` in the same session) is gone.
+
+## Role agents (`.claude/agents/`)
+
+| Agent | Tools | Used by | In merge gate |
+|---|---|---|---|
+| `solution-architect` | Read, Grep, Glob | AI-DLC Design stage, before code | No |
+| `reviewer` | Read, Grep, Glob | `/cr-review` | Yes |
+| `security-reviewer` | Read, Grep, Glob | `/cr-review` | Yes |
+| `tester` | Read, Grep, Glob | `/cr-review` | Yes |
+
+No shell and no edit tools: they cannot change the code they judge. Each ends with a machine-readable `VERDICT:` line (see `hooks.md`). Claude Code loads agent definitions at session start; a session started before an agent file changed does not see the change.
+
+## `scripts/review-prep.sh`, `scripts/review-status.sh`
+
+```bash
+scripts/review-prep.sh CR-050 aidlc-docs/inception/requirements/cr-050-foo.md   # writes diff + brief for HEAD's tree, prints the brief
+scripts/review-status.sh                                                        # markers for HEAD's tree + review hook log; exit 0 = gate would pass
+```
+
+See `hooks.md` (Review markers) for what the hook verifies.
 
 ## `scripts/rebuild.sh`
 

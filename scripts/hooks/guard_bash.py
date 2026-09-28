@@ -7,10 +7,12 @@ blocks it and the stderr message is shown to the agent.
 1. Secrets: the Read/Edit deny rules in .claude/settings.json do not cover the
    shell, so `cat .env` or `docker compose config` would print real secrets.
 2. Merge gate (implementation-audit D1): while on main, `git merge <ref>` needs
-   `make check` to have passed on <ref>'s tree (marker written by
-   scripts/check.sh), and <ref> must already contain main so the merge result
-   is that same tree. `git push` updating main needs the pushed commit's tree
-   to be marked.
+   <ref>'s tree to have passed `make check` (marker written by scripts/check.sh)
+   and the reviewer, security-reviewer and tester agents (markers written by
+   record_review.py), and <ref> must already contain main so the merge result
+   is that same tree. `git push` updating main needs the same for the pushed
+   commit's tree.
+3. The marker directories themselves may not be touched from the shell.
 
 This matches command text; it is a guard against mistakes, not a sandbox. See
 docs/agentic/autonomy-policy.md, "Known gaps".
@@ -36,10 +38,19 @@ COMPOSE_CONFIG_SAFE = re.compile(r"--(?:services|volumes|profiles|images|network
 
 SEPARATORS = {"&&", "||", ";", "|", "&", "(", ")", "\n"}
 
+REVIEW_AGENTS = ("reviewer", "security-reviewer", "tester")
+MARKER_DIRS = re.compile(r"conceptflow/(?:checked-trees|reviewed-trees|review)\b")
+
 
 def block(message):
     print(message, file=sys.stderr)
     sys.exit(2)
+
+
+def check_markers(command):
+    if MARKER_DIRS.search(command):
+        block("Blocked: the merge-gate marker directories are written only by `make check` "
+              "and the review-agent hook. Run /cr-check or /cr-review instead.")
 
 
 def check_secrets(command):
@@ -62,15 +73,20 @@ def git(cwd, *args):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def marks_dir(cwd):
-    common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
-    return os.path.join(common, "conceptflow", "checked-trees") if common else None
-
-
-def tree_checked(cwd, rev):
+def gate_missing(cwd, rev):
+    """What the gate still needs for rev's tree: 'make check' and/or review agents."""
     tree = git(cwd, "rev-parse", "--verify", "--quiet", rev + "^{tree}")
-    marks = marks_dir(cwd)
-    return bool(tree and marks and os.path.exists(os.path.join(marks, tree)))
+    common = git(cwd, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    if not tree or not common:
+        return ["make check"] + ["review by " + a for a in REVIEW_AGENTS]
+    base = os.path.join(common, "conceptflow")
+    missing = []
+    if not os.path.exists(os.path.join(base, "checked-trees", tree)):
+        missing.append("make check")
+    for agent in REVIEW_AGENTS:
+        if not os.path.exists(os.path.join(base, "reviewed-trees", f"{tree}.{agent}")):
+            missing.append("review by " + agent)
+    return missing
 
 
 def segments(command):
@@ -143,10 +159,11 @@ def gate_merge(cwd, refs):
             block(f"Blocked: '{ref}' does not contain the current main, so the merge result "
                   f"would be a tree `make check` never saw. On '{ref}': merge or rebase main, "
                   f"run `make check`, commit, then merge.")
-        if not tree_checked(cwd, ref):
-            block(f"Blocked by merge gate (D1): `make check` has not passed on '{ref}' as "
-                  f"committed. Check out '{ref}', commit everything, run `make check` "
-                  f"(it must pass on a clean tree), then merge.")
+        missing = gate_missing(cwd, ref)
+        if missing:
+            block(f"Blocked by merge gate (D1): '{ref}' as committed still lacks a pass of: "
+                  f"{', '.join(missing)}. Check out '{ref}', commit everything, run /cr-check "
+                  f"(make check on a clean tree) and /cr-review, then merge.")
 
 
 def push_targets_main(args, branch):
@@ -185,10 +202,11 @@ def gate_push(cwd, revs, changed_main_earlier):
         if git(cwd, "rev-parse", rev) == git(cwd, "rev-parse", "--verify", "--quiet",
                                               "origin/" + MAIN):
             continue  # nothing new reaches main
-        if not tree_checked(cwd, rev):
-            block(f"Blocked by merge gate (D1): the tree of '{rev}' has not passed "
-                  f"`make check`. Only a merge of a checked branch that already contains "
-                  f"main can be pushed to main.")
+        missing = gate_missing(cwd, rev)
+        if missing:
+            block(f"Blocked by merge gate (D1): the tree of '{rev}' still lacks a pass of: "
+                  f"{', '.join(missing)}. Only a merge of a checked and reviewed branch that "
+                  f"already contains main can be pushed to main.")
 
 
 def check_git(command, cwd):
@@ -230,6 +248,7 @@ def main():
     command = (payload.get("tool_input") or {}).get("command") or ""
     cwd = payload.get("cwd") or os.getcwd()
     check_secrets(command)
+    check_markers(command)
     check_git(command, cwd)
 
 
