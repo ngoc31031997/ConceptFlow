@@ -16,6 +16,7 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
+import httpx
 import openai
 from openai import AsyncOpenAI
 
@@ -126,7 +127,7 @@ class Provider:
                 return await self._once(req, on_progress)
             except LLMError as err:
                 last = err
-                if err.kind not in errors.RETRYABLE:
+                if err.kind not in errors.RETRYABLE or not err.retryable:
                     break
         assert last is not None
         raise last
@@ -139,9 +140,12 @@ class Provider:
             f"system_chars={len(req.system)} user_chars={len(req.user)}"
         ]
 
-        def fail(kind: str, message: str, usage: Usage | None = None, partial: str = "") -> LLMError:
+        def fail(
+            kind: str, message: str, usage: Usage | None = None, partial: str = "", retryable: bool = True,
+        ) -> LLMError:
             diag.append(f"elapsed: {time.monotonic() - started:.3f}s")
-            return LLMError(kind, self.name, message, usage or Usage(model=model), partial, "\n".join(diag))
+            return LLMError(
+                kind, self.name, message, usage or Usage(model=model), partial, "\n".join(diag), retryable)
 
         messages = []
         if req.system.strip():
@@ -171,6 +175,8 @@ class Provider:
         chunks = 0
         try:
             stream = await self._client.chat.completions.create(**kwargs)
+            request_id = stream.response.headers.get("x-request-id", "")
+            diag.append(f"response: http={stream.response.status_code} request_id={request_id!r}")
             async for chunk in stream:
                 chunks += 1
                 if chunk.model:
@@ -206,6 +212,13 @@ class Provider:
             raise fail(errors.SERVER, f"{self.name} sent an error inside the stream: {exc.message}") from exc
         except TimeoutError as exc:
             raise fail(errors.TIMEOUT, f"call {self.name}: timed out") from exc
+        # Past the first byte the SDK no longer wraps transport errors, so a
+        # connection the provider drops mid-reply arrives as raw httpx.
+        except httpx.TimeoutException as exc:
+            raise fail(errors.TIMEOUT, f"call {self.name}: timed out mid-stream: {exc}") from exc
+        except httpx.TransportError as exc:
+            diag.append(f"stream: chunks={chunks} reasoning_chars={reasoning_chars} content_chars={content_chars}")
+            raise fail(errors.SERVER, f"{self.name} dropped the connection mid-stream: {exc}") from exc
 
         text = "".join(content).strip()
         usage = _usage_from(raw_usage, resp_model or model)
@@ -213,6 +226,16 @@ class Provider:
             f"stream: chunks={chunks} reasoning_chars={reasoning_chars} content_chars={content_chars} "
             f"finish_reason={finish}"
         )
+
+        # A 200 stream that closes without a single event never started, let
+        # alone finished cleanly: the provider dropped it (measured on Hive's
+        # deepseek-v4.1-flash, which does this to the same request every time).
+        if chunks == 0:
+            raise fail(
+                errors.SERVER,
+                f"{self.name} closed the stream without sending anything (no reasoning, no answer, no finish_reason)",
+                retryable=False,
+            )
 
         # D13: "empty" and "ran out of room" are different problems, and a
         # reasoning model turns the second into the first. DeepSeek reports

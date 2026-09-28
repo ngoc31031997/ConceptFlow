@@ -7,7 +7,7 @@
   ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "10s",
   "time": {
     "from": "now-1h",
@@ -56,9 +56,17 @@
           {
             "text": "web-gui",
             "value": "web-gui"
+          },
+          {
+            "text": "authoring-service",
+            "value": "authoring-service"
+          },
+          {
+            "text": "llm-service",
+            "value": "llm-service"
           }
         ],
-        "query": "api-gateway,orchestrator,script-processing,tts,rendering,video-assembly,publisher,web-gui",
+        "query": "api-gateway,orchestrator,script-processing,tts,rendering,video-assembly,publisher,web-gui,authoring-service,llm-service",
         "includeAll": false,
         "multi": false
       }
@@ -350,6 +358,84 @@
       }
     },
     {
+      "id": 18,
+      "type": "stat",
+      "title": "authoring-service",
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 6,
+        "y": 1
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"authoring-service\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "llm-service",
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 5
+      },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({container=\"llm-service\"} |~ `(?i)error|exception|traceback|panic|fatal|empty` [15m]))",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
       "id": 2,
       "type": "row",
       "title": "Error rate over time (all services)",
@@ -357,7 +443,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 5
+        "y": 9
       }
     },
     {
@@ -372,11 +458,11 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 10
       },
       "targets": [
         {
-          "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|script-processing|tts|rendering|video-assembly|publisher|web-gui\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))",
+          "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|script-processing|tts|rendering|video-assembly|publisher|web-gui|authoring-service|llm-service\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))",
           "refId": "A"
         }
       ]
@@ -389,7 +475,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 14
+        "y": 18
       }
     },
     {
@@ -404,7 +490,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 19
       },
       "options": {
         "showTime": true,
@@ -430,7 +516,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 19
       },
       "options": {
         "showTime": true,

@@ -67,6 +67,9 @@ class LLMError(Exception):
     # The provider's own account of the call (status, request id,
     # finish_reason, body) for the error log. Not shown to the Creator.
     diag: str = ""
+    # False stops a RETRYABLE kind from being retried when another attempt is
+    # known to fail the same way and would only double the wait.
+    retryable: bool = True
 
     def __str__(self) -> str:
         return f"{self.provider}: {self.kind}: {self.message}"

@@ -7,7 +7,7 @@ import respx
 from app import errors
 from app.errors import LLMError
 from app.provider import ChatRequest, Provider
-from tests.conftest import chunk, stream_response, usage_chunk
+from tests.conftest import chunk, sse, stream_response, usage_chunk
 
 BASE = "https://hive.test/api/v3"
 URL = BASE + "/chat/completions"
@@ -98,6 +98,40 @@ async def test_empty_content_is_not_always_the_same_failure(no_sleep):
         await make(no_sleep).chat(ChatRequest(user="u", max_tokens=100))
     assert e.value.kind == errors.BUDGET
     assert e.value.usage.reasoning_tokens == 100
+
+
+@respx.mock
+async def test_stream_that_never_starts_is_a_provider_failure_not_retried(no_sleep):
+    # Hive's deepseek-v4.1-flash: 200, then nothing but [DONE] after a long wait.
+    route = respx.post(URL).mock(return_value=httpx.Response(
+        200, headers={"content-type": "text/event-stream", "x-request-id": "req-123"}, text=sse("[DONE]")))
+    with pytest.raises(LLMError) as e:
+        await make(no_sleep, retries=2).chat(ChatRequest(user="u", max_tokens=1000))
+    assert e.value.kind == errors.SERVER
+    assert route.call_count == 1
+    assert "request_id='req-123'" in e.value.diag
+    assert "chunks=0" in e.value.diag
+
+
+class _DropsMidStream(httpx.AsyncByteStream):
+    def __init__(self, first: str) -> None:
+        self._first = first
+
+    async def __aiter__(self):
+        yield self._first.encode()
+        raise httpx.RemoteProtocolError("peer closed connection without sending complete message body")
+
+
+@respx.mock
+async def test_connection_dropped_mid_stream_is_server(no_sleep):
+    route = respx.post(URL).mock(return_value=httpx.Response(
+        200, headers={"content-type": "text/event-stream"}, stream=_DropsMidStream(sse(chunk(reasoning="thinking")))))
+    with pytest.raises(LLMError) as e:
+        await make(no_sleep, retries=0).chat(ChatRequest(user="u"))
+    assert e.value.kind == errors.SERVER
+    assert "mid-stream" in e.value.message
+    assert "chunks=1" in e.value.diag
+    assert route.call_count == 1
 
 
 @respx.mock

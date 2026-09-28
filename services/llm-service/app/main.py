@@ -103,11 +103,14 @@ def _stream(work: Callable[[Callable[[dict], Awaitable[None]]], Awaitable[dict]]
                 await queue.put({"type": "result", **result})
             except PipelineFailure as exc:
                 err = exc.error.to_dict() if exc.error else {"kind": exc.kind, "message": exc.message}
+                diag = exc.error.diag if exc.error else ""
+                logger.warning("pipeline failure: %s\n%s", exc.message, diag)
                 await queue.put({
                     "type": "error", "error": {**err, "message": exc.message, "kind": exc.kind},
                     "calls": [c.to_dict() for c in exc.calls],
                 })
             except LLMError as exc:
+                logger.warning("llm call failed: %s\n%s", exc, exc.diag)
                 await queue.put({"type": "error", "error": exc.to_dict(), "calls": []})
             except _CheckerUnavailable as exc:
                 await queue.put({
@@ -137,6 +140,7 @@ async def _suggestion(stream: bool, run):
         try:
             return await run()
         except LLMError as err:
+            logger.warning("llm call failed: %s\n%s", err, err.diag)
             return _error_response(err)
 
     async def work(emit):
@@ -225,6 +229,7 @@ def create_app(
                         max_tokens=body.max_tokens, temperature=0.0))
                 except LLMError as err:
                     err.usage = total + err.usage
+                    logger.warning("llm call failed: %s\n%s", err, err.diag)
                     return _error_response(err)
                 total = total + res.usage
                 content = res.content
