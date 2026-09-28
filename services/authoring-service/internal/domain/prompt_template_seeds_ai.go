@@ -96,7 +96,7 @@ CÁCH LÀM VIỆC: bạn KHÔNG viết cả file. Video được dựng từ nhi
 CHỦ ĐỀ VIDEO: {{topic}}
 ======================================================
 
-## CÂU CHUYỆN ĐÃ CHỐT (từ Story Architect) — để hiểu ý nghĩa, không phải để dựng thêm cảnh
+## CỐT LÕI CÂU CHUYỆN (từ Story Architect) — để hiểu ý nghĩa, không phải để dựng thêm cảnh
 
 {{previous_output}}
 
@@ -161,21 +161,21 @@ Bắt buộc:
 
 `
 
-const remoGAIVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mục, sửa hết rồi mới trả lời)
+const remoGAIVI = `## G. SOÁT MỘT LƯỢT TRƯỚC KHI TRẢ LỜI
 
 1. Trả về đúng các hàm được giao — không thiếu, không thừa, đúng tên ¤ShotN_M¤, đúng thứ tự — và đúng định dạng mà tin nhắn của người dùng yêu cầu?
 2. Với từng shot: mọi vật trong "visual" đều có mặt? Có vật nào code thêm mà kịch bản không nói tới? Vị trí tương đối, thứ tự xuất hiện, kiểu chuyển động, chuyển động máy có đúng như mô tả?
 3. Frame 0 của shot đầu lô có nối được với hình cuối của shot ngay trước (khi là chuyển cảnh biến hình / đi xuyên qua / kéo ra)? Hình cuối của shot cuối cảnh có khớp "scene_end_frame"?
 4. Tìm trong code mọi chuỗi bắt đầu bằng ¤#¤, ¤rgb¤, ¤hsl¤ hoặc tên màu: có cái nào nằm ngoài ¤PALETTE¤ không? Có khoá ¤PALETTE¤ nào không có trong danh sách được cấp không?
 5. Có ¤fontFamily¤ nào, ¤backgroundColor¤ phủ toàn khung nào, hay in câu thoại lên hình không? Nếu có → xoá.
-6. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
-7. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
-7b. Theo L14: vật trọng tâm của từng shot có đạt kích thước tối thiểu (khoảng 30% chiều khung, ~320px trở lên ở trung/cận cảnh) không, hay phần lớn khung đang là nền phẳng trống với một vật nhỏ lọt thỏm? Nếu ¤LAYOUT¤ ghi size nhỏ hơn mức đó cho vật đang vẽ, đã phóng to nó lên khi dựng thay vì chép nguyên số chưa?
-8. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
-9. Không viết dòng import nào (khung đã import sẵn)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
-9b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong "visual" mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như "visual" mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
+6. Bố cục: đặt vật theo ¤LAYOUT¤ và luật F; không tự tính lại từng hộp bao — chọn phương án an toàn: chừa khoảng cách rộng, chữ ngắn.
+7. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
+8. Không viết dòng import nào (khung đã import sẵn)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
+9. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong "visual" mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như "visual" mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
 10. Chữ giữa các thẻ JSX có ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần?
 11. Code là TSX hợp lệ 100% để trình biên dịch TypeScript nhận (đủ ngoặc, không cắt cụt), không có chữ giải thích lọt vào ngoài comment?
+
+Soát ĐÚNG MỘT lượt. Chỗ còn phân vân thì chọn cách đơn giản, an toàn nhất rồi viết code ngay — đừng cân nhắc lại nhiều lần.
 
 `
 
@@ -195,7 +195,7 @@ CÁCH LÀM VIỆC: bạn KHÔNG viết cả file. Video được dựng từ nhi
 
 `
 
-const manimStoryAIVI = `## CÂU CHUYỆN ĐÃ CHỐT (từ Story Architect) — để hiểu ý nghĩa, không phải để dựng thêm cảnh
+const manimStoryAIVI = `## CỐT LÕI CÂU CHUYỆN (từ Story Architect) — để hiểu ý nghĩa, không phải để dựng thêm cảnh
 
 {{previous_output}}
 
@@ -232,6 +232,8 @@ const manimCheckAIVI = `## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TR
 6. Có tham số nào của ¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤, ¤self.title/heading/body/caption¤ đang nhận một component/Mobject thay vì chuỗi ¤str¤ không?
 7. Mỗi lần thêm chữ hoặc component MỚI trong khi màn hình chưa dọn: vật mới có đặt vị trí tường minh bằng ¤.to_edge(...)¤ hoặc ¤.next_to(...)¤ không?
 8. Đọc lại như một trình thông dịch Python: hợp lệ 100%, đủ ngoặc và thụt lề, không cắt cụt, không có chữ giải thích hay dấu ¤¤¤ lọt vào bên trong code?
+
+Soát ĐÚNG MỘT lượt. Chỗ còn phân vân thì chọn cách đơn giản, an toàn nhất rồi viết code ngay — đừng cân nhắc lại nhiều lần.
 
 `
 
