@@ -5,13 +5,13 @@ import (
 	"testing"
 )
 
-func TestSystemArchetypesAreFourNamedKindsAndComplete(t *testing.T) {
+func TestSystemArchetypesAreSixNamedKindsAndComplete(t *testing.T) {
 	got := SystemVideoArchetypes()
-	if len(got) != 4 {
-		t.Fatalf("want 4 system kinds, got %d", len(got))
+	if len(got) != 6 {
+		t.Fatalf("want 6 system kinds, got %d", len(got))
 	}
-	codes := []string{"NGHỊCH-LÝ", "SO-SÁNH", "DẤU-VẾT", "TIẾN-HOÁ"}
-	ids := []string{"system-A", "system-B", "system-C", "system-D"}
+	codes := []string{"NGHỊCH-LÝ", "SO-SÁNH", "DẤU-VẾT", "TIẾN-HOÁ", "XÂY-TẦNG", "HÀNH-TRÌNH"}
+	ids := []string{"system-A", "system-B", "system-C", "system-D", "system-E", "system-F"}
 	for i, a := range got {
 		if a.Code != codes[i] || !a.IsSystem || a.ID != ids[i] {
 			t.Errorf("kind %d: unexpected %+v", i, a)

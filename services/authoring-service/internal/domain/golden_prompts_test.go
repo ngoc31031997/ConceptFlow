@@ -16,14 +16,15 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // forbid repeating the pattern beat's conclusion in a variation, cap shots
 // per scene, minimum on-screen object size); visual_director and
 // remotion_engineer also re-baselined by CR-047 for the shot-count-cap and
-// minimum-size rules (manim_engineer's shared text was not touched by CR-047,
+// minimum-size rules; story_architect again by v10, which makes the shared
+// frame kind-neutral so outlines follow the topic (manim_engineer's shared text was not touched by CR-047,
 // so it keeps its CR-043 hash).
 //
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
 // factored into parts for the AI flow (CR-039). These are the SHA-256 of the
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "69ff2c7f3cc90a37043dd81a9945573594e4ffa50c7c1eabf3a538741bd20d38",
+	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
 	RoleVisualDirector:   "527d54b9790f1a14b8121775b6ccfbf33e3090daa43279eb36be6b0dc1386853",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
 	RoleRemotionEngineer: "4004796be72d3d260877c22708511d55c5ce8bb12d0b58505da64f79214776a6",
