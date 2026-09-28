@@ -60,6 +60,10 @@ jobs:
         run: make check-all
         env:
           CHECK_LOG_DIR: ${{ runner.temp }}/check-logs
+          # Deselected in CI for now (Creator decision, 2026-09-28): manim and
+          # tooth-mockup tests pass locally and may be dropped later. Markers are
+          # set in services/rendering/tests/conftest.py; `make check` still runs them.
+          PYTEST_ADDOPTS: -m "not manim and not tooth_mockup"
 
       - name: Upload check logs
         if: failure()
