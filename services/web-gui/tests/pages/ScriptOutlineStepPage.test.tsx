@@ -493,7 +493,10 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     await waitFor(() => expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument());
   });
 
-  it("hiện cảnh báo của bước Visual (CR-048 T8/T9) cùng kết cục, và đóng được", async () => {
+  // Skipped in CI only (Creator decision, 2026-09-28): on the GitHub runner the box
+  // is still there after "Đóng thông báo"; not reproducible locally. Backlog:
+  // docs/agentic/implementation-audit.md §8.
+  it.skipIf(process.env.CI)("hiện cảnh báo của bước Visual (CR-048 T8/T9) cùng kết cục, và đóng được", async () => {
     setup({
       running: false,
       steps: ["story", "storyboard", "code"],

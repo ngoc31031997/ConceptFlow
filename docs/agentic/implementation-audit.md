@@ -188,3 +188,21 @@ Bám theo §20 của spec, điều chỉnh theo D1–D3 và các phát hiện �
 | ruff trong venv rendering/tts | Đã cài `ruff==0.7.*` theo `requirements-dev.txt` (chỉ thay đổi môi trường local) |
 
 Kết quả sau khi sửa (chạy lại ngày 2026-09-28): mọi lint (vet, gofmt, ruff, eslint, `tsc -b`) đều pass. Unit test: Go ✅, llm-service 91, publisher 88, rendering 313 (+5 skip), tts 104, video-assembly 186, api-gateway 107, web-gui 383, contract test 2, tất cả pass.
+
+## 8. Phase 3 (CI) — quyết định và backlog (Creator, 2026-09-28)
+
+CI (`.github/workflows/ci.yml`) chạy `make setup` → `make build` → `make check-all` trên mọi push.
+
+| # | Quyết định | Chi tiết |
+|---|---|---|
+| D7 | CI gồm build + lint + unit test | `make build` (compile từng service) + `make check-all` |
+| D8 | SonarQube, OWASP Dependency-Check → **backlog** | Chưa cần token/NVD key; chưa tích hợp |
+| D9 | Test manim và mockup răng **bỏ qua trên CI** | Marker `manim` (`tests/conceptflow/`, 98 test) và `tooth_mockup` (`test_layout_checker`, `test_illustration_kit`, `test_illustration_previewer`, 20 test) trong `services/rendering/tests/conftest.py`; CI lọc bằng `PYTEST_ADDOPTS`. Pass ở local, có thể bỏ trong tương lai |
+| D10 | Test CR-048 T8/T9 "hiện cảnh báo của bước Visual… và đóng được" **bỏ qua trên CI** | `it.skipIf(process.env.CI)` trong `web-gui/tests/pages/ScriptOutlineStepPage.test.tsx`. Trên runner, khung cảnh báo không đóng sau khi bấm "Đóng thông báo"; không tái hiện được ở local (chạy song song, 2 worker + tải CPU, container Linux Node 20) |
+
+Backlog:
+- Tích hợp SonarQube/SonarCloud (`SONAR_TOKEN`) và OWASP Dependency-Check (`NVD_API_KEY`); quyết định chính sách fail.
+- Điều tra D10 (cần xem trạng thái `dismissedAt`/`usePresence` trên runner), rồi bỏ `skipIf`.
+- Khi quyết định giữ hay bỏ manim / mockup răng: bật lại hoặc xoá các test ở D9.
+
+Phát hiện nhờ CI: `services/rendering/requirements-dev.txt` thiếu `httpx` (test import nó, venv local có sẵn do cài tay). Đã bổ sung `httpx==0.28.*`.

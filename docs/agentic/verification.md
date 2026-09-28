@@ -47,6 +47,7 @@ Every step prints one line (`ok`/`FAIL` and its duration). Every step runs even 
 ## Not covered (by design)
 
 - SonarQube and OWASP Dependency-Check are in the backlog (Creator decision, 2026-09-28).
+- CI deselects some tests that `make check` still runs locally: rendering's `manim` and `tooth_mockup` markers (via `PYTEST_ADDOPTS`), and one CR-048 web-gui test (`it.skipIf(process.env.CI)`). See implementation-audit.md §8.
 
 - Integration tests that need Docker, Postgres or RabbitMQ, and anything calling a real LLM or TTS API. `make check` stays fast (≈40 s for the whole repo on a dev Mac) because the Stop hook runs it.
 - Building Docker images. The Docker rebuild policy in `CLAUDE.md` still applies separately.
