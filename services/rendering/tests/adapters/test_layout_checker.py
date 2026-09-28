@@ -30,9 +30,13 @@ STAND_IN = {
         for line in sys.stdin:
             req = json.loads(line)
             if "LOADFAIL" in req["code"]:
-                print(json.dumps({{"id": req["id"], "error": "the script never called registerRoot()", "stage": "load"}}), flush=True)
+                print(json.dumps({{
+                    "id": req["id"], "error": "the script never called registerRoot()", "stage": "load",
+                }}), flush=True)
             elif "MEASUREFAIL" in req["code"]:
-                print(json.dumps({{"id": req["id"], "error": "Target closed", "stage": "measure"}}), flush=True)
+                print(
+                    json.dumps({{"id": req["id"], "error": "Target closed", "stage": "measure"}}), flush=True
+                )
             elif "GARBAGE" in req["code"]:
                 print(json.dumps({{"id": req["id"], "result": {{"version": 7}}}}), flush=True)
             else:
@@ -189,7 +193,10 @@ def _check(real_checker, name: str, band=None):
 def test_real_problems_script_gives_the_three_planted_faults_on_the_right_shots(real_checker):
     out, lines = _check(real_checker, "problems")
     assert not out.ok and out.warnings == []
-    got = sorted((_owner(lines, d.line), d.kind, d.message.split(": ", 1)[1].split(" (")[0]) for d in out.diagnostics)
+    got = sorted(
+        (_owner(lines, d.line), d.kind, d.message.split(": ", 1)[1].split(" (")[0])
+        for d in out.diagnostics
+    )
     assert got == [
         ("1.2", "layout", "nhãn 'Lớp men răng bảo vệ' tràn khung chữ"),
         ("1.3", "layout", "hình Germ ra ngoài vùng an toàn"),
@@ -244,4 +251,5 @@ def test_real_script_that_throws_while_loading_is_reported_as_not_checked(real_c
     out = CheckScriptUseCase(PassingGate(), PassingTsc(), real_checker).check(
         "remotion", "export const narrations: string[] = [];\n", "creator")
     assert out.ok and out.diagnostics == []
-    assert len(out.warnings) == 1 and "KHÔNG kiểm tra được" in out.warnings[0] and "registerRoot" in out.warnings[0]
+    assert len(out.warnings) == 1
+    assert "KHÔNG kiểm tra được" in out.warnings[0] and "registerRoot" in out.warnings[0]

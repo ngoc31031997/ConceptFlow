@@ -95,8 +95,8 @@ def rect(x, y, w, h):
 
 
 def text(line, label, box, **over):
-    e = {"kind": "text", "tag": "div", "line": line, "text": label, "rect": box, "text_rect": box, "opacity": 1,
-         "lines": 1, "font_size": 48, "font_size_rendered": 48, "scroll_width": round(box["w"]),
+    e = {"kind": "text", "tag": "div", "line": line, "text": label, "rect": box, "text_rect": box,
+         "opacity": 1, "lines": 1, "font_size": 48, "font_size_rendered": 48, "scroll_width": round(box["w"]),
          "client_width": round(box["w"]), "scroll_height": round(box["h"]), "client_height": round(box["h"]),
          "text_parent": None}
     e.update(over)
@@ -148,7 +148,9 @@ def test_an_object_that_slides_in_from_outside_the_frame_is_judged_only_once_set
 
 
 def test_an_object_that_never_leaves_the_frame_is_judged_at_every_sample():
-    [f] = evaluate(probe_of(lambda p: [BIG, kit(14, "Sun", rect(1700, 200, 150 if p == 5 / 149 else 100, 100))]))
+    [f] = evaluate(
+        probe_of(lambda p: [BIG, kit(14, "Sun", rect(1700, 200, 150 if p == 5 / 149 else 100, 100))])
+    )
     assert f.rule == SAFE_AREA and f.frames == ["3%"] and "phải x=1850 > 1824" in f.message
 
 
@@ -160,7 +162,9 @@ def test_full_frame_backdrops_and_objects_entirely_off_frame_are_ignored():
 
 
 def test_top_subtitle_band():
-    found = evaluate(probe_of(lambda p: [BIG, text(13, "Tiêu đề", rect(400, 150, 800, 70))]), SubtitleBand("top", 200))
+    found = evaluate(
+        probe_of(lambda p: [BIG, text(13, "Tiêu đề", rect(400, 150, 800, 70))]), SubtitleBand("top", 200)
+    )
     [f] = found
     assert f.rule == SUBTITLE_ZONE and "mép trên y=150 < 200" in f.message
 
@@ -181,7 +185,9 @@ def test_tiny_font_counts_only_once_the_shot_has_settled():
         return [BIG, text(13, "Xin chào", rect(300, 300, 300, 60), font_size_rendered=20 if p < 0.5 else 40)]
 
     assert evaluate(probe_of(grow)) == []
-    [f] = evaluate(probe_of(lambda p: [BIG, text(13, "chú thích", rect(300, 300, 300, 40), font_size_rendered=24)]))
+    [f] = evaluate(
+        probe_of(lambda p: [BIG, text(13, "chú thích", rect(300, 300, 300, 40), font_size_rendered=24)])
+    )
     assert f.rule == MIN_FONT and f.blocking and f.frames == ["85%", "100%"] and "cỡ 24px < 32px" in f.message
 
 

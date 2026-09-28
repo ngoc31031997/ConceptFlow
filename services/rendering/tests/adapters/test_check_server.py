@@ -39,16 +39,23 @@ async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
     r = await client(fake).post("/v1/check/remotion", json={
         "code": "c", "scene_class_name": "creator",
         "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
-    assert r.json()["diagnostics"] == [{"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"}]
+    assert r.json()["diagnostics"] == [
+        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"}
+    ]
     assert r.json()["warnings"] == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
-    assert fake.layouts[0].subtitle_band == SubtitleBand("bottom", 240) and fake.layouts[0].video_font == "Montserrat"
+    assert fake.layouts[0].subtitle_band == SubtitleBand("bottom", 240)
+    assert fake.layouts[0].video_font == "Montserrat"
 
 
 async def test_a_nonsense_subtitle_band_is_rejected():
     fake = Fake(CheckOutcome(True))
-    r = await client(fake).post("/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "bottom", "px": 0}})
+    r = await client(fake).post(
+        "/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "bottom", "px": 0}}
+    )
     assert r.status_code == 400 and fake.calls == []
-    r = await client(fake).post("/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "left", "px": 9}})
+    r = await client(fake).post(
+        "/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "left", "px": 9}}
+    )
     assert r.status_code == 422
 
 

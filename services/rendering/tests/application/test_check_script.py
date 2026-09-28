@@ -139,7 +139,8 @@ def test_the_subtitle_band_and_font_reach_the_layout_check():
     LayoutScriptError("script không nạp được vào trang đo: the script never called registerRoot()"),
 ])
 def test_a_layout_check_that_cannot_run_is_an_explicit_warning_and_tsc_stands(error):
-    out = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(error=error)).check("remotion", "code", "creator")
+    use_case = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(error=error))
+    out = use_case.check("remotion", "code", "creator")
     assert out.ok and out.diagnostics == []
     [w] = out.warnings
     assert w.startswith("Bố cục: KHÔNG kiểm tra được — ") and str(error) in w
@@ -147,8 +148,10 @@ def test_a_layout_check_that_cannot_run_is_an_explicit_warning_and_tsc_stands(er
 
 def test_measurements_the_rules_cannot_read_are_not_a_pass():
     broken = probe([{"kind": "kit", "component": "Tooth", "line": 12, "opacity": 1}])  # no rect
-    out = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(broken)).check("remotion", "code", "creator")
-    assert out.ok and out.diagnostics == [] and "KHÔNG kiểm tra được — số đo không đọc được" in out.warnings[0]
+    use_case = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(broken))
+    out = use_case.check("remotion", "code", "creator")
+    assert out.ok and out.diagnostics == []
+    assert "KHÔNG kiểm tra được — số đo không đọc được" in out.warnings[0]
 
 
 def test_a_missing_font_means_not_checked_rather_than_numbers_in_the_wrong_font():
