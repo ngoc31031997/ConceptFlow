@@ -20,14 +20,14 @@ import aio_pika
 
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import SynthesizeSpeechCommandHandler, TtsCommandDispatcher
-from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
-from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
+from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
 from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
+from adapters.storage.artifact_paths import purge_project_artifacts
 from adapters.tts_engines import azure_adapter
 from adapters.tts_engines.edge_adapter import EdgeTTSAdapter
 from adapters.tts_engines.routing_engine import RoutingTTSEngine

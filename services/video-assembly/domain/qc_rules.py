@@ -150,7 +150,7 @@ class QCThresholds:
     quality_frame_size: dict = field(default_factory=lambda: dict(QUALITY_FRAME_SIZE))
 
     @classmethod
-    def from_env(cls, env: dict | None = None) -> "QCThresholds":
+    def from_env(cls, env: dict | None = None) -> QCThresholds:
         """FR61.5 — mọi ngưỡng đọc từ môi trường, mọi cái vắng mặt lấy mặc định
         ở trên. Giá trị không parse được rơi về mặc định thay vì làm sập QC:
         một cổng hỏng không được biến thành cổng khoá (FR61.4)."""
@@ -568,7 +568,7 @@ def check_static_frame(
     severity = thresholds.severity_for("static_frame")
     starts = sorted(float(s.get("start_time") or 0.0) for s in narration_segments or [])
     findings: list[QCFinding] = []
-    for previous, current in zip(starts, starts[1:]):
+    for previous, current in zip(starts, starts[1:], strict=False):
         gap = current - previous
         if gap > thresholds.max_static_seconds:
             findings.append(
@@ -601,7 +601,7 @@ def check_narration_overlap(
         key=lambda s: float(s.get("start_time") or 0.0),
     )
     findings: list[QCFinding] = []
-    for current, following in zip(segments, segments[1:]):
+    for current, following in zip(segments, segments[1:], strict=False):
         duration = current.get("duration_seconds")
         if duration is None:
             continue
@@ -638,7 +638,7 @@ def check_subtitle_cue_overlap(
         (c for c in subtitle_cues or []), key=lambda c: float(c.get("start_time") or 0.0)
     )
     findings: list[QCFinding] = []
-    for current, following in zip(cues, cues[1:]):
+    for current, following in zip(cues, cues[1:], strict=False):
         end = float(current.get("end_time") or 0.0)
         next_start = float(following.get("start_time") or 0.0)
         overlap = end - next_start

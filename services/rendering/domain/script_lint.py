@@ -159,7 +159,7 @@ class _Collector(ast.NodeVisitor):
     def visit_Name(self, node: ast.Name) -> None:
         # Mọi vị trí gán tên đều đi qua đây: `=`, `for`, `with ... as`,
         # comprehension, `:=`, `+=`. Không cần một visitor cho từng cú pháp.
-        if isinstance(node.ctx, (ast.Store, ast.Del)):
+        if isinstance(node.ctx, ast.Store | ast.Del):
             self.defined.add(node.id)
         else:
             self._loads.append(node)
@@ -233,7 +233,7 @@ class _Collector(ast.NodeVisitor):
             if kw.arg != "font_size" or not isinstance(kw.value, ast.Constant):
                 continue
             value = kw.value.value
-            if isinstance(value, (int, float)) and int(value) not in ALLOWED_FONT_SIZES:
+            if isinstance(value, int | float) and int(value) not in ALLOWED_FONT_SIZES:
                 self.issues.append(
                     LintIssue(
                         line=node.lineno,

@@ -164,7 +164,10 @@ def run_cancellable_streaming(
         for line in proc.stderr:
             err_lines.append(line)
 
-    readers = [threading.Thread(target=drain_stdout, daemon=True), threading.Thread(target=drain_stderr, daemon=True)]
+    readers = [
+        threading.Thread(target=drain_stdout, daemon=True),
+        threading.Thread(target=drain_stderr, daemon=True),
+    ]
     for reader in readers:
         reader.start()
     try:

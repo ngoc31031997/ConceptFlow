@@ -79,12 +79,25 @@ export function KeyboardShortcutsHelp() {
   }
 
   return (
-    <div className={styles.overlay} onClick={() => setIsOpen(false)} data-testid="keyboard-shortcuts-overlay">
-      <div className={`${glass.card} ${styles.modal}`} onClick={(e) => e.stopPropagation()}>
+    <div
+      className={styles.overlay}
+      onClick={(e) => {
+        // Only a click on the backdrop itself closes; clicks inside the card do not.
+        if (e.target === e.currentTarget) setIsOpen(false);
+      }}
+      role="presentation"
+      data-testid="keyboard-shortcuts-overlay"
+    >
+      <div
+        className={`${glass.card} ${styles.modal}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="keyboard-shortcuts-title"
+      >
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <KeyboardIcon />
-            <h2 className={styles.title}>Keyboard Shortcuts</h2>
+            <h2 id="keyboard-shortcuts-title" className={styles.title}>Keyboard Shortcuts</h2>
           </div>
           <button
             type="button"

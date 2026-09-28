@@ -72,7 +72,9 @@ func (f *fakeProjectRows) UpdateProjectIllustration(_ context.Context, r domain.
 
 type storyboardOf string
 
-func (s storyboardOf) GetAuthoringStoryboard(context.Context, string) (string, error) { return string(s), nil }
+func (s storyboardOf) GetAuthoringStoryboard(context.Context, string) (string, error) {
+	return string(s), nil
+}
 
 const planJSON = `Đây là danh sách:
 {"reuse": ["Tooth", "Germ", "KhongCo"],

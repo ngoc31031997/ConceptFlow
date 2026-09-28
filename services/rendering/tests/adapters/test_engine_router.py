@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+
 from adapters.rendering.engine_router import EngineRouterRenderer
 from domain.errors import AnimationEngineError
 from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult

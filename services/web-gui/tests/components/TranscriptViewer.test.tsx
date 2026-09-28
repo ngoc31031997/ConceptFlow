@@ -99,7 +99,7 @@ describe("TranscriptViewer", () => {
           click: mockClick,
           href: "",
           download: "",
-        } as any;
+        } as unknown as HTMLAnchorElement;
       }
       return originalCreateElement(tag);
     });
@@ -152,7 +152,7 @@ describe("TranscriptViewer", () => {
 
   it("formats download content correctly for Vietnamese", () => {
     const mockBlob = vi.fn();
-    global.Blob = mockBlob as any;
+    global.Blob = mockBlob as unknown as typeof Blob;
 
     render(<TranscriptViewer scenes={mockScenes} contentLanguage="vi" />);
 
@@ -168,7 +168,7 @@ describe("TranscriptViewer", () => {
 
   it("formats download content correctly for English", () => {
     const mockBlob = vi.fn();
-    global.Blob = mockBlob as any;
+    global.Blob = mockBlob as unknown as typeof Blob;
 
     render(<TranscriptViewer scenes={mockScenes} contentLanguage="en" />);
 

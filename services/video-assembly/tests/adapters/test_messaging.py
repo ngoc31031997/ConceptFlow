@@ -18,9 +18,9 @@ from adapters.messaging.consumer import (
     QC_STATUS_NOT_SCORED,
     QC_STATUS_PASSED,
     AssembleVideoCommandHandler,
-    RegisterChannelAssetCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
+    RegisterChannelAssetCommandHandler,
 )
 from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.inbox import InboxRepository

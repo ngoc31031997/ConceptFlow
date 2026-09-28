@@ -34,7 +34,7 @@ class Box:
         return self.top - self.bottom
 
     @classmethod
-    def from_mobject(cls, mobject: object) -> "Box":
+    def from_mobject(cls, mobject: object) -> Box:
         """Đọc bbox từ một mobject Manim mà không import manim.
 
         Chỉ dựa vào bốn method mà mọi Mobject đều có.

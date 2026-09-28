@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { Disclosure } from "../../src/components/Disclosure";
 
@@ -40,7 +40,7 @@ describe("Disclosure", () => {
   it("bấm lần hai thì thu gọn lại", async () => {
     render(
       <Disclosure title="Tiêu đề" testId="d1">
-        <p onClick={vi.fn()}>Nội dung</p>
+        <p>Nội dung</p>
       </Disclosure>,
     );
 

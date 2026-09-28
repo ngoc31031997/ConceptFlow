@@ -79,10 +79,11 @@ Style: Default,{font_name},{font_size},{primary},&H00000000,{back},0,{border_sty
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
+"""  # noqa: E501 — ASS section lines cannot be wrapped
 
     lines = [
-        f"Dialogue: 0,{_to_ass_time(cue.start_time)},{_to_ass_time(cue.end_time)},Default,,0,0,0,,{_escape(cue.text)}"
+        f"Dialogue: 0,{_to_ass_time(cue.start_time)},{_to_ass_time(cue.end_time)},"
+        f"Default,,0,0,0,,{_escape(cue.text)}"
         for cue in cues
     ]
     return header + "\n".join(lines) + "\n"

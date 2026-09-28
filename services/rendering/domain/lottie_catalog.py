@@ -34,7 +34,10 @@ DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 ID_RE = re.compile(r"^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$")
 #: `<LottieClip id="cat.idle" .../>` — chỉ nhận id là chuỗi literal; id động thì
 #: không lint được nên để lỗi lộ lúc render (LottieClip ném lỗi rõ ràng).
-CLIP_ID_RE = re.compile(r"<LottieClip\b[^>]*?\bid\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|\{\s*[\"']([^\"']+)[\"']\s*\})")
+CLIP_ID_RE = re.compile(
+    r"<LottieClip\b[^>]*?\bid\s*=\s*"
+    r"(?:\"([^\"]+)\"|'([^']+)'|\{\s*[\"']([^\"']+)[\"']\s*\})"
+)
 
 
 class CatalogError(ValueError):
@@ -173,7 +176,7 @@ def extract_palette(data: Any) -> set[str]:
 
     def add(components: Any) -> None:
         if isinstance(components, list) and len(components) >= 3 and all(
-            isinstance(v, (int, float)) for v in components[:3]
+            isinstance(v, int | float) for v in components[:3]
         ):
             r, g, b = (max(0, min(255, round(v * 255))) for v in components[:3])
             colors.add(f"#{r:02X}{g:02X}{b:02X}")

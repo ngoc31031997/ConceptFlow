@@ -26,7 +26,10 @@ def _encode_args(out_path: str, seconds: int) -> list[str]:
 def test_reports_rising_percentages_held_below_the_share(tmp_path):
     percents: list[int] = []
     FfmpegVideoAssembler._run_ffmpeg_with_progress(
-        _encode_args(str(tmp_path / "out.mp4"), 3), expected_seconds=3.0, share=90, on_progress=percents.append
+        _encode_args(str(tmp_path / "out.mp4"), 3),
+        expected_seconds=3.0,
+        share=90,
+        on_progress=percents.append,
     )
 
     assert percents, "ffmpeg -progress must yield at least one percentage"

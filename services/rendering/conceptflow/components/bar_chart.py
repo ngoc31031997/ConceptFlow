@@ -40,7 +40,7 @@ class BarChart(Component):
 
         self.bars = VGroup()
         columns = VGroup()
-        for i, (label, value) in enumerate(zip(labels, values)):
+        for i, (label, value) in enumerate(zip(labels, values, strict=False)):
             color = t.series_color(i)
             bar = Rectangle(
                 width=BAR_WIDTH,

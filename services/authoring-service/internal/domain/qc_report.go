@@ -45,13 +45,13 @@ type QCFinding struct {
 // *which* findings were waved through, and that is only meaningful next to the
 // report they came from.
 type QCReport struct {
-	ProjectID           string
-	Status              QCStatus
-	Reason              *string
-	Findings            []QCFinding
-	CreatedAt           time.Time
-	OverriddenAt        *time.Time
-	OverriddenFindings  []QCFinding
+	ProjectID          string
+	Status             QCStatus
+	Reason             *string
+	Findings           []QCFinding
+	CreatedAt          time.Time
+	OverriddenAt       *time.Time
+	OverriddenFindings []QCFinding
 }
 
 // BlockingFindings returns only the findings severe enough to stop a publish.

@@ -97,7 +97,11 @@ def _sanitize_script(script_content: str) -> str:
     script — they are never valid TSX and make esbuild fail with
     `Expected ";" but found "tsx"`. If the script holds a fenced block with
     prose around it, keeps only the first block's content."""
-    fenced = re.search(r"^[ \t]*`{3,}[ \t]*[A-Za-z]*[ \t]*\n(.*?)^[ \t]*`{3,}[ \t]*$", script_content, re.MULTILINE | re.DOTALL)
+    fenced = re.search(
+        r"^[ \t]*`{3,}[ \t]*[A-Za-z]*[ \t]*\n(.*?)^[ \t]*`{3,}[ \t]*$",
+        script_content,
+        re.MULTILINE | re.DOTALL,
+    )
     if fenced:
         script_content = fenced.group(1)
     return _FENCE_LINE_RE.sub("", script_content)

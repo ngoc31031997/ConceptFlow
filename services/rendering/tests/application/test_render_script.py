@@ -39,9 +39,14 @@ class FakeRenderer(ManimScriptRendererPort):
 def make_request(project_id: str = "proj-1") -> ScriptRenderRequest:
     return ScriptRenderRequest(
         project_id=project_id,
-        script_content="from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate(\"xin chào\")\n",
+        script_content=(
+            "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
+            "    def construct(self):\n        self.narrate(\"xin chào\")\n"
+        ),
         scene_class_name="DemoScene",
-        narration_segments=[NarrationSegment(scene_index=0, audio_path="/shared/proj-1/audio/0.wav", duration_seconds=2.0)],
+        narration_segments=[
+            NarrationSegment(scene_index=0, audio_path="/shared/proj-1/audio/0.wav", duration_seconds=2.0)
+        ],
     )
 
 
@@ -141,7 +146,10 @@ def test_renders_when_audio_path_is_absent():
     use_case = RenderScriptUseCase(renderer)
     request = ScriptRenderRequest(
         project_id="proj-1",
-        script_content="from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n    def construct(self):\n        self.narrate(\"xin chào\")\n",
+        script_content=(
+            "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
+            "    def construct(self):\n        self.narrate(\"xin chào\")\n"
+        ),
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, duration_seconds=2.0)],
     )

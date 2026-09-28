@@ -26,7 +26,7 @@ class Timeline(Component):
 
         self.marks = VGroup()
         for i, event in enumerate(events):
-            when, what = event if isinstance(event, (tuple, list)) else ("", event)
+            when, what = event if isinstance(event, tuple | list) else ("", event)
             color = t.series_color(i)
             dot = Dot(point=[i * SPACING, 0, 0], radius=0.12, color=color)
             parts = [dot]

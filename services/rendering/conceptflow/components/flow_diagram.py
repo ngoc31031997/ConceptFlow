@@ -41,7 +41,7 @@ class FlowDiagram(Component):
                     color=t.muted,
                     stroke_width=3,
                 )
-                for a, b in zip(self.nodes, self.nodes[1:])
+                for a, b in zip(self.nodes, self.nodes[1:], strict=False)
             )
         )
 

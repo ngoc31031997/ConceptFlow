@@ -20,11 +20,17 @@ from .theme import DEFAULT, TONES, Theme
 #: Vai trò của từng màu — (vi, en). Test buộc mọi trường màu của `Theme` phải có
 #: mặt ở đây, nên thêm màu mà không mô tả cho model là không qua được CI.
 COLOR_ROLES: dict[str, tuple[str, str]] = {
-    "background": ("nền video (đã được vẽ sẵn, KHÔNG tự tô)", "video background (already painted, do NOT paint it)"),
+    "background": (
+        "nền video (đã được vẽ sẵn, KHÔNG tự tô)",
+        "video background (already painted, do NOT paint it)",
+    ),
     "ink": ("chữ chính, nét chính", "primary text and strokes"),
     "muted": ("chữ phụ, đường trục, thứ ít quan trọng", "secondary text, axes, low-priority elements"),
     "surface": ("nền của khung/hộp đặc", "fill of filled boxes"),
-    "accent": ("màu nhấn chính của kênh — thứ cần người xem nhìn vào", "the channel's main highlight — what the viewer should look at"),
+    "accent": (
+        "màu nhấn chính của kênh — thứ cần người xem nhìn vào",
+        "the channel's main highlight — what the viewer should look at",
+    ),
     "accent_alt": ("màu nhấn phụ, đi cặp với accent", "secondary highlight paired with accent"),
     "success": ("đúng, đạt, kết quả tốt", "correct, passing, good result"),
     "warning": ("cẩn thận, chú ý, trường hợp biên", "caution, edge case"),
@@ -36,8 +42,14 @@ GROUP_ROLES: dict[str, tuple[str, str]] = {
     "spacing": ("khoảng cách, dùng cho `buff=`", "gaps, for `buff=`"),
     "strokes": ("độ dày nét, dùng cho `stroke_width=`", "line thickness, for `stroke_width=`"),
     "shapes": ("hình dạng chung của khung/hộp", "shared shape of frames/boxes"),
-    "pacing": ("thời lượng chuyển cảnh, dùng qua `self.pace(\"fast\"|\"normal\"|\"slow\")` hoặc `speed=`", "transition duration, via `self.pace(\"fast\"|\"normal\"|\"slow\")` or `speed=`"),
-    "scale": ("cỡ chữ; chọn bằng method self.title/heading/body/caption, không đặt tay", "font sizes; pick via self.title/heading/body/caption, never set by hand"),
+    "pacing": (
+        "thời lượng chuyển cảnh, dùng qua `self.pace(\"fast\"|\"normal\"|\"slow\")` hoặc `speed=`",
+        "transition duration, via `self.pace(\"fast\"|\"normal\"|\"slow\")` or `speed=`",
+    ),
+    "scale": (
+        "cỡ chữ; chọn bằng method self.title/heading/body/caption, không đặt tay",
+        "font sizes; pick via self.title/heading/body/caption, never set by hand",
+    ),
 }
 
 _GROUPS = ("spacing", "strokes", "shapes", "pacing", "scale")

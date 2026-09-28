@@ -33,7 +33,6 @@ describe("VideoListPage", () => {
         }),
       });
     }) as unknown as typeof fetch;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
       <ThemeProvider>
@@ -48,6 +47,7 @@ describe("VideoListPage", () => {
     expect(screen.getByText(/Thất bại/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("delete-button-p1"));
+    fireEvent.click(screen.getByTestId("confirm-modal-confirm"));
 
     await waitFor(() => expect(screen.queryByTestId("video-row-p1")).not.toBeInTheDocument());
     expect(screen.getByTestId("video-row-p2")).toBeInTheDocument();
@@ -73,7 +73,6 @@ describe("VideoListPage", () => {
         json: async () => ({ projects: [{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }] }),
       });
     }) as unknown as typeof fetch;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
       <ThemeProvider>
@@ -85,6 +84,7 @@ describe("VideoListPage", () => {
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("delete-button-p1"));
+    fireEvent.click(screen.getByTestId("confirm-modal-confirm"));
 
     await waitFor(() => expect(screen.getByText("Đã xóa 1/3 mục")).toBeInTheDocument());
     expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
@@ -99,7 +99,6 @@ describe("VideoListPage", () => {
         projects: [{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }],
       }),
     }) as unknown as typeof fetch;
-    vi.spyOn(window, "confirm").mockReturnValue(false);
 
     render(
       <ThemeProvider>
@@ -111,7 +110,9 @@ describe("VideoListPage", () => {
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("delete-button-p1"));
+    fireEvent.click(screen.getByTestId("confirm-modal-cancel"));
 
+    expect(screen.queryByTestId("confirm-modal")).not.toBeInTheDocument();
     expect(screen.getByTestId("video-row-p1")).toBeInTheDocument();
     const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit?][] } }).mock.calls;
     expect(calls.some(([, init]) => init?.method === "DELETE")).toBe(false);
@@ -136,7 +137,6 @@ describe("VideoListPage", () => {
         }),
       });
     }) as unknown as typeof fetch;
-    vi.spyOn(window, "confirm").mockReturnValue(true);
 
     render(
       <ThemeProvider>
@@ -156,6 +156,7 @@ describe("VideoListPage", () => {
 
     expect(bulkDeleteButton).not.toBeDisabled();
     fireEvent.click(bulkDeleteButton);
+    fireEvent.click(screen.getByTestId("confirm-modal-confirm"));
 
     await waitFor(() => expect(screen.queryByTestId("video-row-p1")).not.toBeInTheDocument());
     expect(screen.queryByTestId("video-row-p2")).not.toBeInTheDocument();

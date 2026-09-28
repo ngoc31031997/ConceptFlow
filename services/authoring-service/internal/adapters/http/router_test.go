@@ -288,6 +288,7 @@ func TestHandleSaveAuthoringMode_NotWired(t *testing.T) {
 		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }
+
 // --- CR-040 FR113: POST /v1/prompt-renders ---
 
 type fakePromptRenderer struct{ got application.RenderInput }

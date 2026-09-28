@@ -18,6 +18,7 @@ from typing import Protocol
 import asyncpg
 
 from adapters.logging.correlation import set_correlation_id
+from adapters.messaging.cancellation import REGISTRY
 from adapters.messaging.producer import (
     channel_asset_render_failed_envelope,
     channel_asset_rendered_envelope,
@@ -27,7 +28,6 @@ from adapters.messaging.producer import (
     validation_failed_envelope,
 )
 from adapters.messaging.progress import ProgressPublisher
-from adapters.messaging.cancellation import REGISTRY
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.render_channel_asset import ChannelAssetRenderError, RenderChannelAssetUseCase

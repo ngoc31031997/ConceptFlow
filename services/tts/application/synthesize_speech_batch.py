@@ -8,8 +8,8 @@ classify_scenes is already handled at Content Plugin Service.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from application.synthesize_speech import SynthesizeSpeechUseCase
 from domain.errors import EmptyTextError, TTSEngineError, UnsupportedLanguageError

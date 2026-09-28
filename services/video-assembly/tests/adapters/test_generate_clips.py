@@ -314,7 +314,9 @@ async def test_generate_clips_is_idempotent_on_message_id(no_real_ffmpeg, tmp_pa
 
 
 @pytest.mark.asyncio
-async def test_generate_clips_intro_duration_shifts_both_presets(no_real_ffmpeg, tmp_path, monkeypatch) -> None:
+async def test_generate_clips_intro_duration_shifts_both_presets(
+    no_real_ffmpeg, tmp_path, monkeypatch
+) -> None:
     handler, pool = _build_handler(tmp_path, monkeypatch)
     requests = [
         {
