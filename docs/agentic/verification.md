@@ -20,6 +20,7 @@ Files that differ from the merge-base of `HEAD` and `$BASE`: committed on the br
 
 - A file under `services/<svc>/` selects that service.
 - A file under `tests/contracts/` or `docs/contracts/` selects the contract tests.
+- A file under `scripts/hooks/` selects the hook tests (`python3 -m unittest discover -s scripts/hooks`). `make check-all` always runs them.
 - A change to `Makefile` or `scripts/{setup,build,check}.sh` selects everything: a change to the verification re-verifies all of it.
 - Nothing selected → `check: nothing to verify`, exit `0`.
 
@@ -36,6 +37,10 @@ A service is a directory under `services/` with one of these at its root. `servi
 Contract tests (`tests/contracts/`) run with pytest from the first Python service's `.venv`, since they need only the stdlib and pytest.
 
 A missing `.venv` or `node_modules` fails the step with `run 'make setup' first`. The script never falls back to the system interpreter: macOS ships Python 3.9 and the services need 3.12.
+
+## Merge-gate marker
+
+When `make check` passes on a clean working tree whose `HEAD` differs from `$BASE`, the tree hash of `HEAD` is recorded in `.git/conceptflow/checked-trees/`. The merge gate hook reads it. See [`hooks.md`](hooks.md).
 
 ## Output
 
