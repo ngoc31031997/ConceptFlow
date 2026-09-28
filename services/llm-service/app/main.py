@@ -183,7 +183,8 @@ def create_app(
 
             res = await provider.chat(
                 ChatRequest(user=body.user, system=body.system, model=model, max_tokens=body.max_tokens,
-                            temperature=body.temperature, json_mode=body.json_mode),
+                            temperature=body.temperature, json_mode=body.json_mode,
+                            max_reasoning_chars=config.chat_max_reasoning_chars),
                 on_progress=progress,
             )
             return {"content": res.content, "usage": res.usage.to_dict(), "provider": provider.name}
@@ -249,6 +250,7 @@ def create_app(
             res = await pipeline.run(CodeRequest(
                 engine=body.engine, topic=body.topic, storyboard=body.storyboard, system=body.system,
                 model=model, max_tokens=body.max_tokens, temperature=body.temperature,
+                max_reasoning_chars=config.code_max_reasoning_chars,
                 illustrations=[i.model_dump() for i in body.illustrations]), emit)
             return res.to_dict()
 

@@ -52,6 +52,9 @@ class CodeRequest:
     model: str = ""
     max_tokens: int = 0
     temperature: float = 0.3
+    #: CR-048 T1 — applied to every call of the run (layout/cast/chunk/repair);
+    #: 0 = no limit. See ChatRequest.max_reasoning_chars.
+    max_reasoning_chars: int = 0
     #: CR-044 — approved library drawings: {name, usage, description, code}.
     illustrations: list[dict] = field(default_factory=list)
 
@@ -204,7 +207,8 @@ class CodePipeline:
             try:
                 res = await self._p.chat(ChatRequest(
                     system=req.system, user=build(problem), model=req.model,
-                    max_tokens=req.max_tokens, temperature=req.temperature))
+                    max_tokens=req.max_tokens, temperature=req.temperature,
+                    max_reasoning_chars=req.max_reasoning_chars))
             except LLMError as err:
                 calls.append(Call(phase, label, False, err.usage, err.kind, str(err), duration_ms=_ms(began)))
                 raise PipelineFailure(f"{phase} {label}: {err}", calls, error=err) from err
