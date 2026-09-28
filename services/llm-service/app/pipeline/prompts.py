@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 
 from app.pipeline import merger
-from app.pipeline.checker import Diagnostic
+from app.pipeline.checker import LAYOUT, Diagnostic
 from app.storyboard import Scene, Shot, Storyboard
 
 
@@ -123,10 +123,14 @@ SHOT NGAY SAU lô này (chỉ để biết hình cuối của shot cuối lô ph
 Mỗi hàm có dạng `function ShotN_M({{duration}}: ShotProps) {{ ... }}` bắt đầu ở cột 0, và ngay phía trên nó là một dòng comment `// Shot n.m — MÁY: ... | HÌNH: ...`. Không khai báo hằng, hàm hay kiểu nào khác ở cấp cao nhất (đặt hằng phụ vào BÊN TRONG hàm shot).{_retry_note(retry)}"""
 
 
+def _listed(diags: list[Diagnostic]) -> str:
+    return "\n".join(f"- dòng {d.line}: {d.message}" if d.line else f"- {d.message}" for d in diags)
+
+
 def remotion_repair(
     sb: Storyboard, layout: str, key: str, code: str, diags: list[Diagnostic], shot_ids_context: list[str]
 ) -> str:
-    listed = "\n".join(f"- dòng {d.line}: {d.message}" if d.line else f"- {d.message}" for d in diags)
+    listed = _listed(diags)
     if key == merger.LAYOUT_KEY:
         return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI BIÊN DỊCH trong khai báo LAYOUT.
 
@@ -141,13 +145,28 @@ Code hiện tại:
 Trả về ĐÚNG khai báo `const LAYOUT = {{ ... }};` đã sửa trong một khối ```tsx, giữ nguyên mọi khoá đang có (các shot đang dùng chúng)."""
     by_id = {sh.id: (sc, sh) for sc, sh in sb.all_shots()}
     shot = _dump(_shot_json(*by_id[key]))
-    return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI BIÊN DỊCH trong shot {key}.
+    compile_diags = [d for d in diags if d.kind != LAYOUT]
+    layout_diags = [d for d in diags if d.kind == LAYOUT]
+    sections: list[str] = []
+    if compile_diags:
+        sections.append(
+            "Lỗi trình biên dịch TypeScript (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):\n"
+            + _listed(compile_diags))
+    if layout_diags:
+        # CR-048 T6b: measured on the shot as it is really drawn, at the moments named.
+        sections.append(
+            "Lỗi bố cục — đo trên hình thật của shot, ở các thời điểm ghi trong từng dòng (số dòng là dòng trong "
+            "FILE ĐẦY ĐỦ; vùng an toàn (96, 96)–(1824, 984); chữ tối thiểu 32px):\n" + _listed(layout_diags)
+            + "\nSửa bằng cách đổi vị trí, kích thước, width, cỡ chữ hoặc biên độ chuyển động (spring vọt lố) "
+            "của đúng vật được nêu; không bỏ vật hay chữ mà kịch bản yêu cầu.")
+    what = "BIÊN DỊCH" if not layout_diags else "BỐ CỤC" if not compile_diags else "BIÊN DỊCH VÀ BỐ CỤC"
+    errors_block = "\n\n".join(sections)
+    return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI {what} trong shot {key}.
 
 Shot theo kịch bản:
 {shot}
 
-Lỗi trình biên dịch TypeScript (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):
-{listed}
+{errors_block}
 
 Code hiện tại của shot:
 ```tsx

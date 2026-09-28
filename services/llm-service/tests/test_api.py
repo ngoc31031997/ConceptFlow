@@ -24,8 +24,13 @@ def config(**over):
 
 
 class OkChecker:
-    async def check(self, engine, code, scene_class_name):
-        return CheckResult(ok=True)
+    def __init__(self, warnings=None):
+        self.layouts = []
+        self.warnings = warnings or []
+
+    async def check(self, engine, code, scene_class_name, layout=None):
+        self.layouts.append(layout)
+        return CheckResult(ok=True, warnings=list(self.warnings))
 
 
 @pytest.fixture
@@ -134,6 +139,31 @@ async def test_code_generate_streams_phases_and_the_final_code(client):
     assert "const SHOTS" in ev[-1]["code"] and len(ev[-1]["calls"]) == 2
 
 
+async def test_code_generate_hands_the_subtitle_band_and_font_to_the_layout_check_and_returns_its_warnings():
+    # CR-048 T6b
+    cfg = config()
+    checker = OkChecker(warnings=["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung"])
+    app = create_app(cfg, Providers(cfg), checker)
+    c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://svc")
+    with respx.mock:
+        respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
+        r = await c.post("/v1/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS",
+            "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
+    ev = events(r)
+    assert ev[-1]["type"] == "result" and ev[-1]["check_ok"] is True
+    assert ev[-1]["warnings"] == ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung"]
+    assert checker.layouts and all(
+        lc.subtitle_band == {"edge": "bottom", "px": 240} and lc.video_font == "Montserrat" for lc in checker.layouts)
+
+
+async def test_code_generate_rejects_a_nonsense_subtitle_band(client):
+    r = await client.post("/v1/code/generate", json={
+        "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS",
+        "subtitle_band": {"edge": "left", "px": 240}})
+    assert r.status_code == 422
+
+
 async def test_code_generate_with_a_prose_storyboard_is_an_error_event(client):
     r = await client.post("/v1/code/generate", json={
         "engine": "remotion", "topic": "t", "storyboard": "CẢNH 1", "system": "SYS"})
@@ -214,3 +244,32 @@ def test_for_model_routes_ollama_ids():
     assert p.for_model(p.hive, "ollama") == (p.ollama, cfg.ollama_model)
     assert p.for_model(p.hive, "ollama/qwen2.5") == (p.ollama, "qwen2.5")
     assert p.for_model(p.hive, "zai-org/glm-5.3-flash") == (p.hive, "zai-org/glm-5.3-flash")
+
+
+@respx.mock
+async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_warnings():
+    # CR-048 T6b
+    from app.pipeline.checker import LayoutContext, RenderingChecker
+
+    route = respx.post("http://rendering.test/v1/check/remotion").mock(return_value=httpx.Response(200, json={
+        "ok": False, "raw": "",
+        "diagnostics": [{"message": "TS2304: x", "line": 3, "kind": "compile"},
+                        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"},
+                        {"message": "old rendering, no kind", "line": 4}],
+        "warnings": ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]}))
+    chk = RenderingChecker("http://rendering.test", 5)
+    res = await chk.check("remotion", "code", "creator",
+                          LayoutContext(subtitle_band={"edge": "top", "px": 200}, video_font="Montserrat"))
+    assert json.loads(route.calls[0].request.content) == {
+        "code": "code", "scene_class_name": "creator",
+        "subtitle_band": {"edge": "top", "px": 200}, "video_font": "Montserrat"}
+    assert [(d.line, d.kind) for d in res.diagnostics] == [(3, "compile"), (62, "layout"), (4, "compile")]
+    assert res.warnings == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
+
+    manim = respx.post("http://rendering.test/v1/check/manim").mock(return_value=httpx.Response(200, json={
+        "ok": True, "diagnostics": [], "raw": ""}))
+    await chk.check("remotion", "code", "creator", LayoutContext())
+    res = await chk.check("manim", "code", "XScene")
+    assert json.loads(route.calls[1].request.content) == {"code": "code", "scene_class_name": "creator"}
+    assert json.loads(manim.calls[0].request.content) == {"code": "code", "scene_class_name": "XScene"}
+    assert res.ok and res.warnings == []  # an answer without warnings (older rendering) reads as none

@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -68,6 +69,12 @@ class IllustrationIn(BaseModel):
     code: str
 
 
+class SubtitleBandIn(BaseModel):
+    """CR-048 T6b — the strip burned-in subtitles cover, from the frame edge."""
+    edge: Literal["top", "bottom"]
+    px: int = Field(gt=0, lt=1080)
+
+
 class CodeBody(BaseModel):
     illustrations: list[IllustrationIn] = []
     engine: str
@@ -77,6 +84,10 @@ class CodeBody(BaseModel):
     model: str = ""
     max_tokens: int = Field(0, ge=0)
     temperature: float = 0.3
+    # CR-048 T6b — passed to the Rendering layout check (Remotion only).
+    # No band = nothing burned into the frame; no font = the video default.
+    subtitle_band: SubtitleBandIn | None = None
+    video_font: str = ""
 
 
 def _line(obj: dict) -> bytes:
@@ -251,7 +262,9 @@ def create_app(
                 engine=body.engine, topic=body.topic, storyboard=body.storyboard, system=body.system,
                 model=model, max_tokens=body.max_tokens, temperature=body.temperature,
                 max_reasoning_chars=config.code_max_reasoning_chars,
-                illustrations=[i.model_dump() for i in body.illustrations]), emit)
+                illustrations=[i.model_dump() for i in body.illustrations],
+                subtitle_band=body.subtitle_band.model_dump() if body.subtitle_band else None,
+                video_font=body.video_font), emit)
             return res.to_dict()
 
         return _stream(work)

@@ -215,6 +215,35 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 	}
 }
 
+func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
+	// CR-048 T6b: the rendering layout check needs the subtitle strip and the font.
+	var bodies []map[string]any
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		bodies = append(bodies, body)
+		ndjson(w, `{"type":"result","code":"CODE","check_ok":true,"calls":[]}`)
+	})
+	band := domain.SubtitleBand{Edge: "top", Px: 280}
+	if _, err := c.GenerateCode(context.Background(), application.CodeGenRequest{
+		Engine: "remotion", SubtitleBand: &band, VideoFont: "Montserrat"}, nil); err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	if _, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, nil); err != nil {
+		t.Fatalf("GenerateCode: %v", err)
+	}
+	sb, ok := bodies[0]["subtitle_band"].(map[string]any)
+	if !ok || sb["edge"] != "top" || sb["px"] != float64(280) || bodies[0]["video_font"] != "Montserrat" {
+		t.Errorf("first body = %v", bodies[0])
+	}
+	if _, has := bodies[1]["subtitle_band"]; has {
+		t.Errorf("no band must mean no subtitle_band field, got %v", bodies[1])
+	}
+	if _, has := bodies[1]["video_font"]; has {
+		t.Errorf("no font must mean no video_font field, got %v", bodies[1])
+	}
+}
+
 func TestGenerateCodeFailureKeepsTheBilledCalls(t *testing.T) {
 	c := serve(t, func(w http.ResponseWriter, _ *http.Request) {
 		ndjson(w, `{"type":"error","error":{"kind":"balance","provider":"hive","message":"out of credit"},`+

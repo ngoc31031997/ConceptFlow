@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
@@ -18,8 +19,9 @@ from pydantic import BaseModel
 from adapters.http.check_metrics import CheckMetrics
 from adapters.rendering.illustration_previewer import IllustrationPreviewError
 from adapters.rendering.typescript_checker import TypeScriptCheckError
-from application.check_script import CheckScriptUseCase
+from application.check_script import CheckScriptUseCase, LayoutContext
 from application.preview_illustration import PreviewIllustrationUseCase
+from domain.layout_rules import SubtitleBand
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +33,19 @@ class IllustrationBody(BaseModel):
     gif: bool = True
 
 
+class SubtitleBandBody(BaseModel):
+    """CR-048 T6b: the strip burned-in subtitles cover, measured from the frame edge."""
+    edge: Literal["top", "bottom"]
+    px: int
+
+
 class CheckBody(BaseModel):
     code: str
     scene_class_name: str = ""
+    # CR-048 T6b — for the layout check (Remotion only). No band = nothing is
+    # burned into the frame; no font = the Stage's default.
+    subtitle_band: SubtitleBandBody | None = None
+    video_font: str = ""
 
 
 def create_check_app(
@@ -64,7 +76,13 @@ def create_check_app(
                 # the render it actually competes with for CPU.
                 renders_running = metrics.renders_running
                 try:
-                    out = await asyncio.to_thread(use_case.check, engine, body.code, body.scene_class_name)
+                    band = body.subtitle_band
+                    layout = LayoutContext(
+                        subtitle_band=SubtitleBand(band.edge, band.px) if band else None,
+                        video_font=body.video_font,
+                    )
+                    out = await asyncio.to_thread(
+                        use_case.check, engine, body.code, body.scene_class_name, layout)
                 except ValueError as exc:
                     return JSONResponse({"error": str(exc)}, status_code=400)
                 except TypeScriptCheckError as exc:
@@ -88,8 +106,9 @@ def create_check_app(
             )
         return {
             "ok": out.ok,
-            "diagnostics": [{"message": d.message, "line": d.line} for d in out.diagnostics],
+            "diagnostics": [{"message": d.message, "line": d.line, "kind": d.kind} for d in out.diagnostics],
             "raw": out.raw,
+            "warnings": out.warnings,
         }
 
     @app.post("/v1/check/remotion")

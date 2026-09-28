@@ -149,6 +149,13 @@ var subtitleBandPx = map[string]int{"small": 200, "medium": 240, "large": 280}
 // own drawing out of it. Only burn-in paints over the frame; a caption track
 // is drawn by the player, off the video, and needs no room.
 func SubtitleZone(project *Project, language string) string {
+	mode, style := projectSubtitleSettings(project)
+	return SubtitleZoneFor(mode, style, language)
+}
+
+// projectSubtitleSettings reads a project's subtitle mode and style, falling
+// back to the legacy on/off flag and the default style.
+func projectSubtitleSettings(project *Project) (SubtitleMode, SubtitleStyle) {
 	mode := project.SubtitleMode
 	if !mode.IsValid() {
 		mode = SubtitleModeFromLegacy(project.SubtitlesEnabled)
@@ -157,23 +164,54 @@ func SubtitleZone(project *Project, language string) string {
 	if project.SubtitleStyle != nil {
 		style = *project.SubtitleStyle
 	}
-	return SubtitleZoneFor(mode, style, language)
+	return mode, style
 }
 
-// SubtitleZoneFor is SubtitleZone for explicit settings — what the wizard has
-// in its draft before anything is saved to the project.
-func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) string {
+// SubtitleBand is the strip of a 1920x1080 frame that burned-in subtitles
+// cover: Px pixels measured from the Edge ("top" or "bottom") of the frame.
+type SubtitleBand struct {
+	Edge string
+	Px   int
+}
+
+// SubtitleBandFor is the strip burned-in subtitles cover, or false when
+// nothing is painted over the frame (off, or a caption track only). It is the
+// one source of the numbers both {{subtitle_zone}} (what the Remotion
+// Engineer is told) and the rendering layout check (CR-048 T6b, what the
+// drawn frame is held to) use.
+func SubtitleBandFor(mode SubtitleMode, style SubtitleStyle) (SubtitleBand, bool) {
 	if mode != SubtitleModeBurnIn && mode != SubtitleModeBoth {
-		if language == "vi" {
-			return "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
-		}
-		return "this video has NO burned-in subtitles — the whole safe area is yours."
+		return SubtitleBand{}, false
 	}
 	band, ok := subtitleBandPx[style.FontSize]
 	if !ok {
 		band = subtitleBandPx["medium"]
 	}
+	edge := "bottom"
 	if style.Position == "top" {
+		edge = "top"
+	}
+	return SubtitleBand{Edge: edge, Px: band}, true
+}
+
+// ProjectSubtitleBand is SubtitleBandFor for a saved project, with the same
+// legacy fallbacks SubtitleZone applies.
+func ProjectSubtitleBand(project *Project) (SubtitleBand, bool) {
+	return SubtitleBandFor(projectSubtitleSettings(project))
+}
+
+// SubtitleZoneFor is SubtitleZone for explicit settings — what the wizard has
+// in its draft before anything is saved to the project.
+func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) string {
+	sb, burned := SubtitleBandFor(mode, style)
+	if !burned {
+		if language == "vi" {
+			return "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."
+		}
+		return "this video has NO burned-in subtitles — the whole safe area is yours."
+	}
+	band := sb.Px
+	if sb.Edge == "top" {
 		if language == "vi" {
 			return fmt.Sprintf("phụ đề được in ở MÉP TRÊN khung — dải y từ 0 đến %d px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn bắt đầu từ y = %d.", band, band+24)
 		}

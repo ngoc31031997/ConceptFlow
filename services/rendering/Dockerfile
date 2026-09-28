@@ -86,6 +86,17 @@ COPY remotion_project/package.json remotion_project/
 # this first cut (nothing has generated one against a real npm registry
 # from inside this repo before) — `npm ci` requires one to exist.
 RUN cd remotion_project && npm install
+# CR-048 T6b: kiểm tra bố cục (remotion_project/layout_check.mjs) điều khiển
+# Chromium headless qua playwright-core. playwright-core KHÔNG tự tải trình
+# duyệt, nên cài ở đây đúng bản headless shell mà phiên bản playwright-core đã
+# ghim được build và test cùng (1.56.1 → Chromium 141, cũng là bản spike T6a đo
+# được). Không dùng Chrome Headless Shell 149 mà Remotion tải ở dưới: cặp
+# playwright-core 1.56 + Chrome 149 chưa ai chạy thử. Thư viện hệ thống cần cho
+# nó là bộ đã cài ở trên cho Chrome của Remotion; font đọc từ fontconfig (Be
+# Vietnam Pro, Montserrat, Cormorant Garamond ở bước font phía trên).
+# Nâng playwright-core trong package.json thì bước này tự tải bản khớp.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers
+RUN cd remotion_project && npx playwright-core install chromium-headless-shell
 COPY . .
 # Downloads Chrome Headless Shell into the image at build time (per Remotion's
 # Docker docs) rather than on first render — a cold first render in

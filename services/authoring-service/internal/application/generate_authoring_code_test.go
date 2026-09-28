@@ -176,6 +176,39 @@ func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 	}
 }
 
+// CR-048 T6b: the layout check gets the same subtitle strip {{subtitle_zone}}
+// describes, and the video's font; Manim gets neither.
+func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
+	run := func(p *domain.Project) application.CodeGenRequest {
+		t.Helper()
+		renderCtx := &fakeRenderContext{project: p, topic: "t", storyboard: `{"scenes":[]}`}
+		gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
+		uc := application.NewGenerateAuthoringUseCase(
+			newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
+			application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, nil,
+			&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
+		).WithPipeline(&stubFinalizer{}, gen)
+		if _, err := uc.Execute(context.Background(), p.ProjectID, "code"); err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		return gen.req
+	}
+
+	req := run(&domain.Project{ProjectID: "p1", RenderEngine: domain.RenderEngineRemotion, VideoFont: "Montserrat",
+		SubtitleMode: domain.SubtitleModeBurnIn, SubtitleStyle: &domain.SubtitleStyle{FontSize: "large", Position: "top"}})
+	if req.SubtitleBand == nil || *req.SubtitleBand != (domain.SubtitleBand{Edge: "top", Px: 280}) || req.VideoFont != "Montserrat" {
+		t.Errorf("burn-in remotion request = band %+v font %q", req.SubtitleBand, req.VideoFont)
+	}
+	req = run(&domain.Project{ProjectID: "p2", RenderEngine: domain.RenderEngineRemotion, SubtitleMode: domain.SubtitleModeTrack})
+	if req.SubtitleBand != nil || req.VideoFont != "" {
+		t.Errorf("a caption track paints nothing on the frame: band %+v font %q", req.SubtitleBand, req.VideoFont)
+	}
+	req = run(&domain.Project{ProjectID: "p3", RenderEngine: domain.RenderEngineManim, SubtitleMode: domain.SubtitleModeBurnIn})
+	if req.SubtitleBand != nil {
+		t.Errorf("manim has no layout check: band %+v", req.SubtitleBand)
+	}
+}
+
 func TestCodeStepUsesTheManimEngineerForAManimProject(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{Code: "from conceptflow import *", CheckOK: true}})

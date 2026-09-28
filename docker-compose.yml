@@ -149,6 +149,14 @@ services:
       CHECK_HTTP_PORT: "8000"
       CHECK_CONCURRENCY: "${CHECK_CONCURRENCY:-2}"
       TSC_TIMEOUT_SECONDS: "${TSC_TIMEOUT_SECONDS:-90}"
+      # CR-048 T6b — kiểm tra bố cục sau khi tsc qua: vẽ từng shot trong
+      # Chromium headless, đo hộp bao, lỗi bố cục (tràn khung, đè chữ, lấn vùng
+      # phụ đề, chữ nhỏ) được gửi vào vòng sửa lỗi như lỗi tsc. Tắt (false) thì
+      # mỗi lượt kiểm tra ghi cảnh báo "chưa kiểm tra bố cục".
+      LAYOUT_CHECK_ENABLED: "${LAYOUT_CHECK_ENABLED:-true}"
+      # Trần thời gian một lượt đo (kể cả mở trình duyệt nếu phải mở lại).
+      # Quá giờ → cảnh báo "không kiểm tra được bố cục", giữ kết quả tsc.
+      LAYOUT_CHECK_TIMEOUT_SECONDS: "${LAYOUT_CHECK_TIMEOUT_SECONDS:-60}"
     # Manim renders on every core it can get (Phase 0 measured CPU-time at
     # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
     # the Postgres instances on the same host. 5G sits just above the 4 GiB

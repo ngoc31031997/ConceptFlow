@@ -1,8 +1,9 @@
 /**
- * Page side of the layout probe (CR-048 T6a spike — not wired into any pipeline).
+ * Page side of the layout probe (CR-048 T6a; the compile check's layout check
+ * since T6b).
  *
- * layout_probe.mjs bundles this file once with esbuild, opens it in headless
- * Chromium and, per merged script:
+ * layout_probe_lib.mjs bundles this file once with esbuild, opens it in headless
+ * Chromium and, per merged script (a fresh page each):
  *   1. hands in the script already compiled to CommonJS (every JSX element
  *      carries a `data-cf-line` attribute = its line in the merged file);
  *   2. `load()` evaluates it with a `require` that only knows the modules a
@@ -335,10 +336,12 @@ async function settle(timeoutMs: number): Promise<number> {
 
 let root: Root | null = null;
 
-async function measure(opts: {shots: number; duration: number; pcts: number[]; settleTimeoutMs: number}) {
+async function measure(opts: {shots: number; duration: number; pcts: number[]; settleTimeoutMs: number; skip?: number[]}) {
   if (!loaded) throw new Error('load() a script first');
   const {component, width, height, fps} = loaded;
   const {shots, duration, pcts, settleTimeoutMs} = opts;
+  // Shots not worth drawing (the merger's `return null` stubs in a one-chunk check).
+  const skip = new Set(opts.skip ?? []);
   const segments = Array.from({length: shots}, (_, i) => ({startFrame: i * duration, durationInFrames: duration}));
   const inputProps = {segments};
   const stage = document.getElementById('cf-stage') as HTMLElement;
@@ -370,8 +373,12 @@ async function measure(opts: {shots: number; duration: number; pcts: number[]; s
       ),
     );
 
-  const result: {index: number; samples: Sample[]}[] = [];
+  const result: {index: number; samples: Sample[]; skipped?: string}[] = [];
   for (let i = 0; i < shots; i++) {
+    if (skip.has(i)) {
+      result.push({index: i, samples: [], skipped: 'stub'});
+      continue;
+    }
     const samples: Sample[] = [];
     for (const pct of pcts) {
       const t0 = performance.now();
