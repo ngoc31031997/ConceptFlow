@@ -1,0 +1,1612 @@
+{
+  "version": 1,
+  "script": "layout_probe_samples/problems.tsx",
+  "composition": {
+    "id": "creator",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "narrations": 6,
+  "nominal_duration": 150,
+  "frames": [
+    {
+      "pct": 0,
+      "frame": 0
+    },
+    {
+      "pct": 0.5,
+      "frame": 75
+    },
+    {
+      "pct": 0.85,
+      "frame": 127
+    },
+    {
+      "pct": 1,
+      "frame": 149
+    }
+  ],
+  "shots": [
+    {
+      "index": 0,
+      "component": "Shot1_1",
+      "id": "1.1",
+      "line": 36,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 0,
+          "elements": [],
+          "ms": 5.5
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 75,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 44,
+              "rect": {
+                "x": 817.6,
+                "y": 390,
+                "w": 284.8,
+                "h": 460
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 45,
+              "text": "Vì sao răng bị sâu?",
+              "rect": {
+                "x": 460,
+                "y": 130,
+                "w": 1000,
+                "h": 72
+              },
+              "text_rect": {
+                "x": 673,
+                "y": 128,
+                "w": 573.9,
+                "h": 76
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 60,
+              "font_size_rendered": 60,
+              "scroll_width": 1000,
+              "client_width": 1000,
+              "scroll_height": 74,
+              "client_height": 72,
+              "text_parent": null
+            }
+          ],
+          "ms": 1.8
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 127,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 44,
+              "rect": {
+                "x": 817.6,
+                "y": 390,
+                "w": 284.8,
+                "h": 460
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 45,
+              "text": "Vì sao răng bị sâu?",
+              "rect": {
+                "x": 460,
+                "y": 130,
+                "w": 1000,
+                "h": 72
+              },
+              "text_rect": {
+                "x": 673,
+                "y": 128,
+                "w": 573.9,
+                "h": 76
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 60,
+              "font_size_rendered": 60,
+              "scroll_width": 1000,
+              "client_width": 1000,
+              "scroll_height": 74,
+              "client_height": 72,
+              "text_parent": null
+            }
+          ],
+          "ms": 1.3
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 149,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 44,
+              "rect": {
+                "x": 817.6,
+                "y": 390,
+                "w": 284.8,
+                "h": 460
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 45,
+              "text": "Vì sao răng bị sâu?",
+              "rect": {
+                "x": 460,
+                "y": 130,
+                "w": 1000,
+                "h": 72
+              },
+              "text_rect": {
+                "x": 673,
+                "y": 128,
+                "w": 573.9,
+                "h": 76
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 60,
+              "font_size_rendered": 60,
+              "scroll_width": 1000,
+              "client_width": 1000,
+              "scroll_height": 74,
+              "client_height": 72,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.4
+        }
+      ]
+    },
+    {
+      "index": 1,
+      "component": "Shot1_2",
+      "id": "1.2",
+      "line": 53,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 150,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 61,
+              "rect": {
+                "x": 429.1,
+                "y": 350,
+                "w": 381.8,
+                "h": 420
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 12
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 225,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 61,
+              "rect": {
+                "x": 414,
+                "y": 333.4,
+                "w": 411.9,
+                "h": 453.1
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 62,
+              "text": "Lớp men răng bảo vệ",
+              "rect": {
+                "x": 1030,
+                "y": 484.5,
+                "w": 388.4,
+                "h": 64.7
+              },
+              "text_rect": {
+                "x": 1030,
+                "y": 483.4,
+                "w": 541.8,
+                "h": 65.8
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 51.8,
+              "scroll_width": 502,
+              "client_width": 360,
+              "scroll_height": 60,
+              "client_height": 60,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.2
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 277,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 61,
+              "rect": {
+                "x": 410,
+                "y": 329,
+                "w": 420,
+                "h": 462
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 62,
+              "text": "Lớp men răng bảo vệ",
+              "rect": {
+                "x": 1038,
+                "y": 483,
+                "w": 396,
+                "h": 66
+              },
+              "text_rect": {
+                "x": 1038,
+                "y": 481.9,
+                "w": 552.4,
+                "h": 67.1
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 52.8,
+              "scroll_width": 502,
+              "client_width": 360,
+              "scroll_height": 60,
+              "client_height": 60,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.3
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 299,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 61,
+              "rect": {
+                "x": 410,
+                "y": 329,
+                "w": 420,
+                "h": 462
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 62,
+              "text": "Lớp men răng bảo vệ",
+              "rect": {
+                "x": 1038,
+                "y": 483,
+                "w": 396,
+                "h": 66
+              },
+              "text_rect": {
+                "x": 1038,
+                "y": 481.9,
+                "w": 552.4,
+                "h": 67.1
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 52.8,
+              "scroll_width": 502,
+              "client_width": 360,
+              "scroll_height": 60,
+              "client_height": 60,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.3
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "component": "Shot1_3",
+      "id": "1.3",
+      "line": 71,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 300,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 77,
+              "rect": {
+                "x": 1509.1,
+                "y": 350,
+                "w": 381.8,
+                "h": 420
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Germ",
+              "line": 78,
+              "rect": {
+                "x": 1690,
+                "y": 370,
+                "w": 140,
+                "h": 140
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "LottieClip",
+              "line": 83,
+              "rect": {
+                "x": 410,
+                "y": 390,
+                "w": 420,
+                "h": 420
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 13.6
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 375,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 77,
+              "rect": {
+                "x": 1509.1,
+                "y": 350,
+                "w": 381.8,
+                "h": 420
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Germ",
+              "line": 78,
+              "rect": {
+                "x": 1690,
+                "y": 370,
+                "w": 140,
+                "h": 140
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "svg",
+              "tag": "svg",
+              "line": 79,
+              "rect": {
+                "x": 1180,
+                "y": 400,
+                "w": 300,
+                "h": 80
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "LottieClip",
+              "line": 83,
+              "rect": {
+                "x": 410,
+                "y": 390,
+                "w": 420,
+                "h": 420
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.2
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 427,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 77,
+              "rect": {
+                "x": 1509.1,
+                "y": 350,
+                "w": 381.8,
+                "h": 420
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Germ",
+              "line": 78,
+              "rect": {
+                "x": 1690,
+                "y": 370,
+                "w": 140,
+                "h": 140
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "svg",
+              "tag": "svg",
+              "line": 79,
+              "rect": {
+                "x": 1180,
+                "y": 400,
+                "w": 300,
+                "h": 80
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "LottieClip",
+              "line": 83,
+              "rect": {
+                "x": 410,
+                "y": 390,
+                "w": 420,
+                "h": 420
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 15.4
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 449,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Tooth",
+              "line": 77,
+              "rect": {
+                "x": 1509.1,
+                "y": 350,
+                "w": 381.8,
+                "h": 420
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Germ",
+              "line": 78,
+              "rect": {
+                "x": 1690,
+                "y": 370,
+                "w": 140,
+                "h": 140
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "svg",
+              "tag": "svg",
+              "line": 79,
+              "rect": {
+                "x": 1180,
+                "y": 400,
+                "w": 300,
+                "h": 80
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "LottieClip",
+              "line": 83,
+              "rect": {
+                "x": 410,
+                "y": 390,
+                "w": 420,
+                "h": 420
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 20.3
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "component": "Shot2_1",
+      "id": "2.1",
+      "line": 89,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 450,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Shield",
+              "line": 95,
+              "rect": {
+                "x": 1194.7,
+                "y": 320,
+                "w": 370.5,
+                "h": 440
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 10
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 525,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Shield",
+              "line": 95,
+              "rect": {
+                "x": 1194.7,
+                "y": 320,
+                "w": 370.5,
+                "h": 440
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 96,
+              "text": "Đánh răng hai lần mỗi ngày",
+              "rect": {
+                "x": 200,
+                "y": 380,
+                "w": 520,
+                "h": 130
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 379,
+                "w": 456.3,
+                "h": 131
+              },
+              "opacity": 1,
+              "lines": 2,
+              "font_size": 52,
+              "font_size_rendered": 52,
+              "scroll_width": 520,
+              "client_width": 520,
+              "scroll_height": 130,
+              "client_height": 130,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 99,
+              "text": "Kem có fluor giúp men chắc hơn",
+              "rect": {
+                "x": 200,
+                "y": 420,
+                "w": 720,
+                "h": 55
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 419,
+                "w": 681.2,
+                "h": 56
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 44,
+              "font_size_rendered": 44,
+              "scroll_width": 720,
+              "client_width": 720,
+              "scroll_height": 55,
+              "client_height": 55,
+              "text_parent": null
+            }
+          ],
+          "ms": 9.7
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 577,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Shield",
+              "line": 95,
+              "rect": {
+                "x": 1194.7,
+                "y": 320,
+                "w": 370.5,
+                "h": 440
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 96,
+              "text": "Đánh răng hai lần mỗi ngày",
+              "rect": {
+                "x": 200,
+                "y": 380,
+                "w": 520,
+                "h": 130
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 379,
+                "w": 456.3,
+                "h": 131
+              },
+              "opacity": 1,
+              "lines": 2,
+              "font_size": 52,
+              "font_size_rendered": 52,
+              "scroll_width": 520,
+              "client_width": 520,
+              "scroll_height": 130,
+              "client_height": 130,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 99,
+              "text": "Kem có fluor giúp men chắc hơn",
+              "rect": {
+                "x": 200,
+                "y": 420,
+                "w": 720,
+                "h": 55
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 419,
+                "w": 681.2,
+                "h": 56
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 44,
+              "font_size_rendered": 44,
+              "scroll_width": 720,
+              "client_width": 720,
+              "scroll_height": 55,
+              "client_height": 55,
+              "text_parent": null
+            }
+          ],
+          "ms": 9.3
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 599,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Shield",
+              "line": 95,
+              "rect": {
+                "x": 1194.7,
+                "y": 320,
+                "w": 370.5,
+                "h": 440
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 96,
+              "text": "Đánh răng hai lần mỗi ngày",
+              "rect": {
+                "x": 200,
+                "y": 380,
+                "w": 520,
+                "h": 130
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 379,
+                "w": 456.3,
+                "h": 131
+              },
+              "opacity": 1,
+              "lines": 2,
+              "font_size": 52,
+              "font_size_rendered": 52,
+              "scroll_width": 520,
+              "client_width": 520,
+              "scroll_height": 130,
+              "client_height": 130,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 99,
+              "text": "Kem có fluor giúp men chắc hơn",
+              "rect": {
+                "x": 200,
+                "y": 420,
+                "w": 720,
+                "h": 55
+              },
+              "text_rect": {
+                "x": 200,
+                "y": 419,
+                "w": 681.2,
+                "h": 56
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 44,
+              "font_size_rendered": 44,
+              "scroll_width": 720,
+              "client_width": 720,
+              "scroll_height": 55,
+              "client_height": 55,
+              "text_parent": null
+            }
+          ],
+          "ms": 9.5
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "component": "Shot2_2",
+      "id": "2.2",
+      "line": 107,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 600,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Backdrop",
+              "line": 113,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "w": 1920,
+                "h": 1080
+              },
+              "opacity": 1,
+              "full_frame": true
+            },
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 114,
+              "rect": {
+                "x": 599,
+                "y": 320,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Candy",
+              "line": 115,
+              "rect": {
+                "x": 900,
+                "y": 612.5,
+                "w": 120,
+                "h": 55
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 675,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Backdrop",
+              "line": 113,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "w": 1920,
+                "h": 1080
+              },
+              "opacity": 1,
+              "full_frame": true
+            },
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 114,
+              "rect": {
+                "x": 599,
+                "y": 320,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Candy",
+              "line": 115,
+              "rect": {
+                "x": 900,
+                "y": 612.5,
+                "w": 120,
+                "h": 55
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Bubble",
+              "line": 116,
+              "rect": {
+                "x": 1110.2,
+                "y": 255.3,
+                "w": 419.4,
+                "h": 169.7
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 116,
+              "text": "Ngọt quá!",
+              "rect": {
+                "x": 1110.2,
+                "y": 255.3,
+                "w": 419.4,
+                "h": 169.7
+              },
+              "text_rect": {
+                "x": 1220.6,
+                "y": 314.2,
+                "w": 198.5,
+                "h": 50.9
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 40,
+              "font_size_rendered": 39.9,
+              "scroll_width": 420,
+              "client_width": 420,
+              "scroll_height": 170,
+              "client_height": 170,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.7
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 727,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Backdrop",
+              "line": 113,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "w": 1920,
+                "h": 1080
+              },
+              "opacity": 1,
+              "full_frame": true
+            },
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 114,
+              "rect": {
+                "x": 599,
+                "y": 320,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Candy",
+              "line": 115,
+              "rect": {
+                "x": 900,
+                "y": 612.5,
+                "w": 120,
+                "h": 55
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Bubble",
+              "line": 116,
+              "rect": {
+                "x": 1110,
+                "y": 255,
+                "w": 420,
+                "h": 170
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 116,
+              "text": "Ngọt quá!",
+              "rect": {
+                "x": 1110,
+                "y": 255,
+                "w": 420,
+                "h": 170
+              },
+              "text_rect": {
+                "x": 1220.6,
+                "y": 314,
+                "w": 198.8,
+                "h": 51
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 40,
+              "font_size_rendered": 40,
+              "scroll_width": 420,
+              "client_width": 420,
+              "scroll_height": 170,
+              "client_height": 170,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.2
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 749,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Backdrop",
+              "line": 113,
+              "rect": {
+                "x": 0,
+                "y": 0,
+                "w": 1920,
+                "h": 1080
+              },
+              "opacity": 1,
+              "full_frame": true
+            },
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 114,
+              "rect": {
+                "x": 599,
+                "y": 320,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Candy",
+              "line": 115,
+              "rect": {
+                "x": 900,
+                "y": 612.5,
+                "w": 120,
+                "h": 55
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Bubble",
+              "line": 116,
+              "rect": {
+                "x": 1110,
+                "y": 255,
+                "w": 420,
+                "h": 170
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 116,
+              "text": "Ngọt quá!",
+              "rect": {
+                "x": 1110,
+                "y": 255,
+                "w": 420,
+                "h": 170
+              },
+              "text_rect": {
+                "x": 1220.6,
+                "y": 314,
+                "w": 198.8,
+                "h": 51
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 40,
+              "font_size_rendered": 40,
+              "scroll_width": 420,
+              "client_width": 420,
+              "scroll_height": 170,
+              "client_height": 170,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.7
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "component": "Shot2_3",
+      "id": "2.3",
+      "line": 124,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 750,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 129,
+              "rect": {
+                "x": 120,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 130,
+              "rect": {
+                "x": 980,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Lollipop",
+              "line": 131,
+              "rect": {
+                "x": 427.7,
+                "y": 290,
+                "w": 204.6,
+                "h": 380
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Apple",
+              "line": 132,
+              "rect": {
+                "x": 1210,
+                "y": 300,
+                "w": 360,
+                "h": 360
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 10.9
+        },
+        {
+          "frame": 75,
+          "pct": 0.5,
+          "global_frame": 825,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 129,
+              "rect": {
+                "x": 120,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 130,
+              "rect": {
+                "x": 980,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Lollipop",
+              "line": 131,
+              "rect": {
+                "x": 427.7,
+                "y": 290,
+                "w": 204.6,
+                "h": 380
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Apple",
+              "line": 132,
+              "rect": {
+                "x": 1210,
+                "y": 300,
+                "w": 360,
+                "h": 360
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 133,
+              "text": "Kẹo dính răng",
+              "rect": {
+                "x": 230,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 364.3,
+                "y": 760,
+                "w": 331.4,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 136,
+              "text": "Táo làm sạch răng",
+              "rect": {
+                "x": 1090,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 1169,
+                "y": 760,
+                "w": 442,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            }
+          ],
+          "ms": 10
+        },
+        {
+          "frame": 127,
+          "pct": 0.85,
+          "global_frame": 877,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 129,
+              "rect": {
+                "x": 120,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 130,
+              "rect": {
+                "x": 980,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Lollipop",
+              "line": 131,
+              "rect": {
+                "x": 427.7,
+                "y": 290,
+                "w": 204.6,
+                "h": 380
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Apple",
+              "line": 132,
+              "rect": {
+                "x": 1210,
+                "y": 300,
+                "w": 360,
+                "h": 360
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 133,
+              "text": "Kẹo dính răng",
+              "rect": {
+                "x": 230,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 364.3,
+                "y": 760,
+                "w": 331.4,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 136,
+              "text": "Táo làm sạch răng",
+              "rect": {
+                "x": 1090,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 1169,
+                "y": 760,
+                "w": 442,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.4
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 899,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 129,
+              "rect": {
+                "x": 120,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Panel",
+              "line": 130,
+              "rect": {
+                "x": 980,
+                "y": 120,
+                "w": 820,
+                "h": 840
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Lollipop",
+              "line": 131,
+              "rect": {
+                "x": 427.7,
+                "y": 290,
+                "w": 204.6,
+                "h": 380
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Apple",
+              "line": 132,
+              "rect": {
+                "x": 1210,
+                "y": 300,
+                "w": 360,
+                "h": 360
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 133,
+              "text": "Kẹo dính răng",
+              "rect": {
+                "x": 230,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 364.3,
+                "y": 760,
+                "w": 331.4,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            },
+            {
+              "kind": "text",
+              "tag": "div",
+              "line": 136,
+              "text": "Táo làm sạch răng",
+              "rect": {
+                "x": 1090,
+                "y": 760,
+                "w": 600,
+                "h": 61
+              },
+              "text_rect": {
+                "x": 1169,
+                "y": 760,
+                "w": 442,
+                "h": 61
+              },
+              "opacity": 1,
+              "lines": 1,
+              "font_size": 48,
+              "font_size_rendered": 48,
+              "scroll_width": 600,
+              "client_width": 600,
+              "scroll_height": 61,
+              "client_height": 61,
+              "text_parent": null
+            }
+          ],
+          "ms": 10.3
+        }
+      ]
+    }
+  ],
+  "page_log": [],
+  "timing_ms": {
+    "compile": 46,
+    "load": 5,
+    "measure": 275,
+    "samples": 24,
+    "sample_avg": 10.2,
+    "sample_max": 20.3,
+    "script_total": 327,
+    "startup": {
+      "bundle_harness": 197,
+      "launch_browser_and_page": 327
+    }
+  },
+  "violations": [
+    {
+      "shot": "1.2",
+      "shot_index": 1,
+      "line": 53,
+      "element_line": 62,
+      "rule": "text_overflow",
+      "severity": "blocking",
+      "frames": [
+        "50%",
+        "85%",
+        "100%"
+      ],
+      "detail": "nhãn 'Lớp men răng bảo vệ' tràn khung chữ (rộng 502px > width 360px)",
+      "message": "Shot 1.2, frame 50%/85%/100%: nhãn 'Lớp men răng bảo vệ' tràn khung chữ (rộng 502px > width 360px)"
+    },
+    {
+      "shot": "1.3",
+      "shot_index": 2,
+      "line": 71,
+      "element_line": 77,
+      "rule": "safe_area",
+      "severity": "blocking",
+      "frames": [
+        "0%",
+        "50%",
+        "85%",
+        "100%"
+      ],
+      "detail": "hình Tooth ra ngoài vùng an toàn (phải x=1891 > 1824)",
+      "message": "Shot 1.3, frame 0%/50%/85%/100%: hình Tooth ra ngoài vùng an toàn (phải x=1891 > 1824)"
+    },
+    {
+      "shot": "1.3",
+      "shot_index": 2,
+      "line": 71,
+      "element_line": 78,
+      "rule": "safe_area",
+      "severity": "blocking",
+      "frames": [
+        "0%",
+        "50%",
+        "85%",
+        "100%"
+      ],
+      "detail": "hình Germ ra ngoài vùng an toàn (phải x=1830 > 1824)",
+      "message": "Shot 1.3, frame 0%/50%/85%/100%: hình Germ ra ngoài vùng an toàn (phải x=1830 > 1824)"
+    },
+    {
+      "shot": "2.1",
+      "shot_index": 3,
+      "line": 89,
+      "element_line": 96,
+      "rule": "text_overlap",
+      "severity": "blocking",
+      "frames": [
+        "50%",
+        "85%",
+        "100%"
+      ],
+      "detail": "nhãn 'Đánh răng hai lần mỗi ngày' (dòng 96) đè lên nhãn 'Kem có fluor giúp men chắc hơn' (dòng 99) — giao nhau 456×56px",
+      "message": "Shot 2.1, frame 50%/85%/100%: nhãn 'Đánh răng hai lần mỗi ngày' (dòng 96) đè lên nhãn 'Kem có fluor giúp men chắc hơn' (dòng 99) — giao nhau 456×56px"
+    }
+  ],
+  "font": {
+    "family": "Be Vietnam Pro",
+    "available": true
+  },
+  "browser": {
+    "path": "/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
+    "version": "141.0.7390.37"
+  }
+}
