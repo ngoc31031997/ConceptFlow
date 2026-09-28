@@ -35,7 +35,8 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 | Destroy Docker data: `docker compose down -v`/`--volumes`, `docker volume rm`, `docker volume prune`, `docker system prune` | Deny | `deny` |
 | Read or write secrets: `.env`, `.env.window`, `secrets/**`, `client_secret_*.json` | Deny | `deny` on `Read(…)` and `Edit(…)`; shell access blocked by the PreToolUse guard hook |
 | Finish a turn with `make check` failing | Deny (once) | Stop hook |
-| Change the gate's configuration: `.claude/settings*.json`, `.claude/agents/**`, `scripts/hooks/**`, `scripts/check.sh`, `scripts/review-prep.sh` | Ask | `ask` on `Edit(…)` for each; changes then go through the reviewed, gated merge |
+| Change the gate's configuration: `.claude/settings*.json`, `.claude/agents/**`, `.claude/skills/**`, `scripts/hooks/**`, `scripts/check.sh`, `scripts/review-prep.sh` | Ask | `ask` on `Edit(…)` for each; changes then go through the reviewed, gated merge |
+| Write or forge Claude Code subagent transcripts, or run the review hook by hand | Deny | `deny` on `Edit(~/.claude/projects/**/subagents/**)`; Bash naming them blocked by the guard hook |
 | Write merge-gate markers or review input (`.git/conceptflow/**`) | Deny | `deny` on `Edit(/.git/conceptflow/**)`; Bash naming the directories blocked by the guard hook. Only `make check`, `review-prep.sh` and the SubagentStop hook write there |
 | Enable/alter the GitHub ruleset `protect-main` | Human | Agents have no admin access. See [`branch-protection.md`](branch-protection.md) |
 | Production deployment, production data mutation | Human | Not applicable yet: the repo has no production environment or deploy credentials |

@@ -40,6 +40,9 @@ SEPARATORS = {"&&", "||", ";", "|", "&", "(", ")", "\n"}
 
 REVIEW_AGENTS = ("reviewer", "security-reviewer", "tester")
 MARKER_DIRS = re.compile(r"conceptflow/(?:checked-trees|reviewed-trees|review)\b")
+# The review hook runs only from Claude Code's SubagentStop event; invoking it by hand, or
+# touching subagent transcripts, would let a session feed it a forged review.
+REVIEW_HOOK = re.compile(r"record_review|subagents/agent-")
 
 
 def block(message):
@@ -51,6 +54,10 @@ def check_markers(command):
     if MARKER_DIRS.search(command):
         block("Blocked: the merge-gate marker directories are written only by `make check` "
               "and the review-agent hook. Run /cr-check or /cr-review instead.")
+    if REVIEW_HOOK.search(command):
+        block("Blocked: the review hook and subagent transcripts are driven only by Claude "
+              "Code's SubagentStop event. Run /cr-review; use scripts/review-status.sh "
+              "to see the result.")
 
 
 def check_secrets(command):

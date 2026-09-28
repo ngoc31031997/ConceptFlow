@@ -6,9 +6,12 @@ the report it delivered must end with `VERDICT: PASS|FAIL tree=<40-hex tree hash
 A PASS writes `<git common dir>/conceptflow/reviewed-trees/<tree>.<agent>`, but only
 if all of these hold:
 
+0. the agent transcript is the one Claude Code wrote for this session's subagent
+   (see genuine_transcript), so a hand-made transcript cannot be passed in;
 1. <tree> is the tree of the current HEAD (the review is of what will be merged);
-2. the agent's prompt is, byte for byte, `conceptflow/review/<tree>.brief` written by
-   scripts/review-prep.sh (the reviewing session cannot soften the brief);
+2. the agent's prompt equals `conceptflow/review/<tree>.brief` written by
+   scripts/review-prep.sh, apart from leading/trailing whitespace (the reviewing
+   session cannot add to or soften the brief);
 3. `conceptflow/review/<tree>.diff` still equals the real diff against the
    merge-base with main (the agent read the whole change).
 
@@ -18,7 +21,8 @@ scripts/review-status.sh prints. Always exits 0: /cr-review reports a review
 without a marker as not done.
 
 Payload fields used (verified on the installed Claude Code, 2026-09-28): agent_type,
-agent_transcript_path, last_assistant_message, cwd. The delivered report is the
+agent_id, session_id, transcript_path, agent_transcript_path, last_assistant_message,
+cwd. The delivered report is the
 last SubagentHandback call in the agent transcript; last_assistant_message is the
 fallback when there is none.
 """
@@ -96,6 +100,33 @@ def delivered_report(entries):
     return report
 
 
+def genuine_transcript(payload):
+    """The agent transcript path, if it is where Claude Code keeps this session's subagents.
+
+    Claude Code stores the session transcript at <root>/<project>/<session_id>.jsonl and
+    each subagent's at <root>/<project>/<session_id>/subagents/agent-<agent_id>.jsonl
+    (verified 2026-09-28). A payload pointing anywhere else, e.g. a forged transcript in
+    the scratchpad fed to this script by hand, is rejected. Writing into <root> with
+    Edit/Write is denied in .claude/settings.json and the Bash guard blocks commands
+    naming this script or subagent transcripts.
+    """
+    root = os.path.realpath(os.environ.get("CONCEPTFLOW_TRANSCRIPTS_ROOT",
+                                           os.path.expanduser("~/.claude/projects")))
+    session = payload.get("session_id") or ""
+    agent_id = payload.get("agent_id") or ""
+    session_transcript = os.path.realpath(payload.get("transcript_path") or "")
+    agent_transcript = os.path.realpath(payload.get("agent_transcript_path") or "")
+    if not (session and agent_id and re.fullmatch(r"[\w-]+", session + agent_id)):
+        return None
+    if not session_transcript.startswith(root + os.sep):
+        return None
+    if os.path.basename(session_transcript) != f"{session}.jsonl":
+        return None
+    expected = os.path.join(session_transcript[:-len(".jsonl")], "subagents",
+                            f"agent-{agent_id}.jsonl")
+    return agent_transcript if agent_transcript == expected else None
+
+
 def main():
     global LOG
     payload = json.load(sys.stdin)
@@ -107,9 +138,16 @@ def main():
     if not common:
         skip(f"{agent}: not a git repository")
     LOG = os.path.join(common, "conceptflow", "review", "hook.log")
-    entries = read_transcript(payload.get("agent_transcript_path") or "")
+    transcript = genuine_transcript(payload)
+    if transcript is None:
+        skip(f"{agent}: the agent transcript is not this session's own subagent transcript")
+    entries = read_transcript(transcript)
+    if any(e.get("agentId") not in (None, payload.get("agent_id")) for e in entries):
+        skip(f"{agent}: the transcript belongs to another agent")
     report = delivered_report(entries) or payload.get("last_assistant_message") or ""
-    lines = [line.strip().strip("`") for line in report.splitlines() if line.strip()]
+    # Strip fences before dropping empty lines, so a verdict inside ``` still ends the report.
+    lines = [line for line in (raw.strip().strip("`").strip() for raw in report.splitlines())
+             if line]
     match = VERDICT.match(lines[-1]) if lines else None
     if not match:
         skip(f"{agent}: the report does not end with a VERDICT line")

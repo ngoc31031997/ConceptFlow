@@ -33,6 +33,7 @@
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)",
       "Edit(/.claude/agents/**)",
+      "Edit(/.claude/skills/**)",
       "Edit(/scripts/hooks/**)",
       "Edit(/scripts/check.sh)",
       "Edit(/scripts/review-prep.sh)"
@@ -67,7 +68,8 @@
       "Edit(**/.env.window)",
       "Edit(**/secrets/**)",
       "Edit(**/client_secret_*.json)",
-      "Edit(/.git/conceptflow/**)"
+      "Edit(/.git/conceptflow/**)",
+      "Edit(~/.claude/projects/**/subagents/**)"
     ]
   },
   "hooks": {

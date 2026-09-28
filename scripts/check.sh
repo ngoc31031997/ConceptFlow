@@ -162,7 +162,7 @@ case "$MODE" in
       grep -q "^services/$svc/" <<<"$files" && SERVICES="$SERVICES $svc"
     done
     grep -qE '^(tests/contracts/|docs/contracts/)' <<<"$files" && RUN_CONTRACTS=1
-    grep -q '^scripts/hooks/' <<<"$files" && RUN_HOOKS=1
+    grep -qE '^scripts/(hooks/|review-(prep|status)\.sh$)' <<<"$files" && RUN_HOOKS=1
     # A change to the verification itself re-verifies everything.
     if grep -qE '^(Makefile|scripts/(check|setup|build)\.sh)$' <<<"$files"; then
       SERVICES="$(all_services)"

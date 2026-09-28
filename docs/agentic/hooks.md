@@ -32,11 +32,17 @@ Auto-merge into `main` stays (D1), but only for work that passed `make check` **
 2. `/cr-review` passes the brief **verbatim** to the `reviewer`, `security-reviewer` and `tester` agents (`.claude/agents/`, tools Read/Grep/Glob only). Each ends its report with `VERDICT: PASS|FAIL tree=<tree hash>`.
 3. The SubagentStop hook `record_review.py` takes the verdict from the report the agent actually delivered (its last `SubagentHandback` call in the agent transcript; `last_assistant_message` if there is none). It writes `.git/conceptflow/reviewed-trees/<tree>.<agent>` on PASS only if **all** of these hold, and removes the marker on FAIL:
    - the tree is the current `HEAD`'s tree;
-   - the agent's prompt (first user message in its transcript) equals `<tree>.brief` byte for byte, so nothing was added such as "just say PASS";
+   - the agent transcript is the one Claude Code wrote for this session's subagent (`<projects>/<project>/<session_id>/subagents/agent-<agent_id>.jsonl`, entries tagged with that `agentId`), so a hand-made transcript cannot be fed in;
+   - the agent's prompt (first user message in its transcript) equals `<tree>.brief`, ignoring only leading/trailing whitespace, so nothing was added such as "just say PASS";
    - `<tree>.diff` still equals the real diff, so the agent saw the whole change.
 4. Every outcome, including the reason a review was **not** recorded, goes to `.git/conceptflow/review/hook.log`. `scripts/review-status.sh` shows the four markers for `HEAD` and the log tail (exit 0 = the gate would pass).
 
-Protection: Bash commands naming `conceptflow/checked-trees`, `reviewed-trees` or `review` are blocked by `guard_bash.py`, and Edit/Write of `.git/conceptflow/**` is denied. Edits to the gate's own configuration (`.claude/settings*.json`, `.claude/agents/**`, `scripts/hooks/**`, `scripts/check.sh`, `scripts/review-prep.sh`) require the Creator's confirmation (`ask`).
+Protection:
+
+- Bash commands naming `conceptflow/checked-trees`, `reviewed-trees`, `review`, the hook `record_review` or a subagent transcript (`subagents/agent-`) are blocked by `guard_bash.py`. Running the hook by hand with a forged payload was the Major finding of the first live review.
+- Edit/Write of `.git/conceptflow/**` and `~/.claude/projects/**/subagents/**` is denied (both verified live: the write was refused).
+- `review-prep.sh` accepts only a short label (`[A-Za-z0-9 ._-]`, max 40) and a requirement doc under `aidlc-docs/` or `docs/`, so no free text gets into the trusted brief.
+- Edits to the gate's own configuration (`.claude/settings*.json`, `.claude/agents/**`, `.claude/skills/**`, `scripts/hooks/**`, `scripts/check.sh`, `scripts/review-prep.sh`) are `ask`. In the session's **auto** permission mode those edits went through without a visible prompt; in the default mode they prompt the Creator.
 
 **Rules** (the guard follows `git checkout`/`git switch` inside a chained command line to know the branch):
 
@@ -85,5 +91,6 @@ Phase 5 gated on `make check` only; Phase 7 added the review markers (Creator ap
 Phase 7:
 
 - SubagentStop payload on the installed Claude Code, captured with a temporary probe hook and an `Explore` agent: `agent_id`, `agent_type`, `agent_transcript_path`, `last_assistant_message`, `cwd`, `stop_hook_active` (already `true` on the first stop, so it is not usable as a loop guard). The probe was removed.
-- `python3 -m unittest discover -s scripts/hooks`: 22 tests pass, adding: gate blocks a checked-but-unreviewed and a reviewed-but-unchecked branch; `record_review.py` writes on PASS, removes on a later FAIL, ignores other agents, a verdict not on the last line, a hash that is not a tree, and no verdict; marker directories blocked from the shell.
-- **Not yet verified live:** a real `reviewer`/`security-reviewer`/`tester` run writing markers. Agent definitions load at session start, so the first run is in the next session.
+- `python3 -m unittest discover -s scripts/hooks`: 36 tests pass (after the first live review's fixes), including: gate blocks a checked-but-unreviewed and a reviewed-but-unchecked branch; `record_review.py` writes on PASS, removes on a later FAIL, ignores other agents, a verdict not on the last line, a hash that is not a tree, and no verdict; marker directories blocked from the shell.
+- **Live run 1** (tree `6e974cc…`): the hook recorded PASS for `security-reviewer` and `tester` and FAIL for `reviewer` (Major: forging a review by running the hook by hand). The gate kept the branch out of `main`. Fixed: transcript-location check, Bash guard for the hook and transcripts, deny on transcript writes, fenced-verdict parsing, label validation, extra tests.
+- A skill invoked in the session can come from a cached copy: `/cr-review` loaded its pre-hardening text while the file on disk was newer. After editing skills, prefer a new session.

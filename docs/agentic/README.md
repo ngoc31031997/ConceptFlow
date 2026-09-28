@@ -82,7 +82,12 @@ Thêm hai điều kiện:
 - Nhánh phải **chứa `main` mới nhất**, để kết quả merge đúng là tree đã được kiểm tra.
 - Push `main` phải là **lệnh riêng**, sau lệnh merge.
 
-Session viết code **không tự ghi được** marker: thư mục marker bị chặn cả ở shell lẫn Edit/Write.
+Session viết code **không tự ghi được** marker. Cụ thể:
+- thư mục marker và transcript của agent bị chặn cả ở shell lẫn Edit/Write;
+- không chạy tay được hook `record_review`;
+- hook chỉ tin transcript nằm đúng chỗ Claude Code ghi cho agent con của session.
+
+Lần review thật đầu tiên đã phát hiện một lỗ hổng giả mạo và nó đã được vá (xem [`hooks.md`](hooks.md)).
 
 ### 2.5 Quyền của agent (tóm tắt)
 
@@ -142,7 +147,8 @@ make check-all               # toàn bộ, giống CI
 - **Hook chỉ áp dụng cho Claude Code.** Người gõ git trong terminal không đi qua cổng; đó là quyền của Creator.
 - **CI chạy sau khi push**, nên nó chỉ phát hiện lỗi chứ không chặn trước. Chặn trước là việc của cổng ở máy local.
 - **Nhiều agent dùng chung một thư mục checkout là rủi ro thật.** Ngày 2026-09-28 một agent khác đổi nhánh giữa chừng làm commit rơi nhầm vào `main` (không bị push). Cách sửa gốc là Phase 8. Trong lúc chờ, agent kiểm tra `git branch --show-current` trước khi commit.
-- **Agent tự tạo được nạp khi session bắt đầu** (có lúc được nạp giữa session). Sửa `.claude/agents/` xong nên mở session mới.
+- **Agent/skill có thể bị cache**: agent tự tạo được nạp khi session bắt đầu (có lúc giữa session), và skill có thể chạy bản cũ đã cache. Sửa `.claude/agents/` hoặc `.claude/skills/` xong nên mở session mới.
+- **`ask` trong chế độ auto**: trong session chạy chế độ quyền *auto*, các lần sửa file cấu hình cổng (thuộc diện `ask`) đã chạy mà không thấy hộp thoại hỏi. Ở chế độ mặc định thì sẽ hỏi Creator. Muốn chắc chắn thì không dùng auto mode khi agent sửa `.claude/` hoặc `scripts/hooks/`.
 - **CI bỏ qua một số test** (manim, mockup răng, 1 test CR-048), xem D9/D10.
 
 ## 6. Còn lại trong lộ trình
@@ -169,7 +175,7 @@ scripts/
     lint-edited.sh               PostToolUse: lint file vừa sửa
     stop-check.sh                Stop: make check
     record_review.py             SubagentStop: ghi verdict review
-    test_hooks.py                28 test (chạy trong make check / CI)
+    test_hooks.py                36 test (chạy trong make check / CI)
 .claude/
   settings.json                  quyền + đăng ký hook (commit, dùng chung)
   settings.local.json            quyền cá nhân (không commit)

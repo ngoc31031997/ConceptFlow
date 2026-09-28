@@ -25,7 +25,7 @@ It writes the diff and the **brief** for the current tree under `.git/conceptflo
 
 ## 2. Run the agents, in parallel
 
-One message with three Agent calls, `subagent_type`: `reviewer`, `security-reviewer`, `tester`, foreground (`run_in_background: false`). The `prompt` of each is the brief **exactly as printed**: no additions, no summary, no context of your own. The SubagentStop hook compares the agent's prompt with the brief byte for byte and records nothing if they differ. If you believe an agent needs more context, tell the Creator instead.
+One message with three Agent calls, `subagent_type`: `reviewer`, `security-reviewer`, `tester`, foreground (`run_in_background: false`). The `prompt` of each is the brief **exactly as printed**: no additions, no summary, no context of your own. The SubagentStop hook compares the agent's prompt with the brief (ignoring only leading/trailing whitespace) and records nothing if they differ. If you believe an agent needs more context, tell the Creator instead.
 
 A review counts only if the hook wrote its marker. Check after the agents return:
 
