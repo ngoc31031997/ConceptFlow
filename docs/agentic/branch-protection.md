@@ -44,4 +44,4 @@ An empty list (`[]`) means no ruleset applies to `main` yet.
 
 ## Switching to a PR flow later
 
-Turn on *Require a pull request before merging* and *Require status checks to pass* (check: `check-all`) in the same ruleset. Then update `CLAUDE.md`'s CR completion policy and the `/cr-finish` skill to open a PR instead of merging locally.
+Turn on *Require a pull request before merging* and *Require status checks to pass* (check: `check-all`, the CI job name) in the same ruleset. Then update `CLAUDE.md`'s CR completion policy and the `/cr-finish` skill to open a PR instead of merging locally.

@@ -1,4 +1,4 @@
-# Clean-environment verification: the same `make setup` + `make check-all`
+# Clean-environment verification: the same `make setup`, `make build` and `make check-all`
 # a developer or Claude Code runs locally (docs/agentic/verification.md).
 # One job on purpose — the whole suite runs in about a minute once set up,
 # and one job keeps CI identical to the local command.
@@ -52,6 +52,9 @@ jobs:
         run: make setup
         env:
           PYTHON: python
+
+      - name: make build
+        run: make build
 
       - name: make check-all
         run: make check-all

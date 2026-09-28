@@ -1,7 +1,7 @@
 # CI/CD Integration Instructions
 
-> **Status (2026-09-28): superseded for CI.** The implemented pipeline is `.github/workflows/ci.yml`. It runs `make setup` + `make check-all` (see `docs/agentic/verification.md`) on every push. Branch rules are in `docs/agentic/branch-protection.md`.
-> Section 2 below is the original proposal and is out of date: it lists `content-plugin` and `script-processing`, which no longer run, and it omits `authoring-service` and `llm-service`. SonarQube, OWASP and deploy stages (sections 3–4) are **not** implemented.
+> **Status (2026-09-28): superseded for CI.** The implemented pipeline is `.github/workflows/ci.yml`. It runs `make setup`, `make build` and `make check-all` (see `docs/agentic/verification.md`) on every push. Branch rules are in `docs/agentic/branch-protection.md`.
+> Section 2 below is the original proposal and is out of date: it lists `content-plugin` and `script-processing`, which no longer run, and it omits `authoring-service` and `llm-service`. SonarQube and OWASP (sections 3–4) are in the **backlog**; deploy stages are not implemented.
 
 ## Pipeline Stages Overview
 [Checkout] → [Install Dependencies] → [Build] → [Unit Tests] → [SonarQube Analysis] → [OWASP Dependency Check] → [Integration/E2E Tests] → [Package/Artifact] → [Deploy]

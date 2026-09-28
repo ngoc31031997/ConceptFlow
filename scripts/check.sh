@@ -141,7 +141,7 @@ case "$MODE" in
     done
     grep -qE '^(tests/contracts/|docs/contracts/)' <<<"$files" && RUN_CONTRACTS=1
     # A change to the verification itself re-verifies everything.
-    if grep -qE '^(Makefile|scripts/(check|setup)\.sh)$' <<<"$files"; then
+    if grep -qE '^(Makefile|scripts/(check|setup|build)\.sh)$' <<<"$files"; then
       SERVICES="$(all_services)"
       RUN_CONTRACTS=1
     fi
@@ -169,6 +169,9 @@ if [ -n "$FAILED" ]; then
     echo
     echo "── $label  (full log: $log)"
     tail -n 25 "$log"
+    if [ -n "${GITHUB_ACTIONS:-}" ]; then
+      echo "::error title=check $label::$(tail -n 15 "$log" | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+    fi
   done
   exit 1
 fi
