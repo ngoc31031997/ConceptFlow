@@ -51,7 +51,7 @@ class Config:
             ollama_model=os.environ.get("OLLAMA_MODEL", "llama3.2"),
             ollama_timeout=_int("OLLAMA_TIMEOUT_SECONDS", 120),
             light_provider=light,
-            code_chunk_shots=_int("CODE_CHUNK_SHOTS", 5),
+            code_chunk_shots=_int("CODE_CHUNK_SHOTS", 3),
             code_chunk_concurrency=_int("CODE_CHUNK_CONCURRENCY", 10),
             code_repair_max_rounds=_int("CODE_REPAIR_MAX_ROUNDS", 3),
             rendering_url=os.environ.get("RENDERING_URL", "http://rendering:8000"),
