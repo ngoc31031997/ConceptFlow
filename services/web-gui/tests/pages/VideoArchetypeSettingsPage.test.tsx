@@ -42,6 +42,9 @@ describe("VideoArchetypeSettingsPage (CR-041)", () => {
     renderPage();
     // Nút "Thêm" bị khóa trong lúc tải danh sách — đợi tải xong rồi mới bấm.
     await waitFor(() => expect(screen.getByTestId("archetype-new-button")).not.toBeDisabled());
+    // Sau khi tải, một effect tự chọn dòng đầu tiên. Bấm "Thêm" trước khi effect đó chạy
+    // thì nó ghi đè lựa chọn "mới" (hay gặp khi máy bận) — đợi trang chọn xong đã.
+    await waitFor(() => expect(screen.getByTestId("archetype-name-input")).toHaveValue(SYSTEM.name));
     fireEvent.click(screen.getByTestId("archetype-new-button"));
     expect(screen.getByTestId("archetype-save-button")).toBeDisabled();
     fireEvent.change(screen.getByTestId("archetype-name-input"), { target: { value: "Gỡ lỗi" } });
