@@ -1,4 +1,4 @@
-Ba hình mẫu CHUẨN của kênh. Mọi hình mới phải cùng cách dựng: bọc trong Figure, màu chính là prop color, một mảng bóng bên phải bằng shadeOf, GroundShadow dưới vật đứng trên sàn, mặt bằng Face, chuyển động nhỏ theo frame và tắt được bằng still.
+Ba hình mẫu CHUẨN của kênh. Mọi hình mới phải cùng cách dựng: bọc trong Figure, màu chính là prop color, một mảng bóng bên phải bằng shadeOf, GroundShadow dưới vật đứng trên sàn, chỉ vật được nhân hoá mới có mặt người (Face) — con vật giữ mặt đúng loài, đồ vật không có mặt, chuyển động nhỏ theo frame và tắt được bằng still.
 
 === SchoolBus — phương tiện được nhân hoá: nhìn ngang, đầu xe bên phải, bánh xe quay, thân nảy khi chạy ===
 ```tsx
@@ -39,14 +39,15 @@ export function SchoolBus({color = '#FFC72C', mood = 'happy', moving = true, ...
 }
 ```
 
-=== Cat — con vật: khối tròn, đầu to, thở và vẫy đuôi, mặt dùng Face ===
+=== Cat — con vật: khối tròn, đầu to, thở và vẫy đuôi, mặt mèo thật (mắt chấm, mũi tam giác, miệng ω, ria) — KHÔNG dùng Face ===
 ```tsx
 import React from 'react';
 import {useCurrentFrame} from 'remotion';
-import {Figure, Face, GroundShadow, useBlink, phaseOf, shadeOf, type FigureProps, type Mood} from './conceptflow-mini/illustration';
+import {Figure, GroundShadow, useBlink, phaseOf, shadeOf, INK, type FigureProps} from './conceptflow-mini/illustration';
 
 // Con mèo ngồi nhìn thẳng. Hộp 220 x 240.
-export function Cat({color = '#FF9F43', mood = 'happy', ...fig}: FigureProps & {color?: string; mood?: Mood}) {
+// Mặt mèo vẽ bằng khối riêng, không dùng Face: con vật phải giống đúng loài của nó.
+export function Cat({color = '#FF9F43', ...fig}: FigureProps & {color?: string}) {
   const frame = useCurrentFrame();
   const phase = phaseOf(fig.x ?? 960, fig.y ?? 540);
   const blink = useBlink(!!fig.still, phase);
@@ -74,7 +75,25 @@ export function Cat({color = '#FF9F43', mood = 'happy', ...fig}: FigureProps & {
         <path d="M66,56 L68,34 L84,50 Z" fill="#FF7AB6" opacity={0.7} />
         <rect x={46} y={40} width={128} height={100} rx={46} fill={color} />
         <rect x={120} y={46} width={50} height={90} rx={30} fill={dark} opacity={0.35} />
-        <Face mood={mood} blink={blink} talking={false} frame={frame} cx={110} cy={92} glasses={false} />
+        {blink ? (
+          <g stroke={INK} strokeWidth={4} strokeLinecap="round">
+            <path d="M78,90 L92,90" />
+            <path d="M128,90 L142,90" />
+          </g>
+        ) : (
+          <g fill={INK}>
+            <ellipse cx={85} cy={88} rx={6} ry={8} />
+            <ellipse cx={135} cy={88} rx={6} ry={8} />
+          </g>
+        )}
+        <path d="M103,104 L117,104 L110,112 Z" fill="#FF7AB6" />
+        <path d="M100,118 Q105,124 110,116 Q115,124 120,118" stroke={INK} strokeWidth={3} strokeLinecap="round" fill="none" />
+        <g stroke={INK} strokeWidth={2.5} strokeLinecap="round" opacity={0.6}>
+          <path d="M92,110 L64,104" />
+          <path d="M92,116 L64,120" />
+          <path d="M128,110 L156,104" />
+          <path d="M128,116 L156,120" />
+        </g>
       </g>
     </Figure>
   );

@@ -18,10 +18,10 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 10, TemplateText: bt(storyArchitectVI)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 10, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleVisualDirector, Language: "vi", Version: 11, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 8, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 4, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 5, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
 		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 3, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// CR-040 FR113: bodies embedded from the exact text the browser used to build.
@@ -421,6 +421,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 13. **CHO NGƯỜI XEM ĐOÁN TRƯỚC.** Trước mỗi cú lật, dựng xong tình huống, để lời thoại đặt câu hỏi, giữ hình khoảng 1 giây rồi mới lộ đáp án. Người đã tự đoán mới muốn xem đáp án.
 
 14. **DIỄN XUẤT BẰNG NÉT MẶT, DÁNG VÀ CHUYỂN ĐỘNG.** Người và vật có mặt (răng, vi khuẩn, giọt nước...) thể hiện cảm xúc bằng nét mặt — vui, buồn, lo, ngạc nhiên, đau, giận — và bằng dáng: vẫy tay, chỉ tay, ôm má, chống cằm suy nghĩ, giơ hai tay mừng, nhún vai. Cách di chuyển cũng là diễn xuất: do dự thì nhích tới rồi lùi lại, tự tin thì lao thẳng, thất vọng thì xẹp xuống và chậm lại. Ghi rõ nét mặt và dáng trong HÌNH khi chúng mang nghĩa.
+    Chỉ NHÂN VẬT mới có mặt người: con người, và vật bạn CHỦ Ý nhân hoá vì nó phải biểu lộ cảm xúc trong câu chuyện (chiếc răng đau, vi khuẩn gian ác) — ghi rõ "có mặt" trong HÌNH. Con vật giữ đúng mặt và dáng của loài (mèo có mũi, ria; chim có mỏ), cảm xúc thể hiện bằng dáng (tai cụp, đuôi vẫy, cúi đầu), KHÔNG vẽ mặt người lên con vật. Đồ vật, công trình, nơi chốn, thiên nhiên (kim tự tháp, ngôi nhà, ngọn núi, đồng xu...) chỉ xuất hiện để minh hoạ hay làm bối cảnh thì KHÔNG có mặt — đừng nhân hoá mọi thứ, hình sẽ trẻ con và khó nhận ra vật.
 
 15. **KHUNG KẾT VẦN VỚI KHUNG MỞ.** Cảnh cuối quay lại hình ảnh của cảnh 1, nhưng giờ nó mang nghĩa mới.
 
@@ -434,7 +435,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
     - ĐỒ ĂN: kẹo, kẹo mút, ly nước ngọt, bánh donut, quả táo.
     - ĐỒ VẬT VÀ BỐI CẢNH: bàn chải (có kem), tuýp kem đánh răng, đồng hồ treo tường (kim quay được), bàn, ghế, cửa sổ (ngày/đêm), chậu cây, ngôi nhà, cái cây, mặt trời, đám mây, bóng đèn (sáng/tắt), đồng xu, quyển sách, điện thoại, kính lúp, dấu đúng/sai, tia lấp lánh, máy bay, bong bóng thoại / bong bóng suy nghĩ chứa một nhãn ngắn.
     - HÌNH HỌC CHO Ý TRỪU TƯỢNG: hình cơ bản, đàn chấm, lưới, đồ thị, mũi tên, số chạy, khối code, dòng thời gian — dùng khi chính ý đó là trừu tượng (một con số, một tỉ lệ, một quan hệ), không dùng để thay cho một vật cụ thể.
-    Vật cụ thể chưa có trong danh sách thì mô tả nó như một hình phẳng đơn giản ghép từ vài khối (một chiếc xe buýt = thân chữ nhật bo góc + cửa sổ vuông + hai bánh tròn). Tránh cảnh 3D, hạt/khói, ảnh chụp, và cử động phức tạp như nhảy múa hay đánh nhau.
+    Vật cụ thể chưa có trong danh sách thì mô tả nó CỤ THỂ đến mức người vẽ không phải đoán: loại cụ thể (không phải "một ngôi nhà" mà "ngôi nhà sàn gỗ mái lá"), góc nhìn và dáng, hình phẳng ghép từ vài khối nào (một chiếc xe buýt = thân chữ nhật bo góc + cửa sổ vuông + hai bánh tròn), 2–3 đặc điểm giúp nhận ra ngay (kim tự tháp: khối tam giác màu cát, các bậc đá ngang, một mặt tối hơn), màu thật của vật, và có mặt hay không (luật 14). Không viết chung chung kiểu "hình minh hoạ về X", "biểu tượng của Y" — ý trừu tượng thì chọn MỘT vật cụ thể tượng trưng cho nó và tả vật đó. Tránh cảnh 3D, hạt/khói, ảnh chụp, và cử động phức tạp như nhảy múa hay đánh nhau.
 
 19. **MINH HOẠ ĐÚNG CÁI ĐANG NÓI.** Đây là luật quan trọng nhất về nội dung hình. Khi THOẠI nhắc tới một người, một vật, một bộ phận cơ thể, một món ăn, một nơi chốn hay một việc đang xảy ra, HÌNH phải cho thấy CHÍNH thứ đó — hoặc một hình ảnh mà người xem nhận ra ngay là nó — chứ không phải một hình tròn hay mũi tên tượng trưng. Nói về sâu răng thì thấy chiếc răng, vi khuẩn, viên kẹo, bàn chải; nói về một ông cụ ngồi chờ thì thấy ông cụ ngồi bên bàn và chiếc đồng hồ. Phép thử: tắt tiếng, chỉ nhìn hình — người xem có đoán được câu thoại đang nói về cái gì không? Nếu không, vẽ lại shot đó. Hình trừu tượng chỉ dành cho ý tự nó trừu tượng, và ngay cả khi đó, gắn nó vào vật cụ thể đã có trên màn hình (con số hiện cạnh chiếc răng, không trôi giữa khung trống).
 
@@ -478,6 +479,7 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 13. Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không?
 14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D, hạt/khói, ảnh chụp, cử động phức tạp) không? Diễn đạt lại bằng tranh phẳng đơn giản.
 15. Tắt tiếng và chỉ nhìn HÌNH từng shot: có shot nào mà THOẠI nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng HÌNH lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
+16. Mỗi vật cụ thể lần đầu xuất hiện đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 

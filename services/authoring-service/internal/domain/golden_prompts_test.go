@@ -17,7 +17,9 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // per scene, minimum on-screen object size); visual_director and
 // remotion_engineer also re-baselined by CR-047 for the shot-count-cap and
 // minimum-size rules; story_architect again by v10, which makes the shared
-// frame kind-neutral so outlines follow the topic (manim_engineer's shared text was not touched by CR-047,
+// frame kind-neutral so outlines follow the topic; visual_director again by
+// CR-049 (faces only on characters, animals keep their species' face, concrete
+// drawable descriptions) (manim_engineer's shared text was not touched by CR-047,
 // so it keeps its CR-043 hash).
 //
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
@@ -25,7 +27,7 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // shipped templates as they were before the split.
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
-	RoleVisualDirector:   "527d54b9790f1a14b8121775b6ccfbf33e3090daa43279eb36be6b0dc1386853",
+	RoleVisualDirector:   "bbf4c69b3304ef766656bbf565914835b89718df78ffe9d5ddf25e030536d8dd",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
 	RoleRemotionEngineer: "4004796be72d3d260877c22708511d55c5ce8bb12d0b58505da64f79214776a6",
 }

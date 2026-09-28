@@ -2,7 +2,7 @@ Linh kiện dùng chung, import từ './conceptflow-mini/illustration' (KHÔNG i
 
 - <Figure {...fig} size={fig.size ?? <cỡ mặc định px>} vw={<rộng hộp>} vh={<cao hộp>}>...</Figure> — BẮT BUỘC bọc toàn bộ hình. Tự đặt hình theo x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity. Toạ độ bên trong là toạ độ của hộp vw × vh.
 - type FigureProps — { x?, y?, size?, rotate?, flip?, scale?, opacity?, still? }. Component nhận ...fig: FigureProps và truyền nguyên cho Figure.
-- <Face mood={mood} blink={blink} talking={false} frame={frame} cx={..} cy={..} glasses={false} /> — khuôn mặt chuẩn của kênh (mắt chấm, lông mày, má hồng, miệng theo mood; mood 'pain'/'worried' có giọt mồ hôi). Mặt rộng khoảng 80 đơn vị, cao khoảng 50, tâm tại (cx, cy).
+- <Face mood={mood} blink={blink} talking={false} frame={frame} cx={..} cy={..} glasses={false} /> — khuôn mặt chuẩn của kênh (mắt chấm, lông mày, má hồng, miệng theo mood; mood 'pain'/'worried' có giọt mồ hôi). Mặt rộng khoảng 80 đơn vị, cao khoảng 50, tâm tại (cx, cy). CHỈ dùng cho vật được nhân hoá mà mô tả hình yêu cầu có mặt (luật S13); KHÔNG dùng cho con vật (tự vẽ mặt đúng loài, luật S15) và không gắn cho đồ vật, công trình, thiên nhiên.
 - type Mood — 'neutral' | 'happy' | 'sad' | 'worried' | 'surprised' | 'pain' | 'angry'.
 - <GroundShadow cx={..} cy={..} rx={..} /> — bóng đổ elip dưới vật đứng trên sàn.
 - useBlink(still: boolean, phase: number): boolean — true trong vài frame mỗi khoảng 3 giây (chớp mắt).
