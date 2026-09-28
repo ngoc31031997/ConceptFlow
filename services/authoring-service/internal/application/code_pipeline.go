@@ -3,6 +3,8 @@ package application
 import (
 	"context"
 	"time"
+
+	"authoring/internal/domain"
 )
 
 // CR-039 — the AI flow's storyboard and code steps are no longer one model
@@ -42,6 +44,12 @@ type CodeGenRequest struct {
 	// may use; llm-service lists them in the prompt and pastes the used ones
 	// into the script (CR-044).
 	Illustrations []LibraryDrawing
+	// SubtitleBand is the strip burned-in subtitles cover (nil = nothing is
+	// burned into the frame) and VideoFont the font text is drawn in ("" =
+	// the default): the rendering layout check holds every drawn shot to
+	// them (CR-048 T6b). Remotion only.
+	SubtitleBand *domain.SubtitleBand
+	VideoFont    string
 }
 
 // CodeEvent is one progress event of a run. Type is "phase", "chunk_start",

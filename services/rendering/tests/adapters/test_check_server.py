@@ -10,8 +10,9 @@ class Fake:
     def __init__(self, outcome=None, raises=None):
         self.outcome, self.raises, self.calls = outcome, raises, []
 
-    def check(self, engine, code, scene_class_name):
+    def check(self, engine, code, scene_class_name, layout=None):
         self.calls.append((engine, code, scene_class_name))
+        self.layouts = getattr(self, "layouts", []) + [layout]
         if self.raises:
             raise self.raises
         return self.outcome
@@ -25,8 +26,31 @@ async def test_returns_diagnostics_and_raw():
     fake = Fake(CheckOutcome(False, [CheckDiagnostic("boom", 4)], "raw text"))
     r = await client(fake).post("/v1/check/remotion", json={"code": "c", "scene_class_name": "creator"})
     assert r.status_code == 200
-    assert r.json() == {"ok": False, "diagnostics": [{"message": "boom", "line": 4}], "raw": "raw text"}
+    assert r.json() == {"ok": False, "diagnostics": [{"message": "boom", "line": 4, "kind": "compile"}],
+                        "raw": "raw text", "warnings": []}
     assert fake.calls == [("remotion", "c", "creator")]
+    assert fake.layouts[0].subtitle_band is None and fake.layouts[0].video_font == ""
+
+
+async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
+    from domain.layout_rules import SubtitleBand
+
+    fake = Fake(CheckOutcome(False, [CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout")], "",
+                             ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]))
+    r = await client(fake).post("/v1/check/remotion", json={
+        "code": "c", "scene_class_name": "creator",
+        "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
+    assert r.json()["diagnostics"] == [{"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"}]
+    assert r.json()["warnings"] == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
+    assert fake.layouts[0].subtitle_band == SubtitleBand("bottom", 240) and fake.layouts[0].video_font == "Montserrat"
+
+
+async def test_a_nonsense_subtitle_band_is_rejected():
+    fake = Fake(CheckOutcome(True))
+    r = await client(fake).post("/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "bottom", "px": 0}})
+    assert r.status_code == 400 and fake.calls == []
+    r = await client(fake).post("/v1/check/remotion", json={"code": "c", "subtitle_band": {"edge": "left", "px": 9}})
+    assert r.status_code == 422
 
 
 async def test_manim_route_uses_manim():

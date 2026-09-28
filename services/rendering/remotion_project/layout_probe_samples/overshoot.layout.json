@@ -1,0 +1,472 @@
+{
+  "version": 1,
+  "composition": {
+    "id": "creator",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  },
+  "narrations": 1,
+  "nominal_duration": 150,
+  "frames": [
+    {
+      "pct": 0,
+      "frame": 0
+    },
+    {
+      "pct": 0.03355704697986577,
+      "frame": 5
+    },
+    {
+      "pct": 0.06711409395973154,
+      "frame": 10
+    },
+    {
+      "pct": 0.10067114093959731,
+      "frame": 15
+    },
+    {
+      "pct": 0.1342281879194631,
+      "frame": 20
+    },
+    {
+      "pct": 0.16778523489932887,
+      "frame": 25
+    },
+    {
+      "pct": 0.20134228187919462,
+      "frame": 30
+    },
+    {
+      "pct": 0.30201342281879195,
+      "frame": 45
+    },
+    {
+      "pct": 0.5033557046979866,
+      "frame": 75
+    },
+    {
+      "pct": 0.697986577181208,
+      "frame": 104
+    },
+    {
+      "pct": 0.8523489932885906,
+      "frame": 127
+    },
+    {
+      "pct": 1,
+      "frame": 149
+    }
+  ],
+  "font": {
+    "family": "Be Vietnam Pro",
+    "available": true
+  },
+  "shots_line": 43,
+  "shots": [
+    {
+      "index": 0,
+      "component": "Shot1_1",
+      "id": "1.1",
+      "line": 31,
+      "stub": false,
+      "samples": [
+        {
+          "frame": 0,
+          "pct": 0,
+          "global_frame": 0,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 32.2
+        },
+        {
+          "frame": 5,
+          "pct": 0.03355704697986577,
+          "global_frame": 5,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1516.9,
+                "y": 176.9,
+                "w": 246.3,
+                "h": 246.3
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 5.8
+        },
+        {
+          "frame": 10,
+          "pct": 0.06711409395973154,
+          "global_frame": 10,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1434.2,
+                "y": 94.2,
+                "w": 411.6,
+                "h": 411.6
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 2.7
+        },
+        {
+          "frame": 15,
+          "pct": 0.10067114093959731,
+          "global_frame": 15,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1481.4,
+                "y": 141.4,
+                "w": 317.2,
+                "h": 317.2
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.4
+        },
+        {
+          "frame": 20,
+          "pct": 0.1342281879194631,
+          "global_frame": 20,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1510.7,
+                "y": 170.7,
+                "w": 258.5,
+                "h": 258.5
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.7
+        },
+        {
+          "frame": 25,
+          "pct": 0.16778523489932887,
+          "global_frame": 25,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1492.7,
+                "y": 152.7,
+                "w": 294.6,
+                "h": 294.6
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 10.6
+        },
+        {
+          "frame": 30,
+          "pct": 0.20134228187919462,
+          "global_frame": 30,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1482.3,
+                "y": 142.3,
+                "w": 315.4,
+                "h": 315.4
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.9
+        },
+        {
+          "frame": 45,
+          "pct": 0.30201342281879195,
+          "global_frame": 45,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1490.2,
+                "y": 150.2,
+                "w": 299.5,
+                "h": 299.5
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 12.3
+        },
+        {
+          "frame": 75,
+          "pct": 0.5033557046979866,
+          "global_frame": 75,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1490,
+                "y": 150,
+                "w": 300,
+                "h": 300
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 12
+        },
+        {
+          "frame": 104,
+          "pct": 0.697986577181208,
+          "global_frame": 104,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1490,
+                "y": 150,
+                "w": 300,
+                "h": 300
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.8
+        },
+        {
+          "frame": 127,
+          "pct": 0.8523489932885906,
+          "global_frame": 127,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1490,
+                "y": 150,
+                "w": 300,
+                "h": 300
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 15
+        },
+        {
+          "frame": 149,
+          "pct": 1,
+          "global_frame": 149,
+          "elements": [
+            {
+              "kind": "kit",
+              "component": "Person",
+              "line": 37,
+              "rect": {
+                "x": 599,
+                "y": 340,
+                "w": 321.9,
+                "h": 520
+              },
+              "opacity": 1
+            },
+            {
+              "kind": "kit",
+              "component": "Sun",
+              "line": 38,
+              "rect": {
+                "x": 1490,
+                "y": 150,
+                "w": 300,
+                "h": 300
+              },
+              "opacity": 1
+            }
+          ],
+          "ms": 11.2
+        }
+      ]
+    }
+  ],
+  "page_log": [
+    {
+      "type": "warning",
+      "text": "conceptflow-mini: font 'Be Vietnam Pro' not found, falling back to sans-serif"
+    }
+  ],
+  "timing_ms": {
+    "compile": 15,
+    "load": 10,
+    "measure": 158,
+    "samples": 12,
+    "sample_avg": 12.4,
+    "sample_max": 32.2,
+    "script_total": 409,
+    "startup": {
+      "bundle_harness": 167,
+      "launch_browser": 87
+    }
+  },
+  "script": "layout_probe_samples/overshoot.tsx",
+  "browser": {
+    "version": "141.0.7390.37"
+  }
+}

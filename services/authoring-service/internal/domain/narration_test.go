@@ -67,6 +67,35 @@ func TestSubtitleModeFromLegacy(t *testing.T) {
 	}
 }
 
+// CR-048 T6b: the layout check holds the drawn frame to the same strip the
+// prompt told the model to keep clear.
+func TestProjectSubtitleBandMatchesTheSubtitleZone(t *testing.T) {
+	cases := []struct {
+		project *Project
+		want    SubtitleBand
+		burned  bool
+		zone    string
+	}{
+		{&Project{SubtitleMode: SubtitleModeTrack}, SubtitleBand{}, false, "NO burned-in subtitles"},
+		{&Project{SubtitleMode: SubtitleModeOff}, SubtitleBand{}, false, "NO burned-in subtitles"},
+		{&Project{SubtitleMode: SubtitleModeBurnIn}, SubtitleBand{Edge: "bottom", Px: 240}, true, "from y = 840 to 1080"},
+		{&Project{SubtitlesEnabled: true}, SubtitleBand{Edge: "bottom", Px: 240}, true, "from y = 840 to 1080"},
+		{&Project{SubtitleMode: SubtitleModeBoth, SubtitleStyle: &SubtitleStyle{FontSize: "large", Position: "top"}},
+			SubtitleBand{Edge: "top", Px: 280}, true, "from y = 0 to 280"},
+		{&Project{SubtitleMode: SubtitleModeBurnIn, SubtitleStyle: &SubtitleStyle{FontSize: "small", Position: "bottom"}},
+			SubtitleBand{Edge: "bottom", Px: 200}, true, "from y = 880 to 1080"},
+	}
+	for i, c := range cases {
+		got, burned := ProjectSubtitleBand(c.project)
+		if got != c.want || burned != c.burned {
+			t.Errorf("case %d: band = %+v, %v; want %+v, %v", i, got, burned, c.want, c.burned)
+		}
+		if zone := SubtitleZone(c.project, "en"); !strings.Contains(zone, c.zone) {
+			t.Errorf("case %d: zone %q does not say %q", i, zone, c.zone)
+		}
+	}
+}
+
 func TestSubtitleZoneFollowsBurnInSettings(t *testing.T) {
 	track := &Project{SubtitleMode: SubtitleModeTrack}
 	if got := SubtitleZone(track, "en"); !strings.Contains(got, "NO burned-in subtitles") {

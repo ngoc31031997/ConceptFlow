@@ -70,10 +70,12 @@ class FakeChecker:
 
     def __init__(self, raw_for_manim=False):
         self.codes: list[str] = []
+        self.layouts: list = []
         self.raw_for_manim = raw_for_manim
 
-    async def check(self, engine, code, scene_class_name):
+    async def check(self, engine, code, scene_class_name, layout=None):
         self.codes.append(code)
+        self.layouts.append(layout)
         diags = [Diagnostic("Cannot find name 'BROKEN'", i)
                  for i, ln in enumerate(code.splitlines(), 1) if "BROKEN" in ln]
         raw = ""
@@ -286,10 +288,10 @@ async def test_an_unreachable_checker_during_chunks_leaves_the_decision_to_the_f
     from app.pipeline.checker import CheckerUnavailable
 
     class FlakyChecker(FakeChecker):
-        async def check(self, engine, code, scene_class_name):
+        async def check(self, engine, code, scene_class_name, layout=None):
             if "return null;\n}" in code and code.count("function Shot") != code.count("// Shot"):
                 raise CheckerUnavailable("rendering is restarting")  # only the stubbed per-chunk files
-            return await super().check(engine, code, scene_class_name)
+            return await super().check(engine, code, scene_class_name, layout)
 
     prov, chk = FakeProvider(broken={"1.3"}), FlakyChecker()
     res = await pipeline(prov, chk, chunk=2).run(req(storyboard(4)), emit_none)
@@ -560,3 +562,80 @@ async def test_cancelling_the_run_cancels_every_chunk_at_once():
         await asyncio.wait_for(run, timeout=2)
     assert prov.finished == []
     assert [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()] == []
+
+
+# --- CR-048 T6b: layout diagnostics, context and warnings ------------------------------
+
+
+class LayoutChecker(FakeChecker):
+    """Passes tsc, but reports a layout fault on Shot1_2's declaration line until
+    the shot has been repaired once; always warns about a small hero."""
+
+    async def check(self, engine, code, scene_class_name, layout=None):
+        self.codes.append(code)
+        self.layouts.append(layout)
+        warn = ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (dòng 20)"]
+        at = next((i for i, ln in enumerate(code.splitlines(), 1) if ln.startswith("function Shot1_2(")), None)
+        if at is None or "// repaired" in code:
+            return CheckResult(ok=True, warnings=warn)
+        return CheckResult(ok=False, warnings=warn, diagnostics=[Diagnostic(
+            "Shot 1.2, frame 85%: nhãn 'Vi khuẩn axit' tràn khung chữ (rộng 412px > width 360px)", at, "layout")])
+
+
+class LayoutRepairProvider(FakeProvider):
+    async def chat(self, req, on_progress=None):
+        if "SỬA LỖI" in req.user:
+            self.calls.append(req)
+            return ChatResult("```tsx\n// repaired\n" + tsx("1.2") + "\n```",
+                              Usage(model="m", prompt_tokens=10, completion_tokens=5))
+        return await super().chat(req, on_progress)
+
+
+async def test_a_layout_diagnostic_is_repaired_on_its_shot_with_a_layout_prompt():
+    prov, chk = LayoutRepairProvider(), LayoutChecker()
+    r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard(3), system="SYS",
+                    subtitle_band={"edge": "bottom", "px": 240}, video_font="Montserrat")
+    res = await pipeline(prov, chk).run(r, emit_none)
+    assert res.check_ok and res.repair_rounds == 1
+    [repair] = [c for c in prov.calls if "SỬA LỖI" in c.user]
+    assert "SỬA LỖI BỐ CỤC trong shot 1.2" in repair.user and "Lỗi bố cục — đo trên hình thật" in repair.user
+    assert "Lỗi trình biên dịch TypeScript" not in repair.user
+    assert "tràn khung chữ (rộng 412px > width 360px)" in repair.user
+    # the layout context reaches every check, and the final check's warning is kept
+    assert chk.layouts and all(
+        lc.subtitle_band == {"edge": "bottom", "px": 240} and lc.video_font == "Montserrat" for lc in chk.layouts)
+    assert res.warnings == ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (dòng 20)"]
+    assert res.to_dict()["diagnostics"] == []
+
+
+async def test_layout_context_is_not_sent_for_manim():
+    chk = FakeChecker()
+    await pipeline(FakeProvider(engine="manim"), chk).run(req(storyboard(2), engine="manim"), emit_none)
+    assert chk.layouts == [None]
+
+
+async def test_a_layout_check_that_could_not_run_surfaces_as_a_warning_of_the_run():
+    class Unchecked(FakeChecker):
+        async def check(self, engine, code, scene_class_name, layout=None):
+            res = await super().check(engine, code, scene_class_name, layout)
+            res.warnings = ["Bố cục: KHÔNG kiểm tra được — đo bố cục quá 60s (đo). Kết quả biên dịch vẫn giữ nguyên."]
+            return res
+
+    res = await pipeline(FakeProvider(), Unchecked()).run(req(storyboard(2)), emit_none)
+    assert res.check_ok and any("KHÔNG kiểm tra được" in w for w in res.warnings)
+
+
+def test_repair_prompt_lists_compile_and_layout_errors_apart():
+    from app.pipeline import prompts
+    from app.storyboard import parse
+
+    sb = parse(storyboard(2))
+    text = prompts.remotion_repair(sb, "const LAYOUT = {};", "1.2", tsx("1.2"), [
+        Diagnostic("TS2304: Cannot find name 'x'.", 30),
+        Diagnostic("Shot 1.2, frame 7%: hình Sun ra ngoài vùng an toàn (trên y=94 < 96)", 31, "layout"),
+    ], [])
+    assert "SỬA LỖI BIÊN DỊCH VÀ BỐ CỤC trong shot 1.2" in text
+    compile_at, layout_at = text.index("Lỗi trình biên dịch TypeScript"), text.index("Lỗi bố cục")
+    assert compile_at < text.index("- dòng 30: TS2304") < layout_at < text.index("- dòng 31: Shot 1.2, frame 7%")
+    only_tsc = prompts.remotion_repair(sb, "const LAYOUT = {};", "1.2", tsx("1.2"), [Diagnostic("TS1005", 3)], [])
+    assert "SỬA LỖI BIÊN DỊCH trong shot 1.2" in only_tsc and "Lỗi bố cục" not in only_tsc

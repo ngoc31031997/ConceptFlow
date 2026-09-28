@@ -38,6 +38,7 @@ from app.pipeline.checker import (
     CheckerUnavailable,
     CheckResult,
     Diagnostic,
+    LayoutContext,
     shots_from_manim_trace,
 )
 from app.provider import ChatRequest, Provider
@@ -73,6 +74,16 @@ class CodeRequest:
     max_reasoning_chars: int = 0
     #: CR-044 — approved library drawings: {name, usage, description, code}.
     illustrations: list[dict] = field(default_factory=list)
+    #: CR-048 T6b — for the layout check of a Remotion script: the strip
+    #: burned-in subtitles cover ({"edge": "top"|"bottom", "px": int}, None =
+    #: none) and the video's font ("" = the default).
+    subtitle_band: dict | None = None
+    video_font: str = ""
+
+    def layout(self) -> LayoutContext | None:
+        if self.engine != "remotion":
+            return None
+        return LayoutContext(subtitle_band=self.subtitle_band, video_font=self.video_font)
 
 
 def library_section(illustrations: list[dict]) -> str:
@@ -124,7 +135,7 @@ class CodeResult:
         return {
             "code": self.code,
             "check_ok": self.check_ok,
-            "diagnostics": [{"message": d.message, "line": d.line} for d in self.diagnostics],
+            "diagnostics": [{"message": d.message, "line": d.line, "kind": d.kind} for d in self.diagnostics],
             "repair_rounds": self.repair_rounds,
             "calls": [c.to_dict() for c in self.calls],
             "warnings": self.warnings,
@@ -428,7 +439,7 @@ class CodePipeline:
         check: CheckResult
         while True:
             await emit({"type": "phase", "phase": "check", "round": rounds})
-            check = await self._checker.check(req.engine, merged.code, merged.scene_class_name)
+            check = await self._checker.check(req.engine, merged.code, merged.scene_class_name, req.layout())
             if check.ok or rounds >= self._repair_rounds:
                 break
             targets, unmapped = _map_failures(req.engine, merged, check)
@@ -448,6 +459,9 @@ class CodePipeline:
             self._cache.drop(used_keys)
         else:
             warnings.append("the script still fails the compile check after the last repair round")
+        # The final check's own warnings (CR-048 T6b: a hero drawn too small, or
+        # a layout check that could not run) — never dropped.
+        warnings.extend(w for w in check.warnings if w not in warnings)
         return CodeResult(
             code=merged.code, check_ok=check.ok, diagnostics=check.diagnostics, repair_rounds=rounds,
             calls=calls, warnings=warnings, scene_class_name=merged.scene_class_name)
@@ -469,7 +483,7 @@ class CodePipeline:
                 return rounds
             merged = merger.merge_remotion(sb, frame, shots, stub_missing=True, library=self._library)
             try:
-                check = await self._checker.check("remotion", merged.code, merged.scene_class_name)
+                check = await self._checker.check("remotion", merged.code, merged.scene_class_name, req.layout())
             except CheckerUnavailable:
                 return rounds
             if check.ok:

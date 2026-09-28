@@ -407,6 +407,13 @@ func (c *Client) GenerateCode(
 		}
 		body["illustrations"] = ills
 	}
+	// CR-048 T6b: what the rendering layout check needs beyond the code.
+	if req.SubtitleBand != nil {
+		body["subtitle_band"] = map[string]any{"edge": req.SubtitleBand.Edge, "px": req.SubtitleBand.Px}
+	}
+	if req.VideoFont != "" {
+		body["video_font"] = req.VideoFont
+	}
 	raw, err := c.stream(ctx, "/v1/code/generate", body, func(kind string, ev json.RawMessage) {
 		if onEvent == nil {
 			return

@@ -8,11 +8,17 @@ from typing import Protocol
 
 import httpx
 
+COMPILE = "compile"
+LAYOUT = "layout"
+
 
 @dataclass
 class Diagnostic:
     message: str
     line: int | None = None
+    # compile: lint / tsc / Manim dry run. layout: measured on the drawn shot
+    # (CR-048 T6b) — same repair loop, but the repair prompt says what it is.
+    kind: str = COMPILE
 
 
 @dataclass
@@ -22,10 +28,33 @@ class CheckResult:
     # Raw tool output, kept because a Manim traceback names the failing shot
     # function on lines that carry no usable line number of their own.
     raw: str = ""
+    # Findings that do not fail the check (a hero drawn too small) and notices
+    # that part of it could not run (the layout check without a browser).
+    warnings: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class LayoutContext:
+    """What the Rendering service's layout check needs beyond the code (CR-048 T6b)."""
+
+    # {"edge": "top" | "bottom", "px": int}: the strip burned-in subtitles
+    # cover. None = nothing is burned into the frame.
+    subtitle_band: dict | None = None
+    video_font: str = ""  # "" = the Stage's default
+
+    def to_json(self) -> dict:
+        out: dict = {}
+        if self.subtitle_band:
+            out["subtitle_band"] = {"edge": self.subtitle_band["edge"], "px": int(self.subtitle_band["px"])}
+        if self.video_font:
+            out["video_font"] = self.video_font
+        return out
 
 
 class CheckerPort(Protocol):
-    async def check(self, engine: str, code: str, scene_class_name: str) -> CheckResult: ...
+    async def check(
+        self, engine: str, code: str, scene_class_name: str, layout: LayoutContext | None = None,
+    ) -> CheckResult: ...
 
 
 class CheckerUnavailable(RuntimeError):
@@ -38,14 +67,16 @@ class RenderingChecker:
         self._base = base_url.rstrip("/")
         self._client = client or httpx.AsyncClient(timeout=timeout)
 
-    async def check(self, engine: str, code: str, scene_class_name: str) -> CheckResult:
+    async def check(
+        self, engine: str, code: str, scene_class_name: str, layout: LayoutContext | None = None,
+    ) -> CheckResult:
         if engine not in ("remotion", "manim"):
             raise ValueError(f"unknown engine {engine!r}")
+        body: dict = {"code": code, "scene_class_name": scene_class_name}
+        if layout is not None:
+            body.update(layout.to_json())
         try:
-            resp = await self._client.post(
-                f"{self._base}/v1/check/{engine}",
-                json={"code": code, "scene_class_name": scene_class_name},
-            )
+            resp = await self._client.post(f"{self._base}/v1/check/{engine}", json=body)
         except httpx.HTTPError as exc:
             raise CheckerUnavailable(f"rendering check call failed: {exc}") from exc
         if resp.status_code != 200:
@@ -54,8 +85,12 @@ class RenderingChecker:
             data = resp.json()
             return CheckResult(
                 ok=bool(data["ok"]),
-                diagnostics=[Diagnostic(d["message"], d.get("line")) for d in data.get("diagnostics", [])],
+                diagnostics=[
+                    Diagnostic(d["message"], d.get("line"), d.get("kind") or COMPILE)
+                    for d in data.get("diagnostics", [])
+                ],
                 raw=data.get("raw", ""),
+                warnings=[str(w) for w in data.get("warnings", [])],
             )
         except (ValueError, KeyError, TypeError) as exc:
             raise CheckerUnavailable(f"rendering check returned an unreadable body: {exc}") from exc

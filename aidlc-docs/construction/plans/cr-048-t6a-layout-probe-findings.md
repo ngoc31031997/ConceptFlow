@@ -1,6 +1,8 @@
 # CR-048 T6a — Spike: đo bố cục shot Remotion trong trình duyệt (findings)
 
 Nhánh: `feature/cr-048-t6a-layout-probe`. Đây là **prototype**, chưa nối vào pipeline (việc đó là T6b).
+
+> **Cập nhật T6b** (`feature/cr-048-t6b-layout-check`): phần đo được tách ra `layout_probe_lib.mjs`, dùng chung cho CLI `layout_probe.mjs` và tiến trình kiểm tra sống lâu `layout_check.mjs`. Luật nguyên mẫu `--check`/`--subtitle-band` của CLI đã bỏ; luật thật nằm ở `services/rendering/domain/layout_rules.py`. Mặc định đo 12 mẫu/shot (`DEFAULT_PCTS`), trình duyệt là headless shell của chính `playwright-core` (Dockerfile cài), không còn gọi `ensureBrowser()` của Remotion. Các lệnh ở mục 4 vì thế không còn `--check`.
 Mọi con số dưới đây lấy từ các lần chạy thật trong môi trường spike (mục 5). Chúng **chưa** được đo trong container `rendering` (lý do ở mục 8.1).
 
 ## 1. Kết luận

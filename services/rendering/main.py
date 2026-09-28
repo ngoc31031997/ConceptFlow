@@ -35,6 +35,7 @@ from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.rendering.engine_router import EngineRouterRenderer
 from adapters.rendering.illustration_previewer import IllustrationPreviewer
+from adapters.rendering.layout_checker import LayoutChecker
 from adapters.rendering.manim_renderer import (
     CACHE_ROOT,
     DEFAULT_DRY_RUN_TIMEOUT_SECONDS,
@@ -63,6 +64,17 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 
 LOTTIE_MANIFEST = Path(__file__).parent / "remotion_project" / "lottie" / "manifest.json"
+
+
+def env_flag(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, "").strip().lower()
+    if raw == "":
+        return default
+    if raw in ("1", "true", "yes", "on"):
+        return True
+    if raw in ("0", "false", "no", "off"):
+        return False
+    raise ValueError(f"{name} must be true or false, got {raw!r}")
 
 
 def approved_lottie_ids() -> set[str]:
@@ -162,7 +174,21 @@ async def run() -> None:
     )
     # Load React/Remotion's type declarations now, not on the first check.
     warm_typescript = asyncio.create_task(asyncio.to_thread(typescript.warm))
-    check_use_case = CheckScriptUseCase(ValidateScriptUseCase(renderer, approved_lottie_ids), typescript)
+    # CR-048 T6b: after tsc passes, every shot is drawn in headless Chromium and
+    # its measured layout held to the layout rules. Off = each check says so.
+    layout = None
+    warm_layout = None
+    if env_flag("LAYOUT_CHECK_ENABLED", True):
+        layout = LayoutChecker(
+            Path(__file__).parent / "remotion_project",
+            timeout_seconds=int(os.environ.get("LAYOUT_CHECK_TIMEOUT_SECONDS", "60")),
+        )
+        # Bundle the probe page and start the browser now, not on the first check.
+        warm_layout = asyncio.create_task(asyncio.to_thread(layout.warm))
+    else:
+        logger.warning("LAYOUT_CHECK_ENABLED=false — code checks will not look at the layout")
+    check_use_case = CheckScriptUseCase(
+        ValidateScriptUseCase(renderer, approved_lottie_ids), typescript, layout)
     # CR-044: xem trước hình của thư viện minh hoạ (tiến trình Node khởi động lúc cần).
     previewer = IllustrationPreviewer(
         Path(__file__).parent / "remotion_project",
@@ -198,6 +224,9 @@ async def run() -> None:
         await check_server_task
         await warm_typescript
         typescript.close()
+        if layout is not None:
+            await warm_layout
+            layout.close()
         previewer.close()
         await queue.cancel(consumer_tag)
         await relay.stop()

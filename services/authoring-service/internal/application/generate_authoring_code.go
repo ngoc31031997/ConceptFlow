@@ -59,10 +59,19 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		}
 	}
 
-	result, genErr := uc.codegen.GenerateCode(ctx, CodeGenRequest{
+	req := CodeGenRequest{
 		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
 		System: rendered.Prompt, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
-	}, func(ev CodeEvent) { uc.updateCodeProgress(projectID, step, ev) })
+	}
+	if project.RenderEngine == domain.RenderEngineRemotion {
+		// CR-048 T6b: the same subtitle strip {{subtitle_zone}} told the model
+		// to keep clear, and the video's font, for the layout check.
+		if band, burned := domain.ProjectSubtitleBand(project); burned {
+			req.SubtitleBand = &band
+		}
+		req.VideoFont = project.VideoFont
+	}
+	result, genErr := uc.codegen.GenerateCode(ctx, req, func(ev CodeEvent) { uc.updateCodeProgress(projectID, step, ev) })
 
 	var calls []CodeCall
 	var llmErr *LLMError
