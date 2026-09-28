@@ -210,3 +210,102 @@ async def test_connection_failure_is_server_and_timeout_is_timeout(no_sleep):
     with pytest.raises(LLMError) as e:
         await make(no_sleep, retries=0).chat(ChatRequest(user="u"))
     assert e.value.kind == errors.TIMEOUT
+
+
+# -- CR-048 T1: stop a call that only reasons ---------------------------------
+
+
+class _CountingStream(httpx.AsyncByteStream):
+    """Serves one SSE event per read and counts how many the client pulled,
+    so a test can tell an early stop from reading the stream to the end."""
+
+    def __init__(self, *payloads) -> None:
+        self.events = [sse(p) for p in (*payloads, "[DONE]")]
+        self.served = 0
+        self.closed = False
+
+    async def __aiter__(self):
+        for ev in self.events:
+            self.served += 1
+            yield ev.encode()
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+
+def _counting(*payloads) -> tuple[httpx.Response, _CountingStream]:
+    body = _CountingStream(*payloads)
+    return httpx.Response(200, headers={"content-type": "text/event-stream"}, stream=body), body
+
+
+def _reasoning(n: int) -> list[dict]:
+    return [chunk(reasoning="r" * 1000) for _ in range(n)]
+
+
+@respx.mock
+async def test_reasoning_without_content_past_the_limit_stops_early_as_budget(no_sleep):
+    # 70 x 1000 = 70k chars of reasoning, never any content, then the length stop.
+    payloads = _reasoning(70) + [chunk("", finish="length"), usage_chunk({"completion_tokens": 128000})]
+    resp, body = _counting(*payloads)
+    route = respx.post(URL).mock(return_value=resp)
+    seen = []
+    with pytest.raises(LLMError) as e:
+        await make(no_sleep, retries=2).chat(
+            ChatRequest(user="u", max_tokens=128000, max_reasoning_chars=60000),
+            on_progress=lambda r, c: seen.append((r, c)))
+    err = e.value
+    assert err.kind == errors.BUDGET and err.retryable is False
+    assert err.message == "model suy nghĩ quá 60000 ký tự mà chưa viết được chữ nào — dừng sớm"
+    assert route.call_count == 1  # not retried
+    # stopped on the first chunk past 60k, well before the end of the stream
+    assert body.served < len(body.events)
+    assert body.closed
+    assert "chunks=61 reasoning_chars=61000 content_chars=0" in err.diag
+    assert "aborted=reasoning_limit" in err.diag
+    assert "usage: not reported (stream aborted), reasoning_chars=61000" in err.diag
+    assert "max_reasoning_chars=60000" in err.diag
+    # the provider reported no usage, so none is invented
+    u = err.usage
+    assert (u.prompt_tokens, u.completion_tokens, u.reasoning_tokens, u.cached_tokens) == (0, 0, 0, 0)
+    assert u.model == "test-model"
+    assert seen[-1] == (61000, 0)
+
+
+@respx.mock
+async def test_reasoning_limit_zero_keeps_the_old_behaviour(no_sleep):
+    payloads = _reasoning(70) + [chunk("answer", finish="stop"),
+                                 usage_chunk({"completion_tokens": 9, "reasoning_tokens": 7})]
+    resp, body = _counting(*payloads)
+    respx.post(URL).mock(return_value=resp)
+    res = await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=0))
+    assert res.content == "answer" and res.usage.reasoning_tokens == 7
+    assert body.served == len(body.events)
+
+    # a reasoning-only stream still fails the old way, with the billed usage
+    payloads = _reasoning(70) + [chunk("", finish="length"),
+                                 usage_chunk({"completion_tokens": 100, "reasoning_tokens": 100})]
+    resp, body = _counting(*payloads)
+    respx.post(URL).mock(return_value=resp)
+    with pytest.raises(LLMError) as e:
+        await make(no_sleep).chat(ChatRequest(user="u", max_tokens=100))
+    assert e.value.kind == errors.BUDGET and e.value.usage.reasoning_tokens == 100
+    assert "aborted" not in e.value.diag
+    assert body.served == len(body.events)
+
+
+@respx.mock
+async def test_reasoning_past_the_limit_after_content_started_is_not_stopped(no_sleep):
+    payloads = [chunk("first words ")] + _reasoning(70) + [
+        chunk("and the rest", finish="stop"), usage_chunk({"completion_tokens": 5})]
+    resp, body = _counting(*payloads)
+    respx.post(URL).mock(return_value=resp)
+    res = await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=60000))
+    assert res.content == "first words and the rest"
+    assert body.served == len(body.events)
+
+
+@respx.mock
+async def test_reasoning_exactly_at_the_limit_is_not_stopped(no_sleep):
+    resp, _ = _counting(*_reasoning(60), chunk("ok", finish="stop"), usage_chunk({}))
+    respx.post(URL).mock(return_value=resp)
+    assert (await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=60000))).content == "ok"

@@ -37,6 +37,11 @@ class ChatRequest:
     max_tokens: int = 0  # 0 = no cap sent; the provider applies its own ceiling
     temperature: float = 0.7
     json_mode: bool = False
+    # CR-048 T1: stop the stream once the model has streamed more than this many
+    # characters of reasoning without writing a single character of answer.
+    # 0 = no limit. A reasoning model can otherwise think until max_tokens
+    # (measured: 380k reasoning chars, 0 content, 13 minutes) and still fail.
+    max_reasoning_chars: int = 0
 
 
 @dataclass
@@ -137,7 +142,8 @@ class Provider:
         started = time.monotonic()
         diag: list[str] = [
             f"request: model={model} max_tokens={req.max_tokens} temperature={req.temperature:g} "
-            f"system_chars={len(req.system)} user_chars={len(req.user)}"
+            f"system_chars={len(req.system)} user_chars={len(req.user)} "
+            f"max_reasoning_chars={req.max_reasoning_chars}"
         ]
 
         def fail(
@@ -173,6 +179,8 @@ class Provider:
         raw_usage: dict | None = None
         resp_model = ""
         chunks = 0
+        reasoning_limit = req.max_reasoning_chars
+        aborted = False
         try:
             stream = await self._client.chat.completions.create(**kwargs)
             request_id = stream.response.headers.get("x-request-id", "")
@@ -197,6 +205,13 @@ class Provider:
                     res = on_progress(reasoning_chars, content_chars)
                     if res is not None:
                         await res
+                if reasoning_limit > 0 and content_chars == 0 and reasoning_chars > reasoning_limit:
+                    aborted = True
+                    break
+            if aborted:
+                # Close the connection instead of waiting for the rest of the
+                # reply (whether the provider then stops generating is up to it).
+                await stream.close()
         except openai.APITimeoutError as exc:
             raise fail(errors.TIMEOUT, f"call {self.name}: {exc}") from exc
         except openai.APIConnectionError as exc:
@@ -219,6 +234,20 @@ class Provider:
         except httpx.TransportError as exc:
             diag.append(f"stream: chunks={chunks} reasoning_chars={reasoning_chars} content_chars={content_chars}")
             raise fail(errors.SERVER, f"{self.name} dropped the connection mid-stream: {exc}") from exc
+
+        if aborted:
+            diag.append(
+                f"stream: chunks={chunks} reasoning_chars={reasoning_chars} content_chars={content_chars} "
+                f"finish_reason={finish} aborted=reasoning_limit")
+            # The usage chunk comes last, so a stream cut short never reports
+            # it. Record what is known instead of inventing token counts.
+            diag.append(f"usage: not reported (stream aborted), reasoning_chars={reasoning_chars}")
+            raise fail(
+                errors.BUDGET,
+                f"model suy nghĩ quá {reasoning_limit} ký tự mà chưa viết được chữ nào — dừng sớm",
+                Usage(model=resp_model or model),
+                retryable=False,
+            )
 
         text = "".join(content).strip()
         usage = _usage_from(raw_usage, resp_model or model)

@@ -101,6 +101,16 @@ def req(sb, engine="remotion"):
     return CodeRequest(engine=engine, topic="Chủ đề", storyboard=sb, system="SYS")
 
 
+@pytest.mark.parametrize("engine", ["remotion", "manim"])
+async def test_every_call_of_the_run_carries_the_reasoning_limit(engine):
+    # CR-048 T1: layout/cast, chunks and repairs all get the request's limit.
+    prov, chk = FakeProvider(engine=engine, broken={"1.2"}), FakeChecker()
+    r = CodeRequest(engine=engine, topic="Chủ đề", storyboard=storyboard(4), system="SYS", max_reasoning_chars=1234)
+    res = await pipeline(prov, chk, chunk=2).run(r, emit_none)
+    assert {c.phase for c in res.calls} >= {"chunk", "repair"} and {c.phase for c in res.calls} & {"layout", "cast"}
+    assert prov.calls and all(c.max_reasoning_chars == 1234 for c in prov.calls)
+
+
 async def test_happy_path_splits_into_chunks_and_records_every_call():
     prov, chk = FakeProvider(), FakeChecker()
     res = await pipeline(prov, chk, chunk=10).run(req(storyboard(25)), emit_none)

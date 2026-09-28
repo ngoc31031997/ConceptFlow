@@ -14,6 +14,13 @@ def _int(name: str, default: int) -> int:
         raise ValueError(f"{name} must be an integer, got {raw!r}") from exc
 
 
+def _non_negative(name: str, default: int) -> int:
+    value = _int(name, default)
+    if value < 0:
+        raise ValueError(f"{name} must be >= 0 (0 = off), got {value}")
+    return value
+
+
 @dataclass(frozen=True)
 class Config:
     hive_api_key: str
@@ -34,6 +41,12 @@ class Config:
     code_repair_max_rounds: int
     rendering_url: str
     rendering_check_timeout: int
+    # CR-048 T1: stop a call that has reasoned for more than this many
+    # characters without writing any answer. 0 = no limit.
+    # Every call of the code pipeline (layout/cast/chunk/repair).
+    code_max_reasoning_chars: int
+    # /v1/chat (steps 1a/1b legitimately think at length, so off by default).
+    chat_max_reasoning_chars: int
 
     @classmethod
     def from_env(cls) -> Config:
@@ -56,4 +69,6 @@ class Config:
             code_repair_max_rounds=_int("CODE_REPAIR_MAX_ROUNDS", 3),
             rendering_url=os.environ.get("RENDERING_URL", "http://rendering:8000"),
             rendering_check_timeout=_int("RENDERING_CHECK_TIMEOUT_SECONDS", 180),
+            code_max_reasoning_chars=_non_negative("CODE_MAX_REASONING_CHARS", 60000),
+            chat_max_reasoning_chars=_non_negative("CHAT_MAX_REASONING_CHARS", 0),
         )

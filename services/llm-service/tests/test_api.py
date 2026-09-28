@@ -17,7 +17,8 @@ def config(**over):
         hive_api_key="k", hive_base_url="https://hive.test/v3", hive_model="deepseek", hive_timeout=5,
         hive_max_retries=0, hive_rate_per_second=1000, ollama_url="http://ollama.test:11434",
         ollama_model="llama", ollama_timeout=5, light_provider="ollama", code_chunk_shots=10,
-        code_chunk_concurrency=2, code_repair_max_rounds=1, rendering_url="http://rendering.test", rendering_check_timeout=5)
+        code_chunk_concurrency=2, code_repair_max_rounds=1, rendering_url="http://rendering.test", rendering_check_timeout=5,
+        code_max_reasoning_chars=60000, chat_max_reasoning_chars=0)
     base.update(over)
     return Config(**base)
 
@@ -138,6 +139,60 @@ async def test_code_generate_with_a_prose_storyboard_is_an_error_event(client):
         "engine": "remotion", "topic": "t", "storyboard": "CẢNH 1", "system": "SYS"})
     ev = events(r)
     assert ev[-1]["type"] == "error" and "step 1b with AI" in ev[-1]["error"]["message"]
+
+
+def _only_reasoning(chars: int):
+    return stream_response(*[chunk(reasoning="r" * 1000) for _ in range(chars // 1000)],
+                           chunk("", finish="length"), usage_chunk({"completion_tokens": 50}))
+
+
+def _client(cfg):
+    return httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=create_app(cfg, Providers(cfg), OkChecker())), base_url="http://svc")
+
+
+async def test_code_generate_stops_a_call_that_only_reasons_past_the_code_limit():
+    with respx.mock:
+        route = respx.post("https://hive.test/v3/chat/completions").mock(return_value=_only_reasoning(5000))
+        r = await _client(config(code_max_reasoning_chars=2000)).post("/v1/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
+    ev = events(r)
+    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "budget"
+    assert "suy nghĩ quá 2000 ký tự" in ev[-1]["error"]["message"]
+    assert ev[-1]["calls"][0]["phase"] == "layout" and ev[-1]["calls"][0]["error_kind"] == "budget"
+    assert route.call_count == 1
+
+
+@respx.mock
+async def test_chat_uses_its_own_limit_off_by_default():
+    respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda _req: stream_response(
+        *[chunk(reasoning="r" * 1000) for _ in range(5)], chunk("hi", finish="stop"), usage_chunk({})))
+    # the code limit does not apply to /v1/chat
+    ev = events(await _client(config(code_max_reasoning_chars=2000)).post("/v1/chat", json={"user": "U"}))
+    assert ev[-1]["type"] == "result" and ev[-1]["content"] == "hi"
+
+    respx.post("https://hive.test/v3/chat/completions").mock(return_value=_only_reasoning(5000))
+    ev = events(await _client(config(chat_max_reasoning_chars=2000)).post("/v1/chat", json={"user": "U"}))
+    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "budget"
+    assert "suy nghĩ quá 2000 ký tự" in ev[-1]["error"]["message"]
+
+
+def test_reasoning_limits_from_env(monkeypatch):
+    from app.config import Config
+
+    monkeypatch.delenv("CODE_MAX_REASONING_CHARS", raising=False)
+    monkeypatch.delenv("CHAT_MAX_REASONING_CHARS", raising=False)
+    cfg = Config.from_env()
+    assert (cfg.code_max_reasoning_chars, cfg.chat_max_reasoning_chars) == (60000, 0)
+
+    monkeypatch.setenv("CODE_MAX_REASONING_CHARS", "0")
+    monkeypatch.setenv("CHAT_MAX_REASONING_CHARS", "90000")
+    cfg = Config.from_env()
+    assert (cfg.code_max_reasoning_chars, cfg.chat_max_reasoning_chars) == (0, 90000)
+
+    monkeypatch.setenv("CODE_MAX_REASONING_CHARS", "-1")
+    with pytest.raises(ValueError, match="CODE_MAX_REASONING_CHARS"):
+        Config.from_env()
 
 
 def _fake_hive(req):

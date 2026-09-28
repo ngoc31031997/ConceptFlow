@@ -443,6 +443,9 @@ services:
       CODE_CHUNK_SHOTS: ${CODE_CHUNK_SHOTS:-3}
       CODE_CHUNK_CONCURRENCY: ${CODE_CHUNK_CONCURRENCY:-10} # every chunk of a typical video at once
       CODE_REPAIR_MAX_ROUNDS: ${CODE_REPAIR_MAX_ROUNDS:-3}
+      # CR-048: dừng sớm một lượt gọi đã suy nghĩ quá N ký tự mà chưa viết chữ nào (0 = tắt)
+      CODE_MAX_REASONING_CHARS: ${CODE_MAX_REASONING_CHARS:-60000} # mọi lượt gọi bước code (layout/cast/chunk/repair)
+      CHAT_MAX_REASONING_CHARS: ${CHAT_MAX_REASONING_CHARS:-0} # /v1/chat (bước 1a/1b suy nghĩ dài là bình thường)
       RENDERING_URL: http://rendering:8000
       RENDERING_CHECK_TIMEOUT_SECONDS: ${RENDERING_CHECK_TIMEOUT_SECONDS:-2100}
     deploy:
