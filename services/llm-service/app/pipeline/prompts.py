@@ -4,6 +4,12 @@ The system prompt of every call is the rendered `*_engineer_ai` role from the
 prompt library — rules, palette discipline, layout law. What varies per call
 lives here: which task this call is, and the slice of the storyboard it owns.
 Every turn states what already exists so the model does not redeclare it.
+
+The system prompt must stay byte-identical across every call of one run so the
+provider's prompt cache keeps working: anything that varies per call belongs in
+these user turns. CR-048 T3 cut the story outline in the code step's system
+prompt down to its core lines, so each chunk turn now opens with the storyboard's
+hero/world line itself.
 """
 
 from __future__ import annotations
@@ -89,7 +95,9 @@ def remotion_chunk(
     prev_txt = _dump(_shot_json(*prev)) if prev else "(không có — đây là lô đầu tiên)"
     next_txt = _dump(_shot_json(*nxt)) if nxt else "(không có — đây là lô cuối cùng)"
     names = ", ".join(merger.remotion_fn(i) for i in shot_ids)
-    return f"""NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]} ({len(shot_ids)} shot).
+    return f"""{_world(sb)}
+
+NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]} ({len(shot_ids)} shot).
 
 Bạn chỉ viết {len(shot_ids)} hàm shot. Hệ thống tự ghép mọi thứ còn lại. ĐÃ CÓ SẴN trong file, TUYỆT ĐỐI KHÔNG viết lại:
 - các dòng import (react; remotion: registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig; ./conceptflow-mini/segments; ./conceptflow-mini/primitives: Stage, SAFE_MARGIN, WIDTH, HEIGHT; ./conceptflow-mini/lottie: LottieClip; ./conceptflow-mini/illustration: {", ".join(merger.ILLUSTRATION_KIT)})
@@ -195,7 +203,9 @@ def manim_chunk(
     next_txt = _dump(_shot_json(*nxt)) if nxt else "(không có — đây là lô cuối cùng)"
     names = ", ".join(merger.manim_fn(i) for i in shot_ids)
     cast_list = ", ".join(f"self.{n}" for n in cast_names) or "(không có vật nào)"
-    return f"""NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]} ({len(shot_ids)} shot).
+    return f"""{_world(sb)}
+
+NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]} ({len(shot_ids)} shot).
 
 Bạn chỉ viết {len(shot_ids)} method shot. Hệ thống tự ghép class, dòng import, `construct`, các lời gọi `self.beat(...)` và `setup_cast`. ĐÃ CÓ SẴN, TUYỆT ĐỐI KHÔNG viết lại: `from conceptflow import *`, class Scene, `construct`, `setup_cast`.
 

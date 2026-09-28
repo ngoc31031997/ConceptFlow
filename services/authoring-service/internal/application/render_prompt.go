@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"authoring/internal/domain"
@@ -279,13 +280,156 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 	case domain.RoleManimEngineerAI, domain.RoleRemotionEngineerAI:
 		// The storyboard is not in the system prompt: llm-service hands each
 		// call its own slice of it, and the whole document only to the layout call.
-		add(story)
+		//
+		// CR-048 T3 — nor is the whole outline. This text is the system prompt
+		// of every chunk and repair call, and each of those user turns already
+		// carries its shots' invariant/narration/visual; the beats, candidate
+		// situations and word counts only give the model more to reason about.
+		// Keep the core lines. An outline whose labels cannot be found (edited
+		// by hand, format changed) is passed whole and logged — never cut
+		// silently.
+		if strings.TrimSpace(story) != "" {
+			core, missing := extractStoryCore(story)
+			switch {
+			case core == "":
+				slog.Warn("code step: no core labels found in the story outline — passing it whole",
+					"project_id", projectID, "role", string(role), "story_chars", len(story))
+				add(story)
+			default:
+				if len(missing) > 0 {
+					slog.Warn("code step: story outline is missing some core labels",
+						"project_id", projectID, "role", string(role), "missing", strings.Join(missing, ", "))
+				}
+				add(core)
+			}
+		}
 	}
 
 	if len(parts) == 0 {
 		return "(chưa có dàn ý/storyboard/code đã lưu ở các bước trước)", nil
 	}
 	return strings.Join(parts, "\n\n---\n\n"), nil
+}
+
+// storyCoreLabels are the lines of the Story Architect's output
+// (storyArchitectVI, "## OUTPUT") that the code step keeps, in the order the
+// outline prints them. "Thế giới chính" sits under KHUNG BÀI.
+var storyCoreLabels = []string{
+	"KIỂU VIDEO",
+	"Thế giới chính",
+	"CÂU HỎI CỐT LÕI",
+	"INSIGHT CỐT LÕI",
+	"SAI LẦM TRỰC GIÁC",
+	"AHA MOMENT",
+}
+
+const storyAhaLabel = "AHA MOMENT"
+
+// storyAhaSubLabels are the two lines printed under AHA MOMENT.
+var storyAhaSubLabels = []string{"Tôi từng nghĩ", "Nhưng bây giờ tôi nhận ra"}
+
+// extractStoryCore returns the core lines of a Story Architect outline and
+// the labels it could not find. core is "" when no label was found at all.
+//
+// Tolerant of what models and Creators do to the format: leading whitespace,
+// list markers, markdown headings and bold ("**KIỂU VIDEO:**", "**KIỂU
+// VIDEO**:"), letter case, and a value written on the lines below its label.
+// Only the first occurrence of a label counts.
+func extractStoryCore(story string) (core string, missing []string) {
+	lines := strings.Split(strings.ReplaceAll(story, "\r\n", "\n"), "\n")
+	found := map[string]bool{}
+	var out []string
+	inAha := false
+
+	for i := 0; i < len(lines); i++ {
+		line := cleanStoryLine(lines[i])
+		if line == "" {
+			continue
+		}
+		if inAha {
+			if label, _, ok := matchStoryLabel(line, storyAhaSubLabels); ok && !found[label] {
+				found[label] = true
+				out = append(out, "  "+line)
+				continue
+			}
+			inAha = false
+		}
+		label, value, ok := matchStoryLabel(line, storyCoreLabels)
+		if !ok || found[label] {
+			continue
+		}
+		found[label] = true
+		if value == "" {
+			// The value sits on the lines below: take them up to a blank line
+			// or the next "LABEL:" line.
+			var cont []string
+			for i+1 < len(lines) {
+				next := cleanStoryLine(lines[i+1])
+				if next == "" || looksLikeStoryLabel(next) {
+					break
+				}
+				cont = append(cont, next)
+				i++
+			}
+			if len(cont) > 0 {
+				line = strings.TrimRight(line, " ") + " " + strings.Join(cont, " ")
+			}
+		}
+		out = append(out, line)
+		inAha = label == storyAhaLabel
+	}
+
+	for _, l := range storyCoreLabels {
+		if !found[l] {
+			missing = append(missing, l)
+		}
+	}
+	if len(out) == 0 {
+		return "", missing
+	}
+	return strings.Join(out, "\n"), missing
+}
+
+// cleanStoryLine strips indentation, list/heading/quote markers and markdown
+// bold so a label can be recognised however the outline was formatted.
+func cleanStoryLine(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimLeft(s, "#>-*• \t")
+	s = strings.ReplaceAll(s, "**", "")
+	s = strings.ReplaceAll(s, "__", "")
+	return strings.TrimSpace(s)
+}
+
+// matchStoryLabel reports which of labels line starts with, followed by ":"
+// (spaces allowed before it), ignoring case. value is what follows the colon.
+func matchStoryLabel(line string, labels []string) (label, value string, ok bool) {
+	// Compare rune by rune: upper-casing keeps the rune count, not
+	// necessarily the byte count.
+	runes := []rune(line)
+	for _, l := range labels {
+		lr := []rune(l)
+		if len(runes) < len(lr) || strings.ToUpper(string(runes[:len(lr)])) != strings.ToUpper(l) {
+			continue
+		}
+		rest := strings.TrimLeft(string(runes[len(lr):]), " \t")
+		if strings.HasPrefix(rest, ":") {
+			return l, strings.TrimSpace(rest[1:]), true
+		}
+	}
+	return "", "", false
+}
+
+// looksLikeStoryLabel reports a line that opens another field of the outline
+// ("BEAT hook — Mở đầu:", "KHUNG BÀI:", "Tôi từng nghĩ: ..."): a short head
+// of at most eight words, then a colon. It bounds how far a label whose value
+// sits on the lines below may read.
+func looksLikeStoryLabel(line string) bool {
+	head, _, ok := strings.Cut(line, ":")
+	if !ok {
+		return false
+	}
+	n := len(strings.Fields(head))
+	return n > 0 && n <= 8
 }
 
 // engineOf is the render engine a role writes for; only Remotion's roles differ.
