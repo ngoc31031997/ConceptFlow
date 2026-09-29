@@ -1,4 +1,4 @@
-# Verification entry points shared by developers, Claude Code hooks and CI.
+# Verification entry points shared by developers, agents and CI.
 # The logic lives in scripts/{setup,build,check}.sh; see docs/agentic/verification.md.
 
 BASE ?= main

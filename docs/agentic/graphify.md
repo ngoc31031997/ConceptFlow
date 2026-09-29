@@ -1,5 +1,7 @@
 # graphify: đồ thị tri thức của code cho agent
 
+> **2026-09-29:** lớp agentic (skills, agents, `/cr-review`, mục "Graph impact") đã bị gỡ; graphify vẫn giữ và là cách **đầu tiên** để đọc codebase (luật trong `CLAUDE.MD`). Các đoạn nhắc tới skill và brief review bên dưới chỉ còn giá trị lịch sử.
+
 > Cập nhật: 2026-09-29. Người đọc: Creator và agent làm CR / sửa bug trong repo này.
 > Công cụ: [graphify](https://github.com/Graphify-Labs/graphify) (gói PyPI `graphifyy`). Quyết định: D12 trong [`implementation-audit.md`](implementation-audit.md) §11.
 

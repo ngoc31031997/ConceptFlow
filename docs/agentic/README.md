@@ -1,5 +1,7 @@
 # Agentic Software Engineering trong ConceptFlow: tổng quan và cách dùng
 
+> **ĐÃ GỠ (2026-09-29):** skills, agents, hooks, cổng merge và script review đã bị xoá vì tốn nhiều token mà chưa hiệu quả. Chỉ giữ graphify, `make check`/`make check-all` và CI. Muốn apply lại: `git revert` commit "Remove the agentic layer, keep graphify" trên `main`. Tài liệu dưới đây mô tả lớp agentic lúc còn bật.
+
 > Cập nhật: 2026-09-28 (hết Phase 7). Người đọc: Creator và bất kỳ ai (người hoặc agent) làm Change Request (CR) trong repo này.
 > Spec gốc: [`docs/AGENTIC_SOFTWARE_ENGINEERING_IMPLEMENTATION.md`](../AGENTIC_SOFTWARE_ENGINEERING_IMPLEMENTATION.md). Quyết định D1–D10: [`implementation-audit.md`](implementation-audit.md).
 
