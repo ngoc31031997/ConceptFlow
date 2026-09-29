@@ -336,6 +336,21 @@ func TestImportIntoAFullExemplarFolderKeepsOriginalsAsDrawingsAndSkipsCopies(t *
 	}
 }
 
+func TestImportRefusesAnExemplarWhoseHomeIsTheExemplarFolder(t *testing.T) {
+	manifest := `{"format":"conceptflow-illustration-library","format_version":1,"folders":[],"illustrations":[
+		{"name":"Loop","title":"x","folder_id":"hinh-mau","status":"approved","version":1,"code_file":"hinh/hinh-mau/Loop.tsx",
+		 "exemplar":true,"home_folder_id":"hinh-mau"}]}`
+	file := makeZip(t, map[string]string{"manifest.json": manifest, "hinh/hinh-mau/Loop.tsx": "export function Loop() {}"})
+	repo := newFakeIllustrationRepo()
+	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).Import(context.Background(), file, ImportOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Items) != 1 || report.Items[0].Result != ImportFailed {
+		t.Fatalf("report: %+v", report.Items)
+	}
+}
+
 func TestImportRefusesAnOrdinaryDrawingFiledInTheExemplarFolder(t *testing.T) {
 	manifest := `{"format":"conceptflow-illustration-library","format_version":1,"folders":[],"illustrations":[
 		{"name":"Sneaky","title":"x","folder_id":"hinh-mau","status":"approved","version":1,"code_file":"hinh/hinh-mau/Sneaky.tsx"}]}`

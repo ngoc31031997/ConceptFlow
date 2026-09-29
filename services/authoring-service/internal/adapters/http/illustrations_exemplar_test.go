@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -47,13 +48,18 @@ func TestDeleteIllustrationAnswersWhyItWasRefused(t *testing.T) {
 	}{
 		{nil, http.StatusNoContent},
 		{inUse, http.StatusConflict},
-		{application.ErrIllustrationUsageUnknown, http.StatusServiceUnavailable},
+		{fmt.Errorf("%w (dial tcp orchestrator:8000: refused)", application.ErrIllustrationUsageUnknown), http.StatusServiceUnavailable},
 		{application.ErrIllustrationReadOnly, http.StatusForbidden},
 	} {
 		rec := serve(&fakeExemplars{deleteErr: tc.err}, http.MethodDelete, "/v1/admin/illustrations/bus")
 		if rec.Code != tc.want {
 			t.Errorf("%v: got %d, want %d", tc.err, rec.Code, tc.want)
 		}
+	}
+	down := serve(&fakeExemplars{deleteErr: fmt.Errorf("%w (dial tcp orchestrator:8000: refused)", application.ErrIllustrationUsageUnknown)},
+		http.MethodDelete, "/v1/admin/illustrations/bus")
+	if strings.Contains(down.Body.String(), "orchestrator:8000") {
+		t.Fatalf("the orchestrator's error reached the browser: %s", down.Body)
 	}
 	rec := serve(&fakeExemplars{deleteErr: inUse}, http.MethodDelete, "/v1/admin/illustrations/bus")
 	var body struct {

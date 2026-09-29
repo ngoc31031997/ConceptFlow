@@ -78,7 +78,7 @@ func (s ProjectStatus) IsInFlight() bool {
 }
 
 // DoneWithLibrary reports whether a project no longer needs the library
-// drawings it uses (CR-052): it reached the result screen (wizard step 12) or
+// drawings it uses (CR-052): it reached the result screen (Kết quả) or
 // later, or it is being deleted. Every other status, failed_at_* included
 // since a failed step can run again, may still render them.
 func (s ProjectStatus) DoneWithLibrary() bool {

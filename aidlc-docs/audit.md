@@ -2111,3 +2111,23 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 - rendering: chỉ đổi test. Code 3 hình mẫu chuyển sang `tests/fixtures/illustration_exemplars_vi.txt` để test bộ kiểm style vẫn chạy.
 **Impact Assessment**: `make check` pass cả 10 bước (api-gateway, authoring-service, rendering, web-gui). Test Postgres chạy trên DB tạm (`TEST_DATABASE_URL`, container tạm đã dừng): 4/4 pass. Đã rebuild và khởi động lại authoring-service, api-gateway (healthy) và web-gui (đang chạy; không có healthcheck). Kiểm tra trực tiếp: 3 hình mẫu đã sang `hinh-mau` và nhớ thư mục gốc; xoá kit hoặc Hình mẫu trả 403; đặt mẫu `Car` tạo `CarMau` (201), đặt lần hai trả 409, bỏ mẫu xoá bản chép (204) và `Car` còn nguyên; lưu hình vào `hinh-mau` trả 422; hình tạm không ai dùng xoá được (204). CHƯA kiểm trực tiếp trường hợp 409 "đang dùng": mọi hình Creator đang liên kết đều thuộc dự án đã ở bước Kết quả (xoá sẽ mất dữ liệu thật), nên trường hợp này chỉ được kiểm bằng unit test và test Postgres.
 **Artifacts Affected**: services/authoring-service (domain, application, adapters/http, adapters/postgres, cmd), services/api-gateway (routes + test), services/web-gui (client, IllustrationLibraryPage, IllustrationEditor, IllustrationTile + test), services/rendering/tests, `aidlc-docs/audit.md`.
+
+## CR-052 — Được duyệt, review PASS, sửa các lỗi nhỏ review nêu, merge
+**Timestamp**: 2026-09-29T21:00:00Z
+**User Input**: "ok" (duyệt code); "ok" (gộp audit khi merge main); "xong toàn bộ thì commit push và merge main đi"
+**AI Response**: /cr-finish: merge `origin/main` (CR-051 và các sửa sau review CR-051) vào nhánh; `audit.md` bị trùng chỗ ghi ở cuối file, giữ cả hai (main trước, CR-052 sau). Sửa test `summaries_cr051_test.go` cho khớp chữ ký mới của `DeleteIllustration`. /cr-review trên cây `cb1e0ef`: reviewer, security-reviewer, tester đều PASS, không Blocker/Major. Trước khi merge, sửa luôn các lỗi nhỏ rõ ràng mà review nêu:
+- bảng hình ở bước 5 không còn hiện "Sửa / Vẽ lại" và "Duyệt" trên Hình mẫu;
+- `SetSkipped` gắn nhãn "reused" cho cả Hình mẫu;
+- lỗi 503 không còn gửi nội dung lỗi của orchestrator ra trình duyệt (chỉ ghi log);
+- file sao lưu không được đặt thư mục cũ của Hình mẫu là `hinh-mau`;
+- chú thích "bước 12" đổi thành "Kết quả" (sau CR-051 Kết quả là bước 13).
+Các lỗi nhỏ còn lại để làm sau:
+- `RenameExport` đổi tên hàm export đầu tiên thay vì hàm trùng tên hình;
+- tìm tên hình trong code khớp cả chú thích và chuỗi (thiên về chặn xoá);
+- câu DELETE chưa kiểm lại phần code tham chiếu;
+- lỗi khi lưu ảnh xem trước sau khi đã tạo bản chép;
+- `/v1/illustration-style` trả 500 khi DB lỗi;
+- chưa có test hai lần "Đặt làm mẫu" song song;
+- chưa có test "Dựng lại" trên Hình mẫu.
+**Impact Assessment**: `go test ./...` (authoring-service) pass; web-gui tsc + vitest 402 test pass; /cr-check và /cr-review chạy lại trên cây cuối trước khi merge.
+**Artifacts Affected**: services/authoring-service (http/illustrations.go, application/{illustration_backup,project_illustrations}.go, domain/project.go + test), services/web-gui (ProjectIllustrationsPanel + test), `aidlc-docs/audit.md`.

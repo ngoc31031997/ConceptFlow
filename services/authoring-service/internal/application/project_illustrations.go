@@ -358,7 +358,7 @@ func (uc *ProjectIllustrationsUseCase) SetSkipped(ctx context.Context, projectID
 		r.State = domain.PISkipped
 	case r.IllustrationID == "":
 		r.State = domain.PIPlanned
-	case r.Illustration != nil && r.Illustration.Builtin:
+	case r.Illustration != nil && r.Illustration.ReadOnly(): // the kit, or a Hình mẫu (CR-052)
 		r.State = domain.PIReused
 	default:
 		r.State = domain.PIDrawn

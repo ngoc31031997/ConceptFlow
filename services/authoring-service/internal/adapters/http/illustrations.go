@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -81,7 +82,9 @@ func illustrationError(w http.ResponseWriter, err error) {
 	case errors.As(err, &inUse):
 		writeJSON(w, http.StatusConflict, map[string]any{"error": inUse.Error(), "code": "illustration_in_use", "projects": inUse.Projects})
 	case errors.Is(err, application.ErrIllustrationUsageUnknown):
-		writeError(w, http.StatusServiceUnavailable, err.Error())
+		// The cause (an orchestrator transport error) is logged, not sent to the browser.
+		slog.Error("illustration usage check failed", "error", err.Error())
+		writeError(w, http.StatusServiceUnavailable, application.ErrIllustrationUsageUnknown.Error())
 	case errors.Is(err, application.ErrExemplarLimit), errors.Is(err, application.ErrAlreadyExemplar),
 		errors.Is(err, application.ErrNotExemplar):
 		writeError(w, http.StatusConflict, err.Error())

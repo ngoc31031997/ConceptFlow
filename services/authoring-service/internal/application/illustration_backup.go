@@ -373,6 +373,9 @@ func (uc *IllustrationsUseCase) importIllustration(
 	if !b.Exemplar && ill.FolderID == domain.ExemplarFolderID {
 		return fail(ErrExemplarFolder.Error())
 	}
+	if b.Exemplar && b.HomeFolderID == domain.ExemplarFolderID {
+		return fail("thư mục cũ của Hình mẫu không thể là chính thư mục Hình mẫu")
+	}
 	if b.Exemplar && b.HomeFolderID != "" {
 		if err := uc.folderExists(ctx, b.HomeFolderID); err != nil {
 			return fail(fmt.Sprintf("thư mục cũ %q của Hình mẫu không có trong thư viện", b.HomeFolderID))
