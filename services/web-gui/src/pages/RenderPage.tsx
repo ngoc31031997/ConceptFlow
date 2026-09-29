@@ -8,7 +8,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
-import { FLOW_LABELS, FLOW_TTS } from "../utils/flow";
+import { FLOW_TTS, flowTitle } from "../utils/flow";
 
 /**
  * Settings that may still change after a stop at this saga step: the ones read
@@ -31,14 +31,15 @@ const SAGA_FLOW_STEP: Record<string, number> = {
 };
 
 /**
- * Bước 5 của 7 — "Xử lý": phần đắt, chạy sau khi Creator duyệt dàn ý ở bước 4.
+ * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chạy sau khi Creator
+ * duyệt dàn ý ở bước 8.
  *
  * CR-031 — màn này từng ôm cả lượt chạy thử kịch bản lẫn cổng duyệt dàn ý.
- * Cả hai đã sang bước 4 (ValidatePage), nên ở đây không còn nhánh nào dừng
+ * Cả hai đã sang bước 7/8 (ValidatePage), nên ở đây không còn nhánh nào dừng
  * chờ người: mọi thứ từ lúc này tới `ready_to_publish` đều tự chạy, và việc
  * duy nhất của trang là cho thấy nó chạy tới đâu.
  *
- * Lỗi ở đây khác hẳn lỗi ở bước 4. TTS/render/ghép hỏng thường vì hạ tầng —
+ * Lỗi ở đây khác hẳn lỗi ở bước 7. TTS/render/ghép hỏng thường vì hạ tầng —
  * hết quota, worker chết, hết đĩa — nên "Thử lại" là việc đúng, và không có
  * nút quay về sửa script: script này đã qua lượt chạy thử và đã được duyệt.
  */
@@ -55,7 +56,7 @@ export function RenderPage() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
 
-  // Một project chưa qua bước 4 (hoặc đã xong hẳn) không thuộc màn này. Bookmark
+  // Một project chưa qua bước 8 (hoặc đã xong hẳn) không thuộc màn này. Bookmark
   // cũ, nút back sau khi duyệt, hay một saga bị đẩy lùi vì Creator từ chối dàn
   // ý — cả ba đều dẫn tới đây với một trạng thái mà trang này không có gì để
   // hiển thị ngoài bốn ô "pending" bất động.
@@ -101,7 +102,6 @@ export function RenderPage() {
   const shownSteps = PROCESS_STEPS.filter((s) => SAGA_FLOW_STEP[s] === shownFlowStep);
   const isShownActive = !reviewingPast && shownFlowStep === activeFlowStep;
   const isShownDone = reviewingPast || shownFlowStep < activeFlowStep;
-  const stepTitle = FLOW_LABELS[shownFlowStep - 1] ?? "Xử lý";
 
   const stopped = (isFailed || isCancelled) && !viewOnly;
   const editableStages = stopped ? (EDITABLE_AFTER_STOP[displayStep ?? ""] ?? []) : [];
@@ -122,7 +122,7 @@ export function RenderPage() {
     <div data-testid="render-page">
       <AppShell
         currentStep={shownFlowStep}
-        title={`Bước ${shownFlowStep} — ${stepTitle}`}
+        title={flowTitle(shownFlowStep)}
         subtitle={
           !isShownActive
             ? isShownDone

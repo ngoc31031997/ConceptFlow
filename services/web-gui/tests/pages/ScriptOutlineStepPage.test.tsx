@@ -215,9 +215,11 @@ describe("ScriptOutlineStepPage", () => {
       expandSettings();
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
-      expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy cả 3 bước bằng AI");
+      // CR-051: the button names the steps by the rail's numbers, whatever the
+      // engine — Manim skips 5 but the range is still 3–6.
+      expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy bằng AI các bước 3–6");
       fireEvent.click(screen.getByTestId("render-engine-remotion"));
-      await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy cả 4 bước bằng AI"));
+      await waitFor(() => expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy bằng AI các bước 3–6"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
       await waitFor(() =>
         expect(start).toHaveBeenCalledWith(expect.any(String), ["story", "storyboard", "illustrations", "code"]),
@@ -469,8 +471,30 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId("run-with-ai-running")).toBeInTheDocument());
-    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Visual");
+    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Đang chạy Bước 4 — Visual");
     expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
+  });
+
+  // CR-051: the chain used to count its own steps ("Bước 2/3") and drop Hình
+  // minh hoạ on Manim, so the Creator saw 3 steps where the rail showed 4.
+  it("chuỗi Manim vẫn hiện đủ bước 3–6 theo số của thanh bước, bước 5 mờ “Không dùng”", async () => {
+    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
+    renderPage();
+
+    const rows = await screen.findAllByTestId(/^authoring-run-panel-/);
+    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual([
+      "authoring-run-panel-story",
+      "authoring-run-panel-storyboard",
+      "authoring-run-panel-illustrations",
+      "authoring-run-panel-code",
+    ]);
+    expect(rows.map((r) => r.getAttribute("data-state"))).toEqual(["done", "running", "skipped", "pending"]);
+    expect(rows[0]).toHaveTextContent("Bước 3 — Kịch bản");
+    expect(rows[1]).toHaveTextContent("Bước 4 — Visual");
+    expect(rows[2]).toHaveTextContent("Bước 5 — Hình minh hoạ");
+    expect(rows[2]).toHaveTextContent("Không dùng");
+    expect(rows[3]).toHaveTextContent("Bước 6 — Code");
+    expect(screen.getByTestId("authoring-run-panel")).not.toHaveTextContent(/Bước \d\/\d/);
   });
 
   it("hiện lỗi của lượt chạy đã dừng khi trang được mở lại, và đóng được", async () => {
@@ -487,7 +511,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
 
     const err = await screen.findByTestId("run-with-ai-error");
     expect(err).toHaveTextContent("hết số dư");
-    expect(err).toHaveTextContent("Visual");
+    expect(err).toHaveTextContent("dừng ở Bước 4 — Visual");
 
     fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
     await waitFor(() => expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument());

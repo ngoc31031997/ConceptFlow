@@ -205,7 +205,7 @@ func (s projectStoreWithAuthoring) List(ctx context.Context) ([]domain.ProjectSu
 			continue
 		}
 		summaries[i].Topic = a.Topic
-		content := domain.AuthoredContent{Story: a.Story, Storyboard: a.Storyboard, Code: a.Code}
+		content := a.Content(summaries[i].RenderEngine)
 		summaries[i].FlowStep = domain.FlowStateFor(summaries[i].Status, summaries[i].WizardStep, content).Step
 	}
 	return summaries, nil

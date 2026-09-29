@@ -13,8 +13,11 @@ interface ProgressTrackerProps {
    * Creator không biết mình đang ở đâu.
    */
   steps: readonly string[];
-  /** Number shown in each row's dot, matching the sidebar; rows not listed fall back to their position. */
-  stepNumbers?: Record<string, number>;
+  /**
+   * Number shown in each row's dot, matching the sidebar — or a sub-step number
+   * ("7.1") for work inside one flow step. Rows not listed fall back to their position.
+   */
+  stepNumbers?: Record<string, number | string>;
   /** Dims the tracker and drops the live wording once the saga has failed. */
   isFailed?: boolean;
   /** Xem lại một bước đã chạy xong: tất cả các ô là "xong", không có tiến độ sống. */

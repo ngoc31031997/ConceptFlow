@@ -20,6 +20,7 @@ import {
 } from "../context/ProjectDraftContext";
 import { patchWizardSettings, type WizardSettingsPatch } from "../api/client";
 import styles from "./WizardSteps.module.css";
+import { FLOW_CONFIG, flowTitle } from "../utils/flow";
 
 /**
  * Bước 2 — cấu hình mà các bước soạn (Kịch bản, Visual, Code) và TTS đọc:
@@ -96,8 +97,8 @@ export function ScriptAuthoringSettingsStepPage() {
       <AppShell
         currentStep={2}
         wide
-        title={isRemotion ? "Bước 2 — Cấu hình Remotion" : "Bước 2 — Cấu hình Manim"}
-        subtitle="Chọn ngôn ngữ, giọng đọc và định dạng video. Chất lượng, phụ đề và nhạc nền chọn ở bước Review. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay."
+        title={flowTitle(FLOW_CONFIG)}
+        subtitle={`${isRemotion ? "Remotion" : "Manim"} · Chọn ngôn ngữ, giọng đọc và định dạng video. Chất lượng, phụ đề và nhạc nền chọn ở bước Review. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay.`}
       >
         <div className={styles.settingsRow}>
           <ContentLanguagePicker

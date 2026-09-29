@@ -21,9 +21,10 @@ import { useVideoFormats } from "../hooks/useVideoFormats";
 import { useDebounce } from "../hooks/useDebounce";
 import { Card, Button, TextInput, TextArea } from "../components/ui";
 import styles from "./WizardSteps.module.css";
+import { FLOW_STORY, flowTitle } from "../utils/flow";
 
 /**
- * Bước 1a (Story Architect) — first tab of the "Bước 3 — Script" sub-wizard.
+ * Bước 3 — Kịch bản (Story Architect), the first of the authoring steps 3–6.
  * Used to be baked into ScriptStepPage + ScriptAssistant as the "blank"
  * situation; pulled out into its own tab/route so all 3 pipeline steps
  * (dàn ý/storyboard/code) are visible and reachable at once (see
@@ -31,9 +32,9 @@ import styles from "./WizardSteps.module.css";
  *
  * The engine choice (Manim vs Remotion) does not change THIS step's own
  * prompt — a plain-text story outline reads the same either way — but
- * CR-030's "chạy cả bước 3 bằng AI" button runs 1b (storyboard) and 1c
- * (code) too, and those two DO branch by engine (RoleFor on the server). So
- * the picker lives here as well, not only on 1c: choosing it up front, before
+ * CR-030's AI chain button runs steps 4 (storyboard), 5 (illustrations,
+ * Remotion only) and 6 (code) too, and those two DO branch by engine (RoleFor on the server). So
+ * the picker lives here as well, not only on step 6: choosing it up front, before
  * the chain runs, is the only way the chain's own storyboard/code calls see
  * the right engine instead of always defaulting to Manim.
  */
@@ -184,7 +185,7 @@ export function ScriptOutlineStepPage() {
       <AppShell
         currentStep={3}
         wide
-        title="Bước 3 — Kịch bản"
+        title={flowTitle(FLOW_STORY)}
         subtitle={
           hasOwnOutline
             ? "Dán dàn ý của bạn vào ô bên phải để bỏ qua bước này."
@@ -281,8 +282,8 @@ export function ScriptOutlineStepPage() {
             huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
             chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
             mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
-            "chạy cả bước 3" bên dưới gọi luôn cả 1b/1c, nên đổi engine phải
-            xong TRƯỚC khi bấm chạy, không phải ở 1c lúc đã muộn). */}
+            chạy chuỗi AI bên dưới gọi luôn cả bước 4–6, nên đổi engine phải
+            xong TRƯỚC khi bấm chạy, không phải ở bước 6 lúc đã muộn). */}
         <div className={styles.settingsRow} style={{ marginTop: 16 }}>
           <PipelineSettingsBar
             renderEngine={draft.renderEngine}

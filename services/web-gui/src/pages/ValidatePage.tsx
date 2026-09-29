@@ -11,8 +11,8 @@ import { useProject } from "../hooks/useProject";
 import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { statusToStep, projectPhase, projectPath, VALIDATE_STEPS } from "../utils/pipelineLabels";
-import { FLOW_REVIEW, FLOW_VALIDATE } from "../utils/flow";
+import { statusToStep, projectPhase, projectPath, VALIDATE_STEPS, VALIDATE_SUBSTEP_NUMBERS } from "../utils/pipelineLabels";
+import { FLOW_REVIEW, FLOW_VALIDATE, flowTitle } from "../utils/flow";
 import type { Project } from "../types";
 import glass from "../styles/glass.module.css";
 import styles from "./ValidatePage.module.css";
@@ -24,26 +24,27 @@ import styles from "./ValidatePage.module.css";
 const EMPTY_PROJECT: Project = { project_id: "", status: "draft", voice_language: "vi", scenes: [] };
 
 /**
- * Bước 4 của 7 — "Validate": phần rẻ của saga, và điểm dừng trước phần đắt.
+ * Bước 7 — "Validate" (và 8 — "Review", cùng màn): phần rẻ của saga, và điểm
+ * dừng trước phần đắt.
  *
  * CR-031 tách màn "Xử lý" cũ làm đôi ở đúng ranh giới mà saga vốn đã có: chạy
  * thử kịch bản (parse_script → validate_script, vài giây, không tốn gì) rồi
  * dừng ở `awaiting_review`; mọi thứ sau đó — TTS, render, ghép — mới là tiền
  * và thời gian thật. Gộp cả hai vào một màn khiến cổng duyệt trông như một
  * gián đoạn giữa chừng của quá trình render, nên Creator hoặc bấm duyệt cho
- * xong, hoặc ngồi đợi một saga đã dừng từ lâu. Tách ra thì bước 4 có đúng một
+ * xong, hoặc ngồi đợi một saga đã dừng từ lâu. Tách ra thì bước 7 có đúng một
  * việc, và "Duyệt và sản xuất" là hành động chuyển bước chứ không phải một
  * nút lạc giữa thanh tiến trình.
  *
  * Trang này không tự nó quyết định gì trên server: cổng duyệt là của CR-024,
  * `ReviewEnabled` vẫn là thứ bật/tắt nó. Khi cổng tắt, saga không dừng và
- * effect bên dưới đẩy Creator thẳng sang bước 5.
+ * effect bên dưới đẩy Creator thẳng sang bước 9 (TTS).
  */
 export function ValidatePage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
-  // ?view=1: mở chỉ để XEM lại bước 6/7 của một dự án đã đi xa hơn — không đẩy
+  // ?view=1: mở chỉ để XEM lại bước 7/8 của một dự án đã đi xa hơn — không đẩy
   // sang màn đang sở hữu dự án, và không có nút hành động nào.
   const [search] = useSearchParams();
   const viewOnly = search.get("view") === "1";
@@ -116,28 +117,27 @@ export function ValidatePage() {
     }
   }
 
+  // Validate (7) and Review (8) share this screen; this is the one it shows now.
+  const shownStep = viewOnly ? viewStep : isAwaitingReview ? FLOW_REVIEW : FLOW_VALIDATE;
+
   return (
     <div data-testid="validate-page">
       <AppShell
-        currentStep={viewOnly ? viewStep : isAwaitingReview ? FLOW_REVIEW : FLOW_VALIDATE}
+        currentStep={shownStep}
         wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
-        title={
-          isCancelled
-            ? "Đã hủy kiểm tra"
-            : isFailed
-            ? "Kịch bản không chạy được"
-            : isAwaitingReview
-              ? "Duyệt dàn ý trước khi sản xuất"
-              : "Đang kiểm tra kịch bản"
-        }
+        // CR-051: the title names the step as the rail does; what is happening
+        // at it moves to the subtitle.
+        title={flowTitle(shownStep)}
         subtitle={
           isCancelled
-            ? "Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
+            ? "Đã hủy kiểm tra. Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
             : isFailed
-            ? "Kịch bản chưa chạy được. Hãy sửa lại rồi chạy lại, chưa mất chi phí nào."
+            ? "Kịch bản không chạy được. Hãy sửa lại rồi chạy lại, chưa mất chi phí nào."
+            : reviewingPast
+            ? "Bước này đã chạy xong."
             : isAwaitingReview
               ? "Bạn có thể chỉnh sửa thoải mái ở bước này. Sau khi duyệt, hệ thống bắt đầu tạo video."
-              : "Hệ thống đang kiểm tra kịch bản của bạn."
+              : "Đang kiểm tra kịch bản của bạn."
         }
       >
         {(isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
@@ -176,6 +176,7 @@ export function ValidatePage() {
                 <ProgressTracker
                   progressState={displayProgressState}
                   steps={VALIDATE_STEPS}
+                  stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
                   isFailed={isFailed}
                   allDone={reviewingPast}
                 />
@@ -196,6 +197,7 @@ export function ValidatePage() {
             <ProgressTracker
               progressState={displayProgressState}
               steps={VALIDATE_STEPS}
+                  stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
               isFailed={isFailed}
               allDone={reviewingPast}
             />

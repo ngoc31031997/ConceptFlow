@@ -162,6 +162,8 @@ case "$MODE" in
       grep -q "^services/$svc/" <<<"$files" && SERVICES="$SERVICES $svc"
     done
     grep -qE '^(tests/contracts/|docs/contracts/)' <<<"$files" && RUN_CONTRACTS=1
+    # CR-051: the flow-steps contract pins these three files together.
+    grep -qE '^services/(authoring-service|orchestrator)/internal/domain/flow\.go$|^services/web-gui/src/utils/flow\.ts$' <<<"$files" && RUN_CONTRACTS=1
     grep -qE '^(scripts/(hooks/|review-(prep|status)\.sh$)|\.claude/(settings\.json$|agents/|skills/))' <<<"$files" && RUN_HOOKS=1
     # A change to the verification itself re-verifies everything.
     if grep -qE '^(Makefile|scripts/(check|setup|build)\.sh)$' <<<"$files"; then
