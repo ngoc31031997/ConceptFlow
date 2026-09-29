@@ -16,9 +16,11 @@ import (
 // line-numbered errors until it passes (at most maxDrawAttempts calls).
 
 const (
-	maxDrawAttempts   = 3
-	maxDrawReferences = 5 // 3 exemplars + up to 2 of the Creator's approved drawings
-	drawerRole        = "illustration_drawer"
+	maxDrawAttempts = 3
+	// maxOwnReferences is how many of the Creator's approved drawings in the
+	// same folder follow the Hình mẫu (at most domain.MaxExemplars) in the prompt.
+	maxOwnReferences = 2
+	drawerRole       = "illustration_drawer"
 )
 
 //go:embed drawer_prompt_vi.txt
@@ -89,39 +91,55 @@ func parseDrawnReply(text string) (drawnReply, error) {
 	return r, nil
 }
 
-// references is the reference text: the exemplars, then the Creator's own
-// approved drawings in the same folder (newest style decisions first).
-func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID string) string {
+// references is the reference text: the Hình mẫu the Creator picked
+// (CR-052), then the Creator's own approved drawings in the same folder.
+func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID string) (string, error) {
 	var b strings.Builder
-	n := 0
-	add := func(i domain.Illustration, why string) {
-		if n >= maxDrawReferences || i.Code == "" || i.ID == skipID {
-			return
+	add := func(i domain.Illustration, why string) bool {
+		if i.Code == "" || i.ID == skipID {
+			return false
 		}
-		n++
 		fmt.Fprintf(&b, "### %s — %s (%s)\n```tsx\n%s```\n\n", i.Name, i.Title, why, i.Code)
+		return true
 	}
-	for _, e := range domain.ExemplarIllustrations() {
+	exemplars, err := uc.Exemplars(ctx)
+	if err != nil {
+		return "", fmt.Errorf("đọc Hình mẫu: %w", err)
+	}
+	for n, e := range exemplars {
+		if n >= domain.MaxExemplars {
+			break
+		}
 		add(e, "hình mẫu chuẩn")
 	}
-	if folderID != "" {
-		if mine, err := uc.repo.ListIllustrations(ctx, IllustrationFilter{FolderID: folderID, Status: domain.IllustrationApproved}); err == nil {
-			for _, i := range mine {
-				if !i.Builtin {
-					add(i, "hình Creator đã duyệt, cùng thư mục")
-				}
+	if folderID != "" && folderID != domain.ExemplarFolderID {
+		mine, err := uc.repo.ListIllustrations(ctx, IllustrationFilter{FolderID: folderID, Status: domain.IllustrationApproved})
+		if err != nil {
+			return "", fmt.Errorf("đọc hình cùng thư mục: %w", err)
+		}
+		own := 0
+		for _, i := range mine {
+			if own < maxOwnReferences && !i.ReadOnly() && add(i, "hình Creator đã duyệt, cùng thư mục") {
+				own++
 			}
 		}
 	}
-	return strings.TrimSpace(b.String())
+	return strings.TrimSpace(b.String()), nil
 }
 
-func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string) string {
+func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string) (string, error) {
+	refs, err := uc.references(ctx, folderID, skipID)
+	if err != nil {
+		return "", err
+	}
+	if refs == "" {
+		refs = "(Chưa có hình tham chiếu — dựng đúng theo luật style và linh kiện ở trên.)"
+	}
 	return strings.NewReplacer(
 		"{{style}}", domain.IllustrationStyleGuide(),
 		"{{helpers}}", domain.IllustrationHelpers(),
-		"{{references}}", uc.references(ctx, folderID, skipID),
-	).Replace(drawerPromptVI)
+		"{{references}}", refs,
+	).Replace(drawerPromptVI), nil
 }
 
 // draw runs the model until the renderer accepts the drawing. user is the
@@ -191,14 +209,18 @@ func (uc *IllustrationsUseCase) Draw(ctx context.Context, req DrawRequest) (doma
 	if req.Description == "" {
 		return domain.Illustration{}, fmt.Errorf("mô tả hình cần vẽ là bắt buộc")
 	}
-	if err := uc.folderExists(ctx, req.FolderID); err != nil {
+	if err := uc.writableFolder(ctx, req.FolderID); err != nil {
 		return domain.Illustration{}, err
 	}
 	user := "Vẽ hình: " + req.Description
 	if n := strings.TrimSpace(req.Name); n != "" {
 		user += "\nTên component bắt buộc: " + n
 	}
-	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, req.FolderID, ""), user, req.Model, req.OnProgress)
+	system, err := uc.drawerSystem(ctx, req.FolderID, "")
+	if err != nil {
+		return domain.Illustration{}, err
+	}
+	reply, preview, err := uc.draw(ctx, system, user, req.Model, req.OnProgress)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
@@ -228,7 +250,7 @@ func (uc *IllustrationsUseCase) Redraw(ctx context.Context, id, note, model stri
 	if err != nil {
 		return existing, err
 	}
-	if existing.Builtin {
+	if existing.ReadOnly() {
 		return existing, ErrIllustrationReadOnly
 	}
 	user := fmt.Sprintf("Vẽ lại hình %s (%s): %s\nGiữ nguyên tên component %s và các prop đang có.\nCode hiện tại:\n```tsx\n%s```",
@@ -238,7 +260,11 @@ func (uc *IllustrationsUseCase) Redraw(ctx context.Context, id, note, model stri
 	} else {
 		user += "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn."
 	}
-	reply, preview, err := uc.draw(ctx, uc.drawerSystem(ctx, existing.FolderID, existing.ID), user, model, nil)
+	system, err := uc.drawerSystem(ctx, existing.FolderID, existing.ID)
+	if err != nil {
+		return existing, err
+	}
+	reply, preview, err := uc.draw(ctx, system, user, model, nil)
 	if err != nil {
 		return existing, err
 	}

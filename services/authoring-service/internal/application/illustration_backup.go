@@ -20,8 +20,8 @@ import (
 // The ZIP holds manifest.json (every folder, and every Creator drawing with its
 // folder, tags, status and version) and, per drawing, its TSX and its stored
 // PNG still and GIF under hinh/<folder>/<Name>.*, so the backup can also be
-// browsed by hand. Built-in rows (the kit and the style exemplars) are left
-// out: they ship with the service and are seeded again on every start.
+// browsed by hand. The kit is left out: it ships with the service and is seeded
+// again on every start. The Hình mẫu are kept (CR-052), marked as such.
 //
 // Restoring files every drawing into the folder it was exported from,
 // creating Creator folders that are missing, and keeps its review status. Like
@@ -67,6 +67,11 @@ type backupIllustration struct {
 	Version     int      `json:"version"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
+	// CR-052: a Hình mẫu, the name of the drawing it copies (if any), and the
+	// folder an original exemplar goes back to.
+	Exemplar     bool   `json:"exemplar,omitempty"`
+	SourceName   string `json:"source_name,omitempty"`
+	HomeFolderID string `json:"home_folder_id,omitempty"`
 	// Paths inside the ZIP. The images are absent when no preview was stored.
 	CodeFile string `json:"code_file"`
 	PNGFile  string `json:"png_file,omitempty"`
@@ -112,6 +117,10 @@ func (uc *IllustrationsUseCase) Export(ctx context.Context, now time.Time) (Libr
 		_, err = w.Write(body)
 		return err
 	}
+	nameOf := map[string]string{}
+	for _, i := range rows {
+		nameOf[i.ID] = i.Name
+	}
 	for _, i := range rows {
 		if i.Builtin {
 			continue
@@ -122,6 +131,7 @@ func (uc *IllustrationsUseCase) Export(ctx context.Context, now time.Time) (Libr
 			Name: i.Name, Title: i.Title, FolderID: i.FolderID, Tags: i.Tags, Description: i.Description,
 			Usage: i.Usage, Status: string(i.Status), Version: i.Version, CreatedAt: i.CreatedAt, UpdatedAt: i.UpdatedAt,
 			CodeFile: base + ".tsx",
+			Exemplar: i.Exemplar, SourceName: nameOf[i.SourceID], HomeFolderID: i.HomeFolderID,
 		}
 		if err := put(entry.CodeFile, []byte(i.Code), zip.Deflate); err != nil {
 			return LibraryExport{}, err
@@ -263,6 +273,10 @@ func (uc *IllustrationsUseCase) Import(ctx context.Context, file []byte, opts Im
 		byName[r.Name] = r
 	}
 	seen := map[string]bool{}
+	// Hình mẫu last, so a copy finds the drawing it was made from.
+	sort.SliceStable(manifest.Illustrations, func(a, b int) bool {
+		return !manifest.Illustrations[a].Exemplar && manifest.Illustrations[b].Exemplar
+	})
 	for n, b := range manifest.Illustrations {
 		item, abort := uc.importIllustration(ctx, b, entries, byName, seen, opts)
 		if abort != nil {
@@ -345,9 +359,24 @@ func (uc *IllustrationsUseCase) importIllustration(
 	case taken && existing.Builtin:
 		item.Result, item.Reason = ImportSkipped, "trùng tên một hình có sẵn của hệ thống"
 		return item, nil
+	case taken && existing.Exemplar:
+		item.Result, item.Reason = ImportSkipped, "trùng tên một Hình mẫu (chỉ đọc)"
+		return item, nil
+	case taken && b.Exemplar:
+		// A Hình mẫu from the file never overwrites one of the Creator's drawings.
+		item.Result, item.Reason = ImportSkipped, "đã có hình cùng tên trong thư viện"
+		return item, nil
 	case taken && !opts.Replace:
 		item.Result, item.Reason = ImportSkipped, "đã có hình cùng tên trong thư viện"
 		return item, nil
+	}
+	if !b.Exemplar && ill.FolderID == domain.ExemplarFolderID {
+		return fail(ErrExemplarFolder.Error())
+	}
+	if b.Exemplar && b.HomeFolderID != "" {
+		if err := uc.folderExists(ctx, b.HomeFolderID); err != nil {
+			return fail(fmt.Sprintf("thư mục cũ %q của Hình mẫu không có trong thư viện", b.HomeFolderID))
+		}
 	}
 	if err := uc.folderExists(ctx, ill.FolderID); err != nil {
 		if errors.Is(err, ErrFolderNotFound) {
@@ -366,6 +395,9 @@ func (uc *IllustrationsUseCase) importIllustration(
 		return item, fmt.Errorf("dừng ở hình %s: %w", ill.Name, err)
 	}
 	ill.Builtin, ill.Exemplar, ill.Status, ill.Warnings = false, false, status, preview.Warnings
+	if b.Exemplar {
+		return uc.importExemplar(ctx, ill, b, byName, preview, item)
+	}
 
 	var saved domain.Illustration
 	if taken {
@@ -380,6 +412,50 @@ func (uc *IllustrationsUseCase) importIllustration(
 	}
 	if errors.Is(err, ErrIllustrationNameTaken) {
 		return fail("đã có hình cùng tên trong thư viện")
+	}
+	if err != nil {
+		return item, err
+	}
+	if err := uc.repo.SaveIllustrationPreview(ctx, saved.ID, saved.Version, preview.PNG, preview.GIF); err != nil {
+		return item, err
+	}
+	byName[saved.Name] = saved
+	return item, nil
+}
+
+// importExemplar restores a Hình mẫu while the folder has room. When it is
+// full, an original exemplar comes back as an ordinary drawing in its folder;
+// a copy is skipped, since its source is a drawing of the library already.
+func (uc *IllustrationsUseCase) importExemplar(
+	ctx context.Context, ill domain.Illustration, b backupIllustration,
+	byName map[string]domain.Illustration, preview IllustrationPreview, item ImportItem,
+) (ImportItem, error) {
+	ex := ill
+	ex.FolderID, ex.Exemplar, ex.Status, ex.Version = domain.ExemplarFolderID, true, domain.IllustrationApproved, max(b.Version, 1)
+	ex.HomeFolderID = b.HomeFolderID
+	if src, ok := byName[b.SourceName]; ok && b.SourceName != "" && !src.ReadOnly() {
+		ex.SourceID = src.ID
+	}
+	saved, err := uc.repo.CreateExemplar(ctx, ex, domain.MaxExemplars)
+	item.Result = ImportCreated
+	switch {
+	case errors.Is(err, ErrExemplarLimit) && ex.HomeFolderID != "":
+		plain := ill
+		plain.FolderID, plain.Status, plain.Version = ex.HomeFolderID, domain.IllustrationApproved, ex.Version
+		saved, err = uc.repo.CreateIllustration(ctx, plain)
+		item.FolderID = plain.FolderID
+		item.Reason = fmt.Sprintf("thư mục Hình mẫu đã đủ %d hình — nhập thành hình thường", domain.MaxExemplars)
+	case errors.Is(err, ErrExemplarLimit):
+		item.Result = ImportSkipped
+		item.Reason = fmt.Sprintf("thư mục Hình mẫu đã đủ %d hình; đây là bản sao của %s nên không nhập", domain.MaxExemplars, b.SourceName)
+		return item, nil
+	case errors.Is(err, ErrAlreadyExemplar):
+		item.Result, item.Reason = ImportSkipped, "hình gốc "+b.SourceName+" đã có bản Hình mẫu"
+		return item, nil
+	}
+	if errors.Is(err, ErrIllustrationNameTaken) {
+		item.Result, item.Reason = ImportFailed, "đã có hình cùng tên trong thư viện"
+		return item, nil
 	}
 	if err != nil {
 		return item, err

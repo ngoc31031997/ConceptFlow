@@ -7,13 +7,17 @@ import { IllustrationEditor } from "../components/IllustrationEditor";
 import { IllustrationBackupCard } from "../components/IllustrationBackupCard";
 import {
   createIllustrationFolder,
+  deleteIllustration,
   deleteIllustrationFolder,
   drawIllustration,
+  EXEMPLAR_FOLDER_ID,
   getIllustrationStyle,
   listIllustrationFolders,
   listIllustrations,
+  makeExemplar,
   rerenderIllustration,
   setIllustrationStatus,
+  unmakeExemplar,
   type Illustration,
   type IllustrationFolder,
   type IllustrationInput,
@@ -29,6 +33,10 @@ const NEW = "new";
  * CR-044 — thư viện hình minh hoạ. Mỗi hình nằm trong đúng một thư mục; Kỹ sư
  * Remotion chỉ được dùng hình "Có sẵn" hoặc "Đã duyệt". Mỗi ô là một hình: rê
  * chuột để xem nó chuyển động, bấm để mở trình sửa code.
+ *
+ * CR-052 — mỗi ô có nút Xoá (server từ chối khi một dự án chưa tới bước Kết quả
+ * còn dùng hình), và Hình mẫu AI vẽ học theo do Creator chọn: "Đặt làm mẫu" chép
+ * một hình đã duyệt vào thư mục Hình mẫu, "Bỏ làm mẫu" gỡ nó ra.
  */
 export function IllustrationLibraryPage() {
   const [folders, setFolders] = useState<IllustrationFolder[]>([]);
@@ -45,6 +53,7 @@ export function IllustrationLibraryPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [rules, setRules] = useState("");
   const [exemplarIds, setExemplarIds] = useState<string[]>([]);
+  const [maxExemplars, setMaxExemplars] = useState(5);
   const [draft, setDraft] = useState<Partial<IllustrationInput> | undefined>(undefined);
   const [drawOpen, setDrawOpen] = useState(false);
   const [drawText, setDrawText] = useState("");
@@ -68,6 +77,7 @@ export function IllustrationLibraryPage() {
       .then((st) => {
         setRules(st.rules);
         setExemplarIds(st.exemplar_ids);
+        setMaxExemplars(st.max_exemplars);
       })
       .catch(() => setRules(""));
   }, [reload]);
@@ -93,7 +103,7 @@ export function IllustrationLibraryPage() {
         title: file.name.replace(/\.svg$/i, ""),
         code: converted.code,
         usage: `<${name} /> — ${converted.width}×${converted.height}`,
-        folder_id: folder || undefined,
+        folder_id: writableFolder,
       });
       setDrawOpen(false);
       setOpenId(NEW);
@@ -107,7 +117,7 @@ export function IllustrationLibraryPage() {
     setDrawing(true);
     setStatus(null);
     try {
-      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawFolder || folder || folders[0]?.id || "" });
+      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget });
       setItems((list) => [...list, made]);
       setDrawText("");
       setDrawOpen(false);
@@ -119,6 +129,13 @@ export function IllustrationLibraryPage() {
       setDrawing(false);
     }
   }
+
+  // The Hình mẫu folder only takes drawings through "Đặt làm mẫu" (CR-052).
+  const writableFolders = folders.filter((f) => f.id !== EXEMPLAR_FOLDER_ID);
+  const writableFolder = folder && folder !== EXEMPLAR_FOLDER_ID ? folder : undefined;
+  const drawTarget = drawFolder || writableFolder || writableFolders[0]?.id || "";
+  const exemplars = exemplarIds.map((id) => items.find((i) => i.id === id)).filter((i): i is Illustration => !!i);
+  const copied = new Set(items.map((i) => i.source_id).filter(Boolean));
 
   const folderName = useMemo(() => Object.fromEntries(folders.map((f) => [f.id, f.name])), [folders]);
   const counts = useMemo(() => {
@@ -159,6 +176,32 @@ export function IllustrationLibraryPage() {
       await rerenderIllustration(ill.id);
       setBust((b) => ({ ...b, [ill.id]: (b[ill.id] ?? 0) + 1 }));
     });
+
+  const remove = (ill: Illustration) => {
+    if (!window.confirm(`Xoá "${ill.title}" khỏi thư viện? Không khôi phục được.`)) return;
+    return onTile(ill.id, async () => {
+      await deleteIllustration(ill.id);
+      setItems((list) => list.filter((i) => i.id !== ill.id));
+      if (openId === ill.id) setOpenId(null);
+    });
+  };
+
+  const makeSample = (ill: Illustration) =>
+    onTile(ill.id, async () => {
+      const copy = await makeExemplar(ill.id);
+      setItems((list) => [...list, copy]);
+      setExemplarIds((ids) => [...ids, copy.id]);
+    });
+
+  const unmakeSample = (ill: Illustration) => {
+    if (!window.confirm(`Bỏ "${ill.title}" khỏi Hình mẫu?`)) return;
+    return onTile(ill.id, async () => {
+      const back = await unmakeExemplar(ill.id);
+      setItems((list) => (back ? list.map((i) => (i.id === ill.id ? back : i)) : list.filter((i) => i.id !== ill.id)));
+      setExemplarIds((ids) => ids.filter((id) => id !== ill.id));
+      if (!back && openId === ill.id) setOpenId(null);
+    });
+  };
 
   async function addFolder() {
     setStatus(null);
@@ -272,12 +315,26 @@ export function IllustrationLibraryPage() {
                 hint="AI vẽ phải theo đúng luật này; hình tải lên hay tự viết code được kiểm tra theo nó. Vi phạm nặng chặn lưu, vi phạm nhẹ chỉ cảnh báo."
                 testId="illustration-style"
               >
+                <p className={styles.exemplarHead} data-testid="illustration-exemplar-count">
+                  Hình mẫu ({exemplars.length}/{maxExemplars}) — AI vẽ học theo các hình này
+                </p>
+                {exemplars.length === 0 && (
+                  <p className={styles.empty}>Chưa có Hình mẫu. Bấm "Đặt làm mẫu" trên một hình đã duyệt.</p>
+                )}
                 <ul className={styles.exemplars}>
-                  {items
-                    .filter((i) => exemplarIds.includes(i.id))
-                    .map((ill) => (
-                      <IllustrationTile key={ill.id} illustration={ill} onOpen={() => setOpenId(ill.id)} />
-                    ))}
+                  {exemplars.map((ill) => (
+                    <IllustrationTile
+                      key={ill.id}
+                      illustration={ill}
+                      busy={busyIds[ill.id]}
+                      onOpen={() => setOpenId(ill.id)}
+                      actions={
+                        <Button variant="ghost" onClick={() => unmakeSample(ill)} disabled={busyIds[ill.id]} data-testid={`unmake-exemplar-${ill.name}`}>
+                          Bỏ làm mẫu
+                        </Button>
+                      }
+                    />
+                  ))}
                 </ul>
                 <pre className={styles.rules} data-testid="illustration-style-rules">{rules}</pre>
               </Disclosure>
@@ -300,8 +357,8 @@ export function IllustrationLibraryPage() {
                 </FormField>
                 <FormField label="Thư mục" className={glass.mtSm}>
                   <Dropdown
-                    value={drawFolder || folder || folders[0]?.id || ""}
-                    options={folders.map((f) => ({ value: f.id, label: f.name, hint: f.description }))}
+                    value={drawTarget}
+                    options={writableFolders.map((f) => ({ value: f.id, label: f.name, hint: f.description }))}
                     onChange={setDrawFolder}
                     data-testid="illustration-draw-folder"
                   />
@@ -324,7 +381,7 @@ export function IllustrationLibraryPage() {
                   illustration={opened}
                   draft={openId === NEW ? draft : undefined}
                   folders={folders}
-                  defaultFolderId={folder || undefined}
+                  defaultFolderId={writableFolder}
                   onSaved={(saved) => {
                     replace(saved);
                     setOpenId(saved.id);
@@ -355,22 +412,43 @@ export function IllustrationLibraryPage() {
                   }}
                   actions={
                     <>
-                      {!ill.builtin && ill.status === "draft" && (
+                      {!ill.builtin && !ill.exemplar && ill.status === "draft" && (
                         <Button onClick={() => approve(ill, "approved")} disabled={busyIds[ill.id]} data-testid={`approve-${ill.name}`}>
                           Duyệt
                         </Button>
                       )}
-                      {!ill.builtin && ill.status === "approved" && (
+                      {!ill.builtin && !ill.exemplar && ill.status === "approved" && (
                         <Button variant="ghost" onClick={() => approve(ill, "draft")} disabled={busyIds[ill.id]}>
                           Bỏ duyệt
+                        </Button>
+                      )}
+                      {!ill.builtin && !ill.exemplar && ill.status === "approved" && !copied.has(ill.id) && (
+                        <Button
+                          variant="ghost"
+                          onClick={() => makeSample(ill)}
+                          disabled={busyIds[ill.id] || exemplars.length >= maxExemplars}
+                          title={exemplars.length >= maxExemplars ? `Đã đủ ${maxExemplars} Hình mẫu — bỏ bớt một hình trước` : undefined}
+                          data-testid={`make-exemplar-${ill.name}`}
+                        >
+                          Đặt làm mẫu
+                        </Button>
+                      )}
+                      {ill.exemplar && (
+                        <Button variant="ghost" onClick={() => unmakeSample(ill)} disabled={busyIds[ill.id]} data-testid={`unmake-exemplar-tile-${ill.name}`}>
+                          Bỏ làm mẫu
                         </Button>
                       )}
                       <Button variant="ghost" onClick={() => rerender(ill)} disabled={busyIds[ill.id]} data-testid={`rerender-${ill.name}`}>
                         Dựng lại
                       </Button>
-                      {!ill.builtin && (
+                      {!ill.builtin && !ill.exemplar && (
                         <Button variant="ghost" onClick={() => setOpenId(ill.id)} data-testid={`edit-${ill.name}`}>
                           Sửa code / Vẽ lại
+                        </Button>
+                      )}
+                      {!ill.builtin && !ill.exemplar && (
+                        <Button variant="dangerGhost" onClick={() => remove(ill)} disabled={busyIds[ill.id]} data-testid={`delete-${ill.name}`}>
+                          Xoá
                         </Button>
                       )}
                     </>

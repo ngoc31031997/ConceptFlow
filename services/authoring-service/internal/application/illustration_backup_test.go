@@ -252,3 +252,103 @@ func TestImportRefusesFilesThatAreNotALibraryBackup(t *testing.T) {
 		}
 	}
 }
+
+// CR-052: the Hình mẫu are Creator data now, so the backup keeps them.
+func TestBackupKeepsTheExemplarsAndRestoresThemAsExemplars(t *testing.T) {
+	src, repo := libraryWithDrawings(t)
+	ctx := context.Background()
+	repo.rows["cat"] = domain.Illustration{ID: "cat", Name: "Cat", Title: "Con mèo", FolderID: domain.ExemplarFolderID, Exemplar: true,
+		HomeFolderID: "dong-vat", Code: "export function Cat() {}", Status: domain.IllustrationApproved, Version: 2}
+	ball, _ := byName(repo, "Ball")
+	cp, err := src.MakeExemplar(ctx, ball.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, err := src.Export(ctx, backupNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var m backupManifest
+	if err := json.Unmarshal(zipFiles(t, backup.Zip)["manifest.json"], &m); err != nil {
+		t.Fatal(err)
+	}
+	marked := map[string]backupIllustration{}
+	for _, i := range m.Illustrations {
+		marked[i.Name] = i
+	}
+	if !marked["Cat"].Exemplar || marked["Cat"].HomeFolderID != "dong-vat" || !marked[cp.Name].Exemplar || marked[cp.Name].SourceName != "Ball" {
+		t.Fatalf("manifest: %+v", m.Illustrations)
+	}
+
+	fresh := newFakeIllustrationRepo()
+	uc := NewIllustrationsUseCase(fresh, &fakeRenderer{})
+	report, err := uc.Import(ctx, backup.Zip, ImportOptions{})
+	if err != nil || report.Aborted != "" {
+		t.Fatalf("import: %+v %v", report, err)
+	}
+	cat, _ := byName(fresh, "Cat")
+	restoredCopy, _ := byName(fresh, cp.Name)
+	restoredBall, _ := byName(fresh, "Ball")
+	if !cat.Exemplar || cat.HomeFolderID != "dong-vat" || cat.FolderID != domain.ExemplarFolderID {
+		t.Fatalf("original exemplar: %+v", cat)
+	}
+	if !restoredCopy.Exemplar || restoredCopy.SourceID != restoredBall.ID {
+		t.Fatalf("copy must find its source again: %+v (Ball %s)", restoredCopy, restoredBall.ID)
+	}
+}
+
+func TestImportIntoAFullExemplarFolderKeepsOriginalsAsDrawingsAndSkipsCopies(t *testing.T) {
+	src, repo := libraryWithDrawings(t)
+	ctx := context.Background()
+	repo.rows["cat"] = domain.Illustration{ID: "cat", Name: "Cat", FolderID: domain.ExemplarFolderID, Exemplar: true,
+		HomeFolderID: "dong-vat", Code: "export function Cat() {}", Status: domain.IllustrationApproved}
+	ball, _ := byName(repo, "Ball")
+	cp, err := src.MakeExemplar(ctx, ball.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	backup, err := src.Export(ctx, backupNow)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	full := newFakeIllustrationRepo()
+	for n := 0; n < domain.MaxExemplars; n++ {
+		id := string(rune('a' + n))
+		full.rows[id] = domain.Illustration{ID: id, Name: "Full" + id, FolderID: domain.ExemplarFolderID, Exemplar: true}
+	}
+	report, err := NewIllustrationsUseCase(full, &fakeRenderer{}).Import(ctx, backup.Zip, ImportOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := map[string]ImportItem{}
+	for _, it := range report.Items {
+		results[it.Name] = it
+	}
+	if r := results["Cat"]; r.Result != ImportCreated || r.FolderID != "dong-vat" || !strings.Contains(r.Reason, "hình thường") {
+		t.Fatalf("original exemplar: %+v", r)
+	}
+	if cat, _ := byName(full, "Cat"); cat.Exemplar || cat.FolderID != "dong-vat" {
+		t.Fatalf("Cat must come back as an ordinary drawing: %+v", cat)
+	}
+	if r := results[cp.Name]; r.Result != ImportSkipped || !strings.Contains(r.Reason, "Ball") {
+		t.Fatalf("copy: %+v", r)
+	}
+}
+
+func TestImportRefusesAnOrdinaryDrawingFiledInTheExemplarFolder(t *testing.T) {
+	manifest := `{"format":"conceptflow-illustration-library","format_version":1,"folders":[],"illustrations":[
+		{"name":"Sneaky","title":"x","folder_id":"hinh-mau","status":"approved","version":1,"code_file":"hinh/hinh-mau/Sneaky.tsx"}]}`
+	file := makeZip(t, map[string]string{"manifest.json": manifest, "hinh/hinh-mau/Sneaky.tsx": "export function Sneaky() {}"})
+	repo := newFakeIllustrationRepo()
+	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).Import(context.Background(), file, ImportOptions{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(report.Items) != 1 || report.Items[0].Result != ImportFailed {
+		t.Fatalf("report: %+v", report.Items)
+	}
+	if _, ok := byName(repo, "Sneaky"); ok {
+		t.Fatal("an ordinary drawing got into the Hình mẫu folder")
+	}
+}

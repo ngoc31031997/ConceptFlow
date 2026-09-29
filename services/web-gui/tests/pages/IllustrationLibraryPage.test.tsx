@@ -6,6 +6,8 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
 const FOLDERS: apiClient.IllustrationFolder[] = [
+  // CR-052: first in the list, yet never offered as a place to save or draw into.
+  { id: "hinh-mau", name: "Hình mẫu", description: "", position: 0, is_system: true },
   { id: "co-the-suc-khoe", name: "Cơ thể & sức khoẻ", description: "", position: 1, is_system: true },
   { id: "phuong-tien", name: "Phương tiện", description: "", position: 2, is_system: true },
 ];
@@ -19,8 +21,11 @@ const BUS: apiClient.Illustration = {
   warnings: [{ message: "[S9] màu #123456 không có trong bảng màu kênh", line: 4 }], status: "draft", version: 2, has_preview: true,
 };
 const CAT: apiClient.Illustration = {
-  id: "exemplar-Cat", name: "Cat", title: "Con mèo", folder_id: "phuong-tien", tags: [], description: "Hình mẫu",
-  usage: "<Cat />", code: "export function Cat() {}", builtin: true, exemplar: true, warnings: [], status: "approved", version: 1, has_preview: true,
+  id: "exemplar-Cat", name: "Cat", title: "Con mèo", folder_id: "hinh-mau", home_folder_id: "dong-vat", tags: [], description: "Hình mẫu",
+  usage: "<Cat />", code: "export function Cat() {}", builtin: false, exemplar: true, warnings: [], status: "approved", version: 1, has_preview: true,
+};
+const VAN: apiClient.Illustration = {
+  ...BUS, id: "v1", name: "Van", title: "Xe tải", code: "export function Van() {}", warnings: [], status: "approved", version: 1,
 };
 
 function renderPage() {
@@ -37,7 +42,7 @@ describe("IllustrationLibraryPage (CR-044)", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "listIllustrationFolders").mockResolvedValue(FOLDERS);
     vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT]);
-    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "[S1] PHẲNG: không gradient", exemplar_ids: ["exemplar-Cat"] });
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "[S1] PHẲNG: không gradient", exemplar_ids: ["exemplar-Cat"], max_exemplars: 5 });
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -234,5 +239,77 @@ describe("IllustrationLibraryPage (CR-044)", () => {
     fireEvent.click(screen.getByTestId("illustration-import-button"));
     expect(await screen.findByRole("alert")).toHaveTextContent("thiếu manifest.json");
   });
-});
 
+  // CR-052 — delete from the tile, and the Hình mẫu the Creator picks.
+  it("deletes a drawing from its tile after confirming", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    const del = vi.spyOn(apiClient, "deleteIllustration").mockResolvedValue(undefined);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("delete-Bus"));
+    await waitFor(() => expect(del).toHaveBeenCalledWith("b1"));
+    await waitFor(() => expect(screen.queryByTestId("illustration-tile-Bus")).toBeNull());
+  });
+
+  it("keeps the drawing and says which project still uses it when the delete is refused", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.spyOn(apiClient, "deleteIllustration").mockRejectedValue(
+      new apiClient.ApiError('Đang được dùng trong dự án "Sâu răng" — xoá được sau khi dự án tới bước Kết quả.', undefined, undefined, 409),
+    );
+    renderPage();
+    fireEvent.click(await screen.findByTestId("delete-Bus"));
+    expect(await screen.findByRole("status")).toHaveTextContent('dự án "Sâu răng"');
+    expect(screen.getByTestId("illustration-tile-Bus")).toBeInTheDocument();
+  });
+
+  it("offers no delete, edit or review on the kit and the Hình mẫu", async () => {
+    renderPage();
+    await screen.findByTestId("illustration-tile-Bus");
+    for (const name of ["Tooth", "Cat"]) {
+      expect(screen.queryByTestId(`delete-${name}`)).toBeNull();
+      expect(screen.queryByTestId(`edit-${name}`)).toBeNull();
+      expect(screen.queryByTestId(`approve-${name}`)).toBeNull();
+    }
+    fireEvent.click(screen.getAllByLabelText("Mở Con mèo")[0]);
+    expect(screen.getByTestId("illustration-editor")).toHaveTextContent("(Hình mẫu)");
+    expect(screen.getByTestId("illustration-code-input")).toHaveAttribute("readonly");
+    expect(screen.queryByTestId("illustration-save-button")).toBeNull();
+    expect(screen.queryByTestId("illustration-delete-button")).toBeNull();
+  });
+
+  it("makes an approved drawing a Hình mẫu and takes one out again", async () => {
+    vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT, VAN]);
+    const copy: apiClient.Illustration = { ...VAN, id: "v2", name: "VanMau", folder_id: "hinh-mau", exemplar: true, source_id: "v1" };
+    const make = vi.spyOn(apiClient, "makeExemplar").mockResolvedValue(copy);
+    const unmake = vi.spyOn(apiClient, "unmakeExemplar").mockResolvedValue(undefined);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+    expect(screen.queryByTestId("make-exemplar-Bus")).toBeNull(); // a draft cannot be one
+    fireEvent.click(await screen.findByTestId("make-exemplar-Van"));
+    await waitFor(() => expect(make).toHaveBeenCalledWith("v1"));
+    fireEvent.click(screen.getByTestId("illustration-style-toggle"));
+    expect(await screen.findByTestId("illustration-exemplar-count")).toHaveTextContent("Hình mẫu (2/5)");
+    expect(screen.queryByTestId("make-exemplar-Van")).toBeNull(); // already has its copy
+
+    fireEvent.click(screen.getByTestId("unmake-exemplar-VanMau"));
+    await waitFor(() => expect(unmake).toHaveBeenCalledWith("v2"));
+    await waitFor(() => expect(screen.getByTestId("illustration-exemplar-count")).toHaveTextContent("Hình mẫu (1/5)"));
+    expect(screen.getByTestId("make-exemplar-Van")).toBeInTheDocument();
+  });
+
+  it("files an original Hình mẫu back into its folder when taken out", async () => {
+    const back: apiClient.Illustration = { ...CAT, exemplar: false, folder_id: "dong-vat", home_folder_id: undefined };
+    vi.spyOn(apiClient, "unmakeExemplar").mockResolvedValue(back);
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    renderPage();
+    fireEvent.click(await screen.findByTestId("unmake-exemplar-tile-Cat"));
+    await waitFor(() => expect(screen.getByTestId("illustration-status-Cat")).toHaveTextContent("Đã duyệt"));
+    expect(screen.getByTestId("delete-Cat")).toBeInTheDocument();
+  });
+
+  it("cannot add a sixth Hình mẫu", async () => {
+    vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT, VAN]);
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "", exemplar_ids: ["exemplar-Cat"], max_exemplars: 1 });
+    renderPage();
+    expect(await screen.findByTestId("make-exemplar-Van")).toBeDisabled();
+  });
+});

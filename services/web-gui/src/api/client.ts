@@ -642,8 +642,12 @@ export interface Illustration {
   usage: string;
   code?: string;
   builtin: boolean;
-  /** Hình mẫu chuẩn của luật style (chỉ xem). */
+  /** Hình mẫu AI vẽ học theo (CR-052): nằm ở thư mục "hinh-mau", chỉ xem, không xoá. */
   exemplar: boolean;
+  /** Bản Hình mẫu chép từ hình này (id hình gốc); trống khi hình gốc đã bị xoá. */
+  source_id?: string;
+  /** Hình mẫu gốc: thư mục nó quay về khi "Bỏ làm mẫu". */
+  home_folder_id?: string;
   /** Cảnh báo style của phiên bản hiện tại — không chặn lưu. */
   warnings: CodeDiagnostic[];
   status: IllustrationStatus;
@@ -668,10 +672,14 @@ export interface IllustrationTry {
   warnings?: CodeDiagnostic[];
 }
 
-/** Luật style của kênh và id các hình mẫu chuẩn (CR-044). */
+/** CR-052 — thư mục chỉ nhận hình qua "Đặt làm mẫu". */
+export const EXEMPLAR_FOLDER_ID = "hinh-mau";
+
+/** Luật style của kênh và id các Hình mẫu, cũ nhất trước (CR-044, CR-052). */
 export interface IllustrationStyle {
   rules: string;
   exemplar_ids: string[];
+  max_exemplars: number;
 }
 
 export function getIllustrationStyle(): Promise<IllustrationStyle> {
@@ -762,8 +770,22 @@ export function rerenderIllustration(id: string): Promise<IllustrationTry> {
   return apiFetch<IllustrationTry>(`/v1/admin/illustrations/${id}/rerender`, { method: "POST" });
 }
 
+/** Xoá hình. Hình một dự án chưa tới bước Kết quả đang dùng → ApiError 409 nêu tên dự án. */
 export async function deleteIllustration(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/illustrations/${id}`, { method: "DELETE" });
+}
+
+/** CR-052 — chép một hình đã duyệt vào thư mục Hình mẫu (tên mới <Tên>Mau). Trả bản chép. */
+export function makeExemplar(id: string): Promise<Illustration> {
+  return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/exemplar`, { method: "POST" });
+}
+
+/**
+ * CR-052 — bỏ một hình khỏi Hình mẫu. Bản chép bị xoá (trả undefined); Hình mẫu gốc
+ * về lại thư mục chủ đề của nó và được trả về.
+ */
+export function unmakeExemplar(id: string): Promise<Illustration | undefined> {
+  return apiFetch<Illustration | undefined>(`/v1/admin/illustrations/${id}/exemplar`, { method: "DELETE" });
 }
 
 /** CR-044 — kết quả nhập lại một hình từ file sao lưu. */

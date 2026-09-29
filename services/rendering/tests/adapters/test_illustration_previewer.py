@@ -47,10 +47,8 @@ def test_dung_hinh_moi_hinh_co_san_va_bao_loi_code_hong():
 
 @needs_browser
 def test_hinh_mau_chuan_dung_duoc_va_canh_bao_di_kem_ket_qua():
-    from tests.domain.test_illustration_style import EXEMPLARS, exemplars
+    from tests.domain.test_illustration_style import exemplars
 
-    if not EXEMPLARS.exists():
-        pytest.skip("authoring-service không có trong cây này")
     ts = TypeScriptChecker(PROJECT, timeout_seconds=90)
     previewer = IllustrationPreviewer(PROJECT, timeout_seconds=240)
     uc = PreviewIllustrationUseCase(ts, previewer)

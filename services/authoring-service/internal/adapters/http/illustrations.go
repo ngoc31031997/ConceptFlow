@@ -29,6 +29,9 @@ type illustrationsUseCase interface {
 	Update(ctx context.Context, id string, i domain.Illustration) (domain.Illustration, error)
 	SetStatus(ctx context.Context, id string, status domain.IllustrationStatus) (domain.Illustration, error)
 	Delete(ctx context.Context, id string) error
+	Exemplars(ctx context.Context) ([]domain.Illustration, error)
+	MakeExemplar(ctx context.Context, id string) (domain.Illustration, error)
+	UnmakeExemplar(ctx context.Context, id string) (*domain.Illustration, error)
 	Preview(ctx context.Context, id string) (png, gif []byte, err error)
 	Rerender(ctx context.Context, id string) (png, gif []byte, err error)
 	Draw(ctx context.Context, req application.DrawRequest) (domain.Illustration, error)
@@ -66,12 +69,24 @@ func (rt *Router) illustrationRoutes(r chi.Router) {
 	r.Post("/v1/admin/illustrations/import", rt.handleImportIllustrations)
 	r.Post("/v1/admin/illustrations/{id}/redraw", rt.handleRedrawIllustration)
 	r.Delete("/v1/admin/illustrations/{id}", rt.handleDeleteIllustration)
+	r.Post("/v1/admin/illustrations/{id}/exemplar", rt.handleMakeExemplar)
+	r.Delete("/v1/admin/illustrations/{id}/exemplar", rt.handleUnmakeExemplar)
 }
 
 func illustrationError(w http.ResponseWriter, err error) {
 	var invalid *application.InvalidIllustrationError
 	var llmErr *application.LLMError
+	var inUse *application.IllustrationInUseError
 	switch {
+	case errors.As(err, &inUse):
+		writeJSON(w, http.StatusConflict, map[string]any{"error": inUse.Error(), "code": "illustration_in_use", "projects": inUse.Projects})
+	case errors.Is(err, application.ErrIllustrationUsageUnknown):
+		writeError(w, http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, application.ErrExemplarLimit), errors.Is(err, application.ErrAlreadyExemplar),
+		errors.Is(err, application.ErrNotExemplar):
+		writeError(w, http.StatusConflict, err.Error())
+	case errors.Is(err, application.ErrExemplarFolder), errors.Is(err, application.ErrNotExemplarSource):
+		writeError(w, http.StatusUnprocessableEntity, err.Error())
 	case errors.Is(err, application.ErrBackupInvalid):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, application.ErrDrawerDisabled):
@@ -320,13 +335,52 @@ func (rt *Router) handleDeleteIllustration(w http.ResponseWriter, r *http.Reques
 }
 
 // handleIllustrationStyle serves the channel's style rules and the ids of the
-// reference drawings, which web-gui shows with their previews (CR-044).
-func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, _ *http.Request) {
+// Hình mẫu (CR-044, read from the library since CR-052), which web-gui shows
+// with their previews.
+func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, r *http.Request) {
 	ids := []string{}
-	for _, e := range domain.ExemplarIllustrations() {
-		ids = append(ids, e.ID)
+	if rt.illustrations != nil {
+		exemplars, err := rt.illustrations.Exemplars(r.Context())
+		if err != nil {
+			illustrationError(w, err)
+			return
+		}
+		for _, e := range exemplars {
+			ids = append(ids, e.ID)
+		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"rules": domain.IllustrationStyleGuide(), "exemplar_ids": ids})
+	writeJSON(w, http.StatusOK, map[string]any{"rules": domain.IllustrationStyleGuide(), "exemplar_ids": ids, "max_exemplars": domain.MaxExemplars})
+}
+
+// handleMakeExemplar copies an approved drawing into the Hình mẫu (CR-052).
+func (rt *Router) handleMakeExemplar(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	out, err := rt.illustrations.MakeExemplar(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+// handleUnmakeExemplar takes a drawing out of the Hình mẫu: an original comes
+// back (200, the drawing as it is now), a copy is deleted (204).
+func (rt *Router) handleUnmakeExemplar(w http.ResponseWriter, r *http.Request) {
+	if !rt.illustrationsEnabled(w) {
+		return
+	}
+	out, err := rt.illustrations.UnmakeExemplar(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	if out == nil {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (rt *Router) handleDrawIllustration(w http.ResponseWriter, r *http.Request) {

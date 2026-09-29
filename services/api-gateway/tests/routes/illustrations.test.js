@@ -44,6 +44,9 @@ describe('illustration library routing', () => {
     ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
     ['delete', '/v1/projects/p1/illustrations/r1/drawing', 'fast'],
+    // CR-052: making a Hình mẫu renders the copy; undoing it does not.
+    ['post', '/v1/admin/illustrations/i1/exemplar', 'slow'],
+    ['delete', '/v1/admin/illustrations/i1/exemplar', 'fast'],
   ])('%s %s -> %s client', async (method, path, which) => {
     const clients = { fast: client(), slow: client() };
     await request(buildApp(clients.fast, clients.slow))[method](path).send({});

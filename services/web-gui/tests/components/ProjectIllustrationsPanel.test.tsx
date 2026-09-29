@@ -113,7 +113,7 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
   });
 
   it("'Nhờ AI sửa' on a tile opens the editor with the warnings in the redraw note", async () => {
-    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "- [S3] BO TRÒN: góc bo.", exemplar_ids: [] });
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "- [S3] BO TRÒN: góc bo.", exemplar_ids: [], max_exemplars: 5 });
     const warned = { ...MOTO, illustration: ill({ id: "m1", name: "Motorbike", title: "Xe máy", warnings: [{ message: "[S3] <rect> không bo góc (thêm rx)", line: 7 }] }) };
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [warned], ready: false });
     renderPanel();

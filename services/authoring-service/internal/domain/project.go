@@ -77,6 +77,18 @@ func (s ProjectStatus) IsInFlight() bool {
 	return false
 }
 
+// DoneWithLibrary reports whether a project no longer needs the library
+// drawings it uses (CR-052): it reached the result screen (wizard step 12) or
+// later, or it is being deleted. Every other status, failed_at_* included
+// since a failed step can run again, may still render them.
+func (s ProjectStatus) DoneWithLibrary() bool {
+	switch s {
+	case StatusReadyToPublish, StatusPublishing, StatusPublished, StatusFailedPublishVideo, StatusDeleting:
+		return true
+	}
+	return false
+}
+
 // Delete-saga steps (CR-040 FR114.2): one per service that owns files on
 // shared_artifacts. Stored in saga_steps like any step so no schema change is
 // needed; the row is deleted with the project.

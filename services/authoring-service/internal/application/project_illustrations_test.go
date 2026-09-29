@@ -386,3 +386,59 @@ func TestDeleteDrawingKeepsApprovedAndLibraryDrawings(t *testing.T) {
 		t.Error("an approved drawing was deleted")
 	}
 }
+
+// CR-052: a Hình mẫu copy only teaches the AI drawer. Videos are offered its
+// source; an original exemplar stays usable as before.
+func TestExemplarCopiesAreNeitherPlannedNorHandedToTheCode(t *testing.T) {
+	llm := &scriptedLLM{replies: []string{`{"reuse": [], "draw": []}`}}
+	uc, _, lib := stage(llm)
+	lib.rows["bus"] = domain.Illustration{ID: "bus", Name: "Bus", FolderID: "phuong-tien", Code: busCode, Status: domain.IllustrationApproved}
+	lib.rows["cp"] = domain.Illustration{ID: "cp", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true, SourceID: "bus",
+		Code: "export function BusMau() {}", Status: domain.IllustrationApproved}
+	lib.rows["cat"] = domain.Illustration{ID: "cat", Name: "Cat", FolderID: domain.ExemplarFolderID, Exemplar: true, HomeFolderID: "dong-vat",
+		Code: "export function Cat() {}", Status: domain.IllustrationApproved}
+	ctx := context.Background()
+	if _, err := uc.Plan(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	sys := llm.calls[0].System
+	if strings.Contains(sys, "BusMau") || !strings.Contains(sys, "- Bus —") || !strings.Contains(sys, "- Cat —") {
+		t.Fatalf("planner catalog: %s", sys)
+	}
+	if strings.Contains(sys, "- "+domain.ExemplarFolderID+" —") {
+		t.Fatal("the planner must not be offered the Hình mẫu folder")
+	}
+	drawings, err := uc.ForCode(ctx, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	names := map[string]bool{}
+	for _, d := range drawings {
+		names[d.Name] = true
+	}
+	if names["BusMau"] || !names["Bus"] || !names["Cat"] {
+		t.Fatalf("code step drawings: %v", names)
+	}
+}
+
+// CR-052: deleting this video's own draft is not blocked by this video, but
+// is by another video that has not reached its result.
+func TestDeleteDrawingIgnoresItsOwnProjectButNotOthers(t *testing.T) {
+	uc, rows, lib := stage(&scriptedLLM{replies: []string{reply("Thing0", "export function Thing0({color = '#fff', ...fig}) { return null; }")}})
+	uc.library.WithProjectStatus(fakeProjectStatus{status: map[string]domain.ProjectStatus{"p1": domain.StatusDraft, "p2": domain.StatusDraft}})
+	ctx := context.Background()
+	plannedRows(rows, "p1", 1)
+	drawn, err := uc.Draw(ctx, "p1", "r1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	lib.users[drawn.IllustrationID] = []IllustrationUser{{ProjectID: "p1"}, {ProjectID: "p2"}}
+	if _, err := uc.DeleteDrawing(ctx, "p1", "r1"); !errors.Is(err, ErrIllustrationInUse) {
+		t.Fatalf("another draft project uses it: %v", err)
+	}
+	lib.users[drawn.IllustrationID] = []IllustrationUser{{ProjectID: "p1"}}
+	lib.linked[drawn.IllustrationID] = []string{"p1"}
+	if _, err := uc.DeleteDrawing(ctx, "p1", "r1"); err != nil {
+		t.Fatalf("its own project must not block it: %v", err)
+	}
+}

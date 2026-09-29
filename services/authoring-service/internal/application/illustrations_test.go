@@ -18,11 +18,16 @@ type fakeIllustrationRepo struct {
 	png     map[string][]byte
 	pv      map[string]int
 	next    int
+	// CR-052: the projects using a drawing, by drawing id, as the database
+	// would find them (drawing list link or code naming it); linked are the
+	// ones that link it in their drawing list.
+	users  map[string][]IllustrationUser
+	linked map[string][]string
 }
 
 func newFakeIllustrationRepo() *fakeIllustrationRepo {
 	r := &fakeIllustrationRepo{folders: domain.SystemIllustrationFolders(), rows: map[string]domain.Illustration{},
-		png: map[string][]byte{}, pv: map[string]int{}}
+		png: map[string][]byte{}, pv: map[string]int{}, users: map[string][]IllustrationUser{}, linked: map[string][]string{}}
 	for _, b := range domain.BuiltinIllustrations() {
 		r.rows[b.ID] = b
 	}
@@ -80,11 +85,60 @@ func (r *fakeIllustrationRepo) UpdateIllustration(_ context.Context, i domain.Il
 	r.rows[i.ID] = i
 	return i, nil
 }
-func (r *fakeIllustrationRepo) DeleteIllustration(_ context.Context, id string) error {
+func (r *fakeIllustrationRepo) DeleteIllustration(_ context.Context, id string, checked []string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	ok := map[string]bool{}
+	for _, p := range checked {
+		ok[p] = true
+	}
+	for _, p := range r.linked[id] {
+		if !ok[p] {
+			return ErrIllustrationLinked
+		}
+	}
 	delete(r.rows, id)
 	return nil
+}
+func (r *fakeIllustrationRepo) FindIllustrationUsers(_ context.Context, id, _ string) ([]IllustrationUser, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.users[id], nil
+}
+func (r *fakeIllustrationRepo) CreateExemplar(_ context.Context, i domain.Illustration, limit int) (domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	count := 0
+	for _, e := range r.rows {
+		if e.Exemplar {
+			count++
+			if i.SourceID != "" && e.SourceID == i.SourceID {
+				return i, ErrAlreadyExemplar
+			}
+		}
+		if e.Name == i.Name {
+			return i, ErrIllustrationNameTaken
+		}
+	}
+	if count >= limit {
+		return i, ErrExemplarLimit
+	}
+	r.next++
+	i.ID, i.FolderID, i.Exemplar = fmt.Sprintf("i%d", r.next), domain.ExemplarFolderID, true
+	i.CreatedAt = fmt.Sprintf("2026-09-29T00:00:%02dZ", r.next)
+	r.rows[i.ID] = i
+	return i, nil
+}
+func (r *fakeIllustrationRepo) ReleaseExemplar(_ context.Context, id, folderID string) (domain.Illustration, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	i, ok := r.rows[id]
+	if !ok || !i.Exemplar {
+		return i, ErrIllustrationNotFound
+	}
+	i.Exemplar, i.HomeFolderID, i.FolderID = false, "", folderID
+	r.rows[id] = i
+	return i, nil
 }
 func (r *fakeIllustrationRepo) SaveIllustrationPreview(_ context.Context, id string, v int, png, _ []byte) error {
 	r.mu.Lock()

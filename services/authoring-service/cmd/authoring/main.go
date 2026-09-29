@@ -79,7 +79,9 @@ func main() {
 	}
 	illustrations := application.NewIllustrationsUseCase(
 		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
-		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
+		// CR-052: a drawing a video still working uses cannot be deleted.
+		WithProjectStatus(projects)
 	// CR-044 — each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).

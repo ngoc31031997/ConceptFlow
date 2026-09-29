@@ -110,6 +110,13 @@
   display: none;
 }
 
+/* CR-052 — "Hình mẫu (x/5)" above the exemplar tiles. */
+.exemplarHead {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
 .exemplars {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));

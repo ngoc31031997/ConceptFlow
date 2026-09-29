@@ -15,7 +15,8 @@ import (
 
 // CR-044 — the illustration library's tables.
 
-const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, warnings, status, version,
+const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, exemplar,
+	COALESCE(source_id, ''), COALESCE(home_folder_id, ''), warnings, status, version,
 	(preview_png IS NOT NULL AND preview_version = version), created_at, updated_at`
 
 func scanIllustration(row pgx.Row) (domain.Illustration, error) {
@@ -23,7 +24,7 @@ func scanIllustration(row pgx.Row) (domain.Illustration, error) {
 	var status string
 	var created, updated time.Time
 	if err := row.Scan(&i.ID, &i.Name, &i.Title, &i.FolderID, &i.Tags, &i.Description, &i.Usage, &i.Code,
-		&i.Builtin, &i.Exemplar, &i.Warnings, &status, &i.Version, &i.HasPreview, &created, &updated); err != nil {
+		&i.Builtin, &i.Exemplar, &i.SourceID, &i.HomeFolderID, &i.Warnings, &status, &i.Version, &i.HasPreview, &created, &updated); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Illustration{}, application.ErrIllustrationNotFound
 		}
@@ -70,9 +71,17 @@ func (r *PromptTemplateRepository) SeedIllustrations(ctx context.Context) error 
 			return err
 		}
 	}
-	// Kit built-ins and style exemplars. A changed exemplar's code bumps its
-	// version, so its stored preview is re-rendered instead of served stale.
-	for _, b := range append(domain.BuiltinIllustrations(), domain.ExemplarIllustrations()...) {
+	// CR-052: the three exemplars this service used to seed become Hình mẫu
+	// data, once. After that they are rows like any other: never seeded again,
+	// so one the Creator took out of the Hình mẫu stays out.
+	if _, err := r.pool.Exec(ctx, `
+		UPDATE illustrations SET home_folder_id = folder_id, folder_id = $1, builtin = false, updated_at = now()
+		WHERE exemplar AND builtin
+	`, domain.ExemplarFolderID); err != nil {
+		return err
+	}
+	// The kit.
+	for _, b := range domain.BuiltinIllustrations() {
 		if _, err := r.pool.Exec(ctx, `
 			INSERT INTO illustrations (id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, status, version)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, 'approved', 1)
@@ -172,9 +181,102 @@ func (r *PromptTemplateRepository) UpdateIllustration(ctx context.Context, i dom
 	return out, mapIllustrationErr(err)
 }
 
-func (r *PromptTemplateRepository) DeleteIllustration(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM illustrations WHERE id = $1 AND NOT builtin`, id)
-	return err
+// DeleteIllustration refuses (ErrIllustrationLinked) when a project outside
+// checked links the drawing: one that planned it after the caller looked.
+func (r *PromptTemplateRepository) DeleteIllustration(ctx context.Context, id string, checked []string) error {
+	if checked == nil {
+		checked = []string{}
+	}
+	tag, err := r.pool.Exec(ctx, `
+		DELETE FROM illustrations WHERE id = $1 AND NOT builtin
+		  AND NOT EXISTS (SELECT 1 FROM project_illustrations WHERE illustration_id = $1 AND project_id <> ALL($2::text[]))
+	`, id, checked)
+	if err != nil || tag.RowsAffected() > 0 {
+		return err
+	}
+	var linked bool
+	if err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (SELECT 1 FROM project_illustrations WHERE illustration_id = $1 AND project_id <> ALL($2::text[]))
+	`, id, checked).Scan(&linked); err != nil {
+		return err
+	}
+	if linked {
+		return application.ErrIllustrationLinked
+	}
+	return nil
+}
+
+// FindIllustrationUsers lists the projects whose drawing list links the
+// drawing or whose saved code names its component (a whole word: Bus is not
+// BusStop). Names are [A-Za-z0-9] only, so they are safe inside the regex.
+func (r *PromptTemplateRepository) FindIllustrationUsers(ctx context.Context, id, name string) ([]application.IllustrationUser, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT u.project_id, COALESCE(pa.topic, '') FROM (
+		    SELECT project_id FROM project_illustrations WHERE illustration_id = $1
+		    UNION
+		    SELECT project_id FROM project_authoring WHERE code_content ~ ('\m' || $2 || '\M')
+		) u LEFT JOIN project_authoring pa ON pa.project_id = u.project_id
+		ORDER BY u.project_id
+	`, id, name)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []application.IllustrationUser{}
+	for rows.Next() {
+		var u application.IllustrationUser
+		if err := rows.Scan(&u.ProjectID, &u.Topic); err != nil {
+			return nil, err
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// CreateExemplar inserts a Hình mẫu. The Hình mẫu folder row is locked for
+// the count, so two "Đặt làm mẫu" at once cannot pass the limit together.
+func (r *PromptTemplateRepository) CreateExemplar(ctx context.Context, i domain.Illustration, limit int) (domain.Illustration, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return i, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	if _, err := tx.Exec(ctx, `SELECT 1 FROM illustration_folders WHERE id = $1 FOR UPDATE`, domain.ExemplarFolderID); err != nil {
+		return i, err
+	}
+	var count int
+	var copied bool
+	if err := tx.QueryRow(ctx, `
+		SELECT count(*), COALESCE(bool_or(source_id = NULLIF($1, '')), false) FROM illustrations WHERE exemplar
+	`, i.SourceID).Scan(&count, &copied); err != nil {
+		return i, err
+	}
+	if copied {
+		return i, application.ErrAlreadyExemplar
+	}
+	if count >= limit {
+		return i, application.ErrExemplarLimit
+	}
+	out, err := scanIllustration(tx.QueryRow(ctx, `
+		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, exemplar,
+		    source_id, home_folder_id, status, version, warnings)
+		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, true, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12)
+		RETURNING `+illustrationColumns, i.Name, i.Title, domain.ExemplarFolderID, i.Tags, i.Description, i.Usage, i.Code,
+		i.SourceID, i.HomeFolderID, string(i.Status), i.Version, findings(i.Warnings)))
+	if err != nil {
+		return out, mapIllustrationErr(err)
+	}
+	return out, tx.Commit(ctx)
+}
+
+// ReleaseExemplar files an original exemplar back into folderID as an
+// ordinary drawing, keeping its id, name and approval.
+func (r *PromptTemplateRepository) ReleaseExemplar(ctx context.Context, id, folderID string) (domain.Illustration, error) {
+	out, err := scanIllustration(r.pool.QueryRow(ctx, `
+		UPDATE illustrations SET exemplar = false, home_folder_id = NULL, folder_id = $2, updated_at = now()
+		WHERE id = $1 AND exemplar
+		RETURNING `+illustrationColumns, id, folderID))
+	return out, mapIllustrationErr(err)
 }
 
 func (r *PromptTemplateRepository) SaveIllustrationPreview(ctx context.Context, id string, version int, png, gif []byte) error {

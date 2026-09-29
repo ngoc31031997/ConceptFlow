@@ -15,6 +15,7 @@ describe("StyleWarnings (CR-045)", () => {
     vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({
       rules: "- [S3] BO TRÒN: góc bo.\n- [S19] Vật sống hoặc có năng lượng CÓ chuyển động tự thân theo frame: thở, nhún.",
       exemplar_ids: [],
+      max_exemplars: 5,
     });
   });
   afterEach(() => vi.restoreAllMocks());
