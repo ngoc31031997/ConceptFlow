@@ -47,7 +47,10 @@ export const FLOW_PUBLISH = 14;
  * rail's, so a screen can never call a step something the rail does not.
  */
 export function flowTitle(step: number): string {
-  return `Bước ${step} — ${FLOW_LABELS[step - 1]}`;
+  // A step outside the flow (a stale or hand-edited ?step=) keeps its number
+  // rather than printing "undefined".
+  const label = FLOW_LABELS[step - 1];
+  return label ? `Bước ${step} — ${label}` : `Bước ${step}`;
 }
 
 export type RunState = "idle" | "running" | "failed" | "done";

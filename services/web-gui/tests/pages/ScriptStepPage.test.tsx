@@ -43,6 +43,8 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
 
   it("khoá Tiếp tục khi chủ đề còn trống hoặc chỉ có khoảng trắng", () => {
     renderPage(createdOk);
+    // CR-051: screen titles name the step as the rail does.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 1 — Khởi tạo");
 
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
     typeTopic("   ");

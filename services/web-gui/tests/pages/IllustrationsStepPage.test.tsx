@@ -44,6 +44,8 @@ describe("IllustrationsStepPage (CR-045)", () => {
   it("is its own tab for a Remotion video: run bar for this step, then the drawing list", async () => {
     renderPage("remotion", NONE);
     expect(await screen.findByTestId("illustrations-step-page")).toBeInTheDocument();
+    // CR-051: screen titles name the step as the rail does.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 5 — Hình minh hoạ");
     expect(await screen.findByTestId("run-with-ai-illustrations")).toHaveTextContent("Chạy hình minh hoạ bằng AI");
     expect(await screen.findByTestId("project-illustrations")).toBeInTheDocument();
     expect(screen.getByTestId("illustrations-step-next")).toHaveTextContent("Sang bước Code");

@@ -19,7 +19,8 @@ export const STEP_LABELS: Record<string, string> = {
   validate_script: "Chạy thử & kiểm tra",
   classify_scenes: "Phân loại cảnh",
   synthesize_speech: "Tạo giọng đọc",
-  render_scenes: "Render hoạt hình",
+  // CR-051: the rail's name — this is the only saga step of "Bước 10 — Render".
+  render_scenes: "Render",
   assemble_video: "Ghép video hoàn chỉnh",
   // CR-021, tắt khỏi luồng chính từ CR-029 (đưa backlog) — nhãn giữ lại chỉ
   // để hiển thị đúng cho project cũ đã chạy qua bước này trước CR-029.

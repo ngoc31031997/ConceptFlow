@@ -6,7 +6,7 @@ import type { ProjectEvent } from "../../src/api/client";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 
 const events = [
-  { id: 3, project_id: "bbbbbbbb-1", at: "2026-01-02T10:00:00Z", flow_step: 10, step_label: "Render hoạt hình", run_state: "failed", source: "saga", duration_ms: 5000, detail: "boom" },
+  { id: 3, project_id: "bbbbbbbb-1", at: "2026-01-02T10:00:00Z", flow_step: 10, step_label: "Render", run_state: "failed", source: "saga", duration_ms: 5000, detail: "boom" },
   { id: 2, project_id: "aaaaaaaa-1", at: "2026-01-01T10:05:00Z", flow_step: 6, step_label: "Code", run_state: "done", source: "authoring", duration_ms: 90000, content_chars: 1200, prompt_tokens: 100, completion_tokens: 400 },
   { id: 1, project_id: "aaaaaaaa-1", at: "2026-01-01T10:00:00Z", flow_step: 6, step_label: "Code", run_state: "running", source: "authoring" },
 ];
