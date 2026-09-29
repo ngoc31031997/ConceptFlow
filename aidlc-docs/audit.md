@@ -2023,3 +2023,10 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **AI Response**: Chốt: kit không xoá được; Hình mẫu có "Bỏ làm mẫu" (bỏ bản clone, hình gốc còn; Hình mẫu gốc thì chuyển về thư mục chủ đề); Hình mẫu chỉ đọc. Viết bản yêu cầu cuối (FR1–FR10, tiêu chí chấp nhận, ngoài phạm vi), chờ Creator duyệt.
 **Impact Assessment**: `authoring-service` và `web-gui`. `llm-service` và `rendering` không đổi. Chưa đổi code.
 **Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Yêu cầu được duyệt, soạn thiết kế
+**Timestamp**: 2026-09-29T00:30:00Z
+**User Input**: "ok"
+**AI Response**: Commit bản yêu cầu (`9b088ab`) và push nhánh. Soạn thiết kế `aidlc-docs/construction/plans/cr-052-image-library-delete-and-edit-samples-design.md`. Nội dung: kiểm "đang dùng" gồm tìm dự án ứng viên trong DB authoring rồi hỏi trạng thái qua `orchestrator.GetStatus` sẵn có (lỗi thì từ chối xoá); cột mới `source_id` và `home_folder_id`; chuyển 3 Hình mẫu seed sang thư mục `hinh-mau` một lần; bỏ `illustration_exemplars_vi.txt`; bản clone đổi tên `<Tên>Mau`; bản clone không vào danh sách chọn ở bước 5 và danh sách của Kỹ sư; thêm 2 route mới ở api-gateway. Chờ Creator duyệt.
+**Impact Assessment**: `authoring-service`, `api-gateway`, `web-gui`. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-052-image-library-delete-and-edit-samples-design.md`, `aidlc-docs/audit.md`.
