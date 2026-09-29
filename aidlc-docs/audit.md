@@ -2002,3 +2002,70 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 4. Visual Director (v11) và Visual Director AI (v5): luật 14 thêm "chỉ nhân vật mới có mặt người", luật 18 yêu cầu tả vật mới cụ thể; thêm một mục tự kiểm tra. Hash golden của visual_director được đặt lại có chủ đích.
 **Impact Assessment**: `go test ./...` (authoring-service) pass; `pytest` style + previewer của rendering: 12 pass, 2 skip (cần node_modules/REMOTION_BROWSER cục bộ). Đã rebuild authoring-service (healthy), prompt mới phục vụ qua `/v1/prompts/*`, ảnh xem trước exemplar-Cat v2 dựng được, 0 cảnh báo. Hình đã vẽ trước đây trong thư viện (vd Pyramid, Worm) KHÔNG tự đổi — cần "Vẽ lại".
 **Artifacts Affected**: `services/authoring-service/internal/domain/prompts/{illustration_style_vi,illustration_exemplars_vi,illustration_helpers_vi}.txt`, `services/authoring-service/internal/application/{drawer_prompt_vi,planner_prompt_vi}.txt`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai,golden_prompts_test}.go`, `aidlc-docs/audit.md`.
+
+## CR-050 — Rà soát các tác vụ gọi LLM; chia nhỏ bước sinh code để lỗi chỉ phải chạy lại đúng đoạn lỗi
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "kiểm tra lại các tác vụ có gọi api llm xem có hợp lý hay chưa, hiện nay ở đoạn code hay bị ngắt và lỗi, ở đoạn đó có thể chia nhỏ ra để chạy song song hoặc tuần tự để khi có lỗi chỉ cần chạy lại đúng đoạn lỗi ko phải toàn bộ như hiện tại"
+**AI Response**: Mở CR-050 trên nhánh `feature/cr-050-llm-call-chunking-resume` (từ `main` @ `1fe7e44`). Requirements Analysis: rà các điểm gọi LLM (story, storyboard + finalize, illustrations planner/drawer, code pipeline, suggest-metadata/short-script) và số liệu `llm_usage` 30 ngày. Điểm nóng là `code/chunk`: 196 lượt gọi, 70 lỗi (45 `empty`, 17 `server` gồm "hive closed the stream without sending anything" và 500, 5 `timeout` trên llama3.2, 3 `budget`/`truncated` trên glm). Pipeline hiện ĐÃ chia chunk 3 shot chạy song song và cache chunk thành công, nhưng: một chunk lỗi làm hỏng cả bước; `empty` và "stream đóng rỗng" không được tự thử lại; cache nằm trong RAM của llm-service (mất khi restart/rebuild) và khoá theo model + prompt (đổi model = sinh lại tất cả); lượt sửa (repair) không cache; Creator không thấy đoạn nào đã xong. Phân tích và câu hỏi: `aidlc-docs/inception/requirements/cr-050-llm-call-chunking-resume.md`, `aidlc-docs/inception/requirements/cr-050-requirement-questions.md`. Chờ Creator trả lời câu hỏi.
+**Context**: INCEPTION — Requirements Analysis (Standard depth). Extension: Security Baseline = No, Property-Based Testing = No (cấu hình sẵn trong `aidlc-state.md`).
+
+---
+
+## CR-050 — Trả lời câu hỏi vòng 1
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "1 cả storyboard/các lượt gọi đơn
+2 ko cần , user sẽ tự chạy lại trên giao diện
+3 chạy tiếp nhưng phải có cách để chạy riêng đoạn đó băng ai ngoài hoặc retry
+4 db
+5. đổi promt
+6 chưa hiểu kích thước mỗi đoạn là sao
+7 giao diện bước code thì như thế nào
+8 không cần. ghi đè lên chỉ cần lưu một kêt quả cuối cùng
+=> cần làm rõ câu 6 7"
+**AI Response**: Ghi câu trả lời vào `cr-050-requirement-questions.md`. Tạo `cr-050-clarification-questions.md`: C1/C1b (phạm vi chia nhỏ Story/Storyboard và cách giữ nhất quán giữa các cảnh), C2 (xác nhận ý "đổi prompt"), C3 (giải thích kích thước đoạn bằng ví dụ), C4 (bản vẽ giao diện bước Code theo từng đoạn, nút chạy lại bằng AI / AI ngoài). Chờ Creator trả lời.
+**Context**: INCEPTION — Requirements Analysis, vòng hỏi 2.
+
+---
+
+## CR-050 — Creator yêu cầu nghĩ lại giải pháp tổng thể
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "có lẽ cần nghiêm túc suy nghĩ 1 solution tốt hơn cho bước chuản bị scirpt và render code này sao cho tiết kiệm token và tối ưu hơn nhưng vẫn đảm bảo chất lượng video"
+**AI Response**: Đo chi phí theo video từ `llm_usage`: bước Code chiếm khoảng 95% token (0,6–1,3 triệu token đầu ra mỗi video, 1–2,5 giờ), trong đó 87–94% là suy nghĩ. Code shot sinh ra chủ yếu là component bộ kit đặt theo x/y/size cộng interpolate/spring (chỉ 4/52 shot tự vẽ SVG). Đề xuất 3 hướng trong `cr-050-solution-options.md`: A tối ưu tại chỗ; B Shot Spec (JSON) + trình biên dịch cố định (khuyến nghị, spike đo trước); C gộp Storyboard với Shot Spec. Thêm câu D1 (chọn hướng) vào `cr-050-clarification-questions.md`. Chờ Creator chọn.
+**Context**: INCEPTION — Requirements Analysis; phạm vi CR-050 có thể mở rộng thành thiết kế lại pipeline (cần ADR nếu chọn B/C).
+
+---
+
+## CR-050 — Review toàn luồng Story → Visual → Hình minh hoạ → Code
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "thử revew lại toàn bộ quá trình tạo video từ story, visual, render hinh minh hoạ đến code. xem còn sửa chữa và tối ưu được gì không?"
+**AI Response**: Review ghi ở `cr-050-pipeline-review.md`. Story, Visual và Hình minh hoạ rẻ và ổn định; bước Code chiếm khoảng 95% chi phí. Phát hiện chính: I1 (lỗi: sinh lại storyboard không lập lại danh sách hình, giao diện không cảnh báo); X1 (lượt AI lỗi ở Story/Visual xoá các bước sau dù nội dung không đổi; có chủ ý từ `15a8111`, cần Creator quyết); C3 (cache chunk trong RAM, khoá gồm cả danh sách hình nằm trong prompt hệ thống); C5 (glm tốn gấp khoảng 3,5 lần token so với deepseek trên bước Code, llama3.2 timeout); V2 (cảnh báo storyboard không chặn bước Code); X2 (`llm_usage` của bước Code chỉ ghi khi pipeline xong, nên restart giữa chừng làm mất ghi nhận; rủi ro theo đọc code, chưa thấy xảy ra); X3 (chẩn đoán sửa lỗi không được lưu). Thêm câu R1, R2 vào `cr-050-clarification-questions.md`.
+**Context**: INCEPTION — Requirements Analysis.
+
+---
+
+## CR-050 — Trả lời câu hỏi vòng 2
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "nãy tôi chưa save đọc lại đi" — câu trả lời trong `cr-050-clarification-questions.md`: D1 = A, R1 = A, R2 = B, C1 = A, C1b = (trống), C2 = (trống), C3 = D, C4 = A.
+**AI Response**: Ghi nhận: đi theo Hướng A (giữ kiến trúc, lưu và chạy lại từng đoạn; Shot Spec chưa làm, để vào backlog); lượt AI lỗi không xoá các bước sau; các lỗi I1, C5, X1 gộp vào CR-050; Story và các gợi ý giữ một lượt gọi, chia nhỏ Storyboard theo cảnh và Code theo đoạn; số shot mỗi đoạn là cài đặt; giao diện danh sách đoạn đầy đủ. Còn chờ C1b, C2 và câu mới C3b (giá trị mặc định).
+**Context**: INCEPTION — Requirements Analysis, vòng hỏi 2.
+
+---
+
+## CR-050 — Trả lời câu hỏi vòng 2 (bổ sung) và requirements
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "d1 làm shot spec luôn
+c1b có
+c2 chỉ khi promt đổi
+c3b mặc định là 3"
+**AI Response**: Ghi câu trả lời vào `cr-050-clarification-questions.md`. Viết requirements đầy đủ vào `cr-050-llm-call-chunking-resume.md`: FR-1..9 lưu và chạy lại từng đoạn (Storyboard, Code; Remotion và Manim); FR-10..11 Storyboard theo cảnh với khung chung; FR-12..16 Shot Spec cho Remotion, có Pha 0 đo làm cổng; FR-17..22 sửa lỗi từ review (I1, X1, C5, V2, X2, X3); NFR-1..6. Nêu hai diễn giải cần Creator xác nhận: (1) C2 cùng R1 được giải bằng dấu vân tay theo nội dung từng đoạn; (2) Shot Spec chỉ áp cho Remotion, Manim giữ đường code hiện tại. Chờ Creator duyệt requirements.
+**Context**: INCEPTION — Requirements Analysis hoàn tất, chờ duyệt.
+
+---
+
+## CR-050 — Duyệt requirements
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "appproce andcode"
+**AI Response**: Requirements Analysis được duyệt, gồm cả hai diễn giải: dấu vân tay theo nội dung từng đoạn, và Shot Spec chỉ cho Remotion. Commit các artefact đã duyệt. Tiếp theo: Workflow Planning. Unit 1 (FR-17..FR-20, sửa lỗi, thiết kế đã rõ) được code ngay sau khi trình thiết kế. Các unit lưu từng đoạn và Shot Spec cần ADR và thiết kế được duyệt trước khi code (quy tắc AI-DLC: không bỏ qua bước thiết kế).
+**Context**: INCEPTION — Requirements Analysis → Workflow Planning.
+
+---
