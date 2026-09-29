@@ -8,6 +8,7 @@
 # Writes, in <git common dir>/conceptflow/review/:
 #   <tree>.diff    git diff <merge-base with $BASE>..HEAD
 #   <tree>.brief   the exact prompt every review agent must receive
+#   <tree>.graph.log  output of the graphify refresh behind the brief's "Graph impact"
 # and prints the brief. record_review.py only records a verdict when the agent's
 # prompt equals <tree>.brief (apart from surrounding whitespace) and <tree>.diff still equals the real
 # diff, so the session that wrote the code cannot hand the agents a softened
@@ -58,6 +59,18 @@ else
   check_status="NOT RUN on this tree: treat every behaviour change as untested until shown otherwise"
 fi
 
+# Callers of the changed files, from the local graphify code graph refreshed for this
+# tree (the working tree is clean, so it equals HEAD; graphify-out/ is git-ignored).
+# graph_impact.py writes "not available (...)" when the graph is missing or was not
+# built at HEAD, rather than listing callers of another tree.
+graph_log="$dir/$tree.graph.log"
+if ./scripts/graph.sh build >"$graph_log" 2>&1; then
+  graph_impact="$(git diff --name-only "$base_commit" HEAD \
+    | python3 scripts/hooks/graph_impact.py --graph graphify-out/graph.json --head "$(git rev-parse HEAD)")"
+else
+  graph_impact="Graph impact: not available (make graph failed; log: ${graph_log})."
+fi
+
 {
   echo "Review ${label} on branch $(git rev-parse --abbrev-ref HEAD). Tree under review: ${tree}."
   echo "Diff: ${dir}/${tree}.diff ($(git diff --shortstat "$base_commit" HEAD | sed 's/^ //'); base ${base_commit:0:12} = merge-base with ${BASE})"
@@ -65,6 +78,7 @@ fi
   echo "make check: ${check_status}"
   echo "Changed files:"
   git diff --name-only "$base_commit" HEAD | sed 's/^/- /'
+  echo "$graph_impact"
   echo
   echo "Read the whole diff and the code around it. End with the exact verdict line for tree ${tree}."
 } >"$dir/$tree.brief"

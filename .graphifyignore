@@ -1,0 +1,6 @@
+# Paths graphify must never index, on top of .gitignore (which graphify merges).
+# Secret files are also skipped by graphify's own sensitive-file filter.
+# The graph is code-only and stays local; see docs/agentic/graphify.md.
+secrets/
+data/
+media/

@@ -21,7 +21,7 @@ The review is done by three read-only agents in `.claude/agents/`, not by this s
 scripts/review-prep.sh CR-<NNN> [requirement-doc]
 ```
 
-It writes the diff and the **brief** for the current tree under `.git/conceptflow/review/` and prints the brief. Do not write or edit these files yourself; the directory is blocked for the shell and for Edit/Write anyway.
+It writes the diff and the **brief** for the current tree under `.git/conceptflow/review/` and prints the brief. The brief includes a **Graph impact** list (files outside the diff that depend on changed files), computed from the graphify graph after the script refreshes it for this tree. If it says `not available (...)`, the review still runs; tell the Creator the reason (usually graphify not installed: `docs/agentic/graphify.md`). Do not write or edit these files yourself; the directory is blocked for the shell and for Edit/Write anyway.
 
 ## 2. Run the agents, in parallel
 

@@ -25,3 +25,7 @@ data/shared_artifacts/*
 
 # Manim ghi cache/output vào ./media khi chạy ngoài container
 media/
+
+# graphify code knowledge graph: local only, rebuilt by `make graph` and the
+# graphify git hooks (docs/agentic/graphify.md)
+graphify-out/

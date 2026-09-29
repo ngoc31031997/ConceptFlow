@@ -28,8 +28,9 @@ Add an entry at the end of `aidlc-docs/audit.md`, in the format of the latest en
 ## 3. Reproduce first
 
 Find the code path from the report, delegating the reading-heavy parts (their output stays out of the main context):
+- **Where the code is, first try** → the code graph, in the main session (cheap, no agent; CLAUDE.md "Code knowledge graph", `make graph` first if it is not built at HEAD): `graphify query "<symptom>"` or `graphify explain "<handler or component>"` to locate it, `graphify path "<entry point>" "<suspect>"` to follow the call chain. It is a map, not evidence.
 - **Logs** → `ops-runner` agent (haiku): "run `docker compose logs --tail 300 <svc>` and return only the lines about <symptom> (errors, stack traces, the request id), verbatim, with timestamps".
-- **Where the code is** → built-in `Explore` agent (haiku), breadth "medium": "find the handler/component/consumer that <does X>, and its callers; return paths with line numbers". Skip this when you already know the file.
+- **Where the code is, when the graph is not enough** (message consumers, HTTP calls between services, graphify not installed) → built-in `Explore` agent (haiku), breadth "medium": "find the handler/component/consumer that <does X>, and its callers; return paths with line numbers". Skip this when you already know the file.
 
 Read the code it points to yourself before writing anything. Then write a **test that fails because of the bug**, in the service's existing test suite, named after the behaviour ("… does not reset X when Y"). Run only that test to see it fail for the reported reason.
 
@@ -49,7 +50,7 @@ Stop and propose `/cr-start` instead when the fix would:
 
 1. Smallest change that removes the root cause. No drive-by refactors; mention anything else you noticed as a follow-up instead.
 2. The new test passes; the rest of the suite still passes: `/cr-check`.
-3. Search for the same mistake elsewhere: one grep yourself when the pattern is literal; the `Explore` agent (haiku) when it needs a sweep across services. Fix identical instances in the same service; list others.
+3. Search for the same mistake elsewhere: one grep yourself when the pattern is literal; the `Explore` agent (haiku) when it needs a sweep across services. Fix identical instances in the same service; list others. If you changed a function's behaviour, `graphify affected "<function>"` lists its callers: check that none relied on the old behaviour.
 4. `/rebuild` every service whose code changed (CLAUDE.md Docker rebuild policy), and confirm healthy.
 5. Check it live where possible: the API call, log line or page that showed the bug now behaves. Give the `ops-runner` agent the exact commands (curl, `docker compose logs --since …`) and the expected result; judge its report yourself. If you cannot check live (needs a real account, a browser, paid API), say so and give the Creator exact steps.
 
