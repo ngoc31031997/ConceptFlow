@@ -10,6 +10,7 @@ import { getAuthoringState } from "../api/client";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
+import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
 
 /**
  * CR-045 — bước Hình minh hoạ, giữa Visual và Code, chỉ cho video Remotion.
@@ -68,7 +69,7 @@ export function IllustrationsStepPage() {
     <div data-testid="illustrations-step-page">
       <AppShell
         currentStep={5}
-        title="Bước 5 — Hình minh hoạ"
+        title={flowTitle(FLOW_ILLUSTRATIONS)}
         subtitle="Hình minh hoạ của video: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt trước khi viết code."
         wide
       >

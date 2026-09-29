@@ -514,13 +514,13 @@ func (rt *Router) handleGetProject(w http.ResponseWriter, r *http.Request) {
 }
 
 // flowFor places a project in the 14-step flow. Only a draft on the script
-// step needs the authoring content to tell 1a from 1b from 1c.
+// steps needs the authoring content to tell 3/4/5/6 apart.
 func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) {
 	var content domain.AuthoredContent
 	if p.Status == domain.StatusDraft && p.WizardStep >= domain.WizardStepScript && rt.authored != nil {
 		if sums, err := rt.authored.Summaries(ctx, []string{p.ProjectID}); err == nil {
 			if st, ok := sums[p.ProjectID]; ok {
-				content = domain.AuthoredContent{Story: st.Story, Storyboard: st.Storyboard, Code: st.Code}
+				content = st.Content(p.RenderEngine)
 			}
 		}
 	}

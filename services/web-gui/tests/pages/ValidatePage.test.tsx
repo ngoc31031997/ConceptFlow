@@ -44,7 +44,7 @@ function renderValidatePage() {
   );
 }
 
-describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
+describe("ValidatePage (bước 7 — chạy thử, bước 8 — duyệt)", () => {
   beforeEach(() => {
     FakeEventSource.instances = [];
     // @ts-expect-error test stub
@@ -56,7 +56,7 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
     window.localStorage.clear();
   });
 
-  it("chỉ hiện hai bước chạy thử, không hiện phần sản xuất của bước 5", async () => {
+  it("chỉ hiện hai việc chạy thử, không hiện phần sản xuất của bước 9–12", async () => {
     stubProject({ project_id: "p1", status: "validating_script", scenes: [] });
 
     renderValidatePage();
@@ -65,7 +65,30 @@ describe("ValidatePage (bước 4 — chạy thử & duyệt)", () => {
     const steps = screen.getByTestId("progress-tracker-steps");
     expect(steps).toHaveTextContent("Phân tích kịch bản");
     expect(steps).toHaveTextContent("Chạy thử & kiểm tra");
-    expect(steps).not.toHaveTextContent("Render hoạt hình");
+    expect(steps).not.toHaveTextContent("Tạo giọng đọc");
+  });
+
+  // CR-051: the two jobs inside step 7 used to be numbered 1 and 2, which read
+  // as flow steps 1 and 2; the title now names the step as the rail does.
+  it("đánh số hai việc là 7.1/7.2 và tiêu đề là “Bước 7 — Validate”", async () => {
+    // parsing: 7.1 is active and 7.2 pending, so both dots show their number.
+    stubProject({ project_id: "p1", status: "parsing_script", scenes: [] });
+
+    renderValidatePage();
+
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toBeInTheDocument());
+    const items = screen.getByTestId("progress-tracker-steps").querySelectorAll("li");
+    expect(Array.from(items).map((li) => li.textContent)).toEqual(["7.1Phân tích kịch bản", "7.2Chạy thử & kiểm tra"]);
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 7 — Validate");
+  });
+
+  it("khi chờ duyệt, tiêu đề là “Bước 8 — Review”", async () => {
+    stubProject({ project_id: "p1", status: "awaiting_review", scenes: [], beats: [] });
+
+    renderValidatePage();
+
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 8 — Review"));
+    expect(screen.getByTestId("outline-review")).toHaveTextContent("Duyệt dàn ý trước khi sản xuất");
   });
 
   it("hiện dàn ý và tiến độ cùng lúc, cạnh nhau, khi đang chờ duyệt", async () => {

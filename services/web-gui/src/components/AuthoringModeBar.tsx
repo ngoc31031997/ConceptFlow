@@ -20,19 +20,43 @@ import { formatChars, formatClock } from "../lib/formatProgress";
 import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import { usePresence } from "../hooks/usePresence";
+import { FLOW_CODE, FLOW_ILLUSTRATIONS, FLOW_STORY, FLOW_VISUAL, flowTitle } from "../utils/flow";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
-/** Nhãn tiếng Việt của từng bước, để câu trạng thái nói đúng nó đang ở đâu. */
-const STEP_LABELS: Record<AuthoringStep, string> = {
-  story: "Kịch bản",
-  storyboard: "Visual",
-  illustrations: "Hình minh hoạ",
-  code: "Code",
-};
-
 /** Thứ tự các bước; "illustrations" chỉ có ở video Remotion (CR-045). */
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "illustrations", "code"];
+
+/**
+ * CR-051 — số của từng bước trong luồng 14 bước. Chuỗi AI từng tự đánh số
+ * "Bước 1/3", "2/3"… trong khi thanh bước bên trái ghi 3/4/5/6, nên Creator
+ * thấy hai danh sách bước khác nhau cho cùng một việc.
+ */
+const STEP_FLOW: Record<AuthoringStep, number> = {
+  story: FLOW_STORY,
+  storyboard: FLOW_VISUAL,
+  illustrations: FLOW_ILLUSTRATIONS,
+  code: FLOW_CODE,
+};
+
+/** "Bước 4 — Visual": tên một bước soạn đúng như thanh bước gọi nó. */
+function stepTitle(step: AuthoringStep): string {
+  return flowTitle(STEP_FLOW[step]);
+}
+
+/** "3–6": dải bước của chuỗi, theo số trên thanh bước. */
+const CHAIN_RANGE = `${FLOW_STORY}–${FLOW_CODE}`;
+
+/**
+ * Các ô của stepper chuỗi: mọi bước soạn từ bước đầu tới bước cuối của chuỗi,
+ * kể cả bước chuỗi bỏ qua (Hình minh hoạ của video Manim), để các ô luôn khớp
+ * với thanh bước.
+ */
+function chainRows(chain: AuthoringStep[]): AuthoringStep[] {
+  const first = ALL_STEPS.indexOf(chain[0]);
+  const last = ALL_STEPS.indexOf(chain[chain.length - 1]);
+  return ALL_STEPS.slice(first, last + 1);
+}
 
 /** Tab của từng bước, để chuỗi AI tự đưa Creator theo đúng bước đang chạy. */
 export const AUTHORING_STEP_PATHS: Record<AuthoringStep, string> = {
@@ -59,7 +83,7 @@ interface LastRun {
 }
 
 function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun>> {
-  const byFlow: Record<number, AuthoringStep> = { 3: "story", 4: "storyboard", 5: "illustrations", 6: "code" };
+  const byFlow = Object.fromEntries(ALL_STEPS.map((st) => [STEP_FLOW[st], st])) as Record<number, AuthoringStep>;
   const out: Partial<Record<AuthoringStep, LastRun>> = {};
   for (const e of [...events].sort((a, b) => a.id - b.id)) {
     // CR-046: illustrations now journals under its own flow number (6). Old rows from
@@ -114,10 +138,11 @@ interface AuthoringModeBarProps {
   onModeChange: (mode: AuthoringMode) => void;
   projectId: string;
   /**
-   * CR-030 — chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Tab 1a
-   * truyền cả ba (`story`, `storyboard`, `code`): Creator chỉ nhập chủ đề rồi
-   * bấm một lần, server chạy tuần tự, mỗi bước đọc kết quả bước trước đã lưu.
-   * Tab 1b/1c truyền đúng một bước, để chạy lại riêng bước đó sau khi sửa tay.
+   * CR-030 — chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Màn bước 3
+   * truyền cả chuỗi (`authoringChainSteps`: story, storyboard, [illustrations],
+   * code): Creator chỉ nhập chủ đề rồi bấm một lần, server chạy tuần tự, mỗi
+   * bước đọc kết quả bước trước đã lưu. Màn 4/5/6 truyền đúng một bước, để
+   * chạy lại riêng bước đó sau khi sửa tay.
    *
    * CR-031 — để trống ở màn chọn tình huống: ở đó chưa có chủ đề, chưa có
    * artefact nào để sinh, nên chỉ có công tắc chế độ chứ không có nút chạy.
@@ -163,11 +188,11 @@ const MODE_LABELS: Record<AuthoringMode, string> = {
 };
 
 /**
- * CR-027 FR79 — cách làm **cả bước 3**, đặt ở đầu mỗi tab 1a/1b/1c.
+ * CR-027 FR79 — cách làm **các bước soạn 3–6**, đặt ở đầu mỗi màn 3/4/5/6.
  *
- * Một lựa chọn cho toàn bộ pipeline, không phải một nút riêng mỗi tab:
+ * Một lựa chọn cho toàn bộ pipeline, không phải một nút riêng mỗi màn:
  * Creator đã quyết định chạy script này bằng API thì không muốn quyết định
- * lại ở 1b, 1c. Lựa chọn nằm trong draft nên nó sống qua việc đổi tab và tải
+ * lại ở bước 4, 6. Lựa chọn nằm trong draft nên nó sống qua việc đổi màn và tải
  * lại trang, và mặc định là `manual` — đúng cái mọi project vẫn làm trước
  * CR-027.
  *
@@ -177,11 +202,11 @@ const MODE_LABELS: Record<AuthoringMode, string> = {
  * hiện ra ở trạng thái không chọn được kèm lý do, chứ không lẳng lặng biến mất
  * — Creator cần biết tính năng có tồn tại và thiếu gì để bật.
  *
- * CR-030 — ở chế độ AI, tab 1a chạy cả ba bước trong một lần bấm (`steps`).
+ * CR-030 — ở chế độ AI, màn bước 3 chạy cả chuỗi 3 → 6 trong một lần bấm (`steps`).
  * Chuỗi chạy ở client chứ không phải một endpoint mới, vì mỗi lượt gọi đã tự
  * lưu kết quả lên server rồi: bước sau render prompt từ đúng dữ liệu bước
  * trước vừa lưu. Đổi lại, khi một bước giữa chừng hỏng thì những bước đã xong
- * vẫn còn nguyên, và Creator chạy tiếp từ tab đang dở thay vì mất cả chuỗi.
+ * vẫn còn nguyên, và Creator chạy tiếp từ màn đang dở thay vì mất cả chuỗi.
  */
 export function AuthoringModeBar({
   llm,
@@ -199,8 +224,8 @@ export function AuthoringModeBar({
   embedded = false,
 }: AuthoringModeBarProps) {
   // Trạng thái "đang chạy" sống ở AuthoringRunContext, ngoài component này —
-  // dùng chung cho cả 3 tab 1a/1b/1c, để tab vừa mở thấy đúng một chuỗi đang
-  // chạy dở ở tab khác thay vì tưởng mình rảnh và cho bấm chạy chồng lên.
+  // dùng chung cho cả các màn 3–6, để màn vừa mở thấy đúng một chuỗi đang
+  // chạy dở ở màn khác thay vì tưởng mình rảnh và cho bấm chạy chồng lên.
   const run = useAuthoringRun();
   const dispatchRun = useAuthoringRunDispatch();
   const dispatchDraft = useContext(ProjectDraftDispatchContext);
@@ -342,7 +367,7 @@ export function AuthoringModeBar({
   // chung khiến Creator tưởng máy đứng hình.
   const runningElsewhere = running && run.steps !== steps && run.steps.join() !== steps.join();
   const outcomeError = outcome?.error
-    ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${STEP_LABELS[outcome.error_step]})` : "")
+    ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${stepTitle(outcome.error_step)})` : "")
     : null;
   const outcomeNote = outcome?.note ?? null;
   const outcomeWaiting = outcome?.waiting ?? null;
@@ -388,7 +413,9 @@ export function AuthoringModeBar({
     }
   }
 
-  const runLabel = isChain ? `Chạy cả ${steps.length} bước bằng AI` : `Chạy ${what} bằng AI`;
+  const runLabel = isChain
+    ? `Chạy bằng AI các bước ${STEP_FLOW[steps[0]]}–${STEP_FLOW[steps[steps.length - 1]]}`
+    : `Chạy ${what} bằng AI`;
 
   const modeHint = !llm.enabled
     ? llm.reason || "Chưa bật AI. Bạn có thể tự làm bằng cách sao chép prompt."
@@ -401,7 +428,7 @@ export function AuthoringModeBar({
     <div className={embedded ? styles.embedded : styles.stack} data-testid="authoring-mode-bar">
       {showSwitch && (
         <div className={`${glass.card} ${styles.card}`}>
-          <div className={glass.cardTitle}>Cách làm bước 3</div>
+          <div className={glass.cardTitle}>Cách làm các bước {CHAIN_RANGE}</div>
           <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />
         </div>
       )}
@@ -414,7 +441,7 @@ export function AuthoringModeBar({
               const r = runs[st] as LastRun;
               return (
                 <li key={st} data-testid={`last-run-${st}`} data-state={r.state}>
-                  <b>{STEP_LABELS[st]}</b>
+                  <b>{stepTitle(st)}</b>
                   <span>{r.state === "done" ? "xong" : r.state === "failed" ? "lỗi" : r.state}</span>
                   <span>{formatMs(r.durationMs)}</span>
                   {r.chars > 0 && <span>{formatChars(r.chars)} ký tự</span>}
@@ -449,11 +476,11 @@ export function AuthoringModeBar({
                 {running && (
                   <p className={styles.status} data-testid="run-with-ai-running">
                     {runningElsewhere
-                      ? `Đang chạy ở bước khác: ${
-                          run.currentIndex >= 0 ? STEP_LABELS[run.steps[run.currentIndex]] : "..."
+                      ? `Đang chạy ở ${
+                          run.currentIndex >= 0 ? stepTitle(run.steps[run.currentIndex]) : "bước khác"
                         }. Vui lòng chờ hoàn tất.`
                       : run.currentIndex >= 0 && isChain
-                        ? `Bước ${run.currentIndex + 1}/${steps.length} — ${STEP_LABELS[steps[run.currentIndex]]}. Có thể mất vài phút. Vui lòng không đóng trang.`
+                        ? `Đang chạy ${stepTitle(steps[run.currentIndex])}. Có thể mất vài phút. Vui lòng không đóng trang.`
                         : "Có thể mất vài chục giây. Vui lòng không đóng trang."}
                   </p>
                 )}
@@ -517,10 +544,13 @@ export function AuthoringModeBar({
             </>
           )}
 
-          {/* Chạy cả chuỗi (1a → 1b → 1c) đụng đúng chỗ Creator từng bị lạc: bấm
-              chạy ở 1a rồi lỡ chuyển sang 1b/1c xem tiến độ. Panel này hiện trên
-              CẢ BA tab bất cứ khi nào một chuỗi đang chạy, nên đứng ở tab nào
-              cũng thấy đủ ba bước và biết đang chờ đúng bước nào. */}
+          {/* Chạy cả chuỗi (bước 3 → 6) đụng đúng chỗ Creator từng bị lạc: bấm
+              chạy ở bước 3 rồi lỡ chuyển sang màn 4/5/6 xem tiến độ. Panel này
+              hiện trên cả bốn màn bất cứ khi nào một chuỗi đang chạy, nên đứng ở
+              màn nào cũng thấy đủ các bước và biết đang chờ đúng bước nào.
+              CR-051: mỗi ô mang số và tên của thanh bước, và bước chuỗi không
+              chạy (Hình minh hoạ của video Manim) vẫn hiện, mờ, "Không dùng" —
+              như thanh bước — thay vì biến mất khiến 4 bước thành 3. */}
           {running && steps.length > 0 && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
               <Button onClick={() => setConfirmingCancel(true)} disabled={cancelling} data-testid="run-with-ai-cancel">
@@ -547,18 +577,29 @@ export function AuthoringModeBar({
               )}
               {run.steps.length > 1 && (
                 <ol className={styles.stepper}>
-                  {run.steps.map((step, index) => {
-                    const status = index < run.currentIndex ? "done" : index === run.currentIndex ? "running" : "pending";
+                  {chainRows(run.steps).map((step) => {
+                    const index = run.steps.indexOf(step);
+                    const status =
+                      index < 0
+                        ? "skipped"
+                        : index < run.currentIndex
+                          ? "done"
+                          : index === run.currentIndex
+                            ? "running"
+                            : "pending";
                     return (
                       <li
                         key={step}
                         className={`${styles.stepItem} ${styles[`stepItem_${status}`]}`}
                         data-testid={`authoring-run-panel-${step}`}
+                        data-state={status}
                         aria-current={status === "running" ? "step" : undefined}
                       >
-                        <span className={styles.stepName}>{STEP_LABELS[step]}</span>
+                        <span className={styles.stepName}>{stepTitle(step)}</span>
                         <span className={styles.stepNote}>
-                          {status === "done"
+                          {status === "skipped"
+                            ? "Không dùng"
+                            : status === "done"
                             ? ["xong", runs[step] ? formatClock(runs[step]!.durationMs / 1000) : null, runs[step]?.chars ? `${formatChars(runs[step]!.chars)} ký tự` : null]
                                 .filter(Boolean)
                                 .join(" · ")
@@ -594,7 +635,7 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
   const aiMode = mode === "ai" && llm.enabled;
   const aiOff = !llm.enabled;
   return (
-    <div className={styles.options} data-testid="authoring-mode-switch" role="radiogroup" aria-label="Cách làm bước 3">
+    <div className={styles.options} data-testid="authoring-mode-switch" role="radiogroup" aria-label={`Cách làm các bước ${CHAIN_RANGE}`}>
       <button
         type="button"
         role="radio"

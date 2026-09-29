@@ -195,7 +195,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		return nil, fmt.Errorf("load storyboard: %w", err)
 	}
 	if strings.TrimSpace(storyboard) == "" {
-		return nil, fmt.Errorf("chưa có storyboard — hãy chạy bước Visual trước")
+		return nil, fmt.Errorf("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
 	}
 	all, err := uc.library.List(ctx, IllustrationFilter{})
 	if err != nil {

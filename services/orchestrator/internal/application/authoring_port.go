@@ -14,6 +14,20 @@ type AuthoringSummary struct {
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
+	// IllustrationsReady (CR-051): the drawing list is planned and every drawing
+	// approved or skipped. nil means an authoring-service from before CR-051
+	// that does not send it — read as ready, which is the old placement.
+	IllustrationsReady *bool `json:"illustrations_ready"`
+}
+
+// Content is the summary as FlowStateFor reads it. Only a Remotion project has
+// the illustrations step (5).
+func (s AuthoringSummary) Content(engine domain.RenderEngine) domain.AuthoredContent {
+	return domain.AuthoredContent{
+		Story: s.Story, Storyboard: s.Storyboard, Code: s.Code,
+		NeedsIllustrations: engine == domain.RenderEngineRemotion,
+		Illustrations:      s.IllustrationsReady == nil || *s.IllustrationsReady,
+	}
 }
 
 // SimilarProject is one match CR-028 FR85 surfaces back to the Creator when a

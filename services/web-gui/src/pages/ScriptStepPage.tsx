@@ -5,6 +5,7 @@ import { Card, TextArea } from "../components/ui";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { createProjectDraft } from "../api/client";
+import { FLOW_INIT, flowTitle } from "../utils/flow";
 
 /**
  * Bước 1 — chỉ còn tình huống "chưa có gì, chỉ có ý tưởng" (các tình huống
@@ -56,7 +57,7 @@ export function ScriptStepPage() {
       <AppShell
         currentStep={1}
         wide
-        title="Bước 1 — Ý tưởng"
+        title={flowTitle(FLOW_INIT)}
         subtitle="Bắt đầu video mới từ một ý tưởng."
       >
         <Card
