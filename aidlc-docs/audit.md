@@ -2021,3 +2021,15 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **User Input**: "Câu 1 \"ok\": ... => ok\nF7 — một bước có hai tên. ... =>ok\nF8 — server không biết tới bước 5. ... => đúng như vậy. cần tách nó thành làm step riêng thật sự\nA — sửa luôn: authoring-service gửi thêm cờ \"hình minh hoạ đã sẵn sàng\" sang orchestrator, để server xếp dự án đúng vào bước 5. Việc này chỉ thêm một trường vào hợp đồng nội bộ, bản cũ vẫn đọc được, và phải rebuild 2 service."
 **AI Response**: Requirements chốt: Q1=A, Q2=A, Q3=C, Q4=A, Q5=A; FR1–FR9. Phát hiện thêm F9 (`ResumeProjectPage` chặn trần ở bước 5, sót lại từ luồng 13 bước) và đưa vào phạm vi (FR9). Commit giai đoạn Requirements, chuyển sang Functional Design.
 **Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-*.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Functional Design (chờ duyệt)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: (tiếp nối sau khi duyệt Requirements)
+**AI Response**: Soạn `aidlc-docs/construction/plans/cr-051-functional-design.md`: D1 cờ `illustrations_ready` (thêm trường vào summaries nội bộ; orchestrator đọc là `*bool`, thiếu thì coi là sẵn sàng), D2 `FlowStateFor` trả về bước 5 cho dự án Remotion nháp chưa sẵn sàng hình (có code thì vẫn 6), D3 nhãn server "Render"/"Cắt short", D4 test hợp đồng: hai `flow.go` giống hệt từng byte và khớp `flow.ts`, D5 chuỗi AI dùng "Bước N — tên" + dòng 5 "Không dùng" cho Manim, D6 tracker 7.1/7.2, D7 tiêu đề màn thống nhất qua `flowTitle`, D8 dọn wizard 7 bước, D9 resume trần ở bước 6.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-051-functional-design.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Duyệt Functional Design
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design được duyệt; commit và chuyển sang Code Generation.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-051-functional-design.md`, `aidlc-docs/audit.md`.
