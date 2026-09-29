@@ -2002,3 +2002,24 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 4. Visual Director (v11) và Visual Director AI (v5): luật 14 thêm "chỉ nhân vật mới có mặt người", luật 18 yêu cầu tả vật mới cụ thể; thêm một mục tự kiểm tra. Hash golden của visual_director được đặt lại có chủ đích.
 **Impact Assessment**: `go test ./...` (authoring-service) pass; `pytest` style + previewer của rendering: 12 pass, 2 skip (cần node_modules/REMOTION_BROWSER cục bộ). Đã rebuild authoring-service (healthy), prompt mới phục vụ qua `/v1/prompts/*`, ảnh xem trước exemplar-Cat v2 dựng được, 0 cảnh báo. Hình đã vẽ trước đây trong thư viện (vd Pyramid, Worm) KHÔNG tự đổi — cần "Vẽ lại".
 **Artifacts Affected**: `services/authoring-service/internal/domain/prompts/{illustration_style_vi,illustration_exemplars_vi,illustration_helpers_vi}.txt`, `services/authoring-service/internal/application/{drawer_prompt_vi,planner_prompt_vi}.txt`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai,golden_prompts_test}.go`, `aidlc-docs/audit.md`.
+
+## CR-052 — Thư viện hình: nút Xoá trên từng hình, cho phép thay đổi Hình mẫu
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "ở màn hình thư viện hình ko có button xoá hình, ở mục hình mẫu có thể cho phép thay đổi không". Trả lời lượt 1: "1 chỉ không được xoá khi hình được dùng trong dự án đang trong quá trình render hoặc đó là hình minh hoạ (bước 5-11) 2 hiện tại ko có phân quyền trên hệ thống hình minh hoạ để promt tham chiếu đến sửa url tham chiếu là được mà đúng ko"
+**AI Response**: Mở CR-052 trên nhánh `feature/cr-052-image-library-delete-and-edit-samples` (worktree riêng vì CR-050 đang được làm ở checkout chính). Phân tích hiện trạng: nút Xoá chỉ có trong trình sửa code, không có trên ô hình. API xoá không kiểm tra hình đang được dự án dùng. Hình mẫu là code TSX nhúng trong image, không phải URL, và prompt hoạ sĩ dán nguyên code đó. Vì vậy muốn đổi Hình mẫu phải chuyển danh sách mẫu vào DB. Đã hỏi Q1–Q4 (phạm vi "đang dùng", nghĩa của "thay đổi Hình mẫu", xoá hình builtin, cách hiển thị khi bị chặn).
+**Impact Assessment**: Dự kiến `web-gui` (IllustrationLibraryPage, IllustrationTile) và `authoring-service` (use case xoá, lưu Hình mẫu, prompt hoạ sĩ). Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Trả lời lượt 2, hỏi F1–F3
+**Timestamp**: 2026-09-29T00:10:00Z
+**User Input**: "Thế nào là "đang dùng ở bước 5–11": ... => đúng / "Thay đổi Hình mẫu" là gì: ... => tối đa 5 hình nhưng các hình mẫu sẽ được clone vào 1 folder và dc ref đến qua url hoặc 1 cách nào đó chứ ko viết cứng trong txt nữa / Hình có sẵn của hệ thống có được xoá không: ... => chỉ có hình mẫu là ko xoá dc / Khi hình bị chặn xoá: ... => dúngd"
+**AI Response**: Chốt Q1 = A, Q4 = A. Q2: tối đa 5 Hình mẫu, là bản clone nằm trong thư mục hệ thống "Hình mẫu"; prompt hoạ sĩ đọc Hình mẫu từ DB, bỏ file `illustration_exemplars_vi.txt`. Q3: Hình mẫu không xoá được. Hỏi thêm F1 (kit nằm trong image render và mọi video import toàn bộ kit, nên xoá hàng kit chỉ làm ẩn, và seeder sẽ thêm lại), F2 (cách bỏ một hình khỏi danh sách mẫu khi Hình mẫu không xoá được), F3 (bản clone có sửa được không).
+**Impact Assessment**: Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Trả lời lượt 3, chốt bản yêu cầu
+**Timestamp**: 2026-09-29T00:20:00Z
+**User Input**: "F1 : không dc xoá / F2 làm theo đề xuất, hình mâux là bản clone / f3 đi theo B"
+**AI Response**: Chốt: kit không xoá được; Hình mẫu có "Bỏ làm mẫu" (bỏ bản clone, hình gốc còn; Hình mẫu gốc thì chuyển về thư mục chủ đề); Hình mẫu chỉ đọc. Viết bản yêu cầu cuối (FR1–FR10, tiêu chí chấp nhận, ngoài phạm vi), chờ Creator duyệt.
+**Impact Assessment**: `authoring-service` và `web-gui`. `llm-service` và `rendering` không đổi. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
