@@ -33,7 +33,7 @@ func TestSummariesIllustrationsReadyMatchesTheCodeGate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = r.DeleteIllustration(ctx, draft.ID) }()
+	defer func() { _ = r.DeleteIllustration(ctx, draft.ID, nil) }()
 
 	cases := []struct {
 		name    string
