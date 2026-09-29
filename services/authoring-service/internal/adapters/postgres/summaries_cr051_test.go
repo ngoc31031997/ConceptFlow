@@ -62,6 +62,10 @@ func TestSummariesIllustrationsReadyMatchesTheCodeGate(t *testing.T) {
 	}
 	for i, c := range cases {
 		id := "cr051-sum-" + string(rune('a'+i))
+		// Deferred, and done up front too, so a failed run leaves nothing that a
+		// rerun on the same database would read (e.g. a stale planned_at).
+		_ = r.DeleteAuthoring(ctx, id)
+		t.Cleanup(func() { _ = r.DeleteAuthoring(ctx, id) })
 		if _, err := pool.Exec(ctx, `INSERT INTO project_authoring (project_id) VALUES ($1) ON CONFLICT DO NOTHING`, id); err != nil {
 			t.Fatal(err)
 		}
@@ -91,9 +95,6 @@ func TestSummariesIllustrationsReadyMatchesTheCodeGate(t *testing.T) {
 		}
 		if goReady != c.want {
 			t.Errorf("%s: Ready() rule says %v, SQL case expects %v", c.name, goReady, c.want)
-		}
-		if err := r.DeleteAuthoring(ctx, id); err != nil {
-			t.Fatal(err)
 		}
 	}
 }

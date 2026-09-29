@@ -49,6 +49,7 @@ export const FLOW_PUBLISH = 14;
 export function flowTitle(step: number): string {
   // A step outside the flow (a stale or hand-edited ?step=) keeps its number
   // rather than printing "undefined".
+  if (!Number.isInteger(step)) return "Bước";
   const label = FLOW_LABELS[step - 1];
   return label ? `Bước ${step} — ${label}` : `Bước ${step}`;
 }

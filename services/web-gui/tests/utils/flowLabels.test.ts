@@ -12,6 +12,7 @@ describe("flowTitle (CR-051)", () => {
   it("does not print “undefined” for a step outside the flow", () => {
     expect(flowTitle(99)).toBe("Bước 99");
     expect(flowTitle(0)).toBe("Bước 0");
+    expect(flowTitle(Number("abc"))).toBe("Bước");
   });
 });
 
