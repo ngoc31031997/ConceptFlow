@@ -15,8 +15,10 @@ if all of these hold:
 3. `conceptflow/review/<tree>.diff` still equals the real diff against the
    merge-base with main (the agent read the whole change).
 
-A FAIL removes the marker, so a later FAIL overrides an earlier PASS. Anything else
-records nothing. Every outcome is appended to `conceptflow/review/hook.log`, which
+A PASS also needs a clean working tree (the agents read code around the diff from
+disk). A FAIL removes the marker and leaves `<tree>.<agent>.fail`, which blocks any
+later PASS on that tree: re-running an agent until it agrees does not work; fixing
+and committing (a new tree) does. Anything else records nothing. Every outcome is appended to `conceptflow/review/hook.log`, which
 scripts/review-status.sh prints. Always exits 0: /cr-review reports a review
 without a marker as not done.
 
@@ -35,7 +37,10 @@ import time
 
 GATED_AGENTS = ("reviewer", "security-reviewer", "tester")
 VERDICT = re.compile(r"^VERDICT: (PASS|FAIL) tree=([0-9a-f]{40})$")
-BASE = os.environ.get("BASE", "main")
+BASE = "main"
+# Fixed on purpose, not read from the environment: an override would let a hand-made
+# transcript pass genuine_transcript(). The tests run a copy with this line rewritten.
+TRANSCRIPTS_ROOT = "~/.claude/projects"
 
 
 def git(cwd, *args, strip=True):
@@ -110,8 +115,7 @@ def genuine_transcript(payload):
     Edit/Write is denied in .claude/settings.json and the Bash guard blocks commands
     naming this script or subagent transcripts.
     """
-    root = os.path.realpath(os.environ.get("CONCEPTFLOW_TRANSCRIPTS_ROOT",
-                                           os.path.expanduser("~/.claude/projects")))
+    root = os.path.realpath(os.path.expanduser(TRANSCRIPTS_ROOT))
     session = payload.get("session_id") or ""
     agent_id = payload.get("agent_id") or ""
     session_transcript = os.path.realpath(payload.get("transcript_path") or "")
@@ -144,7 +148,11 @@ def main():
     entries = read_transcript(transcript)
     if any(e.get("agentId") not in (None, payload.get("agent_id")) for e in entries):
         skip(f"{agent}: the transcript belongs to another agent")
-    report = delivered_report(entries) or payload.get("last_assistant_message") or ""
+    report = delivered_report(entries)
+    if not isinstance(report, str) or not report:
+        report = payload.get("last_assistant_message")
+    if not isinstance(report, str):
+        report = ""
     # Strip fences before dropping empty lines, so a verdict inside ``` still ends the report.
     lines = [line for line in (raw.strip().strip("`").strip() for raw in report.splitlines())
              if line]
@@ -155,15 +163,25 @@ def main():
 
     marks = os.path.join(common, "conceptflow", "reviewed-trees")
     marker = os.path.join(marks, f"{tree}.{agent}")
+    failed = marker + ".fail"
 
     if verdict == "FAIL":
+        # A FAIL sticks to its tree: re-running the agent on the same tree until it says
+        # PASS must not work. A new commit (new tree) starts clean; only the Creator can
+        # lift it by hand (delete the .fail file from a terminal, outside Claude Code).
+        os.makedirs(marks, exist_ok=True)
+        open(failed, "w").close()
         if os.path.exists(marker):
             os.remove(marker)
         log(f"FAIL {agent} tree={tree}")
         return
 
+    if os.path.exists(failed):
+        skip(f"{agent}: an earlier FAIL on tree {tree[:12]} stands; fix and commit (new tree)")
     if git(cwd, "rev-parse", "HEAD^{tree}") != tree:
         skip(f"{agent}: tree {tree[:12]} is not the tree of the current HEAD")
+    if git(cwd, "status", "--porcelain") != "":
+        skip(f"{agent}: uncommitted changes; the agent may have read code that is not in the tree")
     review = os.path.join(common, "conceptflow", "review")
     try:
         with open(os.path.join(review, f"{tree}.brief")) as f:

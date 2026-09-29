@@ -36,7 +36,8 @@
       "Edit(/.claude/skills/**)",
       "Edit(/scripts/hooks/**)",
       "Edit(/scripts/check.sh)",
-      "Edit(/scripts/review-prep.sh)"
+      "Edit(/scripts/review-prep.sh)",
+      "Edit(/scripts/review-status.sh)"
     ],
     "deny": [
       "Bash(git push --force*)",

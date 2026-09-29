@@ -5,6 +5,7 @@ Stdlib only, like the hooks themselves.
 """
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -55,7 +56,10 @@ class SecretGuardTest(unittest.TestCase):
 
     def test_blocks_running_review_hook_by_hand(self):
         self.assertBlocked("python3 scripts/hooks/record_review.py < /tmp/payload.json")
+        self.assertBlocked("python3 scripts/hooks/record_revie?.py < /tmp/payload.json")
         self.assertBlocked("cat ~/.claude/projects/p/s/subagents/agent-1.jsonl")
+        self.assertAllowed("git add scripts/hooks/record_review.py")
+        self.assertAllowed("git diff -- scripts/hooks/record_review.py")
 
     def test_blocks_marker_dirs(self):
         self.assertBlocked("touch .git/conceptflow/reviewed-trees/abc.reviewer")
@@ -212,6 +216,15 @@ class SettingsTest(unittest.TestCase):
                      "Edit(/scripts/check.sh)", "Edit(/scripts/review-prep.sh)"):
             self.assertIn(rule, perms["ask"])
 
+    def test_review_agents_are_read_only(self):
+        agents = os.path.join(HOOKS, "..", "..", ".claude", "agents")
+        for name in ("reviewer", "security-reviewer", "tester", "solution-architect"):
+            with open(os.path.join(agents, f"{name}.md")) as f:
+                front = f.read().split("---")[1]
+            tools = re.search(r"^tools:\s*(.+)$", front, re.M).group(1)
+            self.assertEqual({t.strip() for t in tools.split(",")}, {"Read", "Grep", "Glob"},
+                             name)
+
     def test_hooks_registered(self):
         commands = json.dumps(self.settings["hooks"])
         for script in ("guard_bash.py", "lint-edited.sh", "stop-check.sh", "record_review.py"):
@@ -229,7 +242,8 @@ class RecordReviewTest(unittest.TestCase):
         sh(self.repo, "git", "config", "user.email", "t@example.com")
         sh(self.repo, "git", "config", "user.name", "t")
         os.makedirs(os.path.join(self.repo, "scripts"))
-        shutil.copy(os.path.join(HOOKS, "..", "review-prep.sh"), os.path.join(self.repo, "scripts"))
+        for script in ("review-prep.sh", "review-status.sh"):
+            shutil.copy(os.path.join(HOOKS, "..", script), os.path.join(self.repo, "scripts"))
         self.write("a.txt", "1")
         sh(self.repo, "git", "add", ".")
         sh(self.repo, "git", "commit", "-q", "-m", "a")
@@ -254,8 +268,18 @@ class RecordReviewTest(unittest.TestCase):
         """Runs the hook as Claude Code would, with a transcript laid out like a real
         subagent's: <root>/<project>/<session>.jsonl and
         <root>/<project>/<session>/subagents/agent-<id>.jsonl (root faked via env)."""
-        root = os.path.join(self.repo + "-transcripts")
+        root = os.path.realpath(self.repo + "-transcripts")
         self.addCleanup(shutil.rmtree, root, True)
+        # The hook has no runtime override for its transcript root (that would be a forgery
+        # path), so the test runs a copy with the constant rewritten.
+        hook = os.path.join(root, "record_review_under_test.py")
+        os.makedirs(root, exist_ok=True)
+        with open(RECORD_REVIEW) as f:
+            source = f.read()
+        fixed = 'TRANSCRIPTS_ROOT = "~/.claude/projects"'
+        self.assertIn(fixed, source)
+        with open(hook, "w") as f:
+            f.write(source.replace(fixed, f"TRANSCRIPTS_ROOT = {root!r}"))
         session, agent_id = "sess-1", "a" + agent.replace("-", "")
         session_transcript = os.path.join(root, "proj", f"{session}.jsonl")
         real = os.path.join(root, "proj", session, "subagents", f"agent-{agent_id}.jsonl")
@@ -276,9 +300,7 @@ class RecordReviewTest(unittest.TestCase):
                               "agent_transcript_path": path,
                               "last_assistant_message": report if last_message is None else last_message,
                               "cwd": self.repo})
-        env = dict(os.environ, CONCEPTFLOW_TRANSCRIPTS_ROOT=root)
-        result = subprocess.run(["python3", RECORD_REVIEW], input=payload,
-                                capture_output=True, text=True, env=env)
+        result = subprocess.run(["python3", hook], input=payload, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stderr
 
@@ -287,6 +309,42 @@ class RecordReviewTest(unittest.TestCase):
         self.addCleanup(shutil.rmtree, os.path.dirname(forged), True)
         err = self.record("reviewer", self.verdict(), transcript=forged)
         self.assertIn("not this session's own subagent transcript", err)
+        self.assertFalse(os.path.exists(self.marker("reviewer")))
+
+    def test_fail_sticks_to_its_tree(self):
+        self.record("reviewer", self.verdict("FAIL"))
+        err = self.record("reviewer", self.verdict("PASS"))
+        self.assertIn("earlier FAIL", err)
+        self.assertFalse(os.path.exists(self.marker("reviewer")))
+
+    def test_transcript_of_another_agent_is_rejected(self):
+        # Right place on disk, but its entries are tagged with a different agentId.
+        self.record("reviewer", self.verdict())
+        os.remove(self.marker("reviewer"))
+        root = os.path.realpath(self.repo + "-transcripts")
+        path = os.path.join(root, "proj", "sess-1", "subagents", "agent-areviewer.jsonl")
+        with open(path) as f:
+            text = f.read().replace('"agentId": "areviewer"', '"agentId": "someoneelse"')
+        with open(path, "w") as f:
+            f.write(text)
+        payload = json.dumps({"hook_event_name": "SubagentStop", "agent_type": "reviewer",
+                              "agent_id": "areviewer", "session_id": "sess-1",
+                              "transcript_path": os.path.join(root, "proj", "sess-1.jsonl"),
+                              "agent_transcript_path": path,
+                              "last_assistant_message": self.verdict(), "cwd": self.repo})
+        result = subprocess.run(["python3", os.path.join(root, "record_review_under_test.py")],
+                                input=payload, capture_output=True, text=True)
+        self.assertIn("belongs to another agent", result.stderr)
+        self.assertFalse(os.path.exists(self.marker("reviewer")))
+
+    def test_non_string_report_does_not_crash(self):
+        err = self.record("tester", ["not", "a", "string"], last_message=None)
+        self.assertIn("does not end with a VERDICT line", err)
+
+    def test_pass_with_uncommitted_changes_is_rejected(self):
+        self.write("a.txt", "changed on disk")
+        err = self.record("reviewer", self.verdict())
+        self.assertIn("uncommitted changes", err)
         self.assertFalse(os.path.exists(self.marker("reviewer")))
 
     def test_fenced_verdict_is_read(self):
@@ -301,8 +359,6 @@ class RecordReviewTest(unittest.TestCase):
             self.assertEqual(result.returncode, 2, args)
 
     def test_review_status_exit_code(self):
-        status = os.path.join(HOOKS, "..", "review-status.sh")
-        shutil.copy(status, os.path.join(self.repo, "scripts"))
         run = lambda: subprocess.run(["scripts/review-status.sh"], cwd=self.repo,
                                      capture_output=True, text=True)
         self.assertEqual(run().returncode, 1)

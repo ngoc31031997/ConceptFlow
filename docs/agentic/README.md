@@ -95,7 +95,7 @@ Lần review thật đầu tiên đã phát hiện một lỗ hổng giả mạo
 - **Phải hỏi Creator:**
   - thao tác huỷ thay đổi chưa commit (`git restore`, `reset --hard`, `clean`, `branch -D`);
   - `docker exec`, script migrate dữ liệu;
-  - sửa `.github/`, `.claude/settings*.json`, `.claude/agents/`, `scripts/hooks/`, `scripts/check.sh`, `scripts/review-prep.sh`.
+  - sửa `.github/`, `.claude/settings*.json`, `.claude/agents/`, `.claude/skills/`, `scripts/hooks/`, `scripts/check.sh`, `scripts/review-prep.sh`, `scripts/review-status.sh`.
 - **Cấm:**
   - force push, xoá nhánh remote;
   - `rm -rf`, xoá volume Docker;
@@ -114,7 +114,10 @@ Creator chỉ cần nói bằng lời (ví dụ "làm CR: …"). Agent sẽ tự
 | 4 | Kiểm tra trên app (stack Docker đã rebuild) | Báo kết quả, **chờ duyệt** |
 | 5 | "ok" | `/cr-finish`: commit → merge `origin/main` → `/cr-check` → `/cr-review` (3 agent) → merge vào `main` qua cổng → push → báo kết quả CI |
 
-Nếu `/cr-review` ra **FAIL**, agent sửa các lỗi trong phạm vi CR, commit, rồi chạy lại check và review. Mỗi commit mới là một tree mới, nên dấu cũ không còn giá trị. Lỗi mà agent cho là review sai thì agent đưa bằng chứng để bạn quyết định. Agent không chạy lại review chỉ để mong kết quả khác.
+Nếu `/cr-review` ra **FAIL**:
+- Agent sửa các lỗi trong phạm vi CR, commit, rồi chạy lại check và review. Mỗi commit mới là một tree mới, nên dấu cũ không còn giá trị.
+- FAIL **dính cứng với tree đó**: chạy lại agent trên cùng tree sẽ không ghi PASS nữa (hook chặn).
+- Nếu bạn cho rằng review sai, bạn có thể tự gỡ bằng cách xoá file `.fail` trong terminal. Agent không làm được việc này.
 
 ### Xem nhanh trạng thái cổng
 
@@ -175,7 +178,7 @@ scripts/
     lint-edited.sh               PostToolUse: lint file vừa sửa
     stop-check.sh                Stop: make check
     record_review.py             SubagentStop: ghi verdict review
-    test_hooks.py                36 test (chạy trong make check / CI)
+    test_hooks.py                41 test (chạy trong make check / CI)
 .claude/
   settings.json                  quyền + đăng ký hook (commit, dùng chung)
   settings.local.json            quyền cá nhân (không commit)
