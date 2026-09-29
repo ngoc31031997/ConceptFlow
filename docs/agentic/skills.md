@@ -24,10 +24,11 @@ Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as `/<na
 | `reviewer` | Read, Grep, Glob | `sonnet` / `high` | `/cr-review` | Yes |
 | `security-reviewer` | Read, Grep, Glob | `sonnet` / `high` | `/cr-review` | Yes |
 | `tester` | Read, Grep, Glob | `sonnet` / `medium` | `/cr-review` | Yes |
+| `ops-runner` | Bash, Read, Grep, Glob (no edit) | `haiku` / – | `/rebuild` and `/cr-check` (`context: fork`), CI watch in `/cr-finish` (background), logs and live check in `/fix-bug` | No |
 
-Skills set `effort` only on entry points (`/cr-start` medium, `/fix-bug` medium, `/cr-finish` low). `/cr-check`, `/rebuild` and `/cr-review` deliberately inherit: a skill's model/effort lasts for the rest of the turn, so pinning a cheap model there would also run the code fixes that follow on it. Rationale and how to change: README §2.6.
+Skills set `effort` only on entry points (`/cr-start` medium, `/fix-bug` medium, `/cr-finish` low). A skill's model/effort in the main session lasts for the rest of the turn, so cheap models are never set on a skill: `/rebuild` and `/cr-check` instead run whole in the `ops-runner` agent (`context: fork`, `agent: ops-runner`), and the orchestrating skills (`/cr-review`, `/cr-finish`, `/fix-bug`) stay in the main session because agents cannot start agents, delegating individual steps. `SettingsTest.test_forked_skills_use_existing_agents` checks the fork targets. Rationale and how to change: README §2.6.
 
-No shell and no edit tools: they cannot change the code they judge. Each ends with a machine-readable `VERDICT:` line (see `hooks.md`). Claude Code loads agent definitions at session start; a session started before an agent file changed does not see the change.
+The four role agents have no shell and no edit tools: they cannot change the code they judge. Each ends with a machine-readable `VERDICT:` line (see `hooks.md`). Claude Code loads agent definitions at session start; a session started before an agent file changed does not see the change.
 
 ## `scripts/review-prep.sh`, `scripts/review-status.sh`
 
