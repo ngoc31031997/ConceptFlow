@@ -11,6 +11,8 @@ Implements CLAUDE.md's *CR completion policy* under decision D1 (auto-merge kept
 
 Stop and report at the first step that fails. Do not continue past it.
 
+Who does what (to save tokens): the main session keeps the judgement steps (approval, diff sanity, AI-DLC records, merge). `/cr-check` runs in the `ops-runner` agent (haiku), `/cr-review` in the read-only role agents (sonnet), and the CI watch in `ops-runner` in the background. This skill cannot itself run as a forked agent: agents cannot start other agents, and `/cr-review` needs to.
+
 ## 1. Preconditions
 
 - The Creator explicitly approved this CR's final stage in this conversation ("ok"/"approve"/"go" after the completion message). No approval → stop and ask. A request made earlier in the conversation, or an approval of an earlier stage, is not approval.
@@ -68,14 +70,13 @@ If the gate blocks: report its message verbatim. `main` moved during the pull �
 
 ## 7. CI
 
-The repository is public; watch the run for the pushed commit in the background (no token needed):
+Do not poll from the main session. Hand the watch to the `ops-runner` agent (haiku) with `run_in_background: true`, and meanwhile write the report. Its prompt, with `<sha>` = `git rev-parse main`:
 
-```bash
-curl -s "https://api.github.com/repos/ngoc31031997/ConceptFlow/actions/runs?head_sha=$(git rev-parse main)" \
-  | jq -r '.workflow_runs[0] | "\(.status) \(.conclusion) \(.html_url)"'
-```
+> Watch GitHub CI for commit `<sha>` of the public repository ngoc31031997/ConceptFlow (no token needed). Run
+> `curl -s "https://api.github.com/repos/ngoc31031997/ConceptFlow/actions/runs?head_sha=<sha>" | jq -r '.workflow_runs[0] | "\(.status) \(.conclusion) \(.html_url) \(.id)"'`
+> every 30 s (`sleep 30` between runs) until the status is `completed`, at most 40 minutes. Report the conclusion and the link. If the conclusion is not `success`, also fetch `https://api.github.com/repos/ngoc31031997/ConceptFlow/actions/runs/<id>/jobs`, and for each failed job `https://api.github.com/repos/ngoc31031997/ConceptFlow/check-runs/<job id>/annotations`, and quote the failing annotations.
 
-Poll every 30 s until `completed`. Report the conclusion with the link. A red CI on `main` is reported immediately as the top line, with the failing annotations (`/repos/…/check-runs/<id>/annotations`).
+When it returns, add the CI result to the report. A red CI on `main` is reported immediately as the top line, with the failing annotations. No result within 40 minutes: report CI as **not confirmed**, with the run link.
 
 ## 8. Report
 

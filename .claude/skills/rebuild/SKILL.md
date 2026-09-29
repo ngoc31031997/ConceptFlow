@@ -2,9 +2,13 @@
 name: rebuild
 description: Rebuild and restart the Docker Compose services whose code changed, then wait until they are healthy. Use right after changing service code for a bug fix or Change Request (CLAUDE.md Docker rebuild policy), or when the Creator asks to rebuild/restart a service.
 argument-hint: "[service ...]  (default: services changed vs main)"
+context: fork
+agent: ops-runner
 ---
 
 # /rebuild
+
+Runs in the `ops-runner` agent (haiku), not in the main session: it is only a script run, and the build output stays out of the main context.
 
 Run the rebuild script. It picks the services, builds, restarts and waits for health; do not re-implement those steps by hand.
 
@@ -19,7 +23,7 @@ scripts/rebuild.sh $ARGUMENTS
 ## Report
 
 - Exit 0: list each service and its final state (`healthy`, or `running` for services without a healthcheck such as `web-gui`). Say the change is live.
-- Exit 1: say which service failed (build, start, or health), quote the relevant log lines the script printed, and give the most likely cause. Do not claim the change is live. Fix it if the cause is in the current task's code, then run `/rebuild` again; otherwise stop and ask the Creator.
+- Exit 1: say which service failed (build, start, or health) and quote the relevant log lines the script printed. Do not claim the change is live. End with: `Next: the main session diagnoses the failure; if the cause is in the current task's code it fixes it and runs /rebuild again, otherwise it stops and asks the Creator.`
 - Exit 2: usage problem (unknown service, Docker not running). Report it as is.
 - "nothing to rebuild": no service code changed. Say so. Documentation or script-only changes need no rebuild.
 

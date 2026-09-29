@@ -1,7 +1,7 @@
 # graphify: đồ thị tri thức của code cho agent
 
 > Cập nhật: 2026-09-29. Người đọc: Creator và agent làm CR / sửa bug trong repo này.
-> Công cụ: [graphify](https://github.com/Graphify-Labs/graphify) (gói PyPI `graphifyy`). Quyết định: D12 trong [`implementation-audit.md`](implementation-audit.md) §10.
+> Công cụ: [graphify](https://github.com/Graphify-Labs/graphify) (gói PyPI `graphifyy`). Quyết định: D12 trong [`implementation-audit.md`](implementation-audit.md) §11.
 
 ## 1. Để làm gì
 

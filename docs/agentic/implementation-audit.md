@@ -226,7 +226,18 @@ Phát hiện nhờ CI: `services/rendering/requirements-dev.txt` thiếu `httpx`
 
 Trạng thái lúc chốt: tree `aa9d777…` có `make check` pass; `tester` PASS; `reviewer` FAIL (H1); `security-reviewer` FAIL (H2). Merge Phase 7 do Creator quyết định (xem tin nhắn cuối phiên).
 
-## 10. graphify: đồ thị tri thức của code (Creator, 2026-09-29)
+
+## 10. Agent theo bước: model/effort theo từng bước của skill (Creator, 2026-09-29)
+
+**Yêu cầu (nguyên văn):** "bộ skill cũng khá ổn rồi nhưng nên chia agent mịn hơn để tiết kiệm token ví dụ /rebuild chỉ cần chạy các lệnh docker thì dùng haiku là đủ, sao phải chạy theo phiên, bên trong các skill mỗi bước khác nhau hãy gọi agent khác nhau với tham số là model và effort phù hợp"
+
+**Làm:** agent thực thi `ops-runner` (haiku; Bash + đọc, không Edit/Write). `/rebuild` và `/cr-check` chạy trọn trong agent này (`context: fork`); `/cr-finish` giao bước theo dõi CI cho `ops-runner` chạy nền; `/fix-bug` giao đọc log + kiểm tra trực tiếp cho `ops-runner`, tìm code cho `Explore` (haiku, có sẵn). Nguyên nhân gốc, sửa code, duyệt, merge vẫn ở phiên chính.
+
+**Không tách, và lý do:** agent không gọi được agent khác, nên `/cr-review`, `/cr-finish`, `/fix-bug` phải điều phối từ phiên chính; vài lệnh git ngắn (`/cr-start` bước 1–4, merge) rẻ hơn khi phiên chính tự chạy so với chi phí cố định của một agent. Haiku không đặt `effort`.
+
+**Kiểm tra:** `make check` pass (hooks unittest, gồm test mới `SettingsTest.test_forked_skills_use_existing_agents`). Chưa chạy thử `/rebuild` / `/cr-check` dạng fork trong phiên mới.
+
+## 11. graphify: đồ thị tri thức của code (Creator, 2026-09-29)
 
 **Quyết định D12:** dùng [graphify](https://github.com/Graphify-Labs/graphify) (`graphifyy` 0.9.71) làm bản đồ code cho agent. Chi tiết và cách dùng: [`graphify.md`](graphify.md).
 
