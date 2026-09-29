@@ -132,6 +132,9 @@ func (uc *IllustrationsUseCase) draw(
 	if uc.drawer == nil {
 		return drawnReply{}, IllustrationPreview{}, ErrDrawerDisabled
 	}
+	if err := checkCodeModel(StepIllustrations, model); err != nil {
+		return drawnReply{}, IllustrationPreview{}, err
+	}
 	turn := user
 	var lastErr error
 	report := func(p domain.DrawProgress) {

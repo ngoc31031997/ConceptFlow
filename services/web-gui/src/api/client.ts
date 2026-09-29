@@ -847,8 +847,10 @@ export interface DrawProgress {
 
 export interface ProjectIllustrations {
   illustrations: ProjectIllustration[];
-  /** Mọi hình đã duyệt hoặc bỏ qua — bước Code được chạy. */
+  /** Mọi hình đã duyệt hoặc bỏ qua, và danh sách không cũ — bước Code được chạy. */
   ready: boolean;
+  /** CR-050: danh sách lập từ storyboard cũ hơn storyboard đang lưu. */
+  stale?: boolean;
 }
 
 export function listProjectIllustrations(projectId: string): Promise<ProjectIllustrations> {
@@ -892,6 +894,18 @@ export function skipProjectIllustration(projectId: string, rowId: string, skippe
 export type AuthoringModelOption = {
   id: string;
   label: string;
+  /** CR-050: false = bước Code (và Hình minh hoạ) không dùng được model này. */
+  code_ok?: boolean;
+};
+
+/** CR-050 — chi phí đã đo của một model ở các đoạn code (30 ngày). */
+export type ModelUsageStats = {
+  model: string;
+  calls: number;
+  ok: number;
+  failures: Record<string, number>;
+  avg_completion_tokens: number;
+  avg_duration_ms: number;
 };
 
 export type LlmStatus = {
@@ -902,6 +916,10 @@ export type LlmStatus = {
   models?: AuthoringModelOption[];
   /** Model cụ thể mà lựa chọn rỗng ("") được máy chủ quy về. */
   default_model?: string;
+  /** CR-050: số liệu đo của từng model ở bước Code, theo id model. */
+  code_stats?: Record<string, ModelUsageStats>;
+  /** CR-050: có khi không đọc được số liệu (khác với "chưa có số liệu"). */
+  code_stats_error?: string;
 };
 
 export function getLlmStatus(): Promise<LlmStatus> {

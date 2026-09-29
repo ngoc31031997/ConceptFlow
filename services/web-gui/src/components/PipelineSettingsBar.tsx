@@ -99,6 +99,8 @@ export function PipelineSettingsBar({
               options={llm?.models ?? []}
               defaultModel={llm?.default_model ?? ""}
               disabled={running}
+              codeStats={llm?.code_stats}
+              codeStatsError={llm?.code_stats_error}
             />
           )}
         </div>

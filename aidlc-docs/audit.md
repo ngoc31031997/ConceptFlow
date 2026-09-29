@@ -2069,3 +2069,16 @@ c3b mặc định là 3"
 **Context**: INCEPTION — Requirements Analysis → Workflow Planning.
 
 ---
+
+## CR-050 — Workflow Planning + Unit 1 (FR-17..FR-20) Code Generation
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: (tiếp theo "appproce andcode")
+**AI Response**: Workflow plan và thiết kế Unit 1 ở `aidlc-docs/inception/plans/cr-050-workflow-plan.md` (5 unit; U2 và U4 cần ADR-0030/0031 được duyệt trước khi code). Đã code Unit 1:
+- FR-17: cột `project_authoring.illustrations_storyboard_sha`; `Plan` ghi hash storyboard và giữ lại hàng cùng tên đã có hình hoặc đã bỏ qua; `Stale`; `Prepare` lập lại khi danh sách cũ; bước Code từ chối (`ErrIllustrationsStale`, 409); API danh sách trả `stale`; dải cảnh báo trong `ProjectIllustrationsPanel`.
+- FR-18: bỏ `clearDownstream` (xoá bước sau khi lượt AI lỗi) cùng `WithClearer`; xoá theo tầng khi lưu nội dung mới vẫn giữ.
+- FR-19: `domain.ModelAllowedForStep` (bước code/illustrations từ chối `ollama`, `ollama/*`); chặn khi lưu (400), trong `runInner` code, `draw` và `Plan`; `code_ok` trong danh mục; `/v1/llm/status` trả `code_stats` (30 ngày, từ `llm_usage`) hoặc `code_stats_error`; picker lọc model và hiện dòng số liệu.
+- FR-20: chuỗi dừng (`Waiting`, `WaitingStep=storyboard`) khi storyboard có cảnh báo và còn bước sau. Test cũ `TestChainKeepsStepWarnings` được sửa theo hành vi mới.
+Kiểm thử: `make check` qua 6/6 (gofmt, go vet, go test, eslint, tsc, vitest). Test Postgres của repo bị bỏ qua (không có `TEST_DATABASE_URL`); câu SQL thống kê đã chạy thử (chỉ đọc) trên DB thật. Đã rebuild `authoring-service` (healthy) và `web-gui` (running). Kiểm tra trực tiếp: cột mới có; `/v1/llm/status` trả `code_ok` và số liệu thật; PUT model `ollama` cho code trả 400 và không đổi dữ liệu; danh sách hình trả `stale: false` với danh sách cũ chưa có hash. Chưa kiểm tra trực tiếp: nhánh `stale: true` và việc chuỗi dừng ở storyboard (cần sửa storyboard hoặc chạy AI thật; đã có unit test).
+**Context**: CONSTRUCTION — CR-050 Unit 1, chờ Creator duyệt trước khi commit.
+
+---

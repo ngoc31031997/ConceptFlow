@@ -325,7 +325,10 @@ type stubStage struct {
 	gated    int
 	reports  []application.StageReport
 	model    string
+	stale    bool
 }
+
+func (s *stubStage) Stale(context.Context, string) (bool, error) { return s.stale, nil }
 
 func (s *stubStage) Prepare(_ context.Context, _ string, model string, report func(application.StageReport)) ([]domain.ProjectIllustration, error) {
 	s.prepared++
@@ -385,6 +388,19 @@ func TestCodeStepRefusesAVideoWhoseDrawingsWereNeverPlanned(t *testing.T) {
 	_, err := uc.Execute(context.Background(), "p1", "code")
 	if !errors.Is(err, application.ErrIllustrationsNotPlanned) || gen.calls != 0 || st.prepared != 0 {
 		t.Fatalf("err=%v codegen=%d prepared=%d", err, gen.calls, st.prepared)
+	}
+}
+
+// CR-050 FR-17: a list planned from an older storyboard stops the code step
+// before any model call, even when every drawing on it is approved.
+func TestCodeStepRefusesADrawingListPlannedFromAnOlderStoryboard(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
+	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
+	st := &stubStage{planned: true, stale: true}
+	uc.WithPipeline(&stubFinalizer{}, gen).WithIllustrations(st)
+	_, err := uc.Execute(context.Background(), "p1", "code")
+	if !errors.Is(err, application.ErrIllustrationsStale) || gen.calls != 0 {
+		t.Fatalf("err=%v codegen=%d, want ErrIllustrationsStale before any call", err, gen.calls)
 	}
 }
 
@@ -456,5 +472,31 @@ func TestIllustrationsStepIsForRemotionOnly(t *testing.T) {
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{}).WithIllustrations(st)
 	if _, err := uc.Execute(context.Background(), "p1", application.StepIllustrations); err == nil || st.prepared != 0 {
 		t.Fatalf("a Manim video must not run the illustrations step: %v", err)
+	}
+}
+
+type fixedModels domain.AuthoringStepModels
+
+func (m fixedModels) GetAuthoringModels(context.Context, string) (domain.AuthoringStepModels, error) {
+	return domain.AuthoringStepModels(m), nil
+}
+
+// CR-050 FR-19: a project that saved Ollama for code before the rule existed
+// is stopped before any model call, with the reason.
+func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
+	renderCtx := &fakeRenderContext{
+		project: &domain.Project{ProjectID: "p1", ContentLanguage: domain.LanguageVietnamese, RenderEngine: domain.RenderEngineManim},
+		topic:   "t", storyboard: `{"scenes":[]}`,
+	}
+	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
+	uc := application.NewGenerateAuthoringUseCase(
+		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
+		application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, fixedModels{Code: "ollama"},
+		&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
+	).WithPipeline(&stubFinalizer{}, gen)
+	_, err := uc.Execute(context.Background(), "p1", "code")
+	var notForCode *application.ErrModelNotForCode
+	if !errors.As(err, &notForCode) || gen.calls != 0 {
+		t.Fatalf("err=%v codegen=%d, want ErrModelNotForCode before any call", err, gen.calls)
 	}
 }

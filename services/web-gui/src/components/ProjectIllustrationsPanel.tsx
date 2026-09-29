@@ -59,13 +59,17 @@ export function ProjectIllustrationsPanel({
   const [fixNote, setFixNote] = useState<{ id: string; text: string; n: number } | null>(null);
   const [bust, setBust] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
+  // CR-050 FR-17: the list was planned from an older storyboard.
+  const [stale, setStale] = useState(false);
   // A chain (this step, or the whole pipeline) runs on the server and fills this list.
   const run = useAuthoringRun();
   const chainDrawing = run.running && run.steps.includes("illustrations");
 
   const reload = useCallback(async () => {
     try {
-      setRows((await listProjectIllustrations(projectId)).illustrations);
+      const list = await listProjectIllustrations(projectId);
+      setRows(list.illustrations);
+      setStale(list.stale === true);
     } catch (e) {
       setMessage(e instanceof Error ? e.message : "Không tải được danh sách hình của video.");
     }
@@ -110,11 +114,13 @@ export function ProjectIllustrationsPanel({
   }
 
   async function plan() {
-    if (rows && rows.length > 0 && !window.confirm("Lập lại danh sách từ storyboard? Danh sách hiện tại sẽ bị thay (hình đã vẽ vẫn còn trong thư viện).")) return;
+    if (rows && rows.length > 0 && !window.confirm("Lập lại danh sách từ storyboard? Hình đã vẽ và hình đã bỏ qua được giữ nếu storyboard mới vẫn cần chúng.")) return;
     setPlanning(true);
     setMessage(null);
     try {
-      setRows((await planProjectIllustrations(projectId)).illustrations);
+      const list = await planProjectIllustrations(projectId);
+      setRows(list.illustrations);
+      setStale(list.stale === true);
     } catch (e) {
       setMessage(e instanceof Error && e.message ? e.message : "Không lập được danh sách hình.");
     } finally {
@@ -166,15 +172,23 @@ export function ProjectIllustrationsPanel({
       }
       data-testid="project-illustrations"
     >
-      <p className={rows.length > 0 && ready === rows.length ? styles.ok : styles.waiting} data-testid="pi-summary">
+      <p className={rows.length > 0 && ready === rows.length && !stale ? styles.ok : styles.waiting} data-testid="pi-summary">
         {rows.length === 0
           ? chainDrawing
             ? "AI đang lập danh sách hình từ storyboard…"
             : "Chưa có danh sách — chạy bước Hình minh hoạ bằng AI, hoặc bấm “Lập danh sách từ storyboard”."
-          : ready === rows.length
+          : ready === rows.length && !stale
             ? `Đủ ${rows.length} hình — bước Code chạy được.`
+            : ready === rows.length
+            ? `Đủ ${rows.length} hình nhưng danh sách lập từ storyboard cũ.`
             : `${ready}/${rows.length} hình sẵn sàng — bước Code đang chờ bạn duyệt hoặc bỏ qua các hình còn lại.`}
       </p>
+      {stale && rows.length > 0 && (
+        <p className={styles.error} role="status" data-testid="pi-stale">
+          Storyboard đã đổi sau khi lập danh sách này — bước Code sẽ không chạy với danh sách cũ. Bấm “Lập lại danh sách”,
+          hoặc chạy lại bước Hình minh hoạ (hình đã vẽ vẫn được giữ).
+        </p>
+      )}
       {message && <p className={styles.error} role="status">{message}</p>}
       {openId && (
         <div className={glass.mtSm}>

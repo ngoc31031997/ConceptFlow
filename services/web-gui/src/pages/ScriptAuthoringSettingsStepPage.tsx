@@ -129,6 +129,8 @@ export function ScriptAuthoringSettingsStepPage() {
               onChange={setAuthoringModels}
               options={llm.models ?? []}
               defaultModel={llm.default_model ?? ""}
+              codeStats={llm.code_stats}
+              codeStatsError={llm.code_stats_error}
             />
           </div>
         )}

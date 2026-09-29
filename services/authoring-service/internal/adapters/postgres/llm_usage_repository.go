@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -46,4 +47,60 @@ func (r *LLMUsageRepository) RecordLLMUsage(ctx context.Context, rec application
 		rec.Duration.Milliseconds(), rec.OK, string(rec.ErrorKind), rec.Phase,
 	)
 	return err
+}
+
+// ModelUsageStats aggregates the calls of one step phase since a time, per
+// model (CR-050 FR-19). Averages cover successful calls only: a failed call's
+// duration says how long it took to fail, not what a chunk costs.
+func (r *LLMUsageRepository) ModelUsageStats(
+	ctx context.Context, step, phase string, since time.Time,
+) ([]application.ModelUsageStats, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT model, ok, error_kind, count(*),
+		       COALESCE(avg(completion_tokens), 0)::int, COALESCE(avg(duration_ms), 0)::int
+		FROM llm_usage
+		WHERE step = $1 AND phase = $2 AND created_at >= $3
+		GROUP BY model, ok, error_kind
+		ORDER BY model
+	`, step, phase, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	byModel := map[string]*application.ModelUsageStats{}
+	var order []string
+	for rows.Next() {
+		var (
+			model, kind          string
+			ok                   bool
+			n, avgOut, avgMillis int
+		)
+		if err := rows.Scan(&model, &ok, &kind, &n, &avgOut, &avgMillis); err != nil {
+			return nil, err
+		}
+		st := byModel[model]
+		if st == nil {
+			st = &application.ModelUsageStats{Model: model, Failures: map[string]int{}}
+			byModel[model] = st
+			order = append(order, model)
+		}
+		st.Calls += n
+		if ok {
+			st.OK += n
+			st.AvgCompletionTokens, st.AvgDurationMs = avgOut, avgMillis
+		} else {
+			if kind == "" {
+				kind = "unknown"
+			}
+			st.Failures[kind] += n
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]application.ModelUsageStats, 0, len(order))
+	for _, m := range order {
+		out = append(out, *byModel[m])
+	}
+	return out, nil
 }

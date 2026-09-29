@@ -37,10 +37,6 @@ type GenerateAuthoringUseCase struct {
 	story         authoringStorySaver
 	storyboard    authoringContentSaver
 	code          authoringContentSaver
-	// clearer drops the steps built on this one when its run fails, so a stale
-	// storyboard/code is not left standing on an outline that never landed.
-	// Optional: nil leaves downstream output alone.
-	clearer AuthoringClearerPort
 	// errorLog receives a row for every failed run; nil disables it.
 	errorLog ProjectErrorLogPort
 	// events receives one journal line per run start/end; nil disables it.
@@ -125,12 +121,6 @@ func NewGenerateAuthoringUseCase(
 	}
 }
 
-// WithClearer enables clearing downstream steps when a run fails.
-func (uc *GenerateAuthoringUseCase) WithClearer(clearer AuthoringClearerPort) *GenerateAuthoringUseCase {
-	uc.clearer = clearer
-	return uc
-}
-
 // WithErrorLog makes every failed run leave a row in the project's
 // project_errors column.
 // WithEvents attaches the project journey log: each finished authoring run
@@ -150,24 +140,6 @@ func (uc *GenerateAuthoringUseCase) WithErrorLog(log ProjectErrorLogPort) *Gener
 func (uc *GenerateAuthoringUseCase) WithPipeline(f StoryboardFinalizerPort, c CodePipelinePort) *GenerateAuthoringUseCase {
 	uc.finalizer, uc.codegen = f, c
 	return uc
-}
-
-// clearDownstream is best-effort: the run's own error is what the Creator
-// needs to see, and a failed cleanup must not replace it.
-func (uc *GenerateAuthoringUseCase) clearDownstream(ctx context.Context, project *domain.Project, step string) {
-	if uc.clearer == nil || !domain.IsAuthoringEditable(project.Status) {
-		return
-	}
-	var steps []AuthoringStep
-	switch step {
-	case "story":
-		steps = []AuthoringStep{AuthoringStepStoryboard, AuthoringStepCode}
-	case "storyboard":
-		steps = []AuthoringStep{AuthoringStepCode}
-	default:
-		return
-	}
-	_ = uc.clearer.ClearAuthoringSteps(ctx, project.ProjectID, steps...)
 }
 
 // GeneratedStep is what one run produced, plus what it cost. The content is
@@ -423,6 +395,9 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		}
 		model = stepModels.ModelFor(step)
 	}
+	if err := checkCodeModel(step, model); err != nil {
+		return GeneratedStep{}, err
+	}
 
 	started := time.Now()
 	uc.beginProgress(projectID, step, started)
@@ -450,14 +425,12 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	if chatErr != nil {
 		info.usage = billedUsage(chatErr)
 		info.partialChars = len(partialOf(chatErr))
-		uc.clearDownstream(ctx, project, step)
 		return GeneratedStep{}, chatErr
 	}
 	info.usage = result.Usage
 
 	content := strings.TrimSpace(result.Content)
 	if content == "" {
-		uc.clearDownstream(ctx, project, step)
 		return GeneratedStep{}, &LLMError{
 			Kind: ErrKindEmpty, Provider: uc.provider.Name(),
 			Usage: result.Usage, Err: errors.New("provider returned no content"),
@@ -478,7 +451,6 @@ func (uc *GenerateAuthoringUseCase) runInner(
 			fixed := billedUsage(finErr)
 			uc.recordPhase(ctx, string(role), step, "storyboard_fix", projectID, fixed, started, finErr)
 			info.usage = usageSum(result.Usage, fixed)
-			uc.clearDownstream(ctx, project, step)
 			return GeneratedStep{}, finErr
 		}
 		if fin.Repaired {

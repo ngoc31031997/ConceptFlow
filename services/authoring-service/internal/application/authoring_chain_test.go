@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -156,6 +157,23 @@ func TestChainStopsForReviewAfterTheIllustrationsStep(t *testing.T) {
 	}
 }
 
+// CR-050 FR-20: nothing to wait for when the storyboard is the last step, or
+// has no warnings.
+func TestChainDoesNotWaitOnAStoryboardItEndsWithOrThatHasNoWarnings(t *testing.T) {
+	f := &fakeStepRunner{result: map[string]GeneratedStep{"storyboard": {Warnings: []string{"w"}}}}
+	c := NewAuthoringChainRunner(f, nil)
+	_ = c.Start("p", []string{"story", "storyboard"})
+	if st := waitFinished(t, c, "p"); st.Waiting != "" || len(f.ran) != 2 {
+		t.Fatalf("last step: state %+v ran %v", st, f.ran)
+	}
+	f2 := &fakeStepRunner{}
+	c2 := NewAuthoringChainRunner(f2, nil)
+	_ = c2.Start("p", []string{"storyboard", "code"})
+	if st := waitFinished(t, c2, "p"); st.Waiting != "" || len(f2.ran) != 2 {
+		t.Fatalf("no warnings: state %+v ran %v", st, f2.ran)
+	}
+}
+
 func TestChainGoesOnToCodeWhenNoDrawingWaits(t *testing.T) {
 	f := &fakeStepRunner{}
 	c := NewAuthoringChainRunner(f, nil)
@@ -166,19 +184,18 @@ func TestChainGoesOnToCodeWhenNoDrawingWaits(t *testing.T) {
 	}
 }
 
-// CR-048 T8/T9 — a step's warnings reach the polled state, and survive a later
-// step stopping the chain.
-func TestChainKeepsStepWarnings(t *testing.T) {
+// CR-048 T8/T9 — a step's warnings reach the polled state. CR-050 FR-20 — a
+// storyboard with warnings stops the chain before the steps after it.
+func TestChainKeepsStepWarningsAndWaitsOnAFlaggedStoryboard(t *testing.T) {
 	const warning = "Cảnh hook: ~20 giây, ngân sách 6–10 giây (+100%)"
 	f := &fakeStepRunner{
-		failAt: "code",
 		result: map[string]GeneratedStep{"storyboard": {Warnings: []string{warning}}},
 	}
 	c := NewAuthoringChainRunner(f, nil)
-	_ = c.Start("p", []string{"story", "storyboard", "code"})
+	_ = c.Start("p", []string{"story", "storyboard", StepIllustrations, "code"})
 	st := waitFinished(t, c, "p")
-	if st.ErrorStep != "code" {
-		t.Fatalf("state %+v", st)
+	if st.Error != "" || st.WaitingStep != "storyboard" || !strings.Contains(st.Waiting, "1 cảnh báo") || len(f.ran) != 2 {
+		t.Fatalf("state %+v ran %v, want a wait at the storyboard before any later step", st, f.ran)
 	}
 	if got := st.Warnings["storyboard"]; len(got) != 1 || got[0] != warning {
 		t.Fatalf("storyboard warnings = %q", got)

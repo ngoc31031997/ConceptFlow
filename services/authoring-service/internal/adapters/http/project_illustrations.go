@@ -17,6 +17,7 @@ type projectIllustrationsUseCase interface {
 	Draw(ctx context.Context, projectID, rowID, model string) (domain.ProjectIllustration, error)
 	SetSkipped(ctx context.Context, projectID, rowID string, skipped bool) (domain.ProjectIllustration, error)
 	DeleteDrawing(ctx context.Context, projectID, rowID string) (domain.ProjectIllustration, error)
+	Stale(ctx context.Context, projectID string) (bool, error)
 }
 
 // WithProjectIllustrations enables /v1/projects/{id}/illustrations.
@@ -41,26 +42,34 @@ func (rt *Router) projectIllustrationsEnabled(w http.ResponseWriter) bool {
 	return true
 }
 
-func writeRows(w http.ResponseWriter, rows []domain.ProjectIllustration) {
-	ready := true
+// writeRows answers the list. stale (CR-050 FR-17) says it was planned from a
+// storyboard other than the saved one; the code step refuses to run on it.
+func writeRows(w http.ResponseWriter, rows []domain.ProjectIllustration, stale bool) {
+	ready := !stale
 	for _, r := range rows {
 		if !r.Ready() {
 			ready = false
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"illustrations": rows, "ready": ready})
+	writeJSON(w, http.StatusOK, map[string]any{"illustrations": rows, "ready": ready, "stale": stale})
 }
 
 func (rt *Router) handleListProjectIllustrations(w http.ResponseWriter, r *http.Request) {
 	if !rt.projectIllustrationsEnabled(w) {
 		return
 	}
-	rows, err := rt.projectIllustrations.List(r.Context(), chi.URLParam(r, "project_id"))
+	projectID := chi.URLParam(r, "project_id")
+	rows, err := rt.projectIllustrations.List(r.Context(), projectID)
 	if err != nil {
 		illustrationError(w, err)
 		return
 	}
-	writeRows(w, rows)
+	stale, err := rt.projectIllustrations.Stale(r.Context(), projectID)
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeRows(w, rows, stale)
 }
 
 func (rt *Router) handlePlanProjectIllustrations(w http.ResponseWriter, r *http.Request) {
@@ -76,7 +85,7 @@ func (rt *Router) handlePlanProjectIllustrations(w http.ResponseWriter, r *http.
 		illustrationError(w, err)
 		return
 	}
-	writeRows(w, rows)
+	writeRows(w, rows, false) // just planned from the saved storyboard
 }
 
 func (rt *Router) handleDrawProjectIllustration(w http.ResponseWriter, r *http.Request) {

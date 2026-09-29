@@ -37,6 +37,24 @@ type LLMUsagePort interface {
 	RecordLLMUsage(ctx context.Context, rec LLMUsageRecord) error
 }
 
+// ModelUsageStats is what one model's calls of one step phase cost, over a
+// window (CR-050 FR-19): shown next to the code step's model picker so the
+// Creator picks with the measured numbers in view. Averages are over the
+// successful calls; Failures counts the failed ones by error kind.
+type ModelUsageStats struct {
+	Model               string         `json:"model"`
+	Calls               int            `json:"calls"`
+	OK                  int            `json:"ok"`
+	Failures            map[string]int `json:"failures"`
+	AvgCompletionTokens int            `json:"avg_completion_tokens"`
+	AvgDurationMs       int            `json:"avg_duration_ms"`
+}
+
+// LLMUsageStatsPort reads usage back, aggregated per model.
+type LLMUsageStatsPort interface {
+	ModelUsageStats(ctx context.Context, step, phase string, since time.Time) ([]ModelUsageStats, error)
+}
+
 // LLMUsageRecorder wraps the port so that measurement can never break the
 // feature it measures (CR-027 FR82.5).
 //

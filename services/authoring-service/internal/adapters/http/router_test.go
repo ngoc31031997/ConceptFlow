@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"authoring/internal/application"
 	"authoring/internal/domain"
@@ -330,5 +331,58 @@ func TestHandlePromptRenders_RejectsAnUnknownRoleAnd404sWhenUnwired(t *testing.T
 	NewRouter(nil, nil).Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", strings.NewReader(`{"role":"story_architect"}`)))
 	if rec.Code != 404 {
 		t.Fatalf("unwired: want 404, got %d", rec.Code)
+	}
+}
+
+type fakeUsageStats struct {
+	stats []application.ModelUsageStats
+	err   error
+	step  string
+	phase string
+}
+
+func (f *fakeUsageStats) ModelUsageStats(_ context.Context, step, phase string, _ time.Time) ([]application.ModelUsageStats, error) {
+	f.step, f.phase = step, phase
+	return f.stats, f.err
+}
+
+// CR-050 FR-19: the status carries the measured cost of each model's code
+// chunks, and a failed read is reported as such, never as "no data".
+func TestHandleLLMStatusCodeStats(t *testing.T) {
+	stats := &fakeUsageStats{stats: []application.ModelUsageStats{{
+		Model: "zai-org/glm-5.3-flash", Calls: 20, OK: 18, Failures: map[string]int{"budget": 2},
+		AvgCompletionTokens: 97870, AvgDurationMs: 527000,
+	}}}
+	rec := httptest.NewRecorder()
+	newGenerateRouter(&fakeGenerateAuthoring{available: true}).WithUsageStats(stats).Handler().ServeHTTP(rec,
+		httptest.NewRequest("GET", "/v1/llm/status", nil))
+	var got llmStatusResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	glm := got.CodeStats["zai-org/glm-5.3-flash"]
+	if stats.step != "code" || stats.phase != "chunk" || glm.OK != 18 || glm.Failures["budget"] != 2 || got.CodeStatsError != "" {
+		t.Fatalf("status = %+v (queried %s/%s)", got, stats.step, stats.phase)
+	}
+	for _, m := range got.Models {
+		if m.ID == "ollama" && m.CodeOK {
+			t.Error("ollama offered for the code step")
+		}
+	}
+
+	rec = httptest.NewRecorder()
+	newGenerateRouter(&fakeGenerateAuthoring{available: true}).WithUsageStats(&fakeUsageStats{err: errors.New("db down")}).
+		Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/llm/status", nil))
+	got = llmStatusResponse{}
+	_ = json.Unmarshal(rec.Body.Bytes(), &got)
+	if rec.Code != 200 || got.CodeStats != nil || got.CodeStatsError == "" {
+		t.Fatalf("failed read: code=%d stats=%v err=%q, want 200 with the error stated", rec.Code, got.CodeStats, got.CodeStatsError)
+	}
+}
+
+func TestDescribeGenerateErrorModelNotForCode(t *testing.T) {
+	status, msg := DescribeGenerateError(&application.ErrModelNotForCode{Model: "ollama"})
+	if status != 400 || !strings.Contains(msg, "ollama") {
+		t.Fatalf("got %d %q, want 400 naming the model", status, msg)
 	}
 }

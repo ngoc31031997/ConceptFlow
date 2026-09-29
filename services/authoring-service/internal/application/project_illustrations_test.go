@@ -17,6 +17,7 @@ type fakeProjectRows struct {
 	lib     *fakeIllustrationRepo
 	rows    map[string][]domain.ProjectIllustration
 	planned map[string]bool
+	sha     map[string]string
 	n       int
 }
 
@@ -36,11 +37,20 @@ func (f *fakeProjectRows) ListProjectIllustrations(_ context.Context, pid string
 	}
 	return out, nil
 }
-func (f *fakeProjectRows) MarkIllustrationsPlanned(_ context.Context, pid string) error {
+func (f *fakeProjectRows) MarkIllustrationsPlanned(_ context.Context, pid, sha string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.planned[pid] = true
+	if f.sha == nil {
+		f.sha = map[string]string{}
+	}
+	f.sha[pid] = sha
 	return nil
+}
+func (f *fakeProjectRows) IllustrationsStoryboardSHA(_ context.Context, pid string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.sha[pid], nil
 }
 func (f *fakeProjectRows) IllustrationsPlanned(_ context.Context, pid string) (bool, error) {
 	f.mu.Lock()
@@ -384,5 +394,113 @@ func TestDeleteDrawingKeepsApprovedAndLibraryDrawings(t *testing.T) {
 	}
 	if _, ok := lib.rows["ok"]; !ok {
 		t.Error("an approved drawing was deleted")
+	}
+}
+
+// mutableStoryboard lets a test change the saved storyboard between calls.
+type mutableStoryboard struct{ text string }
+
+func (m *mutableStoryboard) GetAuthoringStoryboard(context.Context, string) (string, error) {
+	return m.text, nil
+}
+
+// CR-050 FR-17: the list remembers which storyboard it was planned from.
+func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
+	lib := newFakeIllustrationRepo()
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(&scriptedLLM{}, nil, 1000)
+	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
+	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
+	llm := &scriptedLLM{replies: []string{planJSON}}
+	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000)
+	ctx := context.Background()
+
+	// A list planned before CR-050 has no fingerprint: not stale.
+	rows.planned["p1"] = true
+	if stale, err := uc.Stale(ctx, "p1"); err != nil || stale {
+		t.Fatalf("legacy list: stale=%v err=%v, want false", stale, err)
+	}
+	if _, err := uc.Plan(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	if rows.sha["p1"] != StoryboardSHA(sb.text) {
+		t.Fatalf("plan recorded sha %q, want the storyboard's", rows.sha["p1"])
+	}
+	if stale, _ := uc.Stale(ctx, "p1"); stale {
+		t.Fatal("fresh list reported stale")
+	}
+	sb.text = `{"scenes":[2]}`
+	if stale, _ := uc.Stale(ctx, "p1"); !stale {
+		t.Fatal("list planned from the old storyboard not reported stale")
+	}
+}
+
+// CR-050 FR-17: re-planning keeps what the old list already had — a drawing
+// (even an unapproved draft) or the Creator's skip — and only takes the new
+// shot list; names the new plan drops are gone.
+func TestReplanKeepsDrawingsAndSkipsByName(t *testing.T) {
+	llm := &scriptedLLM{replies: []string{planJSON, planJSON}}
+	uc, rows, _ := stage(llm)
+	ctx := context.Background()
+	if _, err := uc.Plan(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	rows.mu.Lock()
+	for i, r := range rows.rows["p1"] {
+		switch r.Name {
+		case "Motorbike":
+			r.State, r.IllustrationID, r.Shots = domain.PIDrawn, "draft-1", []string{"9.9"}
+		case "Dentist":
+			r.State = domain.PISkipped
+		}
+		rows.rows["p1"][i] = r
+	}
+	rows.mu.Unlock()
+
+	got, err := uc.Plan(ctx, "p1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	by := map[string]domain.ProjectIllustration{}
+	for _, r := range got {
+		by[r.Name] = r
+	}
+	if m := by["Motorbike"]; m.State != domain.PIDrawn || m.IllustrationID != "draft-1" || strings.Join(m.Shots, ",") != "1.1,2.3" {
+		t.Errorf("drawn row not kept with the new shots: %+v", m)
+	}
+	if d := by["Dentist"]; d.State != domain.PISkipped {
+		t.Errorf("skipped row not kept: %+v", d)
+	}
+	if c := by["Candy"]; c.State != domain.PIReused {
+		t.Errorf("reused row changed: %+v", c)
+	}
+}
+
+// CR-050 FR-17: the chain's illustrations step re-plans a stale list instead
+// of drawing for the old storyboard, and leaves a fresh one alone.
+func TestPrepareReplansOnlyAStaleList(t *testing.T) {
+	lib := newFakeIllustrationRepo()
+	llm := &scriptedLLM{replies: []string{`{"reuse": ["Tooth"], "draw": []}`, `{"reuse": ["Germ"], "draw": []}`}}
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
+	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
+	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000).WithDrawConcurrency(1)
+	ctx := context.Background()
+
+	if _, err := uc.Prepare(ctx, "p1", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.Prepare(ctx, "p1", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(llm.calls) != 1 {
+		t.Fatalf("fresh list re-planned: %d planner calls, want 1", len(llm.calls))
+	}
+	sb.text = `{"scenes":[2]}`
+	if _, err := uc.Prepare(ctx, "p1", "", nil); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := uc.List(ctx, "p1")
+	if len(llm.calls) != 2 || len(list) != 1 || list[0].Name != "Germ" {
+		t.Fatalf("stale list not re-planned: calls=%d list=%+v", len(llm.calls), list)
 	}
 }

@@ -97,13 +97,30 @@ func (r *PromptTemplateRepository) DeleteProjectIllustrations(ctx context.Contex
 	return err
 }
 
-// MarkIllustrationsPlanned records that the video's drawing list was made (CR-045).
-func (r *PromptTemplateRepository) MarkIllustrationsPlanned(ctx context.Context, projectID string) error {
+// MarkIllustrationsPlanned records that the video's drawing list was made
+// (CR-045) and from which storyboard (CR-050 FR-17): storyboardSHA is the
+// sha256 of the storyboard the planner read.
+func (r *PromptTemplateRepository) MarkIllustrationsPlanned(ctx context.Context, projectID, storyboardSHA string) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring (project_id, illustrations_planned_at) VALUES ($1, now())
-		ON CONFLICT (project_id) DO UPDATE SET illustrations_planned_at = now()
-	`, projectID)
+		INSERT INTO project_authoring (project_id, illustrations_planned_at, illustrations_storyboard_sha)
+		VALUES ($1, now(), $2)
+		ON CONFLICT (project_id) DO UPDATE
+		SET illustrations_planned_at = now(), illustrations_storyboard_sha = EXCLUDED.illustrations_storyboard_sha
+	`, projectID, storyboardSHA)
 	return err
+}
+
+// IllustrationsStoryboardSHA returns the sha256 of the storyboard the video's
+// drawing list was planned from; "" for a list planned before CR-050 or never.
+func (r *PromptTemplateRepository) IllustrationsStoryboardSHA(ctx context.Context, projectID string) (string, error) {
+	var sha string
+	err := r.pool.QueryRow(ctx, `
+		SELECT illustrations_storyboard_sha FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&sha)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return sha, err
 }
 
 // IllustrationsPlanned reports whether the video's drawing list was ever made.

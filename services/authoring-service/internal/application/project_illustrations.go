@@ -2,7 +2,9 @@ package application
 
 import (
 	"context"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,6 +53,11 @@ func (e *ErrIllustrationsPending) Error() string {
 // drawing list was never made (CR-045): the illustrations step comes first.
 var ErrIllustrationsNotPlanned = errors.New("chưa lập danh sách hình minh hoạ — hãy chạy bước Hình minh hoạ trước bước Code")
 
+// ErrIllustrationsStale stops the code step when the drawing list was planned
+// from an older storyboard (CR-050 FR-17): the code would be handed the
+// drawings of a storyboard that is no longer there.
+var ErrIllustrationsStale = errors.New("danh sách hình minh hoạ được lập từ storyboard cũ — hãy chạy lại bước Hình minh hoạ trước bước Code")
+
 // ErrIllustrationNotDeletable refuses to delete a drawing that is not this
 // video's own unapproved draft (CR-045).
 var ErrIllustrationNotDeletable = errors.New("chỉ xoá được hình nháp do chính video này vẽ")
@@ -77,8 +84,10 @@ type ProjectIllustrationRepoPort interface {
 	UpdateProjectIllustration(ctx context.Context, row domain.ProjectIllustration) error
 	// CR-045: whether the list was ever planned — an empty list can mean
 	// "this video needs no drawing" or "never planned".
-	MarkIllustrationsPlanned(ctx context.Context, projectID string) error
+	// CR-050 FR-17: which storyboard (sha256) the list was planned from.
+	MarkIllustrationsPlanned(ctx context.Context, projectID, storyboardSHA string) error
 	IllustrationsPlanned(ctx context.Context, projectID string) (bool, error)
+	IllustrationsStoryboardSHA(ctx context.Context, projectID string) (string, error)
 }
 
 // StoryboardReaderPort reads the saved storyboard of a project.
@@ -190,6 +199,9 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	if uc.llm == nil {
 		return nil, ErrDrawerDisabled
 	}
+	if err := checkCodeModel(StepIllustrations, model); err != nil {
+		return nil, err
+	}
 	storyboard, err := uc.storyboards.GetAuthoringStoryboard(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("load storyboard: %w", err)
@@ -236,6 +248,20 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		return nil, err
 	}
 
+	// CR-050 FR-17: re-planning (the storyboard changed) keeps what the old
+	// list already has for a name — a drawing, even a draft still waiting for
+	// review, or the Creator's skip — so nothing is drawn or decided twice.
+	previous, err := uc.repo.ListProjectIllustrations(ctx, projectID)
+	if err != nil {
+		return nil, err
+	}
+	kept := map[string]domain.ProjectIllustration{}
+	for _, r := range previous {
+		if r.IllustrationID != "" || r.State == domain.PISkipped {
+			kept[r.Name] = r
+		}
+	}
+
 	var rows []domain.ProjectIllustration
 	seen := map[string]bool{}
 	add := func(r domain.ProjectIllustration) {
@@ -243,6 +269,14 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 			return
 		}
 		seen[r.Name] = true
+		if old, ok := kept[r.Name]; ok {
+			shots := r.Shots
+			r = old
+			r.ID, r.Error, r.Illustration, r.Progress = "", "", nil, nil
+			if shots != nil {
+				r.Shots = shots
+			}
+		}
 		r.ProjectID, r.Position = projectID, len(rows)+1
 		rows = append(rows, r)
 	}
@@ -273,7 +307,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	if err := uc.repo.ReplaceProjectIllustrations(ctx, projectID, rows); err != nil {
 		return nil, err
 	}
-	if err := uc.repo.MarkIllustrationsPlanned(ctx, projectID); err != nil {
+	if err := uc.repo.MarkIllustrationsPlanned(ctx, projectID, StoryboardSHA(storyboard)); err != nil {
 		return nil, err
 	}
 	return uc.List(ctx, projectID)
@@ -450,7 +484,13 @@ func (uc *ProjectIllustrationsUseCase) Prepare(
 	if err != nil {
 		return nil, err
 	}
-	if len(rows) == 0 {
+	stale := false
+	if len(rows) > 0 {
+		if stale, err = uc.Stale(ctx, projectID); err != nil {
+			return nil, err
+		}
+	}
+	if len(rows) == 0 || stale {
 		report(StageReport{Phase: "plan"})
 		if _, err = uc.Plan(ctx, projectID, model); err != nil {
 			return nil, fmt.Errorf("lập danh sách hình minh hoạ: %w", err)
@@ -461,6 +501,29 @@ func (uc *ProjectIllustrationsUseCase) Prepare(
 	}
 	pending, _, err := uc.Gate(ctx, projectID)
 	return pending, err
+}
+
+// StoryboardSHA fingerprints a saved storyboard (CR-050 FR-17). The saved
+// storyboard is already canonical (storyboard/finalize), so equal content
+// means an equal hash.
+func StoryboardSHA(storyboard string) string {
+	sum := sha256.Sum256([]byte(storyboard))
+	return hex.EncodeToString(sum[:])
+}
+
+// Stale reports whether the video's drawing list was planned from a storyboard
+// other than the one saved now (CR-050 FR-17). A list planned before CR-050
+// carries no fingerprint: there is no evidence it is stale, so it is not.
+func (uc *ProjectIllustrationsUseCase) Stale(ctx context.Context, projectID string) (bool, error) {
+	planned, err := uc.repo.IllustrationsStoryboardSHA(ctx, projectID)
+	if err != nil || planned == "" {
+		return false, err
+	}
+	storyboard, err := uc.storyboards.GetAuthoringStoryboard(ctx, projectID)
+	if err != nil {
+		return false, fmt.Errorf("load storyboard: %w", err)
+	}
+	return planned != StoryboardSHA(storyboard), nil
 }
 
 // Gate is the code step's check: the rows that still hold it back, and whether

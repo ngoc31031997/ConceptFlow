@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -41,6 +42,7 @@ type Router struct {
 	generateAuthoring       generateAuthoringUseCase
 	authoringChain          authoringChainUseCase
 	defaultModel            string
+	usageStats              application.LLMUsageStatsPort
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
@@ -327,6 +329,16 @@ func (rt *Router) WithDefaultModel(id string) *Router {
 	rt.defaultModel = id
 	return rt
 }
+
+// WithUsageStats lets GET /v1/llm/status report what each model has cost the
+// code step (CR-050 FR-19).
+func (rt *Router) WithUsageStats(port application.LLMUsageStatsPort) *Router {
+	rt.usageStats = port
+	return rt
+}
+
+// codeStatsWindow is how far back the code step's model numbers look.
+const codeStatsWindow = 30 * 24 * time.Hour
 
 // WithAuthoringChain enables POST/GET /v1/projects/{id}/authoring/chain.
 func (rt *Router) WithAuthoringChain(chain authoringChainUseCase) *Router {
@@ -952,6 +964,11 @@ type llmStatusResponse struct {
 	Models []domain.AuthoringModelOption `json:"models,omitempty"`
 	// DefaultModel is the concrete model id an empty choice resolves to.
 	DefaultModel string `json:"default_model,omitempty"`
+	// CodeStats is what each model's code chunks cost over the last 30 days
+	// (CR-050 FR-19), keyed by model id. CodeStatsError says why they are
+	// missing when the read failed — never shown as "no data".
+	CodeStats      map[string]application.ModelUsageStats `json:"code_stats,omitempty"`
+	CodeStatsError string                                 `json:"code_stats_error,omitempty"`
 }
 
 func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
@@ -962,10 +979,23 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	writeJSON(w, http.StatusOK, llmStatusResponse{
+	resp := llmStatusResponse{
 		Enabled: true, Provider: rt.generateAuthoring.Provider(),
 		Models: domain.AuthoringModelCatalog, DefaultModel: rt.defaultModel,
-	})
+	}
+	if rt.usageStats != nil {
+		stats, err := rt.usageStats.ModelUsageStats(r.Context(), "code", "chunk", time.Now().Add(-codeStatsWindow))
+		if err != nil {
+			slog.Warn("could not read code model stats", "error", err)
+			resp.CodeStatsError = "không đọc được số liệu đã đo"
+		} else {
+			resp.CodeStats = map[string]application.ModelUsageStats{}
+			for _, s := range stats {
+				resp.CodeStats[s.Model] = s
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleGenerateAuthoring runs one authoring step through the configured
@@ -1028,8 +1058,13 @@ func DescribeGenerateError(err error) (int, string) {
 	if errors.As(err, &pending) {
 		return http.StatusConflict, pending.Error()
 	}
-	if errors.Is(err, application.ErrIllustrationsNotPlanned) {
+	if errors.Is(err, application.ErrIllustrationsNotPlanned) || errors.Is(err, application.ErrIllustrationsStale) {
 		return http.StatusConflict, err.Error()
+	}
+	// CR-050 FR-19: the Creator's model choice, not the provider, is the problem.
+	var notForCode *application.ErrModelNotForCode
+	if errors.As(err, &notForCode) {
+		return http.StatusBadRequest, notForCode.Error()
 	}
 
 	status := http.StatusBadGateway

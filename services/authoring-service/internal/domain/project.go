@@ -584,6 +584,9 @@ func NormalizeAuthoringMode(s string) string {
 type AuthoringModelOption struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
+	// CodeOK is false for a model the code step (and the drawings, which are
+	// code too) refuses — see ModelAllowedForStep (CR-050 FR-19).
+	CodeOK bool `json:"code_ok"`
 }
 
 // AuthoringModelCatalog is the fixed list the picker offers. "" is not listed
@@ -592,8 +595,8 @@ type AuthoringModelOption struct {
 // default" (HIVE_MODEL), which is what an empty/legacy project_authoring row
 // still means today.
 var AuthoringModelCatalog = []AuthoringModelOption{
-	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
-	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
+	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash", CodeOK: true},
+	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash", CodeOK: true},
 	// Local model served by the `ollama` container. llm-service routes any id
 	// "ollama" or "ollama/<model>" to Ollama instead of Hive; bare "ollama"
 	// means whatever OLLAMA_MODEL is set to.
@@ -615,6 +618,18 @@ func ValidAuthoringModel(id string) bool {
 		}
 	}
 	return false
+}
+
+// ModelAllowedForStep reports whether model id may serve an authoring step
+// (CR-050 FR-19). The code step — and the illustrations step, whose drawings
+// are Remotion code written with the code step's model — refuses the local
+// Ollama model: every code chunk sent to it timed out (5/5 measured), and a
+// local model is not strong enough to write a Remotion or Manim scene.
+func ModelAllowedForStep(step, id string) bool {
+	if step != "code" && step != "illustrations" {
+		return true
+	}
+	return id != "ollama" && !strings.HasPrefix(id, "ollama/")
 }
 
 // AuthoringStepModels is the per-step model choice for one project — one Hive

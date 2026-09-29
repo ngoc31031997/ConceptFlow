@@ -323,6 +323,9 @@ func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID str
 			return fmt.Errorf("unknown model %q", id)
 		}
 	}
+	if err := checkCodeModel("code", models.Code); err != nil {
+		return err
+	}
 	return uc.authoring.SaveAuthoringModels(ctx, projectID, models)
 }
 

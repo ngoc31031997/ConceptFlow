@@ -31,8 +31,14 @@ func TestIllustrationsPlannedMarkAndS9CleanupAgainstPostgres(t *testing.T) {
 		if planned, err := r.IllustrationsPlanned(ctx, pid); err != nil || planned {
 			t.Fatalf("%s before planning: planned=%v err=%v", pid, planned, err)
 		}
-		if err := r.MarkIllustrationsPlanned(ctx, pid); err != nil {
+		if sha, err := r.IllustrationsStoryboardSHA(ctx, pid); err != nil || sha != "" {
+			t.Fatalf("%s before planning: sha=%q err=%v", pid, sha, err)
+		}
+		if err := r.MarkIllustrationsPlanned(ctx, pid, "sha-"+pid); err != nil {
 			t.Fatal(err)
+		}
+		if sha, err := r.IllustrationsStoryboardSHA(ctx, pid); err != nil || sha != "sha-"+pid {
+			t.Fatalf("%s after planning: sha=%q err=%v (CR-050 FR-17)", pid, sha, err)
 		}
 		if planned, err := r.IllustrationsPlanned(ctx, pid); err != nil || !planned {
 			t.Fatalf("%s after planning: planned=%v err=%v", pid, planned, err)

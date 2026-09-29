@@ -63,7 +63,8 @@ func main() {
 	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
 	var llmProvider application.LLMProviderPort = llmClient
 	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
-	llmUsageRecorder := application.NewLLMUsageRecorder(postgres.NewLLMUsageRepository(pool), logger)
+	llmUsageRepo := postgres.NewLLMUsageRepository(pool)
+	llmUsageRecorder := application.NewLLMUsageRecorder(llmUsageRepo, logger)
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient)
 	suggestShortScript := application.NewSuggestShortScriptUseCase(llmClient)
@@ -105,7 +106,7 @@ func main() {
 		authoringRepo,
 		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-	).WithClearer(authoringRepo).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
+	).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
 		WithIllustrations(projectIllustrations).
 		// CR-048 T8 — the post-1b length check reads the same format and voice
 		// calibration the outline prompt's beat sheet is built from.
@@ -126,6 +127,7 @@ func main() {
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
 		WithDefaultModel(cfg.HiveModel).
+		WithUsageStats(llmUsageRepo).
 		WithGenerateAuthoring(generateAuthoring)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)

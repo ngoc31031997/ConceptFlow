@@ -187,6 +187,13 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 		case out.AwaitingReview:
 			c.finish(projectID, func(st *ChainState) { st.Waiting, st.WaitingStep = out.Message, step })
 			return
+		case step == "storyboard" && len(out.Warnings) > 0 && i < len(steps)-1:
+			// CR-050 FR-20: the steps after the storyboard are the expensive
+			// ones (the code step alone costs ~95% of a video's tokens); a
+			// storyboard the checks flagged waits for the Creator first.
+			msg := fmt.Sprintf("Storyboard có %d cảnh báo — xem lại, sửa nếu cần, rồi chạy tiếp các bước sau.", len(out.Warnings))
+			c.finish(projectID, func(st *ChainState) { st.Waiting, st.WaitingStep = msg, step })
+			return
 		}
 	}
 	c.finish(projectID, func(st *ChainState) { st.CurrentIndex = len(steps) })

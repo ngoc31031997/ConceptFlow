@@ -143,6 +143,10 @@ CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustra
 -- CR-045: when the video's drawing list was last planned, so the code step can
 -- tell "planned, needs no drawing" from "never planned".
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at TIMESTAMPTZ;
+-- CR-050 FR-17: sha256 of the storyboard the list was planned from, so a list
+-- made from an older storyboard is known to be stale. '' = planned before this
+-- existed (or never): no evidence either way, not treated as stale.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_storyboard_sha TEXT NOT NULL DEFAULT '';
 -- CR-045: colours outside the channel palette (S9) are no longer a warning;
 -- drop the ones stored before, so old drawings do not keep showing them.
 UPDATE illustrations SET warnings = COALESCE((

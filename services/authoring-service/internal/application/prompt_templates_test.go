@@ -2,6 +2,7 @@ package application_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"authoring/internal/application"
@@ -314,5 +315,23 @@ func TestSaveAuthoringModeRejectsUnknownMode(t *testing.T) {
 	}
 	if err := save.Execute(context.Background(), "", "ai"); err == nil {
 		t.Fatal("want an error for a missing project_id")
+	}
+}
+
+// CR-050 FR-19: the code step's model cannot be the local Ollama model; the
+// other steps may still use it.
+func TestSaveAuthoringModelsRefusesOllamaForCode(t *testing.T) {
+	store := newFakeAuthoringStore()
+	uc := application.NewSaveAuthoringModelsUseCase(store)
+	err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Code: "ollama"})
+	var notForCode *application.ErrModelNotForCode
+	if !errors.As(err, &notForCode) {
+		t.Fatalf("err = %v, want ErrModelNotForCode", err)
+	}
+	if _, saved := store.models["p1"]; saved {
+		t.Fatal("refused choice was saved")
+	}
+	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama", Code: "zai-org/glm-5.3-flash"}); err != nil {
+		t.Fatalf("ollama for the story step refused: %v", err)
 	}
 }

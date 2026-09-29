@@ -40,3 +40,18 @@
   font-weight: 600;
   color: var(--ink-faint);
 }
+
+/* CR-050: số liệu đo của model ở bước Code, ngay dưới ô chọn. */
+.stats,
+.statsWarn {
+  max-width: 260px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--ink-faint);
+}
+
+.statsWarn {
+  color: var(--ink);
+  border-left: 3px solid var(--warning);
+  padding-left: 6px;
+}

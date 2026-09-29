@@ -65,6 +65,22 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     expect(list.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("warns that a list planned from an older storyboard holds the code step (CR-050)", async () => {
+    const approvedMoto = { ...MOTO, illustration: ill({ id: "m1", name: "Motorbike", title: "Xe máy", status: "approved" as const }) };
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [TOOTH, approvedMoto], ready: false, stale: true });
+    renderPanel();
+    expect(await screen.findByTestId("pi-stale")).toHaveTextContent("Storyboard đã đổi");
+    expect(screen.getByTestId("pi-summary")).toHaveTextContent("danh sách lập từ storyboard cũ");
+    expect(screen.getByTestId("pi-summary")).not.toHaveTextContent("bước Code chạy được");
+  });
+
+  it("shows no stale warning for a list planned from the saved storyboard", async () => {
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [TOOTH], ready: true, stale: false });
+    renderPanel();
+    expect(await screen.findByTestId("pi-summary")).toHaveTextContent("Đủ 1 hình — bước Code chạy được.");
+    expect(screen.queryByTestId("pi-stale")).toBeNull();
+  });
+
   it("plans from the storyboard when there is no list yet", async () => {
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [], ready: true });
     const plan = vi.spyOn(apiClient, "planProjectIllustrations").mockResolvedValue({ illustrations: [{ ...DENTIST, state: "planned", error: undefined }], ready: false });
