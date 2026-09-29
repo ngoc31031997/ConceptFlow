@@ -1,3 +1,5 @@
+import { FLOW_VALIDATE } from "./flow";
+
 /**
  * Vietnamese labels for the saga's step and status names.
  *
@@ -10,7 +12,7 @@
 export const STEP_LABELS: Record<string, string> = {
   // CR-031: hai bước này lại có nhãn riêng. CR-029 từng gộp chúng làm một ô vì
   // cả hai nằm lọt giữa một bước "Xử lý" duy nhất, nên phân biệt chỉ thêm
-  // nhiễu. Giờ chúng là toàn bộ nội dung của bước 4 (Validate) — đó là màn hình
+  // nhiễu. Giờ chúng là toàn bộ nội dung của bước 7 (Validate) — đó là màn hình
   // Creator ngồi đợi, nên biết đang phân tích hay đang chạy thử là khác biệt
   // thật: một cái tính bằng giây, một cái tính bằng phút.
   parse_script: "Phân tích kịch bản",
@@ -65,7 +67,7 @@ export function statusToStep(status: string): string | null {
     parsing_script: "parse_script",
     validating_script: "validate_script",
     // Cổng duyệt dừng NGAY SAU validate_script, nên ô sáng đúng là ô cuối của
-    // bước 4 — không phải "chưa bắt đầu gì cả".
+    // bước 7 — không phải "chưa bắt đầu gì cả".
     awaiting_review: "validate_script",
     synthesizing_speech: "synthesize_speech",
     rendering: "render_scenes",
@@ -85,15 +87,24 @@ export function statusLabel(status: string): string {
 }
 
 /**
- * CR-031 bước 4 — "Validate": phần rẻ của saga. Chạy xong hai bước này là đã
- * biết script có chạy được không và dàn ý ra sao, mà chưa tốn một giây TTS
- * hay render nào. Cổng duyệt dàn ý (CR-024) dừng đúng ở cuối danh sách này.
+ * Bước 7 — "Validate": phần rẻ của saga. Chạy xong hai việc này là đã biết
+ * script có chạy được không và dàn ý ra sao, mà chưa tốn một giây TTS hay
+ * render nào. Cổng duyệt dàn ý (bước 8 — Review) dừng đúng ở cuối danh sách này.
  */
 export const VALIDATE_STEPS = ["parse_script", "validate_script"] as const;
 
 /**
- * CR-031 bước 5 — "Xử lý": phần đắt, chỉ chạy sau khi Creator duyệt ở bước 4.
- * qc_video không có ở đây (off luồng chính từ CR-029).
+ * CR-051 — hai việc con của bước 7 mang số con 7.1/7.2. Số trơn 1/2 từng làm
+ * Creator đọc thành bước 1 và 2 của luồng.
+ */
+export const VALIDATE_SUBSTEP_NUMBERS: Record<(typeof VALIDATE_STEPS)[number], string> = {
+  parse_script: `${FLOW_VALIDATE}.1`,
+  validate_script: `${FLOW_VALIDATE}.2`,
+};
+
+/**
+ * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chỉ chạy sau khi
+ * Creator duyệt ở bước 8. qc_video không có ở đây (off luồng chính từ CR-029).
  */
 export const PROCESS_STEPS = [
   "synthesize_speech",
@@ -103,9 +114,9 @@ export const PROCESS_STEPS = [
 ] as const;
 
 /**
- * Bước nào của wizard 7 bước đang sở hữu một project ở trạng thái này.
+ * Màn hình nào đang sở hữu một project ở trạng thái này.
  *
- * Tách bước 4/5 nghĩa là có hai URL cùng theo dõi một saga, nên "project này
+ * Validate (7–8) và sản xuất (9–12) là hai màn riêng cùng theo dõi một saga, nên "project này
  * thuộc màn nào" phải trả lời được từ một chỗ duy nhất: nếu không, một Creator
  * mở lại bookmark cũ, hoặc bấm back sau khi duyệt, sẽ ngồi trên màn hình theo
  * dõi những bước đã chạy xong từ lâu mà không bao giờ thấy động tĩnh gì.
@@ -118,7 +129,7 @@ export function projectPhase(status: string): ProjectPhase {
     // Một bước hỏng thuộc về màn hình đang chạy nó — đó là nơi có nút thử lại
     // và câu giải thích đúng ngữ cảnh.
     // classify_scenes không còn trong saga, nhưng project cũ hỏng ở đó vẫn tồn
-    // tại — và nó cũng là lỗi đầu vào, nên thuộc bước 4, nơi có đường quay về
+    // tại — và nó cũng là lỗi đầu vào, nên thuộc bước 7, nơi có đường quay về
     // sửa script.
     if ((VALIDATE_STEPS as readonly string[]).includes(step) || step === "classify_scenes") {
       return "validate";
@@ -150,15 +161,7 @@ export function projectPath(projectId: string, status: string): string {
   const phase = projectPhase(status);
   if (phase === "validate") return `/projects/${projectId}/validate`;
   if (phase === "process") return `/projects/${projectId}/render`;
-  // Bước 7 (đang đăng / đã đăng / đăng lỗi) có màn riêng, khớp nhãn "Bước 7 — Đăng".
+  // Bước 14 (đang đăng / đã đăng / đăng lỗi) có màn riêng.
   if (phase === "publish") return `/projects/${projectId}/publish`;
   return `/projects/${projectId}/result`;
-}
-
-const WIZARD_STEP_NAMES = ["Ý tưởng", "Cấu hình", "Script", "Validate", "Xử lý", "Kết quả", "Đăng"];
-
-/** "Bước 3 — Script": bước wizard mà project đang ở (wizard_step từ server, 1-7). */
-export function wizardStepLabel(step: number | undefined): string | null {
-  if (!step || step < 1 || step > WIZARD_STEP_NAMES.length) return null;
-  return `Bước ${step} — ${WIZARD_STEP_NAMES[step - 1]}`;
 }

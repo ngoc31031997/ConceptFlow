@@ -2033,3 +2033,16 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **User Input**: "ok"
 **AI Response**: Functional Design được duyệt; commit và chuyển sang Code Generation.
 **Artifacts Affected**: `aidlc-docs/construction/plans/cr-051-functional-design.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Code Generation (chờ rebuild + duyệt)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: (tiếp nối sau khi duyệt Functional Design)
+**AI Response**: Triển khai D1–D9. Server: `illustrations_ready` trong summaries (SQL = Gate/Ready), orchestrator đọc `*bool` (thiếu = sẵn sàng) qua `AuthoringSummary.Content`, `FlowStateFor` trả bước 5, nhãn "Render"/"Cắt short", hai `flow.go` giống hệt; test hợp đồng `tests/contracts/test_flow_steps_contract.py` + kích hoạt trong `scripts/check.sh`; câu lỗi "hãy chạy Bước 4 — Visual trước". Web: `flowTitle`, chuỗi AI theo số bước 3–6 (bước 5 "Không dùng" với Manim), tracker 7.1/7.2, tiêu đề màn thống nhất, xoá `wizardStepLabel`, resume trần ở bước 6. Lệch nhỏ so với thiết kế: dòng phụ màn Review không lặp "Duyệt dàn ý trước khi sản xuất" vì thẻ dàn ý đã có tiêu đề đó. Comment "1a/1b/1c" ở các file không bị CR này đụng (AuthoringModelPicker, PipelineSettingsBar, ScriptAssistant, useRequireScript, storyboard_warnings.go, illustration_keywords.go) giữ nguyên.
+**Impact Assessment**: `make check` (đầy đủ) 23/23 pass. Test Postgres của authoring-service (gồm test mới cho `Summaries`) chạy trên Postgres tạm: pass. Kiểm ngược: test hợp đồng hỏng khi nhãn lệch; test resume hỏng với trần cũ. Chưa rebuild Docker: stack `conceptflow` dựng từ checkout chính; `scripts/rebuild.sh` chạy trong worktree sẽ tạo một project compose mới và không có file env — cần Creator quyết định.
+**Artifacts Affected**: xem `git diff` của nhánh `feature/cr-051-pipeline-progress-ux-audit`.
+
+## CR-051 — Duyệt Code Generation, merge
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "chưa cần rebuild bạn chứ merge vào main cho tôi"
+**AI Response**: Creator duyệt phần code và yêu cầu merge vào `main`; **chưa rebuild Docker** (authoring-service, orchestrator, web-gui) theo quyết định của Creator — stack đang chạy vẫn là code trước CR-051 cho tới lần rebuild sau. Chạy /cr-finish.
+**Artifacts Affected**: nhánh `feature/cr-051-pipeline-progress-ux-audit`.

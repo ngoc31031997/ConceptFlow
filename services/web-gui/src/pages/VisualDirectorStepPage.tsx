@@ -11,10 +11,11 @@ import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import styles from "./WizardSteps.module.css";
+import { FLOW_VISUAL, flowTitle } from "../utils/flow";
 
 /**
- * Bước 1b (Visual Director) — second tab of the "Bước 3 — Script"
- * sub-wizard (see ScriptPipelineTabs): fetch the current template, fill it
+ * Bước 4 — Visual (Visual Director), the second authoring step (see
+ * ScriptPipelineTabs): fetch the current template, fill it
  * with the previous tab's saved output, let the Creator copy it out and
  * paste the AI's storyboard back, then save it server-side and advance.
  */
@@ -78,7 +79,7 @@ export function VisualDirectorStepPage() {
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
   // CR-031 — "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
   // ở 1a có thể trống hẳn trong trường hợp đó, và đấy là hợp lệ: storyboard là
-  // thứ duy nhất bước 1c cần đọc.
+  // thứ duy nhất bước 6 (Code) cần đọc.
   const hasOwnStoryboard = draft.scriptSource === "storyboard";
 
   async function handleContinue() {
@@ -108,7 +109,7 @@ export function VisualDirectorStepPage() {
     }
   }
 
-  // CR-027 FR79 — cùng một lựa chọn chế độ với tab 1a; nó nằm trong draft nên
+  // CR-027 FR79 — cùng một lựa chọn chế độ với bước 3; nó nằm trong draft nên
   // không phải chọn lại ở đây.
   const llm = useLlmStatus();
   // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
@@ -130,7 +131,7 @@ export function VisualDirectorStepPage() {
     <div data-testid="visual-director-step-page">
       <AppShell
         currentStep={4}
-        title="Bước 4 — Visual"
+        title={flowTitle(FLOW_VISUAL)}
         subtitle={
           hasOwnStoryboard
             ? "Dán storyboard của bạn vào ô bên phải."

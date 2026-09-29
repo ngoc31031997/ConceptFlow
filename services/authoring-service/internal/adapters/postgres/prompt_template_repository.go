@@ -272,14 +272,28 @@ func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, proje
 
 // Summaries returns the topic and content flags for each project that has an
 // authoring row; projects without one are simply absent from the map.
+//
+// CR-051: illustrations_ready is ProjectIllustrationsUseCase.Gate in SQL — the
+// list was planned (planned_at set, or rows exist) and no row is still short of
+// ProjectIllustration.Ready (skipped, or reused/drawn with a builtin or approved
+// drawing). One query, so the project list stays one round trip.
 func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []string) (map[string]application.AuthoringSummary, error) {
 	out := map[string]application.AuthoringSummary{}
 	if len(projectIDs) == 0 {
 		return out, nil
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT project_id, topic, story_content <> '', storyboard_content <> '', code_content <> ''
-		FROM project_authoring WHERE project_id = ANY($1)`, projectIDs)
+		SELECT pa.project_id, pa.topic, pa.story_content <> '', pa.storyboard_content <> '', pa.code_content <> '',
+		       (pa.illustrations_planned_at IS NOT NULL
+		        OR EXISTS (SELECT 1 FROM project_illustrations pi WHERE pi.project_id = pa.project_id))
+		       AND NOT EXISTS (
+		           SELECT 1 FROM project_illustrations pi
+		           LEFT JOIN illustrations i ON i.id = pi.illustration_id
+		           WHERE pi.project_id = pa.project_id
+		             AND NOT (pi.state = 'skipped'
+		                      OR (pi.state IN ('reused', 'drawn') AND i.id IS NOT NULL
+		                          AND (i.builtin OR i.status = 'approved'))))
+		FROM project_authoring pa WHERE pa.project_id = ANY($1)`, projectIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -287,7 +301,7 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 	for rows.Next() {
 		var id string
 		var s application.AuthoringSummary
-		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code); err != nil {
+		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code, &s.IllustrationsReady); err != nil {
 			return nil, err
 		}
 		out[id] = s
