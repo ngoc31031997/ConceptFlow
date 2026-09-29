@@ -8,6 +8,7 @@ Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as `/<na
 | `/cr-check [all]` | Before saying "done" | `make check` (or `make check-all`), failures as a table with cause and next action; separates branch-caused from pre-existing failures with evidence | `scripts/check.sh` |
 | `/rebuild [svc…]` | After service code changes (CLAUDE.md Docker rebuild policy) | Build + restart the changed (or named) compose services, wait for healthy, show logs on failure | `scripts/rebuild.sh` |
 | `/cr-review [NNN]` | Before merge | Runs the read-only `reviewer`, `security-reviewer`, `tester` agents in parallel on the committed tree; PASS only if all three pass | `.claude/agents/`; verdicts recorded by the SubagentStop hook |
+| `/fix-bug <report>` | The Creator reports something broken | `fix/<slug>` branch, audit entry, failing regression test first, root cause at `file:line`, minimal fix, `/cr-check`, `/rebuild`, live check, report and wait for approval; escalates to `/cr-start` when it is really a requirement/contract change | AI-DLC "simple bug fix" depth |
 | `/cr-finish` | After the Creator approves the final stage | Approval check → diff sanity → AI-DLC records → merge `origin/main` → `/cr-check` → `/cr-review` → merge `--no-ff` → separate push of `main` → watch CI | merge gate hook (`hooks.md`) |
 
 ## Deviations from the spec (§10)
@@ -17,12 +18,14 @@ Project skills live in `.claude/skills/<name>/SKILL.md` and are invoked as `/<na
 
 ## Role agents (`.claude/agents/`)
 
-| Agent | Tools | Used by | In merge gate |
-|---|---|---|---|
-| `solution-architect` | Read, Grep, Glob | AI-DLC Design stage, before code | No |
-| `reviewer` | Read, Grep, Glob | `/cr-review` | Yes |
-| `security-reviewer` | Read, Grep, Glob | `/cr-review` | Yes |
-| `tester` | Read, Grep, Glob | `/cr-review` | Yes |
+| Agent | Tools | model / effort | Used by | In merge gate |
+|---|---|---|---|---|
+| `solution-architect` | Read, Grep, Glob | `opus` / `high` | AI-DLC Design stage, before code | No |
+| `reviewer` | Read, Grep, Glob | `sonnet` / `high` | `/cr-review` | Yes |
+| `security-reviewer` | Read, Grep, Glob | `sonnet` / `high` | `/cr-review` | Yes |
+| `tester` | Read, Grep, Glob | `sonnet` / `medium` | `/cr-review` | Yes |
+
+Skills set `effort` only on entry points (`/cr-start` medium, `/fix-bug` medium, `/cr-finish` low). `/cr-check`, `/rebuild` and `/cr-review` deliberately inherit: a skill's model/effort lasts for the rest of the turn, so pinning a cheap model there would also run the code fixes that follow on it. Rationale and how to change: README §2.6.
 
 No shell and no edit tools: they cannot change the code they judge. Each ends with a machine-readable `VERDICT:` line (see `hooks.md`). Claude Code loads agent definitions at session start; a session started before an agent file changed does not see the change.
 

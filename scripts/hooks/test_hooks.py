@@ -225,6 +225,28 @@ class SettingsTest(unittest.TestCase):
             self.assertEqual({t.strip() for t in tools.split(",")}, {"Read", "Grep", "Glob"},
                              name)
 
+    def test_model_and_effort_values_are_valid(self):
+        """Typos here are silently ignored by Claude Code, so check them."""
+        claude = os.path.join(HOOKS, "..", "..", ".claude")
+        files = [os.path.join(claude, "agents", f) for f in os.listdir(os.path.join(claude, "agents"))
+                 if f.endswith(".md")]
+        files += [os.path.join(claude, "skills", d, "SKILL.md")
+                  for d in os.listdir(os.path.join(claude, "skills"))]
+        for path in files:
+            with open(path) as f:
+                front = f.read().split("---")[1]
+            model = re.search(r"^model:\s*(\S+)", front, re.M)
+            effort = re.search(r"^effort:\s*(\S+)", front, re.M)
+            if model:
+                self.assertIn(model.group(1), {"sonnet", "opus", "haiku", "fable", "inherit"}, path)
+            if effort:
+                self.assertIn(effort.group(1), {"low", "medium", "high", "xhigh", "max"}, path)
+        for agent in ("reviewer", "security-reviewer", "tester", "solution-architect"):
+            with open(os.path.join(claude, "agents", f"{agent}.md")) as f:
+                front = f.read().split("---")[1]
+            self.assertRegex(front, r"(?m)^model:", agent)
+            self.assertRegex(front, r"(?m)^effort:", agent)
+
     def test_hooks_registered(self):
         commands = json.dumps(self.settings["hooks"])
         for script in ("guard_bash.py", "lint-edited.sh", "stop-check.sh", "record_review.py"):

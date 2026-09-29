@@ -2,6 +2,7 @@
 name: cr-finish
 description: Finish an approved Change Request - verify the diff and AI-DLC records, bring the branch up to date with main, pass make check and /cr-review, then merge into main through the merge gate, push, and confirm CI. Use only after the Creator has approved the CR's final stage.
 argument-hint: ""
+effort: low
 ---
 
 # /cr-finish
@@ -13,7 +14,7 @@ Stop and report at the first step that fails. Do not continue past it.
 ## 1. Preconditions
 
 - The Creator explicitly approved this CR's final stage in this conversation ("ok"/"approve"/"go" after the completion message). No approval → stop and ask. A request made earlier in the conversation, or an approval of an earlier stage, is not approval.
-- Current branch is `feature/cr-<NNN>-<slug>` (or `feature/<slug>`), not `main`.
+- Current branch is `feature/cr-<NNN>-<slug>`, `feature/<slug>` or `fix/<slug>` (from `/fix-bug`), not `main`.
 
 ## 2. Diff sanity
 

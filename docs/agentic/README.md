@@ -43,6 +43,7 @@ Nguyên tắc: **luật quan trọng được enforce bằng script/hook**, khô
 | `/cr-check [all]` | Trước khi báo "xong" | `make check` (hoặc `check-all`), trả bảng lỗi kèm nguyên nhân và bước tiếp |
 | `/rebuild [svc…]` | Sau khi sửa code service | Build + restart đúng service đã đổi, chờ `healthy`, in log nếu fail |
 | `/cr-review [NNN]` | Trước khi merge | Chạy song song 3 agent review trên tree đã commit, PASS chỉ khi cả 3 PASS |
+| `/fix-bug <mô tả lỗi>` | Bạn thấy một chỗ **đang chạy sai** (lỗi, kết quả sai, giao diện vỡ) | Nhánh `fix/<slug>` → ghi báo lỗi vào `audit.md` → **viết test tái hiện lỗi trước** → tìm nguyên nhân gốc (`file:dòng`) → sửa tối thiểu → `/cr-check` → `/rebuild` → kiểm tra trực tiếp → báo cáo, **chờ duyệt**. Nếu "lỗi" thực ra là đổi yêu cầu, đổi contract/schema hay nhiều service thì chuyển sang `/cr-start` |
 | `/cr-finish` | Sau khi Creator **duyệt** bước cuối | Kiểm tra diff + hồ sơ AI-DLC → merge `origin/main` → check → review → merge vào `main` qua cổng → push → theo dõi CI |
 
 ### 2.2 Agents, đặt tên theo **vai trò**
@@ -102,6 +103,29 @@ Lần review thật đầu tiên đã phát hiện một lỗ hổng giả mạo
   - đọc/sửa `.env`, `secrets/`;
   - sửa thư mục marker.
 
+### 2.6 Model và effort (tiết kiệm token)
+
+Mỗi agent và skill có thể chọn model (`sonnet`, `opus`, `haiku`, `fable`, `inherit`) và mức suy nghĩ `effort` (`low`, `medium`, `high`, `xhigh`, `max`) trong phần frontmatter đầu file.
+
+| Thành phần | model | effort | Lý do |
+|---|---|---|---|
+| agent `solution-architect` | `opus` | `high` | Ít dùng, nhưng quyết định thiết kế đắt nếu sai |
+| agent `reviewer` | `sonnet` | `high` | Chạy mỗi lần merge; cần suy luận kỹ nhưng không cần model lớn nhất |
+| agent `security-reviewer` | `sonnet` | `high` | Như trên |
+| agent `tester` | `sonnet` | `medium` | Đối chiếu tiêu chí ↔ code ↔ test, ít suy luận sâu hơn |
+| skill `/cr-start` | theo phiên | `medium` | Phân tích yêu cầu |
+| skill `/fix-bug` | theo phiên | `medium` | Tìm nguyên nhân gốc cần model của phiên; effort vừa phải |
+| skill `/cr-finish` | theo phiên | `low` | Các bước cơ học (git, check); review do agent làm |
+| skill `/cr-check`, `/rebuild`, `/cr-review` | theo phiên | theo phiên | **Cố ý không đặt**: model/effort của skill áp dụng **cho hết lượt**, nên nếu `/rebuild` đặt `haiku` thì phần sửa code sau đó trong cùng lượt cũng chạy bằng `haiku` |
+
+Cách đổi:
+- Sửa dòng `model:` / `effort:` trong `.claude/agents/<tên>.md` hoặc `.claude/skills/<tên>/SKILL.md`. Claude Code sẽ hỏi bạn trước khi sửa, vì đây là file cấu hình cổng.
+- Mở session mới để chắc chắn bản mới được nạp.
+- Test `SettingsTest.test_model_and_effort_values_are_valid` bắt lỗi gõ sai, vì Claude Code lặng lẽ bỏ qua giá trị sai.
+- Muốn tiết kiệm hơn nữa: đổi `reviewer`/`security-reviewer` sang `effort: medium`, hoặc `tester` sang `haiku`. Đánh đổi là review kém kỹ hơn.
+
+Ghi chú: trong chế độ quyền *auto*, model nào auto mode không hỗ trợ sẽ bị bỏ qua và phiên giữ model hiện tại.
+
 ## 3. Cách dùng hằng ngày: một CR từ đầu đến cuối
 
 Creator chỉ cần nói bằng lời (ví dụ "làm CR: …"). Agent sẽ tự dùng skill. Tên lệnh ghi ở dưới để bạn biết đang ở bước nào, hoặc gõ trực tiếp.
@@ -138,6 +162,13 @@ make check-all               # toàn bộ, giống CI
 | `Stop blocked: make check failed` | Còn lỗi lint/test | Agent sửa. Nếu lỗi không liên quan CR, agent báo kèm bằng chứng |
 | `review-status.sh` thiếu dấu review | Hook không ghi dấu | Xem dòng `NOT RECORDED …` trong log: sai tree, brief bị sửa, diff lệch, hoặc thiếu dòng VERDICT |
 
+### Sửa một bug bạn tìm thấy
+
+1. Gõ `/fix-bug` kèm mô tả: lỗi gì, ở màn hình/API nào, làm sao để gặp lại; ảnh chụp hoặc log càng tốt. Nói thường ("sửa lỗi …") agent cũng tự dùng skill này.
+2. Agent tạo nhánh `fix/<slug>`, **viết test tái hiện lỗi**. Không tái hiện được thì agent dừng và hỏi thêm thông tin, không sửa theo phỏng đoán.
+3. Agent nêu nguyên nhân gốc rồi sửa, chạy `make check`, rebuild service, kiểm tra trực tiếp, báo cáo kèm cách bạn tự kiểm tra.
+4. Bạn trả lời "ok" → `/cr-finish` merge qua cổng như một CR.
+
 ## 4. Việc Creator cần tự làm
 
 1. **Bật ruleset `protect-main` trên GitHub** (chặn force push và xoá `main`): làm theo [`branch-protection.md`](branch-protection.md). **Chưa làm.**
@@ -145,6 +176,8 @@ make check-all               # toàn bộ, giống CI
 3. Mọi thay đổi cấu hình cổng (settings, agents, hooks) sẽ hiện hộp thoại hỏi bạn. Hãy đọc kỹ trước khi đồng ý.
 
 ## 5. Giới hạn đã biết
+
+- **Cổng ở máy là "khoá chống sơ suất", không phải két sắt** (quyết định D11). Hook chạy chung máy, chung quyền với agent, nên một agent *cố tình* gian lận vẫn có đường vòng. Hai lỗ đã biết (H1: tin nhắn thêm cho agent review; H2: diff so với local `main`) và phương án triệt để (H3: cổng trên GitHub) nằm trong backlog, xem `implementation-audit.md` §9.
 
 - **Hook khớp theo chữ trong lệnh.** `sh -c "$VAR"`, `grep -r` quét qua `.env`, hoặc một lệnh Bash tự sửa script hook sẽ không bị bắt. Lưới cuối cùng là review (thay đổi ở `scripts/hooks/`, `.claude/` nằm trong diff được review) và `git log`.
 - **Hook chỉ áp dụng cho Claude Code.** Người gõ git trong terminal không đi qua cổng; đó là quyền của Creator.
@@ -163,6 +196,7 @@ make check-all               # toàn bộ, giống CI
 | Phase 9 | Background agent | Cần Phase 8 + D6; phải mở PR, không dùng tự merge |
 | Phase 10 | Evals + observability (log mỗi CR, số liệu hằng tháng) | |
 | Phase 11 | Rà lại chính sách tự chủ theo rủi ro | `autonomy-policy.md` đã có, cập nhật theo thực tế |
+| Backlog hook (H1–H10) | Gia cố cổng ở máy (tin nhắn thêm cho agent review, diff so với `origin/main`, …) và **cổng phía GitHub** (PR + CI + review bằng GitHub Action) | Quyết định D11: tạm dừng, xem `implementation-audit.md` §9 |
 
 ## 7. Bản đồ file
 
@@ -178,11 +212,11 @@ scripts/
     lint-edited.sh               PostToolUse: lint file vừa sửa
     stop-check.sh                Stop: make check
     record_review.py             SubagentStop: ghi verdict review
-    test_hooks.py                41 test (chạy trong make check / CI)
+    test_hooks.py                42 test (chạy trong make check / CI)
 .claude/
   settings.json                  quyền + đăng ký hook (commit, dùng chung)
   settings.local.json            quyền cá nhân (không commit)
-  skills/<tên>/SKILL.md          cr-start, cr-check, rebuild, cr-review, cr-finish
+  skills/<tên>/SKILL.md          cr-start, fix-bug, cr-check, rebuild, cr-review, cr-finish
   agents/<vai trò>.md            solution-architect, reviewer, security-reviewer, tester
 .github/workflows/ci.yml         CI
 docs/agentic/                    tài liệu này + chi tiết từng phần
