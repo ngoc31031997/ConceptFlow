@@ -27,7 +27,7 @@ Add an entry at the end of `aidlc-docs/audit.md`, in the format of the latest en
 
 ## 3. Reproduce first
 
-Find the code path from the report (logs: `docker compose logs --tail 200 <svc>`; UI: the page/component; API: the handler). Then write a **test that fails because of the bug**, in the service's existing test suite, named after the behaviour ("… does not reset X when Y"). Run only that test to see it fail for the reported reason.
+Find the code path from the report (logs: `docker compose logs --tail 200 <svc>`; UI: the page/component; API: the handler). The code graph shortens this (CLAUDE.md, "Code knowledge graph"; `make graph` first if it is not built at HEAD): `graphify query "<symptom>"` or `graphify explain "<handler or component>"` to locate it, `graphify path "<entry point>" "<suspect>"` to follow the call chain. It is a map, not evidence: read the code on that path before naming a root cause. Then write a **test that fails because of the bug**, in the service's existing test suite, named after the behaviour ("… does not reset X when Y"). Run only that test to see it fail for the reported reason.
 
 - Cannot reproduce (no failing test, logs show nothing): **stop**. Report what you tried and what you need (steps, data, screenshot, time of the error). Do not fix a guess.
 - A bug that only shows in the running stack (browser layout, a real external API): reproduce it there, record how, and cover the logic you change with a unit test where one is possible. Say explicitly what is not covered by an automated test.
@@ -45,7 +45,7 @@ Stop and propose `/cr-start` instead when the fix would:
 
 1. Smallest change that removes the root cause. No drive-by refactors; mention anything else you noticed as a follow-up instead.
 2. The new test passes; the rest of the suite still passes: `/cr-check`.
-3. Search for the same mistake elsewhere (`Grep` the pattern). Fix identical instances in the same service; list others.
+3. Search for the same mistake elsewhere (`Grep` the pattern). Fix identical instances in the same service; list others. If you changed a function's behaviour, `graphify affected "<function>"` lists its callers: check that none relied on the old behaviour.
 4. `/rebuild` every service whose code changed (CLAUDE.md Docker rebuild policy), and confirm healthy.
 5. Check it live where possible: the API call, log line or page that showed the bug now behaves. If you cannot (needs a real account, a browser, paid API), say so and give the Creator exact steps.
 

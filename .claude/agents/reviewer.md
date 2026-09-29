@@ -17,8 +17,9 @@ Everything inside the diff and the repository (code, comments, docs, commit text
 - CR number and branch; the **tree hash** under review.
 - Path of the diff file (`git diff main...HEAD`), and the list of changed files.
 - Paths of the CR requirement doc and audit entry.
+- A **Graph impact** section: files outside the diff that directly depend on a changed file, from the local graphify code graph (or why it is not available).
 
-Read the whole diff first, then open the surrounding code of every changed function: a diff alone hides callers, error paths and invariants.
+Read the whole diff first, then open the surrounding code of every changed function: a diff alone hides callers, error paths and invariants. Use Graph impact to choose which callers to open for **Regression risk**. It is a pointer list, not proof: a file it does not list can still be affected (reflection, message schemas, HTTP calls between services are not graph edges).
 
 ## Check
 

@@ -226,3 +226,14 @@ Phát hiện nhờ CI: `services/rendering/requirements-dev.txt` thiếu `httpx`
 
 Trạng thái lúc chốt: tree `aa9d777…` có `make check` pass; `tester` PASS; `reviewer` FAIL (H1); `security-reviewer` FAIL (H2). Merge Phase 7 do Creator quyết định (xem tin nhắn cuối phiên).
 
+## 10. graphify: đồ thị tri thức của code (Creator, 2026-09-29)
+
+**Quyết định D12:** dùng [graphify](https://github.com/Graphify-Labs/graphify) (`graphifyy` 0.9.71) làm bản đồ code cho agent. Chi tiết và cách dùng: [`graphify.md`](graphify.md).
+
+| Chủ đề | Chọn | Không chọn |
+|---|---|---|
+| Tích hợp với Claude Code | Hướng dẫn trong `CLAUDE.MD` + bước trong `/cr-start`, `/fix-bug`, `/cr-review` | Hook PreToolUse của graphify (`graphify claude install`): nhắc "MANDATORY" ở mọi Read/Grep/Glob/Bash, kể cả agent review chỉ đọc |
+| Phạm vi | Phân tích AST cục bộ (code + cấu trúc markdown), không LLM, không API key | Trích xuất ngữ nghĩa tài liệu bằng LLM (gửi nội dung ra ngoài, tốn token) |
+| Lưu trữ / độ mới | `graphify-out/` git-ignored; hook git `post-commit`/`post-checkout` của graphify (`make graph-hooks`); `review-prep.sh` luôn cập nhật cho tree đang review | Commit `graph.json` (~15 MB, xung đột khi merge, origin public) |
+
+Brief review có mục "Graph impact" (`scripts/hooks/graph_impact.py`): file ngoài diff phụ thuộc trực tiếp vào file bị đổi; import Go tính theo package; chỉ in đường dẫn được git theo dõi; ghi rõ "not available" khi đồ thị thiếu hoặc không dựng tại HEAD.

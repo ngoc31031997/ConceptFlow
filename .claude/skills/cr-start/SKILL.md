@@ -53,6 +53,8 @@ If the branch name already exists locally or on `origin`, stop and ask. It may b
 
 Read `.ai-dlc/steering/aws-aidlc-rules/core-workflow.md`, then the rule details for the stage the CR starts in (normally `inception/` Requirements Analysis). Follow them; this skill does not replace the AI-DLC workflow.
 
+For the requirement's impact / scope analysis, orient with the code graph before opening files (CLAUDE.md, "Code knowledge graph"): `make graph` if it is missing or not built at HEAD, then `graphify query "<the requested behaviour>"` to find where it lives and `graphify affected "<symbol>"` for what depends on it. List the services and files it points to as the *candidate* scope, then confirm by reading the code; the graph does not see RabbitMQ messages or HTTP calls between services (`docs/contracts/`). If graphify is not installed, say so and scope by reading code as before.
+
 Record the CR the way existing CRs are recorded: look at the most recent `aidlc-docs/inception/requirements/cr-*.md` and the latest `## CR-…` entry in `aidlc-docs/audit.md` for the format, and write the Creator's request verbatim into the audit entry.
 
 ## 6. Report and stop

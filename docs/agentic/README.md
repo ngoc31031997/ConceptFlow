@@ -34,6 +34,7 @@ Nguyên tắc: **luật quan trọng được enforce bằng script/hook**, khô
 | 5 | Hooks: chặn secret, cổng merge, lint file vừa sửa, `make check` khi kết thúc lượt | `scripts/hooks/*` | [`hooks.md`](hooks.md) |
 | 6 | Skills theo bước quy trình: `/cr-start`, `/cr-check`, `/rebuild`, `/cr-review`, `/cr-finish` | `.claude/skills/*/SKILL.md`, `scripts/rebuild.sh` | [`skills.md`](skills.md) |
 | 7 | Agent theo vai trò (chỉ đọc) + review bắt buộc trong cổng merge | `.claude/agents/*.md`, `scripts/review-prep.sh`, `scripts/review-status.sh`, `scripts/hooks/record_review.py` | [`hooks.md`](hooks.md), [`skills.md`](skills.md) |
+| D12 | Đồ thị tri thức của code (graphify, cục bộ, không LLM): agent định hướng bằng `graphify query/affected`; brief review có mục "Graph impact" | `scripts/graph.sh`, `scripts/hooks/graph_impact.py`, `make graph`, `make graph-hooks` | [`graphify.md`](graphify.md) |
 
 ### 2.1 Skills (lệnh gõ `/…`), đặt tên theo **bước**
 
@@ -201,10 +202,11 @@ make check-all               # toàn bộ, giống CI
 ## 7. Bản đồ file
 
 ```
-Makefile                         make setup | build | check | check-all
+Makefile                         make setup | build | check | check-all | graph | graph-hooks
 scripts/
   setup.sh build.sh check.sh     logic kiểm tra (check.sh ghi dấu make check)
   rebuild.sh                     /rebuild
+  graph.sh                       make graph / graph-hooks (graphify, xem graphify.md)
   review-prep.sh                 tạo diff + brief cho agent review
   review-status.sh               xem 4 dấu của tree HEAD
   hooks/
@@ -213,6 +215,7 @@ scripts/
     stop-check.sh                Stop: make check
     record_review.py             SubagentStop: ghi verdict review
     test_hooks.py                42 test (chạy trong make check / CI)
+    graph_impact.py              mục "Graph impact" của brief review (+ test_graph_impact.py)
 .claude/
   settings.json                  quyền + đăng ký hook (commit, dùng chung)
   settings.local.json            quyền cá nhân (không commit)
