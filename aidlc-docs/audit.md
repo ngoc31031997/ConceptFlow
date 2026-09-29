@@ -2002,3 +2002,22 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 4. Visual Director (v11) và Visual Director AI (v5): luật 14 thêm "chỉ nhân vật mới có mặt người", luật 18 yêu cầu tả vật mới cụ thể; thêm một mục tự kiểm tra. Hash golden của visual_director được đặt lại có chủ đích.
 **Impact Assessment**: `go test ./...` (authoring-service) pass; `pytest` style + previewer của rendering: 12 pass, 2 skip (cần node_modules/REMOTION_BROWSER cục bộ). Đã rebuild authoring-service (healthy), prompt mới phục vụ qua `/v1/prompts/*`, ảnh xem trước exemplar-Cat v2 dựng được, 0 cảnh báo. Hình đã vẽ trước đây trong thư viện (vd Pyramid, Worm) KHÔNG tự đổi — cần "Vẽ lại".
 **Artifacts Affected**: `services/authoring-service/internal/domain/prompts/{illustration_style_vi,illustration_exemplars_vi,illustration_helpers_vi}.txt`, `services/authoring-service/internal/application/{drawer_prompt_vi,planner_prompt_vi}.txt`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai,golden_prompts_test}.go`, `aidlc-docs/audit.md`.
+
+## CR-051 — Rà soát quy trình server + giao diện: chỗ gây nhầm lẫn về bước và tiến độ
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "kiểm tra lại giúp tôi toàn bộ quy trình server và giao diện xem có gây confuse gì ko, ví dụ bước 3 4 5 6 là 4 bước riêng nhưng loading lại hiện 3 bước và hiện chung"
+**AI Response**: Mở CR-051 trên nhánh `feature/cr-051-pipeline-progress-ux-audit` (worktree riêng `.claude/worktrees/cr-051`, base `main` 1fe7e44; checkout chính đang là nhánh CR-050 của agent khác nên không đụng). Requirements Analysis (Standard), rà soát bằng cách đọc code, chưa xem UI chạy thật. Phát hiện: F1 chuỗi AI bước 3–6 đánh số riêng "Bước 1/3" và bỏ bước 5 với Manim; F2 tracker màn Validate hiện số 1/2; F3 tên và số bước trên tiêu đề màn không thống nhất với thanh bước; F4 code và comment "wizard 7 bước" còn sót; F5 các màn dùng chung cho nhiều bước; F6 server: `flow.go` của hai service giống hệt nhau, chỉ có rủi ro lệch về sau. Đã tạo 4 câu hỏi làm rõ.
+**Impact Assessment**: Chủ yếu `web-gui`; server chỉ bị đụng nếu Creator chọn Q3-C. Chưa sửa code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-pipeline-progress-ux-audit.md`, `aidlc-docs/inception/requirements/cr-051-questions.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Câu trả lời vòng 1 + phát hiện thêm
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "1 ok\n2 hiện nhưng làm mờ ghi ko dùng\n3 C\n4 đánh 7.1 7.2"
+**AI Response**: Ghi nhận Q1=A (AI hiểu "ok" là A và đã báo lại Creator), Q2=A, Q3=C, Q4=A. Khi xem kỹ phía server, phát hiện thêm F7 (`FlowStepLabel` server "Render hoạt hình"/"Cắt video short" khác web "Render"/"Cắt short", lộ ra ở trang Nhật ký) và F8 (`FlowStateFor` không bao giờ trả về bước 5: dự án Remotion nháp đã có storyboard bị xếp vào bước 6, bước 5 hiện ✓ dù hình chưa xong). F7 đưa vào phạm vi C (FR7). F8 cần đổi hợp đồng nội bộ authoring → orchestrator nên hỏi thêm ở Question 5. Q3-C làm bằng test hợp đồng ở `tests/contracts/`, không gom thành module Go dùng chung (ADR-0001).
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-*.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Duyệt Requirements (vòng 2)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "Câu 1 \"ok\": ... => ok\nF7 — một bước có hai tên. ... =>ok\nF8 — server không biết tới bước 5. ... => đúng như vậy. cần tách nó thành làm step riêng thật sự\nA — sửa luôn: authoring-service gửi thêm cờ \"hình minh hoạ đã sẵn sàng\" sang orchestrator, để server xếp dự án đúng vào bước 5. Việc này chỉ thêm một trường vào hợp đồng nội bộ, bản cũ vẫn đọc được, và phải rebuild 2 service."
+**AI Response**: Requirements chốt: Q1=A, Q2=A, Q3=C, Q4=A, Q5=A; FR1–FR9. Phát hiện thêm F9 (`ResumeProjectPage` chặn trần ở bước 5, sót lại từ luồng 13 bước) và đưa vào phạm vi (FR9). Commit giai đoạn Requirements, chuyển sang Functional Design.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-*.md`, `aidlc-docs/audit.md`.
