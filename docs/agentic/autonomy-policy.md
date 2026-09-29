@@ -23,7 +23,7 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 | Modify application code | Agent | Default (edits prompt or not according to the session's permission mode) |
 | `make setup`, `make build`, `make check`, `make check-all` | Agent | `allow` |
 | Create / switch branches, `git add`, `git commit`, `git fetch`, `git pull` | Agent | `allow` |
-| `git merge` (including into `main`, D1) | Agent, gated | `allow`, plus the merge gate hook: into `main` only when `make check` passed on the branch's tree (review joins in Phase 7). See [`hooks.md`](hooks.md) |
+| `git merge` (including into `main`, D1) | Agent, gated | `allow`, plus the merge gate hook: into `main` only when the branch's tree passed `make check` and the three review agents. See [`hooks.md`](hooks.md) |
 | `git push` to `origin` (plain, no flags that rewrite or delete) | Agent | `allow` for `git push`, `git push origin *`, `git push -u origin *`. A push updating `main` passes the merge gate |
 | Discard uncommitted work: `git checkout -- …`, `git checkout .`, `git restore`, `git reset --hard`, `git clean`, `git branch -D` | Ask | `ask` |
 | `docker exec` (can print container env, i.e. secrets) | Ask | `ask` |
@@ -35,7 +35,9 @@ Precedence in Claude Code is **deny → ask → allow**, across every settings f
 | Destroy Docker data: `docker compose down -v`/`--volumes`, `docker volume rm`, `docker volume prune`, `docker system prune` | Deny | `deny` |
 | Read or write secrets: `.env`, `.env.window`, `secrets/**`, `client_secret_*.json` | Deny | `deny` on `Read(…)` and `Edit(…)`; shell access blocked by the PreToolUse guard hook |
 | Finish a turn with `make check` failing | Deny (once) | Stop hook |
-| Change this policy or `.claude/settings.json` | Human approval | Prose only (`CLAUDE.md` commit policy). Changes go through a reviewed commit |
+| Change the gate's configuration: `.claude/settings*.json`, `.claude/agents/**`, `.claude/skills/**`, `scripts/hooks/**`, `scripts/check.sh`, `scripts/review-prep.sh` | Ask | `ask` on `Edit(…)` for each; changes then go through the reviewed, gated merge |
+| Write or forge Claude Code subagent transcripts, or run the review hook by hand | Deny | `deny` on `Edit(~/.claude/projects/**/subagents/**)`; Bash naming them blocked by the guard hook |
+| Write merge-gate markers or review input (`.git/conceptflow/**`) | Deny | `deny` on `Edit(/.git/conceptflow/**)`; Bash naming the directories blocked by the guard hook. Only `make check`, `review-prep.sh` and the SubagentStop hook write there |
 | Enable/alter the GitHub ruleset `protect-main` | Human | Agents have no admin access. See [`branch-protection.md`](branch-protection.md) |
 | Production deployment, production data mutation | Human | Not applicable yet: the repo has no production environment or deploy credentials |
 
@@ -52,7 +54,7 @@ These are real holes, not oversights. Each has a planned fix.
 
 1. **Shell access to secrets is matched by text.** Since Phase 5 the guard hook blocks commands that name the secret paths or run `docker compose config`, but a command that reads them without naming them (`grep -r KEY .`, a script, `sh -c "$VAR"`) is not caught. The reverse also happens: a Bash command whose *text* mentions `.env` (e.g. a heredoc editing this doc) is blocked; use the Edit/Write tools for such text.
 2. **Bash patterns are prefix/glob matches, not a parser.** Wrapped or chained commands (`sh -c "git push -f …"`, `cd x && rm -rf y`, variables) can slip past a pattern. Deny rules are a guard against accidents, not against a determined bypass. The server-side ruleset (`protect-main`) is the backstop for force-push/deletion of `main`.
-3. **Merge gate covers `make check` only.** Since Phase 5, merging or pushing an unchecked tree into `main` is blocked ([`hooks.md`](hooks.md)). Review is not required yet; Phase 7 adds it.
+3. **Gate files can still be rewritten through Bash.** Since Phase 7 the merge gate requires `make check` plus verified PASS verdicts from the `reviewer`, `security-reviewer` and `tester` agents on the same tree, with the brief and diff produced by a script and checked by the hook ([`hooks.md`](hooks.md)). Edit/Write of the gate's files asks the Creator, but a Bash command rewriting them is not matched. Such a change still appears in the reviewed diff and in `git log`.
 4. **`protect-main` ruleset** must be created by the Creator. Until then nothing server-side stops a force push from a human or another tool.
 
 ## Verification

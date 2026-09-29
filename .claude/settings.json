@@ -29,7 +29,15 @@
       "Bash(git branch -D *)",
       "Bash(docker exec *)",
       "Bash(*migrate-authoring-data.sh*)",
-      "Edit(/.github/**)"
+      "Edit(/.github/**)",
+      "Edit(/.claude/settings.json)",
+      "Edit(/.claude/settings.local.json)",
+      "Edit(/.claude/agents/**)",
+      "Edit(/.claude/skills/**)",
+      "Edit(/scripts/hooks/**)",
+      "Edit(/scripts/check.sh)",
+      "Edit(/scripts/review-prep.sh)",
+      "Edit(/scripts/review-status.sh)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -60,7 +68,9 @@
       "Edit(**/.env)",
       "Edit(**/.env.window)",
       "Edit(**/secrets/**)",
-      "Edit(**/client_secret_*.json)"
+      "Edit(**/client_secret_*.json)",
+      "Edit(/.git/conceptflow/**)",
+      "Edit(~/.claude/projects/**/subagents/**)"
     ]
   },
   "hooks": {
@@ -84,6 +94,13 @@
       {
         "hooks": [
           { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/stop-check.sh", "timeout": 600 }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/record_review.py", "timeout": 30 }
         ]
       }
     ]

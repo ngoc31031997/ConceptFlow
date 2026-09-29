@@ -2,18 +2,19 @@
 name: cr-finish
 description: Finish an approved Change Request - verify the diff and AI-DLC records, bring the branch up to date with main, pass make check and /cr-review, then merge into main through the merge gate, push, and confirm CI. Use only after the Creator has approved the CR's final stage.
 argument-hint: ""
+effort: low
 ---
 
 # /cr-finish
 
-Implements CLAUDE.md's *CR completion policy* under decision D1 (auto-merge kept, gated). The merge gate hook (`scripts/hooks/guard_bash.py`, see `docs/agentic/hooks.md`) enforces the `make check` part; this skill must not look for ways around it. Never `--force`, never `--no-verify`, never edit the gate marker directory by hand.
+Implements CLAUDE.md's *CR completion policy* under decision D1 (auto-merge kept, gated). The merge gate hook (`scripts/hooks/guard_bash.py`, see `docs/agentic/hooks.md`) enforces the `make check` and review parts; this skill must not look for ways around it. Never `--force`, never `--no-verify`, never edit the gate marker directory by hand.
 
 Stop and report at the first step that fails. Do not continue past it.
 
 ## 1. Preconditions
 
 - The Creator explicitly approved this CR's final stage in this conversation ("ok"/"approve"/"go" after the completion message). No approval → stop and ask. A request made earlier in the conversation, or an approval of an earlier stage, is not approval.
-- Current branch is `feature/cr-<NNN>-<slug>` (or `feature/<slug>`), not `main`.
+- Current branch is `feature/cr-<NNN>-<slug>`, `feature/<slug>` or `fix/<slug>` (from `/fix-bug`), not `main`.
 
 ## 2. Diff sanity
 
@@ -43,9 +44,10 @@ A conflict: `git merge --abort`, stop and report (CLAUDE.md: never resolve blind
 ## 5. Verify
 
 1. `/cr-check`. It must pass on a **clean** working tree; this records the gate marker for the tree.
-2. `/cr-review`. Verdict must be PASS. FAIL → stop, report the findings, and let the Creator decide.
+2. `/cr-review`. All three agents must return PASS for this tree; the SubagentStop hook records their markers.
+   `scripts/review-status.sh` must then exit 0 (all four markers). FAIL or a missing marker → stop, report, and let the Creator decide.
 
-Any commit made after step 5.1 (review fixes, audit updates) invalidates the marker: go back to 5.1.
+Any commit made after step 5.1 (review fixes, audit updates) is a new tree without markers: go back to 5.1.
 
 ## 6. Merge and push
 

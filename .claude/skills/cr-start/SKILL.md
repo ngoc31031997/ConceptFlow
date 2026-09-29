@@ -1,7 +1,8 @@
 ---
 name: cr-start
-description: Start a new Change Request - check the working tree is clean, sync main, pick the next CR number, create the feature/cr-NNN-slug branch, and open the AI-DLC Requirements Analysis for it. Use when the Creator asks for a new change, fix or feature that is not already an open CR.
+description: Start a new Change Request - check the working tree is clean, sync main, pick the next CR number, create the feature/cr-NNN-slug branch, and open the AI-DLC Requirements Analysis for it. Use when the Creator asks for a new feature or a change of behaviour that is not already an open CR. For something broken in existing behaviour, use /fix-bug instead.
 argument-hint: "<short-slug> [NNN]  e.g. illustration-faces"
+effort: medium
 ---
 
 # /cr-start

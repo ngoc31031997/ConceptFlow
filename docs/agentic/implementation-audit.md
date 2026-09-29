@@ -206,3 +206,23 @@ Backlog:
 - Khi quyết định giữ hay bỏ manim / mockup răng: bật lại hoặc xoá các test ở D9.
 
 Phát hiện nhờ CI: `services/rendering/requirements-dev.txt` thiếu `httpx` (test import nó, venv local có sẵn do cài tay). Đã bổ sung `httpx==0.28.*`.
+
+## 9. Phase 7: cổng review, giới hạn chấp nhận và backlog (Creator, 2026-09-29)
+
+**Quyết định D11:** dừng gia cố hook ở máy sau 3 vòng review thật. Cổng ở máy được giữ với vai trò **chống sơ suất và bỏ bước**, không chống một agent cố tình gian lận: hook chạy chung máy, chung quyền với agent và nhận diện lệnh qua chữ. Các mục dưới đây vào backlog.
+
+| # | Mức | Nguồn | Nội dung | Hướng sửa |
+|---|---|---|---|---|
+| H1 | Major | reviewer, vòng 3 | `record_review.py` chỉ so **tin nhắn đầu tiên** của agent review với brief. Session có thể nhắn thêm (SendMessage) giữa chừng để "gợi ý" verdict | Từ chối PASS nếu transcript có tin nhắn `user` dạng text sau brief, trừ các thông báo do Claude Code chèn (cần xác định chắc định dạng) |
+| H2 | Major | security-reviewer, vòng 3 | Diff review tính so với **local `main`**. Commit nằm trên local `main` nhưng chưa push sẽ nằm dưới merge-base: không được review nhưng vẫn lên `origin/main` | Tính diff so với `origin/main` (fetch trước) trong `review-prep.sh` và hook; chặn `git commit` trực tiếp trên `main`; thêm test |
+| H3 | Chiến lược | Creator + agent | **Cổng phía server (triệt để):** agent mở PR; GitHub chạy CI + 3 agent review (GitHub Action gọi Claude API); ruleset "Require PR + required checks" + auto-merge. Agent không sửa được quy tắc của GitHub | Đổi D1 (từ merge local sang PR + auto-merge); cần `ANTHROPIC_API_KEY` trong GitHub Secrets và chi phí mỗi PR. Cần Creator duyệt |
+| H4 | Minor | vòng 3 | Tên nhánh và tên file thay đổi đi vào brief "được tin" mà không kiểm tra ký tự | Kiểm tra tên nhánh như label; liệt kê tên file qua bộ lọc ký tự an toàn |
+| H5 | Minor | vòng 3 | Diff chịu ảnh hưởng của `.git/info/attributes`, `diff.external`, `textconv` | `git -c core.attributesFile=/dev/null diff --no-ext-diff --no-textconv --text` ở cả hai chỗ |
+| H6 | Minor | vòng 3 | Guard không bắt lệnh nhắm vào thư mục cha (`rm -r .git/conceptflow`, `cd` rồi xoá) → xoá được `.fail` | Khớp cả `conceptflow` trần và `cd` vào đó; về lâu dài để marker ngoài vùng agent ghi được (hoặc làm H3) |
+| H7 | Minor | vòng 3 | Hook không đối chiếu `agent_type` với loại agent Claude Code ghi cho `agent_id` | Đọc loại agent từ transcript/meta nếu Claude Code có lưu |
+| H8 | Minor | vòng 3 | FAIL chỉ "dính" theo tree; một commit vặt tạo tree mới là chạy lại được | Ghi rõ trong tài liệu, hoặc mang FAIL sang tree sau cho tới khi các file bị nêu thực sự đổi |
+| H9 | Minor | vòng 3 | Brief không có trỏ tới mục audit mà `tester` cần khi không có requirement doc | Thêm dòng `Audit: aidlc-docs/audit.md (## <label>)` cố định vào brief |
+| H10 | Minor | vòng 3 | `implementation-audit.md` bước 7 vẫn ghi "qc"; agent thực tế tên `tester` | Đã ghi nhận ở đây: vai trò QC = agent `tester` |
+
+Trạng thái lúc chốt: tree `aa9d777…` có `make check` pass; `tester` PASS; `reviewer` FAIL (H1); `security-reviewer` FAIL (H2). Merge Phase 7 do Creator quyết định (xem tin nhắn cuối phiên).
+
