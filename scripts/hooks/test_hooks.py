@@ -247,6 +247,26 @@ class SettingsTest(unittest.TestCase):
             self.assertRegex(front, r"(?m)^model:", agent)
             self.assertRegex(front, r"(?m)^effort:", agent)
 
+    def test_forked_skills_use_existing_agents(self):
+        """A skill with `context: fork` runs in the named agent; a wrong name is not an error
+        in Claude Code, so check it. The step agents they fork into cannot edit files."""
+        claude = os.path.join(HOOKS, "..", "..", ".claude")
+        agents = {f[:-3] for f in os.listdir(os.path.join(claude, "agents")) if f.endswith(".md")}
+        forked = {}
+        for d in os.listdir(os.path.join(claude, "skills")):
+            with open(os.path.join(claude, "skills", d, "SKILL.md")) as f:
+                front = f.read().split("---")[1]
+            if re.search(r"(?m)^context:\s*fork\s*$", front):
+                agent = re.search(r"(?m)^agent:\s*(\S+)", front)
+                self.assertIsNotNone(agent, d)
+                self.assertIn(agent.group(1), agents, d)
+                forked[d] = agent.group(1)
+        self.assertEqual(forked, {"rebuild": "ops-runner", "cr-check": "ops-runner"})
+        with open(os.path.join(claude, "agents", "ops-runner.md")) as f:
+            front = f.read().split("---")[1]
+        tools = {t.strip() for t in re.search(r"^tools:\s*(.+)$", front, re.M).group(1).split(",")}
+        self.assertFalse(tools & {"Edit", "Write", "MultiEdit", "NotebookEdit", "Agent"}, tools)
+
     def test_hooks_registered(self):
         commands = json.dumps(self.settings["hooks"])
         for script in ("guard_bash.py", "lint-edited.sh", "stop-check.sh", "record_review.py"):

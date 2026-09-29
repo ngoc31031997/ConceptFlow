@@ -57,6 +57,8 @@ Chỉ có Read/Grep/Glob: không chạy lệnh, không sửa file.
 | `security-reviewer` | Secret, injection, auth, lộ dữ liệu nhạy cảm, dependency, leo quyền | **Có** |
 | `tester` | QC: đối chiếu từng tiêu chí chấp nhận của CR ↔ code ↔ test | **Có** |
 
+Ngoài 4 agent chỉ đọc ở trên còn một agent **thực thi**: `ops-runner` (haiku; Bash + đọc, không có Edit/Write) chạy các bước cơ học của skill và chỉ báo cáo; nó không nằm trong cổng merge.
+
 Không có agent "software engineer" riêng: session chính là người viết code.
 
 ### 2.3 Hooks: chạy tự động, không cần gọi
@@ -113,10 +115,19 @@ Mỗi agent và skill có thể chọn model (`sonnet`, `opus`, `haiku`, `fable`
 | agent `reviewer` | `sonnet` | `high` | Chạy mỗi lần merge; cần suy luận kỹ nhưng không cần model lớn nhất |
 | agent `security-reviewer` | `sonnet` | `high` | Như trên |
 | agent `tester` | `sonnet` | `medium` | Đối chiếu tiêu chí ↔ code ↔ test, ít suy luận sâu hơn |
-| skill `/cr-start` | theo phiên | `medium` | Phân tích yêu cầu |
-| skill `/fix-bug` | theo phiên | `medium` | Tìm nguyên nhân gốc cần model của phiên; effort vừa phải |
-| skill `/cr-finish` | theo phiên | `low` | Các bước cơ học (git, check); review do agent làm |
-| skill `/cr-check`, `/rebuild`, `/cr-review` | theo phiên | theo phiên | **Cố ý không đặt**: model/effort của skill áp dụng **cho hết lượt**, nên nếu `/rebuild` đặt `haiku` thì phần sửa code sau đó trong cùng lượt cũng chạy bằng `haiku` |
+| agent `ops-runner` | `haiku` | (không đặt) | Chỉ chạy lệnh và trích output: `/rebuild`, `/cr-check`, theo dõi CI, đọc log, kiểm tra trực tiếp. Không sửa file, không chẩn đoán |
+| agent `Explore` (có sẵn) | `haiku` | – | Tìm code/đường đi trong `/fix-bug` |
+| skill `/rebuild`, `/cr-check` | → `ops-runner` | | `context: fork`: cả skill chạy trong agent haiku riêng; log build/test dài không vào ngữ cảnh phiên chính |
+| skill `/cr-start` | theo phiên | `medium` | Phân tích yêu cầu, cần hội thoại với Creator |
+| skill `/fix-bug` | theo phiên | `medium` | Nguyên nhân gốc + sửa ở phiên chính; đọc log/tìm code/kiểm tra trực tiếp giao cho `ops-runner`/`Explore` |
+| skill `/cr-review` | theo phiên | theo phiên | Chỉ điều phối; phần nặng do 3 agent sonnet làm |
+| skill `/cr-finish` | theo phiên | `low` | Phán đoán (duyệt, diff, hồ sơ, merge) ở phiên chính; check → `ops-runner`, review → 3 agent, theo dõi CI → `ops-runner` chạy nền |
+
+Nguyên tắc chia:
+- **Đặt model trên agent, không đặt trên skill chạy ở phiên chính.** Model/effort của một skill chạy trong phiên chính áp dụng **cho hết lượt**: nếu `/rebuild` đặt `haiku` thì phần sửa code sau đó cũng chạy bằng haiku. Skill nào chỉ là "chạy lệnh" thì dùng `context: fork` + `agent:` để chạy hẳn trong agent rẻ; model chỉ áp dụng trong agent đó.
+- **Agent không gọi được agent khác.** Vì vậy `/cr-review`, `/cr-finish`, `/fix-bug` (có gọi agent) phải chạy ở phiên chính và giao từng bước cho agent.
+- **Gọi agent có chi phí cố định** (system prompt, CLAUDE.md, định nghĩa tool: cỡ vài chục nghìn token đầu vào, phần lớn được cache). Chỉ đáng khi bước đó sinh output dài (build, test, log, poll CI) hoặc cần suy luận riêng. Vài lệnh git ngắn (`/cr-start` bước 1–4, merge ở `/cr-finish`) để phiên chính chạy thì rẻ hơn.
+- **Haiku không đặt `effort`**: tham số effort chỉ có trên các model hỗ trợ; với haiku để trống.
 
 Cách đổi:
 - Sửa dòng `model:` / `effort:` trong `.claude/agents/<tên>.md` hoặc `.claude/skills/<tên>/SKILL.md`. Claude Code sẽ hỏi bạn trước khi sửa, vì đây là file cấu hình cổng.
