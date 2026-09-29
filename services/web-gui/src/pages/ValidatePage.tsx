@@ -197,7 +197,7 @@ export function ValidatePage() {
             <ProgressTracker
               progressState={displayProgressState}
               steps={VALIDATE_STEPS}
-                  stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
+              stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
               isFailed={isFailed}
               allDone={reviewingPast}
             />

@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"orchestrator/internal/application"
 	"orchestrator/internal/domain"
 )
 
@@ -27,7 +26,7 @@ func TestClient_TopicSimilarSummariesAndDelete(t *testing.T) {
 		case r.URL.Path == "/internal/v1/authoring/similar":
 			_, _ = w.Write([]byte(`[{"project_id":"p2","topic":"t","created_at":"2026-09-01T00:00:00Z"}]`))
 		case r.URL.Path == "/internal/v1/authoring/summaries":
-			_, _ = w.Write([]byte(`{"p1":{"topic":"t","story":true,"storyboard":false,"code":false}}`))
+			_, _ = w.Write([]byte(`{"p1":{"topic":"t","story":true,"storyboard":false,"code":false,"illustrations_ready":false}}`))
 		case r.Method == http.MethodDelete:
 			w.WriteHeader(http.StatusNoContent)
 		default:
@@ -46,8 +45,12 @@ func TestClient_TopicSimilarSummariesAndDelete(t *testing.T) {
 		t.Fatalf("similar = %+v err=%v", sim, err)
 	}
 	sums, err := c.Summaries(ctx, []string{"p1"})
-	if err != nil || sums["p1"] != (application.AuthoringSummary{Topic: "t", Story: true}) {
+	if err != nil || sums["p1"].Topic != "t" || !sums["p1"].Story || sums["p1"].Storyboard || sums["p1"].Code {
 		t.Fatalf("summaries = %+v err=%v", sums, err)
+	}
+	// CR-051: the key is read as sent; a typo would read as nil ("ready").
+	if r := sums["p1"].IllustrationsReady; r == nil || *r {
+		t.Fatalf("illustrations_ready = %v, want false", r)
 	}
 	if err := c.DeleteAuthoring(ctx, "p1"); err != nil {
 		t.Fatal(err)

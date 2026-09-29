@@ -17,9 +17,9 @@ const (
 	FlowValidate      = 7  // Validate (parse + dry run)
 	FlowReview        = 8  // Review — screen only
 	FlowTTS           = 9  // TTS
-	FlowRender        = 10 // Render hoạt hình
+	FlowRender        = 10 // Render
 	FlowMerge         = 11 // Merge (+ QC)
-	FlowSplit         = 12 // Cắt video short
+	FlowSplit         = 12 // Cắt short
 	FlowResult        = 13 // Kết quả
 	FlowPublish       = 14 // Publish
 	FlowStepsTotal    = 14

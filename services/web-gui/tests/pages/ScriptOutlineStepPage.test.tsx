@@ -246,6 +246,9 @@ describe("ScriptOutlineStepPage", () => {
 
       await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
       expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
+      // CR-051: the mode applies to all of steps 3–6, not "bước 3".
+      expect(screen.getByRole("radiogroup", { name: "Cách làm các bước 3–6" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 3 — Kịch bản");
       expect(screen.getByTestId("script-outline-copy")).toBeInTheDocument();
       expect(screen.queryByTestId("run-with-ai-story")).not.toBeInTheDocument();
     });

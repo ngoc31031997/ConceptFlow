@@ -85,6 +85,8 @@ describe("VisualDirectorStepPage", () => {
     );
 
     expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
+    // CR-051: screen titles name the step as the rail does.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Visual");
   });
 
 });

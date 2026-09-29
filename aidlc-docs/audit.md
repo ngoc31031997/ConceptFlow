@@ -2047,6 +2047,32 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **AI Response**: Creator duyệt phần code và yêu cầu merge vào `main`; **chưa rebuild Docker** (authoring-service, orchestrator, web-gui) theo quyết định của Creator — stack đang chạy vẫn là code trước CR-051 cho tới lần rebuild sau. Chạy /cr-finish.
 **Artifacts Affected**: nhánh `feature/cr-051-pipeline-progress-ux-audit`.
 
+## Fix — Các lỗi nhỏ review CR-051 để lại
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "sửa thành 1 fix nhỏ" (trả lời câu hỏi sửa ngay hay để backlog các lỗi nhỏ từ review CR-051: (1) test SQL `illustrations_ready` không chạy trong make check/CI; (2) `flowTitle` không có dự phòng khi step ngoài khoảng — "Bước 99 — undefined" trên `/render?view=1&step=99`; (3) comment cũ "Render hoạt hình"/"Cắt video short" trong hai `flow.go`; (4) nhãn việc con `render_scenes` "Render hoạt hình" dưới tiêu đề "Bước 10 — Render"; (5) thiếu test: wiring `Content()` ở router/list orchestrator, tiêu đề "Cách làm các bước 3–6" và tiêu đề các màn, case chỉ có code; (6) thụt lề `ValidatePage.tsx:200`).
+**AI Response**: Nguyên nhân và cách sửa theo từng mục:
+- (2) `flowTitle` (`services/web-gui/src/utils/flow.ts`) đọc `FLOW_LABELS[step - 1]` mà không có dự phòng. Sửa: nếu bước không có nhãn thì trả về "Bước N".
+- (4) `STEP_LABELS.render_scenes` (`pipelineLabels.ts`) vẫn giữ tên cũ. Sửa: đổi thành "Render".
+- (3) Comment cạnh `FlowRender` và `FlowSplit` trong hai file `flow.go` được sửa theo tên mới; hai file vẫn giống hệt nhau.
+- (6) Sửa thụt lề ở `ValidatePage.tsx`.
+- (5) Thêm test:
+  - `FlowStateFor` với dự án chỉ có code, chưa có storyboard: đứng ở bước 6, đúng hành vi CR-051 đã đưa vào nhưng trước đây không có test;
+  - `TestHandleGetProject_PlacesTheIllustrationsStep`: đi qua `flowFor` với JSON thật;
+  - client test kiểm key `illustrations_ready`;
+  - tiêu đề h1 của các màn 1, 3, 4, 5, 6, 10, 13, 14;
+  - aria-label "Cách làm các bước 3–6".
+- (1) CI (`.github/workflows/ci.yml`) có thêm service Postgres 16 và `TEST_DATABASE_URL` cho bước `make check-all`, nên 4 test repository của authoring-service (gồm test SQL `illustrations_ready`) chạy trong CI. `make check` ở máy local vẫn bỏ qua chúng khi không có DB.
+**Impact Assessment**:
+- Test mới cho (2) và (4) hỏng trước khi sửa, pass sau khi sửa.
+- Kiểm ngược test router: cố tình làm `flowFor` bỏ qua engine thì test hỏng.
+- 4 test Postgres pass trên một Postgres 16 mới tinh, dựng giống cấu hình CI.
+- `make check` 23/23 pass.
+- Chưa kiểm được trên CI thật: CI chỉ chạy khi nhánh được push, sau khi Creator duyệt.
+- Không rebuild Docker: stack chung vẫn đang để hoãn theo quyết định của Creator ở CR-051.
+**Artifacts Affected**: `.github/workflows/ci.yml`, `services/{authoring-service,orchestrator}/internal/domain/flow{,_test}.go`, `services/orchestrator/internal/adapters/{http/router_test.go,authoring/client_test.go}`, `services/web-gui/src/{utils/flow.ts,utils/pipelineLabels.ts,pages/ValidatePage.tsx}`, `services/web-gui/tests/{utils/flowLabels.test.ts,pages/*.test.tsx}`, `aidlc-docs/audit.md`.
+**Approval**: Creator trả lời "ok" — commit, /cr-finish.
+**Review round 1 (/cr-review)**: reviewer FAIL — Major: `ResultPage`/`PublishPage`/`OAuthCallbackPage` passed `currentStep` 12/13 (13-step leftover since CR-046), so the rail highlighted "Cắt short" under "Bước 13 — Kết quả". Fixed with `FLOW_RESULT`/`FLOW_PUBLISH`; regression test `tests/pages/OutputStepsRail.test.tsx` (failed before, passes after). Also fixed two minors: `flowTitle` guards non-integers ("Bước"); the SQL test cleans up with `t.Cleanup` and up front (verified: two runs in a row on the same DB pass). Left: `chainRows` would label a non-contiguous chain's gap "Không dùng" even on Remotion — not reachable (only `authoringChainSteps` builds chains). `make check` 23/23; branch CI (Postgres service) success.
+
 ## CR-052 — Thư viện hình: nút Xoá trên từng hình, cho phép thay đổi Hình mẫu
 **Timestamp**: 2026-09-29T00:00:00Z
 **User Input**: "ở màn hình thư viện hình ko có button xoá hình, ở mục hình mẫu có thể cho phép thay đổi không". Trả lời lượt 1: "1 chỉ không được xoá khi hình được dùng trong dự án đang trong quá trình render hoặc đó là hình minh hoạ (bước 5-11) 2 hiện tại ko có phân quyền trên hệ thống hình minh hoạ để promt tham chiếu đến sửa url tham chiếu là được mà đúng ko"

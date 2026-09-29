@@ -96,6 +96,8 @@ describe("PublishPage publish state", () => {
     renderPublishPage();
 
     await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
+    // CR-051: screen titles name the step as the rail does.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Publish");
   });
 
   it("warns when the caption track was skipped for lacking scope", async () => {
