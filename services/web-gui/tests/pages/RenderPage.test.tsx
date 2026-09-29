@@ -60,8 +60,10 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
 
     renderRenderPage();
 
-    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toHaveTextContent("Render hoạt hình"));
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(1));
     const steps = screen.getByTestId("progress-tracker-steps");
+    expect(steps).toHaveTextContent("10Render");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 10 — Render");
     expect(steps).not.toHaveTextContent("Tạo giọng đọc");
     expect(steps).not.toHaveTextContent("Ghép video hoàn chỉnh");
     expect(steps).not.toHaveTextContent("Phân tích kịch bản");

@@ -114,7 +114,7 @@ export function ResultPage() {
   return (
     <div data-testid="result-page">
       <AppShell
-        currentStep={12}
+        currentStep={FLOW_RESULT}
         wide
         title={flowTitle(FLOW_RESULT)}
         subtitle="Xem lại video, cắt clip hoặc dựng lại. Đăng video ở bước tiếp theo."

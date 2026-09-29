@@ -153,7 +153,7 @@ export function PublishPage() {
   return (
     <div data-testid="publish-page">
       <AppShell
-        currentStep={13}
+        currentStep={FLOW_PUBLISH}
         wide
         title={flowTitle(FLOW_PUBLISH)}
         subtitle="Kết nối YouTube và điền thông tin để đăng video."

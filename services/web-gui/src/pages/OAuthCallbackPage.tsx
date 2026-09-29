@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { completeYoutubeAuthCallback } from "../api/client";
 import { AppShell } from "../components/AppShell";
 import glass from "../styles/glass.module.css";
+import { FLOW_PUBLISH } from "../utils/flow";
 
 export function OAuthCallbackPage() {
   const [searchParams] = useSearchParams();
@@ -41,7 +42,7 @@ export function OAuthCallbackPage() {
     // Nối YouTube bắt đầu từ màn kết quả, nên đây là bước 6 ("Kết quả") —
     // Creator sẽ quay lại đúng chỗ đó sau khi nối xong.
     <AppShell
-      currentStep={13}
+      currentStep={FLOW_PUBLISH}
       title={connectedChannel ? `Đã nối kênh ${connectedChannel}` : "Đang kết nối YouTube..."}
       subtitle="Vui lòng chờ trong giây lát."
     >
