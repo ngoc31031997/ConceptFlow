@@ -2131,3 +2131,17 @@ Các lỗi nhỏ còn lại để làm sau:
 - chưa có test "Dựng lại" trên Hình mẫu.
 **Impact Assessment**: `go test ./...` (authoring-service) pass; web-gui tsc + vitest 402 test pass; /cr-check và /cr-review chạy lại trên cây cuối trước khi merge.
 **Artifacts Affected**: services/authoring-service (http/illustrations.go, application/{illustration_backup,project_illustrations}.go, domain/project.go + test), services/web-gui (ProjectIllustrationsPanel + test), `aidlc-docs/audit.md`.
+
+## CR-053 — Rà soát và xoá file không dùng
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "review lại toàn bộ dự án xem file nào không dùng thì remove hết giúp tôi nhé"
+**AI Response**: Mở nhánh `feature/cr-053-remove-unused-files`. Rà bằng graphify rồi kiểm lại từng loại file (import Python theo module, import TS/JS phân giải ra file, `go list` + symbol Go, tên asset), vì graphify bỏ sót nhiều import Python. Kết quả: nhóm A — code chết thật (web-gui `ScriptEditor`, `useRequireScript`, `useVoiceCalibration` + `fetchVoiceCalibration`, `favicon-48.png`; rendering `conceptflow/fonts.py`; package `adapters/logging` của authoring-service và orchestrator; bản sao sót lại sau CR-040 trong authoring-service: `idgen.go`, `topic.go`, `clip_rules.go`, `script_edit.go`; `orchestrator/internal/domain/testdata/`) — đề xuất xoá. Nhóm B (công cụ chạy tay), `scripts/migrate-authoring-data.sh` và nhóm C (bản nháp prompt/format trong `docs/`) cần Creator quyết. Hỏi 3 câu: (1) nhóm B giữ hết / xoá gallery + benchmark / xoá hết — đề xuất giữ hết; (2) script migrate đã chạy chưa — đã chạy thì xoá; (3) nhóm C — đề xuất xoá. Chờ trả lời.
+**Impact Assessment**: web-gui, rendering, authoring-service, orchestrator (chỉ xoá file). Không đổi contract, DB. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-053-remove-unused-files-design.md`, `aidlc-docs/audit.md`.
+
+## CR-053 — Thiết kế được duyệt
+**Timestamp**: 2026-09-30T00:30:00Z
+**User Input**: "1 chọn a / 2 chạy rồi xoá đi / 3 xoá đi / ok làm đi"
+**AI Response**: Cập nhật thiết kế: giữ toàn bộ nhóm B (công cụ chạy tay); xoá `scripts/migrate-authoring-data.sh` (Creator đã chạy) và 2 bản nháp trong `docs/`; nhóm A xoá như đề xuất. Commit thiết kế, chuyển sang /code.
+**Impact Assessment**: web-gui, rendering, authoring-service, orchestrator, repo gốc (chỉ xoá file). Không đổi contract, DB.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-053-remove-unused-files-design.md`, `aidlc-docs/audit.md`.
