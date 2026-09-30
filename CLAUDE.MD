@@ -47,7 +47,7 @@ When implementing:
 - `graphify-out/` (git-ignored) holds a local graph of the code and markdown structure, built with tree-sitter AST: no LLM, nothing leaves the machine. Refresh it with `make graph`; after `make graph-hooks` the graphify git hooks keep it in step with commits and branch switches. Details: `docs/agentic/graphify.md`.
 - Use it to orient before reading many files, not instead of reading the code you change: `graphify query "<question>"`, `graphify explain "<symbol>"`, `graphify path "<A>" "<B>"`, `graphify affected "<symbol>"` (who depends on it), `graphify-out/GRAPH_REPORT.md` for the architecture overview.
 - It only knows static edges (imports, calls, references). RabbitMQ messages, HTTP calls between services and DB access are not in it; check `docs/contracts/` and the ADRs for those. If `graph.json`'s `built_at_commit` is not HEAD, run `make graph` first.
-- The agentic layer (skills `/cr-*`, `/fix-bug`, `/rebuild`, role agents, hooks, review gate, `make setup/build/check/check-all`, CI workflow) was removed on 2026-09-29/30; do not invoke or recreate it. Rebuild with `docker compose build/up` directly.
+- The agentic layer (skills `/cr-*`, `/fix-bug`, `/rebuild`, role agents, hooks, review gate, `make setup/build/check/check-all`, CI workflow) was removed on 2026-09-29/30; do not invoke or recreate it. Rebuild with `docker compose build/up` directly. The one exception is the `/ship` skill (`.claude/skills/ship/`, Haiku, Creator-invoked only): after the Creator approves, it commits, pushes, merges into main, pulls main and rebuilds the changed services.
 
 ## Web UI / UX design rules
 - Any UI task must follow `docs/ux-ui-design-rules.md` (screen flow order, etc.). Read it before changing or adding a screen.
