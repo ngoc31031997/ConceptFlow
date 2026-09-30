@@ -2485,3 +2485,27 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-056, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-057 — Comment dạng tài liệu và bộ quy tắc chuẩn code
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "bạn kiểm tra giúp tôi cac comment và summary, xoá các phần ko liên quan kiểu như backlog ghi lại lí do vì sao sửa v,v ngoài phần code tôi chỉnh muốn note lại kiểu documentary code thôi thêm rule này vào 1 file tương tự file Ui Rule luôn, các rule này buộc code phải tuân thủ các code stander basic và cos comment code documentary code" / trả lời câu hỏi: "1. a / 2. a / 3. đông ý / cr kia xong rồi bạn có thể bắt đầu"
+**AI Response**:
+- Câu hỏi làm rõ (trước khi thiết kế): 1) xử lý thay đổi dở của CR-056 → a (giao CR-056 trước); 2) phạm vi dọn → a (comment/docstring trong code mọi service, bỏ CR/FR/review/lịch sử); 3) tạo `docs/code-standards-rules.md` và thêm vào CLAUDE.md → đồng ý.
+- Đo phạm vi: khoảng 1.870 dòng trên khoảng 450 file ở 8 service (api-gateway không có), cùng `tests/`, `scripts/`, `infra/`, `docker-compose.yml`, `.env.example`; 3 file test Go mang số CR trong tên.
+- Đề xuất: file quy tắc mới (comment mô tả code chứ không kể lịch sử; doc comment theo ngôn ngữ; chuẩn code cơ bản; test; chuỗi runtime), trỏ từ CLAUDE.md, `/cr`, `/code`; viết lại comment bằng tay theo từng service; không đổi hành vi.
+- Phương án cần chọn: tham chiếu ADR — A giữ dạng `See ADR-00NN.` (khuyên) / B bỏ hết; buộc tuân thủ — A chỉ bằng quy tắc (khuyên) / B thêm `make comment-check`.
+**Impact Assessment**: chỉ comment, chuỗi log/assert có số CR, đổi tên 3 file test; không đổi contract, DB, migration hay hành vi. Rebuild 8 service (trừ api-gateway). Diff lớn, có thể xung đột với các branch còn mở.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-057-code-comment-standards-design.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-057, chờ Creator duyệt.
+
+---
+
+## CR-057 — Creator duyệt thiết kế
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "buộc tuân thủ A, tham chiếu adr a luôn code đi"
+**AI Response**: Chốt phương án: tham chiếu ADR giữ dạng `See ADR-00NN.` (A); buộc tuân thủ chỉ bằng file quy tắc, trỏ từ CLAUDE.md, `/cr`, `/code` (A). Commit thiết kế và chuyển sang `/code CR-057`.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-057-code-comment-standards-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-057, thiết kế đã duyệt.
+
+---
