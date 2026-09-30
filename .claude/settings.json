@@ -12,13 +12,7 @@
       "Bash(git push)",
       "Bash(git push origin *)",
       "Bash(git push -u origin *)",
-      "Bash(make help)",
-      "Bash(make setup)",
-      "Bash(make setup *)",
-      "Bash(make build)",
-      "Bash(make check)",
-      "Bash(make check *)",
-      "Bash(make check-all)"
+      "Bash(make help)"
     ],
     "ask": [
       "Bash(git checkout -- *)",
@@ -31,13 +25,7 @@
       "Bash(*migrate-authoring-data.sh*)",
       "Edit(/.github/**)",
       "Edit(/.claude/settings.json)",
-      "Edit(/.claude/settings.local.json)",
-      "Edit(/.claude/agents/**)",
-      "Edit(/.claude/skills/**)",
-      "Edit(/scripts/hooks/**)",
-      "Edit(/scripts/check.sh)",
-      "Edit(/scripts/review-prep.sh)",
-      "Edit(/scripts/review-status.sh)"
+      "Edit(/.claude/settings.local.json)"
     ],
     "deny": [
       "Bash(git push --force*)",

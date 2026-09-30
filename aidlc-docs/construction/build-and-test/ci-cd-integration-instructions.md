@@ -1,6 +1,6 @@
 # CI/CD Integration Instructions
 
-> **Status (2026-09-28): superseded for CI.** The implemented pipeline is `.github/workflows/ci.yml`. It runs `make setup`, `make build` and `make check-all` (see `docs/agentic/verification.md`) on every push. Branch rules are in `docs/agentic/branch-protection.md`.
+> **Status (2026-09-30): no CI.** The `.github/workflows/ci.yml` pipeline (`make setup` / `make build` / `make check-all`) added on 2026-09-28 was removed on 2026-09-30 together with the rest of the agentic verification layer; see git history.
 > Section 2 below is the original proposal and is out of date: it lists `content-plugin` and `script-processing`, which no longer run, and it omits `authoring-service` and `llm-service`. SonarQube and OWASP (sections 3–4) are in the **backlog**; deploy stages are not implemented.
 
 ## Pipeline Stages Overview

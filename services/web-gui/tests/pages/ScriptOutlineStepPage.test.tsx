@@ -522,7 +522,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
 
   // Skipped in CI only (Creator decision, 2026-09-28): on the GitHub runner the box
   // is still there after "Đóng thông báo"; not reproducible locally. Backlog:
-  // docs/agentic/implementation-audit.md §8.
+  // docs/agentic/implementation-audit.md §8 (file removed 2026-09-30; see git history).
   it.skipIf(process.env.CI)("hiện cảnh báo của bước Visual (CR-048 T8/T9) cùng kết cục, và đóng được", async () => {
     setup({
       running: false,
