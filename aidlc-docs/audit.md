@@ -2417,3 +2417,38 @@ Chưa kiểm trực tiếp: trường hợp chạy chéo phiên bản (`authorin
 **Context**: CONSTRUCTION — CR-050 Unit 2, chờ Creator duyệt.
 
 ---
+
+## CR-056 — Điểm nghẽn bước Code và gần 2 triệu token cho một video lỗi
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "phân tích dự án Tìm hiểu về AI Agentic? chúng thực sự là gì và đóng vai trò gì trong development tìm điểm nghễn gây lỗi khi render code đi" / "phân tích dự án \"Tìm hiểu về AI Agentic? chúng thực sự là gì và đóng vai trò gì trong development\" tìm điểm nghễn gây lỗi khi render code đi tại sao sau khi tối ưu lại tốn gần 2 triệu token cho 1 video lỗi vậy?"
+**AI Response**:
+- Dự án `92192079…` còn `draft`: bước Code thiếu 4 đoạn, cả 4 lỗi `budget` (trần 60 000 ký tự suy nghĩ), nên chưa bao giờ tới bước render.
+- Tổng khoảng 2,06 triệu token. Repair chiếm 1,22 triệu (52 lượt, mỗi lượt khoảng 21k token prompt vì gửi lại nguyên system prompt). Khoảng 1,09 triệu token prompt là cache-hit. 20 lượt bị ngắt `budget` ghi 0 token dù đã tiêu thật.
+- Nguyên nhân gốc: `naming.camel` viết thường role camelCase (`conNguoi→connguoi`). Hệ quả là 228/282 lỗi kiểm tra (81%) là `TS2551`. Hai dự án cũ có role camelCase cũng tốn 59 và 60 lượt repair.
+- Đề xuất:
+  - FR-1: sửa `camel` giữ camelCase.
+  - FR-2A: thêm bí danh key cũ trong `PALETTE` để code đã lưu vẫn chạy.
+  - FR-3: A = ghi `reasoning_chars` và `usage_reported` vào `llm_usage`, hoặc B = không đổi. Chờ Creator chọn.
+  - FR-4: giữ trần, quyết định lại khi có số đo.
+**Impact Assessment**: `llm-service` (bắt buộc). `authoring-service` và contract `/v2/code/*` (additive) chỉ khi chọn FR-3A. Không đổi RabbitMQ.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-056-render-bottleneck-token-cost-design.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-056, chờ Creator duyệt.
+
+---
+
+## CR-056 — Creator duyệt thiết kế
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "1.backlog còn task xoá /v1 có thể làm luôn không?
+2. FR2 => không cần quan tâm đến các dự án cũ nữa làm gì.
+3. chọn A
+giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đến dự án cũ nếu chúng tốn qua nhiều effort"
+**AI Response**:
+- FR-5 thêm vào CR: bỏ `/v1/code/generate`. Điều kiện của backlog đã thoả, vì `authoring-service` đang chạy gọi `/v2` trước.
+- FR-2: không bí danh. Thêm key PALETTE vào fingerprint đoạn shot để code cũ được viết lại thay vì lặng lẽ lỗi.
+- FR-3A: ghi `reasoning_chars` và `usage_reported` vào `llm_usage`.
+- FR-4: giữ trần.
+**Impact Assessment**: `llm-service` và `authoring-service` (2 cột mới ở `llm_usage`, idempotent). Contract `/v2` thay đổi additive; `/v1/code/generate` bị bỏ. Mọi đoạn code đã lưu phải viết lại khi chạy lại.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-056-render-bottleneck-token-cost-design.md`.
+**Context**: CONSTRUCTION — CR-056 design approved, chuyển sang /code.
+
+---
