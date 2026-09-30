@@ -191,11 +191,28 @@ type projectSummaryResponse struct {
 	FlowStep   int    `json:"flow_step"`
 	RunState   string `json:"run_state"`
 	ForkedFrom string `json:"forked_from,omitempty"`
+	// ForkedFromTopic names the source, which may sit on another page (CR-054).
+	ForkedFromTopic string `json:"forked_from_topic,omitempty"`
 }
 
-// projectListResponse is the GET /v1/projects response body.
+// projectListResponse is the GET /v1/projects response body. The paging
+// fields are set only when the request asked for a page (CR-054); without
+// ?page the body is the full list, as before.
 type projectListResponse struct {
-	Projects []projectSummaryResponse `json:"projects"`
+	Projects []projectSummaryResponse   `json:"projects"`
+	Total    *int                       `json:"total,omitempty"`
+	Page     *int                       `json:"page,omitempty"`
+	PageSize *int                       `json:"page_size,omitempty"`
+	Counts   *projectListCountsResponse `json:"counts,omitempty"`
+}
+
+// projectListCountsResponse is how many projects each status chip holds.
+type projectListCountsResponse struct {
+	All     int `json:"all"`
+	Running int `json:"running"`
+	Waiting int `json:"waiting"`
+	Problem int `json:"problem"`
+	Done    int `json:"done"`
 }
 
 // suggestShortScriptRequest is the body of POST /v1/short-script-suggestions
@@ -373,20 +390,34 @@ func toProjectListResponse(summaries []domain.ProjectSummary) projectListRespons
 	projects := make([]projectSummaryResponse, 0, len(summaries))
 	for _, s := range summaries {
 		projects = append(projects, projectSummaryResponse{
-			ProjectID:    s.ProjectID,
-			Status:       string(s.Status),
-			VideoPath:    s.VideoPath,
-			ErrorMessage: s.ErrorMessage,
-			UpdatedAt:    s.UpdatedAt.Format(time.RFC3339),
-			RenderEngine: string(s.RenderEngine),
-			WizardStep:   domain.EffectiveWizardStep(&domain.Project{Status: s.Status, WizardStep: s.WizardStep}),
-			Topic:        s.Topic,
-			FlowStep:     s.FlowStep,
-			RunState:     string(s.RunState),
-			ForkedFrom:   s.ForkedFrom,
+			ProjectID:       s.ProjectID,
+			Status:          string(s.Status),
+			VideoPath:       s.VideoPath,
+			ErrorMessage:    s.ErrorMessage,
+			UpdatedAt:       s.UpdatedAt.Format(time.RFC3339),
+			RenderEngine:    string(s.RenderEngine),
+			WizardStep:      domain.EffectiveWizardStep(&domain.Project{Status: s.Status, WizardStep: s.WizardStep}),
+			Topic:           s.Topic,
+			FlowStep:        s.FlowStep,
+			RunState:        string(s.RunState),
+			ForkedFrom:      s.ForkedFrom,
+			ForkedFromTopic: s.ForkedFromTopic,
 		})
 	}
 	return projectListResponse{Projects: projects}
+}
+
+func toProjectPageResponse(page domain.ProjectPage) projectListResponse {
+	resp := toProjectListResponse(page.Projects)
+	resp.Total, resp.Page, resp.PageSize = &page.Total, &page.Page, &page.PageSize
+	resp.Counts = &projectListCountsResponse{
+		All:     page.Counts.All,
+		Running: page.Counts.Running,
+		Waiting: page.Counts.Waiting,
+		Problem: page.Counts.Problem,
+		Done:    page.Counts.Done,
+	}
+	return resp
 }
 
 func toProjectResponse(p *domain.Project) projectResponse {

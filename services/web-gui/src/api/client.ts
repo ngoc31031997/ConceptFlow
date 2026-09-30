@@ -2,6 +2,8 @@ import type {
   Project,
   ProgressMessage,
   ProjectSummary,
+  ProjectListFilter,
+  ProjectPage,
   PublishMetadata,
   YoutubeAccount,
   YoutubeApp,
@@ -270,6 +272,25 @@ export function retryProject(id: string): Promise<SagaStartedResponse> {
 export async function listProjects(): Promise<ProjectSummary[]> {
   const result = await apiFetch<{ projects: ProjectSummary[] }>("/v1/projects");
   return result.projects;
+}
+
+export interface ProjectPageQuery {
+  page: number;
+  pageSize: number;
+  filter: ProjectListFilter;
+  /** Các bước (1-14) cần lọc; rỗng = mọi bước. */
+  steps: number[];
+}
+
+/** CR-054 — một trang danh sách video, đã lọc và đếm ở server. */
+export function listProjectsPage(query: ProjectPageQuery): Promise<ProjectPage> {
+  const params = new URLSearchParams({
+    page: String(query.page),
+    page_size: String(query.pageSize),
+    filter: query.filter,
+  });
+  if (query.steps.length > 0) params.set("steps", query.steps.join(","));
+  return apiFetch<ProjectPage>(`/v1/projects?${params}`);
 }
 
 export async function deleteProject(id: string): Promise<void> {

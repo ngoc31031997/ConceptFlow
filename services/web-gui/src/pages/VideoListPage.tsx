@@ -1,16 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
 import { RenderEngineBadge } from "../components/RenderEngineBadge";
-import { deleteProject, getProjectVideoUrl, listProjects, ApiError } from "../api/client";
-import type { ProjectSummary } from "../types";
+import { deleteProject, getProjectVideoUrl, listProjectsPage, ApiError } from "../api/client";
+import type { ProjectListFilter, ProjectPage, ProjectSummary } from "../types";
 
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_LABELS, FLOW_RESULT, stepStatus } from "../utils/flow";
-import { Card } from "../components/ui";
+import { FLOW_LABELS, stepStatus } from "../utils/flow";
+import { PAGE_SIZES, pageCount } from "../utils/pagination";
+import { Card, Pagination } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./VideoListPage.module.css";
 
@@ -22,31 +23,13 @@ function TrashIcon() {
   );
 }
 
-type Filter = "all" | "running" | "waiting" | "problem" | "done";
-
-const FILTERS: { key: Filter; label: string }[] = [
+const FILTERS: { key: ProjectListFilter; label: string }[] = [
   { key: "all", label: "Tất cả" },
   { key: "running", label: "Đang chạy" },
   { key: "waiting", label: "Chờ bạn" },
   { key: "problem", label: "Lỗi / đã hủy" },
   { key: "done", label: "Xong" },
 ];
-
-function matches(p: ProjectSummary, filter: Filter): boolean {
-  const step = p.flow_step ?? 0;
-  switch (filter) {
-    case "running":
-      return p.run_state === "running";
-    case "problem":
-      return p.run_state === "failed" || p.run_state === "cancelled";
-    case "done":
-      return step >= FLOW_RESULT && p.run_state !== "failed";
-    case "waiting":
-      return p.run_state === "idle" && step > 0 && step < FLOW_RESULT;
-    default:
-      return true;
-  }
-}
 
 /** 14 ô nhỏ, một ô một bước: dự án đi tới đâu, đang chạy hay lỗi ở ô nào. */
 function FlowMini({ project }: { project: ProjectSummary }) {
@@ -67,45 +50,65 @@ function FlowMini({ project }: { project: ProjectSummary }) {
 }
 
 export function VideoListPage() {
-  const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
+  // CR-054: the server filters, counts and pages the list; this screen holds
+  // only the page on show.
+  const [data, setData] = useState<ProjectPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<ProjectListFilter>("all");
   const [stepFilter, setStepFilter] = useState<Set<number>>(new Set());
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+  const requestSeq = useRef(0);
+  const listTopRef = useRef<HTMLDivElement>(null);
 
   const refetch = useCallback(async () => {
+    // Clicking through pages fast: only the latest request may land.
+    const seq = ++requestSeq.current;
     try {
-      const result = await listProjects();
-      setProjects(result);
+      const result = await listProjectsPage({
+        page,
+        pageSize,
+        filter,
+        steps: Array.from(stepFilter).sort((a, b) => a - b),
+      });
+      if (seq !== requestSeq.current) return;
+      setData(result);
+      // Past the last page (e.g. after deleting its rows) the server answers
+      // with the last page.
+      if (result.page !== page) setPage(result.page);
       setError(null);
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       setError(err instanceof ApiError ? err.message : String(err));
     }
-  }, []);
+  }, [page, pageSize, filter, stepFilter]);
 
   useEffect(() => {
     refetch();
   }, [refetch]);
 
-  const visible = useMemo(
-    () => (projects ?? []).filter(
-        (p) => matches(p, filter) && (stepFilter.size === 0 || stepFilter.has(p.flow_step ?? 0)),
-      ),
-    [projects, filter, stepFilter],
-  );
-  const nameOf = useMemo(() => {
-    const byId = new Map((projects ?? []).map((p) => [p.project_id, p.topic || p.project_id.slice(0, 8)]));
-    return (id: string) => byId.get(id) ?? id.slice(0, 8);
-  }, [projects]);
+  // DeleteProgressCard keeps onDone in an effect's deps, so handleDeleteDone
+  // must stay stable while refetch changes with the page.
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+
+  const rows = data?.projects ?? [];
+  const pages = data ? pageCount(data.total, data.page_size) : 1;
 
   const allSelected = useMemo(
-    () => visible.length > 0 && visible.every((p) => selected.has(p.project_id)),
-    [visible, selected],
+    () => rows.length > 0 && rows.every((p) => selected.has(p.project_id)),
+    [rows, selected],
   );
+
+  function chooseFilter(next: ProjectListFilter) {
+    setFilter(next);
+    setPage(1);
+  }
 
   function toggleStepFilter(step: number) {
     setStepFilter((current) => {
@@ -114,10 +117,34 @@ export function VideoListPage() {
       else next.add(step);
       return next;
     });
+    setPage(1);
   }
 
+  function clearStepFilter() {
+    setStepFilter(new Set());
+    setPage(1);
+  }
+
+  function goToPage(next: number) {
+    setPage(next);
+    listTopRef.current?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+  }
+
+  function choosePageSize(size: number) {
+    setPageSize(size);
+    setPage(1);
+  }
+
+  // "Chọn tất cả" covers the page on show; picks on other pages stay.
   function toggleSelectAll() {
-    setSelected(allSelected ? new Set() : new Set(visible.map((p) => p.project_id)));
+    setSelected((current) => {
+      const next = new Set(current);
+      for (const p of rows) {
+        if (allSelected) next.delete(p.project_id);
+        else next.add(p.project_id);
+      }
+      return next;
+    });
   }
 
   function toggleSelect(projectId: string) {
@@ -145,7 +172,6 @@ export function VideoListPage() {
   const handleDeleteDone = useCallback(() => {
     setDeletingId((id) => {
       if (id) {
-        setProjects((current) => current?.filter((p) => p.project_id !== id) ?? null);
         setSelected((current) => {
           const next = new Set(current);
           next.delete(id);
@@ -154,6 +180,8 @@ export function VideoListPage() {
       }
       return null;
     });
+    // Rows from the next page move up into the gap.
+    refetchRef.current();
   }, []);
 
   async function handleBulkDelete() {
@@ -164,12 +192,12 @@ export function VideoListPage() {
     const results = await Promise.allSettled(ids.map((id) => deleteProject(id)));
     const failedIds = ids.filter((_, index) => results[index].status === "rejected");
 
-    setProjects((current) => current?.filter((p) => !ids.includes(p.project_id) || failedIds.includes(p.project_id)) ?? null);
     setSelected(new Set(failedIds));
     if (failedIds.length > 0) {
       setError(`Không thể xóa ${failedIds.length}/${ids.length} video. Vui lòng thử lại.`);
     }
     setIsBulkDeleting(false);
+    await refetchRef.current();
   }
 
   return (
@@ -185,13 +213,13 @@ export function VideoListPage() {
           </p>
         )}
 
-        {projects === null ? (
-          <p className={glass.helperText}>Đang tải danh sách...</p>
-        ) : projects.length === 0 ? (
+        {data === null ? (
+          !error && <p className={glass.helperText}>Đang tải danh sách...</p>
+        ) : data.counts.all === 0 ? (
           <p className={glass.helperText}>Chưa có video nào.</p>
         ) : (
           <>
-            <div className={styles.filters} role="tablist" aria-label="Lọc theo trạng thái">
+            <div ref={listTopRef} className={styles.filters} role="tablist" aria-label="Lọc theo trạng thái">
               {FILTERS.map((f) => (
                 <button
                   key={f.key}
@@ -199,11 +227,11 @@ export function VideoListPage() {
                   role="tab"
                   aria-selected={filter === f.key}
                   className={`${styles.chip} ${filter === f.key ? styles.chipOn : ""}`}
-                  onClick={() => setFilter(f.key)}
+                  onClick={() => chooseFilter(f.key)}
                   data-testid={`filter-${f.key}`}
                 >
                   {f.label}
-                  <span className={styles.chipCount}>{(projects ?? []).filter((p) => matches(p, f.key)).length}</span>
+                  <span className={styles.chipCount}>{data.counts[f.key]}</span>
                 </button>
               ))}
               <details className={styles.stepFilter} data-testid="step-filter">
@@ -223,7 +251,7 @@ export function VideoListPage() {
                     </label>
                   ))}
                   {stepFilter.size > 0 && (
-                    <button type="button" className={styles.chip} onClick={() => setStepFilter(new Set())}>
+                    <button type="button" className={styles.chip} onClick={clearStepFilter}>
                       Bỏ chọn
                     </button>
                   )}
@@ -259,8 +287,8 @@ export function VideoListPage() {
             </div>
 
             <Card>
-              {visible.length === 0 && <p className={glass.helperText}>Không có video nào ở nhóm này.</p>}
-              {visible.map((project) => (
+              {rows.length === 0 && <p className={glass.helperText}>Không có video nào ở nhóm này.</p>}
+              {rows.map((project) => (
                 <div
                   key={project.project_id}
                   data-testid={`video-row-${project.project_id}`}
@@ -281,7 +309,7 @@ export function VideoListPage() {
                     </div>
                     {project.forked_from && (
                       <div className={styles.lineage} data-testid="lineage">
-                        Bản mới từ “{nameOf(project.forked_from)}”
+                        Bản mới từ “{project.forked_from_topic || project.forked_from.slice(0, 8)}”
                       </div>
                     )}
                     <FlowMini project={project} />
@@ -341,6 +369,19 @@ export function VideoListPage() {
                 </div>
               ))}
             </Card>
+
+            {pages > 1 && (
+              <Pagination
+                page={data.page}
+                pageCount={pages}
+                total={data.total}
+                pageSize={data.page_size}
+                pageSizes={PAGE_SIZES}
+                label="video"
+                onPageChange={goToPage}
+                onPageSizeChange={choosePageSize}
+              />
+            )}
           </>
         )}
       </AppShell>

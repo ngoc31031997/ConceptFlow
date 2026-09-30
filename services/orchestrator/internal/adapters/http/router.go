@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -528,13 +530,60 @@ func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) 
 	return fs.Step, string(domain.RunStateOf(p.Status, p.ErrorMessage))
 }
 
+// handleListProjects serves the whole list, or one page of it when the
+// request carries ?page (CR-054: page, page_size, filter, steps).
 func (rt *Router) handleListProjects(w http.ResponseWriter, r *http.Request) {
+	query, paged, err := parseProjectListQuery(r.URL.Query())
+	if err != nil {
+		writeErrorCode(w, http.StatusBadRequest, err.Error(), "invalid_query")
+		return
+	}
 	summaries, err := rt.projects.List(r.Context())
 	if err != nil {
 		writeUseCaseError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, toProjectListResponse(summaries))
+	if !paged {
+		domain.FillForkedFromTopics(summaries)
+		writeJSON(w, http.StatusOK, toProjectListResponse(summaries))
+		return
+	}
+	writeJSON(w, http.StatusOK, toProjectPageResponse(domain.PageProjects(summaries, query)))
+}
+
+// parseProjectListQuery reads the paging query; paged is false when there is
+// no ?page, which keeps the full-list answer other screens rely on.
+func parseProjectListQuery(v url.Values) (domain.ProjectListQuery, bool, error) {
+	q := domain.ProjectListQuery{PageSize: domain.DefaultProjectPageSize}
+	if v.Get("page") == "" {
+		return q, false, nil
+	}
+	page, err := strconv.Atoi(v.Get("page"))
+	if err != nil || page < 1 {
+		return q, true, errors.New("page phải là số nguyên từ 1")
+	}
+	q.Page = page
+	if s := v.Get("page_size"); s != "" {
+		size, err := strconv.Atoi(s)
+		if err != nil || size < 1 || size > domain.MaxProjectPageSize {
+			return q, true, fmt.Errorf("page_size phải từ 1 đến %d", domain.MaxProjectPageSize)
+		}
+		q.PageSize = size
+	}
+	if q.Filter, err = domain.ParseListFilter(v.Get("filter")); err != nil {
+		return q, true, errors.New("filter phải là all, running, waiting, problem hoặc done")
+	}
+	for _, part := range strings.Split(v.Get("steps"), ",") {
+		if part = strings.TrimSpace(part); part == "" {
+			continue
+		}
+		step, err := strconv.Atoi(part)
+		if err != nil || step < 1 || step > domain.FlowStepsTotal {
+			return q, true, fmt.Errorf("steps phải là các số từ 1 đến %d, cách nhau bằng dấu phẩy", domain.FlowStepsTotal)
+		}
+		q.Steps = append(q.Steps, step)
+	}
+	return q, true, nil
 }
 
 func (rt *Router) handleDeleteProject(w http.ResponseWriter, r *http.Request) {

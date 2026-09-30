@@ -13,6 +13,14 @@
 - **Precondition**: `Project.Status == "ready_to_publish"` (else `409 Conflict`).
 - **Behavior**: publish command `publish_video`, status → `publishing`.
 
+### `GET /v1/projects` (CR-054: phân trang)
+- **Không có `page`**: trả toàn bộ dự án (trừ `deleting`), `updated_at` mới trước: `{ "projects": [ProjectSummary] }`. Nhật ký và "dự án gần nhất" dùng chế độ này.
+- **Có `page`**: query `page` (≥ 1), `page_size` (1–100, mặc định 20), `filter` (`all`|`running`|`waiting`|`problem`|`done`, mặc định `all`), `steps` (số bước 1–14, cách nhau dấu phẩy; bỏ trống = mọi bước).
+  - **Output 200**: `{ "projects": [ProjectSummary], "total": int, "page": int, "page_size": int, "counts": { "all", "running", "waiting", "problem", "done" } }`. `total` = số dự án sau lọc; `counts` tính trên toàn bộ dự án, không theo `steps`; `page` vượt trang cuối thì trả trang cuối (danh sách rỗng: `page=1`).
+  - **Output 400**: `{ "error": "<thông báo>", "code": "invalid_query" }` khi tham số sai.
+- **ProjectSummary**: `project_id`, `status`, `video_path`?, `error_message`?, `updated_at`, `render_engine`, `wizard_step`, `topic`?, `flow_step`, `run_state`, `forked_from`?, `forked_from_topic`? (tên dự án nguồn, có thể nằm ở trang khác).
+- **Behavior**: lọc/đếm/cắt trang làm trong Go (`domain.PageProjects`), không bằng SQL, vì `flow_step` của bản nháp cần dữ liệu authoring-service. Luật `filter`: running = `run_state=running`; problem = `failed`|`cancelled`; done = `flow_step ≥ 13` và không `failed`; waiting = `idle` và `0 < flow_step < 13`.
+
 ### `GET /v1/projects/{project_id}`
 - **Output 200**: `{ "project_id", "status", "video_path"?, "scenes", "plugin_id", "voice_language", "youtube_video_url"? }`
 - **Output 404**: project không tồn tại.

@@ -513,6 +513,8 @@ type ProjectSummary struct {
 	RunState RunState
 	// ForkedFrom is the project this one was forked from, "" if none.
 	ForkedFrom string
+	// ForkedFromTopic names that source (CR-054: it may be on another page).
+	ForkedFromTopic string
 }
 
 // SagaStep tracks the processing state of a single step within one Saga
