@@ -392,6 +392,7 @@ func (uc *GenerateAuthoringUseCase) recordCall(
 		Provider: uc.provider.Name(), Model: model, Role: role, Step: step, Phase: c.Phase,
 		ProjectID: projectID, PromptTokens: c.Usage.PromptTokens, CompletionTokens: c.Usage.CompletionTokens,
 		ReasoningTokens: c.Usage.ReasoningTokens, CachedTokens: c.Usage.CachedTokens,
+		ReasoningChars: c.Usage.ReasoningChars, UsageMissing: c.Usage.UsageMissing,
 		Duration: c.Duration, OK: c.OK, ErrorKind: c.ErrorKind,
 	})
 }

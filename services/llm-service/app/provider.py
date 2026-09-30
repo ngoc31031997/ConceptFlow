@@ -146,12 +146,17 @@ class Provider:
             f"max_reasoning_chars={req.max_reasoning_chars}"
         ]
 
+        reasoning_chars = 0
+
         def fail(
             kind: str, message: str, usage: Usage | None = None, partial: str = "", retryable: bool = True,
         ) -> LLMError:
             diag.append(f"elapsed: {time.monotonic() - started:.3f}s")
-            return LLMError(
-                kind, self.name, message, usage or Usage(model=model), partial, "\n".join(diag), retryable)
+            if usage is None:
+                # No usage record came back: say so rather than let zeros pass
+                # for what was billed (CR-056).
+                usage = Usage(model=model, reasoning_chars=reasoning_chars, usage_reported=False)
+            return LLMError(kind, self.name, message, usage, partial, "\n".join(diag), retryable)
 
         messages = []
         if req.system.strip():
@@ -173,7 +178,6 @@ class Provider:
             await self._limiter.acquire()
 
         content: list[str] = []
-        reasoning_chars = 0
         content_chars = 0
         finish = ""
         raw_usage: dict | None = None
@@ -245,12 +249,14 @@ class Provider:
             raise fail(
                 errors.BUDGET,
                 f"model suy nghĩ quá {reasoning_limit} ký tự mà chưa viết được chữ nào — dừng sớm",
-                Usage(model=resp_model or model),
+                Usage(model=resp_model or model, reasoning_chars=reasoning_chars, usage_reported=False),
                 retryable=False,
             )
 
         text = "".join(content).strip()
         usage = _usage_from(raw_usage, resp_model or model)
+        usage.reasoning_chars = reasoning_chars
+        usage.usage_reported = raw_usage is not None
         diag.append(
             f"stream: chunks={chunks} reasoning_chars={reasoning_chars} content_chars={content_chars} "
             f"finish_reason={finish}"

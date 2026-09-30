@@ -21,6 +21,20 @@ def test_palette_keys_are_ascii_camel_and_unique():
     assert merger.palette_keys(SB) == {"màu nhấn": "mauNhan", "Đã xong": "daXong"}
 
 
+def test_palette_keys_keep_the_camel_case_a_role_already_has():
+    # CR-056: `conNguoi` became `connguoi`, and the model, reading `conNguoi` in
+    # every visual, wrote a PALETTE key that did not exist (TS2551 on most shots).
+    sb = sbm.parse(json.dumps({
+        "hero": "h",
+        "palette": [{"role": r, "hex": "#000000", "meaning": "m"}
+                    for r in ("conNguoi", "NenPanel", "RED", "vàng khao khát", "3d glow", "màu NHẤN")],
+        "scenes": [{"id": "s", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}],
+    }))
+    assert list(merger.palette_keys(sb).values()) == [
+        "conNguoi", "nenPanel", "red", "vangKhaoKhat", "c3dGlow", "mauNhan"]
+    assert "  conNguoi: '#000000'," in merger.remotion_frame_text(sb)["palette"]
+
+
 def test_remotion_narrations_shots_and_order_come_from_the_storyboard():
     m = merger.merge_remotion(SB, "const LAYOUT = {hero: {x: 1, y: 2, size: 3}};", TSX)
     assert "  \"Câu \\\"một\\\".\"," in m.code

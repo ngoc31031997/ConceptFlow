@@ -34,6 +34,12 @@ class Usage:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     cached_tokens: int = 0
+    #: CR-056: characters of reasoning_content counted on the stream — known even
+    #: when the provider never sends its usage record.
+    reasoning_chars: int = 0
+    #: False when the provider sent no usage record (a stream we cut short, a
+    #: call that failed): the token counts above are then not what was billed.
+    usage_reported: bool = True
 
     def to_dict(self) -> dict:
         return {
@@ -42,6 +48,8 @@ class Usage:
             "completion_tokens": self.completion_tokens,
             "reasoning_tokens": self.reasoning_tokens,
             "cached_tokens": self.cached_tokens,
+            "reasoning_chars": self.reasoning_chars,
+            "usage_reported": self.usage_reported,
         }
 
     def __add__(self, other: Usage) -> Usage:
@@ -51,6 +59,8 @@ class Usage:
             completion_tokens=self.completion_tokens + other.completion_tokens,
             reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
             cached_tokens=self.cached_tokens + other.cached_tokens,
+            reasoning_chars=self.reasoning_chars + other.reasoning_chars,
+            usage_reported=self.usage_reported and other.usage_reported,
         )
 
 

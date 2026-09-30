@@ -6,6 +6,7 @@ import pytest
 
 from app import errors
 from app.errors import LLMError, Usage
+from app.pipeline import merger
 from app.pipeline.checker import CheckResult, Diagnostic
 from app.pipeline.run import (
     CodePipeline,
@@ -651,6 +652,18 @@ def test_editing_one_shot_invalidates_only_its_chunk_when_the_layout_comes_from_
     data["scenes"][0]["shots"][3]["visual"] = "khác hẳn"  # shot 1.4
     after = fps(req(json.dumps(data)))
     assert {k for k in before if before[k] != after[k]} == {"1.3-1.4"}
+
+
+def test_a_change_in_the_palette_keys_makes_every_chunk_stale_but_not_the_frame(monkeypatch):
+    # CR-056: code written against `connguoi` must be written again, not reused
+    # into a file whose PALETTE now says `conNguoi`.
+    r = req(storyboard_with_layout(4))
+    before = fps(r)
+    real = merger.palette_keys
+    monkeypatch.setattr(merger, "palette_keys", lambda sb: {k: v.lower() for k, v in real(sb).items()} | {"x": "y"})
+    after = fps(r)
+    assert after["frame"] == before["frame"]
+    assert all(after[k] != before[k] for k in before if k != "frame")
 
 
 def test_an_ai_frame_depends_on_the_whole_storyboard_so_every_chunk_follows_it():

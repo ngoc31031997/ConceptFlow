@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     phase             TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
+-- CR-056: a call whose stream was cut (reasoning budget) or that failed comes
+-- back with no usage record; its tokens are then unknown, not zero.
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS reasoning_chars INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS usage_reported BOOLEAN NOT NULL DEFAULT true;
 
 -- CR-031: the prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active; is_system rows ship in the binary.

@@ -75,6 +75,12 @@ type TokenUsage struct {
 	CompletionTokens int
 	ReasoningTokens  int
 	CachedTokens     int
+	// ReasoningChars is the reasoning text llm-service counted on the stream
+	// (CR-056), known even when the provider sent no usage record.
+	ReasoningChars int
+	// UsageMissing: the provider sent no usage record (a stream cut short, a
+	// failed call), so the token counts above are not what was billed.
+	UsageMissing bool
 }
 
 // LLMErrorKind classifies a failed call so the GUI can tell the Creator what

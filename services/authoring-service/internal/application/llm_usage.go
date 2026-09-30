@@ -27,6 +27,8 @@ type LLMUsageRecord struct {
 	CompletionTokens int
 	ReasoningTokens  int
 	CachedTokens     int
+	ReasoningChars   int  // CR-056, see TokenUsage
+	UsageMissing     bool // CR-056, see TokenUsage; stored as usage_reported = NOT UsageMissing
 	Duration         time.Duration
 	OK               bool
 	ErrorKind        LLMErrorKind
@@ -109,6 +111,8 @@ func RecordFor(provider, role, step, projectID string, usage TokenUsage, started
 		CompletionTokens: usage.CompletionTokens,
 		ReasoningTokens:  usage.ReasoningTokens,
 		CachedTokens:     usage.CachedTokens,
+		ReasoningChars:   usage.ReasoningChars,
+		UsageMissing:     usage.UsageMissing,
 		Duration:         time.Since(started),
 		OK:               err == nil,
 	}
@@ -122,6 +126,8 @@ func RecordFor(provider, role, step, projectID string, usage TokenUsage, started
 			rec.CompletionTokens = billed.CompletionTokens
 			rec.ReasoningTokens = billed.ReasoningTokens
 			rec.CachedTokens = billed.CachedTokens
+			rec.ReasoningChars = billed.ReasoningChars
+			rec.UsageMissing = billed.UsageMissing
 		}
 	}
 	return rec

@@ -12,7 +12,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -79,12 +78,16 @@ type wireUsage struct {
 	CompletionTokens int    `json:"completion_tokens"`
 	ReasoningTokens  int    `json:"reasoning_tokens"`
 	CachedTokens     int    `json:"cached_tokens"`
+	ReasoningChars   int    `json:"reasoning_chars"`
+	// Absent (an llm-service before CR-056) means reported, as it was then assumed.
+	UsageReported *bool `json:"usage_reported"`
 }
 
 func (u wireUsage) usage() application.TokenUsage {
 	return application.TokenUsage{
 		Model: u.Model, PromptTokens: u.PromptTokens, CompletionTokens: u.CompletionTokens,
 		ReasoningTokens: u.ReasoningTokens, CachedTokens: u.CachedTokens,
+		ReasoningChars: u.ReasoningChars, UsageMissing: u.UsageReported != nil && !*u.UsageReported,
 	}
 }
 
@@ -212,9 +215,9 @@ func (c *Client) stream(
 			case "result":
 				return json.RawMessage(trimmed), nil
 			case "error":
-				// A v2 code run streamed its billed calls one by one before this
-				// and sends none here (ADR-0030); the v1 route lists them on
-				// the error. Either way each reaches onEvent exactly once.
+				// A code run streamed its billed calls one by one before this
+				// and sends none here (ADR-0030); an error that does list calls
+				// hands each to onEvent, so each is recorded exactly once.
 				var ev struct {
 					Error wireError         `json:"error"`
 					Calls []json.RawMessage `json:"calls"`
@@ -532,25 +535,13 @@ func codeEvent(kind string, raw json.RawMessage) (application.CodeEvent, error) 
 // run rather than being skipped, because a skipped segment_done or call would
 // lose paid work or its cost.
 //
-// An llm-service without /v2 (an older build) is run through /v1/code/generate
-// instead, so the two services deploy in any order (ADR-0030): the whole step
-// in one go, nothing stored per segment. Dropping /v1 is on the backlog.
+// An llm-service without /v2 (older than CR-050) is ErrSegmentsUnsupported:
+// the /v1 fallback was removed in CR-056, so llm-service must be deployed first.
 func (c *Client) GenerateCode(
 	ctx context.Context, req application.CodeGenRequest, onEvent func(application.CodeEvent),
 ) (application.CodeGenResult, error) {
-	res, err := c.generateCode(ctx, "/v2/code/generate", req, onEvent)
-	if errors.Is(err, errRouteMissing) {
-		slog.Warn("llm-service has no /v2/code/generate — running the code step through /v1, without segments")
-		return c.generateCode(ctx, "/v1/code/generate", req, onEvent)
-	}
-	return res, err
-}
-
-func (c *Client) generateCode(
-	ctx context.Context, path string, req application.CodeGenRequest, onEvent func(application.CodeEvent),
-) (application.CodeGenResult, error) {
 	var badEvent error
-	raw, err := c.stream(ctx, path, codeBody(req), func(kind string, ev json.RawMessage) {
+	raw, err := c.stream(ctx, "/v2/code/generate", codeBody(req), func(kind string, ev json.RawMessage) {
 		e, err := codeEvent(kind, ev)
 		if err != nil {
 			if badEvent == nil {
@@ -562,6 +553,9 @@ func (c *Client) generateCode(
 			onEvent(e)
 		}
 	})
+	if errors.Is(err, errRouteMissing) {
+		return application.CodeGenResult{}, application.ErrSegmentsUnsupported
+	}
 	if err != nil {
 		return application.CodeGenResult{}, err
 	}
@@ -569,34 +563,18 @@ func (c *Client) generateCode(
 		return application.CodeGenResult{}, &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service", Err: badEvent}
 	}
 	var res struct {
-		Status         string            `json:"status"`
-		Calls          []json.RawMessage `json:"calls"` // v1 only: every billed call, at the end
-		Code           string            `json:"code"`
-		CheckOK        bool              `json:"check_ok"`
-		Diagnostics    []wireDiagnostic  `json:"diagnostics"`
-		RepairRounds   int               `json:"repair_rounds"`
-		Warnings       []string          `json:"warnings"`
-		SceneClassName string            `json:"scene_class_name"`
-		Failed         []string          `json:"failed"`
-		Missing        []string          `json:"missing"`
+		Status         string           `json:"status"`
+		Code           string           `json:"code"`
+		CheckOK        bool             `json:"check_ok"`
+		Diagnostics    []wireDiagnostic `json:"diagnostics"`
+		RepairRounds   int              `json:"repair_rounds"`
+		Warnings       []string         `json:"warnings"`
+		SceneClassName string           `json:"scene_class_name"`
+		Failed         []string         `json:"failed"`
+		Missing        []string         `json:"missing"`
 	}
 	if err := json.Unmarshal(raw, &res); err != nil {
 		return application.CodeGenResult{}, &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service", Err: err}
-	}
-	if path == "/v1/code/generate" {
-		// v1 has no status (a result means the step finished) and lists the
-		// calls here: each becomes a call event, as v2 would have streamed it.
-		res.Status = application.CodeGenDone
-		for _, raw := range res.Calls {
-			e, err := codeEvent("call", raw)
-			if err != nil {
-				return application.CodeGenResult{}, &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service",
-					Err: fmt.Errorf("unreadable call in the v1 result: %w", err)}
-			}
-			if onEvent != nil {
-				onEvent(e)
-			}
-		}
 	}
 	if res.Status != application.CodeGenDone && res.Status != application.CodeGenIncomplete {
 		return application.CodeGenResult{}, &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service",

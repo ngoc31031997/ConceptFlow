@@ -2452,3 +2452,36 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-056 design approved, chuyển sang /code.
 
 ---
+
+## CR-056 — Code xong, chờ duyệt
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: (tiếp theo lần duyệt thiết kế; `/code CR-056`)
+**AI Response**:
+- **llm-service**:
+  - FR-1: `naming.camel` giữ chữ hoa bên trong từ (`conNguoi→conNguoi`); từ viết hoa toàn bộ thì viết thường.
+  - FR-2: `make_plan` đưa `palette_keys` vào fingerprint của đoạn shot.
+  - FR-3: `Usage` có thêm `reasoning_chars` và `usage_reported`. Provider điền `reasoning_chars` cho mọi lượt. `usage_reported=false` khi không có gói usage: stream bị ngắt vì budget, lỗi HTTP, lỗi giữa stream.
+    - Khác thiết kế một chút: thiết kế chỉ nêu nhánh `aborted`, nhưng mọi lỗi không có usage đều được đánh dấu `false`. Lý do: cờ này nghĩa là "provider không gửi usage", và điều đó đúng cho cả các lỗi kia.
+  - FR-5: bỏ route `/v1/code/generate`.
+- **authoring-service**:
+  - FR-3: `TokenUsage` và `LLMUsageRecord` có `ReasoningChars` và `UsageMissing`. `wireUsage.usage_reported` là `*bool`, thiếu trường thì hiểu là đã có usage. Migration thêm 2 cột vào `llm_usage`; `RecordLLMUsage` ghi `usage_reported = NOT UsageMissing`.
+  - FR-5: `GenerateCode` chỉ gọi `/v2`; nếu route không có thì trả `ErrSegmentsUnsupported` (đổi câu thông báo).
+- **Tài liệu**: `docs/contracts/authoring-llm-code-v2.md`, `docs/contracts/README.md`, ADR-0030; `aidlc-state.md` gạch mục backlog `/v1` và thêm 4 mục backlog mới.
+- **Test**:
+  - llm-service `pytest`: 140 passed; `ruff`: sạch.
+  - authoring-service `go vet`: sạch; `go test ./...`: pass.
+- **Rebuild**: `llm-service` trước, rồi `authoring-service`; cả hai healthy.
+- **Kiểm trực tiếp**:
+  - `llm_usage` có 2 cột mới.
+  - `POST /v1/code/generate` trả 404.
+  - Prompt đoạn `3.3-3.5` của dự án `92192079…` chỉ có `conNguoi`, không còn `connguoi`.
+  - Câu INSERT mới chạy được (thử trong transaction rồi ROLLBACK).
+- **Chưa kiểm**:
+  - Chưa chạy AI thật (tốn token, chờ Creator).
+  - Đoạn cũ bị coi là lệch fingerprint mới chỉ kiểm bằng unit test. Màn danh sách đoạn vẫn hiện "done" cho tới khi chạy, vì việc reset diễn ra ở sự kiện `plan` lúc bắt đầu chạy.
+  - Chạy lại chỉ các đoạn lỗi sẽ kết thúc "chưa xong", vì các đoạn cũ giờ cũng thiếu. Cần chạy lại cả bước Code.
+**Impact Assessment**: như thiết kế; phải deploy `llm-service` trước `authoring-service`.
+**Artifacts Affected**: 23 file (code, test, tài liệu); chưa commit.
+**Context**: CONSTRUCTION — CR-056, chờ Creator duyệt rồi `/deliver`.
+
+---

@@ -26,8 +26,8 @@ Những gì graphify không thấy (message RabbitMQ, HTTP giữa service, volum
 | api-gateway → orchestrator | [`orchestrator-service/low-level-design/interface-contracts.md`](../../aidlc-docs/construction/orchestrator-service/low-level-design/interface-contracts.md) |
 | api-gateway → publisher (OAuth YouTube) | [`publisher-service/low-level-design/interface-contracts.md`](../../aidlc-docs/construction/publisher-service/low-level-design/interface-contracts.md), ADR-0026 |
 | api-gateway → authoring-service; orchestrator ↔ authoring-service (`/internal/v1/authoring/*`) | [ADR-0029](../../aidlc-docs/decisions/ADR-0029-authoring-service-boundary.md), [`cr-040-service-boundary-cleanup.md`](../../aidlc-docs/inception/requirements/cr-040-service-boundary-cleanup.md) |
-| authoring-service → llm-service (`/v1/chat`, `/v1/storyboard/finalize`, `/v1/suggest-*`, `/v1/code/generate` cũ) | [`cr-039-chunked-code-pipeline-llm-service.md`](../../aidlc-docs/inception/requirements/cr-039-chunked-code-pipeline-llm-service.md); route thật ở `services/llm-service/app/main.py` |
-| authoring-service → llm-service (`/v2/code/generate`, `/v2/code/plan`, `/v2/code/segment-prompt`, `/v2/code/segment-parse`; `/v1/code/generate` giữ lại, sẽ bỏ) | [`authoring-llm-code-v2.md`](authoring-llm-code-v2.md), [ADR-0030](../../aidlc-docs/decisions/ADR-0030-code-segments-and-v2-code-contract.md) |
+| authoring-service → llm-service (`/v1/chat`, `/v1/storyboard/finalize`, `/v1/suggest-*`) | [`cr-039-chunked-code-pipeline-llm-service.md`](../../aidlc-docs/inception/requirements/cr-039-chunked-code-pipeline-llm-service.md); route thật ở `services/llm-service/app/main.py` |
+| authoring-service → llm-service (`/v2/code/generate`, `/v2/code/plan`, `/v2/code/segment-prompt`, `/v2/code/segment-parse`; `/v1/code/generate` đã bỏ ở CR-056) | [`authoring-llm-code-v2.md`](authoring-llm-code-v2.md), [ADR-0030](../../aidlc-docs/decisions/ADR-0030-code-segments-and-v2-code-contract.md) |
 | llm-service, authoring-service → rendering (`/v1/check/*`, `/v1/illustrations/preview`) | CR-039 (như trên); diagnostic có thêm `rule` từ CR-050 ([`authoring-llm-code-v2.md`](authoring-llm-code-v2.md)); route thật ở `services/rendering/adapters/http/check_server.py` |
 
 ### Đổi contract HTTP giữa hai service
@@ -36,7 +36,7 @@ Những gì graphify không thấy (message RabbitMQ, HTTP giữa service, volum
 - Bên gọi dùng bản mới khi có, và quay về bản cũ khi bên nhận chưa có (404 cho chính route).
 - Việc bỏ bản cũ được ghi vào backlog (`aidlc-docs/aidlc-state.md`), và chỉ làm khi mọi bên gọi đang chạy đã dùng bản mới.
 - Chỉ thêm trường thì không cần version mới, nếu bên nhận cũ bỏ qua được trường lạ.
-- Ví dụ: `/v1` và `/v2/code/*` (CR-050, ADR-0030).
+- Ví dụ: `/v1` và `/v2/code/*` (CR-050, ADR-0030); `/v1/code/generate` bị bỏ ở CR-056.
 
 ## Cơ sở dữ liệu
 

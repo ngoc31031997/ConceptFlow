@@ -113,7 +113,11 @@ Plan thực hiện: `aidlc-docs/construction/plans/cr-002-007-execution-plan.md`
 - **Đã giao, chưa verify E2E**: CR-012 (chưa verify với Google thật).
 - **Backlog (2026-09-26)**: Ghép avatar Mướp vào video (CR-038 để lại) — vai trò linh vật/nhân vật, ai chọn trạng thái theo lời thoại, overlay cho engine Manim ở `video-assembly`, bố cục và vùng phụ đề, viền theo nền. Chi tiết: `inception/requirements/cr-038-lottie-illustration-library.md` mục "Backlog".
 - **Backlog (2026-09-26)**: SFX và nhạc theo cảm xúc — bước render xuất các mốc animation, `video-assembly` chèn SFX nhẹ (whoosh/pop) đúng mốc; nhạc nền nhỏ lại ở khoảnh khắc aha, lên lại khi chuyển phần. Tách thành CR riêng khi tới lượt. Nguồn: `inception/requirements/cr-042-cinematic-feel-motion-during-narration.md` (Giai đoạn 4).
-- **Backlog (2026-09-30)**: Bỏ `POST /v1/code/generate` của `llm-service` (CR-050 U2 giữ nó để `llm-service` và `authoring-service` deploy độc lập; ADR-0030). Chỉ làm khi mọi bản `authoring-service` đang chạy đã gọi `/v2/code/*`. Khi đó xoá luôn đường fallback `/v1` trong `authoring-service` (`adapters/llm/llm_service_client.go`, `GenerateCode`) và các test `/v1` ở cả hai service. Làm thành một CR riêng.
+- ~~**Backlog (2026-09-30)**: Bỏ `POST /v1/code/generate`~~ — xong ở CR-056.
+- **Backlog (2026-09-30, CR-056)**: Gộp các shot lỗi của cùng một đoạn vào một lượt repair (mỗi lượt repair gửi lại khoảng 21k token system prompt).
+- **Backlog (2026-09-30, CR-056)**: Thu gọn system prompt `remotion_engineer_ai` (28 500 ký tự).
+- **Backlog (2026-09-30, CR-056)**: Hiện `reasoning_chars` và "không đo được token" (`usage_reported=false`) trên giao diện chi phí.
+- **Backlog (2026-09-30, CR-056)**: Hiệu chỉnh `CODE_MAX_REASONING_CHARS` (đang 60 000) bằng tỉ lệ `reasoning_chars / reasoning_tokens` đo được trong `llm_usage`.
 - **Next Stage**: chờ Creator chọn — (a) tự chạy lại E2E xác nhận 2 fix orchestrator, (b) hiệu chỉnh ngưỡng QC rồi bật `QC_ENFORCE` (CR-021) — cần video thật, (c) verify CR-012 với Google thật, hoặc (d) Change Request mới.
 
 ## Việc tồn đọng cần Creator làm (không phải việc code)

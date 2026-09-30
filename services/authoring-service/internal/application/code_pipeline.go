@@ -173,8 +173,8 @@ func (e *ErrSegmentReply) Error() string {
 }
 
 // ErrSegmentsUnsupported: the llm-service running is older than CR-050 and
-// has no /v2/code routes. The code step still runs, as one whole run.
-var ErrSegmentsUnsupported = errors.New("llm-service đang chạy bản chưa hỗ trợ lưu bước Code theo đoạn — bước Code vẫn chạy được nhưng chạy cả bước một lần; rebuild llm-service để dùng các đoạn")
+// has no /v2/code routes. Since CR-056 the code step does not run at all then.
+var ErrSegmentsUnsupported = errors.New("llm-service đang chạy bản cũ, chưa có bước Code theo đoạn (/v2) — rebuild llm-service rồi chạy lại")
 
 // ErrSegmentUnknown: no segment has this key in the current storyboard.
 var ErrSegmentUnknown = errors.New("không có đoạn này trong storyboard hiện tại — tải lại danh sách đoạn")

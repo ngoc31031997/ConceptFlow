@@ -40,6 +40,7 @@ Chọn **phương án 1**.
   - `authoring-service` gọi `/v2`; nếu route không có (bản `llm-service` cũ) thì quay về `/v1`, chạy cả bước một lần, không lưu theo đoạn;
   - cách chia đoạn chỉ nằm ở `llm-service` (`/v2/code/plan`), `authoring-service` không giữ bản chép;
   - bỏ `/v1` là một mục backlog (`aidlc-state.md`), làm ở CR riêng khi mọi bản `authoring-service` đang chạy đã dùng `/v2`.
+  - **Cập nhật CR-056 (2026-09-30)**: đã bỏ `/v1/code/generate` và đường fallback. `authoring-service` gặp `llm-service` không có `/v2` thì báo `ErrSegmentsUnsupported`. Deploy `llm-service` trước.
 - **Mọi lượt gọi đã tính tiền** được stream thành sự kiện `call` ngay khi xong. `authoring-service` ghi `llm_usage` ngay lúc đó.
 - **Mỗi lần kiểm** được stream thành sự kiện `check`. `authoring-service` ghi vào bảng `code_check_diagnostics`. `rendering` thêm trường `rule` vào diagnostic (chỉ thêm trường, không phá contract cũ).
 
@@ -53,3 +54,4 @@ Chọn **phương án 1**.
 - Deploy theo thứ tự nào cũng được:
   - `llm-service` mới + `authoring-service` cũ: `authoring-service` vẫn gọi `/v1` như trước;
   - `authoring-service` mới + `llm-service` cũ: bước Code chạy qua `/v1`, còn panel đoạn báo `llm-service` chưa hỗ trợ (HTTP 501).
+  - Từ CR-056 không còn đúng: `/v1` đã bỏ, phải deploy `llm-service` trước hoặc cùng lúc.

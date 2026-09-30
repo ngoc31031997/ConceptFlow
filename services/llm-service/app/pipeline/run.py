@@ -284,8 +284,8 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
     - the step's prompt (`req.system` before the library drawings are added —
       approving a drawing must not throw away every chunk, review C3);
     - the frame: the storyboard (or, for a storyboard-given LAYOUT, that LAYOUT);
-    - a chunk: the frame's fingerprint, the storyboard's world and palette, and
-      its own shots. Not the neighbouring shots (a continuity hint only; they
+    - a chunk: the frame's fingerprint, the storyboard's world and palette
+      (with the PALETTE keys derived from it), and its own shots. Not the neighbouring shots (a continuity hint only; they
       would make one edited shot invalidate three chunks), and not the model
       (CR-050 C2).
     """
@@ -304,6 +304,9 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
     shared = _dump({
         "hero": sb.hero, "world": sb.world,
         "palette": [p.model_dump() for p in sb.palette],
+        # The keys the code is written against (CR-056): a change in how a role
+        # becomes a key makes every stored chunk stale instead of failing TS2551.
+        "palette_keys": merger.palette_keys(sb),
     })
     segments = [Segment(FRAME_KEY, FRAME, (), frame_fp)]
     for i in range(0, len(ordered), n):

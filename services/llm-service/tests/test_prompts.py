@@ -37,3 +37,16 @@ def test_chunk_turn_opens_with_the_world_when_there_is_no_hero():
     for engine, turn in _chunk_turns(_sb(world="Bề mặt một chiếc răng phóng to")).items():
         assert turn.startswith("THẾ GIỚI: Bề mặt một chiếc răng phóng to\n\n"), engine
         assert "NHÂN VẬT CHÍNH" not in turn, engine
+
+
+def test_chunk_turn_lists_the_palette_key_the_storyboard_uses():
+    # CR-056: one name per colour, the one the visuals say.
+    sb = sbm.parse(json.dumps({
+        "hero": "Khối mô hình",
+        "palette": [{"role": "conNguoi", "hex": "#F5B841", "meaning": "con người"}],
+        "scenes": [{"id": "hook", "shots": [
+            {"id": "1.1", "visual": "thẻ màu conNguoi", "narration": "Câu một."}]}],
+    }))
+    turn = prompts.remotion_chunk(sb, "const LAYOUT = {};", ["1.1"], None, None)
+    assert "- conNguoi = #F5B841" in turn
+    assert "connguoi" not in turn

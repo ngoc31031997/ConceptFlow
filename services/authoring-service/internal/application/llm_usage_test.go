@@ -124,3 +124,24 @@ func TestRecordFor_NonLLMErrorStillMarksTheRowFailed(t *testing.T) {
 		t.Fatalf("a non-LLM error has no kind, got %q", rec.ErrorKind)
 	}
 }
+
+// TestRecordFor_ACutStreamIsFlaggedNotZero — CR-056: a call cut for its
+// reasoning budget has no usage record; the row says so and keeps the
+// reasoning it counted, rather than passing for a free call.
+func TestRecordFor_ACutStreamIsFlaggedNotZero(t *testing.T) {
+	err := &application.LLMError{
+		Kind: application.ErrKindBudget, Provider: "hive",
+		Usage: application.TokenUsage{Model: "m", ReasoningChars: 61000, UsageMissing: true},
+		Err:   errors.New("reasoned too long"),
+	}
+	rec := application.RecordFor("hive", "remotion_engineer", "code", "p1", application.TokenUsage{}, time.Now(), err)
+	if rec.OK || rec.ReasoningChars != 61000 || !rec.UsageMissing || rec.PromptTokens != 0 {
+		t.Fatalf("rec = %+v", rec)
+	}
+
+	ok := application.RecordFor("hive", "remotion_engineer", "code", "p1",
+		application.TokenUsage{Model: "m", PromptTokens: 3, ReasoningChars: 40}, time.Now(), nil)
+	if ok.UsageMissing || ok.ReasoningChars != 40 {
+		t.Fatalf("ok = %+v", ok)
+	}
+}

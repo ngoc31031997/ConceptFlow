@@ -143,31 +143,11 @@ async def test_code_generate_streams_phases_and_the_final_code(client):
     assert ev[0]["type"] == "plan" and [s["key"] for s in ev[0]["segments"]] == ["frame", "1.1-1.2"]
 
 
-async def test_the_v1_code_route_keeps_its_old_contract(client):
-    # ADR-0030: kept so llm-service deploys without authoring-service (removal
-    # is on the backlog). No segment events; every call listed in the result.
-    with respx.mock:
-        respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
-        r = await client.post("/v1/code/generate", json={
-            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
-    ev = events(r)
-    assert ev[-1]["type"] == "result" and ev[-1]["check_ok"] is True and "const SHOTS" in ev[-1]["code"]
-    assert [c["phase"] for c in ev[-1]["calls"]] == ["layout", "chunk"]
-    assert "status" not in ev[-1] and "failed" not in ev[-1]
-    assert not {e["type"] for e in ev} & {"plan", "segment_start", "segment_done", "segment_failed", "call", "check"}
-    assert {"layout", "chunks", "merge", "check"} <= {e["phase"] for e in ev if e["type"] == "phase"}
-
-
-async def test_the_v1_code_route_fails_the_run_with_the_billed_calls():
-    # v1: the first failed segment is the run's error, with what was billed so far.
-    with respx.mock:
-        respx.post("https://hive.test/v3/chat/completions").mock(return_value=_only_reasoning(5000))
-        r = await _client(config(code_max_reasoning_chars=2000)).post("/v1/code/generate", json={
-            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
-    ev = events(r)
-    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "budget"
-    assert "suy nghĩ quá 2000 ký tự" in ev[-1]["error"]["message"]
-    assert [(c["phase"], c["error_kind"]) for c in ev[-1]["calls"]] == [("layout", "budget")]
+async def test_the_v1_code_route_is_gone(client):
+    # CR-056: removed from the backlog of ADR-0030; the code step is /v2 only.
+    r = await client.post("/v1/code/generate", json={
+        "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
+    assert r.status_code == 404
 
 
 async def test_code_plan_is_the_cut_without_a_model_call(client):
@@ -274,6 +254,8 @@ async def test_code_generate_stops_a_call_that_only_reasons_past_the_code_limit(
     assert failed["error"]["kind"] == "budget" and "suy nghĩ quá 2000 ký tự" in failed["error"]["message"]
     [call] = [e for e in ev if e["type"] == "call"]
     assert call["phase"] == "layout" and call["error_kind"] == "budget"
+    # CR-056: the stream was cut, so no usage came back; what was counted is sent
+    assert call["usage"]["usage_reported"] is False and call["usage"]["reasoning_chars"] > 2000
     assert route.call_count == 1
 
 

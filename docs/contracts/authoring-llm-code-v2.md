@@ -1,6 +1,6 @@
 # authoring-service → llm-service: bước Code theo đoạn (`/v2/code/*`)
 
-CR-050 Unit 2, [ADR-0030](../../aidlc-docs/decisions/ADR-0030-code-segments-and-v2-code-contract.md). Đi kèm `/v1/code/generate`, vẫn được giữ để hai service deploy độc lập (xem mục cuối). Bỏ `/v1` là một mục backlog.
+CR-050 Unit 2, [ADR-0030](../../aidlc-docs/decisions/ADR-0030-code-segments-and-v2-code-contract.md). `/v1/code/generate` đã bỏ ở CR-056 (xem mục cuối).
 
 `llm-service` không lưu gì. `authoring-service` lưu từng đoạn (bảng `authoring_segments`) và gửi lại các đoạn đã xong trong mỗi lượt.
 
@@ -46,7 +46,7 @@ Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trườn
 | `segment_start` | `key` | Đoạn thành `running`. |
 | `segment_done` | `key, fingerprint, content, source ("ai"\|"storyboard"), repaired, duration_ms` | Lưu `done`. Với `repaired: true`, giữ nguyên `source` và `duration_ms` cũ. |
 | `segment_failed` | `key, error: {kind, message, …}` | Lưu `failed`, giữ nội dung cũ nếu có. |
-| `call` | `phase, label, segment, ok, usage, error_kind, error_message, duration_ms` | Ghi một dòng `llm_usage` ngay. |
+| `call` | `phase, label, segment, ok, usage, error_kind, error_message, duration_ms` | Ghi một dòng `llm_usage` ngay. `usage` = `{model, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens, reasoning_chars, usage_reported}`; hai trường cuối thêm ở CR-056 (xem dưới). |
 | `check` | `phase ("chunk"\|"final"), round, segment, diagnostics: [{message, line, kind, rule, shot, segment}]` | Ghi vào `code_check_diagnostics`. |
 | `phase`, `chunk_start`, `chunk_done`, `chunk_split`, `chunk_repair` | như CR-039/CR-048 | Chỉ dùng cho thanh tiến độ. |
 | `result` | `status ("done"\|"incomplete"), code, check_ok, diagnostics, repair_rounds, warnings, scene_class_name, failed, missing` | `done`: lưu code đã ghép. `incomplete`: bước kết thúc "chưa xong". |
@@ -80,8 +80,13 @@ Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trườn
 - lỗi tsc: mã lỗi, ví dụ `TS2322`;
 - lỗi lint và Manim: `""`.
 
-## `POST /v1/code/generate` (giữ lại, sẽ bỏ)
-- Contract trước CR-050, không đổi: sự kiện tiến độ (`phase`, `chunk_*`); `result` có `calls` ở cuối; đoạn lỗi đầu tiên làm cả lượt lỗi, `error.calls` liệt kê các lượt đã tính tiền.
-- Chạy trên pipeline mới, không nhận `segments`/`only`. Không còn cache trong bộ nhớ, nên lượt chạy lại trả tiền lại cho các đoạn đã xong.
-- **Fallback của `authoring-service`**: khi `/v2/code/*` trả 404 mà body không phải `{"error": …}` của `llm-service` (tức là route không có), bước Code chạy qua `/v1`, và mỗi phần tử `calls` được ghi `llm_usage`. Panel đoạn báo 501 "llm-service chưa hỗ trợ lưu theo đoạn".
-- Bỏ route này và đường fallback: mục backlog trong `aidlc-docs/aidlc-state.md`.
+## `usage`: `reasoning_chars`, `usage_reported` (CR-056)
+Thêm trường, bên gọi cũ bỏ qua được. Áp dụng cho mọi `usage` mà `llm-service` trả về, không chỉ bước Code.
+- `reasoning_chars`: số ký tự `reasoning_content` đếm được trên stream. Có cả khi provider không gửi usage.
+- `usage_reported`: `false` khi provider không gửi usage. Ví dụ: stream bị ngắt vì vượt `CODE_MAX_REASONING_CHARS`, hoặc lượt gọi lỗi trước khi có usage. Khi đó các số token là `0` vì không biết, không phải vì miễn phí. Thiếu trường (bản cũ) thì hiểu là `true`.
+- `authoring-service` ghi hai trường này vào cột `llm_usage.reasoning_chars` và `llm_usage.usage_reported`.
+
+## `POST /v1/code/generate` — đã bỏ (CR-056)
+- Route này trả 404.
+- `authoring-service` chỉ gọi `/v2/code/generate`. Nếu route đó không có (`llm-service` cũ hơn CR-050), bước Code lỗi với `ErrSegmentsUnsupported` và không chạy theo cách khác.
+- Vì vậy phải deploy `llm-service` trước hoặc cùng lúc với `authoring-service`.

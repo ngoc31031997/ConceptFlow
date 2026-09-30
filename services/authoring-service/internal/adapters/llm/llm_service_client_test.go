@@ -325,27 +325,34 @@ func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
 	}
 }
 
-// ADR-0030: an llm-service without /v2 runs the step through /v1, the whole
-// step at once; its calls (listed at the end, or on the error) still reach
-// onEvent one by one, so every one is billed.
-func TestGenerateCodeFallsBackToV1OnAnOlderLLMService(t *testing.T) {
+// CR-056: the /v1 fallback is gone — an llm-service without /v2 fails the
+// step with ErrSegmentsUnsupported instead of running it another way.
+func TestGenerateCodeOnAnOlderLLMServiceIsUnsupported(t *testing.T) {
 	var paths []string
-	fail := false
 	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
 		paths = append(paths, r.URL.Path)
-		if r.URL.Path == "/v2/code/generate" {
-			w.WriteHeader(http.StatusNotFound)
-			_, _ = w.Write([]byte(`{"detail":"Not Found"}`))
-			return
-		}
-		if fail {
-			ndjson(w, `{"type":"error","error":{"kind":"budget","provider":"hive","message":"too long"},`+
-				`"calls":[{"phase":"layout","label":"LAYOUT","ok":false,"error_kind":"budget","usage":{"prompt_tokens":9}}]}`)
-			return
-		}
-		ndjson(w, `{"type":"phase","phase":"chunks","total":1}`,
-			`{"type":"result","code":"CODE","check_ok":true,"repair_rounds":0,"diagnostics":[],"warnings":[],`+
-				`"calls":[{"phase":"layout","label":"LAYOUT","ok":true,"usage":{"prompt_tokens":5}},{"phase":"chunk","label":"1.1-1.2","ok":true,"usage":{"prompt_tokens":7}}]}`)
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"detail":"Not Found"}`))
+	})
+	_, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, nil)
+	if !errors.Is(err, application.ErrSegmentsUnsupported) {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Join(paths, ",") != "/v2/code/generate" {
+		t.Errorf("paths = %v", paths)
+	}
+}
+
+// CR-056: a call whose stream was cut carries the reasoning it counted and
+// says its usage was not reported; an older llm-service (no field) is reported.
+func TestCodeCallUsageCarriesReasoningCharsAndTheReportedFlag(t *testing.T) {
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		ndjson(w,
+			`{"type":"call","phase":"chunk","label":"3.3-3.3","ok":false,"error_kind":"budget","segment":"3.3-3.5",`+
+				`"usage":{"model":"m","reasoning_chars":61000,"usage_reported":false}}`,
+			`{"type":"call","phase":"chunk","label":"1.1-1.3","ok":true,"segment":"1.1-1.3",`+
+				`"usage":{"model":"m","prompt_tokens":5}}`,
+			`{"type":"result","status":"incomplete","failed":["3.3-3.5"]}`)
 	})
 	var calls []application.CodeCall
 	on := func(e application.CodeEvent) {
@@ -353,21 +360,17 @@ func TestGenerateCodeFallsBackToV1OnAnOlderLLMService(t *testing.T) {
 			calls = append(calls, *e.Call)
 		}
 	}
-	res, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, on)
-	if err != nil || res.Status != application.CodeGenDone || res.Code != "CODE" {
-		t.Fatalf("res=%+v err=%v", res, err)
+	if _, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, on); err != nil {
+		t.Fatal(err)
 	}
-	if strings.Join(paths, ",") != "/v2/code/generate,/v1/code/generate" {
-		t.Errorf("paths = %v", paths)
+	if len(calls) != 2 {
+		t.Fatalf("calls = %+v", calls)
 	}
-	if len(calls) != 2 || calls[1].Usage.PromptTokens != 7 {
-		t.Errorf("calls = %+v", calls)
+	if u := calls[0].Usage; u.ReasoningChars != 61000 || !u.UsageMissing {
+		t.Errorf("cut call usage = %+v", u)
 	}
-
-	fail, calls = true, nil
-	_, err = c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, on)
-	if application.LLMErrorKindOf(err) != application.ErrKindBudget || len(calls) != 1 || calls[0].Usage.PromptTokens != 9 {
-		t.Errorf("v1 failure: err=%v calls=%+v", err, calls)
+	if u := calls[1].Usage; u.UsageMissing || u.PromptTokens != 5 {
+		t.Errorf("reported call usage = %+v", u)
 	}
 }
 

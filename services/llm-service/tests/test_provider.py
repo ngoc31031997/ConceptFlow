@@ -5,7 +5,7 @@ import pytest
 import respx
 
 from app import errors
-from app.errors import LLMError
+from app.errors import LLMError, Usage
 from app.provider import ChatRequest, Provider
 from tests.conftest import chunk, sse, stream_response, usage_chunk
 
@@ -268,6 +268,8 @@ async def test_reasoning_without_content_past_the_limit_stops_early_as_budget(no
     u = err.usage
     assert (u.prompt_tokens, u.completion_tokens, u.reasoning_tokens, u.cached_tokens) == (0, 0, 0, 0)
     assert u.model == "test-model"
+    # ...but what was counted is kept, and flagged as not the billed usage (CR-056)
+    assert u.reasoning_chars == 61000 and u.usage_reported is False
     assert seen[-1] == (61000, 0)
 
 
@@ -279,6 +281,7 @@ async def test_reasoning_limit_zero_keeps_the_old_behaviour(no_sleep):
     respx.post(URL).mock(return_value=resp)
     res = await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=0))
     assert res.content == "answer" and res.usage.reasoning_tokens == 7
+    assert res.usage.reasoning_chars == 70000 and res.usage.usage_reported is True  # CR-056
     assert body.served == len(body.events)
 
     # a reasoning-only stream still fails the old way, with the billed usage
@@ -309,3 +312,21 @@ async def test_reasoning_exactly_at_the_limit_is_not_stopped(no_sleep):
     resp, _ = _counting(*_reasoning(60), chunk("ok", finish="stop"), usage_chunk({}))
     respx.post(URL).mock(return_value=resp)
     assert (await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=60000))).content == "ok"
+
+
+def test_usage_adds_reasoning_chars_and_is_reported_only_when_every_part_was():
+    # CR-056: one unreported call makes a total unreported.
+    a = Usage(prompt_tokens=1, reasoning_chars=10)
+    b = Usage(prompt_tokens=2, reasoning_chars=5, usage_reported=False)
+    assert (a + a).usage_reported is True
+    total = a + b
+    assert (total.prompt_tokens, total.reasoning_chars, total.usage_reported) == (3, 15, False)
+    assert total.to_dict()["reasoning_chars"] == 15 and total.to_dict()["usage_reported"] is False
+
+
+@respx.mock
+async def test_a_failed_call_without_usage_is_flagged_unreported(no_sleep):
+    respx.post(URL).mock(return_value=httpx.Response(400, json={"error": {"message": "bad"}}))
+    with pytest.raises(LLMError) as e:
+        await make(no_sleep).chat(ChatRequest(user="u"))
+    assert e.value.usage.usage_reported is False and e.value.usage.reasoning_chars == 0

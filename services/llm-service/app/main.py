@@ -26,7 +26,6 @@ from app.pipeline.checker import CheckerPort, RenderingChecker
 from app.pipeline.checker import CheckerUnavailable as _CheckerUnavailable
 from app.pipeline.extract import ExtractError
 from app.pipeline.run import (
-    Call,
     CodePipeline,
     CodeRequest,
     DoneSegment,
@@ -290,58 +289,6 @@ def create_app(
                 continue
             return {"storyboard": sbm.dumps(sb), "usage": total.to_dict(), "repaired": attempt == 1,
                     "shots": len(sb.all_shots())}
-
-    # Events of a v2 run a v1 caller does not know; its calls come back in `calls`.
-    v2_only_events = {"plan", "segment_start", "segment_done", "segment_failed", "call", "check"}
-
-    @app.post("/v1/code/generate")
-    async def code_generate_v1(body: CodeBody):
-        """The pre-CR-050 contract, kept so llm-service and authoring-service
-        deploy independently (ADR-0030); removing it is on the backlog. Runs
-        the whole step with nothing stored: progress events only, every billed
-        call listed at the end, and the first failed segment fails the run with
-        the calls so far — as before. What v1 no longer does is keep finished
-        chunks in memory for a re-run: a v1 re-run pays for them again."""
-        if body.engine not in ("remotion", "manim"):
-            return _error_response(f"unknown engine {body.engine!r}", status=400)
-        provider, model = providers.for_model(providers.hive, body.model)
-        pipeline = CodePipeline(
-            provider, checker,
-            chunk_shots=config.code_chunk_shots, concurrency=config.code_chunk_concurrency,
-            repair_rounds=config.code_repair_max_rounds)
-
-        async def work(emit):
-            calls: list[Call] = []
-            first_failure: dict | None = None
-
-            async def v1_emit(event: dict) -> None:
-                nonlocal first_failure
-                if event["type"] == "call":
-                    calls.append(Call(
-                        event["phase"], event["label"], event["ok"], Usage(**event["usage"]), event["error_kind"],
-                        event["error_message"], event["duration_ms"], event["segment"]))
-                if event["type"] == "segment_failed" and first_failure is None:
-                    first_failure = event["error"]
-                if event["type"] not in v2_only_events:
-                    await emit(event)
-
-            req = body.request(model, config.code_max_reasoning_chars)
-            req.done, req.only = {}, None
-            try:
-                res = await pipeline.run(req, v1_emit)
-            except PipelineFailure as exc:
-                exc.calls = calls  # v1 reports what was billed on the error itself
-                raise
-            if res.status != "done":
-                err = first_failure or {"kind": "malformed", "message": "the code step did not finish"}
-                raise PipelineFailure(err.get("message", ""), calls, kind=err.get("kind", "malformed"))
-            out = res.to_dict()
-            for key in ("status", "failed", "missing"):
-                out.pop(key)
-            out["calls"] = [c.to_dict() for c in calls]
-            return out
-
-        return _stream(work)
 
     @app.post("/v2/code/plan")
     async def code_plan(body: CodeBody):
