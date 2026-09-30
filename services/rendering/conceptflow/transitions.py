@@ -1,4 +1,4 @@
-"""Từ vựng chuyển cảnh chuẩn (CR-017 FR45.4).
+"""Từ vựng chuyển cảnh chuẩn.
 
 Bốn động tác, run_time lấy từ `Theme.pacing`. Script không tự đặt `run_time`,
 nên hai video khác nhau có cùng một nhịp — đó là thứ người xem cảm nhận được

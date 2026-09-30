@@ -39,7 +39,7 @@ func TestReplaceNarrationLiteral_HandlesSingleQuotes(t *testing.T) {
 }
 
 func TestReplaceNarrationLiteral_RefusesWhenAmbiguous(t *testing.T) {
-	// Sau CR-018 một literal có thể sinh ra nhiều dòng dàn ý (vòng lặp), nên
+	// Một literal có thể sinh ra nhiều dòng dàn ý (vòng lặp), nên
 	// đoán xem Creator muốn sửa lần xuất hiện nào là cách làm hỏng script.
 	script := editScript + `        self.narrate("câu một")` + "\n"
 	if _, err := ReplaceNarrationLiteral(script, "câu một", "x"); !errors.Is(err, ErrNarrationNotEditable) {

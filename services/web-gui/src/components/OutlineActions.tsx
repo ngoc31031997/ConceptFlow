@@ -7,9 +7,9 @@ interface OutlineActionsProps {
 }
 
 /**
- * Duyệt/Từ chối dàn ý (CR-024), tách khỏi `OutlineReview` để sống trong cột
- * bên phải cạnh ProgressTracker — bug report: đặt hai nút này ở cuối danh
- * sách dàn ý (có thể dài hàng chục dòng) làm chúng cuộn mất khỏi tầm nhìn.
+ * Duyệt/Từ chối dàn ý, tách khỏi `OutlineReview` để sống trong cột
+ * bên phải cạnh ProgressTracker: đặt hai nút này ở cuối danh sách dàn ý (có
+ * thể dài hàng chục dòng) sẽ làm chúng cuộn mất khỏi tầm nhìn.
  * `outline` là cùng một instance `useOutlineReview` mà `OutlineReview` dùng,
  * nên `busy` khoá cả hai phía cùng lúc (sửa một dòng thì không bấm được Duyệt).
  */

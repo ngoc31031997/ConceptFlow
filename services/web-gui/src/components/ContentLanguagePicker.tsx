@@ -16,7 +16,7 @@ const LANGUAGES: { value: "vi" | "en"; label: string; flag: string }[] = [
 /**
  * Content language is the project's first decision, not a narration setting:
  * it drives the AI prompt, the starter script, the voice, the subtitles, the
- * thumbnail prompt and the YouTube metadata (CR-008).
+ * thumbnail prompt and the YouTube metadata.
  */
 export function ContentLanguagePicker({ value, onChange }: ContentLanguagePickerProps) {
   return (

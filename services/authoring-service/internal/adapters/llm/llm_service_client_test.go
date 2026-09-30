@@ -297,7 +297,7 @@ func TestSegmentCallsMapLLMServiceAnswers(t *testing.T) {
 }
 
 func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
-	// CR-048 T6b: the rendering layout check needs the subtitle strip and the font.
+	// The rendering layout check needs the subtitle strip and the font.
 	var bodies []map[string]any
 	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
@@ -325,7 +325,7 @@ func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
 	}
 }
 
-// CR-056: the /v1 fallback is gone — an llm-service without /v2 fails the
+// The /v1 fallback is gone — an llm-service without /v2 fails the
 // step with ErrSegmentsUnsupported instead of running it another way.
 func TestGenerateCodeOnAnOlderLLMServiceIsUnsupported(t *testing.T) {
 	var paths []string
@@ -343,7 +343,7 @@ func TestGenerateCodeOnAnOlderLLMServiceIsUnsupported(t *testing.T) {
 	}
 }
 
-// CR-056: a call whose stream was cut carries the reasoning it counted and
+// A call whose stream was cut carries the reasoning it counted and
 // says its usage was not reported; an older llm-service (no field) is reported.
 func TestCodeCallUsageCarriesReasoningCharsAndTheReportedFlag(t *testing.T) {
 	c := serve(t, func(w http.ResponseWriter, r *http.Request) {

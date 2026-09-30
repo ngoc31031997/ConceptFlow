@@ -1,4 +1,4 @@
-"""Công cụ cho Creator quản lý danh mục Lottie (CR-038).
+"""Công cụ cho Creator quản lý danh mục Lottie.
 
     python tools/lottie_catalog.py validate     kiểm manifest + file + giấy phép
     python tools/lottie_catalog.py gallery      sinh trang xem trước, mở bằng trình duyệt để DUYỆT clip

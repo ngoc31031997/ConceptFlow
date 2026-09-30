@@ -14,7 +14,7 @@ import { getLlmStatus, type LlmStatus } from "../api/client";
 let cachedStatus: LlmStatus | null = null;
 
 /**
- * CR-027 FR79.4 — whether the "Gọi API trực tiếp" mode exists on this
+ * Whether the "Gọi API trực tiếp" mode exists on this
  * deployment at all.
  *
  * `null` means "not known yet", which callers must treat as neither: drawing

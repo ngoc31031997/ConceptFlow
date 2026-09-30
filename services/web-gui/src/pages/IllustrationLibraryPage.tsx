@@ -30,11 +30,11 @@ const ALL = "";
 const NEW = "new";
 
 /**
- * CR-044 — thư viện hình minh hoạ. Mỗi hình nằm trong đúng một thư mục; Kỹ sư
+ * Thư viện hình minh hoạ. Mỗi hình nằm trong đúng một thư mục; Kỹ sư
  * Remotion chỉ được dùng hình "Có sẵn" hoặc "Đã duyệt". Mỗi ô là một hình: rê
  * chuột để xem nó chuyển động, bấm để mở trình sửa code.
  *
- * CR-052 — mỗi ô có nút Xoá (server từ chối khi một dự án chưa tới bước Kết quả
+ * Mỗi ô có nút Xoá (server từ chối khi một dự án chưa tới bước Kết quả
  * còn dùng hình), và Hình mẫu AI vẽ học theo do Creator chọn: "Đặt làm mẫu" chép
  * một hình đã duyệt vào thư mục Hình mẫu, "Bỏ làm mẫu" gỡ nó ra.
  */
@@ -44,7 +44,7 @@ export function IllustrationLibraryPage() {
   const [folder, setFolder] = useState(ALL);
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(null);
-  // CR-045 — "Nhờ AI sửa các cảnh báo này" on a tile: open that drawing with the redraw note filled in.
+  // "Nhờ AI sửa các cảnh báo này" on a tile: open that drawing with the redraw note filled in.
   const [fixNote, setFixNote] = useState<{ id: string; text: string; n: number } | null>(null);
   const [busyIds, setBusyIds] = useState<Record<string, boolean>>({});
   const [bust, setBust] = useState<Record<string, number>>({});
@@ -130,7 +130,7 @@ export function IllustrationLibraryPage() {
     }
   }
 
-  // The Hình mẫu folder only takes drawings through "Đặt làm mẫu" (CR-052).
+  // The Hình mẫu folder only takes drawings through "Đặt làm mẫu".
   const writableFolders = folders.filter((f) => f.id !== EXEMPLAR_FOLDER_ID);
   const writableFolder = folder && folder !== EXEMPLAR_FOLDER_ID ? folder : undefined;
   const drawTarget = drawFolder || writableFolder || writableFolders[0]?.id || "";

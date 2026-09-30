@@ -52,7 +52,7 @@ interface IllustrationEditorProps {
   onDeleted?: () => void;
   onClose: () => void;
   /**
-   * CR-045 — a note to put in the "Vẽ lại bằng AI" box (from "Nhờ AI sửa các
+   * A note to put in the "Vẽ lại bằng AI" box (from "Nhờ AI sửa các
    * cảnh báo này"). `n` changes on every request, so the same note can be
    * filled in again after the Creator cleared it.
    */
@@ -72,14 +72,14 @@ function toInput(ill: Illustration | null, folderId: string, draft?: Partial<Ill
 }
 
 /**
- * CR-044 — edit one library drawing by hand: its details and its TSX. "Xem
+ * Edit one library drawing by hand: its details and its TSX. "Xem
  * trước" renders the code as it is in the box without saving; saving renders
  * it again and keeps the preview. Code the renderer refuses comes back with
  * line numbers, listed under the box.
  */
 export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose, redrawNote }: IllustrationEditorProps) {
   const creating = illustration === null;
-  // CR-052: a Hình mẫu is read-only like the kit; it changes by picking another one.
+  // A Hình mẫu is read-only like the kit; it changes by picking another one.
   const exemplar = illustration?.exemplar === true;
   const readOnly = illustration?.builtin === true || exemplar;
   // The Hình mẫu folder only takes drawings through "Đặt làm mẫu".

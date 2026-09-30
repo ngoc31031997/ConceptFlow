@@ -1,4 +1,4 @@
-"""purge_project_artifacts — Video Assembly's half of the project-delete saga (CR-040 FR114.2).
+"""purge_project_artifacts — Video Assembly's half of the project-delete saga.
 
 Orchestrator sends this after it has refused to delete a project with a step
 running and marked it `deleting`. This service removes only the files it owns

@@ -9,7 +9,7 @@ type Route = (url: string, init?: RequestInit) => Promise<unknown> | undefined;
 
 const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
 
-// CR-054: the orchestrator's filter rules (domain.ListFilter.Matches).
+// The orchestrator's filter rules (domain.ListFilter.Matches).
 function matches(p: Row, filter: string): boolean {
   const step = p.flow_step ?? 0;
   switch (filter) {
@@ -97,7 +97,7 @@ describe("VideoListPage", () => {
         { project_id: "p1", status: "published", video_path: "/shared/p1/video/final.mp4", updated_at: "2026-01-01T00:00:00Z" },
         { project_id: "p2", status: "failed_at_render_scenes", error_message: "boom", updated_at: "2026-01-02T00:00:00Z" },
       ],
-      // FR116.2: the row goes once the delete saga reports it has finished.
+      // The row goes once the delete saga reports it has finished.
       (url) =>
         url.includes("/v1/operations/delete:p1")
           ? ok({ kind: "delete_project", phase: "purge", done: 3, total: 3, status: "succeeded" })
@@ -273,7 +273,7 @@ describe("VideoListPage", () => {
     });
   });
 
-  describe("phân trang (CR-054)", () => {
+  describe("phân trang", () => {
     it("shows 20 videos a page and moves between pages", async () => {
       const fetchMock = serve(many(45));
       renderPage();

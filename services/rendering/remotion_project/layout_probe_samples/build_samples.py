@@ -1,4 +1,4 @@
-"""Builds the layout-probe sample scripts (CR-048 T6a spike) with the REAL
+"""Builds the layout-probe sample scripts with the REAL
 Code Merger of llm-service, so the probe is tried on exactly the file shape
 the pipeline produces (head, PALETTE, LAYOUT, narrations, SHOTS, tail) and
 the shot line ranges printed here are the ones `_map_failures` would use.

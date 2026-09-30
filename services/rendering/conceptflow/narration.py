@@ -1,26 +1,20 @@
-"""Lời thoại khai báo bằng lời gọi runtime, không phải comment (CR-018).
+"""Lời thoại khai báo bằng lời gọi runtime, không phải comment.
 
-## Vì sao đổi
+## Vì sao là lời gọi runtime
 
-Trước đây lời thoại là comment `# NARRATION: "..."` và điểm chờ là
-`self.wait(AUTO)`, hai thứ tách rời mà Rendering phải khớp **theo số lượng và
-theo thứ tự dòng trong file**. Toàn bộ chuỗi hạn chế phía sau bắt nguồn từ đó:
-`wait(AUTO)` không được nằm trong vòng lặp hay nhánh điều kiện (vì sẽ chạy khác
-số lần), nên lời thoại không đóng gói được vào hàm, nên hook/CTA không thể là
-component — đúng lý do CR-006 §Quyết định #2 đã phải lùi FR17 xuống thành snippet.
-
-`self.narrate("...")` gộp hai thứ làm một lời gọi. Danh sách lời thoại lấy theo
-**thứ tự chạy thật** ở một lượt dry, nên số lượng và thứ tự tự khớp theo cấu
-trúc — không còn gì để lệch.
+`self.narrate("...")` gộp lời thoại và điểm chờ làm một lời gọi. Danh sách lời
+thoại lấy theo **thứ tự chạy thật** ở một lượt dry, nên số lượng và thứ tự tự
+khớp theo cấu trúc. Nhờ vậy lời thoại được phép nằm trong vòng lặp, nhánh điều
+kiện và hàm helper, và hook/CTA là component thật.
 
 ## Hai lượt
 
 - `CF_MODE=dry`   — ghi lời thoại ra JSONL rồi đi tiếp, không chờ. Chạy trước
-  TTS, nên script sai bị chặn trước khi tiêu quota giọng đọc (CR-020 FR56).
+  TTS, nên script sai bị chặn trước khi tiêu quota giọng đọc.
 - `CF_MODE=render` — tra thời lượng audio thật theo thứ tự, ghi mốc bắt đầu
   chờ, rồi chờ đúng bằng thời lượng đó.
 
-Mốc bắt đầu (`kind="mark"`) giữ nguyên ngữ nghĩa CR-002: nó là thời điểm **bắt
+Mốc bắt đầu (`kind="mark"`) là thời điểm **bắt
 đầu** khoảng chờ, tức là chỗ Video Assembly phải đặt đoạn audio. Đọc
 `scene.renderer.time` TRƯỚC khi chờ, không phải sau.
 
@@ -102,7 +96,7 @@ class _Recorder:
 
         `beat()` và `chapter()` gắn vào đây: một beat mở ra tại đúng lời thoại
         giới thiệu nó, nên timestamp của nó là mốc thật mà lượt render đo được
-        chứ không phải ước lượng (giữ nguyên cách CR-006 FR15 đã làm).
+        chứ không phải ước lượng.
         """
         return self._index
 
@@ -116,13 +110,13 @@ def reset() -> None:
     _recorder = _Recorder()
 
 
-# Lượt dry chưa có audio nên chưa có thời lượng thật (CR-042 FR123.2): animation
+# Lượt dry chưa có audio nên chưa có thời lượng thật: animation
 # kèm theo vẫn phải chạy để trạng thái màn hình sau câu thoại giống lượt render,
 # nhưng thời lượng chỉ là ước lượng theo số từ.
 _DRY_SECONDS_PER_WORD = 0.35
 _DRY_MIN_SECONDS = 1.0
 # Ambient drift: đẩy khung vào rất nhẹ, đủ để khung không "chết" mà không đổi
-# bố cục đã dựng (CR-042 FR123.3). Tắt mặc định.
+# bố cục đã dựng. Tắt mặc định.
 DRIFT_SCALE = 0.97
 
 
@@ -147,7 +141,7 @@ def narrate(scene, text: str, *animations, drift: bool = False) -> None:
     """Phát một đoạn lời thoại, cho animation kèm theo chạy TRONG lúc đọc.
 
     `narrate(text)` một tham số giữ nguyên hành vi cũ (đứng yên đúng thời lượng
-    câu). Có animation thì `run_time` của chúng = thời lượng câu (CR-042 FR123).
+    câu). Có animation thì `run_time` của chúng = thời lượng câu.
     `drift=True` (chỉ có tác dụng khi không có animation) đẩy camera vào nhẹ.
     """
     cleaned = text.strip()
@@ -161,7 +155,7 @@ def narrate(scene, text: str, *animations, drift: bool = False) -> None:
             "kind": "narration",
             "index": index,
             "text": cleaned,
-            # CR-024 FR68.5: cái gì đang trên màn hình lúc câu này được nói.
+            # Cái gì đang trên màn hình lúc câu này được nói.
             # Với một kênh đặt trọng tâm vào ví dụ trực quan, duyệt dàn ý mà chỉ
             # đọc được lời thoại là duyệt đúng nửa ít quan trọng hơn.
             "visual": _describe_stage(scene),
@@ -181,7 +175,7 @@ def narrate(scene, text: str, *animations, drift: bool = False) -> None:
     # Đọc mốc TRƯỚC khi chờ: đây là thời điểm bắt đầu, thứ Video Assembly cần.
     now = scene.renderer.time
     _recorder.write({"kind": "mark", "index": index, "t": now})
-    # CR-021 FR58.1: bố cục tại đúng mốc đó, để QC chấm được tràn khung /
+    # Bố cục tại đúng mốc đó, để QC chấm được tràn khung /
     # chồng lấn / chữ nhỏ / tương phản mà không phải xem lại từng khung hình.
     # Chỉ ở lượt render: lượt dry là cổng chặn trước TTS, chỗ Creator đang chờ.
     _recorder.write({"kind": "layout", "index": index, "t": now,
@@ -192,7 +186,7 @@ def narrate(scene, text: str, *animations, drift: bool = False) -> None:
 
 @contextlib.contextmanager
 def clip(scene, name: str):
-    """Đánh dấu một đoạn của scene là clip dọc phái sinh (CR-007 FR19.2).
+    """Đánh dấu một đoạn của scene là clip dọc phái sinh.
 
     Ghi **một** bản ghi `kind="clip"` duy nhất, lúc `__exit__`, mang cả
     `t_start` lẫn `t_end`: gộp hai mốc vào một bản ghi thay vì ghi mở/đóng
@@ -263,14 +257,14 @@ def record_overlap(scene, description: str) -> None:
 
 
 def beat(scene, beat_id: str) -> None:
-    """Đánh dấu mở đầu một beat trong beat sheet (CR-019)."""
+    """Đánh dấu mở đầu một beat trong beat sheet."""
     _recorder.write(
         {"kind": "beat", "index": _recorder.upcoming_index, "id": str(beat_id).strip()}
     )
 
 
 def chapter(scene, title: str) -> None:
-    """Đánh dấu mở đầu một chapter YouTube (CR-006 FR15, thay `# CHAPTER:`)."""
+    """Đánh dấu mở đầu một chapter YouTube."""
     cleaned = str(title).strip()
     if cleaned:
         _recorder.write(
@@ -305,7 +299,7 @@ def _describe_stage(scene) -> str:
 
 
 def _describe_layout(scene) -> list[dict]:
-    """Bố cục khung hình hiện tại, dạng máy chấm được (CR-021 FR58.1).
+    """Bố cục khung hình hiện tại, dạng máy chấm được.
 
     Mỗi mobject thành một bản ghi: tên class, hộp bao theo toạ độ Manim
     (trái/phải/trên/dưới), màu hex và cỡ chữ. Đó đúng là bốn thứ luật QC ở
@@ -313,7 +307,7 @@ def _describe_layout(scene) -> list[dict]:
     `font_size`, tương phản đọc `color`. Không cố đoán ý nghĩa hình, y như
     `_describe_stage`: chấm điểm là việc của luật, không phải của chỗ thu số.
 
-    Best-effort tuyệt đối (FR58.2): đây là dữ liệu cho QC, không phải sản
+    Best-effort tuyệt đối: đây là dữ liệu cho QC, không phải sản
     phẩm, nên một mobject lạ hay một API Manim đổi kiểu phải làm mất dữ liệu
     chứ không được làm hỏng lượt render đã tốn hàng phút.
     """
@@ -372,7 +366,7 @@ def _hex_color(mobject) -> str | None:
     `Text` trong Manim 0.18 là một group các glyph: màu thật nằm ở glyph, còn
     `Text.get_color()` luôn trả `#000000` kể cả khi chữ đang vàng. Lấy màu tô
     của glyph đầu tiên cho nhóm có submobject, nếu không thì `get_color()` —
-    nếu không thế thì luật tương phản (FR59.4) sẽ chấm sai mọi dòng chữ.
+    nếu không thế thì luật tương phản sẽ chấm sai mọi dòng chữ.
     """
     try:
         leaf = mobject

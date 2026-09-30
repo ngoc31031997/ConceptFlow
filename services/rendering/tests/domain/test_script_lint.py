@@ -1,8 +1,5 @@
-"""Lint theo whitelist (CR-017 FR46).
-
-Bộ test cũ kiểm tra blacklist `INVALID_KWARGS_BY_CLASS` (corner_radius trên
-Rectangle...). Blacklist đó đã bị gỡ: sau CR-017, `Rectangle` bản thân nó đã
-không thuộc API cho phép, nên không còn ý nghĩa gì khi hỏi nó nhận kwarg nào.
+"""Lint theo whitelist: cái gì không có trong `conceptflow` thì không hợp lệ,
+nên không cần hỏi một class ngoài whitelist (như `Rectangle`) nhận kwarg nào.
 """
 
 from domain.script_lint import BLOCKING, WARNING, blocking_issues, lint_manim_script

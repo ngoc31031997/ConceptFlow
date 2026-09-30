@@ -19,18 +19,18 @@ type Config struct {
 	HTTPPort                      string
 	RabbitMQReconnectInitialDelay time.Duration
 	RabbitMQReconnectMaxDelay     time.Duration
-	// CR-040 FR111: prompts, the authoring chain and the LLM calls live in
+	// Prompts, the authoring chain and the LLM calls live in
 	// authoring-service; this is where to reach it.
 	AuthoringServiceURL     string
 	AuthoringServiceTimeout time.Duration
-	// CR-023 D2: base URL of the video-assembly service, whose own database
+	// Base URL of the video-assembly service, whose own database
 	// owns channel_assets — Orchestrator reads it synchronously to attach the
 	// channel intro/outro to assemble_video.
 	VideoAssemblyURL     string
 	VideoAssemblyTimeout time.Duration
 
-	// QCEnforce turns CR-021's publish gate from indicate-only into a real
-	// block. Default FALSE on purpose (D5 / CR-021 Decision #3): the rules ship
+	// QCEnforce turns the QC publish gate from indicate-only into a real
+	// block. Default FALSE on purpose: the rules ship
 	// unproven against real footage, and a gate that cries wolf on its first
 	// week is a gate Creators learn to click past — which costs more than
 	// having no gate at all. Findings are recorded with their true severity

@@ -1,5 +1,5 @@
 """Renders subtitle cues into a plain SRT file, for upload as a YouTube
-caption track rather than being burned into the video frames (CR-015 FR38).
+caption track rather than being burned into the video frames.
 
 Deliberately carries no `SubtitleStyle` — SRT has no styling fields, and
 YouTube decides how the track is displayed. That is exactly why the burn-in

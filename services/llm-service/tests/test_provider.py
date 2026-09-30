@@ -212,7 +212,7 @@ async def test_connection_failure_is_server_and_timeout_is_timeout(no_sleep):
     assert e.value.kind == errors.TIMEOUT
 
 
-# -- CR-048 T1: stop a call that only reasons ---------------------------------
+# -- stop a call that only reasons --------------------------------------------
 
 
 class _CountingStream(httpx.AsyncByteStream):
@@ -268,7 +268,7 @@ async def test_reasoning_without_content_past_the_limit_stops_early_as_budget(no
     u = err.usage
     assert (u.prompt_tokens, u.completion_tokens, u.reasoning_tokens, u.cached_tokens) == (0, 0, 0, 0)
     assert u.model == "test-model"
-    # ...but what was counted is kept, and flagged as not the billed usage (CR-056)
+    # ...but what was counted is kept, and flagged as not the billed usage
     assert u.reasoning_chars == 61000 and u.usage_reported is False
     assert seen[-1] == (61000, 0)
 
@@ -281,7 +281,7 @@ async def test_reasoning_limit_zero_keeps_the_old_behaviour(no_sleep):
     respx.post(URL).mock(return_value=resp)
     res = await make(no_sleep).chat(ChatRequest(user="u", max_reasoning_chars=0))
     assert res.content == "answer" and res.usage.reasoning_tokens == 7
-    assert res.usage.reasoning_chars == 70000 and res.usage.usage_reported is True  # CR-056
+    assert res.usage.reasoning_chars == 70000 and res.usage.usage_reported is True
     assert body.served == len(body.events)
 
     # a reasoning-only stream still fails the old way, with the billed usage
@@ -315,7 +315,7 @@ async def test_reasoning_exactly_at_the_limit_is_not_stopped(no_sleep):
 
 
 def test_usage_adds_reasoning_chars_and_is_reported_only_when_every_part_was():
-    # CR-056: one unreported call makes a total unreported.
+    # One unreported call makes a total unreported.
     a = Usage(prompt_tokens=1, reasoning_chars=10)
     b = Usage(prompt_tokens=2, reasoning_chars=5, usage_reported=False)
     assert (a + a).usage_reported is True

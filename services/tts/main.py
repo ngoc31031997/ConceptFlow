@@ -1,9 +1,8 @@
 """Composition root for the TTS Service.
 
-Revision (ADR-0014, ADR-0013): TTS Service is no longer a FastAPI/REST
-app — it's a plain AMQP consumer (command synthesize_speech, queue
-tts.commands) with a PostgreSQL-backed Outbox/Inbox, mirroring Content
-Plugin Service's composition root shape.
+The TTS Service is a plain AMQP consumer (command synthesize_speech, queue
+tts.commands) with a PostgreSQL-backed Outbox/Inbox, not a REST app. See
+ADR-0013 and ADR-0014.
 
 Readiness is signaled via a sentinel file (Infrastructure Design) since
 there's no HTTP endpoint left to serve a /health check.
@@ -47,7 +46,7 @@ READY_SENTINEL_PATH = "/tmp/ready"
 
 def build_engine() -> RoutingTTSEngine:
     """Edge for every voice; Azure and Google only when their credentials are
-    present (ADR-0024, CR-011, ADR-0023).
+    present. See ADR-0023 and ADR-0024.
 
     Edge is always constructed: it owns the default voices and is also where a
     failed metered call degrades to.
@@ -60,7 +59,7 @@ def build_engine() -> RoutingTTSEngine:
     else:
         logger.warning(
             "%s/%s are not set — the Azure voices in the catalogue will fall back "
-            "to the equivalent Edge voice (CR-011).",
+            "to the equivalent Edge voice.",
             azure_adapter.KEY_ENV_VAR,
             azure_adapter.REGION_ENV_VAR,
         )
@@ -104,7 +103,7 @@ async def run() -> None:
     )
     dispatcher = TtsCommandDispatcher(
         command_handler,
-        # CR-040 FR114.2: dọn thư mục audio của project bị xoá.
+        # Dọn thư mục audio của project bị xoá.
         PurgeProjectArtifactsCommandHandler(purge_project_artifacts, pool, inbox, outbox),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

@@ -1,4 +1,4 @@
-"""Ảnh xem trước cho một hình của thư viện minh hoạ (CR-044).
+"""Ảnh xem trước cho một hình của thư viện minh hoạ.
 
 Giống TypeScriptChecker: một tiến trình Node sống lâu
 (`remotion_project/illustration_preview.mjs`) đóng gói host và mở trình duyệt

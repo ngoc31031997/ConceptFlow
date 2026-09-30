@@ -25,11 +25,11 @@ const ALLOWED_AUDIO_MIME_TO_EXT = {
 
 const DEFAULT_RENDER_QUALITY = '1080p60';
 
-/** `asset_role` values on the normalize command (CR-023 FR65.4/FR66.5). */
+/** `asset_role` values on the normalize command. */
 const ASSET_ROLE_VIDEO = 'video';
 const ASSET_ROLE_MUSIC = 'music';
 
-/** FR66.7 — an intro/outro sting is a 16:9 clip of at most 5 seconds. */
+/** An intro/outro sting is a 16:9 clip of at most 5 seconds. */
 const MAX_DURATION_SECONDS = 5;
 const ASPECT_RATIO = 16 / 9;
 // Tolerances: a hair of slack for encoders that report e.g. 1918x1080, and
@@ -58,8 +58,8 @@ function readRenderQuality(req) {
 
 /**
  * Asks Orchestrator to queue the `normalize_channel_asset` AMQP command for a
- * file this Gateway has just written to the shared volume (CR-023 correction:
- * there is no HTTP server on video-assembly — Orchestrator is the only
+ * file this Gateway has just written to the shared volume (there
+ * is no HTTP server on video-assembly — Orchestrator is the only
  * service with an HTTP layer, and it publishes the command).
  */
 async function triggerNormalize(orchestratorClient, req, kind, filePath, sourceHash, renderQuality, assetRole) {
@@ -72,7 +72,7 @@ async function triggerNormalize(orchestratorClient, req, kind, filePath, sourceH
       source_hash: sourceHash,
       render_quality: renderQuality,
       // `asset_role` is what tells video-assembly whether file_path is the
-      // sting clip itself or the music bed it must mix into it (FR66.5) —
+      // sting clip itself or the music bed it must mix into it —
       // the two uploads otherwise look identical downstream.
       asset_role: assetRole,
     },
@@ -134,7 +134,7 @@ async function saveAndTrigger(
 
 /**
  * `POST /v1/channel-assets/:kind` (kind = intro | outro), multipart field
- * "video". Validates the clip at upload time (FR66.7) so the Creator gets a
+ * "video". Validates the clip at upload time so the Creator gets a
  * concrete reason immediately instead of a silent no-op an AMQP hop later —
  * a rejected file is never written to the shared volume (it is probed from a
  * throwaway file under the OS temp dir, which is removed either way).
@@ -212,7 +212,7 @@ function channelAssetVideoUploadHandler(sharedDir, orchestratorClient, deps = {}
 
 /**
  * `POST /v1/channel-assets/:kind-music`, multipart field "music" — the sting's
- * audio bed, which video-assembly normalizes to -14 LUFS (FR66.5); the Gateway
+ * audio bed, which video-assembly normalizes to -14 LUFS; the Gateway
  * only stores the file and triggers the same normalize command.
  *
  * @param {string} sharedDir

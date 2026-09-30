@@ -1,9 +1,9 @@
 """CheckScriptUseCase — the compile check the code-authoring pipeline runs before
-anything is saved (CR-039 FR104).
+anything is saved.
 
 Remotion: Lottie-id lint and the narration dry pass (the same gate the saga
 uses), plus a real `tsc --noEmit`, then — once all of that passes — the layout
-check (CR-048 T6b): every shot is drawn in headless Chromium at a dozen moments
+check: every shot is drawn in headless Chromium at a dozen moments
 and the measured boxes are held to the layout rules (domain/layout_rules.py).
 Manim: the saga's own gate (lint + a dry run of the script). Both report
 line-numbered diagnostics when they can.
@@ -41,7 +41,7 @@ class CheckDiagnostic:
     message: str
     line: int | None = None
     kind: str = COMPILE  # compile | layout
-    # CR-050 FR-22: which rule failed, for statistics — the layout rule
+    # Which rule failed, for statistics — the layout rule
     # (safe_area, subtitle_zone, ...) or the tsc code (TS2322). "" when the
     # source has no code of its own (lint, the Manim dry run).
     rule: str = ""
@@ -123,8 +123,8 @@ class CheckScriptUseCase:
             return [], [f"Bố cục: KHÔNG kiểm tra được — {exc}. Kết quả biên dịch vẫn giữ nguyên."]
         font = probe.get("font") or {}
         if font.get("available") is False:
-            # Every text width would be measured in a fallback font: 3-10 % off
-            # (T6a), enough to invent or hide an overflow. Not a pass either.
+            # Every text width would be measured in a fallback font: 3-10 % off,
+            # enough to invent or hide an overflow. Not a pass either.
             logger.warning(
                 "layout check skipped: font %r is not installed in the probe browser", font.get("family"))
             return [], [

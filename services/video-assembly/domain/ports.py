@@ -33,7 +33,7 @@ class VideoAssemblerPort(ABC):
         the file is complete.
 
         Returns the path to a .srt caption-track file when request.subtitle_mode
-        produced one (CR-015 FR38.4) — "track" or "both" with cues present —
+        produced one — "track" or "both" with cues present —
         or None otherwise.
 
         Raises:

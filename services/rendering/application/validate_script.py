@@ -1,10 +1,10 @@
-"""ValidateScriptUseCase — cổng kiểm tra trước khi tốn TTS (CR-020 FR56).
+"""ValidateScriptUseCase — cổng kiểm tra trước khi tốn TTS.
 
 Chạy hai việc, theo thứ tự rẻ trước:
 
-1. **Lint** (CR-017 FR46) — phân tích tĩnh, mili-giây. Bắt API ngoài design
+1. **Lint** — phân tích tĩnh, mili-giây. Bắt API ngoài design
    system, màu hex viết thẳng, cỡ chữ đặt tay.
-2. **Lượt dry** (CR-018 FR49.1) — thực sự chạy script qua Manim. Đây là thứ
+2. **Lượt dry** — thực sự chạy script qua Manim. Đây là thứ
    thay thế danh sách blacklist: nó bắt **mọi** lỗi API, kể cả những cái chưa
    ai gặp bao giờ, vì nó không đoán mà chạy thật.
 
@@ -13,7 +13,7 @@ Saga cần để gọi TTS.
 
 Vì sao bước này sống ở Rendering chứ không ở một Quality Service riêng: lượt dry
 cần Manim, và Manim kéo theo cả texlive. Dựng image thứ hai nặng như vậy chỉ để
-chạy một lệnh là cái giá không đáng. Bước chấm chất lượng **video** (CR-021)
+chạy một lệnh là cái giá không đáng. Bước chấm chất lượng **video**
 thì ngược lại — nó chỉ cần ffmpeg và file JSONL, nên sẽ sống ở service riêng.
 """
 
@@ -37,12 +37,12 @@ logger = logging.getLogger(__name__)
 class ValidationResult:
     """Kết quả kiểm tra một script.
 
-    `warnings` không chặn Saga (FR56.3): đường thoát hiểm ra API thô của Manim
+    `warnings` không chặn Saga: đường thoát hiểm ra API thô của Manim
     là hợp lệ, chỉ là phần đó không được theme và QC bảo vệ.
     """
 
     dry_run: DryRunResult
-    # CR-040 FR110: the class/composition the saga will render, found here
+    # The class/composition the saga will render, found here
     # (before the dry pass needs it) instead of by a separate parse step.
     scene_class_name: str = ""
     engine: str = "manim"
@@ -64,7 +64,7 @@ class ValidateScriptUseCase:
         approved_lottie_ids: Callable[[], set[str]] | None = None,
     ) -> None:
         self._renderer = renderer
-        # CR-038: ids of the approved Lottie catalog. None disables the check
+        # Ids of the approved Lottie catalog. None disables the check
         # (tests that never touch Remotion), an empty set means "no clip is
         # allowed" — which is exactly what an empty catalog should enforce.
         self._approved_lottie_ids = approved_lottie_ids

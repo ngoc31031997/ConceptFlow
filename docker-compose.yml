@@ -1,9 +1,7 @@
-# Every service below now carries a deploy.resources.limits.memory (rendering
-# and video-assembly already had one — RENDER_MEMORY_LIMIT/ASSEMBLY_MEMORY_LIMIT
-# predate this). Without a cap, a container is free to grow until it starves
+# Every service below carries a deploy.resources.limits.memory. Without a cap, a container is free to grow until it starves
 # every other process sharing the Docker VM's RAM — on Docker Desktop that VM
 # has a FIXED memory ceiling of its own (Settings > Resources), separate from
-# host RAM, and previously only rendering/video-assembly were bounded. Summing
+# host RAM. Summing
 # every default limit below is deliberately > a typical 8G Docker Desktop VM
 # (~20G): these are per-container CEILINGS, not reservations, and rendering,
 # assembly and ollama rarely peak at the same time — but if the VM's own
@@ -66,7 +64,7 @@ services:
       # Leave GOOGLE_TTS_CREDENTIALS_FILE unset in .env and every voice uses the
       # Edge engine (ADR-0024), which needs no cloud account at all.
       GOOGLE_APPLICATION_CREDENTIALS: ${GOOGLE_TTS_CREDENTIALS_FILE:+/run/secrets/google-tts.json}
-      # CR-011 — Azure AI Speech. Leave unset and the Azure voices in the
+      # Azure AI Speech. Leave unset and the Azure voices in the
       # catalogue fall back to the identical Edge voice.
       AZURE_SPEECH_KEY: ${AZURE_SPEECH_KEY:-}
       AZURE_SPEECH_REGION: ${AZURE_SPEECH_REGION:-}
@@ -135,21 +133,21 @@ services:
       # empty string to disable caching. Measured 21s -> 4s on an unchanged
       # re-render, 21s -> 6s after editing one narration line.
       RENDER_CACHE_ROOT: "/shared/.manim-media"
-      # Fallback quality when a project does not specify one (CR-004). The
+      # Fallback quality when a project does not specify one. The
       # Creator picks per project in the GUI; this covers projects created
       # before that field existed.
       RENDER_QUALITY: "${RENDER_QUALITY:-1080p60}"
       # Where conceptflow.channel_idents finds the logo for the intro/outro
-      # stings (CR-023). Mounted rather than COPYed: the build context is
+      # stings. Mounted rather than COPYed: the build context is
       # ./services/rendering, so docs/brand/ cannot enter the image without
       # widening the context for every service (H1, cr-016-024-execution-plan).
       BRAND_ASSETS_DIR: "/brand"
-      # CR-039 — the compile check llm-service calls (POST /v1/check/*). Same
+      # The compile check llm-service calls (POST /v1/check/*). Same
       # process as the queue consumer, reachable on the backend network only.
       CHECK_HTTP_PORT: "8000"
       CHECK_CONCURRENCY: "${CHECK_CONCURRENCY:-2}"
       TSC_TIMEOUT_SECONDS: "${TSC_TIMEOUT_SECONDS:-90}"
-      # CR-048 T6b — kiểm tra bố cục sau khi tsc qua: vẽ từng shot trong
+      # Kiểm tra bố cục sau khi tsc qua: vẽ từng shot trong
       # Chromium headless, đo hộp bao, lỗi bố cục (tràn khung, đè chữ, lấn vùng
       # phụ đề, chữ nhỏ) được gửi vào vòng sửa lỗi như lỗi tsc. Tắt (false) thì
       # mỗi lượt kiểm tra ghi cảnh báo "chưa kiểm tra bố cục".
@@ -213,15 +211,15 @@ services:
       # Override per-host via .env (e.g. .env.window) — a weaker CPU needs a
       # longer ceiling, not a lower crf/preset (those stay quality-first).
       ASSEMBLY_TIMEOUT_SECONDS: "${ASSEMBLY_TIMEOUT_SECONDS:-900}"
-      # CR-005 FR14.5 — silence before the first line and after the last.
+      # Silence before the first line and after the last.
       # Off by default: padding either end forces a full re-encode (tpad
       # repaints frames), and Phase 0 measured stream copy at 250x faster.
       ASSEMBLY_LEAD_IN_SECONDS: "0"
       ASSEMBLY_TAIL_SECONDS: "0"
-      # CR-021 FR61.5 — ngưỡng chấm QC. Mọi biến QC_* đều có mặc định trong
+      # Ngưỡng chấm QC. Mọi biến QC_* đều có mặc định trong
       # domain/qc_rules.py::QCThresholds; liệt kê ở đây để biết chỗ mà siết.
       #
-      # Rủi ro số một của CR-021 là báo động giả: QC kêu ở video vốn ổn thì
+      # Rủi ro số một của QC là báo động giả: QC kêu ở video vốn ổn thì
       # Creator bỏ qua báo cáo và cổng chặn thành hình thức. Nên mặc định nới
       # rộng, chạy chỉ-báo (QC_ENFORCE ở orchestrator, không ở đây), đo trên
       # video thật rồi siết dần bằng các biến dưới.
@@ -284,7 +282,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@publisher-db:5432/publisher
       GOOGLE_OAUTH_CLIENT_SECRETS_DIR: /run/secrets/google-oauth
-      # Legacy single-app fallback (CR-012 FR29.3) — used only when the
+      # Legacy single-app fallback — used only when the
       # secrets directory holds no client_secret*.json.
       GOOGLE_OAUTH_CLIENT_ID: ${GOOGLE_OAUTH_CLIENT_ID}
       GOOGLE_OAUTH_CLIENT_SECRET: ${GOOGLE_OAUTH_CLIENT_SECRET}
@@ -307,7 +305,7 @@ services:
     volumes:
       - shared_artifacts:/shared:ro
       # Read-only: the Publisher only ever reads client secrets, and a
-      # compromised container must not be able to rewrite them (CR-012 FR35.2).
+      # compromised container must not be able to rewrite them.
       - ./secrets:/run/secrets/google-oauth:ro
     networks:
       - backend
@@ -341,12 +339,12 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@orchestrator-db:5432/orchestrator
       OUTBOX_POLL_INTERVAL_MS: "500"
       DATABASE_MAX_CONNS: "10"
-      # CR-040 FR111 — prompts, the 1a/1b/1c chain and every language-model call
+      # Prompts, the 1a/1b/1c chain and every language-model call
       # live in authoring-service. The orchestrator reaches it only for the topic
       # search, list summaries, a fork's copy and cleanup after a delete.
       AUTHORING_SERVICE_URL: http://authoring-service:8000
       AUTHORING_SERVICE_TIMEOUT_SECONDS: ${AUTHORING_SERVICE_TIMEOUT_SECONDS:-10}
-      # CR-021 Quyết định #3 — cổng chặn publish, TẮT ở giai đoạn đầu.
+      # Cổng chặn publish của QC, TẮT ở giai đoạn đầu.
       #
       # Tắt không có nghĩa là QC không chạy: báo cáo vẫn được chấm đầy đủ và
       # vẫn mang severity thật, chỉ là lỗi blocking không chặn đăng video. Đây
@@ -372,7 +370,7 @@ services:
     networks:
       - backend
 
-  # CR-040 FR111 — the prompt library, the 1a/1b/1c authoring chain, metadata and
+  # The prompt library, the 1a/1b/1c authoring chain, metadata and
   # short-script suggestions, and the LLM usage log. Own database; project data
   # (status, settings, formats, journal) is read from the orchestrator over HTTP.
   authoring-service-db:
@@ -408,10 +406,10 @@ services:
       HIVE_MODEL: ${HIVE_MODEL:-deepseek-ai/deepseek-v4.1-flash}
       HIVE_MAX_INPUT_CHARS: ${HIVE_MAX_INPUT_CHARS:-120000}
       HIVE_MAX_OUTPUT_TOKENS: ${HIVE_MAX_OUTPUT_TOKENS:-128000}
-      # CR-044 — library drawings are checked and previewed by rendering.
+      # Library drawings are checked and previewed by rendering.
       RENDERING_URL: http://rendering:8000
       RENDERING_TIMEOUT_SECONDS: ${RENDERING_TIMEOUT_SECONDS:-240}
-      # CR-045 — drawings the illustrations step draws at once.
+      # Drawings the illustrations step draws at once.
       ILLUSTRATION_DRAW_CONCURRENCY: ${ILLUSTRATION_DRAW_CONCURRENCY:-4}
     deploy:
       resources:
@@ -430,7 +428,7 @@ services:
     networks:
       - backend
 
-  # CR-039 — the only service that talks to a language model. Hive and Ollama
+  # The only service that talks to a language model. Hive and Ollama
   # are both called through the OpenAI SDK (Ollama via its /v1 endpoint). It
   # also runs the chunked code pipeline: layout/cast, shots in parallel, merge,
   # compile check (rendering), repair.
@@ -451,7 +449,7 @@ services:
       CODE_CHUNK_SHOTS: ${CODE_CHUNK_SHOTS:-3}
       CODE_CHUNK_CONCURRENCY: ${CODE_CHUNK_CONCURRENCY:-10} # every chunk of a typical video at once
       CODE_REPAIR_MAX_ROUNDS: ${CODE_REPAIR_MAX_ROUNDS:-3}
-      # CR-048: dừng sớm một lượt gọi đã suy nghĩ quá N ký tự mà chưa viết chữ nào (0 = tắt)
+      # Dừng sớm một lượt gọi đã suy nghĩ quá N ký tự mà chưa viết chữ nào (0 = tắt)
       CODE_MAX_REASONING_CHARS: ${CODE_MAX_REASONING_CHARS:-60000} # mọi lượt gọi bước code (layout/cast/chunk/repair)
       CHAT_MAX_REASONING_CHARS: ${CHAT_MAX_REASONING_CHARS:-0} # /v1/chat (bước 1a/1b suy nghĩ dài là bình thường)
       RENDERING_URL: http://rendering:8000

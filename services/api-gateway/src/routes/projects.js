@@ -19,15 +19,15 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 /**
  * `GET /v1/projects`, `GET /v1/projects/:id`, `GET /v1/voice-calibration` and
  * `POST /v1/projects/:id/retry` → Orchestrator Service.
- * `GET /v1/projects/:id/qc-report` → Orchestrator Service (CR-021 FR61.2).
- * `POST/GET /v1/projects/:id/clips` → Orchestrator Service (CR-007 D7).
+ * `GET /v1/projects/:id/qc-report` → Orchestrator Service.
+ * `POST/GET /v1/projects/:id/clips` → Orchestrator Service.
  * `GET /v1/projects/:id/clips/:name/:preset` streams one generated clip from the shared volume.
  * `GET /v1/projects/:id/video` streams the assembled video from the shared volume.
  * `POST /v1/projects/:id/suggest-metadata` drafts SEO title/description/tags via Ollama —
  * proxied through `orchestratorAiClient` (a longer timeout than the default
  * 30s, since local LLM generation can take up to ~2 minutes).
  * `POST /v1/short-script-suggestions` drafts a standalone Shorts/TikTok
- * script via Ollama (CR-026 FR71) — same `orchestratorAiClient`, no :id.
+ * script via Ollama — same `orchestratorAiClient`, no :id.
  * `POST /v1/projects/:id/thumbnail` (multipart, field "thumbnail", max 2MB,
  * jpeg/png) saves a manually-uploaded thumbnail to the shared volume;
  * `GET /v1/projects/:id/thumbnail` serves it back for preview.
@@ -43,19 +43,19 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
  */
 function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, authoringClient, authoringAiClient) {
   const router = express.Router();
-  // CR-040 FR111: authoring routes (prompts, the 1a/1b/1c artefacts, generate,
+  // Authoring routes (prompts, the 1a/1b/1c artefacts, generate,
   // chain, progress, suggestions) belong to authoring-service. Falling back to
   // the orchestrator client keeps a gateway without AUTHORING_SERVICE_URL working
   // against the old single-service layout (and the route tests simple).
   const authoring = authoringClient || orchestratorClient;
   const authoringAi = authoringAiClient || authoringClient || orchestratorAiClient || orchestratorClient;
   router.get('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-028 FR83.1/FR83.2 — the project row is created at wizard step 1
+  // The project row is created at wizard step 1
   // (topic entry), not at POST /v1/sagas/render, so authoring state written
   // from step 1 on always has a real project to hang off of.
   router.post('/v1/projects', proxyHandler(orchestratorClient, 'orchestrator'));
   router.patch('/v1/projects/:id/topic', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-028 FR84.3 — read-only history of every authoring field overwrite.
+  // read-only history of every authoring field overwrite.
   router.get('/v1/projects/:id/authoring/history', proxyHandler(authoring, 'authoring-service'));
   // Append-only trace of failed runs (project_errors column).
   router.get('/v1/projects/:id/errors', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -63,10 +63,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   // cross-project feed the "Nhật ký" screen reads.
   router.get('/v1/projects/:id/events', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/events', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-016 FR43.2 — tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
+  // Tốc độ đọc đo được của từng giọng, để ước lượng thời lượng
   // lúc soạn khớp với giọng Creator thực sự dùng.
   router.get('/v1/voice-calibration', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-019 FR51.3/51.5 — hình dạng video: đọc danh sách, và lưu bản đã sửa
+  // Hình dạng video: đọc danh sách, và lưu bản đã sửa
   // thành một phiên bản mới (không bao giờ ghi đè).
   router.get('/v1/formats', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/formats', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -77,7 +77,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   // fork a project into a new one starting again at an earlier step.
   router.post('/v1/projects/:id/cancel', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/fork', proxyHandler(orchestratorClient, 'orchestrator'));
-  // CR-024 FR69.2/69.3 — hai lối ra khỏi cổng duyệt dàn ý.
+  // Hai lối ra khỏi cổng duyệt dàn ý.
   router.post('/v1/projects/:id/approve', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/reject', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/narration', proxyHandler(orchestratorClient, 'orchestrator'));
@@ -85,22 +85,22 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/clips/:name/:preset', clipHandler(orchestratorClient, sharedDir));
-  // CR-025 step 1 — saves the Story Architect output a Creator pasted back
+  // Step 1 — saves the Story Architect output a Creator pasted back
   // after the external-AI round trip.
   router.post('/v1/projects/:id/authoring/story', proxyHandler(authoring, 'authoring-service'));
-  // CR-025 step 2 — same shape, for the Visual Director's pasted storyboard.
+  // Step 2 — same shape, for the Visual Director's pasted storyboard.
   router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(authoring, 'authoring-service'));
-  // CR-025 step 3 — the Manim Engineer's pasted code.
+  // Step 3 — the Manim Engineer's pasted code.
   router.post('/v1/projects/:id/authoring/code', proxyHandler(authoring, 'authoring-service'));
-  // CR-025 — rehydrates every saved authoring output (story + storyboard +
+  // Rehydrates every saved authoring output (story + storyboard +
   // code) so the wizard can restore state on reload/back-navigation.
   router.get('/v1/projects/:id/authoring', proxyHandler(authoring, 'authoring-service'));
-  // CR-027 FR79 — cách làm bước 1 (copy tay / gọi API), nhớ theo project nên
+  // Cách làm bước 1 (copy tay / gọi API), nhớ theo project nên
   // mở lại ở máy khác hay sau khi restart vẫn đúng chế độ đã chọn.
   router.put('/v1/projects/:id/authoring/mode', proxyHandler(authoring, 'authoring-service'));
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
   router.put('/v1/projects/:id/authoring/models', proxyHandler(authoring, 'authoring-service'));
-  // CR-050 Unit 2 — the code step's segments: list, one segment's prompt for an
+  // The code step's segments: list, one segment's prompt for an
   // outside AI, paste/hand-edit one segment, shots per segment. Short calls
   // (the prompt and the paste check go to llm-service without a model call);
   // running segments goes through the chain above.
@@ -112,7 +112,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   // "Tiếp tục" gửi confirm để sang bước 3.
   router.patch('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
   // Records which wizard screen a draft was left on, so "Chi tiết" reopens there.
-  // CR-027 FR78 — chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
+  // Chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
   // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
   // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
   // Live progress of the run above (streamed reply size + phase), polled by the GUI.
@@ -131,7 +131,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(authoringAi, 'authoring-service'),
   );
-  // CR-026 FR71 — same longer-timeout client as suggest-metadata: drafting a
+  // Same longer-timeout client as suggest-metadata: drafting a
   // whole script via the local model takes longer than a title/description.
   // No :id in the path (unlike suggest-metadata) — a Creator can draft a
   // short from a bare topic without an existing project.
@@ -145,7 +145,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/music', musicUpload.single('music'), musicUploadHandler(sharedDir));
   router.get('/v1/projects/:id/music/info', musicInfoHandler(sharedDir));
   router.get('/v1/projects/:id/music', musicServeHandler(sharedDir));
-  // CR-040 FR116.3 — one progress endpoint for every long call. The delete saga
+  // One progress endpoint for every long call. The delete saga
   // (`delete:<project_id>`) is the orchestrator's; everything else is a
   // suggestion running in authoring-service.
   const toAuthoring = proxyHandler(authoring, 'authoring-service');

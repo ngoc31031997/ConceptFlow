@@ -9,10 +9,10 @@ import (
 )
 
 // TestEstimateNarrationDuration_MatchesSharedVectors khoá bản Go với bản
-// TypeScript trong web-gui (CR-016 FR42.2).
+// TypeScript trong web-gui.
 //
 // Cùng một con số được dùng ở hai nơi: ở GUI để Creator thấy trước lúc soạn, và
-// ở đây để định thời lượng thật khi tắt TTS (CR-001). Nếu hai bản trôi khỏi
+// ở đây để định thời lượng thật khi tắt TTS. Nếu hai bản trôi khỏi
 // nhau thì con số hiển thị lúc soạn khác con số hệ thống thực sự dùng — loại
 // sai lệch không ai truy ra được từ triệu chứng.
 func TestEstimateNarrationDuration_MatchesSharedVectors(t *testing.T) {

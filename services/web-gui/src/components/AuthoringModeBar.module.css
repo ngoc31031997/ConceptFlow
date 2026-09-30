@@ -81,7 +81,7 @@
 
 .stepper {
   display: grid;
-  /* One row of four steps (3–6); Hình minh hoạ is a dimmed "Không dùng" cell on Manim (CR-051). */
+  /* One row of four steps (3–6); Hình minh hoạ is a dimmed "Không dùng" cell on Manim. */
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 10px;
@@ -112,7 +112,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* CR-051: a step the chain does not run (Hình minh hoạ on a Manim video) —
+/* A step the chain does not run (Hình minh hoạ on a Manim video) —
    dimmed and struck through, as the step rail shows it. */
 .stepItem_skipped {
   opacity: 0.45;
@@ -287,7 +287,7 @@
   border-top: 1px dashed var(--surface-border);
 }
 
-/* CR-045 — the chain stopped for drawing review: a sentence and a way there. */
+/* The chain stopped for drawing review: a sentence and a way there. */
 .waitingRow {
   display: flex;
   align-items: center;
@@ -295,7 +295,7 @@
   gap: var(--space-xs);
 }
 
-/* CR-048 T8/T9 — non-blocking warnings from the storyboard step: a bordered
+/* Non-blocking warnings from the storyboard step: a bordered
    box with a warning-coloured edge, left-aligned like the status lines. */
 .warnings {
   width: 100%;

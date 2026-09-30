@@ -54,3 +54,7 @@ When implementing:
 
 ## Web UI / UX design rules
 - Any UI task must follow `docs/ux-ui-design-rules.md` (screen flow order, etc.). Read it before changing or adding a screen.
+
+## Code standards and documentation comments
+- Every code change must follow `docs/code-standards-rules.md`. Read it before writing code.
+- Comments and docstrings document what the code does and why it is built that way today; they never carry CR/FR/ticket numbers, change history or "used to / no longer" notes. That history belongs in git, `aidlc-docs/` and the ADRs (a short `See ADR-00NN.` is allowed).

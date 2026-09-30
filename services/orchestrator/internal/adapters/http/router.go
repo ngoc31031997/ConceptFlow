@@ -52,7 +52,7 @@ type cancelStepUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.CancelStepOutput, error)
 }
 
-// channelAssetsUseCase backs the two CR-023 correction endpoints. Normalize
+// channelAssetsUseCase backs the two channel-asset endpoints. Normalize
 // only publishes an AMQP command (no HTTP call to video-assembly); Preview
 // only reads Orchestrator's own channel_asset_pointers projection.
 type channelAssetsUseCase interface {
@@ -60,14 +60,14 @@ type channelAssetsUseCase interface {
 	Preview(ctx context.Context) ([]domain.ChannelAssetPointer, error)
 }
 
-// createProjectDraftUseCase backs CR-028 FR83.1's POST /v1/projects — the
+// createProjectDraftUseCase backs POST /v1/projects — the
 // project row is created here, at wizard step 1, instead of at
 // POST /v1/sagas/render.
 type createProjectDraftUseCase interface {
 	Execute(ctx context.Context, input application.CreateProjectDraftInput) (*application.CreateProjectDraftOutput, error)
 }
 
-// updateProjectTopicUseCase backs CR-028 FR83.2's PATCH
+// updateProjectTopicUseCase backs PATCH
 // /v1/projects/{id}/topic.
 type updateProjectTopicUseCase interface {
 	Execute(ctx context.Context, input application.UpdateProjectTopicInput) (*application.UpdateProjectTopicOutput, error)
@@ -95,11 +95,11 @@ type projectStore interface {
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 	List(ctx context.Context) ([]domain.ProjectSummary, error)
 	Delete(ctx context.Context, projectID string) error
-	// The three below serve authoring-service's internal reads (CR-040 FR111).
+	// The three below serve authoring-service's internal reads.
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 	GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error)
 	GetVoiceCalibration(ctx context.Context, voiceID string) (domain.VoiceCalibration, error)
-	// Save persists the Creator's clip selections (CR-007 D7's POST
+	// Save persists the Creator's clip selections (POST
 	// /v1/projects/{id}/clips) — a plain field update, not a use case, since
 	// it only stores intent and never triggers anything by itself (merged into
 	// generate_clips's request list at dispatch time instead).
@@ -134,7 +134,7 @@ type Router struct {
 	createProjectDraft createProjectDraftUseCase
 	updateProjectTopic updateProjectTopicUseCase
 	// authored says which authoring artefacts a draft holds — that lives in
-	// authoring-service now (CR-040 FR111). nil = none known.
+	// authoring-service now. nil = none known.
 	authored authoredContentReader
 }
 
@@ -263,7 +263,7 @@ func (rt *Router) handleCancel(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"step": string(out.Step), "status": string(out.Status)})
 }
 
-// WithProjectDrafts attaches CR-028's early-draft use cases, enabling
+// WithProjectDrafts attaches the early-draft use cases, enabling
 // POST /v1/projects and PATCH /v1/projects/{project_id}/topic.
 func (rt *Router) WithProjectDrafts(createProjectDraft createProjectDraftUseCase, updateProjectTopic updateProjectTopicUseCase) *Router {
 	rt.createProjectDraft = createProjectDraft
@@ -279,15 +279,15 @@ func (rt *Router) WithWizard(saveSettings patchWizardSettingsUseCase) *Router {
 }
 
 // WithQCReports attaches the QC report store, enabling
-// GET /v1/projects/{project_id}/qc-report (CR-021 FR61.1/FR61.2). Without it
-// the route answers 404, the same way the CR-023 routes do when unwired.
+// GET /v1/projects/{project_id}/qc-report. Without it
+// the route answers 404, the same way the channel-asset routes do when unwired.
 func (rt *Router) WithQCReports(qcReports qcReportReader) *Router {
 	rt.qcReports = qcReports
 	return rt
 }
 
 // NewRouter constructs the Router with its dependencies (module-structure.md).
-// channelAssets may be nil in tests that do not exercise CR-023's routes.
+// channelAssets may be nil in tests that do not exercise the channel-asset routes.
 func NewRouter(startRenderSaga startRenderSagaUseCase, startPublishSaga startPublishSagaUseCase, retryStep retryStepUseCase, projects projectStore, reviewOutline reviewOutlineUseCase, channelAssets channelAssetsUseCase) *Router {
 	return &Router{startRenderSaga: startRenderSaga, startPublishSaga: startPublishSaga, retryStep: retryStep, projects: projects, reviewOutline: reviewOutline, channelAssets: channelAssets}
 }
@@ -306,7 +306,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/sagas/render", rt.handleStartRenderSaga)
 	r.Post("/v1/sagas/publish", rt.handleStartPublishSaga)
 	r.Get("/v1/projects", rt.handleListProjects)
-	// CR-028 FR83/FR84/FR85: the project row now exists from wizard step 1.
+	// The project row now exists from wizard step 1.
 	r.Post("/v1/projects", rt.handleCreateProjectDraft)
 	r.Patch("/v1/projects/{project_id}/topic", rt.handleUpdateProjectTopic)
 	r.Get("/v1/voice-calibration", rt.handleVoiceCalibration)
@@ -326,18 +326,18 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/projects/{project_id}/qc-report", rt.handleQCReport)
 	r.Post("/v1/projects/{project_id}/clips", rt.handleCreateClip)
 	r.Get("/v1/projects/{project_id}/clips", rt.handleListClips)
-	// CR-025: prompt wording moved to the DB. Public read (web-gui's wizard
+	// Prompt wording moved to the DB. Public read (web-gui's wizard
 	// fetches the current template at runtime); admin list/update (the
 	// PromptSettingsPage editor). No auth guard exists on this router today —
 	// same "add plainly, don't invent auth" posture the plan called for; see
 	// the router_test.go note and the final report's followup item.
-	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
-	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether
+	// The prompt with every {{variable}} already filled in.
+	// Run a step with the API, and tell the GUI whether
 	// that option exists at all before it draws the button.
 	r.Get("/v1/projects/{project_id}/errors", rt.handleListProjectErrors)
 	r.Get("/v1/projects/{project_id}/events", rt.handleListProjectEvents)
 	r.Get("/v1/events", rt.handleListRecentEvents)
-	// CR-027 FR79 — the step-1 working mode, remembered per project.
+	// The step-1 working mode, remembered per project.
 	r.Patch("/v1/projects/{project_id}/settings", rt.handlePatchWizardSettings)
 	return r
 }
@@ -436,9 +436,8 @@ func (rt *Router) handleStartPublishSaga(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusCreated, sagaStartedResponse{SagaID: out.SagaID, Status: string(out.Status)})
 }
 
-// handleCreateProjectDraft backs CR-028 FR83.1 — POST /v1/projects, called
-// by wizard step 1 as soon as the Creator finishes typing a topic. Replaces
-// the client-generated UUID ProjectDraftContext used to keep locally.
+// handleCreateProjectDraft backs POST /v1/projects, called by wizard step 1
+// as soon as the Creator finishes typing a topic.
 func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Request) {
 	if rt.createProjectDraft == nil {
 		writeError(w, http.StatusNotFound, "project drafts are not enabled")
@@ -474,10 +473,10 @@ func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Reques
 	})
 }
 
-// handleUpdateProjectTopic backs CR-028 FR83.2 — PATCH
+// handleUpdateProjectTopic backs PATCH
 // /v1/projects/{project_id}/topic, called when the Creator returns to step 1
 // and edits the topic of a draft they already created. 409s once render has
-// started (FR84.2 — same lock as the authoring saves).
+// started (same lock as the authoring saves).
 func (rt *Router) handleUpdateProjectTopic(w http.ResponseWriter, r *http.Request) {
 	if rt.updateProjectTopic == nil {
 		writeError(w, http.StatusNotFound, "project drafts are not enabled")
@@ -531,7 +530,7 @@ func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) 
 }
 
 // handleListProjects serves the whole list, or one page of it when the
-// request carries ?page (CR-054: page, page_size, filter, steps).
+// request carries ?page (page, page_size, filter, steps).
 func (rt *Router) handleListProjects(w http.ResponseWriter, r *http.Request) {
 	query, paged, err := parseProjectListQuery(r.URL.Query())
 	if err != nil {
@@ -588,7 +587,7 @@ func parseProjectListQuery(v url.Values) (domain.ProjectListQuery, bool, error) 
 
 func (rt *Router) handleDeleteProject(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
-	// CR-040 FR114.2: the delete saga answers 202 — the project disappears once
+	// The delete saga answers 202 — the project disappears once
 	// every service has removed its own files.
 	if rt.deleteProject != nil {
 		if err := rt.deleteProject.Execute(r.Context(), projectID); err != nil {
@@ -610,7 +609,7 @@ type deleteProgressReader interface {
 	Progress(ctx context.Context, projectID string) (application.DeleteProgress, error)
 }
 
-// handleGetOperation serves GET /v1/operations/{id} (CR-040 FR116.3) for the
+// handleGetOperation serves GET /v1/operations/{id} for the
 // operations the orchestrator owns: `delete:<project_id>` is the delete saga,
 // reported as done/total purge owners. Anything else is authoring-service's.
 func (rt *Router) handleGetOperation(w http.ResponseWriter, r *http.Request) {
@@ -654,7 +653,7 @@ func (rt *Router) handleRetry(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleNormalizeChannelAsset triggers video-assembly to normalize a
-// Creator-uploaded intro/outro file (CR-023 correction, FR65.1). api-gateway
+// Creator-uploaded intro/outro file. api-gateway
 // has already written the file to the shared volume and computed its hash;
 // this handler only publishes the normalize_channel_asset AMQP command — it
 // never calls video-assembly over HTTP (no such server exists).
@@ -684,8 +683,7 @@ func (rt *Router) handleNormalizeChannelAsset(w http.ResponseWriter, r *http.Req
 		return
 	}
 	// asset_role tells video-assembly whether file_path is the sting clip or
-	// its music bed (FR66.5). Absent means "video", the only thing this
-	// endpoint used to accept.
+	// its music bed. Absent means "video".
 	role := req.AssetRole
 	if role == "" {
 		role = application.AssetRoleVideo
@@ -714,7 +712,7 @@ func (rt *Router) handleNormalizeChannelAsset(w http.ResponseWriter, r *http.Req
 }
 
 // handleChannelAssetPreview serves Orchestrator's own channel_asset_pointers
-// projection (CR-023 correction, FR67.4's data half — no HTTP call to
+// projection (no HTTP call to
 // video-assembly, whose full channel_assets table Orchestrator never sees).
 func (rt *Router) handleChannelAssetPreview(w http.ResponseWriter, r *http.Request) {
 	if rt.channelAssets == nil {
@@ -739,8 +737,8 @@ func (rt *Router) handleChannelAssetPreview(w http.ResponseWriter, r *http.Reque
 	writeJSON(w, http.StatusOK, map[string]interface{}{"assets": out})
 }
 
-// handleQCReport serves the project's latest automated QC report
-// (CR-021 FR61.1) — what FR61.2's ResultPage renders above the publish button.
+// handleQCReport serves the project's latest automated QC report —
+// what the GUI's ResultPage renders above the publish button.
 //
 // A project that was never scored answers 200 with status "not_scored" and no
 // findings, rather than 404. The GUI needs to draw something either way, and
@@ -789,14 +787,14 @@ func (rt *Router) handleQCReport(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleCreateClip stores a Creator-entered vertical-clip selection (CR-007
-// FR19.2/D3/D7) — {name, start_seconds, end_seconds, presets}. It only saves
+// handleCreateClip stores a Creator-entered vertical-clip selection —
+// {name, start_seconds, end_seconds, presets}. It only saves
 // intent onto Project.ClipRequests; the actual cut happens later, when the
 // Render Saga reaches generate_clips and merges this list with whatever the
-// script's `with self.clip(...)` calls produced (D3 — a matching name here
+// script's `with self.clip(...)` calls produced (a matching name here
 // wins over the script one).
 //
-// Each requested preset is validated independently (FR19.6/19.7): a segment
+// Each requested preset is validated independently: a segment
 // that does not fit "short" is rejected for that preset alone and reported in
 // rejected_presets, while any preset that does fit is still saved and
 // reported in accepted_presets. Only when EVERY preset is rejected does this
@@ -841,7 +839,7 @@ func (rt *Router) handleCreateClip(w http.ResponseWriter, r *http.Request) {
 		writeUseCaseError(w, err)
 		return
 	}
-	// Upsert by name (D3): a Creator refining the same clip's timing sends
+	// Upsert by name: a Creator refining the same clip's timing sends
 	// another POST with the same name rather than accumulating duplicates.
 	clipRequests := make([]map[string]interface{}, 0, len(project.ClipRequests)+1)
 	for _, existing := range project.ClipRequests {
@@ -871,7 +869,7 @@ func (rt *Router) handleCreateClip(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleListClips serves the outcome of generate_clips (CR-007 D7/FR20.1) —
+// handleListClips serves the outcome of generate_clips —
 // what the results screen offers for download. An empty list (not 404) when
 // the saga has not reached generate_clips yet, or when a project predates
 // this CR: "nothing generated yet" is a normal state, not a missing resource.
@@ -898,7 +896,7 @@ func writeUseCaseError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusConflict, err.Error())
 	// 409 rather than 422: nothing about the request is malformed, the project
 	// is simply in a state that does not allow publishing yet — and the message
-	// tells the Creator the one field that changes that (CR-021 FR61.3).
+	// tells the Creator the one field that changes that.
 	case errors.Is(err, domain.ErrQCBlocked):
 		writeErrorCode(w, http.StatusConflict, err.Error(), ErrorCodeQCBlocked)
 	default:
@@ -921,7 +919,7 @@ func writeJSON(w http.ResponseWriter, status int, body interface{}) {
 }
 
 // handleVoiceCalibration serves the measured reading rate of every voice that
-// has enough samples (CR-016 FR43.2).
+// has enough samples.
 //
 // The Web GUI uses it to make the authoring-time estimate match what the
 // Creator's own voice actually does, instead of a constant that was never
@@ -944,8 +942,7 @@ func (rt *Router) handleVoiceCalibration(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusOK, map[string]interface{}{"words_per_minute": out})
 }
 
-// handleListFormats serves the video formats the Creator can pick from
-// (CR-019 FR51.3).
+// handleListFormats serves the video formats the Creator can pick from.
 func (rt *Router) handleListFormats(w http.ResponseWriter, r *http.Request) {
 	formats, err := rt.projects.ListVideoFormats(r.Context())
 	if err != nil {
@@ -955,7 +952,7 @@ func (rt *Router) handleListFormats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]interface{}{"formats": formats})
 }
 
-// handleSaveFormat stores a format as a new version (CR-019 FR51.5).
+// handleSaveFormat stores a format as a new version.
 //
 // Cloning and editing is the same operation as creating: post a format with a
 // new id to clone, or with an existing id to add a version to it. There is no
@@ -988,12 +985,12 @@ func (rt *Router) handleSaveFormat(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, saved)
 }
 
-// handleApproveOutline releases a saga waiting at the review gate (CR-024 FR69.2).
+// handleApproveOutline releases a saga waiting at the review gate.
 func (rt *Router) handleApproveOutline(w http.ResponseWriter, r *http.Request) {
 	rt.handleReviewDecision(w, r, rt.reviewOutline.Approve)
 }
 
-// handleRejectOutline ends the saga so the Creator can go and edit (FR69.3).
+// handleRejectOutline ends the saga so the Creator can go and edit.
 func (rt *Router) handleRejectOutline(w http.ResponseWriter, r *http.Request) {
 	rt.handleReviewDecision(w, r, rt.reviewOutline.Reject)
 }
@@ -1011,7 +1008,7 @@ func (rt *Router) handleReviewDecision(w http.ResponseWriter, r *http.Request, d
 	case errors.Is(err, application.ErrNotAwaitingReview):
 		// 409 rather than 400: nothing about the request is malformed, the
 		// project has simply moved on. Approving twice lands here, which is
-		// what makes the second press harmless (FR69.4).
+		// what makes the second press harmless.
 		writeError(w, http.StatusConflict, "project is not awaiting review")
 	default:
 		writeError(w, http.StatusInternalServerError, "could not record the decision")
@@ -1019,7 +1016,7 @@ func (rt *Router) handleReviewDecision(w http.ResponseWriter, r *http.Request, d
 }
 
 // handleEditNarration rewrites one narration line while the project waits at
-// the review gate (CR-024 FR70).
+// the review gate.
 func (rt *Router) handleEditNarration(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	if rt.reviewOutline == nil {
@@ -1097,7 +1094,7 @@ func enumPtr[T ~string](s *string) *T {
 	return &v
 }
 
-// --- internal API for authoring-service (CR-040 FR111) ----------------------
+// --- internal API for authoring-service ----------------------
 
 // handleInternalGetProject returns the whole Project — the settings, script and
 // chapters the prompt renderer and the metadata suggester read.

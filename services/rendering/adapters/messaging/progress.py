@@ -1,4 +1,4 @@
-"""Progress publisher for long-running renders (CR-003 FR11.4).
+"""Progress publisher for long-running renders.
 
 Rendering is the only Python service that publishes progress directly. Every
 other step is short enough that the Orchestrator's own step-level "completed"

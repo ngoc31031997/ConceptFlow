@@ -27,9 +27,9 @@ const fixture = JSON.parse(
 };
 
 describe("estimateNarrationDuration khớp bản Go", () => {
-  // Cùng một con số được dùng ở hai nơi: ở đây để Creator thấy trước lúc soạn
-  // (CR-016 FR42), và ở Orchestrator để định thời lượng thật khi tắt TTS
-  // (CR-001). Bộ vector này là thứ giữ hai bản không trôi khỏi nhau.
+  // Cùng một con số được dùng ở hai nơi: ở đây để Creator thấy trước lúc soạn,
+  // và ở Orchestrator để định thời lượng thật khi tắt TTS.
+  // Bộ vector này là thứ giữ hai bản không trôi khỏi nhau.
   it.each(fixture.vectors)("$why", ({ text, language, expected_seconds }) => {
     expect(estimateNarrationDuration(text, language)).toBeCloseTo(expected_seconds, 6);
   });
@@ -47,7 +47,7 @@ describe("countWords", () => {
   });
 });
 
-describe("WPM đã hiệu chỉnh (FR43)", () => {
+describe("WPM đã hiệu chỉnh", () => {
   it("giọng đọc nhanh hơn cho ra thời lượng ngắn hơn", () => {
     const text = "một hai ba bốn năm sáu bảy tám chín mười";
     expect(estimateNarrationDuration(text, "vi", 200)).toBeLessThan(

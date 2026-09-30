@@ -1,11 +1,11 @@
-"""Đo đạc cho QC (CR-021 LLD D4) — TOÀN BỘ I/O nằm ở đây.
+"""Đo đạc cho QC — TOÀN BỘ I/O nằm ở đây.
 
 `domain/qc_rules.py` là hàm thuần và không được biết ffmpeg tồn tại; module này
 là chỗ duy nhất chạy tiến trình con để lấy số đo, rồi trả về dict thuần đưa
 thẳng vào luật.
 
 Mọi hàm ở đây **không ném**: một phép đo hỏng trả None/`{}` và luật tương ứng
-im lặng bỏ qua. FR61.4 — cổng QC hỏng không được biến thành cổng khoá. Việc
+im lặng bỏ qua: cổng QC hỏng không được biến thành cổng khoá. Việc
 phân biệt "chấm được nhưng không có finding" với "không chấm được" là của
 handler, dựa trên `probe_video()['ok']`.
 """
@@ -40,7 +40,7 @@ def _run(cmd: list[str], timeout_seconds: int) -> subprocess.CompletedProcess | 
 def measure_loudness(
     video_path: str, timeout_seconds: int = DEFAULT_QC_TIMEOUT_SECONDS
 ) -> float | None:
-    """LUFS tích hợp thật của file cuối (FR60.1).
+    """LUFS tích hợp thật của file cuối.
 
     `loudnorm ... print_format=json` in khối JSON ra STDERR sau mọi log khác —
     lấy khối `{...}` cuối cùng trong stderr chứ không parse cả stderr.
@@ -96,7 +96,7 @@ _PEAK_RE = re.compile(r"Peak_level=\s*(-?[\d.]+|-?inf)", re.IGNORECASE)
 def measure_peak_dbfs(
     video_path: str, timeout_seconds: int = DEFAULT_QC_TIMEOUT_SECONDS
 ) -> float | None:
-    """Peak level (dBFS) qua `astats` (FR60.3). Lấy giá trị LỚN NHẤT trong mọi
+    """Peak level (dBFS) qua `astats`. Lấy giá trị LỚN NHẤT trong mọi
     kênh/khối astats in ra — clipping ở một kênh vẫn là clipping."""
     result = _run(
         [
@@ -122,7 +122,7 @@ def measure_peak_dbfs(
 def probe_publish_attributes(
     video_path: str, timeout_seconds: int = DEFAULT_QC_TIMEOUT_SECONDS
 ) -> dict:
-    """Độ phân giải / framerate / pix_fmt / +faststart của file cuối (FR60.5).
+    """Độ phân giải / framerate / pix_fmt / +faststart của file cuối.
 
     Trả `{}` khi ffprobe không đọc được — handler coi đó là không chấm được.
     """
@@ -206,7 +206,7 @@ def _probe_faststart(video_path: str) -> bool | None:
 def measure_narration_durations(
     narration_segments: list[dict], timeout_seconds: int = DEFAULT_QC_TIMEOUT_SECONDS
 ) -> list[dict]:
-    """Gắn `duration_seconds` thật vào từng đoạn narration cho FR60.2.
+    """Gắn `duration_seconds` thật vào từng đoạn narration cho luật chồng lấn narration.
 
     Tái dùng `_probe_audio_duration` của ffmpeg_assembler (cùng quy ước: file
     không đọc được → 0.0 kèm cảnh báo). 0.0 được bỏ đi thay vì để lại, vì một

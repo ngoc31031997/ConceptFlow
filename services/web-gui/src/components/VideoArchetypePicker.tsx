@@ -28,7 +28,7 @@ interface VideoArchetypePickerProps {
 }
 
 /**
- * CR-041 — chọn kiểu video ngay cạnh chủ đề. Server không lưu kiểu riêng: lựa
+ * Chọn kiểu video ngay cạnh chủ đề. Server không lưu kiểu riêng: lựa
  * chọn được ghi thành "kiểu: X" ở cuối chủ đề, đúng cú pháp prompt Biên kịch
  * vốn đã hiểu, nên đường copy prompt tay và đường "Chạy bằng AI" đều thấy nó
  * mà không cần thêm cột nào. Gõ tay "kiểu: X" vào chủ đề vẫn được, và dropdown

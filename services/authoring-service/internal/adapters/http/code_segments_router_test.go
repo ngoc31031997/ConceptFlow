@@ -13,7 +13,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// fakeCodeSegments is the generate use case with the CR-050 segment side.
+// fakeCodeSegments is the generate use case with the code-segment side.
 type fakeCodeSegments struct {
 	fakeGenerateAuthoring
 	opts     application.CodeRunOptions
@@ -153,7 +153,7 @@ func (f *fakeChain) State(string) (application.ChainState, bool) {
 }
 func (f *fakeChain) Cancel(string) bool { return false }
 
-// CR-050: the panel's segment re-run and fresh run start the server chain.
+// The panel's segment re-run and fresh run start the server chain.
 func TestChainStartCarriesCodeRunOptions(t *testing.T) {
 	ch := &fakeChain{}
 	rt := newGenerateRouter(nil).WithAuthoringChain(ch)

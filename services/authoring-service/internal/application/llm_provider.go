@@ -7,11 +7,11 @@ import (
 )
 
 // LLMProviderPort is the one way the application talks to a large language
-// model (CR-027 FR76.1). One adapter implements it: the llm-service client
-// (CR-039), which is the only thing that talks to Hive or Ollama.
+// model. One adapter implements it: the llm-service client,
+// which is the only thing that talks to Hive or Ollama.
 //
-// Deliberately narrower than either adapter's own surface. The CR-014/CR-026
-// use cases keep their task-shaped ports (MetadataSuggesterPort,
+// Deliberately narrower than either adapter's own surface. The metadata and
+// short-script use cases keep their task-shaped ports (MetadataSuggesterPort,
 // ShortScriptSuggesterPort) with their own prompts and response shapes; this
 // one carries a prompt and hands back text, because the authoring pipeline's
 // prompts already live in the database and the caller assembles them.
@@ -27,14 +27,13 @@ type ChatRequest struct {
 	User   string
 	// MaxTokens caps the response. Generous by default — a reasoning model
 	// spends part of this budget thinking before it writes a single
-	// character of the answer (CR-027 D13).
+	// character of the answer.
 	MaxTokens   int
 	Temperature float64
 	// Model overrides the adapter's own configured model (HIVE_MODEL) for
-	// this one call — the model-per-step picker at wizard step 1 (follow-up
-	// to CR-027). "" means "use the adapter's default", so every caller that
-	// predates this field, and every project that never touched the picker,
-	// keeps behaving exactly as before.
+	// this one call — the model-per-step picker at wizard step 1.
+	// "" means "use the adapter's default", for every caller that does not set
+	// it and every project that never touched the picker.
 	Model string
 	// OnProgress, when set, is called as the reply streams in with running
 	// totals — a provider that cannot stream simply never calls it. It runs on
@@ -57,8 +56,7 @@ type ChatResult struct {
 }
 
 // TokenUsage is the measured cost of one call, written to llm_usage so the
-// Creator can see spend in the web GUI instead of on a provider dashboard
-// (CR-027 FR82).
+// Creator can see spend in the web GUI instead of on a provider dashboard.
 //
 // ReasoningTokens is broken out rather than folded into CompletionTokens
 // because it is not free: glm-5.3-flash spent 66 of 122 completion tokens
@@ -75,8 +73,8 @@ type TokenUsage struct {
 	CompletionTokens int
 	ReasoningTokens  int
 	CachedTokens     int
-	// ReasoningChars is the reasoning text llm-service counted on the stream
-	// (CR-056), known even when the provider sent no usage record.
+	// ReasoningChars is the reasoning text llm-service counted on the stream,
+	// known even when the provider sent no usage record.
 	ReasoningChars int
 	// UsageMissing: the provider sent no usage record (a stream cut short, a
 	// failed call), so the token counts above are not what was billed.
@@ -84,7 +82,7 @@ type TokenUsage struct {
 }
 
 // LLMErrorKind classifies a failed call so the GUI can tell the Creator what
-// to actually do about it (CR-027 FR76.6 / D11). Lumping these together as
+// to actually do about it. Lumping these together as
 // "the AI failed" sends them looking in the wrong place — the fix for a dead
 // key and the fix for an exhausted token budget have nothing in common.
 type LLMErrorKind string
@@ -101,7 +99,7 @@ const (
 	// ErrKindTimeout — no answer inside the configured timeout.
 	ErrKindTimeout LLMErrorKind = "timeout"
 	// ErrKindBudget — stopped on length with NOTHING written. On a reasoning
-	// model this means the whole allowance went on thinking (CR-027 D13):
+	// model this means the whole allowance went on thinking:
 	// measured, glm-5.3-flash with max_tokens=5 returned empty content and a
 	// filled reasoning_content. The fix is a bigger budget, not a new prompt.
 	ErrKindBudget LLMErrorKind = "budget"
@@ -115,7 +113,7 @@ const (
 	// ErrKindNotConfigured — no provider is available (no API key).
 	ErrKindNotConfigured LLMErrorKind = "not_configured"
 	// ErrKindCheckFailed — the code pipeline finished and saved the script, but
-	// it still fails the compile check after the last repair round (CR-039).
+	// it still fails the compile check after the last repair round.
 	ErrKindCheckFailed LLMErrorKind = "check_failed"
 )
 

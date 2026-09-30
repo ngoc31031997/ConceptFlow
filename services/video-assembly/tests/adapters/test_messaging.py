@@ -113,7 +113,7 @@ async def test_enqueues_success_event_to_outbox_and_acks(shared_volume_root) -> 
 
 @pytest.mark.asyncio
 async def test_caption_path_is_carried_into_the_video_assembled_event(shared_volume_root) -> None:
-    """CR-015 FR38.4: caption_path travels through the outbox event the same
+    """caption_path travels through the outbox event the same
     way video_path does, so the Orchestrator can pick it up downstream."""
     caption_path = str(shared_volume_root / "project-1" / "video" / "final.srt")
     handler, pool = _build_handler(FakeVideoAssembler(caption_path=caption_path))
@@ -177,9 +177,8 @@ class RecordingVideoAssembler(VideoAssemblerPort):
 
 @pytest.mark.asyncio
 async def test_missing_subtitle_mode_in_payload_defaults_to_burn_in(shared_volume_root) -> None:
-    """A command already sitting in the queue when CR-015 ships carries no
-    subtitle_mode key at all — it must keep producing exactly what it
-    produced before (burn-in), not silently switch to a caption track."""
+    """A command with no subtitle_mode key is burned in, not silently switched
+    to a caption track."""
     assembler = RecordingVideoAssembler()
     handler, _ = _build_handler(assembler)
     message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
@@ -204,7 +203,7 @@ async def test_subtitle_mode_in_payload_is_passed_through(shared_volume_root) ->
 
 @pytest.mark.asyncio
 async def test_assemble_video_resolves_intro_asset_id_into_the_request(shared_volume_root) -> None:
-    """CR-023 D2: intro_asset_id on the command is opaque — this handler must
+    """intro_asset_id on the command is opaque — this handler must
     resolve it via ChannelAssetsRepository into the real video_path/duration
     the assembler needs."""
     pool = FakePool()
@@ -271,7 +270,7 @@ async def test_skips_reprocessing_duplicate_message_id(shared_volume_root) -> No
     assert len(pool.store.outbox_events) == 0
 
 
-# --- CR-023: channel_asset_rendered / normalize_channel_asset -------------
+# --- channel_asset_rendered / normalize_channel_asset ---------------------
 
 
 class FakeProbeCompletedProcess:
@@ -350,7 +349,7 @@ async def test_normalize_channel_asset_registers_and_publishes_normalized_event(
 async def test_normalize_channel_asset_skips_rebuild_on_matching_source_hash(
     shared_volume_root,
 ) -> None:
-    """FR65.6: building twice with the same source_hash for the same
+    """Building twice with the same source_hash for the same
     (kind, render_quality) must not re-transcode or publish a second
     channel_asset_normalized — the second call is a no-op."""
     handler, pool = _build_normalize_handler()
@@ -399,7 +398,7 @@ def make_normalize_music_envelope(
     source_hash: str = "music-hash-1",
     render_quality: str = "1080p60",
 ) -> bytes:
-    """Same command, asset_role="music" (FR66.5) — file_path is the bed, not
+    """Same command, asset_role="music" — file_path is the bed, not
     a clip."""
     envelope = json.loads(
         make_normalize_envelope(
@@ -433,7 +432,7 @@ async def test_normalize_music_without_an_active_video_asset_registers_nothing()
 
 @pytest.mark.asyncio
 async def test_normalize_music_muxes_into_the_active_video_asset(shared_volume_root) -> None:
-    """FR66.5 / D5: the bed is baked into the clip at build time, producing a
+    """The bed is baked into the clip at build time, producing a
     new version whose music_path is the uploaded file and whose duration is
     the clip's (the music must never lengthen the sting)."""
     handler, pool = _build_normalize_handler()
@@ -461,7 +460,7 @@ async def test_normalize_music_muxes_into_the_active_video_asset(shared_volume_r
 
 @pytest.mark.asyncio
 async def test_normalize_music_skips_remux_on_matching_music_hash(shared_volume_root) -> None:
-    """FR65.6 for the music half — cached against music_source_hash, not the
+    """The music half is cached against music_source_hash, not the
     video's source_hash."""
     handler, pool = _build_normalize_handler()
 
@@ -529,7 +528,7 @@ def _build_rendered_handler() -> tuple[RegisterChannelAssetCommandHandler, FakeP
 
 @pytest.mark.asyncio
 async def test_channel_asset_rendered_registers_for_the_rendered_quality_only() -> None:
-    """FR65.5: one asset per quality. Rendering names the quality it actually
+    """One asset per quality. Rendering names the quality it actually
     rendered at, and only that row may be registered — a 1080p60 outro
     registered as the 4k60 one would fail the concat at assembly time."""
     handler, pool = _build_rendered_handler()
@@ -581,7 +580,7 @@ async def test_channel_asset_rendered_is_idempotent_on_duplicate_message_id() ->
     assert len(pool.store.outbox_events) == 1
 
 
-# --- qc_video (CR-021 FR59/FR60/FR61.4) --------------------------------------
+# --- qc_video ------------------------------------------------------------------
 
 
 def make_qc_envelope(
@@ -689,7 +688,7 @@ async def test_qc_video_reports_findings_for_a_frame_overflowing_video(
     assert payload["status"] == QC_STATUS_HAS_FINDINGS
     assert payload["reason"] is None
     assert any(f["rule"] == "frame_overflow" for f in payload["findings"])
-    assert all("timestamp_seconds" in f for f in payload["findings"])  # FR59.6
+    assert all("timestamp_seconds" in f for f in payload["findings"])
 
 
 @pytest.mark.asyncio
@@ -728,7 +727,7 @@ async def test_qc_video_reports_passed_for_a_clean_video(shared_volume_root, mon
 async def test_qc_video_missing_layout_marks_is_not_scored_not_failed(
     shared_volume_root, monkeypatch
 ) -> None:
-    """FR61.4 — a project with no layout_marks (e.g. an older render) still
+    """A project with no layout_marks (e.g. an older render) still
     produces qc_completed, never a failure event, and the reason explains
     why nothing was scored."""
     video_path = str(shared_volume_root / "final.mp4")
@@ -752,7 +751,7 @@ async def test_qc_video_missing_layout_marks_is_not_scored_not_failed(
 async def test_qc_video_ffmpeg_error_is_not_scored_not_failed(
     shared_volume_root, monkeypatch
 ) -> None:
-    """FR61.4 — a technical ffmpeg failure (e.g. loudnorm probe blowing up)
+    """A technical ffmpeg failure (e.g. loudnorm probe blowing up)
     must not produce a qc_failed event; there is no such event. It still
     publishes qc_completed with status=not_scored."""
     video_path = str(shared_volume_root / "final.mp4")
@@ -807,7 +806,7 @@ async def test_qc_video_marks_message_processed_and_is_idempotent(
 async def test_qc_video_reports_real_severity_regardless_of_enforcement(
     shared_volume_root, monkeypatch
 ) -> None:
-    """LLD D5: báo cáo luôn mang severity thật. Service này không đọc
+    """Báo cáo luôn mang severity thật. Service này không đọc
     QC_ENFORCE — cổng chặn là của orchestrator, nên chế độ chỉ-báo vẫn phải
     nhìn thấy được finding nào sẽ chặn khi bật cổng."""
     video_path = str(shared_volume_root / "final.mp4")

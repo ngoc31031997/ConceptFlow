@@ -1,10 +1,10 @@
-"""ConceptFlow — bề mặt API mà script video được phép dùng (CR-017).
+"""ConceptFlow — bề mặt API mà script video được phép dùng.
 
 Script của Creator mở đầu bằng `from conceptflow import *`, không phải
 `from manim import *`. Danh sách `__all__` dưới đây **chính là whitelist** mà
-lint (CR-017 FR46.1) đối chiếu: mọi thứ ngoài đây bị coi là API thô của Manim.
+lint đối chiếu: mọi thứ ngoài đây bị coi là API thô của Manim.
 
-Đường thoát hiểm (FR45.5): `from manim import ...` vẫn dùng được khi component
+Đường thoát hiểm: `from manim import ...` vẫn dùng được khi component
 không đủ diễn đạt. Lint cảnh báo chứ không chặn — thư viện chặn được cả những
 video tham vọng nhất thì nó đang làm hại chứ không giúp.
 """
@@ -51,7 +51,7 @@ __all__ = [
     "get",
     "register",
     "available",
-    # Hình học khung an toàn (cũng dùng cho QC — CR-021)
+    # Hình học khung an toàn (cũng dùng cho QC)
     "Box",
     "safe_area",
     "overflow",

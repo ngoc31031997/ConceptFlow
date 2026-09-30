@@ -12,13 +12,13 @@ import (
 )
 
 type fakeIllustrationRepo struct {
-	mu      sync.Mutex // CR-045: the illustrations step draws several at once
+	mu      sync.Mutex // the illustrations step draws several at once
 	folders []domain.IllustrationFolder
 	rows    map[string]domain.Illustration
 	png     map[string][]byte
 	pv      map[string]int
 	next    int
-	// CR-052: the projects using a drawing, by drawing id, as the database
+	// The projects using a drawing, by drawing id, as the database
 	// would find them (drawing list link or code naming it); linked are the
 	// ones that link it in their drawing list.
 	users  map[string][]IllustrationUser

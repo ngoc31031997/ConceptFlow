@@ -6,7 +6,7 @@ import { Button } from "./ui";
 import styles from "./IllustrationsGateNote.module.css";
 
 /**
- * CR-045 — on the Code tab of a Remotion video: where its drawings stand, and a
+ * On the Code tab of a Remotion video: where its drawings stand, and a
  * way to the illustrations step. Running Code with AI waits for every drawing
  * to be approved or skipped, so the Creator sees that here before pressing it.
  */

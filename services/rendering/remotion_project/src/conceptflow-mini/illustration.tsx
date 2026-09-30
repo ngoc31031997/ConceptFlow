@@ -1,10 +1,10 @@
 /**
- * conceptflow-mini/illustration — a kit of flat, story-book style drawings
- * (CR-043): people, body parts, food, household objects, scene backdrops.
+ * conceptflow-mini/illustration — a kit of flat, story-book style drawings:
+ * people, body parts, food, household objects, scene backdrops.
  *
- * Why it exists: a generated script used to draw every picture from raw SVG
- * primitives, so a video about tooth decay showed circles and arrows instead
- * of a tooth. A model that has to invent the path of a molar on the fly
+ * Why it exists: a generated script that draws every picture from raw SVG
+ * primitives shows circles and arrows instead of a tooth in a video about
+ * tooth decay. A model that has to invent the path of a molar on the fly
  * produces something that is either abstract or ugly; a model that picks
  * <Tooth decay={0.6} /> gets a drawing that was designed once and reviewed.
  *
@@ -31,7 +31,7 @@ import {AbsoluteFill, useCurrentFrame} from 'remotion';
 
 // --- shared ------------------------------------------------------------------
 
-// Exported, with the helpers below, for the library's own figures (CR-044):
+// Exported, with the helpers below, for the library's own figures:
 // a drawing added through the review screen reuses the same box, face, blink
 // and shading, so it is drawn by the same hand as the built-in kit.
 export const INK = '#3A1F4B';

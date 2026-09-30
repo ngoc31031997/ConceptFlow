@@ -1,4 +1,4 @@
-"""Unit tests cho từng luật QC (CR-021 FR59/FR60).
+"""Unit tests cho từng luật QC.
 
 Mỗi luật có ít nhất một case ĐẠT và một case KHÔNG ĐẠT, dữ liệu dựng sẵn — đúng
 mục Kiểm chứng của CR. Luật là hàm thuần nên không cần file, ffmpeg hay pool.
@@ -59,7 +59,7 @@ def test_frame_constants_match_manim_defaults() -> None:
     assert FRAME_WIDTH == pytest.approx(8.0 * 16 / 9)
 
 
-# --- FR59.1 tràn khung --------------------------------------------------------
+# --- tràn khung ---------------------------------------------------------------
 
 
 def test_frame_overflow_passes_for_a_box_inside_the_safe_area() -> None:
@@ -70,7 +70,7 @@ def test_frame_overflow_flags_a_box_outside_the_manim_frame() -> None:
     findings = check_frame_overflow([mark(text(-9.0, -7.5, 1.0, 0.0))], T)
     assert [f.rule for f in findings] == ["frame_overflow"]
     assert "tràn ra ngoài khung" in findings[0].message
-    assert findings[0].timestamp_seconds == 12.5  # FR59.6
+    assert findings[0].timestamp_seconds == 12.5
 
 
 def test_frame_overflow_flags_a_box_intruding_on_the_safe_margin() -> None:
@@ -81,20 +81,20 @@ def test_frame_overflow_flags_a_box_intruding_on_the_safe_margin() -> None:
 
 
 def test_frame_overflow_ignores_transparent_mobjects() -> None:
-    """Đã FadeOut nhưng chưa remove — bbox còn, mắt không thấy (LLD Rủi ro)."""
+    """Đã FadeOut nhưng chưa remove — bbox còn, mắt không thấy."""
     faded = text(-9.0, -7.5, 1.0, 0.0, opacity=0.0)
     assert check_frame_overflow([mark(faded)], T) == []
 
 
 def test_frame_overflow_is_always_reported_as_blocking() -> None:
-    """Quyết định #1: tràn khung là blocking. Severity không đổi theo chế độ —
-    chế độ chỉ-báo tồn tại để ĐẾM xem luật này kêu đúng bao nhiêu, nên nó phải
-    nhìn thấy được severity thật trong báo cáo (LLD D5)."""
+    """Tràn khung là blocking. Severity không đổi theo chế độ — chế độ chỉ-báo
+    tồn tại để ĐẾM xem luật này kêu đúng bao nhiêu, nên nó phải nhìn thấy được
+    severity thật trong báo cáo."""
     boxes = [mark(text(-9.0, -7.5, 1.0, 0.0))]
     assert check_frame_overflow(boxes, QCThresholds())[0].severity == SEVERITY_BLOCKING
 
 
-# --- FR59.2 chồng lấn ---------------------------------------------------------
+# --- chồng lấn ----------------------------------------------------------------
 
 
 def test_text_overlap_passes_for_boxes_that_do_not_touch() -> None:
@@ -128,7 +128,7 @@ def test_text_overlap_tolerates_a_brushing_touch_below_the_ratio() -> None:
     assert check_text_overlap([scene], T) == []
 
 
-# --- FR59.3 chữ quá nhỏ -------------------------------------------------------
+# --- chữ quá nhỏ --------------------------------------------------------------
 
 
 def test_font_size_to_pixels_matches_the_manim_frame_mapping() -> None:
@@ -146,8 +146,8 @@ def test_text_too_small_flags_tiny_text() -> None:
 
 
 def test_text_too_small_accounts_for_the_export_resolution() -> None:
-    """Cùng cỡ chữ: đạt ở 1080p, không đạt ở 720p (FR59.3 nói rõ 'ở độ phân
-    giải xuất')."""
+    """Cùng cỡ chữ: đạt ở 1080p, không đạt ở 720p (ngưỡng tính ở độ phân
+    giải xuất)."""
     marks = [mark(text(-1, 1, 1, 0, font_size=20.0))]
     assert check_text_too_small(marks, "1080p60", T) == []
     assert len(check_text_too_small(marks, "720p30", T)) == 1
@@ -157,7 +157,7 @@ def test_text_too_small_skips_mobjects_without_a_font_size() -> None:
     assert check_text_too_small([mark(text(-1, 1, 1, 0, font_size=None))], "1080p60", T) == []
 
 
-# --- FR59.4 tương phản --------------------------------------------------------
+# --- tương phản ---------------------------------------------------------------
 
 
 def test_contrast_ratio_extremes() -> None:
@@ -178,7 +178,7 @@ def test_low_contrast_skips_an_unparseable_colour() -> None:
     assert check_low_contrast([mark(text(-1, 1, 1, 0, color=None))], T) == []
 
 
-# --- FR59.5 hình chết ---------------------------------------------------------
+# --- hình chết ----------------------------------------------------------------
 
 
 def test_static_frame_passes_for_closely_spaced_narration() -> None:
@@ -192,7 +192,7 @@ def test_static_frame_flags_a_long_gap() -> None:
     assert findings[0].timestamp_seconds == 0.0
 
 
-# --- FR60.2 chồng lấn narration ----------------------------------------------
+# --- chồng lấn narration -----------------------------------------------------
 
 
 def test_narration_overlap_passes_when_each_clip_ends_before_the_next_starts() -> None:
@@ -226,7 +226,7 @@ def test_narration_overlap_is_always_reported_as_blocking() -> None:
     assert check_narration_overlap(segments, T)[0].severity == SEVERITY_BLOCKING
 
 
-# --- FR60.4 cue phụ đề --------------------------------------------------------
+# --- cue phụ đề ---------------------------------------------------------------
 
 
 def test_subtitle_cue_overlap_passes_for_sequential_cues() -> None:
@@ -247,7 +247,7 @@ def test_subtitle_cue_overlap_flags_overlapping_cues() -> None:
     assert findings[0].timestamp_seconds == 2.0
 
 
-# --- FR60.1 LUFS --------------------------------------------------------------
+# --- LUFS ---------------------------------------------------------------------
 
 
 def test_loudness_passes_within_tolerance() -> None:
@@ -263,7 +263,7 @@ def test_loudness_is_skipped_when_nothing_could_be_measured() -> None:
     assert check_loudness(None, T) == []
 
 
-# --- FR60.3 clipping ----------------------------------------------------------
+# --- clipping -----------------------------------------------------------------
 
 
 def test_clipping_passes_below_the_ceiling() -> None:
@@ -274,7 +274,7 @@ def test_clipping_flags_a_peak_at_the_ceiling() -> None:
     assert [f.rule for f in check_clipping(0.0, T)] == ["clipping"]
 
 
-# --- FR60.5 thuộc tính phát hành ---------------------------------------------
+# --- thuộc tính phát hành ----------------------------------------------------
 
 
 GOOD_ATTRIBUTES = {
@@ -291,7 +291,7 @@ def test_publish_attributes_pass_for_a_correctly_encoded_file() -> None:
 
 
 def test_publish_attributes_flag_wrong_resolution_framerate_pixfmt_and_faststart() -> None:
-    """Cả bốn thuộc tính FR60.5 liệt kê, cùng một file hỏng."""
+    """Cả bốn thuộc tính phát hành, cùng một file hỏng."""
     bad = {
         "width": 1280,
         "height": 720,
@@ -308,7 +308,7 @@ def test_publish_attributes_are_skipped_when_ffprobe_read_nothing() -> None:
     assert check_publish_attributes({}, "1080p60", T) == []
 
 
-# --- Ngưỡng đọc từ môi trường (FR61.5) ---------------------------------------
+# --- Ngưỡng đọc từ môi trường -------------------------------------------------
 
 
 def test_thresholds_are_read_from_the_environment() -> None:
@@ -325,7 +325,7 @@ def test_thresholds_are_read_from_the_environment() -> None:
 
 
 def test_an_unparseable_threshold_falls_back_instead_of_breaking_qc() -> None:
-    """FR61.4: một biến gõ sai không được biến cổng QC thành cổng khoá."""
+    """Một biến gõ sai không được biến cổng QC thành cổng khoá."""
     assert QCThresholds.from_env({"QC_MAX_STATIC_SECONDS": "khong-phai-so"}).max_static_seconds == 12.0
 
 

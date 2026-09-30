@@ -1,8 +1,7 @@
 """Abstract port for the TTS Service (module-structure.md, ADR-0002).
 
 The domain/application layers depend only on this abstraction, never on a
-concrete engine — this is what let ADR-0023 add Google alongside the local
-engine, and ADR-0024 replace that local engine with Edge, without touching
+concrete engine, so engines can be added or replaced without touching
 business logic.
 """
 

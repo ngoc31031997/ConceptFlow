@@ -66,7 +66,7 @@ def create_v1_router(
                 source_file=app.source_file,
                 redirect_ok=app.accepts_redirect(redirect_uri),
                 # Surfaced up front so the Creator can fix Cloud Console
-                # before being bounced to a Google error page (FR30.3).
+                # before being bounced to a Google error page.
                 redirect_uri_hint=None if app.accepts_redirect(redirect_uri) else redirect_uri,
             )
             for app in app_registry.list()
@@ -120,7 +120,7 @@ def create_v1_router(
             )
         except RedirectUriNotRegisteredError as exc:
             # 400 with the exact URI to register, instead of forwarding the
-            # Creator to Google's redirect_uri_mismatch page (FR30.2).
+            # Creator to Google's redirect_uri_mismatch page.
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         redirect = RedirectResponse(authorization_url, status_code=302)
@@ -170,7 +170,7 @@ def create_v1_router(
 
 def _select_app(app_registry: OAuthAppRegistryPort, client_id: str | None):
     """Resolves the ?app= parameter, defaulting to the only app when just
-    one is configured so the single-app setup needs no picker (FR34.2)."""
+    one is configured so the single-app setup needs no picker."""
     apps = app_registry.list()
     if not apps:
         raise HTTPException(
@@ -198,7 +198,7 @@ def _select_app(app_registry: OAuthAppRegistryPort, client_id: str | None):
 
 def create_health_router(is_ready: callable) -> APIRouter:
     """Unversioned /health endpoint — infra concern, not part of the
-    public v1 API contract (mirror Content Plugin Service)."""
+    public v1 API contract."""
     router = APIRouter()
 
     @router.get("/health", include_in_schema=False)

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Long-lived layout checker (CR-048 T6b). The compile check
+ * Long-lived layout checker. The compile check
  * (services/rendering/adapters/rendering/layout_checker.py) starts it once and
  * keeps it: the harness bundle and the browser are paid for at start-up, and
  * each check then costs a fresh page, the script's compile and the measuring.

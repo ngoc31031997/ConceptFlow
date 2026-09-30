@@ -37,7 +37,7 @@ export interface IllustrationsSummary {
 }
 
 /**
- * CR-044/045 — the drawings this Remotion video needs, on the illustrations
+ * The drawings this Remotion video needs, on the illustrations
  * step. Running the step (here or from the chain) plans the list from the
  * storyboard and draws what is missing, several at once on the server; each
  * drawing in flight shows its own progress. The code step waits until every
@@ -59,7 +59,7 @@ export function ProjectIllustrationsPanel({
   const [fixNote, setFixNote] = useState<{ id: string; text: string; n: number } | null>(null);
   const [bust, setBust] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
-  // CR-050 FR-17: the list was planned from an older storyboard.
+  // The list was planned from an older storyboard.
   const [stale, setStale] = useState(false);
   // A chain (this step, or the whole pipeline) runs on the server and fills this list.
   const run = useAuthoringRun();
@@ -237,7 +237,7 @@ export function ProjectIllustrationsPanel({
                         Duyệt
                       </Button>
                     )}
-                    {/* CR-052: a Hình mẫu is read-only like the kit. */}
+                    {/* A Hình mẫu is read-only like the kit. */}
                     {!ill.builtin && !ill.exemplar && (
                       <Button variant="ghost" onClick={() => setOpenId(r.id)} data-testid={`pi-edit-${r.name}`}>
                         Sửa / Vẽ lại

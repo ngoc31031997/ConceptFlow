@@ -19,8 +19,8 @@ type PromptRenderContextPort interface {
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
 }
 
-// VoiceCalibrationPort returns what a voice has actually been measured doing
-// (CR-016). The measurement is only trusted after enough samples; see
+// VoiceCalibrationPort returns what a voice has actually been measured doing.
+// The measurement is only trusted after enough samples; see
 // domain.VoiceCalibration.WordsPerMinute.
 type VoiceCalibrationPort interface {
 	GetVoiceCalibration(ctx context.Context, voiceID string) (domain.VoiceCalibration, error)
@@ -33,16 +33,10 @@ type FormatLookupPort interface {
 	GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error)
 }
 
-// RenderPromptUseCase fills a role's template with this project's data
-// (CR-027 FR77).
+// RenderPromptUseCase fills a role's template with this project's data.
 //
-// This used to happen in the browser: scriptPrompts.ts substituted the
-// variables into the template web-gui had fetched. That left the server
-// unable to produce a prompt, which FR78's generate endpoints need to do —
-// and it meant the only copy of the substitution logic lived in a place the
-// server could not reach.
-//
-// One renderer serves both paths. The Copy-prompt button and the Run-with-AI
+// Rendering happens on the server so the run-a-step-with-AI endpoints can
+// produce a prompt. One renderer serves both paths. The Copy-prompt button and the Run-with-AI
 // button must send identical text to the model; two implementations would
 // let them drift on the same role with nothing in either output to show it.
 // PromptActivePort is the one read the renderer needs from the prompt library.
@@ -55,7 +49,7 @@ type RenderPromptUseCase struct {
 	projects    PromptRenderContextPort
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
-	archetypes  ArchetypeListPort // optional (CR-041); nil renders {{video_archetypes}} empty
+	archetypes  ArchetypeListPort // optional; nil renders {{video_archetypes}} empty
 }
 
 // ArchetypeListPort is the one read the renderer needs from the archetype table.
@@ -103,13 +97,11 @@ type RenderedPrompt struct {
 }
 
 // TopicPlaceholder is what {{topic}} becomes when the project has no topic
-// saved — every project created before CR-027 D0. Identical to the string
-// web-gui has always shown, so an old project's prompt reads exactly as it
-// did before.
+// saved. Identical to the placeholder web-gui shows.
 const TopicPlaceholder = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]"
 
 // RoleFor maps a pipeline step to the prompt role, which depends on the
-// project's render engine (CR-027 D4).
+// project's render engine.
 //
 // This lives on the server on purpose. web-gui currently works it out in two
 // separate pages, and a third copy in a third place is how the Remotion and
@@ -134,7 +126,7 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 	}
 }
 
-// AIRoleFor is RoleFor for the AI flow (CR-039): the story step is shared, the
+// AIRoleFor is RoleFor for the AI flow: the story step is shared, the
 // storyboard step asks for JSON, and the code step asks for shot functions
 // only. The manual (Copy) flow keeps using RoleFor.
 func AIRoleFor(step string, renderEngine string) (domain.PromptRole, error) {
@@ -155,7 +147,7 @@ func AIRoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 
 // Execute renders the prompt for one role of one project.
 //
-// CR-030 — không còn tham số lintResults: {{lint_results}} chỉ tồn tại cho
+// Không còn tham số lintResults: {{lint_results}} chỉ tồn tại cho
 // bước duyệt (Script Reviewer), mà bước đó đã bị bỏ khỏi sản phẩm.
 func (uc *RenderPromptUseCase) Execute(
 	ctx context.Context, projectID string, role domain.PromptRole,
@@ -281,7 +273,7 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 		// The storyboard is not in the system prompt: llm-service hands each
 		// call its own slice of it, and the whole document only to the layout call.
 		//
-		// CR-048 T3 — nor is the whole outline. This text is the system prompt
+		// Nor is the whole outline. This text is the system prompt
 		// of every chunk and repair call, and each of those user turns already
 		// carries its shots' invariant/narration/visual; the beats, candidate
 		// situations and word counts only give the model more to reason about.

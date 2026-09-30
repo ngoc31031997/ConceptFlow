@@ -125,7 +125,7 @@
 
 /*
   Settings that belong to the toggle right above them. Indenting and boxing
-  them makes the ownership visible, so a toggle and its options no longer read
+  them makes the ownership visible, so a toggle and its options do not read
   as two unrelated blocks.
 */
 .nested {

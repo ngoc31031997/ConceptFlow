@@ -1,25 +1,19 @@
 /**
  * Kiểm tra script ngay lúc soạn, trước khi gửi đi render.
  *
- * Sau CR-018 đây **không còn là bài toán đếm khớp**. Trước kia lời thoại là
- * comment `# NARRATION:` còn điểm chờ là `self.wait(AUTO)`, hai thứ tách rời mà
- * số lượng phải bằng nhau tuyệt đối — nên file này tồn tại chủ yếu để bắt lỗi
- * lệch đếm, thứ mà chính prompt mô tả là lỗi thường gặp nhất. `self.narrate()`
- * gộp hai thứ làm một, nên lớp lỗi đó biến mất theo cấu trúc và không còn gì
- * để đếm khớp.
+ * Đây **không phải bài toán đếm khớp**: `self.narrate()` gộp lời thoại và
+ * điểm chờ làm một, nên không có gì để đếm khớp.
  *
- * CR-040 FR113.3: kết luận "hợp lệ" là của `rendering` (`validate_script`,
+ * Kết luận "hợp lệ" là của `rendering` (`validate_script`,
  * `script_locator`, `dry_run`). Những gì server đã bắt đúng — thiếu class Scene,
- * thiếu `<Composition id>` / `narrations` — đã bị xóa khỏi đây; chuẩn cũ
- * `# NARRATION` + `self.wait(AUTO)` đã bị gỡ khỏi hệ thống nên cũng không còn
- * được nhắc tới. Ở lại là những gì server không báo trước lúc render.
+ * thiếu `<Composition id>` / `narrations` — không kiểm ở đây. Ở lại là những gì server không báo trước lúc render.
  *
- * Việc còn lại của file này là **cho Creator thấy trước video sẽ dài bao nhiêu**
- * (CR-016 FR42). Con số đó vốn chỉ lộ ra ở bước 3 của Saga, sau khi TTS đã chạy.
+ * Việc còn lại của file này là **cho Creator thấy trước video sẽ dài bao nhiêu**.
+ * Con số đó vốn chỉ lộ ra ở bước 3 của Saga, sau khi TTS đã chạy.
  *
  * Lưu ý: phân tích tĩnh ở đây chỉ thấy các lời gọi `self.narrate("…")` viết
  * thẳng trong script. Lời thoại sinh ra trong vòng lặp hoặc trong hàm helper —
- * hoàn toàn hợp lệ sau CR-018 — không đếm được từ text. Vì vậy đây là **ước
+ * hoàn toàn hợp lệ — không đếm được từ text. Vì vậy đây là **ước
  * lượng tối thiểu**, và chỉ lượt dry bên Rendering mới biết con số thật.
  */
 
@@ -84,10 +78,10 @@ export interface ScriptValidation {
   narrationCount: number;
   isValid: boolean;
   message: string | null;
-  /** Từng đoạn lời thoại tìm thấy, kèm ước lượng thời lượng (FR42.4). */
+  /** Từng đoạn lời thoại tìm thấy, kèm ước lượng thời lượng. */
   narrations: NarrationEstimate[];
   totalWords: number;
-  /** Tổng thời lượng lời thoại. CHƯA gồm thời gian animation (FR42.3). */
+  /** Tổng thời lượng lời thoại. CHƯA gồm thời gian animation. */
   estimatedNarrationSeconds: number;
 }
 

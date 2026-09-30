@@ -15,7 +15,7 @@ interface SubtitleSettingsProps {
 }
 
 /**
- * CR-015 FR41.1: replaces the old on/off toggle. Which delivery is right
+ * Replaces the old on/off toggle. Which delivery is right
  * depends on where the video will be watched (ADR-0027) — YouTube reads a
  * caption track, a short-form platform needs burned-in text — so the choice
  * is spelled out rather than collapsed back into a boolean.
@@ -61,7 +61,7 @@ export function SubtitleSettings({ mode, onModeChange, style, onStyleChange, tts
       </div>
 
       {mode === "both" && (
-        // FR41.3: "both" is a valid choice (e.g. repost target without a
+        // "both" is a valid choice (e.g. repost target without a
         // caption-track upload path) — flagged, not blocked.
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
           Người xem bật phụ đề sẽ thấy chữ bị trùng lặp.

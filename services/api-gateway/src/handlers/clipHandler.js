@@ -4,16 +4,14 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Streams one generated vertical clip from the shared_artifacts volume
- * (CR-007 D7/FR20.1).
+ * Streams one generated vertical clip from the shared_artifacts volume.
  *
  * Mirrors videoHandler's shape: Orchestrator only stores the clip's
- * output_path (video-assembly wrote it there directly, per
- * cr-007-low-level-design.md D5), so this handler asks Orchestrator for the
+ * output_path (video-assembly wrote it there directly), so this handler asks Orchestrator for the
  * project's clip list, finds the one matching :name/:preset, then streams the
  * file from the Gateway's own mount of the same volume. This is deliberately
- * NOT re-slugified here — the LLD flagged two independent slugify
- * implementations (Python in video-assembly, JS here) as a real drift risk,
+ * NOT re-slugified here — two independent slugify implementations
+ * (Python in video-assembly, JS here) would be a real drift risk,
  * so the path comes from Orchestrator's stored output_path instead of being
  * recomputed.
  *

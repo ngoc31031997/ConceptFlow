@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-// CR-050 Unit 2 / ADR-0030 — the code step is stored as segments: the shared
+// The code step is stored as segments (see ADR-0030): the shared
 // frame (LAYOUT for Remotion, cast for Manim) and one segment per chunk of
 // shots. llm-service decides what each segment's fingerprint is; this service
 // keeps the segments so a failed or interrupted run loses nothing already
@@ -24,8 +24,8 @@ const (
 // Where a segment's content came from.
 const (
 	SegmentSourceAI         = "ai"
-	SegmentSourceExternal   = "external" // pasted from an outside AI (FR-5)
-	SegmentSourceManual     = "manual"   // edited by hand (FR-5)
+	SegmentSourceExternal   = "external" // pasted from an outside AI
+	SegmentSourceManual     = "manual"   // edited by hand
 	SegmentSourceStoryboard = "storyboard"
 )
 
@@ -43,7 +43,7 @@ const (
 )
 
 // DefaultChunkShots is how many shots one code segment holds unless the
-// Creator changed it (FR-7, C3b); MaxChunkShots bounds the setting.
+// Creator changed it; MaxChunkShots bounds the setting.
 const (
 	DefaultChunkShots = 3
 	MaxChunkShots     = 10
@@ -69,7 +69,7 @@ type CodeSegment struct {
 }
 
 // CheckDiagnosticRecord is one failed-check finding of a code run, kept for
-// statistics (CR-050 FR-22).
+// statistics.
 type CheckDiagnosticRecord struct {
 	ProjectID  string
 	Engine     string

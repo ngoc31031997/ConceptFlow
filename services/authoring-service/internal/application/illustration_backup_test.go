@@ -253,7 +253,7 @@ func TestImportRefusesFilesThatAreNotALibraryBackup(t *testing.T) {
 	}
 }
 
-// CR-052: the Hình mẫu are Creator data now, so the backup keeps them.
+// The Hình mẫu are Creator data now, so the backup keeps them.
 func TestBackupKeepsTheExemplarsAndRestoresThemAsExemplars(t *testing.T) {
 	src, repo := libraryWithDrawings(t)
 	ctx := context.Background()

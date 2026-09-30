@@ -11,7 +11,7 @@ import (
 // fakeDraftRepo is a minimal in-memory application.ProjectDraftPort, just
 // enough for CreateProjectDraftUseCase's own logic — it does not model
 // FindSimilarTopics collisions beyond "none" since no test here exercises
-// FR85.
+// topic collisions.
 type fakeDraftRepo struct {
 	saved        map[string]*domain.Project
 	topics       map[string]string
@@ -67,7 +67,7 @@ func (f *fakeDraftRepo) SaveRenderEngine(_ context.Context, projectID string, en
 }
 
 // TestCreateProjectDraft_NewProjectDefaultsEngineButRenderEngineOverrides —
-// CR-030: a fresh row starts on DefaultRenderEngine like before, but a
+// A fresh row starts on DefaultRenderEngine like before, but a
 // caller that already knows the Creator's choice (tab 1a's chain, or "/"
 // picking Remotion) gets it persisted in the same call, not only at
 // render-submit time.

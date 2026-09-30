@@ -1,4 +1,4 @@
-"""Code Merger (CR-039 FR103) — deterministic, no LLM.
+"""Code Merger — deterministic, no LLM.
 
 Everything that must agree with the storyboard by construction is generated
 here: the narrations array, the shot list and its order, the composition
@@ -54,7 +54,7 @@ def palette_keys(sb: Storyboard) -> dict[str, str]:
     return {p.role: k for p, k in zip(sb.palette, keys, strict=True)}
 
 
-# CR-043: every component of conceptflow-mini/illustration.tsx. The prompt
+# Every component of conceptflow-mini/illustration.tsx. The prompt
 # tells the model the whole kit is already imported, so the frame imports all
 # of it; rendering/tests/domain/test_illustration_kit.py holds this list to the
 # file's real exports.
@@ -64,7 +64,7 @@ ILLUSTRATION_KIT = (
     "Chair", "Window", "Plant", "House", "Tree", "Sun", "Cloud", "Lightbulb", "Coin", "Book",
     "Phone", "Magnifier", "Mark", "Sparkle", "Airplane", "Bubble",
 )
-# CR-044: the building blocks a library drawing (pasted into the script) uses.
+# The building blocks a library drawing (pasted into the script) uses.
 ILLUSTRATION_HELPERS = (
     "Figure", "Face", "GroundShadow", "useBlink", "phaseOf", "shadeOf", "useSvgId",
     "INK", "SHADE", "BLUSH", "WHITE",
@@ -143,7 +143,7 @@ _TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b")
 
 
 def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
-    """CR-044: the library drawings the shots actually use, pasted into the
+    """The library drawings the shots actually use, pasted into the
     script so it renders without any file beside it. Their imports are the
     frame's own (react, remotion, the illustration kit), so they are dropped;
     `export` is dropped so the only exports stay the frame's."""

@@ -8,10 +8,10 @@ import (
 )
 
 // The channel's illustration style rules and the building blocks a drawing may
-// use (CR-044). The rules are what the AI drawer is held to and what web-gui
+// use. The rules are what the AI drawer is held to and what web-gui
 // shows; rendering/domain/illustration_style.py checks the [S..] rules it can
 // check mechanically. The reference drawings (Hình mẫu) are library rows the
-// Creator picks (CR-052), not text shipped with the image.
+// Creator picks, not text shipped with the image.
 //
 //go:embed prompts/illustration_style_vi.txt
 var illustrationStyleVI string
@@ -26,17 +26,17 @@ func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyl
 func IllustrationHelpers() string { return strings.TrimSpace(illustrationHelpersVI) }
 
 // CodeFinding is one problem found in a drawing's code: a check failure that
-// blocks saving, or a style warning that does not (CR-044).
+// blocks saving, or a style warning that does not.
 type CodeFinding struct {
 	Message string `json:"message"`
 	Line    *int   `json:"line"`
 }
 
-// CR-044: the illustration library. Every drawing the Remotion Engineer may
+// The illustration library. Every drawing the Remotion Engineer may
 // place in a shot is a row here, filed in exactly one folder so the Creator and
 // the matcher find it again instead of drawing it twice.
 //
-// Built-in rows are the CR-043 kit: their code lives in
+// Built-in rows are the illustration kit: their code lives in
 // rendering/remotion_project/src/conceptflow-mini/illustration.tsx and ships
 // with the image, so the row carries only what is needed to find and describe
 // them. Library rows carry their own TSX, drawn by the model or by hand.
@@ -68,9 +68,9 @@ type Illustration struct {
 	Description string   `json:"description"` // what it looks like and when to use it
 	Usage       string   `json:"usage"`       // one-line API: props and box aspect
 	Code        string   `json:"code,omitempty"`
-	// Builtin rows are the CR-043 kit: code ships in the image, Code is empty.
+	// Builtin rows are the illustration kit: code ships in the image, Code is empty.
 	Builtin bool `json:"builtin"`
-	// Exemplar rows are the Hình mẫu the AI drawer learns from (CR-052), filed
+	// Exemplar rows are the Hình mẫu the AI drawer learns from, filed
 	// in ExemplarFolderID. A copy made by "Đặt làm mẫu" carries SourceID (empty
 	// again once its source is deleted); one of the three original exemplars
 	// carries HomeFolderID, where "Bỏ làm mẫu" files it back.
@@ -85,7 +85,7 @@ type Illustration struct {
 	UpdatedAt    string             `json:"updated_at"`
 }
 
-// CR-052 — the Hình mẫu folder and how many drawings it holds at most.
+// The Hình mẫu folder and how many drawings it holds at most.
 const (
 	ExemplarFolderID = "hinh-mau"
 	MaxExemplars     = 5
@@ -168,11 +168,11 @@ func NormalizeTags(tags []string) []string {
 	return out
 }
 
-// SystemIllustrationFolders are the shelves the library starts with (CR-044,
-// agreed with the Creator 2026-09-27). The Creator can add more.
+// SystemIllustrationFolders are the shelves the library starts with. The
+// Creator can add more.
 func SystemIllustrationFolders() []IllustrationFolder {
 	rows := []IllustrationFolder{
-		// CR-052: filled only through "Đặt làm mẫu", never by saving a drawing into it.
+		// Filled only through "Đặt làm mẫu", never by saving a drawing into it.
 		{ID: ExemplarFolderID, Name: "Hình mẫu", Description: "hình mẫu chuẩn AI vẽ học theo (tối đa 5)"},
 		{ID: "con-nguoi", Name: "Con người", Description: "người, nghề nghiệp, nhóm người"},
 		{ID: "dong-vat", Name: "Động vật", Description: "thú, chim, cá, côn trùng"},
@@ -195,7 +195,7 @@ func SystemIllustrationFolders() []IllustrationFolder {
 	return rows
 }
 
-// BuiltinIllustrations are the 34 figures of the CR-043 kit, filed into the
+// BuiltinIllustrations are the 34 figures of the illustration kit, filed into the
 // system folders. Name must match an export of illustration.tsx; the rendering
 // test suite checks the kit against the prompt, and illustration_test.go
 // checks this list against the same prompt text.

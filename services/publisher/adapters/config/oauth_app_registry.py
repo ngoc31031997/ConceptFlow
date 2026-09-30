@@ -1,5 +1,5 @@
 """FileOAuthAppRegistry — implements OAuthAppRegistryPort by scanning a
-directory of client_secret*.json files (ADR-0026, CR-012 FR29).
+directory of client_secret*.json files. See ADR-0026.
 
 Loading from a *directory* rather than numbered env vars
 (GOOGLE_OAUTH_CLIENT_ID_2, _3, ...) is deliberate: Google Cloud Console
@@ -43,8 +43,8 @@ class FileOAuthAppRegistry(OAuthAppRegistryPort):
     @classmethod
     def from_environment(cls) -> FileOAuthAppRegistry:
         """Builds the registry from GOOGLE_OAUTH_CLIENT_SECRETS_DIR, falling
-        back to the pre-CR-012 single-app env vars (FR29.3) so an existing
-        .env keeps working untouched."""
+        back to the legacy single-app env vars so an .env that only sets
+        those keeps working."""
         directory = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRETS_DIR", DEFAULT_SECRETS_DIR)
         apps = cls._load_directory(Path(directory))
 
@@ -83,7 +83,7 @@ class FileOAuthAppRegistry(OAuthAppRegistryPort):
     def _parse_file(path: Path) -> OAuthApp | None:
         """Returns None (with a warning naming the file) for anything
         unusable. A stray or malformed file in the secrets directory must
-        not take the whole Publisher down at startup (FR29.4)."""
+        not take the whole Publisher down at startup."""
         try:
             raw = json.loads(path.read_text())
         except (OSError, json.JSONDecodeError) as exc:
@@ -123,8 +123,7 @@ class FileOAuthAppRegistry(OAuthAppRegistryPort):
             return None
 
         # The legacy env vars carry no redirect_uris list of their own, so
-        # the configured redirect is taken on trust — it is the same single
-        # value the pre-CR-012 code used unconditionally.
+        # the configured redirect is taken on trust.
         redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "")
         return OAuthApp(
             client_id=client_id,

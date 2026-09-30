@@ -16,13 +16,13 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — the drawings one video needs. After the storyboard, a model reads it
+// The drawings one video needs. After the storyboard, a model reads it
 // against the library and lists what can be reused and what must be drawn;
 // each missing drawing goes through the AI drawer; the Creator reviews them;
 // the code step waits until every one is approved or skipped, then hands the
 // approved drawings to the Remotion Engineer.
 //
-// CR-045 — planning and drawing are their own authoring step ("illustrations",
+// Planning and drawing are their own authoring step ("illustrations",
 // between Visual and Code), the list has no size cap, missing drawings are
 // drawn several at a time, and each drawing in flight reports its progress.
 
@@ -50,16 +50,16 @@ func (e *ErrIllustrationsPending) Error() string {
 }
 
 // ErrIllustrationsNotPlanned stops the code step of a Remotion video whose
-// drawing list was never made (CR-045): the illustrations step comes first.
+// drawing list was never made: the illustrations step comes first.
 var ErrIllustrationsNotPlanned = errors.New("chưa lập danh sách hình minh hoạ — hãy chạy bước Hình minh hoạ trước bước Code")
 
 // ErrIllustrationsStale stops the code step when the drawing list was planned
-// from an older storyboard (CR-050 FR-17): the code would be handed the
+// from an older storyboard: the code would be handed the
 // drawings of a storyboard that is no longer there.
 var ErrIllustrationsStale = errors.New("danh sách hình minh hoạ được lập từ storyboard cũ — hãy chạy lại bước Hình minh hoạ trước bước Code")
 
 // ErrIllustrationNotDeletable refuses to delete a drawing that is not this
-// video's own unapproved draft (CR-045).
+// video's own unapproved draft.
 var ErrIllustrationNotDeletable = errors.New("chỉ xoá được hình nháp do chính video này vẽ")
 
 func pendingNames(rows []domain.ProjectIllustration) string {
@@ -82,9 +82,9 @@ type ProjectIllustrationRepoPort interface {
 	ListProjectIllustrations(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error)
 	ReplaceProjectIllustrations(ctx context.Context, projectID string, rows []domain.ProjectIllustration) error
 	UpdateProjectIllustration(ctx context.Context, row domain.ProjectIllustration) error
-	// CR-045: whether the list was ever planned — an empty list can mean
+	// Whether the list was ever planned — an empty list can mean
 	// "this video needs no drawing" or "never planned".
-	// CR-050 FR-17: which storyboard (sha256) the list was planned from.
+	// Which storyboard (sha256) the list was planned from.
 	MarkIllustrationsPlanned(ctx context.Context, projectID, storyboardSHA string) error
 	IllustrationsPlanned(ctx context.Context, projectID string) (bool, error)
 	IllustrationsStoryboardSHA(ctx context.Context, projectID string) (string, error)
@@ -224,7 +224,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 			continue // a draft is not something to reuse yet
 		}
 		if i.IsExemplarCopy() {
-			continue // CR-052: a Hình mẫu copy; its source is in the catalog
+			continue // a Hình mẫu copy; its source is in the catalog
 		}
 		byName[i.Name] = i
 		fmt.Fprintf(&catalog, "- %s — %s — %s — %s\n", i.Name, i.Title, i.FolderID, strings.Join(i.Tags, ", "))
@@ -232,7 +232,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	folderIDs := map[string]bool{}
 	for _, f := range folders {
 		if f.ID == domain.ExemplarFolderID {
-			continue // CR-052: filled only by "Đặt làm mẫu"
+			continue // filled only by "Đặt làm mẫu"
 		}
 		folderIDs[f.ID] = true
 		fmt.Fprintf(&folderText, "- %s — %s — %s\n", f.ID, f.Name, f.Description)
@@ -254,7 +254,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		return nil, err
 	}
 
-	// CR-050 FR-17: re-planning (the storyboard changed) keeps what the old
+	// re-planning (the storyboard changed) keeps what the old
 	// list already has for a name — a drawing, even a draft still waiting for
 	// review, or the Creator's skip — so nothing is drawn or decided twice.
 	previous, err := uc.repo.ListProjectIllustrations(ctx, projectID)
@@ -392,7 +392,7 @@ func (uc *ProjectIllustrationsUseCase) SetSkipped(ctx context.Context, projectID
 		r.State = domain.PISkipped
 	case r.IllustrationID == "":
 		r.State = domain.PIPlanned
-	case r.Illustration != nil && r.Illustration.ReadOnly(): // the kit, or a Hình mẫu (CR-052)
+	case r.Illustration != nil && r.Illustration.ReadOnly(): // the kit, or a Hình mẫu
 		r.State = domain.PIReused
 	default:
 		r.State = domain.PIDrawn
@@ -476,7 +476,7 @@ func (uc *ProjectIllustrationsUseCase) DrawMissing(
 	return ctx.Err()
 }
 
-// Prepare is the illustrations step (CR-045): plan the list when the video has
+// Prepare is the illustrations step: plan the list when the video has
 // none, draw what is missing, and return the rows still waiting for the
 // Creator. Re-running it never re-plans an existing list — "Lập lại danh sách"
 // does that — it only draws what is still planned or failed.
@@ -509,7 +509,7 @@ func (uc *ProjectIllustrationsUseCase) Prepare(
 	return pending, err
 }
 
-// StoryboardSHA fingerprints a saved storyboard (CR-050 FR-17). The saved
+// StoryboardSHA fingerprints a saved storyboard. The saved
 // storyboard is already canonical (storyboard/finalize), so equal content
 // means an equal hash.
 func StoryboardSHA(storyboard string) string {
@@ -518,8 +518,8 @@ func StoryboardSHA(storyboard string) string {
 }
 
 // Stale reports whether the video's drawing list was planned from a storyboard
-// other than the one saved now (CR-050 FR-17). A list planned before CR-050
-// carries no fingerprint: there is no evidence it is stale, so it is not.
+// other than the one saved now. A list with no recorded
+// fingerprint: there is no evidence it is stale, so it is not.
 func (uc *ProjectIllustrationsUseCase) Stale(ctx context.Context, projectID string) (bool, error) {
 	planned, err := uc.repo.IllustrationsStoryboardSHA(ctx, projectID)
 	if err != nil || planned == "" {
@@ -533,7 +533,7 @@ func (uc *ProjectIllustrationsUseCase) Stale(ctx context.Context, projectID stri
 }
 
 // Gate is the code step's check: the rows that still hold it back, and whether
-// the list was planned at all. A list made before CR-045 has rows but no mark.
+// the list was planned at all. A legacy list can have rows but no mark.
 func (uc *ProjectIllustrationsUseCase) Gate(ctx context.Context, projectID string) ([]domain.ProjectIllustration, bool, error) {
 	rows, err := uc.repo.ListProjectIllustrations(ctx, projectID)
 	if err != nil {
@@ -580,7 +580,7 @@ func (uc *ProjectIllustrationsUseCase) DeleteDrawing(ctx context.Context, projec
 
 // ForCode lists the approved drawings with code the Remotion Engineer may use:
 // this video's own first (all of them), then up to maxCodeLibraryDrawings more
-// from the rest of the library (original exemplars included; CR-052 copies are
+// from the rest of the library (original exemplars included; Hình mẫu copies are
 // not, their source is). Kit built-ins are not listed: they are always imported.
 func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID string) ([]LibraryDrawing, error) {
 	rows, err := uc.repo.ListProjectIllustrations(ctx, projectID)

@@ -110,7 +110,7 @@
   display: none;
 }
 
-/* CR-052 — "Hình mẫu (x/5)" above the exemplar tiles. */
+/* "Hình mẫu (x/5)" above the exemplar tiles. */
 .exemplarHead {
   margin: 0;
   font-family: var(--font-display);

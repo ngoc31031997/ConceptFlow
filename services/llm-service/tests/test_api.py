@@ -137,14 +137,14 @@ async def test_code_generate_streams_phases_and_the_final_code(client):
     assert ev[-1]["type"] == "result" and ev[-1]["check_ok"] is True
     assert {"layout", "chunks", "merge", "check"} <= {e["phase"] for e in ev if e["type"] == "phase"}
     assert ev[-1]["status"] == "done" and "const SHOTS" in ev[-1]["code"]
-    # CR-050 FR-21: each billed call is its own event, not a list at the end
+    # Each billed call is its own event, not a list at the end
     assert [e["phase"] for e in ev if e["type"] == "call"] == ["layout", "chunk"] and "calls" not in ev[-1]
     assert [e["key"] for e in ev if e["type"] == "segment_done"] == ["frame", "1.1-1.2"]
     assert ev[0]["type"] == "plan" and [s["key"] for s in ev[0]["segments"]] == ["frame", "1.1-1.2"]
 
 
 async def test_the_v1_code_route_is_gone(client):
-    # CR-056: removed from the backlog of ADR-0030; the code step is /v2 only.
+    # The code step is /v2 only.
     r = await client.post("/v1/code/generate", json={
         "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
     assert r.status_code == 404
@@ -201,7 +201,6 @@ async def test_segment_prompt_and_parse(client):
 
 
 async def test_code_generate_hands_the_subtitle_band_and_font_to_the_layout_check_and_returns_its_warnings():
-    # CR-048 T6b
     cfg = config()
     checker = OkChecker(warnings=["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung"])
     app = create_app(cfg, Providers(cfg), checker)
@@ -248,13 +247,13 @@ async def test_code_generate_stops_a_call_that_only_reasons_past_the_code_limit(
         r = await _client(config(code_max_reasoning_chars=2000)).post("/v2/code/generate", json={
             "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
     ev = events(r)
-    # CR-050: a failed segment is reported and the run ends incomplete, not as an error.
+    # A failed segment is reported and the run ends incomplete, not as an error.
     assert ev[-1]["type"] == "result" and ev[-1]["status"] == "incomplete" and ev[-1]["failed"] == ["frame"]
     [failed] = [e for e in ev if e["type"] == "segment_failed"]
     assert failed["error"]["kind"] == "budget" and "suy nghĩ quá 2000 ký tự" in failed["error"]["message"]
     [call] = [e for e in ev if e["type"] == "call"]
     assert call["phase"] == "layout" and call["error_kind"] == "budget"
-    # CR-056: the stream was cut, so no usage came back; what was counted is sent
+    # The stream was cut, so no usage came back; what was counted is sent
     assert call["usage"]["usage_reported"] is False and call["usage"]["reasoning_chars"] > 2000
     assert route.call_count == 1
 
@@ -314,7 +313,6 @@ def test_for_model_routes_ollama_ids():
 
 @respx.mock
 async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_warnings():
-    # CR-048 T6b
     from app.pipeline.checker import LayoutContext, RenderingChecker
 
     route = respx.post("http://rendering.test/v1/check/remotion").mock(return_value=httpx.Response(200, json={
@@ -330,7 +328,7 @@ async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_wa
         "code": "code", "scene_class_name": "creator",
         "subtitle_band": {"edge": "top", "px": 200}, "video_font": "Montserrat"}
     assert [(d.line, d.kind) for d in res.diagnostics] == [(3, "compile"), (62, "layout"), (4, "compile")]
-    assert [d.rule for d in res.diagnostics] == ["", "text_overflow", ""]  # CR-050 FR-22
+    assert [d.rule for d in res.diagnostics] == ["", "text_overflow", ""]
     assert res.warnings == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
 
     manim = respx.post("http://rendering.test/v1/check/manim").mock(return_value=httpx.Response(200, json={

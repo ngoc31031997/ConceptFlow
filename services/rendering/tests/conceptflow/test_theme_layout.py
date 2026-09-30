@@ -1,8 +1,8 @@
 """Theme và hình học khung an toàn — phần thuần Python của design system.
 
-Không import manim, đúng như `theme.py`/`layout.py`. Đây là chỗ đáng test nhất
-của CR-017: bảng màu và luật "thế nào là tràn khung" là thứ CR-021 sẽ dùng lại
-để chấm QC, nên chúng phải đúng trước khi có bất kỳ khung hình nào được dựng.
+Không import manim, đúng như `theme.py`/`layout.py`. Bảng màu và luật "thế nào
+là tràn khung" được QC dùng lại để chấm, nên chúng phải đúng trước khi có bất kỳ
+khung hình nào được dựng.
 """
 
 import pytest

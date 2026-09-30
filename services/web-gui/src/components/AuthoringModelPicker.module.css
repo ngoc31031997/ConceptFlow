@@ -41,7 +41,7 @@
   color: var(--ink-faint);
 }
 
-/* CR-050: số liệu đo của model ở bước Code, ngay dưới ô chọn. */
+/* Số liệu đo của model ở bước Code, ngay dưới ô chọn. */
 .stats,
 .statsWarn {
   max-width: 260px;

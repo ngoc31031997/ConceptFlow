@@ -9,7 +9,7 @@ const path = require('path');
 const GATEWAY_OWNED_DIRS = ['thumbnail', 'music'];
 
 /**
- * Deletes a project (CR-040 FR114.2). The Orchestrator runs the delete saga:
+ * Deletes a project. The Orchestrator runs the delete saga:
  * it refuses (409) while a step is running, marks the project `deleting`, and
  * has tts/rendering/video-assembly remove their own files before the row goes.
  * Answered 202 — the project disappears from the list at once and is gone for

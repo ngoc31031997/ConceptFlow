@@ -1,5 +1,5 @@
 /**
- * Preview host for one illustration of the library (CR-044).
+ * Preview host for one illustration of the library.
  *
  * Bundled ONCE by illustration_preview.mjs; each preview hands the figure in as
  * input props — already-compiled JavaScript for a library drawing, or the name

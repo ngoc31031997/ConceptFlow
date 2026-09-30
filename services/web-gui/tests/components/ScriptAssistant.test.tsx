@@ -4,7 +4,7 @@ import { ScriptAssistant } from "../../src/components/ScriptAssistant";
 import * as apiClient from "../../src/api/client";
 import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
-// CR-031 — ScriptAssistant chỉ còn một việc: biến code sẵn có thành một
+// ScriptAssistant chỉ còn một việc: biến code sẵn có thành một
 // prompt yêu cầu AI chuẩn hoá nó. Nhánh "ready" cũ (hướng dẫn + nút script
 // mẫu) đã về tab 1c, nơi ô soạn thảo thật sự nằm.
 function renderAssistant(renderEngine: "manim" | "remotion" = "manim") {

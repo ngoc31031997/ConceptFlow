@@ -1,7 +1,7 @@
-"""Numbers for deciding whether the compile check needs its own container (CR-040 FR115).
+"""Numbers for deciding whether the compile check needs its own container.
 
 The check shares a process, CPU limit and event loop with render. Nothing has
-to be split until these numbers say so: FR115.3's trigger is p95 wait above a
+to be split until these numbers say so: the trigger is p95 wait above a
 threshold. Kept in memory and read from GET /metrics/checks — losing them on a
 restart only resets a window, and no metrics stack is needed to read three
 counters.

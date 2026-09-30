@@ -4,7 +4,7 @@ import { OperationProgressCard } from "../../src/components/OperationProgressCar
 import { operationSubtitle, operationErrorLabel } from "../../src/lib/formatProgress";
 
 describe("OperationProgressCard", () => {
-  it("runs indeterminate, without a made-up percentage, when the total is unknown (FR116.4)", () => {
+  it("runs indeterminate, without a made-up percentage, when the total is unknown", () => {
     render(<OperationProgressCard subtitle="AI đang phân tích · 1,2k ký tự · 5s" />);
     const bar = screen.getByRole("progressbar");
     expect(bar).not.toHaveAttribute("aria-valuenow");
@@ -16,7 +16,7 @@ describe("OperationProgressCard", () => {
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "25");
   });
 
-  it("keeps the subtitle and shows the classified error on failure (FR116.5)", () => {
+  it("keeps the subtitle and shows the classified error on failure", () => {
     render(<OperationProgressCard subtitle="AI đang viết · 14,3k ký tự · 2m 5s" error={operationErrorLabel("balance")} />);
     expect(screen.getByText(/14,3k ký tự/)).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("balance");

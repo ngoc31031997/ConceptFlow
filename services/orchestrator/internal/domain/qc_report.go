@@ -2,9 +2,9 @@ package domain
 
 import "time"
 
-// QCStatus is the overall verdict of one automated QC pass (CR-021 D6).
+// QCStatus is the overall verdict of one automated QC pass.
 //
-// `not_scored` is a first-class verdict, not an error: FR61.4 says a QC that
+// `not_scored` is a first-class verdict, not an error: a QC that
 // could not run (marks missing, ffprobe failed) must report that it could not
 // score the video and let the publish proceed. Folding it into "passed" would
 // hide a broken measurement behind a green light; folding it into a failure
@@ -18,17 +18,17 @@ const (
 )
 
 // QC finding severities. Only Blocking is ever capable of stopping a publish,
-// and even then only with QC_ENFORCE on (CR-021 D5 — the indicate-first mode).
+// and even then only with QC_ENFORCE on (indicate-first by default).
 const (
 	QCSeverityBlocking = "blocking"
 	QCSeverityWarning  = "warning"
 )
 
 // QCFinding is one thing the QC pass noticed, shaped exactly as the
-// `qc_completed` event carries it (CR-021 D4).
+// `qc_completed` event carries it.
 //
 // TimestampSeconds is what makes a report actionable rather than a list of
-// complaints: FR61.2's GUI turns it into a click that seeks the <video> to the
+// complaints: the GUI turns it into a click that seeks the <video> to the
 // moment in question.
 type QCFinding struct {
 	Rule             string  `json:"rule"`
@@ -37,10 +37,10 @@ type QCFinding struct {
 	TimestampSeconds float64 `json:"timestamp_seconds"`
 }
 
-// QCReport is one stored QC pass for a project (FR61.1 — machine-readable,
+// QCReport is one stored QC pass for a project (machine-readable,
 // not a log line).
 //
-// OverriddenAt/OverriddenFindings record a deliberate bypass (FR61.3). They
+// OverriddenAt/OverriddenFindings record a deliberate bypass. They
 // live on the report rather than on the project because what matters later is
 // *which* findings were waved through, and that is only meaningful next to the
 // report they came from.

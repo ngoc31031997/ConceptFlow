@@ -1,4 +1,4 @@
-// Package application — cổng duyệt dàn ý (CR-024).
+// Package application — cổng duyệt dàn ý.
 package application
 
 import (
@@ -16,8 +16,7 @@ type resumer interface {
 	ResumeAfterReview(ctx context.Context, project *domain.Project) error
 }
 
-// ReviewOutlineUseCase implements the two ways out of `awaiting_review`
-// (CR-024 FR69.2/FR69.3).
+// ReviewOutlineUseCase implements the two ways out of `awaiting_review`.
 //
 // Until this existed the Render Saga ran start to finish with no place to stop,
 // so the first time the Creator saw what a video says was when they watched the
@@ -46,7 +45,7 @@ func NewReviewOutlineUseCase(
 // ErrNotAwaitingReview is returned when the project is not at the gate.
 //
 // It is deliberately the same answer for "already approved" as for "never got
-// there": approving twice must not start a second run of TTS (FR69.4), and the
+// there": approving twice must not start a second run of TTS, and the
 // status check is the guard that makes that true. No second mechanism is added
 // on top of the step-level one that already exists.
 var ErrNotAwaitingReview = fmt.Errorf("project is not awaiting review")
@@ -65,12 +64,12 @@ func (uc *ReviewOutlineUseCase) Approve(ctx context.Context, projectID string) e
 	return uc.resume.ResumeAfterReview(ctx, project)
 }
 
-// EditNarration rewrites one narration line and re-runs validation (FR70).
+// EditNarration rewrites one narration line and re-runs validation.
 //
 // The edit goes back into the *script*, not into a copy of the outline: the
 // script is what gets rendered, so an outline that drifts from it would be a
 // review of something that never ships. Re-validating afterwards is not
-// optional either (FR70.4) — a corrected line can still bust a beat budget or
+// optional either — a corrected line can still bust a beat budget or
 // contain a symbol TTS will read wrong.
 func (uc *ReviewOutlineUseCase) EditNarration(ctx context.Context, projectID string, sceneIndex int, newText string) error {
 	project, err := uc.repo.Get(ctx, projectID)
@@ -129,10 +128,10 @@ func (uc *ReviewOutlineUseCase) revalidate(ctx context.Context, project *domain.
 	})
 }
 
-// Reject sends the project back to the Creator to edit (FR69.3).
+// Reject sends the project back to the Creator to edit.
 //
 // The saga ends here rather than hanging: a rejected outline means the script
-// is going to change, and a saga waiting on a script that no longer exists is
+// is going to change, and a saga waiting on a script that is being replaced is
 // just a row nobody will ever close.
 func (uc *ReviewOutlineUseCase) Reject(ctx context.Context, projectID string) error {
 	project, err := uc.repo.Get(ctx, projectID)

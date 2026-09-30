@@ -1,9 +1,9 @@
 """AMQP command consumer — handles synthesize_speech from tts.commands
 (interface-contracts.md, ADR-0014).
 
-Revision (ADR-0013): idempotency + event publishing go through the
-Inbox/Outbox pattern (adapters/persistence/), mirroring Content Plugin
-Service — the consumer never publishes to RabbitMQ directly, it only
+Idempotency and event publishing go through the Inbox/Outbox pattern
+(adapters/persistence/, see ADR-0013): the consumer never publishes to
+RabbitMQ directly, it only
 enqueues the event to the Outbox, atomically with marking the message
 processed in the Inbox.
 """
@@ -106,7 +106,7 @@ class SynthesizeSpeechCommandHandler:
             if self._progress is None:
                 return
             # From the worker thread back onto the loop; fire-and-forget so
-            # progress never slows the real work (CR-029).
+            # progress never slows the real work.
             asyncio.run_coroutine_threadsafe(
                 self._progress.publish_scene_progress(project_id, scene_index, scene_total), loop
             )
@@ -139,9 +139,8 @@ class SynthesizeSpeechCommandHandler:
 
 
 class TtsCommandDispatcher:
-    """`tts.commands` carries synthesize_speech and, since CR-040 FR114.2,
-    purge_project_artifacts. Anything without an event_type is the original
-    synthesize_speech shape."""
+    """`tts.commands` carries synthesize_speech and purge_project_artifacts.
+    Anything without an event_type is a synthesize_speech command."""
 
     def __init__(self, synthesize: SynthesizeSpeechCommandHandler, purge=None) -> None:
         self._synthesize = synthesize

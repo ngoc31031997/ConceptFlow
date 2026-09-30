@@ -48,7 +48,7 @@ func TestClient_TopicSimilarSummariesAndDelete(t *testing.T) {
 	if err != nil || sums["p1"].Topic != "t" || !sums["p1"].Story || sums["p1"].Storyboard || sums["p1"].Code {
 		t.Fatalf("summaries = %+v err=%v", sums, err)
 	}
-	// CR-051: the key is read as sent; a typo would read as nil ("ready").
+	// The key is read as sent; a typo would read as nil ("ready").
 	if r := sums["p1"].IllustrationsReady; r == nil || *r {
 		t.Fatalf("illustrations_ready = %v, want false", r)
 	}

@@ -79,7 +79,7 @@ export function ManimEngineerStepPage() {
     .filter((part) => part.trim().length > 0)
     .join("\n\n---\n\n");
 
-  // CR-040 FR113: the server fills the template from the draft — no prompt text
+  // The server fills the template from the draft — no prompt text
   // is assembled in the browser.
   const rendered = useRenderedPrompt({
     role: engineerRole,
@@ -123,7 +123,7 @@ export function ManimEngineerStepPage() {
   const validation = isRemotion ? validateRemotionScript(code) : validateScript(code, draft.voiceLanguage);
   const isEmpty = code.trim().length === 0;
   const isValid = !isEmpty && validation.isValid;
-  // CR-031 — tình huống "Đã có code" vào thẳng tab này. Trước đây nó có màn
+  // Tình huống "Đã có code" vào thẳng tab này. Trước đây nó có màn
   // riêng ở "/" kèm ScriptAssistant; giờ trợ lý đó sống ở đây, cạnh đúng ô
   // soạn thảo mà kết quả của nó phải được dán vào.
   const hasOwnCode = draft.scriptSource === "code";
@@ -179,15 +179,15 @@ export function ManimEngineerStepPage() {
         ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
         : validation.message;
 
-  // CR-027 FR79 — cùng lựa chọn chế độ với các bước soạn 3–5.
+  // Cùng lựa chọn chế độ với các bước soạn 3–5.
   const llm = useLlmStatus();
-  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // Chế độ lấy từ project ở server (qua draft), nên mở lại dự án
   // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
   const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
   // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
   // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
   const aiMode = authoringMode === "ai" && llm?.enabled === true;
-  // CR-050 Unit 2: the segments panel and the shots-per-segment setting, AI mode only.
+  // The segments panel and the shots-per-segment setting, AI mode only.
   const showSegments = aiMode && !hasOwnCode && !!draft.projectId;
   const [segmentsVersion, setSegmentsVersion] = useState(0);
 
@@ -203,7 +203,7 @@ export function ManimEngineerStepPage() {
         }
         wide
       >
-        {/* CR-050 FR-7: read by the next run, so it sits before the run button. */}
+        {/* Read by the next run, so it sits before the run button. */}
         {showSegments && (
           <div className={styles.settingsRow}>
             <CodeChunkShotsField projectId={draft.projectId} onSaved={() => setSegmentsVersion((v) => v + 1)} />
@@ -214,7 +214,7 @@ export function ManimEngineerStepPage() {
             renderEngine={draft.renderEngine}
             onEngineChange={(engine) => {
               dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
-              // CR-030 — server phải biết engine trước khi render prompt cho
+              // Server phải biết engine trước khi render prompt cho
               // storyboard/code (RoleFor đọc project.RenderEngine), không chỉ
               // ở lúc nộp render. Best-effort như useAuthoringMode: lỗi mạng ở
               // đây không được chặn Creator đổi lựa chọn trên màn hình.
@@ -265,7 +265,7 @@ export function ManimEngineerStepPage() {
           </div>
         )}
 
-        {/* CR-045 — the drawings have their own step now; this only says where they stand. */}
+        {/* The drawings have their own step; this only says where they stand. */}
         {isRemotion && draft.projectId && (
           <div className={styles.settingsRow}>
             <IllustrationsGateNote projectId={draft.projectId} onOpen={() => navigate(AUTHORING_STEP_PATHS.illustrations)} />

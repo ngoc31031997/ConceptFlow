@@ -1,5 +1,5 @@
 """YouTubeVideoPublisher — implements VideoPublisherPort via
-google-api-python-client's resumable upload (Low-Level Design Question 5).
+google-api-python-client's resumable upload.
 
 Runs the upload in a ThreadPoolExecutor so it never blocks the FastAPI
 event loop (google-api-python-client has no async API) — mirror Unit
@@ -40,7 +40,7 @@ class YouTubeVideoPublisher(VideoPublisherPort):
         # A registry rather than one client_id/secret pair: a refresh token
         # can only be refreshed with the exact credentials that issued it,
         # so with several apps configured a single global pair would fail
-        # with invalid_client for every channel but one (CR-012 FR32.4).
+        # with invalid_client for every channel but one.
         self._app_registry = app_registry
         self._credential_store = credential_store
         self._timeout_seconds = timeout_seconds
@@ -85,7 +85,7 @@ class YouTubeVideoPublisher(VideoPublisherPort):
             is_default=credential.is_default,
             # A token refresh does not re-run consent, so it cannot grant a
             # scope the Creator has not already agreed to — carried over
-            # unchanged, not re-derived (CR-015).
+            # unchanged, not re-derived.
             scopes=credential.scopes,
         )
         self._credential_store.save(refreshed)
@@ -156,14 +156,14 @@ class YouTubeVideoPublisher(VideoPublisherPort):
     ) -> str | None:
         """Best-effort, like the thumbnail above — but unlike a bad
         thumbnail, a missing caption track is invisible to the Creator on
-        YouTube itself (CR-015 FR39.4), so the outcome is returned rather
+        YouTube itself, so the outcome is returned rather
         than only logged."""
         if not request.caption_path:
             return None
 
-        # FR40.2: checked BEFORE calling the API, not learned from a 403
-        # after the fact. A credential from before CR-015 shipped has
-        # scopes == () and is read as "youtube.upload only" (ADR-0028) —
+        # Checked BEFORE calling the API, not learned from a 403 after the
+        # fact. A credential with no recorded scopes has scopes == () and is
+        # read as "youtube.upload only" (ADR-0028) —
         # never assumed to carry force-ssl just because upload succeeded.
         if YOUTUBE_FORCE_SSL_SCOPE not in credential.scopes:
             logger.warning(
@@ -180,7 +180,7 @@ class YouTubeVideoPublisher(VideoPublisherPort):
                 body={
                     "snippet": {
                         "videoId": video_id,
-                        # FR39.3: BCP-47, sourced from the project's content
+                        # BCP-47, sourced from the project's content
                         # language — never hardcoded, or YouTube auto-translates
                         # from the wrong source language.
                         "language": request.caption_language or "en",

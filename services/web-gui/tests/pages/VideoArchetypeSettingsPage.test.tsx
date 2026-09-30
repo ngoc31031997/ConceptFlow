@@ -22,7 +22,7 @@ function renderPage() {
   );
 }
 
-describe("VideoArchetypeSettingsPage (CR-041)", () => {
+describe("VideoArchetypeSettingsPage", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "listVideoArchetypes").mockResolvedValue([SYSTEM, MINE]);
   });

@@ -1,4 +1,4 @@
-"""locate_scene (chuyển từ script-processing, CR-040 FR110).
+"""locate_scene.
 
 Các test cũ về thứ tự `# NARRATION:` và gom `# CHAPTER:` đã bỏ: hai thứ đó
 không đọc từ text nữa, chúng do lượt dry của Rendering thu theo thứ tự chạy
@@ -43,7 +43,7 @@ def test_bao_loi_khi_khong_co_class_scene():
 def test_khong_con_bat_buoc_co_narration_trong_text():
     """Một script không có chữ 'narrate' nào trong nguồn vẫn hợp lệ ở bước này:
     lời thoại có thể nằm trong hàm helper của thư viện, và chỉ lượt dry mới
-    biết. Bắt lỗi ở đây sẽ chặn nhầm đúng loại script mà CR-018 mở ra."""
+    biết. Bắt lỗi ở đây sẽ chặn nhầm những script hợp lệ đó."""
     script = "class DemoScene(ConceptFlowScene):\n    def construct(self):\n        pass\n"
     assert locate_scene(script).scene_class_name == "DemoScene"
 
@@ -82,7 +82,7 @@ def test_manim_van_uu_tien_khi_ca_hai_dang_deu_co_the_khop():
 
 def test_composition_khong_trong_registerroot_thi_khong_tinh():
     """Chỉ có `<Composition id="...">` mà không có `registerRoot(...)` thì
-    không phải một entry file Remotion hợp lệ — báo lỗi như trước đây."""
+    không phải một entry file Remotion hợp lệ — báo lỗi."""
     script = '<Composition id="MyComp" component={X} />\n'
     with pytest.raises(SceneNotFoundError):
         locate_scene(script)

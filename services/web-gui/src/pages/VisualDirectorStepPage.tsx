@@ -58,7 +58,7 @@ export function VisualDirectorStepPage() {
   // agnostic, and only the code step forks (manim_engineer / remotion_engineer).
   const directorRole = "visual_director";
 
-  // CR-040 FR113: rendered by the server, not assembled here.
+  // Rendered by the server, not assembled here.
   const rendered = useRenderedPrompt({
     role: directorRole,
     language: draft.voiceLanguage,
@@ -77,7 +77,7 @@ export function VisualDirectorStepPage() {
   }
 
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
-  // CR-031 — "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
+  // "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
   // ở 1a có thể trống hẳn trong trường hợp đó, và đấy là hợp lệ: storyboard là
   // thứ duy nhất bước 6 (Code) cần đọc.
   const hasOwnStoryboard = draft.scriptSource === "storyboard";
@@ -100,7 +100,7 @@ export function VisualDirectorStepPage() {
           payload: { story: draft.authoringStory, storyboard: draft.authoringStoryboard, code: "" },
         });
       }
-      // CR-045: a Remotion video gets its drawings before its code.
+      // A Remotion video gets its drawings before its code.
       navigate(draft.renderEngine === "remotion" ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS.code);
     } catch {
       setSaveError("Không lưu được. Vui lòng thử lại.");
@@ -109,10 +109,10 @@ export function VisualDirectorStepPage() {
     }
   }
 
-  // CR-027 FR79 — cùng một lựa chọn chế độ với bước 3; nó nằm trong draft nên
+  // Cùng một lựa chọn chế độ với bước 3; nó nằm trong draft nên
   // không phải chọn lại ở đây.
   const llm = useLlmStatus();
-  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // Chế độ lấy từ project ở server (qua draft), nên mở lại dự án
   // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
   const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
   // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy

@@ -1,5 +1,5 @@
-"""CR-048 T3 — every chunk turn names the hero/world, now that the code step's
-system prompt carries only the story's core lines."""
+"""Every chunk turn names the hero/world, since the code step's system prompt
+carries only the story's core lines."""
 
 import json
 
@@ -40,7 +40,7 @@ def test_chunk_turn_opens_with_the_world_when_there_is_no_hero():
 
 
 def test_chunk_turn_lists_the_palette_key_the_storyboard_uses():
-    # CR-056: one name per colour, the one the visuals say.
+    # One name per colour, the one the visuals say.
     sb = sbm.parse(json.dumps({
         "hero": "Khối mô hình",
         "palette": [{"role": "conNguoi", "hex": "#F5B841", "meaning": "con người"}],

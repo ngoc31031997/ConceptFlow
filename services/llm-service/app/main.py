@@ -1,4 +1,4 @@
-"""llm-service HTTP API (CR-039).
+"""llm-service HTTP API.
 
 The single place that talks to an LLM provider. Streaming endpoints answer
 newline-delimited JSON: zero or more `progress`/`phase` events, then exactly one
@@ -55,7 +55,7 @@ class MetadataBody(BaseModel):
     script_content: str
     category_hint: str = ""
     language: str = "en"
-    stream: bool = False  # CR-040 FR116: emit `progress` events like /v1/chat
+    stream: bool = False  # emit `progress` events like /v1/chat
 
 
 class ShortScriptBody(BaseModel):
@@ -72,7 +72,7 @@ class StoryboardBody(BaseModel):
 
 
 class IllustrationIn(BaseModel):
-    """CR-044 — one approved library drawing the code step may use."""
+    """One approved library drawing the code step may use."""
     name: str
     usage: str = ""
     description: str = ""
@@ -80,13 +80,13 @@ class IllustrationIn(BaseModel):
 
 
 class SubtitleBandIn(BaseModel):
-    """CR-048 T6b — the strip burned-in subtitles cover, from the frame edge."""
+    """The strip burned-in subtitles cover, from the frame edge."""
     edge: Literal["top", "bottom"]
     px: int = Field(gt=0, lt=1080)
 
 
 class SegmentIn(BaseModel):
-    """CR-050 — a segment the caller already stored (ADR-0030)."""
+    """A segment the caller already stored. See ADR-0030."""
     key: str
     fingerprint: str
     content: dict
@@ -101,13 +101,13 @@ class CodeBody(BaseModel):
     model: str = ""
     max_tokens: int = Field(0, ge=0)
     temperature: float = 0.3
-    # CR-048 T6b — passed to the Rendering layout check (Remotion only).
+    # Passed to the Rendering layout check (Remotion only).
     # No band = nothing burned into the frame; no font = the video default.
     subtitle_band: SubtitleBandIn | None = None
     video_font: str = ""
-    # CR-050 FR-7 — shots per chunk for this project; 0 = CODE_CHUNK_SHOTS.
+    # Shots per chunk for this project; 0 = CODE_CHUNK_SHOTS.
     chunk_shots: int = Field(0, ge=0, le=10)
-    # CR-050 — what the caller already has, and (FR-4) the only segments to run.
+    # What the caller already has, and the only segments to run.
     segments: list[SegmentIn] = []
     only: list[str] | None = None
 
@@ -292,7 +292,7 @@ def create_app(
 
     @app.post("/v2/code/plan")
     async def code_plan(body: CodeBody):
-        """CR-050: how this storyboard is cut into segments, so authoring-service
+        """How this storyboard is cut into segments, so authoring-service
         never keeps its own copy of the rule. Fingerprints included; no model call."""
         try:
             plan = make_plan(body.request("", 0), body.chunk_shots or config.code_chunk_shots)
@@ -305,8 +305,8 @@ def create_app(
 
     @app.post("/v2/code/generate")
     async def code_generate(body: CodeBody):
-        """CR-050 / ADR-0030: runs the missing segments (or `only`), streaming
-        each segment's result, each billed call and each failed check."""
+        """Run the missing segments (or `only`), streaming each segment's
+        result, each billed call and each failed check. See ADR-0030."""
         if body.engine not in ("remotion", "manim"):
             return _error_response(f"unknown engine {body.engine!r}", status=400)
         provider, model = providers.for_model(providers.hive, body.model)
@@ -332,7 +332,7 @@ def create_app(
 
     @app.post("/v2/code/segment-prompt")
     async def code_segment_prompt(body: SegmentPromptBody):
-        """CR-050 FR-5: the exact turn one segment would be asked, for an outside AI."""
+        """The exact turn one segment would be asked, for an outside AI."""
         _, model = providers.for_model(providers.hive, body.model)
         try:
             system, user = segment_prompt(
@@ -343,7 +343,7 @@ def create_app(
 
     @app.post("/v2/code/segment-parse")
     async def code_segment_parse(body: SegmentParseBody):
-        """CR-050 FR-5: check a reply written outside the pipeline for one segment."""
+        """Check a reply written outside the pipeline for one segment."""
         _, model = providers.for_model(providers.hive, body.model)
         try:
             fingerprint, content = parse_segment(

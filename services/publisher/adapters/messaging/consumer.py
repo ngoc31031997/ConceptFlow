@@ -5,10 +5,10 @@ PublishVideoUseCase.publish() can run for a while (YouTube upload, up to
 UPLOAD_TIMEOUT_SECONDS). Calling it directly from this coroutine would
 block the asyncio event loop for that duration — starving RabbitMQ
 heartbeats, the OutboxRelay, and the OAuth REST routes. It's therefore
-run via asyncio.to_thread() (mirror Unit 6's AssembleVideoCommandHandler).
+run via asyncio.to_thread().
 
-Exactly one Outbox row per command (video_published or publish_failed) —
-no per-scene/progress events, unlike Unit 5.
+Exactly one Outbox row per command (video_published or publish_failed);
+no per-scene or progress events.
 """
 
 from __future__ import annotations
@@ -74,11 +74,11 @@ class PublishVideoCommandHandler:
             visibility=payload.get("visibility", ""),
             publish_at=payload.get("publish_at"),
             thumbnail_path=payload.get("thumbnail_path"),
-            # Absent for projects created before CR-012 — None means the
-            # default channel, preserving the old single-channel behaviour.
+            # Absent when the project names no channel — None means the
+            # default channel.
             channel_id=payload.get("channel_id"),
-            # CR-015 — absent whenever subtitle_mode didn't produce a
-            # caption track (off/burn-in, or a pre-CR-015 project).
+            # Absent whenever subtitle_mode didn't produce a caption track
+            # (off or burn-in).
             caption_path=payload.get("caption_path"),
             caption_language=payload.get("caption_language"),
         )

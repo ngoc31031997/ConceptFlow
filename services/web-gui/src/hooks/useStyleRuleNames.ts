@@ -5,7 +5,7 @@ import { describeWarning, parseRuleNames, type StyleWarning } from "../utils/sty
 let cached: Promise<Record<string, string>> | null = null;
 
 /**
- * CR-045 — tên luật style theo mã (S3 → "Bo tròn"), tải một lần cho cả trang.
+ * Tên luật style theo mã (S3 → "Bo tròn"), tải một lần cho cả trang.
  * Lỗi mạng: trả về rỗng (cảnh báo vẫn hiện, chỉ thiếu tên luật) và lần sau thử lại.
  */
 export function useStyleRuleNames(): Record<string, string> {

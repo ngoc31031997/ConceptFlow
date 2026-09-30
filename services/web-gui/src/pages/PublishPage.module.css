@@ -26,9 +26,8 @@
 }
 
 /*
-  The publish button used to re-enable the moment POST /v1/sagas/publish
-  returned — the saga had only been *started*, so a second click landed on a
-  409 and the user had no sign the upload was running. These two cards render
+  POST /v1/sagas/publish only *starts* the saga, so the button stays off and
+  these two cards render
   the publishing / failed states the project status reports instead.
 */
 .publishedCard {

@@ -1,4 +1,4 @@
-"""Progress publisher for synthesize_speech (CR-029).
+"""Progress publisher for synthesize_speech.
 
 Mirrors services/rendering/adapters/messaging/progress.py: a batch of scenes
 can take long enough (many scenes, a metered engine with real network calls)
@@ -34,7 +34,7 @@ class ProgressPublisher:
         """Reports that one more scene's narration has finished synthesizing.
 
         Bắn theo đơn vị hoàn thành (1 câu xong = 1 event), không theo tick
-        thời gian — CR-029: giữ tần suất event thấp (tối đa scene_total event
+        thời gian — giữ tần suất event thấp (tối đa scene_total event
         cho cả bước), không tạo tải thêm lên RabbitMQ/SSE.
         """
         message = {

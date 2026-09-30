@@ -22,7 +22,7 @@ func (f *fakeProjectIllustrations) DeleteDrawing(_ context.Context, _, rowID str
 	return domain.ProjectIllustration{ID: rowID, State: domain.PISkipped}, f.err
 }
 
-// CR-045: deleting a video's AI draft from the library.
+// Deleting a video's AI draft from the library.
 func TestDeleteProjectIllustrationDrawing(t *testing.T) {
 	uc := &fakeProjectIllustrations{}
 	h := NewRouter(nil, nil).WithProjectIllustrations(uc).Handler()

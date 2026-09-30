@@ -9,7 +9,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// fakeAuthoringStore backs the tests below for CR-025's authoring
+// fakeAuthoringStore backs the tests below for the authoring
 // save/read use cases — a bare in-memory map is enough since these use
 // cases do nothing but validate and delegate.
 type fakeAuthoringStore struct {
@@ -19,10 +19,10 @@ type fakeAuthoringStore struct {
 	code       map[string]string
 	// status defaults to domain.StatusDraft (Go zero value is "", so
 	// GetStatus below maps "" to draft) — set per project_id to simulate a
-	// project whose render has already started (CR-028 FR84.2).
+	// project whose render has already started.
 	status map[string]domain.ProjectStatus
-	// mode backs CR-027 FR79's step-1 working mode. Unset means a project
-	// whose row predates the column, which reads back as the default.
+	// mode backs the step-1 working mode. Unset means a project with no
+	// stored mode, which reads back as the default.
 	mode map[string]string
 	// models backs the model-per-step picker. Unset means a project whose
 	// row predates the columns, which reads back as the zero value (every
@@ -42,7 +42,7 @@ func newFakeAuthoringStore() *fakeAuthoringStore {
 	}
 }
 
-// SaveAuthoringMode/GetAuthoringMode back CR-027 FR79's step-1 working mode.
+// SaveAuthoringMode/GetAuthoringMode back the step-1 working mode.
 func (f *fakeAuthoringStore) SaveAuthoringMode(_ context.Context, projectID, mode string) error {
 	f.mode[projectID] = mode
 	return nil
@@ -62,8 +62,8 @@ func (f *fakeAuthoringStore) GetAuthoringModels(_ context.Context, projectID str
 	return f.models[projectID], nil
 }
 
-// GetStatus backs CR-028 FR84.2's authoring lock. Defaults to draft (unset
-// entries) so every pre-existing test above, which never touches status,
+// GetStatus backs the authoring lock. Defaults to draft (unset
+// entries) so every test above, which never touches status,
 // keeps passing unmodified.
 func (f *fakeAuthoringStore) GetStatus(_ context.Context, projectID string) (domain.ProjectStatus, error) {
 	if s, ok := f.status[projectID]; ok {
@@ -87,7 +87,7 @@ func (f *fakeAuthoringStore) ClearAuthoringSteps(_ context.Context, projectID st
 	return nil
 }
 
-// SaveAuthoringStory mirrors the repository's CR-027 D0 rule: an empty topic
+// SaveAuthoringStory mirrors the repository's rule: an empty topic
 // leaves the stored one alone rather than clearing it.
 func (f *fakeAuthoringStore) SaveAuthoringStory(_ context.Context, projectID, content, topic string) error {
 	f.story[projectID] = content
@@ -144,9 +144,9 @@ func TestSaveAuthoringStoryUseCase(t *testing.T) {
 	}
 }
 
-// TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne covers
-// CR-027 D0. A missing topic must not block saving the outline — that would
-// break every pre-CR-027 caller for a field it does not know about — and it
+// TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne: a
+// missing topic must not block saving the outline — that would break every
+// caller that does not send one — and it
 // must not wipe a topic the Creator already gave us, since every later
 // pipeline step renders {{topic}} from it.
 func TestSaveAuthoringStoryUseCase_EmptyTopicIsAllowedAndKeepsTheStoredOne(t *testing.T) {
@@ -267,7 +267,7 @@ func TestGetAuthoringStateUseCase(t *testing.T) {
 	}
 }
 
-// CR-027 FR79 — the step-1 working mode lives in the database, so a project
+// The step-1 working mode lives in the database, so a project
 // picked up again on any tab (another browser, after a restart) still knows how
 // its Creator chose to work.
 func TestSaveAuthoringModeRoundTrip(t *testing.T) {
@@ -318,7 +318,7 @@ func TestSaveAuthoringModeRejectsUnknownMode(t *testing.T) {
 	}
 }
 
-// CR-050 FR-19: the code step's model cannot be the local Ollama model; the
+// The code step's model cannot be the local Ollama model; the
 // other steps may still use it.
 func TestSaveAuthoringModelsRefusesOllamaForCode(t *testing.T) {
 	store := newFakeAuthoringStore()

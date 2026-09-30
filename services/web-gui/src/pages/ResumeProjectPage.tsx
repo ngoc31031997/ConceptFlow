@@ -88,8 +88,6 @@ export function ResumeProjectPage() {
         // Đích lấy từ vị trí server suy ra (flow_step: bước xa nhất đang ở), không
         // phải màn nào mở lần cuối. Với dự án đã qua bước Code (6) mà chưa chỉ
         // định bước (sửa sau lỗi), mở màn Code — nơi có nội dung xa nhất.
-        // CR-051: trần từng là 5 (Code của luồng 13 bước), nên sau CR-046 một
-        // dự án đang ở Code bị mở nhầm sang màn Hình minh hoạ.
         const flowStep = project.flow_step ?? FLOW_CONFIG;
         const step = stepParam || Math.min(flowStep, FLOW_CODE);
         navigate(authoringRoute(step), { replace: true });

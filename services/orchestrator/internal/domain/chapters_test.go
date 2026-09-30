@@ -15,7 +15,7 @@ func chapters(indices ...int) []Chapter {
 
 func TestBuildChapterTimestamps_UsesMeasuredOffsets(t *testing.T) {
 	// The offsets are what Rendering measured, not a running sum of narration
-	// durations — that is the whole reason chapters can be trusted (CR-002).
+	// durations — that is the whole reason chapters can be trusted.
 	offsets := []float64{0, 40, 95, 160}
 
 	lines := BuildChapterTimestamps(chapters(0, 1, 2, 3), offsets, 200, 0.0)
@@ -84,12 +84,12 @@ func TestBuildChapterTimestamps_RejectsAnIndexBeyondTheOffsets(t *testing.T) {
 	}
 }
 
-// --- CR-023 D6: introDuration > 0 ---
+// --- introDuration > 0 ---
 
 func TestBuildChapterTimestamps_WithIntro_PrependsSyntheticIntroChapter(t *testing.T) {
 	// The intro itself must be >= MinChapterSeconds to survive as its own
-	// chapter, so use 15s; videoSeconds already includes it (caller's job per
-	// D6): 15 (intro) + 200 (main) = 215.
+	// chapter, so use 15s; videoSeconds already includes it (the caller's
+	// job): 15 (intro) + 200 (main) = 215.
 	offsets := []float64{0, 40, 95}
 	introDuration := 15.0
 	videoSeconds := 215.0
@@ -126,7 +126,7 @@ func TestBuildChapterTimestamps_WithIntro_DoesNotForceOtherChaptersToZero(t *tes
 func TestBuildChapterTimestamps_WithIntro_ValidatesMinLengthAgainstShiftedTotal(t *testing.T) {
 	// The intro chapter itself must satisfy MinChapterSeconds against the
 	// *shifted* start of the next chapter, using the total duration the
-	// caller passed in (which already includes intro+outro per D6).
+	// caller passed in (which already includes intro+outro).
 	introDuration := 3.0 // under MinChapterSeconds — the Intro chapter is only 3s long
 	lines := BuildChapterTimestamps(chapters(0, 1, 2), []float64{0, 60, 120}, 200+introDuration, introDuration)
 

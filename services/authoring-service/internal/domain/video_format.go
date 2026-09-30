@@ -2,18 +2,16 @@ package domain
 
 import "fmt"
 
-// VideoFormat is a channel's repeatable shape for a video (CR-019 FR51).
+// VideoFormat is a channel's repeatable shape for a video.
 //
-// Before this, the only statement of structure anywhere in the system was one
-// sentence inside the prompt string the Creator copies to an external AI:
-// "mở đầu gây chú ý → giải thích khái niệm cốt lõi → ví dụ minh họa → tổng kết".
-// Nothing checked it, so every video invented its own shape.
+// A format states the beats a video follows so they can be checked, instead
+// of each video inventing its own shape.
 //
-// Making it data rather than code is the point of FR51.4/FR51.5: which beats a
+// It is data rather than code: which beats a
 // topic needs varies a lot, so a bộ beat hardcoded in the source would be wrong
 // the first time a subject did not fit. Formats are rows, cloned and edited by
 // the Creator, and versioned so a project rendered last month still reports the
-// structure it was actually built against (FR51.6).
+// structure it was actually built against.
 type VideoFormat struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -34,7 +32,7 @@ type FormatBeat struct {
 	MinSeconds float64 `json:"min_seconds"`
 	MaxSeconds float64 `json:"max_seconds"`
 
-	// Required beats are the only ones whose absence blocks a render (FR52.5).
+	// Required beats are the only ones whose absence blocks a render.
 	// Everything else is advisory, because a budget checked against an estimate
 	// carries the estimate's error with it.
 	Required bool `json:"required"`
@@ -58,7 +56,7 @@ type BeatIssue struct {
 	Blocking bool   `json:"blocking"`
 }
 
-// ValidateBeats checks a script's observed beats against the format (FR52.3).
+// ValidateBeats checks a script's observed beats against the format.
 //
 // Three classes of problem, and only the first blocks:
 //
@@ -68,8 +66,8 @@ type BeatIssue struct {
 //   - beats out of the format's order.
 //
 // Duration budgets are deliberately NOT checked here: they are checked against
-// an estimate that carries ±15% error, so they are warnings raised elsewhere
-// (FR52.5). Blocking a render on a number that soft would teach the Creator to
+// an estimate that carries ±15% error, so they are warnings raised elsewhere.
+// Blocking a render on a number that soft would teach the Creator to
 // ignore the whole mechanism.
 func (f VideoFormat) ValidateBeats(observed []BeatOccurrence) []BeatIssue {
 	issues := make([]BeatIssue, 0)

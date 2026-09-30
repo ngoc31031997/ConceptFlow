@@ -2,9 +2,8 @@ package domain
 
 import _ "embed"
 
-// CR-040 FR113 — the starter scripts and insertable snippets web-gui used to
-// carry in scriptTemplates.ts. They are static, so they are embedded as the
-// exact files the TypeScript held rather than retyped.
+// The starter scripts and insertable snippets. They are static, so they are
+// embedded as the exact files of scriptTemplates.ts rather than retyped.
 //
 // The Vietnamese starter mirrors services/rendering/tests/fixtures/conceptflow_template.py,
 // where lint and a real Manim render run against it: a template the lint itself

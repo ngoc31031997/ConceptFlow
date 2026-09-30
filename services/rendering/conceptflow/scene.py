@@ -1,12 +1,12 @@
-"""`ConceptFlowScene` — nền chung của mọi video trên kênh (CR-017 FR45.1).
+"""`ConceptFlowScene` — nền chung của mọi video trên kênh.
 
 Script của Creator kế thừa class này thay vì `Scene`, và nhờ đó nhận được nền,
-font, bảng màu và nhịp chuyển cảnh mà không phải khai báo gì. Đó là toàn bộ ý
-tưởng của CR-017: bản sắc nằm trong code, không nằm trong prompt.
+font, bảng màu và nhịp chuyển cảnh mà không phải khai báo gì: bản sắc nằm
+trong code, không nằm trong prompt.
 
 Các factory chữ (`title`, `body`, ...) tồn tại để script **không bao giờ gọi
 `Text(...)` trực tiếp** — mỗi lần gọi trực tiếp là một lần cỡ chữ và màu có cơ
-hội trôi khỏi chuẩn. Lint (FR46.4) cảnh báo đúng việc đó.
+hội trôi khỏi chuẩn. Lint cảnh báo đúng việc đó.
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ class ConceptFlowScene(MovingCameraScene):
         """Công thức dùng LaTeX mặc định của Manim.
 
         Không ép font display lên đây: `MathTex` đi qua LaTeX chứ không qua
-        Pango, nên đổi font là đổi cả gói chữ toán, việc đó vượt phạm vi CR-017.
+        Pango, nên đổi font là đổi cả gói chữ toán.
         """
         kwargs.setdefault("color", self.theme.ink)
         return MathTex(latex, **kwargs)
@@ -139,7 +139,7 @@ class ConceptFlowScene(MovingCameraScene):
         return self.fit(group)
 
     def fit(self, mobject: Mobject) -> Mobject:
-        """Co lại nếu tràn khung an toàn (FR45.3).
+        """Co lại nếu tràn khung an toàn.
 
         Chỉ thu nhỏ, không bao giờ phóng to: nếu phóng to thì cùng một đoạn chữ
         sẽ hiện ở cỡ khác nhau tuỳ độ dài, và thang cỡ chữ mất hết ý nghĩa.
@@ -302,37 +302,37 @@ class ConceptFlowScene(MovingCameraScene):
     def _tone_color(self, tone: str) -> str:
         return getattr(self.theme, tone if tone in TONES else "accent")
 
-    # --- Lời thoại (CR-018) ---------------------------------------------------
+    # --- Lời thoại ---------------------------------------------------
 
-    # Ambient drift (CR-042 FR123.3): tắt mặc định. Bật cho cả scene bằng
+    # Ambient drift: tắt mặc định. Bật cho cả scene bằng
     # `ambient_drift = True` hoặc từng câu bằng `narrate(..., drift=True)`.
     ambient_drift = False
 
     def narrate(self, text: str, *animations, drift: bool | None = None) -> None:
         """Phát một đoạn lời thoại ngay tại đây.
 
-        Animation truyền kèm chạy TRONG lúc đọc, `run_time` = thời lượng câu
-        (CR-042): `self.narrate("Một nửa khả năng biến mất.", half.animate.fade(0.9))`.
+        Animation truyền kèm chạy TRONG lúc đọc, `run_time` = thời lượng câu:
+        `self.narrate("Một nửa khả năng biến mất.", half.animate.fade(0.9))`.
         Không kèm animation thì khung đứng yên, trừ khi bật `drift`.
 
         Dùng được bên trong vòng lặp, nhánh điều kiện và hàm helper — đó là
         điểm khác biệt với `# NARRATION` + `self.wait(AUTO)` mà nó thay thế, và
-        là thứ cho phép hook/CTA trở thành component thật (CR-019).
+        là thứ cho phép hook/CTA trở thành component thật.
         """
         narration_runtime.narrate(
             self, text, *animations, drift=self.ambient_drift if drift is None else drift
         )
 
     def beat(self, beat_id: str) -> None:
-        """Mở một beat của beat sheet (CR-019). Gắn vào lời thoại kế tiếp."""
+        """Mở một beat của beat sheet. Gắn vào lời thoại kế tiếp."""
         narration_runtime.beat(self, beat_id)
 
     def chapter(self, title: str) -> None:
-        """Mở một chapter YouTube (CR-006 FR15). Gắn vào lời thoại kế tiếp."""
+        """Mở một chapter YouTube. Gắn vào lời thoại kế tiếp."""
         narration_runtime.chapter(self, title)
 
     def clip(self, name: str):
-        """Đánh dấu một đoạn của scene là clip dọc phái sinh (CR-007 FR19.2).
+        """Đánh dấu một đoạn của scene là clip dọc phái sinh.
 
         Dùng như context manager: `with self.clip("tên"): ...`. Hoạt động
         được cả khi bên trong gọi `self.narrate()` — dùng chung `_recorder`
@@ -342,20 +342,18 @@ class ConceptFlowScene(MovingCameraScene):
         """
         return narration_runtime.clip(self, name)
 
-    # --- Beat dựng sẵn (CR-019 FR53) ------------------------------------------
+    # --- Beat dựng sẵn ------------------------------------------
     #
     # Ba beat này là khuôn hình lặp lại ở MỌI video, nên chúng là method chứ
-    # không phải thứ Creator dựng lại mỗi lần. Chúng chỉ khả thi sau CR-018:
-    # trước đó lời thoại là comment phải đếm khớp theo thứ tự dòng, nên không
-    # thể nằm trong một hàm — đúng lý do CR-006 §Quyết định #2 phải lùi FR17
-    # xuống thành snippet Creator tự chép.
+    # không phải thứ Creator dựng lại mỗi lần. Chúng khả thi vì lời thoại là
+    # lời gọi runtime (`narrate`), nên nằm được trong một hàm.
 
     def hook(self, question: str, *animations) -> None:
         """Mở đầu bằng hình: frame đầu đã có thứ chuyển động, không phải thẻ tiêu đề.
 
         Dựng cảnh mở màn (vật, nhân vật) TRƯỚC khi gọi, rồi truyền animation
         kèm theo để chúng chạy trong lúc câu hỏi được đọc. Muốn thẻ tiêu đề thì
-        gọi `hook_card()` (CR-042 FR124).
+        gọi `hook_card()`.
         """
         self.beat("hook")
         self.restore_view()
@@ -366,7 +364,7 @@ class ConceptFlowScene(MovingCameraScene):
 
         Nội dung do Creator truyền vào, KHÔNG tự sinh từ tiêu đề video: tiêu đề
         được soạn ở bước publish, sau khi render, nên tại đây nó chưa tồn tại
-        (cùng lý do khiến thumbnail tự động không burn chữ — CR-006 §Quyết định #3).
+        (cùng lý do khiến thumbnail tự động không burn chữ).
         """
         self.beat("hook")
         self.restore_view()
@@ -382,7 +380,7 @@ class ConceptFlowScene(MovingCameraScene):
         Không hiện bảng gạch đầu dòng: những gì đang trên màn hình LÀ phần tóm
         tắt, khung chỉ lùi ra toàn cảnh và đẩy vào chậm trong lúc đọc. `points`
         chỉ còn để ghép thành lời thoại khi không truyền `narration`; `title`
-        giữ cho tương thích. Muốn bảng thì gọi `recap_card()` (CR-042 FR124.2).
+        giữ cho tương thích. Muốn bảng thì gọi `recap_card()`.
         """
         self.beat("recap")
         self.restore_view()
@@ -402,7 +400,7 @@ class ConceptFlowScene(MovingCameraScene):
         """Kêu gọi hành động, rồi giữ khung cuối.
 
         `hold_seconds` là số cụ thể chứ không phải lời thoại: đây là khoảng lặng
-        để YouTube có chỗ hiện end-screen element (CR-006 FR17.1).
+        để YouTube có chỗ hiện end-screen element.
         """
         self.beat("cta")
         self.restore_view()
@@ -411,13 +409,13 @@ class ConceptFlowScene(MovingCameraScene):
         self.narrate(message)
         self.wait(hold_seconds)
 
-    # --- Phát hiện chồng lấn (bug report 2026-09-12) ---------------------------
+    # --- Phát hiện chồng lấn ---------------------------------------------------
 
     def play(self, *args, **kwargs):
         """Bọc `Scene.play` để soi chồng lấn hình ảnh SAU mỗi animation.
 
         Chỉ chạy ở lượt dry (`narration_runtime.is_dry_run()`): đây là cổng
-        kiểm tra trước TTS (CR-020), không phải thứ đáng trả thêm thời gian ở
+        kiểm tra trước TTS, không phải thứ đáng trả thêm thời gian ở
         lượt render thật — lượt đó chạy đúng lại animation y hệt nên chồng lấn
         (nếu có) đã được báo ở lượt dry rồi.
         """
@@ -607,7 +605,7 @@ def _edge_points(source: Mobject, target: Mobject, buff: float = 0.15):
 def _bbox_of(mobject: Mobject) -> tuple[float, float, float, float]:
     """Hộp bao trục-song-song (left, right, top, bottom) theo toạ độ Manim.
 
-    Cùng bốn accessor `narration._describe_layout` đã dùng cho QC (FR58.1) —
+    Cùng bốn accessor `narration._describe_layout` đã dùng cho QC —
     giữ một nguồn sự thật duy nhất cho "hộp bao của một mobject là gì".
     """
     return (

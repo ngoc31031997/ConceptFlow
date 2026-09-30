@@ -10,8 +10,8 @@ import (
 )
 
 // ChannelAssetPointerRepository implements domain.ChannelAssetPort against
-// Orchestrator's own channel_asset_pointers projection (CR-023 correction —
-// there is no HTTP server on video-assembly for Orchestrator to call; this
+// Orchestrator's own channel_asset_pointers projection (there
+// is no HTTP server on video-assembly for Orchestrator to call; this
 // table is kept current by subscribing to channel_asset_rendered /
 // channel_asset_normalized events, see application/handle_step_event.go).
 type ChannelAssetPointerRepository struct {

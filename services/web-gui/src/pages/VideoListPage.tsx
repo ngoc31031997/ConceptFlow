@@ -50,7 +50,7 @@ function FlowMini({ project }: { project: ProjectSummary }) {
 }
 
 export function VideoListPage() {
-  // CR-054: the server filters, counts and pages the list; this screen holds
+  // The server filters, counts and pages the list; this screen holds
   // only the page on show.
   const [data, setData] = useState<ProjectPage | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -161,7 +161,7 @@ export function VideoListPage() {
     setDeletingId(projectId);
     try {
       // 202: the delete saga runs on; the row goes when DeleteProgressCard
-      // reports every service has cleaned up (FR116.2).
+      // reports every service has cleaned up.
       await deleteProject(projectId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -341,12 +341,9 @@ export function VideoListPage() {
                         Xem video
                       </a>
                     )}
-                    {/* Bug report: "Chi tiết" từng luôn trỏ vào /result, vốn
-                        chẳng hiển thị gì cho một project chưa xong — Creator
-                        rời đi giữa chừng rồi quay lại qua danh sách này thì
-                        không có đường về màn theo dõi. projectPath trả lời
-                        "project ở trạng thái này thuộc màn nào", và từ CR-031
-                        câu trả lời đó có thêm bước 4 (Validate). */}
+                    {/* "Chi tiết" mở đúng màn của trạng thái project (projectPath),
+                        để Creator rời đi giữa chừng vẫn quay về được màn
+                        theo dõi, kể cả bước Validate. */}
                     <Link className={glass.ghostBtn} to={projectPath(project.project_id, project.status)}>
                       Chi tiết
                     </Link>

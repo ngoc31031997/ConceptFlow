@@ -7,9 +7,9 @@ it directly from this coroutine would block the asyncio event loop for
 that duration — starving RabbitMQ heartbeats and the OutboxRelay. It's
 therefore run via asyncio.to_thread().
 
-Each command still produces exactly one Outbox row (Low-Level Design
-Question 10), written in the same transaction as the Inbox mark — CR-029's
-progress pings (adapters/messaging/progress.py) are a separate, fire-and-forget
+Each command produces exactly one Outbox row, written in the same
+transaction as the Inbox mark — progress pings
+(adapters/messaging/progress.py) are a separate, fire-and-forget
 publish straight to progress.fanout, not an Outbox event, since they are UX-only
 and must never gate that one durable transaction.
 """
@@ -74,7 +74,7 @@ from domain.qc_rules import QCThresholds, evaluate_all
 logger = logging.getLogger(__name__)
 
 # Target frame size per render_quality, for NormalizeChannelAssetCommandHandler's
-# transcode of a Creator-uploaded file (CR-023 D8). Mirrors the resolutions
+# transcode of a Creator-uploaded file. Mirrors the resolutions
 # implied by rendering/adapters/rendering/manim_renderer.py's Manim quality
 # flags (-qm/-qh/-qk), kept here as plain ffmpeg scale targets since this
 # service has no Manim dependency of its own.
@@ -91,21 +91,20 @@ DEFAULT_QUALITY_FRAME_SIZE = QUALITY_FRAME_SIZE["1080p60"]
 # and the pixel-height rule needs *some* frame size.
 DEFAULT_QC_RENDER_QUALITY = "1080p60"
 
-# `asset_role` on normalize_channel_asset (CR-023 FR65.4/FR66.5): whether
-# file_path is the intro/outro clip or the music bed that goes into it.
-# Absent means "video" — the shape the command had before FR66.5 landed.
+# `asset_role` on normalize_channel_asset: whether file_path is the
+# intro/outro clip or the music bed that goes into it. Absent means "video".
 ASSET_ROLE_VIDEO = "video"
 ASSET_ROLE_MUSIC = "music"
 
 
 def _parse_narration_segments(payload: dict) -> list[NarrationSegment]:
-    """Reads CR-002's `narration_segments`, falling back to the pre-CR-002
+    """Reads `narration_segments`, falling back to the legacy
     `audio_segments` shape.
 
-    The fallback exists for commands already sitting in the queue when this
-    ships. It reproduces the old, wrong end-to-end placement, so it is logged:
-    such a project needs re-rendering to get correct timing, and silently
-    producing a desynchronised video is exactly what CR-002 set out to stop.
+    The legacy shape carries no offsets, so its segments are laid end to end,
+    which drifts out of sync with the animation. It is logged: such a project
+    needs re-rendering to get correct timing, and a desynchronised video must
+    never be produced silently.
     """
     raw = payload.get("narration_segments")
     if raw is not None:
@@ -119,7 +118,7 @@ def _parse_narration_segments(payload: dict) -> list[NarrationSegment]:
     legacy = payload.get("audio_segments") or []
     if legacy:
         logger.warning(
-            "assemble_video command carries the pre-CR-002 audio_segments shape; "
+            "assemble_video command carries the legacy audio_segments shape; "
             "narration will be laid end to end and WILL drift out of sync with "
             "the animation — re-render this project to fix it"
         )
@@ -127,7 +126,7 @@ def _parse_narration_segments(payload: dict) -> list[NarrationSegment]:
 
 
 def _parse_subtitle_cues(raw: list[dict] | None) -> list[SubtitleCue] | None:
-    """Absent when the Creator disabled subtitles (CR-001 FR9.1)."""
+    """Absent when the Creator disabled subtitles."""
     if not raw:
         return None
     return [
@@ -177,12 +176,10 @@ class AssembleVideoCommandHandler:
         self._pool = pool
         self._inbox = inbox
         self._outbox = outbox
-        # CR-023 D2: optional so every pre-existing call site/test (none of
-        # which know about channel assets) keeps working unchanged — a
-        # command with no intro_asset_id/outro_asset_id never touches this.
+        # Optional: a command with no intro_asset_id/outro_asset_id never
+        # touches it, so callers without channel assets can omit it.
         self._channel_assets = channel_assets
-        # CR-029: optional for the same reason — every pre-existing test
-        # constructs this handler without a progress publisher.
+        # Optional: without a publisher no progress is sent.
         self._progress = progress
 
     async def _resolve_channel_asset(self, asset_id: str | None) -> tuple[str | None, float]:
@@ -217,7 +214,7 @@ class AssembleVideoCommandHandler:
             return
 
         payload = envelope["payload"]
-        # CR-023 D2: intro_asset_id/outro_asset_id are opaque ids Orchestrator
+        # intro_asset_id/outro_asset_id are opaque ids Orchestrator
         # read from its own channel_asset_pointers projection — absent
         # (omitted, not null) when the Creator's toggle is off or no active
         # asset was found (see assembleVideoPayload in handle_step_event.go).
@@ -245,9 +242,8 @@ class AssembleVideoCommandHandler:
                 subtitle_cues=_parse_subtitle_cues(payload.get("subtitle_cues")),
                 subtitle_style=_parse_subtitle_style(payload.get("subtitle_style")),
                 # Default matches VideoAssemblyRequest's own default: a command
-                # already in the queue when CR-015 ships carries no subtitle_mode
-                # at all, and must keep producing exactly what it produced before
-                # (burn-in), not silently switch to a caption track.
+                # with no subtitle_mode is burned in, not silently switched to a
+                # caption track.
                 subtitle_mode=payload.get("subtitle_mode") or "burn_in",
                 intro_video_path=intro_video_path,
                 intro_duration_seconds=intro_duration_seconds,
@@ -281,12 +277,11 @@ class AssembleVideoCommandHandler:
 
 
 class RegisterChannelAssetCommandHandler:
-    """Handles `register_channel_asset` (CR-040 FR112) — Orchestrator's command
-    after it receives rendering's `channel_asset_rendered` (it replaces the old
-    second binding of rendering.events onto this service).
+    """Handles `register_channel_asset` — Orchestrator's command after it
+    receives rendering's `channel_asset_rendered`.
 
     Registers the rendered file in `channel_assets` under the quality
-    rendering names (FR65.5 — one asset per quality), then announces it as
+    rendering names (one asset per quality), then announces it as
     `channel_asset_normalized` so Orchestrator's channel_asset_pointers
     projection picks it up. Idempotent on message_id via the inbox.
     """
@@ -320,7 +315,7 @@ class RegisterChannelAssetCommandHandler:
             kind = payload["kind"]
             video_path = payload["video_path"]
             duration_seconds = float(payload.get("video_duration_seconds") or 0.0)
-            # Rendering names the quality it actually rendered at (FR65.5) — an
+            # Rendering names the quality it actually rendered at — an
             # intro rendered at 1080p60 cannot be concatenated onto a 4k60 body,
             # so it is registered for that one quality and no other.
             render_quality = payload["render_quality"]
@@ -341,7 +336,7 @@ class RegisterChannelAssetCommandHandler:
             return
         # No real source_hash travels on this event (rendering doesn't
         # compute one for its own Manim output) — this is descriptive only,
-        # not used for de-duplication here. FR65.6's cache check applies to
+        # not used for de-duplication here. The source-hash cache check applies to
         # the Creator-upload path (NormalizeChannelAssetCommandHandler),
         # where a real content hash is available.
         source_hash = f"rendered:{kind}:{video_path}:{duration_seconds}"
@@ -372,16 +367,16 @@ class RegisterChannelAssetCommandHandler:
 
 class NormalizeChannelAssetCommandHandler:
     """Handles `normalize_channel_asset` (from Orchestrator's
-    ChannelAssetsUseCase.Normalize, CR-023 D8) — a Creator-uploaded intro/
+    ChannelAssetsUseCase.Normalize) — a Creator-uploaded intro/
     outro file api-gateway already wrote to the shared volume.
 
     Transcodes it to the target render_quality's frame size with ffmpeg
     (reusing ffmpeg_assembler's VIDEO_ENCODE_ARGS/AUDIO_ENCODE_ARGS so an
     uploaded intro carries the same upload-grade settings as an assembled
-    video), loudnorms its audio to -14 LUFS if it has any (FR66.5), and
+    video), loudnorms its audio to -14 LUFS if it has any, and
     registers the result in `channel_assets` — skipping the transcode
     entirely when `source_hash` matches what's already active for
-    (kind, render_quality) (FR65.6).
+    (kind, render_quality).
     """
 
     def __init__(
@@ -419,8 +414,8 @@ class NormalizeChannelAssetCommandHandler:
             # Commands published before asset_role existed carry only video.
             asset_role = payload.get("asset_role") or ASSET_ROLE_VIDEO
         except (KeyError, TypeError) as exc:
-            # No failure event exists for this command (D8 leaves it to the
-            # Creator to retry the upload, same as the AssemblyEngineError
+            # No failure event exists for this command (the Creator retries
+            # the upload, same as the AssemblyEngineError
             # branch below) — mark processed so a malformed payload is not
             # left unacked nor retried forever.
             logger.warning(
@@ -451,7 +446,7 @@ class NormalizeChannelAssetCommandHandler:
             return
 
         if active is not None and active.source_hash == source_hash:
-            # FR65.6: source unchanged since the active version — do not
+            # Source unchanged since the active version — do not
             # re-transcode, do not publish a new channel_asset_normalized.
             logger.info(
                 "normalize_channel_asset: %s/%s already up to date (source_hash match), skipping",
@@ -470,8 +465,8 @@ class NormalizeChannelAssetCommandHandler:
             )
         except AssemblyEngineError as exc:
             logger.warning("normalize_channel_asset failed for kind=%s: %s", kind, exc)
-            # No failure event exists for this command (D8 leaves it to the
-            # Creator to retry the upload) — mark processed so a redelivery
+            # No failure event exists for this command (the Creator retries
+            # the upload) — mark processed so a redelivery
             # of the same bad file does not retry forever.
             async with self._pool.acquire() as conn, conn.transaction():
                 await self._inbox.mark_processed(conn, message_id)
@@ -511,11 +506,10 @@ class NormalizeChannelAssetCommandHandler:
         music_source_hash: str,
         active: ChannelAsset | None,
     ) -> None:
-        """FR66.5 / CR-023 D5 — the music bed is normalised to -14 LUFS and
-        muxed into the sting clip HERE, at asset-build time, so assembly of a
-        project only ever concatenates a clip that already carries its audio
-        (and FR66.6 holds for free: the body's background music is a separate
-        stream over a separate segment)."""
+        """The music bed is normalised to -14 LUFS and muxed into the sting
+        clip HERE, at asset-build time, so assembly of a project only ever
+        concatenates a clip that already carries its audio (the body's
+        background music is a separate stream over a separate segment)."""
         if active is None:
             # Nothing to mux the music into yet. This is not an error: the
             # Creator can upload the music before the clip, and video-assembly
@@ -536,7 +530,7 @@ class NormalizeChannelAssetCommandHandler:
             return
 
         if active.music_source_hash == music_source_hash:
-            # FR65.6, music half: same music file already baked into the
+            # Same music file already baked into the
             # active version — compared against music_source_hash, never
             # against source_hash (which describes the video source).
             logger.info(
@@ -689,14 +683,14 @@ QC_STATUS_NOT_SCORED = "not_scored"
 
 
 class QCVideoCommandHandler:
-    """Handles `qc_video` (CR-021 FR59/FR60), the saga step between
-    assemble_video and publish_video.
+    """Handles `qc_video`, the saga step between assemble_video and
+    publish_video.
 
-    Lives in video-assembly rather than a quality-service of its own (LLD D1):
-    QC needs exactly ffmpeg/ffprobe and the file this service just wrote, and
+    Lives in video-assembly rather than a quality-service of its own: QC
+    needs exactly ffmpeg/ffprobe and the file this service just wrote, and
     both are already here.
 
-    FR61.4 is the load-bearing rule of this handler: there is NO failure
+    The load-bearing rule of this handler: there is NO failure
     branch. Missing layout_marks, an ffmpeg error, an unreadable file — all of
     them still publish `qc_completed`, with status="not_scored" and a reason.
     A broken gate must not become a locked gate, so any exception at all is
@@ -713,7 +707,7 @@ class QCVideoCommandHandler:
         self._pool = pool
         self._inbox = inbox
         self._outbox = outbox
-        # Read once at composition time (FR61.5) — a threshold change is a
+        # Read once at composition time — a threshold change is a
         # redeploy, not a per-message environment read.
         self._thresholds = thresholds or QCThresholds.from_env()
 
@@ -732,7 +726,7 @@ class QCVideoCommandHandler:
         payload = envelope["payload"]
         try:
             status, findings, reason = await asyncio.to_thread(self._score, payload)
-        except Exception as exc:  # noqa: BLE001 — FR61.4, see class docstring
+        except Exception as exc:  # noqa: BLE001 — no failure branch, see class docstring
             logger.exception("qc_video could not score project_id=%s", project_id)
             status, findings, reason = (
                 QC_STATUS_NOT_SCORED,
@@ -762,7 +756,7 @@ class QCVideoCommandHandler:
             return QC_STATUS_NOT_SCORED, [], f"không đọc được file video: {video_path!r}"
 
         if not layout_marks:
-            # The layout data comes from rendering's marks file (LLD D3). An
+            # The layout data comes from rendering's marks file. An
             # older project, or a render whose mark capture silently failed,
             # has none — the audio/packaging half could still be scored, but a
             # report missing every layout rule while claiming to have passed
@@ -794,12 +788,12 @@ class QCVideoCommandHandler:
 
 
 class GenerateClipsCommandHandler:
-    """Handles `generate_clips` (CR-007 FR19), the saga step between
-    `qc_video` and `publish_video` (LLD D1).
+    """Handles `generate_clips`, the saga step between `qc_video` and
+    `publish_video`.
 
     One `clips_generated` event per command, carrying one entry per
     `(request, preset)` pair with its own status — there is no global
-    failure branch (D1, same shape as QCVideoCommandHandler's FR61.4): a
+    failure branch (same shape as QCVideoCommandHandler): a
     clip that fails validation or ffmpeg does not stop the rest, and never
     blocks publish.
     """
@@ -856,7 +850,7 @@ class GenerateClipsCommandHandler:
 
     def _generate_all(self, project_id: str, payload: dict) -> list[dict]:
         """Runs synchronously in a thread — six ffmpeg re-encodes (three clips
-        x two presets, per LLD Rủi ro) is exactly the blocking work that must
+        x two presets) is exactly the blocking work that must
         not sit on the event loop."""
         video_path = payload["video_path"]
         intro_duration_seconds = float(payload.get("intro_duration_seconds") or 0.0)
@@ -875,7 +869,7 @@ class GenerateClipsCommandHandler:
             for preset in raw_request.get("presets") or []:
                 # One (request, preset) at a time — an exception from ffmpeg
                 # or an unreadable video must not take the sibling presets
-                # (or the next request) down with it (D1).
+                # (or the next request) down with it.
                 try:
                     result = generate_clip(
                         project_id=project_id,
@@ -904,10 +898,11 @@ class GenerateClipsCommandHandler:
 
 
 class VideoAssemblyCommandDispatcher:
-    """One queue, three commands (CR-023, mirrors RenderingCommandDispatcher on
-    the Rendering side): `video_assembly.commands` carries `assemble_video`
-    (per-project, saga-driven), `normalize_channel_asset` (channel-wide,
-    admin/upload-triggered) and, since CR-021, `qc_video` — one queue because
+    """One queue for all of this service's commands (mirrors
+    RenderingCommandDispatcher on the Rendering side):
+    `video_assembly.commands` carries `assemble_video` (per-project,
+    saga-driven), `normalize_channel_asset` (channel-wide,
+    admin/upload-triggered), `qc_video` and the others — one queue because
     all are this service's own work and all need to queue behind each other
     rather than run concurrently and contend for the same ffmpeg thread pool.
     """
@@ -954,9 +949,8 @@ class VideoAssemblyCommandDispatcher:
         # NOT payload["event_type"], which channel_assets.go happens to also
         # set redundantly but assembleVideoPayload never does).
         command = envelope.get("event_type")
-        # A command already sitting in the queue when CR-023 ships may carry
-        # no event_type at all (pre-CR-023 assemble_video shape) — default to
-        # assemble_video so nothing already in flight starts being ignored.
+        # A command with no event_type is the legacy assemble_video shape —
+        # default to assemble_video so it is never ignored.
         handler = self._handlers.get(command) or self._handlers.get("assemble_video")
         if handler is None:
             logger.warning("Unrecognized command %r on video_assembly.commands, ignoring", command)
@@ -983,6 +977,6 @@ class VideoAssemblyCommandDispatcher:
             logger.exception("Lệnh %r thất bại ngoài dự kiến, chuyển sang DLQ (không tự thử lại)", command)
             # requeue=False: dead-letter thẳng sang *.commands.dlq, nơi
             # Orchestrator đánh dấu bước thất bại để Creator tự bấm thử lại.
-            # Requeue trước đây lặp vô hạn (không backoff) tới TTL 24h, và
-            # chạy lại một lệnh tốn vài phút mà Creator không hề biết.
+            # Requeue sẽ lặp vô hạn (không backoff) tới TTL 24h, chạy lại một
+            # lệnh tốn vài phút mà Creator không hề biết.
             await message.reject(requeue=False)

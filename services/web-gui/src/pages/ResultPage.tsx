@@ -20,9 +20,7 @@ import styles from "./ResultPage.module.css";
 import { FLOW_RESULT, flowTitle } from "../utils/flow";
 
 /**
- * Bước 13 — "Kết quả" (bug report, 2026-09-12): trước đây trang này vừa xem
- * lại video vừa đăng bài cùng lúc, nên "chỉ muốn xem/chỉnh sửa" và "chỉ muốn
- * đăng" luôn phải đi qua chung một trang dài. Tách ra: trang này CHỈ xem lại
+ * Bước 13 — "Kết quả": trang này CHỈ xem lại
  * và các thao tác khác (render lại, tạo bản Shorts, xem input, xóa) — đăng
  * bài chuyển hẳn sang `PublishPage` (bước 14), tới đây bằng nút "Tiếp tục để
  * đăng" hoặc link "Xem chi tiết" khi đã đăng rồi.
@@ -45,7 +43,7 @@ export function ResultPage() {
   const [rerenderError, setRerenderError] = useState<string | null>(null);
 
   /**
-   * "Render lại ở chất lượng khác" (bug report): dùng lại chính project_id
+   * "Render lại ở chất lượng khác": dùng lại chính project_id
    * này — StartRenderSagaUseCase (orchestrator) upsert theo project_id, nên
    * đây là một saga render mới chạy lại từ parse_script, không phải một bước
    * vá riêng. Chấp nhận cái giá đó (tốn TTS lại) để đổi lấy việc không phải
@@ -90,8 +88,8 @@ export function ResultPage() {
     setError(null);
     setIsDeleting(true);
     try {
-      // 202: stay on the page with the progress card until the saga finishes
-      // (FR116.2); DeleteProgressCard's onDone navigates away.
+      // 202: stay on the page with the progress card until the saga finishes;
+      // DeleteProgressCard's onDone navigates away.
       await deleteProject(projectId);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));
@@ -105,7 +103,7 @@ export function ResultPage() {
 
   const isPublished = project.status === "published" || Boolean(project.youtube_video_url);
 
-  // CR-007 follow-up: a clip only ever comes from `with self.clip(...)` in
+  // A clip only ever comes from `with self.clip(...)` in
   // the script — picking "short"/"both" alone never produces one.
   const outputMode = project.video_output_mode ?? "long";
   const wantsClips = outputMode === "short" || outputMode === "both";
@@ -175,11 +173,8 @@ export function ResultPage() {
         </div>
 
         {/*
-          UX review #2 — the highest-impact fix on this page: these used to be
-          3-4 full-weight glass cards stacked as peers of the primary preview
-          +publish layout above, each with its own bespoke toggle. Grouped
-          under one demoted heading, using the one shared Disclosure
-          affordance (review #5), so the page reads as "primary: preview &
+          Secondary panels are grouped under one demoted heading, using the
+          shared Disclosure affordance, so the page reads as "primary: preview &
           publish" then "secondary: everything else" instead of five stacked
           look-alikes.
         */}

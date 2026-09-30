@@ -92,9 +92,8 @@
 }
 
 /*
-  rowMain's badge/hint text and the three action buttons both refused to
-  shrink on a narrow phone, so they overflowed past each other instead of
-  wrapping. Full-width lines for each keep every label readable.
+  rowMain's badge/hint text and the three action buttons do not shrink on a
+  narrow phone and would overflow past each other. Full-width lines for each keep every label readable.
 */
 @media (max-width: 560px) {
   .rowMain {

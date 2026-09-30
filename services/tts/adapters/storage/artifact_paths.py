@@ -1,4 +1,4 @@
-"""Shared-volume path convention for TTS audio artifacts (Low-Level Design Question 5).
+"""Shared-volume path convention for TTS audio artifacts.
 
 Pure filesystem helpers, no framework dependency — constructed directly by
 the application layer rather than injected (dependency-injection.md).
@@ -18,11 +18,10 @@ def compute_audio_path(project_id: str, scene_index: int, voice_id: str, text: s
     """Conventional path:
     /shared/{project_id}/audio/{scene_index}_{voice_id}_{text_hash}.wav
 
-    The text hash is not an optimisation — it is a correctness fix (CR-005
-    FR13.6). The path used to be keyed on (project_id, scene_index, voice_id)
-    alone, so editing a narration line and re-rendering the same project hit
-    the idempotency check and reused the OLD audio: the video said the previous
-    sentence while the subtitle showed the new one.
+    The text hash is needed for correctness, not speed: keyed on
+    (project_id, scene_index, voice_id) alone, an edited narration line would
+    hit the idempotency check and reuse the old audio, so the video would say
+    the previous sentence while the subtitle shows the new one.
 
     Hashing also means a re-render only pays for the lines that actually
     changed, which matters once synthesis is metered (ADR-0023).
@@ -78,7 +77,7 @@ def _rmdir_if_empty(path: str) -> None:
 
 
 def purge_project_artifacts(project_id: str) -> None:
-    """CR-040 FR114.2: remove what TTS owns for a deleted project
+    """Remove what TTS owns for a deleted project
     (/shared/{project_id}/audio) and nothing else. Idempotent."""
     project_dir = os.path.join(SHARED_VOLUME_ROOT, _safe_project_id(project_id))
     _remove(os.path.join(project_dir, "audio"))

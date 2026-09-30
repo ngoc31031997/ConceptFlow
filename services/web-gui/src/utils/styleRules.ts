@@ -1,7 +1,7 @@
 import type { CodeDiagnostic } from "../api/client";
 
 /**
- * CR-045 — tên các luật style, đọc thẳng từ file luật server trả về
+ * Tên các luật style, đọc thẳng từ file luật server trả về
  * (GET /v1/illustration-style), để cảnh báo "[S3] ..." hiện kèm tên luật mà
  * không phải chép danh sách luật sang một chỗ thứ hai.
  *

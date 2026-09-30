@@ -1,10 +1,8 @@
 """One OpenAI-compatible provider (Hive or Ollama), called through the
 `openai` SDK.
 
-Replaces the orchestrator's hand-written hive_client.go while keeping the
-behaviour that file had been measured and fixed into (CR-027 D11-D13):
-error classification, both usage shapes, mid-stream error chunks, the
-"budget" vs "empty" distinction and retry only for 429/5xx.
+Handles error classification, both usage shapes, mid-stream error chunks, the
+"budget" vs "empty" distinction, and retries only 429/5xx.
 """
 
 from __future__ import annotations
@@ -37,7 +35,7 @@ class ChatRequest:
     max_tokens: int = 0  # 0 = no cap sent; the provider applies its own ceiling
     temperature: float = 0.7
     json_mode: bool = False
-    # CR-048 T1: stop the stream once the model has streamed more than this many
+    # Stop the stream once the model has streamed more than this many
     # characters of reasoning without writing a single character of answer.
     # 0 = no limit. A reasoning model can otherwise think until max_tokens
     # (measured: 380k reasoning chars, 0 content, 13 minutes) and still fail.
@@ -51,7 +49,7 @@ class ChatResult:
 
 
 def _usage_from(raw: dict | None, model: str) -> Usage:
-    """Accepts BOTH shapes the two documented Hive models return (CR-027 D12):
+    """Accepts BOTH shapes the two documented Hive models return:
 
     glm-5.3-flash        reasoning_tokens at the top level
     deepseek-v4.1-flash  reasoning_tokens nested in completion_tokens_details,
@@ -154,7 +152,7 @@ class Provider:
             diag.append(f"elapsed: {time.monotonic() - started:.3f}s")
             if usage is None:
                 # No usage record came back: say so rather than let zeros pass
-                # for what was billed (CR-056).
+                # for what was billed.
                 usage = Usage(model=model, reasoning_chars=reasoning_chars, usage_reported=False)
             return LLMError(kind, self.name, message, usage, partial, "\n".join(diag), retryable)
 
@@ -272,7 +270,7 @@ class Provider:
                 retryable=False,
             )
 
-        # D13: "empty" and "ran out of room" are different problems, and a
+        # "empty" and "ran out of room" are different problems, and a
         # reasoning model turns the second into the first. DeepSeek reports
         # finish_reason "stop" even when max_tokens ended the reply
         # mid-reasoning, so an empty answer that used the whole budget is a

@@ -6,11 +6,11 @@ import (
 )
 
 // Chapter is one YouTube chapter, marked by a `# CHAPTER: "..."` comment in the
-// Creator's script (CR-006 FR15.1).
+// Creator's script.
 //
 // SceneIndex ties it to a narration marker rather than to a timestamp, because
 // the real timestamp is only known after Rendering measures where that line
-// actually falls (CR-002). Storing a time here would mean guessing.
+// actually falls. Storing a time here would mean guessing.
 type Chapter struct {
 	SceneIndex int    `json:"scene_index"`
 	Title      string `json:"title"`
@@ -27,15 +27,15 @@ const (
 )
 
 // BuildChapterTimestamps turns chapter markers into the "0:00 Title" lines that
-// go at the top of a YouTube description (FR15.2).
+// go at the top of a YouTube description.
 //
 // offsets are the real per-narration start times from Rendering. videoSeconds
-// must already include intro/outro (CR-023 D6) — the caller adds those before
+// must already include intro/outro — the caller adds those before
 // calling in, since only it knows whether they were attached at assembly.
 //
 // introDuration is the length of the channel intro sting prepended ahead of
-// the rendered video (CR-023 D2/D6), or 0 when this project has no intro.
-//   - introDuration == 0: unchanged from before CR-023 — chapter[0] is pulled
+// the rendered video, or 0 when this project has no intro.
+//   - introDuration == 0: chapter[0] is pulled
 //     to 0:00 because it genuinely is the start of the video.
 //   - introDuration > 0: a synthetic "Intro" chapter is inserted at 0:00, and
 //     every other chapter's start is pushed out by introDuration (not forced
@@ -118,7 +118,7 @@ func FormatTimestamp(seconds float64) string {
 	return fmt.Sprintf("%d:%02d", minutes, secs)
 }
 
-// ComposeDescription assembles the four-part description of FR18.2: the
+// ComposeDescription assembles the four-part description: the
 // model's summary, the chapter list, a call to action, and hashtags.
 //
 // Each part is omitted when empty rather than leaving a blank heading, so a

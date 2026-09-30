@@ -9,7 +9,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — the drawings one video needs, joined with the library row they
+// The drawings one video needs, joined with the library row they
 // point at so the review screen and the code-step gate read one list.
 
 func (r *PromptTemplateRepository) ListProjectIllustrations(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error) {
@@ -91,14 +91,14 @@ func (r *PromptTemplateRepository) UpdateProjectIllustration(ctx context.Context
 	return err
 }
 
-// DeleteProjectIllustrations drops a deleted project's list (CR-040 FR114 cleanup).
+// DeleteProjectIllustrations drops a deleted project's list.
 func (r *PromptTemplateRepository) DeleteProjectIllustrations(ctx context.Context, projectID string) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM project_illustrations WHERE project_id = $1`, projectID)
 	return err
 }
 
 // MarkIllustrationsPlanned records that the video's drawing list was made
-// (CR-045) and from which storyboard (CR-050 FR-17): storyboardSHA is the
+// and from which storyboard: storyboardSHA is the
 // sha256 of the storyboard the planner read.
 func (r *PromptTemplateRepository) MarkIllustrationsPlanned(ctx context.Context, projectID, storyboardSHA string) error {
 	_, err := r.pool.Exec(ctx, `
@@ -111,7 +111,7 @@ func (r *PromptTemplateRepository) MarkIllustrationsPlanned(ctx context.Context,
 }
 
 // IllustrationsStoryboardSHA returns the sha256 of the storyboard the video's
-// drawing list was planned from; "" for a list planned before CR-050 or never.
+// drawing list was planned from; "" when none was recorded.
 func (r *PromptTemplateRepository) IllustrationsStoryboardSHA(ctx context.Context, projectID string) (string, error) {
 	var sha string
 	err := r.pool.QueryRow(ctx, `

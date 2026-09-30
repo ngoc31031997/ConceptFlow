@@ -10,7 +10,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — the illustration library: folders of drawings, each with a PNG
+// The illustration library: folders of drawings, each with a PNG
 // still and a short GIF rendered by the rendering service, reviewed and
 // approved by the Creator before the Remotion Engineer may use it.
 
@@ -26,7 +26,7 @@ var (
 	// the diagnostics travel with it so the editor can point at the line.
 	ErrIllustrationInvalid = errors.New("illustration code did not pass the check")
 
-	// CR-052 — deleting a drawing a video may still render, and the Hình mẫu folder.
+	// Deleting a drawing a video may still render, and the Hình mẫu folder.
 	ErrIllustrationInUse        = errors.New("illustration is used by a project that has not reached its result")
 	ErrIllustrationUsageUnknown = errors.New("không kiểm tra được hình có đang được dự án nào dùng không — thử lại sau")
 	// ErrIllustrationLinked is the repository's answer when a project it was
@@ -107,7 +107,7 @@ type IllustrationRepoPort interface {
 type PreviewDiagnostic = domain.CodeFinding
 
 // IllustrationPreview is the renderer's answer for one drawing. Warnings are
-// style findings that do not block saving (CR-044, agreed with the Creator).
+// style findings that do not block saving.
 type IllustrationPreview struct {
 	OK          bool
 	Diagnostics []PreviewDiagnostic
@@ -360,7 +360,7 @@ func (uc *IllustrationsUseCase) SetStatus(ctx context.Context, id string, status
 }
 
 // Delete removes a drawing from the library, unless a video that has not
-// reached its result screen still uses it (CR-052).
+// reached its result screen still uses it.
 func (uc *IllustrationsUseCase) Delete(ctx context.Context, id string) error {
 	return uc.deleteDrawing(ctx, id, "")
 }

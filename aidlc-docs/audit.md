@@ -2509,3 +2509,34 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-057, thiết kế đã duyệt.
 
 ---
+
+## CR-057 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: (tiếp theo lần duyệt thiết kế; `/code CR-057`)
+**AI Response**:
+- **Quy tắc**: thêm `docs/code-standards-rules.md` (5 mục: comment mô tả code chứ không kể lịch sử; doc comment theo ngôn ngữ; chuẩn code cơ bản; test; chuỗi runtime). `CLAUDE.md` có mục "Code standards and documentation comments"; `.claude/skills/code/SKILL.md` và `.claude/skills/cr/SKILL.md` trỏ tới file này.
+- **Dọn comment** (khoảng 480 file, chỉ comment/docstring/comment SQL, cùng vài chuỗi log/assert/tên test):
+  - Bỏ mọi tham chiếu `CR-xxx`, `FRxx`, `review Cx`, `Unit N`, nhãn quyết định `D1/LLD`, "bug report", "Content Plugin", lịch sử "used to / before CR / trước đây". Giữ lý do kỹ thuật còn đúng. Giữ tham chiếu ADR (phương án A).
+  - Nhật ký phiên bản prompt trong `prompt_template_seeds.go` viết lại thành mô tả prompt hiện tại; nội dung prompt không đổi.
+  - Chuỗi runtime: log publisher `"Migrated the legacy OAuth credential into youtube_accounts"`, cảnh báo `audio_segments` của video-assembly (`legacy`). Tên test web-gui/api-gateway và thông báo assert Go bỏ số CR.
+  - Đổi tên file test authoring-service: `summaries_cr051_test.go` → `summaries_illustrations_ready_test.go`, `project_illustration_cr045_test.go` → `project_illustration_planning_test.go`, `code_segment_cr050_test.go` → `code_segment_repository_test.go`; id dữ liệu test `cr0NN-*` đổi thành tên mô tả.
+  - Bản sao dùng chung `adapters/persistence/inbox.py` (tts/rendering/video-assembly/publisher) và `internal/domain/flow.go` (authoring/orchestrator) giữ giống hệt nhau.
+- **Khác thiết kế**: api-gateway cũng có comment kiểu lịch sử (thiết kế tính 0 vì lần quét đầu bỏ sót `*.js`), nên đã dọn và rebuild; tổng cộng 9 service thay vì 8.
+- **Ngoại lệ còn giữ, có chủ ý**:
+  - id migration `'cr046_illustrations_flow_step'` trong `schema_migrations` của orchestrator (là dữ liệu; đổi sẽ chạy lại migration);
+  - nhãn mục trong nội dung prompt ("mục C3"…) và các file `prompts/*.txt` (dữ liệu prompt, ngoài phạm vi);
+  - các câu "no longer"/"previously" còn lại mô tả hành vi, không phải lịch sử (ví dụ "a client_id that is no longer configured");
+  - "Phase 0 benchmark" (nguồn số đo).
+- **Test**:
+  - llm-service 140 passed; tts 104; publisher 88; video-assembly 186; rendering 351 passed, 11 skipped. ruff sạch, trừ rendering 4 lỗi E501 có sẵn trên `main`.
+  - orchestrator và authoring-service: gofmt/vet sạch, `go test ./...` pass. Test Postgres của authoring-service (6 test) chạy trên container `postgres:16` tạm: pass.
+  - api-gateway 113 passed. web-gui: `tsc` sạch; eslint 0 lỗi, 20 cảnh báo (bằng `main`); vitest 429/429 pass. Có một lần chạy báo 1 fail chập chờn khi máy đang tải nặng, không lặp lại qua 4 lần chạy sau; chưa xác định được tên test.
+  - `tests/contracts` 12 passed.
+- **Rebuild**: api-gateway, authoring-service, llm-service, orchestrator, publisher, rendering, tts, video-assembly, web-gui. Tất cả healthy; web-gui không có healthcheck, trả HTTP 200. Log khởi động không lỗi (schema/migration chạy bình thường).
+- **Kiểm trực tiếp**: `GET /v1/projects?page=1` qua gateway trả danh sách (39 project); `GET /v1/prompts/story_architect` 200; web-gui `/` và `/videos` 200.
+- **Graph**: `make graph` đã chạy.
+**Impact Assessment**: không đổi hành vi, contract, DB hay migration; chỉ comment, tên file test và vài chuỗi log.
+**Artifacts Affected**: khoảng 484 file (code, test, `docs/code-standards-rules.md`, `CLAUDE.md`, 2 skill); chưa commit.
+**Context**: CONSTRUCTION — CR-057, chờ Creator duyệt rồi `/deliver`.
+
+---

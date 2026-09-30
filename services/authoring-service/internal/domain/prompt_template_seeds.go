@@ -8,13 +8,13 @@ import "strings"
 // code-formatting backtick (e.g. `self.narrate(...)`) and is restored here.
 func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 
-// DefaultPromptTemplates returns the seed rows for the 4 CR-025 authoring
+// DefaultPromptTemplates returns the seed rows for the authoring
 // roles. They are Vietnamese only: these are instructions the Creator reads,
 // while the video's narration language is chosen per project and varied by
 // {{narration_language_rule}}, not by a second copy of the prompt.
 //
 // Content is adapted from services/web-gui/src/components/scriptPrompts.ts,
-// split across the 4 pipeline roles per CR-025's low-level design.
+// split across the pipeline roles.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 10, TemplateText: bt(storyArchitectVI)},
@@ -24,7 +24,7 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 5, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
 		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 3, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
-		// CR-040 FR113: bodies embedded from the exact text the browser used to build.
+		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
 		{Role: RoleShortScript, Language: "vi", Version: 1, TemplateText: shortScriptTemplate},
@@ -47,97 +47,47 @@ func DefaultPromptTemplate(role PromptRole, language string) (PromptTemplate, bo
 	return PromptTemplate{}, false
 }
 
-// --- Story Architect (FR72.1) ---------------------------------------------
-// The role no longer describes itself as "3Blue1Brown-style". Defining the
-// channel by naming another channel bought nothing the rules below do not say
-// more precisely, and the model collapsed the name into surface cliché instead
-// of method. The channel's own voice now arrives as {{channel_identity}}
-// (services/web-gui/src/components/scriptPrompts.ts), so it can change without
-// touching this prompt.
+// --- Story Architect -------------------------------------------------------
+// The channel's own voice arrives as {{channel_identity}}, so it can change
+// without touching this prompt; the role does not define itself by naming
+// another channel.
 //
-// Candidate core questions must be proposed and narrowed (a one-shot
-// model will never obey "stop and rethink"); the metaphor must declare where it
-// breaks; beats must echo the format's real ids so the Visual Director can map
-// them 1:1; each beat reports its own word count against the budget; narration
+// Structure: candidate core questions are proposed and narrowed; the metaphor
+// (optional — a forced analogy is worse than none) must declare where it
+// breaks; beats echo the format's real ids so the Visual Director can map them
+// 1:1; each beat reports its own word count against the budget; narration
 // drafts carry hard TTS constraints — the text is spoken verbatim by a
-// single-locale voice with no SSML (see services/tts/adapters/tts_engines),
-// so symbols and un-transliterated English are read wrong.
+// single-locale voice with no SSML (see services/tts/adapters/tts_engines), so
+// symbols and un-transliterated English are read wrong.
 //
-// v2 adds the cognitive layer the structural rules could not reach: an outline
-// could satisfy every beat id and word budget and still be a textbook dump.
-// The foundations now carry an intuitive misconception (explicitly allowed to
-// be "none clear", since a model asked for one will otherwise invent one), and
-// the aha moment must be expressible as "I used to think X, but now I realize
-// Y" — chained to that misconception, or to the viewer's own prediction when
-// there is none, so misconception/aha/insight stop being three unrelated
-// fields. Beats gained a cognitive role and a "what the viewer must realize"
-// line: the latter is a content requirement for the Visual Director, which
-// receives this output as raw prose, not a storyboard instruction — hence the
-// wrong/right pair and the deletion test that keep it from becoming one. The
-// metaphor became optional (a forced analogy is worse than none), and a
-// self-check runs before output in the same detect-then-fix shape the Visual
-// Director already uses, reporting a single SELF-CHECK line so a human
-// reviewing step 1 can see whether it actually ran.
+// Cognitive layer: the foundations carry an intuitive misconception (allowed
+// to be "none clear", since a model asked for one will otherwise invent one),
+// and the aha moment must be expressible as "I used to think X, but now I
+// realize Y", chained to that misconception or to the viewer's own prediction.
+// Each beat has a cognitive role and a "what the viewer must realize" line — a
+// content requirement for the Visual Director, kept from becoming a storyboard
+// instruction by the wrong/right pair and the deletion test.
 //
-// v4 changes the voice, not the skeleton. v3 outlines were correct but read
-// like lecture notes: accurate, dry, pitched at people who already liked the
-// subject. The role is now a screenwriter: every video gets a character with
-// a goal, a concrete situation that goes wrong, and a turn — the explanation
-// happens as the plot, not beside it. The situation doubles as the channel's
-// "start from something real" running example, and the misconception is what
-// the character tries first, so story and cognitive arc are one chain rather
-// than a story pasted over a lecture. Humour is required but bounded: it must
-// come from the situation, never mock the viewer, never blur a fact, and must
-// survive a TTS voice (no emoji, no "haha", no puns that only work in
-// writing). Accessibility is pinned to a concrete audience test (a curious
-// twelve-year-old and their grandparent) and jargon may only arrive after the
-// intuition, with an everyday gloss. Every v3 output field is kept with the
-// same label, so the Visual Director's contract is unchanged; v4 only adds
-// STORY FRAME fields up top and a per-beat "Scene" line.
+// Voice: the role is a screenwriter. Every video gets a character with a goal,
+// a concrete situation that goes wrong, and a turn — the explanation happens
+// as the plot. Humour follows a comedy PLAN (one running gag with a callback)
+// and named techniques with assigned roles, comes from the situation, never
+// mocks the viewer or blurs a fact, and survives a TTS voice. Accessibility is
+// pinned to a concrete audience test (a curious twelve-year-old and their
+// grandparent); jargon arrives only after the intuition, with an everyday
+// gloss. The opening screen must be describable as basic shapes, text, lines
+// and motion, since the renderers cannot draw real-world scenes.
 //
-// v5 fixes two things v4 got wrong in practice. (1) The humour was bland
-// because the rules only said what to avoid, so the model fell back on the
-// safest register. Humour now has a comedy PLAN (one running gag with a
-// callback) and named techniques with assigned roles — deadpan as the voice,
-// escalation as the gag engine, expectation-vs-reality for the hook,
-// exaggerated comparison for scale, self-deprecation as seasoning — mixed by
-// role rather than sprinkled. (2) Steps 1-2 kept picking real-world scenes
-// (a shop, a courier) that the renderers (Manim/Remotion) cannot draw. Steps
-// 1-2 now require the opening screen to be describable as basic shapes,
-// text, lines and motion, and characters are abstract entities with a
-// personality. The visual guidance is principle + non-exhaustive examples +
-// a short hard-no list, so it does not become a whitelist that caps ideas.
-//
-// v7 (CR-041 phase 1) stops forcing every topic into the paradox-plus-examples
-// mould. The prompt was one skeleton (archetype A), so a topic like "for vs
-// while vs do-while" got three parallel definitions. It is now a shared frame
-// (identity, voice, truth rules, output shape, self-check) plus a Step 0 that
-// picks a video archetype (A paradox, B concept family, C mechanism trace, D
-// evolving problem) and one short playbook per archetype that says how to
-// assign the archetype to the CHOSEN format's beats. The archetype is printed
-// as the first output line so a wrong pick is visible at a glance, and the
-// beat ids stay the format's own: an archetype that does not fit the format
-// adds a warning line instead of bending the structure (validate_script would
-// block it). Every v6 output label is kept, so the Visual Director's contract
-// is unchanged; v7 only adds the KIỂU VIDEO line (and an optional CẢNH BÁO
-// FORMAT line) above them. The kinds themselves live in the video_archetypes
-// table (CR-041): {{video_archetypes}} expands to the menu plus one playbook
-// per row, so the Creator can add kinds without touching this prompt.
-//
-// v10 stops the outline from coming back the same for every topic. v9 still
-// carried archetype A everywhere outside Step 0: the channel identity, Step 1-2,
-// the per-beat role table, the voice (a fixed list of contrast connectors), the
-// KHUNG BÀI fields and half the self-check all described "paradox + 5–7
-// cross-domain examples", so whatever kind the model picked, it wrote that
-// video with a different label. The shared frame is now kind-neutral: the
-// paradox specifics live only in the NGHỊCH-LÝ playbook. A new Step 1 makes
-// the model diagnose THIS topic before outlining — what exactly makes it hard,
-// what the viewer must already know, which explanation device fits it best
-// (trace, build-up, contrast, numbers, story, analogy) and the natural order
-// the ideas depend on each other — and the outline must follow that order.
-// A "swap test" in the self-check rejects an outline that would still fit if
-// the topic were replaced. Output labels are unchanged, so the Visual
-// Director's contract is unchanged.
+// Topic fit: the shared frame is kind-neutral. Step 0 picks a video archetype
+// from {{video_archetypes}} (the video_archetypes table: a menu plus one
+// playbook per row, so the Creator can add kinds without touching this
+// prompt), printed as the first output line (KIỂU VIDEO, plus an optional
+// CẢNH BÁO FORMAT line when the archetype does not fit the chosen format).
+// Step 1 diagnoses THIS topic — what makes it hard, what the viewer must
+// already know, which explanation device fits, and the order the ideas depend
+// on each other — and the outline follows that order. The self-check runs
+// before output, reports a single SELF-CHECK line, and its "swap test" rejects
+// an outline that would still fit if the topic were replaced.
 const storyArchitectVI = `Bạn là BIÊN KỊCH của một kênh video phổ biến kiến thức. Người xem bấm vào vì một câu hỏi có thật họ chưa trả lời được, ở lại vì mỗi phút họ hiểu thêm một điều rõ ràng, và rời đi có thể tự giải thích lại chủ đề cho người khác. Việc của bạn ở bước này là dựng DÀN Ý và LỜI THOẠI — không viết code, không mô tả animation.
 
 ======================================================
@@ -334,26 +284,22 @@ TỰ KIỂM: <đã soi 10 mục — sửa: ... / đã soi 10 mục, không phả
 
 Sửa xong hết rồi mới xuất output. Đây là bước 1/3 — Visual Director (bước 2) sẽ nhận đúng nội dung này để dựng storyboard, nên chỉ viết NỘI DUNG và LỜI THOẠI.`
 
-// --- Visual Director (FR72.2-72.4) ----------------------------------------
-// Turns the story outline into a shooting script. v7 makes the role engine
+// --- Visual Director -------------------------------------------------------
+// Turns the story outline into a shooting script. The role is engine
 // agnostic: it directs a short film — shots, camera movement, transitions,
 // color as meaning, one visual world that carries the argument — and knows
-// nothing about Manim or Remotion. Earlier versions handed this role the
-// engine's constraints (a closed action vocabulary, and the fact that Manim's
-// `narrate()` freezes the frame for the whole spoken line), which made it
-// design around the renderer instead of around the viewer: the output read as
-// a checklist of reveal/swap calls rather than a film. Those constraints now
-// live where they bite — in the engineer prompts, which translate the
-// director's intent into what their engine can actually render (the Manim
-// Engineer, for instance, splits a long line into several narrate calls so
-// the picture keeps moving).
+// nothing about Manim or Remotion, so it designs around the viewer rather than
+// the renderer. Engine constraints live in the engineer prompts, which
+// translate the director's intent into what their engine can render (the
+// Manim Engineer, for instance, splits a long line into several narrate calls
+// so the picture keeps moving).
 //
-// What survives from v4-v6 is the semantic layer, because it is about the
-// story, not the renderer: every motion must carry meaning, narration states
-// meaning rather than describing the picture, the story may not be rewritten,
-// and each beat declares an `Invariant meaning` line that acts as a semantic
-// checksum the engineer may not alter. The anchor object becomes the film's
-// "protagonist", and a fixed color script replaces the per-shot color notes.
+// The semantic layer is about the story, not the renderer: every motion must
+// carry meaning, narration states meaning rather than describing the picture,
+// the story may not be rewritten, and each beat declares an `Invariant
+// meaning` line that acts as a semantic checksum the engineer may not alter.
+// The anchor object is the film's "protagonist", and a fixed color script
+// sets the colors.
 //
 // There is one director for every render engine: only the code step forks
 // (manim_engineer / remotion_engineer).
@@ -633,16 +579,12 @@ Chỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc tr
 
 const manimEngineerVI = manimIntroVI + manimStoryVI + manimFormatVI + manimSharedVI + manimCheckVI + manimOutputVI
 
-// --- Remotion Engineer (feature/remotion-engine) ---------------------------
-// v5 (CR-038): gains the optional Lottie clip catalog ({{lottie_catalog}}, baked
-// at seed time like theme_reference). The Visual Director is deliberately left
-// engine-agnostic, so only this role sees the catalog and may swap in a clip
-// where a shot's HÌNH names that clip's subject.
+// --- Remotion Engineer ----------------------------------------------------
 // The Remotion counterpart of manim_engineer, consuming story + storyboard via
 // {{previous_output}} exactly like manimEngineerVI does.
 //
-// v4 turns the role into a pure translator. Every creative decision now
-// belongs upstream or to the Creator's settings:
+// The role is a pure translator. Every creative decision belongs upstream or
+// to the Creator's settings:
 //   - colours: the Visual Director's COLOR SCRIPT carries hex codes, copied
 //     verbatim into a PALETTE constant; no other colour may appear;
 //   - background and font: fixed by conceptflow-mini's <Stage> (background
@@ -651,11 +593,12 @@ const manimEngineerVI = manimIntroVI + manimStoryVI + manimFormatVI + manimShare
 //     settings, so the script never prints narration on screen, and
 //     {{subtitle_zone}} tells it which band of the frame to keep clear.
 //
-// v3's allow-list (TitleText/BodyText only) and its template that printed each
-// narration line as a giant centred title are gone: they made every Remotion
-// video a slideshow of text. In their place is a long, concrete layout
-// rulebook, because with no design system and no pre-render lint, overlapping
-// or overflowing elements are the failure that only shows up after a render.
+// It carries a long, concrete layout rulebook, because with no design system
+// and no pre-render lint, overlapping or overflowing elements are the failure
+// that only shows up after a render. It also sees the optional Lottie clip
+// catalog ({{lottie_catalog}}, baked at seed time like theme_reference) and may
+// swap in a clip where a shot's HÌNH names that clip's subject; the Visual
+// Director stays engine-agnostic and never sees the catalog.
 const remoIntroVI = `Bạn là KỸ SƯ REMOTION. Bạn nhận một kịch bản phân cảnh ĐÃ CHỐT từ Đạo diễn (Visual Director) và dựng nó thành code Remotion (React/TypeScript, https://remotion.dev) — CHÍNH XÁC, SỐNG ĐỘNG, KHÔNG LỖI HIỂN THỊ. Mọi quyết định sáng tạo (nội dung, hình, màu, chuyển động, nhịp) đã được đưa ra. Việc của bạn chỉ là CODE: dựng lại đúng từng shot như đạo diễn mô tả, không thêm, không bớt, không "cải tiến".
 
 ======================================================
@@ -716,7 +659,7 @@ Cách dùng (chỉ khi danh sách trên có clip):
 
 `
 
-// C3 (CR-043): the flat illustration kit. {{illustration_kit}} is baked at seed
+// C3: the flat illustration kit. {{illustration_kit}} is baked at seed
 // time from prompts/illustration_kit_vi.txt, which the rendering test suite
 // holds to the components remotion_project/src/conceptflow-mini/illustration.tsx
 // actually exports.

@@ -3,7 +3,7 @@ package domain
 import "testing"
 
 // TestRenderQualityIsValid locks in the four presets Rendering can honour —
-// 480p15 was added (bug report) as an explicit "for testing only" tier below
+// 480p15 is an explicit "for testing only" tier below
 // 720p30, so a Creator can iterate on content/timing without paying for a
 // heavier render.
 func TestRenderQualityIsValid(t *testing.T) {

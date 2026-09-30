@@ -3,7 +3,7 @@ package domain
 // The 14-step production flow the Creator sees. It is derived from the saga
 // status plus what the draft already holds, never stored: one function decides
 // where a project is, so the wizard, the project list and the event log cannot
-// disagree the way wizard_route and the real content used to.
+// disagree.
 //
 // Review (8) is a screen, not a saga state: validate finishes at
 // awaiting_review and nothing runs until the Creator presses "start render".
@@ -12,7 +12,7 @@ const (
 	FlowConfig        = 2  // Cấu hình
 	FlowStory         = 3  // Kịch bản
 	FlowVisual        = 4  // Visual
-	FlowIllustrations = 5  // Hình minh hoạ (CR-046: promoted from a source="illustrations" sub-state of Code; runs BEFORE Code, whose output Code reads)
+	FlowIllustrations = 5  // Hình minh hoạ: runs before Code, which reads its output
 	FlowCode          = 6  // Code
 	FlowValidate      = 7  // Validate (parse + dry run)
 	FlowReview        = 8  // Review — screen only
@@ -54,7 +54,7 @@ func RunStateOf(status ProjectStatus, errorMessage *string) RunState {
 
 // AuthoredContent says which authoring artefacts a draft holds.
 //
-// CR-051: NeedsIllustrations is set for a Remotion project, the only engine
+// NeedsIllustrations is set for a Remotion project, the only engine
 // that has an illustrations step (5); Illustrations says its drawing list is
 // planned and every drawing approved or skipped — the same rule that gates
 // the code step.

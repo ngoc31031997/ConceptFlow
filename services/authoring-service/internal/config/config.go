@@ -20,7 +20,7 @@ type Config struct {
 	OrchestratorURL     string
 	OrchestratorTimeout time.Duration
 
-	// CR-039 — every language-model call goes through llm-service, which alone
+	// Every language-model call goes through llm-service, which alone
 	// holds HIVE_API_KEY / OLLAMA_URL and the retry/rate-limit policy.
 	LLMServiceURL string
 	// 0 = wait as long as llm-service does (Hive can take minutes on a reasoning model).
@@ -31,11 +31,11 @@ type Config struct {
 	HiveMaxInputChars   int
 	HiveMaxOutputTokens int
 
-	// CR-044 — the rendering service checks and previews library drawings.
+	// The rendering service checks and previews library drawings.
 	RenderingURL     string
 	RenderingTimeout time.Duration
 
-	// CR-045 — how many drawings the illustrations step draws at once.
+	// How many drawings the illustrations step draws at once.
 	IllustrationDrawConcurrency int
 }
 
@@ -81,7 +81,7 @@ func Load() (*Config, error) {
 	}
 	// Generous on purpose: a full Manim script runs to several hundred lines,
 	// and on a reasoning model part of this budget is spent before the first
-	// character of the answer is written (CR-027 D13).
+	// character of the answer is written.
 	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 128000)
 	if err != nil {
 		return nil, err

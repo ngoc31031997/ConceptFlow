@@ -1,1 +1,1 @@
-"""QC probes (CR-021) — the I/O half of quality checking."""
+"""QC probes — the I/O half of quality checking."""

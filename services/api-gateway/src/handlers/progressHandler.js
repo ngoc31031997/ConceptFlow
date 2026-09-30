@@ -1,7 +1,7 @@
 'use strict';
 
 /**
- * Factory managing the SSE side of the AMQP-to-SSE bridge (LLD Flow 3).
+ * Factory managing the SSE side of the AMQP-to-SSE bridge.
  *
  * Holds a `Map<projectId, Response[]>` connection registry in memory —
  * intentionally not persisted (logical-components.md): if the Gateway

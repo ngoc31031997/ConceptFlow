@@ -170,8 +170,8 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 // scenes/script_content), newest-updated first, for GET /v1/projects.
 func (r *ProjectRepository) List(ctx context.Context) ([]domain.ProjectSummary, error) {
 	// error: the failed saga step's own message (see Get for why the column is
-	// not trusted). The topic and what a draft holds live in authoring-service
-	// (CR-040 FR111); the caller fills them in from its summaries.
+	// not trusted). The topic and what a draft holds live in authoring-service;
+	// the caller fills them in from its summaries.
 	rows, err := r.pool.Query(ctx, `
 		SELECT p.project_id, p.status, p.video_path,
 		       (SELECT s.error_message FROM saga_steps s
@@ -221,7 +221,7 @@ func (r *ProjectRepository) ForkedFrom(ctx context.Context, projectID string) (s
 	return from, err
 }
 
-// BeginDelete starts the delete saga (CR-040 FR114.2): under a row lock it
+// BeginDelete starts the delete saga: under a row lock it
 // refuses a project with a step in flight and marks it `deleting`. A project
 // already `deleting` is accepted again (retry after a failed purge).
 func (r *ProjectRepository) BeginDelete(ctx context.Context, projectID string) (string, error) {
@@ -261,7 +261,7 @@ func (r *ProjectRepository) BeginDelete(ctx context.Context, projectID string) (
 // still queued for it (matched by the project_id embedded in the command
 // payload) — so a deleted video leaves no residual rows behind to bloat the
 // database. File cleanup on the shared volume is done beforehand by each owning
-// service (the delete saga, CR-040 FR114.2); this is only the final row removal.
+// service (the delete saga); this is only the final row removal.
 func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -269,7 +269,7 @@ func (r *ProjectRepository) Delete(ctx context.Context, projectID string) error 
 	}
 	defer tx.Rollback(ctx)
 
-	// CR-040 FR114.3: lock the row and refuse while a saga step is executing,
+	// Lock the row and refuse while a saga step is executing,
 	// otherwise a worker could recreate files after the project is gone.
 	var sagaID, status string
 	err = tx.QueryRow(ctx, `SELECT saga_id, status FROM projects WHERE project_id = $1 FOR UPDATE`, projectID).Scan(&sagaID, &status)
@@ -308,14 +308,14 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	if !renderEngine.IsValid() {
 		renderEngine = domain.DefaultRenderEngine
 	}
-	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý (CR-024), nên NULL khi rỗng
+	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý, nên NULL khi rỗng
 	// thay vì một mảng JSON rỗng — dễ đọc hơn khi soi database.
 	scenesJSON, err := json.Marshal(project.Scenes)
 	if err != nil {
 		return err
 	}
 
-	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý (CR-024), nên để NULL khi rỗng
+	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý, nên để NULL khi rỗng
 	// thay vì một mảng JSON rỗng — dễ đọc hơn khi soi database.
 	var beatsJSON, warningsJSON []byte
 	if len(project.Beats) > 0 {
@@ -351,7 +351,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		}
 	}
 
-	// CR-021: NULL when Rendering sent none (a project rendered before the
+	// NULL when Rendering sent none (a project rendered before the
 	// layout marks existed), which qc_video then reports as not_scored rather
 	// than pretending an empty screen.
 	var layoutMarksJSON []byte
@@ -361,8 +361,8 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		}
 	}
 
-	// CR-007: NULL when there is nothing yet — a project pre-CR-007, or one
-	// whose script never used `with self.clip(...)` and whose Creator never
+	// NULL when there is nothing yet — a project whose
+	// script never used `with self.clip(...)` and whose Creator never
 	// entered a manual selection.
 	var clipMarksJSON, clipRequestsJSON, clipsJSON []byte
 	if len(project.ClipMarks) > 0 {
@@ -552,7 +552,7 @@ func (r *ProjectRepository) ListRecentProjectEvents(ctx context.Context, limit i
 	return scanProjectEvents(rows)
 }
 
-// SaveRenderEngine updates only Project.RenderEngine (CR-030 — the wizard
+// SaveRenderEngine updates only Project.RenderEngine (the wizard
 // picks the engine at step "/" / tab 1a, before any authoring content
 // exists, so this has to land on the row without touching the other columns
 // Save()'s full upsert would otherwise reset). A no-op on an unknown
@@ -696,7 +696,7 @@ func (r *ProjectRepository) UpdateStep(ctx context.Context, step *domain.SagaSte
 }
 
 // RecordVoiceSamples folds one project's measurement into the voice's running
-// totals (CR-016 FR43.1).
+// totals.
 //
 // The upsert adds rather than replaces: a voice's measured rate should settle
 // as evidence accumulates, not swing to whatever the last project happened to
@@ -754,8 +754,7 @@ func (r *ProjectRepository) ListVoiceCalibrations(ctx context.Context) ([]domain
 	return out, rows.Err()
 }
 
-// SeedVideoFormats writes the built-in formats if they are not already there
-// (CR-019 FR51.2).
+// SeedVideoFormats writes the built-in formats if they are not already there.
 //
 // Insert-if-absent rather than upsert: once the Creator has edited a format,
 // a restart must not quietly restore the shipped numbers underneath them.
@@ -831,7 +830,7 @@ func (r *ProjectRepository) ListVideoFormats(ctx context.Context) ([]domain.Vide
 	return out, rows.Err()
 }
 
-// SaveVideoFormat stores a format as a NEW version (CR-019 FR51.6).
+// SaveVideoFormat stores a format as a NEW version.
 //
 // Never overwrites: a project rendered against version 3 must keep reporting
 // version 3's beats, otherwise editing a format silently rewrites the structure
@@ -858,7 +857,7 @@ func (r *ProjectRepository) SaveVideoFormat(ctx context.Context, format domain.V
 	return format, nil
 }
 
-// GetStatus is the narrow read the authoring lock (CR-028 FR84.2) needs — just
+// GetStatus is the narrow read the authoring lock needs — just
 // enough to decide draft-vs-locked without the full Project scan Get does.
 func (r *ProjectRepository) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
 	var status string
@@ -872,7 +871,7 @@ func (r *ProjectRepository) GetStatus(ctx context.Context, projectID string) (do
 	return domain.ProjectStatus(status), nil
 }
 
-// GetStatusAndLanguage is GetStatus plus the content language, for FR83.2's
+// GetStatusAndLanguage is GetStatus plus the content language, for the
 // re-scan of the topic-collision list (scoped to the project's own language).
 func (r *ProjectRepository) GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error) {
 	var status, language string

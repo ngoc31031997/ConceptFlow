@@ -18,9 +18,9 @@ function renderBar(overrides: Partial<Parameters<typeof PipelineSettingsBar>[0]>
   );
 }
 
-// CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình huống
-// (ScriptStepPage); hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab 1a/1b/1c
-// đọc như thể Creator chưa chọn gì. PipelineSettingsBar thay chúng bằng một
+// Engine và cách làm đã chốt ở màn chọn tình huống (ScriptStepPage); hiện
+// lại y nguyên hai bộ chọn đầy đủ ở mỗi tab 1a/1b/1c sẽ đọc như thể Creator
+// chưa chọn gì. PipelineSettingsBar thay chúng bằng một
 // dòng tóm tắt, chỉ mở lại thành bộ chọn đầy đủ khi bấm "Đổi".
 describe("PipelineSettingsBar", () => {
   it("mặc định thu gọn: không hiện bộ chọn engine hay công tắc chế độ", () => {

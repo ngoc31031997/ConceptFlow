@@ -1,11 +1,10 @@
 """Voice catalog — the single source of truth for which voices this service
-offers (CR-001, replacing the earlier one-voice-per-language map from
-Low-Level Design Question 4).
+offers.
 
 The catalog is exported to the shared volume at startup (see
 `export_catalog`) so the API Gateway can serve `GET /v1/voices` without the
-TTS Service needing an HTTP server of its own — ADR-0014 deliberately
-removed REST from this service.
+TTS Service needing an HTTP server of its own (the service has no REST API,
+see ADR-0014).
 """
 
 from __future__ import annotations
@@ -22,7 +21,7 @@ CATALOG_FILENAME = "catalog.json"
 
 # Engine identifiers. Edge is the engine every project uses by default
 # (ADR-0024); Azure reaches the same voices through the documented paid API
-# (CR-011); Google is kept wired but dormant (ADR-0023). Azure and Google only
+# Google is kept wired but dormant (ADR-0023). Azure and Google only
 # run when their credentials are configured.
 ENGINE_EDGE = "edge"
 ENGINE_AZURE = "azure"
@@ -51,7 +50,7 @@ VOICES: tuple[Voice, ...] = (
     Voice("vi-VN-NamMinhNeural", "vi", "male", "neural", "Tiếng Việt — Nam"),
     Voice("en-US-JennyNeural", "en", "female", "neural", "English — Female"),
     Voice("en-US-GuyNeural", "en", "male", "neural", "English — Male"),
-    # Azure AI Speech (CR-011) — the same four voices through the documented
+    # Azure AI Speech — the same four voices through the documented
     # API: 500k neural characters a month free, commercial rights, an SLA.
     # Selectable only when AZURE_SPEECH_KEY/REGION are configured.
     Voice(
@@ -70,8 +69,8 @@ VOICES: tuple[Voice, ...] = (
         f"{AZURE_VOICE_PREFIX}en-US-GuyNeural", "en", "male", "neural",
         "English — Male", ENGINE_AZURE,
     ),
-    # Google WaveNet (ADR-0023) — dormant since Google withdrew its free tier
-    # (CR-010). Selectable only if GOOGLE_APPLICATION_CREDENTIALS is set.
+    # Google WaveNet (ADR-0023) — dormant, no free tier.
+    # Selectable only if GOOGLE_APPLICATION_CREDENTIALS is set.
     Voice("vi-VN-Wavenet-A", "vi", "female", "wavenet", "Tiếng Việt — Nữ", ENGINE_GOOGLE),
     Voice("vi-VN-Wavenet-B", "vi", "male", "wavenet", "Tiếng Việt — Nam", ENGINE_GOOGLE),
     Voice("vi-VN-Wavenet-C", "vi", "female", "wavenet", "Tiếng Việt — Nữ 2", ENGINE_GOOGLE),
@@ -115,8 +114,8 @@ def voices_for_engine(engine: str) -> list[Voice]:
 
 
 def fallback_voice_for(voice_id: str) -> str:
-    """The voice to use when a Google voice cannot be synthesized (CR-005
-    FR13.3). Falls back within the same language so a Vietnamese project does
+    """The voice to use when a metered voice cannot be synthesized.
+    Falls back within the same language so a Vietnamese project does
     not suddenly speak English."""
     voice = _BY_ID.get(voice_id)
     language = voice.language if voice else "en"
@@ -125,7 +124,7 @@ def fallback_voice_for(voice_id: str) -> str:
 
 def resolve_voice_id(voice_id: str | None, language: str) -> str:
     """Falls back to the language's default voice when no voice was chosen —
-    keeps projects created before CR-001 (which carry only a language) working.
+    keeps projects that carry only a language working.
     """
     if voice_id and voice_id in _BY_ID:
         return voice_id

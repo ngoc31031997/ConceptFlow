@@ -13,7 +13,7 @@ class StepList(Component):
 
     Số trong vòng tròn chứ không phải dấu chấm: nó cho phép narration nhắc "bước
     hai" và người xem tìm được ngay, đồng thời đưa vào khung hình một phần tử
-    hình học — đúng thứ FR46.5 đòi ở mỗi beat.
+    hình học mà mỗi beat cần có.
     """
 
     def __init__(self, items: list[str], theme: Theme | None = None) -> None:

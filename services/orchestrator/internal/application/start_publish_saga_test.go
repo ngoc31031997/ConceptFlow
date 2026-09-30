@@ -55,7 +55,7 @@ func TestStartPublishSagaUseCase_RejectsWrongStatus(t *testing.T) {
 	}
 }
 
-// CR-012: the chosen channel has to survive all the way into the AMQP
+// The chosen channel has to survive all the way into the AMQP
 // payload, since that is the only thing the Publisher sees.
 func TestStartPublishSagaUseCase_CarriesChannelIDIntoPayload(t *testing.T) {
 	repo := newFakeRepo()
@@ -87,7 +87,7 @@ func TestStartPublishSagaUseCase_CarriesChannelIDIntoPayload(t *testing.T) {
 	}
 }
 
-// CR-015 FR38.4/FR39.3: caption_path and its language have to reach the
+// caption_path and its language have to reach the
 // Publisher the same way thumbnail_path does — through this payload — since
 // that's the only thing the Publisher sees.
 func TestStartPublishSagaUseCase_CarriesCaptionPathAndLanguageIntoPayload(t *testing.T) {
@@ -150,7 +150,7 @@ func TestStartPublishSagaUseCase_OmitsCaptionFieldsWhenUnset(t *testing.T) {
 	}
 }
 
-// Projects created before CR-012 carry no channel. The key must be absent
+// A project with no channel: The key must be absent
 // rather than present-and-null, because the Publisher reads a missing key as
 // "use the default channel".
 func TestStartPublishSagaUseCase_OmitsChannelIDWhenUnset(t *testing.T) {
@@ -179,7 +179,7 @@ func TestStartPublishSagaUseCase_OmitsChannelIDWhenUnset(t *testing.T) {
 }
 
 // blockingReport is a QCReport with one blocking finding, the shared fixture
-// for the QC-gate tests below (CR-021 D5/FR61.3).
+// for the QC-gate tests below.
 func blockingReport(projectID string) domain.QCReport {
 	return domain.QCReport{
 		ProjectID: projectID,
@@ -191,7 +191,7 @@ func blockingReport(projectID string) domain.QCReport {
 }
 
 // TestStartPublishSagaUseCase_QCEnforceFalse_DoesNotBlockEvenWithBlockingFinding
-// is D5's default (Decision #3): QC_ENFORCE=false means findings are shown but
+// is the default: QC_ENFORCE=false means findings are shown but
 // never stop a publish, no matter their severity.
 func TestStartPublishSagaUseCase_QCEnforceFalse_DoesNotBlockEvenWithBlockingFinding(t *testing.T) {
 	repo := newFakeRepo()
@@ -214,7 +214,7 @@ func TestStartPublishSagaUseCase_QCEnforceFalse_DoesNotBlockEvenWithBlockingFind
 	}
 }
 
-// TestStartPublishSagaUseCase_QCEnforceTrue_BlocksOnBlockingFinding is FR61.3's
+// TestStartPublishSagaUseCase_QCEnforceTrue_BlocksOnBlockingFinding is the
 // core rule: with the gate enforced, a blocking finding refuses the publish
 // unless the Creator acknowledges it.
 func TestStartPublishSagaUseCase_QCEnforceTrue_BlocksOnBlockingFinding(t *testing.T) {
@@ -239,7 +239,7 @@ func TestStartPublishSagaUseCase_QCEnforceTrue_BlocksOnBlockingFinding(t *testin
 }
 
 // TestStartPublishSagaUseCase_QCEnforceTrue_AcknowledgeQCOverridesAndRecords is
-// FR61.3's escape hatch: acknowledge_qc:true lets the publish through, and the
+// the escape hatch: acknowledge_qc:true lets the publish through, and the
 // bypass must be recorded (overridden_at) so it is never a silent override.
 func TestStartPublishSagaUseCase_QCEnforceTrue_AcknowledgeQCOverridesAndRecords(t *testing.T) {
 	repo := newFakeRepo()

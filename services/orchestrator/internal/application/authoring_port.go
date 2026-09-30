@@ -8,15 +8,15 @@ import (
 )
 
 // AuthoringSummary is what authoring-service reports per project: the topic to
-// name it by and which of the three authoring outputs exist (CR-040 FR111).
+// name it by and which of the three authoring outputs exist.
 type AuthoringSummary struct {
 	Topic      string `json:"topic"`
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
-	// IllustrationsReady (CR-051): the drawing list is planned and every drawing
-	// approved or skipped. nil means an authoring-service from before CR-051
-	// that does not send it — read as ready, which is the old placement.
+	// IllustrationsReady: the drawing list is planned and every drawing
+	// approved or skipped. nil means the authoring-service did not send
+	// it — read as ready.
 	IllustrationsReady *bool `json:"illustrations_ready"`
 }
 
@@ -30,7 +30,7 @@ func (s AuthoringSummary) Content(engine domain.RenderEngine) domain.AuthoredCon
 	}
 }
 
-// SimilarProject is one match CR-028 FR85 surfaces back to the Creator when a
+// SimilarProject is one match the topic-collision check surfaces back to the Creator when a
 // topic collides (after normalization) with an existing project's saved topic,
 // in the same content_language.
 type SimilarProject struct {

@@ -17,8 +17,8 @@ interface VideoOutputModePickerProps {
 }
 
 /**
- * CR-007 follow-up. A clip is always cut from the rendered 16:9 video (CR-007
- * D1 — no standalone vertical production), so "short" still runs the exact
+ * A clip is always cut from the rendered 16:9 video (no standalone vertical
+ * production), so "short" still runs the exact
  * same long-form pipeline as source; the choice here only decides whether
  * generate_clips runs at all, and which output step 5 puts front and center.
  * Publishing a clip is a manual upload either way — this app never auto-

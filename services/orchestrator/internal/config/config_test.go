@@ -13,7 +13,7 @@ func setRequired(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgresql://localhost:5432/orchestrator")
 }
 
-// CR-040 FR111: the orchestrator reaches authoring-service on the compose
+// The orchestrator reaches authoring-service on the compose
 // network by default, and both settings can be overridden.
 func TestLoad_AuthoringServiceDefaultsAndOverrides(t *testing.T) {
 	setRequired(t)

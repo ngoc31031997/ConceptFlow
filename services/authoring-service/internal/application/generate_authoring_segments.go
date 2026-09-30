@@ -9,7 +9,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-050 FR-4/5/7/9 — what the Creator does with the code step's segments
+// What the Creator does with the code step's segments
 // outside a run: see them, copy one segment's prompt for an outside AI, paste
 // or hand-edit one segment's result, and choose the shots per segment.
 
@@ -30,7 +30,7 @@ func (e *ErrStoryboardNotSegmentable) Error() string {
 
 // CodeSegments lists the segments of the current storyboard, cut by
 // llm-service with the Creator's shots per segment, each with what is stored
-// for it. Stored segments the current cut no longer has are not shown (the
+// for it. Stored segments the current cut does not have are not shown (the
 // next run deletes them). Before any run every segment reads as pending.
 func (uc *GenerateAuthoringUseCase) CodeSegments(ctx context.Context, projectID string) (CodeSegmentsView, error) {
 	if uc.segments == nil {
@@ -127,7 +127,7 @@ func (uc *GenerateAuthoringUseCase) codeSegmentRequest(ctx context.Context, proj
 }
 
 // CodeSegmentPrompt is the exact turn one segment would be asked, for the
-// Creator to run in an outside AI (FR-5).
+// Creator to run in an outside AI.
 func (uc *GenerateAuthoringUseCase) CodeSegmentPrompt(ctx context.Context, projectID, key string) (system, user string, err error) {
 	req, err := uc.codeSegmentRequest(ctx, projectID)
 	if err != nil {
@@ -138,7 +138,7 @@ func (uc *GenerateAuthoringUseCase) CodeSegmentPrompt(ctx context.Context, proje
 
 // PasteCodeSegment stores a reply written outside the pipeline — pasted from
 // an outside AI or edited by hand — as the segment's result, once llm-service
-// has checked it has the segment's shape (FR-5). Not while the step runs.
+// has checked it has the segment's shape. Not while the step runs.
 func (uc *GenerateAuthoringUseCase) PasteCodeSegment(
 	ctx context.Context, projectID, key, reply, source string,
 ) (domain.CodeSegment, error) {
@@ -185,7 +185,7 @@ func (uc *GenerateAuthoringUseCase) PasteCodeSegment(
 	return *seg, nil
 }
 
-// SetCodeChunkShots stores the Creator's shots per segment (FR-7). Not while
+// SetCodeChunkShots stores the Creator's shots per segment. Not while
 // the step runs: the run in flight was cut with the old size.
 func (uc *GenerateAuthoringUseCase) SetCodeChunkShots(ctx context.Context, projectID string, n int) error {
 	if uc.segments == nil {

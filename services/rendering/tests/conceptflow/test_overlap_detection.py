@@ -1,10 +1,10 @@
-"""Phát hiện chồng lấn hình ảnh ở lượt dry (bug report 2026-09-12).
+"""Phát hiện chồng lấn hình ảnh ở lượt dry.
 
-Root cause thật: `ConceptFlowScene.caption(...)` (và `title`/`heading`/`body`)
-dựng một `Text(...)` không định vị — Manim đặt nó ở tâm khung hình mặc định.
-Một script quên `.to_edge(...)`/`.next_to(...)` khi khung đã có sẵn một
-bảng/table sẽ chồng khít lên nhau, không đọc được, và trước bug fix này không
-gì bắt được việc đó trước khi tốn TTS.
+`ConceptFlowScene.caption(...)` (và `title`/`heading`/`body`) dựng một
+`Text(...)` không định vị — Manim đặt nó ở tâm khung hình mặc định. Một script
+quên `.to_edge(...)`/`.next_to(...)` khi khung đã có sẵn một bảng/table sẽ
+chồng khít lên nhau, không đọc được; lượt dry phải bắt được việc đó trước khi
+tốn TTS.
 
 Bộ test này chứng minh `ConceptFlowScene.play()` bắt được đúng trường hợp đó
 (hai mobject cùng ở tâm mặc định) và không báo động giả cho bố cục đã tách

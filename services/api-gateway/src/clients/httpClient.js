@@ -70,7 +70,7 @@ function createHttpClient(baseUrl, options = {}) {
       };
       if (timeoutMs === 0) fetchOptions.dispatcher = NO_TIMEOUT_DISPATCHER;
       if (body !== undefined && body !== null && method !== 'GET' && method !== 'HEAD') {
-        // Strings and raw bytes (CR-044 library backup upload) go as they are.
+        // Strings and raw bytes (library backup upload) go as they are.
         fetchOptions.body = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body);
       }
 
@@ -106,7 +106,7 @@ function createHttpClient(baseUrl, options = {}) {
  * and ZIP bodies as bytes.
  */
 async function readResponseBody(res) {
-  // CR-044: illustration previews are images and the library backup is a ZIP;
+  // Illustration previews are images and the library backup is a ZIP;
   // decoding them as text corrupts them.
   const type = (res.headers.get('content-type') || '').toLowerCase();
   const binary = type.startsWith('image/') || type.startsWith('application/zip');

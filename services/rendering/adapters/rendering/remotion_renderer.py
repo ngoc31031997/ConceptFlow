@@ -13,7 +13,7 @@ all for dry_run() — faster, and it means a broken dry pass can never be a
 Remotion/Chromium problem, only a script problem.
 
 Two-pass contract (mirrors manim_renderer.py's outward behaviour exactly —
-see that module's docstring for the full CR-018 rationale):
+see that module's docstring for the rationale):
 - dry_run(): regex-extract `narrations` from script_content. No video, no
   Node/Chromium spent.
 - render(): convert each narration_segment's real TTS duration_seconds into
@@ -50,10 +50,10 @@ HEARTBEAT_INTERVAL_SECONDS = 2
 # Printed by render.mjs's renderMedia onProgress.
 _PROGRESS_LINE_RE = re.compile(r"^CF_PROGRESS (\d+)\s*$")
 
-# CR-047 — video review finding: shots were laid back to back with zero gap
-# (startFrame of shot N+1 == end of shot N), so the narration read as one
-# unbroken stream with no breathing room between lines, even across beats.
-# A uniform pause after every shot but the last fixes that without touching
+# Shots laid back to back with zero gap (startFrame of shot N+1 == end of
+# shot N) make the narration read as one unbroken stream with no breathing
+# room between lines. A uniform pause after every shot but the last avoids
+# that without touching
 # the render contract: wait_offsets (below) is derived from these same
 # startFrame values, so video-assembly's `adelay` placement of each
 # narration's audio automatically shifts by the same gap — video and audio
@@ -82,9 +82,8 @@ _NARRATIONS_HEADER_RE = re.compile(
     r"export\s+const\s+narrations\s*(?::\s*string\s*\[\s*\]\s*)?=\s*\["
 )
 # Double/single/back-quoted string literals — matches web-gui's
-# REMOTION_STRING_LITERAL_RE exactly, including the backtick that the old
-# regex here was missing (a `narrations` array of template literals used to
-# silently count as empty).
+# REMOTION_STRING_LITERAL_RE exactly, including the backtick (without it a
+# `narrations` array of template literals would silently count as empty).
 _STRING_LITERAL_RE = re.compile(r"""(['"`])((?:(?!\1)[^\\]|\\.)*)\1""")
 
 

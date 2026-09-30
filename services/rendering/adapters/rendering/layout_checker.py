@@ -1,4 +1,4 @@
-"""Đo bố cục một script Remotion trong Chromium headless (CR-048 T6b).
+"""Đo bố cục một script Remotion trong Chromium headless.
 
 Giống TypeScriptChecker: một tiến trình Node sống lâu
 (`remotion_project/layout_check.mjs`) đóng gói trang đo và mở trình duyệt MỘT

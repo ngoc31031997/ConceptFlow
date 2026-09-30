@@ -45,7 +45,7 @@ DATABASE_URL = os.environ["DATABASE_URL"]
 
 class ServiceState:
     """Tracks readiness for the /health endpoint: ready once the AMQP
-    consumer + OutboxRelay are up (mirror Content Plugin Service)."""
+    consumer + OutboxRelay are up."""
 
     def __init__(self) -> None:
         self.ready = False

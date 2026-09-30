@@ -1,7 +1,7 @@
 """Shared in-memory test doubles for the Publisher Service ports.
 
-CR-012 widened CredentialStorePort from two methods to five. Re-implementing
-that surface in every test module invites the doubles to drift apart from
+Re-implementing CredentialStorePort's five methods in every test module
+invites the doubles to drift apart from
 each other and from the real Postgres store, so they live here once.
 """
 

@@ -1,11 +1,10 @@
 package domain
 
-// Built-in formats, seeded into the database on first start (CR-019 FR51.2).
+// Built-in formats, seeded into the database on first start.
 //
 // These are a **starting point to edit**, not a fixed shape. The Creator clones
-// and adjusts them (FR51.5); the numbers below came from reasoning about a new
-// channel, not from data. CR-022 replaces them with measured retention once the
-// channel has enough of it.
+// and adjusts them; the numbers below came from reasoning about a new
+// channel, not from data, until measured retention is available.
 //
 // Neither format targets the 8-minute mid-roll threshold. That mark only pays
 // off after monetisation is switched on (1.000 subscriber + 4.000 giờ xem), and
@@ -81,7 +80,7 @@ func BuiltinFormats() []VideoFormat {
 const DefaultVideoFormatID = "case_study_essay_8min"
 
 // BeatBudget is how long one beat actually came out, against what the format
-// asked for (CR-019 FR52.4).
+// asked for.
 type BeatBudget struct {
 	BeatID  string  `json:"beat_id"`
 	Seconds float64 `json:"seconds"`
@@ -95,7 +94,7 @@ type BeatBudget struct {
 //
 // Every result is advisory. Durations here are either estimates (before TTS) or
 // real measurements (after), and the caller cannot always tell which — so this
-// never produces a blocking issue. FR52.5 draws the line: block on facts
+// never produces a blocking issue. The line is: block on facts
 // (a missing required beat), warn on numbers.
 func (f VideoFormat) MeasureBeatBudgets(observed []BeatOccurrence, sceneDurations []float64) []BeatBudget {
 	if len(observed) == 0 {

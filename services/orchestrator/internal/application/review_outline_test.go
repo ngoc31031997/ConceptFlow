@@ -45,7 +45,7 @@ func TestApprove_ResumesTheSaga(t *testing.T) {
 }
 
 func TestApprove_IsIdempotent(t *testing.T) {
-	// FR69.4: bấm duyệt lần thứ hai không được sinh ra một lượt TTS thứ hai.
+	// Bấm duyệt lần thứ hai không được sinh ra một lượt TTS thứ hai.
 	// Guard chính là trạng thái — không dựng thêm cơ chế thứ hai chồng lên
 	// lớp bảo vệ ở cấp SagaStep vốn đã có.
 	uc, repo, resume, _, _ := newReviewUseCase()
@@ -78,7 +78,7 @@ func TestApprove_RefusesAProjectThatNeverReachedTheGate(t *testing.T) {
 }
 
 func TestReject_EndsTheSagaCleanly(t *testing.T) {
-	// FR69.3: Saga kết thúc chứ không nằm treo — script sắp thay đổi, nên một
+	// Saga kết thúc chứ không nằm treo — script sắp thay đổi, nên một
 	// saga chờ trên một script không còn tồn tại chỉ là một dòng không ai đóng.
 	uc, repo, resume, progress, _ := newReviewUseCase()
 	repo.projects["proj-1"] = awaitingProject()
@@ -99,7 +99,7 @@ func TestReject_EndsTheSagaCleanly(t *testing.T) {
 }
 
 func TestEditNarration_RewritesTheScriptAndRevalidates(t *testing.T) {
-	// FR70.2/70.4: sửa phải đi vào SCRIPT (thứ được render), rồi chạy lại
+	// Sửa phải đi vào SCRIPT (thứ được render), rồi chạy lại
 	// validate — một câu sửa xong vẫn có thể vi phạm ngân sách beat hoặc chứa
 	// ký hiệu TTS đọc sai.
 	uc, repo, _, _, commands := newReviewUseCase()

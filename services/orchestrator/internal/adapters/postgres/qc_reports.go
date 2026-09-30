@@ -12,7 +12,7 @@ import (
 )
 
 // QCReportRepository implements domain.QCReportPort against the qc_reports
-// table (CR-021 D6).
+// table.
 type QCReportRepository struct {
 	pool *pgxpool.Pool
 }
@@ -27,7 +27,7 @@ func NewQCReportRepository(pool *pgxpool.Pool) *QCReportRepository {
 // Append-only rather than upsert: a project re-rendered after a fix is scored
 // again, and the previous report describes a video file that no longer exists —
 // overwriting it would destroy exactly the before/after pair that makes
-// threshold calibration (D5) possible. Duplicate inserts from a redelivered
+// threshold calibration possible. Duplicate inserts from a redelivered
 // event are prevented upstream by the Inbox (processed_messages), which is the
 // one place in this service that dedupes incoming events.
 func (r *QCReportRepository) SaveQCReport(ctx context.Context, report domain.QCReport) error {
@@ -49,9 +49,9 @@ func (r *QCReportRepository) SaveQCReport(ctx context.Context, report domain.QCR
 // LatestQCReport returns the newest report for a project, or (nil, nil) when
 // there is none.
 //
-// The nil-not-error contract matters: every project rendered before CR-021 has
+// The nil-not-error contract matters: a project that was never scored has
 // no report, and the publish gate must read that as "nothing to enforce" rather
-// than as a failure — the same reasoning FR61.4 applies to an unscorable video.
+// than as a failure — the same reasoning that applies to an unscorable video.
 func (r *QCReportRepository) LatestQCReport(ctx context.Context, projectID string) (*domain.QCReport, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT project_id, status, reason, findings, created_at, overridden_at, overridden_findings
@@ -84,12 +84,11 @@ func (r *QCReportRepository) LatestQCReport(ctx context.Context, projectID strin
 	return &report, nil
 }
 
-// RecordQCOverride stamps the project's latest report as deliberately bypassed
-// (FR61.3).
+// RecordQCOverride stamps the project's latest report as deliberately bypassed.
 //
 // `AND overridden_at IS NULL` is what makes a second press of the publish
 // button harmless: the recorded moment is the first conscious decision, not the
-// last retry of it — the same idempotency shape CR-024's review gate uses.
+// last retry of it — the same idempotency shape the outline review gate uses.
 func (r *QCReportRepository) RecordQCOverride(ctx context.Context, projectID string, findings []domain.QCFinding) error {
 	if findings == nil {
 		findings = []domain.QCFinding{}

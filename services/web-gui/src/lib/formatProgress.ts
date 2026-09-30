@@ -22,7 +22,7 @@ const ERROR_LABELS: Record<string, string> = {
   server: "Dịch vụ AI đang gặp sự cố",
 };
 
-/** Lỗi đã phân loại của một lượt gọi → câu ngắn cho Creator (FR116.5). */
+/** Lỗi đã phân loại của một lượt gọi → câu ngắn cho Creator. */
 export function operationErrorLabel(kind: string): string {
   return ERROR_LABELS[kind] ? `${ERROR_LABELS[kind]} (${kind})` : kind;
 }
@@ -37,7 +37,7 @@ interface SubtitleSource {
 }
 
 /**
- * Dòng phụ `pha · số lượng · thời gian` (FR116.1): "AI đang viết · 14,3k ký tự ·
+ * Dòng phụ `pha · số lượng · thời gian`: "AI đang viết · 14,3k ký tự ·
  * 2m05s". Có `done/total` thì hiện "k/N" thay cho số ký tự.
  */
 export function operationSubtitle(op: SubtitleSource | null, waitingLabel = "Đang chờ AI phản hồi"): string {

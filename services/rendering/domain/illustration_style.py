@@ -1,10 +1,10 @@
-"""Bộ kiểm tra style cho hình của thư viện minh hoạ (CR-044).
+"""Bộ kiểm tra style cho hình của thư viện minh hoạ.
 
 Luật đầy đủ nằm ở authoring-service/.../prompts/illustration_style_vi.txt;
 mã [S..] ở đây là mã luật trong file đó. Vi phạm làm hỏng style của cả kênh
 (gradient, filter, ảnh, chữ, ngẫu nhiên theo đồng hồ) là LỖI và chặn lưu; phần
-còn lại là CẢNH BÁO — Creator quyết định (đã chốt 2026-09-27). Màu ngoài bảng
-màu kênh (S9) không bị kiểm tra (CR-045).
+còn lại là CẢNH BÁO — Creator quyết định. Màu ngoài bảng
+màu kênh (S9) không bị kiểm tra.
 
 Kiểm tra trên mã nguồn TSX, không trên ảnh: rẻ, tất định, và chỉ được đúng dòng.
 """
@@ -96,7 +96,7 @@ def check_style(code: str) -> tuple[list[StyleFinding], list[StyleFinding]]:
     colours: dict[str, int] = {}
     for m in HEX_RE.finditer(code):
         colours.setdefault(_expand(m.group(1)), _line(code, m.start()))
-    # S9 (bảng màu kênh) không còn là cảnh báo (CR-045): hình minh hoạ được
+    # S9 (bảng màu kênh) không phải cảnh báo: hình minh hoạ được
     # dùng màu của chính vật, bảng màu chỉ là gợi ý cho AI vẽ.
     base = {c for c in colours if c not in {"FFFFFF", "000000", "3A1F4B"}}
     if len(base) > 6:

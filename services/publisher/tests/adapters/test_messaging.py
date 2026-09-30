@@ -85,7 +85,7 @@ async def test_enqueues_success_event_to_outbox_and_acks() -> None:
 
 @pytest.mark.asyncio
 async def test_caption_status_is_carried_into_the_video_published_event() -> None:
-    """CR-015 FR39.4: caption_status travels through the outbox event the
+    """caption_status travels through the outbox event the
     same way youtube_video_url does, so the Orchestrator/GUI can surface a
     silently failed or skipped caption upload."""
     use_case = FakePublishVideoUseCase(

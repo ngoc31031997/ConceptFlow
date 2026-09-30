@@ -1,4 +1,4 @@
-"""Bộ kiểm tra style (CR-044): mỗi luật có ca vi phạm, và hình mẫu chuẩn phải sạch hoàn toàn."""
+"""Bộ kiểm tra style: mỗi luật có ca vi phạm, và hình mẫu chuẩn phải sạch hoàn toàn."""
 
 import re
 from pathlib import Path
@@ -7,7 +7,7 @@ import pytest
 
 from domain.illustration_style import check_style
 
-# CR-052: ba hình mẫu gốc giờ là dữ liệu trong DB của authoring-service; bản
+# Ba hình mẫu gốc là dữ liệu trong DB của authoring-service; bản
 # code của chúng được giữ ở đây làm dữ liệu kiểm thử cho bộ kiểm tra style.
 EXEMPLARS = Path(__file__).resolve().parents[1] / "fixtures" / "illustration_exemplars_vi.txt"
 
@@ -79,7 +79,7 @@ def test_canh_bao_khong_chan(change, replacement, rule):
 
 
 def test_mau_ngoai_bang_mau_kenh_khong_canh_bao():
-    # CR-045: hình minh hoạ dùng màu của chính vật; bảng màu kênh chỉ là gợi ý.
+    # Hình minh hoạ dùng màu của chính vật; bảng màu kênh chỉ là gợi ý.
     errors, warnings = rules(CLEAN.replace("'#FF9F43'", "'#123456'", 1))
     assert errors == [] and warnings == []
 

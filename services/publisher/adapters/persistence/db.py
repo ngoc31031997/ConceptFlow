@@ -4,12 +4,10 @@ Bootstraps the Outbox/Inbox tables plus youtube_accounts with a plain
 CREATE TABLE IF NOT EXISTS at startup rather than a migration tool —
 appropriate at this project's MVP scale (see ADR-0013's "Follow-ups").
 
-CR-012 replaced the single-row oauth_credentials table (which had a
-CHECK (id = 1) constraint, so connecting a second channel silently
-overwrote the first) with youtube_accounts, keyed by channel_id. The old
-table is left in place rather than dropped: it is the only copy of the
-Creator's existing refresh token until the migration below has run, and
-keeping it costs nothing.
+Channels live in youtube_accounts, keyed by channel_id. The legacy
+single-row oauth_credentials table is left in place rather than dropped: it
+is the only copy of a legacy refresh token until the migration below has
+run, and keeping it costs nothing.
 """
 
 from __future__ import annotations
@@ -65,19 +63,18 @@ CREATE TABLE IF NOT EXISTS youtube_accounts (
 -- At most one default channel. A partial unique index rather than
 -- application-level checking, so a concurrent save() cannot leave the
 -- Creator with two "default" channels and a coin-flip as to which one
--- publishes (CR-012 FR31.2).
+-- publishes.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_youtube_accounts_single_default
     ON youtube_accounts (is_default) WHERE is_default;
 
--- CR-015 FR40: space-separated OAuth scopes Google actually granted at
--- consent. Added after the initial CREATE TABLE shipped without it — the
--- default '' means "channel connected before force-ssl existed", which
--- OAuthCredential.scopes (adapters/persistence/credential_store.py) reads
--- as "youtube.upload only", never as "has force-ssl too" (ADR-0028).
+-- Space-separated OAuth scopes Google actually granted at consent. The
+-- default '' means "no scopes recorded", which OAuthCredential.scopes
+-- (adapters/persistence/credential_store.py) reads as "youtube.upload
+-- only", never as "has force-ssl too" (ADR-0028).
 ALTER TABLE youtube_accounts ADD COLUMN IF NOT EXISTS scopes TEXT NOT NULL DEFAULT '';
 """
 
-# One-shot data migration (CR-012 FR31.3). Guarded by NOT EXISTS rather
+# One-shot data migration. Guarded by NOT EXISTS rather
 # than a version table: it must be a no-op on every start after the first,
 # and must never clobber a channel the Creator has since re-connected.
 MIGRATE_LEGACY_CREDENTIAL = """
@@ -100,7 +97,7 @@ async def create_pool() -> asyncpg.Pool:
 
 
 async def _migrate_legacy_credential(conn: asyncpg.Connection) -> None:
-    """Carries the pre-CR-012 single credential into youtube_accounts so the
+    """Carries the legacy single credential into youtube_accounts so the
     Creator does not have to re-connect the channel they are already using.
 
     The legacy row predates per-credential client ids, so it is attributed
@@ -115,4 +112,4 @@ async def _migrate_legacy_credential(conn: asyncpg.Connection) -> None:
 
     result = await conn.execute(MIGRATE_LEGACY_CREDENTIAL, legacy_client_id)
     if result != "INSERT 0 0":
-        logger.info("Migrated the pre-CR-012 OAuth credential into youtube_accounts")
+        logger.info("Migrated the legacy OAuth credential into youtube_accounts")

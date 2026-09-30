@@ -12,7 +12,7 @@ const { UpstreamUnavailableError } = require('../clients/httpClient');
  * (interface-contracts.md "Passthrough Behavior", NFR Design Question 5).
  *
  * @param {import('../clients/httpClient').HttpClient} client - bound to one
- *   downstream base URL (Orchestrator / Content Plugin / Publisher).
+ *   downstream base URL (Orchestrator / authoring-service / Publisher).
  * @param {string} serviceName - used only in the 502 error body, so the
  *   caller can tell which downstream failed.
  * @returns {import('express').RequestHandler}
@@ -39,7 +39,7 @@ function proxyHandler(client, serviceName) {
       const location = upstreamRes.headers && upstreamRes.headers.get && upstreamRes.headers.get('location');
       if (location) res.set('Location', location);
 
-      // Binary bodies (CR-044 illustration previews, library backup) keep their
+      // Binary bodies (illustration previews, library backup) keep their
       // type, caching and download name.
       if (Buffer.isBuffer(upstreamRes.body) && upstreamRes.headers && upstreamRes.headers.get) {
         for (const name of ['content-type', 'cache-control', 'content-disposition']) {

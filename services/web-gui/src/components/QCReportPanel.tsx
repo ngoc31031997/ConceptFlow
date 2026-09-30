@@ -8,7 +8,7 @@ import styles from "./QCReportPanel.module.css";
 interface QCReportPanelProps {
   projectId: string;
   /**
-   * Tua video tới giây của một phát hiện (FR61.2). Không truyền thì mốc thời
+   * Tua video tới giây của một phát hiện. Không truyền thì mốc thời
    * gian hiện ra dạng chữ thường — báo cáo vẫn đọc được khi chưa có player.
    */
   onSeek?: (seconds: number) => void;
@@ -61,13 +61,13 @@ function FindingRow({ finding, onSeek }: { finding: QCFinding; onSeek?: (s: numb
 }
 
 /**
- * Báo cáo QC, đặt trước nút đăng (CR-021 FR61.2).
+ * Báo cáo QC, đặt trước nút đăng.
  *
  * Ba trạng thái, và khác biệt giữa chúng là điều quan trọng nhất ở đây:
  * - `has_findings`: có phát hiện, nhóm theo mức độ, lỗi chặn lên trước.
  * - `passed`: đã chấm, không có gì. Một dòng, không cần hơn.
  * - `not_scored`: KHÔNG chấm được (thiếu dữ liệu, ffmpeg lỗi). Hiện như thông
- *   tin, không phải như lỗi — FR61.4: một cổng hỏng không được biến thành cổng
+ *   tin, không phải như lỗi — một cổng hỏng không được biến thành cổng
  *   khoá, nên giao diện cũng không được làm nó trông như đang khoá.
  *
  * Lỗi khi tải báo cáo cũng im lặng theo đúng tinh thần đó: không có báo cáo thì
@@ -93,7 +93,7 @@ export function QCReportPanel({ projectId, onSeek }: QCReportPanelProps) {
   if (!report) return null;
 
   /*
-    Chịu được báo cáo khuyết trường: cùng lý do với FR61.4 — QC là phần phụ của
+    Chịu được báo cáo khuyết trường: QC là phần phụ của
     trang này, một phản hồi lạ không được làm trắng cả màn đăng video.
   */
   const findings = Array.isArray(report.findings) ? report.findings : [];

@@ -35,13 +35,13 @@ class Config:
     ollama_timeout: int
     # Which provider serves the light tasks (suggest-metadata, suggest-short-script).
     light_provider: str
-    # Code pipeline (CR-039).
+    # Code pipeline.
     code_chunk_shots: int
     code_chunk_concurrency: int
     code_repair_max_rounds: int
     rendering_url: str
     rendering_check_timeout: int
-    # CR-048 T1: stop a call that has reasoned for more than this many
+    # Stop a call that has reasoned for more than this many
     # characters without writing any answer. 0 = no limit.
     # Every call of the code pipeline (layout/cast/chunk/repair).
     code_max_reasoning_chars: int

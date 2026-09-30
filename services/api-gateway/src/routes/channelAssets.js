@@ -14,7 +14,7 @@ const videoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
 const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 /**
- * CR-023 — channel-wide intro/outro stings (FR65.1, FR66.5, FR66.7, FR67.4).
+ * channel-wide intro/outro stings.
  *
  * These assets belong to the channel, not to a project, so the routes carry no
  * `:id`: `POST /v1/channel-assets/intro|outro` (multipart field "video") and

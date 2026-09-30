@@ -11,7 +11,7 @@ interface DeleteProgressCardProps {
   onDone: () => void;
 }
 
-/** FR116.2 — "Đang dọn · k/N service" while the delete saga runs. */
+/** "Đang dọn · k/N service" while the delete saga runs. */
 export function DeleteProgressCard({ projectId, onDone }: DeleteProgressCardProps) {
   const op = useOperationProgress(`delete:${projectId}`);
   const status = op?.status;

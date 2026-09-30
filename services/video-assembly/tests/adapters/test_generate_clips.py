@@ -1,4 +1,4 @@
-"""Unit tests for CR-007's `generate_clips` command handler and its
+"""Unit tests for the `generate_clips` command handler and its
 `adapters/clips/vertical_clip.py` support code.
 
 `FfmpegVideoAssembler._run_ffmpeg` is patched everywhere so these tests never
@@ -104,7 +104,7 @@ def test_generate_clip_ok_writes_output_path(no_real_ffmpeg, tmp_path, monkeypat
 
 
 def test_generate_clip_adds_intro_duration_to_start_and_end(no_real_ffmpeg, tmp_path, monkeypatch) -> None:
-    """D5 rủi ro / CR-023: clip_marks' t_start/t_end are Manim-video seconds,
+    """clip_marks' t_start/t_end are Manim-video seconds,
     not yet shifted by the intro — video-assembly must add the offset itself,
     the same amount ffmpeg_assembler's effective_lead_in already applies."""
     monkeypatch.setattr("adapters.storage.artifact_paths.SHARED_VOLUME_ROOT", str(tmp_path))
@@ -163,7 +163,7 @@ def test_generate_clip_burns_subtitles_shifted_and_clamped_to_clip(
     assert "trước hẳn" not in content
     assert "sau hẳn" not in content
 
-    # Style is the vertical one (D6): PlayRes matches 1080x1920, not 1920x1080.
+    # Style is the vertical one: PlayRes matches 1080x1920, not 1920x1080.
     assert "PlayResX: 1080" in content
     assert "PlayResY: 1920" in content
 
@@ -259,7 +259,7 @@ async def test_one_request_two_presets_both_ok(no_real_ffmpeg, tmp_path, monkeyp
 
 @pytest.mark.asyncio
 async def test_short_preset_error_does_not_block_long_preset(no_real_ffmpeg, tmp_path, monkeypatch) -> None:
-    """FR19.7/D1 — a 75s segment is invalid for `short` but valid for `long`;
+    """A 75s segment is invalid for `short` but valid for `long`;
     the loop must not stop after the first failure."""
     handler, pool = _build_handler(tmp_path, monkeypatch)
     requests = [

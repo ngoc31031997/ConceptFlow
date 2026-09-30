@@ -202,7 +202,7 @@ describe('routes/projects', () => {
         expect.objectContaining({ method: 'DELETE', path: '/v1/projects/p1' }),
       );
       expect(fs.existsSync(path.join(sharedDir, 'p1', 'thumbnail'))).toBe(false);
-      // tts/rendering/video-assembly purge their own files (CR-040 FR114.2)
+      // tts/rendering/video-assembly purge their own files
       expect(fs.existsSync(path.join(sharedDir, 'p1', 'video', 'final.mp4'))).toBe(true);
     });
 

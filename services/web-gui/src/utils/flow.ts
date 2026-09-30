@@ -7,9 +7,8 @@
  * Review (8) is a screen, not a saved state: validate (7) finishes at
  * `awaiting_review` and nothing runs until the Creator presses start.
  *
- * CR-046 (2026-09-27, reverses CR-045 FR9): "Hình minh hoạ" is now its own
- * numbered step, shown disabled ("Không dùng") when renderEngine !== "remotion"
- * instead of being folded, invisibly, under Code. It sits at step 5, BEFORE
+ * "Hình minh hoạ" is its own numbered step, shown disabled ("Không dùng")
+ * when renderEngine !== "remotion". It sits at step 5, BEFORE
  * Code (6): illustrations run first and Code reads what they drew.
  */
 export const FLOW_LABELS = [
@@ -42,7 +41,7 @@ export const FLOW_RESULT = 13;
 export const FLOW_PUBLISH = 14;
 
 /**
- * CR-051 — "Bước 4 — Visual": the one way a step is named to the Creator, on a
+ * "Bước 4 — Visual": the one way a step is named to the Creator, on a
  * screen title, in the AI chain's progress, anywhere. The name is the step
  * rail's, so a screen can never call a step something the rail does not.
  */
@@ -93,7 +92,7 @@ export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled"
  * Trạng thái của bước `step` cho dự án ở (flowStep, runState). Bước trước bước
  * hiện tại là xong, bước hiện tại mang trạng thái chạy của nó, các bước sau
  * chưa tới. Bước cắt short bị bỏ qua khi dự án không làm video dọc. Bước Hình
- * minh hoạ (CR-046) bị bỏ qua ("Không dùng") khi dự án không dùng Remotion.
+ * minh hoạ bị bỏ qua ("Không dùng") khi dự án không dùng Remotion.
  */
 export function stepStatus(
   step: number,

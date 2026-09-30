@@ -1,10 +1,10 @@
-"""Bản sắc kênh cố định: intro/outro (CR-023 FR65, FR66.5).
+"""Bản sắc kênh cố định: intro/outro.
 
 Hai scene ở đây **khác loại** với mọi script Creator viết: chúng không có lời
 thoại, không gọi `self.narrate()`/`self.beat()`, và vì vậy không đi qua lượt
-dry của CR-018 (script sẽ không sinh ra một dòng lời thoại nào để lượt dry thu
-thập). Chúng được dựng một lần, không phải mỗi project (D3 của
-`cr-023-low-level-design.md`), qua `RenderChannelAssetUseCase` chứ không qua
+dry (script sẽ không sinh ra một dòng lời thoại nào để lượt dry thu thập).
+Chúng được dựng một lần, không phải mỗi project, qua
+`RenderChannelAssetUseCase` chứ không qua
 saga `render_scenes`.
 
 `DefaultIntroSting` và `ChannelOutro` vẫn kế thừa `ConceptFlowScene` để lấy nền
@@ -24,8 +24,8 @@ from .scene import ConceptFlowScene
 
 #: Thư mục chứa bộ nhận diện. `docs/brand/` KHÔNG vào được image: build context
 #: của rendering là `./services/rendering` (docker-compose.yml), nên mọi thứ
-#: ngoài thư mục đó nằm ngoài tầm với của `COPY` — đúng ràng buộc H1 mà kế
-#: hoạch CR-016..024 đã ghi. Cách đi vào là một bind mount read-only, còn biến
+#: ngoài thư mục đó nằm ngoài tầm với của `COPY`. Cách đi vào là một bind
+#: mount read-only, còn biến
 #: này để lúc dev chạy thẳng từ checkout vẫn tìm được cùng file.
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 BRAND_ASSETS_DIR = Path(os.environ.get("BRAND_ASSETS_DIR") or (_REPO_ROOT / "docs" / "brand"))
@@ -33,21 +33,21 @@ BRAND_ASSETS_DIR = Path(os.environ.get("BRAND_ASSETS_DIR") or (_REPO_ROOT / "doc
 #: Logo bộ nhận diện (`docs/brand/make-banner.py` sinh ra file này).
 LOGO_MARK_PATH = BRAND_ASSETS_DIR / "conceptflow-mark-1024.png"
 
-#: D4: 3s là đủ để logo "đóng dấu" mà không làm mất giây xem đầu tiên.
+#: 3s là đủ để logo "đóng dấu" mà không làm mất giây xem đầu tiên.
 INTRO_DURATION_SECONDS = 3.0
 
-#: D4: 15–20s, chọn 18s — đủ chỗ cho end-screen (element YouTube giữ tối thiểu
+#: 15–20s, chọn 18s — đủ chỗ cho end-screen (element YouTube giữ tối thiểu
 #: 5s) mà không kéo dài quá mức so với biên trên của CR.
 OUTRO_DURATION_SECONDS = 18.0
 
 
 class DefaultIntroSting(ConceptFlowScene):
-    """Sting mở kênh: logo fade+scale trên nền brand (FR65.2 mặc định).
+    """Sting mở kênh mặc định: logo fade+scale trên nền brand.
 
     Không dùng `self.reveal()`/`self.dismiss()` của `ConceptFlowScene`: những
     animation đó lấy `run_time` từ `theme.pacing`, vốn được hiệu chỉnh cho
     khuôn hình có chữ đọc được — sting logo cần đúng 3s cố định bất kể theme,
-    vì đó là thời lượng mà D5 cộng thẳng vào `lead_in` của video-assembly.
+    vì đó là thời lượng video-assembly cộng thẳng vào `lead_in`.
     """
 
     def construct(self) -> None:
@@ -70,7 +70,7 @@ class DefaultIntroSting(ConceptFlowScene):
 class ChannelOutro(ConceptFlowScene):
     """Outro cố định: logo + wordmark, khung "video đề xuất", lời mời đăng ký.
 
-    FR65.8 buộc chừa 3 vùng an toàn không đè lên nhau cho end-screen element
+    Phải chừa 3 vùng an toàn không đè lên nhau cho end-screen element
     của YouTube (YouTube tự vẽ đè video/subscribe thật lên đây — Rendering chỉ
     phải KHÔNG đặt chữ/hình của mình vào chỗ YouTube sẽ chèn):
 

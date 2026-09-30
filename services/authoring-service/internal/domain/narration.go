@@ -5,16 +5,15 @@ import (
 	"strings"
 )
 
-// LanguageProfile carries everything that varies per content language
-// (CR-008 FR21.6). Adding a language is a matter of adding a row here plus a
+// LanguageProfile carries everything that varies per content language.
+// Adding a language is a matter of adding a row here plus a
 // TTS voice — never of editing branching logic scattered across the codebase,
 // which is what the previous pair of constants and an `if` forced.
 type LanguageProfile struct {
-	// WordsPerMinute paces animation and subtitles when TTS is disabled
-	// (CR-001 FR3.4/FR9.3).
+	// WordsPerMinute paces animation and subtitles when TTS is disabled.
 	WordsPerMinute float64
 	// EnglishName is how the language is named to an LLM when asking it to
-	// produce content in that language (CR-008 FR21.3). English is used
+	// produce content in that language. English is used
 	// because prompts are more reliably followed when the target language is
 	// named in the prompt's own language.
 	EnglishName string
@@ -33,7 +32,7 @@ var languageProfiles = map[ContentLanguage]LanguageProfile{
 const defaultLanguage = LanguageEnglish
 
 // DefaultBackgroundMusicVolume is the level used when the Creator has not
-// chosen one — the value music was fixed at before CR-005 made it adjustable.
+// chosen one.
 const DefaultBackgroundMusicVolume = 0.2
 
 // minNarrationSeconds keeps a very short line on screen long enough to
@@ -80,8 +79,8 @@ func countWords(text string) int {
 	return len(strings.Fields(text))
 }
 
-// SubtitleStyle is the Creator-chosen appearance of burned-in subtitles
-// (CR-001 FR9.4). It is persisted on Project and passed through to Video
+// SubtitleStyle is the Creator-chosen appearance of burned-in subtitles.
+// It is persisted on Project and passed through to Video
 // Assembly unchanged; the zero value is not meaningful, use DefaultSubtitleStyle.
 type SubtitleStyle struct {
 	// FontFamily is one of SubtitleFontFamilies. Empty on every row saved
@@ -177,8 +176,8 @@ type SubtitleBand struct {
 // SubtitleBandFor is the strip burned-in subtitles cover, or false when
 // nothing is painted over the frame (off, or a caption track only). It is the
 // one source of the numbers both {{subtitle_zone}} (what the Remotion
-// Engineer is told) and the rendering layout check (CR-048 T6b, what the
-// drawn frame is held to) use.
+// Engineer is told) and the rendering layout check (what the drawn frame is
+// held to) use.
 func SubtitleBandFor(mode SubtitleMode, style SubtitleStyle) (SubtitleBand, bool) {
 	if mode != SubtitleModeBurnIn && mode != SubtitleModeBoth {
 		return SubtitleBand{}, false
@@ -223,22 +222,20 @@ func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) st
 	return fmt.Sprintf("subtitles are burned in at the BOTTOM of the frame — the strip from y = %d to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = %d.", 1080-band, 1080-band-24)
 }
 
-// SubtitleMode is how subtitle_cues get delivered to the viewer (CR-015,
-// ADR-0027) — a dimension of its own rather than a bolt-on to the CR-001
-// on/off toggle, because which delivery is correct depends on the publishing
+// SubtitleMode is how subtitle_cues get delivered to the viewer (see
+// ADR-0027) — a dimension of its own rather than a bolt-on to an on/off
+// toggle, because which delivery is correct depends on the publishing
 // surface, not on whether the Creator "wants subtitles":
 //
 //   - Off:    no subtitles.
-//   - Track:  a .srt YouTube caption track (FR38) — searchable,
+//   - Track:  a .srt YouTube caption track — searchable,
 //     auto-translatable, dismissable by the viewer, never painted
-//     over Manim's edge content. The GUI default for new projects
-//     (FR41.2).
-//   - BurnIn: painted into the video frames — CR-001's original (and, until
-//     this CR, only) behaviour. Still required for platforms with
-//     no caption-track upload path (Shorts/TikTok, CR-007).
+//     over Manim's edge content. The GUI default for new projects.
+//   - BurnIn: painted into the video frames. Required for platforms with
+//     no caption-track upload path (Shorts/TikTok).
 //   - Both:   both at once. Valid (e.g. a repost target with no track
-//     upload path) but doubles the text for a viewer with CC on
-//     (FR41.3) — the GUI warns rather than blocking it.
+//     upload path) but doubles the text for a viewer with CC on —
+//     the GUI warns rather than blocking it.
 type SubtitleMode string
 
 const (
@@ -263,7 +260,7 @@ func (m SubtitleMode) NeedsCues() bool {
 	return m != SubtitleModeOff
 }
 
-// SubtitleModeFromLegacy derives a mode from the pre-CR-015 boolean, for a
+// SubtitleModeFromLegacy derives a mode from the legacy boolean, for a
 // project row that predates the subtitle_mode column (project_repository.go)
 // or a caller that still only sends subtitles_enabled. It reproduces exactly
 // the one behaviour that boolean ever meant: enabled meant burned-in text,

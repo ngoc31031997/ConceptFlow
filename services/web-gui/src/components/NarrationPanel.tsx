@@ -66,8 +66,7 @@ function Toggle({
 /**
  * Narration: the on/off toggle followed immediately by the voice list.
  *
- * Subtitles used to share this card; they moved to SubtitleSettings, shown
- * where the merge step that burns/attaches them runs (review gate and the
+ * Subtitles are not here but in SubtitleSettings, shown where the merge step that burns/attaches them runs (review gate and the
  * merge failure panel), so a subtitle problem can be fixed next to its retry.
  */
 export function NarrationPanel({

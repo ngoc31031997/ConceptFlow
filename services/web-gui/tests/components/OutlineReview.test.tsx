@@ -22,7 +22,7 @@ const PROJECT: Project = {
 
 /**
  * OutlineReview (danh sách, cột trái) và OutlineActions (nút Duyệt/Từ chối,
- * cột phải cạnh ProgressTracker — bug report) chia nhau một instance
+ * cột phải cạnh ProgressTracker) chia nhau một instance
  * `useOutlineReview` duy nhất, đúng như RenderPage lắp chúng thật. Test ở
  * đây dựng lại đúng cặp đó thay vì test OutlineReview một mình, vì hành vi
  * (busy khoá cả hai phía, approve/reject) giờ sống ở hook chung.
@@ -43,7 +43,7 @@ beforeEach(() => {
 
 describe("OutlineReview", () => {
   it("hiện lời thoại, beat và khung hình — không hiện code", () => {
-    // FR68.4/68.5: với kênh đặt trọng tâm vào ví dụ trực quan, duyệt mà chỉ đọc
+    // Với kênh đặt trọng tâm vào ví dụ trực quan, duyệt mà chỉ đọc
     // được lời thoại là duyệt đúng nửa ít quan trọng hơn.
     render(<Harness onDecided={vi.fn()} onRejected={vi.fn()} />);
 
@@ -54,7 +54,7 @@ describe("OutlineReview", () => {
   });
 
   it("nêu cảnh báo cùng chỗ với dàn ý", () => {
-    // FR68.3: duyệt nội dung và duyệt cảnh báo tách làm hai lần nhìn thì lần
+    // Duyệt nội dung và duyệt cảnh báo tách làm hai lần nhìn thì lần
     // thứ hai sẽ bị bỏ qua.
     render(<Harness onDecided={vi.fn()} onRejected={vi.fn()} />);
     expect(screen.getByTestId("outline-warnings")).toHaveTextContent("chưa khai báo beat");
@@ -116,9 +116,9 @@ describe("OutlineActions", () => {
   });
 
   it("từ chối thì gọi endpoint reject và onRejected, không phải onDecided", async () => {
-    // Bug đã sửa: "Quay lại sửa script" trước đây gọi cùng callback với nút
-    // Duyệt, nên trang gọi nó (RenderPage) không có cách nào biết phải điều
-    // hướng Creator về đâu — họ kẹt lại ở một trang đã hết việc để hiện.
+    // "Quay lại sửa script" phải gọi callback riêng, khác nút Duyệt, để trang
+    // gọi nó (RenderPage) biết phải điều hướng Creator về đâu thay vì để họ
+    // kẹt lại ở một trang đã hết việc để hiện.
     const onDecided = vi.fn();
     const onRejected = vi.fn();
     render(<Harness onDecided={onDecided} onRejected={onRejected} />);

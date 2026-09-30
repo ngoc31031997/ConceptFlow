@@ -21,11 +21,11 @@ const ROLES: { value: PromptRole; label: string }[] = [
   // Bước 3 rẽ theo engine render: dự án chọn Remotion dùng prompt này thay
   // cho Manim Engineer. Hai bước đầu dùng chung cho mọi engine.
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
-  // CR-039 — ba prompt của luồng "Chạy bằng AI" (không dùng cho nút Copy).
+  // Ba prompt của luồng "Chạy bằng AI" (không dùng cho nút Copy).
   { value: "visual_director_ai", label: "AI 2. Visual Director — storyboard dạng JSON" },
   { value: "manim_engineer_ai", label: "AI 3. Manim Engineer — chỉ viết các hàm shot" },
   { value: "remotion_engineer_ai", label: "AI 3. Remotion Engineer — chỉ viết các hàm shot" },
-  // CR-040 FR113 — các prompt trước đây ghép chuỗi ngay trong trình duyệt.
+  // Các prompt "chép sang AI ngoài", do server dựng.
   { value: "manim_adjust", label: "Phụ trợ — chuẩn hoá script Manim có sẵn" },
   { value: "remotion_adjust", label: "Phụ trợ — chuẩn hoá code Remotion có sẵn" },
   { value: "short_script", label: "Phụ trợ — soạn script Shorts/TikTok" },
@@ -57,7 +57,7 @@ function renderPreview(templateText: string): string {
 }
 
 /**
- * CR-031 — thư viện prompt. Mỗi vai trò trong pipeline soạn kịch bản có một
+ * Thư viện prompt. Mỗi vai trò trong pipeline soạn kịch bản có một
  * DANH SÁCH prompt; tại một thời điểm chỉ một dòng được bật và đó là dòng
  * pipeline chạy.
  *

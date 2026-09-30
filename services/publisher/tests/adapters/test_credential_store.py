@@ -93,8 +93,7 @@ def test_list_returns_every_connected_channel():
 
 
 def test_save_upserts_on_channel_id_not_a_fixed_row():
-    """The pre-CR-012 statement wrote id=1 unconditionally, so connecting a
-    second channel overwrote the first."""
+    """Connecting a second channel adds a row instead of overwriting the first."""
     mock_conn, mock_cursor = _mock_connect()
     with patch("adapters.persistence.credential_store.psycopg2.connect", return_value=mock_conn):
         PostgresCredentialStore("postgresql://fake").save(
@@ -116,7 +115,7 @@ def test_save_upserts_on_channel_id_not_a_fixed_row():
 
 def test_save_keeps_the_stored_refresh_token_when_google_returns_none():
     """Google only issues a refresh token on the first consent, so a
-    re-consent must not blank the stored one (FR31.6)."""
+    re-consent must not blank the stored one."""
     mock_conn, mock_cursor = _mock_connect()
     with patch("adapters.persistence.credential_store.psycopg2.connect", return_value=mock_conn):
         PostgresCredentialStore("postgresql://fake").save(
@@ -149,7 +148,7 @@ def test_get_parses_stored_scopes():
 
 
 def test_get_empty_scopes_column_reads_as_no_scopes():
-    """A row written before CR-015 has scopes='' (the column default) — this
+    """A row with no recorded scopes has scopes='' (the column default) — this
     must read back as (), which OAuthCredential treats as 'upload only', not
     as None or a crash (ADR-0028)."""
     mock_conn, _ = _mock_connect(fetchone_return=_row(scopes=""))

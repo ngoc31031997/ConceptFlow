@@ -8,7 +8,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-051: Summaries' illustrations_ready is the code step's gate in SQL. Each
+// Summaries' illustrations_ready is the code step's gate in SQL. Each
 // case checks the SQL answer against ProjectIllustration.Ready on the same rows,
 // so the two cannot drift apart silently.
 // Runs against a real, disposable database: TEST_DATABASE_URL=postgres://...
@@ -61,7 +61,7 @@ func TestSummariesIllustrationsReadyMatchesTheCodeGate(t *testing.T) {
 		}, true},
 	}
 	for i, c := range cases {
-		id := "cr051-sum-" + string(rune('a'+i))
+		id := "summaries-" + string(rune('a'+i))
 		// Deferred, and done up front too, so a failed run leaves nothing that a
 		// rerun on the same database would read (e.g. a stale planned_at).
 		_ = r.DeleteAuthoring(ctx, id)

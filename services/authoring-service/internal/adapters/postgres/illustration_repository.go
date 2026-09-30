@@ -13,7 +13,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — the illustration library's tables.
+// The illustration library's tables.
 
 const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, exemplar,
 	COALESCE(source_id, ''), COALESCE(home_folder_id, ''), warnings, status, version,
@@ -71,7 +71,7 @@ func (r *PromptTemplateRepository) SeedIllustrations(ctx context.Context) error 
 			return err
 		}
 	}
-	// CR-052: the three exemplars this service used to seed become Hình mẫu
+	// The three original exemplars become Hình mẫu
 	// data, once. After that they are rows like any other: never seeded again,
 	// so one the Creator took out of the Hình mẫu stays out.
 	if _, err := r.pool.Exec(ctx, `

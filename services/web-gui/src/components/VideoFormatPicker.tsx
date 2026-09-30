@@ -11,7 +11,7 @@ interface VideoFormatPickerProps {
 }
 
 /**
- * Chọn hình dạng video cho project (CR-019 FR51.3).
+ * Chọn hình dạng video cho project.
  *
  * Bộ beat hiện ra ngay dưới mỗi lựa chọn chứ không giấu sau một nút: đó là phần
  * Creator thực sự cần biết khi viết script, và cũng là thứ hệ thống sẽ kiểm lại

@@ -18,7 +18,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     tipa \
     dvisvgm \
     && rm -rf /var/lib/apt/lists/*
-# Font của bộ nhận diện (CR-017 §Quyết định #2). Manim/Pango **im lặng thay
+# Font của bộ nhận diện. Manim/Pango **im lặng thay
 # bằng font khác** khi font yêu cầu không có, nên thiếu bước này thì mọi video
 # vẫn render thành công — chỉ là bằng font của người khác, và không ai phát hiện
 # ra cho tới lúc nhìn video đã publish.
@@ -86,7 +86,7 @@ COPY remotion_project/package.json remotion_project/
 # this first cut (nothing has generated one against a real npm registry
 # from inside this repo before) — `npm ci` requires one to exist.
 RUN cd remotion_project && npm install
-# CR-048 T6b: kiểm tra bố cục (remotion_project/layout_check.mjs) điều khiển
+# Kiểm tra bố cục (remotion_project/layout_check.mjs) điều khiển
 # Chromium headless qua playwright-core. playwright-core KHÔNG tự tải trình
 # duyệt, nên cài ở đây đúng bản headless shell mà phiên bản playwright-core đã
 # ghim được build và test cùng (1.56.1 → Chromium 141, cũng là bản spike T6a đo

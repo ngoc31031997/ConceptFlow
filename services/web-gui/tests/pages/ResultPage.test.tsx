@@ -87,8 +87,7 @@ describe("ResultPage delete button", () => {
 });
 
 /*
-  Bug report (2026-09-12): trước đây trang này vừa xem lại vừa đăng bài — giờ
-  Bước 5 "Kết quả" chỉ dẫn sang Bước 6 "Đăng", không tự đăng gì ở đây.
+  Trang "Kết quả" chỉ dẫn sang trang "Đăng", không tự đăng gì ở đây.
 */
 describe("ResultPage continue-to-publish handoff", () => {
   afterEach(() => {
@@ -101,7 +100,7 @@ describe("ResultPage continue-to-publish handoff", () => {
     renderResultPage();
 
     await waitFor(() => expect(screen.getByTestId("result-continue-to-publish")).toBeInTheDocument());
-    // CR-051: screen titles name the step as the rail does.
+    // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Kết quả");
     expect(screen.queryByTestId("publish-form-submit-button")).not.toBeInTheDocument();
 

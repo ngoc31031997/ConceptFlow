@@ -1,4 +1,4 @@
-"""Client for the Rendering service's compile check (CR-039 FR104)."""
+"""Client for the Rendering service's compile check."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ class Diagnostic:
     message: str
     line: int | None = None
     # compile: lint / tsc / Manim dry run. layout: measured on the drawn shot
-    # (CR-048 T6b) — same repair loop, but the repair prompt says what it is.
+    # — same repair loop, but the repair prompt says what it is.
     kind: str = COMPILE
-    # CR-050 FR-22: the rule that failed (a layout rule, a tsc code), "" when
+    # The rule that failed (a layout rule, a tsc code), "" when
     # the checker has none — for statistics, not for the repair prompt.
     rule: str = ""
 
@@ -38,7 +38,7 @@ class CheckResult:
 
 @dataclass(frozen=True)
 class LayoutContext:
-    """What the Rendering service's layout check needs beyond the code (CR-048 T6b)."""
+    """What the Rendering service's layout check needs beyond the code."""
 
     # {"edge": "top" | "bottom", "px": int}: the strip burned-in subtitles
     # cover. None = nothing is burned into the frame.

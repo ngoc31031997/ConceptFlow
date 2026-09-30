@@ -1,5 +1,5 @@
 /**
- * `remotion`, as the layout probe's page sees it (CR-048 T6a/T6b).
+ * `remotion`, as the layout probe's page sees it.
  *
  * The probe draws a merged script through @remotion/player's <Thumbnail>, and
  * Remotion refuses getInputProps() inside a Player ("the props are available

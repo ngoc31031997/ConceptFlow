@@ -1,4 +1,4 @@
-"""Bản sắc thị giác của kênh — nguồn sự thật duy nhất (CR-017 FR44).
+"""Bản sắc thị giác của kênh — nguồn sự thật duy nhất.
 
 Đổi diện mạo của toàn bộ kênh là sửa file này, không sửa script nào.
 
@@ -11,7 +11,7 @@ fake/mock cho toàn bộ tương tác Manim thật).
 
 Nền lấy từ bộ nhận diện đã có (`docs/brand/make-banner.py`, cũng là nền của
 logo), còn màu nhấn lấy từ Catppuccin Mocha. Creator chọn giữ màu brand cho
-intro/outro (CR-023) nhưng dùng Catppuccin cho nội dung; hai nền khác nhau sẽ
+intro/outro nhưng dùng Catppuccin cho nội dung; hai nền khác nhau sẽ
 giật màu ở đúng điểm nối intro→thân, nên nền dùng chung và chỉ màu nhấn khác
 nhau.
 """
@@ -44,7 +44,7 @@ FRAME_HEIGHT = 8.0
 FRAME_WIDTH = 14.222222222222221
 
 #: Chữ và hình phải nằm trong khung này. Rộng hơn mép an toàn của TV vì video
-#: còn bị YouTube crop nhẹ trên một số bề mặt, và vì phụ đề burn-in (CR-001)
+#: còn bị YouTube crop nhẹ trên một số bề mặt, và vì phụ đề burn-in
 #: chiếm phần đáy.
 SAFE_MARGIN = 0.6
 
@@ -140,7 +140,7 @@ class Theme:
     """Một bản sắc hoàn chỉnh.
 
     Theme mới tạo bằng `derive()` (kế thừa rồi ghi đè), không chép lại toàn bộ —
-    CR-017 FR44.3 yêu cầu kiến trúc cho nhiều theme ngay cả khi hiện chỉ dùng một.
+    kiến trúc cho nhiều theme ngay cả khi hiện chỉ dùng một.
     """
 
     name: str

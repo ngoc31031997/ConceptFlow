@@ -1,8 +1,7 @@
 """Composition root for the Video Assembly Service.
 
-Plain AMQP consumer with a PostgreSQL-backed Outbox/Inbox, mirroring
-Content Plugin Service / TTS Service / Script Processing Service /
-Rendering Service's composition root shape (ADR-0013). No REST endpoint —
+Plain AMQP consumer with a PostgreSQL-backed Outbox/Inbox, same composition
+root shape as the TTS and Rendering services (ADR-0013). No REST endpoint —
 readiness is signaled via a sentinel file (Infrastructure Design).
 """
 
@@ -69,7 +68,7 @@ async def run() -> None:
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    # CR-029: assemble_video/generate_clips run their ffmpeg work in a worker
+    # assemble_video/generate_clips run their ffmpeg work in a worker
     # thread (asyncio.to_thread) — ProgressPublisher needs the running loop
     # itself to marshal a publish back onto it from that thread.
     progress = ProgressPublisher(progress_exchange, asyncio.get_running_loop())
@@ -78,12 +77,12 @@ async def run() -> None:
         use_case, pool, inbox, outbox, channel_assets, progress
     )
     normalize_handler = NormalizeChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
-    # CR-021 FR61.5: thresholds are read from the environment once, here, and
+    # Thresholds are read from the environment once, here, and
     # nowhere else. QC_ENFORCE is deliberately NOT among them — this service
     # scores and reports the real severity; whether a blocking finding actually
-    # stops a publish is Orchestrator's call (LLD D5).
+    # stops a publish is Orchestrator's call.
     qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
-    # CR-007 D2/C2b: preset thresholds read from the environment once, here —
+    # Preset thresholds read from the environment once, here —
     # same convention as QC_ENFORCE-adjacent QCThresholds above.
     generate_clips_handler = GenerateClipsCommandHandler(
         pool, inbox, outbox, ClipThresholds.from_env(), progress
@@ -92,7 +91,7 @@ async def run() -> None:
     command_dispatcher = VideoAssemblyCommandDispatcher(
         assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler,
         register_channel_asset_handler,
-        # CR-040 FR114.2: dọn final.mp4/final.srt/clips của project bị xoá.
+        # Dọn final.mp4/final.srt/clips của project bị xoá.
         purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
             purge_project_artifacts, pool, inbox, outbox
         ),

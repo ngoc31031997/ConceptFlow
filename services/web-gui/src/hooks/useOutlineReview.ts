@@ -3,12 +3,11 @@ import { approveOutline, editNarration, rejectOutline } from "../api/client";
 import type { Project } from "../types";
 
 /**
- * Shared state/actions behind the outline review screen (CR-024), pulled out
+ * Shared state/actions behind the outline review screen, pulled out
  * of the OutlineReview component so the approve/reject buttons can render in
  * RenderPage's sticky right column (next to ProgressTracker) while the
- * scrollable line list stays in the main column — bug report: the buttons
- * used to sit at the bottom of a list that can run to dozens of lines, so
- * they scrolled out of view exactly when a Creator most wanted them close by.
+ * scrollable line list stays in the main column: at the bottom of a list
+ * that can run to dozens of lines, the buttons would scroll out of view.
  */
 export function useOutlineReview(project: Project, onDecided: () => void, onRejected: () => void) {
   const [busy, setBusy] = useState(false);

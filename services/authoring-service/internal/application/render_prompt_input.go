@@ -8,14 +8,13 @@ import (
 	"authoring/internal/domain"
 )
 
-// RenderInput is everything a stateless prompt render needs (CR-040 FR113).
+// RenderInput is everything a stateless prompt render needs.
 //
 // The wizard and the assistants hold unsaved drafts — the topic being typed,
 // the script being pasted, the subtitle style not yet applied — so they send
 // what they have instead of asking the server to read it back from a project
-// row that may be stale. Every field is optional; a blank one becomes the
-// placeholder the browser used to show, so a prompt rendered from nothing reads
-// exactly as it did before this moved to the server.
+// row that may be stale. Every field is optional; a blank one becomes its
+// placeholder, so a prompt rendered from nothing still reads as a template.
 type RenderInput struct {
 	Role     domain.PromptRole
 	Language string // "vi" | "en"; anything else is "vi", as elsewhere

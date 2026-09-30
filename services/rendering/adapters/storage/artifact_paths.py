@@ -21,13 +21,12 @@ def compute_video_path(project_id: str) -> str:
 
 
 def compute_timing_path(project_id: str) -> str:
-    """Sidecar for the timing that CR-002 added: /shared/{id}/video/timing.json
+    """Sidecar for the narration timing: /shared/{id}/video/timing.json
 
     Kept next to the video rather than only on the event, because render() is
     idempotent — a redelivered command finds the .mp4 already there and skips
     the Manim run. Without this file that fast path would have no offsets to
-    report and would silently emit a desynchronised event, which is precisely
-    the failure CR-002 removes.
+    report and would silently emit a desynchronised event.
     """
     return os.path.join(SHARED_VOLUME_ROOT, project_id, "video", "timing.json")
 
@@ -62,11 +61,11 @@ def ensure_parent_dir(video_path: str) -> None:
 
 
 def compute_channel_asset_path(kind: str, render_quality: str) -> str:
-    """Conventional path for a channel-wide asset (CR-023 D1/D3):
+    """Conventional path for a channel-wide asset:
     /shared/channel-assets/{kind}/{render_quality}/rendered.mp4
 
     Not keyed by project_id — intro/outro belong to the channel, not to any
-    one project (D1). Keyed by render_quality because FR65.5 caches one asset
+    one project. Keyed by render_quality because there is one asset
     per quality: splicing a 1080p60 intro onto a 4k60 body is not a concat the
     demuxer can do, so the two cannot share a file. video-assembly is the one
     that copies this into its own `channel_assets` table (with
@@ -101,7 +100,7 @@ def _rmdir_if_empty(path: str) -> None:
 
 
 def purge_project_artifacts(project_id: str, cache_root: str | None = None) -> None:
-    """CR-040 FR114.2: remove what Rendering owns for a deleted project — its
+    """Remove what Rendering owns for a deleted project — its
     rendered video and timing sidecar, and its Manim media cache
     (`cache_root/{project_id}`, RENDER_CACHE_ROOT). Never touches final.mp4,
     which belongs to video-assembly. Idempotent."""

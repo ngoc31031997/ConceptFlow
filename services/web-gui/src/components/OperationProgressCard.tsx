@@ -4,10 +4,10 @@ interface OperationProgressCardProps {
   title?: string;
   /** Dòng phụ dạng `pha · số lượng · thời gian`. */
   subtitle?: string | null;
-  /** Có `total` thì hiện phần trăm; thiếu thì thanh chạy không xác định (FR116.4). */
+  /** Có `total` thì hiện phần trăm; thiếu thì thanh chạy không xác định. */
   done?: number | null;
   total?: number | null;
-  /** Lỗi đã phân loại; thẻ vẫn giữ dòng phụ (số ký tự, thời gian) (FR116.5). */
+  /** Lỗi đã phân loại; thẻ vẫn giữ dòng phụ (số ký tự, thời gian). */
   error?: string | null;
   /** "step": kiểu thẻ bước trong stepper. */
   variant?: "default" | "step";

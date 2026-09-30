@@ -10,7 +10,7 @@ import (
 )
 
 // LLMUsageRepository implements application.LLMUsagePort against the
-// llm_usage table (CR-027 D9).
+// llm_usage table.
 type LLMUsageRepository struct {
 	pool *pgxpool.Pool
 }
@@ -51,7 +51,7 @@ func (r *LLMUsageRepository) RecordLLMUsage(ctx context.Context, rec application
 }
 
 // ModelUsageStats aggregates the calls of one step phase since a time, per
-// model (CR-050 FR-19). Averages cover successful calls only: a failed call's
+// model. Averages cover successful calls only: a failed call's
 // duration says how long it took to fail, not what a chunk costs.
 func (r *LLMUsageRepository) ModelUsageStats(
 	ctx context.Context, step, phase string, since time.Time,

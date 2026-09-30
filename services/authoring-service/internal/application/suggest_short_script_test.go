@@ -50,7 +50,7 @@ func TestSuggestShortScriptUseCase_RejectsEmptyTopicAndSource(t *testing.T) {
 
 func TestSuggestShortScriptUseCase_SourceScriptContentAloneIsEnough(t *testing.T) {
 	// Called from an existing long-form project's Result page: no separate
-	// topic typed in, the long script itself is the context (CR-026 FR71.1).
+	// topic typed in, the long script itself is the context.
 	suggester := &fakeShortScriptSuggester{script: "script"}
 	uc := NewSuggestShortScriptUseCase(suggester)
 

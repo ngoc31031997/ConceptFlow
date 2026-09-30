@@ -77,14 +77,14 @@ def test_render_is_idempotent_when_video_already_exists():
     second = use_case.render(make_request())
 
     assert len(renderer.calls) == 1
-    # CR-002: the fast path must reproduce the timing too, not just the path —
+    # The fast path must reproduce the timing too, not just the path —
     # an offset-less "completed" event would desynchronise assembly.
     assert second.wait_offsets == first.wait_offsets
     assert second.video_duration_seconds == first.video_duration_seconds
 
 
 def test_render_redoes_work_when_timing_sidecar_is_missing(shared_volume_root):
-    """A video rendered before CR-002 has no timing.json. Reusing it would
+    """A video without a timing.json sidecar is not reused: that would
     emit an event with no offsets, so the use case must re-render instead."""
     import os
 
@@ -140,7 +140,7 @@ def test_render_rejects_empty_narration_segments():
 
 
 def test_renders_when_audio_path_is_absent():
-    # CR-001: narration disabled means no audio file exists at all — only the
+    # Narration disabled means no audio file exists at all — only the
     # estimated duration_seconds is used to substitute self.wait(AUTO).
     renderer = FakeRenderer()
     use_case = RenderScriptUseCase(renderer)

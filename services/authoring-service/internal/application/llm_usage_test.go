@@ -28,7 +28,7 @@ func quietLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// TestRecorder_AFailedWriteNeverReachesTheCaller is CR-027 FR82.5. A Creator
+// TestRecorder_AFailedWriteNeverReachesTheCaller: a Creator
 // whose draft came back fine must not be told it failed because a
 // bookkeeping row did not land.
 func TestRecorder_AFailedWriteNeverReachesTheCaller(t *testing.T) {
@@ -125,7 +125,7 @@ func TestRecordFor_NonLLMErrorStillMarksTheRowFailed(t *testing.T) {
 	}
 }
 
-// TestRecordFor_ACutStreamIsFlaggedNotZero — CR-056: a call cut for its
+// TestRecordFor_ACutStreamIsFlaggedNotZero: a call cut for its
 // reasoning budget has no usage record; the row says so and keeps the
 // reasoning it counted, rather than passing for a free call.
 func TestRecordFor_ACutStreamIsFlaggedNotZero(t *testing.T) {

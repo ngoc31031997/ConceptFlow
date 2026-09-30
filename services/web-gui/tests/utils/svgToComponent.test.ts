@@ -10,7 +10,7 @@ const SVG = `<?xml version="1.0"?>
   <script>alert(1)</script>
 </svg>`;
 
-describe("svgToComponent (CR-044)", () => {
+describe("svgToComponent", () => {
   it("wraps the shapes in Figure with the SVG's own box, in JSX spelling", () => {
     const out = svgToComponent(SVG, "SchoolBus");
     expect(out.width).toBe(120);

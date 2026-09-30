@@ -3,29 +3,25 @@ import { FLOW_VALIDATE } from "./flow";
 /**
  * Vietnamese labels for the saga's step and status names.
  *
- * The progress tracker used to print the raw step id ("Đang xử lý:
- * assemble_video") while the video list already had its own Vietnamese
- * mapping. One table now serves both, so a new step is translated once.
+ * One table serves the progress tracker and the video list, so a new step is
+ * translated once.
  */
 
 /** Saga step ids, as they arrive on the SSE progress stream. */
 export const STEP_LABELS: Record<string, string> = {
-  // CR-031: hai bước này lại có nhãn riêng. CR-029 từng gộp chúng làm một ô vì
-  // cả hai nằm lọt giữa một bước "Xử lý" duy nhất, nên phân biệt chỉ thêm
-  // nhiễu. Giờ chúng là toàn bộ nội dung của bước 7 (Validate) — đó là màn hình
+  // Hai bước này có nhãn riêng: chúng là toàn bộ nội dung của bước 7 (Validate) — đó là màn hình
   // Creator ngồi đợi, nên biết đang phân tích hay đang chạy thử là khác biệt
   // thật: một cái tính bằng giây, một cái tính bằng phút.
   parse_script: "Phân tích kịch bản",
   validate_script: "Chạy thử & kiểm tra",
   classify_scenes: "Phân loại cảnh",
   synthesize_speech: "Tạo giọng đọc",
-  // CR-051: the rail's name — this is the only saga step of "Bước 10 — Render".
+  // The rail's name — this is the only saga step of "Bước 10 — Render".
   render_scenes: "Render",
   assemble_video: "Ghép video hoàn chỉnh",
-  // CR-021, tắt khỏi luồng chính từ CR-029 (đưa backlog) — nhãn giữ lại chỉ
-  // để hiển thị đúng cho project cũ đã chạy qua bước này trước CR-029.
+  // Không nằm trong luồng chính — nhãn giữ lại để hiển thị đúng cho project
+  // đã chạy qua bước này.
   qc_video: "Chấm chất lượng video",
-  // CR-007
   generate_clips: "Cắt clip dọc Shorts/TikTok",
   publish_video: "Đăng lên YouTube",
 };
@@ -95,7 +91,7 @@ export function statusLabel(status: string): string {
 export const VALIDATE_STEPS = ["parse_script", "validate_script"] as const;
 
 /**
- * CR-051 — hai việc con của bước 7 mang số con 7.1/7.2. Số trơn 1/2 từng làm
+ * Hai việc con của bước 7 mang số con 7.1/7.2. Số trơn 1/2 từng làm
  * Creator đọc thành bước 1 và 2 của luồng.
  */
 export const VALIDATE_SUBSTEP_NUMBERS: Record<(typeof VALIDATE_STEPS)[number], string> = {
@@ -105,7 +101,7 @@ export const VALIDATE_SUBSTEP_NUMBERS: Record<(typeof VALIDATE_STEPS)[number], s
 
 /**
  * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chỉ chạy sau khi
- * Creator duyệt ở bước 8. qc_video không có ở đây (off luồng chính từ CR-029).
+ * Creator duyệt ở bước 8. qc_video không có ở đây (không nằm trong luồng chính).
  */
 export const PROCESS_STEPS = [
   "synthesize_speech",

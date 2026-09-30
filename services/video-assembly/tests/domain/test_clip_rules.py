@@ -1,4 +1,4 @@
-"""Unit tests for domain/clip_rules.py (CR-007 FR19.6/19.7) — pure functions,
+"""Unit tests for domain/clip_rules.py — pure functions,
 no ffmpeg, no I/O."""
 
 from __future__ import annotations

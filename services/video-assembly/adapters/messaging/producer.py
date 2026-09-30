@@ -37,17 +37,16 @@ def video_assembled_envelope(
     payload = {
         "event_type": "video_assembled",
         "video_path": video_path,
-        # CR-007 D5 rủi ro: đây là nguồn thật duy nhất của intro_duration —
-        # AssembleVideoCommandHandler đã resolve nó để dịch timeline (CR-023
-        # effective_lead_in). Không mang nó ra thì generate_clips sau này
-        # (Orchestrator không có cách nào khác biết con số này — nó không gọi
-        # HTTP sang video-assembly, xem correction ở CR-023 LLD) sẽ cắt lệch
-        # đúng bằng độ dài intro. 0.0 khi project không bật intro.
+        # Nguồn thật duy nhất của intro_duration — AssembleVideoCommandHandler
+        # đã resolve nó để dịch timeline (effective_lead_in). Không mang nó ra
+        # thì generate_clips sau này (Orchestrator không có cách nào khác biết
+        # con số này — nó không gọi HTTP sang video-assembly) sẽ cắt lệch đúng
+        # bằng độ dài intro. 0.0 khi project không bật intro.
         "intro_duration_seconds": intro_duration_seconds,
     }
     if caption_path:
-        # Absent rather than null when there is no caption track (CR-015
-        # FR38.4) — mirrors how thumbnail_path already flows downstream.
+        # Absent rather than null when there is no caption track — mirrors
+        # how thumbnail_path flows downstream.
         payload["caption_path"] = caption_path
     return build_envelope(saga_id, project_id, payload)
 
@@ -65,9 +64,9 @@ def qc_completed_envelope(
     findings: list[dict],
     reason: str | None = None,
 ) -> dict:
-    """CR-021 — the ONLY event `qc_video` ever produces.
+    """The ONLY event `qc_video` ever produces.
 
-    There is deliberately no `qc_failed` counterpart (FR61.4 / LLD D2): a
+    There is deliberately no `qc_failed` counterpart: a
     technical failure (no layout marks, ffmpeg error, unreadable file) still
     publishes this event with status="not_scored" and a reason, so the project
     still reaches ready_to_publish. A broken gate must not become a locked gate.
@@ -88,8 +87,8 @@ def qc_completed_envelope(
 
 
 def clips_generated_envelope(saga_id: str, project_id: str, clips: list[dict]) -> dict:
-    """CR-007 — the ONLY event `generate_clips` produces. There is no global
-    `generate_clips_failed` (LLD D1, same shape as qc_video's FR61.4): each
+    """The ONLY event `generate_clips` produces. There is no global
+    `generate_clips_failed` (same shape as qc_video): each
     clip in `clips` carries its own status="ok"/"error", so one bad clip
     never keeps the good ones (or publish) from going through."""
     return build_envelope(
@@ -100,7 +99,7 @@ def clips_generated_envelope(saga_id: str, project_id: str, clips: list[dict]) -
 def channel_asset_normalized_envelope(
     saga_id: str, project_id: str, kind: str, asset_id: str, render_quality: str, version: int
 ) -> dict:
-    """CR-023 D1/D8 correction — the one event shaped enough for Orchestrator's
+    """The one event shaped enough for Orchestrator's
     channel_asset_pointers projection (handle_step_event.go's
     handleChannelAssetProjection reads exactly these field names: kind,
     render_quality, asset_id, version). Published both after ingesting

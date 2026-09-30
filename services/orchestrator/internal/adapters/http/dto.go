@@ -20,12 +20,12 @@ type startRenderSagaRequest struct {
 	ContentLanguage     string  `json:"voice_language"`
 	BackgroundMusicPath *string `json:"background_music_path,omitempty"`
 
-	// CR-001. TTSEnabled is a pointer so an omitted field keeps the pre-CR-001
+	// TTSEnabled is a pointer so an omitted field keeps the
 	// default (narration on) instead of decoding to false.
 	TTSEnabled       *bool  `json:"tts_enabled,omitempty"`
 	VoiceID          string `json:"voice_id,omitempty"`
 	SubtitlesEnabled bool   `json:"subtitles_enabled,omitempty"`
-	// CR-015 FR41 — "off" | "track" | "burn_in" | "both". Wins over
+	// "off" | "track" | "burn_in" | "both". Wins over
 	// SubtitlesEnabled when both are present (start_render_saga.go).
 	SubtitleMode  string                `json:"subtitle_mode,omitempty"`
 	SubtitleStyle *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
@@ -38,7 +38,7 @@ type startRenderSagaRequest struct {
 	VideoFont             string  `json:"video_font,omitempty"`
 	// "long" | "short" | "both" — empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode string `json:"video_output_mode,omitempty"`
-	// CR-026 D1 — project_id of the companion video covering the same
+	// project_id of the companion video covering the same
 	// topic (the other of the long-form/short-form pair), if any.
 	CompanionProjectID *string `json:"companion_project_id,omitempty"`
 }
@@ -53,7 +53,7 @@ type startPublishSagaRequest struct {
 	PublishAt     *string  `json:"publish_at,omitempty"`
 	ThumbnailPath *string  `json:"thumbnail_path,omitempty"`
 	ChannelID     *string  `json:"channel_id,omitempty"`
-	// CR-021 FR61.3 — the conscious action that gets past a blocking QC
+	// The conscious action that gets past a blocking QC
 	// finding. Absent means "no": an override has to be asked for.
 	AcknowledgeQC bool `json:"acknowledge_qc,omitempty"`
 }
@@ -67,8 +67,7 @@ type qcFindingResponse struct {
 	TimestampSeconds float64 `json:"timestamp_seconds"`
 }
 
-// qcReportResponse is the GET /v1/projects/{project_id}/qc-report body
-// (CR-021 FR61.1/FR61.2).
+// qcReportResponse is the GET /v1/projects/{project_id}/qc-report body.
 //
 // Status "not_scored" with an empty findings list is a normal, successful
 // response, not an error — the GUI says so rather than showing a green tick the
@@ -79,8 +78,8 @@ type qcReportResponse struct {
 	Reason    *string             `json:"reason,omitempty"`
 	Findings  []qcFindingResponse `json:"findings"`
 	CreatedAt *string             `json:"created_at,omitempty"`
-	// OverriddenAt is set once the Creator published past a blocking finding
-	// (FR61.3), so the record of that decision is visible where the findings are.
+	// OverriddenAt is set once the Creator published past a blocking finding,
+	// so the record of that decision is visible where the findings are.
 	OverriddenAt *string `json:"overridden_at,omitempty"`
 }
 
@@ -141,26 +140,26 @@ type projectResponse struct {
 	Warnings         []string                `json:"validation_warnings"`
 	VideoFormatVer   int                     `json:"video_format_version"`
 	YoutubeVideoURL  *string                 `json:"youtube_video_url,omitempty"`
-	// CR-015 FR39.4 — absent when no caption was requested, otherwise
+	// Absent when no caption was requested, otherwise
 	// "uploaded" | "skipped_no_scope" | "failed".
 	CaptionStatus *string `json:"caption_status,omitempty"`
 	ErrorMessage  *string `json:"error_message,omitempty"`
-	// CR-007 D7 — the vertical clips generate_clips produced, if the saga has
+	// The vertical clips generate_clips produced, if the saga has
 	// reached that step yet.
 	Clips []clipResultResponse `json:"clips,omitempty"`
 	// ScriptContent, BackgroundMusicPath and BackgroundMusicVolume round out
 	// what StartRenderSagaInput needs — the GUI's "render lại ở chất lượng
-	// khác" (bug report) resubmits POST /v1/sagas/render for this same
+	// khác" resubmits POST /v1/sagas/render for this same
 	// project_id once it is done, and it can only carry over settings it can
 	// actually read back from here.
 	ScriptContent         string  `json:"script_content"`
 	BackgroundMusicPath   *string `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
 	VideoFont             string  `json:"video_font,omitempty"`
-	// "long" | "short" | "both" (CR-007 follow-up) — which output(s) the
+	// "long" | "short" | "both" — which output(s) the
 	// Result screen should feature, and whether generate_clips ran at all.
 	VideoOutputMode string `json:"video_output_mode"`
-	// CR-026 D1/D6 — id only, not the nested project: the GUI re-fetches it
+	// Id only, not the nested project: the GUI re-fetches it
 	// through the same GET /v1/projects/{id} it already calls for anything
 	// else, rather than orchestrator embedding one project inside another.
 	CompanionProjectID *string `json:"companion_project_id,omitempty"`
@@ -191,12 +190,12 @@ type projectSummaryResponse struct {
 	FlowStep   int    `json:"flow_step"`
 	RunState   string `json:"run_state"`
 	ForkedFrom string `json:"forked_from,omitempty"`
-	// ForkedFromTopic names the source, which may sit on another page (CR-054).
+	// ForkedFromTopic names the source, which may sit on another page.
 	ForkedFromTopic string `json:"forked_from_topic,omitempty"`
 }
 
 // projectListResponse is the GET /v1/projects response body. The paging
-// fields are set only when the request asked for a page (CR-054); without
+// fields are set only when the request asked for a page; without
 // ?page the body is the full list, as before.
 type projectListResponse struct {
 	Projects []projectSummaryResponse   `json:"projects"`
@@ -215,8 +214,8 @@ type projectListCountsResponse struct {
 	Done    int `json:"done"`
 }
 
-// suggestShortScriptRequest is the body of POST /v1/short-script-suggestions
-// (CR-026 FR71.1). No project_id: a Creator can draft a short from a bare
+// suggestShortScriptRequest is the body of POST /v1/short-script-suggestions.
+// No project_id: a Creator can draft a short from a bare
 // topic without an existing project. SourceScriptContent is optional context
 // pulled from an existing long-form project when called from its Result
 // screen — the topic alone is enough to draft something without it.
@@ -240,8 +239,8 @@ type suggestMetadataResponse struct {
 	Tags        []string `json:"tags"`
 }
 
-// createClipRequest is the body of POST /v1/projects/{project_id}/clips
-// (CR-007 FR19.2/D3/D7) — a Creator-entered clip selection.
+// createClipRequest is the body of POST /v1/projects/{project_id}/clips:
+// a Creator-entered clip selection.
 type createClipRequest struct {
 	Name         string   `json:"name"`
 	StartSeconds float64  `json:"start_seconds"`
@@ -250,7 +249,7 @@ type createClipRequest struct {
 }
 
 // clipResultResponse mirrors domain.ClipResult for
-// GET /v1/projects/{project_id}/clips (CR-007 D7/FR20.1).
+// GET /v1/projects/{project_id}/clips.
 type clipResultResponse struct {
 	Name            string  `json:"name"`
 	Preset          string  `json:"preset"`
@@ -263,7 +262,7 @@ type clipResultResponse struct {
 // createClipResponse is the 200/202 response of
 // POST /v1/projects/{project_id}/clips. AcceptedPresets/RejectedPresets let
 // the GUI show exactly which preset(s) were saved and which were refused and
-// why (FR19.7 — one bad preset must never sink the request the Creator did
+// why (one bad preset must never sink the request the Creator did
 // get right).
 type createClipResponse struct {
 	Name            string            `json:"name"`
@@ -286,7 +285,7 @@ func toClipResultResponses(clips []domain.ClipResult) []clipResultResponse {
 //
 // Code is set only where the client has to branch on *which* failure it was,
 // not merely report it. Publishing returns 409 both for a project in the wrong
-// status and for a QC block (CR-021 FR61.3), and only the second one offers the
+// status and for a QC block, and only the second one offers the
 // Creator a way through — leaving the GUI to tell them apart by matching on
 // prose would break the moment the wording changes.
 type errorResponse struct {
@@ -316,7 +315,7 @@ type patchWizardSettingsRequest struct {
 }
 
 // saveAuthoringModeRequest is the body of PUT
-// /v1/projects/{id}/authoring/mode (CR-027 FR79): "manual" or "ai".
+// /v1/projects/{id}/authoring/mode: "manual" or "ai".
 type saveAuthoringModeRequest struct {
 	Mode string `json:"mode"`
 }
@@ -333,8 +332,7 @@ type saveAuthoringModelsRequest struct {
 // ErrorCodeQCBlocked marks the 409 that `acknowledge_qc: true` can get past.
 const ErrorCodeQCBlocked = "qc_blocked"
 
-// createProjectDraftRequest is the body of POST /v1/projects (CR-028
-// FR83.1) — sent as soon as the Creator finishes typing a topic on wizard
+// createProjectDraftRequest is the body of POST /v1/projects — sent as soon as the Creator finishes typing a topic on wizard
 // step 1, well before there is any script.
 type createProjectDraftRequest struct {
 	// ProjectID is optional — see CreateProjectDraftInput's doc comment for
@@ -342,18 +340,18 @@ type createProjectDraftRequest struct {
 	ProjectID       string `json:"project_id,omitempty"`
 	Topic           string `json:"topic"`
 	ContentLanguage string `json:"content_language"`
-	// RenderEngine is optional (CR-030): "" means "unchanged" — see
+	// RenderEngine is optional: "" means "unchanged" — see
 	// CreateProjectDraftInput.RenderEngine's doc comment.
 	RenderEngine string `json:"render_engine,omitempty"`
 }
 
 // updateProjectTopicRequest is the body of PATCH
-// /v1/projects/{project_id}/topic (CR-028 FR83.2).
+// /v1/projects/{project_id}/topic.
 type updateProjectTopicRequest struct {
 	Topic string `json:"topic"`
 }
 
-// similarProjectResponse is one entry of the FR85 collision-warning list.
+// similarProjectResponse is one entry of the topic collision-warning list.
 type similarProjectResponse struct {
 	ProjectID string    `json:"project_id"`
 	Topic     string    `json:"topic"`

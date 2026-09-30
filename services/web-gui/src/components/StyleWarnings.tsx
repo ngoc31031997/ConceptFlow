@@ -38,7 +38,7 @@ interface StyleWarningsProps {
 }
 
 /**
- * CR-045 — "⚠ N cảnh báo style" trên ô hình. Rê chuột (hoặc focus) hiện ngay
+ * "⚠ N cảnh báo style" trên ô hình. Rê chuột (hoặc focus) hiện ngay
  * danh sách dạng tooltip; bấm thì mở danh sách ngay dưới ô (trượt ra, dùng
  * được trên màn hình cảm ứng), kèm nút sao chép và nút nhờ AI sửa.
  */

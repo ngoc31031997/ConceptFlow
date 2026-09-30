@@ -1,8 +1,8 @@
-"""Thư viện component dựng cảnh (CR-017 FR45.2).
+"""Thư viện component dựng cảnh.
 
 Sáu khuôn hình rút từ những gì các script đã sản xuất thực sự dùng
 (`tests/fixtures/long_form_reference.py` và template trong `scriptTemplates.ts`),
-không phải từ tưởng tượng — đúng cách giảm thiểu rủi ro mà CR-017 §Rủi ro đặt ra.
+không phải từ tưởng tượng.
 """
 
 from .bar_chart import BarChart

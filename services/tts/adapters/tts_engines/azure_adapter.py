@@ -1,11 +1,10 @@
-"""AzureTTSAdapter — implements TTSEnginePort via Azure AI Speech (CR-009).
+"""AzureTTSAdapter — implements TTSEnginePort via Azure AI Speech.
 
 Azure serves the same neural voices EdgeTTSAdapter reaches for free, but as a
 documented, account-backed API: an F0 resource allows 500,000 neural characters
 a month at no cost, with commercial rights and an SLA. That is the difference
 worth exposing to the Creator — same sound, different guarantees — so Azure is
-offered as its own set of catalogue entries rather than silently substituted
-(CR-011).
+offered as its own set of catalogue entries rather than silently substituted.
 
 Unlike Edge, Azure can return RIFF/WAV directly, so there is no ffmpeg step:
 `riff-24khz-16bit-mono-pcm` is exactly what the rest of the pipeline reads with
@@ -15,7 +14,7 @@ Credentials come from AZURE_SPEECH_KEY and AZURE_SPEECH_REGION, kept separate
 from the Publisher's YouTube OAuth (different scope, different lifecycle — the
 same principle ADR-0023 applied to Google).
 
-Synthesis retries with backoff (CR-013). Measured 16/20 successes calling the
+Synthesis retries with backoff. Measured 16/20 successes calling the
 endpoint with a valid key: the four failures were bare HTTP 401s with no JSON
 body and an istio-envoy server header, scattered rather than clustered — Azure
 gateway instances disagreeing about subscription state, not a bad key. Without
@@ -117,7 +116,7 @@ class AzureTTSAdapter(TTSEnginePort):
             f.write(audio)
 
     def _fetch_audio(self, text: str, voice_name: str) -> bytes:
-        """Retries transient rejections (CR-013). A permanent one — bad SSML, an
+        """Retries transient rejections. A permanent one — bad SSML, an
         unknown voice — is raised on the first attempt, since retrying a
         deterministic answer only delays the fallback."""
         for attempt in range(1, MAX_ATTEMPTS + 1):

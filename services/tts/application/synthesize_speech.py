@@ -32,7 +32,7 @@ class SynthesizeSpeechUseCase:
 
         voice_id = resolve_voice_id(request.voice_id, request.language)
         # The text is part of the key: without it, editing a narration line and
-        # re-rendering silently reused the previous line's audio (CR-005 FR13.6).
+        # re-rendering would silently reuse the previous line's audio.
         audio_path = compute_audio_path(request.project_id, request.scene_index, voice_id, text)
 
         if audio_exists(audio_path):

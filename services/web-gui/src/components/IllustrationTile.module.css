@@ -77,7 +77,7 @@
   font-size: 12.5px;
 }
 
-/* CR-045 — the tile widens while its style warnings are open, so the list stays readable. */
+/* The tile widens while its style warnings are open, so the list stays readable. */
 @media (min-width: 720px) {
   .wide {
     grid-column: span 2;

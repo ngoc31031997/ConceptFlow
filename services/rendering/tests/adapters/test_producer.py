@@ -1,4 +1,4 @@
-"""script_validated_envelope must carry clip_marks (bug report, 2026-09-12) —
+"""script_validated_envelope must carry clip_marks —
 otherwise Orchestrator/GUI have no way to warn "chưa có clip nào sẽ được tạo"
 before TTS runs, only after."""
 

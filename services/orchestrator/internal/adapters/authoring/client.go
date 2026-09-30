@@ -1,6 +1,6 @@
 // Package authoring is the orchestrator's client for authoring-service, which
 // owns the prompt library, the 1a/1b/1c artefacts, the topic and the LLM
-// calls (CR-040 FR111). The orchestrator only needs a few things from it —
+// calls. The orchestrator only needs a few things from it —
 // the topic collision search, list summaries, a fork's copy and a cleanup —
 // over its internal HTTP API.
 package authoring

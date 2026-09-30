@@ -1,6 +1,6 @@
 /**
- * conceptflow-mini/lottie — plays a clip from the channel's Lottie catalog
- * (CR-038). The catalog itself (ids, licences, approval) lives in
+ * conceptflow-mini/lottie — plays a clip from the channel's Lottie catalog.
+ * The catalog itself (ids, licences, approval) lives in
  * ../../lottie/manifest.json and is curated by the Creator; a generated script
  * only ever picks an id, never writes or edits Lottie JSON.
  *

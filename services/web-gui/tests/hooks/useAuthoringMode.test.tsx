@@ -12,7 +12,7 @@ describe("useAuthoringMode.setMode", () => {
 
   // project_authoring has an FK to projects and the mode picker is reachable
   // before any draft row exists: the row must be ensured BEFORE the mode PUT,
-  // or the save fails and used to vanish silently.
+  // or the save fails.
   it("makes sure the project row exists before saving the mode", async () => {
     const order: string[] = [];
     vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });

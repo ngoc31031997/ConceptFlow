@@ -9,8 +9,8 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-039 — the AI flow's storyboard and code steps are no longer one model
-// call each. These ports are how the orchestrator hands them to llm-service,
+// The AI flow's storyboard and code steps are not one model call each.
+// These ports are how this service hands them to llm-service,
 // which owns every conversation with a model.
 
 // StoryboardFinalizerPort validates the Visual Director's JSON (and gets one
@@ -29,7 +29,7 @@ type FinalizedStoryboard struct {
 }
 
 // CodePipelinePort runs the chunked code pipeline: layout/cast → chunks in
-// parallel → merge → compile check → repair. Since CR-050 (ADR-0030) the run
+// parallel → merge → compile check → repair. The run (see ADR-0030)
 // is cut into segments this service stores: each run is sent the segments
 // already done, writes only the missing ones (or Only), and streams every
 // segment result, billed call and failed check as it happens.
@@ -40,10 +40,10 @@ type CodePipelinePort interface {
 	// of that rule.
 	PlanSegments(ctx context.Context, req CodeGenRequest) ([]domain.CodeSegment, error)
 	// SegmentPrompt is the exact (system, user) turn one segment would be
-	// asked, for an outside AI (FR-5).
+	// asked, for an outside AI.
 	SegmentPrompt(ctx context.Context, req CodeGenRequest, key string) (system, user string, err error)
 	// ParseSegment checks a reply written outside the pipeline for one
-	// segment and returns its fingerprint and content (FR-5).
+	// segment and returns its fingerprint and content.
 	ParseSegment(ctx context.Context, req CodeGenRequest, key, reply string) (fingerprint string, content json.RawMessage, err error)
 }
 
@@ -57,19 +57,19 @@ type CodeGenRequest struct {
 	MaxTokens int
 	// Illustrations are the approved library drawings the Remotion Engineer
 	// may use; llm-service lists them in the prompt and pastes the used ones
-	// into the script (CR-044).
+	// into the script.
 	Illustrations []LibraryDrawing
 	// SubtitleBand is the strip burned-in subtitles cover (nil = nothing is
 	// burned into the frame) and VideoFont the font text is drawn in ("" =
 	// the default): the rendering layout check holds every drawn shot to
-	// them (CR-048 T6b). Remotion only.
+	// them. Remotion only.
 	SubtitleBand *domain.SubtitleBand
 	VideoFont    string
-	// ChunkShots is the Creator's shots per segment (FR-7).
+	// ChunkShots is the Creator's shots per segment.
 	ChunkShots int
 	// Done are the stored segments sent back so they are not written again.
 	Done []DoneSegment
-	// Only restricts the run to these segment keys (FR-4); nil = every
+	// Only restricts the run to these segment keys; nil = every
 	// missing one.
 	Only []string
 }
@@ -82,7 +82,7 @@ type DoneSegment struct {
 }
 
 // CodeEvent is one event of a run. Progress types: "phase", "chunk_start",
-// "chunk_done", "chunk_repair", "chunk_split" (CR-048 T2). CR-050 types:
+// "chunk_done", "chunk_repair", "chunk_split". Segment types:
 // "plan" (Plan), "segment_start", "segment_done" (Key, Fingerprint, Content,
 // Source, Repaired, DurationMS), "segment_failed" (Key, Error), "call" (Call)
 // and "check" (Check). Types a consumer does not use are ignored.
@@ -172,8 +172,8 @@ func (e *ErrSegmentReply) Error() string {
 	return "kết quả dán vào không dùng được: " + e.Message
 }
 
-// ErrSegmentsUnsupported: the llm-service running is older than CR-050 and
-// has no /v2/code routes. Since CR-056 the code step does not run at all then.
+// ErrSegmentsUnsupported: the llm-service running has no /v2/code routes, so
+// the code step cannot run.
 var ErrSegmentsUnsupported = errors.New("llm-service đang chạy bản cũ, chưa có bước Code theo đoạn (/v2) — rebuild llm-service rồi chạy lại")
 
 // ErrSegmentUnknown: no segment has this key in the current storyboard.

@@ -1,4 +1,4 @@
-"""Unit tests for the ASS subtitle writer (CR-004 FR12.5)."""
+"""Unit tests for the ASS subtitle writer."""
 
 from __future__ import annotations
 

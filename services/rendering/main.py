@@ -1,8 +1,7 @@
 """Composition root for the Rendering Service.
 
-Plain AMQP consumer with a PostgreSQL-backed Outbox/Inbox, mirroring
-Content Plugin Service / TTS Service / Script Processing Service's
-composition root shape (ADR-0013). No REST endpoint — readiness is
+AMQP consumer with a PostgreSQL-backed Outbox/Inbox (ADR-0013), plus the
+internal HTTP compile check. No public REST endpoint — readiness is
 signaled via a sentinel file (Infrastructure Design).
 """
 
@@ -78,7 +77,7 @@ def env_flag(name: str, default: bool) -> bool:
 
 
 def approved_lottie_ids() -> set[str]:
-    """CR-038: ids a Remotion script may pass to <LottieClip>; read per call so a
+    """Ids a Remotion script may pass to <LottieClip>; read per call so a
     manifest fixed by hand is picked up without restarting the consumer."""
     return {a.id for a in lottie_catalog.approved(lottie_catalog.load_manifest(LOTTIE_MANIFEST))}
 
@@ -132,7 +131,7 @@ async def run() -> None:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
     command_handler = RenderingCommandDispatcher(
-        # Cổng kiểm tra chạy trước TTS (CR-020): script sai bị chặn trước khi
+        # Cổng kiểm tra chạy trước TTS: script sai bị chặn trước khi
         # tiêu quota giọng đọc.
         ValidateScriptCommandHandler(
             ValidateScriptUseCase(renderer, approved_lottie_ids), pool, inbox, outbox
@@ -140,14 +139,14 @@ async def run() -> None:
         RenderScriptCommandHandler(
             use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
         ),
-        # Dựng intro/outro cố định của kênh (CR-023 D3) — cùng renderer, khác
+        # Dựng intro/outro cố định của kênh — cùng renderer, khác
         # use case: không có script Creator, không có lượt dry/narration.
         # feature/remotion-engine: dùng thẳng manim_renderer (ChannelAssetRendererPort
         # chỉ có ManimScriptRenderer implement — xem docstring remotion_renderer.py).
         RenderChannelAssetCommandHandler(
             RenderChannelAssetUseCase(manim_renderer), pool, inbox, outbox
         ),
-        # CR-040 FR114.2: dọn video đã dựng và cache Manim của project bị xoá.
+        # Dọn video đã dựng và cache Manim của project bị xoá.
         purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
             lambda project_id: purge_project_artifacts(project_id, cache_root), pool, inbox, outbox
         ),
@@ -155,7 +154,7 @@ async def run() -> None:
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()
 
-    # CR-040 FR115: how many render commands are in flight when a check starts.
+    # How many render commands are in flight when a check starts.
     check_metrics = CheckMetrics()
 
     async def handle_counted(message):
@@ -166,7 +165,7 @@ async def run() -> None:
     # Cancel requests arrive on their own fanout, not behind the running render.
     await listen_for_cancels(channel)
 
-    # CR-039 FR104: the compile check the llm-service calls before a generated
+    # The compile check the llm-service calls before a generated
     # script is saved. Same process, same event loop; internal network only.
     typescript = TypeScriptChecker(
         Path(__file__).parent / "remotion_project",
@@ -174,7 +173,7 @@ async def run() -> None:
     )
     # Load React/Remotion's type declarations now, not on the first check.
     warm_typescript = asyncio.create_task(asyncio.to_thread(typescript.warm))
-    # CR-048 T6b: after tsc passes, every shot is drawn in headless Chromium and
+    # After tsc passes, every shot is drawn in headless Chromium and
     # its measured layout held to the layout rules. Off = each check says so.
     layout = None
     warm_layout = None
@@ -189,7 +188,7 @@ async def run() -> None:
         logger.warning("LAYOUT_CHECK_ENABLED=false — code checks will not look at the layout")
     check_use_case = CheckScriptUseCase(
         ValidateScriptUseCase(renderer, approved_lottie_ids), typescript, layout)
-    # CR-044: xem trước hình của thư viện minh hoạ (tiến trình Node khởi động lúc cần).
+    # Xem trước hình của thư viện minh hoạ (tiến trình Node khởi động lúc cần).
     previewer = IllustrationPreviewer(
         Path(__file__).parent / "remotion_project",
         timeout_seconds=int(os.environ.get("ILLUSTRATION_PREVIEW_TIMEOUT_SECONDS", "180")),

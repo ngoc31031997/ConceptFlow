@@ -13,22 +13,22 @@ import (
 )
 
 // GenerateAuthoringUseCase runs one authoring step with the configured LLM
-// provider instead of the copy-out-to-an-AI round trip (CR-027 FR78).
+// provider instead of the copy-out-to-an-AI round trip.
 //
 // It adds a second way to do a step; it does not replace the first. The Copy
 // button keeps working, renders through the SAME RenderPromptUseCase, and is
 // the documented fallback whenever this path is unavailable — no key, no
-// credit, provider down (FR77.4/FR83.2). That is why every failure here is
+// credit, provider down. That is why every failure here is
 // classified rather than collapsed into "AI failed": the Creator needs to
 // know whether to top up an account or just paste the prompt elsewhere.
 //
-// What it deliberately does NOT do (FR78.2): advance the wizard, submit
+// What it deliberately does NOT do: advance the wizard, submit
 // anything to the render saga, or touch the other steps' saved output. It
 // renders, calls, saves that one step, and hands the text back for the
 // Creator to edit.
 type GenerateAuthoringUseCase struct {
 	renderer authoringPromptRenderer
-	// illustrations is the CR-044 drawing stage; nil = off (Manim, or not wired).
+	// illustrations is the drawing stage; nil = off (Manim, or not wired).
 	illustrations IllustrationStagePort
 	provider      LLMProviderPort
 	recorder      *LLMUsageRecorder
@@ -42,25 +42,25 @@ type GenerateAuthoringUseCase struct {
 	// events receives one journal line per run start/end; nil disables it.
 	events domain.ProjectEventPort
 	// finalizer validates the storyboard JSON; codegen runs the chunked code
-	// pipeline (CR-039). Both are llm-service; a run of the step that needs one
+	// pipeline. Both are llm-service; a run of the step that needs one
 	// fails loudly when it is missing rather than quietly doing something else.
 	finalizer StoryboardFinalizerPort
 	codegen   CodePipelinePort
-	// segments stores the code step segment by segment (CR-050, ADR-0030).
+	// segments stores the code step segment by segment (see ADR-0030).
 	segments CodeSegmentPort
-	// formats/calibration feed the post-1b narration length check (CR-048 T8);
+	// formats/calibration feed the post-1b narration length check;
 	// see WithStoryboardChecks. Nil formats = no length check.
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
 
 	// maxInputChars is HIVE_MAX_INPUT_CHARS: not a context limit (Hive's
 	// window is 1M tokens) but a blast radius, so one broken project cannot
-	// bill for an unbounded prompt (FR80.2).
+	// bill for an unbounded prompt.
 	maxInputChars   int
 	maxOutputTokens int
 
 	// running holds the (project, step) pairs a call is in flight for, so a
-	// double click costs one billed call instead of two (FR78.4). In-memory
+	// double click costs one billed call instead of two. In-memory
 	// on purpose — the lock only has to outlive a single HTTP request, and a
 	// Postgres advisory lock would buy cross-replica correctness for a
 	// single-replica orchestrator.
@@ -71,7 +71,7 @@ type GenerateAuthoringUseCase struct {
 
 // authoringPromptRenderer is RenderPromptUseCase. Shared with the Copy path
 // by construction: one renderer, so the two paths cannot send different text
-// to the same model (FR77.3).
+// to the same model.
 type authoringPromptRenderer interface {
 	Execute(ctx context.Context, projectID string, role domain.PromptRole) (RenderedPrompt, error)
 }
@@ -95,12 +95,12 @@ type AuthoringModelsReaderPort interface {
 	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
 }
 
-// ErrGenerateBusy is the second of two concurrent clicks (FR78.4) — 409, not
+// ErrGenerateBusy is the second of two concurrent clicks — 409, not
 // an error the Creator did anything about.
 var ErrGenerateBusy = errors.New("một lượt chạy AI cho bước này đang diễn ra")
 
 // ErrLLMNotConfigured means no API key is set, so this path does not exist
-// for this deployment. The Copy button still does (FR83.2).
+// for this deployment. The Copy button still does.
 var ErrLLMNotConfigured = errors.New("chưa cấu hình API key cho nhà cung cấp AI")
 
 func NewGenerateAuthoringUseCase(
@@ -138,7 +138,7 @@ func (uc *GenerateAuthoringUseCase) WithErrorLog(log ProjectErrorLogPort) *Gener
 }
 
 // WithPipeline wires the two llm-service capabilities the AI flow's storyboard
-// and code steps need (CR-039).
+// and code steps need.
 func (uc *GenerateAuthoringUseCase) WithPipeline(f StoryboardFinalizerPort, c CodePipelinePort) *GenerateAuthoringUseCase {
 	uc.finalizer, uc.codegen = f, c
 	return uc
@@ -154,11 +154,11 @@ type GeneratedStep struct {
 	Provider string     `json:"provider"`
 	Usage    TokenUsage `json:"usage"`
 	// SaveError is set when the call succeeded but persisting its output did
-	// not — a locked project (FR84.2), say. The content still comes back: the
+	// not — a locked project, say. The content still comes back: the
 	// tokens are already paid for, and the Creator can keep the text in the
 	// editor rather than buy it a second time.
 	SaveError string `json:"save_error,omitempty"`
-	// CR-039 — set by the code step. CheckFailed means the script was saved but
+	// Set by the code step. CheckFailed means the script was saved but
 	// still fails the compile check after the last repair round; the Creator can
 	// read Diagnostics and fix it by hand.
 	CheckFailed  bool     `json:"check_failed,omitempty"`
@@ -166,13 +166,13 @@ type GeneratedStep struct {
 	RepairRounds int      `json:"repair_rounds,omitempty"`
 	Warnings     []string `json:"warnings,omitempty"`
 	ModelCalls   int      `json:"model_calls,omitempty"`
-	// CR-045 — set by the illustrations step when it finished drawing but some
+	// Set by the illustrations step when it finished drawing but some
 	// drawings still wait for the Creator; Message says which.
 	AwaitingReview bool   `json:"awaiting_review,omitempty"`
 	Message        string `json:"message,omitempty"`
 }
 
-// Available reports whether the AI path can be offered at all (FR79.4). The
+// Available reports whether the AI path can be offered at all. The
 // GUI asks so it can explain a missing button instead of showing one that
 // fails when pressed.
 func (uc *GenerateAuthoringUseCase) Available() bool {
@@ -199,7 +199,7 @@ func (uc *GenerateAuthoringUseCase) Provider() string {
 // Execute runs one step end to end: render the prompt, call the provider,
 // record the cost, save the output.
 //
-// CR-030 — web-gui chạy ba bước bằng cách gọi hàm này ba lần theo thứ tự, chứ
+// web-gui chạy ba bước bằng cách gọi hàm này ba lần theo thứ tự, chứ
 // không có một endpoint "chạy cả chuỗi": mỗi lượt đã tự lưu kết quả rồi, nên
 // bước sau render prompt từ đúng dữ liệu bước trước vừa lưu, và một bước hỏng
 // giữa chừng không xoá mất những bước đã xong.
@@ -209,7 +209,7 @@ func (uc *GenerateAuthoringUseCase) Execute(
 	return uc.execute(ctx, projectID, step, CodeRunOptions{})
 }
 
-// ExecuteCode runs the code step with CR-050 options: one segment only, or
+// ExecuteCode runs the code step with options: one segment only, or
 // every segment dropped and written again. Execute("code") runs the missing
 // segments, which is what the chain does.
 func (uc *GenerateAuthoringUseCase) ExecuteCode(
@@ -265,9 +265,7 @@ func (uc *GenerateAuthoringUseCase) recordEvent(
 	}
 	fs, source := domain.FlowStepForAuthoring(step), "authoring"
 	if step == StepIllustrations {
-		// CR-046: illustrations now has its own numbered flow step, reversing
-		// the CR-045 workaround that logged it under Code with source
-		// "illustrations" to avoid adding a number to the shared 1–13 flow.
+		// Illustrations has its own numbered flow step.
 		fs = domain.FlowIllustrations
 	}
 	if fs == 0 {
@@ -315,7 +313,7 @@ func (uc *GenerateAuthoringUseCase) traceEnd(
 type runInfo struct {
 	partialChars int
 	usage        TokenUsage
-	// codeOpts are the code step's run options (CR-050 FR-4).
+	// codeOpts are the code step's run options.
 	codeOpts CodeRunOptions
 }
 
@@ -376,8 +374,8 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	if step == StepIllustrations {
 		return uc.runIllustrations(ctx, project)
 	}
-	// FR78.5 — step → role is the server's decision, read off the project's
-	// engine. The GUI used to work this out, in two places.
+	// Step → role is the server's decision, read off the project's
+	// engine, not the GUI's.
 	role, err := AIRoleFor(step, string(project.RenderEngine))
 	if err != nil {
 		return GeneratedStep{}, err
@@ -459,7 +457,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	usage := result.Usage
 	var warnings []string
 	if step == "storyboard" {
-		// CR-039: the storyboard is JSON the code step splits by shot, so it is
+		// The storyboard is JSON the code step splits by shot, so it is
 		// validated here — with one model repair turn if it is not — and saved in
 		// canonical form. An unusable storyboard is an error, never saved as-is.
 		if uc.finalizer == nil {
@@ -478,13 +476,13 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		content = fin.Storyboard
 		usage = usageSum(result.Usage, fin.Usage)
 		info.usage = usage
-		// CR-048 T8/T9 — cheap checks the Creator sees before the code step
+		// Cheap checks the Creator sees before the code step
 		// spends money on this storyboard. Warnings only; never block.
 		warnings = uc.storyboardWarnings(ctx, project, content)
 	}
 
-	// FR78.3 — saving overwrites this step and only this step; the existing
-	// save use cases already carry the FR84.2 draft lock and the FR84.3
+	// Saving overwrites this step and only this step; the existing
+	// save use cases already carry the draft lock and the
 	// history write, so an AI run is audited exactly like a paste.
 	out := GeneratedStep{
 		Step: step, Role: string(role), Content: content,
@@ -506,8 +504,8 @@ func (uc *GenerateAuthoringUseCase) save(ctx context.Context, projectID, step, c
 		if uc.story == nil {
 			return fmt.Errorf("save-story use case is not wired")
 		}
-		// topic "" — the project already has its topic (CR-028 FR83.1 wrote
-		// it when the Creator typed it); passing "" leaves it untouched.
+		// topic "" — the project already has its topic (POST /v1/projects
+		// wrote it when the Creator typed it); passing "" leaves it untouched.
 		return uc.story.Execute(ctx, projectID, content, "")
 	case "storyboard":
 		return saveWith(ctx, uc.storyboard, projectID, content, step)
@@ -553,13 +551,13 @@ type AuthoringProgress struct {
 	ReasoningChars int    `json:"reasoning_chars"`
 	ContentChars   int    `json:"content_chars"`
 	ElapsedSeconds int    `json:"elapsed_seconds"`
-	// CR-039 — the code step's own progress: chunks finished of the total, and
+	// The code step's own progress: chunks finished of the total, and
 	// the current repair round of the maximum.
 	ChunksDone  int `json:"chunks_done,omitempty"`
 	ChunksTotal int `json:"chunks_total,omitempty"`
 	RepairRound int `json:"repair_round,omitempty"`
 	RepairMax   int `json:"repair_max,omitempty"`
-	// CR-045 — the illustrations step: drawings to draw in this run, finished
+	// The illustrations step: drawings to draw in this run, finished
 	// (drawn or failed), failed, served by the library, and the list's size.
 	DrawingsTotal   int `json:"drawings_total,omitempty"`
 	DrawingsDone    int `json:"drawings_done,omitempty"`

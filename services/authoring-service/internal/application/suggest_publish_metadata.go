@@ -11,7 +11,7 @@ import (
 // (not "OllamaPort") so a different local/self-hosted model can be swapped
 // in later without touching this use case.
 type MetadataSuggesterPort interface {
-	// language is the project's ContentLanguage (CR-008 FR21.3) — the metadata
+	// language is the project's ContentLanguage — the metadata
 	// must come back in the language the audience speaks, not the one the
 	// prompt happens to be written in.
 	Suggest(ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage) (title, description string, tags []string, err error)
@@ -59,15 +59,15 @@ func (uc *SuggestPublishMetadataUseCase) Execute(ctx context.Context, projectID 
 		return nil, fmt.Errorf("suggest metadata: %w", err)
 	}
 
-	// CR-006 FR15.2/FR18.2 — chapters come from the Creator's own markers,
+	// Chapters come from the Creator's own markers,
 	// timed by the offsets Rendering measured, so they land on the same frame
 	// as the narration that introduces them. The model is never asked to guess
 	// timestamps; it could not know them.
-	// CR-023 D6: chapter timestamps must land after the channel intro, when
+	// Chapter timestamps must land after the channel intro, when
 	// this project actually has one attached — intro duration is not plumbed
 	// through to metadata suggestion yet (it is resolved at assemble_video
 	// time from channel_assets, which this use case never touches), so 0.0
-	// preserves the exact pre-CR-023 behaviour here.
+	// (no intro chapter) is used here.
 	chapterLines := domain.BuildChapterTimestamps(
 		project.Chapters, project.WaitOffsets, project.RenderedVideoSeconds, 0.0,
 	)

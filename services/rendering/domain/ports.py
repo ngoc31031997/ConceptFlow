@@ -25,10 +25,10 @@ class ManimScriptRendererPort(ABC):
     @abstractmethod
     def dry_run(self, request: ScriptRenderRequest) -> DryRunResult:
         """Executes the script without producing a video, to learn which
-        narration lines it produces and in what order (CR-018 FR49.1).
+        narration lines it produces and in what order.
 
-        Runs before TTS, so a script that fails here costs no voice quota
-        (CR-020 FR56). request.narration_segments is ignored — the dry pass is
+        Runs before TTS, so a script that fails here costs no voice quota.
+        request.narration_segments is ignored — the dry pass is
         what determines them.
 
         Raises:
@@ -43,8 +43,8 @@ class ManimScriptRendererPort(ABC):
         narration_segments duration.
 
         Returns the result carrying output_path plus wait_offsets — where each
-        narration segment actually begins in the finished video (CR-002
-        FR10.1) — and the video's real duration.
+        narration segment actually begins in the finished video — and the
+        video's real duration.
 
         Raises:
             domain.errors.AnimationEngineError: if the engine fails, times
@@ -56,12 +56,11 @@ class ManimScriptRendererPort(ABC):
 
 class ChannelAssetRendererPort(ABC):
     """Renders one of the two fixed channel-identity scenes
-    (`conceptflow.channel_idents.DefaultIntroSting` / `.ChannelOutro`) —
-    CR-023 FR65, D3/D4.
+    (`conceptflow.channel_idents.DefaultIntroSting` / `.ChannelOutro`).
 
     Deliberately a **separate** port from `ManimScriptRendererPort` rather
     than a new abstract method on it: adding a method there would force every
-    existing implementer (including CR-018/020's test fakes) to grow a stub
+    existing implementer (including test fakes) to grow a stub
     they have no use for, just to keep satisfying `ABC`. `ManimScriptRenderer`
     implements both ports — one adapter, two narrow interfaces.
     """
@@ -85,7 +84,7 @@ class ChannelAssetRendererPort(ABC):
         """The quality this renderer would actually use for `requested`.
 
         Exposed because the caller has to name the output path before the
-        render runs, and FR65.5 keys that path by quality — an absent or
+        render runs, and that path is keyed by quality — an absent or
         unknown `requested` falls back to the service default, and the caller
         cannot guess which one that is.
         """

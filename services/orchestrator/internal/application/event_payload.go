@@ -21,7 +21,7 @@ type synthesizedSceneData struct {
 
 // parseInitialScenes decodes the script_parsed payload's scenes array into
 // domain.Scene values (business-logic-model.md Bước 1/2).
-// parseChapters reads the optional `# CHAPTER:` markers (CR-006 FR15.1).
+// parseChapters reads the optional `# CHAPTER:` markers.
 // Absent or malformed entries yield no chapters rather than an error: a video
 // without chapters is fine, a saga that fails over a description detail is not.
 func parseChapters(payload map[string]interface{}) []domain.Chapter {
@@ -126,7 +126,7 @@ func scenesToPayload(scenes []domain.Scene) []map[string]interface{} {
 // requires synthesize_speech's scenes to each carry "language" (mirroring the
 // synchronous TTSEnginePort.synthesize(text, language, ...) signature this
 // command replaced), not a single top-level voice_language field. voice_id
-// (CR-001) selects which bundled Piper voice reads the line; an empty value
+// selects which bundled Piper voice reads the line; an empty value
 // lets the TTS Service fall back to that language's default voice.
 func scenesToPayloadForSynthesis(scenes []domain.Scene, language, voiceID string) []map[string]interface{} {
 	out := scenesToPayload(scenes)
@@ -180,7 +180,7 @@ func floatSliceFromPayload(payload map[string]interface{}, key string) []float64
 	return out
 }
 
-// mapSliceFromPayload extracts a list-of-objects field verbatim (CR-021's
+// mapSliceFromPayload extracts a list-of-objects field verbatim (e.g.
 // layout_marks).
 //
 // Verbatim is the point: Orchestrator carries this from rendering_completed to
@@ -234,7 +234,7 @@ func parseQCFindings(payload map[string]interface{}) []domain.QCFinding {
 	return out
 }
 
-// parseClipResults decodes clips_generated's "clips" array (CR-007) into
+// parseClipResults decodes clips_generated's "clips" array into
 // domain.ClipResult values. A malformed entry is dropped rather than failing
 // the whole event — a report missing one clip is better than losing the
 // Render Saga's ending over a single bad entry (same posture as
@@ -278,12 +278,12 @@ func stringSliceFromMap(m map[string]interface{}, key string) []string {
 	return out
 }
 
-// buildClipRequests merges CR-007 D3's two sources of clip selections into
+// buildClipRequests merges the two sources of clip selections into
 // the flat `requests` list generate_clips expects: clipMarks (from the
 // script's `with self.clip(...)`, t_start/t_end, no presets — defaulted to
 // both) and clipRequests (Creator-entered via POST /v1/projects/{id}/clips,
 // start_seconds/end_seconds/presets already in that shape). A name present
-// in both loses its script version — D3: "trùng tên thì GUI thắng", since a
+// in both loses its script version ("trùng tên thì GUI thắng"), since a
 // Creator's typed-in selection is the newer intent.
 func buildClipRequests(clipMarks, clipRequests []map[string]interface{}) []map[string]interface{} {
 	byName := make(map[string]map[string]interface{})
@@ -304,7 +304,7 @@ func buildClipRequests(clipMarks, clipRequests []map[string]interface{}) []map[s
 		startSeconds := floatFromMap(m, "t_start")
 		endSeconds := floatFromMap(m, "t_end")
 		if name == "" || endSeconds <= startSeconds {
-			// Dry-pass placeholders (t_start/t_end null, CR-024's outline gate)
+			// Dry-pass placeholders (t_start/t_end null, from the outline gate)
 			// and anything else that never got a real timestamp — nothing to
 			// dispatch for those.
 			continue
@@ -377,11 +377,11 @@ func floatFromMap(m map[string]interface{}, key string) float64 {
 	}
 }
 
-// parseBeats reads the beat markers the dry pass observed (CR-019 FR52.1).
+// parseBeats reads the beat markers the dry pass observed.
 //
 // Each carries the narration index it opens on, not a timestamp — the real
-// timestamp is only known after the render pass measures it (CR-002), and
-// storing a guess here is what CR-006 FR15 deliberately avoided for chapters.
+// timestamp is only known after the render pass measures it, and
+// storing a guess here would make chapter timestamps wrong.
 func parseBeats(payload map[string]interface{}) []domain.BeatOccurrence {
 	raw, ok := payload["beats"].([]interface{})
 	if !ok {
@@ -403,16 +403,14 @@ func parseBeats(payload map[string]interface{}) []domain.BeatOccurrence {
 	return beats
 }
 
-// chaptersFromBeats turns the observed beats into YouTube chapters
-// (CR-019 FR52.2).
+// chaptersFromBeats turns the observed beats into YouTube chapters.
 //
 // Beats replace the old `# CHAPTER:` markers rather than living beside them:
 // two mechanisms describing the same structure drift apart, and the beat is
 // already where the Creator decided what the section is.
 //
 // The title is the beat id as written. Making it prettier would mean guessing
-// what the section is about, which is exactly what CR-006 refused to let a
-// model do.
+// what the section is about, which is not left to a model.
 func chaptersFromBeats(beats []domain.BeatOccurrence) []domain.Chapter {
 	if len(beats) == 0 {
 		return nil
@@ -424,8 +422,8 @@ func chaptersFromBeats(beats []domain.BeatOccurrence) []domain.Chapter {
 	return chapters
 }
 
-// warningsFromPayload reads the non-blocking lint messages Rendering reported
-// (CR-020 FR56.3). They ride along to the review screen rather than only to a
+// warningsFromPayload reads the non-blocking lint messages Rendering reported.
+// They ride along to the review screen rather than only to a
 // log, because a warning nobody sees is the same as no warning.
 func warningsFromPayload(payload map[string]interface{}) []string {
 	raw, ok := payload["warnings"].([]interface{})
@@ -442,8 +440,8 @@ func warningsFromPayload(payload map[string]interface{}) []string {
 }
 
 // layoutWarningsFromPayload reads the non-blocking overlap warnings the
-// rendering dry pass reported (bug report 2026-09-12: an unpositioned
-// self.caption(...) landed exactly on top of an already-visible table).
+// rendering dry pass reported (e.g. an unpositioned self.caption(...) landing
+// exactly on top of an already-visible table).
 //
 // Formatted into plain strings here, the same shape `warningsFromPayload`
 // returns, so both ride in the single `ValidationWarnings` slice on Project

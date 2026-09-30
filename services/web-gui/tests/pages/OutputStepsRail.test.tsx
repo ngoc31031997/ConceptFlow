@@ -33,8 +33,8 @@ function renderAt(path: string, status: string, flowStep: number) {
   );
 }
 
-// CR-051 review: Result and Publish still told the rail they were steps 12 and
-// 13 (the 13-step flow), so it highlighted "Cắt short" under "Bước 13 — Kết quả".
+// Result and Publish must tell the rail their own step numbers, or it
+// highlights "Cắt short" under "Bước 13 — Kết quả".
 describe("the rail highlights the step the title names on the output screens", () => {
   afterEach(() => {
     vi.restoreAllMocks();

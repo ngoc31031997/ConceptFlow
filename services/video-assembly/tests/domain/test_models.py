@@ -1,4 +1,4 @@
-"""Unit tests for SubtitleCue.shifted_by (CR-015 / ADR-0027).
+"""Unit tests for SubtitleCue.shifted_by (see ADR-0027).
 
 This is the single place a subtitle timestamp gets shifted — both the .ass
 and .srt serializers receive already-shifted cues, so this is the one test

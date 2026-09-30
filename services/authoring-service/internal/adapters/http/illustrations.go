@@ -18,7 +18,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// illustrationsUseCase backs the illustration library (CR-044).
+// illustrationsUseCase backs the illustration library.
 type illustrationsUseCase interface {
 	Folders(ctx context.Context) ([]domain.IllustrationFolder, error)
 	CreateFolder(ctx context.Context, f domain.IllustrationFolder) (domain.IllustrationFolder, error)
@@ -338,7 +338,7 @@ func (rt *Router) handleDeleteIllustration(w http.ResponseWriter, r *http.Reques
 }
 
 // handleIllustrationStyle serves the channel's style rules and the ids of the
-// Hình mẫu (CR-044, read from the library since CR-052), which web-gui shows
+// Hình mẫu (read from the library), which web-gui shows
 // with their previews.
 func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, r *http.Request) {
 	ids := []string{}
@@ -355,7 +355,7 @@ func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, map[string]any{"rules": domain.IllustrationStyleGuide(), "exemplar_ids": ids, "max_exemplars": domain.MaxExemplars})
 }
 
-// handleMakeExemplar copies an approved drawing into the Hình mẫu (CR-052).
+// handleMakeExemplar copies an approved drawing into the Hình mẫu.
 func (rt *Router) handleMakeExemplar(w http.ResponseWriter, r *http.Request) {
 	if !rt.illustrationsEnabled(w) {
 		return
@@ -430,7 +430,7 @@ func (rt *Router) handleRedrawIllustration(w http.ResponseWriter, r *http.Reques
 	writeJSON(w, http.StatusOK, out)
 }
 
-// handleExportIllustrations downloads the whole library as one ZIP (CR-044).
+// handleExportIllustrations downloads the whole library as one ZIP.
 func (rt *Router) handleExportIllustrations(w http.ResponseWriter, r *http.Request) {
 	if !rt.illustrationsEnabled(w) {
 		return

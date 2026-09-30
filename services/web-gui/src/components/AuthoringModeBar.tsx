@@ -24,11 +24,11 @@ import { FLOW_CODE, FLOW_ILLUSTRATIONS, FLOW_STORY, FLOW_VISUAL, flowTitle } fro
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
-/** Thứ tự các bước; "illustrations" chỉ có ở video Remotion (CR-045). */
+/** Thứ tự các bước; "illustrations" chỉ có ở video Remotion. */
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "illustrations", "code"];
 
 /**
- * CR-051 — số của từng bước trong luồng 14 bước. Chuỗi AI từng tự đánh số
+ * Số của từng bước trong luồng 14 bước. Chuỗi AI từng tự đánh số
  * "Bước 1/3", "2/3"… trong khi thanh bước bên trái ghi 3/4/5/6, nên Creator
  * thấy hai danh sách bước khác nhau cho cùng một việc.
  */
@@ -86,9 +86,8 @@ function lastRuns(events: ProjectEvent[]): Partial<Record<AuthoringStep, LastRun
   const byFlow = Object.fromEntries(ALL_STEPS.map((st) => [STEP_FLOW[st], st])) as Record<number, AuthoringStep>;
   const out: Partial<Record<AuthoringStep, LastRun>> = {};
   for (const e of [...events].sort((a, b) => a.id - b.id)) {
-    // CR-046: illustrations now journals under its own flow number (6). Old rows from
-    // before CR-046 journaled under Code's flow number (5) with source "illustrations" —
-    // keep reading those the old way so historical logs still show up correctly.
+    // Illustrations journals under its own flow number (6); legacy rows carry
+    // Code's flow number (5) with source "illustrations", so the source decides.
     const step = e.source === "illustrations" ? "illustrations" : byFlow[e.flow_step];
     if ((e.source !== "authoring" && e.source !== "illustrations") || !step || e.run_state === "running") continue;
     out[step] = {
@@ -138,13 +137,13 @@ interface AuthoringModeBarProps {
   onModeChange: (mode: AuthoringMode) => void;
   projectId: string;
   /**
-   * CR-030 — chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Màn bước 3
+   * Chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Màn bước 3
    * truyền cả chuỗi (`authoringChainSteps`: story, storyboard, [illustrations],
    * code): Creator chỉ nhập chủ đề rồi bấm một lần, server chạy tuần tự, mỗi
    * bước đọc kết quả bước trước đã lưu. Màn 4/5/6 truyền đúng một bước, để
    * chạy lại riêng bước đó sau khi sửa tay.
    *
-   * CR-031 — để trống ở màn chọn tình huống: ở đó chưa có chủ đề, chưa có
+   * Để trống ở màn chọn tình huống: ở đó chưa có chủ đề, chưa có
    * artefact nào để sinh, nên chỉ có công tắc chế độ chứ không có nút chạy.
    * Chọn chế độ ngay từ đó là có ích vì nó lưu lên project và đi theo sang cả
    * ba tab.
@@ -152,7 +151,7 @@ interface AuthoringModeBarProps {
   steps?: AuthoringStep[];
   /** Bước này sinh ra cái gì, để câu chữ trên nút nói đúng việc nó làm. */
   what?: string;
-  /** Kết quả từng bước, để trang nhét thẳng vào ô soạn thảo (FR78.2). */
+  /** Kết quả từng bước, để trang nhét thẳng vào ô soạn thảo. */
   onGenerated?: (step: AuthoringStep, content: string) => void;
   /**
    * Chỉ với chuỗi nhiều bước: gọi khi server chuyển sang bước mới, và một lần
@@ -161,8 +160,7 @@ interface AuthoringModeBarProps {
   onFollow?: (step: AuthoringStep | "done") => void;
   /**
    * Việc phải xong trước khi gọi — lưu chủ đề/kết quả bước trước lên server,
-   * vì server render prompt từ dữ liệu của nó, không từ state trình duyệt
-   * (FR80.1).
+   * vì server render prompt từ dữ liệu của nó, không từ state trình duyệt.
    */
   beforeRun?: () => Promise<void>;
   /** Chặn nút chạy dù đã chọn chế độ AI — ví dụ chưa nhập chủ đề. */
@@ -188,21 +186,20 @@ const MODE_LABELS: Record<AuthoringMode, string> = {
 };
 
 /**
- * CR-027 FR79 — cách làm **các bước soạn 3–6**, đặt ở đầu mỗi màn 3/4/5/6.
+ * Cách làm **các bước soạn 3–6**, đặt ở đầu mỗi màn 3/4/5/6.
  *
  * Một lựa chọn cho toàn bộ pipeline, không phải một nút riêng mỗi màn:
  * Creator đã quyết định chạy script này bằng API thì không muốn quyết định
  * lại ở bước 4, 6. Lựa chọn nằm trong draft nên nó sống qua việc đổi màn và tải
- * lại trang, và mặc định là `manual` — đúng cái mọi project vẫn làm trước
- * CR-027.
+ * lại trang, và mặc định là `manual`.
  *
  * Chế độ `manual` không bao giờ mất đi: nó là đường đi khi chưa có key, hết số
- * dư, provider sập, hoặc khi Creator muốn dùng ChatGPT/Claude/Gemini của mình
- * (FR77.4/FR83.2). Vì vậy khi máy chủ chưa cấu hình key, lựa chọn "Gọi API"
+ * dư, provider sập, hoặc khi Creator muốn dùng ChatGPT/Claude/Gemini của mình.
+ * Vì vậy khi máy chủ chưa cấu hình key, lựa chọn "Gọi API"
  * hiện ra ở trạng thái không chọn được kèm lý do, chứ không lẳng lặng biến mất
  * — Creator cần biết tính năng có tồn tại và thiếu gì để bật.
  *
- * CR-030 — ở chế độ AI, màn bước 3 chạy cả chuỗi 3 → 6 trong một lần bấm (`steps`).
+ * Ở chế độ AI, màn bước 3 chạy cả chuỗi 3 → 6 trong một lần bấm (`steps`).
  * Chuỗi chạy ở client chứ không phải một endpoint mới, vì mỗi lượt gọi đã tự
  * lưu kết quả lên server rồi: bước sau render prompt từ đúng dữ liệu bước
  * trước vừa lưu. Đổi lại, khi một bước giữa chừng hỏng thì những bước đã xong
@@ -239,7 +236,7 @@ export function AuthoringModeBar({
         type: "SYNC_AUTHORING",
         payload: { story: state.story, storyboard: state.storyboard, code: state.code },
       });
-      // Nhét kết quả từng bước vào ô soạn thảo (FR78.2). Bước chưa chạy tới thì
+      // Nhét kết quả từng bước vào ô soạn thảo. Bước chưa chạy tới thì
       // server đã xóa nội dung, nên rỗng và bị bỏ qua. Chỉ nạp bước thuộc tab
       // này: chuỗi vừa xong có thể do tab khác chạy, và đẩy nội dung bước khác
       // vào ô của tab này (story vào ô storyboard/code) là lỗi từng xảy ra.
@@ -321,7 +318,7 @@ export function AuthoringModeBar({
       if (c.finished && c.finished_at && handledFinish.current !== c.finished_at) {
         handledFinish.current = c.finished_at;
         await syncFromServer(c.steps);
-        // CR-045: a chain that stopped for drawing review takes the Creator to
+        // A chain that stopped for drawing review takes the Creator to
         // the review; one that ran through goes to its last tab.
         if (sawRunning.current && c.steps.length > 1 && !c.error && !c.cancelled) {
           followRef.current?.(c.waiting && c.waiting_step ? c.waiting_step : "done");
@@ -347,7 +344,7 @@ export function AuthoringModeBar({
     Date.now() - new Date(chain.finished_at).getTime() < OUTCOME_TTL_MS
       ? chain
       : null;
-  // CR-048 T8/T9 — cảnh báo của bước Visual, không chặn: xem trước khi tốn
+  // Cảnh báo của bước Visual, không chặn: xem trước khi tốn
   // tiền cho bước Code. Giữ bản cuối để khối còn nội dung khi đang thu lại.
   const storyboardWarnings = outcome?.warnings?.storyboard ?? [];
   const shownWarnings = useRef<string[]>([]);
@@ -544,11 +541,11 @@ export function AuthoringModeBar({
             </>
           )}
 
-          {/* Chạy cả chuỗi (bước 3 → 6) đụng đúng chỗ Creator từng bị lạc: bấm
-              chạy ở bước 3 rồi lỡ chuyển sang màn 4/5/6 xem tiến độ. Panel này
+          {/* Chạy cả chuỗi (bước 3 → 6): Creator bấm chạy ở bước 3 rồi có thể
+              chuyển sang màn 4/5/6 xem tiến độ. Panel này
               hiện trên cả bốn màn bất cứ khi nào một chuỗi đang chạy, nên đứng ở
               màn nào cũng thấy đủ các bước và biết đang chờ đúng bước nào.
-              CR-051: mỗi ô mang số và tên của thanh bước, và bước chuỗi không
+              Mỗi ô mang số và tên của thanh bước, và bước chuỗi không
               chạy (Hình minh hoạ của video Manim) vẫn hiện, mờ, "Không dùng" —
               như thanh bước — thay vì biến mất khiến 4 bước thành 3. */}
           {running && steps.length > 0 && (
@@ -670,7 +667,7 @@ export function AuthoringModeSwitch({ llm, mode, onModeChange, disabled }: Autho
 }
 
 /**
- * Chỉ pha biết tổng mới có phần trăm (FR116.4): các lô của 1c và vòng sửa lỗi
+ * Chỉ pha biết tổng mới có phần trăm: các lô của 1c và vòng sửa lỗi
  * biên dịch. Pha suy luận/viết không biết tổng nên thanh chạy không xác định.
  */
 function liveCounts(p: AuthoringProgress | null): { done?: number; total?: number } {
@@ -681,7 +678,7 @@ function liveCounts(p: AuthoringProgress | null): { done?: number; total?: numbe
   return {};
 }
 
-/** CR-045 — "Đang vẽ 3/7 hình · 1 lỗi · 4 hình dùng lại". */
+/** "Đang vẽ 3/7 hình · 1 lỗi · 4 hình dùng lại". */
 function drawingText(p: AuthoringProgress): string {
   if (p.phase === "plan") return "Đang lập danh sách hình từ storyboard";
   const total = p.drawings_total ?? 0;
@@ -711,7 +708,7 @@ function liveProgressText(p: AuthoringProgress): string {
   if (p.phase === "layout" || p.phase === "cast") {
     return `Đang chuẩn bị bố cục… ${time}`;
   }
-  // CR-045 — the illustrations step: planning, then drawing with counts.
+  // The illustrations step: planning, then drawing with counts.
   if (p.phase === "plan") return `${drawingText(p)}… ${time}`;
   if (p.phase === "draw") return `${drawingText(p)} · ${time}`;
   if (p.phase === "chunks") return `Đang viết code: ${p.chunks_done ?? 0}/${p.chunks_total ?? "?"} phần · ${time}`;

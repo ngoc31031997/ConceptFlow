@@ -1,4 +1,4 @@
-"""Generates one short preview clip per offered voice at startup (CR-001 FR4.5).
+"""Generates one short preview clip per offered voice at startup.
 
 Written to the shared volume rather than the image so the API Gateway can
 serve the files without reaching into the TTS container. Regenerated only
@@ -35,7 +35,7 @@ def _prune_stale_samples(offered_ids: set[str]) -> None:
     than by the engine on its label. Leaving it means that adding
     AZURE_SPEECH_KEY later would never regenerate it (the file already exists),
     so the Azure previews would go on playing Edge audio forever. The same
-    delete also clears the Piper clips left behind by ADR-0024.
+    delete also clears clips of any other voice not in the catalog.
     """
     directory = samples_dir()
     if not os.path.isdir(directory):

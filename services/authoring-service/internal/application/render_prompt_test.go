@@ -87,7 +87,7 @@ func TestRoleFor_StoryIsSharedByBothEngines(t *testing.T) {
 	}
 }
 
-// CR-030 — bước duyệt đã bị bỏ khỏi sản phẩm, nên "review" phải bị từ chối
+// Bước duyệt đã bị bỏ khỏi sản phẩm, nên "review" phải bị từ chối
 // như bất cứ tên bước lạ nào, chứ không lặng lẽ render một prompt không ai gọi.
 func TestRoleFor_ReviewIsNoLongerAStep(t *testing.T) {
 	for _, engine := range []string{"manim", "remotion"} {
@@ -147,9 +147,8 @@ func TestRender_SubstitutesEveryVariable(t *testing.T) {
 	}
 }
 
-// TestRender_ProjectWithoutATopicGetsThePlaceholder — every project created
-// before CR-027 D0 has no topic. Its prompt must read exactly as it did
-// before, not show a blank where the subject should be.
+// TestRender_ProjectWithoutATopicGetsThePlaceholder — a project with no
+// topic gets the placeholder, not a blank where the subject should be.
 func TestRender_ProjectWithoutATopicGetsThePlaceholder(t *testing.T) {
 	uc := newRenderer("CHỦ ĐỀ: {{topic}}", &fakeRenderContext{project: aProject(), topic: ""})
 
@@ -259,7 +258,7 @@ func TestRender_RequiresAProjectID(t *testing.T) {
 	}
 }
 
-// --- CR-039: the AI flow's own roles ----------------------------------------
+// --- the AI flow's own roles -------------------------------------------------
 
 func TestAIRoleFor_UsesTheAIPromptsAndLeavesTheManualMappingAlone(t *testing.T) {
 	cases := []struct {
@@ -312,7 +311,7 @@ func TestRender_AIEngineerPromptCarriesTheStoryButNotTheStoryboard(t *testing.T)
 	}
 }
 
-// --- CR-048 T3: the code step carries the story's core, not the whole outline
+// --- the code step carries the story's core, not the whole outline
 
 // sampleStory is a full Story Architect outline in the format storyArchitectVI
 // asks for, sized like a real one.
@@ -436,7 +435,7 @@ func TestRender_AICodeStepKeepsOnlyTheStoryCore(t *testing.T) {
 
 // TestRender_AICodeStepSystemPromptSize renders the shipped AI code templates
 // with sampleStory and logs the system prompt size with the core versus with
-// the whole outline — the number CR-048 T3 reports.
+// the whole outline.
 func TestRender_AICodeStepSystemPromptSize(t *testing.T) {
 	core, missing := "", []string(nil)
 	for _, tmpl := range domain.DefaultPromptTemplates() {

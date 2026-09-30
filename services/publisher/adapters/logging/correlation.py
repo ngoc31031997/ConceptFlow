@@ -3,7 +3,7 @@
 REST requests use X-Request-ID (generated if the caller doesn't send
 one); AMQP messages use saga_id from the message envelope. Both are
 attached to the logging context so every log line for a given
-request/message carries its correlation ID (Low-Level Design, Question 9).
+request/message carries its correlation ID.
 """
 
 from __future__ import annotations

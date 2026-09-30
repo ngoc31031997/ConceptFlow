@@ -83,7 +83,7 @@ def test_idempotent_call_does_not_reassemble(shared_volume_root):
 
 
 def test_empty_narration_segments_assembles_a_silent_video(shared_volume_root):
-    # CR-001: narration is optional, so no audio segments is a valid request
+    # Narration is optional, so no audio segments is a valid request
     # rather than a missing artifact.
     video_path = str(shared_volume_root / "rendered.mp4")
     _touch(video_path)
@@ -145,7 +145,7 @@ def test_missing_background_music_raises_missing_artifact_error(shared_volume_ro
 
 
 def test_caption_path_flows_from_assembler_into_the_result(shared_volume_root):
-    """CR-015 FR38.4: caption_path travels the same way thumbnail_path does —
+    """caption_path travels the same way thumbnail_path does —
     through the result, not rediscovered by the caller."""
     video_path = str(shared_volume_root / "rendered.mp4")
     audio_path = str(shared_volume_root / "audio0.wav")

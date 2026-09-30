@@ -8,9 +8,8 @@ import { createProjectDraft } from "../api/client";
 import { FLOW_INIT, flowTitle } from "../utils/flow";
 
 /**
- * Bước 1 — chỉ còn tình huống "chưa có gì, chỉ có ý tưởng" (các tình huống
- * đã có dàn ý/storyboard/code sẽ quay lại sau; xem CR-031 cho lịch sử). Ngôn
- * ngữ, render engine và cách làm (manual/AI) đã dời sang Bước 2
+ * Bước 1 — tình huống "chưa có gì, chỉ có ý tưởng". Ngôn ngữ, render engine
+ * và cách làm (manual/AI) chọn ở Bước 2
  * (ScriptAuthoringSettingsStepPage) — chọn xong ở đây là tạo project ngay,
  * để projectId sẵn sàng trước khi vào Bước 2.
  */

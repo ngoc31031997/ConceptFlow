@@ -17,7 +17,7 @@ interface AuthoringModelPickerProps {
   /** Model cụ thể mà giá trị rỗng ("") được máy chủ quy về. */
   defaultModel?: string;
   disabled?: boolean;
-  /** CR-050: chi phí đã đo của từng model ở bước Code (GET /v1/llm/status). */
+  /** Chi phí đã đo của từng model ở bước Code (GET /v1/llm/status). */
   codeStats?: Record<string, ModelUsageStats>;
   codeStatsError?: string;
 }
@@ -36,7 +36,7 @@ const FAILURE_LABEL: Record<string, string> = {
 // Những lỗi nói rằng model không hợp với bước Code, không phải lỗi thoáng qua.
 const UNFIT = ["timeout", "budget", "truncated"];
 
-/** Một dòng số liệu cho model đang chọn ở bước Code (CR-050 FR-19). */
+/** Một dòng số liệu cho model đang chọn ở bước Code. */
 export function codeStatsLine(stats: ModelUsageStats | undefined): { text: string; warn: boolean } {
   if (!stats || stats.calls === 0) return { text: "Chưa có số liệu đo cho model này ở bước Code.", warn: false };
   const parts = [`Đo 30 ngày: ${stats.ok}/${stats.calls} đoạn code đạt`];
@@ -88,7 +88,7 @@ export function AuthoringModelPicker({
       <div className={styles.selects}>
         {STEP_ORDER.map(({ key, label }) => {
           const value = models[key] || defaultModel || shown[0].id;
-          // CR-050 FR-19: bước Code chỉ liệt kê model viết được code. Lựa chọn
+          // Bước Code chỉ liệt kê model viết được code. Lựa chọn
           // cũ không hợp lệ vẫn hiện (kèm nhãn) để Creator thấy mà đổi.
           const listed = key === "code"
             ? shown.filter((o) => o.code_ok !== false || o.id === value)

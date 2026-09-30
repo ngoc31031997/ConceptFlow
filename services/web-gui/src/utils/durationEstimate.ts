@@ -1,11 +1,11 @@
 /**
- * Ước lượng thời lượng đọc một đoạn lời thoại (CR-016 FR42).
+ * Ước lượng thời lượng đọc một đoạn lời thoại.
  *
  * **Đây là bản sao của `EstimateNarrationDuration` bên Go**
  * (`services/orchestrator/internal/domain/narration.go`). Hai bản phải cho cùng
  * kết quả trên cùng input, vì cùng một con số được dùng ở hai nơi khác nhau:
  * ở đây để Creator thấy trước lúc soạn, và ở Orchestrator để định thời lượng
- * thật khi tắt TTS (CR-001). Lệch nhau thì con số hiển thị lúc soạn khác con số
+ * thật khi tắt TTS. Lệch nhau thì con số hiển thị lúc soạn khác con số
  * hệ thống thực sự dùng — loại sai lệch không ai truy ra được.
  *
  * `tests/fixtures/narration-duration-vectors.json` ở gốc repo là bộ dữ liệu
@@ -19,7 +19,7 @@ export type ContentLanguage = "vi" | "en";
  * cùng một lượng nội dung.
  *
  * Đây là giá trị mặc định khi chưa hiệu chỉnh. Sau đủ số mẫu đo thật,
- * `voice_calibration` bên TTS cho ra WPM riêng cho từng giọng (FR43).
+ * `voice_calibration` bên TTS cho ra WPM riêng cho từng giọng.
  */
 export const WORDS_PER_MINUTE: Record<ContentLanguage, number> = {
   vi: 140,

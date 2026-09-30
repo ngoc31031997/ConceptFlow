@@ -33,7 +33,7 @@ func kitComponents(t *testing.T) []string {
 	return out
 }
 
-// CR-048 T9: the keyword table must cover the kit exactly, like the Lottie
+// The keyword table must cover the kit exactly, like the Lottie
 // catalog is held to its clips (lottie_catalog_test.go). A component added to
 // the kit needs keywords or an entry in illustrationKitUnkeyed saying why not;
 // a component removed from it must leave the table.

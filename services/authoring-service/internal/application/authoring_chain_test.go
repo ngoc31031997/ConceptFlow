@@ -142,7 +142,7 @@ func TestChainCancelUnknownProject(t *testing.T) {
 	}
 }
 
-// CR-045: drawings waiting for review stop the chain before Code — not an error.
+// Drawings waiting for review stop the chain before Code — not an error.
 func TestChainStopsForReviewAfterTheIllustrationsStep(t *testing.T) {
 	f := &fakeStepRunner{result: map[string]GeneratedStep{
 		StepIllustrations: {AwaitingReview: true, Message: "Còn 2 hình chờ bạn duyệt"},
@@ -157,7 +157,7 @@ func TestChainStopsForReviewAfterTheIllustrationsStep(t *testing.T) {
 	}
 }
 
-// CR-050 FR-20: nothing to wait for when the storyboard is the last step, or
+// Nothing to wait for when the storyboard is the last step, or
 // has no warnings.
 func TestChainDoesNotWaitOnAStoryboardItEndsWithOrThatHasNoWarnings(t *testing.T) {
 	f := &fakeStepRunner{result: map[string]GeneratedStep{"storyboard": {Warnings: []string{"w"}}}}
@@ -184,7 +184,7 @@ func TestChainGoesOnToCodeWhenNoDrawingWaits(t *testing.T) {
 	}
 }
 
-// CR-048 T8/T9 — a step's warnings reach the polled state. CR-050 FR-20 — a
+// A step's warnings reach the polled state; a
 // storyboard with warnings stops the chain before the steps after it.
 func TestChainKeepsStepWarningsAndWaitsOnAFlaggedStoryboard(t *testing.T) {
 	const warning = "Cảnh hook: ~20 giây, ngân sách 6–10 giây (+100%)"
@@ -210,7 +210,7 @@ func TestChainKeepsStepWarningsAndWaitsOnAFlaggedStoryboard(t *testing.T) {
 	}
 }
 
-// codeOptsRunner also takes the code step's CR-050 options.
+// codeOptsRunner also takes the code step's options.
 type codeOptsRunner struct {
 	fakeStepRunner
 	opts []CodeRunOptions
@@ -224,7 +224,7 @@ func (f *codeOptsRunner) ExecuteCode(_ context.Context, _ string, opts CodeRunOp
 	return GeneratedStep{}, nil
 }
 
-// CR-050 FR-4: a segment re-run and a fresh run go through the chain, so they
+// A segment re-run and a fresh run go through the chain, so they
 // survive the browser closing; without options the code step runs as before.
 func TestChainCarriesTheCodeRunOptions(t *testing.T) {
 	f := &codeOptsRunner{}

@@ -68,8 +68,8 @@ describe("ValidatePage (bước 7 — chạy thử, bước 8 — duyệt)", () 
     expect(steps).not.toHaveTextContent("Tạo giọng đọc");
   });
 
-  // CR-051: the two jobs inside step 7 used to be numbered 1 and 2, which read
-  // as flow steps 1 and 2; the title now names the step as the rail does.
+  // The two jobs inside step 7 are numbered 7.1/7.2 so they do not read as
+  // flow steps 1 and 2; the title names the step as the rail does.
   it("đánh số hai việc là 7.1/7.2 và tiêu đề là “Bước 7 — Validate”", async () => {
     // parsing: 7.1 is active and 7.2 pending, so both dots show their number.
     stubProject({ project_id: "p1", status: "parsing_script", scenes: [] });

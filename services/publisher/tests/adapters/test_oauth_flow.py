@@ -1,4 +1,4 @@
-"""Unit tests for GoogleOAuthFlow's scope handling (CR-015 FR40.1).
+"""Unit tests for GoogleOAuthFlow's scope handling.
 
 Mocks google_auth_oauthlib.flow.Flow so no real Google endpoint is needed.
 """
@@ -34,7 +34,7 @@ def _channel_response() -> dict:
 
 
 def test_authorization_url_requests_force_ssl_alongside_upload_and_readonly():
-    """FR40.1: captions.insert needs force-ssl, which upload/readonly do
+    """captions.insert needs force-ssl, which upload/readonly do
     not cover — it must be requested at consent time, not discovered later
     as a missing scope on an existing token."""
     captured_scopes = {}

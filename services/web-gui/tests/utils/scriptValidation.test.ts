@@ -30,8 +30,8 @@ describe("validateScript", () => {
     expect(result.message).toContain("```");
   });
 
-  // CR-040 FR113.3: what rendering already rejects (script_locator, dry_run) is no
-  // longer second-guessed here, and the pre-CR-018 markers are simply not a thing.
+  // What rendering already rejects (script_locator, dry_run) is not
+  // second-guessed here.
   it("không còn chặn những gì server đã bắt: thiếu class Scene, thiếu narrations/Composition id", () => {
     expect(validateScript("x = 1", "vi").isValid).toBe(true);
     expect(validateRemotionScript(VALID_REMOTION.replace("export const narrations", "const narrations")).narrationCount).toBe(0);
@@ -49,7 +49,7 @@ describe("validateScript", () => {
   });
 
   it("không đếm được lời thoại sinh trong vòng lặp — đây là ước lượng tối thiểu", () => {
-    // Sau CR-018 narrate() nằm trong vòng lặp là hợp lệ, nhưng phân tích tĩnh
+    // narrate() nằm trong vòng lặp là hợp lệ, nhưng phân tích tĩnh
     // không thể biết nó chạy mấy lần. Chỉ lượt dry bên Rendering mới biết.
     const looped =
       'class A(ConceptFlowScene):\n    def construct(self):\n        for i in range(3):\n            self.narrate("lặp")';

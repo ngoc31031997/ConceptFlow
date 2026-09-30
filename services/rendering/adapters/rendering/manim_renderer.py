@@ -12,11 +12,10 @@ to the subprocess:
 - An address-space (memory) resource limit via `resource.setrlimit`, applied in
   the child before exec via `preexec_fn`.
 
-There is deliberately **no** RLIMIT_CPU (CR-003 FR11.3). It used to be set equal
-to the wall-clock timeout, which was wrong: benchmarking measured Manim burning
-CPU-time at 2.21x wall-clock (it renders on multiple cores), so that limit fired
-at roughly 45% of the time the config claimed to allow and killed legitimate
-renders with SIGXCPU well before the timeout. The wall-clock timeout on
+There is deliberately **no** RLIMIT_CPU: benchmarking measured Manim burning
+CPU-time at 2.21x wall-clock (it renders on multiple cores), so a CPU limit
+equal to the wall-clock timeout would fire at roughly 45% of the allowed time
+and kill legitimate renders with SIGXCPU. The wall-clock timeout on
 `subprocess.run` is the correct and sufficient bound.
 
 This is deliberate, bounded hardening for a single-Creator tool — not a full
@@ -24,30 +23,27 @@ sandbox (no seccomp/container-per-render/network isolation). It assumes
 scripts are authored by the Creator themselves, not submitted by untrusted
 third parties (ADR pending).
 
-Rendering runs the script **twice** (CR-018):
+Rendering runs the script **twice**:
 
 1. A dry pass (`dry_run`) that executes it with `--dry_run`, producing no video
    but collecting every `self.narrate(...)` line in the order it really runs.
 2. A real pass (`render`) where each narrate waits exactly as long as its
    synthesized audio, and records where in the finished video that wait begins.
 
-Before CR-018 this was done by rewriting the source: `self.wait(AUTO)` was
-textually substituted with `(_cf_mark(self, i), self.wait(D))`. That forced the
-narration count to match the wait count exactly and in file order, which in turn
-banned narration from loops, branches and helpers. Running the script is what
-removes the need for any of it — the two passes execute the same code, so the
-count and the order agree by construction.
+The script is never rewritten. Because the two passes execute the same code,
+the narration count and order agree by construction, so narration may sit in
+loops, branches and helpers.
 
-Each mark records **where in the finished video that wait begins** (CR-002
-FR10.1). This matters because the video's timeline is
+Each mark records **where in the finished video that wait begins**. This
+matters because the video's timeline is
 
     video_duration = sum(self.play(...) durations) + sum(self.wait(...))
 
 so narration i does not start at the sum of the preceding narration durations —
 it starts after all the animation that ran before it too. Video Assembly needs
 those real offsets to place each audio segment; without them the narration runs
-ahead of the picture by the accumulated animation time (measured at 61.6s on a
-3.6-minute reference video before this was fixed).
+ahead of the picture by the accumulated animation time (61.6s on a 3.6-minute
+reference video).
 """
 
 from __future__ import annotations
@@ -89,10 +85,9 @@ DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
 DEFAULT_RENDER_MEMORY_LIMIT_GB = 4
 
 # Manim 0.18 has no configurable cache location — it keeps cached animation
-# segments in `partial_movie_files/` *inside* media_dir. Rendering used to hand
-# it a fresh tempdir and delete it afterwards, so the cache could never survive
-# a run and --disable_caching was the honest setting. Keeping media_dir per
-# project on the shared volume is what actually makes caching possible: Manim
+# segments in `partial_movie_files/` *inside* media_dir, so a fresh tempdir per
+# run could never keep a cache. Keeping media_dir per project on the shared
+# volume is what makes caching possible: Manim
 # keys each segment by its own content hash, so editing one narration line
 # re-renders only what changed.
 CACHE_ROOT = "/shared/.manim-media"
@@ -103,7 +98,7 @@ CACHE_ROOT = "/shared/.manim-media"
 # healthy working set while staying well clear of filling the volume.
 DEFAULT_CACHE_BUDGET_BYTES = 5 * 1024 * 1024 * 1024
 
-# How often to report that a long render is still alive (CR-003 FR11.4).
+# How often to report that a long render is still alive.
 HEARTBEAT_INTERVAL_SECONDS = 15
 
 # Manim logs "Animation 12: ..." as it works through a scene. There is no
@@ -112,11 +107,10 @@ HEARTBEAT_INTERVAL_SECONDS = 15
 # position, never as a fabricated percentage.
 ANIMATION_LINE_RE = re.compile(r"Animation (\d+)\s*:")
 
-# Manim's quality flags. 720p30 was hardcoded, which is below what a monetized
-# channel should publish and throws away Manim's main strength — smooth motion
-# (CR-004 FR12.1). 1080p60 is the default; the Phase 0 benchmark measured it at
-# 3.6x the render time of 720p30 and 2.1x the peak memory, both well inside the
-# limits CR-003 raised.
+# Manim's quality flags. 720p30 is below what a monetized channel should
+# publish and throws away Manim's main strength — smooth motion. 1080p60 is
+# the default; the Phase 0 benchmark measured it at 3.6x the render time of
+# 720p30 and 2.1x the peak memory, both well inside the service's limits.
 QUALITY_FLAGS = {
     # -ql (480p15): fastest preset Manim ships, for iterating on a script's
     # content/timing before spending time on anything a viewer will see.
@@ -130,7 +124,7 @@ DEFAULT_RENDER_QUALITY = "1080p60"
 MARKS_FILENAME = "cf_marks.jsonl"
 
 # Directory that must be on the child's PYTHONPATH for `import conceptflow` to
-# resolve (CR-017). Derived from this file's own location rather than hardcoded,
+# resolve. Derived from this file's own location rather than hardcoded,
 # so it stays correct whether the service runs from /app inside the image or
 # from a checkout during development.
 _CONCEPTFLOW_PARENT = os.path.dirname(
@@ -138,7 +132,7 @@ _CONCEPTFLOW_PARENT = os.path.dirname(
 )
 
 # Framerate per quality flag, used to round narration durations onto a whole
-# number of frames (CR-018 FR49.5).
+# number of frames.
 #
 # Manim keys each cached animation segment by a content hash. A duration carried
 # to microsecond precision changes that hash for every segment after an edit,
@@ -155,8 +149,7 @@ QUALITY_FPS = {
 DURATIONS_FILENAME = "cf_durations.json"
 
 #: A dry pass must not be allowed to run as long as a real render — a script
-#: that hangs should surface on the cheap pass, not the expensive one
-#: (CR-018 FR49.2).
+#: that hangs should surface on the cheap pass, not the expensive one.
 #:
 #: Overridable via DRY_RUN_TIMEOUT_SECONDS, because "cheaper than a real
 #: render" is not the same as "fast": the dry pass deliberately executes every
@@ -166,10 +159,10 @@ DURATIONS_FILENAME = "cf_durations.json"
 #: timeout as its only diagnosis.
 DEFAULT_DRY_RUN_TIMEOUT_SECONDS = 300
 
-#: CR-023 D3/D4 — the only two scene classes `render_channel_asset` may run.
+#: The only two scene classes `render_channel_asset` may run.
 #: A fixed map (not an arbitrary `scene_class_name` from the request) because,
-#: unlike `render()`, this path is not validated by CR-020's lint/dry-run gate
-#: first: the caller is the admin flow in D3, not a Creator-authored script.
+#: unlike `render()`, this path is not validated by the lint/dry-run gate
+#: first: the caller is the admin flow, not a Creator-authored script.
 CHANNEL_ASSET_SCENES = {
     "intro": "DefaultIntroSting",
     "outro": "ChannelOutro",
@@ -222,17 +215,16 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         self._on_heartbeat = callback
 
     def dry_run(self, request: ScriptRenderRequest) -> DryRunResult:
-        """Executes the script without producing a video (CR-018 FR49.1).
+        """Executes the script without producing a video.
 
         Returns the narration lines **in the order they actually run**, plus the
         beat and chapter markers attached to them. This is what replaces parsing
         `# NARRATION:` comments out of the source text: a comment can only be
         read in file order, so narration could never live inside a loop, a
-        branch, or a helper — and therefore hook/CTA could never be components
-        (CR-006 §Quyết định #2).
+        branch, or a helper — and therefore hook/CTA could never be components.
 
         It doubles as the validation pass: a script that fails here fails before
-        any TTS quota is spent (CR-020 FR56).
+        any TTS quota is spent.
         """
         media_dir, ephemeral = self._media_dir_for(request.project_id)
         marks_path = os.path.join(media_dir, MARKS_FILENAME)
@@ -310,10 +302,8 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             # carry the previous render's marks into this one.
             if os.path.exists(marks_path):
                 os.remove(marks_path)
-            # The script is written out exactly as the Creator wrote it. Before
-            # CR-018 it was rewritten here (`self.wait(AUTO)` substituted with a
-            # tuple expression), which meant what ran was never quite what they
-            # authored — and what was stored was not valid Python at all.
+            # The script is written out exactly as the Creator wrote it, so what
+            # runs is exactly what they authored.
             with open(script_path, "w") as f:
                 f.write(request.script_content)
             with open(durations_path, "w") as f:
@@ -350,8 +340,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
     def render_channel_asset(
         self, request: ChannelAssetRenderRequest, output_path: str
     ) -> ChannelAssetRenderResult:
-        """Runs one of the two fixed `conceptflow.channel_idents` scenes
-        (CR-023 D3/D4).
+        """Runs one of the two fixed `conceptflow.channel_idents` scenes.
 
         Deliberately simpler than `render()`: no marks file, no durations
         file, no wait-offset reconciliation — neither scene calls
@@ -416,12 +405,12 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         durations_path: str | None = None,
         dry: bool = False,
     ) -> None:
-        """Runs one pass. `dry=True` is the validation pass (CR-018 FR49).
+        """Runs one pass. `dry=True` is the validation pass.
 
         The dry pass renders at the lowest quality and writes no video file,
         but it *does* execute every animation — that is the point. Skipping the
         animations would make it faster and would also stop it from catching
-        the API misuse it exists to catch (CR-020 FR56.2).
+        the API misuse it exists to catch.
         """
         if dry:
             cmd = ["manim", "-ql", "--dry_run", "--disable_caching",
@@ -439,7 +428,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             # the dry pass, timing marks on the real one. It stays inside
             # media_dir, which is torn down after every ephemeral render.
             "CF_MARKS_PATH": marks_path,
-            # The design system the script imports (CR-017). The subprocess runs
+            # The design system the script imports. The subprocess runs
             # with a stripped environment, so without this `from conceptflow
             # import *` cannot resolve and every script fails on its first line.
             # This is the only variable added — no new channel *out* of the
@@ -450,7 +439,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         if durations_path is not None:
             safe_env["CF_DURATIONS_PATH"] = durations_path
 
-        # The dry pass gets the same isolation as the real one (FR49.3). It runs
+        # The dry pass gets the same isolation as the real one. It runs
         # unvetted code earlier in the pipeline, not safer code.
         timeout = self._dry_run_timeout_seconds if dry else self._timeout_seconds
         label = "Manim dry run" if dry else "Manim render"
@@ -471,7 +460,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         label: str = "Manim render",
     ) -> tuple[int, str]:
         """Runs Manim, streaming stderr so a long render can report that it is
-        still alive (CR-003 FR11.4).
+        still alive.
 
         Popen rather than subprocess.run because the latter only hands back
         output once the process has exited — which for a multi-minute render
@@ -551,8 +540,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         many times `narrate()` runs — which can only happen if the script is
         non-deterministic (random, wall-clock, external state). Rendering must
         fail loudly: silently returning a partial list would put every later
-        narration on the wrong offset, the exact class of bug CR-002 exists to
-        remove.
+        narration on the wrong offset and desynchronise the video.
         """
         records = _read_marks(marks_path)
         marks = {int(r["index"]): float(r["t"]) for r in records if r.get("kind") == "mark"}
@@ -573,7 +561,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
 
     @staticmethod
     def _read_layout_marks(marks_path: str) -> list[dict]:
-        """The layout snapshots the render pass recorded (CR-021 FR58).
+        """The layout snapshots the render pass recorded.
 
         Unlike the timing marks, a missing or partial list is not fatal: the
         script writes these best-effort, and QC scoring what it has beats
@@ -583,7 +571,7 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
 
     @staticmethod
     def _read_clip_marks(marks_path: str) -> list[dict]:
-        """The clip selections `with self.clip(...)` recorded (CR-007 FR19.2).
+        """The clip selections `with self.clip(...)` recorded.
 
         Same best-effort posture as `_read_layout_marks`: a script that never
         calls `self.clip(...)` is a perfectly normal (non-Shorts) video, so a
@@ -744,7 +732,7 @@ def _read_marks(marks_path: str) -> list[dict]:
 
 
 def _round_to_frames(durations: list[float], fps: int) -> list[float]:
-    """Snaps each duration onto a whole number of frames (CR-018 FR49.5).
+    """Snaps each duration onto a whole number of frames.
 
     Manim hashes each cached animation segment by content, so a duration carried
     to microsecond precision reshuffles the hash of everything after an edited

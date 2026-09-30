@@ -7,10 +7,9 @@ import (
 	"time"
 )
 
-// Operation is what the GUI polls for a long call (CR-040 FR116.3): where the
+// Operation is what the GUI polls for a long call: where the
 // model is, how much it has written and how long it has taken. `Done`/`Total`
-// are nil when the total is unknown, so the GUI never invents a percentage
-// (FR116.4).
+// are nil when the total is unknown, so the GUI never invents a percentage.
 type Operation struct {
 	Kind           string `json:"kind"`
 	Phase          string `json:"phase"` // "waiting" | "reasoning" | "writing"
@@ -71,7 +70,7 @@ func (o *Operations) Progress(id string, p ChatProgress) {
 }
 
 // Finish closes the operation; a non-nil err marks it failed and keeps the
-// counters and elapsed time already reached (FR116.5).
+// counters and elapsed time already reached.
 func (o *Operations) Finish(id string, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()

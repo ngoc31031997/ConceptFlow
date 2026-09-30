@@ -1,7 +1,7 @@
 // Package orchestrator is authoring-service's only route to project data: the
 // orchestrator owns projects, video formats, voice calibration and the project
-// journal, and this client reads and appends to them over its internal HTTP API
-// (CR-040 FR111.3). authoring-service never opens the orchestrator's database.
+// journal, and this client reads and appends to them over its internal HTTP API.
+// authoring-service never opens the orchestrator's database.
 package orchestrator
 
 import (
@@ -77,7 +77,7 @@ func (c *Client) Get(ctx context.Context, projectID string) (*domain.Project, er
 	return &p, nil
 }
 
-// GetStatus is the narrow read the authoring lock (CR-028 FR84.2) needs.
+// GetStatus is the narrow read the authoring lock needs.
 func (c *Client) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
 	var out struct {
 		Status domain.ProjectStatus `json:"status"`

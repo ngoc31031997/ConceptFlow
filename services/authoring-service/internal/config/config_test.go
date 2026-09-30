@@ -15,7 +15,7 @@ func setRequired(t *testing.T) {
 }
 
 // authoring-service does not hold any provider credential: with nothing set
-// it still starts (CR-027 FR83.2 — the AI path is optional) and points at
+// it still starts (the AI path is optional) and points at
 // llm-service on the compose network.
 func TestLoad_LLMServiceDefaults(t *testing.T) {
 	setRequired(t)

@@ -1,9 +1,8 @@
 /*
   Step 1: guidance on the left, the script itself on the right. The
-  assistant column used to cap at 400px regardless of how wide the page got,
-  so its numbered steps (topic input, copy prompt) stayed cramped even on a
-  1680px-wide screen. A flexible ratio instead of a hard cap lets it actually
-  use the extra room.
+  assistant column uses a flexible ratio rather than a hard cap, so its
+  numbered steps (topic input, copy prompt) use the extra room on a wide
+  screen.
 */
 .scriptLayout {
   display: grid;
@@ -137,7 +136,7 @@
   color: var(--danger, #c0392b);
 }
 
-/* CR-028 FR85.3 — warning, not error: a matching topic never blocks Continue. */
+/* Warning, not error: a matching topic never blocks Continue. */
 .topicCollisionBanner {
   margin-bottom: 12px;
   padding: 10px 12px;

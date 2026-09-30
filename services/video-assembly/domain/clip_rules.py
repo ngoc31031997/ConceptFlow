@@ -1,7 +1,7 @@
-"""Luật validate độ dài clip dọc theo preset (CR-007 FR19.6/19.7) — HÀM THUẦN.
+"""Luật validate độ dài clip dọc theo preset — HÀM THUẦN.
 
-Không đọc file, không gọi ffmpeg. Ngưỡng preset là config (C2b của CR-007 —
-YouTube/TikTok đổi ngưỡng theo thời gian), đọc từ biến môi trường theo đúng
+Không đọc file, không gọi ffmpeg. Ngưỡng preset là config (YouTube/TikTok
+đổi ngưỡng theo thời gian), đọc từ biến môi trường theo đúng
 convention của `domain/qc_rules.py::QCThresholds.from_env()`.
 """
 
@@ -32,7 +32,7 @@ def _as_float(raw: str | None, default: float) -> float:
 
 @dataclass(frozen=True)
 class ClipThresholds:
-    """FR19.6/C2b — ngưỡng độ dài mỗi preset, cấu hình được bằng biến môi
+    """Ngưỡng độ dài mỗi preset, cấu hình được bằng biến môi
     trường vì bên thứ ba (YouTube/TikTok) đổi ngưỡng theo thời gian."""
 
     short_max_seconds: float = CLIP_PRESET_SHORT_MAX_SECONDS
@@ -60,9 +60,9 @@ def validate_clip_duration(
     duration_seconds: float, preset: str, thresholds: ClipThresholds
 ) -> str | None:
     """Trả `None` nếu `duration_seconds` hợp lệ cho `preset`, hoặc thông báo
-    lỗi rõ ràng nếu không (FR19.6 — không im lặng cắt cụt).
+    lỗi rõ ràng nếu không (không im lặng cắt cụt).
 
-    FR19.7: mỗi preset được validate độc lập — một đoạn không hợp `short`
+    Mỗi preset được validate độc lập — một đoạn không hợp `short`
     vẫn có thể hợp `long`, gọi hàm này riêng cho từng preset và không đánh
     đổ preset kia.
     """

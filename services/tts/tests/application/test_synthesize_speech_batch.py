@@ -1,5 +1,4 @@
-"""Unit tests for SynthesizeSpeechBatchUseCase (ADR-0014 — fail-fast batch,
-mirrors ClassifyScenesBatchUseCase, Unit 2)."""
+"""Unit tests for SynthesizeSpeechBatchUseCase (fail-fast batch, see ADR-0014)."""
 
 from __future__ import annotations
 

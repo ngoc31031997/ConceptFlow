@@ -19,7 +19,7 @@ import (
 // InternalAuthoring is what the orchestrator's internal calls need beyond the
 // public use cases: the raw authoring state with no draft lock (the copy made
 // by a fork is brand new), the topic-collision search, the list summaries and
-// the cleanup when a project is deleted (CR-040 FR111).
+// the cleanup when a project is deleted.
 type InternalAuthoring interface {
 	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
 	SaveAuthoringStory(ctx context.Context, projectID, content, topic string) error
@@ -66,7 +66,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
-	// CR-025: prompt wording lives in the DB. Public read (the wizard fetches the
+	// Prompt wording lives in the DB. Public read (the wizard fetches the
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
 	rt.illustrationRoutes(r)
@@ -86,14 +86,14 @@ func (rt *Router) Handler() http.Handler {
 	r.Post("/v1/projects/{project_id}/authoring/storyboard", rt.handleSaveAuthoringStoryboard)
 	r.Post("/v1/projects/{project_id}/authoring/code", rt.handleSaveAuthoringCode)
 	r.Get("/v1/projects/{project_id}/authoring", rt.handleGetAuthoringState)
-	// CR-027 FR77.2 — the prompt with every {{variable}} already filled in.
+	// The prompt with every {{variable}} already filled in.
 	r.Get("/v1/projects/{project_id}/prompts/{role}", rt.handleRenderPrompt)
-	// CR-040 FR113 — the same render for what the browser has in hand but has
+	// The same render for what the browser has in hand but has
 	// not saved (draft topic, pasted script, unapplied subtitle style).
 	r.Post("/v1/prompt-renders", rt.handlePromptRenders)
-	// CR-040 FR113 — starter scripts and hook/end-screen snippets (static text).
+	// Starter scripts and hook/end-screen snippets (static text).
 	r.Get("/v1/script-templates", rt.handleScriptTemplates)
-	// CR-027 FR78/FR79 — run a step with the API, and tell the GUI whether that
+	// Run a step with the API, and tell the GUI whether that
 	// option exists at all before it draws the button.
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
 	r.Post("/v1/projects/{project_id}/authoring/chain", rt.handleStartAuthoringChain)
@@ -103,7 +103,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Get("/v1/projects/{project_id}/authoring/{step}/progress", rt.handleAuthoringProgress)
-	// CR-050 Unit 2 — the code step's segments (ADR-0030).
+	// The code step's segments (ADR-0030).
 	r.Get("/v1/projects/{project_id}/authoring/code/segments", rt.handleCodeSegments)
 	r.Get("/v1/projects/{project_id}/authoring/code/segments/{key}/prompt", rt.handleCodeSegmentPrompt)
 	r.Put("/v1/projects/{project_id}/authoring/code/segments/{key}", rt.handlePasteCodeSegment)
@@ -142,7 +142,7 @@ type internalPutRequest struct {
 
 // handleInternalPut writes whichever authoring fields are present, without the
 // draft lock: a fork's copy is new, and a draft's topic is saved before any
-// step exists (CR-040 FR111).
+// step exists.
 func (rt *Router) handleInternalPut(w http.ResponseWriter, r *http.Request) {
 	projectID := chi.URLParam(r, "project_id")
 	var req internalPutRequest
@@ -219,14 +219,14 @@ type suggestPublishMetadataUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
 }
 
-// suggestShortScriptUseCase backs CR-026's short-script assistant (FR71) —
+// suggestShortScriptUseCase backs the short-script assistant —
 // no project_id, unlike suggestPublishMetadataUseCase, since a Creator can
 // start a short from a bare topic without an existing project.
 type suggestShortScriptUseCase interface {
 	Execute(ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage) (string, error)
 }
 
-// promptsUseCase backs the prompt library (CR-031): a list of prompts per
+// promptsUseCase backs the prompt library: a list of prompts per
 // role, one active. System rows are read-only; Creator rows are editable.
 type promptsUseCase interface {
 	Active(ctx context.Context, role domain.PromptRole) (domain.Prompt, error)
@@ -238,14 +238,14 @@ type promptsUseCase interface {
 	Delete(ctx context.Context, id string) error
 }
 
-// renderPromptUseCase backs CR-027 FR77's GET
+// renderPromptUseCase backs GET
 // /v1/projects/{id}/prompts/{role} — the prompt fully substituted, so the
 // Copy button and the server's own generate call use the same text.
 type renderPromptUseCase interface {
 	Execute(ctx context.Context, projectID string, role domain.PromptRole) (application.RenderedPrompt, error)
 }
 
-// saveAuthoringModeUseCase backs CR-027 FR79's PUT
+// saveAuthoringModeUseCase backs PUT
 // /v1/projects/{id}/authoring/mode — the step-1 working mode, stored per
 // project so it survives a reload, another browser and a restart.
 type saveAuthoringModeUseCase interface {
@@ -258,9 +258,9 @@ type saveAuthoringModelsUseCase interface {
 	Execute(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
 }
 
-// generateAuthoringUseCase backs CR-027 FR78's POST
+// generateAuthoringUseCase backs POST
 // /v1/projects/{id}/authoring/{step}/generate — the second way to do a step,
-// beside the Copy-prompt round trip, which stays exactly as it was (FR77.4).
+// beside the Copy-prompt round trip, which stays exactly as it was.
 type generateAuthoringUseCase interface {
 	Execute(ctx context.Context, projectID, step string) (application.GeneratedStep, error)
 	Available() bool
@@ -270,7 +270,7 @@ type generateAuthoringUseCase interface {
 // authoringChainUseCase runs 1a/1b/1c in order on the server, so a run
 // survives the browser closing (see application.AuthoringChainRunner).
 type authoringChainUseCase interface {
-	// StartWith takes the code step's CR-050 options (zero = none).
+	// StartWith takes the code step's options (zero = none).
 	StartWith(projectID string, steps []string, opts application.CodeRunOptions) error
 	State(projectID string) (application.ChainState, bool)
 	// Cancel stops a running chain; false when none is running.
@@ -283,7 +283,7 @@ type authoringProgressReader interface {
 	Progress(projectID, step string) application.AuthoringProgress
 }
 
-// codeSegmentsUseCase is the optional CR-050 side of the generate use case:
+// codeSegmentsUseCase is the optional code-segment side of the generate use case:
 // the code step's segments and the per-run options.
 type codeSegmentsUseCase interface {
 	ExecuteCode(ctx context.Context, projectID string, opts application.CodeRunOptions) (application.GeneratedStep, error)
@@ -293,19 +293,19 @@ type codeSegmentsUseCase interface {
 	SetCodeChunkShots(ctx context.Context, projectID string, n int) error
 }
 
-// saveAuthoringStoryUseCase backs CR-025 step 1's POST
+// saveAuthoringStoryUseCase backs step 1's POST
 // /v1/projects/{id}/authoring/story.
 type saveAuthoringStoryUseCase interface {
 	Execute(ctx context.Context, projectID, content, topic string) error
 }
 
-// saveAuthoringStoryboardUseCase backs CR-025 step 2's POST
+// saveAuthoringStoryboardUseCase backs step 2's POST
 // /v1/projects/{id}/authoring/storyboard.
 type saveAuthoringStoryboardUseCase interface {
 	Execute(ctx context.Context, projectID, content string) error
 }
 
-// saveAuthoringCodeUseCase backs CR-025 step 3's POST
+// saveAuthoringCodeUseCase backs step 3's POST
 // /v1/projects/{id}/authoring/code.
 type saveAuthoringCodeUseCase interface {
 	Execute(ctx context.Context, projectID, content string) error
@@ -317,13 +317,13 @@ type getAuthoringStateUseCase interface {
 	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
 }
 
-// WithRenderPrompt enables CR-027 FR77's server-side prompt rendering.
+// WithRenderPrompt enables server-side prompt rendering.
 func (rt *Router) WithRenderPrompt(renderPrompt renderPromptUseCase) *Router {
 	rt.renderPrompt = renderPrompt
 	return rt
 }
 
-// WithAuthoringMode enables CR-027 FR79's persisted step-1 working mode.
+// WithAuthoringMode enables the persisted step-1 working mode.
 func (rt *Router) WithAuthoringMode(saveAuthoringMode saveAuthoringModeUseCase) *Router {
 	rt.saveAuthoringMode = saveAuthoringMode
 	return rt
@@ -336,10 +336,10 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 	return rt
 }
 
-// WithGenerateAuthoring enables CR-027 FR78's run-a-step-with-AI endpoint.
+// WithGenerateAuthoring enables the run-a-step-with-AI endpoint.
 // Left unwired (no API key), the route answers 404 and GET /v1/llm/status
 // reports disabled, so the GUI hides the button and says why instead of
-// offering one that fails on the first press (FR79.4).
+// offering one that fails on the first press.
 // WithDefaultModel tells GET /v1/llm/status which concrete model an empty
 // ("server default") choice resolves to, so the GUI can name it.
 func (rt *Router) WithDefaultModel(id string) *Router {
@@ -348,7 +348,7 @@ func (rt *Router) WithDefaultModel(id string) *Router {
 }
 
 // WithUsageStats lets GET /v1/llm/status report what each model has cost the
-// code step (CR-050 FR-19).
+// code step.
 func (rt *Router) WithUsageStats(port application.LLMUsageStatsPort) *Router {
 	rt.usageStats = port
 	return rt
@@ -370,7 +370,7 @@ func (rt *Router) handleStartAuthoringChain(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
 		return
 	}
-	// CR-050 FR-4: {"steps": ["code"], "segment": key} re-runs one code
+	// {"steps": ["code"], "segment": key} re-runs one code
 	// segment, {"steps": ["code"], "fresh": true} writes every segment again.
 	var req struct {
 		Steps   []string `json:"steps"`
@@ -428,7 +428,7 @@ func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCa
 	return rt
 }
 
-// WithPrompts attaches the CR-031 prompt library, enabling GET
+// WithPrompts attaches the prompt library, enabling GET
 // /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the routes
 // answer 404, the same "unwired means absent" posture as WithQCReports.
 func (rt *Router) WithPrompts(prompts promptsUseCase) *Router {
@@ -436,35 +436,35 @@ func (rt *Router) WithPrompts(prompts promptsUseCase) *Router {
 	return rt
 }
 
-// WithAuthoringStory attaches CR-025 step 1's save-story use case, enabling
+// WithAuthoringStory attaches step 1's save-story use case, enabling
 // POST /v1/projects/{project_id}/authoring/story.
 func (rt *Router) WithAuthoringStory(saveAuthoringStory saveAuthoringStoryUseCase) *Router {
 	rt.saveAuthoringStory = saveAuthoringStory
 	return rt
 }
 
-// WithAuthoringStoryboard attaches CR-025 step 2's save-storyboard use case,
+// WithAuthoringStoryboard attaches step 2's save-storyboard use case,
 // enabling POST /v1/projects/{project_id}/authoring/storyboard.
 func (rt *Router) WithAuthoringStoryboard(saveAuthoringStoryboard saveAuthoringStoryboardUseCase) *Router {
 	rt.saveAuthoringStoryboard = saveAuthoringStoryboard
 	return rt
 }
 
-// WithAuthoringCode attaches CR-025 step 3's save-code use case, enabling
+// WithAuthoringCode attaches step 3's save-code use case, enabling
 // POST /v1/projects/{project_id}/authoring/code.
 func (rt *Router) WithAuthoringCode(saveAuthoringCode saveAuthoringCodeUseCase) *Router {
 	rt.saveAuthoringCode = saveAuthoringCode
 	return rt
 }
 
-// WithAuthoringState attaches CR-025's read-side use case, enabling
+// WithAuthoringState attaches the authoring read-side use case, enabling
 // GET /v1/projects/{project_id}/authoring.
 func (rt *Router) WithAuthoringState(getAuthoringState getAuthoringStateUseCase) *Router {
 	rt.getAuthoringState = getAuthoringState
 	return rt
 }
 
-// WithShortScriptSuggester attaches CR-026's short-script assistant,
+// WithShortScriptSuggester attaches the short-script assistant,
 // enabling POST /v1/short-script-suggestions. Without it the route answers
 // 404 — same "unwired means absent, not broken" posture as WithQCReports.
 func (rt *Router) WithShortScriptSuggester(suggestShortScript suggestShortScriptUseCase) *Router {
@@ -472,8 +472,8 @@ func (rt *Router) WithShortScriptSuggester(suggestShortScript suggestShortScript
 	return rt
 }
 
-// WithOperations attaches the registry behind GET /v1/operations/{id}
-// (CR-040 FR116.3). Without it suggestions still work, just without a live
+// WithOperations attaches the registry behind GET /v1/operations/{id}.
+// Without it suggestions still work, just without a live
 // progress card.
 func (rt *Router) WithOperations(ops *application.Operations) *Router {
 	rt.operations = ops
@@ -586,8 +586,7 @@ func promptError(w http.ResponseWriter, err error) {
 }
 
 // handleGetActivePrompt serves the wording a role currently runs on — what the
-// wizard reads. Shape kept as the pre-CR-031 response (template_text) with the
-// library facts added alongside.
+// wizard reads: template_text, with the library facts alongside.
 func (rt *Router) handleGetActivePrompt(w http.ResponseWriter, r *http.Request) {
 	if rt.prompts == nil {
 		writeError(w, http.StatusNotFound, "prompts are not enabled")
@@ -715,7 +714,7 @@ func (rt *Router) handleDeletePrompt(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleSaveAuthoringStory stores the Story Architect output a Creator
-// pasted back after the external-AI round trip (CR-025 step 1).
+// pasted back after the external-AI round trip (step 1).
 func (rt *Router) handleSaveAuthoringStory(w http.ResponseWriter, r *http.Request) {
 	if rt.saveAuthoringStory == nil {
 		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
@@ -725,9 +724,8 @@ func (rt *Router) handleSaveAuthoringStory(w http.ResponseWriter, r *http.Reques
 
 	var req struct {
 		Content string `json:"content"`
-		// CR-027 D0 — optional: an empty topic leaves the stored one alone
-		// (see PromptTemplateRepository.SaveAuthoringStory), so a browser
-		// running pre-CR-027 JavaScript keeps working unchanged.
+		// Optional: an empty topic leaves the stored one alone
+		// (see PromptTemplateRepository.SaveAuthoringStory).
 		Topic string `json:"topic"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -743,7 +741,7 @@ func (rt *Router) handleSaveAuthoringStory(w http.ResponseWriter, r *http.Reques
 }
 
 // handleSaveAuthoringStoryboard stores the Visual Director output a Creator
-// pasted back after the external-AI round trip (CR-025 step 2).
+// pasted back after the external-AI round trip (step 2).
 func (rt *Router) handleSaveAuthoringStoryboard(w http.ResponseWriter, r *http.Request) {
 	if rt.saveAuthoringStoryboard == nil {
 		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
@@ -767,7 +765,7 @@ func (rt *Router) handleSaveAuthoringStoryboard(w http.ResponseWriter, r *http.R
 }
 
 // handleSaveAuthoringCode stores the Manim Engineer output a Creator pasted
-// back after the external-AI round trip (CR-025 step 3).
+// back after the external-AI round trip (step 3).
 func (rt *Router) handleSaveAuthoringCode(w http.ResponseWriter, r *http.Request) {
 	if rt.saveAuthoringCode == nil {
 		writeError(w, http.StatusNotFound, "authoring pipeline is not enabled")
@@ -808,7 +806,7 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{
-		// CR-027 FR79 — how the Creator is working step 1, so the wizard
+		// How the Creator is working step 1, so the wizard
 		// restores the choice on reload or on another machine instead of
 		// falling back to copy-and-paste. Always "manual" or "ai".
 		"mode":       state.Mode,
@@ -825,7 +823,7 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 }
 
 // handleSaveAuthoringModels stores the model-per-step picker's choice for
-// the three authoring tabs — the follow-up to CR-027 FR79 that lets each
+// the three authoring tabs, which lets each
 // step call a different Hive model instead of the one HIVE_MODEL hardcodes.
 //
 // PUT, not POST, for the same reason as handleSaveAuthoringMode: it replaces
@@ -860,7 +858,7 @@ func (rt *Router) handleAuthoringProgress(w http.ResponseWriter, r *http.Request
 	writeJSON(w, http.StatusOK, pr.Progress(chi.URLParam(r, "project_id"), chi.URLParam(r, "step")))
 }
 
-// handleSaveAuthoringMode stores how the Creator works step 1 (CR-027 FR79).
+// handleSaveAuthoringMode stores how the Creator works step 1.
 //
 // PUT, not POST: it replaces one value, and sending it twice must mean the
 // same as sending it once — the GUI writes it on every toggle.
@@ -884,7 +882,7 @@ func (rt *Router) handleSaveAuthoringMode(w http.ResponseWriter, r *http.Request
 }
 
 // handleRenderPrompt serves one role's prompt with every {{variable}}
-// already substituted (CR-027 FR77.2).
+// already substituted.
 //
 // web-gui's Copy button moves to this endpoint. Before, the browser fetched
 // the raw template and did the substitution itself — which is why the server
@@ -937,7 +935,7 @@ type promptRenderRequest struct {
 	VoiceID          string `json:"voice_id"`
 }
 
-// handlePromptRenders serves POST /v1/prompt-renders (CR-040 FR113.1): the
+// handlePromptRenders serves POST /v1/prompt-renders: the
 // prompt for one library role with the caller's draft values substituted. It
 // replaces the string assembly web-gui did in the browser, so the text a
 // Creator copies and the text the server sends to the model come from one place.
@@ -970,13 +968,13 @@ func (rt *Router) handlePromptRenders(w http.ResponseWriter, r *http.Request) {
 }
 
 // llmStatusResponse tells the GUI whether the "Chạy bằng AI" button has
-// anything to call (CR-027 FR79.4).
+// anything to call.
 type llmStatusResponse struct {
 	Enabled  bool   `json:"enabled"`
 	Provider string `json:"provider"`
 	// Reason is filled only when Enabled is false, in Vietnamese, pointing at
 	// the file the Creator has to edit — a disabled button that does not say
-	// why is a bug report waiting to happen.
+	// why leaves the Creator stuck.
 	Reason string `json:"reason,omitempty"`
 	// Models is the model-per-step picker's catalog (domain.
 	// AuthoringModelCatalog) — served here rather than hardcoded a second
@@ -986,8 +984,8 @@ type llmStatusResponse struct {
 	Models []domain.AuthoringModelOption `json:"models,omitempty"`
 	// DefaultModel is the concrete model id an empty choice resolves to.
 	DefaultModel string `json:"default_model,omitempty"`
-	// CodeStats is what each model's code chunks cost over the last 30 days
-	// (CR-050 FR-19), keyed by model id. CodeStatsError says why they are
+	// CodeStats is what each model's code chunks cost over the last 30 days,
+	// keyed by model id. CodeStatsError says why they are
 	// missing when the read failed — never shown as "no data".
 	CodeStats      map[string]application.ModelUsageStats `json:"code_stats,omitempty"`
 	CodeStatsError string                                 `json:"code_stats_error,omitempty"`
@@ -1021,7 +1019,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGenerateAuthoring runs one authoring step through the configured
-// provider (CR-027 FR78.1).
+// provider.
 //
 // It is an addition, not a replacement: GET .../prompts/{role} still serves
 // the same text for the Copy button, and every failure below names the
@@ -1034,7 +1032,7 @@ func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request
 	projectID := chi.URLParam(r, "project_id")
 	step := chi.URLParam(r, "step")
 
-	// CR-050 FR-4: the code step takes an optional body — {"segment": key}
+	// The code step takes an optional body — {"segment": key}
 	// re-runs one segment, {"fresh": true} writes every segment again. No
 	// body runs the missing segments.
 	var opts application.CodeRunOptions
@@ -1083,7 +1081,7 @@ func errorCause(err error) string {
 }
 
 // writeGenerateError maps a failed run onto a status code and a Vietnamese
-// sentence that says what to do about it (FR76.6/FR79.3). "AI failed" would
+// sentence that says what to do about it. "AI failed" would
 // send a Creator with an empty Hive balance to go rewrite their prompt.
 func writeGenerateError(w http.ResponseWriter, err error) {
 	status, message := DescribeGenerateError(err)
@@ -1105,7 +1103,7 @@ func DescribeGenerateError(err error) (int, string) {
 	case errors.Is(err, domain.ErrProjectNotFound):
 		return http.StatusNotFound, "project not found"
 	}
-	// CR-044: not a failure — the code step waits for the Creator's review.
+	// Not a failure — the code step waits for the Creator's review.
 	var pending *application.ErrIllustrationsPending
 	if errors.As(err, &pending) {
 		return http.StatusConflict, pending.Error()
@@ -1113,12 +1111,12 @@ func DescribeGenerateError(err error) (int, string) {
 	if errors.Is(err, application.ErrIllustrationsNotPlanned) || errors.Is(err, application.ErrIllustrationsStale) {
 		return http.StatusConflict, err.Error()
 	}
-	// CR-050 FR-2: the step kept what finished; the Creator re-runs the rest.
+	// The step kept what finished; the Creator re-runs the rest.
 	var incomplete *application.ErrSegmentsIncomplete
 	if errors.As(err, &incomplete) {
 		return http.StatusUnprocessableEntity, incomplete.Error()
 	}
-	// CR-050 FR-19: the Creator's model choice, not the provider, is the problem.
+	// The Creator's model choice, not the provider, is the problem.
 	var notForCode *application.ErrModelNotForCode
 	if errors.As(err, &notForCode) {
 		return http.StatusBadRequest, notForCode.Error()
@@ -1143,7 +1141,7 @@ func DescribeGenerateError(err error) (int, string) {
 	case application.ErrKindEmpty:
 		message = "AI trả về rỗng — thử chạy lại, hoặc sửa lời prompt ở trang Prompt."
 	case application.ErrKindMalformed:
-		// CR-039: llm-service says what was wrong (an unusable storyboard, code
+		// llm-service says what was wrong (an unusable storyboard, code
 		// the model could not get into shape) — that is what the Creator needs.
 		message = "Kết quả AI không dùng được: " + errorCause(err)
 	case application.ErrKindServer:
@@ -1163,7 +1161,7 @@ func DescribeGenerateError(err error) (int, string) {
 	return status, message + fallback
 }
 
-// --- CR-050 Unit 2: code segments ------------------------------------------
+// --- code segments -----------------------------------------------------------
 
 func (rt *Router) codeSegments(w http.ResponseWriter) (codeSegmentsUseCase, bool) {
 	segs, ok := rt.generateAuthoring.(codeSegmentsUseCase)

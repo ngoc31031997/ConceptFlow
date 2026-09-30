@@ -12,7 +12,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// archetypesUseCase backs the video-archetype table (CR-041).
+// archetypesUseCase backs the video-archetype table.
 type archetypesUseCase interface {
 	List(ctx context.Context) ([]domain.VideoArchetype, error)
 	Create(ctx context.Context, a domain.VideoArchetype) (domain.VideoArchetype, error)

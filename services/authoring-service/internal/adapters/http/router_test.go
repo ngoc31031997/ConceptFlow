@@ -23,7 +23,7 @@ func (f *fakeSuggestMetadata) Execute(_ context.Context, _ string) (*application
 	return f.out, f.err
 }
 
-// --- CR-026: POST /v1/short-script-suggestions ---
+// --- POST /v1/short-script-suggestions ---
 
 type fakeSuggestShortScript struct {
 	script string
@@ -35,7 +35,7 @@ func (f *fakeSuggestShortScript) Execute(_ context.Context, _, _ string, _ domai
 }
 
 func TestHandleSuggestShortScript_404WhenUnwired(t *testing.T) {
-	// Same "unwired means absent, not broken" posture as qc-report (CR-021).
+	// Same "unwired means absent, not broken" posture as qc-report.
 	router := NewRouter(nil, nil)
 
 	body, _ := json.Marshal(map[string]string{"topic": "chủ đề", "language": "vi"})
@@ -98,7 +98,7 @@ func TestHandleSuggestShortScript_UseCaseErrorIs400(t *testing.T) {
 	}
 }
 
-// fakeGenerateAuthoring stands in for CR-027 FR78's use case.
+// fakeGenerateAuthoring stands in for the run-a-step-with-AI use case.
 type fakeGenerateAuthoring struct {
 	out       application.GeneratedStep
 	err       error
@@ -145,7 +145,7 @@ func TestHandleGenerateAuthoring_OK(t *testing.T) {
 	}
 }
 
-// CR-030 — bước duyệt đã bị bỏ, nên "review" không còn là một step hợp lệ:
+// Bước duyệt đã bị bỏ, nên "review" không còn là một step hợp lệ:
 // route vẫn khớp, nhưng use case từ chối nó.
 func TestHandleGenerateAuthoring_ForwardsStepVerbatim(t *testing.T) {
 	gen := &fakeGenerateAuthoring{available: true}
@@ -159,7 +159,7 @@ func TestHandleGenerateAuthoring_ForwardsStepVerbatim(t *testing.T) {
 }
 
 // Unwired means absent, not broken: without a key the route 404s and the
-// Copy-prompt path is the one that works (FR83.2).
+// Copy-prompt path is the one that works.
 func TestHandleGenerateAuthoring_NotWired(t *testing.T) {
 	rec := httptest.NewRecorder()
 	newGenerateRouter(nil).Handler().ServeHTTP(rec,
@@ -181,7 +181,7 @@ func TestHandleGenerateAuthoring_BusyIsConflict(t *testing.T) {
 	}
 }
 
-// FR79.3 — each provider failure names its own cause AND the copy-out way
+// Each provider failure names its own cause AND the copy-out way
 // through. "AI failed" would send a Creator with an empty balance to go
 // rewrite their prompt.
 func TestHandleGenerateAuthoring_ProviderErrorsAreClassified(t *testing.T) {
@@ -237,11 +237,11 @@ func TestHandleLLMStatus(t *testing.T) {
 		t.Error("want disabled when no provider is wired")
 	}
 	if disabled.Reason == "" {
-		t.Error("want a reason so the GUI can explain the missing button (FR79.4)")
+		t.Error("want a reason so the GUI can explain the missing button")
 	}
 }
 
-// fakeSaveAuthoringMode backs CR-027 FR79's mode endpoint.
+// fakeSaveAuthoringMode backs the authoring mode endpoint.
 type fakeSaveAuthoringMode struct {
 	gotMode string
 	err     error
@@ -290,7 +290,7 @@ func TestHandleSaveAuthoringMode_NotWired(t *testing.T) {
 	}
 }
 
-// --- CR-040 FR113: POST /v1/prompt-renders ---
+// --- POST /v1/prompt-renders ---
 
 type fakePromptRenderer struct{ got application.RenderInput }
 
@@ -346,7 +346,7 @@ func (f *fakeUsageStats) ModelUsageStats(_ context.Context, step, phase string, 
 	return f.stats, f.err
 }
 
-// CR-050 FR-19: the status carries the measured cost of each model's code
+// The status carries the measured cost of each model's code
 // chunks, and a failed read is reported as such, never as "no data".
 func TestHandleLLMStatusCodeStats(t *testing.T) {
 	stats := &fakeUsageStats{stats: []application.ModelUsageStats{{

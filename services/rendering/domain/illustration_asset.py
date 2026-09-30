@@ -1,4 +1,4 @@
-"""Luật cho một hình trong thư viện minh hoạ (CR-044).
+"""Luật cho một hình trong thư viện minh hoạ.
 
 Một hình là MỘT file TSX xuất đúng một component tên PascalCase, chỉ import từ
 react, remotion và bộ minh hoạ (để dùng lại Figure/Face/useBlink...). Hình này
@@ -19,7 +19,7 @@ TOP_DECL_RE = re.compile(
     r"^(?:export\s+)?(?:function|const|let|var|class|type|interface)\s+([A-Za-z_]\w*)", re.M,
 )
 
-#: Tên đã có trong khung script (CR-039 merger) — hình không được khai báo lại.
+#: Tên đã có trong khung script (Code Merger) — hình không được khai báo lại.
 RESERVED = {
     "React", "PALETTE", "LAYOUT", "SHOTS", "clamp", "narrations", "ShotProps", "CreatorComposition",
     "Stage", "Segments", "SAFE_MARGIN", "WIDTH", "HEIGHT", "LottieClip",

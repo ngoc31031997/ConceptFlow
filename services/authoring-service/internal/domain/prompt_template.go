@@ -2,37 +2,33 @@ package domain
 
 import "strings"
 
-// PromptRole identifies which stage of the CR-025 authoring pipeline a
+// PromptRole identifies which stage of the authoring pipeline a
 // template drives: Story Architect → Visual Director → Manim Engineer, with
 // remotion_engineer replacing manim_engineer when the project renders with
 // Remotion. The first two steps are engine agnostic — only the code step
 // forks by render engine.
 //
-// CR-030 bỏ hẳn vai trò thứ tư, Script Reviewer: bước duyệt không còn tồn tại
-// trong sản phẩm. Cột review_content và những dòng prompt cũ trong DB vẫn nằm
-// yên đó — không có gì đọc chúng nữa, và xoá dữ liệu của Creator để dọn dẹp là
-// cái giá không đáng.
+// Không có vai trò Script Reviewer. Cột review_content và những dòng prompt
+// cũ trong DB được giữ nguyên — không gì đọc chúng, và xoá dữ liệu của Creator
+// để dọn dẹp là cái giá không đáng.
 type PromptRole string
 
 const (
 	RoleStoryArchitect PromptRole = "story_architect"
 	RoleVisualDirector PromptRole = "visual_director"
 	RoleManimEngineer  PromptRole = "manim_engineer"
-	// feature/remotion-engine: a single flat prompt (topic -> code), the same
-	// shape the Manim path had before CR-025 split it into 4 roles — Remotion
-	// has no design system/multi-step pipeline yet, so one prompt is the
-	// whole story for now. Selected instead of story_architect when the
+	// A single flat prompt (topic -> code) for Remotion, which has no
+	// design system or multi-step pipeline. Selected instead of story_architect when the
 	// Creator's project has render_engine=remotion (see ScriptAssistant.tsx).
 	RoleRemotionEngineer PromptRole = "remotion_engineer"
 
-	// CR-039 — the AI flow ("Chạy bằng AI") has its own prompts; the manual
+	// The AI flow ("Chạy bằng AI") has its own prompts; the manual
 	// (Copy) flow keeps the four above untouched. See prompt_template_seeds_ai.go.
 	RoleVisualDirectorAI   PromptRole = "visual_director_ai"
 	RoleManimEngineerAI    PromptRole = "manim_engineer_ai"
 	RoleRemotionEngineerAI PromptRole = "remotion_engineer_ai"
 
-	// CR-040 FR113 — the prompts web-gui used to assemble in the browser, now
-	// library roles rendered by POST /v1/prompt-renders. None of them is a step
+	// Library roles rendered by POST /v1/prompt-renders. None of them is a step
 	// of the authoring pipeline; each is a "copy this to an external AI" prompt.
 	RoleManimAdjust     PromptRole = "manim_adjust"     // fix an existing Manim script (narrate calls, design system)
 	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
@@ -52,7 +48,7 @@ func ValidPromptRole(role string) bool {
 	}
 }
 
-// PromptTemplate is one role/language's editable prompt text (CR-025).
+// PromptTemplate is one role/language's editable prompt text.
 //
 // Text lives in Postgres, not in web-gui source, so an editor can fix wording
 // without a frontend rebuild/deploy. Placeholders are plain `{{name}}` tokens
@@ -79,7 +75,7 @@ func RenderPromptTemplate(templateText string, values map[string]string) string 
 	return out
 }
 
-// Prompt is one row of the prompt library (CR-031): a named wording for one
+// Prompt is one row of the prompt library: a named wording for one
 // pipeline role. Each role owns a list of these.
 //
 // Exactly one row per role is active at a time and is what the pipeline

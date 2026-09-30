@@ -1,4 +1,4 @@
-"""TypeScript check of a Creator/LLM-authored Remotion script (CR-039 FR104).
+"""TypeScript check of a Creator/LLM-authored Remotion script.
 
 A plain `tsc --noEmit` spends about a second re-reading React's, Remotion's and
 the lib's type declarations before it looks at the script, and the code

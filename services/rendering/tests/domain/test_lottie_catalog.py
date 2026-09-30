@@ -1,4 +1,4 @@
-"""Danh mục Lottie (CR-038): manifest, cổng giấy phép, khối prompt, lint id."""
+"""Danh mục Lottie: manifest, cổng giấy phép, khối prompt, lint id."""
 
 import json
 

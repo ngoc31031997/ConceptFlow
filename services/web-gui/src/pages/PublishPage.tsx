@@ -22,7 +22,7 @@ import styles from "./PublishPage.module.css";
 import { FLOW_PUBLISH, flowTitle } from "../utils/flow";
 
 /**
- * Bước 14 — "Publish" (bug report, 2026-09-12): tách khỏi ResultPage (bước
+ * Bước 14 — "Publish": tách khỏi ResultPage (bước
  * 13, "Kết quả"), để trang này CHỈ làm một việc — kết nối YouTube, điền
  * tiêu đề/mô tả, xem báo cáo QC, và đăng. Mọi thứ khác (render lại, tạo bản
  * Shorts, xem input, xóa) ở lại ResultPage.
@@ -35,7 +35,7 @@ export function PublishPage() {
   const [error, setError] = useState<string | null>(null);
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
-  // CR-007 follow-up: collapsed by default only for "short" — a Creator who
+  // Collapsed by default only for "short" — a Creator who
   // picked "chỉ video ngắn" is here for the clip, not the YouTube form. null
   // means "not touched yet" so the default can depend on `project`, which is
   // not loaded yet on the render that mounts this state.
@@ -47,7 +47,7 @@ export function PublishPage() {
   const inFlightRef = useRef(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  /** FR61.2 — bấm mốc thời gian trong báo cáo QC thì tua player tới đúng giây. */
+  /** Bấm mốc thời gian trong báo cáo QC thì tua player tới đúng giây. */
   function handleSeek(seconds: number) {
     const video = videoRef.current;
     if (!video) return;
@@ -81,7 +81,7 @@ export function PublishPage() {
       await refetch();
     } catch (err) {
       /*
-        CR-021 FR61.3: QC chặn là loại 409 duy nhất có đường đi tiếp. Xin đồng ý
+        QC chặn là loại 409 duy nhất có đường đi tiếp. Xin đồng ý
         SAU khi đã nhả cờ in-flight ở finally, nếu không lần gọi lại sẽ bị chính
         cái chốt chống bấm hai lần chặn mất.
       */
@@ -133,8 +133,8 @@ export function PublishPage() {
   const isPublishing = isSubmitting || project.status === "publishing";
   const hasPublishFailed = project.status === "failed_at_publish_video";
 
-  // CR-007 follow-up: "short" still renders the full long-form pipeline as
-  // clip source (CR-007 D1), but the Creator picked this project to only care
+  // "short" still renders the full long-form pipeline as
+  // clip source, but the Creator picked this project to only care
   // about the vertical clip — the YouTube publish UI would just be clutter in
   // front of the thing they actually want, so it collapses behind a toggle.
   const outputMode = project.video_output_mode ?? "long";
@@ -186,10 +186,9 @@ export function PublishPage() {
           </Card>
         ) : (
           /*
-            Preview on the left, everything the upload needs on the right. The
-            publish button used to sit at the bottom of a single stacked column
-            — below the player, the connect button and the thumbnail uploader —
-            so the action the page exists for was the last thing reachable.
+            Preview on the left, everything the upload needs on the right, so the
+            publish button is not the last thing reachable below the player,
+            the connect button and the thumbnail uploader.
           */
           <div className={styles.layout}>
             <div className={styles.preview}>
@@ -254,7 +253,7 @@ export function PublishPage() {
                   />
                   {errorBanner}
                   {/*
-                    Trước nút đăng, không sau (FR61.2): báo cáo chỉ có tác dụng
+                    Trước nút đăng, không sau: báo cáo chỉ có tác dụng
                     nếu Creator đọc nó trước khi quyết định đăng.
                   */}
                   <QCReportPanel projectId={projectId} onSeek={handleSeek} />

@@ -9,7 +9,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-050 Unit 2 against a real database (TEST_DATABASE_URL): the segment
+// Code segments against a real database (TEST_DATABASE_URL): the segment
 // store's rules — a plan resets only what changed, a failure keeps the last
 // content, a repair keeps the source, the startup sweep, the chunk size, the
 // diagnostics log, and a deleted project takes its segments with it.
@@ -24,7 +24,7 @@ func TestCodeSegmentsAgainstPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewPromptTemplateRepository(pool)
-	const pid, step = "cr050-seg", "code"
+	const pid, step = "segments-test", "code"
 	t.Cleanup(func() { _ = r.DeleteAuthoring(ctx, pid) })
 	_ = r.DeleteAuthoring(ctx, pid)
 
@@ -69,7 +69,7 @@ func TestCodeSegmentsAgainstPostgres(t *testing.T) {
 	if s := get("a"); s.Status != domain.SegmentDone || s.Source != "external" || s.DurationMS != 70 || string(s.Content) != `{"shots": {"a": "FIXED"}}` {
 		t.Fatalf("repaired = %+v content=%s", s, s.Content)
 	}
-	// a failed re-run keeps the last content (R1)
+	// a failed re-run keeps the last content
 	if err := r.MarkSegmentRunning(ctx, pid, step, "a"); err != nil {
 		t.Fatal(err)
 	}

@@ -8,7 +8,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-045 against a real database (TEST_DATABASE_URL): the "planned" mark, and
+// A video's drawing list against a real database (TEST_DATABASE_URL): the "planned" mark, and
 // the startup clean-up that drops stored out-of-palette (S9) warnings.
 func TestIllustrationsPlannedMarkAndS9CleanupAgainstPostgres(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -21,13 +21,13 @@ func TestIllustrationsPlannedMarkAndS9CleanupAgainstPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewPromptTemplateRepository(pool)
-	if _, err := pool.Exec(ctx, `DELETE FROM project_authoring WHERE project_id IN ('cr045-a', 'cr045-b')`); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM project_authoring WHERE project_id IN ('planning-a', 'planning-b')`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO project_authoring (project_id) VALUES ('cr045-a')`); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO project_authoring (project_id) VALUES ('planning-a')`); err != nil {
 		t.Fatal(err)
 	}
-	for _, pid := range []string{"cr045-a", "cr045-b"} { // with and without an authoring row
+	for _, pid := range []string{"planning-a", "planning-b"} { // with and without an authoring row
 		if planned, err := r.IllustrationsPlanned(ctx, pid); err != nil || planned {
 			t.Fatalf("%s before planning: planned=%v err=%v", pid, planned, err)
 		}
@@ -38,7 +38,7 @@ func TestIllustrationsPlannedMarkAndS9CleanupAgainstPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		if sha, err := r.IllustrationsStoryboardSHA(ctx, pid); err != nil || sha != "sha-"+pid {
-			t.Fatalf("%s after planning: sha=%q err=%v (CR-050 FR-17)", pid, sha, err)
+			t.Fatalf("%s after planning: sha=%q err=%v", pid, sha, err)
 		}
 		if planned, err := r.IllustrationsPlanned(ctx, pid); err != nil || !planned {
 			t.Fatalf("%s after planning: planned=%v err=%v", pid, planned, err)

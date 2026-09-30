@@ -1,4 +1,4 @@
-"""Cổng kiểm tra trước TTS (CR-020 FR56)."""
+"""Cổng kiểm tra trước TTS."""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ def test_loi_lint_chan_truoc_khi_chay_luot_dry():
 
 
 def test_canh_bao_khong_chan_va_duoc_tra_ve():
-    """Đường thoát hiểm ra API thô của Manim là hợp lệ (CR-017 FR46.3)."""
+    """Đường thoát hiểm ra API thô của Manim là hợp lệ."""
     renderer = FakeRenderer()
     script = "from conceptflow import *\nfrom manim import Arrow\n" + VALID.split("\n", 1)[1]
 
@@ -106,7 +106,7 @@ def test_manim_khong_bi_lint_lottie():
 
 
 def test_tu_tim_ten_class_khi_request_de_trong():
-    """CR-040 FR110: không còn bước parse_script, nên tên class rỗng là bình thường."""
+    """Không còn bước parse_script, nên tên class rỗng là bình thường."""
     renderer = FakeRenderer()
 
     result = ValidateScriptUseCase(renderer).validate(

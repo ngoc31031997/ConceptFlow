@@ -15,8 +15,8 @@ def ascii_words(text: str) -> list[str]:
 
 def camel(text: str, fallback: str = "color") -> str:
     """camelCase that keeps the capitals already inside a word, so a role the
-    storyboard wrote as `conNguoi` stays `conNguoi` (CR-056: lowering it made the
-    model write a key PALETTE did not have). A word in all capitals is lowered."""
+    storyboard wrote as `conNguoi` stays `conNguoi` and matches the key the
+    model reads in every visual. A word in all capitals is lowered."""
     words = [w.lower() if len(w) > 1 and w.isupper() else w for w in ascii_words(text)]
     if not words:
         return fallback

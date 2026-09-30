@@ -1,4 +1,4 @@
-"""Dựng bộ avatar mèo `cat.*` từ clip gốc (CR-038).
+"""Dựng bộ avatar mèo `cat.*` từ clip gốc.
 
     python tools/build_avatar.py            sinh mọi biến thể vào remotion_project/public/lottie/
     python tools/build_avatar.py --manifest cập nhật luôn remotion_project/lottie/manifest.json

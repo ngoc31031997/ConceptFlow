@@ -10,13 +10,13 @@ import (
 var ErrNarrationNotEditable = fmt.Errorf("narration line cannot be edited here")
 
 // ReplaceNarrationLiteral rewrites one `self.narrate("...")` literal in the
-// script (CR-024 FR70.2).
+// script.
 //
 // ## Why this can refuse
 //
 // The outline comes from *running* the script, while this edit has to change
-// the *source*. Those two are not always one-to-one, and CR-018 is the reason:
-// narration is now allowed inside loops and helpers, so a single literal can
+// the *source*. Those two are not always one-to-one:
+// narration is allowed inside loops and helpers, so a single literal can
 // produce three outline lines, and an f-string produces text that appears
 // nowhere in the source at all.
 //
@@ -32,7 +32,7 @@ func ReplaceNarrationLiteral(script, oldText, newText string) (string, error) {
 	if strings.ContainsAny(newText, "\"'\n\\") {
 		// The replacement is spliced into a Python string literal, so a quote
 		// or a backslash in it would end the literal early and produce a script
-		// that no longer parses.
+		// that does not parse.
 		return "", fmt.Errorf(`%w: lời thoại không được chứa dấu nháy, xuống dòng hay dấu \`, ErrNarrationNotEditable)
 	}
 

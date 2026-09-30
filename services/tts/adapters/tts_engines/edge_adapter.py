@@ -1,16 +1,14 @@
 """EdgeTTSAdapter — implements TTSEnginePort via Microsoft Edge's Read Aloud
-voices (ADR-0024, replacing Piper).
+voices. See ADR-0024.
 
 These are the same neural voices Azure sells, but reached through the endpoint
-Edge's reader uses, so they need no account, key or billing — which is the
-whole reason this replaced Piper: `vi_VN-vivos-x_low` was the only male
-Vietnamese voice Piper published, and its quality is the largest monetization
-risk this pipeline carries (CR-001 §C1, CR-005).
+Edge's reader uses, so they need no account, key or billing, and give good
+quality Vietnamese voices of both genders.
 
 Three consequences the rest of the service depends on:
 
-- This engine needs the network. Nothing in the pipeline runs fully offline any
-  more (ADR-0024 records that trade-off).
+- This engine needs the network, so the pipeline does not run fully offline
+  (ADR-0024 records that trade-off).
 - The service returns MP3, so synthesis is a two-step write: MP3 from
   edge-tts, then ffmpeg to the 24 kHz mono WAV the rest of the pipeline reads
   with the `wave` module.

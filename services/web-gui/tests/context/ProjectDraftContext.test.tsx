@@ -89,10 +89,10 @@ describe("draft lifecycle", () => {
     expect(screen.getByTestId("script").textContent).toBe("");
   });
 
-  it("giữ giọng đọc đã chọn cho video tiếp theo thay vì bắt chọn lại (bug report)", () => {
-    // Trước khi sửa: RESET (và một draft mới sau khi submit) luôn đưa
-    // voiceId về null, khiến NarrationPanel tự chọn giọng đầu tiên trong danh
-    // sách — Creator phải chọn lại giọng mình muốn mỗi lần tạo video mới.
+  it("giữ giọng đọc đã chọn cho video tiếp theo thay vì bắt chọn lại", () => {
+    // RESET (và một draft mới sau khi submit) không được đưa voiceId về null,
+    // nếu không NarrationPanel tự chọn giọng đầu tiên trong danh sách và
+    // Creator phải chọn lại giọng mình muốn mỗi lần tạo video mới.
     const first = render(
       <ProjectDraftProvider>
         <ResetConsumer />
@@ -113,7 +113,7 @@ describe("draft lifecycle", () => {
     expect(screen.getByTestId("voice-id").textContent).toBe("voice-b");
   });
 
-  it("RESUME_EDITING clears hasSubmitted without touching script or project id (CR-024 reject flow)", () => {
+  it("RESUME_EDITING clears hasSubmitted without touching script or project id (outline reject flow)", () => {
     render(
       <ProjectDraftProvider>
         <ResetConsumer />

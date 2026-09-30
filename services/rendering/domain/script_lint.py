@@ -1,4 +1,4 @@
-"""Lint script video trước khi tốn một lượt `manim` (CR-017 FR46).
+"""Lint script video trước khi tốn một lượt `manim`.
 
 ## Vì sao đổi từ blacklist sang whitelist
 
@@ -7,7 +7,7 @@ docstring của nó thừa nhận danh sách ấy "can never be exhaustive". Man
 trăm class; một danh sách chép tay luôn chạy sau lỗi mới, và mỗi lỗi lọt lưới
 tốn một lượt render mới phát hiện.
 
-Sau CR-017, script chỉ được phép gọi bề mặt API hẹp của `conceptflow`. Luật vì
+Script chỉ được phép gọi bề mặt API hẹp của `conceptflow`. Luật vì
 thế đảo chiều và thu về đúng một câu: **cái gì không có trong `conceptflow` thì
 không hợp lệ**. Nó phủ mọi API sai, kể cả những cái chưa ai gặp bao giờ.
 
@@ -20,7 +20,7 @@ import package, nên hai nguồn không trôi khỏi nhau.
 
 ## Hai mức nghiêm trọng
 
-`BLOCKING` chặn render; `WARNING` chỉ báo. Đường thoát hiểm (FR45.5) là warning
+`BLOCKING` chặn render; `WARNING` chỉ báo. Đường thoát hiểm là warning
 chứ không phải lỗi — một thư viện chặn được cả những video tham vọng nhất thì nó
 đang làm hại chứ không giúp.
 """

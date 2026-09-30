@@ -4,14 +4,12 @@ Manim-script input mode: Rendering produces one silent video for the whole
 project (not per-scene clips), so assembly's job is to lay each narration
 segment onto that video at its own offset, and optionally overlay
 background music. There is no per-scene clip:audio pairing or
-format-consistency check anymore (only one video, no clips to compare).
+format-consistency check (only one video, no clips to compare).
 
-CR-002 replaced the earlier `audio_segments: list[str]`, which assembly
-simply concatenated back to back. That was wrong: the video's timeline is
-animation time *plus* narration time, so laying the audio end to end made
-every segment after the first play early, by the total animation time
-that had run before it. Each segment now carries the offset Rendering
-measured for it.
+The video's timeline is animation time *plus* narration time, so laying the
+audio end to end would make every segment after the first play early, by the
+total animation time that had run before it. Each segment therefore carries
+the offset Rendering measured for it.
 """
 
 from __future__ import annotations
@@ -21,7 +19,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class SubtitleCue:
-    """One narration line and the window it stays on screen (CR-001 FR9.3).
+    """One narration line and the window it stays on screen.
 
     Timings come from the Orchestrator — real synthesized-audio durations when
     narration is on, estimated reading time when it is off — so subtitles stay
@@ -55,7 +53,7 @@ class SubtitleCue:
 
 @dataclass(frozen=True)
 class SubtitleStyle:
-    """Creator-chosen subtitle appearance (CR-001 FR9.4)."""
+    """Creator-chosen subtitle appearance."""
 
     font_size: str = "medium"  # small | medium | large
     text_color: str = "#FFFFFF"
@@ -71,7 +69,7 @@ class NarrationSegment:
     """One narration clip and where it belongs in the rendered video.
 
     start_time is the offset Rendering measured for the matching
-    `self.wait(AUTO)` (CR-002 FR10.1) — not the running total of the
+    `self.wait(AUTO)` — not the running total of the
     preceding narration durations.
     """
 
@@ -85,12 +83,12 @@ class VideoAssemblyRequest:
     narration segments with their offsets, plus optional background music and
     subtitles.
 
-    narration_segments is empty when the Creator disabled narration (CR-001) —
+    narration_segments is empty when the Creator disabled narration —
     the result is then a silent video, or one carrying background music alone.
 
     video_duration_seconds is Rendering's measured length of video_path. It is
     what assembly pads against so a final narration that runs past the last
-    frame is not cut off (CR-002 FR10.6); 0.0 means "unknown", in which case no
+    frame is not cut off; 0.0 means "unknown", in which case no
     padding is attempted.
     """
 
@@ -99,21 +97,20 @@ class VideoAssemblyRequest:
     narration_segments: list[NarrationSegment]
     video_duration_seconds: float = 0.0
     background_music_path: str | None = None
-    # CR-005 FR14.2 — Creator-chosen music level, 0.0-1.0.
+    # Creator-chosen music level, 0.0-1.0.
     background_music_volume: float = 0.2
     subtitle_cues: list[SubtitleCue] | None = None
     subtitle_style: SubtitleStyle | None = None
-    # How subtitle_cues get delivered (CR-015, ADR-0027):
+    # How subtitle_cues get delivered (see ADR-0027):
     #   off      — no subtitles at all
     #   track    — .srt only, for upload as a YouTube caption track
-    #   burn_in  — .ass only, painted into the video frames (CR-001 behaviour)
+    #   burn_in  — .ass only, painted into the video frames
     #   both     — both, with the risk of doubled text a Creator who picks
-    #              this has been warned about (CR-015 FR41.3)
-    # Defaults to "burn_in" rather than the GUI's new "track" default
-    # (CR-015 FR41.2) so a command already sitting in the queue when this
-    # ships keeps producing exactly what it produced before.
+    #              this has been warned about
+    # Defaults to "burn_in" rather than the GUI's "track" default so a
+    # command that carries no subtitle_mode keeps being burned in.
     subtitle_mode: str = "burn_in"
-    # CR-023 FR65/FR67 — the channel's fixed intro/outro, resolved by
+    # The channel's fixed intro/outro, resolved by
     # application/assemble_video.py from the command's intro_asset_id/
     # outro_asset_id (opaque ids Orchestrator read from its own
     # channel_asset_pointers projection) via ChannelAssetsRepository.
@@ -132,7 +129,7 @@ class VideoAssemblyRequest:
 
 @dataclass(frozen=True)
 class ChannelAsset:
-    """One row of `channel_assets` (CR-023 D1) — the channel-wide intro/outro
+    """One row of `channel_assets` — the channel-wide intro/outro
     currently (or formerly, when superseded) active for one (kind,
     render_quality) pair.
 
@@ -151,7 +148,7 @@ class ChannelAsset:
     version: int
     duration_seconds: float
     # Hash of the music file baked into video_path, when one has been
-    # uploaded (FR66.5). Kept apart from source_hash — which always describes
+    # uploaded. Kept apart from source_hash — which always describes
     # the VIDEO source — so each upload path caches against its own input.
     music_source_hash: str | None = None
 
@@ -166,7 +163,7 @@ class VideoAssemblyResult:
     """
 
     video_path: str
-    # Set only when subtitle_mode produced a .srt (CR-015 FR38.4) — None when
+    # Set only when subtitle_mode produced a .srt — None when
     # subtitles are off or burn-in only. Flows to Publisher the same way
     # thumbnail_path does.
     caption_path: str | None = None

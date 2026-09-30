@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Long-lived preview renderer for the illustration library (CR-044).
+ * Long-lived preview renderer for the illustration library.
  *
  * Bundles src/illustration-preview/host.tsx and opens the browser once, then
  * answers one JSON request per stdin line with one JSON reply per stdout line:

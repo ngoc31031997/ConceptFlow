@@ -1,4 +1,4 @@
-"""Sting mở/đóng kênh cố định (CR-023 FR65, FR66.5).
+"""Sting mở/đóng kênh cố định.
 
 `importorskip` giữ đúng tính chất mà test suite của Rendering đang có: chạy
 được mà không cần cài manim thật (README) — CI trong image thì luôn có.
@@ -50,7 +50,7 @@ def test_outro_dai_trong_khoang_15_20_giay():
 
 
 def test_ba_vung_an_toan_cua_outro_khong_de_len_nhau():
-    """FR65.8: logo, khung 'video đề xuất', và lời mời đăng ký phải tách bạch —
+    """Logo, khung 'video đề xuất', và lời mời đăng ký phải tách bạch —
     YouTube tự chèn end-screen element thật đè lên các vùng này."""
     logo = Box(*ChannelOutro.LOGO_ZONE)
     suggested = Box(*ChannelOutro.SUGGESTED_ZONE)

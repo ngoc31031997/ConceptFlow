@@ -24,8 +24,8 @@ func TestFlowStateFor(t *testing.T) {
 			AuthoredContent{Story: true, Storyboard: true, Code: true, NeedsIllustrations: true}, FlowState{FlowCode, RunIdle}},
 		{"remotion before the storyboard is still visual", StatusDraft, 3,
 			AuthoredContent{Story: true, NeedsIllustrations: true}, FlowState{FlowVisual, RunIdle}},
-		// CR-051: code is checked first, so a draft with the Creator's own code
-		// and no storyboard stands at Code (it used to report step 3/4).
+		// Code is checked first, so a draft with the Creator's own code
+		// and no storyboard stands at Code, not at step 3/4.
 		{"own code without a storyboard stands at code", StatusDraft, 3,
 			AuthoredContent{Code: true}, FlowState{FlowCode, RunIdle}},
 		{"validating", StatusValidatingScript, 3, AuthoredContent{}, FlowState{FlowValidate, RunRunning}},

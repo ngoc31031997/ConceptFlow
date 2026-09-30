@@ -1,4 +1,4 @@
-"""Bộ minh hoạ phẳng (CR-043): code, tài liệu trong prompt và danh sách import
+"""Bộ minh hoạ phẳng: code, tài liệu trong prompt và danh sách import
 của Code Merger phải khớp nhau.
 
 Ba nơi cùng mô tả một bộ component:
@@ -27,7 +27,7 @@ MERGER = SERVICES / "llm-service" / "app" / "pipeline" / "merger.py"
 NOT_KIT_TAGS = {"AbsoluteFill"}
 
 
-# Linh kiện để vẽ hình mới (CR-044), không phải hình để đặt lên khung.
+# Linh kiện để vẽ hình mới, không phải hình để đặt lên khung.
 HELPERS = {"Figure", "Face", "GroundShadow"}
 
 

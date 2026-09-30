@@ -13,7 +13,7 @@ class SpeechRequest:
     """Input to speech synthesis.
 
     project_id/scene_index identify the shared-volume artifact path
-    (Low-Level Design Question 5) — they are not persisted anywhere else.
+    — they are not persisted anywhere else.
     """
 
     project_id: str

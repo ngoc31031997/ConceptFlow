@@ -16,7 +16,7 @@ type ProjectDeleteStore interface {
 	BeginDelete(ctx context.Context, projectID string) (sagaID string, err error)
 }
 
-// DeleteProjectUseCase is the delete saga (CR-040 FR114.2): it asks every
+// DeleteProjectUseCase is the delete saga: it asks every
 // service that writes to shared_artifacts to remove its own files, and the
 // project row is removed only when all of them have answered (see
 // HandleStepEventUseCase.handlePurgeEvent). Nothing can recreate files after
@@ -57,7 +57,7 @@ func (uc *DeleteProjectUseCase) Execute(ctx context.Context, projectID string) e
 	return nil
 }
 
-// DeleteProgress is how far the delete saga has got (CR-040 FR116.2): how many
+// DeleteProgress is how far the delete saga has got: how many
 // of the purge owners have confirmed. Gone means the project row is already
 // removed, i.e. the saga finished.
 type DeleteProgress struct {

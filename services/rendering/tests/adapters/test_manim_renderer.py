@@ -1,8 +1,8 @@
 """Unit tests for ManimScriptRenderer.
 
 The subprocess layer is monkeypatched in every test — these tests never
-actually invoke the real `manim` CLI, only verify the two-pass contract
-(CR-018), timing-mark handling, subprocess error mapping, cache behaviour, and
+actually invoke the real `manim` CLI, only verify the two-pass contract,
+timing-mark handling, subprocess error mapping, cache behaviour, and
 output-file discovery.
 
 Manim is launched with Popen (so a long render can stream heartbeats), while
@@ -150,7 +150,7 @@ def test_render_raises_on_timeout_and_kills_the_child(tmp_path, monkeypatch):
 
 
 def test_heartbeat_reports_elapsed_time_and_animation_index(tmp_path, monkeypatch):
-    """CR-003 FR11.4: a multi-minute render must show it is still alive."""
+    """A multi-minute render must show it is still alive."""
     import adapters.rendering.manim_renderer as mod
 
     beats: list[tuple[float, int | None]] = []
@@ -283,13 +283,11 @@ def test_find_rendered_file_raises_when_missing(tmp_path):
 
 
 def test_child_resource_limits_cap_memory_but_not_cpu_time(monkeypatch):
-    """CR-003 FR11.3 regression.
+    """Only the address-space cap may be set.
 
-    RLIMIT_CPU used to be set equal to the wall-clock timeout. That is wrong:
-    Phase 0 benchmarking measured Manim burning CPU-time at 2.21x wall-clock
-    (it renders on several cores), so the limit fired at roughly 45% of the
-    configured timeout and killed legitimate long renders with SIGXCPU. Only
-    the address-space cap may be set here.
+    Manim burns CPU-time at 2.21x wall-clock (it renders on several cores), so
+    an RLIMIT_CPU equal to the wall-clock timeout would fire at roughly 45% of
+    the configured timeout and kill legitimate long renders with SIGXCPU.
     """
     renderer = ManimScriptRenderer(timeout_seconds=1800, memory_limit_gb=4)
     applied: dict[int, tuple[int, int]] = {}
@@ -337,11 +335,11 @@ def test_read_wait_offsets_returns_marks_in_scene_order(tmp_path):
 def test_read_wait_offsets_rejects_a_missing_mark(tmp_path):
     """The two passes disagreed about how many narration lines the script has.
 
-    After CR-018 a loop or an `if` around narration is perfectly legal — both
-    passes run the same code, so both see the same count. A mismatch therefore
-    means something genuinely worse: the script is non-deterministic. Returning
-    a partial list would put every later narration on the wrong offset, the
-    exact bug CR-002 removes, so this has to fail loudly."""
+    A loop or an `if` around narration is perfectly legal — both passes run
+    the same code, so both see the same count. A mismatch therefore means
+    something genuinely worse: the script is non-deterministic. Returning a
+    partial list would put every later narration on the wrong offset, so this
+    has to fail loudly."""
     marks = tmp_path / "cf_marks.jsonl"
     marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n')
 
@@ -363,7 +361,7 @@ def test_read_wait_offsets_raises_when_file_absent(tmp_path):
 
 
 def test_read_layout_marks_collects_only_layout_records(tmp_path):
-    """CR-021 FR58: the layout snapshots ride the same JSONL as the timing
+    """The layout snapshots ride the same JSONL as the timing
     marks, so parsing has to pick them out by `kind` and leave the rest alone."""
     marks = tmp_path / "cf_marks.jsonl"
     marks.write_text(
@@ -393,7 +391,7 @@ def test_read_layout_marks_is_empty_when_the_script_recorded_none(tmp_path):
 
 
 def test_read_clip_marks_collects_only_clip_records(tmp_path):
-    """CR-007 FR19.2: clip selections ride the same JSONL, picked out by
+    """Clip selections ride the same JSONL, picked out by
     `kind` like layout marks already are."""
     marks = tmp_path / "cf_marks.jsonl"
     marks.write_text(
@@ -490,7 +488,7 @@ def test_cache_prune_never_evicts_a_concurrently_running_project(tmp_path):
     assert os.path.isdir(first_dir), "pruner deleted a running render's media_dir"
     marks = os.path.join(first_dir, "cf_marks.jsonl")
     with open(marks, "a", encoding="utf-8") as f:
-        f.write("{}\n")  # the write that used to raise FileNotFoundError
+        f.write("{}\n")  # would raise FileNotFoundError if the dir had been pruned
 
     # Once the first render finishes and releases its claim, the dir becomes an
     # ordinary eviction candidate again — the fix must not pin dirs forever.
@@ -500,9 +498,8 @@ def test_cache_prune_never_evicts_a_concurrently_running_project(tmp_path):
 
 
 def test_default_quality_is_1080p60(tmp_path, monkeypatch):
-    """CR-004 FR12.1. 720p30 was hardcoded, which is below what a monetized
-    channel should publish and throws away Manim's main strength — smooth
-    motion."""
+    """720p30 is below what a monetized channel should publish and throws away
+    Manim's main strength — smooth motion."""
     assert DEFAULT_RENDER_QUALITY == "1080p60"
 
     renderer = ManimScriptRenderer(cache_root=None)
@@ -579,7 +576,7 @@ def test_quality_fps_covers_every_quality_flag():
 
 
 def test_per_project_quality_overrides_the_service_default(tmp_path, monkeypatch):
-    """CR-004 FR12.6: a Creator checks content with a fast 720p30 draft, then
+    """A Creator checks content with a fast 720p30 draft, then
     renders the upload pass at 1080p60 — same project, different pass."""
     renderer = ManimScriptRenderer(cache_root=None, quality="1080p60")
     captured = {}
@@ -625,7 +622,7 @@ def test_unknown_per_project_quality_falls_back_to_the_default():
     assert renderer._resolve_quality("4k60") == "4k60"
 
 
-# --- CR-018: hai lượt render ---------------------------------------------------
+# --- hai lượt render -----------------------------------------------------------
 
 
 def test_rounds_durations_onto_frame_boundaries():
@@ -670,7 +667,7 @@ def test_dry_run_collects_narration_beats_and_chapters(tmp_path, monkeypatch):
     assert "--dry_run" in captured["cmd"]
     assert "-ql" in captured["cmd"]
     assert captured["env"]["CF_MODE"] == "dry"
-    # Cùng mức cách ly như lượt thật (FR49.3): không rò credential nào.
+    # Cùng mức cách ly như lượt thật: không rò credential nào.
     assert set(captured["env"]) == {
         "PATH", "HOME", "CF_MARKS_PATH", "PYTHONPATH", "CF_MODE",
     }
@@ -740,9 +737,8 @@ def test_dry_run_fails_when_script_produces_no_narration(monkeypatch):
 
 
 def test_render_hands_durations_to_the_script_and_writes_it_unmodified(tmp_path, monkeypatch):
-    """Trước CR-018 script bị viết lại trước khi chạy, nên thứ chạy không bao
-    giờ đúng là thứ Creator viết — và thứ được lưu thậm chí không phải Python
-    hợp lệ."""
+    """Script được ghi ra đúng như Creator viết, không bị viết lại trước khi
+    chạy."""
     import json
     import os
 

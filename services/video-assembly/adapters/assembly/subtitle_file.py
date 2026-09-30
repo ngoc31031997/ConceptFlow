@@ -1,4 +1,4 @@
-"""Renders subtitle cues into an ASS file for ffmpeg to burn in (CR-001 FR9.2/FR9.4).
+"""Renders subtitle cues into an ASS file for ffmpeg to burn in.
 
 ASS rather than SRT because the Creator chooses the appearance (size, colour,
 background box, position) and SRT carries no styling — with SRT those choices
@@ -14,7 +14,7 @@ from domain.models import SubtitleCue, SubtitleStyle
 
 # ASS scales its layout from a declared reference resolution to the real frame.
 # Declaring the video's actual resolution keeps that mapping 1:1, so font sizes
-# and margins mean what they say (CR-004 FR12.5). These are the fallback when
+# and margins mean what they say. These are the fallback when
 # the resolution cannot be read, and match the 1080p default.
 DEFAULT_PLAY_RES_X = 1920
 DEFAULT_PLAY_RES_Y = 1080
@@ -51,11 +51,11 @@ def _render(cues: list[SubtitleCue], style: SubtitleStyle, play_res: tuple[int, 
     # a line, which is exactly what determines whether subtitles overflow.
     # For any 16:9 resolution this is identical to scaling by height (width
     # and height are proportional), so long-form output is unchanged. It is
-    # NOT identical for the 9:16 vertical clip (CR-007): that frame is
+    # NOT identical for the 9:16 vertical clip: that frame is
     # narrower (1080) but much TALLER (1920) than the 16:9 default, so
-    # scaling by height alone inflated "large" from 72pt to ~128pt — a font
+    # scaling by height alone would inflate "large" from 72pt to ~128pt — a font
     # too big for a frame that is also narrower, forcing every line to wrap
-    # after 1-2 words and covering nearly the whole picture (bug report).
+    # after 1-2 words and covering nearly the whole picture.
     scale = play_res[0] / DEFAULT_PLAY_RES_X
     font_size = round(FONT_SIZES.get(style.font_size, FONT_SIZES["medium"]) * scale)
     font_name = style.font_family if style.font_family in SUBTITLE_FONTS else DEFAULT_FONT

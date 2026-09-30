@@ -1,5 +1,5 @@
 // Long-lived TypeScript checker for Creator/LLM-authored Remotion scripts
-// (CR-039 FR104, kept warm so a check does not pay tsc's start-up every time).
+// (kept warm so a check does not pay tsc's start-up every time).
 //
 // Protocol: one JSON object per line on stdin, one per line on stdout.
 //   in:  {"id": "...", "code": "<tsx>"}

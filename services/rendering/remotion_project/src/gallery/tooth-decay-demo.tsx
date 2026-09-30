@@ -1,6 +1,6 @@
 /**
- * A hand-written sample of what an illustrated script should look like
- * (CR-043): four shots of a "tooth decay" video, built only from the
+ * A hand-written sample of what an illustrated script should look like:
+ * four shots of a "tooth decay" video, built only from the
  * conceptflow-mini illustration kit, in the same shape a generated script has
  * (PALETTE, LAYOUT, one ShotN_M per narration line, <Stage>/<Segments>).
  *

@@ -85,8 +85,8 @@ def test_rejects_a_client_id_that_is_no_longer_configured():
 
 
 def test_falls_back_to_the_only_app_when_state_carries_no_client_id():
-    """A pre-CR-012 state string still in flight is unambiguous while only
-    one app exists (FR33.3)."""
+    """A legacy state string with no client_id is unambiguous while only
+    one app exists."""
     flow = FakeOAuthFlow()
     use_case = _use_case(flow)
 

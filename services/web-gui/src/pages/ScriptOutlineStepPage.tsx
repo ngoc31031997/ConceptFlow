@@ -32,7 +32,7 @@ import { FLOW_STORY, flowTitle } from "../utils/flow";
  *
  * The engine choice (Manim vs Remotion) does not change THIS step's own
  * prompt — a plain-text story outline reads the same either way — but
- * CR-030's AI chain button runs steps 4 (storyboard), 5 (illustrations,
+ * the AI chain button runs steps 4 (storyboard), 5 (illustrations,
  * Remotion only) and 6 (code) too, and those two DO branch by engine (RoleFor on the server). So
  * the picker lives here as well, not only on step 6: choosing it up front, before
  * the chain runs, is the only way the chain's own storyboard/code calls see
@@ -48,10 +48,10 @@ export function ScriptOutlineStepPage() {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  // CR-028 FR83.1/FR83.2/FR85 — the project row (and its topic) is created/
+  // The project row (and its topic) is created/
   // updated on the server as soon as the Creator stops typing, instead of
   // waiting for POST /v1/sagas/render (docs/review/data-flow-review.md's
-  // "orphan draft" risk). similarProjects backs the FR85 collision banner.
+  // "orphan draft" risk). similarProjects backs the topic collision banner.
   const [similarProjects, setSimilarProjects] = useState<SimilarProject[]>([]);
   const debouncedTopic = useDebounce(draft.authoringTopic.trim(), 600);
 
@@ -66,7 +66,7 @@ export function ScriptOutlineStepPage() {
         if (!cancelled) setSimilarProjects(similarProjects);
       })
       .catch(() => {
-        // Best-effort — a Creator offline or mid-render (FR84.2 lock) can
+        // Best-effort — a Creator offline or mid-render (authoring lock) can
         // still type/paste normally; the collision warning just won't show.
       });
     return () => {
@@ -88,8 +88,8 @@ export function ScriptOutlineStepPage() {
         if (state.story && !draft.authoringStory) {
           dispatch({ type: "SET_AUTHORING_STORY", payload: state.story });
         }
-        // CR-027 D0 — chủ đề giờ cũng nằm ở server, nên nó rehydrate được
-        // như 4 artefact kia. "" nghĩa là project tạo trước CR-027.
+        // Chủ đề nằm ở server, nên nó rehydrate được
+        // như 4 artefact kia. "" nghĩa là project chưa lưu chủ đề.
         if (state.topic && !draft.authoringTopic) {
           dispatch({ type: "SET_AUTHORING_TOPIC", payload: state.topic });
         }
@@ -103,7 +103,7 @@ export function ScriptOutlineStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
-  // CR-040 FR113: the server fills the template — channel identity, beat sheet
+  // The server fills the template — channel identity, beat sheet
   // at this voice's speaking rate, narration-language rule. The browser only
   // says which topic, language, format and voice the Creator has picked.
   const rendered = useRenderedPrompt({
@@ -128,12 +128,12 @@ export function ScriptOutlineStepPage() {
 
   const storyIsEmpty = draft.authoringStory.trim().length === 0;
   const topicIsEmpty = draft.authoringTopic.trim().length === 0;
-  // CR-031 — "Đã có dàn ý" vào đúng tab này, nhưng để dán chứ không để sinh.
+  // "Đã có dàn ý" vào đúng tab này, nhưng để dán chứ không để sinh.
   // Cùng một màn hình, hai nửa khác nhau được dùng, nên chữ phải nói rõ nửa
   // nào là việc của Creator lúc này.
   const hasOwnOutline = draft.scriptSource === "outline";
   const llm = useLlmStatus();
-  // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
+  // Chế độ lấy từ project ở server (qua draft), nên mở lại dự án
   // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
   const { mode: authoringMode, setMode: setAuthoringMode } = useAuthoringMode(draft.projectId);
   // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
@@ -144,9 +144,9 @@ export function ScriptOutlineStepPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      // CR-027 D0 — chủ đề đi kèm dàn ý trong cùng một lượt lưu. Trước đây
+      // Chủ đề đi kèm dàn ý trong cùng một lượt lưu. Trước đây
       // nó chỉ sống trong localStorage của trình duyệt, nên server không có
-      // gì để điền vào {{topic}} lúc tự render prompt (FR77).
+      // gì để điền vào {{topic}} lúc tự render prompt.
       // Đổi dàn ý thì storyboard và code dựng từ bản cũ bị xóa ở server: hỏi
       // trước, rồi đọc lại để bản nháp không giữ thứ đã mất.
       const saved = await getAuthoringState(draft.projectId).catch(() => null);
@@ -278,10 +278,10 @@ export function ScriptOutlineStepPage() {
           </Card>
         </div>
         {/* Đặt SAU chủ đề và dàn ý: nút chạy phải nằm dưới dữ liệu nó dùng
-            (quy tắc luồng UI trong CLAUDE.MD). CR-031 bug report — engine và cách làm đã chốt ở màn chọn tình
-            huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab đọc như thể
-            chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
-            mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (CR-030: nút
+            (docs/ux-ui-design-rules.md). Engine và cách làm đã chốt ở màn chọn
+            tình huống; hiện lại y nguyên hai bộ chọn đầy đủ ở mỗi tab sẽ đọc
+            như thể chưa chọn gì. PipelineSettingsBar thu gọn thành một dòng tóm tắt,
+            mở rộng khi Creator bấm "Đổi" — vẫn đổi được ở đây (nút
             chạy chuỗi AI bên dưới gọi luôn cả bước 4–6, nên đổi engine phải
             xong TRƯỚC khi bấm chạy, không phải ở bước 6 lúc đã muộn). */}
         <div className={styles.settingsRow} style={{ marginTop: 16 }}>

@@ -1,9 +1,8 @@
 """SynthesizeSpeechBatchUseCase — synthesizes every scene in a project,
-fail-fast on the first error (mirrors ClassifyScenesBatchUseCase, Unit 2).
+fail-fast on the first error.
 
 Used by the synthesize_speech AMQP command handler (ADR-0014): the command
-carries every scene for a project in one batch, matching how
-classify_scenes is already handled at Content Plugin Service.
+carries every scene for a project in one batch.
 """
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ class SynthesizeSpeechBatchUseCase:
         on_scene_done: Callable[[int, int], None] | None = None,
         should_stop: Callable[[], bool] | None = None,
     ) -> BatchSynthesisOutcome:
-        """CR-029: on_scene_done(scene_index, scene_total), called right after
+        """on_scene_done(scene_index, scene_total), called right after
         each scene's audio is ready, lets the caller publish a progress ping
         without this use case knowing anything about RabbitMQ/asyncio — it
         stays synchronous and testable exactly as before.

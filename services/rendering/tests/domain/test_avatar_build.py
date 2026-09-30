@@ -1,4 +1,4 @@
-"""Bộ avatar mèo `cat.*` (CR-038): dựng lại được, hợp lệ, và khớp manifest."""
+"""Bộ avatar mèo `cat.*`: dựng lại được, hợp lệ, và khớp manifest."""
 
 import importlib.util
 import json

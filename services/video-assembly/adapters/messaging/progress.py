@@ -1,4 +1,4 @@
-"""Progress publisher for assemble_video/generate_clips (CR-029).
+"""Progress publisher for assemble_video/generate_clips.
 
 Mirrors services/rendering/adapters/messaging/progress.py and
 services/tts/adapters/messaging/progress.py: both steps here run one or more

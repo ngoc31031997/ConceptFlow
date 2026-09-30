@@ -47,7 +47,7 @@ async function main() {
     process.exit(1);
   }
 
-  // CR-038: Lottie clips are served from ./public/lottie via staticFile(); the
+  // Lottie clips are served from ./public/lottie via staticFile(); the
   // entry file lives in src/, so the public dir has to be named explicitly.
   const serveUrl = await bundle({
     entryPoint: args.entry,

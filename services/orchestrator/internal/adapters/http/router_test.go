@@ -174,8 +174,8 @@ func TestHandleGetProject_OK(t *testing.T) {
 	}
 }
 
-// TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality is the
-// bug report's second half: the GUI resubmits POST /v1/sagas/render for the
+// TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality: the GUI
+// resubmits POST /v1/sagas/render for the
 // same project_id at a higher quality once a video is finalized, and can only
 // do that with settings it can read back from here.
 func TestHandleGetProject_CarriesFieldsNeededToRerenderAtAnotherQuality(t *testing.T) {
@@ -342,7 +342,7 @@ func TestHandleHealth(t *testing.T) {
 func TestHandleVoiceCalibration_OmitsVoicesBelowThreshold(t *testing.T) {
 	// Giọng chưa đủ mẫu bị bỏ hẳn khỏi kết quả chứ không trả về một con số
 	// độ tin cậy thấp: GUI rơi về hằng số theo ngôn ngữ, và đó là câu trả lời
-	// trung thực hơn (CR-016 FR43.2).
+	// trung thực hơn.
 	reader := &fakeProjectReader{calibrations: []domain.VoiceCalibration{
 		{VoiceID: "vi-Enough", SampleCount: domain.MinCalibrationSamples, TotalWords: 900, TotalSecond: 360},
 		{VoiceID: "vi-TooFew", SampleCount: 1, TotalWords: 300, TotalSecond: 120},
@@ -388,7 +388,7 @@ func TestHandleSaveFormat_RejectsAFormatWithNoBeats(t *testing.T) {
 }
 
 func TestHandleSaveFormat_StoresAsANewVersion(t *testing.T) {
-	// FR51.6: không bao giờ ghi đè — project dựng theo version 3 phải tiếp tục
+	// Không bao giờ ghi đè — project dựng theo version 3 phải tiếp tục
 	// báo đúng beat của version 3.
 	reader := &fakeProjectReader{}
 	router := NewRouter(nil, nil, nil, reader, nil, nil)
@@ -431,7 +431,7 @@ func TestHandleListFormats_ServesTheBuiltins(t *testing.T) {
 	}
 }
 
-// CR-023 correction: normalize only publishes an AMQP command, never an HTTP
+// Normalize only publishes an AMQP command, never an HTTP
 // call to video-assembly.
 func TestHandleNormalizeChannelAsset_QueuesAndReturnsAccepted(t *testing.T) {
 	fake := &fakeChannelAssets{}
@@ -454,7 +454,7 @@ func TestHandleNormalizeChannelAsset_QueuesAndReturnsAccepted(t *testing.T) {
 	}
 }
 
-// FR66.5: the music bed is uploaded through the same endpoint, distinguished
+// The music bed is uploaded through the same endpoint, distinguished
 // only by asset_role.
 func TestHandleNormalizeChannelAsset_PassesMusicAssetRoleThrough(t *testing.T) {
 	fake := &fakeChannelAssets{}
@@ -540,7 +540,7 @@ func (f *fakeProjectReader) GetVoiceCalibration(_ context.Context, _ string) (do
 	return domain.VoiceCalibration{}, nil
 }
 
-// The internal endpoints authoring-service reads (CR-040 FR111).
+// The internal endpoints authoring-service reads.
 func TestInternalProjectStatus(t *testing.T) {
 	router := NewRouter(nil, nil, nil, &fakeProjectReader{project: &domain.Project{Status: domain.StatusDraft}}, nil, nil)
 	rec := httptest.NewRecorder()
@@ -571,7 +571,7 @@ func (s stubAuthored) Summaries(_ context.Context, ids []string) (map[string]app
 	return map[string]application.AuthoringSummary{ids[0]: sum}, nil
 }
 
-// CR-051: GET /v1/projects/:id places a Remotion draft whose drawings are not
+// GET /v1/projects/:id places a Remotion draft whose drawings are not
 // ready at Hình minh hoạ (5); Manim, or ready drawings, stay at Code (6).
 func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
 	cases := []struct {

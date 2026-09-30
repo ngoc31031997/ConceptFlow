@@ -1,4 +1,4 @@
-"""Runtime lời thoại hai lượt (CR-018).
+"""Runtime lời thoại hai lượt.
 
 Bộ test này chứng minh đúng thứ mà `# NARRATION` + `self.wait(AUTO)` không làm
 được: lời thoại nằm trong vòng lặp, trong nhánh điều kiện và trong hàm helper.
@@ -59,7 +59,7 @@ def test_loi_thoai_trong_nhanh_dieu_kien(dry):
 
 
 def test_loi_thoai_trong_ham_helper(dry):
-    """Đây là điều kiện để hook/CTA trở thành component thật (CR-019)."""
+    """Đây là điều kiện để hook/CTA trở thành component thật."""
 
     class S(ConceptFlowScene):
         def hook(self):
@@ -74,7 +74,7 @@ def test_loi_thoai_trong_ham_helper(dry):
 
 def test_beat_va_chapter_gan_vao_loi_thoai_ke_tiep(dry):
     """Timestamp của beat/chapter là mốc thật lượt render đo được cho lời thoại
-    mở đầu nó, không phải ước lượng (giữ nguyên cách CR-006 FR15 làm)."""
+    mở đầu nó, không phải ước lượng."""
 
     class S(ConceptFlowScene):
         def construct(self):
@@ -100,8 +100,8 @@ def test_loi_thoai_rong_bi_tu_choi(dry):
 
 
 def test_clip_ghi_mot_ban_ghi_o_luot_dry_voi_t_null(dry):
-    """CR-007 FR19.2: ở lượt dry chưa có thời gian thật — Creator chỉ cần thấy
-    clip nào được định cắt, để CR-024 duyệt dàn ý trước khi tốn TTS."""
+    """Ở lượt dry chưa có thời gian thật — Creator chỉ cần thấy
+    clip nào được định cắt, để duyệt dàn ý trước khi tốn TTS."""
 
     class S(ConceptFlowScene):
         def construct(self):
@@ -186,7 +186,7 @@ def test_che_do_render_cho_dung_thoi_luong_audio(tmp_path, monkeypatch):
 
     assert waited == [2.0, 3.5]
     kinds = [json.loads(line)["kind"] for line in marks.read_text().splitlines() if line]
-    # Mỗi mốc kèm đúng một bản ghi bố cục cho QC (CR-021 FR58.1).
+    # Mỗi mốc kèm đúng một bản ghi bố cục cho QC.
     assert kinds == ["mark", "layout", "mark", "layout"]
 
 
@@ -213,7 +213,7 @@ def test_render_thieu_thoi_luong_bao_loi_ro_rang(tmp_path, monkeypatch):
 
 
 def test_clip_o_luot_render_ghi_t_start_nho_hon_t_end(tmp_path, monkeypatch):
-    """CR-007 FR19.2: ở lượt render, t_start/t_end là mốc thật đọc từ
+    """Ở lượt render, t_start/t_end là mốc thật đọc từ
     `scene.renderer.time`, không phải null như lượt dry.
 
     Gọi thẳng `narration.clip()` với một scene giả có `renderer.time` tăng dần
@@ -251,11 +251,8 @@ def test_clip_o_luot_render_ghi_t_start_nho_hon_t_end(tmp_path, monkeypatch):
 
 
 def test_hook_recap_cta_tu_mang_beat_va_loi_thoai(dry):
-    """CR-019 FR53: ba beat này chỉ trở thành method được sau CR-018.
-
-    Trước đó lời thoại là comment phải đếm khớp theo thứ tự dòng, nên không thể
-    nằm trong một hàm — đúng lý do CR-006 §Quyết định #2 phải lùi FR17 xuống
-    thành snippet Creator tự chép.
+    """Hook/recap/CTA là method: lời thoại nằm được trong một hàm, và mỗi beat
+    mang đúng beat id cùng lời thoại của nó.
     """
 
     class S(ConceptFlowScene):
@@ -277,7 +274,7 @@ def test_hook_recap_cta_tu_mang_beat_va_loi_thoai(dry):
 
 
 def test_ghi_lai_khung_hinh_tai_moi_loi_thoai(dry):
-    """CR-024 FR68.5: duyệt dàn ý mà chỉ đọc lời thoại là duyệt nửa ít quan
+    """Duyệt dàn ý mà chỉ đọc lời thoại là duyệt nửa ít quan
     trọng hơn, với một kênh đặt trọng tâm vào ví dụ trực quan."""
     from manim import Square, Text
 
@@ -302,7 +299,7 @@ def test_khung_trong_duoc_noi_ro(dry):
     assert record["visual"] == "khung trống"
 
 
-# --- CR-021 FR58: thu dữ liệu bố cục ở lượt render ---------------------------
+# --- thu dữ liệu bố cục ở lượt render ----------------------------------------
 
 
 def _render_records(tmp_path, monkeypatch, scene_cls, count=1):
@@ -343,7 +340,7 @@ def test_ban_ghi_layout_di_kem_moc_render(tmp_path, monkeypatch):
     assert entry["bbox"][0] < entry["bbox"][1]  # left < right
     assert entry["bbox"][3] < entry["bbox"][2]  # bottom < top
     # Màu thật của chữ, không phải #000000 mà `Text.get_color()` luôn trả về:
-    # luật tương phản FR59.4 sống hay chết ở con số này.
+    # luật tương phản của QC sống hay chết ở con số này.
     assert entry["color"] == "#FFFF00"
     assert entry["font_size"] > 0
 
@@ -381,7 +378,7 @@ def test_khung_trong_cho_danh_sach_rong():
 
 
 def test_loi_thu_bo_cuc_khong_lam_hong_luot_render():
-    """FR58.2: dữ liệu QC không bao giờ được đắt hơn cái video nó đang chấm."""
+    """Dữ liệu QC không bao giờ được đắt hơn cái video nó đang chấm."""
 
     class _Broken:
         def get_left(self):
@@ -400,7 +397,7 @@ def test_loi_thu_bo_cuc_khong_lam_hong_luot_render():
     assert narration._describe_layout(_NoMobjects()) == []
 
 
-# --- CR-042: hình chuyển động trong lúc đọc thoại ----------------------------
+# --- hình chuyển động trong lúc đọc thoại ------------------------------------
 
 
 @pytest.fixture

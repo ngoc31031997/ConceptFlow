@@ -78,7 +78,7 @@ const eventsQueue = "orchestrator.events"
 const eventsDLQQueue = "orchestrator.events.dlq"
 
 // dlqQueues are the 6 dead-letter queues (one per command routing key,
-// Unit 1's "*.commands.dlq" pattern) Orchestrator also consumes — a
+// the "*.commands.dlq" pattern) Orchestrator also consumes — a
 // dead-lettered command means a downstream service never picked it up.
 var dlqQueues = []string{
 	"tts.commands.dlq",
@@ -188,7 +188,7 @@ func (c *Consumer) consumeEventsDLQ(ctx context.Context, queue string) error {
 }
 
 // resolveEventType extracts the event type from an inbound event envelope.
-// The 6 upstream Python services publish events per Unit 1's approved
+// The 6 upstream Python services publish events per the approved
 // envelope standard (messaging-design.md), which carries "event_type"
 // INSIDE payload, not as a top-level envelope field — unlike the commands
 // Orchestrator itself publishes (application/dispatch), which use a
@@ -289,7 +289,7 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 
 // deadLetterMessage says why a command landed in a DLQ, read from the broker's
 // x-death header: "rejected" is the worker giving up on an unexpected error
-// (it no longer requeues), "expired" is nobody picking the command up within
+// (it does not requeue), "expired" is nobody picking the command up within
 // the queue TTL. Nothing retries either automatically — the Creator decides.
 func deadLetterMessage(d amqp.Delivery) string {
 	if deaths, ok := d.Headers["x-death"].([]interface{}); ok && len(deaths) > 0 {

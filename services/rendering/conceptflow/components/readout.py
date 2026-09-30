@@ -1,4 +1,4 @@
-"""Số chạy — một con số thay đổi được trong lúc quay (CR-017 FR45.2).
+"""Số chạy — một con số thay đổi được trong lúc quay.
 
 Đây là khuôn hình duy nhất trong thư viện có **trạng thái chạy theo thời gian**:
 `self.tracker` là một `ValueTracker`, và con số trên màn hình bám theo nó. Script

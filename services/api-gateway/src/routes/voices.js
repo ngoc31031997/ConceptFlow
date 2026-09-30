@@ -8,7 +8,7 @@ const VOICE_SAMPLES_DIR = 'voice_samples';
 const CATALOG_FILE = 'catalog.json';
 
 /**
- * `GET /v1/voices` and `GET /v1/voices/:voiceId/sample` (CR-001).
+ * `GET /v1/voices` and `GET /v1/voices/:voiceId/sample`.
  *
  * The catalog and its preview clips are written to the shared volume by the
  * TTS Service at startup rather than fetched over HTTP: the TTS Service is a

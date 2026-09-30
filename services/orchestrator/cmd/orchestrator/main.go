@@ -55,7 +55,7 @@ func main() {
 
 	// 4. Construct postgres.ProjectRepository, InboxRepository, OutboxRepository.
 	projectRepo := postgres.NewProjectRepository(pool)
-	// CR-019 FR51.2: gieo các format dựng sẵn nếu chưa có. Insert-if-absent,
+	// Gieo các format dựng sẵn nếu chưa có. Insert-if-absent,
 	// không upsert — khi Creator đã sửa một format rồi thì lần khởi động sau
 	// không được lặng lẽ khôi phục lại số liệu gốc bên dưới.
 	if err := projectRepo.SeedVideoFormats(ctx); err != nil {
@@ -73,18 +73,18 @@ func main() {
 	// realPublisher directly, so a command dispatch survives a crash between
 	// the state update and the network send.
 	startRenderSaga := application.NewStartRenderSagaUseCase(projectRepo, outboxRepo)
-	// CR-021 D5/D6: the publish gate reads the QC report the saga stored, and
+	// The publish gate reads the QC report the saga stored, and
 	// QC_ENFORCE (default false) decides whether a blocking finding actually
 	// stops the Saga or is only shown.
 	qcReportRepo := postgres.NewQCReportRepository(pool)
 	startPublishSaga := application.NewStartPublishSagaUseCase(projectRepo, outboxRepo).
 		WithQCGate(qcReportRepo, cfg.QCEnforce)
-	// CR-023 correction: there is no HTTP server between backend services —
+	// There is no HTTP server between backend services —
 	// Orchestrator resolves the active intro/outro from its own local
 	// channel_asset_pointers projection (kept current by subscribing to
 	// channel_asset_rendered/channel_asset_normalized events in
 	// handle_step_event.go), not by calling video-assembly over HTTP.
-	// CR-040 FR111: prompts, the 1a/1b/1c chain, LLM calls and usage live in
+	// Prompts, the 1a/1b/1c chain, LLM calls and usage live in
 	// authoring-service. The orchestrator reaches it only for the few things it
 	// still needs: the topic search, list summaries, a fork's copy and cleanup.
 	authoringClient := authoring.NewClient(cfg.AuthoringServiceURL, cfg.AuthoringServiceTimeout)
@@ -119,14 +119,14 @@ func main() {
 	go relay.Run(ctx)
 
 	// 9. Construct chi router, wire the 4 REST handlers to their use cases.
-	// CR-024: cổng duyệt dàn ý dùng lại đúng nhánh chọn TTS mà handleStepEvent
+	// Cổng duyệt dàn ý dùng lại đúng nhánh chọn TTS mà handleStepEvent
 	// đã sở hữu, thay vì dựng một bản thứ hai của cùng quyết định.
 	reviewOutline := application.NewReviewOutlineUseCase(projectRepo, handleStepEvent, realPublisher, outboxRepo, logger)
-	// CR-023 correction: Normalize dispatches normalize_channel_asset via the
+	// Normalize dispatches normalize_channel_asset via the
 	// Outbox (same durability guarantee as every other command), Preview
 	// reads the local channel_asset_pointers projection.
 	channelAssets := application.NewChannelAssetsUseCase(outboxRepo, channelAssetPointers)
-	// CR-028 FR83: the project row is created here, at wizard step 1
+	// The project row is created here, at wizard step 1
 	// (POST /v1/projects); the topic and its collision search live in
 	// authoring-service (see projectDraftAdapter).
 	draftPort := projectDraftAdapter{projects: projectRepo, authoring: authoringClient}
@@ -211,7 +211,7 @@ func (s projectStoreWithAuthoring) List(ctx context.Context) ([]domain.ProjectSu
 	return summaries, nil
 }
 
-// projectDraftAdapter joins what CR-028's early-draft use cases read/write: the
+// projectDraftAdapter joins what the early-draft use cases read/write: the
 // projects row (this service) and the topic with its collision search
 // (authoring-service).
 type projectDraftAdapter struct {

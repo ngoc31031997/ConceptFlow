@@ -21,8 +21,8 @@ interface Answer {
 }
 
 /**
- * The prompt for one library role, rendered by authoring-service (CR-040
- * FR113): the browser assembles no prompt text, so what the Creator copies is
+ * The prompt for one library role, rendered by authoring-service: the
+ * browser assembles no prompt text, so what the Creator copies is
  * what the server would send to the model.
  *
  * Re-renders — debounced, so typing a topic is one request, not one per key —

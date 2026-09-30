@@ -1,13 +1,13 @@
-"""Sinh clip dọc 9:16 từ video 16:9 đã ghép (CR-007 FR19, LLD D5/D6).
+"""Sinh clip dọc 9:16 từ video 16:9 đã ghép.
 
-Hàm thuần về mặt điều khiển (validate trước, không im lặng cắt cụt — D4),
+Hàm thuần về mặt điều khiển (validate trước, không im lặng cắt cụt),
 nhưng CÓ side effect: gọi ffmpeg qua `FfmpegVideoAssembler._run_ffmpeg` để cắt
 đoạn thật. Tái dùng đúng `VIDEO_ENCODE_ARGS`/`AUDIO_ENCODE_ARGS`/
 `CONTAINER_ARGS` của `adapters/assembly/ffmpeg_assembler.py` — clip cũng là
 file đem đăng, không có lý do để nó kém hơn video chính.
 
 Mỗi (request, preset) độc lập: một clip lỗi validate hoặc lỗi ffmpeg không
-được làm hỏng các clip khác trong cùng lần chạy `generate_clips` (D1).
+được làm hỏng các clip khác trong cùng lần chạy `generate_clips`.
 """
 
 from __future__ import annotations
@@ -30,13 +30,13 @@ from domain.models import SubtitleCue, SubtitleStyle
 
 logger = logging.getLogger(__name__)
 
-# D5 — nền là chính khung gốc phóng to rồi làm mờ, video gốc căn giữa. Manim
+# Nền là chính khung gốc phóng to rồi làm mờ, video gốc căn giữa. Manim
 # hay đặt công thức ở rìa khung nên crop là mất nội dung.
 VERTICAL_WIDTH = 1080
 VERTICAL_HEIGHT = 1920
 BOXBLUR_STRENGTH = "20:2"
 
-# D6 — style riêng cho clip dọc: xem trên điện thoại, phụ đề phải to hơn hẳn
+# Style riêng cho clip dọc: xem trên điện thoại, phụ đề phải to hơn hẳn
 # và đặt giữa khung, khác hẳn style clip ngang.
 VERTICAL_SUBTITLE_STYLE = SubtitleStyle(font_size="large", position="center")
 VERTICAL_PLAY_RES = (VERTICAL_WIDTH, VERTICAL_HEIGHT)
@@ -53,7 +53,7 @@ def slugify(name: str) -> str:
 
 
 class ClipRequest:
-    """Đối chiếu D3's `ClipRequest{ name, start_seconds, end_seconds,
+    """Tương ứng `ClipRequest{ name, start_seconds, end_seconds,
     presets }` — dựng ở handler từ payload["requests"], một instance ở đây
     ứng với một `(request, preset)` đã tách phẳng."""
 
@@ -68,8 +68,8 @@ class ClipRequest:
 def _shift_and_clamp_cues(
     cues: list[SubtitleCue], effective_start: float, effective_end: float
 ) -> list[SubtitleCue]:
-    """D6 rủi ro: dịch cue về mốc 0 của clip, bỏ cue ngoài khoảng, clamp cue
-    vắt qua biên. Đây là chỗ dễ sai nhất của CR này — test khoá bằng số."""
+    """Dịch cue về mốc 0 của clip, bỏ cue ngoài khoảng, clamp cue vắt qua
+    biên. Đây là chỗ dễ sai nhất của việc sinh clip — test khoá bằng số."""
     duration = effective_end - effective_start
     result: list[SubtitleCue] = []
     for cue in cues:
@@ -129,10 +129,10 @@ def generate_clip(
 
     KHÔNG ném ngoại lệ cho lỗi validate/ffmpeg — cả hai được bắt và trả về
     như một clip status="error", để vòng lặp gọi hàm này tiếp tục với các
-    (request, preset) khác (D1: lỗi sinh clip không chặn publish).
+    (request, preset) khác (lỗi sinh clip không chặn publish).
     """
     name = request.name
-    # D5 rủi ro / CR-023: mốc trong clip_marks là giây trong video Manim gốc,
+    # Mốc trong clip_marks là giây trong video Manim gốc,
     # chưa cộng intro — cộng offset y hệt effective_lead_in của ffmpeg_assembler.
     effective_start = request.start_seconds + intro_duration_seconds
     effective_end = request.end_seconds + intro_duration_seconds

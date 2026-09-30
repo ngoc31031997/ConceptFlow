@@ -4,10 +4,10 @@ from pydantic import BaseModel
 
 
 class OAuthAppResponse(BaseModel):
-    """One configured OAuth client, as offered to the Creator (CR-012 FR29).
+    """One configured OAuth client, as offered to the Creator.
 
     client_secret is deliberately absent — this shape is the only thing
-    that reaches the browser, so the secret cannot leak through it (FR29.5).
+    that reaches the browser, so the secret cannot leak through it.
     """
 
     client_id: str
@@ -26,7 +26,7 @@ class YouTubeAccountResponse(BaseModel):
     client_id: str
     app_label: str
     is_default: bool
-    # CR-015 FR40.2 — a channel connected before force-ssl was requested
+    # A channel connected without the force-ssl scope
     # cannot receive a caption track; surfaced here so the Creator learns
     # that from the channel picker, not from a video that quietly has no CC.
     has_caption_scope: bool = False
@@ -41,8 +41,7 @@ class OAuthCallbackResponse(BaseModel):
 
 
 class OAuthStatusResponse(BaseModel):
-    # `connected` is kept alongside the account list so pre-CR-012 clients
-    # (and the health-check style "is anything set up?" question) keep a
-    # single boolean to read.
+    # `connected` is kept alongside the account list so a caller asking "is
+    # anything set up?" has a single boolean to read.
     connected: bool
     accounts: list[YouTubeAccountResponse] = []

@@ -7,7 +7,7 @@ import (
 )
 
 // NarrationBudgetTolerance is how far a scene's estimated narration may fall
-// outside its beat's budget before the Creator is warned (CR-048 T8). Wider
+// outside its beat's budget before the Creator is warned. Wider
 // than the ±15% the outline prompt allows, because this compares an estimate
 // (words at a speaking rate) with a budget, and the estimate carries its own
 // error.
@@ -15,7 +15,7 @@ const NarrationBudgetTolerance = 0.20
 
 // CheckNarrationBudgets estimates how long each storyboard scene's narration
 // takes to read and compares it with the budget the video format gives that
-// scene's beat (CR-048 T8). It returns one Creator-facing warning per scene
+// scene's beat. It returns one Creator-facing warning per scene
 // that is off by more than NarrationBudgetTolerance, and one per scene whose id
 // is not a beat of the format. Warnings only: the numbers are estimates.
 //

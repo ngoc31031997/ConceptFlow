@@ -1,4 +1,4 @@
-"""Dựng xem trước thật một hình (CR-044). Cần node_modules và một trình duyệt."""
+"""Dựng xem trước thật một hình. Cần node_modules và một trình duyệt."""
 
 import base64
 import os

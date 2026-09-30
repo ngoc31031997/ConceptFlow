@@ -1,15 +1,13 @@
-"""Fixture tham chiếu cho Pha 0 (CR-002 / CR-003) — video dài ~5 phút.
+"""Fixture tham chiếu cho Pha 0 — video dài ~5 phút.
 
-Mục đích: đây là kịch bản chuẩn để đo và nghiệm thu mọi thay đổi của
-CR-002 (đồng bộ timeline) và CR-003 (năng lực render dài). Nó cố ý có:
+Mục đích: kịch bản chuẩn để đo đồng bộ timeline và năng lực render dài.
+Nó cố ý có:
 
-- 20 marker `# NARRATION:` — đủ nhiều để sai số cộng dồn của lỗi
-  đồng bộ hiện tại lộ ra rõ ràng (video 2 scene KHÔNG lộ ra lỗi này,
-  đó là lý do CR-001 để lọt).
-- Nhiều `self.play(...)` dài xen giữa các narration — chính phần thời
-  gian animation này là thứ track audio hiện tại không hề tính đến.
-- Tổng thời lượng ~5 phút, đủ dài để chạm các giới hạn timeout/RAM
-  mà CR-003 phải nới.
+- 20 marker `# NARRATION:` — đủ nhiều để sai số đồng bộ cộng dồn lộ ra
+  rõ ràng (video 2 scene không lộ ra loại lỗi này).
+- Nhiều `self.play(...)` dài xen giữa các narration — phần thời gian
+  animation mà việc cộng dồn thời lượng narration bỏ qua.
+- Tổng thời lượng ~5 phút, đủ dài để chạm các giới hạn timeout/RAM.
 
 Chạy qua pipeline thật: dán nội dung file này vào Web GUI.
 Chạy để benchmark trực tiếp: dùng tests/benchmark_render.py.

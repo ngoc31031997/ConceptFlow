@@ -8,14 +8,14 @@ import (
 	"authoring/internal/domain"
 )
 
-// AuthoringStoryPort persists CR-025 step 1's pasted story outline, and from
-// CR-027 D0 the topic it was written from.
+// AuthoringStoryPort persists step 1's pasted story outline and the topic it
+// was written from.
 type AuthoringStoryPort interface {
 	SaveAuthoringStory(ctx context.Context, projectID, content, topic string) error
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 }
 
-// AuthoringLockPort is the CR-028 FR84.2 precondition every authoring save
+// AuthoringLockPort is the precondition every authoring save
 // shares: writes are unrestricted while the project is still status=draft,
 // and refused once render has started.
 type AuthoringLockPort interface {
@@ -39,9 +39,9 @@ type AuthoringClearerPort interface {
 	ClearAuthoringSteps(ctx context.Context, projectID string, steps ...AuthoringStep) error
 }
 
-// checkAuthoringUnlocked is the FR84.2 precondition shared by all four
+// checkAuthoringUnlocked is the precondition shared by all four
 // SaveAuthoring*UseCase.Execute methods: a project that does not exist yet
-// cannot have its authoring edited (CR-028 requires POST /v1/projects
+// cannot have its authoring edited (POST /v1/projects comes
 // first), and one that has already started rendering is locked so the
 // script that got rendered cannot silently change under it.
 func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projectID string) error {
@@ -58,9 +58,9 @@ func checkAuthoringUnlocked(ctx context.Context, locks AuthoringLockPort, projec
 }
 
 // SaveAuthoringStoryUseCase stores the Story Architect output a Creator
-// pasted back after the external-AI round trip (CR-025 step 1). It performs
+// pasted back after the external-AI round trip (step 1). It performs
 // no saga/state-machine transition by itself — same "just persist intent"
-// posture as the CR-007 clip-selection endpoint — later pipeline steps read
+// posture as the clip-selection endpoint — later pipeline steps read
 // it back via {{previous_output}}.
 type SaveAuthoringStoryUseCase struct {
 	authoring AuthoringStoryPort
@@ -75,7 +75,7 @@ func NewSaveAuthoringStoryUseCase(authoring AuthoringStoryPort, locks AuthoringL
 // Execute saves the outline and, when one is supplied, the topic. topic is
 // deliberately NOT required: the outline is what this step exists to store,
 // and refusing to save it because a topic is missing would break every
-// pre-CR-027 caller for a field they do not know about.
+// caller that does not send one.
 func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, content, topic string) error {
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
@@ -99,14 +99,14 @@ func (uc *SaveAuthoringStoryUseCase) Execute(ctx context.Context, projectID, con
 	return uc.clearer.ClearAuthoringSteps(ctx, projectID, AuthoringStepStoryboard, AuthoringStepCode)
 }
 
-// AuthoringStoryboardPort persists CR-025 step 2's pasted storyboard.
+// AuthoringStoryboardPort persists step 2's pasted storyboard.
 type AuthoringStoryboardPort interface {
 	SaveAuthoringStoryboard(ctx context.Context, projectID, content string) error
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 }
 
 // SaveAuthoringStoryboardUseCase stores the Visual Director output a Creator
-// pasted back after the external-AI round trip (CR-025 step 2) — same
+// pasted back after the external-AI round trip (step 2) — same
 // "just persist intent" posture as SaveAuthoringStoryUseCase.
 type SaveAuthoringStoryboardUseCase struct {
 	authoring AuthoringStoryboardPort
@@ -141,14 +141,14 @@ func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID
 	return uc.clearer.ClearAuthoringSteps(ctx, projectID, AuthoringStepCode)
 }
 
-// AuthoringCodePort persists CR-025 step 3's pasted Manim code.
+// AuthoringCodePort persists step 3's pasted Manim code.
 type AuthoringCodePort interface {
 	SaveAuthoringCode(ctx context.Context, projectID, content string) error
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
 }
 
 // SaveAuthoringCodeUseCase stores the Manim Engineer output a Creator pasted
-// back after the external-AI round trip (CR-025 step 3) — same "just persist
+// back after the external-AI round trip (step 3) — same "just persist
 // intent" posture as SaveAuthoringStoryUseCase/SaveAuthoringStoryboardUseCase.
 type SaveAuthoringCodeUseCase struct {
 	authoring AuthoringCodePort
@@ -182,7 +182,7 @@ func (uc *SaveAuthoringCodeUseCase) Execute(ctx context.Context, projectID, cont
 // client-side draft state.
 type AuthoringStateReaderPort interface {
 	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
-	// GetAuthoringMode returns "" for a project saved before CR-027 FR79, or
+	// GetAuthoringMode returns "" for a project with no stored mode, or
 	// one whose Creator never touched the choice. Execute turns that into the
 	// default rather than leaking an empty third value to the GUI.
 	GetAuthoringMode(ctx context.Context, projectID string) (string, error)
@@ -198,7 +198,7 @@ type AuthoringStateReaderPort interface {
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
 // pipeline output saved so far, empty string when a step has not been saved.
 type AuthoringState struct {
-	// Mode is CR-027 FR79's step-1 working mode, always either "manual" or
+	// Mode is the step-1 working mode, always either "manual" or
 	// "ai" — never "".
 	Mode       string
 	Topic      string
@@ -211,7 +211,7 @@ type AuthoringState struct {
 	Models domain.AuthoringStepModels
 }
 
-// GetAuthoringStateUseCase backs the read side of CR-025's authoring pipeline.
+// GetAuthoringStateUseCase backs the read side of the authoring pipeline.
 type GetAuthoringStateUseCase struct {
 	authoring AuthoringStateReaderPort
 }
@@ -251,13 +251,13 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	}, nil
 }
 
-// AuthoringModePort persists CR-027 FR79's step-1 working mode.
+// AuthoringModePort persists the step-1 working mode.
 type AuthoringModePort interface {
 	SaveAuthoringMode(ctx context.Context, projectID, mode string) error
 }
 
 // SaveAuthoringModeUseCase stores how the Creator is working step 1 — copy the
-// prompts out by hand, or let the server call the provider (CR-027 FR79).
+// prompts out by hand, or let the server call the provider.
 //
 // Server-side because the choice covers all four tabs and a project can be
 // picked up again on any of them: another browser, another machine, or after
@@ -289,8 +289,7 @@ func (uc *SaveAuthoringModeUseCase) Execute(ctx context.Context, projectID, mode
 	return uc.authoring.SaveAuthoringMode(ctx, projectID, mode)
 }
 
-// AuthoringModelsPort persists the per-step Hive model choice — the
-// model-per-step follow-up to CR-027's FR79 mode switch.
+// AuthoringModelsPort persists the per-step Hive model choice.
 type AuthoringModelsPort interface {
 	SaveAuthoringModels(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
 }
@@ -329,7 +328,7 @@ func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID str
 	return uc.authoring.SaveAuthoringModels(ctx, projectID, models)
 }
 
-// SimilarProject is one match CR-028 FR85 surfaces back to the Creator when a
+// SimilarProject is one match the topic-collision check surfaces back to the Creator when a
 // topic collides (after normalization) with another project's saved topic in
 // the same content language. Status is not known to authoring-service — the
 // orchestrator, which owns projects, fills it in.
@@ -347,7 +346,7 @@ type AuthoringSummary struct {
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
-	// IllustrationsReady (CR-051): the drawing list is planned and every drawing
+	// IllustrationsReady: the drawing list is planned and every drawing
 	// approved or skipped — what the code step's gate asks. Engine-agnostic; the
 	// orchestrator only reads it for a Remotion project.
 	IllustrationsReady bool `json:"illustrations_ready"`

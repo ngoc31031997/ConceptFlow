@@ -40,7 +40,7 @@ interface Props {
 }
 
 /**
- * CR-044 — sao lưu và khôi phục thư viện hình. Xuất: một file ZIP gồm mọi thư
+ * Sao lưu và khôi phục thư viện hình. Xuất: một file ZIP gồm mọi thư
  * mục và mọi hình tự vẽ (code, ảnh PNG, GIF, thẻ, trạng thái duyệt). Nhập: mỗi
  * hình về đúng thư mục của nó; thư mục thiếu được tạo lại. Hình có sẵn của hệ
  * thống không nằm trong file: chúng đi kèm phần mềm.

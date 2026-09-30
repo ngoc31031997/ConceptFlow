@@ -1,4 +1,4 @@
-"""CR-051: the 14-step flow is defined three times and must say the same thing.
+"""The 14-step flow is defined three times and must say the same thing.
 
 authoring-service and orchestrator each carry domain/flow.go (separate Go
 modules, separate Docker build contexts — ADR-0001/ADR-0029), and the web-gui

@@ -41,7 +41,7 @@ describe('routes/auth', () => {
     );
   });
 
-  // CR-012: the multi-channel surface.
+  // The multi-channel surface.
   test.each([
     ['get', '/v1/auth/youtube/apps', 'GET'],
     ['get', '/v1/auth/youtube/accounts', 'GET'],

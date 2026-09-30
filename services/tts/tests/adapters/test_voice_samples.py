@@ -1,4 +1,4 @@
-"""Unit tests for the startup preview clips (CR-001 FR4.5, CR-011 follow-up)."""
+"""Unit tests for the startup preview clips."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ def test_previews_for_no_longer_offered_voices_are_deleted(shared):
     """The clip on disk for an unconfigured Azure voice was made by the Edge
     fallback. Keeping it would mean that adding AZURE_SPEECH_KEY later never
     regenerates it — the Azure preview would play Edge audio for good. The same
-    sweep clears the Piper clips ADR-0024 left behind."""
+    sweep clears clips of any voice not in the catalog."""
     shared.mkdir(parents=True)
     (shared / "azure:vi-VN-HoaiMyNeural.wav").write_bytes(b"edge audio")
     (shared / "vi_VN-vais1000-medium.wav").write_bytes(b"piper audio")

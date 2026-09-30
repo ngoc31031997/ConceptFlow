@@ -9,7 +9,7 @@ const WARNINGS: apiClient.CodeDiagnostic[] = [
   { message: "[S19] hình có mặt nhưng không có chuyển động tự thân nào", line: null },
 ];
 
-describe("StyleWarnings (CR-045)", () => {
+describe("StyleWarnings", () => {
   beforeEach(() => {
     resetStyleRuleNamesCache();
     vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({

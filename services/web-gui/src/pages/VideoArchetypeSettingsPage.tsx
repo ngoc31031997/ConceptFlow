@@ -16,7 +16,7 @@ import styles from "./PromptSettingsPage.module.css";
 const NEW_ROW = "new";
 
 /**
- * CR-041 — bảng kiểu video. Prompt Biên kịch đọc bảng này (biến
+ * Bảng kiểu video. Prompt Biên kịch đọc bảng này (biến
  * `{{video_archetypes}}`): mỗi dòng là một kiểu để model chọn, kèm playbook nói
  * cách gán kiểu đó vào các beat của format.
  *

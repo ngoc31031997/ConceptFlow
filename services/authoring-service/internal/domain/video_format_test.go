@@ -21,7 +21,7 @@ func TestValidateBeats_AcceptsAWellFormedScript(t *testing.T) {
 
 func TestValidateBeats_BlocksOnMissingRequiredBeat(t *testing.T) {
 	// Beat bắt buộc thiếu là một dữ kiện chắc chắn, không phải ước lượng — nên
-	// chặn được (FR52.5).
+	// chặn được.
 	issues := FormatVisualFirst7Min.ValidateBeats(occurrences(
 		0, "hook", 1, "pattern", 5, "recap", 8, "cta",
 	))

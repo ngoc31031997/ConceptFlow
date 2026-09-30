@@ -1,8 +1,8 @@
 """AssembleVideoUseCase — business-logic-model.md.
 
-Unlike Unit 2/3/4/5, there is no separate "batch" wrapper — assemble_video
-is already a single operation over an entire project (Low-Level Design
-Question 10), so this one use case is the whole application layer.
+There is no separate "batch" wrapper — assemble_video is already a single
+operation over an entire project, so this one use case is the whole
+application layer.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ class AssembleVideoUseCase:
         if not file_exists(request.video_path):
             raise MissingArtifactError(f"missing video {request.video_path}")
 
-        # An empty narration_segments list is valid since CR-001: the Creator
+        # An empty narration_segments list is valid: the Creator
         # can disable narration, producing a silent video (or one with
         # background music only).
         for segment in request.narration_segments:

@@ -1,4 +1,4 @@
-"""ChannelAssetsRepository — persistence for `channel_assets` (CR-023 D1).
+"""ChannelAssetsRepository — persistence for `channel_assets`.
 
 Like InboxRepository/OutboxRepository, this is a thin, concrete asyncpg
 wrapper (module-structure.md's persistence convention for this service) —
@@ -61,7 +61,7 @@ class ChannelAssetsRepository:
         music_source_hash: str | None = None,
     ) -> ChannelAsset:
         """Supersedes whatever was active for (kind, render_quality) and
-        inserts the new row as the next version (FR65.9) — must be called
+        inserts the new row as the next version — must be called
         with the same connection/transaction as the caller's Inbox/Outbox
         writes, so all three commit atomically (ADR-0013), the same
         discipline OutboxRepository.enqueue() already documents.

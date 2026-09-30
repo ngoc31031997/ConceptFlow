@@ -104,11 +104,11 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           )}
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
           <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
-          {/* CR-025 — admin entry to edit the authoring pipeline's prompt wording. */}
+          {/* Admin entry to edit the authoring pipeline's prompt wording. */}
           <NavLink to="/settings/prompts" className={navCls}>Cài đặt prompt</NavLink>
-          {/* CR-041 — the table of video kinds the Story Architect chooses from. */}
+          {/* The table of video kinds the Story Architect chooses from. */}
           <NavLink to="/settings/video-archetypes" className={navCls}>Kiểu video</NavLink>
-          {/* CR-044 — the illustration library the Remotion Engineer draws from. */}
+          {/* The illustration library the Remotion Engineer draws from. */}
           <NavLink to="/settings/illustrations" className={navCls}>Thư viện hình</NavLink>
         </nav>
       </aside>

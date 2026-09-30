@@ -117,7 +117,7 @@ def test_start_requires_an_app_when_several_are_configured():
 
 def test_start_reports_a_missing_redirect_uri_instead_of_bouncing_to_google():
     """Google's own redirect_uri_mismatch page names neither the client nor
-    the URI to add, so this must be caught first (CR-012 FR30.2)."""
+    the URI to add, so this must be caught first."""
     broken = make_app(redirect_uris=("http://localhost:3000/",))
     client, _, _ = _build_client(registry=FakeOAuthAppRegistry([broken]))
 
@@ -175,7 +175,7 @@ def test_callback_failure_returns_400():
 
 def test_callback_rejects_a_state_this_server_never_issued():
     """Without this, a forged callback could attach an attacker's channel to
-    the Creator's installation (CR-012 FR33.2)."""
+    the Creator's installation."""
     from adapters.youtube.oauth_state import encode_state
 
     client, _, _ = _build_client()
@@ -230,7 +230,7 @@ def test_accounts_endpoint_labels_a_channel_whose_client_is_gone():
 
 
 def test_accounts_endpoint_flags_caption_scope(monkeypatch):
-    """CR-015 FR40.2: the Creator learns a channel needs reconnecting from
+    """The Creator learns a channel needs reconnecting from
     the channel picker, not from a video that quietly has no CC."""
     from adapters.youtube.oauth_flow import YOUTUBE_FORCE_SSL_SCOPE
 

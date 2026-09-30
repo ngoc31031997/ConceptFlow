@@ -38,13 +38,13 @@ function main() {
   //
   // TEMPORARY: timeoutMs 0 = no gateway timeout, so heavy system prompts can
   // wait on Hive as long as needed (pairs with HIVE_TIMEOUT_SECONDS=0).
-  // Previously 200s, not 130s: CR-027's authoring-generate route sits behind this client
-  // and the orchestrator's own HIVE_TIMEOUT_SECONDS defaults to 180. A gateway
+  // With a finite timeout, it must outlast the orchestrator's own
+  // HIVE_TIMEOUT_SECONDS (default 180) for the authoring-generate route: a gateway
   // that gave up first would show the Creator a timeout for a call that was
   // still going to succeed, after the tokens were already billed.
   const orchestratorClient = createHttpClient(config.orchestratorUrl);
   const orchestratorAiClient = createHttpClient(config.orchestratorUrl, { timeoutMs: 0 });
-  // CR-040 FR111: prompts and the authoring chain are served by authoring-service.
+  // Prompts and the authoring chain are served by authoring-service.
   const authoringClient = createHttpClient(config.authoringServiceUrl);
   const authoringAiClient = createHttpClient(config.authoringServiceUrl, { timeoutMs: 0 });
   const publisherClient = createHttpClient(config.publisherUrl);

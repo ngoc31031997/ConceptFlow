@@ -1,4 +1,4 @@
-"""HTTP surface of the Rendering service — only the compile check (CR-039 FR104).
+"""HTTP surface of the Rendering service — only the compile check.
 
 The service is otherwise a message consumer. This runs inside the same
 process and event loop, so the checks take a semaphore: a Manim dry run is
@@ -34,7 +34,7 @@ class IllustrationBody(BaseModel):
 
 
 class SubtitleBandBody(BaseModel):
-    """CR-048 T6b: the strip burned-in subtitles cover, measured from the frame edge."""
+    """The strip burned-in subtitles cover, measured from the frame edge."""
     edge: Literal["top", "bottom"]
     px: int
 
@@ -42,7 +42,7 @@ class SubtitleBandBody(BaseModel):
 class CheckBody(BaseModel):
     code: str
     scene_class_name: str = ""
-    # CR-048 T6b — for the layout check (Remotion only). No band = nothing is
+    # For the layout check (Remotion only). No band = nothing is
     # burned into the frame; no font = the Stage's default.
     subtitle_band: SubtitleBandBody | None = None
     video_font: str = ""
@@ -121,7 +121,7 @@ def create_check_app(
     async def check_manim(body: CheckBody):
         return await run("manim", body)
 
-    # CR-044: xem trước một hình của thư viện minh hoạ. Hàng đợi riêng, một
+    # Xem trước một hình của thư viện minh hoạ. Hàng đợi riêng, một
     # yêu cầu một lúc — bộ dựng xem trước chỉ mở một tab trình duyệt.
     preview_gate = asyncio.Semaphore(1)
 

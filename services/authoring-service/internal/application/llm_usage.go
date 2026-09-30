@@ -7,7 +7,7 @@ import (
 )
 
 // LLMUsageRecord is one row of llm_usage: what a single call to a language
-// model cost (CR-027 FR82.1). Failed calls are recorded too — a truncated
+// model cost. Failed calls are recorded too — a truncated
 // answer is billed like any other.
 type LLMUsageRecord struct {
 	Provider string
@@ -17,18 +17,18 @@ type LLMUsageRecord struct {
 	// no pipeline step, such as suggest-metadata.
 	Role string
 	Step string
-	// Phase breaks one step into its calls (CR-039): "layout", "cast",
+	// Phase breaks one step into its calls: "layout", "cast",
 	// "chunk", "repair", "storyboard_fix". Empty when the step is one call.
 	Phase string
 	// ProjectID is empty for calls made before any project exists — a
-	// Creator can draft a short script from nothing (CR-026 FR71.1).
+	// Creator can draft a short script from nothing.
 	ProjectID        string
 	PromptTokens     int
 	CompletionTokens int
 	ReasoningTokens  int
 	CachedTokens     int
-	ReasoningChars   int  // CR-056, see TokenUsage
-	UsageMissing     bool // CR-056, see TokenUsage; stored as usage_reported = NOT UsageMissing
+	ReasoningChars   int  // see TokenUsage
+	UsageMissing     bool // see TokenUsage; stored as usage_reported = NOT UsageMissing
 	Duration         time.Duration
 	OK               bool
 	ErrorKind        LLMErrorKind
@@ -40,7 +40,7 @@ type LLMUsagePort interface {
 }
 
 // ModelUsageStats is what one model's calls of one step phase cost, over a
-// window (CR-050 FR-19): shown next to the code step's model picker so the
+// window: shown next to the code step's model picker so the
 // Creator picks with the measured numbers in view. Averages are over the
 // successful calls; Failures counts the failed ones by error kind.
 type ModelUsageStats struct {
@@ -58,7 +58,7 @@ type LLMUsageStatsPort interface {
 }
 
 // LLMUsageRecorder wraps the port so that measurement can never break the
-// feature it measures (CR-027 FR82.5).
+// feature it measures.
 //
 // A failed insert is logged and dropped. The alternative — returning the
 // error to the caller — would mean a Creator whose draft came back perfectly

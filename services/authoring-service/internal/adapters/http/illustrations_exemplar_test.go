@@ -13,7 +13,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-052 — delete refusals, the Hình mẫu routes and the style endpoint.
+// Delete refusals, the Hình mẫu routes and the style endpoint.
 type fakeExemplars struct {
 	illustrationsUseCase
 	deleteErr error

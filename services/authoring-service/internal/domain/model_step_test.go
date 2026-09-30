@@ -2,7 +2,7 @@ package domain
 
 import "testing"
 
-// CR-050 FR-19: the code step and the drawings refuse the local Ollama model.
+// The code step and the drawings refuse the local Ollama model.
 func TestModelAllowedForStep(t *testing.T) {
 	cases := []struct {
 		step, model string

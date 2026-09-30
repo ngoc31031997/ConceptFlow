@@ -5,7 +5,7 @@ export interface RenderInput {
   background_music_path?: string;
   tts_enabled: boolean;
   voice_id?: string;
-  /** CR-015 — "off" | "track" | "burn_in" | "both" (ADR-0027). */
+  /** "off" | "track" | "burn_in" | "both" (ADR-0027). */
   subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
@@ -15,14 +15,14 @@ export interface RenderInput {
   video_font?: string;
   video_format_id?: string;
   background_music_volume?: number;
-  /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
+  /** "long" | "short" | "both" — empty means "long". */
   video_output_mode?: "long" | "short" | "both";
-  /** CR-026 D1 — links this project to another covering the same topic. */
+  /** Links this project to another covering the same topic. */
   companion_project_id?: string;
   /**
-   * CR-024 cổng duyệt dàn ý; bỏ trống thì server hiểu là bật.
+   * Cổng duyệt dàn ý; bỏ trống thì server hiểu là bật.
    *
-   * CR-031 — bước 4 (Validate) CHÍNH LÀ cổng đó: nó là màn hình Creator dừng
+   * Bước 4 (Validate) CHÍNH LÀ cổng đó: nó là màn hình Creator dừng
    * lại để xem dàn ý và cảnh báo trước khi tốn TTS/render. Tắt cổng nghĩa là
    * bước 4 không có gì để dừng và saga chạy thẳng sang bước 5, nên nơi nào
    * nộp saga từ wizard đều gửi `true` tường minh thay vì dựa vào mặc định.
@@ -57,7 +57,7 @@ export interface Voice {
 export interface Scene {
   scene_index: number;
   narration_text: string;
-  /** CR-024 FR68.5 — khung hình lúc câu này được nói, dạng "Text×2, Arrow". */
+  /** Khung hình lúc câu này được nói, dạng "Text×2, Arrow". */
   visual?: string;
   duration_seconds?: number;
   audio_path?: string;
@@ -78,7 +78,7 @@ export interface Project {
   /** Project mà bản này được tạo từ đó (fork); vắng mặt nếu không phải bản fork. */
   forked_from?: string;
   /**
-   * The project's content language. The wire name is historical (CR-008 §C2):
+   * The project's content language. The wire name is historical:
    * it now drives subtitles, metadata and prompts, not just the TTS voice.
    */
   voice_language: "vi" | "en";
@@ -87,19 +87,18 @@ export interface Project {
   youtube_video_url?: string;
   error_message?: string;
   /**
-   * CR-015 FR39.4 — absent when no caption track was requested; otherwise
+   * Absent when no caption track was requested; otherwise
    * "uploaded" | "skipped_no_scope" | "failed". A skipped/failed caption
    * would otherwise be invisible (the video itself published fine).
    */
   caption_status?: string;
-  /** CR-024 — dữ liệu dựng màn duyệt dàn ý; chỉ có mặt khi cổng duyệt bật. */
+  /** Dữ liệu dựng màn duyệt dàn ý; chỉ có mặt khi cổng duyệt bật. */
   review_enabled?: boolean;
   beats?: BeatOccurrence[];
   validation_warnings?: string[];
   /**
    * Đủ dữ liệu để gọi lại `startRenderSaga` cho ĐÚNG project_id này ở một
-   * `render_quality` khác (bug report: "cho phép render lại chất lượng cao
-   * hơn khi chốt final"). Không optional theo nghĩa "có thể thiếu dữ liệu" —
+   * `render_quality` khác (render lại chất lượng cao hơn khi chốt final). Không optional theo nghĩa "có thể thiếu dữ liệu" —
    * orchestrator luôn trả các trường này — nhưng đánh dấu optional vì test cũ
    * dựng `Project` tối giản không cần khai báo hết.
    */
@@ -116,15 +115,15 @@ export interface Project {
   /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
   video_font?: string;
   video_format_id?: string;
-  /** "long" | "short" | "both" (CR-007 follow-up) — empty means "long". */
+  /** "long" | "short" | "both" — empty means "long". */
   video_output_mode?: "long" | "short" | "both";
   /** Kết quả generate_clips, nếu saga đã chạy tới bước đó. */
   clips?: Clip[];
-  /** CR-026 D1 — id của project cùng chủ đề (bản dài/bản ngắn kia), nếu có. */
+  /** Id của project cùng chủ đề (bản dài/bản ngắn kia), nếu có. */
   companion_project_id?: string;
 }
 
-/** Một clip dọc Shorts/TikTok cắt từ video 16:9 đã render (CR-007 D7). */
+/** Một clip dọc Shorts/TikTok cắt từ video 16:9 đã render. */
 export interface Clip {
   name: string;
   preset: "short" | "long";
@@ -147,7 +146,7 @@ export interface ProgressMessage {
   scene_index?: number;
   scene_total?: number;
   /**
-   * Heartbeat from a long render (CR-003 FR11.4). Carries no percentage on
+   * Heartbeat from a long render. Carries no percentage on
    * purpose: Manim gives no reliable total animation count, and a fabricated
    * percentage that stalls or jumps backwards is worse than an honest clock.
    */
@@ -157,7 +156,7 @@ export interface ProgressMessage {
   render_percent?: number;
   /** 0-100, assemble_video: ffmpeg's own -progress position over the target length. */
   merge_percent?: number;
-  // CR-029: generate_clips reports by clip cut.
+  // generate_clips reports by clip cut.
   clip_index?: number;
   clip_total?: number;
   error_message?: string;
@@ -177,7 +176,7 @@ export interface PublishMetadata {
 /**
  * One configured OAuth client = one GCP project = one quota bucket
  * (~6 uploads/day). Adding a client_secret file raises that ceiling;
- * connecting more channels to the same client does not (CR-012, ADR-0026).
+ * connecting more channels to the same client does not (see ADR-0026).
  */
 export interface YoutubeApp {
   client_id: string;
@@ -197,7 +196,7 @@ export interface YoutubeAccount {
   app_label: string;
   is_default: boolean;
   /**
-   * CR-015 FR40.2 — false for a channel connected before force-ssl was
+   * False for a channel connected before force-ssl was
    * requested. Publishing still works; only the caption track is skipped.
    */
   has_caption_scope: boolean;
@@ -224,17 +223,17 @@ export interface ProjectSummary {
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   forked_from?: string;
-  /** Tên dự án nguồn — có thể nằm ở trang khác (CR-054). */
+  /** Tên dự án nguồn — có thể nằm ở trang khác. */
   forked_from_topic?: string;
 }
 
-/** Nhóm lọc của danh sách video (CR-054: lọc ở server). */
+/** Nhóm lọc của danh sách video (lọc ở server). */
 export type ProjectListFilter = "all" | "running" | "waiting" | "problem" | "done";
 
 /** Số dự án trong từng nhóm lọc, tính trên toàn bộ danh sách. */
 export type ProjectListCounts = Record<ProjectListFilter, number>;
 
-/** Một trang của GET /v1/projects?page=… (CR-054). */
+/** Một trang của GET /v1/projects?page=…. */
 export interface ProjectPage {
   projects: ProjectSummary[];
   /** Số dự án sau khi lọc. */
@@ -246,7 +245,7 @@ export interface ProjectPage {
 }
 
 
-/** Một beat trong hình dạng video (CR-019 FR51). */
+/** Một beat trong hình dạng video. */
 export interface FormatBeat {
   id: string;
   role: string;
@@ -261,7 +260,7 @@ export interface FormatBeat {
  *
  * Là dữ liệu chứ không phải hằng số trong mã nguồn: beat nào một chủ đề cần thì
  * thay đổi rất nhiều, nên một bộ beat cố định sẽ sai ngay ở chủ đề đầu tiên
- * không vừa khuôn. Creator nhân bản rồi sửa (FR51.5).
+ * không vừa khuôn. Creator nhân bản rồi sửa.
  */
 export interface VideoFormat {
   id: string;

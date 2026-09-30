@@ -34,7 +34,7 @@ const SAGA_FLOW_STEP: Record<string, number> = {
  * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chạy sau khi Creator
  * duyệt dàn ý ở bước 8.
  *
- * CR-031 — màn này từng ôm cả lượt chạy thử kịch bản lẫn cổng duyệt dàn ý.
+ * Màn này từng ôm cả lượt chạy thử kịch bản lẫn cổng duyệt dàn ý.
  * Cả hai đã sang bước 7/8 (ValidatePage), nên ở đây không còn nhánh nào dừng
  * chờ người: mọi thứ từ lúc này tới `ready_to_publish` đều tự chạy, và việc
  * duy nhất của trang là cho thấy nó chạy tới đâu.

@@ -31,10 +31,10 @@ CREATE TABLE IF NOT EXISTS processed_messages (
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- CR-023 D1 — the channel's fixed intro/outro. Keyed by (kind, render_quality);
+-- The channel's fixed intro/outro. Keyed by (kind, render_quality);
 -- `superseded_at IS NULL` marks the currently active row for that pair, and a
 -- new version is inserted (never updated in place) so a version history stays
--- around for the FR65.9 version counter. duration_seconds is ffprobe's
+-- around for the version counter. duration_seconds is ffprobe's
 -- measured length of video_path, kept here so assemble_video.py never has to
 -- probe it again per project.
 CREATE TABLE IF NOT EXISTS channel_assets (
@@ -53,8 +53,8 @@ CREATE TABLE IF NOT EXISTS channel_assets (
 CREATE INDEX IF NOT EXISTS idx_channel_assets_active
     ON channel_assets (kind, render_quality) WHERE superseded_at IS NULL;
 
--- CR-023 FR66.5 — the music bed is uploaded separately from the clip, so the
--- FR65.6 "same source, don't rebuild" cache needs its own hash: source_hash
+-- The music bed is uploaded separately from the clip, so the
+-- "same source, don't rebuild" cache needs its own hash: source_hash
 -- stays the hash of the VIDEO source, music_source_hash is the hash of the
 -- music file muxed into it. Sharing one column would make the next video
 -- upload compare against a music hash and rebuild (or skip) wrongly.

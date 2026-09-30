@@ -29,8 +29,7 @@ function renderResume(flowStep: number, renderEngine: "manim" | "remotion") {
   );
 }
 
-// CR-051: the resume target was capped at 5 — Code in the 13-step flow — so
-// after CR-046 a draft standing at Code (6) reopened on Hình minh hoạ.
+// A draft standing at Code (6) must reopen on Code, not on Hình minh hoạ.
 describe("ResumeProjectPage mở lại đúng bước server báo", () => {
   afterEach(() => vi.restoreAllMocks());
 

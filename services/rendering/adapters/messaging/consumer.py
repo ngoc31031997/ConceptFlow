@@ -143,7 +143,7 @@ class RenderScriptCommandHandler:
 
 
 class ValidateScriptCommandHandler:
-    """Cổng kiểm tra trước TTS (CR-020 FR56).
+    """Cổng kiểm tra trước TTS.
 
     Lượt dry là một subprocess Manim, nên cũng phải chạy qua `to_thread` như
     lượt render thật — nếu không nó khoá event loop và bỏ đói heartbeat của
@@ -184,7 +184,7 @@ class ValidateScriptCommandHandler:
             request = ScriptRenderRequest(
                 project_id=project_id,
                 script_content=payload["script_content"],
-                # CR-040 FR110: rỗng nghĩa là để use case tự tìm trong script.
+                # Rỗng nghĩa là để use case tự tìm trong script.
                 scene_class_name=payload.get("scene_class_name", ""),
                 # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
                 narration_segments=[],
@@ -225,9 +225,9 @@ class ValidateScriptCommandHandler:
 
 
 class RenderChannelAssetCommandHandler:
-    """Dựng intro/outro cố định của kênh (CR-023 D3).
+    """Dựng intro/outro cố định của kênh.
 
-    Đồng bộ, không qua queue riêng như `validate_script` (CR-020): cùng lý do
+    Đồng bộ, không qua queue riêng như `validate_script`: cùng lý do
     — đây không phải việc chạy trong project pipeline. Vẫn dùng
     `asyncio.to_thread`: Manim là một subprocess có thể chạy hàng chục giây,
     và chạy trực tiếp trên coroutine này sẽ khoá event loop, bỏ đói heartbeat
@@ -294,11 +294,11 @@ class RenderChannelAssetCommandHandler:
 
 
 class RenderingCommandDispatcher:
-    """Một queue, ba lệnh (CR-020, CR-023).
+    """Một queue, ba lệnh.
 
     `rendering.commands` mang `validate_script` (lượt dry, trước TTS),
-    `render_scenes` (lượt thật, sau TTS), và giờ thêm `render_channel_asset`
-    (dựng intro/outro cố định của kênh — CR-023 D3). Dùng chung một queue thay
+    `render_scenes` (lượt thật, sau TTS) và `render_channel_asset`
+    (dựng intro/outro cố định của kênh). Dùng chung một queue thay
     vì mở queue riêng vì cả ba đều là công việc của cùng service, cùng cần
     Manim, và cùng phải xếp hàng sau nhau — nhiều queue chỉ tạo ra khả năng
     chúng chạy song song và tranh nhau CPU của cùng một container.
@@ -362,6 +362,6 @@ class RenderingCommandDispatcher:
             logger.exception("Lệnh %r thất bại ngoài dự kiến, chuyển sang DLQ (không tự thử lại)", command)
             # requeue=False: dead-letter thẳng sang *.commands.dlq, nơi
             # Orchestrator đánh dấu bước thất bại để Creator tự bấm thử lại.
-            # Requeue trước đây lặp vô hạn (không backoff) tới TTL 24h, và
-            # chạy lại một lệnh tốn vài phút mà Creator không hề biết.
+            # Requeue sẽ lặp vô hạn (không backoff) tới TTL 24h, chạy lại một
+            # lệnh tốn vài phút mà Creator không hề biết.
             await message.reject(requeue=False)

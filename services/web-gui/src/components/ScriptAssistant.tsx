@@ -23,7 +23,7 @@ function CopyIcon() {
  * một prompt yêu cầu AI sửa nó cho khớp quy ước hệ thống. Nó CHỈ sinh prompt —
  * kết quả được dán vào ô soạn thảo của tab 1c, không phải vào đây.
  *
- * CR-031 — trước đây component này còn một nhánh "ready" chỉ gồm một đoạn
+ * Trước đây component này còn một nhánh "ready" chỉ gồm một đoạn
  * hướng dẫn và nút script mẫu, dùng ở màn "/" cũ. Màn đó giờ chỉ còn chọn
  * tình huống, và cả hai thứ kia đã về tab 1c (nơi ô soạn thảo thật sự nằm),
  * nên nhánh đó không còn ai gọi.
@@ -32,7 +32,7 @@ export function ScriptAssistant({ contentLanguage, renderEngine }: ScriptAssista
   const [existingScript, setExistingScript] = useState("");
   const [copied, setCopied] = useState(false);
 
-  // CR-040 FR113: the "fix my existing code" prompt is a library role rendered by
+  // The "fix my existing code" prompt is a library role rendered by
   // the server; the pasted script travels as data and is never re-expanded.
   const rendered = useRenderedPrompt({
     role: renderEngine === "remotion" ? "remotion_adjust" : "manim_adjust",

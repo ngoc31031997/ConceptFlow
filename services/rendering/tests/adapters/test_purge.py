@@ -1,4 +1,4 @@
-"""purge_project_artifacts (CR-040 FR114.2)."""
+"""purge_project_artifacts."""
 
 from __future__ import annotations
 

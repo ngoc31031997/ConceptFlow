@@ -6,11 +6,9 @@ interface StatusBadgeProps {
 }
 
 /**
- * The one status-color vocabulary in the app (UX review #3) — VideoListPage
- * used to be the only page with this badge; RenderPage/ResultPage each
- * re-invented their own status visual (spinner text, colored card border)
- * instead of reusing it, so the same underlying status ("failed",
- * "processing", "done") looked different depending which page you were on.
+ * The one status-color vocabulary in the app: every page shows a status
+ * ("failed", "processing", "done") with this badge, so the same status looks
+ * the same everywhere.
  */
 function badgeClassFor(status: string): string {
   if (status.startsWith("failed_at_")) return glass.badgeFailed;

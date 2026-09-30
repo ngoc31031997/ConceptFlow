@@ -17,7 +17,7 @@ var (
 	ErrPromptReadOnly = errors.New("system prompt is read-only")
 )
 
-// PromptPort is the persistence capability the prompt library needs (CR-031).
+// PromptPort is the persistence capability the prompt library needs.
 type PromptPort interface {
 	// GetActive returns the row the pipeline should render for a role: the
 	// active one, else the role's system row.
@@ -35,7 +35,7 @@ type PromptPort interface {
 }
 
 // PromptsUseCase backs the prompt library: a list of prompts per role, one of
-// them active (CR-031).
+// them active.
 type PromptsUseCase struct {
 	prompts PromptPort
 }

@@ -17,9 +17,9 @@ type StartPublishSagaInput struct {
 	Visibility    domain.Visibility
 	PublishAt     *string // RFC3339 — only set alongside Visibility == private (validated by the HTTP layer)
 	ThumbnailPath *string // absolute path on shared_artifacts, from a prior POST /v1/projects/{id}/thumbnail upload
-	ChannelID     *string // connected YouTube channel to publish to; nil leaves the choice to the Publisher's default (CR-012)
+	ChannelID     *string // connected YouTube channel to publish to; nil leaves the choice to the Publisher's default
 	// AcknowledgeQC is the Creator saying, deliberately, that they have read
-	// the blocking QC findings and want to publish anyway (CR-021 FR61.3).
+	// the blocking QC findings and want to publish anyway.
 	// It only means anything when QC_ENFORCE is on, and it is recorded on the
 	// report either way it is used — an override nobody can see afterwards is
 	// not an override, it is a hole.
@@ -38,9 +38,9 @@ type StartPublishSagaOutput struct {
 type StartPublishSagaUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
-	// qcReports and qcEnforce are CR-021's publish gate (D5). Both are
-	// optional: with no report store, or with enforcement off, Execute behaves
-	// exactly as it did before this CR.
+	// qcReports and qcEnforce are the QC publish gate. Both are
+	// optional: with no report store, or with enforcement off, Execute does
+	// not gate on QC.
 	qcReports domain.QCReportPort
 	qcEnforce bool
 }
@@ -51,9 +51,9 @@ func NewStartPublishSagaUseCase(repo domain.ProjectRepositoryPort, publisher dom
 	return &StartPublishSagaUseCase{repo: repo, publisher: publisher}
 }
 
-// WithQCGate attaches CR-021's publish gate.
+// WithQCGate attaches the QC publish gate.
 //
-// enforce comes from QC_ENFORCE and defaults to false (D5 / Decision #3): until
+// enforce comes from QC_ENFORCE and defaults to false: until
 // the thresholds have been calibrated against real footage, findings are shown
 // and recorded but never block. Passing the flag in rather than reading the
 // environment here keeps the use case testable and keeps config-reading in
@@ -77,7 +77,7 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 		return nil, domain.ErrInvalidStatus
 	}
 
-	// CR-021 FR61.3: the gate lives here, not in the GUI. A button is not where
+	// The gate lives here, not in the GUI. A button is not where
 	// a rule is kept — anything that can POST this endpoint would otherwise
 	// walk straight past it.
 	if err := uc.checkQCGate(ctx, input); err != nil {
@@ -128,13 +128,13 @@ func (uc *StartPublishSagaUseCase) Execute(ctx context.Context, input StartPubli
 }
 
 // checkQCGate refuses a publish whose latest QC report carries a blocking
-// finding, unless the Creator acknowledged it (CR-021 FR61.3).
+// finding, unless the Creator acknowledged it.
 //
 // Three ways this returns nil, and each is deliberate:
-//   - QC_ENFORCE off (the default, D5) — findings are advice, not a lock, while
+//   - QC_ENFORCE off (the default) — findings are advice, not a lock, while
 //     the thresholds are still being calibrated against real videos.
-//   - No report at all — a project rendered before CR-021, or one whose report
-//     failed to persist. FR61.4's principle covers both: an absent measurement
+//   - No report at all — a project never scored, or one whose report
+//     failed to persist. The same principle covers both: an absent measurement
 //     is not evidence of a problem.
 //   - status not_scored, or findings that are all warnings — nothing blocking
 //     was actually found.
@@ -144,8 +144,8 @@ func (uc *StartPublishSagaUseCase) checkQCGate(ctx context.Context, input StartP
 	}
 	report, err := uc.qcReports.LatestQCReport(ctx, input.ProjectID)
 	if err != nil {
-		// A gate that cannot read its own report must open, not close
-		// (FR61.4): a database hiccup is not a quality finding.
+		// A gate that cannot read its own report must open, not close:
+		// a database hiccup is not a quality finding.
 		return nil
 	}
 	if report == nil || !report.HasBlockingFindings() {
@@ -193,17 +193,16 @@ func publishVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	if project.CaptionPath != nil {
 		payload["caption_path"] = *project.CaptionPath
-		// CR-015 FR39.3: YouTube's captions.insert needs a BCP-47 language
+		// YouTube's captions.insert needs a BCP-47 language
 		// code to attach the track under. ContentLanguage's values ("vi",
-		// "en" — CR-008) are already valid BCP-47 primary subtags, so no
+		// "en") are already valid BCP-47 primary subtags, so no
 		// translation table is needed. Wrong here means auto-translate
-		// dubs from the wrong source language — exactly what CR-015 set
-		// out to fix, not reintroduce.
+		// dubs from the wrong source language.
 		payload["caption_language"] = string(project.ContentLanguage)
 	}
 	// Omitted rather than sent as null when unset, so the Publisher's
 	// payload.get("channel_id") keeps meaning "use the default channel"
-	// for projects created before CR-012.
+	// for projects that name no channel.
 	if project.YoutubeChannelID != nil {
 		payload["channel_id"] = *project.YoutubeChannelID
 	}

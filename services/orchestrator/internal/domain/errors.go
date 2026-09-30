@@ -23,16 +23,16 @@ var (
 	ErrSagaStepNotFound = errors.New("saga step not found")
 
 	// ErrQCBlocked is returned by the Publish Saga when QC_ENFORCE is on and
-	// the project's latest QC report carries a blocking finding (CR-021 FR61.3).
+	// the project's latest QC report carries a blocking finding.
 	// The Creator gets past it by re-posting with acknowledge_qc: true, which is
-	// the "conscious action" FR61.3 asks for — and which is recorded.
+	// the "conscious action" — and which is recorded.
 	ErrQCBlocked = errors.New("quality check found blocking issues; re-submit with acknowledge_qc to publish anyway")
 )
 
 // ErrInvalidWizardInput marks a wizard save whose body is malformed (unknown
 // quality, subtitle mode, step number...). The HTTP layer maps it to 400.
-// ErrProjectBusy: a saga step is running, so the project cannot be deleted
-// (CR-040 FR114.3). Cancel the step first.
+// ErrProjectBusy: a saga step is running, so the project cannot be deleted.
+// Cancel the step first.
 var ErrProjectBusy = errors.New("project is rendering; cancel it before deleting")
 
 var ErrInvalidWizardInput = errors.New("invalid wizard input")

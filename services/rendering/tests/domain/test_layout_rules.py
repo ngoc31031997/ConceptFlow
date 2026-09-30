@@ -1,4 +1,4 @@
-"""Luật bố cục (CR-048 T6b) trên số đo thật của layout probe.
+"""Luật bố cục trên số đo thật của layout probe.
 
 `remotion_project/layout_probe_samples/*.layout.json` là output thật của probe
 (`node layout_probe.mjs --out-dir layout_probe_samples ...`) cho các script mẫu
@@ -68,7 +68,7 @@ def test_the_three_planted_faults_block_on_the_right_shots():
 
 
 def test_spring_overshoot_between_the_old_four_samples_is_caught():
-    # T6a: 0/50/85/100% bỏ sót; mặt trời spring({damping: 6}) vọt ra ở frame 10.
+    # 0/50/85/100% bỏ sót; mặt trời spring({damping: 6}) vọt ra ở frame 10.
     probe, lines = load("overshoot")
     [f] = evaluate(probe)
     assert f.blocking and f.rule == SAFE_AREA and owner(lines, f.line) == "1.1"

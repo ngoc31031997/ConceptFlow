@@ -57,7 +57,7 @@ function errorText(e: unknown, fallback: string): string {
 }
 
 /**
- * CR-050 FR-7 — how many shots one code segment holds. It sits before the run
+ * How many shots one code segment holds. It sits before the run
  * button (docs/ux-ui-design-rules.md §1): the next run is cut with it.
  */
 export function CodeChunkShotsField({ projectId, onSaved }: { projectId: string; onSaved: () => void }) {
@@ -174,7 +174,7 @@ function Reveal({ open, children }: { open: boolean; children: React.ReactNode }
 }
 
 /**
- * CR-050 FR-9 — the code step's segments: the frame (LAYOUT/cast) and every
+ * The code step's segments: the frame (LAYOUT/cast) and every
  * group of shots, each with its state, why it failed, how long it took, and
  * its own actions — re-run it with AI, copy its prompt for an outside AI,
  * paste the outside AI's reply, or edit it by hand. Runs go through the
@@ -390,7 +390,7 @@ export function CodeSegmentsPanel({
       </ul>
       <div className={styles.footer}>
         {/* With nothing missing (every segment pasted, say) the same run only
-            merges, checks and repairs (FR-8). */}
+            merges, checks and repairs. */}
         <Button onClick={() => void start()} disabled={locked} data-testid="code-segments-run-missing">
           {starting ? "Đang bắt đầu…" : missing > 0 ? `Chạy các đoạn còn thiếu (${missing})` : "Ghép và kiểm lại code"}
         </Button>

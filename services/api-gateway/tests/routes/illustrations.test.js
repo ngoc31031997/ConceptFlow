@@ -19,7 +19,7 @@ function buildApp(fast, slow) {
   return app;
 }
 
-// CR-044: anything that renders a preview waits on rendering, so it must use the no-timeout client.
+// Anything that renders a preview waits on rendering, so it must use the no-timeout client.
 describe('illustration library routing', () => {
   test.each([
     ['get', '/v1/illustration-folders', 'fast'],
@@ -44,7 +44,7 @@ describe('illustration library routing', () => {
     ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
     ['delete', '/v1/projects/p1/illustrations/r1/drawing', 'fast'],
-    // CR-052: making a Hình mẫu renders the copy; undoing it does not.
+    // Making a Hình mẫu renders the copy; undoing it does not.
     ['post', '/v1/admin/illustrations/i1/exemplar', 'slow'],
     ['delete', '/v1/admin/illustrations/i1/exemplar', 'fast'],
   ])('%s %s -> %s client', async (method, path, which) => {

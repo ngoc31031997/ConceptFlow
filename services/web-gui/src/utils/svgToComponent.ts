@@ -1,5 +1,5 @@
 /**
- * CR-044 — turn an uploaded SVG file into a library drawing's TSX, in the
+ * Turn an uploaded SVG file into a library drawing's TSX, in the
  * browser, so it lands in the same editor as hand-written code: the Creator
  * sees the code, previews it, and the renderer's style check warns about what
  * does not fit the channel (off-palette colours, outlines) before saving.

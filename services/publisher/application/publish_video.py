@@ -1,7 +1,7 @@
 """PublishVideoUseCase — business-logic-model.md.
 
 No batch wrapper needed — publish_video is already a single operation
-per command (mirror Unit 6's AssembleVideoUseCase).
+per command.
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ class PublishVideoUseCase:
             if request.channel_id:
                 # Deliberately not falling back to the default channel:
                 # publishing to a channel the Creator did not choose is
-                # publicly visible and cannot be taken back (CR-012 FR32.3).
+                # publicly visible and cannot be taken back.
                 raise MissingCredentialError(
                     f"YouTube channel {request.channel_id!r} is not connected — "
                     "connect it again, or pick a different channel"

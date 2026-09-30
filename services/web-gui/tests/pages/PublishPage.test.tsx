@@ -18,9 +18,9 @@ function renderPublishPage() {
 }
 
 /*
-  The publish button used to re-enable as soon as POST /v1/sagas/publish
-  returned, even though the upload had only just been queued — so a second
-  click hit a 409 and the page showed nothing in between.
+  The publish button must stay disabled after POST /v1/sagas/publish returns:
+  the upload has only been queued, so a second click would hit a 409 with
+  nothing shown in between.
 */
 describe("PublishPage publish state", () => {
   afterEach(() => {
@@ -96,7 +96,7 @@ describe("PublishPage publish state", () => {
     renderPublishPage();
 
     await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
-    // CR-051: screen titles name the step as the rail does.
+    // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Publish");
   });
 
@@ -138,7 +138,7 @@ describe("PublishPage publish state", () => {
   });
 });
 
-describe("PublishPage QC gate (CR-021 FR61.3)", () => {
+describe("PublishPage QC gate", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -205,7 +205,7 @@ describe("PublishPage QC gate (CR-021 FR61.3)", () => {
   }
 
   it("never sends acknowledge_qc on the first attempt", async () => {
-    // FR61.3: bỏ qua phải là hành động có ý thức. Gửi cờ ngay lần đầu là biến
+    // Bỏ qua phải là hành động có ý thức. Gửi cờ ngay lần đầu là biến
     // cổng chặn thành thứ trang tự mở hộ.
     const bodies: Array<Record<string, unknown>> = [];
     global.fetch = mockQCBlockedFetch(bodies);

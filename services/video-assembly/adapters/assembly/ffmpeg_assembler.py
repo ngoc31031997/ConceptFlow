@@ -3,13 +3,11 @@ the ffmpeg CLI binary in a single pass: place each narration segment at its
 own offset on one track, mux that onto the (silent) video, and overlay
 optional background music underneath — all via one filter_complex graph.
 
-The offsets matter (CR-002). This used to `concat` the narration clips back
-to back, which assumed the video was nothing but narration. It is not: a
-Manim video is animation time *plus* narration time, so every segment after
-the first played early by however much animation had run before it, and the
-error accumulated — measured at 61.6s of drift by the end of a 3.6-minute
-reference video. Each segment now gets an `adelay` to the offset Rendering
-measured for it.
+The offsets matter. A Manim video is animation time *plus* narration time,
+so concatenating the narration clips back to back would play every segment
+after the first early by however much animation had run before it, and the
+error accumulates (61.6s of drift by the end of a 3.6-minute reference
+video). Each segment gets an `adelay` to the offset Rendering measured for it.
 
 Runs in a threadpool so it never blocks the asyncio event loop (NFR
 Requirements, Performance), with a bounded timeout so a hung ffmpeg call
@@ -57,7 +55,7 @@ DEFAULT_BACKGROUND_MUSIC_VOLUME = 0.2
 # the (much faster, stream-copy) concat pass is the rest.
 MAIN_PASS_SHARE_WITH_CHANNEL_ASSETS = 90
 
-# Sidechain ducking (CR-005 FR14.1). A flat mix leaves music competing with the
+# Sidechain ducking. A flat mix leaves music competing with the
 # narration when it is loud and leaves silence when it is not; ducking pulls the
 # music down only while someone is speaking, which is what every produced video
 # does. threshold/ratio/attack/release are conventional voice-over values.
@@ -66,10 +64,10 @@ DUCKING_FILTER = "sidechaincompress=threshold=0.05:ratio=8:attack=20:release=400
 # YouTube normalizes everything it serves to about -14 LUFS. A quieter master
 # does not get left quiet — it gets turned up, along with its noise floor — so
 # matching the target here is what keeps the channel from sounding weaker than
-# everyone else's (CR-005 FR14.3).
+# everyone else's.
 LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
 
-# Optional silence before the first line and after the last (CR-005 FR14.5).
+# Optional silence before the first line and after the last.
 #
 # Both default to OFF, which is a deliberate trade rather than an oversight.
 # Padding either end means tpad, tpad repaints frames, and repainting frames
@@ -83,7 +81,7 @@ LOUDNORM_FILTER = "loudnorm=I=-14:TP=-1.5:LRA=11"
 DEFAULT_LEAD_IN_SECONDS = 0.0
 DEFAULT_TAIL_SECONDS = 0.0
 
-# Auto-generated thumbnail candidate (CR-006 FR16). YouTube wants 1280x720 and
+# Auto-generated thumbnail candidate. YouTube wants 1280x720 and
 # under 2MB; q=3 lands comfortably inside that for a Manim frame, which is flat
 # colour and text rather than photographic detail.
 THUMBNAIL_WIDTH = 1280
@@ -98,7 +96,7 @@ THUMBNAIL_POSITION_FRACTION = 0.25
 # Below this, padding the video is not worth re-encoding it for.
 VIDEO_PAD_EPSILON_SECONDS = 0.05
 
-# Upload-grade x264 settings (CR-004 FR12.2). YouTube transcodes whatever it is
+# Upload-grade x264 settings. YouTube transcodes whatever it is
 # given, so the source has to carry spare quality into that second encode.
 #
 # The Phase 0 benchmark makes this nearly free: slow/crf18 measured 25.9s
@@ -163,17 +161,14 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         n = len(segments)
 
         # Lead-in shifts the video, the narration and the subtitles by the SAME
-        # amount, so the alignment CR-002 established is untouched — narration i
-        # still lands exactly on wait i, just half a second later in the file.
-        # Shifting only the audio here would reintroduce the very desync that
-        # CR-002 existed to remove.
+        # amount, so narration i still lands exactly on wait i, just later in
+        # the file. Shifting only the audio would put every line out of sync
+        # with its animation.
         #
-        # CR-023: effective_lead_in folds the channel intro's own duration into
-        # that same single shift (D5) — a project with an intro spliced in
-        # front needs narration/subtitles pushed later by the intro's length
-        # too, on top of whatever ASSEMBLY_LEAD_IN_SECONDS already added. This
-        # is the only source-of-truth change; every consumer below is
-        # unchanged from when it read `lead_in`.
+        # effective_lead_in folds the channel intro's own duration into that
+        # same single shift — a project with an intro spliced in front needs
+        # narration/subtitles pushed later by the intro's length too, on top
+        # of whatever ASSEMBLY_LEAD_IN_SECONDS already added.
         base_lead_in = self._lead_in_seconds if request.video_duration_seconds > 0 else 0.0
         effective_lead_in = base_lead_in + (request.intro_duration_seconds or 0.0)
 
@@ -184,7 +179,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         target_duration = self._target_duration(request, segments)
         if target_duration is not None:
             # Lead-in pushes everything later; the tail leaves the closing frame
-            # up briefly instead of cutting hard (FR14.5).
+            # up briefly instead of cutting hard.
             target_duration += effective_lead_in + self._tail_seconds
 
         filter_parts: list[str] = []
@@ -235,7 +230,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         video_filters: list[str] = []
 
         if target_duration is not None:
-            # CR-002 FR10.6: hold the last frame rather than truncating a final
+            # Hold the last frame rather than truncating a final
             # narration that runs past the end of the animation.
             pad_seconds = target_duration - request.video_duration_seconds - effective_lead_in
             if effective_lead_in > VIDEO_PAD_EPSILON_SECONDS:
@@ -304,10 +299,10 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             cmd += ["-shortest"]
 
         has_channel_assets = bool(request.intro_video_path or request.outro_video_path)
-        # CR-023 D5: with an intro/outro to splice in, this pass produces only
-        # the main segment, to a temp path — _concat_channel_assets below
-        # joins it with the real intro/outro files afterward. Without either,
-        # this pass's output IS the final file, exactly as before this CR.
+        # With an intro/outro to splice in, this pass produces only the main
+        # segment, to a temp path — _concat_channel_assets below joins it with
+        # the real intro/outro files afterward. Without either, this pass's
+        # output IS the final file.
         main_target = _main_segment_path(output_path) if has_channel_assets else output_path
         cmd += [main_target]
 
@@ -333,8 +328,8 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
     @staticmethod
     def _concat_channel_assets(request: VideoAssemblyRequest, main_path: str, output_path: str) -> None:
         """Splices the channel's real intro/outro files around the just-built
-        main segment (CR-023 D5) via the concat demuxer, in one re-encode
-        pass — accepted cost (LLD's "Rủi ro" section): the main segment may
+        main segment via the concat demuxer, in one re-encode pass — an
+        accepted cost: the main segment may
         already have lost `-c:v copy` to tpad/subtitles, and concat forces a
         matching re-encode of the intro/outro anyway since nothing here tries
         to keep them byte-identical to the main segment's codec profile.
@@ -367,7 +362,7 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
             _remove_if_exists(main_path)
 
     def _write_thumbnail_candidate(self, video_path: str, duration: float | None) -> None:
-        """Extracts a still the Creator can use as a thumbnail (CR-006 FR16.1).
+        """Extracts a still the Creator can use as a thumbnail.
 
         Deliberately no text overlay. The title does not exist yet at assembly
         time — it is drafted later, at publish — so anything burned in here
@@ -406,8 +401,8 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
         request: VideoAssemblyRequest, segments: list[NarrationSegment]
     ) -> float | None:
         """How long the finished video should be, or None when Rendering did
-        not report a duration (a pre-CR-002 project), in which case the old
-        `-shortest` behaviour is kept rather than guessing.
+        not report a duration, in which case `-shortest` is used rather than
+        guessing.
 
         It is the longer of the rendered animation and the end of the last
         narration — the latter can win because a narration segment's audio may
@@ -437,9 +432,9 @@ class FfmpegVideoAssembler(VideoAssemblerPort):
 
     @staticmethod
     def _write_srt(request: VideoAssemblyRequest, cues: list[SubtitleCue], output_path: str) -> str:
-        """Caption-track file for Publisher to upload (CR-015 FR38). `cues`
-        are expected already shifted, same as _write_ass — no `SubtitleStyle`
-        here, SRT has no styling fields (FR38.3)."""
+        """Caption-track file for Publisher to upload. `cues` are expected
+        already shifted, same as _write_ass — no `SubtitleStyle` here, SRT
+        has no styling fields."""
         caption_path = os.path.join(os.path.dirname(output_path), f"{request.project_id}.srt")
         write_srt_file(cues, caption_path)
         return caption_path
@@ -484,7 +479,7 @@ def _remove_if_exists(path: str) -> None:
 
 def _main_segment_path(output_path: str) -> str:
     """Temp path for the main-only segment when an intro/outro will be
-    concatenated around it (CR-023 D5) — sits next to output_path so it is
+    concatenated around it — sits next to output_path so it is
     on the same filesystem/volume as the concat demuxer's other inputs."""
     return f"{output_path}.main.mp4"
 

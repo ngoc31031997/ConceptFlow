@@ -23,7 +23,7 @@ func (seededStore) GetActive(_ context.Context, role domain.PromptRole) (domain.
 	return domain.Prompt{}, application.ErrPromptNotFound
 }
 
-// CR-040 FR113.2: testdata/prompt_golden.json holds what web-gui's TypeScript
+// testdata/prompt_golden.json holds what web-gui's TypeScript
 // builders produced for each language × input, generated before that code was
 // deleted. The server must reproduce it byte for byte.
 func TestRender_MatchesWhatTheBrowserUsedToBuild(t *testing.T) {

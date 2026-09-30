@@ -1,6 +1,5 @@
-"""The two light tasks that used to live in the orchestrator's ollama_client.go
-(CR-014 suggest-metadata, CR-026 suggest-short-script). Prompts and guard rails
-are carried over unchanged; only the transport moved.
+"""The two light tasks: suggest-metadata (title, description, tags for a
+script) and suggest-short-script (a short script from a long one).
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ DEFAULT_LANGUAGE = "en"  # mirrors domain.defaultLanguage in the orchestrator
 
 MAX_TITLE_LENGTH = 100  # YouTube counts characters, not bytes.
 # Ollama defaults num_ctx to 2048 tokens; a ten-minute script overflows it and
-# the model then returns a well-formed but empty object (CR-014, measured).
+# the model then returns a well-formed but empty object (measured).
 # A title and description are drawn from the opening, where the topic is stated.
 MAX_SCRIPT_CHARS = 4000
 SUGGEST_MAX_ATTEMPTS = 2

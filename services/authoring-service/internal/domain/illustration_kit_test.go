@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// CR-043: the director must ask for pictures of what the narration talks
+// The director must ask for pictures of what the narration talks
 // about, not stand-in shapes; it must still not name an engine's API.
 func TestVisualDirectorIllustratesWhatIsSaid(t *testing.T) {
 	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
@@ -27,7 +27,7 @@ func TestVisualDirectorIllustratesWhatIsSaid(t *testing.T) {
 	}
 }
 
-// CR-043: both Remotion roles receive the kit, expanded at seed time.
+// Both Remotion roles receive the kit, expanded at seed time.
 func TestRemotionEngineersGetTheIllustrationKit(t *testing.T) {
 	for _, role := range []PromptRole{RoleRemotionEngineer, RoleRemotionEngineerAI} {
 		text := aiTemplate(t, role)

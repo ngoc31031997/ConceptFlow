@@ -1,4 +1,4 @@
-"""The per-call user turns of the code pipeline (CR-039).
+"""The per-call user turns of the code pipeline.
 
 The system prompt of every call is the rendered `*_engineer_ai` role from the
 prompt library — rules, palette discipline, layout law. What varies per call
@@ -7,9 +7,8 @@ Every turn states what already exists so the model does not redeclare it.
 
 The system prompt must stay byte-identical across every call of one run so the
 provider's prompt cache keeps working: anything that varies per call belongs in
-these user turns. CR-048 T3 cut the story outline in the code step's system
-prompt down to its core lines, so each chunk turn now opens with the storyboard's
-hero/world line itself.
+these user turns. The code step's system prompt carries only the story's core
+lines, so each chunk turn opens with the storyboard's hero/world line itself.
 """
 
 from __future__ import annotations
@@ -153,7 +152,7 @@ Trả về ĐÚNG khai báo `const LAYOUT = {{ ... }};` đã sửa trong một k
             "Lỗi trình biên dịch TypeScript (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):\n"
             + _listed(compile_diags))
     if layout_diags:
-        # CR-048 T6b: measured on the shot as it is really drawn, at the moments named.
+        # Measured on the shot as it is really drawn, at the moments named.
         sections.append(
             "Lỗi bố cục — đo trên hình thật của shot, ở các thời điểm ghi trong từng dòng (số dòng là dòng trong "
             "FILE ĐẦY ĐỦ; vùng an toàn (96, 96)–(1824, 984); chữ tối thiểu 32px):\n" + _listed(layout_diags)

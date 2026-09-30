@@ -1,9 +1,9 @@
 """GoogleTTSAdapter — implements TTSEnginePort via Google Cloud Text-to-Speech
 (ADR-0023).
 
-Dormant since Google withdrew the WaveNet free tier this adapter was chosen for
-(CR-010); Edge owns the default voices now (ADR-0024). It stays wired because
-the credential is the only thing it needs to work again.
+Dormant: Google has no WaveNet free tier, and Edge owns the default voices
+(ADR-0024). It stays wired because the credential is the only thing it needs
+to work.
 
 Runs in a threadpool with a bounded timeout, mirroring EdgeTTSAdapter — the
 Google client library is synchronous.

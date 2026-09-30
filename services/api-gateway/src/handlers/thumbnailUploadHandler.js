@@ -12,7 +12,7 @@ const ALLOWED_MIME_TO_EXT = {
  * Thumbnails to look for, most-preferred first.
  *
  * A Creator's own upload always wins over `auto.jpg`, the candidate Video
- * Assembly extracts from the finished video (CR-006 FR16). The auto one exists
+ * Assembly extracts from the finished video. The auto one exists
  * so a project is never publishable without any thumbnail at all — YouTube
  * otherwise picks a frame itself, and its choice is rarely a good one.
  */

@@ -11,7 +11,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — the AI drawer: one model call per drawing, held to the channel's
+// The AI drawer: one model call per drawing, held to the channel's
 // style rules, checked by the renderer, and sent back with the renderer's
 // line-numbered errors until it passes (at most maxDrawAttempts calls).
 
@@ -32,7 +32,7 @@ type DrawRequest struct {
 	FolderID    string
 	Name        string // optional; the model proposes one otherwise
 	Model       string // optional model override
-	// OnProgress, when set, hears each attempt's phase as it happens (CR-045).
+	// OnProgress, when set, hears each attempt's phase as it happens.
 	OnProgress func(domain.DrawProgress)
 }
 
@@ -91,8 +91,8 @@ func parseDrawnReply(text string) (drawnReply, error) {
 	return r, nil
 }
 
-// references is the reference text: the Hình mẫu the Creator picked
-// (CR-052), then the Creator's own approved drawings in the same folder.
+// references is the reference text: the Hình mẫu the Creator picked,
+// then the Creator's own approved drawings in the same folder.
 func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID string) (string, error) {
 	var b strings.Builder
 	add := func(i domain.Illustration, why string) bool {

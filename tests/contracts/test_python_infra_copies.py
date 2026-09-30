@@ -1,4 +1,4 @@
-"""CR-055: messaging/persistence plumbing copied between the Python services must stay identical.
+"""messaging/persistence plumbing copied between the Python services must stay identical.
 
 tts, rendering, video-assembly and publisher each carry their own outbox, relay,
 inbox, purge and test fake (separate Docker build contexts, no shared package —

@@ -5,7 +5,7 @@ import { ReadOnlyValue } from "./ReadOnlyValue";
 
 type TextAreaProps = TextareaHTMLAttributes<HTMLTextAreaElement>;
 
-// forwardRef: a caller may need to focus the box (CR-045 — the redraw note).
+// forwardRef: a caller may need to focus the box (the redraw note).
 export const TextArea = forwardRef<HTMLTextAreaElement, TextAreaProps>(function TextArea({ className, ...rest }, ref) {
   const readOnly = useReadOnly();
   if (readOnly) {

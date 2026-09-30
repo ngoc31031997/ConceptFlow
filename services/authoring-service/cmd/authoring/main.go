@@ -1,6 +1,6 @@
 // Command authoring is authoring-service's composition root: the prompt library,
 // the 1a/1b/1c authoring chain (story → storyboard → code) with its LLM calls,
-// the metadata and short-script suggestions, and the LLM usage log (CR-040 FR111).
+// the metadata and short-script suggestions, and the LLM usage log.
 //
 // It owns its own database. Everything about the project itself — status,
 // settings, video formats, voice calibration and the project journal — is read
@@ -43,7 +43,7 @@ func main() {
 	}
 	defer pool.Close()
 
-	// CR-031: the prompt library. Legacy override rows/tables are purged first so
+	// The prompt library. Legacy override rows/tables are purged first so
 	// none of them can hold an active slot when the system rows are seeded.
 	// (Per the re-seed memory: seeding upserts, so a changed seed needs a rebuild
 	// and restart of this service, and prompt_overrides must not shadow it.)
@@ -59,7 +59,7 @@ func main() {
 
 	projects := orchestrator.NewClient(cfg.OrchestratorURL, cfg.OrchestratorTimeout)
 
-	// CR-039 — the one path to a language model.
+	// The one path to a language model.
 	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
 	var llmProvider application.LLMProviderPort = llmClient
 	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
@@ -74,22 +74,22 @@ func main() {
 	}
 	archetypes := application.NewVideoArchetypesUseCase(authoringRepo)
 
-	// CR-044 — the illustration library, previews rendered by the rendering service.
+	// The illustration library, previews rendered by the rendering service.
 	if err := authoringRepo.SeedIllustrations(ctx); err != nil {
 		logger.Warn("could not seed the illustration library", "error", err)
 	}
 	illustrations := application.NewIllustrationsUseCase(
 		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
 		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
-		// CR-052: a drawing a video still working uses cannot be deleted.
+		// A drawing a video still working uses cannot be deleted.
 		WithProjectStatus(projects)
-	// CR-044 — each Remotion video's drawings, gated before the code step.
+	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
 		WithDrawConcurrency(cfg.IllustrationDrawConcurrency)
 
 	prompts := application.NewPromptsUseCase(authoringRepo)
-	// CR-028 FR84.2: every authoring save shares the same lock check (the project
+	// Every authoring save shares the same lock check (the project
 	// must still be a draft, read from the orchestrator), and clears the steps
 	// built on the one it overwrote.
 	saveAuthoringStory := application.NewSaveAuthoringStoryUseCase(authoringRepo, projects, authoringRepo)
@@ -100,7 +100,7 @@ func main() {
 	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo)
 
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
-	// CR-027 FR77.1 — ONE renderer, shared by the Copy button and the generate endpoint.
+	// ONE renderer, shared by the Copy button and the generate endpoint.
 	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).WithArchetypes(authoringRepo)
 	generateAuthoring := application.NewGenerateAuthoringUseCase(
 		renderPrompt, llmProvider, llmUsageRecorder,
@@ -110,10 +110,10 @@ func main() {
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
 	).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
 		WithIllustrations(projectIllustrations).
-		// CR-048 T8 — the post-1b length check reads the same format and voice
+		// The post-1b length check reads the same format and voice
 		// calibration the outline prompt's beat sheet is built from.
 		WithStoryboardChecks(projects, projects).
-		// CR-050 Unit 2 (ADR-0030) — the code step stored segment by segment.
+		// The code step stored segment by segment. See ADR-0030.
 		WithSegments(authoringRepo)
 	// NFR-3: nothing can be running yet, so a segment still marked running was
 	// cut off when this service last stopped.

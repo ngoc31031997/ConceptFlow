@@ -7,7 +7,7 @@ import (
 )
 
 // The assertions web-gui's contentLanguage.test.ts held for these texts, kept
-// now that the texts live here (CR-040 FR113).
+// now that the texts live here.
 func TestBuiltinScriptTemplates(t *testing.T) {
 	tpl := BuiltinScriptTemplates()
 

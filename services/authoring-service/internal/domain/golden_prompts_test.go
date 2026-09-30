@@ -10,21 +10,9 @@ import (
 
 var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 
-// story_architect was re-baselined on purpose by CR-041 (video archetypes),
-// again when the system kinds got semantic codes (NGHỊCH-LÝ/SO-SÁNH/DẤU-VẾT/TIẾN-HOÁ),
-// and again by CR-047 (video review: forbid reading scaffold labels aloud,
-// forbid repeating the pattern beat's conclusion in a variation, cap shots
-// per scene, minimum on-screen object size); visual_director and
-// remotion_engineer also re-baselined by CR-047 for the shot-count-cap and
-// minimum-size rules; story_architect again by v10, which makes the shared
-// frame kind-neutral so outlines follow the topic; visual_director again by
-// CR-049 (faces only on characters, animals keep their species' face, concrete
-// drawable descriptions) (manim_engineer's shared text was not touched by CR-047,
-// so it keeps its CR-043 hash).
-//
 // The manual (Copy-prompt) flow must not change when the shared prompt text is
-// factored into parts for the AI flow (CR-039). These are the SHA-256 of the
-// shipped templates as they were before the split.
+// factored into parts for the AI flow. These are the SHA-256 of the shipped
+// manual templates; a deliberate wording change updates the hash here.
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
 	RoleVisualDirector:   "bbf4c69b3304ef766656bbf565914835b89718df78ffe9d5ddf25e030536d8dd",
@@ -44,7 +32,7 @@ func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {
 	}
 }
 
-// --- the AI flow's prompts (CR-039) ---------------------------------------------
+// --- the AI flow's prompts ---------------------------------------------
 
 func aiTemplate(t *testing.T, role PromptRole) string {
 	t.Helper()
@@ -117,8 +105,8 @@ func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 	}
 }
 
-// CR-042: the director gets rules 12–18 and a list of buildable materials; the
-// Manim engineer animates during narration and no longer defaults to title cards.
+// The director gets rules 12–18 and a list of buildable materials; the
+// Manim engineer animates during narration and does not default to title cards.
 func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
 	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
 		text := aiTemplate(t, role)
@@ -149,7 +137,7 @@ func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
 	}
 }
 
-// CR-041: the Story Architect picks a video archetype and says so first, while
+// The Story Architect picks a video archetype and says so first, while
 // every beat id still comes from the chosen format.
 func TestStoryArchitectAsksForAnArchetypeAndKeepsTheFormatsBeats(t *testing.T) {
 	text := aiTemplate(t, RoleStoryArchitect)

@@ -55,7 +55,7 @@ func TestDrawPromptCarriesRulesHelpersExemplarsAndTheCreatorsApprovedDrawings(t 
 		Code: "export function Scooter() {}", Status: domain.IllustrationApproved}
 	repo.rows["other"] = domain.Illustration{ID: "other", Name: "Dog", FolderID: "dong-vat",
 		Code: "export function Dog() {}", Status: domain.IllustrationApproved}
-	// CR-052: the Hình mẫu are library rows the Creator picked.
+	// The Hình mẫu are library rows the Creator picked.
 	for n, name := range []string{"SchoolBus", "Cat", "Microscope"} {
 		id := "exemplar-" + name
 		repo.rows[id] = domain.Illustration{ID: id, Name: name, FolderID: domain.ExemplarFolderID, Exemplar: true,

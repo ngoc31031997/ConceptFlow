@@ -2,7 +2,7 @@ package domain
 
 import "fmt"
 
-// CR-054: the video list is paged on the server. flow_step and run_state are
+// The video list is paged on the server. flow_step and run_state are
 // derived in Go (a draft's step needs authoring-service content), so the list
 // is filtered, counted and sliced here rather than with LIMIT/OFFSET in SQL —
 // one set of rules, next to FlowStateFor.

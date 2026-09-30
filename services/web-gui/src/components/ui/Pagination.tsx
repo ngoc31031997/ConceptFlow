@@ -14,7 +14,7 @@ interface PaginationProps {
 }
 
 /**
- * Thanh phân trang (CR-054). Không giữ state: trang hiện tại do nơi gọi quyết.
+ * Thanh phân trang. Không giữ state: trang hiện tại do nơi gọi quyết.
  * Trái → phải: đang hiện gì, số mỗi trang, rồi các nút chuyển trang.
  */
 export function Pagination({

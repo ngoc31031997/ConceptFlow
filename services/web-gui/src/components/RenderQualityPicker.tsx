@@ -9,7 +9,7 @@ interface RenderQualityPickerProps {
 }
 
 /**
- * CR-004 FR12.6. The presets are framed around what the Creator is doing
+ * The presets are framed around what the Creator is doing
  * rather than the numbers: a draft pass exists to check that the content
  * works, and only the upload pass needs to be worth publishing.
  */

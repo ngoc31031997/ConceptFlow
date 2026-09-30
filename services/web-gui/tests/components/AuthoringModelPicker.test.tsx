@@ -22,7 +22,7 @@ function openOptions(testId: string): string[] {
   return within(screen.getByRole("listbox")).getAllByRole("option").map((o) => o.textContent ?? "");
 }
 
-describe("AuthoringModelPicker (CR-050 FR-19)", () => {
+describe("AuthoringModelPicker", () => {
   it("does not offer Ollama for the code step", () => {
     render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
       options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" />);

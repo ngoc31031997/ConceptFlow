@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { FLOW_LABELS, flowTitle } from "../../src/utils/flow";
 import { stepLabel } from "../../src/utils/pipelineLabels";
 
-describe("flowTitle (CR-051)", () => {
+describe("flowTitle", () => {
   it("names a step as the step rail does", () => {
     expect(flowTitle(4)).toBe("Bước 4 — Visual");
     expect(flowTitle(FLOW_LABELS.length)).toBe("Bước 14 — Publish");

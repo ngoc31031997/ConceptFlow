@@ -1,15 +1,15 @@
-"""Luật chấm chất lượng video (CR-021 FR59/FR60) — HÀM THUẦN.
+"""Luật chấm chất lượng video — HÀM THUẦN.
 
 Không đọc file, không gọi ffmpeg, không async. Mọi số đo (LUFS, peak, độ phân
 giải, thời lượng audio) được adapter `adapters/qc/ffmpeg_probe.py` đo trước rồi
-đưa vào đây dưới dạng dữ liệu thuần. Đây là chỗ toàn bộ unit test của FR59/FR60
-trỏ vào (LLD D4).
+đưa vào đây dưới dạng dữ liệu thuần, nên unit test của từng luật chỉ cần dữ
+liệu dựng sẵn.
 
-Ngưỡng (FR61.5) nằm trọn trong `QCThresholds`, đọc từ biến môi trường —
-KHÔNG hằng số rải trong thân luật. Lý do là rủi ro số một của CR: báo động giả.
-Ngưỡng khởi đầu nới rộng, siết dần bằng biến môi trường sau khi đo trên video
-thật. Module này KHÔNG biết gì về `QC_ENFORCE` — severity là thuộc tính của
-phát hiện, còn việc chặn publish là của orchestrator (LLD D5).
+Ngưỡng nằm trọn trong `QCThresholds`, đọc từ biến môi trường — KHÔNG hằng số
+rải trong thân luật, vì rủi ro lớn nhất của QC là báo động giả: ngưỡng khởi đầu
+nới rộng, siết dần bằng biến môi trường sau khi đo trên video thật. Module này
+KHÔNG biết gì về `QC_ENFORCE` — severity là thuộc tính của phát hiện, còn việc
+chặn publish là của orchestrator.
 """
 
 from __future__ import annotations
@@ -32,12 +32,12 @@ FRAME_HEIGHT = 8.0
 THEME_SAFE_MARGIN = 0.6
 
 # Nguồn: services/rendering/conceptflow/theme.py::BRAND_BG — nền của mọi cảnh,
-# dùng làm màu nền để tính tương phản (FR59.4).
+# dùng làm màu nền để tính tương phản.
 THEME_BACKGROUND = "#080E1C"
 
-#: Chỉ những class này mới bị áp luật chồng lấn/chữ nhỏ/tương phản (FR59.2).
+#: Chỉ những class này mới bị áp luật chồng lấn/chữ nhỏ/tương phản.
 #: `VGroup`/`Group` bị loại vì bbox của nhóm bao trùm con nó nên nhóm nào cũng
-#: "chồng" con nó — một trong ba nguồn hiểu nhầm CR nêu đích danh (LLD Rủi ro).
+#: "chồng" con nó, gây báo động giả.
 TEXT_CLASSES = frozenset({"Text", "MarkupText", "Tex", "MathTex", "Title", "Paragraph"})
 
 #: Khung pixel theo `render_quality` — cùng bảng với
@@ -54,11 +54,11 @@ DEFAULT_QUALITY = "1080p60"
 SEVERITY_BLOCKING = "blocking"
 SEVERITY_WARNING = "warning"
 
-#: Hai luật mang severity blocking (Quyết định #1 của CR): tràn khung và chồng
+#: Hai luật mang severity blocking: tràn khung và chồng
 #: lấn narration. Mọi luật còn lại là cảnh báo.
 #:
 #: Severity ở đây là **thuộc tính của phát hiện**, không phải của chính sách:
-#: nó luôn được ghi đúng vào báo cáo, kể cả lúc chạy chế độ chỉ-báo (LLD D5).
+#: nó luôn được ghi đúng vào báo cáo, kể cả lúc chạy chế độ chỉ-báo.
 #: Việc một finding blocking có chặn publish hay không do `QC_ENFORCE` bên
 #: orchestrator quyết định — service này không đọc biến đó. Hạ cấp severity ở
 #: đây sẽ phá đúng mục đích của chế độ chỉ-báo: đo xem luật blocking kêu đúng
@@ -71,14 +71,14 @@ class QCFinding:
     rule: str
     severity: str
     message: str
-    #: FR59.6 — luôn có, để Creator tua thẳng tới chỗ đó. Luật xét cả file
+    #: Luôn có, để Creator tua thẳng tới chỗ đó. Luật xét cả file
     #: (LUFS, thuộc tính phát hành) dùng 0.0 = đầu video.
     timestamp_seconds: float
 
 
 def _as_float(raw: str | None, default: float) -> float:
     """Giá trị không parse được rơi về mặc định thay vì ném — một biến môi
-    trường gõ sai không được làm sập QC (FR61.4)."""
+    trường gõ sai không được làm sập QC."""
     if raw is None or raw.strip() == "":
         return default
     try:
@@ -95,54 +95,54 @@ def _as_bool(raw: str | None, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class QCThresholds:
-    """FR61.5 — mọi ngưỡng ở một chỗ, cấu hình được bằng biến môi trường."""
+    """Mọi ngưỡng ở một chỗ, cấu hình được bằng biến môi trường."""
 
-    # --- FR59.1 tràn khung ---
+    # --- tràn khung ---
     safe_margin: float = THEME_SAFE_MARGIN
     #: Dung sai (đơn vị Manim) trước khi kêu — bbox Manim rộng hơn nét chữ thật
     #: vài phần trăm, kêu ở 0.0 là kêu suốt.
     frame_overflow_tolerance: float = 0.05
 
-    # --- FR59.2 chồng lấn ---
+    # --- chồng lấn ---
     #: Tỉ lệ diện tích giao trên diện tích của mobject NHỎ HƠN. 0.15 nới rộng có
     #: chủ ý: chữ có dấu tiếng Việt hay chạm nhẹ nhau mà mắt không thấy.
     text_overlap_min_ratio: float = 0.15
 
-    # --- FR59.3 chữ quá nhỏ ---
+    # --- chữ quá nhỏ ---
     #: Chiều cao chữ tối thiểu tính bằng pixel Ở ĐỘ PHÂN GIẢI XUẤT.
-    #: Căn cứ (Quyết định #2): màn 5,5 inch xem toàn màn hình → khung 16:9 cao
+    #: Căn cứ: màn 5,5 inch xem toàn màn hình → khung 16:9 cao
     #: ~68 mm. 24 px trên 1080 dòng ≈ 1,5 mm chiều cao em — sàn đọc thoải mái ở
     #: khoảng cách cầm tay ~30 cm. Ở 720p cùng cỡ chữ chỉ còn 16 px nên bị kêu,
     #: và đó là đúng: chữ nhỏ ở bitrate thấp còn bị encode làm nhoè thêm.
     min_text_pixel_height: float = 24.0
 
-    # --- FR59.4 tương phản ---
+    # --- tương phản ---
     #: Tỉ số tương phản WCAG. 3.0 là ngưỡng WCAG AA cho chữ LỚN — chữ trên video
     #: gần như luôn là chữ lớn, và ngưỡng 4.5 sẽ kêu cả những cặp màu theme đã
     #: chọn có chủ ý.
     min_contrast_ratio: float = 3.0
     background_color: str = THEME_BACKGROUND
 
-    # --- FR59.5 hình chết ---
+    # --- hình chết ---
     max_static_seconds: float = 12.0
 
-    # --- FR60.1 LUFS ---
+    # --- LUFS ---
     loudness_target_lufs: float = -14.0
     loudness_tolerance_lu: float = 1.5
 
-    # --- FR60.2 chồng lấn narration ---
+    # --- chồng lấn narration ---
     #: Đoạn audio được phép tràn sang mốc kế tiếp chừng này giây trước khi kêu —
     #: đuôi im lặng của file TTS thường dài cỡ này.
     narration_overlap_tolerance_seconds: float = 0.15
 
-    # --- FR60.3 clipping ---
+    # --- clipping ---
     #: dBFS. Trên -0.1 dBFS coi như đã chạm trần.
     max_peak_dbfs: float = -0.1
 
-    # --- FR60.4 cue phụ đề ---
+    # --- cue phụ đề ---
     subtitle_overlap_tolerance_seconds: float = 0.05
 
-    # --- FR60.5 thuộc tính phát hành ---
+    # --- thuộc tính phát hành ---
     required_pix_fmt: str = "yuv420p"
     require_faststart: bool = True
 
@@ -151,9 +151,9 @@ class QCThresholds:
 
     @classmethod
     def from_env(cls, env: dict | None = None) -> QCThresholds:
-        """FR61.5 — mọi ngưỡng đọc từ môi trường, mọi cái vắng mặt lấy mặc định
+        """Mọi ngưỡng đọc từ môi trường, mọi cái vắng mặt lấy mặc định
         ở trên. Giá trị không parse được rơi về mặc định thay vì làm sập QC:
-        một cổng hỏng không được biến thành cổng khoá (FR61.4)."""
+        một cổng hỏng không được biến thành cổng khoá."""
         source = os.environ if env is None else env
         get = source.get
         return cls(
@@ -178,7 +178,7 @@ class QCThresholds:
         )
 
     def severity_for(self, rule: str) -> str:
-        """LLD D5: severity thật luôn được ghi vào báo cáo. Cổng chặn là việc
+        """Severity thật luôn được ghi vào báo cáo. Cổng chặn là việc
         của orchestrator (`QC_ENFORCE`), không phải của người chấm."""
         return SEVERITY_BLOCKING if rule in BLOCKING_RULES else SEVERITY_WARNING
 
@@ -208,7 +208,7 @@ def _is_text(mobject: dict) -> bool:
 
 
 def _is_visible(mobject: dict) -> bool:
-    """Mobject trong suốt bị bỏ qua (LLD Rủi ro) — đã `FadeOut` nhưng chưa
+    """Mobject trong suốt bị bỏ qua — đã `FadeOut` nhưng chưa
     remove thì bbox vẫn còn đó mà mắt không thấy gì."""
     for key in ("opacity", "fill_opacity", "stroke_opacity"):
         value = mobject.get(key)
@@ -275,7 +275,7 @@ def _label(mobject: dict) -> str:
     return cls
 
 
-# --- FR59.1 ------------------------------------------------------------------
+# --- tràn khung --------------------------------------------------------------
 
 
 def check_frame_overflow(layout_marks: list[dict], thresholds: QCThresholds) -> list[QCFinding]:
@@ -375,7 +375,7 @@ def _overflow_of(
     return findings
 
 
-# --- FR59.2 ------------------------------------------------------------------
+# --- chồng lấn ---------------------------------------------------------------
 
 
 def _area(box: tuple[float, float, float, float]) -> float:
@@ -431,7 +431,7 @@ def check_text_overlap(layout_marks: list[dict], thresholds: QCThresholds) -> li
     return findings
 
 
-# --- FR59.3 ------------------------------------------------------------------
+# --- chữ quá nhỏ -------------------------------------------------------------
 
 
 def font_size_to_pixels(font_size: float, render_quality: str, thresholds: QCThresholds) -> float:
@@ -494,7 +494,7 @@ def _too_small_in_mark(
     return findings
 
 
-# --- FR59.4 ------------------------------------------------------------------
+# --- tương phản --------------------------------------------------------------
 
 
 def _parse_hex_color(value: str | None) -> tuple[float, float, float] | None:
@@ -558,7 +558,7 @@ def check_low_contrast(layout_marks: list[dict], thresholds: QCThresholds) -> li
     return findings
 
 
-# --- FR59.5 ------------------------------------------------------------------
+# --- hình chết ---------------------------------------------------------------
 
 
 def check_static_frame(
@@ -585,7 +585,7 @@ def check_static_frame(
     return findings
 
 
-# --- FR60.2 ------------------------------------------------------------------
+# --- chồng lấn narration -----------------------------------------------------
 
 
 def check_narration_overlap(
@@ -627,7 +627,7 @@ def check_narration_overlap(
     return findings
 
 
-# --- FR60.4 ------------------------------------------------------------------
+# --- cue phụ đề --------------------------------------------------------------
 
 
 def check_subtitle_cue_overlap(
@@ -657,12 +657,12 @@ def check_subtitle_cue_overlap(
     return findings
 
 
-# --- FR60.1 ------------------------------------------------------------------
+# --- LUFS --------------------------------------------------------------------
 
 
 def check_loudness(measured_lufs: float | None, thresholds: QCThresholds) -> list[QCFinding]:
-    """FR60.1 — CR này chỉ ĐO VÀ BÁO. Chuyển loudnorm sang hai lượt là thay đổi
-    assembly có chi phí, chỉ làm khi số đo chứng minh sai lệch đủ lớn (LLD)."""
+    """Chỉ ĐO VÀ BÁO. Chuyển loudnorm sang hai lượt là thay đổi assembly có
+    chi phí, chỉ đáng làm khi số đo chứng minh sai lệch đủ lớn."""
     if measured_lufs is None:
         return []
     deviation = measured_lufs - thresholds.loudness_target_lufs
@@ -682,7 +682,7 @@ def check_loudness(measured_lufs: float | None, thresholds: QCThresholds) -> lis
     ]
 
 
-# --- FR60.3 ------------------------------------------------------------------
+# --- clipping ----------------------------------------------------------------
 
 
 def check_clipping(peak_dbfs: float | None, thresholds: QCThresholds) -> list[QCFinding]:
@@ -703,7 +703,7 @@ def check_clipping(peak_dbfs: float | None, thresholds: QCThresholds) -> list[QC
     ]
 
 
-# --- FR60.5 ------------------------------------------------------------------
+# --- thuộc tính phát hành ----------------------------------------------------
 
 
 def check_publish_attributes(
@@ -787,8 +787,8 @@ def evaluate_all(
     publish_attributes: dict | None = None,
     thresholds: QCThresholds | None = None,
 ) -> list[QCFinding]:
-    """Chạy toàn bộ luật, trả findings đã sắp theo timestamp (FR59.6 — báo cáo
-    đọc từ trên xuống là đi dọc video)."""
+    """Chạy toàn bộ luật, trả findings đã sắp theo timestamp (báo cáo đọc từ
+    trên xuống là đi dọc video)."""
     t = thresholds or QCThresholds.from_env()
     marks = layout_marks or []
     segments = narration_segments or []

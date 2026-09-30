@@ -1,4 +1,4 @@
-"""Unit tests for the CR-001 voice catalog."""
+"""Unit tests for the voice catalog."""
 
 from __future__ import annotations
 
@@ -89,9 +89,8 @@ def test_edge_only_deployment_offers_exactly_the_four_edge_voices():
 
 
 def test_azure_and_edge_labels_are_identical_so_the_gui_must_badge_the_engine():
-    """CR-011 used to disambiguate the two in the label text itself. The GUI
-    now renders the engine field as its own badge, so the suffix would be a
-    second, hand-maintained copy of the same fact."""
+    """The GUI renders the engine field as its own badge, so a suffix in the
+    label would be a second, hand-maintained copy of the same fact."""
     from adapters.tts_engines.voice_registry import ENGINE_AZURE
 
     assert all("(" not in voice.label for voice in VOICES)
@@ -101,7 +100,7 @@ def test_azure_and_edge_labels_are_identical_so_the_gui_must_badge_the_engine():
 
 
 def test_azure_and_edge_offer_the_same_voices_under_distinct_keys():
-    """CR-011 lists both because they differ in guarantees, not in sound. The
+    """Both are listed because they differ in guarantees, not in sound. The
     prefix is what keeps the identical voice names from colliding here."""
     from adapters.tts_engines.voice_registry import ENGINE_AZURE, azure_voice_name
 

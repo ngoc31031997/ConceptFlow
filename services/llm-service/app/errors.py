@@ -1,8 +1,7 @@
 """Error classification for LLM calls.
 
-Carried over from the orchestrator's llm_provider.go (CR-027 FR76.6 / D11):
-the fix for a dead key and the fix for an exhausted token budget have nothing
-in common, so a failed call says which one it was.
+The fix for a dead key and the fix for an exhausted token budget have nothing
+in common, so a failed call says which kind of failure it was.
 """
 
 from __future__ import annotations
@@ -15,7 +14,7 @@ RATE_LIMIT = "rate_limit"
 SERVER = "server"
 TIMEOUT = "timeout"
 # Stopped on length with NOTHING written: on a reasoning model the whole
-# allowance went on thinking (CR-027 D13). The fix is a bigger budget.
+# allowance went on thinking. The fix is a bigger budget.
 BUDGET = "budget"
 # Stopped on length mid-answer. Same fix as BUDGET.
 TRUNCATED = "truncated"
@@ -34,7 +33,7 @@ class Usage:
     completion_tokens: int = 0
     reasoning_tokens: int = 0
     cached_tokens: int = 0
-    #: CR-056: characters of reasoning_content counted on the stream — known even
+    #: Characters of reasoning_content counted on the stream — known even
     #: when the provider never sends its usage record.
     reasoning_chars: int = 0
     #: False when the provider sent no usage record (a stream we cut short, a

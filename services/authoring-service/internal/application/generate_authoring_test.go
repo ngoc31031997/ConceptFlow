@@ -12,8 +12,8 @@ import (
 )
 
 // stubProvider stands in for Hive. It records the request so a test can check
-// that the prompt sent is the rendered one — the whole point of FR77.3 is that
-// the AI path and the Copy path cannot diverge.
+// that the prompt sent is the rendered one — the AI path and the Copy path
+// must not diverge.
 type stubProvider struct {
 	req     application.ChatRequest
 	content string
@@ -114,7 +114,7 @@ func TestGenerateAuthoringStorySendsRenderedPromptAndSaves(t *testing.T) {
 	if story.content != "BEAT 1 — mở đầu" {
 		t.Errorf("saved %q, want the generated outline", story.content)
 	}
-	// The topic is already on the project (CR-028 FR83.1); an AI run must not
+	// The topic is already on the project; an AI run must not
 	// overwrite it with a blank derived from nothing.
 	if story.topic != "" {
 		t.Errorf("saved topic = %q, want it left untouched", story.topic)

@@ -1,10 +1,9 @@
-"""GoogleOAuthFlow — wraps google-auth-oauthlib's Authorization Code flow
-(Low-Level Design Question 3).
+"""GoogleOAuthFlow — wraps google-auth-oauthlib's Authorization Code flow.
 
 Only this module talks to google-auth-oauthlib directly — application
 layer depends on the OAuthFlowPort protocol (application/handle_oauth_callback.py).
 
-CR-012: the flow is app-aware. Which OAuth app to use is chosen per
+The flow is app-aware: which OAuth app to use is chosen per
 authorization (and recovered from `state` on the way back), because the
 token exchange needs that specific app's client_secret.
 """
@@ -20,11 +19,11 @@ from domain.models import OAuthApp, OAuthCredential
 
 YOUTUBE_UPLOAD_SCOPE = "https://www.googleapis.com/auth/youtube.upload"
 YOUTUBE_READONLY_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
-# CR-015 FR40.1 — captions.insert has no narrower scope than this one, which
-# also grants far more than captions (edit/delete video, playlists, comments).
-# Accepted deliberately (ADR-0028): the OAuth app is in Testing, so adding it
-# needs no Google re-verification, but every channel connected before this
-# shipped has to be re-consented to actually receive it (FR40.2/40.3).
+# captions.insert has no narrower scope than this one, which also grants far
+# more than captions (edit/delete video, playlists, comments). Accepted
+# deliberately (ADR-0028): the OAuth app is in Testing, so it needs no Google
+# re-verification; a channel consented without it has to be re-consented to
+# receive it.
 YOUTUBE_FORCE_SSL_SCOPE = "https://www.googleapis.com/auth/youtube.force-ssl"
 
 
@@ -33,7 +32,7 @@ class RedirectUriNotRegisteredError(Exception):
 
     Raised before sending the Creator to Google, so they get an actionable
     message instead of Google's own redirect_uri_mismatch page, which does
-    not say what to add or where (CR-012 FR30.2).
+    not say what to add or where.
     """
 
 
@@ -81,7 +80,7 @@ class GoogleOAuthFlow:
             # Google session is already signed in, so a second channel could
             # not be connected without signing out of Google first.
             # "select_account" is what surfaces the account/channel chooser
-            # every time (CR-012 FR36.1).
+            # every time.
             prompt="select_account consent",
             state=state,
         )
@@ -98,18 +97,17 @@ class GoogleOAuthFlow:
         return OAuthCredential(
             access_token=creds.token,
             # Empty rather than None on a re-consent: the store treats ''
-            # as "keep the stored one" (credential_store.save, FR31.6).
+            # as "keep the stored one" (credential_store.save).
             refresh_token=creds.refresh_token or "",
             expires_at=expires_at,
             channel_id=channel_id,
             client_id=app.client_id,
             channel_title=channel_title,
-            # CR-015 FR40.1: granted_scopes is what Google actually handed
-            # back, which can be a strict subset of what _new_flow asked for
-            # — the Creator can untick a scope on the consent screen. Storing
-            # what was requested instead would make the FR40.2 pre-upload
-            # check always pass, silently reintroducing the late-403 failure
-            # that check exists to prevent.
+            # granted_scopes is what Google actually handed back, which can
+            # be a strict subset of what _new_flow asked for — the Creator can
+            # untick a scope on the consent screen. Storing what was requested
+            # instead would make the pre-upload scope check always pass and
+            # let the caption upload fail late with a 403.
             scopes=tuple(creds.granted_scopes or creds.scopes or ()),
         )
 
@@ -118,7 +116,7 @@ class GoogleOAuthFlow:
         """Returns (channel_id, channel_title) for the single channel this
         token is bound to — the one picked on Google's chooser. mine=True
         never returns the account's other channels, which is why each
-        channel needs its own consent (FR36.4)."""
+        channel needs its own consent."""
         youtube = build("youtube", "v3", credentials=creds)
         response = youtube.channels().list(part="id,snippet", mine=True).execute()
         item = response["items"][0]

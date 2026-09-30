@@ -15,7 +15,7 @@ const VALID_CODE = [
   '        self.narrate("Xin chao")',
 ].join("\n");
 
-// CR-025 step 3: fetches the manim_engineer template and rehydrates saved
+// Step 3: fetches the manim_engineer template and rehydrates saved
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring VisualDirectorStepPage.test.tsx's stub.
 beforeEach(() => {
@@ -110,7 +110,7 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
   });
 
-  // CR-040 FR113: the {{topic}} substitution lives on the server now (and is held
+  // The {{topic}} substitution lives on the server now (and is held
   // to the old TypeScript output by its golden tests). This proves the wiring: the
   // page sends the draft's values and shows what the server answers.
   it("asks the server to render the engineer prompt and shows its answer", async () => {
@@ -148,9 +148,9 @@ describe("ManimEngineerStepPage", () => {
     // feature/remotion-engine: the engine choice lives on THIS tab now, not
     // on the situation-chooser page — switching it must fetch the matching
     // prompt role (remotion_engineer instead of manim_engineer).
-    // CR-031 — thu gọn sau PipelineSettingsBar's "Đổi".
+    // Thu gọn sau PipelineSettingsBar's "Đổi".
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
-    // CR-051: screen titles name the step as the rail does.
+    // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 6 — Code");
     expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("render-engine-remotion"));
@@ -159,7 +159,7 @@ describe("ManimEngineerStepPage", () => {
     );
   });
 
-  // CR-045 — the drawings moved to their own step; the Code tab only says where they stand.
+  // The drawings moved to their own step; the Code tab only says where they stand.
   it("a Remotion video's Code tab shows how many drawings are ready and leads back to the drawings step", async () => {
     window.localStorage.setItem("conceptflow.lastUsedSettings.v1", JSON.stringify({ renderEngine: "remotion" }));
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({

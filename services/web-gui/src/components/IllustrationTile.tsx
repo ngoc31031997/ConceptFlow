@@ -15,7 +15,7 @@ interface IllustrationTileProps {
   onOpen?: () => void;
   /** Extra buttons under the picture (Duyệt, Dựng lại, Vẽ lại bằng AI...). */
   actions?: ReactNode;
-  /** CR-045 — "Nhờ AI sửa các cảnh báo này": opens the redraw with this note filled in. */
+  /** "Nhờ AI sửa các cảnh báo này": opens the redraw with this note filled in. */
   onFixWarnings?: (note: string) => void;
 }
 
@@ -25,7 +25,7 @@ function badgeClass(ill: Illustration): string {
 }
 
 /**
- * CR-044 — one drawing of the library as a tile: the PNG still, which turns
+ * One drawing of the library as a tile: the PNG still, which turns
  * into its GIF (the figure's own motion) while hovered or focused.
  */
 export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0, selected, onOpen, actions, onFixWarnings }: IllustrationTileProps) {

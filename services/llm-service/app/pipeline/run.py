@@ -1,4 +1,4 @@
-"""The chunked code pipeline (CR-039 FR102-FR105, CR-050 Unit 2 / ADR-0030).
+"""The chunked code pipeline. See ADR-0030.
 
 layout/cast -> chunks of N shots in parallel -> deterministic merge ->
 compile check -> repair only the shots that failed -> check again.
@@ -11,11 +11,11 @@ without a model call; the others are written. Every segment result, every
 billed call and every failed check is streamed as it happens, so nothing paid
 for is lost when the run is cut off.
 
-A segment that fails does not stop the others (CR-050 FR-2): the run ends
+A segment that fails does not stop the others: the run ends
 `incomplete` with the failed keys, and the Creator re-runs only those. A dead
 key, an empty balance or the Creator cancelling still stops everything at once.
 A chunk that ran out of token budget is written again as two halves, down to
-one shot (CR-048 T2).
+one shot.
 
 Remotion takes two shortcuts off the critical path: a storyboard that already
 carries `layout` skips the LAYOUT call, and each chunk is compiled (against
@@ -59,7 +59,7 @@ Record = Callable[["Call"], Awaitable[None]]
 
 EXTRACT_ATTEMPTS = 2
 
-# A chunk that failed with one of these is written again as two halves (CR-048 T2).
+# A chunk that failed with one of these is written again as two halves.
 SPLIT_KINDS = (errors.BUDGET, errors.TRUNCATED)
 # Errors that fail every other segment the same way: the other segments are
 # cancelled at once instead of being allowed to finish.
@@ -105,21 +105,21 @@ class CodeRequest:
     model: str = ""
     max_tokens: int = 0
     temperature: float = 0.3
-    #: CR-048 T1 — applied to every call of the run (layout/cast/chunk/repair);
+    #: Applied to every call of the run (layout/cast/chunk/repair);
     #: 0 = no limit. See ChatRequest.max_reasoning_chars.
     max_reasoning_chars: int = 0
-    #: CR-044 — approved library drawings: {name, usage, description, code}.
+    #: Approved library drawings: {name, usage, description, code}.
     illustrations: list[dict] = field(default_factory=list)
-    #: CR-048 T6b — for the layout check of a Remotion script: the strip
+    #: For the layout check of a Remotion script: the strip
     #: burned-in subtitles cover ({"edge": "top"|"bottom", "px": int}, None =
     #: none) and the video's font ("" = the default).
     subtitle_band: dict | None = None
     video_font: str = ""
-    #: CR-050 FR-7 — shots per chunk for this project; 0 = the service default.
+    #: Shots per chunk for this project; 0 = the service default.
     chunk_shots: int = 0
-    #: CR-050 — the segments the caller already stored, by key.
+    #: The segments the caller already stored, by key.
     done: dict[str, DoneSegment] = field(default_factory=dict)
-    #: CR-050 FR-4 — run only these segments; None = every missing one.
+    #: Run only these segments; None = every missing one.
     only: set[str] | None = None
 
     def layout(self) -> LayoutContext | None:
@@ -282,12 +282,12 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
     A fingerprint covers what the segment's prompt is built from, so a stored
     segment is reused exactly when writing it again would ask the same thing:
     - the step's prompt (`req.system` before the library drawings are added —
-      approving a drawing must not throw away every chunk, review C3);
+      approving a drawing must not throw away every chunk);
     - the frame: the storyboard (or, for a storyboard-given LAYOUT, that LAYOUT);
     - a chunk: the frame's fingerprint, the storyboard's world and palette
-      (with the PALETTE keys derived from it), and its own shots. Not the neighbouring shots (a continuity hint only; they
-      would make one edited shot invalidate three chunks), and not the model
-      (CR-050 C2).
+      (with the PALETTE keys derived from it), and its own shots. Not the
+      neighbouring shots (a continuity hint only; they would make one edited
+      shot invalidate three chunks), and not the model.
     """
     sb = _storyboard(req)
     n = chunk_shots if chunk_shots > 0 else 1
@@ -304,7 +304,7 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
     shared = _dump({
         "hero": sb.hero, "world": sb.world,
         "palette": [p.model_dump() for p in sb.palette],
-        # The keys the code is written against (CR-056): a change in how a role
+        # The keys the code is written against: a change in how a role
         # becomes a key makes every stored chunk stale instead of failing TS2551.
         "palette_keys": merger.palette_keys(sb),
     })
@@ -385,7 +385,7 @@ def parse_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
     return {i: got[i] for i in expected}  # extras are dropped
 
 
-# -- one segment outside a run: copy its prompt, check a pasted reply (FR-5) --
+# -- one segment outside a run: copy its prompt, check a pasted reply ---------
 
 def segment_prompt(req: CodeRequest, key: str, default_chunk_shots: int) -> tuple[str, str]:
     """The (system, user) turn the pipeline would send for one segment, for
@@ -656,7 +656,7 @@ class CodePipeline:
             new_frame = await self._repair(ask_req, plan, remotion, frame, shots, targets, check, record, sem)
             changed = {plan.owner(k) for k in targets}
             frame = new_frame
-            # The repaired sections overwrite the segments that own them (FR-8).
+            # The repaired sections overwrite the segments that own them.
             for key in sorted(k for k in changed if k):
                 seg = plan.get(key)
                 content = {"code": frame} if seg.kind == FRAME else {"shots": {i: shots[i] for i in seg.shots}}
@@ -666,7 +666,7 @@ class CodePipeline:
 
         if not check.ok:
             warnings.append("the script still fails the compile check after the last repair round")
-        # The final check's own warnings (CR-048 T6b: a hero drawn too small, or
+        # The final check's own warnings (a hero drawn too small, or
         # a layout check that could not run) — never dropped.
         warnings.extend(w for w in check.warnings if w not in warnings)
         return CodeResult(
@@ -745,7 +745,7 @@ class CodePipeline:
 def _check_event(
     phase: str, round_: int, segment: str, plan: Plan, merged: merger.Merged, check: CheckResult,
 ) -> dict:
-    """A failed check, for the caller's diagnostics log (CR-050 FR-22): each
+    """A failed check, for the caller's diagnostics log: each
     diagnostic with the shot and segment its line falls in."""
     out = []
     for d in check.diagnostics:

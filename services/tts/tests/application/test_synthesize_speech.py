@@ -105,12 +105,11 @@ def test_duration_is_measured_from_wav_file_not_estimated(shared_volume_root):
 
 
 def test_editing_the_narration_resynthesizes_instead_of_reusing_old_audio(shared_volume_root):
-    """CR-005 FR13.6 regression, and a correctness bug in its own right.
+    """The text is part of the audio path.
 
-    The audio path used to be keyed on (project_id, scene_index, voice_id)
-    alone. Editing a line and re-rendering the same project therefore hit the
-    idempotency check and returned the PREVIOUS audio — the video said the old
-    sentence while the subtitle showed the new one.
+    Keyed on (project_id, scene_index, voice_id) alone, an edited line would
+    hit the idempotency check and return the previous audio — the video would
+    say the old sentence while the subtitle shows the new one.
     """
     engine = FakeTTSEngine(duration_seconds=2.0)
     use_case = SynthesizeSpeechUseCase(engine)
@@ -124,7 +123,7 @@ def test_editing_the_narration_resynthesizes_instead_of_reusing_old_audio(shared
 
 
 def test_unchanged_narration_still_reuses_its_audio(shared_volume_root):
-    """The idempotency the hash replaced must still hold: re-rendering a project
+    """Idempotency still holds: re-rendering a project
     without touching a line should not re-synthesize it, which is what keeps a
     metered engine cheap (ADR-0023)."""
     engine = FakeTTSEngine(duration_seconds=2.0)

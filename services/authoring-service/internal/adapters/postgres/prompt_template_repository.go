@@ -25,14 +25,14 @@ func NewPromptTemplateRepository(pool *pgxpool.Pool) *PromptTemplateRepository {
 	return &PromptTemplateRepository{pool: pool}
 }
 
-// --- CR-025 step 1: authoring story (Story Architect output) --------------
+// --- step 1: authoring story (Story Architect output) ---------------------
 
 // SaveAuthoringStory upserts the pasted story outline for a project, plus the
-// topic it was written from (CR-027 D0 — the topic is what {{topic}} renders
-// to, and tab 1a is where the Creator types it).
+// topic it was written from (the topic is what {{topic}} renders to, and tab
+// 1a is where the Creator types it).
 //
 // An empty topic leaves the stored one alone instead of clearing it. A caller
-// that has no topic to offer — a browser still running pre-CR-027 JavaScript,
+// that has no topic to offer — an older browser tab,
 // or any later save that only means to replace the outline — must not wipe a
 // topic the Creator already gave us, since every later pipeline step renders
 // its prompt from it.
@@ -49,8 +49,7 @@ func (r *PromptTemplateRepository) SaveAuthoringStory(ctx context.Context, proje
 	return err
 }
 
-// GetAuthoringTopic returns the saved topic, or "" if none was saved yet
-// (every project created before CR-027 D0).
+// GetAuthoringTopic returns the saved topic, or "" if none was saved yet.
 func (r *PromptTemplateRepository) GetAuthoringTopic(ctx context.Context, projectID string) (string, error) {
 	var topic string
 	err := r.pool.QueryRow(ctx, `
@@ -62,7 +61,7 @@ func (r *PromptTemplateRepository) GetAuthoringTopic(ctx context.Context, projec
 	return topic, err
 }
 
-// SaveAuthoringTopic upserts just the topic (CR-028 FR83.1/FR83.2) — unlike
+// SaveAuthoringTopic upserts just the topic — unlike
 // SaveAuthoringStory, content is not required here: this is called at step 1
 // of the wizard, before any outline exists.
 //
@@ -80,7 +79,7 @@ func (r *PromptTemplateRepository) SaveAuthoringTopic(ctx context.Context, proje
 	return err
 }
 
-// FindSimilarTopics backs CR-028 FR85 — other projects, in the same content
+// FindSimilarTopics backs the topic-collision warning — other projects, in the same content
 // language, whose saved topic normalizes to the same string as normalizedTopic.
 // excludeProjectID keeps a project from "colliding" with its own topic. An empty
 // normalizedTopic never matches anything. The candidate's current status is not
@@ -151,7 +150,7 @@ func (r *PromptTemplateRepository) GetAuthoringStory(ctx context.Context, projec
 	return content, err
 }
 
-// --- CR-025 step 2: authoring storyboard (Visual Director output) ---------
+// --- step 2: authoring storyboard (Visual Director output) ----------------
 
 // SaveAuthoringStoryboard upserts the pasted storyboard for a project. Same
 // insert-if-absent-row/update-in-place shape as SaveAuthoringStory, sharing
@@ -180,7 +179,7 @@ func (r *PromptTemplateRepository) GetAuthoringStoryboard(ctx context.Context, p
 	return content, err
 }
 
-// --- CR-025 step 3: authoring code (Manim Engineer output) ----------------
+// --- step 3: authoring code (Manim Engineer output) -----------------------
 
 // SaveAuthoringCode upserts the pasted Manim code for a project. Same
 // insert-if-absent-row/update-in-place shape as SaveAuthoringStory/
@@ -207,7 +206,7 @@ func (r *PromptTemplateRepository) GetAuthoringCode(ctx context.Context, project
 	return content, err
 }
 
-// --- CR-027 FR79: how the Creator works step 1 ----------------------------
+// --- how the Creator works step 1 -----------------------------------------
 
 // SaveAuthoringMode upserts the step-1 working mode ("manual" or "ai").
 //
@@ -237,8 +236,7 @@ func (r *PromptTemplateRepository) GetAuthoringMode(ctx context.Context, project
 	return mode, err
 }
 
-// SaveAuthoringModels upserts the per-step Hive model choice (model-per-step
-// follow-up to CR-027) — all three tabs in one write, mirroring how the GUI
+// SaveAuthoringModels upserts the per-step Hive model choice — all three tabs in one write, mirroring how the GUI
 // saves them (one picker, at step 1, for all of 1a/1b/1c at once).
 //
 // Upsert on project_id alone, like SaveAuthoringMode: the choice can be made
@@ -273,7 +271,7 @@ func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, proje
 // Summaries returns the topic and content flags for each project that has an
 // authoring row; projects without one are simply absent from the map.
 //
-// CR-051: illustrations_ready is ProjectIllustrationsUseCase.Gate in SQL — the
+// illustrations_ready is ProjectIllustrationsUseCase.Gate in SQL — the
 // list was planned (planned_at set, or rows exist) and no row is still short of
 // ProjectIllustration.Ready (skipped, or reused/drawn with a builtin or approved
 // drawing). One query, so the project list stays one round trip.
@@ -311,11 +309,11 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 
 // DeleteAuthoring removes a deleted project's authoring row. Idempotent.
 func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectID string) error {
-	// CR-044: the video's drawing list goes with it (the drawings stay in the library).
+	// The video's drawing list goes with it (the drawings stay in the library).
 	if err := r.DeleteProjectIllustrations(ctx, projectID); err != nil {
 		return err
 	}
-	// CR-050: and its stored code segments.
+	// And its stored code segments.
 	if _, err := r.pool.Exec(ctx, `DELETE FROM authoring_segments WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}

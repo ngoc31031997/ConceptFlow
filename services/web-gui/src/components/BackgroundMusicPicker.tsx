@@ -6,7 +6,7 @@ interface BackgroundMusicPickerProps {
   projectId: string;
   value: string | null;
   onChange: (path: string | null) => void;
-  /** CR-005 FR14.2 — music level, 0.0-1.0. Was fixed at 0.2. */
+  /** Music level, 0.0-1.0. Was fixed at 0.2. */
   volume: number;
   onVolumeChange: (volume: number) => void;
 }

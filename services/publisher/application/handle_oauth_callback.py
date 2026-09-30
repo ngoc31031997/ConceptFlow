@@ -56,8 +56,8 @@ class HandleOAuthCallbackUseCase:
                 )
             return app
 
-        # No client_id in state: either a pre-CR-012 state string still in
-        # flight, or a hand-built callback. Only unambiguous with exactly
+        # No client_id in state: either a legacy bare state string or a
+        # hand-built callback. Only unambiguous with exactly
         # one app configured — guessing among several would exchange the
         # code against the wrong client and fail confusingly.
         apps = self._app_registry.list()

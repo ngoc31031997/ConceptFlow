@@ -6,7 +6,7 @@ import styles from "./VideoPlayer.module.css";
 
 interface VideoPlayerProps {
   videoSrc: string;
-  /** CR-021 FR61.2 — để báo cáo QC tua tới mốc của một phát hiện. */
+  /** Để báo cáo QC tua tới mốc của một phát hiện. */
   videoRef?: Ref<HTMLVideoElement>;
   scenes?: Scene[];
   contentLanguage?: "vi" | "en";
@@ -18,7 +18,7 @@ export function VideoPlayer({ videoSrc, videoRef, scenes, contentLanguage = "vi"
       <Card>
         <div className={styles.frame}>
           {/*
-            No <track>: subtitles are burnt into the frames by Rendering (CR-002),
+            No <track>: subtitles are burnt into the frames by Rendering,
             so there is no separate caption file to point at. Turning them on is a
             choice made in step 2, before the render.
           */}

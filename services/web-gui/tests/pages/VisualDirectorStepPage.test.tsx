@@ -7,7 +7,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
-// CR-025 step 2: renders the visual_director prompt (server-side, CR-040 FR113) and rehydrates saved
+// Step 2: renders the visual_director prompt (server-side) and rehydrates saved
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring ScriptStepPage.test.tsx's story_architect stub.
 beforeEach(() => {
@@ -85,7 +85,7 @@ describe("VisualDirectorStepPage", () => {
     );
 
     expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
-    // CR-051: screen titles name the step as the rail does.
+    // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Visual");
   });
 

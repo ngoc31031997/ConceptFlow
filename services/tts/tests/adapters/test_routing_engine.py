@@ -1,4 +1,4 @@
-"""Unit tests for RoutingTTSEngine (CR-005 FR13.3 / FR13.5, ADR-0023, ADR-0024, CR-011)."""
+"""Unit tests for RoutingTTSEngine."""
 
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ def test_edge_voice_bypasses_google_entirely(tmp_path):
 
 
 def test_missing_credentials_fall_back_within_the_same_language(tmp_path):
-    """FR13.3. A Vietnamese project must not suddenly speak English because the
+    """A Vietnamese project must not suddenly speak English because the
     cloud engine was unavailable."""
     edge = RecordingEngine()
     engine = make_engine(tmp_path, google=None, edge=edge)
@@ -175,7 +175,7 @@ def test_azure_voice_goes_to_azure_when_configured(tmp_path):
 
 
 def test_azure_voice_falls_back_to_the_same_language_edge_voice(tmp_path):
-    """CR-011: picking an Azure voice with no credentials configured must still
+    """Picking an Azure voice with no credentials configured must still
     render, in the language the project asked for."""
     edge = RecordingEngine()
     engine = make_engine(tmp_path, azure=None, edge=edge)

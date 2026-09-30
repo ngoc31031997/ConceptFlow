@@ -22,8 +22,8 @@ def test_palette_keys_are_ascii_camel_and_unique():
 
 
 def test_palette_keys_keep_the_camel_case_a_role_already_has():
-    # CR-056: `conNguoi` became `connguoi`, and the model, reading `conNguoi` in
-    # every visual, wrote a PALETTE key that did not exist (TS2551 on most shots).
+    # The model reads `conNguoi` in every visual; a lowered key `connguoi` would
+    # make it write a PALETTE key that does not exist (TS2551).
     sb = sbm.parse(json.dumps({
         "hero": "h",
         "palette": [{"role": r, "hex": "#000000", "meaning": "m"}
@@ -42,7 +42,7 @@ def test_remotion_narrations_shots_and_order_come_from_the_storyboard():
     assert "mauNhan: '#F5B841'" in m.code and 'id="creator"' in m.code
     # The prompt tells the model LottieClip is already imported, so the frame must import it.
     assert "import {LottieClip} from './conceptflow-mini/lottie';" in m.code
-    # CR-043: likewise the whole illustration kit.
+    # Likewise the whole illustration kit.
     assert "import {Backdrop, Panel, Person, Tooth, Germ," in m.code
     assert "} from './conceptflow-mini/illustration';" in m.code
     assert m.code.index("const LAYOUT") < m.code.index("function Shot1_1")

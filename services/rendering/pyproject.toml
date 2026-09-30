@@ -14,6 +14,6 @@ select = ["E", "F", "I", "UP", "B"]
 "tests/fixtures/conceptflow_template.py" = ["F403", "F405", "E501"]
 # Offline asset generators: dense geometry/data tables, not service code.
 "tools/*" = ["E501", "E702"]
-# Layout-probe sample generator (CR-048 T6a spike): its long lines are JSX
+# Layout-probe sample generator: its long lines are JSX
 # inside the TSX templates it writes, so wrapping them would change the output.
 "remotion_project/layout_probe_samples/*" = ["E501"]

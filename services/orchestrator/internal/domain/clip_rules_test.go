@@ -11,7 +11,7 @@ func TestValidateClipDuration_ShortPreset(t *testing.T) {
 		{"well within short", 30, false},
 		{"at the boundary", 60, false},
 		{"just over the boundary", 60.1, true},
-		{"too long (75s from the LLD example)", 75, true},
+		{"too long (75s)", 75, true},
 		{"zero is not a valid clip", 0, true},
 		{"negative is not a valid clip", -5, true},
 	}
@@ -31,7 +31,7 @@ func TestValidateClipDuration_LongPreset(t *testing.T) {
 		duration float64
 		wantErr  bool
 	}{
-		{"75s from the LLD example fits long", 75, false},
+		{"75s fits long", 75, false},
 		{"at the lower boundary", 60, false},
 		{"at the upper boundary", 180, false},
 		{"just under the lower boundary", 59.9, true},
@@ -48,7 +48,7 @@ func TestValidateClipDuration_LongPreset(t *testing.T) {
 	}
 }
 
-// TestValidateClipDuration_75sBothPresets locks FR19.6/19.7's own example:
+// TestValidateClipDuration_75sBothPresets:
 // a 75s segment is rejected for "short" with a clear reason and accepted for
 // "long" — one preset's rejection never disqualifies the other.
 func TestValidateClipDuration_75sBothPresets(t *testing.T) {

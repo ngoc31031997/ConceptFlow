@@ -3,7 +3,7 @@ import { getOperation, type OperationProgress } from "../api/client";
 
 /**
  * Poll `GET /v1/operations/{id}` mỗi giây tới khi lượt gọi kết thúc. Best-effort:
- * lỗi mạng bỏ qua, không làm hỏng lượt gọi (FR116.5).
+ * lỗi mạng bỏ qua, không làm hỏng lượt gọi.
  */
 export function useOperationProgress(operationId: string | null): OperationProgress | null {
   const [progress, setProgress] = useState<OperationProgress | null>(null);

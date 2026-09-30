@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Preview the flat illustration kit (CR-043) without running the pipeline.
+ * Preview the flat illustration kit without running the pipeline.
  *
  *   node render_gallery.mjs sheets <outDir>   two PNG sheets: every pose/mood of
  *                                             <Person>, and every other figure

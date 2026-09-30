@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// CR-038: {{lottie_catalog}} is baked into the Remotion Engineer at seed time.
+// {{lottie_catalog}} is baked into the Remotion Engineer at seed time.
 // A leftover placeholder would reach the model as literal text.
 func TestRemotionEngineerSeedExpandsLottieCatalog(t *testing.T) {
 	for _, tpl := range DefaultPromptTemplates() {

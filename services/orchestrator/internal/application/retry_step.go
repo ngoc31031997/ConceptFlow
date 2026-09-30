@@ -23,7 +23,7 @@ var stepRoutingKey = map[domain.StepName]string{
 	domain.StepSynthesizeSpeech: "tts",
 	domain.StepRenderScenes:     "rendering",
 	domain.StepAssembleVideo:    "video_assembly",
-	// CR-021 D1: same queue as assemble_video — the QC worker lives inside
+	// Same queue as assemble_video — the QC worker lives inside
 	// video-assembly, told apart by event_type.
 	domain.StepQCVideo:      "video_assembly",
 	domain.StepPublishVideo: "publisher",
@@ -47,7 +47,7 @@ var failedStatusToStep = map[domain.ProjectStatus]domain.StepName{
 	domain.StatusFailedRenderScenes:     domain.StepRenderScenes,
 	domain.StatusFailedAssembleVideo:    domain.StepAssembleVideo,
 	// Only reachable when the qc_completed message itself was unusable — QC
-	// never reports a failure of its own (FR61.4).
+	// never reports a failure of its own.
 	domain.StatusFailedQCVideo:      domain.StepQCVideo,
 	domain.StatusFailedPublishVideo: domain.StepPublishVideo,
 }
@@ -82,7 +82,7 @@ func (uc *RetryStepUseCase) Execute(ctx context.Context, projectID string) (*Ret
 		return nil, domain.ErrInvalidStatus
 	}
 
-	// CR-040 FR110: a project that failed at the retired parse_script step
+	// A project that failed at the retired parse_script step
 	// resumes at validate_script, which now finds the scene class itself.
 	if stepName == domain.StepParseScript {
 		stepName = domain.StepValidateScript

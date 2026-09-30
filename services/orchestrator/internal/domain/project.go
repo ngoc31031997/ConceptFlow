@@ -19,14 +19,14 @@ const (
 	StatusDraft            ProjectStatus = "draft"
 	StatusParsingScript    ProjectStatus = "parsing_script"
 	StatusValidatingScript ProjectStatus = "validating_script"
-	// CR-024: Saga dừng lại chờ Creator duyệt dàn ý. Đây là đường đi bình
+	// Saga dừng lại chờ Creator duyệt dàn ý. Đây là đường đi bình
 	// thường, KHÔNG phải một trạng thái lỗi — nó cố ý không nằm trong nhóm
-	// failed_at_* (FR69.1).
+	// failed_at_*.
 	StatusAwaitingReview     ProjectStatus = "awaiting_review"
 	StatusSynthesizingSpeech ProjectStatus = "synthesizing_speech"
 	StatusRendering          ProjectStatus = "rendering"
 	StatusAssemblingVideo    ProjectStatus = "assembling_video"
-	// CR-021 D2: video đã ghép xong và đang được chấm chất lượng tự động. Nằm
+	// Video đã ghép xong và đang được chấm chất lượng tự động. Nằm
 	// giữa assembling_video và ready_to_publish — không phải trạng thái chờ
 	// người, Creator không phải làm gì ở đây.
 	StatusRunningQC              ProjectStatus = "running_qc"
@@ -38,26 +38,26 @@ const (
 	StatusFailedSynthesizeSpeech ProjectStatus = "failed_at_synthesize_speech"
 	StatusFailedRenderScenes     ProjectStatus = "failed_at_render_scenes"
 	StatusFailedAssembleVideo    ProjectStatus = "failed_at_assemble_video"
-	// CR-021 FR61.4: QC KHÔNG có nhánh failed từ phía chấm điểm — không chấm
+	// QC KHÔNG có nhánh failed từ phía chấm điểm — không chấm
 	// được vẫn phát qc_completed với status="not_scored" và project vẫn về
 	// ready_to_publish. Trạng thái này chỉ dùng khi chính message hỏng (không
 	// dựng nổi envelope), đúng ngữ nghĩa các bước khác. Một cổng hỏng không
 	// được biến thành cổng khoá.
 	StatusFailedQCVideo ProjectStatus = "failed_at_qc_video"
-	// CR-007 D1: generate_clips sits between qc_video and publish_video —
+	// generate_clips sits between qc_video and publish_video —
 	// cutting vertical clips from a video QC already flagged just multiplies
 	// the same defect into two or three clips, and clips should exist before
 	// the Creator reaches the results screen.
 	StatusGeneratingClips ProjectStatus = "generating_clips"
 	// StatusFailedGenerateClips is used only when the generate_clips MESSAGE
 	// itself is broken (undeliverable command, dead-lettered) — never when an
-	// individual clip fails. D1: a clip's own failure is carried as
+	// individual clip fails. A clip's own failure is carried as
 	// status="error" on that one entry of clips_generated, and the saga still
 	// proceeds to ready_to_publish (a vertical clip is a derivative product,
 	// not the main video).
 	StatusFailedGenerateClips ProjectStatus = "failed_at_generate_clips"
 	StatusFailedPublishVideo  ProjectStatus = "failed_at_publish_video"
-	// CR-040 FR114.2: delete is a saga. The project stays `deleting` (hidden
+	// Delete is a saga. The project stays `deleting` (hidden
 	// from the list, not in flight) until every service that writes to
 	// shared_artifacts has confirmed it removed its own files.
 	StatusDeleting ProjectStatus = "deleting"
@@ -66,7 +66,7 @@ const (
 // IsInFlight reports whether a saga step is executing right now, i.e. a
 // worker may still be writing files for the project. Waiting for the Creator
 // (draft, awaiting_review, ready_to_publish, published) and failed_at_* are not
-// in flight. CR-040 FR114.3: such a project must not be deleted.
+// in flight. An in-flight project must not be deleted.
 func (s ProjectStatus) IsInFlight() bool {
 	switch s {
 	case StatusParsingScript, StatusValidatingScript, StatusSynthesizingSpeech,
@@ -77,7 +77,7 @@ func (s ProjectStatus) IsInFlight() bool {
 	return false
 }
 
-// Delete-saga steps (CR-040 FR114.2): one per service that owns files on
+// Delete-saga steps: one per service that owns files on
 // shared_artifacts. Stored in saga_steps like any step so no schema change is
 // needed; the row is deleted with the project.
 const (
@@ -109,11 +109,11 @@ const (
 	StepSynthesizeSpeech StepName = "synthesize_speech"
 	StepRenderScenes     StepName = "render_scenes"
 	StepAssembleVideo    StepName = "assemble_video"
-	// CR-021 D1: bước riêng, nhưng worker sống trong video-assembly (nơi đã có
+	// Bước riêng, nhưng worker sống trong video-assembly (nơi đã có
 	// sẵn ffmpeg/ffprobe và chính file video vừa ghép). Lệnh `qc_video` đi trên
 	// đúng queue `video_assembly.commands` mà `assemble_video` đang đi.
 	StepQCVideo StepName = "qc_video"
-	// CR-007 D1: worker lives in video-assembly (same queue/dispatcher as
+	// Worker lives in video-assembly (same queue/dispatcher as
 	// assemble_video/qc_video/normalize_channel_asset — event_type tells them apart).
 	StepGenerateClips StepName = "generate_clips"
 	StepPublishVideo  StepName = "publish_video"
@@ -166,8 +166,8 @@ const (
 	SagaStepFailed     SagaStepStatus = "failed"
 )
 
-// ContentLanguage is the language a project's *content* is produced in
-// (CR-008 FR21.1). It drives the TTS voice, the narration-pacing estimate,
+// ContentLanguage is the language a project's *content* is produced in.
+// It drives the TTS voice, the narration-pacing estimate,
 // the subtitles, and the language the SEO metadata and thumbnail prompt are
 // generated in — everything the audience sees or hears.
 //
@@ -176,8 +176,8 @@ const (
 // so the two are separate axes and only this one lives on the Project.
 //
 // The JSON field and database column are still named `voice_language`: renaming
-// them would break every project created before CR-008 for no functional gain
-// (CR-008 §C2). The name is historical, the meaning is now broader.
+// them would break every stored project for no functional gain.
+// The name is historical, the meaning is now broader.
 type ContentLanguage string
 
 const (
@@ -185,8 +185,8 @@ const (
 	LanguageEnglish    ContentLanguage = "en"
 )
 
-// RenderQuality is the resolution/framerate the Creator chose for a project
-// (CR-004 FR12.6). A draft pass at 720p30 is for checking the content; the
+// RenderQuality is the resolution/framerate the Creator chose for a project.
+// A draft pass at 720p30 is for checking the content; the
 // upload pass should be 1080p60 or better, since anything less is below what a
 // monetized channel should publish and wastes Manim's smooth motion.
 type RenderQuality string
@@ -241,10 +241,9 @@ func (q RenderQuality) IsValid() bool {
 	return false
 }
 
-// VideoOutputMode is which of the two shapes a project produces (CR-007
-// follow-up): the standard 16:9 long-form video, the vertical Shorts/TikTok
+// VideoOutputMode is which of the two shapes a project produces: the standard 16:9 long-form video, the vertical Shorts/TikTok
 // clip(s) cut from it, or both. A clip is always derived from the assembled
-// 16:9 video (CR-007 D1 — no standalone vertical production), so
+// 16:9 video (no standalone vertical production), so
 // ModeShortOnly still runs the full render pipeline as source material; the
 // mode only decides whether generate_clips runs at all, and which output the
 // Result screen puts front and center.
@@ -293,7 +292,7 @@ const (
 type Scene struct {
 	SceneIndex    int    `json:"scene_index"`
 	NarrationText string `json:"narration_text"`
-	// CR-024 FR68.5: khung hình lúc câu này được nói, dạng "Text×2, Arrow".
+	// Khung hình lúc câu này được nói, dạng "Text×2, Arrow".
 	// Chỉ dùng cho màn duyệt dàn ý; không ảnh hưởng gì tới render.
 	Visual              string  `json:"visual,omitempty"`
 	IllustrationHint    string  `json:"illustration_hint"`
@@ -318,46 +317,46 @@ type Project struct {
 	ScriptContent       string
 	ManimSceneClassName string // the Manim `Scene` subclass Rendering must execute — set from script_parsed (Manim-script input mode)
 	PluginID            string
-	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
+	CategoryHint        string // business-rules.md Rule 1 — Creator-chosen, applied to every scene
 	ContentLanguage     ContentLanguage
 	BackgroundMusicPath *string // optional static input, set at Saga start, reused unchanged at assemble_video (Rule 3)
-	// CR-005 FR14.2 — music level, 0.0-1.0. Zero means "unset"; assembly
+	// Music level, 0.0-1.0. Zero means "unset"; assembly
 	// substitutes its own default so an old project keeps the previous 0.2.
 	BackgroundMusicVolume float64
 	// Font for text drawn inside a Remotion video. Empty means
 	// DefaultVideoFont. Manim ignores it: its fonts come from the theme.
 	VideoFont string
 
-	// CR-001 — narration and subtitles are independently switchable per project.
+	// Narration and subtitles are independently switchable per project.
 	// When TTSEnabled is false the synthesize_speech step is skipped entirely and
 	// Scene.DurationSeconds is filled from EstimateNarrationDuration instead.
 	TTSEnabled bool
 	VoiceID    string
 
-	// CR-019: hình dạng video project này được dựng theo. Version chốt lại tại
+	// Hình dạng video project này được dựng theo. Version chốt lại tại
 	// thời điểm render, nên sửa format sau đó không làm sai lệch dàn ý hay
-	// chapter của video cũ (FR51.6).
+	// chapter của video cũ.
 	VideoFormatID      string
 	VideoFormatVersion int
 
-	// CR-024: các beat lượt dry quan sát được, và cảnh báo từ bước validate.
+	// Các beat lượt dry quan sát được, và cảnh báo từ bước validate.
 	// Cả hai chỉ tồn tại để dựng màn duyệt dàn ý.
 	Beats              []BeatOccurrence
 	ValidationWarnings []string
 
-	// ReviewEnabled bật cổng duyệt dàn ý (FR69.7). Mặc định bật; tắt được cho
+	// ReviewEnabled bật cổng duyệt dàn ý. Mặc định bật; tắt được cho
 	// những lần chạy mà Creator đã biết rõ mình muốn gì — một cổng không bỏ qua
 	// được sẽ biến thành thao tác bấm cho xong và mất hết giá trị.
 	ReviewEnabled bool
 	// SubtitlesEnabled is kept for wire/schema backward compatibility (a
 	// caller that never adopts subtitle_mode) but SubtitleMode is the
-	// source of truth from CR-015 on — see project_repository.go's Get for
-	// how a row from before that column existed gets one anyway.
+	// source of truth — see project_repository.go's Get for how a legacy row
+	// without that column gets one.
 	SubtitlesEnabled bool
 	SubtitleMode     SubtitleMode
 	SubtitleStyle    *SubtitleStyle
 
-	// CR-004 — resolution/framerate for this project's render.
+	// resolution/framerate for this project's render.
 	RenderQuality RenderQuality
 
 	// RenderEngine is which rendering backend (Manim or Remotion) executes
@@ -369,13 +368,13 @@ type Project struct {
 	// clips, or both. Drives whether generate_clips runs at all.
 	VideoOutputMode VideoOutputMode
 
-	// CR-023 FR67.1/67.2 — whether the fixed channel intro/outro sting is
+	// Whether the fixed channel intro/outro sting is
 	// attached at assemble_video. Both default true (long-form channel
 	// identity is opt-out, not opt-in).
 	IntroEnabled bool
 	OutroEnabled bool
 	// IntroAssetID/OutroAssetID are resolved once, at assemble_video dispatch
-	// time, from video-assembly's channel_assets (CR-023 D1/D2) and then
+	// time, from video-assembly's channel_assets and then
 	// persisted here — nil when disabled or when no active asset was found
 	// (the saga proceeds without one rather than failing). Storing the
 	// resolved id rather than re-resolving it keeps RetryStepUseCase's Rule 5
@@ -386,24 +385,24 @@ type Project struct {
 
 	Scenes []Scene
 
-	// CR-006 — chapter markers from the script, resolved to timestamps only
+	// Chapter markers from the script, resolved to timestamps only
 	// once Rendering reports where each narration actually starts.
 	Chapters []Chapter
 
 	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
 	VideoPath         *string
-	// CR-015 FR38.4 — the .srt caption track Video Assembly wrote alongside
+	// The .srt caption track Video Assembly wrote alongside
 	// VideoPath, or nil when subtitle_mode didn't produce one (off/burn_in
 	// only, or subtitles disabled). Flows to the Publish Saga the same way
 	// YoutubeThumbnailPath does.
 	CaptionPath *string
-	// CaptionStatus mirrors the Publisher's PublishResult.caption_status
-	// (CR-015 FR39.4) — nil when no caption was requested; otherwise
+	// CaptionStatus mirrors the Publisher's PublishResult.caption_status —
+	// nil when no caption was requested; otherwise
 	// "uploaded" | "skipped_no_scope" | "failed". Surfaced to the GUI so a
 	// silently skipped or failed caption is not invisible.
 	CaptionStatus *string
 
-	// CR-002 — where each narration segment actually begins in RenderedVideoPath,
+	// Where each narration segment actually begins in RenderedVideoPath,
 	// measured by Rendering. WaitOffsets[i] belongs to Scenes[i] in scene_index
 	// order. It is NOT the running sum of Scene.DurationSeconds: the animation
 	// between narrations pushes every later segment further out, and assuming
@@ -412,7 +411,7 @@ type Project struct {
 	WaitOffsets          []float64
 	RenderedVideoSeconds float64 // Rendering's measured length of RenderedVideoPath
 
-	// CR-021 FR58/D3 — what was on screen at each narration mark, as measured
+	// What was on screen at each narration mark, as measured
 	// by Rendering's `{"kind":"layout"}` records and carried out on
 	// `rendering_completed`. Orchestrator stores it and hands it straight back
 	// to the QC worker on `qc_video`; it never interprets it, which is why the
@@ -422,36 +421,36 @@ type Project struct {
 	// code that reads a bbox is `video-assembly/domain/qc_rules.py`.
 	LayoutMarks []map[string]interface{}
 
-	// CR-007 FR19.2 — the `with self.clip(...)` selections Rendering measured
+	// The `with self.clip(...)` selections Rendering measured
 	// on the real render pass, carried verbatim on rendering_completed
 	// (kind="clip", name, t_start, t_end) exactly like LayoutMarks: Orchestrator
 	// never reads a field inside, only stores it and hands it to
-	// generate_clips's request-merging logic (D3).
+	// generate_clips's request-merging logic.
 	ClipMarks []map[string]interface{}
 
 	// IntroDurationSeconds is the channel intro's real length, as measured by
 	// video-assembly when it resolved IntroAssetID and folded it into
-	// effective_lead_in (CR-023 D5) — carried out on video_assembled. It is
+	// effective_lead_in — carried out on video_assembled. It is
 	// the only source of this number: Orchestrator's channel_asset_pointers
 	// projection stores no duration, and Orchestrator does not call
-	// video-assembly over HTTP (CR-023 correction). generate_clips needs it
+	// video-assembly over HTTP. generate_clips needs it
 	// to shift a Creator's clip selection by the same amount the narration
 	// and subtitles were already shifted — without it, a clip cut from a
 	// project with an intro enabled would be off by exactly the intro's
-	// length (CR-007 D5 risk).
+	// length.
 	IntroDurationSeconds float64
 	// ClipRequests holds the Creator-entered clip selections from
 	// POST /v1/projects/{id}/clips — {name, start_seconds, end_seconds,
-	// presets}. Kept separate from ClipMarks (script-sourced) so D3's "trùng
+	// presets}. Kept separate from ClipMarks (script-sourced) so "trùng
 	// tên thì GUI thắng" can be resolved at generate_clips dispatch time
 	// without the two sources overwriting each other on arrival.
 	ClipRequests []map[string]interface{}
 	// Clips is the outcome of generate_clips, stored verbatim from
 	// clips_generated (one entry per requested (name, preset) pair, "ok" or
-	// "error" — D1: a clip failure never blocks the saga).
+	// "error" — a clip failure never blocks the saga).
 	Clips []ClipResult
 
-	// CompanionProjectID (CR-026 D1) links two independent projects that
+	// CompanionProjectID links two independent projects that
 	// cover the same topic as two different outputs — a long-form video and
 	// a short-form one with its own dedicated script (not a crop of the
 	// long one). Self-referencing, no FK: the two projects have independent
@@ -467,7 +466,7 @@ type Project struct {
 	YoutubeVisibility    *Visibility
 	YoutubePublishAt     *string // RFC3339 — schedules the video to auto-go-public at this time (only valid alongside YoutubeVisibility == private, per YouTube Data API)
 	YoutubeThumbnailPath *string // absolute path on shared_artifacts, set by a manual upload before Publish Saga starts
-	YoutubeChannelID     *string // which connected YouTube channel to publish to; nil means the Publisher's default channel (CR-012)
+	YoutubeChannelID     *string // which connected YouTube channel to publish to; nil means the Publisher's default channel
 	YoutubeVideoURL      *string
 
 	ErrorMessage *string
@@ -483,8 +482,8 @@ type Project struct {
 	WizardRoute string
 }
 
-// ClipResult is one (name, preset) outcome of the generate_clips step
-// (CR-007), stored verbatim from clips_generated's "clips" array.
+// ClipResult is one (name, preset) outcome of the generate_clips step,
+// stored verbatim from clips_generated's "clips" array.
 type ClipResult struct {
 	Name            string  `json:"name"`
 	Preset          string  `json:"preset"`
@@ -513,7 +512,7 @@ type ProjectSummary struct {
 	RunState RunState
 	// ForkedFrom is the project this one was forked from, "" if none.
 	ForkedFrom string
-	// ForkedFromTopic names that source (CR-054: it may be on another page).
+	// ForkedFromTopic names that source (it may be on another page).
 	ForkedFromTopic string
 }
 
@@ -540,7 +539,7 @@ type ProgressMessage struct {
 	ErrorMessage *string `json:"error_message,omitempty"`
 }
 
-// AuthoringMode is how the Creator works step 1 of the wizard (CR-027 FR79):
+// AuthoringMode is how the Creator works step 1 of the wizard:
 // copy each prompt out to an external AI and paste the answer back, or let the
 // server render the prompt and call the provider itself.
 //
@@ -552,13 +551,13 @@ type ProgressMessage struct {
 type AuthoringMode string
 
 const (
-	// AuthoringModeManual is the copy-prompt-out round trip — the only way
-	// that existed before CR-027, and the way that still works with no API
-	// key, no credit, or a provider outage (FR77.4/FR83.2). It is the default
-	// for every project, including every project created before FR79.
+	// AuthoringModeManual is the copy-prompt-out round trip — the way
+	// that works with no API
+	// key, no credit, or a provider outage. It is the default
+	// for every project.
 	AuthoringModeManual AuthoringMode = "manual"
-	// AuthoringModeAI lets the server render the prompt and call the provider
-	// (FR78). It is only offered where a provider is actually configured.
+	// AuthoringModeAI lets the server render the prompt and call the provider.
+	// It is only offered where a provider is actually configured.
 	AuthoringModeAI AuthoringMode = "ai"
 )
 
@@ -579,9 +578,9 @@ func NormalizeAuthoringMode(s string) string {
 }
 
 // AuthoringModelOption is one entry of the Hive model picker the Creator sees
-// at wizard step 1 (in-app authoring, model-per-step follow-up to CR-027).
+// at wizard step 1 (in-app authoring, one model per step).
 // ID is the exact string Hive's chat-completions API expects in the "model"
-// field — the two values below are the ones CR-027's own measurements were
+// field — the two values below are the ones the token measurements were
 // taken against (see llm_provider.go's TokenUsage doc and hive_client.go).
 type AuthoringModelOption struct {
 	ID    string `json:"id"`

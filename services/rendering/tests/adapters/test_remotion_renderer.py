@@ -149,7 +149,7 @@ class TestRender:
         assert result.video_path == output_path
         assert result.video_duration_seconds == 12.3
         # segment 0 starts at frame 0 (t=0s); segment 1 starts after 2s * 30fps = 60
-        # frames plus the CR-047 inter-shot gap (0.3s = 9 frames) = 69 frames = 2.3s
+        # frames plus the inter-shot gap (0.3s = 9 frames) = 69 frames = 2.3s
         assert result.wait_offsets == [0.0, 2.3]
 
         # The entry file lands at the fixed src/ path, not the media dir —

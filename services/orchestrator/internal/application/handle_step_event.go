@@ -79,12 +79,12 @@ var eventStepMap = map[string]domain.StepName{
 	"rendering_failed":    domain.StepRenderScenes,
 	"video_assembled":     domain.StepAssembleVideo,
 	"assembly_failed":     domain.StepAssembleVideo,
-	// CR-021 FR61.4: qc_completed is the ONLY event qc_video ever produces.
+	// qc_completed is the ONLY event qc_video ever produces.
 	// There is deliberately no qc_failed counterpart — a QC that could not run
 	// reports status="not_scored" and the saga carries on, so a broken measuring
 	// tool can never hold a finished video hostage.
 	"qc_completed": domain.StepQCVideo,
-	// CR-007 D1: clips_generated is the ONLY event generate_clips ever
+	// clips_generated is the ONLY event generate_clips ever
 	// produces — same posture as qc_completed. A clip that failed to cut is
 	// reported inside its own entry (status="error"), never as a step-level
 	// failure, so there is no generate_clips_failed counterpart here.
@@ -121,22 +121,21 @@ type HandleStepEventUseCase struct {
 	authoringCleanup AuthoringCleanupPort
 	publisher        domain.CommandPublisherPort
 	progress         domain.ProgressPublisherPort
-	// qcReports stores the automated QC report (CR-021 D6). Optional/nil-checked
+	// qcReports stores the automated QC report. Optional/nil-checked
 	// at its call sites for the same reason channelAssets is: callers and tests
-	// written before CR-021 keep working, and a project simply ends up with no
+	// without it keep working, and a project simply ends up with no
 	// report — which the publish gate already has to treat as "nothing to
-	// enforce" anyway (FR61.4).
+	// enforce" anyway.
 	qcReports domain.QCReportPort
-	// channelAssets resolves the active intro/outro asset (CR-023 D1/D2).
-	// Optional (nil-checked at the one call site) so existing callers/tests
-	// built before CR-023 keep compiling and behaving exactly as before —
-	// intro/outro simply stay unattached without one.
+	// channelAssets resolves the active intro/outro asset.
+	// Optional (nil-checked at the one call site) so callers/tests
+	// without it keep working — intro/outro simply stay unattached.
 	channelAssets domain.ChannelAssetPort
 	logger        *slog.Logger
 }
 
 // NewHandleStepEventUseCase constructs the use case with its port
-// dependencies. channelAssets may be nil (CR-023's intro/outro lookup is then
+// dependencies. channelAssets may be nil (the intro/outro lookup is then
 // skipped entirely, same as if both toggles were off).
 func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher domain.CommandPublisherPort, progress domain.ProgressPublisherPort, channelAssets domain.ChannelAssetPort, logger *slog.Logger) *HandleStepEventUseCase {
 	if logger == nil {
@@ -146,7 +145,7 @@ func NewHandleStepEventUseCase(repo domain.ProjectRepositoryPort, publisher doma
 }
 
 // AuthoringCleanupPort removes a deleted project's authoring row in
-// authoring-service (CR-040 FR111).
+// authoring-service.
 type AuthoringCleanupPort interface {
 	DeleteAuthoring(ctx context.Context, projectID string) error
 }
@@ -206,7 +205,7 @@ func ClassifySagaFailure(step domain.StepName, message string) string {
 	return ""
 }
 
-// WithQCReports attaches the QC report store (CR-021 D6).
+// WithQCReports attaches the QC report store.
 //
 // A setter rather than another constructor parameter: NewHandleStepEventUseCase
 // already takes five, and every existing caller and test would have to be
@@ -231,7 +230,7 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 		return uc.handlePurgeEvent(ctx, event)
 	}
 
-	// CR-023 correction: channel_asset_rendered/channel_asset_normalized are
+	// channel_asset_rendered/channel_asset_normalized are
 	// not saga-step events for any project — intro/outro belong to the
 	// channel, not a project (see rendering/producer.py's
 	// channel_asset_rendered_envelope docstring). They update Orchestrator's
@@ -254,7 +253,7 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 		// nor a dead-letter exchange (infra/rabbitmq/definitions.json) — so a
 		// returned error on an event that can never succeed becomes an
 		// unbounded hot redelivery loop. Observed live: two validation_failed
-		// events for projects whose rows no longer existed produced thousands
+		// events for projects whose rows had been deleted produced thousands
 		// of identical ERROR lines per second, burning CPU and drowning Loki.
 		//
 		// A missing step row is the same class of thing as the "step is no
@@ -272,7 +271,7 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 	}
 	if step.Status != domain.SagaStepInProgress {
 		// Rule 4 / Flow 6: out-of-order or redelivered event for a step that
-		// is no longer in_progress — skip processing, still ack (handled by
+		// is not in_progress — skip processing, still ack (handled by
 		// the caller returning nil here).
 		uc.logger.WarnContext(ctx, "unexpected event for non-in-progress step, skipping",
 			"event_type", event.EventType, "saga_id", event.SagaID, "step", stepName, "step_status", step.Status)
@@ -308,7 +307,7 @@ func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Contex
 //
 // channel_asset_rendered (rendering's raw output: kind, video_path, duration,
 // render_quality) is turned into a register_channel_asset command to
-// video-assembly (CR-040 FR112.1) — the Orchestrator, not a second queue
+// video-assembly — the Orchestrator, not a second queue
 // binding on rendering.events, decides who ingests it. The command's
 // message_id is derived from the event's so a redelivered event yields the same
 // command and video-assembly's inbox drops the duplicate.
@@ -480,18 +479,17 @@ func (uc *HandleStepEventUseCase) handleSuccess(ctx context.Context, event StepE
 // synthesize_speech (a "failed" one for render_scenes was already sent).
 var errAggregationFailed = fmt.Errorf("scene aggregation failed (Rule 1)")
 
-// errAwaitingReview is the same trick for CR-024's pause: validate_script did
+// errAwaitingReview is the same trick for the outline review pause: validate_script did
 // finish, but the saga is now parked at the review gate, so the trailing
 // "completed" progress message must not overwrite the "awaiting_review" one
 // the handler already sent. Reporting the step completed here would tell the
 // GUI the pipeline is moving when it is waiting for a human.
 var errAwaitingReview = fmt.Errorf("saga is parked awaiting review")
 
-// onScriptParsed dispatches the validation pass (CR-020 FR56.1).
+// onScriptParsed dispatches the validation pass.
 //
-// Before CR-018 this step also carried the narration lines, which Script
-// Processing had scraped out of the source with a regex over `# NARRATION:`
-// comments. It cannot: narration now lives inside `self.narrate(...)` calls
+// This step does not carry the narration lines: narration lives inside
+// `self.narrate(...)` calls
 // that may sit in a loop, a branch or a helper, so the only way to know what a
 // script says is to run it. `script_parsed` therefore carries just the scene
 // class name, and validate_script — a dry pass in Rendering — produces the rest.
@@ -530,7 +528,7 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 // order the viewer will hear them — including narration produced inside loops,
 // which no amount of reading the source text could have counted correctly.
 func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event StepEvent, project *domain.Project) error {
-	// CR-040 FR110: rendering found the class/composition while validating.
+	// Rendering found the class/composition while validating.
 	// Empty (an older worker) leaves whatever a legacy script_parsed stored.
 	if name := stringFromPayload(event.Payload, "scene_class_name"); name != "" {
 		project.ManimSceneClassName = name
@@ -544,12 +542,12 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	// finds an empty ClipsPanel.
 	project.ClipMarks = mapSliceFromPayload(event.Payload, "clip_marks")
 
-	// CR-019 FR52.2: chapter sinh ra từ beat, không còn từ marker `# CHAPTER:`
+	// Chapter sinh ra từ beat, không còn từ marker `# CHAPTER:`
 	// rời rạc. Hai cơ chế song song sẽ trôi khỏi nhau, và beat vốn đã là chỗ
 	// Creator quyết định cấu trúc.
 	project.Chapters = chaptersFromBeats(beats)
 
-	// Chốt phiên bản format tại thời điểm chạy (FR51.6), để sửa format sau này
+	// Chốt phiên bản format tại thời điểm chạy, để sửa format sau này
 	// không làm sai lệch cấu trúc của video đã dựng.
 	format, err := uc.repo.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)
 	if err == nil {
@@ -560,7 +558,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 		return err
 	}
 
-	// FR52.3/FR52.5: thiếu beat bắt buộc là dữ kiện chắc chắn nên chặn được;
+	// Thiếu beat bắt buộc là dữ kiện chắc chắn nên chặn được;
 	// mọi thứ còn lại (beat lạ, lặp quá, sai thứ tự) chỉ cảnh báo, vì chặn
 	// render vì một con số mềm sẽ dạy Creator bỏ qua cả cơ chế.
 	issues := format.ValidateBeats(beats)
@@ -568,7 +566,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 		return uc.failValidationForBeats(ctx, event, domain.BlockingBeatIssues(issues))
 	}
 
-	// Mọi thứ còn lại đi kèm dàn ý để Creator duyệt cùng một lúc (CR-024 FR68.3):
+	// Mọi thứ còn lại đi kèm dàn ý để Creator duyệt cùng một lúc:
 	// duyệt nội dung và duyệt cảnh báo tách làm hai lần nhìn thì lần thứ hai sẽ
 	// bị bỏ qua.
 	project.Beats = beats
@@ -578,7 +576,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	// Bug report (2026-09-12): overlap warnings from the dry pass's geometry
 	// check (an unpositioned Text landing on an existing visual) ride the same
 	// non-blocking ValidationWarnings slice as lint warnings and beat issues —
-	// one list, one place the Creator looks, per CR-024 FR68.3.
+	// one list, one place the Creator looks.
 	project.ValidationWarnings = append(
 		project.ValidationWarnings, layoutWarningsFromPayload(event.Payload)...,
 	)
@@ -597,7 +595,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 		return err
 	}
 
-	// CR-024 FR69.1 — điểm dừng, đặt ở đúng ranh giới giữa phần rẻ và phần đắt:
+	// Điểm dừng, đặt ở đúng ranh giới giữa phần rẻ và phần đắt:
 	// lượt dry vừa xong nên đã có đủ dữ liệu để dựng dàn ý, mà TTS thì chưa chạy
 	// nên chưa tốn gì.
 	if project.ReviewEnabled {
@@ -609,7 +607,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 			Step:      string(domain.StepValidateScript),
 			// "awaiting_review" chứ không phải "completed": một Saga đang dừng
 			// mà giao diện trông như đang chạy là cách chắc chắn để Creator ngồi
-			// đợi vô ích (FR69.5).
+			// đợi vô ích.
 			Status: "awaiting_review",
 		}); err != nil {
 			return err
@@ -653,8 +651,7 @@ func (uc *HandleStepEventUseCase) failValidationForBeats(ctx context.Context, ev
 	return errAggregationFailed
 }
 
-// ResumeAfterReview restarts the saga once the Creator has approved the outline
-// (CR-024 FR69.2).
+// ResumeAfterReview restarts the saga once the Creator has approved the outline.
 //
 // Exported because the approve use case needs exactly the branch this type
 // already owns — with narration on, dispatch to TTS; with it off, estimate the
@@ -668,7 +665,7 @@ func (uc *HandleStepEventUseCase) ResumeAfterReview(ctx context.Context, project
 }
 
 // recordVoiceCalibration folds this project's totals into its voice's running
-// average (CR-016 FR43).
+// average.
 func (uc *HandleStepEventUseCase) recordVoiceCalibration(ctx context.Context, project *domain.Project) error {
 	words := 0
 	seconds := 0.0
@@ -679,14 +676,14 @@ func (uc *HandleStepEventUseCase) recordVoiceCalibration(ctx context.Context, pr
 	return uc.repo.RecordVoiceSamples(ctx, project.VoiceID, words, seconds)
 }
 
-// skipSynthesizeSpeech is the TTS-disabled branch (CR-001 FR4.6): no audio is
+// skipSynthesizeSpeech is the TTS-disabled branch: no audio is
 // synthesized, so the step is closed as completed without ever being
 // dispatched, each scene's duration is estimated from its narration text, and
 // render_scenes is dispatched directly. Rendering and Video Assembly stay
 // unaware of the toggle — they only ever see a populated DurationSeconds.
 func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
 	// Use whatever this voice has actually been measured at, when there is
-	// enough of it (CR-016 FR43.2). Falls back to the language constant on its
+	// enough of it. Falls back to the language constant on its
 	// own, so an unmeasured voice behaves exactly as before.
 	calibration, err := uc.repo.GetVoiceCalibration(ctx, project.VoiceID)
 	if err != nil {
@@ -715,8 +712,7 @@ func (uc *HandleStepEventUseCase) skipSynthesizeSpeech(ctx context.Context, saga
 }
 
 // startSynthesizeSpeech dispatches synthesize_speech (Bước 3) — shared by
-// onScriptParsed since classify_scenes no longer runs as a separate
-// dispatched step.
+// onScriptParsed.
 func (uc *HandleStepEventUseCase) startSynthesizeSpeech(ctx context.Context, sagaID, projectID string, project *domain.Project) error {
 	// A fresh run of this step always gets the full automatic-retry budget,
 	// whether this is the saga's first attempt or a Creator-triggered manual
@@ -775,7 +771,7 @@ func (uc *HandleStepEventUseCase) onSpeechSynthesized(ctx context.Context, event
 		return err
 	}
 
-	// CR-016 FR43.1: this is the only moment where both halves of the
+	// This is the only moment where both halves of the
 	// measurement exist together — the text we sent, and how long it really
 	// took to read. Recording it costs nothing and is what eventually replaces
 	// the guessed words-per-minute constants with something measured.
@@ -799,7 +795,7 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 	}
 	quality := project.RenderQuality
 	if !quality.IsValid() {
-		// Covers projects created before CR-004 added the field.
+		// Covers projects with no stored render quality.
 		quality = domain.DefaultRenderQuality
 	}
 	engine := project.RenderEngine
@@ -836,7 +832,7 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
 	videoPath := stringFromPayload(event.Payload, "video_path")
 
-	// CR-002 FR10.5: the offsets must line up one-to-one with the scenes, in
+	// The offsets must line up one-to-one with the scenes, in
 	// order. A short or mismatched list would silently put every later
 	// narration on the wrong offset, which is precisely the desynchronisation
 	// this CR removes — so fail the saga loudly instead of assembling a video
@@ -871,17 +867,17 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 	project.RenderedVideoPath = &videoPath
 	project.WaitOffsets = waitOffsets
 	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
-	// CR-021 FR58: on-screen geometry per scene, needed by qc_video to score
+	// on-screen geometry per scene, needed by qc_video to score
 	// the render. Never assigned before this fix — every project fell back to
 	// QC's "not_scored" path regardless of QC_ENFORCE.
 	project.LayoutMarks = mapSliceFromPayload(event.Payload, "layout_marks")
-	// CR-007 FR19.2: the `with self.clip(...)` selections Rendering measured
+	// The `with self.clip(...)` selections Rendering measured
 	// on this real render pass, stored verbatim exactly like LayoutMarks —
 	// Orchestrator never interprets a field inside, only carries it forward to
 	// generate_clips's request-merging (buildClipRequests).
 	project.ClipMarks = mapSliceFromPayload(event.Payload, "clip_marks")
 
-	// CR-023 D2: resolve the channel intro/outro before publishing
+	// Resolve the channel intro/outro before publishing
 	// assemble_video, and persist the resolved id on Project rather than
 	// re-resolving on retry (RetryStepUseCase's Rule 5 rebuilds purely from
 	// Project). A toggle off or no active asset both simply leave the field
@@ -903,7 +899,7 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 }
 
 // resolveChannelAssets looks up the active intro/outro asset for each toggle
-// the project has enabled (CR-023 FR67.1/67.2 default true) and sets
+// the project has enabled (both default true) and sets
 // IntroAssetID/OutroAssetID on project. Best-effort: a lookup failure or a
 // missing asset is logged and leaves the field nil, never fails the saga —
 // video-assembly is asked to attach an asset if one is there, not required to
@@ -939,7 +935,7 @@ func (uc *HandleStepEventUseCase) resolveChannelAssets(ctx context.Context, proj
 func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event StepEvent, project *domain.Project) error {
 	videoPath := stringFromPayload(event.Payload, "video_path")
 	project.VideoPath = &videoPath
-	// CR-015 FR38.4: present only when subtitle_mode produced a caption
+	// Present only when subtitle_mode produced a caption
 	// track. Absent (not null) for every other case — see producer.py's
 	// video_assembled_envelope — so an empty string here would wrongly
 	// overwrite a caption_path a previous, idempotent call already stored.
@@ -951,23 +947,20 @@ func (uc *HandleStepEventUseCase) onVideoAssembled(ctx context.Context, event St
 		return err
 	}
 
-	// CR-029: qc_video is off the main saga. It ran *after* assembly with no
+	// qc_video is off the main saga. It ran *after* assembly with no
 	// fail branch (a "not_scored" verdict never blocked anything), so it never
 	// gated quality — it only added a QC-report side effect once every cost
 	// (TTS+render+assembly) had already been spent. That posture belongs
-	// before render, not after it (backlog — see
-	// cr-029-render-saga-consolidation.md), so assembly now goes straight to
-	// the same branch onQCCompleted used to reach (generate_clips or
-	// ready_to_publish). The qc_video plumbing (StepQCVideo, qcVideoPayload,
+	// before render, not after it, so assembly goes straight to the same
+	// branch onQCCompleted reaches (generate_clips or ready_to_publish). The qc_video plumbing (StepQCVideo, qcVideoPayload,
 	// onQCCompleted) stays in place, unused, so re-enabling it later is a
 	// one-line dispatch change rather than a rebuild.
 	return uc.advanceAfterVideoReady(ctx, event, project)
 }
 
-// advanceAfterVideoReady is the branch that used to run only after
-// onQCCompleted (CR-007 D1): a project with no clip requests is done,
-// everything else gets generate_clips dispatched. CR-029 also reaches it
-// directly from onVideoAssembled now that qc_video sits between them no more.
+// advanceAfterVideoReady: a project with no clip requests is done, everything
+// else gets generate_clips dispatched. Reached from onVideoAssembled and from
+// onQCCompleted.
 func (uc *HandleStepEventUseCase) advanceAfterVideoReady(ctx context.Context, event StepEvent, project *domain.Project) error {
 	if !project.VideoOutputMode.WantsClips() {
 		return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusReadyToPublish)
@@ -984,14 +977,14 @@ func (uc *HandleStepEventUseCase) advanceAfterVideoReady(ctx context.Context, ev
 	return uc.repo.UpdateStatus(ctx, event.ProjectID, domain.StatusGeneratingClips)
 }
 
-// onQCCompleted stores the QC report and dispatches generate_clips (CR-007
-// D1) — QC no longer ends the Render Saga itself.
+// onQCCompleted stores the QC report and dispatches generate_clips — QC
+// does not end the Render Saga itself.
 //
 // It moves on unconditionally. Whatever the verdict — passed, has_findings, or
-// not_scored — the project proceeds to generate_clips (FR61.4): QC decides
+// not_scored — the project proceeds to generate_clips: QC decides
 // what the Creator is *told*, never whether the pipeline finishes. The one
 // place a blocking finding can actually stop anything is the Publish Saga,
-// and only with QC_ENFORCE on (D5).
+// and only with QC_ENFORCE on.
 func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
 	status := domain.QCStatus(stringFromPayload(event.Payload, "status"))
 	switch status {
@@ -1027,7 +1020,7 @@ func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepE
 		return err
 	}
 
-	// CR-007 follow-up: a project that only wants its long-form video (the
+	// A project that only wants its long-form video (the
 	// default, and every project created before this field existed — Go's
 	// zero value for VideoOutputMode is "") has no clip requests to act on
 	// anyway, so dispatching generate_clips would only be a round-trip that
@@ -1041,7 +1034,7 @@ func (uc *HandleStepEventUseCase) onQCCompleted(ctx context.Context, event StepE
 // It ends it unconditionally, exactly like onQCCompleted did before this CR:
 // a clip that failed to cut (status="error" on that one entry of "clips") is
 // surfaced to the Creator, never a reason to strand a finished, QC'd video
-// short of ready_to_publish (D1 — a vertical clip is a derivative product).
+// short of ready_to_publish (a vertical clip is a derivative product).
 func (uc *HandleStepEventUseCase) onClipsGenerated(ctx context.Context, event StepEvent, project *domain.Project) error {
 	project.Clips = parseClipResults(event.Payload)
 	if err := uc.repo.Save(ctx, project); err != nil {
@@ -1053,8 +1046,8 @@ func (uc *HandleStepEventUseCase) onClipsGenerated(ctx context.Context, event St
 // generateClipsPayload builds the generate_clips command from data already on
 // Project (Rule 5 — a retry rebuilds it without re-running an earlier step):
 // the assembled video, its subtitle cues (dịch về mốc 0 của từng clip là việc
-// của video-assembly — D6, vì chỉ nó biết offset thật sau khi ghép intro), and
-// the merged request list (D3).
+// của video-assembly, vì chỉ nó biết offset thật sau khi ghép intro), and
+// the merged request list.
 //
 // intro_duration_seconds comes from Project.IntroDurationSeconds, which
 // onVideoAssembled stored from video-assembly's own measurement (the only
@@ -1074,7 +1067,7 @@ func generateClipsPayload(project *domain.Project) map[string]interface{} {
 // (Rule 5 — a retry rebuilds it without re-running an earlier step).
 //
 // It sends the *assembled* video_path, not RenderedVideoPath: the loudness,
-// clipping and container checks of FR60 only mean anything against the file
+// clipping and container checks only mean anything against the file
 // that will actually be uploaded, music bed, intro sting and all.
 func qcVideoPayload(project *domain.Project) map[string]interface{} {
 	scenes := sortedScenes(project.Scenes)
@@ -1096,7 +1089,7 @@ func qcVideoPayload(project *domain.Project) map[string]interface{} {
 		"layout_marks":       layoutMarks,
 	}
 	// Subtitle cues are sent whenever they exist, regardless of delivery mode:
-	// FR60.4 checks whether two cues overlap in time, which is wrong in a
+	// The subtitle rule checks whether two cues overlap in time, which is wrong in a
 	// burn-in render exactly as much as in a sidecar .srt.
 	payload["subtitle_cues"] = subtitleCues(scenes, project.WaitOffsets)
 	return payload
@@ -1106,7 +1099,7 @@ func qcVideoPayload(project *domain.Project) map[string]interface{} {
 func (uc *HandleStepEventUseCase) onVideoPublished(ctx context.Context, event StepEvent, project *domain.Project) error {
 	url := stringFromPayload(event.Payload, "youtube_video_url")
 	project.YoutubeVideoURL = &url
-	// CR-015 FR39.4: absent when no caption was requested, otherwise
+	// Absent when no caption was requested, otherwise
 	// "uploaded" | "skipped_no_scope" | "failed" — surfaced on the project
 	// so a silently skipped or failed caption is not invisible.
 	if captionStatus := stringFromPayload(event.Payload, "caption_status"); captionStatus != "" {
@@ -1134,7 +1127,7 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 
 // assembleVideoPayload builds the assemble_video command payload: the single
 // rendered video_path (from rendering_completed) plus the narration segments,
-// each carrying the offset in that video where it belongs (CR-002), plus the
+// each carrying the offset in that video where it belongs, plus the
 // static background_music_path (Rule 3).
 //
 // The offsets come from Rendering, not from adding up durations here. A Manim
@@ -1143,7 +1136,7 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 // Assembly laid end to end, drifted by the accumulated animation time (61.6s
 // by the end of a 3.6-minute reference video).
 //
-// When narration is disabled (CR-001) narration_segments comes back empty and
+// When narration is disabled narration_segments comes back empty and
 // the video is assembled silent (or with background music only); subtitle_cues
 // are sent whenever the Creator enabled subtitles, timed by the same offsets.
 func assembleVideoPayload(project *domain.Project) map[string]interface{} {
@@ -1159,7 +1152,7 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 		"narration_segments":     narrationSegments(scenes, offsets),
 		"video_duration_seconds": project.RenderedVideoSeconds,
 	}
-	// CR-023 D2: optional, nullable — nil (omitted) when the toggle is off or
+	// Optional, nullable — nil (omitted) when the toggle is off or
 	// no active channel_assets row was found, in which case video-assembly
 	// assembles without an intro/outro exactly as it did before this CR.
 	if project.IntroAssetID != nil {
@@ -1178,7 +1171,7 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 	}
 	// SubtitleMode is normally already resolved by the time a Project
 	// reaches here (start_render_saga.go at creation, project_repository.go's
-	// Get for a pre-CR-015 row) — this fallback exists only so an invalid or
+	// Get for a legacy row) — this fallback exists only so an invalid or
 	// zero-value mode (a Project built by hand, e.g. in a test) degrades to
 	// the one behaviour SubtitlesEnabled ever meant, rather than treating ""
 	// as if it needed cues.
@@ -1202,7 +1195,7 @@ func assembleVideoPayload(project *domain.Project) map[string]interface{} {
 }
 
 // narrationSegments pairs each scene's audio file with the offset Rendering
-// measured for it. Shared by assemble_video and qc_video (CR-021 FR60.2) so
+// measured for it. Shared by assemble_video and qc_video so
 // the overlap check runs against precisely the placement assembly used —
 // a second, independently-built list is a second chance to disagree.
 func narrationSegments(scenes []domain.Scene, offsets []float64) []map[string]interface{} {
@@ -1229,7 +1222,7 @@ func narrationSegments(scenes []domain.Scene, offsets []float64) []map[string]in
 //
 // The offsets are essential here for the same reason as the audio: cueing
 // subtitles off a running total of durations would drift them away from the
-// picture exactly as far as the narration used to drift.
+// picture exactly as far as the narration would drift.
 func subtitleCues(scenes []domain.Scene, offsets []float64) []map[string]interface{} {
 	cues := make([]map[string]interface{}, 0, len(scenes))
 	for i, s := range scenes {
@@ -1291,7 +1284,7 @@ func sortedScenes(scenes []domain.Scene) []domain.Scene {
 }
 
 // registerRenderedChannelAsset forwards a rendered intro/outro to
-// video-assembly as register_channel_asset (CR-040 FR112.1).
+// video-assembly as register_channel_asset.
 func (uc *HandleStepEventUseCase) registerRenderedChannelAsset(ctx context.Context, event StepEvent) error {
 	kind := stringFromPayload(event.Payload, "kind")
 	videoPath := stringFromPayload(event.Payload, "video_path")
@@ -1318,7 +1311,7 @@ func (uc *HandleStepEventUseCase) registerRenderedChannelAsset(ctx context.Conte
 	})
 }
 
-// handlePurgeEvent advances the delete saga (CR-040 FR114.2). Each owner
+// handlePurgeEvent advances the delete saga. Each owner
 // answers once; when all of them have, the project and its saga rows are
 // deleted. A failure leaves the project `deleting` with the step failed, so
 // the Creator's next DELETE re-issues the purge.

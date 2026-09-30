@@ -216,7 +216,7 @@ func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 	if got.Usage.PromptTokens != 330 || got.ModelCalls != 3 || got.RepairRounds != 1 {
 		t.Errorf("usage=%+v calls=%d rounds=%d", got.Usage, got.ModelCalls, got.RepairRounds)
 	}
-	// One row per billed call, the failed repair recorded as failed (FR-21).
+	// One row per billed call, the failed repair recorded as failed.
 	if len(usage.rows) != 3 {
 		t.Fatalf("usage rows = %d, want 3 (layout, chunk, failed repair)", len(usage.rows))
 	}
@@ -225,7 +225,7 @@ func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 	}
 }
 
-// CR-048 T6b: the layout check gets the same subtitle strip {{subtitle_zone}}
+// The layout check gets the same subtitle strip {{subtitle_zone}}
 // describes, and the video's font; Manim gets neither.
 func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
 	run := func(p *domain.Project) application.CodeGenRequest {
@@ -332,7 +332,7 @@ func TestCodeStepProgressReflectsChunksAndRepairRounds(t *testing.T) {
 	gen.events = []application.CodeEvent{
 		{Type: "phase", Phase: "chunks", Total: 4},
 		{Type: "chunk_done", Done: 3, Total: 4},
-		// CR-048 T2: a chunk written again as two halves is still one chunk of
+		// A chunk written again as two halves is still one chunk of
 		// the progress; the event changes nothing here.
 		{Type: "chunk_split", Index: 4, Total: 4},
 		{Type: "phase", Phase: "repair", Round: 2, Total: 3},
@@ -407,7 +407,7 @@ func (s *stubStage) ForCode(context.Context, string) ([]application.LibraryDrawi
 	return s.drawings, nil
 }
 
-// CR-044: a Remotion video waits for its drawings; approved ones reach the pipeline.
+// A Remotion video waits for its drawings; approved ones reach the pipeline.
 func TestCodeStepWaitsForTheVideosDrawingsThenHandsThemOver(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
 	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}
@@ -439,7 +439,7 @@ func TestManimCodeStepSkipsTheDrawingStage(t *testing.T) {
 	}
 }
 
-// CR-045: the code step no longer draws; a list never planned sends the Creator
+// The code step does not draw; a list never planned sends the Creator
 // to the illustrations step instead.
 func TestCodeStepRefusesAVideoWhoseDrawingsWereNeverPlanned(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
@@ -452,7 +452,7 @@ func TestCodeStepRefusesAVideoWhoseDrawingsWereNeverPlanned(t *testing.T) {
 	}
 }
 
-// CR-050 FR-17: a list planned from an older storyboard stops the code step
+// A list planned from an older storyboard stops the code step
 // before any model call, even when every drawing on it is approved.
 func TestCodeStepRefusesADrawingListPlannedFromAnOlderStoryboard(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
@@ -542,7 +542,7 @@ func (m fixedModels) GetAuthoringModels(context.Context, string) (domain.Authori
 	return domain.AuthoringStepModels(m), nil
 }
 
-// CR-050 FR-19: a project that saved Ollama for code before the rule existed
+// A project that saved Ollama for code before the rule existed
 // is stopped before any model call, with the reason.
 func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
 	renderCtx := &fakeRenderContext{

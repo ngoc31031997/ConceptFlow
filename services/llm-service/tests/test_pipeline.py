@@ -137,7 +137,7 @@ def req(sb, engine="remotion"):
 
 @pytest.mark.parametrize("engine", ["remotion", "manim"])
 async def test_every_call_of_the_run_carries_the_reasoning_limit(engine):
-    # CR-048 T1: layout/cast, chunks and repairs all get the request's limit.
+    # Layout/cast, chunks and repairs all get the request's limit.
     prov, chk = FakeProvider(engine=engine, broken={"1.2"}), FakeChecker()
     r = CodeRequest(engine=engine, topic="Chủ đề", storyboard=storyboard(4), system="SYS", max_reasoning_chars=1234)
     res = await pipeline(prov, chk, chunk=2).run(r, emit_none)
@@ -376,7 +376,7 @@ async def test_manim_ignores_library_drawings():
     assert all("C4." not in c.system for c in provider.calls)
 
 
-# --- CR-048 T2: a failing chunk does not throw away the others; split on budget ----
+# --- a failing chunk does not throw away the others; split on budget ----------
 
 def chunk_ids(user: str) -> list[str] | None:
     m = re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", user)
@@ -420,7 +420,7 @@ def chunk_turns(prov):
 
 
 async def test_a_failing_chunk_does_not_stop_the_others_and_a_rerun_pays_only_for_it():
-    # CR-050 FR-2: every other chunk is written and handed back; the run ends incomplete.
+    # Every other chunk is written and handed back; the run ends incomplete.
     prov1 = Scripted(fail=lambda ids: llm_err(errors.SERVER) if ids == ["1.2"] else None)
     ev = Events()
     res1 = await pipeline(prov1, FakeChecker(), chunk=1).run(req(storyboard_with_layout(4)), ev)
@@ -543,7 +543,7 @@ async def test_cancelling_the_run_cancels_every_chunk_at_once():
     assert [t for t in asyncio.all_tasks() if t is not asyncio.current_task() and not t.done()] == []
 
 
-# --- CR-048 T6b: layout diagnostics, context and warnings ------------------------------
+# --- layout diagnostics, context and warnings ------------------------------------------
 
 
 class LayoutChecker(FakeChecker):
@@ -620,7 +620,7 @@ def test_repair_prompt_lists_compile_and_layout_errors_apart():
     assert "SỬA LỖI BIÊN DỊCH trong shot 1.2" in only_tsc and "Lỗi bố cục" not in only_tsc
 
 
-# --- CR-050 Unit 2: segments, fingerprints, streamed calls and checks ---------------
+# --- segments, fingerprints, streamed calls and checks ------------------------------
 
 def fps(r: CodeRequest, chunk=2) -> dict[str, str]:
     return {s.key: s.fingerprint for s in make_plan(r, chunk).segments}
@@ -637,10 +637,10 @@ def test_fingerprints_follow_the_prompt_and_the_inputs_but_not_the_model_or_the_
     base = fps(req(storyboard(4)))
     other_model = req(storyboard(4))
     other_model.model = "glm"
-    assert fps(other_model) == base  # CR-050 C2
+    assert fps(other_model) == base  # the model is not part of a fingerprint
     with_drawings = req(storyboard(4))
     with_drawings.illustrations = [{"name": "Cat", "usage": "", "description": "", "code": "export function Cat() {}"}]
-    assert fps(with_drawings) == base  # approving a drawing keeps every chunk (review C3)
+    assert fps(with_drawings) == base  # approving a drawing keeps every chunk
     new_prompt = req(storyboard(4))
     new_prompt.system = "SYS v2"
     assert all(fps(new_prompt)[k] != v for k, v in base.items())
@@ -655,7 +655,7 @@ def test_editing_one_shot_invalidates_only_its_chunk_when_the_layout_comes_from_
 
 
 def test_a_change_in_the_palette_keys_makes_every_chunk_stale_but_not_the_frame(monkeypatch):
-    # CR-056: code written against `connguoi` must be written again, not reused
+    # Code written against `connguoi` must be written again, not reused
     # into a file whose PALETTE now says `conNguoi`.
     r = req(storyboard_with_layout(4))
     before = fps(r)

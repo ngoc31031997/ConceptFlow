@@ -71,8 +71,8 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
       const suggestion = await suggestPublishMetadata(projectId, suggestRun.begin());
       suggestRun.end();
       // Normalised rather than trusted: this is a model-generated payload
-      // crossing a service boundary, and a missing tags array used to throw
-      // "Cannot read properties of null" instead of showing an error.
+      // crossing a service boundary; a missing tags array must not throw
+      // "Cannot read properties of null".
       setTitle((suggestion.title ?? "").slice(0, TITLE_MAX_LENGTH));
       setDescription(suggestion.description ?? "");
       setTags(Array.isArray(suggestion.tags) ? suggestion.tags.join(", ") : "");

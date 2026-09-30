@@ -14,8 +14,7 @@ import (
 // port says anything different from what the browser has been sending to the
 // Creator's AI all along.
 //
-// This is the load-bearing test of CR-027 FR77. Everything else in the CR
-// assumes the two paths — copy the prompt out, or run it here — are working
+// This is the load-bearing test of server-side prompt rendering: the two paths — copy the prompt out, or run it here — are working
 // from the same text.
 
 func loadGolden(t *testing.T, name string) string {
@@ -133,7 +132,7 @@ func TestNarrationLanguageRule_NamesTheRightLanguage(t *testing.T) {
 	}
 }
 
-// CR-040 FR113.2: the subtitle-zone text web-gui used to build, for every
+// The subtitle-zone text, for every
 // language × mode × size × position, including the unknown size that falls back to medium.
 func TestSubtitleZoneFor_MatchesTheTypeScriptCharacterForCharacter(t *testing.T) {
 	raw, err := os.ReadFile("testdata/prompt_golden.json")

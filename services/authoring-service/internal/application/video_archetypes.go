@@ -15,7 +15,7 @@ var (
 	ErrArchetypeCodeTaken = errors.New("video archetype code is already used")
 )
 
-// VideoArchetypePort is the persistence the archetype table needs (CR-041).
+// VideoArchetypePort is the persistence the archetype table needs.
 type VideoArchetypePort interface {
 	ListArchetypes(ctx context.Context) ([]domain.VideoArchetype, error)
 	GetArchetype(ctx context.Context, id string) (domain.VideoArchetype, error)

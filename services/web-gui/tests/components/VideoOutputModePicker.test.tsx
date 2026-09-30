@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { VideoOutputModePicker } from "../../src/components/VideoOutputModePicker";
 
 describe("VideoOutputModePicker", () => {
-  it("defaults to long-only, reproducing the pre-CR-007-follow-up behaviour", () => {
+  it("defaults to long-only", () => {
     render(<VideoOutputModePicker value="long" onChange={vi.fn()} />);
 
     expect(screen.getByTestId("video-output-mode-long")).toHaveAttribute("aria-checked", "true");

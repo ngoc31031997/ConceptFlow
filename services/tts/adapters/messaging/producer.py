@@ -1,8 +1,8 @@
 """Event envelope builders for speech_synthesized / synthesis_failed
 (interface-contracts.md, ADR-0014).
 
-Mirrors Content Plugin Service's producer.py (ADR-0013): only builds the
-envelope dict — the consumer writes it to the Outbox, and OutboxRelay
+Only builds the envelope dict (see ADR-0013): the consumer writes it to the
+Outbox, and OutboxRelay
 (adapters/persistence/relay.py) is the only place that actually publishes.
 """
 

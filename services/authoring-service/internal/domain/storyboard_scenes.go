@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// StoryboardShot is the part of one storyboard shot the post-1b checks read
-// (CR-048 T8/T9). The full shape is visual_director_ai's JSON output, parsed
+// StoryboardShot is the part of one storyboard shot the post-1b checks read.
+// The full shape is visual_director_ai's JSON output, parsed
 // and canonicalised by llm-service (app/storyboard.py).
 type StoryboardShot struct {
 	ID        string `json:"id"`

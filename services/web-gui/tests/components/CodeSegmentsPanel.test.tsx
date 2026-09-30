@@ -35,7 +35,7 @@ function renderPanel(isRemotion = true) {
   );
 }
 
-describe("CodeSegmentsPanel (CR-050 FR-9)", () => {
+describe("CodeSegmentsPanel", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("lists every segment with its state, source, time and why it failed", async () => {
@@ -86,7 +86,7 @@ describe("CodeSegmentsPanel (CR-050 FR-9)", () => {
     const start = vi.spyOn(apiClient, "startAuthoringChain").mockResolvedValue();
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderPanel();
-    // nothing missing: the same run only merges and checks (FR-8)
+    // nothing missing: the same run only merges and checks
     expect(await screen.findByTestId("code-segments-run-missing")).toHaveTextContent("Ghép và kiểm lại code");
     fireEvent.click(screen.getByTestId("code-segments-regenerate"));
     await waitFor(() => expect(start).toHaveBeenCalledWith("p1", ["code"], { fresh: true }));
@@ -141,7 +141,7 @@ describe("CodeSegmentsPanel (CR-050 FR-9)", () => {
   });
 });
 
-describe("CodeChunkShotsField (CR-050 FR-7)", () => {
+describe("CodeChunkShotsField", () => {
   afterEach(() => vi.restoreAllMocks());
 
   function renderField(onSaved = vi.fn()) {

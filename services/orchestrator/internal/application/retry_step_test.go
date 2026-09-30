@@ -63,9 +63,8 @@ func TestRetryStepUseCase_RejectsNonFailedStatus(t *testing.T) {
 	}
 }
 
-// Retrying validate_script used to publish an empty payload, which crashed
-// rendering's consumer with KeyError: 'script_content' and left the message
-// redelivering forever.
+// Retrying validate_script must publish the full payload: an empty one crashes
+// rendering's consumer with KeyError: 'script_content' and redelivers forever.
 func TestRetryStepUseCase_RebuildsValidateScriptPayload(t *testing.T) {
 	repo := newFakeRepo()
 	pub := &fakePublisher{}
@@ -105,7 +104,7 @@ func TestRetryStepUseCase_RebuildsValidateScriptPayload(t *testing.T) {
 	}
 }
 
-// CR-040 FR110: a project that failed at the retired parse_script step resumes
+// A project that failed at the retired parse_script step resumes
 // at validate_script on rendering.
 func TestRetryStepUseCase_LegacyFailedParseScriptResumesAtValidate(t *testing.T) {
 	repo := newFakeRepo()

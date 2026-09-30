@@ -196,8 +196,7 @@ func (f *fakeProgress) last() *domain.ProgressMessage {
 }
 
 // fakeChannelAssetPointers is a fake domain.ChannelAssetPort backed by an
-// in-memory map, standing in for postgres.ChannelAssetPointerRepository
-// (CR-023 correction).
+// in-memory map, standing in for postgres.ChannelAssetPointerRepository.
 type fakeChannelAssetPointers struct {
 	pointers map[string]domain.ChannelAssetPointer
 }
@@ -230,7 +229,7 @@ func (f *fakeChannelAssetPointers) ListChannelAssetPointers(_ context.Context) (
 	return out, nil
 }
 
-// fakeQCReports is an in-memory domain.QCReportPort for testing CR-021's
+// fakeQCReports is an in-memory domain.QCReportPort for testing the QC
 // saga step and publish gate without a real Postgres instance.
 type fakeQCReports struct {
 	reports map[string][]domain.QCReport // keyed by project_id, append-only

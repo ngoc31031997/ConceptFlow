@@ -27,16 +27,15 @@ const EMPTY_PROJECT: Project = { project_id: "", status: "draft", voice_language
  * Bước 7 — "Validate" (và 8 — "Review", cùng màn): phần rẻ của saga, và điểm
  * dừng trước phần đắt.
  *
- * CR-031 tách màn "Xử lý" cũ làm đôi ở đúng ranh giới mà saga vốn đã có: chạy
+ * Màn này dừng ở đúng ranh giới mà saga vốn đã có: chạy
  * thử kịch bản (parse_script → validate_script, vài giây, không tốn gì) rồi
  * dừng ở `awaiting_review`; mọi thứ sau đó — TTS, render, ghép — mới là tiền
- * và thời gian thật. Gộp cả hai vào một màn khiến cổng duyệt trông như một
- * gián đoạn giữa chừng của quá trình render, nên Creator hoặc bấm duyệt cho
- * xong, hoặc ngồi đợi một saga đã dừng từ lâu. Tách ra thì bước 7 có đúng một
+ * và thời gian thật. Gộp cả hai vào một màn sẽ khiến cổng duyệt
+ * trông như một gián đoạn giữa chừng của quá trình render. Bước 7 có đúng một
  * việc, và "Duyệt và sản xuất" là hành động chuyển bước chứ không phải một
  * nút lạc giữa thanh tiến trình.
  *
- * Trang này không tự nó quyết định gì trên server: cổng duyệt là của CR-024,
+ * Trang này không tự nó quyết định gì trên server: cổng duyệt là của saga,
  * `ReviewEnabled` vẫn là thứ bật/tắt nó. Khi cổng tắt, saga không dừng và
  * effect bên dưới đẩy Creator thẳng sang bước 9 (TTS).
  */
@@ -55,8 +54,8 @@ export function ValidatePage() {
   const [isRetrying, setIsRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
 
-  // CR-024: Saga đang dừng chờ người, không phải đang chạy. Phân biệt hai thứ
-  // này là cả điểm của FR69.5 — nếu không Creator sẽ ngồi đợi một tiến trình
+  // Saga đang dừng chờ người, không phải đang chạy. Phân biệt hai thứ
+  // này là cần thiết — nếu không Creator sẽ ngồi đợi một tiến trình
   // đã dừng từ lâu.
   const isAwaitingReview = project?.status === "awaiting_review";
 
@@ -125,7 +124,7 @@ export function ValidatePage() {
       <AppShell
         currentStep={shownStep}
         wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
-        // CR-051: the title names the step as the rail does; what is happening
+        // The title names the step as the rail does; what is happening
         // at it moves to the subtitle.
         title={flowTitle(shownStep)}
         subtitle={
@@ -143,14 +142,13 @@ export function ValidatePage() {
         {(isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
           /*
             Two columns only while there is an outline to review: it can run
-            to dozens of lines, and stacking it above the tracker used to push
+            to dozens of lines, and stacking it above the tracker would push
             status far down a wall of text. The tracker moves to a sticky
             side column instead of disappearing.
 
             OutlineActions (Duyệt/Từ chối) sits at the TOP of that side
-            column, above the tracker — bug report: the buttons used to live
-            at the bottom of the outline list itself, which could run to
-            dozens of lines and scroll them out of view exactly when needed.
+            column, above the tracker: at the bottom of the outline list, which
+            can run to dozens of lines, they would scroll out of view.
           */
           <div className={styles.layout}>
             <OutlineReview project={project} outline={outline} />

@@ -1,4 +1,4 @@
-"""Unit tests for the OAuth state codec and nonce store (CR-012 FR33)."""
+"""Unit tests for the OAuth state codec and nonce store."""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ def test_state_survives_a_null_project():
 
 
 def test_a_bare_project_id_still_decodes(): 
-    """A pre-CR-012 consent already in flight when this deploys (FR33.3)."""
+    """A legacy state that is only the bare project_id."""
     decoded = decode_state("project-1")
 
     assert decoded.project_id == "project-1"

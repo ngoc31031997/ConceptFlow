@@ -72,7 +72,7 @@
 
 .stepDot {
   flex: 0 0 auto;
-  /* min-width, not width: a sub-step number ("7.1", CR-051) widens the circle into a pill. */
+  /* min-width, not width: a sub-step number ("7.1") widens the circle into a pill. */
   min-width: 20px;
   height: 20px;
   padding: 0 3px;

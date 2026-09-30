@@ -9,8 +9,7 @@ import (
 )
 
 // illustrationKeywordGroup ties one component of the flat illustration kit
-// (prompts/illustration_kit_vi.txt) to the Vietnamese words that name it
-// (CR-048 T9).
+// (prompts/illustration_kit_vi.txt) to the Vietnamese words that name it.
 //
 // Spoken words trigger the check when they appear in a shot's narration, and
 // count as the thing being shown when they appear in its visual. Shown words
@@ -80,7 +79,7 @@ var illustrationKitUnkeyed = map[string]string{
 // CheckIllustratedNarration flags shots whose narration names a thing the
 // illustration kit can draw while the shot's visual never mentions it — the
 // "mute the video and look" rule (visual director rule 19) caught cheaply
-// after step 1b (CR-048 T9). Warnings only; it is a word match, not an
+// after step 1b. Warnings only; it is a word match, not an
 // understanding of the shot.
 //
 // One warning per shot and component. When two missing keywords overlap

@@ -1,5 +1,5 @@
 /*
-  OutlineReview (CR-024) can run to dozens of narration lines — cramming it
+  OutlineReview can run to dozens of narration lines — cramming it
   above ProgressTracker in one stacked column pushed the status tracker far
   down the page and made the whole screen feel like a wall of text. Split into
   two columns only while there is actually a second thing to show (the

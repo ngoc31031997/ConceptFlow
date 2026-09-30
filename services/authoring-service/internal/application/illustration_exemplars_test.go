@@ -10,7 +10,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-052 — deleting a drawing a video still needs, and the Hình mẫu folder.
+// Deleting a drawing a video still needs, and the Hình mẫu folder.
 
 type fakeProjectStatus struct {
 	status map[string]domain.ProjectStatus

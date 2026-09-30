@@ -39,6 +39,7 @@ Follow CLAUDE.md "Read the codebase through graphify first". Do not list directo
 3. `graphify query "<the requested behaviour>"`, `graphify explain "<symbol>"`, `graphify path "<A>" "<B>"`, and `graphify affected "<symbol>"` for every symbol whose behaviour would change.
 4. Read only the files (or line ranges) the graph points to. For RabbitMQ messages, HTTP between services and DB access, read `docs/contracts/` and the relevant ADR in `aidlc-docs/decisions/`.
 5. UI change: read `docs/ux-ui-design-rules.md`.
+6. Code change: read `docs/code-standards-rules.md`; the plan must respect it.
 
 Describe the current behaviour from the code you read, not from assumption.
 

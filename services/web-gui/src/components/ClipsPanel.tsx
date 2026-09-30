@@ -17,10 +17,8 @@ const PRESET_LABELS: Record<string, string> = {
 };
 
 /**
- * CR-007 D7 follow-up: the API to list/download generated vertical clips
- * (`GET /v1/projects/{id}/clips`, streamed via clipHandler.js) has existed
- * since CR-007 shipped, but no screen ever called it — a Creator had no way
- * to see or download a clip generate_clips produced. Publishing a clip stays
+ * Lists and downloads the vertical clips generate_clips produced
+ * (`GET /v1/projects/{id}/clips`, streamed via clipHandler.js). Publishing a clip stays
  * a manual upload outside this app (no Shorts/TikTok auto-publish adapter),
  * so this panel's job ends at "here is the file."
  */

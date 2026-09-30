@@ -11,9 +11,9 @@ interface AiOperationCardProps {
 }
 
 /**
- * OperationProgressCard wired to a useOperationRun (CR-040 FR116.2): live while
+ * OperationProgressCard wired to a useOperationRun: live while
  * the request is open, and — after a failure — kept on screen with the chars and
- * time already spent plus the classified error (FR116.5).
+ * time already spent plus the classified error.
  */
 export function AiOperationCard({ run, active, testId, title }: AiOperationCardProps) {
   const failed = run.progress?.status === "failed";

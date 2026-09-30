@@ -20,11 +20,11 @@ export const GENERIC_CONNECTION_ERROR = "Không thể kết nối máy chủ, th
 export class ApiError extends Error {
   /**
    * Mã lỗi đọc được bằng máy, khi máy chủ gửi kèm. Publish trả 409 cho cả
-   * "project sai trạng thái" lẫn "QC có lỗi chặn" (CR-021 FR61.3), và chỉ cái
+   * "project sai trạng thái" lẫn "QC có lỗi chặn", và chỉ cái
    * thứ hai mới có đường đi tiếp — dò theo câu chữ sẽ vỡ ngay khi đổi từ ngữ.
    */
   readonly code?: string;
-  /** CR-044 — lỗi code của một hình minh hoạ, kèm số dòng để trình sửa chỉ ra. */
+  /** Lỗi code của một hình minh hoạ, kèm số dòng để trình sửa chỉ ra. */
   readonly diagnostics?: CodeDiagnostic[];
   /** HTTP status of the refusal, when there was a response at all. */
   readonly status?: number;
@@ -42,21 +42,21 @@ export interface CodeDiagnostic {
   line: number | null;
 }
 
-/** CR-021 FR61.3 — mã 409 mà `acknowledge_qc: true` đi qua được. */
+/** Mã 409 mà `acknowledge_qc: true` đi qua được. */
 export const ERROR_CODE_QC_BLOCKED = "qc_blocked";
 
-/** Duyệt dàn ý, cho Saga chạy tiếp (CR-024 FR69.2). */
+/** Duyệt dàn ý, cho Saga chạy tiếp. */
 export async function approveOutline(projectId: string): Promise<void> {
   await postDecision(`${GATEWAY_URL}/v1/projects/${projectId}/approve`);
 }
 
-/** Từ chối dàn ý — Saga kết thúc để Creator quay lại sửa script (FR69.3). */
+/** Từ chối dàn ý — Saga kết thúc để Creator quay lại sửa script. */
 export async function rejectOutline(projectId: string): Promise<void> {
   await postDecision(`${GATEWAY_URL}/v1/projects/${projectId}/reject`);
 }
 
 /**
- * Sửa một câu lời thoại ngay tại màn duyệt (FR70).
+ * Sửa một câu lời thoại ngay tại màn duyệt.
  *
  * Server có thể từ chối với 422 khi câu này không truy ngược được về đúng một
  * chỗ trong script — lời thoại sinh trong vòng lặp hoặc bằng f-string. Thông
@@ -86,7 +86,7 @@ async function postDecision(url: string): Promise<void> {
   }
 }
 
-/** Các hình dạng video Creator chọn được (CR-019 FR51.3). */
+/** Các hình dạng video Creator chọn được. */
 export async function fetchVideoFormats(): Promise<VideoFormat[]> {
   const response = await fetch(`${GATEWAY_URL}/v1/formats`);
   if (!response.ok) return [];
@@ -102,7 +102,7 @@ export function getProjectThumbnailUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/thumbnail`;
 }
 
-/** CR-007 D7 — streams one generated vertical clip from the shared volume. */
+/** Streams one generated vertical clip from the shared volume. */
 export function getProjectClipUrl(projectId: string, name: string, preset: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/clips/${encodeURIComponent(name)}/${preset}`;
 }
@@ -111,7 +111,7 @@ export interface ThumbnailInfo {
   exists: boolean;
   thumbnail_path: string | null;
   /** True when the image is the frame Video Assembly extracted, not the
-   * Creator's own upload (CR-006 FR16). */
+   * Creator's own upload. */
   auto_generated?: boolean;
 }
 
@@ -200,7 +200,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-/** POST multipart bằng XHR — fetch chưa báo được số byte đã gửi (FR116.2, tải ảnh lên). */
+/** POST multipart bằng XHR — fetch chưa báo được số byte đã gửi (tải ảnh lên). */
 function uploadWithProgress<T>(
   path: string,
   body: FormData,
@@ -282,7 +282,7 @@ export interface ProjectPageQuery {
   steps: number[];
 }
 
-/** CR-054 — một trang danh sách video, đã lọc và đếm ở server. */
+/** Một trang danh sách video, đã lọc và đếm ở server. */
 export function listProjectsPage(query: ProjectPageQuery): Promise<ProjectPage> {
   const params = new URLSearchParams({
     page: String(query.page),
@@ -301,7 +301,7 @@ export function startPublishSaga(
   id: string,
   metadata: PublishMetadata,
   /**
-   * CR-021 FR61.3 — chỉ gửi `true` sau khi Creator đã đọc báo cáo QC và chủ
+   * Chỉ gửi `true` sau khi Creator đã đọc báo cáo QC và chủ
    * động chọn đăng bất chấp lỗi chặn. Không bao giờ gửi ở lần bấm đầu: bỏ qua
    * phải là một hành động có ý thức, và máy chủ ghi lại lần bỏ qua đó.
    */
@@ -318,7 +318,7 @@ export function startPublishSaga(
   });
 }
 
-/** CR-021 — một phát hiện QC, kèm mốc thời gian để tua tới chỗ đó (FR59.6). */
+/** Một phát hiện QC, kèm mốc thời gian để tua tới chỗ đó. */
 export interface QCFinding {
   rule: string;
   severity: "blocking" | "warning";
@@ -336,7 +336,7 @@ export interface QCReport {
 }
 
 /**
- * Báo cáo QC của project (CR-021 FR61.1/FR61.2).
+ * Báo cáo QC của project.
  *
  * Máy chủ luôn trả 200: chưa chấm thì `status: "not_scored"` với danh sách
  * rỗng, không phải 404 — một cổng chưa chạy không phải một lỗi.
@@ -351,7 +351,7 @@ export interface SuggestedMetadata {
   tags: string[];
 }
 
-/** Id do GUI tự cấp cho một lượt gọi chạy lâu để poll tiến độ trong lúc request còn mở (FR116.3). */
+/** Id do GUI tự cấp cho một lượt gọi chạy lâu để poll tiến độ trong lúc request còn mở. */
 export function newOperationId(): string {
   return globalThis.crypto?.randomUUID?.() ?? `op-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
@@ -368,11 +368,11 @@ export function suggestPublishMetadata(id: string, operationId?: string): Promis
 export interface SuggestShortScriptInput {
   topic: string;
   language: "vi" | "en";
-  /** Ngữ cảnh tuỳ chọn — script dài đã có, dùng để rút chủ đề (CR-026 FR71.1). */
+  /** Ngữ cảnh tuỳ chọn — script dài đã có, dùng để rút chủ đề. */
   source_script_content?: string;
 }
 
-/** CR-026 FR71 — soạn nháp script Shorts/TikTok bằng AI nội bộ (Ollama). */
+/** Soạn nháp script Shorts/TikTok bằng AI nội bộ (Ollama). */
 export function suggestShortScript(
   input: SuggestShortScriptInput,
   operationId?: string,
@@ -387,7 +387,7 @@ export function suggestShortScript(
 export function getYoutubeAuthStartUrl(projectId: string, clientId?: string): string {
   const params = new URLSearchParams({ state: projectId });
   // Omitted when there is only one configured client — the Publisher picks
-  // it, so the Creator never sees a one-option chooser (CR-012 FR34.2).
+  // it, so the Creator never sees a one-option chooser.
   if (clientId) params.set("app", clientId);
   return `${GATEWAY_URL}/v1/auth/youtube/start?${params.toString()}`;
 }
@@ -446,19 +446,19 @@ export type PromptRole =
   | "visual_director"
   | "manim_engineer"
   | "remotion_engineer"
-  // CR-039 — luồng "Chạy bằng AI" có prompt riêng (storyboard xuất JSON, code
+  // Luồng "Chạy bằng AI" có prompt riêng (storyboard xuất JSON, code
   // chỉ viết các hàm shot); luồng Copy giữ bốn vai trò trên nguyên vẹn.
   | "visual_director_ai"
   | "manim_engineer_ai"
   | "remotion_engineer_ai"
-  // CR-040 FR113 — prompts that used to be assembled in the browser.
+  // "Copy to an external AI" prompts, rendered by the server.
   | "manim_adjust"
   | "remotion_adjust"
   | "short_script"
   | "thumbnail_design";
 
 /**
- * CR-031 — một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
+ * Một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại
  * một thời điểm chỉ MỘT dòng `is_active` và đó là dòng pipeline chạy.
  *
  * `is_system` là bản mặc định đi kèm hệ thống: chỉ xem và copy được, không
@@ -482,7 +482,7 @@ export function getPromptTemplate(role: PromptRole): Promise<Prompt> {
 }
 
 /**
- * CR-040 FR113 — what the caller has in hand but has not saved. Every field is
+ * What the caller has in hand but has not saved. Every field is
  * optional; the server fills a blank one with the placeholder the browser used
  * to show.
  */
@@ -517,7 +517,7 @@ export function renderPrompt(input: PromptRenderInput): Promise<RenderedPromptRe
   });
 }
 
-/** CR-040 FR113 — starter scripts and insertable snippets, served by authoring-service. */
+/** Starter scripts and insertable snippets, served by authoring-service. */
 export interface ScriptTemplates {
   starter_script: Record<"vi" | "en", string>;
   hook_snippet: Record<"vi" | "en", string>;
@@ -569,7 +569,7 @@ export async function deletePrompt(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/prompts/${id}`, { method: "DELETE" });
 }
 
-/** CR-041 — một kiểu video mà prompt Biên kịch có thể được bảo dựng. */
+/** Một kiểu video mà prompt Biên kịch có thể được bảo dựng. */
 export interface VideoArchetype {
   id: string;
   /** Mã ngắn (A, B, ...) — Creator gõ "kiểu: B" vào chủ đề để ép kiểu. */
@@ -624,7 +624,7 @@ export async function deleteVideoArchetype(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/video-archetypes/${id}`, { method: "DELETE" });
 }
 
-/** CR-044 — một ngăn của thư viện hình minh hoạ. */
+/** Một ngăn của thư viện hình minh hoạ. */
 export interface IllustrationFolder {
   id: string;
   name: string;
@@ -635,7 +635,7 @@ export interface IllustrationFolder {
 
 export type IllustrationStatus = "draft" | "approved";
 
-/** CR-044 — một hình của thư viện: có sẵn trong bộ minh hoạ, hoặc do AI/Creator vẽ. */
+/** Một hình của thư viện: có sẵn trong bộ minh hoạ, hoặc do AI/Creator vẽ. */
 export interface Illustration {
   id: string;
   /** Tên component (PascalCase) mà Kỹ sư Remotion gọi. */
@@ -648,7 +648,7 @@ export interface Illustration {
   usage: string;
   code?: string;
   builtin: boolean;
-  /** Hình mẫu AI vẽ học theo (CR-052): nằm ở thư mục "hinh-mau", chỉ xem, không xoá. */
+  /** Hình mẫu AI vẽ học theo: nằm ở thư mục "hinh-mau", chỉ xem, không xoá. */
   exemplar: boolean;
   /** Bản Hình mẫu chép từ hình này (id hình gốc); trống khi hình gốc đã bị xoá. */
   source_id?: string;
@@ -678,10 +678,10 @@ export interface IllustrationTry {
   warnings?: CodeDiagnostic[];
 }
 
-/** CR-052 — thư mục chỉ nhận hình qua "Đặt làm mẫu". */
+/** Thư mục chỉ nhận hình qua "Đặt làm mẫu". */
 export const EXEMPLAR_FOLDER_ID = "hinh-mau";
 
-/** Luật style của kênh và id các Hình mẫu, cũ nhất trước (CR-044, CR-052). */
+/** Luật style của kênh và id các Hình mẫu, cũ nhất trước. */
 export interface IllustrationStyle {
   rules: string;
   exemplar_ids: string[];
@@ -781,20 +781,20 @@ export async function deleteIllustration(id: string): Promise<void> {
   await apiFetch<undefined>(`/v1/admin/illustrations/${id}`, { method: "DELETE" });
 }
 
-/** CR-052 — chép một hình đã duyệt vào thư mục Hình mẫu (tên mới <Tên>Mau). Trả bản chép. */
+/** Chép một hình đã duyệt vào thư mục Hình mẫu (tên mới <Tên>Mau). Trả bản chép. */
 export function makeExemplar(id: string): Promise<Illustration> {
   return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/exemplar`, { method: "POST" });
 }
 
 /**
- * CR-052 — bỏ một hình khỏi Hình mẫu. Bản chép bị xoá (trả undefined); Hình mẫu gốc
+ * Bỏ một hình khỏi Hình mẫu. Bản chép bị xoá (trả undefined); Hình mẫu gốc
  * về lại thư mục chủ đề của nó và được trả về.
  */
 export function unmakeExemplar(id: string): Promise<Illustration | undefined> {
   return apiFetch<Illustration | undefined>(`/v1/admin/illustrations/${id}/exemplar`, { method: "DELETE" });
 }
 
-/** CR-044 — kết quả nhập lại một hình từ file sao lưu. */
+/** Kết quả nhập lại một hình từ file sao lưu. */
 export interface IllustrationImportItem {
   name: string;
   folder_id: string;
@@ -804,7 +804,7 @@ export interface IllustrationImportItem {
   diagnostics?: CodeDiagnostic[];
 }
 
-/** CR-044 — báo cáo một lần khôi phục thư viện hình. */
+/** Báo cáo một lần khôi phục thư viện hình. */
 export interface IllustrationImportReport {
   exported_at: string;
   folders_created: string[];
@@ -844,7 +844,7 @@ export function importIllustrationLibrary(file: Blob, replace: boolean): Promise
   );
 }
 
-/** CR-044 — một hình mà video cần: lập từ storyboard, rồi dùng lại hoặc vẽ mới. */
+/** Một hình mà video cần: lập từ storyboard, rồi dùng lại hoặc vẽ mới. */
 export type ProjectIllustrationState = "planned" | "drawing" | "drawn" | "reused" | "failed" | "skipped";
 
 export interface ProjectIllustration {
@@ -858,11 +858,11 @@ export interface ProjectIllustration {
   error?: string;
   illustration_id?: string;
   illustration?: Illustration;
-  /** CR-045 — tiến độ sống khi hình đang được vẽ; không có khi không vẽ. */
+  /** Tiến độ sống khi hình đang được vẽ; không có khi không vẽ. */
   progress?: DrawProgress;
 }
 
-/** CR-045 — AI vẽ một hình tới đâu: lượt thử thứ mấy, đang làm gì trong lượt đó. */
+/** AI vẽ một hình tới đâu: lượt thử thứ mấy, đang làm gì trong lượt đó. */
 export interface DrawProgress {
   attempt: number;
   max_attempts: number;
@@ -877,7 +877,7 @@ export interface ProjectIllustrations {
   illustrations: ProjectIllustration[];
   /** Mọi hình đã duyệt hoặc bỏ qua, và danh sách không cũ — bước Code được chạy. */
   ready: boolean;
-  /** CR-050: danh sách lập từ storyboard cũ hơn storyboard đang lưu. */
+  /** Danh sách lập từ storyboard cũ hơn storyboard đang lưu. */
   stale?: boolean;
 }
 
@@ -895,7 +895,7 @@ export function drawProjectIllustration(projectId: string, rowId: string): Promi
 }
 
 /**
- * CR-045 — xoá hình nháp AI vẽ cho video này khỏi thư viện (tránh rác) và bỏ
+ * Xoá hình nháp AI vẽ cho video này khỏi thư viện (tránh rác) và bỏ
  * qua hình đó cho video. Hình đã duyệt hoặc dùng lại từ thư viện không xoá được.
  */
 export function deleteProjectIllustrationDrawing(projectId: string, rowId: string): Promise<ProjectIllustration> {
@@ -911,22 +911,22 @@ export function skipProjectIllustration(projectId: string, rowId: string, skippe
 }
 
 /**
- * CR-027 FR79.4 — nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
+ * Nút "Chạy bằng AI" có nơi nào để gọi không. Hỏi trước khi
  * vẽ nút: một nút bấm vào là lỗi tệ hơn một nút không có kèm lời giải thích.
  */
 /**
- * Một model trong danh mục Hive máy chủ cho phép chọn (model-per-step, tiếp
- * theo CR-027) — `id` là chuỗi gửi thẳng cho Hive, `label` là tên hiển thị.
+ * Một model trong danh mục Hive máy chủ cho phép chọn (mỗi bước một model)
+ * — `id` là chuỗi gửi thẳng cho Hive, `label` là tên hiển thị.
  * "" luôn là một lựa chọn hợp lệ, nghĩa là "dùng mặc định máy chủ".
  */
 export type AuthoringModelOption = {
   id: string;
   label: string;
-  /** CR-050: false = bước Code (và Hình minh hoạ) không dùng được model này. */
+  /** False = bước Code (và Hình minh hoạ) không dùng được model này. */
   code_ok?: boolean;
 };
 
-/** CR-050 — chi phí đã đo của một model ở các đoạn code (30 ngày). */
+/** Chi phí đã đo của một model ở các đoạn code (30 ngày). */
 export type ModelUsageStats = {
   model: string;
   calls: number;
@@ -944,9 +944,9 @@ export type LlmStatus = {
   models?: AuthoringModelOption[];
   /** Model cụ thể mà lựa chọn rỗng ("") được máy chủ quy về. */
   default_model?: string;
-  /** CR-050: số liệu đo của từng model ở bước Code, theo id model. */
+  /** Số liệu đo của từng model ở bước Code, theo id model. */
   code_stats?: Record<string, ModelUsageStats>;
-  /** CR-050: có khi không đọc được số liệu (khác với "chưa có số liệu"). */
+  /** Có khi không đọc được số liệu (khác với "chưa có số liệu"). */
   code_stats_error?: string;
 };
 
@@ -955,25 +955,25 @@ export function getLlmStatus(): Promise<LlmStatus> {
 }
 
 /**
- * CR-027 FR79 — cách làm bước 1, theo đúng hai giá trị server nhận. Kiểu nằm ở
+ * Cách làm bước 1, theo đúng hai giá trị server nhận. Kiểu nằm ở
  * đây vì đây là hợp đồng trên đường truyền; ProjectDraftContext export lại nó
  * kèm ý nghĩa nghiệp vụ.
  */
 export type AuthoringMode = "manual" | "ai";
 
 /**
- * Ba bước của pipeline soạn kịch bản, theo đúng tên server dùng (FR78.5).
+ * Ba bước của pipeline soạn kịch bản, theo đúng tên server dùng.
  *
- * CR-030 — bước "review" (Script Reviewer) đã bị bỏ hẳn khỏi sản phẩm; server
+ * Bước "review" (Script Reviewer) đã bị bỏ hẳn khỏi sản phẩm; server
  * cũng không còn nhận nó nữa.
  *
- * CR-045 — "illustrations" (chỉ Remotion): lập danh sách hình từ storyboard và
+ * "illustrations" (chỉ Remotion): lập danh sách hình từ storyboard và
  * vẽ hình còn thiếu, nằm giữa Visual và Code. Không sinh nội dung soạn thảo.
  */
 export type AuthoringStep = "story" | "storyboard" | "illustrations" | "code";
 
 /**
- * CR-027 FR78 — kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
+ * Kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
  * sinh được nội dung nhưng chưa lưu được (ví dụ project đã khoá vì đang
  * render): nội dung vẫn trả về, vì token đã bị tính tiền rồi.
  */
@@ -989,7 +989,7 @@ export type GeneratedStep = {
   };
   save_error?: string;
   /**
-   * CR-039 — chỉ bước 1c. `check_failed`: code đã được lưu nhưng vẫn không qua
+   * Chỉ bước 1c. `check_failed`: code đã được lưu nhưng vẫn không qua
    * kiểm tra biên dịch sau `repair_rounds` vòng sửa; `diagnostics` là danh sách
    * lỗi để Creator tự sửa. `model_calls` là số lượt gọi model của cả lượt chạy.
    */
@@ -998,13 +998,13 @@ export type GeneratedStep = {
   repair_rounds?: number;
   warnings?: string[];
   model_calls?: number;
-  /** CR-045 — bước Hình minh hoạ đã vẽ xong nhưng còn hình chờ duyệt; `message` nói hình nào. */
+  /** Bước Hình minh hoạ đã vẽ xong nhưng còn hình chờ duyệt; `message` nói hình nào. */
   awaiting_review?: boolean;
   message?: string;
 };
 
 /**
- * CR-027 FR78.1 — chạy một bước bằng API: server tự render prompt (cùng một
+ * Chạy một bước bằng API: server tự render prompt (cùng một
  * hàm với nút Copy), gọi provider, lưu kết quả, trả nội dung về.
  *
  * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Sao chép prompt vẫn là
@@ -1033,11 +1033,11 @@ export interface AuthoringChainState {
   note?: string;
   /** Creator bấm Dừng (hoặc dự án bị xoá): không phải lỗi, `error` để trống. */
   cancelled?: boolean;
-  /** CR-045 — dừng chờ Creator duyệt hình minh hoạ (không phải lỗi); `waiting_step` là bước dừng. */
+  /** Dừng chờ Creator duyệt hình minh hoạ (không phải lỗi); `waiting_step` là bước dừng. */
   waiting?: string;
   waiting_step?: AuthoringStep;
   /**
-   * CR-048 T8/T9 — cảnh báo không chặn của từng bước đã xong, theo bước. Bước
+   * Cảnh báo không chặn của từng bước đã xong, theo bước. Bước
    * Visual (storyboard): cảnh nào lời thoại dài/ngắn so với ngân sách của
    * format, shot nào lời thoại nhắc một vật mà HÌNH không có.
    */
@@ -1047,7 +1047,7 @@ export interface AuthoringChainState {
 }
 
 /**
- * CR-050 FR-4 — cách chạy bước Code: `segment` chạy lại đúng một đoạn,
+ * Cách chạy bước Code: `segment` chạy lại đúng một đoạn,
  * `fresh` bỏ mọi đoạn rồi sinh lại toàn bộ. Không có gì = chạy các đoạn còn thiếu.
  */
 export type CodeRunOptions = { segment: string } | { fresh: true };
@@ -1064,7 +1064,7 @@ export function startAuthoringChain(
   });
 }
 
-/** CR-050 Unit 2 — một đoạn của bước Code: khung (LAYOUT/cast) hoặc một nhóm shot. */
+/** Một đoạn của bước Code: khung (LAYOUT/cast) hoặc một nhóm shot. */
 export interface CodeSegment {
   key: string;
   kind: "frame" | "shots";
@@ -1091,7 +1091,7 @@ export function getCodeSegments(projectId: string): Promise<CodeSegmentsView> {
   return apiFetch<CodeSegmentsView>(`/v1/projects/${projectId}/authoring/code/segments`);
 }
 
-/** Đúng lượt hỏi của một đoạn, để chạy bằng AI ngoài (FR-5). */
+/** Đúng lượt hỏi của một đoạn, để chạy bằng AI ngoài. */
 export function getCodeSegmentPrompt(projectId: string, key: string): Promise<{ system: string; user: string }> {
   return apiFetch(`/v1/projects/${projectId}/authoring/code/segments/${encodeURIComponent(key)}/prompt`);
 }
@@ -1110,7 +1110,7 @@ export function putCodeSegment(
   });
 }
 
-/** FR-7 — số shot mỗi đoạn của bước Code (1–10). */
+/** Số shot mỗi đoạn của bước Code (1–10). */
 export async function putCodeChunkShots(projectId: string, chunkShots: number): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code/chunk-shots`, {
     method: "PUT",
@@ -1138,12 +1138,12 @@ export interface AuthoringProgress {
   reasoning_chars: number;
   content_chars: number;
   elapsed_seconds: number;
-  // CR-039 — tiến độ riêng của bước 1c: số lô đã xong / tổng, vòng sửa hiện tại / tối đa.
+  // Tiến độ riêng của bước 1c: số lô đã xong / tổng, vòng sửa hiện tại / tối đa.
   chunks_done?: number;
   chunks_total?: number;
   repair_round?: number;
   repair_max?: number;
-  // CR-045 — bước Hình minh hoạ: số hình cần vẽ ở lượt này, đã xong (kể cả lỗi),
+  // Bước Hình minh hoạ: số hình cần vẽ ở lượt này, đã xong (kể cả lỗi),
   // lỗi, dùng lại từ thư viện, và tổng số hình trong danh sách.
   drawings_total?: number;
   drawings_done?: number;
@@ -1156,7 +1156,7 @@ export function getAuthoringProgress(projectId: string, step: AuthoringStep): Pr
   return apiFetch<AuthoringProgress>(`/v1/projects/${projectId}/authoring/${step}/progress`);
 }
 
-/** CR-025 bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
+/** Bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
 export async function saveAuthoringStory(
   projectId: string,
   content: string,
@@ -1169,7 +1169,7 @@ export async function saveAuthoringStory(
   });
 }
 
-/** CR-025 bước 2 — lưu storyboard (Visual Director) Creator dán vào. */
+/** Bước 2 — lưu storyboard (Visual Director) Creator dán vào. */
 export async function saveAuthoringStoryboard(projectId: string, content: string): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/storyboard`, {
     method: "POST",
@@ -1178,7 +1178,7 @@ export async function saveAuthoringStoryboard(projectId: string, content: string
   });
 }
 
-/** CR-025 bước 3 — lưu code Manim (Manim Engineer) Creator dán vào. */
+/** Bước 3 — lưu code Manim (Manim Engineer) Creator dán vào. */
 export async function saveAuthoringCode(projectId: string, content: string): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code`, {
     method: "POST",
@@ -1188,19 +1188,19 @@ export async function saveAuthoringCode(projectId: string, content: string): Pro
 }
 
 /**
- * Cả ba kết quả đã lưu của pipeline soạn kịch bản (CR-025) — dùng để nạp
+ * Cả ba kết quả đã lưu của pipeline soạn kịch bản — dùng để nạp
  * lại trạng thái khi Creator tải lại trang hoặc quay lại một bước trước đó,
  * thay vì chỉ dựa vào draft ở client (localStorage có thể đã mất khi mở lại
  * bằng một trình duyệt/máy khác dùng chung project_id).
  */
 export interface AuthoringState {
   /**
-   * CR-027 FR79 — cách làm bước 1 đã lưu cho project này: "manual" hoặc "ai".
+   * Cách làm bước 1 đã lưu cho project này: "manual" hoặc "ai".
    * Server luôn trả một trong hai (project cũ đọc ra "manual"), nhưng để
    * optional để một orchestrator chưa nâng cấp không làm vỡ phần rehydrate.
    */
   mode?: AuthoringMode;
-  /** CR-027 D0 — "" cho mọi project tạo trước CR-027. */
+  /** "" khi project chưa lưu chủ đề. */
   topic: string;
   story: string;
   storyboard: string;
@@ -1216,7 +1216,7 @@ export function getAuthoringState(projectId: string): Promise<AuthoringState> {
 }
 
 /**
- * CR-027 FR79 — lưu cách làm bước 1 cho project này.
+ * Lưu cách làm bước 1 cho project này.
  *
  * Nằm ở server, không chỉ trong localStorage: lựa chọn này áp cho cả 4 tab và
  * một project có thể được mở lại ở bất cứ tab nào, từ trình duyệt khác hoặc
@@ -1249,7 +1249,7 @@ export async function saveAuthoringModels(projectId: string, models: AuthoringSt
   });
 }
 
-/** CR-028 FR85 — một project khác (cùng ngôn ngữ) có chủ đề trùng sau khi chuẩn hoá. */
+/** Một project khác (cùng ngôn ngữ) có chủ đề trùng sau khi chuẩn hoá. */
 export interface SimilarProject {
   projectId: string;
   topic: string;
@@ -1274,7 +1274,7 @@ function fromWireSimilarProjects(wire: similarProjectsWire[]): SimilarProject[] 
 }
 
 /**
- * CR-028 FR83.1 — tạo hàng project ngay khi Creator gõ xong chủ đề (bước 1),
+ * Tạo hàng project ngay khi Creator gõ xong chủ đề (bước 1),
  * thay vì đợi tới POST /v1/sagas/render. `projectId` là id đã sinh sẵn ở
  * client (ProjectDraftContext) — gửi lên để mọi endpoint authoring đã và sẽ
  * gọi với id đó vẫn trỏ đúng một project, không đổi kiến trúc id ở client.
@@ -1283,7 +1283,7 @@ export async function createProjectDraft(
   projectId: string,
   topic: string,
   contentLanguage: "vi" | "en",
-  // CR-030 — optional: "" (mặc định) nghĩa là "không khai báo ở lượt gọi
+  // Optional: "" (mặc định) nghĩa là "không khai báo ở lượt gọi
   // này", server giữ nguyên engine đã lưu chứ không reset về Manim. Truyền
   // vào khi Creator vừa chọn engine ở "/" hoặc ngay trước khi chạy chuỗi AI
   // 1a→1b→1c ở tab 1a — server đọc project.RenderEngine để chọn đúng vai trò
@@ -1364,8 +1364,8 @@ export async function patchWizardSettings(projectId: string, patch: WizardSettin
 }
 
 /**
- * CR-028 FR83.2 — Creator quay lại bước 1 và sửa chủ đề của draft đã tạo.
- * 409 nếu render đã bắt đầu (FR84.2 — cùng khoá với authoring saves).
+ * Creator quay lại bước 1 và sửa chủ đề của draft đã tạo.
+ * 409 nếu render đã bắt đầu (cùng khoá với authoring saves).
  */
 export async function updateProjectTopic(
   projectId: string,
@@ -1401,7 +1401,7 @@ export interface ProjectEvent {
   flow_step: number;
   step_label: string;
   run_state: "idle" | "running" | "done" | "failed" | "cancelled";
-  /** CR-045: "illustrations" = bước Hình minh hoạ, ghi dưới số bước của Code. */
+  /** "illustrations" = bước Hình minh hoạ, ghi dưới số bước của Code. */
   source: "authoring" | "saga" | "illustrations";
   from_status?: string;
   to_status?: string;
@@ -1444,7 +1444,7 @@ export function forkProject(id: string, fromStep: number): Promise<ForkResult> {
   });
 }
 
-/** FR116.3 — tiến độ chung của một lượt gọi chạy lâu. */
+/** Tiến độ chung của một lượt gọi chạy lâu. */
 export interface OperationProgress {
   kind: string;
   phase: string;

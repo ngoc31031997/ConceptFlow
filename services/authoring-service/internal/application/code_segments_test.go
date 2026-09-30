@@ -179,7 +179,7 @@ func doneEvent(key string) application.CodeEvent {
 		Content: json.RawMessage(`{"code":"` + key + `"}`), Source: domain.SegmentSourceAI, DurationMS: 10}
 }
 
-// CR-050 FR-1/FR-2: every segment is stored as it finishes; a failed one does
+// Every segment is stored as it finishes; a failed one does
 // not stop the step from keeping the rest, and the step says what is left.
 func TestCodeStepStoresSegmentsAndEndsIncompleteWhenOneFailed(t *testing.T) {
 	uc, store, usage, code := segmentFixture(t, domain.RenderEngineManim, fourShots)
@@ -218,7 +218,7 @@ func TestCodeStepStoresSegmentsAndEndsIncompleteWhenOneFailed(t *testing.T) {
 	}
 }
 
-// FR-4: the next run is sent what is done — and "re-run this segment" leaves
+// The next run is sent what is done — and "re-run this segment" leaves
 // that one out and runs only it; "write everything again" drops them all first.
 func TestCodeRunOptionsDecideWhatIsSentBack(t *testing.T) {
 	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
@@ -291,7 +291,7 @@ func TestAnInterruptedRunFailsItsRunningSegments(t *testing.T) {
 	}
 }
 
-// FR-8/FR-22: a repair overwrites its segment but keeps who wrote it; every
+// A repair overwrites its segment but keeps who wrote it; every
 // failed check is logged with its rule, shot and segment.
 func TestRepairsKeepTheSourceAndChecksAreLogged(t *testing.T) {
 	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
@@ -320,7 +320,7 @@ func TestRepairsKeepTheSourceAndChecksAreLogged(t *testing.T) {
 	}
 }
 
-// FR-9: before any run the panel already lists every segment of the storyboard,
+// Before any run the panel already lists every segment of the storyboard,
 // cut with the Creator's size; a storyboard-given LAYOUT needs no run.
 func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
@@ -360,7 +360,7 @@ func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 		t.Errorf("prose storyboard: %v", err)
 	}
 
-	// An llm-service older than CR-050 has no plan: said so, not a crash.
+	// An llm-service without /v2 has no plan: said so, not a crash.
 	old, _, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
 	old.WithPipeline(&stubFinalizer{}, &stubCodegen{err: application.ErrSegmentsUnsupported})
 	if _, err := old.CodeSegments(context.Background(), "p1"); !errors.Is(err, application.ErrSegmentsUnsupported) {
@@ -368,7 +368,7 @@ func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 	}
 }
 
-// FR-5: a pasted segment is checked by llm-service and stored with its source.
+// A pasted segment is checked by llm-service and stored with its source.
 func TestPasteCodeSegment(t *testing.T) {
 	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
 	store.chunkShots = 2

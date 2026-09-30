@@ -15,7 +15,7 @@ from __future__ import annotations
 #: Nền của mọi video.
 SCENE_NAMES = frozenset({"ConceptFlowScene"})
 
-#: Component dựng cảnh (CR-017 FR45.2).
+#: Component dựng cảnh.
 COMPONENT_NAMES = frozenset({
     "TitleCard",
     "Callout",
@@ -67,7 +67,7 @@ SCENE_METHODS = frozenset({
     "reveal", "dismiss", "swap", "emphasize", "travel", "clear_stage",
     # Camera
     "focus", "restore_view", "pace",
-    # Beat dựng sẵn (CR-019 FR53)
+    # Beat dựng sẵn
     "hook", "hook_card", "recap", "recap_card", "call_to_action",
     "narrate", "beat", "chapter", "clip",
 })

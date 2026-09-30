@@ -22,7 +22,7 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 // script_parsed must mark it completed synchronously and dispatch
 // synthesize_speech directly — not wait for a scenes_classified event.
 func TestHandleStepEventUseCase_ScriptParsed_DispatchesValidateScript(t *testing.T) {
-	// CR-020: script_parsed giờ chỉ mang tên class Scene, và mở ra bước
+	// script_parsed giờ chỉ mang tên class Scene, và mở ra bước
 	// validate_script — cổng chạy TRƯỚC TTS, nên script sai không tiêu quota giọng đọc.
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{ProjectID: "proj-1", Status: domain.StatusParsingScript, ContentLanguage: domain.LanguageVietnamese, TTSEnabled: true, ScriptContent: "from conceptflow import *", RenderQuality: domain.Quality1080p60}
@@ -211,7 +211,7 @@ func TestHandleStepEventUseCase_SceneRenderedProgressOnly(t *testing.T) {
 // guards the Manim-script input mode's assemble_video contract: rendering
 // produces one video_path for the whole script (not per-scene clips), and
 // Video Assembly needs the narration audio from step 3 (Rule 2), each paired
-// with the offset Rendering measured for it (CR-002).
+// with the offset Rendering measured for it.
 func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNarrationSegments(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -260,8 +260,8 @@ func TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNa
 	}
 }
 
-// TestHandleStepEventUseCase_VideoAssembled_StoresCaptionPath is CR-015
-// FR38.4: a video_assembled event carrying caption_path must persist it on
+// TestHandleStepEventUseCase_VideoAssembled_StoresCaptionPath:
+// a video_assembled event carrying caption_path must persist it on
 // the project so the Publish Saga can pick it up later.
 func TestHandleStepEventUseCase_VideoAssembled_StoresCaptionPath(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
@@ -308,7 +308,7 @@ func TestHandleStepEventUseCase_VideoAssembled_NoCaptionPathLeavesItNil(t *testi
 }
 
 // TestHandleStepEventUseCase_VideoAssembled_StoresIntroDurationForClips is
-// CR-007 D5's risk made concrete: video-assembly is the only place that ever
+// guards that video-assembly is the only place that ever
 // measures the channel intro's real length, so if this number is dropped on
 // the floor here, generate_clips would cut every clip off by exactly that
 // many seconds on any project with an intro enabled.
@@ -360,7 +360,7 @@ func TestHandleStepEventUseCase_VideoAssembled_NoIntroDurationDefaultsToZero(t *
 	}
 }
 
-// TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode is CR-015:
+// TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode:
 // the assemble_video command must say subtitle_mode explicitly rather than
 // leaning on Video Assembly's own default, so the wire contract does not
 // depend on a default that a future change could alter out from under it.
@@ -378,7 +378,7 @@ func TestAssembleVideoPayload_SubtitlesEnabledSendsExplicitBurnInMode(t *testing
 	}
 }
 
-// TestAssembleVideoPayload_TrackModeSendsCuesWithoutForcingBurnIn is CR-015:
+// TestAssembleVideoPayload_TrackModeSendsCuesWithoutForcingBurnIn:
 // "track" needs subtitle_cues (Video Assembly writes them to .srt) but the
 // mode string itself must say "track", not the "burn_in" the earlier,
 // pre-GUI-wiring version of this code hardcoded.
@@ -421,8 +421,8 @@ func TestAssembleVideoPayload_OffModeSendsNoCues(t *testing.T) {
 	}
 }
 
-// TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus is CR-015
-// FR39.4: a caption_status carried on video_published must persist onto the
+// TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus:
+// a caption_status carried on video_published must persist onto the
 // project so the GUI can show a silently skipped or failed caption.
 func TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
@@ -448,11 +448,11 @@ func TestHandleStepEventUseCase_VideoPublished_StoresCaptionStatus(t *testing.T)
 	}
 }
 
-// guards CR-001's branch: with narration off, no synthesize_speech command may
+// guards the narration-off branch: with narration off, no synthesize_speech command may
 // reach the TTS Service, yet render_scenes must still carry a duration per
 // scene so each `self.narrate(...)` still holds the animation for the right
 // length. The branch now hangs off script_validated, since that is where the
-// narration lines arrive (CR-018).
+// narration lines arrive.
 func TestHandleStepEventUseCase_ScriptValidated_TTSDisabled_SkipsSynthesisAndEstimatesDurations(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -544,10 +544,9 @@ func TestAssembleVideoPayload_SubtitlesAndSilentVideo(t *testing.T) {
 	}
 }
 
-// TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets is the CR-002
-// regression on the Orchestrator side: each narration segment must go out with
-// the offset Rendering measured, never the running total of durations that the
-// old audio_segments payload implied.
+// TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets: each
+// narration segment must go out with the offset Rendering measured, never a
+// running total of durations.
 func TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets(t *testing.T) {
 	rendered := "/shared/proj-1/video.mp4"
 	project := &domain.Project{
@@ -579,11 +578,11 @@ func TestAssembleVideoPayload_NarrationCarriesMeasuredOffsets(t *testing.T) {
 		t.Fatalf("expected the rendered duration to be forwarded, got %v", payload["video_duration_seconds"])
 	}
 	if _, ok := payload["audio_segments"]; ok {
-		t.Fatal("the pre-CR-002 audio_segments key must not be sent anymore")
+		t.Fatal("the legacy audio_segments key must not be sent")
 	}
 }
 
-// TestOnRenderingCompleted_RejectsMismatchedOffsetCount covers CR-002 FR10.5:
+// TestOnRenderingCompleted_RejectsMismatchedOffsetCount:
 // a wait_offsets list that does not line up with the scenes must fail the saga
 // rather than silently assembling a video whose audio drifts.
 func TestOnRenderingCompleted_RejectsMismatchedOffsetCount(t *testing.T) {
@@ -624,7 +623,7 @@ func TestOnRenderingCompleted_RejectsMismatchedOffsetCount(t *testing.T) {
 }
 
 func TestHandleStepEventUseCase_SpeechSynthesized_RecordsVoiceCalibration(t *testing.T) {
-	// CR-016 FR43.1: đây là thời điểm duy nhất có đủ cả hai nửa của phép đo —
+	// Đây là thời điểm duy nhất có đủ cả hai nửa của phép đo —
 	// văn bản đã gửi đi, và thời lượng thật đọc ra.
 	uc, repo, _, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -657,7 +656,7 @@ func TestHandleStepEventUseCase_SpeechSynthesized_RecordsVoiceCalibration(t *tes
 }
 
 func TestHandleStepEventUseCase_TTSDisabled_UsesCalibratedRateWhenAvailable(t *testing.T) {
-	// FR43.2: đủ mẫu thì dùng số đo thật thay cho hằng số theo ngôn ngữ.
+	// Đủ mẫu thì dùng số đo thật thay cho hằng số theo ngôn ngữ.
 	uc, repo, _, _ := newTestUseCase()
 	for i := 0; i < domain.MinCalibrationSamples; i++ {
 		// 300 wpm — nhanh gấp đôi hằng số tiếng Việt (140).
@@ -690,7 +689,7 @@ func TestHandleStepEventUseCase_TTSDisabled_UsesCalibratedRateWhenAvailable(t *t
 }
 
 func TestHandleStepEventUseCase_ScriptValidated_BlocksWhenARequiredBeatIsMissing(t *testing.T) {
-	// CR-019 FR52.3/52.5: chặn ở dữ kiện chắc chắn (beat bắt buộc thiếu), và
+	// Chặn ở dữ kiện chắc chắn (beat bắt buộc thiếu), và
 	// chặn TRƯỚC TTS nên không tốn quota giọng đọc.
 	uc, repo, pub, prog := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -729,7 +728,7 @@ func TestHandleStepEventUseCase_ScriptValidated_BlocksWhenARequiredBeatIsMissing
 }
 
 func TestHandleStepEventUseCase_ScriptValidated_DerivesChaptersFromBeats(t *testing.T) {
-	// FR52.2: chapter sinh từ beat thay cho marker `# CHAPTER:` rời rạc.
+	// Chapter sinh từ beat thay cho marker `# CHAPTER:` rời rạc.
 	uc, repo, _, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
@@ -760,14 +759,14 @@ func TestHandleStepEventUseCase_ScriptValidated_DerivesChaptersFromBeats(t *test
 	if project.Chapters[0].Title != "hook" || project.Chapters[0].SceneIndex != 0 {
 		t.Fatalf("chapter đầu sai: %+v", project.Chapters[0])
 	}
-	// FR51.6: phiên bản format được chốt lại tại thời điểm chạy.
+	// Phiên bản format được chốt lại tại thời điểm chạy.
 	if project.VideoFormatVersion == 0 {
 		t.Error("phải chốt phiên bản format")
 	}
 }
 
 func TestHandleStepEventUseCase_ScriptValidated_StopsAtTheReviewGate(t *testing.T) {
-	// CR-024 FR69.1: điểm dừng đặt đúng ranh giới giữa phần rẻ và phần đắt —
+	// Điểm dừng đặt đúng ranh giới giữa phần rẻ và phần đắt —
 	// lượt dry vừa xong nên đã đủ dữ liệu dựng dàn ý, mà TTS thì chưa chạy.
 	uc, repo, pub, prog := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -796,11 +795,11 @@ func TestHandleStepEventUseCase_ScriptValidated_StopsAtTheReviewGate(t *testing.
 	if last := pub.last(); last != nil && last.routingKey == "tts" {
 		t.Fatal("không được gọi TTS trước khi Creator duyệt")
 	}
-	// FR69.5: giao diện phải phân biệt "đang chờ bạn" với "đang xử lý".
+	// Giao diện phải phân biệt "đang chờ bạn" với "đang xử lý".
 	if got := prog.last(); got == nil || got.Status != "awaiting_review" {
 		t.Fatalf("muốn progress awaiting_review, có %+v", got)
 	}
-	// FR68.3/68.5: cảnh báo và mô tả khung hình đi kèm dàn ý.
+	// Cảnh báo và mô tả khung hình đi kèm dàn ý.
 	// Hai cảnh báo: một từ lint của Rendering, một vì script chưa khai báo beat
 	// nào — cả hai phải tới được màn duyệt, vì cảnh báo không ai thấy thì bằng
 	// không có cảnh báo.
@@ -813,10 +812,9 @@ func TestHandleStepEventUseCase_ScriptValidated_StopsAtTheReviewGate(t *testing.
 }
 
 // TestHandleStepEventUseCase_ScriptValidated_WarnsWhenClipsWantedButScriptHasNone
-// is the bug report (2026-09-12): a project with video_output_mode short/both
-// whose script never calls self.clip(...) only found out "Chưa có clip nào"
-// after TTS/render/QC had already run for nothing — the warning must reach
-// the Creator here, at the review gate, before any of that runs.
+// a project with video_output_mode short/both whose script never calls
+// self.clip(...) must learn "Chưa có clip nào" here, at the review gate, before
+// TTS/render run for nothing.
 func TestHandleStepEventUseCase_ScriptValidated_WarnsWhenClipsWantedButScriptHasNone(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
@@ -884,7 +882,7 @@ func TestHandleStepEventUseCase_ScriptValidated_NoClipWarningWhenLongOnly(t *tes
 }
 
 func TestHandleStepEventUseCase_ScriptValidated_SkipsTheGateWhenDisabled(t *testing.T) {
-	// FR69.7: một cổng không bỏ qua được sẽ biến thành thao tác bấm cho xong.
+	// Một cổng không bỏ qua được sẽ biến thành thao tác bấm cho xong.
 	uc, repo, pub, _ := newTestUseCase()
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1", SagaID: "saga-1", Status: domain.StatusValidatingScript,
@@ -906,7 +904,7 @@ func TestHandleStepEventUseCase_ScriptValidated_SkipsTheGateWhenDisabled(t *test
 	}
 }
 
-// CR-023 correction: channel_asset_normalized upserts Orchestrator's local
+// channel_asset_normalized upserts Orchestrator's local
 // projection instead of any HTTP round trip.
 func TestHandleStepEvent_ChannelAssetNormalized_UpsertsPointer(t *testing.T) {
 	repo := newFakeRepo()
@@ -940,7 +938,7 @@ func TestHandleStepEvent_ChannelAssetNormalized_UpsertsPointer(t *testing.T) {
 }
 
 // channel_asset_rendered is forwarded to video-assembly as a
-// register_channel_asset command (CR-040 FR112.1); it must not touch the
+// register_channel_asset command; it must not touch the
 // pointers projection (only channel_asset_normalized does).
 func TestHandleStepEvent_ChannelAssetRendered_PublishesRegisterCommand(t *testing.T) {
 	repo := newFakeRepo()
@@ -990,12 +988,9 @@ func TestHandleStepEvent_ChannelAssetRendered_MalformedIsDropped(t *testing.T) {
 }
 
 // TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish
-// locks CR-029's behaviour change: qc_video is off the main saga (it ran
-// after every cost was already spent and had no fail branch, so it never
-// actually gated anything — see cr-029-render-saga-consolidation.md).
-// video_assembled now reaches ready_to_publish directly when the project has
-// no clip requests (VideoOutputMode zero value), same destination
-// onQCCompleted used to reach via qc_completed.
+// locks that qc_video is off the main saga: video_assembled reaches
+// ready_to_publish directly when the project has no clip requests
+// (VideoOutputMode zero value), the same destination onQCCompleted reaches.
 func TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish(t *testing.T) {
 	uc, repo, pub, _ := newTestUseCase()
 	rendered := "/shared/proj-1/rendered.mp4"
@@ -1029,7 +1024,7 @@ func TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish
 }
 
 // TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips
-// covers the other CR-029 branch: a project that wants Shorts/TikTok clips
+// covers the other branch: a project that wants Shorts/TikTok clips
 // still gets generate_clips dispatched straight after assembly, just without
 // the qc_video hop in between.
 func TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips(t *testing.T) {
@@ -1062,10 +1057,9 @@ func TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips(
 }
 
 // TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips is the
-// direct lock for CR-007 D1: qc_completed now dispatches generate_clips
-// (moved from setting ready_to_publish directly, which is CR-021 D2's old
-// behavior — see TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish
-// for where ready_to_publish now happens).
+// direct lock that qc_completed dispatches generate_clips rather than setting
+// ready_to_publish (see TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish
+// for where ready_to_publish happens).
 func TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips(t *testing.T) {
 	uc, repo, publisher, _ := newTestUseCase()
 	qc := newFakeQCReports()
@@ -1088,7 +1082,7 @@ func TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips(t *testing.T
 
 	project, _ := repo.Get(context.Background(), "proj-1")
 	if project.Status != domain.StatusGeneratingClips {
-		t.Fatalf("expected generating_clips after qc_completed (D1), got %s", project.Status)
+		t.Fatalf("expected generating_clips after qc_completed, got %s", project.Status)
 	}
 
 	cmd := publisher.last()
@@ -1111,7 +1105,7 @@ func TestHandleStepEventUseCase_QCCompleted_DispatchesGenerateClips(t *testing.T
 }
 
 // TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClips
-// is FR61.4's continuation under D1: a QC that could not run must never
+// checks that a QC that could not run must never
 // become a lock. status=not_scored still moves the saga on to generate_clips.
 func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClips(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
@@ -1133,7 +1127,7 @@ func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClip
 
 	project, _ := repo.Get(context.Background(), "proj-1")
 	if project.Status != domain.StatusGeneratingClips {
-		t.Fatalf("expected generating_clips even when not_scored (FR61.4/D1), got %s", project.Status)
+		t.Fatalf("expected generating_clips even when not_scored, got %s", project.Status)
 	}
 
 	report, _ := qc.LatestQCReport(context.Background(), "proj-1")
@@ -1143,7 +1137,7 @@ func TestHandleStepEventUseCase_QCCompleted_NotScoredStillDispatchesGenerateClip
 }
 
 // TestHandleStepEventUseCase_QCCompleted_SkipsGenerateClipsWhenLongOnly is the
-// CR-007 follow-up: a project that only wants its long-form video (the
+// A project that only wants its long-form video (the
 // default VideoOutputMode, and every project predating this field) must not
 // pay for a generate_clips round-trip that would come back with nothing —
 // qc_completed goes straight to ready_to_publish instead.
@@ -1171,8 +1165,8 @@ func TestHandleStepEventUseCase_QCCompleted_SkipsGenerateClipsWhenLongOnly(t *te
 	}
 }
 
-// TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish is CR-007 D1's
-// saga ending: clips_generated (not qc_completed) is what now sets
+// TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish is the
+// saga ending: clips_generated (not qc_completed) is what sets
 // ready_to_publish.
 func TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish(t *testing.T) {
 	uc, repo, _, _ := newTestUseCase()
@@ -1202,7 +1196,7 @@ func TestHandleStepEventUseCase_ClipsGenerated_SetsReadyToPublish(t *testing.T) 
 }
 
 // TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish locks
-// D1's core guarantee: even when every clip failed, the saga still reaches
+// the core guarantee: even when every clip failed, the saga still reaches
 // ready_to_publish — a vertical clip is a derivative product, not the main
 // video.
 func TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish(t *testing.T) {
@@ -1224,15 +1218,13 @@ func TestHandleStepEventUseCase_ClipsGenerated_ClipErrorDoesNotBlockPublish(t *t
 
 	project, _ := repo.Get(context.Background(), "proj-1")
 	if project.Status != domain.StatusReadyToPublish {
-		t.Fatalf("expected ready_to_publish despite clip error (D1), got %s", project.Status)
+		t.Fatalf("expected ready_to_publish despite clip error, got %s", project.Status)
 	}
 }
 
-// TestHandleStepEventUseCase_UnknownSagaStepAcked guards the fix for a live
-// incident: two validation_failed events arrived for sagas whose saga_steps
-// rows no longer existed (their projects had been removed), GetStep returned
-// domain.ErrSagaStepNotFound, Execute handed that back as an error, and the
-// consumer nacked with requeue onto a queue that has neither a delivery limit
+// TestHandleStepEventUseCase_UnknownSagaStepAcked: an event for a saga whose
+// saga_steps rows are gone (the project was removed) makes GetStep return
+// domain.ErrSagaStepNotFound; returned as an error, the consumer would nack with requeue onto a queue that has neither a delivery limit
 // nor a dead-letter exchange. The result was an unbounded hot redelivery loop
 // writing thousands of identical ERROR lines per second.
 //

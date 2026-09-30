@@ -67,7 +67,7 @@ func TestSubtitleModeFromLegacy(t *testing.T) {
 	}
 }
 
-// CR-048 T6b: the layout check holds the drawn frame to the same strip the
+// The layout check holds the drawn frame to the same strip the
 // prompt told the model to keep clear.
 func TestProjectSubtitleBandMatchesTheSubtitleZone(t *testing.T) {
 	cases := []struct {

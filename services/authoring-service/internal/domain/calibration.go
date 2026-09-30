@@ -1,14 +1,13 @@
 package domain
 
-// VoiceCalibration is what a single voice has actually been measured doing
-// (CR-016 FR43).
+// VoiceCalibration is what a single voice has actually been measured doing.
 //
 // The words-per-minute constants in languageProfiles are a guess that has never
 // been checked against anything. Every synthesis run is a chance to check it:
 // the Orchestrator knows both the text it sent and the real audio duration that
 // came back, so the measurement is free.
 //
-// It is kept per voice, not per language (FR43.3). Two Vietnamese Azure voices
+// It is kept per voice, not per language. Two Vietnamese Azure voices
 // read at visibly different speeds; averaging them together would cancel out
 // exactly the thing being measured.
 type VoiceCalibration struct {

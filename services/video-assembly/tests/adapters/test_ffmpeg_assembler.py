@@ -84,7 +84,7 @@ def test_assemble_runs_single_ffmpeg_pass_without_background_music(tmp_path):
 
 
 def test_each_narration_segment_is_delayed_to_its_own_offset(tmp_path):
-    """CR-002 core regression: segments must be placed at their measured
+    """Segments must be placed at their measured
     offsets, never concatenated end to end."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
@@ -133,7 +133,7 @@ def test_segments_are_placed_by_offset_not_input_order(tmp_path):
 
 
 def test_video_is_padded_when_narration_outlasts_the_animation(tmp_path):
-    """CR-002 FR10.6: hold the last frame rather than cutting the closing line."""
+    """Hold the last frame rather than cutting the closing line."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -150,7 +150,7 @@ def test_video_is_padded_when_narration_outlasts_the_animation(tmp_path):
     joined = " ".join(args)
     assert "tpad=stop_mode=clone:stop_duration=3.000" in joined
     assert args[args.index("-t") + 1] == "23.000"
-    # -shortest is what used to truncate the closing narration.
+    # -shortest would truncate the closing narration.
     assert "-shortest" not in args
 
 
@@ -174,8 +174,8 @@ def test_video_is_not_padded_when_narration_fits(tmp_path):
 
 
 def test_falls_back_to_shortest_without_a_known_video_duration(tmp_path):
-    """A pre-CR-002 project reports no duration; keep the old behaviour rather
-    than guessing a target length."""
+    """A project that reports no duration uses -shortest rather than guessing
+    a target length."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -239,7 +239,7 @@ def test_assemble_wraps_timeout_as_assembly_engine_error(tmp_path):
 
 
 def test_assemble_without_narration_produces_a_silent_video(tmp_path):
-    # CR-001: no audio_segments means nothing to mux — the output must be
+    # No audio_segments means nothing to mux — the output must be
     # explicitly silent rather than inheriting a stray stream.
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
@@ -306,7 +306,7 @@ def test_assemble_with_subtitles_burns_them_in_and_reencodes(tmp_path):
 
 
 def test_subtitle_mode_track_writes_only_srt_and_stream_copies(tmp_path):
-    """CR-015 FR38 / ADR-0027: 'track' delivers a caption file for Publisher
+    """'track' delivers a caption file for Publisher
     to upload, and does NOT paint anything into the video — so, unlike
     burn-in, the video stream stays stream-copyable."""
     assembler = FfmpegVideoAssembler()
@@ -356,7 +356,7 @@ def test_subtitle_mode_both_writes_both_files(tmp_path):
 
 def test_subtitle_mode_off_ignores_cues_entirely(tmp_path):
     """A cue list left over from before the Creator turned subtitles off
-    must not produce either file (CR-001 FR9.1 still holds)."""
+    must not produce either file."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -400,7 +400,7 @@ def test_lead_in_shifts_the_caption_track_too(tmp_path):
 
 
 def test_encoded_output_uses_upload_grade_settings(tmp_path):
-    """CR-004 FR12.2. YouTube transcodes whatever it receives, so the source has
+    """YouTube transcodes whatever it receives, so the source has
     to carry spare quality into that second encode — and yuv420p/+faststart are
     correctness, not polish: without them some players reject the file or must
     download it whole before playing."""
@@ -441,9 +441,8 @@ def test_keyframe_interval_follows_the_videos_frame_rate(tmp_path):
 
 
 def test_stream_copy_skips_the_encode_settings_entirely(tmp_path):
-    """FR12.3. Phase 0 measured -c:v copy at 0.1s against 24.8s for a
-    re-encode, so not re-encoding when nothing repaints the picture is the
-    single highest-value change here."""
+    """-c:v copy measured 0.1s against 24.8s for a re-encode, so nothing is
+    re-encoded when nothing repaints the picture."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -478,7 +477,7 @@ def test_silent_video_gets_no_audio_encode_args(tmp_path):
 
 
 def test_background_music_is_ducked_against_the_narration(tmp_path):
-    """CR-005 FR14.1. A flat mix leaves music fighting the voice when it is
+    """A flat mix leaves music fighting the voice when it is
     loud and leaves silence when it is not."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
@@ -539,7 +538,7 @@ def test_every_filtergraph_label_is_consumed_exactly_once(tmp_path):
 
 
 def test_music_volume_is_configurable(tmp_path):
-    """FR14.2 — 0.2 was hardcoded."""
+    """The music level comes from the request."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -557,7 +556,7 @@ def test_music_volume_is_configurable(tmp_path):
 
 
 def test_audio_is_normalised_to_youtubes_target(tmp_path):
-    """FR14.3. YouTube normalizes to about -14 LUFS, so a quieter master is not
+    """YouTube normalizes to about -14 LUFS, so a quieter master is not
     left quiet — it is turned up along with its noise floor."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
@@ -589,7 +588,7 @@ def test_silent_video_is_not_normalised(tmp_path):
 
 
 def test_padding_is_off_by_default_so_stream_copy_survives(tmp_path):
-    """FR14.5's trade-off, asserted so it is not silently reversed: padding
+    """The padding trade-off, asserted so it is not silently reversed: padding
     either end means tpad, tpad repaints frames, and that rules out -c:v copy —
     measured at 250x faster in Phase 0."""
     assembler = FfmpegVideoAssembler()
@@ -609,7 +608,7 @@ def test_padding_is_off_by_default_so_stream_copy_survives(tmp_path):
 
 
 def test_lead_in_shifts_picture_audio_and_subtitles_together(tmp_path):
-    """The lead-in must not reintroduce CR-002's desync: narration i still has
+    """The lead-in must not desync narration: narration i still has
     to land on wait i, just later in the file. Shifting only the audio would
     put every line ahead of its animation by the lead-in."""
     assembler = FfmpegVideoAssembler(lead_in_seconds=0.5, tail_seconds=1.0)
@@ -642,7 +641,7 @@ def ffmpeg_calls(mock_run):
 
 
 def test_a_thumbnail_candidate_is_extracted(tmp_path):
-    """CR-006 FR16.1. No text is burned in: the title does not exist yet at
+    """No text is burned in: the title does not exist yet at
     assembly time, so anything overlaid here would be guesswork."""
     assembler = FfmpegVideoAssembler()
     video_dir = tmp_path / "proj-1" / "video"
@@ -694,7 +693,7 @@ def test_thumbnail_failure_does_not_fail_the_assembly(tmp_path):
 
 
 def test_intro_duration_shifts_narration_offset_and_subtitle_cues(tmp_path):
-    """CR-023 D5: effective_lead_in folds intro_duration_seconds into the
+    """effective_lead_in folds intro_duration_seconds into the
     same single shift as ASSEMBLY_LEAD_IN_SECONDS — narration i must still
     land on wait i, just intro_duration seconds later in the concatenated
     output, and the burned-in subtitle cue must move by exactly that much."""
@@ -746,8 +745,8 @@ def test_intro_and_lead_in_seconds_combine_into_effective_lead_in(tmp_path):
 
 def test_no_intro_duration_leaves_lead_in_behaviour_unchanged(tmp_path):
     """Without intro_video_path (the default), effective_lead_in must reduce
-    to exactly the old lead_in — this is the regression guard for CR-023
-    not touching any existing project's assembly."""
+    to exactly lead_in, so a project without channel assets assembles the
+    same way."""
     assembler = FfmpegVideoAssembler()
     request = VideoAssemblyRequest(
         project_id="proj-1",
@@ -765,7 +764,7 @@ def test_no_intro_duration_leaves_lead_in_behaviour_unchanged(tmp_path):
 
 
 def test_intro_and_outro_are_concatenated_around_the_main_segment(tmp_path):
-    """CR-023 D5: with intro_video_path/outro_video_path set, assembly must
+    """With intro_video_path/outro_video_path set, assembly must
     run a second ffmpeg pass concatenating [intro, main, outro] via the
     concat demuxer, using the same upload-grade encode settings, and the
     temp main-segment file must not be left behind."""

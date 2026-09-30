@@ -1,5 +1,5 @@
 /**
- * Contact sheets of the flat illustration kit (CR-043), for reviewing the
+ * Contact sheets of the flat illustration kit, for reviewing the
  * drawings by eye: `node render_gallery.mjs sheets <outDir>`.
  */
 import React from 'react';

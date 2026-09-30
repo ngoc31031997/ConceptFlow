@@ -1,4 +1,4 @@
-"""Unit tests for the SRT caption-track writer (CR-015 FR38)."""
+"""Unit tests for the SRT caption-track writer."""
 
 from __future__ import annotations
 

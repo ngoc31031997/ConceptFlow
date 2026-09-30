@@ -57,9 +57,9 @@ export function aggregateByStep(events: ProjectEvent[]): StepStat[] {
     return cur;
   };
   for (const e of events) {
-    // CR-046: the illustrations step is an authoring run too, now counted under its own
-    // flow number (5, before Code at 6) via e.flow_step; source "illustrations" still
-    // tells it apart from "authoring" rows for historical events recorded before CR-046.
+    // The illustrations step is an authoring run too, now counted under its own
+    // flow number (5, before Code at 6) via e.flow_step; source "illustrations"
+    // tells legacy rows apart from "authoring" ones.
     if (e.source === "authoring" || e.source === "illustrations") {
       if (e.run_state === "running") continue; // dòng bắt đầu không có số đo
       const st = at(e.flow_step);

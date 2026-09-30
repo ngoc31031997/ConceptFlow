@@ -58,14 +58,14 @@ type ProjectRepositoryPort interface {
 	UpdateStep(ctx context.Context, step *SagaStep) error
 
 	// RecordVoiceSamples folds one project's measurement into a voice's
-	// running totals (CR-016 FR43.1). Additive rather than replacing, so a
+	// running totals. Additive rather than replacing, so a
 	// voice's estimate keeps improving instead of swinging with the last
 	// project rendered.
 	RecordVoiceSamples(ctx context.Context, voiceID string, words int, seconds float64) error
 	GetVoiceCalibration(ctx context.Context, voiceID string) (VoiceCalibration, error)
 	ListVoiceCalibrations(ctx context.Context) ([]VoiceCalibration, error)
 
-	// CR-019: hình dạng video, lưu dưới dạng dữ liệu sửa được.
+	// Hình dạng video, lưu dưới dạng dữ liệu sửa được.
 	SeedVideoFormats(ctx context.Context) error
 	GetVideoFormat(ctx context.Context, formatID string, version int) (VideoFormat, error)
 	ListVideoFormats(ctx context.Context) ([]VideoFormat, error)
@@ -73,7 +73,7 @@ type ProjectRepositoryPort interface {
 }
 
 // ChannelAssetPort resolves the currently-active channel intro/outro asset
-// (CR-023 D1/D2, corrected). There is no HTTP server between backend
+// There is no HTTP server between backend
 // services in this system, so Orchestrator does NOT call video-assembly to
 // find the active asset — video-assembly's full channel_assets table (with
 // real video_path) is never visible to Orchestrator. Instead Orchestrator
@@ -101,14 +101,14 @@ type ChannelAssetPort interface {
 	ListChannelAssetPointers(ctx context.Context) ([]ChannelAssetPointer, error)
 }
 
-// QCReportPort persists and reads back the automated QC reports (CR-021 D6,
-// FR61.1). Implemented by adapters/postgres.QCReportRepository.
+// QCReportPort persists and reads back the automated QC reports.
+// Implemented by adapters/postgres.QCReportRepository.
 //
 // Only the latest report per project is ever read: a project is scored once per
 // assemble_video, and an older report describes a video file that no longer
 // exists. History is kept rather than overwritten so a re-render's report can
 // be compared against the one it replaced while thresholds are being calibrated
-// (CR-021's own answer to the false-positive risk).
+// (the answer to the false-positive risk).
 type QCReportPort interface {
 	// SaveQCReport stores one completed QC pass. A redelivered qc_completed
 	// event must not accumulate duplicate reports, so implementations key on
@@ -117,19 +117,19 @@ type QCReportPort interface {
 	SaveQCReport(ctx context.Context, report QCReport) error
 
 	// LatestQCReport returns the most recent report for a project, or
-	// (nil, nil) when it was never scored — a project rendered before CR-021
-	// has no report and must still be publishable (FR61.4's reasoning applies
+	// (nil, nil) when it was never scored — a project never scored
+	// has no report and must still be publishable (the same reasoning applies
 	// identically to a missing report and an unscorable one).
 	LatestQCReport(ctx context.Context, projectID string) (*QCReport, error)
 
-	// RecordQCOverride stamps the latest report as deliberately bypassed
-	// (FR61.3). Idempotent: overriding twice keeps the first timestamp, so a
+	// RecordQCOverride stamps the latest report as deliberately bypassed.
+	// Idempotent: overriding twice keeps the first timestamp, so a
 	// double-clicked publish button does not rewrite the audit trail.
 	RecordQCOverride(ctx context.Context, projectID string, findings []QCFinding) error
 }
 
 // ChannelAssetPointer is one row of Orchestrator's channel_asset_pointers
-// projection (CR-023 correction).
+// projection.
 type ChannelAssetPointer struct {
 	Kind          string
 	RenderQuality RenderQuality

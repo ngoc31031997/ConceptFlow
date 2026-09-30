@@ -19,7 +19,7 @@ function buildApp(clients) {
   return app;
 }
 
-// CR-040 FR111: prompts and the 1a/1b/1c chain are authoring-service's; the
+// Prompts and the 1a/1b/1c chain are authoring-service's; the
 // project itself stays with the orchestrator.
 describe('routing between orchestrator and authoring-service', () => {
   let clients;

@@ -26,7 +26,7 @@ interface Props {
 }
 
 /**
- * Replaces the old connected/not-connected button (CR-012 FR34).
+ * Replaces the old connected/not-connected button.
  *
  * A boolean was the right shape while exactly one channel could exist. Now
  * that several can, the Creator needs to see *which* channels are connected
@@ -157,7 +157,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
       {unusableApps.length > 0 && (
         // Surfaced here rather than after the Creator has been bounced to
         // Google's redirect_uri_mismatch page, which names neither the client
-        // nor the URI to add (CR-012 FR30.3).
+        // nor the URI to add.
         <div role="alert" className={styles.warning} data-testid="youtube-redirect-warning">
           {unusableApps.map((app) => (
             <p key={app.client_id}>
@@ -200,7 +200,7 @@ export function YoutubeChannels({ projectId, onSelectedChannelChange }: Props) {
                 </span>
                 {account.is_default && <span className={styles.defaultBadge}>mặc định</span>}
                 {!account.has_caption_scope && (
-                  // CR-015 FR40.2: learned here, before publish, rather than
+                  // Learned here, before publish, rather than
                   // from a video that quietly has no CC afterward.
                   <span
                     className={styles.captionBadge}

@@ -13,7 +13,7 @@ import (
 // schema is applied at startup via CREATE TABLE IF NOT EXISTS, like every other
 // service in this system.
 const schema = `
--- CR-025/027/028: the per-project authoring artefacts (Story Architect output,
+-- The per-project authoring artefacts (Story Architect output,
 -- storyboard, code, topic, working mode, model per step). One row per project.
 -- No foreign key: the project lives in the orchestrator's database; deleting a
 -- project deletes this row through DELETE /internal/v1/authoring/{id}.
@@ -28,15 +28,15 @@ CREATE TABLE IF NOT EXISTS project_authoring (
     story_model        TEXT NOT NULL DEFAULT '',
     storyboard_model   TEXT NOT NULL DEFAULT '',
     code_model         TEXT NOT NULL DEFAULT '',
-    -- CR-040 FR111: what the orchestrator's projects row used to give the
-    -- topic-collision search (CR-028 FR85). The language is sent with the topic.
+    -- The topic and its language, for the
+    -- topic-collision search. The language is sent with the topic.
     language           TEXT NOT NULL DEFAULT '',
     created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS project_authoring_topic_lang ON project_authoring (language);
 
--- CR-027 D9/FR82: one row per LLM call. project_id is nullable and has no FK:
+-- One row per LLM call. project_id is nullable and has no FK:
 -- suggest-short-script runs before any project exists, and deleting a project
 -- must not erase the record of what it cost.
 CREATE TABLE IF NOT EXISTS llm_usage (
@@ -57,12 +57,12 @@ CREATE TABLE IF NOT EXISTS llm_usage (
     phase             TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
--- CR-056: a call whose stream was cut (reasoning budget) or that failed comes
+-- A call whose stream was cut (reasoning budget) or that failed comes
 -- back with no usage record; its tokens are then unknown, not zero.
 ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS reasoning_chars INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS usage_reported BOOLEAN NOT NULL DEFAULT true;
 
--- CR-031: the prompt library. Each pipeline role owns a list of prompts and
+-- The prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active; is_system rows ship in the binary.
 CREATE TABLE IF NOT EXISTS prompts (
     id            TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS prompts (
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
 
--- CR-041: video archetypes the Story Architect can be told to make. System rows
+-- Video archetypes the Story Architect can be told to make. System rows
 -- ship in the binary (read-only); the Creator adds their own.
 CREATE TABLE IF NOT EXISTS video_archetypes (
     id          TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
@@ -92,8 +92,8 @@ CREATE TABLE IF NOT EXISTS video_archetypes (
 CREATE UNIQUE INDEX IF NOT EXISTS video_archetypes_code_key ON video_archetypes (upper(code));
 ALTER TABLE video_archetypes ADD COLUMN IF NOT EXISTS recommended_format_id TEXT NOT NULL DEFAULT '';
 
--- CR-044: the illustration library. Folders are shelves; each drawing lives in
--- exactly one. Built-in rows (the CR-043 kit) carry no code: it ships in the
+-- The illustration library. Folders are shelves; each drawing lives in
+-- exactly one. Built-in rows (the illustration kit) carry no code: it ships in the
 -- rendering image. The preview is stored for the version it was rendered from,
 -- so a stale one is never served after the code changes.
 CREATE TABLE IF NOT EXISTS illustration_folders (
@@ -127,13 +127,13 @@ CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id)
 -- style findings of the current version that did not block saving.
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
--- CR-052: a Hình mẫu copy points at the drawing it was made from (NULL once
+-- A Hình mẫu copy points at the drawing it was made from (NULL once
 -- that one is deleted); an original exemplar remembers the folder it goes
 -- back to when it stops being one.
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS source_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL;
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS home_folder_id TEXT;
 
--- CR-044: the drawings one video needs, planned from its storyboard. No FK to
+-- The drawings one video needs, planned from its storyboard. No FK to
 -- the project (it lives in the orchestrator); deleting the project deletes
 -- these rows with its authoring row.
 CREATE TABLE IF NOT EXISTS project_illustrations (
@@ -149,14 +149,14 @@ CREATE TABLE IF NOT EXISTS project_illustrations (
     illustration_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustrations (project_id, position);
--- CR-045: when the video's drawing list was last planned, so the code step can
+-- When the video's drawing list was last planned, so the code step can
 -- tell "planned, needs no drawing" from "never planned".
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at TIMESTAMPTZ;
--- CR-050 FR-17: sha256 of the storyboard the list was planned from, so a list
+-- sha256 of the storyboard the list was planned from, so a list
 -- made from an older storyboard is known to be stale. '' = planned before this
 -- existed (or never): no evidence either way, not treated as stale.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_storyboard_sha TEXT NOT NULL DEFAULT '';
--- CR-050 Unit 2 (ADR-0030): the code step stored segment by segment, so a
+-- The code step stored segment by segment, so a
 -- failed or interrupted run keeps what it already wrote. No FK, like
 -- project_illustrations: DeleteAuthoring removes a project's segments.
 CREATE TABLE IF NOT EXISTS authoring_segments (
@@ -177,9 +177,9 @@ CREATE TABLE IF NOT EXISTS authoring_segments (
     PRIMARY KEY (project_id, step, key)
 );
 CREATE INDEX IF NOT EXISTS authoring_segments_running_idx ON authoring_segments (status) WHERE status = 'running';
--- CR-050 FR-7: shots per code segment, chosen by the Creator.
+-- Shots per code segment, chosen by the Creator.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_chunk_shots INTEGER NOT NULL DEFAULT 3;
--- CR-050 FR-22: every failed check of a code run, for statistics. Kept when
+-- Every failed check of a code run, for statistics. Kept when
 -- the project is deleted, like llm_usage.
 CREATE TABLE IF NOT EXISTS code_check_diagnostics (
     id          BIGSERIAL PRIMARY KEY,
@@ -196,8 +196,8 @@ CREATE TABLE IF NOT EXISTS code_check_diagnostics (
     line        INTEGER
 );
 CREATE INDEX IF NOT EXISTS code_check_diagnostics_created_idx ON code_check_diagnostics (created_at DESC);
--- CR-045: colours outside the channel palette (S9) are no longer a warning;
--- drop the ones stored before, so old drawings do not keep showing them.
+-- Colours outside the channel palette (S9) are not a warning; drop any such
+-- stored warnings so no drawing shows them.
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

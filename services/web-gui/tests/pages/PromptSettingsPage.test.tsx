@@ -36,7 +36,7 @@ function renderPage() {
   );
 }
 
-// CR-031 — mỗi vai trò một danh sách prompt, một dòng đang bật. Dòng hệ thống
+// Mỗi vai trò một danh sách prompt, một dòng đang bật. Dòng hệ thống
 // chỉ xem/copy; dòng của người dùng sửa/xóa/bật được.
 describe("PromptSettingsPage — thư viện prompt", () => {
   beforeEach(() => {

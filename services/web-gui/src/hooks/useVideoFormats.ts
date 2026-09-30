@@ -3,7 +3,7 @@ import { fetchVideoFormats } from "../api/client";
 import type { VideoFormat } from "../types";
 
 /**
- * Danh sách hình dạng video (CR-019 FR51.3).
+ * Danh sách hình dạng video.
  *
  * Lỗi mạng trả về danh sách rỗng thay vì ném ra: chọn format là một tiện ích
  * định hướng, không phải điều kiện để soạn được script. Hỏng thì Creator vẫn

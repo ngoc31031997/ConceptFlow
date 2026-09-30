@@ -110,7 +110,7 @@ def test_publish_does_not_refresh_when_credential_still_valid():
 def test_refreshes_with_the_client_that_issued_the_credential():
     """A refresh token is only valid against the exact client_id/secret pair
     that minted it, so with several apps configured the publisher must look
-    up the credential's own app (CR-012 FR32.4)."""
+    up the credential's own app."""
     mock_youtube = MagicMock()
     mock_youtube.videos.return_value.insert.return_value.execute.return_value = {"id": "abc123"}
     store = InMemoryCredentialStore()
@@ -206,7 +206,7 @@ def test_publish_uploads_caption_when_scope_is_present():
 
 
 def test_publish_skips_caption_when_credential_lacks_force_ssl_scope():
-    """FR40.2/FR40.3: a channel connected before CR-015 shipped must still
+    """A channel connected without the force-ssl scope must still
     publish — just without the caption — rather than 403ing mid-upload or
     blocking the publish entirely."""
     mock_youtube = MagicMock()
@@ -231,7 +231,7 @@ def test_publish_skips_caption_when_credential_lacks_force_ssl_scope():
 
 
 def test_publish_reports_failed_caption_status_without_failing_the_publish():
-    """FR39.4: a caption upload error is logged, not raised — the video is
+    """A caption upload error is logged, not raised — the video is
     already up — but unlike the thumbnail, the outcome must be visible
     somewhere other than a log line."""
     mock_youtube = MagicMock()

@@ -27,8 +27,7 @@ const SUBTITLE_MODE_LABELS: Record<string, string> = {
  * Toàn bộ input đã dùng để tạo project này — không chỉ script mà cả mọi lựa
  * chọn cấu hình đi kèm (giọng, phụ đề, chất lượng, nhạc nền, định dạng).
  * Backend luôn trả các trường này về (dùng để dựng lại saga khi "Render lại
- * ở chất lượng khác"), nhưng trước đây ResultPage chỉ dùng chúng âm thầm chứ
- * chưa từng hiện ra — Creator muốn xem lại toàn bộ input để tối ưu hoặc tái
+ * ở chất lượng khác"); panel này hiện chúng ra để Creator xem lại toàn bộ input để tối ưu hoặc tái
  * sử dụng cho video sau, kể cả sau khi đã đăng.
  */
 export function ProjectInputPanel({ project }: ProjectInputPanelProps) {

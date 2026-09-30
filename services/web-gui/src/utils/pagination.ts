@@ -1,4 +1,4 @@
-/** CR-054 — phân trang: số video mỗi trang Creator chọn được. */
+/** Phân trang: số video mỗi trang Creator chọn được. */
 export const PAGE_SIZES = [10, 20, 50];
 
 /** Số trang, ít nhất 1 (danh sách rỗng vẫn là một trang). */

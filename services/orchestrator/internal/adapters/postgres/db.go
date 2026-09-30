@@ -46,20 +46,20 @@ CREATE TABLE IF NOT EXISTS projects (
 -- existing deployments need this explicit ALTER to pick up the column.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
 
--- CR-012: which connected channel a project publishes to. Same reason as
+-- Which connected channel a project publishes to. Same reason as
 -- above — an already-bootstrapped database never re-runs CREATE TABLE.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS manim_scene_class_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;
--- CR-001: narration and subtitles are switchable per project. tts_enabled
+-- Narration and subtitles are switchable per project. tts_enabled
 -- defaults to true so projects created before this column existed keep the
 -- narrated behaviour they were rendered with.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS tts_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS voice_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitles_enabled BOOLEAN NOT NULL DEFAULT FALSE;
 
--- CR-016 FR43: what each voice was actually measured reading at.
+-- What each voice was actually measured reading at.
 --
 -- The words-per-minute constants in the domain are a guess that had never been
 -- checked. Every synthesis run is a free chance to check it: the Orchestrator
@@ -74,12 +74,12 @@ CREATE TABLE IF NOT EXISTS voice_calibration (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- CR-019: hình dạng lặp lại của một video, dưới dạng dữ liệu sửa được.
+-- Hình dạng lặp lại của một video, dưới dạng dữ liệu sửa được.
 --
 -- Là bảng chứ không phải hằng số trong mã nguồn vì beat nào một chủ đề cần thì
 -- thay đổi rất nhiều — một bộ beat hardcode sẽ sai ngay ở chủ đề đầu tiên không
--- vừa khuôn (FR51.4/FR51.5). Cột version để một project render tháng trước vẫn
--- báo đúng cấu trúc nó thực sự được dựng theo (FR51.6).
+-- vừa khuôn. Cột version để một project render tháng trước vẫn
+-- báo đúng cấu trúc nó thực sự được dựng theo.
 CREATE TABLE IF NOT EXISTS video_formats (
     format_id TEXT NOT NULL,
     version INTEGER NOT NULL,
@@ -95,62 +95,62 @@ CREATE TABLE IF NOT EXISTS video_formats (
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_format_version INTEGER NOT NULL DEFAULT 0;
 
--- CR-024: cổng duyệt dàn ý. review_enabled mặc định TRUE — project tạo trước
+-- Cổng duyệt dàn ý. review_enabled mặc định TRUE — project tạo trước
 -- khi cột này tồn tại cũng đi qua cổng, vì đó là hành vi CR muốn.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS review_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS beats JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS validation_warnings JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_style JSONB;
--- CR-002: where each narration segment actually begins in the rendered video,
+-- Where each narration segment actually begins in the rendered video,
 -- as measured by Rendering. Projects rendered before this column existed have
 -- NULL here; assemble_video then falls back to offset 0 for every segment,
 -- which reproduces the old (desynchronised) behaviour, so such a project needs
 -- re-rendering rather than re-assembling.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS wait_offsets JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
--- CR-004: resolution/framerate for this project's render. Defaults to 1080p60
+-- resolution/framerate for this project's render. Defaults to 1080p60
 -- so projects created before this column existed are upgraded rather than
 -- pinned to the old hardcoded 720p30.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_quality TEXT NOT NULL DEFAULT '1080p60';
--- CR-005: Creator-chosen background music level. 0 means unset, which assembly
+-- Creator-chosen background music level. 0 means unset, which assembly
 -- reads as the 0.2 the level was fixed at before this was adjustable.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS background_music_volume DOUBLE PRECISION NOT NULL DEFAULT 0;
 -- Font for text drawn inside a Remotion video. '' means DefaultVideoFont.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_font TEXT NOT NULL DEFAULT '';
--- CR-006: chapter markers from the script. Timestamps are not stored — they are
+-- Chapter markers from the script. Timestamps are not stored — they are
 -- derived from wait_offsets, so a re-render moves the chapters with the video.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS chapters JSONB;
--- CR-015: the .srt caption track Video Assembly wrote alongside video_path,
+-- The .srt caption track Video Assembly wrote alongside video_path,
 -- when subtitle_mode asked for one. NULL for every project rendered before
 -- this column existed, and for one where subtitles were off or burn-in only —
 -- Publisher already treats a NULL/absent caption_path as "nothing to upload"
 -- the same way it does youtube_thumbnail_path.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_path TEXT;
--- CR-015 FR41: which of the four delivery modes this project renders
+-- Which of the four delivery modes this project renders
 -- subtitles with. Empty string for every row predating this column —
 -- project_repository.go's Get() derives it from subtitles_enabled in that
 -- case (domain.SubtitleModeFromLegacy), never left blank downstream.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS subtitle_mode TEXT NOT NULL DEFAULT '';
--- CR-015 FR39.4: mirrors the Publisher's PublishResult.caption_status, so a
+-- Mirrors the Publisher's PublishResult.caption_status, so a
 -- silently skipped or failed caption upload is visible on the project.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS caption_status TEXT;
 -- Append-only trace of failures (authoring runs today), newest 100 kept. A log
 -- for humans: nothing reads it to make a decision. See application.ProjectError.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_errors JSONB NOT NULL DEFAULT '[]';
 
--- CR-023 D7/FR67.1/FR67.2: whether the fixed channel intro/outro is attached
+-- Whether the fixed channel intro/outro is attached
 -- at assemble_video. Default TRUE for both — channel identity is opt-out, so
 -- a project created before these columns existed also gets it.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_enabled BOOLEAN NOT NULL DEFAULT TRUE;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS outro_enabled BOOLEAN NOT NULL DEFAULT TRUE;
--- CR-023 D2: the channel_assets id actually resolved and dispatched with this
+-- The channel_assets id actually resolved and dispatched with this
 -- project's assemble_video command, persisted (not re-resolved) so a retry
 -- reconstructs the identical payload (Rule 5) rather than looking it up again
 -- and potentially disagreeing with what was already sent.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_asset_id TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS outro_asset_id TEXT;
 
--- CR-023 correction: orchestrator no longer calls video-assembly over HTTP to
+-- Orchestrator does not call video-assembly over HTTP to
 -- find the active intro/outro asset (no such HTTP server exists between
 -- backend services). It keeps its own lightweight projection instead, kept
 -- current by subscribing to channel_asset_rendered/channel_asset_normalized
@@ -167,40 +167,40 @@ CREATE TABLE IF NOT EXISTS channel_asset_pointers (
     PRIMARY KEY (kind, render_quality)
 );
 
--- CR-021 FR58/D3: what was on screen at each narration mark, measured by
+-- What was on screen at each narration mark, measured by
 -- Rendering and carried on rendering_completed. Stored here purely so the
 -- qc_video command can be rebuilt from Project alone (Rule 5) rather than
 -- needing the original event again — exactly the reason wait_offsets is stored.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS layout_marks JSONB;
 
--- CR-007 FR19.2/D1/D3: the with-self.clip(...) selections Rendering
+-- The with-self.clip(...) selections Rendering
 -- measured, carried verbatim on rendering_completed exactly like
 -- layout_marks — stored so generate_clips can be rebuilt from Project alone
 -- (Rule 5). clip_requests holds the Creator-entered selections from POST
--- /v1/projects/{id}/clips separately (D3 merges the two at dispatch time,
+-- /v1/projects/{id}/clips separately (the two are merged at dispatch time,
 -- GUI wins on a matching name). clips is generate_clips's own result, one
 -- row's worth of (name, preset, status, output_path, duration_seconds,
--- error_message) entries — a clip-level failure never blocks the saga (D1),
+-- error_message) entries — a clip-level failure never blocks the saga,
 -- so this is just the audit trail the Creator sees on the results screen.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_marks JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_requests JSONB;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS clips JSONB;
 
--- CR-007 D5 risk: video-assembly is the only place that knows the channel
+-- video-assembly is the only place that knows the channel
 -- intro's real length (it resolved intro_asset_id and folded it into
--- effective_lead_in — CR-023), and Orchestrator has no synchronous way to ask
--- it again (CR-023 correction: no HTTP between the two). Stored from
+-- effective_lead_in), and Orchestrator has no synchronous way to ask
+-- it again (no HTTP between the two). Stored from
 -- video_assembled so generate_clips can shift a Creator's clip selection by
 -- the same amount narration/subtitles were already shifted — omit it and a
 -- clip is off by exactly the intro's length. 0 when the project has no intro.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_duration_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
 
--- CR-007 follow-up: "long" | "short" | "both" — which output(s) this project
+-- "long" | "short" | "both" — which output(s) this project
 -- produces. Default 'long' reproduces the only behaviour that existed before
 -- this column did: generate_clips never ran unless a Creator opted in.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DEFAULT 'long';
 
--- CR-026 D1: links two independent projects covering the same topic (a
+-- Links two independent projects covering the same topic (a
 -- long-form video and a short-form one with its own dedicated script) so
 -- the Result screen can show both together. Self-referencing, no FK — the
 -- two projects have independent lifecycles.
@@ -220,15 +220,15 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS wizard_step INTEGER NOT NULL DEFAU
 -- furthest screen that happens to have content. '' = never recorded.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS wizard_route TEXT NOT NULL DEFAULT '';
 
--- CR-021 D6/FR61.1: one row per automated QC pass.
+-- One row per automated QC pass.
 --
--- findings is JSONB, not text: FR61.1 asks for machine-readable data and the
+-- findings is JSONB, not text: the report must be machine-readable data and the
 -- GUI groups by severity, neither of which a log line supports. History is
 -- kept (no primary key on project_id) because the point of the indicate-first
--- mode in D5 is to compare reports across renders while the thresholds are
+-- mode is to compare reports across renders while the thresholds are
 -- being calibrated.
 --
--- overridden_at/overridden_findings are the audit half of FR61.3: a deliberate
+-- overridden_at/overridden_findings are the audit trail of a QC override: a deliberate
 -- bypass has to leave a trace, and the trace is only meaningful if it says
 -- which findings were waved through — the report's findings can change on the
 -- next render, so they are copied, not referenced.
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS processed_messages (
     processed_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- CR-025 step 1 (Story Architect): the pasted story outline a Creator gets
+-- Step 1 (Story Architect): the pasted story outline a Creator gets
 -- back from the external AI, saved server-side so the wizard can hand it to
 -- the next pipeline step (Visual Director) via {{previous_output}}. A
 -- separate table rather than a projects column: Project's Save() is one large
@@ -285,28 +285,28 @@ CREATE TABLE IF NOT EXISTS project_authoring (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- CR-025 step 2 (Visual Director): the pasted storyboard a Creator gets back
+-- Step 2 (Visual Director): the pasted storyboard a Creator gets back
 -- from the external AI, same reasoning and same table as story_content above
 -- (one row per project, authoring-time-only data) — a second column rather
 -- than a second table since it shares the exact same key and lifecycle as
 -- story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT NOT NULL DEFAULT '';
 
--- CR-025 step 3 (Manim Engineer): the pasted Manim code a Creator gets back
+-- Step 3 (Manim Engineer): the pasted Manim code a Creator gets back
 -- from the external AI, same reasoning/table as story_content/
 -- storyboard_content above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NULL DEFAULT '';
 
--- CR-025 step 4 (Script Reviewer), bước đã bị CR-030 bỏ hẳn: cột giữ lại cho
--- dữ liệu cũ, không còn gì đọc/ghi. The pasted PASS/REVISE verdict text a
+-- Step 4 (Script Reviewer), không còn dùng: cột giữ lại cho dữ liệu cũ,
+-- không gì đọc/ghi. The pasted PASS/REVISE verdict text a
 -- Creator gets back from the external AI, same reasoning/table as the columns
 -- above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT NULL DEFAULT '';
 
--- CR-027 D0: the project's topic. Until now the topic lived only in the
+-- The project's topic. Until now the topic lived only in the
 -- browser (ProjectDraftContext + localStorage) and was interpolated into
 -- {{topic}} by scriptPrompts.ts on the client, so the server had no way to
--- render a prompt at all — which is exactly what CR-027 FR77 needs to do.
+-- render a prompt at all — which the server-side authoring chain needs.
 --
 -- Same table as the four *_content columns above and for the same reason:
 -- authoring-time-only data, one row per project, written by a Creator action
@@ -314,12 +314,12 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS review_content TEXT NOT N
 -- whose single long positional UPDATE would put every existing parameter at
 -- risk of misalignment for the sake of one authoring field.
 --
--- Projects created before CR-027 keep '' here; their rendered prompt then
+-- Projects without a saved topic keep '' here; their rendered prompt then
 -- carries the same "paste your topic here" placeholder the GUI shows today.
 -- No attempt is made to guess a topic out of story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAULT '';
 
--- CR-027 FR79: how the Creator works step 1 — 'manual' (copy each prompt out
+-- How the Creator works step 1 — 'manual' (copy each prompt out
 -- to ChatGPT/Claude/Gemini and paste the answer back) or 'ai' (the server
 -- renders the prompt and calls the provider itself).
 --
@@ -335,7 +335,7 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS topic TEXT NOT NULL DEFAU
 -- which is exactly what it was doing.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS authoring_mode TEXT NOT NULL DEFAULT 'manual';
 
--- Model-per-step follow-up to CR-027: which Hive model each of the three
+-- Model per step: which Hive model each of the three
 -- authoring tabs (1a story / 1b storyboard / 1c code) calls, instead of the
 -- one model HIVE_MODEL hardcodes for the whole deployment. "" means "server
 -- default" — same meaning, same reasoning as authoring_mode's own default
@@ -344,24 +344,24 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_model TEXT NOT NULL
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_model TEXT NOT NULL DEFAULT '';
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_model TEXT NOT NULL DEFAULT '';
 
--- CR-028 FR85.2: projects never had a created_at column — every existing
+-- Projects never had a created_at column — every existing
 -- consumer of this table either already knew its own creation time (the
--- Creator, from the wizard) or didn't need it. FR85's collision list does
+-- Creator, from the wizard) or didn't need it. The topic collision list does
 -- ("tạo lúc ..."), so it gets one now. DEFAULT now() means every row that
 -- already existed when this migration runs gets the migration's timestamp,
 -- not its true creation time — acceptable here: this column is a display/
 -- sort convenience for the warning banner, not data anything else keys off.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
--- CR-028 FR83.3: project_authoring was deliberately FK-less because a
+-- project_authoring was deliberately FK-less because a
 -- project could outlive its own existence check — authoring rows were
 -- written under a project_id the projects table might never see (the
 -- review that found this: docs/review/data-flow-review.md, "Rủi ro"). Now
--- that POST /v1/projects (FR83.1) always creates the projects row FIRST,
+-- that POST /v1/projects always creates the projects row FIRST,
 -- the FK is safe to add — NOT VALID so it only checks rows written from now
 -- on and does not fail startup over authoring rows orphaned before this
--- migration ran (those are cleaned up by hand, FR83.5 decision: no
--- automatic sweep). A future CR can VALIDATE CONSTRAINT once the backlog is
+-- migration ran (those are cleaned up by hand, no automatic sweep).
+-- VALIDATE CONSTRAINT can be run once the backlog is
 -- confirmed clean.
 DO $$
 BEGIN
@@ -375,14 +375,14 @@ BEGIN
     END IF;
 END $$;
 
--- The append-only project_authoring_history table (CR-028 FR84.3) was never
+-- The append-only project_authoring_history table was never
 -- read by anything; authoring saves now just overwrite, and clear the steps
 -- built on the one that changed.
 DROP TABLE IF EXISTS project_authoring_history;
 
--- CR-027 D9/FR82: one row per LLM call, so the Creator can see spend in the
+-- One row per LLM call, so the Creator can see spend in the
 -- web GUI instead of on a provider dashboard. This is the first paid service
--- in the pipeline, and CR-021's lesson applies: measure first, enforce later.
+-- in the pipeline: measure first, enforce later.
 -- No spending cap here on purpose — a cap set before anyone knows the real
 -- numbers is how a gate loses its credibility.
 --
@@ -391,11 +391,11 @@ DROP TABLE IF EXISTS project_authoring_history;
 --
 -- reasoning_tokens is its own column rather than folded into completion:
 -- measured, glm-5.3-flash spent 66 of 122 completion tokens reasoning before
--- answering a one-sentence question (D12). A screen that hides that cannot
+-- answering a one-sentence question. A screen that hides that cannot
 -- explain why one model costs twice another for the same visible output.
 --
 -- project_id is nullable and carries NO foreign key: suggest-short-script
--- (CR-026 FR71.1) runs before any project exists, and deleting a project must
+-- runs before any project exists, and deleting a project must
 -- not erase the record of what it cost.
 CREATE TABLE IF NOT EXISTS llm_usage (
     id                BIGSERIAL PRIMARY KEY,
@@ -418,12 +418,12 @@ CREATE TABLE IF NOT EXISTS llm_usage (
 -- index matches the only access pattern there is.
 CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
 
--- CR-039: the code step is now several calls (layout/cast, one per chunk,
+-- The code step is now several calls (layout/cast, one per chunk,
 -- repairs). phase says which, so a step's cost can be broken down; '' for every
 -- call that is one call for its step.
 ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS phase TEXT NOT NULL DEFAULT '';
 
--- CR-031: the prompt library. Each pipeline role owns a list of prompts and
+-- The prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active. A row with is_system ships in the binary
 -- (seeded on every start, read-only); the rest belong to the Creator. This
 -- replaces prompt_templates + prompt_overrides, which PurgeLegacyPrompts drops.
@@ -476,10 +476,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- CR-046: illustrations gets its own numbered flow step (6), reversing
--- CR-045 FR9. Every step from Validate (was 6) through Publish (was 13)
--- shifts up by one to make room, so historical project_events rows must
--- shift the same way. A DO block is one statement, hence one transaction,
+-- Illustrations has its own numbered flow step (6). This migration shifts
+-- the stored project_events rows of every step from Validate through Publish
+-- up by one to match. A DO block is one statement, hence one transaction,
 -- and the schema_migrations guard keeps a second run from shifting twice.
 DO $$
 BEGIN
@@ -490,7 +489,7 @@ BEGIN
     END IF;
 END $$;
 
--- CR-046 follow-up: illustrations runs BEFORE Code (Code reads its drawings),
+-- Illustrations runs BEFORE Code (Code reads its drawings),
 -- so the two numbers swap: Illustrations=5, Code=6. A CASE swaps both in one
 -- pass, so 5->6 and 6->5 never collide.
 DO $$

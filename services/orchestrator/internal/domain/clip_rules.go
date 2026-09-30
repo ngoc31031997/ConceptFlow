@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-// Preset length thresholds for CR-007's vertical clips (FR19.5/C2b). Mirrors
+// Preset length thresholds for vertical clips. Mirrors
 // video-assembly/domain/clip_rules.py's CLIP_PRESET_* constants exactly —
-// both services validate independently (D4: GUI catches it early, video-
+// both services validate independently (the GUI catches it early, video-
 // assembly re-checks against the real post-intro offset), so they must agree
 // on the same env var names and defaults or a request the GUI accepted could
 // still be rejected downstream for a different reason.
@@ -38,12 +38,12 @@ func clipFloatEnvOrDefault(key string, def float64) float64 {
 }
 
 // ValidateClipDuration reports whether durationSeconds is within bounds for
-// preset (FR19.6), reading thresholds from CLIP_PRESET_SHORT_MAX_SECONDS /
+// preset, reading thresholds from CLIP_PRESET_SHORT_MAX_SECONDS /
 // CLIP_PRESET_LONG_MIN_SECONDS / CLIP_PRESET_LONG_MAX_SECONDS (C2b — third
 // parties change these over time, so they must be config, not a constant).
 //
 // Returns nil when durationSeconds fits preset, or an error with a specific,
-// actionable message otherwise — FR19.6 explicitly rules out silently
+// actionable message otherwise — never silently
 // truncating a segment that does not fit.
 func ValidateClipDuration(durationSeconds float64, preset string) error {
 	shortMax := clipFloatEnvOrDefault("CLIP_PRESET_SHORT_MAX_SECONDS", defaultClipPresetShortMaxSeconds)

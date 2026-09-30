@@ -36,20 +36,20 @@ def rendering_completed_envelope(
     layout_marks: list[dict] | None = None,
     clip_marks: list[dict] | None = None,
 ) -> dict:
-    """wait_offsets / video_duration_seconds added by CR-002 (FR10.2).
+    """The `rendering_completed` event.
 
     wait_offsets[i] is where narration segment i actually starts in the
     rendered video. The Orchestrator validates it against its own scene count
     before passing it to Video Assembly.
 
-    layout_marks added by CR-021 (FR58): the on-screen geometry at each
+    layout_marks: the on-screen geometry at each
     narration mark, which the Orchestrator stores and hands to `qc_video`.
     Best-effort upstream, so an empty list is a normal value, not an error.
 
-    clip_marks added by CR-007 (FR19.2): the `with self.clip(...)` selections
+    clip_marks: the `with self.clip(...)` selections
     the script made, one dict per clip
     ({"kind","name","index","t_start","t_end"}). The Orchestrator merges these
-    with any GUI-entered clip requests (D3) before handing them to the
+    with any GUI-entered clip requests before handing them to the
     `generate_clips` saga step. Best-effort, same posture as layout_marks.
     """
     return build_envelope(
@@ -85,35 +85,32 @@ def script_validated_envelope(
     scene_class_name: str = "",
     engine: str = "manim",
 ) -> dict:
-    """CR-020 FR56 — kết quả cổng kiểm tra, chạy trước TTS.
+    """Kết quả cổng kiểm tra, chạy trước TTS.
 
     `scenes` mang đúng hình dạng mà `script_parsed` từng mang, để Orchestrator
     và các bước phía sau không phải đổi cách đọc. Khác biệt nằm ở nguồn: danh
     sách này đến từ việc **chạy** script (thứ tự runtime), không phải từ việc
     quét comment (thứ tự dòng).
 
-    clip_marks (bug report, 2026-09-12): lượt dry đã tính được `with
-    self.clip(...)` từ trước (CR-007), nhưng trước đây chỉ gửi đi ở
-    `rendering_completed` — tức là SAU khi đã tốn TTS. Một project chọn
-    `video_output_mode` short/both mà script không đánh dấu gì thì render
-    xong mới biết "Chưa có clip nào", tốn hết mọi thứ trước đó vô ích. Gửi
-    kèm ở đây để Orchestrator/GUI cảnh báo ngay tại màn duyệt dàn ý — trước
-    khi TTS chạy — cho Creator cơ hội quay lại sửa script khi chưa tốn gì.
+    clip_marks: lượt dry đã tính được `with self.clip(...)`. Gửi kèm ở đây
+    (không đợi `rendering_completed`, tức SAU khi đã tốn TTS) để
+    Orchestrator/GUI cảnh báo ngay tại màn duyệt dàn ý khi một project chọn
+    `video_output_mode` short/both mà script không đánh dấu clip nào — cho
+    Creator cơ hội sửa script trước khi tốn gì.
     """
     return build_envelope(
         saga_id,
         project_id,
         {
             "event_type": "script_validated",
-            # CR-040 FR110: script_parsed no longer exists; Orchestrator stores
-            # these from here.
+            # Orchestrator stores the scene class and narrations from this event.
             "scene_class_name": scene_class_name,
             "engine": engine,
             "scenes": [
                 {
                     "scene_index": index,
                     "narration_text": text,
-                    # CR-024 FR68.5 — cái gì trên khung hình lúc câu này được nói.
+                    # Cái gì trên khung hình lúc câu này được nói.
                     "visual": visuals[index] if index < len(visuals) else "",
                     "illustration_hint": None,
                     "code_snippet": None,
@@ -151,10 +148,10 @@ def channel_asset_rendered_envelope(
     video_duration_seconds: float,
     render_quality: str,
 ) -> dict:
-    """CR-023 D3 — kết quả dựng intro/outro cố định.
+    """Kết quả dựng intro/outro cố định.
 
-    `project_id` ở đây không phải một project thật: intro/outro thuộc về kênh
-    (D1), không thuộc project nào, nên đây là id của lượt gọi admin flow, giữ
+    `project_id` ở đây không phải một project thật: intro/outro thuộc về kênh,
+    không thuộc project nào, nên đây là id của lượt gọi admin flow, giữ
     lại để khớp hình dạng envelope chung và cho `inbox`/`outbox` có khoá.
     """
     return build_envelope(
@@ -165,7 +162,7 @@ def channel_asset_rendered_envelope(
             "kind": kind,
             "video_path": video_path,
             "video_duration_seconds": video_duration_seconds,
-            # FR65.5: one asset per quality, so the consumer must not have to
+            # One asset per quality, so the consumer must not have to
             # guess which quality this file was rendered at.
             "render_quality": render_quality,
         },

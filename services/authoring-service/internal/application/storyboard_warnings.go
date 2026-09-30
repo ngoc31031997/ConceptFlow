@@ -8,8 +8,8 @@ import (
 	"authoring/internal/domain"
 )
 
-// WithStoryboardChecks enables the checks that run after step 1b succeeds
-// (CR-048 T8): the project's format supplies the per-beat budgets and the
+// WithStoryboardChecks enables the checks that run after step 1b succeeds:
+// the project's format supplies the per-beat budgets and the
 // voice calibration the speaking rate — the same two sources the outline
 // prompt's beat sheet is built from. Nil formats disables the length check;
 // nil calibration uses the language default rate.
@@ -19,7 +19,7 @@ func (uc *GenerateAuthoringUseCase) WithStoryboardChecks(formats FormatLookupPor
 }
 
 // storyboardWarnings runs the non-blocking checks on a finalized storyboard
-// (CR-048 T8/T9) and returns what the Creator should look at before paying for
+// and returns what the Creator should look at before paying for
 // the code step. Nothing here can fail the run: a check that cannot run says so
 // as a warning instead of staying silent.
 func (uc *GenerateAuthoringUseCase) storyboardWarnings(ctx context.Context, project *domain.Project, storyboard string) []string {
@@ -27,10 +27,10 @@ func (uc *GenerateAuthoringUseCase) storyboardWarnings(ctx context.Context, proj
 	if language != "vi" && language != "en" {
 		language = "vi" // same fallback as the prompt renderer
 	}
-	// T8 — no format on the project means the outline was written without a
+	// No format on the project means the outline was written without a
 	// beat sheet, so there is no budget to hold the storyboard to.
 	checkLength := uc.formats != nil && project.VideoFormatID != ""
-	// T9 — the kit and its keyword table are Vietnamese and Remotion-only.
+	// The kit and its keyword table are Vietnamese and Remotion-only.
 	checkIllustrated := project.RenderEngine == domain.RenderEngineRemotion && language == "vi"
 	if !checkLength && !checkIllustrated {
 		return nil

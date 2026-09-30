@@ -8,7 +8,7 @@ import glass from "../styles/glass.module.css";
 import styles from "./ScriptAssistant.module.css";
 
 interface ShortScriptAssistantProps {
-  /** Project video dài sẽ được liên kết làm companion (CR-026 FR73.1). */
+  /** Project video dài sẽ được liên kết làm companion. */
   sourceProjectId: string;
   sourceScriptContent?: string;
   contentLanguage: "vi" | "en";
@@ -26,13 +26,13 @@ function CopyIcon() {
 
 /**
  * Tạo một bản Shorts/TikTok RIÊNG cho một video dài đã có — kịch bản của
- * riêng nó, không phải cắt từ video dài (CR-026). Hai lối lấy script, dùng
+ * riêng nó, không phải cắt từ video dài. Hai lối lấy script, dùng
  * song song: copy prompt ra ChatGPT/Claude/Gemini (giống hệt luồng đã quen
  * với script dài), hoặc để AI nội bộ (Ollama) soạn thẳng một bản nháp.
  *
  * Nộp xong tạo một PROJECT MỚI (`video_output_mode: "short"`), liên kết
  * 2 chiều với project hiện tại qua `companion_project_id` — không sửa
- * project dài đang có (FR72.1).
+ * project dài đang có.
  */
 export function ShortScriptAssistant({
   sourceProjectId,
@@ -48,7 +48,7 @@ export function ShortScriptAssistant({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // CR-040 FR113: rendered by the server from the `short_script` library role.
+  // Rendered by the server from the `short_script` library role.
   const rendered = useRenderedPrompt({ role: "short_script", language: contentLanguage, topic });
   const prompt = rendered.prompt ?? (rendered.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
@@ -77,8 +77,8 @@ export function ShortScriptAssistant({
         suggestRun.begin(),
       );
       suggestRun.end();
-      // Nháp AI, không tự nộp — Creator vẫn sửa được trước khi bấm nộp
-      // (FR71.3), cùng nguyên tắc với "Sao chép prompt".
+      // Nháp AI, không tự nộp — Creator vẫn sửa được trước khi bấm nộp,
+      // cùng nguyên tắc với "Sao chép prompt".
       setDraftScript(result.script_content);
     } catch (err) {
       setSuggestError(err instanceof ApiError ? err.message : String(err));

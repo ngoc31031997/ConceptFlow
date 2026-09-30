@@ -1,4 +1,4 @@
-"""Luật tĩnh cho một hình của thư viện minh hoạ (CR-044)."""
+"""Luật tĩnh cho một hình của thư viện minh hoạ."""
 
 from domain.illustration_asset import validate_asset_code
 

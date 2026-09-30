@@ -2,7 +2,7 @@ import { vi } from "vitest";
 import * as apiClient from "../../src/api/client";
 
 /**
- * CR-040 FR113: prompt text is rendered by authoring-service (and held to the
+ * Prompt text is rendered by authoring-service (and held to the
  * old TypeScript output by its golden tests), so component tests only need to
  * prove the wiring: which role and which draft values were sent, and that the
  * server's answer is what gets shown and copied.

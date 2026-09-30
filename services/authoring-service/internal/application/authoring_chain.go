@@ -19,7 +19,7 @@ type authoringStepRunner interface {
 	Execute(ctx context.Context, projectID, step string) (GeneratedStep, error)
 }
 
-// codeStepRunner runs the code step with CR-050 options (one segment, or
+// codeStepRunner runs the code step with options (one segment, or
 // every segment written again).
 type codeStepRunner interface {
 	ExecuteCode(ctx context.Context, projectID string, opts CodeRunOptions) (GeneratedStep, error)
@@ -43,14 +43,13 @@ type ChainState struct {
 	// Cancelled is set when the Creator stopped the chain (or the project was
 	// deleted). It is not an error: Error stays empty.
 	Cancelled bool `json:"cancelled,omitempty"`
-	// Waiting is a stop for the Creator (CR-045): the illustrations step drew
+	// Waiting is a stop for the Creator: the illustrations step drew
 	// what it could and some drawings wait for review. Not an error; the
 	// Creator reviews them, then runs Code. WaitingStep is where it stopped.
 	Waiting     string `json:"waiting,omitempty"`
 	WaitingStep string `json:"waiting_step,omitempty"`
 	// Warnings are each finished step's non-blocking warnings, by step — e.g.
-	// the storyboard's narration length and illustration checks (CR-048
-	// T8/T9). Kept even when a later step stops the chain: they are about
+	// the storyboard's narration length and illustration checks. Kept even when a later step stops the chain: they are about
 	// content that was saved.
 	Warnings   map[string][]string `json:"warnings,omitempty"`
 	StartedAt  time.Time           `json:"started_at"`
@@ -89,7 +88,7 @@ func (c *AuthoringChainRunner) Start(projectID string, steps []string) error {
 	return c.StartWith(projectID, steps, CodeRunOptions{})
 }
 
-// StartWith is Start with the code step's CR-050 options: a segment re-run or
+// StartWith is Start with the code step's options: a segment re-run or
 // a fresh run goes through the chain too, so it survives the browser closing
 // and shows in the same progress. Options apply to a chain of the code step alone.
 func (c *AuthoringChainRunner) StartWith(projectID string, steps []string, opts CodeRunOptions) error {
@@ -215,7 +214,7 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 			c.finish(projectID, func(st *ChainState) { st.Waiting, st.WaitingStep = out.Message, step })
 			return
 		case step == "storyboard" && len(out.Warnings) > 0 && i < len(steps)-1:
-			// CR-050 FR-20: the steps after the storyboard are the expensive
+			// The steps after the storyboard are the expensive
 			// ones (the code step alone costs ~95% of a video's tokens); a
 			// storyboard the checks flagged waits for the Creator first.
 			msg := fmt.Sprintf("Storyboard có %d cảnh báo — xem lại, sửa nếu cần, rồi chạy tiếp các bước sau.", len(out.Warnings))

@@ -1,6 +1,6 @@
 package domain
 
-// Prompts of the AI flow (CR-039). "Chạy bằng AI" no longer asks a model for
+// Prompts of the AI flow. "Chạy bằng AI" does not ask a model for
 // the whole artefact in one turn, so it does not use the manual flow's prompts:
 //
 //   - visual_director_ai writes the storyboard as JSON, which the code step

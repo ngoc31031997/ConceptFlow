@@ -12,7 +12,7 @@ export interface OperationRun {
 }
 
 /**
- * The GUI side of a long call (CR-040 FR116.3): pick an operation id, send it
+ * The GUI side of a long call: pick an operation id, send it
  * with the request, and poll `/v1/operations/{id}` while the request is open.
  */
 export function useOperationRun(): OperationRun {

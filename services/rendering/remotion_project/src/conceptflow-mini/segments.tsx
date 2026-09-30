@@ -21,7 +21,7 @@ export interface Segment {
 }
 
 // A type alias, not an interface: only aliases get an implicit index signature,
-// which <Composition>'s `Props extends Record<string, unknown>` needs for tsc (CR-039).
+// which <Composition>'s `Props extends Record<string, unknown>` needs for tsc.
 export type SegmentsProps = {
   segments?: Segment[];
 };

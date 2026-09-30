@@ -10,17 +10,17 @@ export interface SubtitleStyle {
 }
 
 /**
- * How subtitle_cues get delivered to YouTube (CR-015, ADR-0027):
+ * How subtitle_cues get delivered to YouTube (see ADR-0027):
  *   off     — no subtitles
  *   track   — a caption track the viewer can toggle with CC — searchable,
  *             auto-translatable, and it never paints over Manim's edge content
- *   burn_in — painted into the video frames (the only option before CR-015)
+ *   burn_in — painted into the video frames
  *   both    — both at once, which means a viewer with CC on sees the text twice
  */
 export type SubtitleMode = "off" | "track" | "burn_in" | "both";
 
 /**
- * CR-031 — bốn tình huống của bước 1, mỗi cái là một điểm vào khác nhau của
+ * Bốn tình huống của bước 1, mỗi cái là một điểm vào khác nhau của
  * chuỗi 1a → 1b → 1c:
  *
  *   idea       — chưa có gì, chỉ có ý tưởng      → vào 1a, nhập chủ đề
@@ -28,26 +28,20 @@ export type SubtitleMode = "off" | "track" | "burn_in" | "both";
  *   storyboard — đã có storyboard                → vào 1b, dán storyboard
  *   code       — đã có code Manim/Remotion       → vào 1c, dán code
  *
- * Trước đây chỉ có ba ("blank"/"draft"/"ready"), và hai cái sau đều nghĩa là
- * "đã có code" — khác nhau ở chỗ code đã đúng chuẩn hệ thống hay chưa. Đó là
- * thứ lint ở tab 1c tự trả lời được sau khi dán, nên bắt Creator tự phân loại
- * trước khi dán là hỏi một câu họ chưa có cơ sở để trả lời. Gộp lại thành
- * "code", và dùng chỗ trống đó cho hai điểm vào thật sự còn thiếu: dàn ý và
- * storyboard, trước đây không có đường nào ngoài việc giả vờ chọn "chỉ có ý
- * tưởng" rồi bỏ qua tab đầu.
+ * Chỉ có một nguồn "code": code đã đúng chuẩn hệ thống hay chưa là thứ lint
+ * ở tab 1c tự trả lời sau khi dán, nên Creator không phải tự phân loại trước.
+ * Dàn ý và storyboard là hai điểm vào riêng.
  */
 export type ScriptSource = "idea" | "outline" | "storyboard" | "code";
 
 /**
- * CR-027 FR79 — how the Creator works ALL FOUR tabs of "Bước 3 — Script",
+ * How the Creator works ALL FOUR tabs of "Bước 3 — Script",
  * not one tab at a time:
  *
  *   manual — copy each prompt into ChatGPT/Claude/Gemini and paste the answer
- *            back. The only way that existed before CR-027, and the way that
- *            still works with no API key, no credit, or a provider outage
- *            (FR77.4/FR83.2).
+ *            back. The way that works with no API key, no credit, or a provider outage.
  *   ai     — the server renders the prompt, calls the provider and fills the
- *            editor in (FR78).
+ *            editor in.
  *
  * One choice for the whole pipeline rather than a button per tab: a Creator
  * who has decided to run this script through the API does not want to make
@@ -86,7 +80,7 @@ export interface ProjectDraft {
    * exists to keep filling the story_architect prompt on that tab.
    */
   /**
-   * CR-027 FR79 — copy-prompt-by-hand or call the API, for all four tabs of
+   * copy-prompt-by-hand or call the API, for all four tabs of
    * step 1. See AuthoringMode. Defaults to "manual".
    */
   authoringMode: AuthoringMode;
@@ -99,14 +93,14 @@ export interface ProjectDraft {
   authoringModels: AuthoringStepModels;
   authoringTopic: string;
   /**
-   * CR-025 step 1 — the Story Architect story outline the Creator pasted
+   * Step 1 — the Story Architect story outline the Creator pasted
    * back and the server has saved (POST /v1/projects/:id/authoring/story).
    * Kept here so step 2 (Visual Director, currently a stub) can show it as
    * {{previous_output}} without a re-fetch.
    */
   authoringStory: string;
   /**
-   * CR-025 step 2 — the Visual Director storyboard the Creator pasted back
+   * Step 2 — the Visual Director storyboard the Creator pasted back
    * and the server has saved (POST /v1/projects/:id/authoring/storyboard).
    * Kept here so step 3 (Manim Engineer, currently a stub) can show
    * story+storyboard as {{previous_output}} without a re-fetch.
@@ -122,7 +116,7 @@ export interface ProjectDraft {
 }
 
 /**
- * Resolution/framerate for the render (CR-004 FR12.6). A 720p30 draft is for
+ * Resolution/framerate for the render. A 720p30 draft is for
  * checking the content quickly; anything published should be 1080p60 or better.
  */
 export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
@@ -136,8 +130,8 @@ export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 export type RenderEngine = "manim" | "remotion";
 
 /**
- * Which output(s) this project produces (CR-007 follow-up). A short clip is
- * always cut from the rendered 16:9 video (CR-007 D1 — no standalone vertical
+ * Which output(s) this project produces. A short clip is
+ * always cut from the rendered 16:9 video (no standalone vertical
  * production), so "short" still renders the full long-form pipeline as
  * source; it only changes what generate_clips does and what step 5
  * (ResultPage) puts front and center — publishing a Shorts/TikTok clip stays
@@ -187,7 +181,7 @@ const initialDraft: ProjectDraft = {
   backgroundMusicPath: null,
   ttsEnabled: true,
   voiceId: null,
-  // CR-015 FR41.2: caption track is the default for long-form YouTube —
+  // Caption track is the default for long-form YouTube —
   // searchable, auto-translatable, and never painted over the frame.
   // Burn-in remains available as an explicit Creator choice.
   subtitleMode: "track",
@@ -261,7 +255,7 @@ function saveLastVoiceId(voiceId: string | null): void {
 }
 
 /**
- * CR-028 FR86 — "một bộ cấu hình lần cuối dùng" toàn cục: engine, quality,
+ * "một bộ cấu hình lần cuối dùng" toàn cục: engine, quality,
  * TTS, giọng, sub, nhạc nền, output mode, hình dạng video. Step 2's fields are
  * saved when the Creator leaves step 2 (saveLastUsedSettings), the render/merge
  * ones whenever they are saved on a project (rememberProductionSettings); read back to prefill every new draft from then on
@@ -306,7 +300,7 @@ function writeLastUsedSettings(patch: Partial<LastUsedSettings>): void {
  * Call once a project's step-2 settings are final (the "Tiếp tục" press).
  * Deliberately not saved on every keystroke while still editing — a
  * half-finished change to one project's settings must not leak into the next
- * project's defaults before the Creator confirms it (FR86.2).
+ * project's defaults before the Creator confirms it.
  *
  * Only the fields step 2 still shows are written: quality, video font,
  * subtitles and music are chosen later (review gate / failure panel) and saved
@@ -343,9 +337,7 @@ function loadDraft(): ProjectDraft {
     ...loadLastUsedSettings(),
     authoringModels: loadLastModels() ?? initialDraft.authoringModels,
     projectId: crypto.randomUUID(),
-    // LAST_VOICE_KEY predates FR86 and stays authoritative for voiceId
-    // specifically — same value in practice, but no behaviour change for
-    // anyone already relying on it.
+    // LAST_VOICE_KEY stays authoritative for voiceId specifically.
     voiceId: loadLastVoiceId(),
   };
 }
@@ -405,7 +397,7 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...initialDraft, ...action.payload, hasSubmitted: false };
     case "MARK_SUBMITTED":
       return { ...state, hasSubmitted: true };
-    // CR-024's "Quay lại sửa script" (outline rejected): the render saga has
+    // "Quay lại sửa script" (outline rejected): the render saga has
     // already restarted the SAME project_id from scratch server-side
     // (StartRenderSagaUseCase upserts it back to StatusDraft), so the fix here
     // is the mirror image of MARK_SUBMITTED — clear the flag, keep everything

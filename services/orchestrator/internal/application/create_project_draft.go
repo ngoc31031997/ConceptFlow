@@ -8,7 +8,7 @@ import (
 	"orchestrator/internal/domain"
 )
 
-// ProjectDraftPort is the persistence capability CR-028's early-draft use
+// ProjectDraftPort is the persistence capability the early-draft use
 // cases need. Save reuses domain.ProjectRepositoryPort's existing upsert
 // (INSERT ... ON CONFLICT DO UPDATE) — the same Save call StartRenderSaga
 // already makes at render time now simply updates the row this created
@@ -17,12 +17,12 @@ type ProjectDraftPort interface {
 	Save(ctx context.Context, project *domain.Project) error
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 	// GetStatusAndLanguage is GetStatus plus the project's content_language,
-	// which FR83.2's re-check of FR85's collision list needs (comparison is
+	// which the re-check of the topic collision list needs (comparison is
 	// scoped to "same language" — see NormalizeTopic's doc comment).
 	GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error)
 	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
 	FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]SimilarProject, error)
-	// SaveRenderEngine persists CR-030's engine choice as soon as the
+	// SaveRenderEngine persists the engine choice as soon as the
 	// Creator makes it, instead of only at render-submit time — the
 	// server-side authoring chain (RenderPromptUseCase.RoleFor) reads
 	// project.RenderEngine to pick storyboard/code prompts, so a chain run
@@ -34,16 +34,16 @@ type ProjectDraftPort interface {
 // CreateProjectDraftInput is the parsed body of POST /v1/projects.
 type CreateProjectDraftInput struct {
 	// ProjectID is optional: when empty, the server generates a fresh one
-	// (CR-028 FR83.1's default). When set, it is the id web-gui's
+	// (the default). When set, it is the id web-gui's
 	// ProjectDraftContext already generated client-side for this draft
-	// (unchanged from before this CR) — accepting it here avoids a much
+	// — accepting it here avoids a much
 	// larger refactor of every page that already reads draft.projectId
 	// synchronously, while still creating the projects row at step 1
 	// instead of at render time.
 	ProjectID       string
 	Topic           string
 	ContentLanguage domain.ContentLanguage
-	// RenderEngine is optional (CR-030): "" means the caller is not
+	// RenderEngine is optional: "" means the caller is not
 	// declaring an engine this call (e.g. a topic-only debounce save) —
 	// leave whatever is already on the row untouched, same "only touch what
 	// was sent" rule the topic field already follows.
@@ -57,7 +57,7 @@ type CreateProjectDraftOutput struct {
 	SimilarProjects []SimilarProject
 }
 
-// CreateProjectDraftUseCase backs CR-028 FR83.1: a Project row (status=draft)
+// CreateProjectDraftUseCase backs POST /v1/projects: a Project row (status=draft)
 // is created as soon as the Creator finishes typing a topic (wizard step 1),
 // not at POST /v1/sagas/render. Everything the authoring wizard writes from
 // then on (project_authoring) has a real project_id to hang off of, so a
@@ -145,15 +145,15 @@ type UpdateProjectTopicInput struct {
 }
 
 // UpdateProjectTopicOutput mirrors CreateProjectDraftOutput's collision list
-// so the GUI shows the same banner whether the topic was just set (FR83.1)
-// or edited afterward (FR83.2).
+// so the GUI shows the same banner whether the topic was just set
+// or edited afterward.
 type UpdateProjectTopicOutput struct {
 	SimilarProjects []SimilarProject
 }
 
-// UpdateProjectTopicUseCase backs CR-028 FR83.2: Creator returns to step 1
+// UpdateProjectTopicUseCase backs PATCH /v1/projects/{id}/topic: Creator returns to step 1
 // and edits the topic of a draft they already created. Locked the same way
-// authoring saves are (FR84.2) — once render has started, the topic that
+// authoring saves are — once render has started, the topic that
 // produced the rendered script should not silently change under it.
 type UpdateProjectTopicUseCase struct {
 	repo ProjectDraftPort

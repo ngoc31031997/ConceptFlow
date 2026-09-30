@@ -1,4 +1,4 @@
-"""Kiểm tra rồi dựng xem trước một hình của thư viện minh hoạ (CR-044).
+"""Kiểm tra rồi dựng xem trước một hình của thư viện minh hoạ.
 
 Thứ tự: luật tĩnh (tên, import, trùng tên) → tsc thật → dựng PNG/GIF. Hình
 hỏng ở bước nào thì trả lỗi có số dòng của bước đó, để nút "Sửa code" hay

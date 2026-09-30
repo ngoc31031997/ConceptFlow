@@ -14,48 +14,48 @@ type StartRenderSagaInput struct {
 	ProjectID           string
 	ScriptContent       string
 	PluginID            string
-	CategoryHint        string // Content Plugin's business-rules.md Rule 1 — Creator-chosen, applied to every scene (Revision 2026-09-05)
+	CategoryHint        string // business-rules.md Rule 1 — Creator-chosen, applied to every scene
 	ContentLanguage     domain.ContentLanguage
 	BackgroundMusicPath *string // optional, business-rules.md Rule 3
 
-	// CR-001 — narration/subtitle switches chosen by the Creator at submit time.
+	// narration/subtitle switches chosen by the Creator at submit time.
 	TTSEnabled bool
 	VoiceID    string
 
-	// CR-019 — empty means DefaultVideoFormatID.
+	// Empty means DefaultVideoFormatID.
 	VideoFormatID string
 
-	// CR-024 FR69.7 — nil means "on". A pointer rather than a bool because the
+	// Nil means "on". A pointer rather than a bool because the
 	// zero value of a bool is false, and defaulting this to off would silently
 	// remove the gate for every caller that does not know about it yet.
 	ReviewEnabled *bool
-	// SubtitlesEnabled is the pre-CR-015 shape, still accepted from a caller
+	// SubtitlesEnabled is the legacy shape, still accepted from a caller
 	// that has not adopted SubtitleMode; SubtitleMode wins when both are
 	// sent (a client migrating one field at a time should not regress).
 	SubtitlesEnabled bool
 	SubtitleMode     domain.SubtitleMode
 	SubtitleStyle    *domain.SubtitleStyle
 
-	// CR-004 — empty means DefaultRenderQuality.
+	// Empty means DefaultRenderQuality.
 	RenderQuality domain.RenderQuality
 	// empty means DefaultRenderEngine ("manim").
 	RenderEngine domain.RenderEngine
-	// CR-005 FR14.2 — 0 means DefaultBackgroundMusicVolume.
+	// 0 means DefaultBackgroundMusicVolume.
 	BackgroundMusicVolume float64
 	// Empty means DefaultVideoFont.
 	VideoFont string
 
-	// CR-023 FR67.1/FR67.2 — nil means "on", same reasoning as ReviewEnabled
+	// Nil means "on", same reasoning as ReviewEnabled
 	// above: the zero value of a bool is false, and defaulting the channel
 	// identity off would silently drop it for every caller unaware of these
 	// fields yet.
 	IntroEnabled *bool
 	OutroEnabled *bool
 
-	// CR-007 follow-up — empty means DefaultVideoOutputMode ("long").
+	// Empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode domain.VideoOutputMode
 
-	// CR-026 D1 — nil means this project stands alone. When set, it must
+	// Nil means this project stands alone. When set, it must
 	// name an existing project covering the same topic; the two get linked
 	// both ways (best-effort — see Execute).
 	CompanionProjectID *string
@@ -69,7 +69,7 @@ type StartRenderSagaOutput struct {
 
 // StartRenderSagaUseCase implements Saga step 1 (business-logic-model.md
 // "Bước 1"): creates the Project, opens the first SagaStep, and dispatches
-// the validate_script command to rendering via the Outbox (CR-040 FR110).
+// the validate_script command to rendering via the Outbox.
 type StartRenderSagaUseCase struct {
 	repo      domain.ProjectRepositoryPort
 	publisher domain.CommandPublisherPort
@@ -103,7 +103,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		engine = domain.DefaultRenderEngine
 	}
 
-	// CR-015: SubtitleMode is authoritative when valid; otherwise fall back
+	// SubtitleMode is authoritative when valid; otherwise fall back
 	// to the legacy boolean, which reproduces exactly the one behaviour it
 	// ever meant (burn-in) rather than guessing at a new one.
 	subtitleMode := input.SubtitleMode
@@ -144,7 +144,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		return nil, err
 	}
 
-	// CR-026 D1: link the other project back to this new one. Best-effort —
+	// Link the other project back to this new one. Best-effort —
 	// a Creator who typed a stale/wrong companion id, or a race with that
 	// project being deleted, must never cost them the video they are
 	// actually here to create.
@@ -159,7 +159,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 		}
 	}
 
-	// CR-040 FR110: there is no parse_script step any more. Rendering finds the
+	// There is no parse_script step any more. Rendering finds the
 	// scene class itself at the top of validate_script (it needs it before the
 	// dry pass anyway) and reports it back on script_validated.
 	step := &domain.SagaStep{
@@ -196,7 +196,7 @@ func (uc *StartRenderSagaUseCase) Execute(ctx context.Context, input StartRender
 }
 
 // formatOrDefault keeps every project pointing at a real format, including the
-// ones created before formats existed (CR-019 FR51.3).
+// ones created before formats existed.
 func formatOrDefault(formatID string) string {
 	if formatID == "" {
 		return domain.DefaultVideoFormatID

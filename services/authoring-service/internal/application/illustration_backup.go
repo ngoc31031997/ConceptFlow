@@ -14,14 +14,14 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-044 — back up the illustration library to one ZIP file and restore it,
+// Back up the illustration library to one ZIP file and restore it,
 // so the Creator's drawings survive a lost database.
 //
 // The ZIP holds manifest.json (every folder, and every Creator drawing with its
 // folder, tags, status and version) and, per drawing, its TSX and its stored
 // PNG still and GIF under hinh/<folder>/<Name>.*, so the backup can also be
 // browsed by hand. The kit is left out: it ships with the service and is seeded
-// again on every start. The Hình mẫu are kept (CR-052), marked as such.
+// again on every start. The Hình mẫu are kept, marked as such.
 //
 // Restoring files every drawing into the folder it was exported from,
 // creating Creator folders that are missing, and keeps its review status. Like
@@ -67,7 +67,7 @@ type backupIllustration struct {
 	Version     int      `json:"version"`
 	CreatedAt   string   `json:"created_at"`
 	UpdatedAt   string   `json:"updated_at"`
-	// CR-052: a Hình mẫu, the name of the drawing it copies (if any), and the
+	// A Hình mẫu, the name of the drawing it copies (if any), and the
 	// folder an original exemplar goes back to.
 	Exemplar     bool   `json:"exemplar,omitempty"`
 	SourceName   string `json:"source_name,omitempty"`

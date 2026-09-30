@@ -13,23 +13,22 @@ import (
 type NormalizeChannelAssetInput struct {
 	Kind          string // "intro" or "outro"
 	FilePath      string // path on the shared volume api-gateway just wrote
-	SourceHash    string // content hash api-gateway computed, for video-assembly's cache (FR65.6)
+	SourceHash    string // content hash api-gateway computed, for video-assembly's cache
 	RenderQuality domain.RenderQuality
 	// AssetRole says what kind of file FilePath is: AssetRoleVideo (the
-	// sting clip itself) or AssetRoleMusic (its audio bed, FR66.5). Empty
-	// means video, so a command published before this field existed — or by
-	// any older caller — keeps its original meaning.
+	// sting clip itself) or AssetRoleMusic (its audio bed). Empty
+	// means video.
 	AssetRole string
 }
 
-// Asset roles carried on normalize_channel_asset (CR-023 FR65.4/FR66.5).
+// Asset roles carried on normalize_channel_asset.
 const (
 	AssetRoleVideo = "video"
 	AssetRoleMusic = "music"
 )
 
 // ChannelAssetsUseCase handles the two synchronous-looking but AMQP-backed
-// channel asset operations (CR-023 correction): triggering a normalize run
+// channel asset operations: triggering a normalize run
 // for an uploaded file, and reading back the current projection for preview.
 // There is no HTTP call to video-assembly anywhere in here — Normalize only
 // publishes a command, and Preview only reads Orchestrator's own
@@ -49,7 +48,7 @@ func NewChannelAssetsUseCase(commands domain.CommandPublisherPort, pointers doma
 // video-assembly's consumer.go dispatches on payload event_type). This is not
 // part of any render/publish saga — there is no saga_id to thread through, so
 // a fresh message_id stands alone, mirroring how rendering's admin-triggered
-// render_channel_asset command (CR-023 D3) has no real project behind it
+// render_channel_asset command has no real project behind it
 // either.
 func (uc *ChannelAssetsUseCase) Normalize(ctx context.Context, in NormalizeChannelAssetInput) error {
 	role := in.AssetRole

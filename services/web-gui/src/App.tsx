@@ -61,20 +61,20 @@ export function App() {
             <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
-            {/* CR-045 — Remotion only: the video's drawings, between Visual and Code. */}
+            {/* Remotion only: the video's drawings, between Visual and Code. */}
             <Route path="/create/script/illustrations" element={<IllustrationsStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
             <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />
 
-            {/* CR-025 — admin screen to edit pipeline prompt wording, outside
+            {/* Admin screen to edit pipeline prompt wording, outside
                 the Creator wizard flow. */}
             <Route path="/settings/prompts" element={<PromptSettingsPage />} />
             <Route path="/settings/video-archetypes" element={<VideoArchetypeSettingsPage />} />
-            {/* CR-044 — the illustration library, folders of reviewed drawings. */}
+            {/* The illustration library, folders of reviewed drawings. */}
             <Route path="/settings/illustrations" element={<IllustrationLibraryPage />} />
 
-            {/* CR-031 — bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
+            {/* Bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng
                 thái project không thuộc về nó (projectPath). */}
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />

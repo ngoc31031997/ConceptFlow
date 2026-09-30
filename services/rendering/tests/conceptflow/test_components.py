@@ -1,4 +1,4 @@
-"""Component dựng cảnh (CR-017 FR45).
+"""Component dựng cảnh.
 
 `importorskip` giữ đúng tính chất mà test suite của Rendering đang có: chạy được
 mà không cần cài manim (README). Ai có manim thì được kiểm thêm phần này; CI
@@ -94,8 +94,8 @@ def test_template_khoi_dau_phai_qua_duoc_lint():
     ).read_text(encoding="utf-8")
 
     assert blocking_issues(lint_manim_script(source)) == []
-    # CR-018: lời thoại là self.narrate(...), không phải marker + wait rời rạc.
-    # Một template còn dùng chuẩn cũ sẽ có narration_segments rỗng khi render
+    # Lời thoại là self.narrate(...), không phải marker + wait rời rạc.
+    # Một template dùng marker + wait sẽ có narration_segments rỗng khi render
     # thật (render_script.py từ chối) — lint không bắt được việc này vì đây là
     # quy ước ngữ nghĩa, không phải API sai.
     assert "self.narrate(" in source

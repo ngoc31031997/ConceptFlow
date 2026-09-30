@@ -8,8 +8,8 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
  * useAuthoringMode: đọc từ project ở server lúc mount, ghi lên server mỗi
  * lần đổi, giữ trong draft để mọi trang đọc cùng một giá trị.
  *
- * Cùng race condition useAuthoringMode từng gặp (bug report: chọn ở bước 1
- * rồi sang tab kế bị đọc đè lại giá trị cũ). Chặn bằng bộ đếm version: một
+ * Cùng race condition như useAuthoringMode (chọn ở bước 1 rồi sang tab kế bị
+ * đọc đè lại giá trị cũ). Chặn bằng bộ đếm version: một
  * presence-check trên "lượt lưu đang bay" không đủ, vì PUT có thể resolve
  * (tự xóa khỏi map) trước khi GET đang đua — đọc dữ liệu cũ — resolve xong,
  * nên giá trị cũ vẫn thắng. Đếm version theo project: chỉ áp kết quả đọc khi

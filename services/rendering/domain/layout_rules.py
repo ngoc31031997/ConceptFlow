@@ -1,4 +1,4 @@
-"""Luật bố cục của một script Remotion, áp lên số đo thật (CR-048 T6b).
+"""Luật bố cục của một script Remotion, áp lên số đo thật.
 
 Số đo đến từ layout probe (`remotion_project/layout_check.mjs`): hộp bao DOM
 của mọi chữ, `<svg>`, hình của bộ minh hoạ, clip Lottie và khối màu mà từng
@@ -316,7 +316,7 @@ def _check_text(e: dict, ctx: _Shot, settled: bool, col: _Collector, pct: float)
         col.add((TEXT_OVERFLOW, ident), ctx.finding(TEXT_OVERFLOW, line, detail, sw - cw), pct)
     elif ch and sh is not None and sh > ch + fs / 2:
         # Nửa dòng chứ không phải 1px: lineHeight 1.2 với dấu tiếng Việt đã làm
-        # scrollHeight lớn hơn chiều cao tự nhiên vài px (T6a).
+        # scrollHeight lớn hơn chiều cao tự nhiên vài px.
         detail = f"nhãn {label} tràn khung chữ theo chiều cao (cao {sh}px > height {ch}px)"
         col.add((TEXT_OVERFLOW, ident), ctx.finding(TEXT_OVERFLOW, line, detail, sh - ch), pct)
     rendered = e.get("font_size_rendered")

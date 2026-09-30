@@ -21,7 +21,7 @@ Read the design doc. Then read only the files the plan names (graphify for anyth
 
 Follow "Kế hoạch thực hiện" step by step:
 
-- Match the surrounding code's style, naming and comment density. UI: `docs/ux-ui-design-rules.md`.
+- Match the surrounding code's style and naming. Every code change follows `docs/code-standards-rules.md` (documentation comments only, no CR numbers or change history; basic code standards). UI: `docs/ux-ui-design-rules.md`.
 - No stubs, fake outputs, `TODO: implement`, swallowed errors (CLAUDE.md "No fake code").
 - Add or update the tests the plan names.
 - If a step turns out wrong or impossible, or the code contradicts the design, STOP and ask. Do not redesign on your own and do not skip the step.

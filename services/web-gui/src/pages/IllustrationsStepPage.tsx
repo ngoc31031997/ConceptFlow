@@ -13,7 +13,7 @@ import styles from "./WizardSteps.module.css";
 import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
 
 /**
- * CR-045 — bước Hình minh hoạ, giữa Visual và Code, chỉ cho video Remotion.
+ * Bước Hình minh hoạ, giữa Visual và Code, chỉ cho video Remotion.
  *
  * Trước đây việc lập danh sách và vẽ hình chạy ngầm ở đầu bước Code, nên thẻ
  * "Code" đứng vài phút mà chưa viết dòng code nào. Giờ nó là một tab riêng:
@@ -21,9 +21,8 @@ import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
  * (nhiều hình cùng lúc, mỗi hình một thanh tiến độ), Creator duyệt / sửa / bỏ
  * qua / xoá ngay tại đây, rồi mới sang Code.
  *
- * CR-046 (2026-09-27, đảo ngược FR9 của CR-045): giờ có số bước riêng (6) trên
- * thanh bước, hiện "Không dùng" khi renderEngine không phải Remotion, thay vì
- * ẩn hoàn toàn dưới bước Code như trước.
+ * Có số bước riêng trên thanh bước, hiện "Không dùng" khi renderEngine không
+ * phải Remotion.
  */
 export function IllustrationsStepPage() {
   const draft = useContext(ProjectDraftContext);

@@ -52,7 +52,7 @@ class CredentialStorePort(ABC):
 
     @abstractmethod
     def save(self, credential: OAuthCredential) -> None:
-        """Upserts by channel_id (CR-012 FR31.5) — re-consenting a channel
+        """Upserts by channel_id — re-consenting a channel
         updates that channel's row and leaves every other channel alone.
 
         The first connected channel becomes the default; later ones do not

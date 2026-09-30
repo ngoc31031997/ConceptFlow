@@ -1,4 +1,4 @@
-"""Danh mục animation Lottie cho engine Remotion (CR-038).
+"""Danh mục animation Lottie cho engine Remotion.
 
 Creator chọn clip từ các kho miễn phí và bỏ file vào `remotion_project/public/lottie/`;
 LLM không sinh, không sửa file Lottie — nó chỉ CHỌN theo id. Module này là nguồn sự

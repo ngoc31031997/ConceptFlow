@@ -1,6 +1,5 @@
 /**
- * Page side of the layout probe (CR-048 T6a; the compile check's layout check
- * since T6b).
+ * Page side of the layout probe and of the compile check's layout check.
  *
  * layout_probe_lib.mjs bundles this file once with esbuild, opens it in headless
  * Chromium and, per merged script (a fresh page each):

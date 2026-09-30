@@ -1,4 +1,4 @@
-"""The warm layout checker (remotion_project/layout_check.mjs + its Python client), CR-048 T6b.
+"""The warm layout checker (remotion_project/layout_check.mjs + its Python client).
 
 Process behaviour is exercised against stand-in checkers run by this Python
 interpreter, so those tests need neither Node nor a browser. The real checker

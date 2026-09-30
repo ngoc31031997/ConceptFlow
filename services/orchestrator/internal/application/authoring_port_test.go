@@ -7,7 +7,7 @@ import (
 	"orchestrator/internal/domain"
 )
 
-// CR-051: where a draft stands depends on illustrations_ready only for a
+// Where a draft stands depends on illustrations_ready only for a
 // Remotion project, and an authoring-service that does not send the field yet
 // must leave the old placement (Code) in place.
 func TestAuthoringSummaryPlacesTheIllustrationsStep(t *testing.T) {

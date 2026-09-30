@@ -5,7 +5,7 @@ const { execFile } = require('child_process');
 /**
  * Thin wrapper over `ffprobe`, kept in its own module (rather than inline in
  * the handler) for the same reason `httpClient` is separate: the handler's
- * upload-time validation rules (CR-023 FR66.7 — 16:9, ≤5s) are business
+ * upload-time validation rules (16:9, ≤5s) are business
  * logic worth unit-testing, while spawning a binary that may not exist in
  * the test image is infrastructure worth stubbing.
  *

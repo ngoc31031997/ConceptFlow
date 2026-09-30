@@ -11,17 +11,17 @@ import (
 	"authoring/internal/domain"
 )
 
-// runCode is the AI flow's code step (CR-039): instead of one model call that
+// runCode is the AI flow's code step: instead of one model call that
 // writes the whole file, llm-service writes a shared layout/cast, then the
 // shots in chunks, merges them deterministically, compile-checks the result and
 // repairs only the shots that fail.
 //
-// CR-050 (ADR-0030): the run is cut into segments stored here as they finish.
+// The run is cut (see ADR-0030) into segments stored here as they finish.
 // A run sends the segments already done and llm-service writes only the
 // missing ones (or the one segment the Creator re-runs). A failed segment does
 // not stop the others: the step ends "incomplete" and keeps everything else.
 // Every model call is recorded as its own llm_usage row the moment it ends,
-// and every failed check is logged (FR-21, FR-22).
+// and every failed check is logged.
 func (uc *GenerateAuthoringUseCase) runCode(
 	ctx context.Context, project *domain.Project, rendered RenderedPrompt, role domain.PromptRole,
 	model string, info *runInfo, started time.Time,
@@ -127,7 +127,7 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 		return CodeGenRequest{}, fmt.Errorf("load topic: %w", err)
 	}
 
-	// CR-044/045: a Remotion video's drawings are planned and drawn by the
+	// A Remotion video's drawings are planned and drawn by the
 	// illustrations step before this one; the code step only checks that the
 	// list exists and that the Creator approved or skipped every drawing.
 	var drawings []LibraryDrawing
@@ -159,7 +159,7 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 		System: system, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
 	}
 	if project.RenderEngine == domain.RenderEngineRemotion {
-		// CR-048 T6b: the same subtitle strip {{subtitle_zone}} told the model
+		// The same subtitle strip {{subtitle_zone}} told the model
 		// to keep clear, and the video's font, for the layout check.
 		if band, burned := domain.ProjectSubtitleBand(project); burned {
 			req.SubtitleBand = &band
@@ -189,7 +189,7 @@ func (uc *GenerateAuthoringUseCase) sendStoredSegments(ctx context.Context, proj
 	return nil
 }
 
-// incomplete reads the segments back to say what is left (FR-2).
+// incomplete reads the segments back to say what is left.
 func (uc *GenerateAuthoringUseCase) incomplete(ctx context.Context, projectID string) error {
 	segs, err := uc.segments.ListSegments(ctx, projectID, "code")
 	if err != nil {
@@ -208,7 +208,7 @@ func (uc *GenerateAuthoringUseCase) incomplete(ctx context.Context, projectID st
 	return out
 }
 
-// CodeRunOptions are the Creator's choices for one code run (CR-050 FR-4).
+// CodeRunOptions are the Creator's choices for one code run.
 type CodeRunOptions struct {
 	// Segment re-runs this one segment only ("Chạy lại đoạn này").
 	Segment string
@@ -216,7 +216,7 @@ type CodeRunOptions struct {
 	Fresh bool
 }
 
-// CodeSegmentPort stores the code step's segments (CR-050, ADR-0030).
+// CodeSegmentPort stores the code step's segments (see ADR-0030).
 type CodeSegmentPort interface {
 	ListSegments(ctx context.Context, projectID, step string) ([]domain.CodeSegment, error)
 	ApplySegmentPlan(ctx context.Context, projectID, step string, plan []domain.CodeSegment) error
@@ -231,7 +231,7 @@ type CodeSegmentPort interface {
 	InsertCheckDiagnostics(ctx context.Context, list []domain.CheckDiagnosticRecord) error
 }
 
-// WithSegments turns on the CR-050 segment store the code step needs.
+// WithSegments turns on the segment store the code step needs.
 func (uc *GenerateAuthoringUseCase) WithSegments(store CodeSegmentPort) *GenerateAuthoringUseCase {
 	uc.segments = store
 	return uc
@@ -348,7 +348,7 @@ func (r *codeRun) onEvent(ev CodeEvent) {
 	}
 }
 
-// ErrModelNotForCode refuses a model the code step cannot use (CR-050 FR-19).
+// ErrModelNotForCode refuses a model the code step cannot use.
 type ErrModelNotForCode struct{ Model string }
 
 func (e *ErrModelNotForCode) Error() string {
@@ -369,12 +369,12 @@ func checkCodeModel(step, model string) error {
 type IllustrationStagePort interface {
 	Prepare(ctx context.Context, projectID, model string, report func(StageReport)) ([]domain.ProjectIllustration, error)
 	Gate(ctx context.Context, projectID string) ([]domain.ProjectIllustration, bool, error)
-	// Stale: the list was planned from an older storyboard (CR-050 FR-17).
+	// Stale: the list was planned from an older storyboard.
 	Stale(ctx context.Context, projectID string) (bool, error)
 	ForCode(ctx context.Context, projectID string) ([]LibraryDrawing, error)
 }
 
-// WithIllustrations turns on the CR-044 drawing stage for Remotion projects.
+// WithIllustrations turns on the drawing stage for Remotion projects.
 func (uc *GenerateAuthoringUseCase) WithIllustrations(stage IllustrationStagePort) *GenerateAuthoringUseCase {
 	uc.illustrations = stage
 	return uc
@@ -440,7 +440,7 @@ func (uc *GenerateAuthoringUseCase) updateCodeProgress(projectID, step string, e
 	}
 }
 
-// StepIllustrations is the CR-045 authoring step between Visual and Code: plan
+// StepIllustrations is the authoring step between Visual and Code: plan
 // the video's drawings from the storyboard and draw the missing ones. Remotion only.
 const StepIllustrations = "illustrations"
 

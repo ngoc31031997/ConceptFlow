@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Layout probe, command line (CR-048 T6a; the compile check uses
+ * Layout probe, command line (the compile check uses
  * layout_check.mjs, the same measuring code kept warm).
  *
  * Writes the measured DOM boxes of every shot of one or more merged Remotion

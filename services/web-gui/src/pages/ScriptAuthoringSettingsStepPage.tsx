@@ -83,7 +83,7 @@ export function ScriptAuthoringSettingsStepPage() {
       // Các field đã lưu từng cái một; bấm tiếp chỉ chốt bước (và gửi lại
       // field nào trước đó lưu lỗi) rồi mới đi tiếp.
       if (await send({ confirm: true })) {
-        // CR-028 FR86.1 — cấu hình này thành mặc định cho project kế tiếp.
+        // Cấu hình này thành mặc định cho project kế tiếp.
         saveLastUsedSettings(draft);
         navigate("/create/script/outline");
       }

@@ -1,5 +1,5 @@
 // Package rendering calls the rendering service's illustration preview
-// endpoint (CR-044): check a library drawing and render its PNG still and GIF.
+// endpoint: check a library drawing and render its PNG still and GIF.
 package rendering
 
 import (

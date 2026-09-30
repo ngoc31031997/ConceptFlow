@@ -12,13 +12,13 @@ interface CompanionProjectCardProps {
 }
 
 /**
- * CR-026 FR73.3 — project cùng chủ đề (bản dài/bản ngắn kia), hiện tóm tắt
+ * Project cùng chủ đề (bản dài/bản ngắn kia), hiện tóm tắt
  * ngay trên Result page thay vì bắt Creator tự đi tìm trong danh sách video.
  *
- * Cố ý KHÔNG nhân đôi toàn bộ PublishForm/YoutubeChannels lên đây (D6) — chỉ
+ * Cố ý KHÔNG nhân đôi toàn bộ PublishForm/YoutubeChannels lên đây — chỉ
  * đủ để biết trạng thái và xem/tải nhanh; muốn đăng/thao tác đầy đủ thì bấm
- * "Xem đầy đủ" sang trang riêng của nó (mỗi project vẫn có trang đầy đủ của
- * mình, y như trước CR-026).
+ * "Xem đầy đủ" sang trang riêng của nó (mỗi project có trang đầy đủ của
+ * mình).
  */
 export function CompanionProjectCard({ companionProjectId }: CompanionProjectCardProps) {
   const { project, error } = useProject(companionProjectId);

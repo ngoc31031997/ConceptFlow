@@ -30,7 +30,7 @@ function renderPanel() {
   );
 }
 
-describe("ProjectIllustrationsPanel (CR-044)", () => {
+describe("ProjectIllustrationsPanel", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "listIllustrationFolders").mockResolvedValue([]);
   });
@@ -65,7 +65,7 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     expect(list.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 
-  it("warns that a list planned from an older storyboard holds the code step (CR-050)", async () => {
+  it("warns that a list planned from an older storyboard holds the code step", async () => {
     const approvedMoto = { ...MOTO, illustration: ill({ id: "m1", name: "Motorbike", title: "Xe máy", status: "approved" as const }) };
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [TOOTH, approvedMoto], ready: false, stale: true });
     renderPanel();
@@ -91,7 +91,7 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     expect(await screen.findByTestId("pi-draw-Dentist")).toHaveTextContent("Vẽ");
   });
 
-  // CR-045 — each drawing in flight has its own progress bar.
+  // Each drawing in flight has its own progress bar.
   it("shows a progress bar with the drawer's attempt and phase on each drawing being drawn", async () => {
     const drawing: apiClient.ProjectIllustration = {
       ...DENTIST, state: "drawing", error: undefined,
@@ -140,7 +140,7 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     await waitFor(() => expect((note as HTMLTextAreaElement).value).toContain("- S3 · Bo tròn — dòng 7: <rect> không bo góc (thêm rx)"));
   });
 
-  // CR-052: an original Hình mẫu reused by a video is read-only, like the kit.
+  // An original Hình mẫu reused by a video is read-only, like the kit.
   it("offers no edit or approve on a reused Hình mẫu", async () => {
     const cat: apiClient.ProjectIllustration = {
       id: "r4", position: 1, name: "Cat", description: "Mèo", folder_id: "hinh-mau", shots: [], state: "reused",

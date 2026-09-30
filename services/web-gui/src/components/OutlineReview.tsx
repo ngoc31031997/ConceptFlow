@@ -11,17 +11,17 @@ interface OutlineReviewProps {
 }
 
 /**
- * Màn duyệt dàn ý — điểm dừng duy nhất trước khi hệ thống tiêu tiền (CR-024).
+ * Màn duyệt dàn ý — điểm dừng duy nhất trước khi hệ thống tiêu tiền.
  *
  * Trước CR này, lần đầu Creator biết video nói gì là lúc xem video đã dựng
  * xong: nội dung chỉ tồn tại dưới dạng chuỗi ký tự nằm rải rác trong một file
  * Python do AI ngoài viết ra, không có cách nào đọc lướt.
  *
- * Màn này cố ý KHÔNG hiện code, tên class hay đường dẫn artifact (FR68.4). Nó
+ * Màn này cố ý KHÔNG hiện code, tên class hay đường dẫn artifact. Nó
  * hiện thứ Creator cần để trả lời đúng một câu hỏi: video này nói gì, theo thứ
  * tự nào, và trên màn hình có gì.
  *
- * Nút Duyệt/Từ chối SỐNG Ở `OutlineActions`, không phải ở đây (bug report):
+ * Nút Duyệt/Từ chối SỐNG Ở `OutlineActions`, không phải ở đây:
  * danh sách này có thể dài hàng chục dòng, đặt nút ở cuối nó thì nút cuộn mất
  * khỏi tầm nhìn đúng lúc cần nhất. State dùng chung qua `useOutlineReview` nên
  * bấm nút ở cột kia vẫn phản ánh đúng vào danh sách này (busy khoá cả sửa dòng

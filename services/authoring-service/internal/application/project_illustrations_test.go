@@ -197,7 +197,7 @@ func TestForCodeNeverHandsOverADraft(t *testing.T) {
 	}
 }
 
-// CR-045: the planner's list is kept whole — no cap on how many drawings a video gets.
+// The planner's list is kept whole — no cap on how many drawings a video gets.
 func TestPlanKeepsEveryDrawingTheStoryboardNeeds(t *testing.T) {
 	var draw []string
 	for i := 0; i < 15; i++ {
@@ -404,7 +404,7 @@ func (m *mutableStoryboard) GetAuthoringStoryboard(context.Context, string) (str
 	return m.text, nil
 }
 
-// CR-050 FR-17: the list remembers which storyboard it was planned from.
+// The list remembers which storyboard it was planned from.
 func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
 	lib := newFakeIllustrationRepo()
 	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(&scriptedLLM{}, nil, 1000)
@@ -414,7 +414,7 @@ func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
 	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000)
 	ctx := context.Background()
 
-	// A list planned before CR-050 has no fingerprint: not stale.
+	// A list with no recorded fingerprint: not stale.
 	rows.planned["p1"] = true
 	if stale, err := uc.Stale(ctx, "p1"); err != nil || stale {
 		t.Fatalf("legacy list: stale=%v err=%v, want false", stale, err)
@@ -434,7 +434,7 @@ func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
 	}
 }
 
-// CR-050 FR-17: re-planning keeps what the old list already had — a drawing
+// re-planning keeps what the old list already had — a drawing
 // (even an unapproved draft) or the Creator's skip — and only takes the new
 // shot list; names the new plan drops are gone.
 func TestReplanKeepsDrawingsAndSkipsByName(t *testing.T) {
@@ -475,7 +475,7 @@ func TestReplanKeepsDrawingsAndSkipsByName(t *testing.T) {
 	}
 }
 
-// CR-050 FR-17: the chain's illustrations step re-plans a stale list instead
+// The chain's illustrations step re-plans a stale list instead
 // of drawing for the old storyboard, and leaves a fresh one alone.
 func TestPrepareReplansOnlyAStaleList(t *testing.T) {
 	lib := newFakeIllustrationRepo()
@@ -505,7 +505,7 @@ func TestPrepareReplansOnlyAStaleList(t *testing.T) {
 	}
 }
 
-// CR-052: a Hình mẫu copy only teaches the AI drawer. Videos are offered its
+// A Hình mẫu copy only teaches the AI drawer. Videos are offered its
 // source; an original exemplar stays usable as before.
 func TestExemplarCopiesAreNeitherPlannedNorHandedToTheCode(t *testing.T) {
 	llm := &scriptedLLM{replies: []string{`{"reuse": [], "draw": []}`}}
@@ -539,7 +539,7 @@ func TestExemplarCopiesAreNeitherPlannedNorHandedToTheCode(t *testing.T) {
 	}
 }
 
-// CR-052: deleting this video's own draft is not blocked by this video, but
+// Deleting this video's own draft is not blocked by this video, but
 // is by another video that has not reached its result.
 func TestDeleteDrawingIgnoresItsOwnProjectButNotOthers(t *testing.T) {
 	uc, rows, lib := stage(&scriptedLLM{replies: []string{reply("Thing0", "export function Thing0({color = '#fff', ...fig}) { return null; }")}})

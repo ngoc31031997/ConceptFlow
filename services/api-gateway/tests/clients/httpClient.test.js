@@ -36,7 +36,7 @@ describe('httpClient', () => {
     expect(res.body).toEqual({ ok: true });
   });
 
-  test('sends a Buffer body as raw bytes and reads a ZIP answer as bytes (CR-044 backup)', async () => {
+  test('sends a Buffer body as raw bytes and reads a ZIP answer as bytes (library backup)', async () => {
     let capturedOptions;
     const zip = Buffer.from([0x50, 0x4b, 0x03, 0x04, 0xff]);
     const fetchImpl = async (url, opts) => {
@@ -104,7 +104,7 @@ describe('httpClient', () => {
   });
 });
 
-describe('httpClient binary bodies (CR-044)', () => {
+describe('httpClient binary bodies', () => {
   test('keeps an image body as bytes instead of decoding it as text', async () => {
     const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0xff, 0x00]);
     const fetchImpl = async () => ({

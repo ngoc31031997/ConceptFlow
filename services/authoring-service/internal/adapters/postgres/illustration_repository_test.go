@@ -27,7 +27,7 @@ func TestIllustrationRepositoryAgainstPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewPromptTemplateRepository(pool)
-	// CR-052: a database from before still holds the three exemplars as seeded
+	// A database from before still holds the three exemplars as seeded
 	// built-ins; the first start after the change turns them into Hình mẫu data.
 	if err := r.SeedIllustrations(ctx); err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestIllustrationRepositoryAgainstPostgres(t *testing.T) {
 	}
 }
 
-// CR-052 against a real database (TEST_DATABASE_URL): who uses a drawing, the
+// The illustration library against a real database (TEST_DATABASE_URL): who uses a drawing, the
 // delete that refuses a project nobody checked, and the Hình mẫu limit.
 func TestIllustrationUsageAndExemplarsAgainstPostgres(t *testing.T) {
 	url := os.Getenv("TEST_DATABASE_URL")

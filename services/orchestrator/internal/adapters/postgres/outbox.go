@@ -14,7 +14,7 @@ import (
 // actual send happens later, from OutboxRelay. This guarantees a command
 // dispatch survives a crash between the Project/SagaStep state update and
 // the network call to RabbitMQ (the crash-safety property this system's
-// other units get from Outbox-for-events; ADR-0019 explains why Unit 8's
+// other services get from Outbox-for-events; ADR-0019 explains why this
 // Outbox instead holds commands, and why the table keeps the
 // "outbox_events" name despite that semantic difference).
 type OutboxRepository struct {

@@ -1,6 +1,6 @@
 package domain
 
-// ProjectIllustrationState is where one planned drawing of a video stands (CR-044).
+// ProjectIllustrationState is where one planned drawing of a video stands.
 type ProjectIllustrationState string
 
 const (
@@ -27,12 +27,12 @@ type ProjectIllustration struct {
 	Error          string                   `json:"error,omitempty"`
 	IllustrationID string                   `json:"illustration_id,omitempty"`
 	Illustration   *Illustration            `json:"illustration,omitempty"`
-	// Progress is the live state of a drawing in flight (CR-045); in memory
+	// Progress is the live state of a drawing in flight; in memory
 	// only, never stored — nil when the row is not being drawn right now.
 	Progress *DrawProgress `json:"progress,omitempty"`
 }
 
-// DrawProgress is how far the AI drawer has got on one drawing (CR-045): which
+// DrawProgress is how far the AI drawer has got on one drawing: which
 // attempt of how many, and what it is doing in that attempt.
 type DrawProgress struct {
 	Attempt     int `json:"attempt"`

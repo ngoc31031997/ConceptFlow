@@ -50,7 +50,7 @@ def test_remotion_pass_runs_both_the_gate_and_tsc():
 def test_remotion_reports_tsc_diagnostics_with_lines():
     out = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")])).check("remotion", "code", "creator")
     assert not out.ok and out.diagnostics[0].line == 12 and "TS2304" in out.diagnostics[0].message
-    assert out.diagnostics[0].rule == "TS2304"  # CR-050 FR-22
+    assert out.diagnostics[0].rule == "TS2304"
 
 
 def test_gate_and_tsc_failures_are_both_reported():
@@ -80,7 +80,7 @@ def test_bad_input_is_a_value_error(engine, code):
         make().check(engine, code, "s")
 
 
-# --- CR-048 T6b: the layout check after tsc -------------------------------------------
+# --- the layout check after tsc -------------------------------------------------------
 
 
 def box(x, y, w, h):

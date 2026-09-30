@@ -3,13 +3,13 @@
 CredentialStorePort is synchronous (domain/ports.py) so PublishVideoUseCase
 and YouTubeVideoPublisher's internal token-refresh persistence can call it
 directly without an event loop — both run inside a worker thread via
-asyncio.to_thread (mirror Unit 6's AssembleVideoUseCase), where the
+asyncio.to_thread, where the
 asyncpg pool (bound to the main event loop) cannot be awaited safely.
 psycopg2 (a plain blocking driver) sidesteps that loop-binding problem for
 this one small, low-frequency table — the Inbox/Outbox tables stay on
 asyncpg since those are only ever accessed from async code.
 
-CR-012: multi-channel. Rows are keyed by channel_id, so connecting a
+Multi-channel: rows are keyed by channel_id, so connecting a
 second channel adds a row instead of overwriting the first.
 """
 
@@ -59,14 +59,14 @@ class PostgresCredentialStore(CredentialStorePort):
         return [_to_credential(row) for row in rows]
 
     def save(self, credential: OAuthCredential) -> None:
-        """Upsert by channel_id (FR31.5).
+        """Upsert by channel_id.
 
         Two details this statement has to get right, both of which are
         silent data loss if missed:
 
         - refresh_token: Google only returns one on the *first* consent for
           a given user/client pair. A re-consent that omits it must keep the
-          stored one, or the channel becomes unrefreshable (FR31.6).
+          stored one, or the channel becomes unrefreshable.
         - is_default: the first channel connected becomes the default;
           later ones must not steal the flag from the Creator's choice.
         """
@@ -150,7 +150,7 @@ def _to_credential(row: tuple) -> OAuthCredential:
         client_id=client_id,
         channel_title=channel_title,
         is_default=is_default,
-        # '' for a row written before CR-015 (column default) splits to [],
+        # '' for a row with no recorded scopes (column default) splits to [],
         # which OAuthCredential already treats as "youtube.upload only".
         scopes=tuple((scopes or "").split()),
     )

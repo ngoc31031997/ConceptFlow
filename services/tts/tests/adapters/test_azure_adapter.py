@@ -1,4 +1,4 @@
-"""Unit tests for AzureTTSAdapter (CR-011)."""
+"""Unit tests for AzureTTSAdapter."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class FakeResponse:
 
 @pytest.fixture(autouse=True)
 def no_retry_sleep(monkeypatch):
-    """CR-013 made synthesis retry with backoff. Sleeping for real would add
+    """Synthesis retries with backoff. Sleeping for real would add
     ~9s to every failure test for no coverage — the delays are asserted
     explicitly in the retry tests below instead."""
     slept: list[float] = []
@@ -121,7 +121,7 @@ def test_credentials_and_output_format_are_sent(tmp_path, adapter, monkeypatch):
 def test_http_errors_become_domain_errors(tmp_path, adapter, monkeypatch, status):
     """After the retries are exhausted, a wrong key or a spent quota still has
     to reach RoutingTTSEngine as a TTSEngineError, or the Edge fallback never
-    runs (CR-013 FR37.5)."""
+    runs."""
 
     def failing_urlopen(request, timeout=None):
         raise urllib.error.HTTPError(
@@ -171,7 +171,7 @@ def test_is_configured_needs_both_key_and_region(monkeypatch):
     assert azure_adapter.is_configured()
 
 
-# --- CR-013: retry with backoff ---
+# --- retry with backoff ---
 
 
 def test_a_transient_failure_is_retried_and_then_succeeds(tmp_path, adapter, monkeypatch):
@@ -228,7 +228,7 @@ def test_backoff_grows_between_attempts(tmp_path, adapter, monkeypatch, no_retry
 @pytest.mark.parametrize("status", [400, 404])
 def test_a_deterministic_rejection_is_not_retried(tmp_path, adapter, monkeypatch, status):
     """Bad SSML or an unknown voice answers the same way every time, so retrying
-    only delays the fallback (FR37.2)."""
+    only delays the fallback."""
     attempts = {"n": 0}
 
     def failing(request, timeout=None):
@@ -298,7 +298,7 @@ def test_an_http_date_retry_after_falls_back_to_normal_backoff(
 
 def test_the_outer_ceiling_outlasts_every_attempt_and_its_backoff():
     """If this ever inverts, the ceiling cuts the retry loop short and the
-    retries silently stop happening (FR37.3)."""
+    retries silently stop happening."""
     worst_case = azure_adapter.MAX_ATTEMPTS * azure_adapter.ATTEMPT_TIMEOUT_SECONDS + (
         azure_adapter.RETRY_BACKOFF_SECONDS * sum(range(1, azure_adapter.MAX_ATTEMPTS))
     )

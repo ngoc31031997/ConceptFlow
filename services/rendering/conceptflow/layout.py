@@ -1,10 +1,10 @@
-"""Hình học của khung an toàn (CR-017 FR45.3).
+"""Hình học của khung an toàn.
 
 Cũng **không import manim**, vì lý do giống `theme.py`: đây là số học thuần trên
 bounding box, và nó là phần duy nhất của bố cục thực sự cần kiểm thử. Component
 chỉ việc đọc bbox của mobject rồi đưa vào đây.
 
-CR-021 FR59.1 (phát hiện tràn khung khi chấm QC) dùng lại đúng các hàm này, nên
+Luật tràn khung khi chấm QC dùng lại đúng các hàm này, nên
 luật "thế nào là tràn" chỉ tồn tại ở một nơi — nếu QC và component tự định nghĩa
 riêng, sẽ có lúc component dựng ra thứ mà chính QC báo lỗi.
 """
@@ -81,7 +81,7 @@ def overflow(box: Box, margin: float = SAFE_MARGIN) -> tuple[str, ...]:
 #: Không có biên này, một nhóm cao đúng bằng vùng an toàn sẽ được co về đúng
 #: mép, rồi sai số dấu phẩy động đẩy nó ra ngoài vài phần nghìn đơn vị — và
 #: chính `overflow()` báo tràn thứ mà `fit_scale()` vừa bảo là vừa. Hai hàm này
-#: phải nhất quán với nhau, vì CR-021 dùng `overflow()` để chấm QC những khung
+#: phải nhất quán với nhau, vì QC dùng `overflow()` để chấm những khung
 #: hình do component ở đây dựng ra.
 FIT_EPSILON = 0.995
 
@@ -100,7 +100,7 @@ def fit_scale(box: Box, margin: float = SAFE_MARGIN) -> float:
 
 
 def overlaps(a: Box, b: Box, tolerance: float = 0.0) -> bool:
-    """Hai box có giao nhau không (CR-021 FR59.2).
+    """Hai box có giao nhau không.
 
     `tolerance` nới lỏng phép so: bbox của Manim thường rộng hơn phần mực thật
     (đuôi chữ, khoảng đệm của font), nên hai dòng chữ sát nhau có thể "giao" về
@@ -128,7 +128,7 @@ def relative_luminance(hex_color: str) -> float:
 def contrast_ratio(foreground: str, background: str) -> float:
     """Tỉ lệ tương phản WCAG, từ 1.0 (trùng màu) tới 21.0 (đen trên trắng).
 
-    Dùng cho CR-021 FR59.4. Ngưỡng 4.5 là mức AA của WCAG cho chữ thường; chữ
+    Dùng cho luật tương phản của QC. Ngưỡng 4.5 là mức AA của WCAG cho chữ thường; chữ
     trên video nên cao hơn vì còn bị nén và bị xem trên màn hình kém.
     """
     light = relative_luminance(foreground)

@@ -1,5 +1,6 @@
 /**
- * Layout probe — the measuring half (CR-048 T6a spike, wired in by T6b).
+ * Layout probe — the measuring half, shared by the command line probe and the
+ * compile check's layout check.
  *
  * Measures, in headless Chromium, the DOM boxes of what each shot of a merged
  * Remotion script draws at chosen moments of the shot. It only MEASURES: the

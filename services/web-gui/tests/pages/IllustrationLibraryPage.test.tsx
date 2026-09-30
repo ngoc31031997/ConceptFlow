@@ -6,7 +6,7 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
 const FOLDERS: apiClient.IllustrationFolder[] = [
-  // CR-052: first in the list, yet never offered as a place to save or draw into.
+  // First in the list, yet never offered as a place to save or draw into.
   { id: "hinh-mau", name: "Hình mẫu", description: "", position: 0, is_system: true },
   { id: "co-the-suc-khoe", name: "Cơ thể & sức khoẻ", description: "", position: 1, is_system: true },
   { id: "phuong-tien", name: "Phương tiện", description: "", position: 2, is_system: true },
@@ -38,7 +38,7 @@ function renderPage() {
   );
 }
 
-describe("IllustrationLibraryPage (CR-044)", () => {
+describe("IllustrationLibraryPage", () => {
   beforeEach(() => {
     vi.spyOn(apiClient, "listIllustrationFolders").mockResolvedValue(FOLDERS);
     vi.spyOn(apiClient, "listIllustrations").mockResolvedValue([TOOTH, BUS, CAT]);
@@ -240,7 +240,7 @@ describe("IllustrationLibraryPage (CR-044)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("thiếu manifest.json");
   });
 
-  // CR-052 — delete from the tile, and the Hình mẫu the Creator picks.
+  // Delete from the tile, and the Hình mẫu the Creator picks.
   it("deletes a drawing from its tile after confirming", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     const del = vi.spyOn(apiClient, "deleteIllustration").mockResolvedValue(undefined);

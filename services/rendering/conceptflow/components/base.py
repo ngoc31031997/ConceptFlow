@@ -1,4 +1,4 @@
-"""Nền chung của mọi component (CR-017 FR45.2, FR45.3).
+"""Nền chung của mọi component.
 
 Component là `VGroup` dựng sẵn theo theme, tự giữ mình trong khung an toàn. Điểm
 quan trọng: chúng nhận **theme** chứ không nhận toạ độ hay cỡ chữ — script không

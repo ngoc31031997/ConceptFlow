@@ -5,9 +5,8 @@ import (
 	"strings"
 )
 
-// VideoArchetype is one kind of video the Story Architect can be told to make
-// (CR-041). The prompt used to carry a single skeleton; now the kinds are rows
-// the Creator can add to, and {{video_archetypes}} expands to whatever rows
+// VideoArchetype is one kind of video the Story Architect can be told to make.
+// The kinds are rows the Creator can add to, and {{video_archetypes}} expands to whatever rows
 // exist. System rows ship in the binary and are read-only, like system prompts.
 type VideoArchetype struct {
 	ID        string `json:"id"`
@@ -23,9 +22,9 @@ type VideoArchetype struct {
 	UpdatedAt           string `json:"updated_at"`
 }
 
-// SystemVideoArchetypes are the four kinds CR-041 phase 1 shipped inside the
-// prompt, plus XÂY-TẦNG and HÀNH-TRÌNH so abstract concepts and discovery
-// stories stop being forced into one of the four. Their ids are stable so the seeder can refresh wording on restart.
+// SystemVideoArchetypes are the built-in kinds: the four core ones plus
+// XÂY-TẦNG and HÀNH-TRÌNH, so abstract concepts and discovery stories are not
+// forced into one of the four. Their ids are stable so the seeder can refresh wording on restart.
 func SystemVideoArchetypes() []VideoArchetype {
 	return []VideoArchetype{
 		{

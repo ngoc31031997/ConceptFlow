@@ -6,11 +6,10 @@ import (
 	"orchestrator/internal/domain"
 )
 
-// TestResolveEventType_PrefersPayloadEventType guards a real bug found via
-// live E2E testing: every downstream Python service nests "event_type"
-// inside payload (Unit 1's approved envelope standard), but Orchestrator
-// used to read only a top-level envelope field that those services never
-// set — silently dropping every single event and hanging every Saga.
+// TestResolveEventType_PrefersPayloadEventType: every downstream Python
+// service nests "event_type" inside payload (the approved envelope standard)
+// and never sets a top-level envelope field, so reading only the top level
+// would silently drop every event and hang every Saga.
 func TestResolveEventType_PrefersPayloadEventType(t *testing.T) {
 	envelope := domain.Envelope{
 		Payload: map[string]interface{}{"event_type": "script_parsed", "scenes": []interface{}{}},

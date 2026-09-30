@@ -168,7 +168,7 @@ describe('handlers/channelAssetUploadHandler', () => {
         body: expect.objectContaining({
           file_path: expectedPath,
           render_quality: '1080p60',
-          // FR66.5: video-assembly must see this is the music bed, not a clip.
+          // video-assembly must see this is the music bed, not a clip.
           asset_role: 'music',
         }),
       }),

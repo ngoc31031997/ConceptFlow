@@ -1,12 +1,11 @@
 """RoutingTTSEngine — picks the engine a voice belongs to, falls back to Edge
-when a metered engine cannot deliver, and meters what it sends (CR-005 FR13.3 /
-FR13.5, ADR-0023, ADR-0024, CR-011).
+when a metered engine cannot deliver, and meters what it sends. See ADR-0023
+and ADR-0024.
 
 This sits behind TTSEnginePort like any other engine, so the use case stays
 unaware that there is more than one. Keeping the routing here rather than in
-the application layer is what let ADR-0023 add a second engine, ADR-0024 swap
-the base one, and CR-011 add a third, without touching business logic — the
-point of the port in the first place.
+the application layer lets engines be added or swapped without touching
+business logic.
 
 Edge is the only engine that is always present: it needs no account, so it is
 both the default and the thing every other engine degrades to.
@@ -34,9 +33,9 @@ logger = logging.getLogger(__name__)
 USAGE_PATH = "/shared/tts_usage.json"
 
 # What each metered engine allows per month before characters start costing
-# money. Azure's is a real free tier (F0: 500k neural characters, CR-011).
-# Google's was withdrawn (CR-010), so its number is now only a "you are
-# spending real money" tripwire. Nothing here blocks synthesis.
+# money. Azure's is a real free tier (F0: 500k neural characters).
+# Google has no free tier, so its number is only a "you are spending real
+# money" tripwire. Nothing here blocks synthesis.
 FREE_TIER_CHARACTERS = {
     ENGINE_AZURE: 500_000,
     ENGINE_GOOGLE: 4_000_000,
@@ -93,7 +92,6 @@ class RoutingTTSEngine(TTSEnginePort):
         except TTSEngineError as exc:
             # A network blip, an expired credential or a spent quota should cost
             # the chosen voice, not the whole render — but never silently
-            # (FR13.3).
             fallback = fallback_voice_for(voice_id)
             logger.warning(
                 "%s TTS failed for %s (%s); falling back to %s.",

@@ -5,7 +5,7 @@ import { getScriptTemplates, type ScriptTemplates } from "../api/client";
 // is cached — a failed load is retried by the next mount.
 let loaded: ScriptTemplates | null = null;
 
-/** The starter scripts and hook/end-screen snippets (CR-040 FR113); null until loaded. */
+/** The starter scripts and hook/end-screen snippets; null until loaded. */
 export function useScriptTemplates(): ScriptTemplates | null {
   const [templates, setTemplates] = useState<ScriptTemplates | null>(loaded);
   useEffect(() => {

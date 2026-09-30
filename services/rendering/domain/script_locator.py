@@ -1,6 +1,6 @@
 """Tìm tên class Scene (Manim) hoặc composition id (Remotion) trong script.
 
-Chuyển từ script-processing (CR-040 FR110): tên này là một khai báo tĩnh trong
+Tên này là một khai báo tĩnh trong
 mã nguồn nên đọc bằng regex là đúng và đủ, và nó phải được biết **trước** lượt
 dry vì `manim` cần biết chạy class nào. Không bao giờ thực thi script.
 """

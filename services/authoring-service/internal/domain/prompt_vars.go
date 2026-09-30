@@ -7,12 +7,8 @@ import (
 	"strings"
 )
 
-// CR-027 FR77: these prompt variables used to be filled in by the browser.
-// scriptPrompts.ts held the constants and substituted them into the template
-// it had fetched, which left the server unable to render a prompt at all —
-// exactly what FR78's generate endpoints have to do.
-//
-// Moving them here is not tidying up. Two copies would let the
+// Prompt variables are filled in on the server, so the run-a-step-with-AI
+// endpoints can render a prompt. Two copies would let the
 // copy-the-prompt-out flow and the run-it-here flow drift apart on the same
 // role, and nothing in either output would say so.
 //
@@ -40,14 +36,14 @@ var themeReferenceEN string
 
 // lottie_catalog_vi.txt is GENERATED from the approved clips in
 // rendering/remotion_project/lottie/manifest.json by
-// rendering/tools/lottie_catalog.py prompt (CR-038) — never edit it by hand.
+// rendering/tools/lottie_catalog.py prompt — never edit it by hand.
 // It is Vietnamese only, like the seeded prompts that carry it.
 //
 //go:embed prompts/lottie_catalog_vi.txt
 var lottieCatalogVI string
 
 // illustration_kit_vi.txt is the API of remotion_project/src/conceptflow-mini/
-// illustration.tsx as the Remotion Engineer reads it (CR-043). It is written by
+// illustration.tsx as the Remotion Engineer reads it. It is written by
 // hand, and rendering/tests/domain/test_illustration_kit.py fails when a
 // component is exported but not documented here, or documented but gone.
 //
@@ -69,7 +65,7 @@ var narrationRuleRemotionVI string
 //go:embed prompts/narration_rule_remotion_en.txt
 var narrationRuleRemotionEN string
 
-// CR-040 FR113 — bodies of the prompts web-gui used to build in the browser.
+// Bodies of the "copy to an external AI" prompts.
 // Generated from the shipping TypeScript (see testdata/prompt_golden.json) and
 // held to it byte for byte by prompt_golden_test.go.
 //
@@ -92,7 +88,7 @@ var thumbnailAudienceVI string
 var thumbnailAudienceEN string
 
 // wordsPerMinute is the fallback speaking rate per content language, used
-// when the project's voice has no measured calibration of its own (CR-016).
+// when the project's voice has no measured calibration of its own.
 var wordsPerMinute = map[string]float64{
 	"vi": 140,
 	"en": 150,
@@ -142,7 +138,7 @@ func withIllustrationKit(text string) string {
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language
-// the spoken lines must be written in (CR-008 FR21.3).
+// the spoken lines must be written in.
 func NarrationLanguageRule(language string) string {
 	if language == "vi" {
 		return narrationRuleVI
@@ -182,7 +178,7 @@ func NarrateExample(language string) string {
 // BeatSheetWordsPerMinute is the speaking rate the beat budgets are converted
 // at: the voice's measured rate when there is one (calibratedWPM > 0), else
 // the language default, else English. The outline prompt (words per beat) and
-// the storyboard length check (seconds per scene, CR-048 T8) both use it, so
+// the storyboard length check (seconds per scene) both use it, so
 // the budget the model was given and the one it is checked against agree.
 func BeatSheetWordsPerMinute(language string, calibratedWPM float64) float64 {
 	if calibratedWPM > 0 && !math.IsInf(calibratedWPM, 0) {
@@ -199,7 +195,7 @@ func BeatSheetWordsPerMinute(language string, calibratedWPM float64) float64 {
 // speaking rate of the voice this project will actually use.
 //
 // Words rather than seconds because the Story Architect step writes prose,
-// and a budget it cannot apply while writing is not a budget (CR-016/CR-019).
+// and a budget it cannot apply while writing is not a budget.
 //
 // calibratedWPM is the measured rate for the project's voice, or 0 to fall
 // back to the language default.

@@ -1,5 +1,5 @@
 // Package llm is the orchestrator's only path to a language model: an HTTP
-// client for llm-service (CR-039), which owns the Hive and Ollama connections
+// client for llm-service, which owns the Hive and Ollama connections
 // (through the OpenAI SDK), retries, error classification and the chunked code
 // pipeline. Nothing in the orchestrator talks to a provider directly any more.
 package llm
@@ -79,7 +79,7 @@ type wireUsage struct {
 	ReasoningTokens  int    `json:"reasoning_tokens"`
 	CachedTokens     int    `json:"cached_tokens"`
 	ReasoningChars   int    `json:"reasoning_chars"`
-	// Absent (an llm-service before CR-056) means reported, as it was then assumed.
+	// Absent means reported.
 	UsageReported *bool `json:"usage_reported"`
 }
 
@@ -339,7 +339,7 @@ func (c *Client) Chat(ctx context.Context, req application.ChatRequest) (applica
 // --- MetadataSuggesterPort / ShortScriptSuggesterPort ------------------------
 
 // suggestCall posts a suggestion request. When ctx carries a progress callback
-// (CR-040 FR116) it asks llm-service to stream and forwards the reply's size as
+// it asks llm-service to stream and forwards the reply's size as
 // it grows; otherwise it is the plain one-shot call.
 func (c *Client) suggestCall(ctx context.Context, path string, body map[string]any, out any) error {
 	report := application.ProgressFrom(ctx)
@@ -439,7 +439,7 @@ func codeBody(req application.CodeGenRequest) map[string]any {
 		}
 		body["illustrations"] = ills
 	}
-	// CR-048 T6b: what the rendering layout check needs beyond the code.
+	// What the rendering layout check needs beyond the code.
 	if req.SubtitleBand != nil {
 		body["subtitle_band"] = map[string]any{"edge": req.SubtitleBand.Edge, "px": req.SubtitleBand.Px}
 	}
@@ -530,13 +530,13 @@ func codeEvent(kind string, raw json.RawMessage) (application.CodeEvent, error) 
 	return out, nil
 }
 
-// GenerateCode runs POST /v2/code/generate (CR-050, ADR-0030). Every event is
+// GenerateCode runs POST /v2/code/generate (see ADR-0030). Every event is
 // handed to onEvent as it arrives; an event this client cannot read fails the
 // run rather than being skipped, because a skipped segment_done or call would
 // lose paid work or its cost.
 //
-// An llm-service without /v2 (older than CR-050) is ErrSegmentsUnsupported:
-// the /v1 fallback was removed in CR-056, so llm-service must be deployed first.
+// An llm-service without /v2 is ErrSegmentsUnsupported; there is no
+// fallback, so llm-service must be deployed first.
 func (c *Client) GenerateCode(
 	ctx context.Context, req application.CodeGenRequest, onEvent func(application.CodeEvent),
 ) (application.CodeGenResult, error) {
@@ -628,7 +628,7 @@ func (c *Client) segmentCall(ctx context.Context, path string, body map[string]a
 		switch resp.StatusCode {
 		case http.StatusNotFound:
 			if !own {
-				// The route itself is missing: an llm-service older than CR-050.
+				// The route itself is missing: an llm-service without /v2.
 				return application.ErrSegmentsUnsupported
 			}
 			return application.ErrSegmentUnknown

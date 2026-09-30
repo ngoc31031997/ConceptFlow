@@ -32,9 +32,8 @@ interface PipelineSettingsBarProps {
 }
 
 /**
- * CR-031 bug report — Creator đã chọn engine và cách làm ở bước 1, rồi bước
- * vào 1a/1b/1c lại thấy y nguyên hai bộ chọn đầy đủ, y như chưa chọn gì. Đúng
- * là hai lựa chọn này ĐỔI được ở bất cứ tab nào (đó là chủ ý), nhưng "đổi
+ * Creator đã chọn engine và cách làm ở bước 1; ở 1a/1b/1c hiện lại y nguyên hai
+ * bộ chọn đầy đủ sẽ trông như chưa chọn gì. Hai lựa chọn này ĐỔI được ở bất cứ tab nào (đó là chủ ý), nhưng "đổi
  * được" và "phải nhìn lại từ đầu mỗi lần chuyển tab" là hai việc khác nhau.
  *
  * Ở 1a/1b/1c, control này mặc định thu gọn thành một dòng tóm tắt ("Manim ·

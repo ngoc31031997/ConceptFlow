@@ -56,8 +56,8 @@ function renderPage() {
   );
 }
 
-// CR-031 bug report — engine/cách làm đã chốt ở màn chọn tình huống, nên mỗi
-// tab giờ chỉ hiện một dòng tóm tắt, thu gọn hai bộ chọn đầy đủ lại (xem
+// Engine/cách làm đã chốt ở màn chọn tình huống, nên mỗi
+// tab chỉ hiện một dòng tóm tắt, thu gọn hai bộ chọn đầy đủ lại (xem
 // PipelineSettingsBar). Các test dưới đây thao tác trực tiếp với hai bộ chọn
 // đó, nên phải mở panel ra trước — y hệt một Creator bấm "Đổi".
 function expandSettings() {
@@ -113,9 +113,8 @@ describe("ScriptOutlineStepPage", () => {
     });
   });
 
-  // CR-027 D0 — the topic used to live only in this browser, so the server
-  // could not render {{topic}} itself. These two cover the round trip that
-  // FR77 depends on: it goes up with the outline, and it comes back down.
+  // The server renders {{topic}} itself, so the topic must reach it. These
+  // two cover the round trip: it goes up with the outline, and it comes back down.
   it("sends the Creator's topic to the server alongside the outline", async () => {
     renderPage();
 
@@ -166,10 +165,10 @@ describe("ScriptOutlineStepPage", () => {
     expect(screen.queryByTestId("script-tab-code")).not.toBeInTheDocument();
   });
 
-  // CR-030 — engine phải lên server ngay khi chọn, không phải chỉ lúc nộp
+  // Engine phải lên server ngay khi chọn, không phải chỉ lúc nộp
   // render: chuỗi 1a→1b→1c đọc project.RenderEngine từ server để chọn đúng
   // vai trò storyboard/code, nên tới lúc Creator xuống 1c đổi thì đã trễ.
-  describe("chọn công cụ render (CR-030)", () => {
+  describe("chọn công cụ render", () => {
     it("mặc định chọn Manim và lưu Remotion lên server ngay khi Creator đổi", async () => {
       const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       renderPage();
@@ -205,7 +204,7 @@ describe("ScriptOutlineStepPage", () => {
       );
     });
 
-    // CR-045 — a Remotion video gets its drawings between Visual and Code.
+    // A Remotion video gets its drawings between Visual and Code.
     it("chuỗi của video Remotion có thêm bước Hình minh hoạ trước Code; Manim thì không", async () => {
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
@@ -215,7 +214,7 @@ describe("ScriptOutlineStepPage", () => {
       expandSettings();
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
-      // CR-051: the button names the steps by the rail's numbers, whatever the
+      // The button names the steps by the rail's numbers, whatever the
       // engine — Manim skips 5 but the range is still 3–6.
       expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy bằng AI các bước 3–6");
       fireEvent.click(screen.getByTestId("render-engine-remotion"));
@@ -227,10 +226,9 @@ describe("ScriptOutlineStepPage", () => {
     });
   });
 
-  // CR-027 FR79 — chế độ làm việc là lựa chọn cho CẢ bước 1, không phải một
-  // nút riêng từng tab. Mặc định là copy tay, đúng cái mọi project vẫn làm
-  // trước CR-027.
-  describe("chế độ làm bước 1 (CR-027 FR79)", () => {
+  // Chế độ làm việc là lựa chọn cho CẢ bước 1, không phải một
+  // nút riêng từng tab. Mặc định là copy tay.
+  describe("chế độ làm bước 1", () => {
     function mockLlm(enabled: boolean, reason?: string) {
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
         enabled,
@@ -246,7 +244,7 @@ describe("ScriptOutlineStepPage", () => {
 
       await waitFor(() => expect(screen.getByTestId("authoring-mode-bar")).toBeInTheDocument());
       expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
-      // CR-051: the mode applies to all of steps 3–6, not "bước 3".
+      // The mode applies to all of steps 3–6, not "bước 3".
       expect(screen.getByRole("radiogroup", { name: "Cách làm các bước 3–6" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 3 — Kịch bản");
       expect(screen.getByTestId("script-outline-copy")).toBeInTheDocument();
@@ -266,7 +264,7 @@ describe("ScriptOutlineStepPage", () => {
       expect(screen.queryByTestId("script-outline-copy")).not.toBeInTheDocument();
     });
 
-    // CR-030 — một lần bấm chạy cả 1a → 1b → 1c. Chuỗi chạy tuần tự vì mỗi
+    // Một lần bấm chạy cả 1a → 1b → 1c. Chuỗi chạy tuần tự vì mỗi
     // lượt gọi tự lưu kết quả lên server, và bước sau render prompt từ đúng
     // dữ liệu bước trước vừa lưu.
     it("chạy cả ba bước bằng API và điền kết quả vào đúng từng ô", async () => {
@@ -295,7 +293,7 @@ describe("ScriptOutlineStepPage", () => {
       );
     });
 
-    // CR-039 — 1c có thể lưu code vẫn còn lỗi biên dịch sau các vòng sửa. Đó là
+    // 1c có thể lưu code vẫn còn lỗi biên dịch sau các vòng sửa. Đó là
     // ghi chú (code đã lưu, token đã tốn), nhưng phải nói rõ và kèm lỗi, không
     // được im lặng như thể xong sạch.
     it("báo code đã lưu nhưng còn lỗi biên dịch, kèm danh sách lỗi", async () => {
@@ -368,7 +366,7 @@ describe("ScriptOutlineStepPage", () => {
       );
     });
 
-    // FR79.4 — chưa có key thì chế độ AI không chọn được, và đường copy tay
+    // Chưa có key thì chế độ AI không chọn được, và đường copy tay
     // vẫn nguyên vẹn; không bao giờ có một nút bấm vào là lỗi.
     it("không cho chọn chế độ AI khi chưa có API key", async () => {
       mockLlm(false, "Chưa cấu hình HIVE_API_KEY");
@@ -406,7 +404,7 @@ describe("ScriptOutlineStepPage", () => {
       expect(screen.getByTestId("run-with-ai-error")).toHaveTextContent("Sao chép prompt");
     });
 
-    // FR79 — chế độ nằm ở project trong DB, không chỉ localStorage: đó là cái
+    // Chế độ nằm ở project trong DB, không chỉ localStorage: đó là cái
     // làm nó sống qua reload, qua trình duyệt khác và qua restart, ở bất cứ
     // bước nào của dự án.
     it("lưu chế độ lên server khi Creator đổi", async () => {
@@ -478,8 +476,8 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
   });
 
-  // CR-051: the chain used to count its own steps ("Bước 2/3") and drop Hình
-  // minh hoạ on Manim, so the Creator saw 3 steps where the rail showed 4.
+  // The chain shows the rail's step numbers and keeps Hình minh hoạ (dimmed)
+  // on Manim, so it shows as many steps as the rail.
   it("chuỗi Manim vẫn hiện đủ bước 3–6 theo số của thanh bước, bước 5 mờ “Không dùng”", async () => {
     setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
     renderPage();
@@ -523,7 +521,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
   // Skipped in CI only (Creator decision, 2026-09-28): on the GitHub runner the box
   // is still there after "Đóng thông báo"; not reproducible locally. Backlog:
   // docs/agentic/implementation-audit.md §8 (file removed 2026-09-30; see git history).
-  it.skipIf(process.env.CI)("hiện cảnh báo của bước Visual (CR-048 T8/T9) cùng kết cục, và đóng được", async () => {
+  it.skipIf(process.env.CI)("hiện cảnh báo của bước Visual cùng kết cục, và đóng được", async () => {
     setup({
       running: false,
       steps: ["story", "storyboard", "code"],

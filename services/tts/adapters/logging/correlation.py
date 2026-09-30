@@ -1,7 +1,7 @@
 """Correlation ID propagation (interface-contracts.md).
 
-Revision (ADR-0014): saga_id now comes from the AMQP command envelope,
-not an HTTP header (TTS Service no longer serves REST).
+saga_id comes from the AMQP command envelope; the TTS Service serves no
+HTTP. See ADR-0014.
 """
 
 from __future__ import annotations

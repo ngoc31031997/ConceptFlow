@@ -103,7 +103,7 @@ async def test_success_enqueues_rendering_completed_with_video_path(shared_volum
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "rendering_completed"
     assert event["payload"]["payload"]["video_path"].endswith("rendered.mp4")
-    # CR-002 FR10.2: the event must carry where each narration actually starts.
+    # The event must carry where each narration actually starts.
     assert event["payload"]["payload"]["wait_offsets"] == [0.0]
     assert event["payload"]["payload"]["video_duration_seconds"] == 10.0
 

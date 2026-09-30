@@ -45,7 +45,7 @@ describe("QCReportPanel", () => {
   });
 
   it("bấm mốc thời gian thì tua tới đúng giây của phát hiện", async () => {
-    // FR61.2: mốc bấm được là lý do báo cáo này dùng được — không có nó thì
+    // Mốc bấm được là lý do báo cáo này dùng được — không có nó thì
     // Creator phải tự dò trong video mười phút.
     const onSeek = vi.fn();
     render(<QCReportPanel projectId="proj-1" onSeek={onSeek} />);
@@ -61,7 +61,7 @@ describe("QCReportPanel", () => {
   });
 
   it("nói rõ là không chấm được, và không làm nó trông như lỗi chặn", async () => {
-    // FR61.4: một cổng hỏng không được biến thành cổng khoá — kể cả về mặt
+    // Một cổng hỏng không được biến thành cổng khoá — kể cả về mặt
     // giao diện, nên trạng thái này không có nhóm "lỗi nghiêm trọng" nào.
     mockReport({
       project_id: "proj-1",

@@ -1,4 +1,4 @@
-"""Harness benchmark cho Pha 0 (CR-002 / CR-003).
+"""Harness benchmark cho Pha 0.
 
 Render fixture tham chiếu bằng đúng cơ chế mà Rendering Service dùng
 (thay `self.wait(AUTO)` bằng thời lượng narration, chạy manim qua
@@ -8,8 +8,7 @@ subprocess), rồi đo:
 - RAM đỉnh của tiến trình con
 - thời lượng video thật (ffprobe)
 - **độ lệch đồng bộ**: offset thật của từng narration (qua marker
-  `_cf_mark`, cơ chế đề xuất ở CR-002 FR10.1) so với offset mà pipeline
-  HIỆN TẠI giả định (cộng dồn thời lượng narration).
+  `_cf_mark`) so với offset tính bằng cách cộng dồn thời lượng narration.
 
 Chạy trong container rendering:
     docker exec rendering python /tmp/benchmark_render.py -q m

@@ -10,7 +10,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// projectIllustrationsUseCase backs a video's drawing list (CR-044).
+// projectIllustrationsUseCase backs a video's drawing list.
 type projectIllustrationsUseCase interface {
 	List(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error)
 	Plan(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error)
@@ -42,7 +42,7 @@ func (rt *Router) projectIllustrationsEnabled(w http.ResponseWriter) bool {
 	return true
 }
 
-// writeRows answers the list. stale (CR-050 FR-17) says it was planned from a
+// writeRows answers the list. stale says it was planned from a
 // storyboard other than the saved one; the code step refuses to run on it.
 func writeRows(w http.ResponseWriter, rows []domain.ProjectIllustration, stale bool) {
 	ready := !stale
@@ -124,7 +124,7 @@ func (rt *Router) handleSkipProjectIllustration(w http.ResponseWriter, r *http.R
 }
 
 // handleDeleteProjectIllustrationDrawing removes the row's unapproved AI drawing
-// from the library and skips the row (CR-045).
+// from the library and skips the row.
 func (rt *Router) handleDeleteProjectIllustrationDrawing(w http.ResponseWriter, r *http.Request) {
 	if !rt.projectIllustrationsEnabled(w) {
 		return

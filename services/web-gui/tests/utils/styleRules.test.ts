@@ -9,7 +9,7 @@ const RULES = `## 1. Hình khối
 - [S12] Màu chính của vật phải đổi được qua prop color (và các prop màu phụ nếu cần), để Kỹ sư gán màu.
 - [S20] Chuyển động NHỎ và ĐỀU: không quá 5% cạnh hộp.`;
 
-describe("style rule names (CR-045)", () => {
+describe("style rule names", () => {
   it("reads each rule's name from the served rules text", () => {
     expect(parseRuleNames(RULES)).toEqual({
       S2: "Không viền quanh khối",

@@ -123,7 +123,7 @@ describe("YoutubeChannels", () => {
     expect(screen.getByText("second-project")).toBeInTheDocument();
   });
 
-  it("flags a channel connected before force-ssl was requested (CR-015 FR40.2)", async () => {
+  it("flags a channel connected before force-ssl was requested", async () => {
     const unScoped: YoutubeAccount = { ...CHANNEL_ONE, has_caption_scope: false };
     global.fetch = mockFetch([unScoped, CHANNEL_TWO], [APP]);
     renderChannels();

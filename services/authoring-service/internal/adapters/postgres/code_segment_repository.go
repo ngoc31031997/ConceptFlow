@@ -9,7 +9,7 @@ import (
 	"authoring/internal/domain"
 )
 
-// CR-050 Unit 2 / ADR-0030 — the code step's segments, the Creator's shots
+// The code step's segments (ADR-0030), the Creator's shots
 // per segment, and the failed-check log.
 
 const segmentColumns = `key, kind, position, shots, status, source, fingerprint, content,
@@ -54,7 +54,7 @@ func (r *PromptTemplateRepository) ListSegments(ctx context.Context, projectID, 
 // ApplySegmentPlan makes the stored segments follow the plan llm-service sent
 // at the start of a run: keys the plan no longer has are deleted, new keys are
 // added as pending, and a segment whose fingerprint changed goes back to
-// pending without its content (CR-050 FR-6). A matching segment is untouched.
+// pending without its content. A matching segment is untouched.
 func (r *PromptTemplateRepository) ApplySegmentPlan(ctx context.Context, projectID, step string, plan []domain.CodeSegment) error {
 	keys := make([]string, 0, len(plan))
 	for _, s := range plan {
@@ -124,7 +124,7 @@ func (r *PromptTemplateRepository) SaveSegmentDone(ctx context.Context, projectI
 }
 
 // SaveSegmentFailed marks a segment failed. Its last content, if any, is kept:
-// a failed re-run must not throw away what was there (CR-050 R1).
+// a failed re-run must not throw away what was there.
 func (r *PromptTemplateRepository) SaveSegmentFailed(ctx context.Context, projectID, step, key, kind, message string, durationMS int) error {
 	return r.updateSegment(ctx, `UPDATE authoring_segments
 		SET status = 'failed', error_kind = $4, error_message = $5, duration_ms = $6, updated_at = now()
@@ -165,7 +165,7 @@ func (r *PromptTemplateRepository) DeleteSegments(ctx context.Context, projectID
 	return err
 }
 
-// GetCodeChunkShots is the Creator's shots per code segment (FR-7); a project
+// GetCodeChunkShots is the Creator's shots per code segment; a project
 // without an authoring row yet has the default.
 func (r *PromptTemplateRepository) GetCodeChunkShots(ctx context.Context, projectID string) (int, error) {
 	var n int
@@ -184,7 +184,7 @@ func (r *PromptTemplateRepository) SaveCodeChunkShots(ctx context.Context, proje
 	return err
 }
 
-// InsertCheckDiagnostics logs one failed check's findings (CR-050 FR-22).
+// InsertCheckDiagnostics logs one failed check's findings.
 func (r *PromptTemplateRepository) InsertCheckDiagnostics(ctx context.Context, list []domain.CheckDiagnosticRecord) error {
 	if len(list) == 0 {
 		return nil

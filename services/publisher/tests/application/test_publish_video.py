@@ -119,7 +119,7 @@ def test_publishes_to_the_channel_named_in_the_request(shared_volume_root):
 
 def test_unknown_channel_raises_rather_than_falling_back_to_the_default(shared_volume_root):
     """Publishing to a channel the Creator did not choose is public and
-    cannot be undone, so a stale channel_id must fail loudly (FR32.3)."""
+    cannot be undone, so a stale channel_id must fail loudly."""
     video_path = str(shared_volume_root / "final.mp4")
     _touch(video_path)
     default = make_credential(channel_id="UC_default", is_default=True)
@@ -132,7 +132,7 @@ def test_unknown_channel_raises_rather_than_falling_back_to_the_default(shared_v
 
 
 def test_no_channel_in_request_uses_the_default_channel(shared_volume_root):
-    """Projects created before CR-012 carry no channel and must keep working."""
+    """A request that names no channel publishes to the default channel."""
     video_path = str(shared_volume_root / "final.mp4")
     _touch(video_path)
     other = make_credential(channel_id="UC_other")

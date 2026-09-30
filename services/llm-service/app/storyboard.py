@@ -1,6 +1,6 @@
-"""Storyboard JSON (CR-039 FR101).
+"""Storyboard JSON.
 
-The Visual Director now returns a JSON document instead of prose so that the
+The Visual Director returns a JSON document instead of prose so that the
 code step can split it by shot without re-reading prose. This module parses,
 validates and renders it back to the readable `CẢNH n / n.m | MÁY | HÌNH |
 THOẠI` form the Creator edits.

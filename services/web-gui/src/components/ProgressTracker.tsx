@@ -6,7 +6,7 @@ import { Card } from "./ui";
 interface ProgressTrackerProps {
   progressState: ProgressState;
   /**
-   * CR-031 — các bước màn hình NÀY chịu trách nhiệm, theo thứ tự. Trước đây
+   * Các bước màn hình NÀY chịu trách nhiệm, theo thứ tự. Trước đây
    * tracker luôn vẽ cả saga từ một hằng số dùng chung; từ khi bước 4
    * (Validate) và bước 5 (Xử lý) là hai màn riêng, mỗi màn chỉ được vẽ phần
    * của mình — nếu không thì cả hai cùng hiện một danh sách giống hệt và
@@ -35,7 +35,7 @@ function CheckIcon() {
 }
 
 /**
- * CR-029: a Manim render_scenes reports elapsed time only (no reliable total);
+ * A Manim render_scenes reports elapsed time only (no reliable total);
  * a Remotion one carries render_percent, assemble_video merge_percent.
  * synthesize_speech/generate_clips
  * each report a real (index, total) pair now, just under different field

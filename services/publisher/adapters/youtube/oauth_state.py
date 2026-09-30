@@ -1,10 +1,8 @@
-"""OAuth `state` encoding plus the nonce store that backs it (CR-012 FR33).
+"""OAuth `state` encoding plus the nonce store that backs it.
 
-Before CR-012 `state` was the bare project_id, echoed back to the GUI so it
-knew where to navigate after connecting. With more than one OAuth app the
-callback also has to know *which* app minted the code, since the token
-exchange needs that app's client_secret — so state now carries a small
-JSON object instead of a bare string.
+`state` carries a small JSON object: the project_id, echoed back to the GUI
+so it knows where to navigate after connecting, and *which* OAuth app minted
+the code, since the token exchange needs that app's client_secret.
 
 The nonce is the CSRF defence: without it, anyone able to make the
 Creator's browser hit /callback with an attacker-obtained code could
@@ -42,10 +40,9 @@ def encode_state(client_id: str, project_id: str | None, nonce: str) -> str:
 def decode_state(raw: str | None) -> OAuthState | None:
     """Decodes a state produced by encode_state.
 
-    Anything that is not one of ours — including the pre-CR-012 bare
-    project_id — comes back as an OAuthState with an empty client_id and
-    nonce, so a consent flow already in flight when this version deploys
-    still lands somewhere sensible rather than erroring (FR33.3).
+    Anything that is not one of ours — including a legacy bare project_id —
+    comes back as an OAuthState with an empty client_id and nonce, so such a
+    callback still lands somewhere sensible rather than erroring.
     """
     if not raw:
         return None

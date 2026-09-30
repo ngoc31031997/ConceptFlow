@@ -53,8 +53,8 @@ class RenderScriptUseCase:
             # Idempotency: reuse the artifact from a prior call instead of
             # re-rendering — but only when its timing sidecar is there too.
             # Reporting a video without offsets would desynchronise the whole
-            # downstream assembly (CR-002), so a video whose timing is missing
-            # (e.g. rendered before CR-002 shipped) is re-rendered instead.
+            # downstream assembly, so a video whose timing is missing
+            # is re-rendered instead.
             timing = read_timing(timing_path)
             if timing is not None:
                 return ScriptRenderResult(
@@ -84,15 +84,15 @@ class RenderScriptUseCase:
         if blocking:
             raise InvalidManimApiUsageError(blocking)
         for issue in issues:
-            # Cảnh báo không chặn render (CR-017 FR46.3): đường thoát hiểm ra
+            # Cảnh báo không chặn render: đường thoát hiểm ra
             # API thô của Manim là hợp lệ, chỉ là phần đó không được theme và
             # QC bảo vệ. Chặn nó lại sẽ chặn đúng những video tham vọng nhất.
             logger.warning("lint script (%s): %s", request.project_id, issue)
         if not request.narration_segments:
             raise ValueError("narration_segments must not be empty")
         for segment in request.narration_segments:
-            # audio_path may legitimately be absent (CR-001: narration
-            # disabled) — duration_seconds is the only field Rendering
+            # audio_path may legitimately be absent (narration disabled) —
+            # duration_seconds is the only field Rendering
             # actually needs, to substitute into self.wait(AUTO).
             if segment.duration_seconds <= 0:
                 raise InvalidDurationError(segment.duration_seconds)

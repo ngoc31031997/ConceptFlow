@@ -61,7 +61,7 @@ func TestStartRenderSagaUseCase_Execute(t *testing.T) {
 	}
 }
 
-// TestStartRenderSagaUseCase_SubtitleModeIsPersisted is CR-015 FR41: the
+// TestStartRenderSagaUseCase_SubtitleModeIsPersisted: the
 // Creator's explicit choice among the four delivery modes must survive into
 // the saved Project, for handle_step_event.go's assembleVideoPayload to
 // pick up later.
@@ -207,7 +207,7 @@ func TestStartRenderSagaUseCase_CompanionProjectID_LinksBothWays(t *testing.T) {
 }
 
 func TestStartRenderSagaUseCase_CompanionProjectID_MissingCompanionIsBestEffort(t *testing.T) {
-	// CR-026 D1: a stale/wrong companion id must never cost the Creator the
+	// A stale/wrong companion id must never cost the Creator the
 	// video they are actually here to create.
 	repo := newFakeRepo()
 	uc := NewStartRenderSagaUseCase(repo, &fakePublisher{})

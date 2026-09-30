@@ -9,7 +9,6 @@ export interface ProgressState {
   elapsedSeconds: number | null;
   animationIndex: number | null;
   renderPercent: number | null;
-  // CR-029
   mergePercent: number | null;
   clipIndex: number | null;
   clipTotal: number | null;

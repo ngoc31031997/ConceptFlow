@@ -147,8 +147,8 @@
     min-width: 0;
   }
   /*
-    Two nowrap buttons plus the logo never fit on one 390px-wide line — they
-    used to spill left over the logo text instead of wrapping. Forcing this
+    Two nowrap buttons plus the logo never fit on one 390px-wide line and
+    would spill left over the logo text instead of wrapping. Forcing this
     onto its own full-width line (flex-basis: 100% breaks the flex line)
     keeps every button legible instead of overlapping.
   */
