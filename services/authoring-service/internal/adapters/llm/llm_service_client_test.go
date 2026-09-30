@@ -178,40 +178,121 @@ func TestFinalizeStoryboard(t *testing.T) {
 
 func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v2/code/generate" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
-		if body["engine"] != "remotion" || body["storyboard"] != "SB" || body["system"] != "SYS" {
+		if body["engine"] != "remotion" || body["storyboard"] != "SB" || body["system"] != "SYS" || body["chunk_shots"] != float64(2) {
 			t.Errorf("body = %v", body)
 		}
+		segs, _ := body["segments"].([]any)
+		if len(segs) != 1 || segs[0].(map[string]any)["key"] != "frame" || body["only"].([]any)[0] != "1.3-1.4" {
+			t.Errorf("segments/only = %v / %v", body["segments"], body["only"])
+		}
 		ndjson(w,
-			`{"type":"phase","phase":"layout"}`,
-			`{"type":"phase","phase":"chunks","total":3}`,
-			`{"type":"chunk_done","index":1,"total":3,"done":1}`,
-			`{"type":"phase","phase":"repair","round":1,"total":3,"targets":["1.3"]}`,
-			`{"type":"chunk_split","index":2,"total":3,"shots":["1.4","1.5","1.6"],"into":[["1.4","1.5"],["1.6"]]}`,
-			`{"type":"result","code":"CODE","check_ok":false,"repair_rounds":3,"scene_class_name":"XScene","warnings":["w"],`+
-				`"diagnostics":[{"message":"boom","line":9},{"message":"no line","line":null}],`+
-				`"calls":[{"phase":"chunk","label":"1.1-1.10","ok":true,"cached":false,"duration_ms":1500,"usage":{"model":"m","prompt_tokens":5,"completion_tokens":6}}]}`)
+			`{"type":"plan","segments":[{"key":"frame","kind":"frame","shots":[],"fingerprint":"f0"},{"key":"1.3-1.4","kind":"shots","shots":["1.3","1.4"],"fingerprint":"f2"}]}`,
+			`{"type":"phase","phase":"chunks","total":1}`,
+			`{"type":"segment_start","key":"1.3-1.4"}`,
+			`{"type":"call","phase":"chunk","label":"1.3-1.4","segment":"1.3-1.4","ok":true,"duration_ms":1500,"usage":{"model":"m","prompt_tokens":5,"completion_tokens":6}}`,
+			`{"type":"check","phase":"chunk","round":0,"segment":"1.3-1.4","diagnostics":[{"message":"boom","line":9,"kind":"layout","rule":"safe_area","shot":"1.3","segment":"1.3-1.4"}]}`,
+			`{"type":"segment_done","key":"1.3-1.4","fingerprint":"f2","content":{"shots":{"1.3":"a","1.4":"b"}},"source":"ai","repaired":false,"duration_ms":2000}`,
+			`{"type":"segment_failed","key":"1.5-1.5","error":{"kind":"timeout","message":"slow"}}`,
+			`{"type":"chunk_done","index":1,"total":1,"done":1}`,
+			`{"type":"result","status":"done","code":"CODE","check_ok":false,"repair_rounds":3,"scene_class_name":"XScene","warnings":["w"],`+
+				`"diagnostics":[{"message":"boom","line":9,"rule":"TS1"},{"message":"no line","line":null}],"failed":[],"missing":[]}`)
 	})
 	var events []application.CodeEvent
 	res, err := c.GenerateCode(context.Background(),
-		application.CodeGenRequest{Engine: "remotion", Storyboard: "SB", System: "SYS"},
+		application.CodeGenRequest{Engine: "remotion", Storyboard: "SB", System: "SYS", ChunkShots: 2, Only: []string{"1.3-1.4"},
+			Done: []application.DoneSegment{{Key: "frame", Fingerprint: "f0", Content: json.RawMessage(`{"code":"L"}`)}}},
 		func(e application.CodeEvent) { events = append(events, e) })
 	if err != nil {
 		t.Fatalf("GenerateCode: %v", err)
 	}
-	if len(events) != 5 || events[2].Type != "chunk_done" || events[2].Done != 1 || events[3].Round != 1 || events[3].Targets[0] != "1.3" ||
-		events[4].Type != "chunk_split" || events[4].Index != 2 {
-		t.Errorf("events = %+v", events)
+	if len(events) != 8 {
+		t.Fatalf("events = %+v", events)
 	}
-	if res.Code != "CODE" || res.CheckOK || res.RepairRounds != 3 || res.SceneClassName != "XScene" || len(res.Warnings) != 1 {
+	if p := events[0].Plan; len(p) != 2 || p[1].Key != "1.3-1.4" || p[1].Position != 1 || p[1].Fingerprint != "f2" || len(p[1].Shots) != 2 {
+		t.Errorf("plan = %+v", p)
+	}
+	if call := events[3].Call; call == nil || call.Segment != "1.3-1.4" || call.Duration != 1500*time.Millisecond || call.Usage.PromptTokens != 5 {
+		t.Errorf("call = %+v", events[3])
+	}
+	if chk := events[4].Check; chk == nil || chk.Segment != "1.3-1.4" || len(chk.Diagnostics) != 1 ||
+		chk.Diagnostics[0].Rule != "safe_area" || chk.Diagnostics[0].Shot != "1.3" || chk.Diagnostics[0].Line != 9 {
+		t.Errorf("check = %+v", events[4])
+	}
+	if d := events[5]; d.Key != "1.3-1.4" || d.Fingerprint != "f2" || d.Source != "ai" || d.DurationMS != 2000 ||
+		string(d.Content) != `{"shots":{"1.3":"a","1.4":"b"}}` {
+		t.Errorf("segment_done = %+v", d)
+	}
+	if f := events[6]; f.Key != "1.5-1.5" || f.ErrorKind != "timeout" || f.ErrorText != "slow" {
+		t.Errorf("segment_failed = %+v", f)
+	}
+	if res.Status != application.CodeGenDone || res.Code != "CODE" || res.CheckOK || res.RepairRounds != 3 || res.SceneClassName != "XScene" {
 		t.Errorf("result = %+v", res)
 	}
-	if len(res.Diagnostics) != 2 || res.Diagnostics[0].Line != 9 || res.Diagnostics[1].Line != 0 {
+	if len(res.Diagnostics) != 2 || res.Diagnostics[0].Line != 9 || res.Diagnostics[0].Rule != "TS1" || res.Diagnostics[1].Line != 0 {
 		t.Errorf("diagnostics = %+v", res.Diagnostics)
 	}
-	if len(res.Calls) != 1 || res.Calls[0].Duration != 1500*time.Millisecond || res.Calls[0].Usage.PromptTokens != 5 {
-		t.Errorf("calls = %+v", res.Calls)
+}
+
+func TestGenerateCodeRefusesAnUnknownStatusOrAnUnreadableEvent(t *testing.T) {
+	bad := serve(t, func(w http.ResponseWriter, _ *http.Request) {
+		ndjson(w, `{"type":"result","status":"weird"}`)
+	})
+	if _, err := bad.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, nil); application.LLMErrorKindOf(err) != application.ErrKindMalformed {
+		t.Errorf("unknown status: err = %v", err)
+	}
+	broken := serve(t, func(w http.ResponseWriter, _ *http.Request) {
+		ndjson(w, `{"type":"call","usage":"not an object"}`, `{"type":"result","status":"done","code":"C"}`)
+	})
+	if _, err := broken.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, nil); application.LLMErrorKindOf(err) != application.ErrKindMalformed {
+		t.Errorf("an unreadable call event must fail the run, not lose its cost: err = %v", err)
+	}
+}
+
+func TestSegmentCallsMapLLMServiceAnswers(t *testing.T) {
+	status := http.StatusOK
+	var path string
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		path = r.URL.Path
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		if body["key"] != "1.1-1.2" {
+			t.Errorf("body = %v", body)
+		}
+		w.WriteHeader(status)
+		switch {
+		case status != http.StatusOK:
+			_, _ = w.Write([]byte(`{"error":{"kind":"malformed","message":"missing shot function(s): 1.2"}}`))
+		case r.URL.Path == "/v2/code/segment-prompt":
+			_, _ = w.Write([]byte(`{"system":"S","user":"U"}`))
+		default:
+			_, _ = w.Write([]byte(`{"fingerprint":"fp","content":{"shots":{"1.1":"a"}}}`))
+		}
+	})
+	req := application.CodeGenRequest{Engine: "remotion"}
+	if sys, user, err := c.SegmentPrompt(context.Background(), req, "1.1-1.2"); err != nil || sys != "S" || user != "U" || path != "/v2/code/segment-prompt" {
+		t.Errorf("prompt: %q %q %v %s", sys, user, err, path)
+	}
+	if fp, content, err := c.ParseSegment(context.Background(), req, "1.1-1.2", "reply"); err != nil || fp != "fp" || string(content) != `{"shots":{"1.1":"a"}}` {
+		t.Errorf("parse: %q %s %v", fp, content, err)
+	}
+	status = http.StatusUnprocessableEntity
+	var reply *application.ErrSegmentReply
+	if _, _, err := c.ParseSegment(context.Background(), req, "1.1-1.2", "reply"); !errors.As(err, &reply) || !strings.Contains(reply.Message, "1.2") {
+		t.Errorf("422: %v", err)
+	}
+	status = http.StatusConflict
+	var notReady *application.ErrSegmentNotReady
+	if _, _, err := c.SegmentPrompt(context.Background(), req, "1.1-1.2"); !errors.As(err, &notReady) {
+		t.Errorf("409: %v", err)
+	}
+	status = http.StatusNotFound
+	if _, _, err := c.SegmentPrompt(context.Background(), req, "1.1-1.2"); !errors.Is(err, application.ErrSegmentUnknown) {
+		t.Errorf("404: %v", err)
 	}
 }
 
@@ -222,7 +303,7 @@ func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		bodies = append(bodies, body)
-		ndjson(w, `{"type":"result","code":"CODE","check_ok":true,"calls":[]}`)
+		ndjson(w, `{"type":"result","status":"done","code":"CODE","check_ok":true}`)
 	})
 	band := domain.SubtitleBand{Edge: "top", Px: 280}
 	if _, err := c.GenerateCode(context.Background(), application.CodeGenRequest{
@@ -244,18 +325,97 @@ func TestGenerateCodeSendsTheLayoutContextOnlyWhenThereIsOne(t *testing.T) {
 	}
 }
 
-func TestGenerateCodeFailureKeepsTheBilledCalls(t *testing.T) {
-	c := serve(t, func(w http.ResponseWriter, _ *http.Request) {
-		ndjson(w, `{"type":"error","error":{"kind":"balance","provider":"hive","message":"out of credit"},`+
-			`"calls":[{"phase":"layout","label":"LAYOUT","ok":true,"usage":{"model":"m","prompt_tokens":100}},{"phase":"chunk","label":"1.1-1.10","ok":false,"error_kind":"balance"}]}`)
+// ADR-0030: an llm-service without /v2 runs the step through /v1, the whole
+// step at once; its calls (listed at the end, or on the error) still reach
+// onEvent one by one, so every one is billed.
+func TestGenerateCodeFallsBackToV1OnAnOlderLLMService(t *testing.T) {
+	var paths []string
+	fail := false
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.URL.Path)
+		if r.URL.Path == "/v2/code/generate" {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"detail":"Not Found"}`))
+			return
+		}
+		if fail {
+			ndjson(w, `{"type":"error","error":{"kind":"budget","provider":"hive","message":"too long"},`+
+				`"calls":[{"phase":"layout","label":"LAYOUT","ok":false,"error_kind":"budget","usage":{"prompt_tokens":9}}]}`)
+			return
+		}
+		ndjson(w, `{"type":"phase","phase":"chunks","total":1}`,
+			`{"type":"result","code":"CODE","check_ok":true,"repair_rounds":0,"diagnostics":[],"warnings":[],`+
+				`"calls":[{"phase":"layout","label":"LAYOUT","ok":true,"usage":{"prompt_tokens":5}},{"phase":"chunk","label":"1.1-1.2","ok":true,"usage":{"prompt_tokens":7}}]}`)
 	})
-	_, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "manim"}, nil)
+	var calls []application.CodeCall
+	on := func(e application.CodeEvent) {
+		if e.Call != nil {
+			calls = append(calls, *e.Call)
+		}
+	}
+	res, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, on)
+	if err != nil || res.Status != application.CodeGenDone || res.Code != "CODE" {
+		t.Fatalf("res=%+v err=%v", res, err)
+	}
+	if strings.Join(paths, ",") != "/v2/code/generate,/v1/code/generate" {
+		t.Errorf("paths = %v", paths)
+	}
+	if len(calls) != 2 || calls[1].Usage.PromptTokens != 7 {
+		t.Errorf("calls = %+v", calls)
+	}
+
+	fail, calls = true, nil
+	_, err = c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, on)
+	if application.LLMErrorKindOf(err) != application.ErrKindBudget || len(calls) != 1 || calls[0].Usage.PromptTokens != 9 {
+		t.Errorf("v1 failure: err=%v calls=%+v", err, calls)
+	}
+}
+
+func TestPlanSegmentsAndAnOlderLLMService(t *testing.T) {
+	missing := false
+	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
+		if missing {
+			w.WriteHeader(http.StatusNotFound)
+			_, _ = w.Write([]byte(`{"detail":"Not Found"}`))
+			return
+		}
+		if r.URL.Path != "/v2/code/plan" {
+			t.Errorf("path = %s", r.URL.Path)
+		}
+		_, _ = w.Write([]byte(`{"segments":[{"key":"frame","kind":"frame","shots":[],"fingerprint":"f","source":"storyboard"},` +
+			`{"key":"1.1-1.3","kind":"shots","shots":["1.1","1.2","1.3"],"fingerprint":"g"}]}`))
+	})
+	plan, err := c.PlanSegments(context.Background(), application.CodeGenRequest{Engine: "remotion", ChunkShots: 3})
+	if err != nil || len(plan) != 2 || plan[0].Source != "storyboard" || plan[1].Position != 1 || len(plan[1].Shots) != 3 {
+		t.Fatalf("plan = %+v err = %v", plan, err)
+	}
+	missing = true
+	if _, err := c.PlanSegments(context.Background(), application.CodeGenRequest{}); !errors.Is(err, application.ErrSegmentsUnsupported) {
+		t.Errorf("no route: %v", err)
+	}
+	if _, _, err := c.SegmentPrompt(context.Background(), application.CodeGenRequest{}, "frame"); !errors.Is(err, application.ErrSegmentsUnsupported) {
+		t.Errorf("no route must not read as an unknown segment: %v", err)
+	}
+}
+
+func TestGenerateCodeFailureIsTheProviderError(t *testing.T) {
+	// ADR-0030: the billed calls were streamed before the error; it carries none.
+	c := serve(t, func(w http.ResponseWriter, _ *http.Request) {
+		ndjson(w, `{"type":"call","phase":"layout","label":"LAYOUT","ok":true,"usage":{"model":"m","prompt_tokens":100}}`,
+			`{"type":"error","error":{"kind":"balance","provider":"hive","message":"out of credit"},"calls":[]}`)
+	})
+	var calls []application.CodeCall
+	_, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "manim"}, func(e application.CodeEvent) {
+		if e.Call != nil {
+			calls = append(calls, *e.Call)
+		}
+	})
 	var llmErr *application.LLMError
 	if !asLLMError(err, &llmErr) || llmErr.Kind != application.ErrKindBalance {
 		t.Fatalf("err = %v", err)
 	}
-	if len(llmErr.Calls) != 2 || llmErr.Calls[0].Usage.PromptTokens != 100 || llmErr.Calls[1].ErrorKind != application.ErrKindBalance {
-		t.Errorf("calls = %+v", llmErr.Calls)
+	if len(calls) != 1 || calls[0].Usage.PromptTokens != 100 {
+		t.Errorf("calls = %+v", calls)
 	}
 }
 

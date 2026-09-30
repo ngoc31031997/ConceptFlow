@@ -136,7 +136,7 @@ CREATE INDEX IF NOT EXISTS code_check_diagnostics_created_idx ON code_check_diag
 - `P = sha256(system)`: `system` là prompt `*_engineer_ai` đã render, **trước** khi ghép phần hình thư viện. Đây là "prompt của bước" (C2).
 - Khung Remotion lấy từ storyboard: `sha256("frame-sb", layout)`, nguồn `storyboard`, không gọi AI.
 - Khung AI: `sha256("frame", engine, P, storyboard)`.
-- Đoạn shot: `sha256("shots", engine, P, sha256(nội dung khung), JSON chuẩn hoá các shot của đoạn)`.
+- Đoạn shot: `sha256("shots", engine, P, vân tay khung, {hero, world, palette}, JSON chuẩn hoá các shot của đoạn)`. Xem mục "Thay đổi khi code".
 - Không chứa: model (C2), hình thư viện (sửa lỗi C3 của review), shot liền trước/liền sau.
   - Shot kề chỉ là gợi ý nối cảnh; nếu đưa vào thì sửa một shot kéo theo ba đoạn.
 
@@ -317,10 +317,36 @@ Tạo `docs/contracts/authoring-llm-code-v2.md` với body, sự kiện NDJSON (
 - **Truy vấn thống kê mẫu (FR-22)**: `SELECT rule, kind, count(*) FROM code_check_diagnostics WHERE created_at > now() - interval '30 days' GROUP BY 1,2 ORDER BY 3 DESC;`
 
 ## Rủi ro
-- **Hai phía phải deploy cùng lúc.** Bỏ `/v1/code/generate` nghĩa là `authoring-service` bản cũ gọi `llm-service` bản mới sẽ nhận 404. Phải rebuild cùng lúc, và không có lượt Code nào đang chạy khi rebuild.
+- ~~**Hai phía phải deploy cùng lúc.**~~ Đã bỏ ràng buộc này, xem mục "Thay đổi khi code" điểm 6. Bỏ `/v1/code/generate` nghĩa là `authoring-service` bản cũ gọi `llm-service` bản mới sẽ nhận 404. Phải rebuild cùng lúc, và không có lượt Code nào đang chạy khi rebuild.
 - **Sửa tay cả file code rồi chạy lại AI** thì code ghép từ các đoạn sẽ ghi đè bản sửa. Hành vi này giống hiện nay: lượt AI luôn ghi đè. Panel sẽ nói rõ "code sẽ được ghép lại từ các đoạn".
 - **Manim, hoặc Remotion không có `layout` trong storyboard**: mọi lần sửa storyboard đều sinh lại khung, nên sinh lại mọi đoạn (ADR-0030).
 - **Đổi số shot mỗi đoạn** làm đổi khoá, nên các đoạn không còn khoá trong cách chia mới sẽ bị bỏ. Giao diện cảnh báo trước khi lưu nếu đã có đoạn `done`.
 - **Không còn cache "đoạn quá lớn"** giữa các lượt: một đoạn hết budget ở lượt trước sẽ thử lại cả khối một lần trước khi chia đôi.
 - **Payload**: mỗi lượt gửi lại toàn bộ đoạn đã xong (khoảng 130 KB với 52 shot). Nếu vượt giới hạn body mặc định của FastAPI/uvicorn thì phải nâng giới hạn; cần kiểm khi code.
 - Khi merge `main`, có một chỗ lệch chữ ký phải sửa: `summaries_cr051_test.go` gọi `MarkIllustrationsPlanned` theo chữ ký cũ. Đã sửa trong merge đang chờ commit.
+
+## Thay đổi khi code (2026-09-30)
+Những điểm dưới đây lệch so với bản thiết kế đã duyệt:
+1. **Gateway phải sửa.** Thiết kế ghi "gateway không cần sửa", nhưng `api-gateway/src/routes/projects.js` liệt kê từng route authoring một.
+   - Đã thêm 4 route: `GET .../code/segments`, `GET .../code/segments/:key/prompt`, `PUT .../code/segments/:key`, `PUT .../code/chunk-shots`, kèm test định tuyến.
+   - Creator đã chọn phương án này.
+2. **Chạy lại một đoạn và sinh lại toàn bộ đi qua chuỗi server.**
+   - `POST .../authoring/chain` nhận thêm `{"segment": key}` hoặc `{"fresh": true}` với `steps: ["code"]` (`AuthoringChainRunner.StartWith`).
+   - Lý do: một request `generate` trực tiếp từ trình duyệt sẽ bị huỷ khi đóng tab hoặc mất mạng. Chuỗi server thì chạy độc lập với trình duyệt, và dùng lại được thanh tiến độ cùng nút Dừng.
+   - `POST .../code/generate` vẫn nhận body như thiết kế.
+   - Creator đã chọn phương án này.
+3. **Vân tay đoạn shot dùng vân tay khung, không dùng nội dung khung.**
+   - Nếu dùng nội dung, lần sửa LAYOUT ở vòng repair sẽ làm mọi đoạn bị coi là cũ ở lượt sau.
+   - Đưa thêm hero/world/palette vào vân tay, vì prompt đoạn có đọc chúng (FR-1: vân tay gồm mọi phần đầu vào của đoạn).
+   - Hệ quả: chạy lại riêng đoạn khung (cùng vân tay) không tự đẩy các đoạn shot về trạng thái chờ. Code của chúng được kiểm ở bước ghép, và vòng sửa xử lý phần lệch LAYOUT.
+4. **Danh sách đoạn hiện ngay cả trước lượt chạy đầu.**
+   - `authoring-service` chia đoạn bằng Go (`domain.PlanCodeSegments`), theo đúng cách chia của `llm-service`, để panel liệt kê đủ đoạn và cho phép dán ngay (C4).
+   - Vân tay vẫn chỉ do `llm-service` tính.
+5. **Nút "Chạy các đoạn còn thiếu" vẫn bấm được khi không còn đoạn thiếu.** Nhãn đổi thành "Ghép và kiểm lại code", vì lượt chạy đó chỉ ghép, kiểm và sửa (FR-8). Trường hợp này xảy ra chẳng hạn khi mọi đoạn đều được dán từ AI ngoài.
+6. **Hai service deploy độc lập** (Creator yêu cầu 2026-09-30, sau lần báo "code xong" đầu tiên):
+   - `llm-service` giữ `/v1/code/generate` (hành vi cũ, chạy trên pipeline mới).
+   - `authoring-service` quay về `/v1` khi `llm-service` chưa có `/v2`.
+   - Thêm `/v2/code/plan`; bỏ bản chép cách chia đoạn bằng Go (`domain.PlanCodeSegments`, `StoryboardHasLayout`) nêu ở điểm 4. Panel lấy danh sách đoạn từ `llm-service`.
+   - Panel báo 501 khi `llm-service` chưa hỗ trợ.
+   - Quy tắc đổi contract được ghi vào `docs/contracts/README.md`.
+   - Bỏ `/v1`: mục backlog trong `aidlc-state.md`.

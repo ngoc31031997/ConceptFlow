@@ -100,6 +100,14 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/authoring/mode', proxyHandler(authoring, 'authoring-service'));
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
   router.put('/v1/projects/:id/authoring/models', proxyHandler(authoring, 'authoring-service'));
+  // CR-050 Unit 2 — the code step's segments: list, one segment's prompt for an
+  // outside AI, paste/hand-edit one segment, shots per segment. Short calls
+  // (the prompt and the paste check go to llm-service without a model call);
+  // running segments goes through the chain above.
+  router.get('/v1/projects/:id/authoring/code/segments', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/authoring/code/segments/:key/prompt', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/authoring/code/segments/:key', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/authoring/code/chunk-shots', proxyHandler(authoring, 'authoring-service'));
   // Wizard: settings = bước 2 (Cấu hình), PATCH từng field khi Creator đổi;
   // "Tiếp tục" gửi confirm để sang bước 3.
   router.patch('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));

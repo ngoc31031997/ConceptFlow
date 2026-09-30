@@ -209,3 +209,50 @@ func TestChainKeepsStepWarningsAndWaitsOnAFlaggedStoryboard(t *testing.T) {
 		t.Error("State leaked its internal warnings slice")
 	}
 }
+
+// codeOptsRunner also takes the code step's CR-050 options.
+type codeOptsRunner struct {
+	fakeStepRunner
+	opts []CodeRunOptions
+}
+
+func (f *codeOptsRunner) ExecuteCode(_ context.Context, _ string, opts CodeRunOptions) (GeneratedStep, error) {
+	f.mu.Lock()
+	f.opts = append(f.opts, opts)
+	f.ran = append(f.ran, "code*")
+	f.mu.Unlock()
+	return GeneratedStep{}, nil
+}
+
+// CR-050 FR-4: a segment re-run and a fresh run go through the chain, so they
+// survive the browser closing; without options the code step runs as before.
+func TestChainCarriesTheCodeRunOptions(t *testing.T) {
+	f := &codeOptsRunner{}
+	c := NewAuthoringChainRunner(f, nil)
+	if err := c.StartWith("p", []string{"code"}, CodeRunOptions{Segment: "1.4-1.6"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, c, "p")
+	if err := c.Start("p", []string{"code"}); err != nil {
+		t.Fatal(err)
+	}
+	waitFinished(t, c, "p")
+	if len(f.opts) != 1 || f.opts[0].Segment != "1.4-1.6" || strings.Join(f.ran, ",") != "code*,code" {
+		t.Errorf("opts %+v ran %v", f.opts, f.ran)
+	}
+	for _, bad := range []struct {
+		steps []string
+		opts  CodeRunOptions
+	}{
+		{[]string{"storyboard", "code"}, CodeRunOptions{Fresh: true}},
+		{[]string{"story"}, CodeRunOptions{Segment: "x"}},
+		{[]string{"code"}, CodeRunOptions{Segment: "x", Fresh: true}},
+	} {
+		if err := c.StartWith("p", bad.steps, bad.opts); !errors.Is(err, ErrChainInvalid) {
+			t.Errorf("%v %+v: %v", bad.steps, bad.opts, err)
+		}
+	}
+	if err := NewAuthoringChainRunner(&fakeStepRunner{}, nil).StartWith("p", []string{"code"}, CodeRunOptions{Fresh: true}); err == nil {
+		t.Error("a runner without ExecuteCode must refuse options rather than ignore them")
+	}
+}

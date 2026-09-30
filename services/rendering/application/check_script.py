@@ -41,6 +41,10 @@ class CheckDiagnostic:
     message: str
     line: int | None = None
     kind: str = COMPILE  # compile | layout
+    # CR-050 FR-22: which rule failed, for statistics — the layout rule
+    # (safe_area, subtitle_zone, ...) or the tsc code (TS2322). "" when the
+    # source has no code of its own (lint, the Manim dry run).
+    rule: str = ""
 
 
 @dataclass
@@ -101,7 +105,7 @@ class CheckScriptUseCase:
 
         warnings: list[str] = []
         if engine == "remotion":
-            diags += [CheckDiagnostic(f"{d.code}: {d.message}", d.line) for d in self._ts.check(code)]
+            diags += [CheckDiagnostic(f"{d.code}: {d.message}", d.line, rule=str(d.code)) for d in self._ts.check(code)]
             if not diags:
                 # Only a script that compiles is worth drawing.
                 layout_diags, warnings = self._check_layout(code, layout or LayoutContext())
@@ -132,7 +136,7 @@ class CheckScriptUseCase:
         except (KeyError, TypeError, ValueError) as exc:
             logger.error("layout probe answered measurements the rules cannot read: %r", exc)
             return [], [f"Bố cục: KHÔNG kiểm tra được — số đo không đọc được ({exc!r})."]
-        diags =[CheckDiagnostic(f.message, f.line, LAYOUT) for f in findings if f.blocking]
+        diags = [CheckDiagnostic(f.message, f.line, LAYOUT, f.rule) for f in findings if f.blocking]
         warnings = [
             f"Bố cục: {f.message}" + (f" (dòng {f.line})" if f.line else "")
             for f in findings if not f.blocking

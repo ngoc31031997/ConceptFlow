@@ -2,7 +2,9 @@ package application_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -41,7 +43,50 @@ func (c *stubCodegen) GenerateCode(_ context.Context, req application.CodeGenReq
 	for _, e := range c.events {
 		on(e)
 	}
-	return c.result, c.err
+	res := c.result
+	if res.Status == "" && c.err == nil {
+		res.Status = application.CodeGenDone // the tests that only care about the merged code
+	}
+	return res, c.err
+}
+
+// PlanSegments stands in for llm-service's cut: the frame, then every
+// ChunkShots shots; a storyboard with a layout gives the Remotion frame.
+func (c *stubCodegen) PlanSegments(_ context.Context, req application.CodeGenRequest) ([]domain.CodeSegment, error) {
+	scenes, err := domain.ParseStoryboardScenes(req.Storyboard)
+	if err != nil {
+		return nil, &application.LLMError{Kind: application.ErrKindMalformed, Provider: "llm-service", Err: err}
+	}
+	var ids []string
+	for _, sc := range scenes {
+		for _, sh := range sc.Shots {
+			ids = append(ids, sh.ID)
+		}
+	}
+	frame := domain.CodeSegment{Key: "frame", Kind: domain.SegmentKindFrame, Shots: []string{}, Status: domain.SegmentPending}
+	if req.Engine == "remotion" && strings.Contains(req.Storyboard, `"layout"`) {
+		frame.Source = domain.SegmentSourceStoryboard
+	}
+	out := []domain.CodeSegment{frame}
+	for i := 0; i < len(ids); i += req.ChunkShots {
+		chunk := ids[i:min(i+req.ChunkShots, len(ids))]
+		out = append(out, domain.CodeSegment{Key: chunk[0] + "-" + chunk[len(chunk)-1], Kind: domain.SegmentKindShots,
+			Position: len(out), Shots: chunk, Fingerprint: "fp", Status: domain.SegmentPending})
+	}
+	return out, c.err
+}
+
+func (c *stubCodegen) SegmentPrompt(_ context.Context, req application.CodeGenRequest, key string) (string, string, error) {
+	c.req = req
+	return req.System, "USER " + key, c.err
+}
+
+func (c *stubCodegen) ParseSegment(_ context.Context, req application.CodeGenRequest, key, reply string) (string, json.RawMessage, error) {
+	c.req = req
+	if c.err != nil {
+		return "", nil, c.err
+	}
+	return "fp-" + key, json.RawMessage(`{"reply":` + strconv.Quote(reply) + `}`), nil
 }
 
 type usagePort struct {
@@ -70,7 +115,7 @@ func codeFixture(t *testing.T, engine domain.RenderEngine, storyboard string) (
 		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 		application.NewLLMUsageRecorder(usage, nil), renderCtx, nil,
 		&recordingSaver{}, sb, code, 0, 16000,
-	)
+	).WithSegments(newFakeSegments())
 	return uc, sb, code, usage
 }
 
@@ -131,19 +176,21 @@ func TestStoryboardStepWithoutAFinalizerFailsLoudly(t *testing.T) {
 	}
 }
 
+func callEvent(c application.CodeCall) application.CodeEvent {
+	return application.CodeEvent{Type: "call", Call: &c}
+}
+
 func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 	uc, _, code, usage := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
 	gen := &stubCodegen{
-		result: application.CodeGenResult{
-			Code: "export const narrations = []", CheckOK: true, RepairRounds: 1,
-			Calls: []application.CodeCall{
-				{Phase: "layout", Label: "LAYOUT", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 100, CompletionTokens: 10}},
-				{Phase: "chunk", Label: "1.1-1.10", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 200, CompletionTokens: 50}},
-				{Phase: "chunk", Label: "cached", OK: true, Cached: true},
-				{Phase: "repair", Label: "1.3", OK: false, ErrorKind: application.ErrKindMalformed, Usage: application.TokenUsage{Model: "m", PromptTokens: 30}},
-			},
+		result: application.CodeGenResult{Code: "export const narrations = []", CheckOK: true, RepairRounds: 1},
+		events: []application.CodeEvent{
+			{Type: "phase", Phase: "chunks", Total: 3},
+			callEvent(application.CodeCall{Phase: "layout", Label: "LAYOUT", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 100, CompletionTokens: 10}}),
+			callEvent(application.CodeCall{Phase: "chunk", Label: "1.1-1.10", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 200, CompletionTokens: 50}}),
+			{Type: "chunk_done", Done: 2, Total: 3},
+			callEvent(application.CodeCall{Phase: "repair", Label: "1.3", OK: false, ErrorKind: application.ErrKindMalformed, Usage: application.TokenUsage{Model: "m", PromptTokens: 30}}),
 		},
-		events: []application.CodeEvent{{Type: "phase", Phase: "chunks", Total: 3}, {Type: "chunk_done", Done: 2, Total: 3}},
 	}
 	uc.WithPipeline(&stubFinalizer{}, gen)
 
@@ -157,17 +204,19 @@ func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 	if !strings.HasPrefix(gen.req.System, "SYSTEM") {
 		t.Errorf("system prompt = %q, want the rendered *_engineer_ai prompt", gen.req.System)
 	}
+	if gen.req.ChunkShots != domain.DefaultChunkShots || gen.req.Only != nil {
+		t.Errorf("chunk shots %d only %v, want the default and every missing segment", gen.req.ChunkShots, gen.req.Only)
+	}
 	if got.Role != string(domain.RoleRemotionEngineerAI) {
 		t.Errorf("role = %q, want remotion_engineer_ai", got.Role)
 	}
 	if code.content != "export const narrations = []" || got.CheckFailed {
 		t.Errorf("saved=%q checkFailed=%v", code.content, got.CheckFailed)
 	}
-	if got.Usage.PromptTokens != 330 || got.ModelCalls != 4 || got.RepairRounds != 1 {
+	if got.Usage.PromptTokens != 330 || got.ModelCalls != 3 || got.RepairRounds != 1 {
 		t.Errorf("usage=%+v calls=%d rounds=%d", got.Usage, got.ModelCalls, got.RepairRounds)
 	}
-	// One row per BILLED call: the cached chunk cost nothing and has no row; the
-	// failed repair is billed and recorded as failed.
+	// One row per billed call, the failed repair recorded as failed (FR-21).
 	if len(usage.rows) != 3 {
 		t.Fatalf("usage rows = %d, want 3 (layout, chunk, failed repair)", len(usage.rows))
 	}
@@ -187,7 +236,7 @@ func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
 			newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 			application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, nil,
 			&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
-		).WithPipeline(&stubFinalizer{}, gen)
+		).WithPipeline(&stubFinalizer{}, gen).WithSegments(newFakeSegments())
 		if _, err := uc.Execute(context.Background(), p.ProjectID, "code"); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -239,13 +288,13 @@ func TestCodeStepSavesAScriptThatStillFailsTheCheckButFlagsIt(t *testing.T) {
 
 func TestCodeStepBillsTheCallsOfARunThatFailed(t *testing.T) {
 	uc, _, code, usage := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
-	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{err: &application.LLMError{
-		Kind: application.ErrKindBalance, Provider: "hive", Err: errors.New("no credit"),
-		Calls: []application.CodeCall{
-			{Phase: "layout", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 100}},
-			{Phase: "chunk", OK: false, ErrorKind: application.ErrKindBalance},
+	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{
+		events: []application.CodeEvent{
+			callEvent(application.CodeCall{Phase: "layout", OK: true, Usage: application.TokenUsage{Model: "m", PromptTokens: 100}}),
+			callEvent(application.CodeCall{Phase: "chunk", OK: false, ErrorKind: application.ErrKindBalance}),
 		},
-	}})
+		err: &application.LLMError{Kind: application.ErrKindBalance, Provider: "hive", Err: errors.New("no credit")},
+	})
 
 	_, err := uc.Execute(context.Background(), "p1", "code")
 	if application.LLMErrorKindOf(err) != application.ErrKindBalance {
@@ -307,6 +356,18 @@ type progressSpy struct {
 	inner *stubCodegen
 	uc    *application.GenerateAuthoringUseCase
 	out   *[]application.AuthoringProgress
+}
+
+func (p *progressSpy) PlanSegments(ctx context.Context, req application.CodeGenRequest) ([]domain.CodeSegment, error) {
+	return p.inner.PlanSegments(ctx, req)
+}
+
+func (p *progressSpy) SegmentPrompt(ctx context.Context, req application.CodeGenRequest, key string) (string, string, error) {
+	return p.inner.SegmentPrompt(ctx, req, key)
+}
+
+func (p *progressSpy) ParseSegment(ctx context.Context, req application.CodeGenRequest, key, reply string) (string, json.RawMessage, error) {
+	return p.inner.ParseSegment(ctx, req, key, reply)
 }
 
 func (p *progressSpy) GenerateCode(ctx context.Context, req application.CodeGenRequest, on func(application.CodeEvent)) (application.CodeGenResult, error) {

@@ -315,6 +315,10 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	if err := r.DeleteProjectIllustrations(ctx, projectID); err != nil {
 		return err
 	}
+	// CR-050: and its stored code segments.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM authoring_segments WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
 	_, err := r.pool.Exec(ctx, `DELETE FROM project_authoring WHERE project_id = $1`, projectID)
 	return err
 }

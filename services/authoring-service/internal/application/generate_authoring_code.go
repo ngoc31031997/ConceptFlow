@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -15,9 +16,12 @@ import (
 // shots in chunks, merges them deterministically, compile-checks the result and
 // repairs only the shots that fail.
 //
-// Every model call of the run is recorded as its own llm_usage row, on success
-// and on failure alike — a run that dies on its fifth chunk still paid for the
-// first four.
+// CR-050 (ADR-0030): the run is cut into segments stored here as they finish.
+// A run sends the segments already done and llm-service writes only the
+// missing ones (or the one segment the Creator re-runs). A failed segment does
+// not stop the others: the step ends "incomplete" and keeps everything else.
+// Every model call is recorded as its own llm_usage row the moment it ends,
+// and every failed check is logged (FR-21, FR-22).
 func (uc *GenerateAuthoringUseCase) runCode(
 	ctx context.Context, project *domain.Project, rendered RenderedPrompt, role domain.PromptRole,
 	model string, info *runInfo, started time.Time,
@@ -27,91 +31,64 @@ func (uc *GenerateAuthoringUseCase) runCode(
 	if uc.codegen == nil {
 		return GeneratedStep{}, errors.New("the code pipeline is not wired")
 	}
-	storyboard, err := uc.projects.GetAuthoringStoryboard(ctx, projectID)
+	if uc.segments == nil {
+		return GeneratedStep{}, errors.New("the code segment store is not wired")
+	}
+	req, err := uc.codeRequest(ctx, project, rendered.Prompt, model)
 	if err != nil {
-		return GeneratedStep{}, fmt.Errorf("load storyboard: %w", err)
+		return GeneratedStep{}, err
 	}
-	if strings.TrimSpace(storyboard) == "" {
-		return GeneratedStep{}, errors.New("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
+	opts := info.codeOpts
+	if opts.Fresh {
+		if err := uc.segments.DeleteSegments(ctx, projectID, step); err != nil {
+			return GeneratedStep{}, fmt.Errorf("drop the code segments: %w", err)
+		}
 	}
-	topic, err := uc.projects.GetAuthoringTopic(ctx, projectID)
-	if err != nil {
-		return GeneratedStep{}, fmt.Errorf("load topic: %w", err)
+	if err := uc.sendStoredSegments(ctx, projectID, &req, opts.Segment); err != nil {
+		return GeneratedStep{}, err
 	}
-
-	// CR-044/045: a Remotion video's drawings are planned and drawn by the
-	// illustrations step before this one; the code step only checks that the
-	// list exists and that the Creator approved or skipped every drawing.
-	var drawings []LibraryDrawing
-	if project.RenderEngine == domain.RenderEngineRemotion && uc.illustrations != nil {
-		pending, planned, err := uc.illustrations.Gate(ctx, projectID)
-		if err != nil {
-			return GeneratedStep{}, fmt.Errorf("check the video's drawings: %w", err)
-		}
-		if !planned {
-			return GeneratedStep{}, ErrIllustrationsNotPlanned
-		}
-		stale, err := uc.illustrations.Stale(ctx, projectID)
-		if err != nil {
-			return GeneratedStep{}, fmt.Errorf("check the video's drawings: %w", err)
-		}
-		if stale {
-			return GeneratedStep{}, ErrIllustrationsStale
-		}
-		if len(pending) > 0 {
-			return GeneratedStep{}, &ErrIllustrationsPending{Rows: pending}
-		}
-		if drawings, err = uc.illustrations.ForCode(ctx, projectID); err != nil {
-			return GeneratedStep{}, fmt.Errorf("load library drawings: %w", err)
-		}
+	if opts.Segment != "" {
+		req.Only = []string{opts.Segment}
 	}
 
-	req := CodeGenRequest{
-		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
-		System: rendered.Prompt, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
-	}
-	if project.RenderEngine == domain.RenderEngineRemotion {
-		// CR-048 T6b: the same subtitle strip {{subtitle_zone}} told the model
-		// to keep clear, and the video's font, for the layout check.
-		if band, burned := domain.ProjectSubtitleBand(project); burned {
-			req.SubtitleBand = &band
-		}
-		req.VideoFont = project.VideoFont
-	}
-	result, genErr := uc.codegen.GenerateCode(ctx, req, func(ev CodeEvent) { uc.updateCodeProgress(projectID, step, ev) })
+	run := &codeRun{uc: uc, projectID: projectID, role: string(role), model: model, engine: req.Engine,
+		// Stored even when the caller has gone: a segment the model finished is paid for.
+		ctx: context.WithoutCancel(ctx), plan: map[string]domain.CodeSegment{}}
+	result, genErr := uc.codegen.GenerateCode(ctx, req, run.onEvent)
+	info.usage = run.total
 
-	var calls []CodeCall
-	var llmErr *LLMError
 	if genErr != nil {
+		// NFR-3: a segment still running when the run stopped is failed with
+		// the reason, so the Creator sees it and can run it again.
+		kind, reason := domain.SegmentErrInterrupted, "bị ngắt: "+genErr.Error()
+		if ctx.Err() != nil {
+			kind, reason = domain.SegmentErrCancelled, "đã huỷ"
+		}
+		if _, err := uc.segments.FailRunningSegments(run.ctx, projectID, step, kind, reason); err != nil {
+			run.fail(fmt.Errorf("mark the running segments failed: %w", err))
+		}
+		var llmErr *LLMError
 		if errors.As(genErr, &llmErr) {
-			calls = llmErr.Calls
-		}
-	} else {
-		calls = result.Calls
-	}
-	var total TokenUsage
-	for _, c := range calls {
-		uc.recordCall(ctx, string(role), step, projectID, c, model)
-		total = usageSum(total, c.Usage)
-	}
-	info.usage = total
-
-	if genErr != nil {
-		if llmErr != nil {
 			info.partialChars = len(llmErr.Partial)
 		}
-		return GeneratedStep{}, genErr
+		return GeneratedStep{}, errors.Join(genErr, run.persistErr)
+	}
+	if run.persistErr != nil {
+		return GeneratedStep{}, fmt.Errorf("không lưu được kết quả các đoạn code: %w", run.persistErr)
+	}
+	if result.Status != CodeGenDone {
+		return GeneratedStep{}, uc.incomplete(ctx, projectID)
 	}
 	if strings.TrimSpace(result.Code) == "" {
 		return GeneratedStep{}, &LLMError{
-			Kind: ErrKindEmpty, Provider: uc.provider.Name(), Usage: total,
+			Kind: ErrKindEmpty, Provider: uc.provider.Name(), Usage: run.total,
 			Err: errors.New("the code pipeline returned no code"),
 		}
 	}
 
 	out := GeneratedStep{
 		Step: step, Role: string(role), Content: result.Code, Provider: uc.provider.Name(),
-		Usage: total, RepairRounds: result.RepairRounds, Warnings: result.Warnings, ModelCalls: len(calls),
+		Usage: run.total, RepairRounds: result.RepairRounds, Warnings: result.Warnings, ModelCalls: run.calls,
 	}
 	if !result.CheckOK {
 		// Saved anyway: the tokens are spent, and the Creator can read the
@@ -129,6 +106,246 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		out.SaveError = fmt.Sprintf("Đã sinh được nội dung nhưng chưa lưu được: %v", err)
 	}
 	return out, nil
+}
+
+// codeRequest is everything llm-service needs for this project's code step,
+// shared by a run and the one-segment prompt/paste paths so they fingerprint
+// the same input the same way.
+func (uc *GenerateAuthoringUseCase) codeRequest(
+	ctx context.Context, project *domain.Project, system, model string,
+) (CodeGenRequest, error) {
+	projectID := project.ProjectID
+	storyboard, err := uc.projects.GetAuthoringStoryboard(ctx, projectID)
+	if err != nil {
+		return CodeGenRequest{}, fmt.Errorf("load storyboard: %w", err)
+	}
+	if strings.TrimSpace(storyboard) == "" {
+		return CodeGenRequest{}, errors.New("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
+	}
+	topic, err := uc.projects.GetAuthoringTopic(ctx, projectID)
+	if err != nil {
+		return CodeGenRequest{}, fmt.Errorf("load topic: %w", err)
+	}
+
+	// CR-044/045: a Remotion video's drawings are planned and drawn by the
+	// illustrations step before this one; the code step only checks that the
+	// list exists and that the Creator approved or skipped every drawing.
+	var drawings []LibraryDrawing
+	if project.RenderEngine == domain.RenderEngineRemotion && uc.illustrations != nil {
+		pending, planned, err := uc.illustrations.Gate(ctx, projectID)
+		if err != nil {
+			return CodeGenRequest{}, fmt.Errorf("check the video's drawings: %w", err)
+		}
+		if !planned {
+			return CodeGenRequest{}, ErrIllustrationsNotPlanned
+		}
+		stale, err := uc.illustrations.Stale(ctx, projectID)
+		if err != nil {
+			return CodeGenRequest{}, fmt.Errorf("check the video's drawings: %w", err)
+		}
+		if stale {
+			return CodeGenRequest{}, ErrIllustrationsStale
+		}
+		if len(pending) > 0 {
+			return CodeGenRequest{}, &ErrIllustrationsPending{Rows: pending}
+		}
+		if drawings, err = uc.illustrations.ForCode(ctx, projectID); err != nil {
+			return CodeGenRequest{}, fmt.Errorf("load library drawings: %w", err)
+		}
+	}
+
+	req := CodeGenRequest{
+		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
+		System: system, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
+	}
+	if project.RenderEngine == domain.RenderEngineRemotion {
+		// CR-048 T6b: the same subtitle strip {{subtitle_zone}} told the model
+		// to keep clear, and the video's font, for the layout check.
+		if band, burned := domain.ProjectSubtitleBand(project); burned {
+			req.SubtitleBand = &band
+		}
+		req.VideoFont = project.VideoFont
+	}
+	if uc.segments != nil {
+		if req.ChunkShots, err = uc.segments.GetCodeChunkShots(ctx, projectID); err != nil {
+			return CodeGenRequest{}, fmt.Errorf("load shots per segment: %w", err)
+		}
+	}
+	return req, nil
+}
+
+// sendStoredSegments adds the finished segments to req, except `skip` (the
+// segment the Creator asked to write again).
+func (uc *GenerateAuthoringUseCase) sendStoredSegments(ctx context.Context, projectID string, req *CodeGenRequest, skip string) error {
+	stored, err := uc.segments.ListSegments(ctx, projectID, "code")
+	if err != nil {
+		return fmt.Errorf("load the code segments: %w", err)
+	}
+	for _, s := range stored {
+		if s.Status == domain.SegmentDone && len(s.Content) > 0 && s.Key != skip {
+			req.Done = append(req.Done, DoneSegment{Key: s.Key, Fingerprint: s.Fingerprint, Content: s.Content})
+		}
+	}
+	return nil
+}
+
+// incomplete reads the segments back to say what is left (FR-2).
+func (uc *GenerateAuthoringUseCase) incomplete(ctx context.Context, projectID string) error {
+	segs, err := uc.segments.ListSegments(ctx, projectID, "code")
+	if err != nil {
+		return fmt.Errorf("the code step is not finished, and its segments could not be read: %w", err)
+	}
+	out := &ErrSegmentsIncomplete{Total: len(segs)}
+	for _, s := range segs {
+		switch s.Status {
+		case domain.SegmentDone:
+		case domain.SegmentFailed:
+			out.Failed = append(out.Failed, s)
+		default:
+			out.Missing++
+		}
+	}
+	return out
+}
+
+// CodeRunOptions are the Creator's choices for one code run (CR-050 FR-4).
+type CodeRunOptions struct {
+	// Segment re-runs this one segment only ("Chạy lại đoạn này").
+	Segment string
+	// Fresh drops every stored segment first ("Sinh lại toàn bộ").
+	Fresh bool
+}
+
+// CodeSegmentPort stores the code step's segments (CR-050, ADR-0030).
+type CodeSegmentPort interface {
+	ListSegments(ctx context.Context, projectID, step string) ([]domain.CodeSegment, error)
+	ApplySegmentPlan(ctx context.Context, projectID, step string, plan []domain.CodeSegment) error
+	MarkSegmentRunning(ctx context.Context, projectID, step, key string) error
+	SaveSegmentDone(ctx context.Context, projectID, step string, s domain.CodeSegment, repaired bool) error
+	SaveSegmentFailed(ctx context.Context, projectID, step, key, kind, message string, durationMS int) error
+	FailRunningSegments(ctx context.Context, projectID, step, kind, message string) (int64, error)
+	FailAllRunningSegments(ctx context.Context, kind, message string) (int64, error)
+	DeleteSegments(ctx context.Context, projectID, step string) error
+	GetCodeChunkShots(ctx context.Context, projectID string) (int, error)
+	SaveCodeChunkShots(ctx context.Context, projectID string, n int) error
+	InsertCheckDiagnostics(ctx context.Context, list []domain.CheckDiagnosticRecord) error
+}
+
+// WithSegments turns on the CR-050 segment store the code step needs.
+func (uc *GenerateAuthoringUseCase) WithSegments(store CodeSegmentPort) *GenerateAuthoringUseCase {
+	uc.segments = store
+	return uc
+}
+
+// ErrSegmentsIncomplete: the code step ended with segments failed or not run.
+// Everything that finished is stored; the Creator re-runs or pastes the rest.
+type ErrSegmentsIncomplete struct {
+	Total   int
+	Failed  []domain.CodeSegment
+	Missing int
+}
+
+func (e *ErrSegmentsIncomplete) Error() string {
+	var parts []string
+	for i, s := range e.Failed {
+		if i == 3 {
+			parts = append(parts, fmt.Sprintf("và %d đoạn khác", len(e.Failed)-3))
+			break
+		}
+		reason := s.ErrorKind
+		if reason == "" {
+			reason = "lỗi"
+		}
+		parts = append(parts, fmt.Sprintf("%s: %s", s.Key, reason))
+	}
+	msg := fmt.Sprintf("Bước Code chưa xong: %d/%d đoạn lỗi", len(e.Failed), e.Total)
+	if len(parts) > 0 {
+		msg += " (" + strings.Join(parts, "; ") + ")"
+	}
+	if e.Missing > 0 {
+		msg += fmt.Sprintf(", %d đoạn chưa chạy", e.Missing)
+	}
+	return msg + ". Các đoạn đã xong đã được lưu — chạy lại đoạn lỗi hoặc dán kết quả AI ngoài."
+}
+
+// codeRun turns a run's events into stored segments, usage rows and the
+// failed-check log, as they arrive.
+type codeRun struct {
+	uc        *GenerateAuthoringUseCase
+	ctx       context.Context
+	projectID string
+	role      string
+	model     string
+	engine    string
+	plan      map[string]domain.CodeSegment
+	total     TokenUsage
+	calls     int
+	// persistErr is the first store that failed: the run goes on (the model
+	// work is not wasted for the other segments) but the step reports it.
+	persistErr error
+}
+
+func (r *codeRun) fail(err error) {
+	if r.persistErr == nil {
+		r.persistErr = err
+	}
+}
+
+func (r *codeRun) onEvent(ev CodeEvent) {
+	const step = "code"
+	uc := r.uc
+	switch ev.Type {
+	case "plan":
+		for _, s := range ev.Plan {
+			r.plan[s.Key] = s
+		}
+		if err := uc.segments.ApplySegmentPlan(r.ctx, r.projectID, step, ev.Plan); err != nil {
+			r.fail(fmt.Errorf("store the segment plan: %w", err))
+		}
+	case "segment_start":
+		if err := uc.segments.MarkSegmentRunning(r.ctx, r.projectID, step, ev.Key); err != nil {
+			r.fail(fmt.Errorf("mark segment %s running: %w", ev.Key, err))
+		}
+	case "segment_done":
+		seg, ok := r.plan[ev.Key]
+		if !ok {
+			r.fail(fmt.Errorf("segment %s is not in the run's plan", ev.Key))
+			return
+		}
+		seg.Fingerprint, seg.Content, seg.Source, seg.DurationMS = ev.Fingerprint, ev.Content, ev.Source, ev.DurationMS
+		if err := uc.segments.SaveSegmentDone(r.ctx, r.projectID, step, seg, ev.Repaired); err != nil {
+			r.fail(fmt.Errorf("store segment %s: %w", ev.Key, err))
+		}
+	case "segment_failed":
+		if err := uc.segments.SaveSegmentFailed(r.ctx, r.projectID, step, ev.Key, ev.ErrorKind, ev.ErrorText, ev.DurationMS); err != nil {
+			r.fail(fmt.Errorf("mark segment %s failed: %w", ev.Key, err))
+		}
+	case "call":
+		if ev.Call == nil {
+			return
+		}
+		r.calls++
+		r.total = usageSum(r.total, ev.Call.Usage)
+		uc.recordCall(r.ctx, r.role, step, r.projectID, *ev.Call, r.model)
+	case "check":
+		if ev.Check == nil {
+			return
+		}
+		list := make([]domain.CheckDiagnosticRecord, 0, len(ev.Check.Diagnostics))
+		for _, d := range ev.Check.Diagnostics {
+			list = append(list, domain.CheckDiagnosticRecord{
+				ProjectID: r.projectID, Engine: r.engine, Phase: ev.Check.Phase, Round: ev.Check.Round,
+				SegmentKey: d.Segment, ShotID: d.Shot, Kind: d.Kind, Rule: d.Rule, Message: d.Message, Line: d.Line,
+			})
+		}
+		// A lost statistics row must not fail a run the Creator waited for;
+		// it is logged, like a lost usage row.
+		if err := uc.segments.InsertCheckDiagnostics(r.ctx, list); err != nil {
+			slog.Warn("could not log check diagnostics", "project_id", r.projectID, "error", err)
+		}
+	default:
+		uc.updateCodeProgress(r.projectID, step, ev)
+	}
 }
 
 // ErrModelNotForCode refuses a model the code step cannot use (CR-050 FR-19).
@@ -167,9 +384,6 @@ func (uc *GenerateAuthoringUseCase) WithIllustrations(stage IllustrationStagePor
 func (uc *GenerateAuthoringUseCase) recordCall(
 	ctx context.Context, role, step, projectID string, c CodeCall, requestedModel string,
 ) {
-	if c.Cached {
-		return // nothing was billed
-	}
 	model := c.Usage.Model
 	if model == "" {
 		model = requestedModel

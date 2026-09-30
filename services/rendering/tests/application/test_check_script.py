@@ -50,6 +50,7 @@ def test_remotion_pass_runs_both_the_gate_and_tsc():
 def test_remotion_reports_tsc_diagnostics_with_lines():
     out = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")])).check("remotion", "code", "creator")
     assert not out.ok and out.diagnostics[0].line == 12 and "TS2304" in out.diagnostics[0].message
+    assert out.diagnostics[0].rule == "TS2304"  # CR-050 FR-22
 
 
 def test_gate_and_tsc_failures_are_both_reported():
@@ -58,6 +59,7 @@ def test_gate_and_tsc_failures_are_both_reported():
     )
     out = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")])).check("remotion", "code", "creator")
     assert [d.line for d in out.diagnostics] == [7, 3]
+    assert [d.rule for d in out.diagnostics] == ["", "TS1005"]  # lint issues carry no rule code
 
 
 def test_manim_dry_run_failure_keeps_the_traceback_in_raw_and_never_runs_tsc():
@@ -112,7 +114,7 @@ def test_blocking_layout_violations_become_line_numbered_layout_diagnostics():
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("remotion", "code", "creator")
     assert not out.ok and out.warnings == []
     [d] = out.diagnostics
-    assert d.kind == "layout" and d.line == 12
+    assert d.kind == "layout" and d.line == 12 and d.rule == "safe_area"
     assert d.message == "Shot 1.1, mọi frame đo: hình Tooth ra ngoài vùng an toàn (phải x=1920 > 1824)"
 
 

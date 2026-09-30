@@ -13,6 +13,7 @@ import { Disclosure } from "../components/Disclosure";
 import { ScriptAssistant } from "../components/ScriptAssistant";
 import { useScriptTemplates } from "../hooks/useScriptTemplates";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
+import { CodeChunkShotsField, CodeSegmentsPanel } from "../components/CodeSegmentsPanel";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
@@ -186,6 +187,9 @@ export function ManimEngineerStepPage() {
   // Chế độ AI chỉ "thật" khi máy chủ có provider: một draft chọn AI trên máy
   // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
   const aiMode = authoringMode === "ai" && llm?.enabled === true;
+  // CR-050 Unit 2: the segments panel and the shots-per-segment setting, AI mode only.
+  const showSegments = aiMode && !hasOwnCode && !!draft.projectId;
+  const [segmentsVersion, setSegmentsVersion] = useState(0);
 
   return (
     <div data-testid="manim-engineer-step-page">
@@ -199,6 +203,12 @@ export function ManimEngineerStepPage() {
         }
         wide
       >
+        {/* CR-050 FR-7: read by the next run, so it sits before the run button. */}
+        {showSegments && (
+          <div className={styles.settingsRow}>
+            <CodeChunkShotsField projectId={draft.projectId} onSaved={() => setSegmentsVersion((v) => v + 1)} />
+          </div>
+        )}
         <div className={styles.settingsRow}>
           <PipelineSettingsBar
             renderEngine={draft.renderEngine}
@@ -259,6 +269,12 @@ export function ManimEngineerStepPage() {
         {isRemotion && draft.projectId && (
           <div className={styles.settingsRow}>
             <IllustrationsGateNote projectId={draft.projectId} onOpen={() => navigate(AUTHORING_STEP_PATHS.illustrations)} />
+          </div>
+        )}
+
+        {showSegments && (
+          <div className={styles.settingsRow}>
+            <CodeSegmentsPanel projectId={draft.projectId} isRemotion={isRemotion} reloadKey={segmentsVersion} />
           </div>
         )}
 

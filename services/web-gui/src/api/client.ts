@@ -1046,11 +1046,76 @@ export interface AuthoringChainState {
   finished_at?: string;
 }
 
-export function startAuthoringChain(projectId: string, steps: AuthoringStep[]): Promise<void> {
+/**
+ * CR-050 FR-4 — cách chạy bước Code: `segment` chạy lại đúng một đoạn,
+ * `fresh` bỏ mọi đoạn rồi sinh lại toàn bộ. Không có gì = chạy các đoạn còn thiếu.
+ */
+export type CodeRunOptions = { segment: string } | { fresh: true };
+
+export function startAuthoringChain(
+  projectId: string,
+  steps: AuthoringStep[],
+  codeOptions?: CodeRunOptions,
+): Promise<void> {
   return apiFetch<void>(`/v1/projects/${projectId}/authoring/chain`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ steps }),
+    body: JSON.stringify({ steps, ...codeOptions }),
+  });
+}
+
+/** CR-050 Unit 2 — một đoạn của bước Code: khung (LAYOUT/cast) hoặc một nhóm shot. */
+export interface CodeSegment {
+  key: string;
+  kind: "frame" | "shots";
+  position: number;
+  shots: string[];
+  status: "pending" | "running" | "done" | "failed";
+  /** "" khi chưa có nội dung. */
+  source: "" | "ai" | "external" | "manual" | "storyboard";
+  /** Khung: {code}; đoạn shot: {shots: {"1.1": "..."}}. */
+  content?: { code?: string; shots?: Record<string, string> };
+  error_kind: string;
+  error_message: string;
+  duration_ms: number;
+  updated_at: string;
+}
+
+export interface CodeSegmentsView {
+  chunk_shots: number;
+  running: boolean;
+  segments: CodeSegment[];
+}
+
+export function getCodeSegments(projectId: string): Promise<CodeSegmentsView> {
+  return apiFetch<CodeSegmentsView>(`/v1/projects/${projectId}/authoring/code/segments`);
+}
+
+/** Đúng lượt hỏi của một đoạn, để chạy bằng AI ngoài (FR-5). */
+export function getCodeSegmentPrompt(projectId: string, key: string): Promise<{ system: string; user: string }> {
+  return apiFetch(`/v1/projects/${projectId}/authoring/code/segments/${encodeURIComponent(key)}/prompt`);
+}
+
+/** Lưu kết quả dán từ AI ngoài, hoặc bản sửa tay, của một đoạn; server kiểm khuôn trước (422 nếu sai). */
+export function putCodeSegment(
+  projectId: string,
+  key: string,
+  reply: string,
+  source: "external" | "manual",
+): Promise<CodeSegment> {
+  return apiFetch<CodeSegment>(`/v1/projects/${projectId}/authoring/code/segments/${encodeURIComponent(key)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reply, source }),
+  });
+}
+
+/** FR-7 — số shot mỗi đoạn của bước Code (1–10). */
+export async function putCodeChunkShots(projectId: string, chunkShots: number): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code/chunk-shots`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ chunk_shots: chunkShots }),
   });
 }
 

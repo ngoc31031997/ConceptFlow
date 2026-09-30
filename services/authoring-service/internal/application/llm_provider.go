@@ -127,10 +127,7 @@ type LLMError struct {
 	// request id, finish_reason, the response body — for the error log. Not
 	// shown to the Creator.
 	Diag string
-	// Calls lists the model calls a multi-call run made before it failed, so
-	// each can still be billed (CR-039). Empty for a single-call failure.
-	Calls []CodeCall
-	Err   error
+	Err  error
 }
 
 func (e *LLMError) Error() string {

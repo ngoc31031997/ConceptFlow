@@ -152,6 +152,46 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at 
 -- made from an older storyboard is known to be stale. '' = planned before this
 -- existed (or never): no evidence either way, not treated as stale.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_storyboard_sha TEXT NOT NULL DEFAULT '';
+-- CR-050 Unit 2 (ADR-0030): the code step stored segment by segment, so a
+-- failed or interrupted run keeps what it already wrote. No FK, like
+-- project_illustrations: DeleteAuthoring removes a project's segments.
+CREATE TABLE IF NOT EXISTS authoring_segments (
+    project_id    TEXT NOT NULL,
+    step          TEXT NOT NULL,
+    key           TEXT NOT NULL,
+    position      INTEGER NOT NULL,
+    kind          TEXT NOT NULL,
+    shots         TEXT[] NOT NULL DEFAULT '{}',
+    status        TEXT NOT NULL DEFAULT 'pending',
+    source        TEXT NOT NULL DEFAULT '',
+    fingerprint   TEXT NOT NULL DEFAULT '',
+    content       JSONB,
+    error_kind    TEXT NOT NULL DEFAULT '',
+    error_message TEXT NOT NULL DEFAULT '',
+    duration_ms   INTEGER NOT NULL DEFAULT 0,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, step, key)
+);
+CREATE INDEX IF NOT EXISTS authoring_segments_running_idx ON authoring_segments (status) WHERE status = 'running';
+-- CR-050 FR-7: shots per code segment, chosen by the Creator.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_chunk_shots INTEGER NOT NULL DEFAULT 3;
+-- CR-050 FR-22: every failed check of a code run, for statistics. Kept when
+-- the project is deleted, like llm_usage.
+CREATE TABLE IF NOT EXISTS code_check_diagnostics (
+    id          BIGSERIAL PRIMARY KEY,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    project_id  TEXT NOT NULL,
+    engine      TEXT NOT NULL,
+    phase       TEXT NOT NULL,
+    round       INTEGER NOT NULL,
+    segment_key TEXT NOT NULL DEFAULT '',
+    shot_id     TEXT NOT NULL DEFAULT '',
+    kind        TEXT NOT NULL,
+    rule        TEXT NOT NULL DEFAULT '',
+    message     TEXT NOT NULL,
+    line        INTEGER
+);
+CREATE INDEX IF NOT EXISTS code_check_diagnostics_created_idx ON code_check_diagnostics (created_at DESC);
 -- CR-045: colours outside the channel palette (S9) are no longer a warning;
 -- drop the ones stored before, so old drawings do not keep showing them.
 UPDATE illustrations SET warnings = COALESCE((

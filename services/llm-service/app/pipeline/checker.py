@@ -19,6 +19,9 @@ class Diagnostic:
     # compile: lint / tsc / Manim dry run. layout: measured on the drawn shot
     # (CR-048 T6b) — same repair loop, but the repair prompt says what it is.
     kind: str = COMPILE
+    # CR-050 FR-22: the rule that failed (a layout rule, a tsc code), "" when
+    # the checker has none — for statistics, not for the repair prompt.
+    rule: str = ""
 
 
 @dataclass
@@ -86,7 +89,7 @@ class RenderingChecker:
             return CheckResult(
                 ok=bool(data["ok"]),
                 diagnostics=[
-                    Diagnostic(d["message"], d.get("line"), d.get("kind") or COMPILE)
+                    Diagnostic(d["message"], d.get("line"), d.get("kind") or COMPILE, d.get("rule") or "")
                     for d in data.get("diagnostics", [])
                 ],
                 raw=data.get("raw", ""),

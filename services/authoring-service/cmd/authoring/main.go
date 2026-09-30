@@ -112,7 +112,16 @@ func main() {
 		WithIllustrations(projectIllustrations).
 		// CR-048 T8 — the post-1b length check reads the same format and voice
 		// calibration the outline prompt's beat sheet is built from.
-		WithStoryboardChecks(projects, projects)
+		WithStoryboardChecks(projects, projects).
+		// CR-050 Unit 2 (ADR-0030) — the code step stored segment by segment.
+		WithSegments(authoringRepo)
+	// NFR-3: nothing can be running yet, so a segment still marked running was
+	// cut off when this service last stopped.
+	if n, err := generateAuthoring.FailInterruptedSegments(ctx); err != nil {
+		logger.Warn("could not mark interrupted code segments failed", "error", err)
+	} else if n > 0 {
+		logger.Warn("marked interrupted code segments failed", "count", n)
+	}
 
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithShortScriptSuggester(suggestShortScript).

@@ -31,9 +31,15 @@ Chọn **phương án 1**.
 - **Dấu vân tay** không chứa model (C2) và không chứa danh sách hình thư viện:
   - khung = `sha256(engine, prompt, storyboard)`;
   - khung Remotion lấy từ storyboard = `sha256(layout)`;
-  - đoạn = `sha256(engine, prompt, nội dung khung, JSON các shot của đoạn)`.
+  - đoạn = `sha256(engine, prompt, vân tay khung, hero/world/palette của storyboard, JSON các shot của đoạn)`.
+  - Đoạn dựa trên **vân tay** của khung, không dựa trên nội dung khung. Vòng sửa có thể sửa LAYOUT; nếu tính theo nội dung thì lần sửa đó sẽ làm mọi đoạn bị coi là cũ, dù đầu vào không đổi. Sửa khi code, xem thiết kế U2, mục "Thay đổi khi code".
   - `prompt` là prompt `*_engineer_ai` đã render, chưa ghép phần hình thư viện.
-- **Contract mới, có version**: `POST /v2/code/generate` (NDJSON), `POST /v2/code/segment-prompt`, `POST /v2/code/segment-parse`. Chi tiết ở `docs/contracts/authoring-llm-code-v2.md`. `authoring-service` là consumer duy nhất và hai service được build cùng nhau, nên `/v1/code/generate` được **xoá** trong cùng CR, không giữ song song.
+- **Contract mới, có version**: `POST /v2/code/generate` (NDJSON), `POST /v2/code/plan`, `POST /v2/code/segment-prompt`, `POST /v2/code/segment-parse`. Chi tiết ở `docs/contracts/authoring-llm-code-v2.md`.
+- **Hai service deploy độc lập** (sửa 2026-09-30, theo yêu cầu Creator):
+  - `llm-service` **giữ** `/v1/code/generate` với hành vi cũ, chạy trên pipeline mới;
+  - `authoring-service` gọi `/v2`; nếu route không có (bản `llm-service` cũ) thì quay về `/v1`, chạy cả bước một lần, không lưu theo đoạn;
+  - cách chia đoạn chỉ nằm ở `llm-service` (`/v2/code/plan`), `authoring-service` không giữ bản chép;
+  - bỏ `/v1` là một mục backlog (`aidlc-state.md`), làm ở CR riêng khi mọi bản `authoring-service` đang chạy đã dùng `/v2`.
 - **Mọi lượt gọi đã tính tiền** được stream thành sự kiện `call` ngay khi xong. `authoring-service` ghi `llm_usage` ngay lúc đó.
 - **Mỗi lần kiểm** được stream thành sự kiện `check`. `authoring-service` ghi vào bảng `code_check_diagnostics`. `rendering` thêm trường `rule` vào diagnostic (chỉ thêm trường, không phá contract cũ).
 
@@ -44,3 +50,6 @@ Chọn **phương án 1**.
 - Mất khả năng "nhớ đoạn này quá lớn, chia đôi luôn" giữa các lượt (trước đây nằm trong cache). Đoạn hết budget vẫn được chia đôi ngay trong lượt đó như hiện nay.
 - Manim, hoặc Remotion không có `layout` trong storyboard: sửa storyboard sẽ đổi dấu vân tay của khung, nên mọi đoạn đều phải sinh lại. Đây là hệ quả đúng, vì mọi đoạn dựa trên khung.
 - Đổi số shot mỗi đoạn làm đổi cách chia. Đoạn có khoá không còn trong cách chia mới sẽ bị bỏ.
+- Deploy theo thứ tự nào cũng được:
+  - `llm-service` mới + `authoring-service` cũ: `authoring-service` vẫn gọi `/v1` như trước;
+  - `authoring-service` mới + `llm-service` cũ: bước Code chạy qua `/v1`, còn panel đoạn báo `llm-service` chưa hỗ trợ (HTTP 501).

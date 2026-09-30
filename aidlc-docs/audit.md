@@ -2329,3 +2329,91 @@ Kiểm thử: `make check` qua 6/6 (gofmt, go vet, go test, eslint, tsc, vitest)
 **Context**: CONSTRUCTION — CR-050 Unit 2, thiết kế đã duyệt.
 
 ---
+
+## CR-050 — Code xong, chờ duyệt (Unit 2: FR-1..FR-9, FR-21, FR-22)
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "ok duyệt" (thiết kế U2), rồi hai câu trả lời khi code: gateway "Thêm 4 route (Recommended)", đường chạy "Qua chuỗi server (Recommended)".
+**AI Response**: Code theo `aidlc-docs/construction/plans/cr-050-u2-code-segments-design.md`, có ghi mục "Thay đổi khi code".
+- **rendering**: `CheckDiagnostic.rule` (tên luật bố cục, mã lỗi tsc; rỗng với lint và Manim); `/v1/check/*` trả thêm `rule`.
+- **llm-service**:
+  - `pipeline/run.py` viết lại theo đoạn: `make_plan` (khoá và vân tay), bỏ `ChunkCache`;
+  - lỗi một đoạn không dừng các đoạn khác (`result.status=incomplete`), chỉ dừng hẳn khi `auth`/`balance`/`not_configured` hoặc Creator huỷ;
+  - sự kiện `plan`, `segment_start/done/failed`, `call` (mỗi lượt gọi), `check` (mỗi lần kiểm lỗi);
+  - thêm `segment_prompt`, `parse_segment`;
+  - route `/v2/code/generate`, `/v2/code/segment-prompt`, `/v2/code/segment-parse`; bỏ `/v1/code/generate`;
+  - `checker.Diagnostic.rule`.
+- **authoring-service**:
+  - bảng `authoring_segments`, `code_check_diagnostics`, cột `project_authoring.code_chunk_shots`;
+  - repo đoạn; `runCode` lưu từng sự kiện ngay (đoạn, `llm_usage`, chẩn đoán);
+  - `ErrSegmentsIncomplete` (422);
+  - `ExecuteCode` với `CodeRunOptions{Segment, Fresh}`;
+  - `CodeSegments`, `CodeSegmentPrompt`, `PasteCodeSegment`, `SetCodeChunkShots`;
+  - `domain.PlanCodeSegments`;
+  - dọn đoạn `running` khi stream đứt và khi khởi động;
+  - route `GET .../code/segments`, `GET .../code/segments/{key}/prompt`, `PUT .../code/segments/{key}`, `PUT .../code/chunk-shots`;
+  - chuỗi server nhận `{segment}`/`{fresh}`;
+  - client `/v2`; bỏ `LLMError.Calls`, `CodeCall.Cached`.
+- **api-gateway**: 4 route đoạn (ngoài thiết kế, Creator đã chọn).
+- **web-gui**:
+  - `CodeChunkShotsField` đặt trước thanh chạy;
+  - `CodeSegmentsPanel`: trạng thái, nguồn, thời gian, lỗi; chạy lại đoạn, sao chép prompt, dán AI ngoài, sửa tay, xem code; chạy đoạn thiếu hoặc ghép lại; sinh lại toàn bộ có hỏi xác nhận; khoá khi đang chạy;
+  - hàm client tương ứng.
+- **Tài liệu**: `docs/contracts/authoring-llm-code-v2.md`, `docs/contracts/README.md`, ADR-0030 (vân tay đoạn), thiết kế U2 (mục "Thay đổi khi code"), workflow plan, `aidlc-state`.
+
+Kiểm thử:
+- rendering pytest 351 pass (11 skip, có sẵn).
+- llm-service pytest 134 pass, ruff sạch.
+- authoring-service `go vet` sạch, `go test ./...` pass; test Postgres (gồm `TestCodeSegmentsAgainstPostgres`) pass trên DB tạm `postgres:16-alpine`.
+- api-gateway jest 113 pass.
+- web-gui tsc sạch; eslint 0 lỗi (20 warning có sẵn, không nằm trong file sửa); vitest 429 pass.
+
+Rebuild: `rendering`, `llm-service`, `authoring-service`, `api-gateway` healthy; `web-gui` Up (không có healthcheck).
+
+Kiểm tra trực tiếp (chỉ đọc):
+- bảng và cột mới có trong DB;
+- `GET .../code/segments` của `f7103848` trả 19 đoạn (khung từ storyboard + 18 đoạn × 3 shot);
+- prompt đoạn `1.1-1.3` của `69948fcb` có đủ hình thư viện;
+- prompt khung lấy từ storyboard trả 409;
+- project còn hình chưa duyệt trả 409 như bước Code;
+- `/v1/code/generate` trả 404;
+- `rendering` trả `rule: "TS2322"`.
+
+Chưa kiểm trực tiếp:
+- lượt AI thật theo đoạn, restart `llm-service` giữa lượt, chạy lại một đoạn: tốn token thật, chờ Creator đồng ý;
+- dán hoặc sửa tay một đoạn, đổi số shot mỗi đoạn trên project thật: sẽ ghi vào dữ liệu thật; đã có unit và integration test;
+- xem giao diện trên trình duyệt.
+**Impact Assessment**: 5 service đổi code. Không đổi RabbitMQ và orchestrator. DB chỉ thêm bảng và cột. `llm-service` và `authoring-service` phải deploy cùng lúc (bỏ `/v1/code/generate`).
+**Artifacts Affected**: như trên; chưa commit.
+**Context**: CONSTRUCTION — CR-050 Unit 2 Code Generation, chờ Creator duyệt.
+
+---
+
+## CR-050 — U2: llm-service và authoring-service deploy độc lập
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "tại sao llm-service và authoring lại phải rebuild cufng lúc vậy, đây là microsevice tôi không muốn chúng có liên quan đến nhau" → "ok tạm thời sửa theo hướng đó nhưng nhớ note lại phần bỏ v1 vào backlog để làm sau"
+**AI Response**:
+- Nguyên nhân: bản U2 đầu tiên xoá `/v1/code/generate` trong cùng thay đổi thêm `/v2`, và chép cách chia đoạn của `llm-service` sang Go.
+- Đã sửa:
+  - `llm-service` giữ `/v1/code/generate` (contract cũ, chạy trên pipeline mới, thu `calls` từ sự kiện `call`) và thêm `/v2/code/plan`.
+  - `authoring-service`: client quay về `/v1` khi `/v2` trả 404 của chính route (không có body `{"error"}`); `calls` của `/v1` (ở `result` hoặc `error`) được đưa thành sự kiện `call` để vẫn ghi `llm_usage`.
+  - Danh sách đoạn lấy từ `/v2/code/plan`; bỏ `domain.PlanCodeSegments` và `StoryboardHasLayout`.
+  - `ErrSegmentsUnsupported` → HTTP 501 khi `llm-service` chưa có `/v2`.
+- Tài liệu:
+  - quy tắc "thêm bản mới, giữ bản cũ, bỏ bản cũ ở lần sau" trong `docs/contracts/README.md`;
+  - cập nhật contract v2, ADR-0030, thiết kế U2 (điểm 6);
+  - backlog "bỏ `/v1/code/generate`" trong `aidlc-state.md`.
+
+Kiểm thử:
+- llm-service pytest 136 pass (thêm test `/v1` giữ contract cũ, `/v1` lỗi kèm `calls`, `/v2/code/plan`), ruff sạch.
+- authoring-service `go vet` sạch, `go test ./...` pass (thêm test fallback `/v1`, `PlanSegments`, 404 route với 404 khoá, 501).
+
+Rebuild từng service riêng: `llm-service` trước (healthy; kiểm `/v1` còn trả stream), rồi `authoring-service` (healthy).
+
+Kiểm trực tiếp:
+- `GET .../code/segments` của `f7103848` và `69948fcb` trả 19 và 15 đoạn qua `/v2/code/plan`, khung "storyboard";
+- prompt đoạn `1.1-1.3` đúng.
+
+Chưa kiểm trực tiếp: trường hợp chạy chéo phiên bản (`authoring-service` mới với `llm-service` cũ), vì không còn image cũ đang chạy; đã có unit test cho fallback.
+**Context**: CONSTRUCTION — CR-050 Unit 2, chờ Creator duyệt.
+
+---

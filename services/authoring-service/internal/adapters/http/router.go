@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -102,6 +103,11 @@ func (rt *Router) Handler() http.Handler {
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
 	r.Get("/v1/projects/{project_id}/authoring/{step}/progress", rt.handleAuthoringProgress)
+	// CR-050 Unit 2 — the code step's segments (ADR-0030).
+	r.Get("/v1/projects/{project_id}/authoring/code/segments", rt.handleCodeSegments)
+	r.Get("/v1/projects/{project_id}/authoring/code/segments/{key}/prompt", rt.handleCodeSegmentPrompt)
+	r.Put("/v1/projects/{project_id}/authoring/code/segments/{key}", rt.handlePasteCodeSegment)
+	r.Put("/v1/projects/{project_id}/authoring/code/chunk-shots", rt.handleSaveCodeChunkShots)
 
 	// Internal — called by the orchestrator only (never routed by the gateway).
 	r.Get("/internal/v1/authoring/summaries", rt.handleInternalSummaries)
@@ -264,7 +270,8 @@ type generateAuthoringUseCase interface {
 // authoringChainUseCase runs 1a/1b/1c in order on the server, so a run
 // survives the browser closing (see application.AuthoringChainRunner).
 type authoringChainUseCase interface {
-	Start(projectID string, steps []string) error
+	// StartWith takes the code step's CR-050 options (zero = none).
+	StartWith(projectID string, steps []string, opts application.CodeRunOptions) error
 	State(projectID string) (application.ChainState, bool)
 	// Cancel stops a running chain; false when none is running.
 	Cancel(projectID string) bool
@@ -274,6 +281,16 @@ type authoringChainUseCase interface {
 // use case; a use case without it simply has no progress endpoint.
 type authoringProgressReader interface {
 	Progress(projectID, step string) application.AuthoringProgress
+}
+
+// codeSegmentsUseCase is the optional CR-050 side of the generate use case:
+// the code step's segments and the per-run options.
+type codeSegmentsUseCase interface {
+	ExecuteCode(ctx context.Context, projectID string, opts application.CodeRunOptions) (application.GeneratedStep, error)
+	CodeSegments(ctx context.Context, projectID string) (application.CodeSegmentsView, error)
+	CodeSegmentPrompt(ctx context.Context, projectID, key string) (string, string, error)
+	PasteCodeSegment(ctx context.Context, projectID, key, reply, source string) (domain.CodeSegment, error)
+	SetCodeChunkShots(ctx context.Context, projectID string, n int) error
 }
 
 // saveAuthoringStoryUseCase backs CR-025 step 1's POST
@@ -353,14 +370,19 @@ func (rt *Router) handleStartAuthoringChain(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
 		return
 	}
+	// CR-050 FR-4: {"steps": ["code"], "segment": key} re-runs one code
+	// segment, {"steps": ["code"], "fresh": true} writes every segment again.
 	var req struct {
-		Steps []string `json:"steps"`
+		Steps   []string `json:"steps"`
+		Segment string   `json:"segment"`
+		Fresh   bool     `json:"fresh"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	err := rt.authoringChain.Start(chi.URLParam(r, "project_id"), req.Steps)
+	err := rt.authoringChain.StartWith(chi.URLParam(r, "project_id"), req.Steps,
+		application.CodeRunOptions{Segment: req.Segment, Fresh: req.Fresh})
 	switch {
 	case errors.Is(err, application.ErrChainBusy):
 		writeError(w, http.StatusConflict, "Một lượt chạy AI cho dự án này đang diễn ra, chờ nó xong đã.")
@@ -1012,7 +1034,37 @@ func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request
 	projectID := chi.URLParam(r, "project_id")
 	step := chi.URLParam(r, "step")
 
-	result, err := rt.generateAuthoring.Execute(r.Context(), projectID, step)
+	// CR-050 FR-4: the code step takes an optional body — {"segment": key}
+	// re-runs one segment, {"fresh": true} writes every segment again. No
+	// body runs the missing segments.
+	var opts application.CodeRunOptions
+	if r.ContentLength != 0 {
+		var body struct {
+			Segment string `json:"segment"`
+			Fresh   bool   `json:"fresh"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		opts = application.CodeRunOptions{Segment: body.Segment, Fresh: body.Fresh}
+	}
+	var result application.GeneratedStep
+	var err error
+	if opts != (application.CodeRunOptions{}) {
+		segs, ok := rt.generateAuthoring.(codeSegmentsUseCase)
+		if !ok || step != "code" {
+			writeError(w, http.StatusBadRequest, "segment and fresh apply to the code step only")
+			return
+		}
+		if opts.Segment != "" && opts.Fresh {
+			writeError(w, http.StatusBadRequest, "segment and fresh cannot be combined")
+			return
+		}
+		result, err = segs.ExecuteCode(r.Context(), projectID, opts)
+	} else {
+		result, err = rt.generateAuthoring.Execute(r.Context(), projectID, step)
+	}
 	if err != nil {
 		writeGenerateError(w, err)
 		return
@@ -1061,6 +1113,11 @@ func DescribeGenerateError(err error) (int, string) {
 	if errors.Is(err, application.ErrIllustrationsNotPlanned) || errors.Is(err, application.ErrIllustrationsStale) {
 		return http.StatusConflict, err.Error()
 	}
+	// CR-050 FR-2: the step kept what finished; the Creator re-runs the rest.
+	var incomplete *application.ErrSegmentsIncomplete
+	if errors.As(err, &incomplete) {
+		return http.StatusUnprocessableEntity, incomplete.Error()
+	}
 	// CR-050 FR-19: the Creator's model choice, not the provider, is the problem.
 	var notForCode *application.ErrModelNotForCode
 	if errors.As(err, &notForCode) {
@@ -1104,4 +1161,113 @@ func DescribeGenerateError(err error) (int, string) {
 		return http.StatusBadRequest, err.Error()
 	}
 	return status, message + fallback
+}
+
+// --- CR-050 Unit 2: code segments ------------------------------------------
+
+func (rt *Router) codeSegments(w http.ResponseWriter) (codeSegmentsUseCase, bool) {
+	segs, ok := rt.generateAuthoring.(codeSegmentsUseCase)
+	if !ok {
+		writeError(w, http.StatusNotFound, "code segments are not enabled")
+	}
+	return segs, ok
+}
+
+// writeSegmentError maps the one-segment calls' errors; anything else is
+// described like a failed run.
+func writeSegmentError(w http.ResponseWriter, err error) {
+	var notReady *application.ErrSegmentNotReady
+	var reply *application.ErrSegmentReply
+	var notCut *application.ErrStoryboardNotSegmentable
+	switch {
+	case errors.Is(err, application.ErrSegmentUnknown):
+		writeError(w, http.StatusNotFound, err.Error())
+	case errors.Is(err, application.ErrSegmentsUnsupported):
+		// An older llm-service (ADR-0030: the two deploy independently).
+		writeError(w, http.StatusNotImplemented, err.Error())
+	case errors.As(err, &notReady):
+		writeError(w, http.StatusConflict, "Chưa lấy được prompt của đoạn này: "+notReady.Message)
+	case errors.As(err, &reply):
+		writeError(w, http.StatusUnprocessableEntity, reply.Error())
+	case errors.As(err, &notCut):
+		writeError(w, http.StatusConflict, notCut.Error())
+	case errors.Is(err, domain.ErrInvalidChunkShots):
+		writeError(w, http.StatusBadRequest, err.Error())
+	default:
+		writeGenerateError(w, err)
+	}
+}
+
+// GET /v1/projects/{id}/authoring/code/segments
+func (rt *Router) handleCodeSegments(w http.ResponseWriter, r *http.Request) {
+	segs, ok := rt.codeSegments(w)
+	if !ok {
+		return
+	}
+	view, err := segs.CodeSegments(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeSegmentError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+// GET /v1/projects/{id}/authoring/code/segments/{key}/prompt
+func (rt *Router) handleCodeSegmentPrompt(w http.ResponseWriter, r *http.Request) {
+	segs, ok := rt.codeSegments(w)
+	if !ok {
+		return
+	}
+	system, user, err := segs.CodeSegmentPrompt(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "key"))
+	if err != nil {
+		writeSegmentError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"system": system, "user": user})
+}
+
+// PUT /v1/projects/{id}/authoring/code/segments/{key} {reply, source}
+func (rt *Router) handlePasteCodeSegment(w http.ResponseWriter, r *http.Request) {
+	segs, ok := rt.codeSegments(w)
+	if !ok {
+		return
+	}
+	var body struct {
+		Reply  string `json:"reply"`
+		Source string `json:"source"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if body.Source != domain.SegmentSourceExternal && body.Source != domain.SegmentSourceManual {
+		writeError(w, http.StatusBadRequest, `source must be "external" or "manual"`)
+		return
+	}
+	seg, err := segs.PasteCodeSegment(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "key"), body.Reply, body.Source)
+	if err != nil {
+		writeSegmentError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, seg)
+}
+
+// PUT /v1/projects/{id}/authoring/code/chunk-shots {chunk_shots}
+func (rt *Router) handleSaveCodeChunkShots(w http.ResponseWriter, r *http.Request) {
+	segs, ok := rt.codeSegments(w)
+	if !ok {
+		return
+	}
+	var body struct {
+		ChunkShots int `json:"chunk_shots"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := segs.SetCodeChunkShots(r.Context(), chi.URLParam(r, "project_id"), body.ChunkShots); err != nil {
+		writeSegmentError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -1,23 +1,31 @@
-"""The chunked code pipeline (CR-039 FR102-FR105).
+"""The chunked code pipeline (CR-039 FR102-FR105, CR-050 Unit 2 / ADR-0030).
 
 layout/cast -> chunks of N shots in parallel -> deterministic merge ->
 compile check -> repair only the shots that failed -> check again.
+
+The run is split into segments: the shared frame (LAYOUT / cast) and one
+segment per chunk of shots. This service keeps none of them: the caller
+(authoring-service) stores every finished segment and sends the ones it has
+back with the next run. A segment whose fingerprint still matches is reused
+without a model call; the others are written. Every segment result, every
+billed call and every failed check is streamed as it happens, so nothing paid
+for is lost when the run is cut off.
+
+A segment that fails does not stop the others (CR-050 FR-2): the run ends
+`incomplete` with the failed keys, and the Creator re-runs only those. A dead
+key, an empty balance or the Creator cancelling still stops everything at once.
+A chunk that ran out of token budget is written again as two halves, down to
+one shot (CR-048 T2).
 
 Remotion takes two shortcuts off the critical path: a storyboard that already
 carries `layout` skips the LAYOUT call, and each chunk is compiled (against
 stubs for the shots it does not own) and repaired as soon as it is written,
 while the other chunks are still being generated. The full-file check at the
-end stays the gate.
+end stays the gate, and only runs once every segment is done.
 
-When a chunk fails, the chunks already talking to the model are allowed to
-finish so their billed output reaches the cache for the re-run, and no new chunk
-starts; a dead key, an empty balance or the Creator cancelling stops everything
-at once. A chunk that ran out of token budget is written again as two halves,
-down to one shot (CR-048 T2).
-
-Nothing here pretends: a chunk that cannot be produced fails the run with its
-error; a repair round that changes nothing is counted; a script that still
-fails the check after the last round is returned as check_failed with the
+Nothing here pretends: a segment that cannot be produced is reported failed
+with its error; a repair round that changes nothing is counted; a script that
+still fails the check after the last round is returned as check_failed with the
 diagnostics, never as a pass.
 """
 
@@ -25,6 +33,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import re
 import time
 from collections.abc import Awaitable, Callable
@@ -46,18 +55,45 @@ from app.storyboard import Storyboard, StoryboardError
 from app.storyboard import parse as parse_storyboard
 
 Emit = Callable[[dict], Awaitable[None]]
+Record = Callable[["Call"], Awaitable[None]]
 
 EXTRACT_ATTEMPTS = 2
 
 # A chunk that failed with one of these is written again as two halves (CR-048 T2).
 SPLIT_KINDS = (errors.BUDGET, errors.TRUNCATED)
-# Errors that fail every other chunk the same way: the other chunks are cancelled
-# at once instead of being allowed to finish.
+# Errors that fail every other segment the same way: the other segments are
+# cancelled at once instead of being allowed to finish.
 STOP_NOW_KINDS = (errors.AUTH, errors.BALANCE, errors.NOT_CONFIGURED)
 
+FRAME_KEY = "frame"
+FRAME = "frame"
+SHOTS = "shots"
+# Where a segment's content came from. The caller also stores "external" and
+# "manual" for what the Creator pasted or edited.
+SOURCE_AI = "ai"
+SOURCE_STORYBOARD = "storyboard"
 
-class _NotStarted(Exception):
-    """A chunk (or half) that never reached the model because the run had already failed."""
+
+@dataclass(frozen=True)
+class Segment:
+    """One unit the caller stores: the frame, or one chunk of shots."""
+
+    key: str
+    kind: str  # FRAME | SHOTS
+    shots: tuple[str, ...]
+    fingerprint: str
+
+    def to_dict(self) -> dict:
+        return {"key": self.key, "kind": self.kind, "shots": list(self.shots), "fingerprint": self.fingerprint}
+
+
+@dataclass(frozen=True)
+class DoneSegment:
+    """A segment the caller already has: its fingerprint and its content,
+    {"code": "..."} for the frame, {"shots": {"1.1": "..."}} for a chunk."""
+
+    fingerprint: str
+    content: dict
 
 
 @dataclass
@@ -79,6 +115,12 @@ class CodeRequest:
     #: none) and the video's font ("" = the default).
     subtitle_band: dict | None = None
     video_font: str = ""
+    #: CR-050 FR-7 — shots per chunk for this project; 0 = the service default.
+    chunk_shots: int = 0
+    #: CR-050 — the segments the caller already stored, by key.
+    done: dict[str, DoneSegment] = field(default_factory=dict)
+    #: CR-050 FR-4 — run only these segments; None = every missing one.
+    only: set[str] | None = None
 
     def layout(self) -> LayoutContext | None:
         if self.engine != "remotion":
@@ -110,41 +152,57 @@ class Call:
     usage: Usage
     error_kind: str = ""
     error_message: str = ""
-    cached: bool = False
     duration_ms: int = 0
+    segment: str = ""
 
     def to_dict(self) -> dict:
         return {
             "phase": self.phase, "label": self.label, "ok": self.ok, "usage": self.usage.to_dict(),
-            "error_kind": self.error_kind, "error_message": self.error_message, "cached": self.cached,
-            "duration_ms": self.duration_ms,
+            "error_kind": self.error_kind, "error_message": self.error_message,
+            "duration_ms": self.duration_ms, "segment": self.segment,
         }
+
+
+def _diag_dict(d: Diagnostic) -> dict:
+    return {"message": d.message, "line": d.line, "kind": d.kind, "rule": d.rule}
 
 
 @dataclass
 class CodeResult:
-    code: str
-    check_ok: bool
-    diagnostics: list[Diagnostic]
-    repair_rounds: int
-    calls: list[Call]
+    #: "done" — every segment is done and the script was merged and checked;
+    #: "incomplete" — some segment failed or was not run, nothing was merged.
+    status: str
+    code: str = ""
+    check_ok: bool = False
+    diagnostics: list[Diagnostic] = field(default_factory=list)
+    repair_rounds: int = 0
+    #: Every billed call of the run, also streamed one by one as `call` events.
+    calls: list[Call] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     scene_class_name: str = ""
+    #: Segments that failed in this run, and segments still without content.
+    failed: list[str] = field(default_factory=list)
+    missing: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
+            "status": self.status,
             "code": self.code,
             "check_ok": self.check_ok,
-            "diagnostics": [{"message": d.message, "line": d.line, "kind": d.kind} for d in self.diagnostics],
+            "diagnostics": [_diag_dict(d) for d in self.diagnostics],
             "repair_rounds": self.repair_rounds,
-            "calls": [c.to_dict() for c in self.calls],
             "warnings": self.warnings,
             "scene_class_name": self.scene_class_name,
+            "failed": self.failed,
+            "missing": self.missing,
         }
 
 
 class PipelineFailure(Exception):
-    """The run could not produce code. `calls` still lists what was billed."""
+    """A call, a segment or the whole run failed. Raised out of the run only
+    when it cannot go on at all (a dead key, no balance, an unreadable
+    storyboard). `calls` stays empty: every billed call was already streamed
+    as a `call` event, and must not be recorded twice."""
 
     def __init__(self, message: str, calls: list[Call], error: LLMError | None = None, kind: str = "") -> None:
         super().__init__(message)
@@ -154,37 +212,206 @@ class PipelineFailure(Exception):
         self.kind = kind or (error.kind if error else errors.MALFORMED)
 
 
-class ChunkCache:
-    """Successful chunk outputs of a run that later failed, kept so a re-run
-    does not pay for them again. Dropped on the first fully successful run."""
-
-    def __init__(self, max_entries: int = 512) -> None:
-        self._data: dict[str, str] = {}
-        self._max = max_entries
-
-    def get(self, key: str) -> str | None:
-        return self._data.get(key)
-
-    def put(self, key: str, value: str) -> None:
-        if len(self._data) >= self._max:
-            self._data.pop(next(iter(self._data)))
-        self._data[key] = value
-
-    def drop(self, keys: list[str]) -> None:
-        for k in keys:
-            self._data.pop(k, None)
+class SegmentNotReady(ValueError):
+    """A segment's prompt needs a frame that is not written yet."""
 
 
 def _ms(since: float) -> int:
     return int((time.monotonic() - since) * 1000)
 
 
-def _key(*parts: str) -> str:
+def _sha(*parts: str) -> str:
     h = hashlib.sha256()
     for p in parts:
         h.update(p.encode())
         h.update(b"\x00")
     return h.hexdigest()
+
+
+def _dump(obj) -> str:
+    return json.dumps(obj, ensure_ascii=False, sort_keys=True)
+
+
+def _storyboard(req: CodeRequest) -> Storyboard:
+    try:
+        return parse_storyboard(req.storyboard)
+    except StoryboardError as exc:
+        raise PipelineFailure(
+            "storyboard is not valid JSON — it was written for the manual flow; run step 1b with AI "
+            f"again ({exc})", [], kind=errors.MALFORMED) from exc
+
+
+# -- the plan: segments and their fingerprints (ADR-0030) --------------------
+
+@dataclass
+class Plan:
+    sb: Storyboard
+    segments: list[Segment]
+    ordered: list[str]
+    # LAYOUT built from the storyboard itself (Remotion only), else None.
+    given_frame: str | None
+
+    @property
+    def frame(self) -> Segment:
+        return self.segments[0]
+
+    @property
+    def chunks(self) -> list[Segment]:
+        return self.segments[1:]
+
+    def get(self, key: str) -> Segment:
+        for s in self.segments:
+            if s.key == key:
+                return s
+        raise KeyError(key)
+
+    def owner(self, section: str) -> str:
+        """The segment a merged-file section (a shot id, or the LAYOUT/cast
+        frame) belongs to."""
+        if section in (merger.LAYOUT_KEY, merger.CAST_KEY):
+            return FRAME_KEY
+        for s in self.chunks:
+            if section in s.shots:
+                return s.key
+        return ""
+
+
+def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
+    """Cut the storyboard into segments and fingerprint each one.
+
+    A fingerprint covers what the segment's prompt is built from, so a stored
+    segment is reused exactly when writing it again would ask the same thing:
+    - the step's prompt (`req.system` before the library drawings are added —
+      approving a drawing must not throw away every chunk, review C3);
+    - the frame: the storyboard (or, for a storyboard-given LAYOUT, that LAYOUT);
+    - a chunk: the frame's fingerprint, the storyboard's world and palette, and
+      its own shots. Not the neighbouring shots (a continuity hint only; they
+      would make one edited shot invalidate three chunks), and not the model
+      (CR-050 C2).
+    """
+    sb = _storyboard(req)
+    n = chunk_shots if chunk_shots > 0 else 1
+    remotion = req.engine == "remotion"
+    prompt_fp = _sha(req.system)
+    given = merger.layout_from_storyboard(sb) if remotion else None
+    if given is not None:
+        frame_fp = _sha("frame-sb", given)
+    else:
+        frame_fp = _sha("frame", req.engine, prompt_fp, req.storyboard)
+    all_shots = sb.all_shots()
+    ordered = [sh.id for _, sh in all_shots]
+    by_id = {sh.id: (sc, sh) for sc, sh in all_shots}
+    shared = _dump({
+        "hero": sb.hero, "world": sb.world,
+        "palette": [p.model_dump() for p in sb.palette],
+    })
+    segments = [Segment(FRAME_KEY, FRAME, (), frame_fp)]
+    for i in range(0, len(ordered), n):
+        ids = tuple(ordered[i : i + n])
+        own = _dump([prompts._shot_json(*by_id[s]) for s in ids])
+        segments.append(Segment(
+            f"{ids[0]}-{ids[-1]}", SHOTS, ids, _sha("shots", req.engine, prompt_fp, frame_fp, shared, own)))
+    return Plan(sb, segments, ordered, given)
+
+
+def _neighbours(plan: Plan, ids: list[str]) -> tuple:
+    by_id = {sh.id: (sc, sh) for sc, sh in plan.sb.all_shots()}
+    i = plan.ordered.index(ids[0])
+    j = plan.ordered.index(ids[-1]) + 1
+    prev = by_id[plan.ordered[i - 1]] if i > 0 else None
+    nxt = by_id[plan.ordered[j]] if j < len(plan.ordered) else None
+    return prev, nxt
+
+
+def _cast_names(frame: str) -> list[str]:
+    return re.findall(r"self\.(\w+)\s*=", frame)
+
+
+def _chunk_prompt(req: CodeRequest, plan: Plan, frame: str, ids: list[str], retry: str | None) -> str:
+    prev, nxt = _neighbours(plan, ids)
+    if req.engine == "remotion":
+        return prompts.remotion_chunk(plan.sb, frame, ids, prev, nxt, retry)
+    return prompts.manim_chunk(plan.sb, frame, _cast_names(frame), ids, prev, nxt, retry)
+
+
+def _frame_prompt(req: CodeRequest, plan: Plan, retry: str | None) -> str:
+    if req.engine == "remotion":
+        return prompts.remotion_layout(plan.sb, retry)
+    return prompts.manim_cast(plan.sb, retry)
+
+
+def _system(req: CodeRequest) -> str:
+    if req.engine == "remotion" and req.illustrations:
+        return req.system + library_section(req.illustrations)
+    return req.system
+
+
+def _stored_frame(req: CodeRequest, plan: Plan) -> str | None:
+    if plan.given_frame is not None:
+        return plan.given_frame
+    d = req.done.get(FRAME_KEY)
+    if d is not None and d.fingerprint == plan.frame.fingerprint:
+        code = d.content.get("code")
+        if isinstance(code, str) and code.strip():
+            return code
+    return None
+
+
+# -- parsers ----------------------------------------------------------------
+
+def parse_layout(text: str) -> str:
+    code = extract.strip_fence(text).strip()
+    if not re.match(r"^const LAYOUT\s*=", code):
+        raise extract.ExtractError("the reply must be a single `const LAYOUT = {...};` declaration")
+    return code
+
+
+def parse_cast(text: str) -> str:
+    code = extract.strip_fence(text).strip("\n")
+    if not re.match(r"^def setup_cast\s*\(self\)\s*:", code):
+        raise extract.ExtractError("the reply must be a single `def setup_cast(self):` method at column 0")
+    return code
+
+
+def parse_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
+    pattern = merger.REMOTION_SHOT if engine == "remotion" else merger.MANIM_SHOT
+    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), pattern))
+    missing = [i for i in expected if i not in got]
+    if missing:
+        raise extract.ExtractError(f"missing shot function(s): {', '.join(missing)}")
+    return {i: got[i] for i in expected}  # extras are dropped
+
+
+# -- one segment outside a run: copy its prompt, check a pasted reply (FR-5) --
+
+def segment_prompt(req: CodeRequest, key: str, default_chunk_shots: int) -> tuple[str, str]:
+    """The (system, user) turn the pipeline would send for one segment, for
+    the Creator to run in an outside AI. Raises KeyError for an unknown key
+    and SegmentNotReady when a chunk's frame is not written yet."""
+    plan = make_plan(req, req.chunk_shots or default_chunk_shots)
+    seg = plan.get(key)
+    if seg.kind == FRAME:
+        if plan.given_frame is not None:
+            raise SegmentNotReady("the LAYOUT of this video comes from its storyboard; there is nothing to write")
+        return _system(req), _frame_prompt(req, plan, None)
+    frame = _stored_frame(req, plan)
+    if frame is None:
+        raise SegmentNotReady("the frame (LAYOUT / cast) is not written yet — run or paste the frame segment first")
+    return _system(req), _chunk_prompt(req, plan, frame, list(seg.shots), None)
+
+
+def parse_segment(req: CodeRequest, key: str, reply: str, default_chunk_shots: int) -> tuple[str, dict]:
+    """Check a reply written outside the pipeline for one segment. Returns the
+    segment's (fingerprint, content); raises ValueError (ExtractError) with
+    what is wrong, KeyError for an unknown key."""
+    plan = make_plan(req, req.chunk_shots or default_chunk_shots)
+    seg = plan.get(key)
+    if seg.kind == FRAME:
+        if plan.given_frame is not None:
+            raise SegmentNotReady("the LAYOUT of this video comes from its storyboard; there is nothing to paste")
+        code = parse_layout(reply) if req.engine == "remotion" else parse_cast(reply)
+        return seg.fingerprint, {"code": code}
+    return seg.fingerprint, {"shots": parse_shots(req.engine, list(seg.shots), reply)}
 
 
 class CodePipeline:
@@ -196,7 +423,6 @@ class CodePipeline:
         chunk_shots: int,
         concurrency: int,
         repair_rounds: int,
-        cache: ChunkCache | None = None,
     ) -> None:
         if chunk_shots < 1 or concurrency < 1 or repair_rounds < 0:
             raise ValueError("chunk_shots and concurrency must be >= 1 and repair_rounds >= 0")
@@ -205,7 +431,6 @@ class CodePipeline:
         self._chunk_shots = chunk_shots
         self._concurrency = concurrency
         self._repair_rounds = repair_rounds
-        self._cache = cache or ChunkCache()
         self._library: dict[str, str] = {}
 
     # -- one model call, with extraction retry ---------------------------------
@@ -215,19 +440,11 @@ class CodePipeline:
         req: CodeRequest,
         phase: str,
         label: str,
+        segment: str,
         build: Callable[[str | None], str],
         parse: Callable[[str], object],
-        calls: list[Call],
-        cache_key: str | None = None,
+        record: Record,
     ):
-        if cache_key and (hit := self._cache.get(cache_key)) is not None:
-            try:
-                value = parse(hit)
-            except (extract.ExtractError, ValueError):
-                self._cache.drop([cache_key])
-            else:
-                calls.append(Call(phase, label, True, Usage(), cached=True))
-                return value
         problem: str | None = None
         for _attempt in range(EXTRACT_ATTEMPTS):
             began = time.monotonic()
@@ -237,193 +454,172 @@ class CodePipeline:
                     max_tokens=req.max_tokens, temperature=req.temperature,
                     max_reasoning_chars=req.max_reasoning_chars))
             except LLMError as err:
-                calls.append(Call(phase, label, False, err.usage, err.kind, str(err), duration_ms=_ms(began)))
-                raise PipelineFailure(f"{phase} {label}: {err}", calls, error=err) from err
+                await record(Call(phase, label, False, err.usage, err.kind, str(err), _ms(began), segment))
+                raise PipelineFailure(f"{phase} {label}: {err}", [], error=err) from err
             try:
                 value = parse(res.content)
             except (extract.ExtractError, ValueError) as exc:
-                calls.append(Call(phase, label, False, res.usage, errors.MALFORMED, str(exc), duration_ms=_ms(began)))
+                await record(Call(phase, label, False, res.usage, errors.MALFORMED, str(exc), _ms(began), segment))
                 problem = str(exc)
                 continue
-            calls.append(Call(phase, label, True, res.usage, duration_ms=_ms(began)))
-            if cache_key:
-                self._cache.put(cache_key, res.content)
+            await record(Call(phase, label, True, res.usage, duration_ms=_ms(began), segment=segment))
             return value
         raise PipelineFailure(
-            f"{phase} {label}: the model kept returning unusable code ({problem})", calls, kind=errors.MALFORMED)
-
-    # -- parsers --------------------------------------------------------------
-
-    @staticmethod
-    def _parse_layout(text: str) -> str:
-        code = extract.strip_fence(text).strip()
-        if not re.match(r"^const LAYOUT\s*=", code):
-            raise extract.ExtractError("the reply must be a single `const LAYOUT = {...};` declaration")
-        return code
-
-    @staticmethod
-    def _parse_cast(text: str) -> str:
-        code = extract.strip_fence(text).strip("\n")
-        if not re.match(r"^def setup_cast\s*\(self\)\s*:", code):
-            raise extract.ExtractError("the reply must be a single `def setup_cast(self):` method at column 0")
-        return code
-
-    def _parse_shots(self, engine: str, expected: list[str], text: str) -> dict[str, str]:
-        pattern = merger.REMOTION_SHOT if engine == "remotion" else merger.MANIM_SHOT
-        got = extract.shot_map(extract.split_shots(extract.strip_fence(text), pattern))
-        missing = [i for i in expected if i not in got]
-        if missing:
-            raise extract.ExtractError(f"missing shot function(s): {', '.join(missing)}")
-        return {i: got[i] for i in expected}  # extras are dropped by the caller's warning path
+            f"{phase} {label}: the model kept returning unusable code ({problem})", [], kind=errors.MALFORMED)
 
     # -- the run ---------------------------------------------------------------
 
     async def run(self, req: CodeRequest, emit: Emit) -> CodeResult:
         if req.engine not in ("remotion", "manim"):
             raise PipelineFailure(f"unknown engine {req.engine!r}", [])
-        try:
-            sb = parse_storyboard(req.storyboard)
-        except StoryboardError as exc:
-            raise PipelineFailure(
-                "storyboard is not valid JSON — it was written for the manual flow; run step 1b with AI "
-                f"again ({exc})", [], kind=errors.MALFORMED) from exc
+        plan = make_plan(req, req.chunk_shots or self._chunk_shots)
+        sb = plan.sb
+        await emit({"type": "plan", "segments": [s.to_dict() for s in plan.segments]})
 
         calls: list[Call] = []
         warnings: list[str] = []
-        used_keys: list[str] = []
+        failed: list[str] = []
         remotion = req.engine == "remotion"
+
+        async def record(call: Call) -> None:
+            calls.append(call)
+            await emit({"type": "call", **call.to_dict()})
+
         library: dict[str, str] = {}
         if remotion and req.illustrations:
             library = {i["name"]: i["code"] for i in req.illustrations if i.get("name") and i.get("code")}
-            req = replace(req, system=req.system + library_section(req.illustrations))
         self._library = library
-        all_shots = sb.all_shots()
-        ordered = [sh.id for _, sh in all_shots]
+        ask_req = replace(req, system=_system(req))
+
+        def stored(seg: Segment) -> dict | None:
+            d = req.done.get(seg.key)
+            return d.content if d is not None and d.fingerprint == seg.fingerprint else None
+
+        def wanted(seg: Segment) -> bool:
+            return req.only is None or seg.key in req.only
+
+        async def segment_failed(seg: Segment, exc: PipelineFailure) -> None:
+            failed.append(seg.key)
+            err = exc.error.to_dict() if exc.error else {"kind": exc.kind, "message": exc.message}
+            await emit({"type": "segment_failed", "key": seg.key,
+                        "error": {**err, "kind": exc.kind, "message": exc.message}})
 
         # 1. shared frame: LAYOUT (Remotion) / cast (Manim)
-        frame_key = _key(req.engine, "frame", req.system, req.model, req.storyboard)
-        used_keys.append(frame_key)
-        given = merger.layout_from_storyboard(sb) if remotion else None
-        if given is not None:
+        frame_seg = plan.frame
+        frame: str | None = None
+        if plan.given_frame is not None:
             await emit({"type": "phase", "phase": "layout", "source": "storyboard"})
-            frame: str = given
-        elif remotion:
-            await emit({"type": "phase", "phase": "layout"})
-            frame = await self._ask(
-                req, "layout", "LAYOUT", lambda r: prompts.remotion_layout(sb, r),
-                self._parse_layout, calls, frame_key)
-        else:
-            await emit({"type": "phase", "phase": "cast"})
-            frame = await self._ask(
-                req, "cast", "setup_cast", lambda r: prompts.manim_cast(sb, r),
-                self._parse_cast, calls, frame_key)
-        cast_names = re.findall(r"self\.(\w+)\s*=", frame) if not remotion else []
+            frame = plan.given_frame
+            if stored(frame_seg) is None:
+                await emit({"type": "segment_done", "key": FRAME_KEY, "fingerprint": frame_seg.fingerprint,
+                            "content": {"code": frame}, "source": SOURCE_STORYBOARD, "repaired": False})
+        elif (have := stored(frame_seg)) is not None and isinstance(have.get("code"), str):
+            frame = have["code"]
+        elif wanted(frame_seg):
+            phase, label = ("layout", "LAYOUT") if remotion else ("cast", "setup_cast")
+            await emit({"type": "phase", "phase": phase})
+            await emit({"type": "segment_start", "key": FRAME_KEY})
+            began = time.monotonic()
+            try:
+                frame = await self._ask(
+                    ask_req, phase, label, FRAME_KEY, lambda r: _frame_prompt(req, plan, r),
+                    parse_layout if remotion else parse_cast, record)
+            except PipelineFailure as exc:
+                if exc.kind in STOP_NOW_KINDS:
+                    raise
+                await segment_failed(frame_seg, exc)
+            else:
+                await emit({"type": "segment_done", "key": FRAME_KEY, "fingerprint": frame_seg.fingerprint,
+                            "content": {"code": frame}, "source": SOURCE_AI, "repaired": False,
+                            "duration_ms": _ms(began)})
+        if frame is None:
+            # Nothing can be written against a frame that does not exist.
+            return CodeResult(status="incomplete", calls=calls, failed=failed,
+                              missing=[s.key for s in plan.segments if s.key not in failed and stored(s) is None])
 
         # 2. chunks in parallel
-        chunks = [ordered[i : i + self._chunk_shots] for i in range(0, len(ordered), self._chunk_shots)]
-        by_id: dict[str, tuple] = {sh.id: (sc, sh) for sc, sh in all_shots}
+        shots: dict[str, str] = {}
+        have_keys: set[str] = set()
+        todo: list[Segment] = []
+        for seg in plan.chunks:
+            content = stored(seg)
+            got = content.get("shots") if content else None
+            if isinstance(got, dict) and all(isinstance(got.get(i), str) for i in seg.shots):
+                shots.update({i: got[i] for i in seg.shots})
+                have_keys.add(seg.key)
+            elif wanted(seg):
+                todo.append(seg)
+
         sem = asyncio.Semaphore(self._concurrency)
         done = 0
-        results: dict[int, dict[str, str]] = {}
         # One chunk's check is the final check when there is only one chunk.
-        early_check = remotion and len(chunks) > 1
-        chunk_rounds = [0] * len(chunks)
-        # Set once a chunk has failed: chunks already talking to the model finish
-        # (their billed output reaches the cache), nothing new starts.
-        stopping = False
+        early_check = remotion and len(plan.chunks) > 1
+        chunk_rounds: dict[str, int] = {}
 
-        async def write(n: int, ids: list[str], first: bool) -> dict[str, str]:
+        async def write(n: int, seg: Segment, ids: list[str], first: bool) -> dict[str, str]:
             """One chunk's shots. A chunk the model could not finish within its
             token budget is written again as two halves, down to one shot."""
-            prev = by_id[ordered[ordered.index(ids[0]) - 1]] if ids[0] != ordered[0] else None
-            nxt_i = ordered.index(ids[-1]) + 1
-            nxt = by_id[ordered[nxt_i]] if nxt_i < len(ordered) else None
-            key = _key(req.engine, "chunk", req.system, req.model, req.storyboard, frame, ",".join(ids))
-            # Remembers that this exact chunk already ran out of budget, so a
-            # re-run goes straight to the halves instead of paying for it again.
-            split_key = _key(key, "split")
-            used_keys.extend((key, split_key))
-
-            def build(r: str | None) -> str:
-                if remotion:
-                    return prompts.remotion_chunk(sb, frame, ids, prev, nxt, r)
-                return prompts.manim_chunk(sb, frame, cast_names, ids, prev, nxt, r)
-
             async with sem:
-                if stopping:
-                    raise _NotStarted
                 if first:
-                    await emit({"type": "chunk_start", "index": n + 1, "total": len(chunks), "shots": ids})
-                known_too_big = len(ids) > 1 and self._cache.get(split_key) is not None
-                if not known_too_big:
-                    try:
-                        return await self._ask(
-                            req, "chunk", f"{ids[0]}-{ids[-1]}", build,
-                            lambda text: self._parse_shots(req.engine, ids, text), calls, key)
-                    except PipelineFailure as exc:
-                        if exc.kind not in SPLIT_KINDS or len(ids) < 2:
-                            raise
-                        self._cache.put(split_key, exc.kind)
+                    await emit({"type": "segment_start", "key": seg.key})
+                    await emit({"type": "chunk_start", "index": n + 1, "total": len(todo), "shots": ids})
+                try:
+                    return await self._ask(
+                        ask_req, "chunk", f"{ids[0]}-{ids[-1]}", seg.key,
+                        lambda r: _chunk_prompt(req, plan, frame, ids, r),
+                        lambda text: parse_shots(req.engine, ids, text), record)
+                except PipelineFailure as exc:
+                    if exc.kind not in SPLIT_KINDS or len(ids) < 2:
+                        raise
             # Outside the semaphore: each half takes a slot of its own.
             half = (len(ids) + 1) // 2
             parts = [ids[:half], ids[half:]]
-            await emit({"type": "chunk_split", "index": n + 1, "total": len(chunks), "shots": ids, "into": parts})
+            await emit({"type": "chunk_split", "index": n + 1, "total": len(todo), "shots": ids, "into": parts})
             out: dict[str, str] = {}
             for part in parts:
-                out.update(await write(n, part, False))
+                out.update(await write(n, seg, part, False))
             return out
 
-        async def do_chunk(n: int, ids: list[str]) -> None:
-            nonlocal done, stopping
+        async def do_chunk(n: int, seg: Segment) -> None:
+            nonlocal done
+            began = time.monotonic()
             try:
-                results[n] = await write(n, ids, True)
-            except _NotStarted:
+                mine = await write(n, seg, list(seg.shots), True)
+            except PipelineFailure as exc:
+                if exc.kind in STOP_NOW_KINDS:
+                    raise
+                await segment_failed(seg, exc)
                 return
-            except BaseException:
-                # Set here, not when run() sees the error: the slot this chunk
-                # just freed may be handed to a waiting chunk first.
-                stopping = True
-                raise
-            if early_check and not stopping:
+            if early_check:
                 # Outside the semaphore: the check does not hold a generation slot;
                 # its repair calls take one each, like any other call.
-                chunk_rounds[n] = await self._settle_chunk(
-                    req, sb, frame, n, len(chunks), results[n], calls, sem, emit, lambda: stopping)
+                chunk_rounds[seg.key] = await self._settle_chunk(
+                    req, ask_req, plan, frame, seg, n, len(todo), mine, record, sem, emit)
+            shots.update(mine)
+            have_keys.add(seg.key)
             done += 1
-            await emit({"type": "chunk_done", "index": n + 1, "total": len(chunks), "done": done})
+            await emit({"type": "segment_done", "key": seg.key, "fingerprint": seg.fingerprint,
+                        "content": {"shots": mine}, "source": SOURCE_AI, "repaired": False,
+                        "duration_ms": _ms(began)})
+            await emit({"type": "chunk_done", "index": n + 1, "total": len(todo), "done": done})
 
-        await emit({"type": "phase", "phase": "chunks", "total": len(chunks)})
-        tasks = {asyncio.create_task(do_chunk(n, ids)): n for n, ids in enumerate(chunks)}
-        failure: PipelineFailure | None = None
-        pending = set(tasks)
+        await emit({"type": "phase", "phase": "chunks", "total": len(todo)})
+        tasks = [asyncio.create_task(do_chunk(n, seg)) for n, seg in enumerate(todo)]
         try:
-            while pending:
-                finished, pending = await asyncio.wait(pending, return_when=asyncio.FIRST_EXCEPTION)
-                for t in sorted(finished, key=tasks.__getitem__):
-                    exc = t.exception()
-                    if exc is None:
-                        continue
-                    if not isinstance(exc, PipelineFailure) or exc.kind in STOP_NOW_KINDS:
-                        # A dead key / no balance / no provider fails every other
-                        # chunk the same way, and an unexpected error is not a
-                        # chunk's fault: stop paying at once.
-                        raise exc
-                    if failure is None:
-                        failure = exc
+            for t in asyncio.as_completed(tasks):
+                await t
         except BaseException:
-            # Also the Creator cancelling the run (CancelledError): stop at once.
+            # A dead key / no balance / no provider fails every other chunk the
+            # same way, an unexpected error is not a chunk's fault, and the
+            # Creator cancelling (CancelledError) means stop: stop paying at once.
             for t in tasks:
                 t.cancel()
             await asyncio.gather(*tasks, return_exceptions=True)
             raise
-        if failure is not None:
-            # `calls` is the run's shared list, so it now also holds what the
-            # chunks that were allowed to finish spent.
-            raise failure
 
-        shots: dict[str, str] = {}
-        for n in range(len(chunks)):
-            shots.update(results[n])
+        missing = [s.key for s in plan.chunks if s.key not in have_keys and s.key not in failed]
+        if failed or missing:
+            return CodeResult(status="incomplete", calls=calls, failed=failed, missing=missing)
 
         # 3. merge + check + repair
         def merge() -> merger.Merged:
@@ -435,11 +631,13 @@ class CodePipeline:
         merged = merge()
         # Rounds spent on a chunk before the merge count against the same cap:
         # the cap bounds how many repair turns a shot can wait for.
-        rounds = max(chunk_rounds, default=0)
+        rounds = max(chunk_rounds.values(), default=0)
         check: CheckResult
         while True:
             await emit({"type": "phase", "phase": "check", "round": rounds})
             check = await self._checker.check(req.engine, merged.code, merged.scene_class_name, req.layout())
+            if not check.ok:
+                await emit(_check_event("final", rounds, "", plan, merged, check))
             if check.ok or rounds >= self._repair_rounds:
                 break
             targets, unmapped = _map_failures(req.engine, merged, check)
@@ -452,42 +650,44 @@ class CodePipeline:
             rounds += 1
             await emit({"type": "phase", "phase": "repair", "round": rounds, "total": self._repair_rounds,
                         "targets": sorted(targets)})
-            frame = await self._repair(req, sb, remotion, frame, shots, targets, check, calls, sem)
+            new_frame = await self._repair(ask_req, plan, remotion, frame, shots, targets, check, record, sem)
+            changed = {plan.owner(k) for k in targets}
+            frame = new_frame
+            # The repaired sections overwrite the segments that own them (FR-8).
+            for key in sorted(k for k in changed if k):
+                seg = plan.get(key)
+                content = {"code": frame} if seg.kind == FRAME else {"shots": {i: shots[i] for i in seg.shots}}
+                await emit({"type": "segment_done", "key": key, "fingerprint": seg.fingerprint,
+                            "content": content, "repaired": True})
             merged = merge()
 
-        if check.ok:
-            self._cache.drop(used_keys)
-        else:
+        if not check.ok:
             warnings.append("the script still fails the compile check after the last repair round")
         # The final check's own warnings (CR-048 T6b: a hero drawn too small, or
         # a layout check that could not run) — never dropped.
         warnings.extend(w for w in check.warnings if w not in warnings)
         return CodeResult(
-            code=merged.code, check_ok=check.ok, diagnostics=check.diagnostics, repair_rounds=rounds,
-            calls=calls, warnings=warnings, scene_class_name=merged.scene_class_name)
+            status="done", code=merged.code, check_ok=check.ok, diagnostics=check.diagnostics,
+            repair_rounds=rounds, calls=calls, warnings=warnings, scene_class_name=merged.scene_class_name)
 
     async def _settle_chunk(
-        self, req: CodeRequest, sb: Storyboard, frame: str, index: int, total: int,
-        shots: dict[str, str], calls: list[Call], sem: asyncio.Semaphore, emit: Emit,
-        stopped: Callable[[], bool] = lambda: False,
+        self, req: CodeRequest, ask_req: CodeRequest, plan: Plan, frame: str, seg: Segment, index: int,
+        total: int, shots: dict[str, str], record: Record, sem: asyncio.Semaphore, emit: Emit,
     ) -> int:
         """Compile one Remotion chunk (`shots` holds exactly its shots) against stubs
         for every other shot and repair its own failing shots, up to the repair cap. Returns the rounds
         used. What it cannot settle here (an error in LAYOUT or outside the chunk,
-        the checker being unreachable) is left to the full-file check. Stops
-        before another repair round once `stopped()` says the run has failed:
-        repairs are not cached, so they would be paid for and thrown away."""
+        the checker being unreachable) is left to the full-file check."""
         rounds = 0
         while True:
-            if stopped():
-                return rounds
-            merged = merger.merge_remotion(sb, frame, shots, stub_missing=True, library=self._library)
+            merged = merger.merge_remotion(plan.sb, frame, shots, stub_missing=True, library=self._library)
             try:
                 check = await self._checker.check("remotion", merged.code, merged.scene_class_name, req.layout())
             except CheckerUnavailable:
                 return rounds
             if check.ok:
                 return rounds
+            await emit(_check_event("chunk", rounds, seg.key, plan, merged, check))
             targets, _ = _map_failures("remotion", merged, check)
             mine = {k: v for k, v in targets.items() if k in shots}
             if not mine or rounds >= self._repair_rounds:
@@ -495,16 +695,17 @@ class CodePipeline:
             rounds += 1
             await emit({"type": "chunk_repair", "index": index + 1, "total": total, "round": rounds,
                         "max": self._repair_rounds, "targets": sorted(mine)})
-            await self._repair(req, sb, True, frame, shots, mine, check, calls, sem)
+            await self._repair(ask_req, plan, True, frame, shots, mine, check, record, sem)
 
     async def _repair(
-        self, req: CodeRequest, sb: Storyboard, remotion: bool, frame: str, shots: dict[str, str],
-        targets: dict[str, list[Diagnostic]], check: CheckResult, calls: list[Call],
+        self, req: CodeRequest, plan: Plan, remotion: bool, frame: str, shots: dict[str, str],
+        targets: dict[str, list[Diagnostic]], check: CheckResult, record: Record,
         sem: asyncio.Semaphore,
     ) -> str:
         """Ask for a fix of each failing section, in parallel. A section whose
         fix cannot be parsed keeps its old code (the failed call is recorded)
         and will fail the next check again rather than being dropped."""
+        sb = plan.sb
         new_frame = frame
         results: dict[str, str] = {}
 
@@ -518,16 +719,16 @@ class CodePipeline:
 
             def parse(text: str) -> str:
                 if is_frame:
-                    return self._parse_layout(text) if remotion else self._parse_cast(text)
-                return self._parse_shots(req.engine, [key], text)[key]
+                    return parse_layout(text) if remotion else parse_cast(text)
+                return parse_shots(req.engine, [key], text)[key]
 
             async with sem:
                 try:
-                    results[key] = await self._ask(req, "repair", key, build, parse, calls)
+                    results[key] = await self._ask(req, "repair", key, plan.owner(key), build, parse, record)
                 except PipelineFailure as exc:
-                    if exc.error is not None and exc.error.kind in (errors.AUTH, errors.BALANCE, errors.NOT_CONFIGURED):
+                    if exc.kind in STOP_NOW_KINDS:
                         raise
-                    # unusable repair reply: keep the old code, already recorded in `calls`
+                    # unusable repair reply: keep the old code, already recorded as a call
 
         await asyncio.gather(*(fix(k, d) for k, d in targets.items()))
         for key, code in results.items():
@@ -536,6 +737,20 @@ class CodePipeline:
             else:
                 shots[key] = code
         return new_frame
+
+
+def _check_event(
+    phase: str, round_: int, segment: str, plan: Plan, merged: merger.Merged, check: CheckResult,
+) -> dict:
+    """A failed check, for the caller's diagnostics log (CR-050 FR-22): each
+    diagnostic with the shot and segment its line falls in."""
+    out = []
+    for d in check.diagnostics:
+        section = merged.shot_at(d.line) if d.line else None
+        shot = section if section and section not in (merger.LAYOUT_KEY, merger.CAST_KEY) else ""
+        owner = plan.owner(section) if section else ""
+        out.append({**_diag_dict(d), "shot": shot, "segment": owner or segment})
+    return {"type": "check", "phase": phase, "round": round_, "segment": segment, "diagnostics": out}
 
 
 def _map_failures(

@@ -9,7 +9,7 @@ from app.main import create_app
 from app.pipeline.checker import CheckResult
 from app.registry import Providers
 from tests.conftest import chunk, stream_response, usage_chunk
-from tests.test_pipeline import storyboard
+from tests.test_pipeline import storyboard, storyboard_with_layout
 
 
 def config(**over):
@@ -131,12 +131,93 @@ async def test_storyboard_finalize_fails_with_422_when_repair_is_still_invalid(c
 async def test_code_generate_streams_phases_and_the_final_code(client):
     with respx.mock:
         respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
-        r = await client.post("/v1/code/generate", json={
+        r = await client.post("/v2/code/generate", json={
             "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
     ev = events(r)
     assert ev[-1]["type"] == "result" and ev[-1]["check_ok"] is True
     assert {"layout", "chunks", "merge", "check"} <= {e["phase"] for e in ev if e["type"] == "phase"}
-    assert "const SHOTS" in ev[-1]["code"] and len(ev[-1]["calls"]) == 2
+    assert ev[-1]["status"] == "done" and "const SHOTS" in ev[-1]["code"]
+    # CR-050 FR-21: each billed call is its own event, not a list at the end
+    assert [e["phase"] for e in ev if e["type"] == "call"] == ["layout", "chunk"] and "calls" not in ev[-1]
+    assert [e["key"] for e in ev if e["type"] == "segment_done"] == ["frame", "1.1-1.2"]
+    assert ev[0]["type"] == "plan" and [s["key"] for s in ev[0]["segments"]] == ["frame", "1.1-1.2"]
+
+
+async def test_the_v1_code_route_keeps_its_old_contract(client):
+    # ADR-0030: kept so llm-service deploys without authoring-service (removal
+    # is on the backlog). No segment events; every call listed in the result.
+    with respx.mock:
+        respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
+        r = await client.post("/v1/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
+    ev = events(r)
+    assert ev[-1]["type"] == "result" and ev[-1]["check_ok"] is True and "const SHOTS" in ev[-1]["code"]
+    assert [c["phase"] for c in ev[-1]["calls"]] == ["layout", "chunk"]
+    assert "status" not in ev[-1] and "failed" not in ev[-1]
+    assert not {e["type"] for e in ev} & {"plan", "segment_start", "segment_done", "segment_failed", "call", "check"}
+    assert {"layout", "chunks", "merge", "check"} <= {e["phase"] for e in ev if e["type"] == "phase"}
+
+
+async def test_the_v1_code_route_fails_the_run_with_the_billed_calls():
+    # v1: the first failed segment is the run's error, with what was billed so far.
+    with respx.mock:
+        respx.post("https://hive.test/v3/chat/completions").mock(return_value=_only_reasoning(5000))
+        r = await _client(config(code_max_reasoning_chars=2000)).post("/v1/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
+    ev = events(r)
+    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "budget"
+    assert "suy nghĩ quá 2000 ký tự" in ev[-1]["error"]["message"]
+    assert [(c["phase"], c["error_kind"]) for c in ev[-1]["calls"]] == [("layout", "budget")]
+
+
+async def test_code_plan_is_the_cut_without_a_model_call(client):
+    with respx.mock:
+        route = respx.post("https://hive.test/v3/chat/completions")
+        r = await client.post("/v2/code/plan", json={
+            "engine": "remotion", "storyboard": storyboard_with_layout(5), "system": "", "chunk_shots": 2})
+    assert r.status_code == 200 and route.call_count == 0
+    segs = r.json()["segments"]
+    assert [(s["key"], s["kind"], s["shots"]) for s in segs] == [
+        ("frame", "frame", []), ("1.1-1.2", "shots", ["1.1", "1.2"]), ("1.3-1.4", "shots", ["1.3", "1.4"]),
+        ("1.5-1.5", "shots", ["1.5"])]
+    assert segs[0]["source"] == "storyboard" and "source" not in segs[1]
+    manim = await client.post("/v2/code/plan", json={"engine": "manim", "storyboard": storyboard(2), "system": ""})
+    assert "source" not in manim.json()["segments"][0]
+    bad = await client.post("/v2/code/plan", json={"engine": "remotion", "storyboard": "CẢNH 1", "system": ""})
+    assert bad.status_code == 422
+
+
+async def test_code_generate_runs_only_what_is_missing(client):
+    with respx.mock:
+        respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
+        first = events(await client.post("/v2/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"}))
+        stored = [{"key": e["key"], "fingerprint": e["fingerprint"], "content": e["content"]}
+                  for e in first if e["type"] == "segment_done"]
+        route = respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
+        before = route.call_count
+        again = events(await client.post("/v2/code/generate", json={
+            "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS",
+            "model": "another", "segments": stored}))
+    assert again[-1]["status"] == "done" and route.call_count == before
+
+
+async def test_segment_prompt_and_parse(client):
+    base = {"engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS", "chunk_shots": 1}
+    r = await client.post("/v2/code/segment-prompt", json={**base, "key": "frame"})
+    assert r.status_code == 200 and r.json()["system"] == "SYS" and "LAYOUT (bước 1/2" in r.json()["user"]
+    r = await client.post("/v2/code/segment-prompt", json={**base, "key": "1.2-1.2"})
+    assert r.status_code == 409  # no frame yet
+    r = await client.post("/v2/code/segment-prompt", json={**base, "key": "7.7-7.7"})
+    assert r.status_code == 404
+    r = await client.post("/v2/code/segment-parse", json={**base, "key": "frame", "reply": "prose"})
+    assert r.status_code == 422 and "const LAYOUT" in r.json()["error"]["message"]
+    r = await client.post("/v2/code/segment-parse", json={**base, "key": "frame", "reply": "const LAYOUT = {};"})
+    assert r.status_code == 200 and r.json()["content"] == {"code": "const LAYOUT = {};"}
+    fp = r.json()["fingerprint"]
+    r = await client.post("/v2/code/segment-prompt", json={
+        **base, "key": "1.2-1.2", "segments": [{"key": "frame", "fingerprint": fp, "content": {"code": "const LAYOUT = {};"}}]})
+    assert r.status_code == 200 and "VIẾT CODE CHO SHOT 1.2 → 1.2" in r.json()["user"]
 
 
 async def test_code_generate_hands_the_subtitle_band_and_font_to_the_layout_check_and_returns_its_warnings():
@@ -147,7 +228,7 @@ async def test_code_generate_hands_the_subtitle_band_and_font_to_the_layout_chec
     c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://svc")
     with respx.mock:
         respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))
-        r = await c.post("/v1/code/generate", json={
+        r = await c.post("/v2/code/generate", json={
             "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS",
             "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
     ev = events(r)
@@ -158,14 +239,14 @@ async def test_code_generate_hands_the_subtitle_band_and_font_to_the_layout_chec
 
 
 async def test_code_generate_rejects_a_nonsense_subtitle_band(client):
-    r = await client.post("/v1/code/generate", json={
+    r = await client.post("/v2/code/generate", json={
         "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS",
         "subtitle_band": {"edge": "left", "px": 240}})
     assert r.status_code == 422
 
 
 async def test_code_generate_with_a_prose_storyboard_is_an_error_event(client):
-    r = await client.post("/v1/code/generate", json={
+    r = await client.post("/v2/code/generate", json={
         "engine": "remotion", "topic": "t", "storyboard": "CẢNH 1", "system": "SYS"})
     ev = events(r)
     assert ev[-1]["type"] == "error" and "step 1b with AI" in ev[-1]["error"]["message"]
@@ -184,12 +265,15 @@ def _client(cfg):
 async def test_code_generate_stops_a_call_that_only_reasons_past_the_code_limit():
     with respx.mock:
         route = respx.post("https://hive.test/v3/chat/completions").mock(return_value=_only_reasoning(5000))
-        r = await _client(config(code_max_reasoning_chars=2000)).post("/v1/code/generate", json={
+        r = await _client(config(code_max_reasoning_chars=2000)).post("/v2/code/generate", json={
             "engine": "remotion", "topic": "t", "storyboard": storyboard(2), "system": "SYS"})
     ev = events(r)
-    assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "budget"
-    assert "suy nghĩ quá 2000 ký tự" in ev[-1]["error"]["message"]
-    assert ev[-1]["calls"][0]["phase"] == "layout" and ev[-1]["calls"][0]["error_kind"] == "budget"
+    # CR-050: a failed segment is reported and the run ends incomplete, not as an error.
+    assert ev[-1]["type"] == "result" and ev[-1]["status"] == "incomplete" and ev[-1]["failed"] == ["frame"]
+    [failed] = [e for e in ev if e["type"] == "segment_failed"]
+    assert failed["error"]["kind"] == "budget" and "suy nghĩ quá 2000 ký tự" in failed["error"]["message"]
+    [call] = [e for e in ev if e["type"] == "call"]
+    assert call["phase"] == "layout" and call["error_kind"] == "budget"
     assert route.call_count == 1
 
 
@@ -254,7 +338,7 @@ async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_wa
     route = respx.post("http://rendering.test/v1/check/remotion").mock(return_value=httpx.Response(200, json={
         "ok": False, "raw": "",
         "diagnostics": [{"message": "TS2304: x", "line": 3, "kind": "compile"},
-                        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"},
+                        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout", "rule": "text_overflow"},
                         {"message": "old rendering, no kind", "line": 4}],
         "warnings": ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]}))
     chk = RenderingChecker("http://rendering.test", 5)
@@ -264,6 +348,7 @@ async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_wa
         "code": "code", "scene_class_name": "creator",
         "subtitle_band": {"edge": "top", "px": 200}, "video_font": "Montserrat"}
     assert [(d.line, d.kind) for d in res.diagnostics] == [(3, "compile"), (62, "layout"), (4, "compile")]
+    assert [d.rule for d in res.diagnostics] == ["", "text_overflow", ""]  # CR-050 FR-22
     assert res.warnings == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
 
     manim = respx.post("http://rendering.test/v1/check/manim").mock(return_value=httpx.Response(200, json={

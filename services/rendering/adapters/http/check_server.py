@@ -106,7 +106,9 @@ def create_check_app(
             )
         return {
             "ok": out.ok,
-            "diagnostics": [{"message": d.message, "line": d.line, "kind": d.kind} for d in out.diagnostics],
+            "diagnostics": [
+                {"message": d.message, "line": d.line, "kind": d.kind, "rule": d.rule} for d in out.diagnostics
+            ],
             "raw": out.raw,
             "warnings": out.warnings,
         }

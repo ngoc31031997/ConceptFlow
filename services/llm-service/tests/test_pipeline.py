@@ -7,7 +7,16 @@ import pytest
 from app import errors
 from app.errors import LLMError, Usage
 from app.pipeline.checker import CheckResult, Diagnostic
-from app.pipeline.run import ChunkCache, CodePipeline, CodeRequest, PipelineFailure
+from app.pipeline.run import (
+    CodePipeline,
+    CodeRequest,
+    DoneSegment,
+    PipelineFailure,
+    SegmentNotReady,
+    make_plan,
+    parse_segment,
+    segment_prompt,
+)
 from app.provider import ChatRequest, ChatResult
 
 
@@ -96,8 +105,29 @@ async def emit_none(_):
     return None
 
 
-def pipeline(provider, checker, chunk=10, rounds=3, cache=None):
-    return CodePipeline(provider, checker, chunk_shots=chunk, concurrency=3, repair_rounds=rounds, cache=cache)
+def pipeline(provider, checker, chunk=10, rounds=3):
+    return CodePipeline(provider, checker, chunk_shots=chunk, concurrency=3, repair_rounds=rounds)
+
+
+class Events:
+    """Collects what a run streams; `done()` is what the caller would have
+    stored, ready to send back with the next run."""
+
+    def __init__(self):
+        self.all: list[dict] = []
+
+    async def __call__(self, ev):
+        self.all.append(ev)
+
+    def of(self, kind):
+        return [e for e in self.all if e["type"] == kind]
+
+    def done(self):
+        out = {}
+        for e in self.of("segment_done"):
+            prev = out.get(e["key"])
+            out[e["key"]] = DoneSegment(e.get("fingerprint") or prev.fingerprint, e["content"])
+        return out
 
 
 def req(sb, engine="remotion"):
@@ -182,20 +212,20 @@ async def test_a_storyboard_that_is_prose_is_refused_with_an_actionable_message(
     assert "run step 1b with AI" in e.value.message and e.value.calls == []
 
 
-async def test_failed_run_keeps_finished_chunks_in_cache_and_a_rerun_does_not_pay_again():
-    cache = ChunkCache()
+async def test_a_rerun_with_every_segment_stored_pays_for_no_writing_turn():
+    ev = Events()
     prov1 = FakeProvider(broken={"1.1"}, fail_repair=True)
-    res1 = await pipeline(prov1, FakeChecker(), chunk=1, rounds=1, cache=cache).run(req(storyboard(3)), emit_none)
-    assert not res1.check_ok
+    res1 = await pipeline(prov1, FakeChecker(), chunk=1, rounds=1).run(req(storyboard(3)), ev)
+    assert res1.status == "done" and not res1.check_ok
     prov2 = FakeProvider()
-    res2 = await pipeline(prov2, FakeChecker(), chunk=1, rounds=1, cache=cache).run(req(storyboard(3)), emit_none)
-    # layout + 3 chunks come from the cache (free); the cached 1.1 is still broken,
-    # so the re-run pays for exactly one thing: repairing it.
-    assert sum(1 for c in res2.calls if c.cached) == 4
+    r = req(storyboard(3))
+    r.done = ev.done()
+    res2 = await pipeline(prov2, FakeChecker(), chunk=1, rounds=1).run(r, emit_none)
+    # layout + 3 chunks come from the caller; the stored 1.1 is still broken, so
+    # the re-run pays for exactly one thing: repairing it.
     assert res2.check_ok and res2.repair_rounds == 1
-    paid = [c for c in res2.calls if not c.cached]
-    assert [c.phase for c in paid] == ["repair"]
-    assert [r for r in prov2.calls if "VIẾT CODE CHO SHOT" in r.user or "LAYOUT (bước 1/2" in r.user] == []
+    assert [c.phase for c in res2.calls] == ["repair"]
+    assert [x for x in prov2.calls if "VIẾT CODE CHO SHOT" in x.user or "LAYOUT (bước 1/2" in x.user] == []
 
 
 async def test_manim_pipeline_uses_cast_and_maps_tracebacks_to_shots():
@@ -254,7 +284,7 @@ async def test_each_remotion_chunk_is_checked_against_stubs_and_repaired_before_
     repairs = [c for c in prov.calls if "SỬA LỖI" in c.user]
     assert len(repairs) == 1 and "trong shot 1.4" in repairs[0].user
     assert any(ev.get("type") == "chunk_repair" and ev["index"] == 2 and ev["targets"] == ["1.4"] for ev in events)
-    assert not any(ev.get("phase") == "repair" for ev in events)  # nothing was left for the final loop
+    assert not any(ev["type"] == "phase" and ev["phase"] == "repair" for ev in events)  # nothing left for the final loop
     assert "BROKEN" not in res.code
 
 
@@ -388,83 +418,44 @@ def chunk_turns(prov):
     return [ids for c in prov.calls if (ids := chunk_ids(c.user)) is not None]
 
 
-async def test_a_failing_chunk_lets_running_chunks_finish_into_the_cache_and_a_rerun_pays_only_for_it():
-    cache = ChunkCache()
-    others_in, release = asyncio.Event(), asyncio.Event()
-    arrived = []
-
-    def gate(ids):
-        if ids == ["1.2"]:
-            return others_in  # fails only once chunks 1 and 3 are talking to the model
-        arrived.append(ids)
-        if len(arrived) == 2:
-            others_in.set()
-        return release
-
-    def fail(ids):
-        if ids == ["1.2"]:
-            release.set()  # chunks 1 and 3 are still waiting on the model when this one fails
-            return llm_err(errors.SERVER)
-
-    prov1 = Scripted(fail=fail, gate=gate)
-    with pytest.raises(PipelineFailure) as e:
-        await pipeline(prov1, FakeChecker(), chunk=1, cache=cache).run(req(storyboard_with_layout(3)), emit_none)
-    assert e.value.kind == errors.SERVER
-    assert sorted(prov1.finished) == [["1.1"], ["1.3"]]  # chunks 1 and 3 were not thrown away
-    by_label = {c.label: c for c in e.value.calls}
-    assert by_label["1.1-1.1"].ok and by_label["1.3-1.3"].ok  # ...and their cost is reported
-    assert not by_label["1.2-1.2"].ok and by_label["1.2-1.2"].error_kind == errors.SERVER
+async def test_a_failing_chunk_does_not_stop_the_others_and_a_rerun_pays_only_for_it():
+    # CR-050 FR-2: every other chunk is written and handed back; the run ends incomplete.
+    prov1 = Scripted(fail=lambda ids: llm_err(errors.SERVER) if ids == ["1.2"] else None)
+    ev = Events()
+    res1 = await pipeline(prov1, FakeChecker(), chunk=1).run(req(storyboard_with_layout(4)), ev)
+    assert res1.status == "incomplete" and res1.failed == ["1.2-1.2"] and res1.missing == []
+    assert res1.code == "" and sorted(prov1.finished) == [["1.1"], ["1.3"], ["1.4"]]
+    assert sorted(e["key"] for e in ev.of("segment_done")) == ["1.1-1.1", "1.3-1.3", "1.4-1.4", "frame"]
+    [failed] = ev.of("segment_failed")
+    assert failed["key"] == "1.2-1.2" and failed["error"]["kind"] == errors.SERVER
+    assert not ev.of("check")  # nothing is merged while a segment is missing
 
     prov2 = Scripted()
-    res = await pipeline(prov2, FakeChecker(), chunk=1, cache=cache).run(req(storyboard_with_layout(3)), emit_none)
-    assert res.check_ok
+    r = req(storyboard_with_layout(4))
+    r.done = ev.done()
+    res2 = await pipeline(prov2, FakeChecker(), chunk=1).run(r, emit_none)
+    assert res2.status == "done" and res2.check_ok
     assert chunk_turns(prov2) == [["1.2"]]  # the re-run calls the model for chunk 2 only
-    assert sorted(c.label for c in res.calls if c.cached) == ["1.1-1.1", "1.3-1.3"]
+    assert res2.code.count("function Shot1_") == 4
 
 
-async def test_chunks_still_waiting_for_a_slot_do_not_start_after_a_failure():
-    release = asyncio.Event()
-
-    def fail(ids):
-        if ids == ["1.2"]:
-            release.set()
-            return llm_err(errors.SERVER)
-
-    prov = Scripted(fail=fail, gate=lambda ids: release if ids == ["1.1"] else None)
+async def test_chunks_waiting_for_a_slot_still_start_after_a_failure():
+    prov = Scripted(fail=lambda ids: llm_err(errors.SERVER) if ids == ["1.2"] else None)
     p = CodePipeline(prov, FakeChecker(), chunk_shots=1, concurrency=2, repair_rounds=1)
-    events = []
-
-    async def emit(ev):
-        events.append(ev)
-
-    with pytest.raises(PipelineFailure):
-        await p.run(req(storyboard_with_layout(4)), emit)
-    assert sorted(chunk_turns(prov)) == [["1.1"], ["1.2"]]  # 1.3 and 1.4 never reached the model
-    assert prov.finished == [["1.1"]]
-    assert sorted(ev["index"] for ev in events if ev["type"] == "chunk_start") == [1, 2]
+    ev = Events()
+    res = await p.run(req(storyboard_with_layout(4)), ev)
+    assert sorted(chunk_turns(prov)) == [["1.1"], ["1.2"], ["1.3"], ["1.4"]]
+    assert res.failed == ["1.2-1.2"]
+    assert sorted(e["index"] for e in ev.of("chunk_start")) == [1, 2, 3, 4]
 
 
-async def test_the_first_failure_is_raised_even_when_a_later_chunk_also_fails():
-    second_in, release = asyncio.Event(), asyncio.Event()
-
-    def gate(ids):
-        if ids == ["1.1"]:
-            return second_in
-        second_in.set()
-        return release
-
-    def fail(ids):
-        if ids == ["1.1"]:
-            release.set()
-            return llm_err(errors.SERVER)
-        if ids == ["1.2"]:
-            return llm_err(errors.TIMEOUT)
-
-    prov = Scripted(fail=fail, gate=gate)
-    with pytest.raises(PipelineFailure) as e:
-        await pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(2)), emit_none)
-    assert e.value.kind == errors.SERVER
-    assert sorted(c.error_kind for c in e.value.calls) == [errors.SERVER, errors.TIMEOUT]
+async def test_every_failed_chunk_is_reported():
+    prov = Scripted(fail=lambda ids: {"1.1": llm_err(errors.SERVER), "1.2": llm_err(errors.TIMEOUT)}.get(ids[0]))
+    ev = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(3)), ev)
+    assert sorted(res.failed) == ["1.1-1.1", "1.2-1.2"]
+    assert sorted(e["error"]["kind"] for e in ev.of("segment_failed")) == [errors.SERVER, errors.TIMEOUT]
+    assert sorted(c.error_kind for c in res.calls if not c.ok) == [errors.SERVER, errors.TIMEOUT]
 
 
 async def test_a_chunk_over_budget_is_split_in_two_and_the_run_succeeds():
@@ -505,45 +496,32 @@ async def test_splitting_recurses_down_to_one_shot_on_truncation():
         ("1.1-1.3", False), ("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", True), ("1.3-1.3", True)]
 
 
-async def test_a_one_shot_chunk_over_budget_fails_the_run_with_budget():
+async def test_a_one_shot_chunk_over_budget_fails_its_segment_with_budget():
     prov = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if "1.2" in ids else None)
-    with pytest.raises(PipelineFailure) as e:
-        await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard_with_layout(2)), emit_none)
-    assert e.value.kind == errors.BUDGET
-    assert [(c.label, c.ok) for c in e.value.calls] == [("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", False)]
+    ev = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard_with_layout(2)), ev)
+    assert res.status == "incomplete" and res.failed == ["1.1-1.2"]
+    assert ev.of("segment_failed")[0]["error"]["kind"] == errors.BUDGET
+    assert [(c.label, c.ok) for c in res.calls] == [("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", False)]
 
 
 async def test_other_error_kinds_are_not_split():
     prov = Scripted(fail=lambda ids: llm_err(errors.EMPTY))
-    with pytest.raises(PipelineFailure) as e:
-        await pipeline(prov, FakeChecker(), chunk=4).run(req(storyboard_with_layout(4)), emit_none)
-    assert e.value.kind == errors.EMPTY and chunk_turns(prov) == [["1.1", "1.2", "1.3", "1.4"]]
-
-
-async def test_a_rerun_goes_straight_to_the_halves_of_a_chunk_that_was_over_budget():
-    cache = ChunkCache()
-    prov1 = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 4 or ids == ["1.5"] else None)
-    with pytest.raises(PipelineFailure):
-        await pipeline(prov1, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
-    prov2 = Scripted()
-    res = await pipeline(prov2, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
-    assert res.check_ok
-    assert chunk_turns(prov2) == [["1.5"]]  # neither the 4-shot chunk nor its cached halves are paid again
-    # a fully successful run drops the split marker with the rest of its cache
-    prov3 = Scripted()
-    await pipeline(prov3, FakeChecker(), chunk=4, cache=cache).run(req(storyboard_with_layout(5)), emit_none)
-    assert sorted(chunk_turns(prov3)) == [["1.1", "1.2", "1.3", "1.4"], ["1.5"]]
+    res = await pipeline(prov, FakeChecker(), chunk=4).run(req(storyboard_with_layout(4)), emit_none)
+    assert res.failed == ["1.1-1.4"] and chunk_turns(prov) == [["1.1", "1.2", "1.3", "1.4"]]
 
 
 async def test_a_dead_key_cancels_the_other_chunks_at_once():
     never = asyncio.Event()
     prov = Scripted(fail=lambda ids: llm_err(errors.AUTH) if ids == ["1.2"] else None,
                     gate=lambda ids: never if ids != ["1.2"] else None)
+    ev = Events()
     with pytest.raises(PipelineFailure) as e:
         await asyncio.wait_for(
-            pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(3)), emit_none), timeout=2)
+            pipeline(prov, FakeChecker(), chunk=1).run(req(storyboard_with_layout(3)), ev), timeout=2)
     assert e.value.kind == errors.AUTH
-    assert prov.finished == [] and [c.label for c in e.value.calls] == ["1.2-1.2"]
+    assert prov.finished == [] and [c["label"] for c in ev.of("call")] == ["1.2-1.2"]
+    assert e.value.calls == []  # already streamed; must not be recorded twice
 
 
 async def test_cancelling_the_run_cancels_every_chunk_at_once():
@@ -639,3 +617,157 @@ def test_repair_prompt_lists_compile_and_layout_errors_apart():
     assert compile_at < text.index("- dòng 30: TS2304") < layout_at < text.index("- dòng 31: Shot 1.2, frame 7%")
     only_tsc = prompts.remotion_repair(sb, "const LAYOUT = {};", "1.2", tsx("1.2"), [Diagnostic("TS1005", 3)], [])
     assert "SỬA LỖI BIÊN DỊCH trong shot 1.2" in only_tsc and "Lỗi bố cục" not in only_tsc
+
+
+# --- CR-050 Unit 2: segments, fingerprints, streamed calls and checks ---------------
+
+def fps(r: CodeRequest, chunk=2) -> dict[str, str]:
+    return {s.key: s.fingerprint for s in make_plan(r, chunk).segments}
+
+
+def test_the_plan_cuts_a_frame_and_chunks_of_the_requested_size():
+    plan = make_plan(req(storyboard(5)), 2)
+    assert [(s.key, s.kind, list(s.shots)) for s in plan.segments] == [
+        ("frame", "frame", []), ("1.1-1.2", "shots", ["1.1", "1.2"]),
+        ("1.3-1.4", "shots", ["1.3", "1.4"]), ("1.5-1.5", "shots", ["1.5"])]
+
+
+def test_fingerprints_follow_the_prompt_and_the_inputs_but_not_the_model_or_the_library():
+    base = fps(req(storyboard(4)))
+    other_model = req(storyboard(4))
+    other_model.model = "glm"
+    assert fps(other_model) == base  # CR-050 C2
+    with_drawings = req(storyboard(4))
+    with_drawings.illustrations = [{"name": "Cat", "usage": "", "description": "", "code": "export function Cat() {}"}]
+    assert fps(with_drawings) == base  # approving a drawing keeps every chunk (review C3)
+    new_prompt = req(storyboard(4))
+    new_prompt.system = "SYS v2"
+    assert all(fps(new_prompt)[k] != v for k, v in base.items())
+
+
+def test_editing_one_shot_invalidates_only_its_chunk_when_the_layout_comes_from_the_storyboard():
+    data = json.loads(storyboard_with_layout(6))
+    before = fps(req(json.dumps(data)))
+    data["scenes"][0]["shots"][3]["visual"] = "khác hẳn"  # shot 1.4
+    after = fps(req(json.dumps(data)))
+    assert {k for k in before if before[k] != after[k]} == {"1.3-1.4"}
+
+
+def test_an_ai_frame_depends_on_the_whole_storyboard_so_every_chunk_follows_it():
+    data = json.loads(storyboard(4))
+    before = fps(req(json.dumps(data)))
+    data["scenes"][0]["shots"][0]["visual"] = "khác"
+    after = fps(req(json.dumps(data)))
+    assert all(before[k] != after[k] for k in before)
+
+
+async def test_stored_segments_with_a_matching_fingerprint_are_not_written_again():
+    ev = Events()
+    await pipeline(FakeProvider(), FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    r = req(storyboard(4))
+    r.model = "another-model"
+    r.done = ev.done()
+    prov = FakeProvider()
+    ev2 = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(r, ev2)
+    assert res.status == "done" and res.check_ok and prov.calls == [] and not ev2.of("segment_done")
+
+
+async def test_a_stale_stored_segment_is_written_again():
+    ev = Events()
+    await pipeline(FakeProvider(), FakeChecker(), chunk=2).run(req(storyboard_with_layout(4)), ev)
+    done = ev.done()
+    done["1.3-1.4"] = DoneSegment("an-old-fingerprint", done["1.3-1.4"].content)
+    r = req(storyboard_with_layout(4))
+    r.done = done
+    prov = FakeProvider()
+    await pipeline(prov, FakeChecker(), chunk=2).run(r, emit_none)
+    assert chunk_turns(prov) == [["1.3", "1.4"]]
+
+
+async def test_only_runs_the_named_segment_and_merges_when_nothing_else_is_missing():
+    prov1 = Scripted(fail=lambda ids: llm_err(errors.TIMEOUT) if ids[0] in ("1.1", "1.3") else None)
+    ev = Events()
+    await pipeline(prov1, FakeChecker(), chunk=2).run(req(storyboard_with_layout(6)), ev)
+    r = req(storyboard_with_layout(6))
+    r.done, r.only = ev.done(), {"1.1-1.2"}
+    prov2 = Scripted()
+    res = await pipeline(prov2, FakeChecker(), chunk=2).run(r, emit_none)
+    assert chunk_turns(prov2) == [["1.1", "1.2"]]
+    assert res.status == "incomplete" and res.failed == [] and res.missing == ["1.3-1.4"]
+    r.done, r.only = {**r.done, "1.1-1.2": DoneSegment(fps(r)["1.1-1.2"], {"shots": {
+        "1.1": tsx("1.1"), "1.2": tsx("1.2")}})}, {"1.3-1.4"}
+    res = await pipeline(Scripted(), FakeChecker(), chunk=2).run(r, emit_none)
+    assert res.status == "done" and res.check_ok
+
+
+async def test_a_failed_frame_leaves_every_chunk_missing():
+    class NoLayout(FakeProvider):
+        async def chat(self, req, on_progress=None):
+            if "LAYOUT (bước 1/2" in req.user:
+                self.calls.append(req)
+                raise llm_err(errors.TIMEOUT)
+            return await super().chat(req, on_progress)
+
+    prov = NoLayout()
+    ev = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    assert res.status == "incomplete" and res.failed == ["frame"] and res.missing == ["1.1-1.2", "1.3-1.4"]
+    assert chunk_turns(prov) == []
+
+
+async def test_every_billed_call_is_streamed_once_with_its_segment():
+    ev = Events()
+    res = await pipeline(FakeProvider(broken={"1.3"}), FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    calls = ev.of("call")
+    assert len(calls) == len(res.calls) and [c["label"] for c in calls] == [c.label for c in res.calls]
+    assert {(c["phase"], c["segment"]) for c in calls} == {
+        ("layout", "frame"), ("chunk", "1.1-1.2"), ("chunk", "1.3-1.4"), ("repair", "1.3-1.4")}
+    assert all(c["usage"]["prompt_tokens"] == 10 for c in calls)
+
+
+async def test_repaired_shots_overwrite_their_segment_and_every_failed_check_is_reported():
+    ev = Events()
+    res = await pipeline(FakeProvider(broken={"1.3"}), FakeChecker(), chunk=10).run(req(storyboard(4)), ev)
+    assert res.check_ok
+    [check] = ev.of("check")
+    assert check["phase"] == "final" and check["round"] == 0
+    [d] = check["diagnostics"]
+    assert d["shot"] == "1.3" and d["segment"] == "1.1-1.4" and d["kind"] == "compile" and d["rule"] == ""
+    repaired = [e for e in ev.of("segment_done") if e["repaired"]]
+    assert [e["key"] for e in repaired] == ["1.1-1.4"]
+    assert "BROKEN" not in repaired[0]["content"]["shots"]["1.3"] and len(repaired[0]["content"]["shots"]) == 4
+
+
+async def test_early_chunk_checks_are_reported_against_their_segment():
+    ev = Events()
+    await pipeline(FakeProvider(broken={"1.4"}), FakeChecker(), chunk=3).run(req(storyboard(7)), ev)
+    [check] = ev.of("check")
+    assert check["phase"] == "chunk" and check["segment"] == "1.4-1.6"
+    assert [d["shot"] for d in check["diagnostics"]] == ["1.4"]
+
+
+def test_a_segment_prompt_is_what_the_pipeline_would_send():
+    r = req(storyboard(4))
+    r.illustrations = [{"name": "Cat", "usage": "<Cat />", "description": "mèo", "code": "export function Cat() {}"}]
+    system, user = segment_prompt(r, "frame", 2)
+    assert "## C4. HÌNH THƯ VIỆN" in system and "LAYOUT (bước 1/2" in user
+    with pytest.raises(SegmentNotReady):
+        segment_prompt(r, "1.3-1.4", 2)
+    r.done = {"frame": DoneSegment(fps(r)["frame"], {"code": "const LAYOUT = {hero: {x: 1, y: 2, size: 3}};"})}
+    _, user = segment_prompt(r, "1.3-1.4", 2)
+    assert "VIẾT CODE CHO SHOT 1.3 → 1.4" in user and "hero: {x: 1, y: 2, size: 3}" in user
+    with pytest.raises(KeyError):
+        segment_prompt(r, "9.9-9.9", 2)
+
+
+def test_a_pasted_reply_is_checked_and_fingerprinted():
+    r = req(storyboard(4))
+    fp, content = parse_segment(r, "1.1-1.2", "```tsx\n" + tsx("1.1") + "\n\n" + tsx("1.2") + "\n```", 2)
+    assert fp == fps(r)["1.1-1.2"] and sorted(content["shots"]) == ["1.1", "1.2"]
+    with pytest.raises(ValueError, match="missing shot function"):
+        parse_segment(r, "1.1-1.2", "```tsx\n" + tsx("1.1") + "\n```", 2)
+    fp, content = parse_segment(r, "frame", "const LAYOUT = {a: {x: 1}};", 2)
+    assert content == {"code": "const LAYOUT = {a: {x: 1}};"}
+    with pytest.raises(SegmentNotReady):
+        parse_segment(req(storyboard_with_layout(2)), "frame", "const LAYOUT = {};", 2)

@@ -19,6 +19,12 @@ type authoringStepRunner interface {
 	Execute(ctx context.Context, projectID, step string) (GeneratedStep, error)
 }
 
+// codeStepRunner runs the code step with CR-050 options (one segment, or
+// every segment written again).
+type codeStepRunner interface {
+	ExecuteCode(ctx context.Context, projectID string, opts CodeRunOptions) (GeneratedStep, error)
+}
+
 // ChainState is what the GUI polls: which steps a chain runs, where it is, and
 // how it ended. The last finished state stays until the next Start so a page
 // that was closed mid-run finds the outcome when it reopens — the reason the
@@ -80,8 +86,23 @@ var chainSteps = map[string]bool{"story": true, "storyboard": true, StepIllustra
 
 // Start launches the chain and returns at once.
 func (c *AuthoringChainRunner) Start(projectID string, steps []string) error {
+	return c.StartWith(projectID, steps, CodeRunOptions{})
+}
+
+// StartWith is Start with the code step's CR-050 options: a segment re-run or
+// a fresh run goes through the chain too, so it survives the browser closing
+// and shows in the same progress. Options apply to a chain of the code step alone.
+func (c *AuthoringChainRunner) StartWith(projectID string, steps []string, opts CodeRunOptions) error {
 	if projectID == "" || len(steps) == 0 {
 		return ErrChainInvalid
+	}
+	if opts != (CodeRunOptions{}) {
+		if len(steps) != 1 || steps[0] != "code" || (opts.Segment != "" && opts.Fresh) {
+			return ErrChainInvalid
+		}
+		if _, ok := c.runner.(codeStepRunner); !ok {
+			return errors.New("the code step runner takes no run options")
+		}
 	}
 	for _, s := range steps {
 		if !chainSteps[s] {
@@ -103,7 +124,7 @@ func (c *AuthoringChainRunner) Start(projectID string, steps []string) error {
 	c.cancels[projectID] = cancel
 	c.mu.Unlock()
 
-	go c.run(ctx, projectID, append([]string(nil), steps...))
+	go c.run(ctx, projectID, append([]string(nil), steps...), opts)
 	return nil
 }
 
@@ -136,7 +157,7 @@ func (c *AuthoringChainRunner) finish(projectID string, fn func(*ChainState)) {
 	})
 }
 
-func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps []string) {
+func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps []string, opts CodeRunOptions) {
 	defer func() {
 		c.mu.Lock()
 		if cancel := c.cancels[projectID]; cancel != nil {
@@ -152,7 +173,13 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 	}()
 	for i, step := range steps {
 		c.update(projectID, func(st *ChainState) { st.CurrentIndex = i })
-		out, err := c.runner.Execute(ctx, projectID, step)
+		var out GeneratedStep
+		var err error
+		if code, ok := c.runner.(codeStepRunner); ok && step == "code" && opts != (CodeRunOptions{}) {
+			out, err = code.ExecuteCode(ctx, projectID, opts)
+		} else {
+			out, err = c.runner.Execute(ctx, projectID, step)
+		}
 		if err == nil && len(out.Warnings) > 0 {
 			c.update(projectID, func(st *ChainState) {
 				if st.Warnings == nil {

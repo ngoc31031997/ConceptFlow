@@ -46,6 +46,8 @@ type GenerateAuthoringUseCase struct {
 	// fails loudly when it is missing rather than quietly doing something else.
 	finalizer StoryboardFinalizerPort
 	codegen   CodePipelinePort
+	// segments stores the code step segment by segment (CR-050, ADR-0030).
+	segments CodeSegmentPort
 	// formats/calibration feed the post-1b narration length check (CR-048 T8);
 	// see WithStoryboardChecks. Nil formats = no length check.
 	formats     FormatLookupPort
@@ -204,12 +206,27 @@ func (uc *GenerateAuthoringUseCase) Provider() string {
 func (uc *GenerateAuthoringUseCase) Execute(
 	ctx context.Context, projectID, step string,
 ) (GeneratedStep, error) {
+	return uc.execute(ctx, projectID, step, CodeRunOptions{})
+}
+
+// ExecuteCode runs the code step with CR-050 options: one segment only, or
+// every segment dropped and written again. Execute("code") runs the missing
+// segments, which is what the chain does.
+func (uc *GenerateAuthoringUseCase) ExecuteCode(
+	ctx context.Context, projectID string, opts CodeRunOptions,
+) (GeneratedStep, error) {
+	return uc.execute(ctx, projectID, "code", opts)
+}
+
+func (uc *GenerateAuthoringUseCase) execute(
+	ctx context.Context, projectID, step string, opts CodeRunOptions,
+) (GeneratedStep, error) {
 	started := time.Now()
 	// Flow trace: one start + one end line per run, keyed by project_id, so a
 	// project's journey (which step, how long, how big, how it ended) can be
 	// reconstructed from the logs alone.
 	slog.Info("authoring step start", "project_id", projectID, "step", step)
-	out, info, err := uc.run(ctx, projectID, step)
+	out, info, err := uc.run(ctx, projectID, step, opts)
 	uc.traceEnd(projectID, step, out, info, err, started)
 	if errors.Is(err, ErrGenerateBusy) || errors.Is(err, ErrLLMNotConfigured) {
 		// Not a run: nothing started, so the journal gets no end line either.
@@ -298,6 +315,8 @@ func (uc *GenerateAuthoringUseCase) traceEnd(
 type runInfo struct {
 	partialChars int
 	usage        TokenUsage
+	// codeOpts are the code step's run options (CR-050 FR-4).
+	codeOpts CodeRunOptions
 }
 
 // logError never fails the run: it is a trace, and losing a trace must not
@@ -333,9 +352,9 @@ func (uc *GenerateAuthoringUseCase) logError(
 }
 
 func (uc *GenerateAuthoringUseCase) run(
-	ctx context.Context, projectID, step string,
+	ctx context.Context, projectID, step string, opts CodeRunOptions,
 ) (GeneratedStep, runInfo, error) {
-	var info runInfo
+	info := runInfo{codeOpts: opts}
 	out, err := uc.runInner(ctx, projectID, step, &info)
 	return out, info, err
 }

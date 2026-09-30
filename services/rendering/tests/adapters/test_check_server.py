@@ -25,7 +25,7 @@ async def test_returns_diagnostics_and_raw():
     fake = Fake(CheckOutcome(False, [CheckDiagnostic("boom", 4)], "raw text"))
     r = await client(fake).post("/v1/check/remotion", json={"code": "c", "scene_class_name": "creator"})
     assert r.status_code == 200
-    assert r.json() == {"ok": False, "diagnostics": [{"message": "boom", "line": 4, "kind": "compile"}],
+    assert r.json() == {"ok": False, "diagnostics": [{"message": "boom", "line": 4, "kind": "compile", "rule": ""}],
                         "raw": "raw text", "warnings": []}
     assert fake.calls == [("remotion", "c", "creator")]
     assert fake.layouts[0].subtitle_band is None and fake.layouts[0].video_font == ""
@@ -34,13 +34,13 @@ async def test_returns_diagnostics_and_raw():
 async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
     from domain.layout_rules import SubtitleBand
 
-    fake = Fake(CheckOutcome(False, [CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout")], "",
+    fake = Fake(CheckOutcome(False, [CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout", "text_overflow")], "",
                              ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]))
     r = await client(fake).post("/v1/check/remotion", json={
         "code": "c", "scene_class_name": "creator",
         "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
     assert r.json()["diagnostics"] == [
-        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout"}
+        {"message": "Shot 1.2, frame 85%: nhãn tràn", "line": 62, "kind": "layout", "rule": "text_overflow"}
     ]
     assert r.json()["warnings"] == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
     assert fake.layouts[0].subtitle_band == SubtitleBand("bottom", 240)

@@ -1,0 +1,138 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.row {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.badge {
+  padding: 1px 8px;
+  font-size: 12px;
+  font-weight: 700;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+}
+
+.pending {
+  background: var(--muted);
+}
+
+.running {
+  color: #fff;
+  background: var(--run);
+}
+
+.done {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.failed {
+  color: #fff;
+  background: var(--danger);
+}
+
+.source,
+.meta {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  margin-top: var(--space-xs);
+}
+
+.editor {
+  margin-top: var(--space-xs);
+}
+
+.code {
+  margin: var(--space-xs) 0 0;
+  max-height: 360px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  white-space: pre;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.summary {
+  margin: 0 0 var(--space-xs);
+  font-weight: 600;
+}
+
+.ok {
+  margin: 0 0 var(--space-xs);
+  color: var(--ok);
+  font-weight: 600;
+}
+
+.waiting {
+  margin: 0 0 var(--space-xs);
+  color: var(--warn);
+  font-weight: 600;
+}
+
+.error {
+  margin: var(--space-xs) 0 0;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.notice {
+  margin: 0 0 var(--space-xs);
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.chunkField {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.chunkLabel {
+  font-weight: 600;
+}
+
+.chunkInput {
+  width: 5em;
+}
+
+.chunkHint {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
