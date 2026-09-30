@@ -23,7 +23,6 @@
       "Bash(git clean *)",
       "Bash(git branch -D *)",
       "Bash(docker exec *)",
-      "Bash(*migrate-authoring-data.sh*)",
       "Edit(/.github/**)",
       "Edit(/.claude/settings.json)",
       "Edit(/.claude/settings.local.json)"

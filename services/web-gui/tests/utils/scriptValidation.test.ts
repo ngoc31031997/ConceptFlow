@@ -21,7 +21,7 @@ describe("validateScript", () => {
 
   it("báo còn dính dòng markdown ``` thay vì lỗi cú pháp Python mơ hồ", () => {
     // Bug report 2026-09-12: Creator copy nguyên khối ```python ... ``` từ AI
-    // vào ScriptEditor. ScriptEditor tự gỡ khối trọn vẹn qua
+    // vào ô code. Ô code ở bước Kỹ sư tự gỡ khối trọn vẹn qua
     // stripMarkdownCodeFence; luật này là lưới an toàn cho phần còn sót (ví dụ
     // chỉ còn dòng mở, thiếu dòng đóng).
     const withFence = "```python\nfrom conceptflow import *\n";

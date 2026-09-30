@@ -109,8 +109,7 @@ export function ManimEngineerStepPage() {
   // fence — pasting that whole block (fence included) is the single most
   // common way this round trip fails: the fence markers are not valid
   // Python/TSX, so esbuild/ast.parse chokes on line 1 with a syntax error
-  // that says nothing about the real cause. Strip it the same way
-  // ScriptEditor already does for the "draft"/"ready" situations.
+  // that says nothing about the real cause. Strip it before storing.
   const setCode = (value: string) => dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(value) });
   // validateScript only understands Manim's self.narrate/ConceptFlowScene
   // conventions; validateRemotionScript checks the structural rules the

@@ -13,7 +13,7 @@
 }
 
 /*
-  Source "blank" has no ScriptEditor — the 2-column grid above would still
+  Source "blank" has no editor column — the 2-column grid above would still
   reserve that column's ~1.4fr, leaving the assistant cramped into a narrow
   strip with the rest of the page empty beside it. Full width instead: since
   ScriptAssistant itself now splits into form + live prompt preview when

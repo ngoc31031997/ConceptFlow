@@ -2145,3 +2145,16 @@ Các lỗi nhỏ còn lại để làm sau:
 **AI Response**: Cập nhật thiết kế: giữ toàn bộ nhóm B (công cụ chạy tay); xoá `scripts/migrate-authoring-data.sh` (Creator đã chạy) và 2 bản nháp trong `docs/`; nhóm A xoá như đề xuất. Commit thiết kế, chuyển sang /code.
 **Impact Assessment**: web-gui, rendering, authoring-service, orchestrator, repo gốc (chỉ xoá file). Không đổi contract, DB.
 **Artifacts Affected**: `aidlc-docs/construction/plans/cr-053-remove-unused-files-design.md`, `aidlc-docs/audit.md`.
+
+## CR-053 — Code xong, chờ duyệt
+**Timestamp**: 2026-09-30T01:00:00Z
+**User Input**: "ok làm đi" (sau khi chọn 1a, 2a, 3a)
+**AI Response**: Xoá file theo mục 7 của thiết kế (22 file):
+- web-gui: `ScriptEditor.tsx` + `.module.css` + test, `useRequireScript.ts` + test, `useVoiceCalibration.ts`, `public/favicon-48.png`; bỏ `fetchVoiceCalibration` trong `src/api/client.ts`. Sửa 4 chú thích còn nhắc tên `ScriptEditor` (`ManimEngineerStepPage.tsx`, `WizardSteps.module.css`, `scriptValidation.ts`, `tests/utils/scriptValidation.test.ts`); không đổi code.
+- rendering: `conceptflow/fonts.py`.
+- authoring-service: `internal/adapters/logging/correlation.go`, `internal/application/idgen.go`, `internal/domain/topic.go`, `clip_rules.go` + test, `script_edit.go` + test.
+- orchestrator: `internal/adapters/logging/correlation.go`, `internal/domain/testdata/` (4 file).
+- Repo gốc: `scripts/migrate-authoring-data.sh`, `docs/story_architect_tu_lieu.txt`, `docs/format_case_study_essay.json`; bỏ dòng `Bash(*migrate-authoring-data.sh*)` trong `.claude/settings.json`.
+Giữ nguyên nhóm B (công cụ chạy tay) theo lựa chọn 1a. `git grep` không còn tham chiếu tới file đã xoá ngoài `aidlc-docs/`.
+**Impact Assessment**: authoring-service `go vet` + `go test ./...` pass; orchestrator `go vet` + `go test ./...` pass; web-gui `tsc -b` sạch, vitest 62 file / 393 test pass (trước là 402 test, bớt 9 test của 2 file đã xoá); rendering pytest 351 pass, 11 skipped (chạy bằng `.venv/bin/python -m pytest` vì script `.venv/bin/pytest` trỏ tới đường dẫn cũ `ConcertFlow/...`). Rebuild authoring-service, rendering (healthy), web-gui (đang chạy; không có healthcheck); orchestrator build ra image giống hệt image đang chạy (`2aee15d1…`) nên container không cần tạo lại, vẫn healthy. Kiểm trực tiếp: web-gui `/`, `favicon.ico`, `favicon-16/32.png`, `site.webmanifest` trả 200; gateway `/v1/projects`, `/v1/script-templates` trả 200. Chưa đi tay qua wizard trên trình duyệt.
+**Artifacts Affected**: services/web-gui, services/rendering, services/authoring-service, services/orchestrator, scripts/, docs/, `.claude/settings.json`, `aidlc-docs/audit.md`.
