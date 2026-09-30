@@ -13,7 +13,7 @@
       "Bash(git push origin *)",
       "Bash(git push -u origin *)",
       "Bash(make help)",
-      "Bash(.claude/skills/ship/ship.sh *)"
+      "Bash(.claude/skills/deliver/deliver.sh *)"
     ],
     "ask": [
       "Bash(git checkout -- *)",

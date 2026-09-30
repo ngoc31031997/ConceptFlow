@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# Ship an approved, already committed branch: push it, merge it into main in the
-# primary checkout, push main, then rebuild and restart only the Docker services
-# whose code changed, and wait until they report healthy.
+# Deliver an approved, already committed branch: push it, merge it into main in the
+# primary checkout, push main, refresh the graphify code graph for the new main,
+# then rebuild and restart only the Docker services whose code changed, and wait
+# until they report healthy.
 #
-# Usage: .claude/skills/ship/ship.sh <branch>
+# Usage: .claude/skills/deliver/deliver.sh <branch>
 # Exit codes: 1 bad input/state, 2 push failed, 3 merge conflict (merge aborted),
-#             4 docker build/up failed, 5 a service is not healthy.
+#             4 docker build/up failed, 5 a service is not healthy,
+#             6 everything else succeeded but the graphify refresh failed.
 set -euo pipefail
 
 branch="${1:-}"
 [ -n "$branch" ] || { echo "usage: $0 <branch>" >&2; exit 1; }
-[ "$branch" != "main" ] || { echo "ERROR: refusing to ship main itself; ship a feature/fix/chore branch" >&2; exit 1; }
+[ "$branch" != "main" ] || { echo "ERROR: refusing to deliver main itself; deliver a feature/fix/chore branch" >&2; exit 1; }
 git rev-parse --verify --quiet "refs/heads/$branch" >/dev/null || { echo "ERROR: no local branch $branch" >&2; exit 1; }
 
 # The first worktree is the primary checkout; main and the compose project live there.
@@ -47,10 +49,22 @@ fi
 echo "== push main"
 git -C "$main_wt" push origin main || { echo "ERROR: push of main failed" >&2; exit 2; }
 
+# Keep graphify-out/ in step with the new main. A failure here does not undo the
+# merge or skip the rebuild; it is reported through exit code 6 at the end.
+graph_status=0
+echo "== refresh graphify graph"
+"$main_wt/scripts/graph.sh" build || { graph_status=6; echo "ERROR: graphify refresh failed; run 'make graph' in $main_wt" >&2; }
+graph_built=$(sed -n 's/.*"built_at_commit": *"\([0-9a-f]*\)".*/\1/p' "$main_wt/graphify-out/graph.json" 2>/dev/null | head -1 || true)
+if [ "$graph_status" -eq 0 ] && [ "$graph_built" != "$(git -C "$main_wt" rev-parse HEAD)" ]; then
+  graph_status=6
+  echo "ERROR: graphify-out/graph.json built_at_commit ($graph_built) is not main HEAD" >&2
+fi
+[ "$graph_status" -eq 0 ] && echo "== graph built at $(git -C "$main_wt" rev-parse --short HEAD)"
+
 changed=$(git -C "$main_wt" diff --name-only "$before" HEAD)
 if [ -z "$changed" ]; then
   echo "== $branch was already in main; nothing changed, no rebuild"
-  exit 0
+  exit "$graph_status"
 fi
 
 if printf '%s\n' "$changed" | grep -qx 'docker-compose.yml'; then
@@ -68,7 +82,7 @@ done
 
 if [ "${#svcs[@]}" -eq 0 ]; then
   echo "== no service code changed; no rebuild"
-  exit 0
+  exit "$graph_status"
 fi
 
 echo "== rebuild: ${svcs[*]}"
@@ -98,4 +112,5 @@ while :; do
 done
 
 (cd "$main_wt" && docker compose ps "${svcs[@]}")
-echo "== shipped $branch -> main ($(git -C "$main_wt" rev-parse --short HEAD)); healthy: ${svcs[*]}"
+echo "== delivered $branch -> main ($(git -C "$main_wt" rev-parse --short HEAD)); healthy: ${svcs[*]}"
+exit "$graph_status"

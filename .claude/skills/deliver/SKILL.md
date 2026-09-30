@@ -1,15 +1,16 @@
 ---
-name: ship
-description: After the Creator approves the code, commit the current branch, push it, merge it into main, pull main and rebuild the changed Docker services. Run only when the Creator types /ship.
+name: deliver
+description: After the Creator approves the code, commit the current branch, push it, merge it into main, pull main, refresh the graphify code graph for the new main and rebuild the changed Docker services. Run only when the Creator types /deliver.
 disable-model-invocation: true
-model: haiku
+model: sonnet
+effort: medium
 argument-hint: "[optional commit message hint]"
-allowed-tools: Bash(git status*), Bash(git diff*), Bash(git log*), Bash(git branch*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(.claude/skills/ship/ship.sh*)
+allowed-tools: Bash(git status*), Bash(git diff*), Bash(git log*), Bash(git branch*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(.claude/skills/deliver/deliver.sh*)
 ---
 
-# /ship
+# /deliver
 
-The Creator typing `/ship` is the approval. Do exactly the steps below, in order, and nothing else.
+The Creator typing `/deliver` is the approval. Do exactly the steps below, in order, and nothing else.
 Do not edit code, do not fix anything, and do not work around errors: when a step fails, stop and report.
 
 ## 1. Check the branch
@@ -43,15 +44,15 @@ Run `git rev-parse --abbrev-ref HEAD` and `git status -s`.
    - Write only about changes that are really in the diff. Do not list files one by one unless each file is its own change.
    - If `$ARGUMENTS` is not empty, use it as the basis for the subject and the brief.
 
-## 3. Ship
+## 3. Deliver
 
 Run the script with the branch name. Give the Bash call a 600000 ms timeout, because Docker builds are slow:
 
 ```
-.claude/skills/ship/ship.sh <branch>
+.claude/skills/deliver/deliver.sh <branch>
 ```
 
-The script pushes the branch, fast-forwards `main` in the primary checkout, merges the branch into it, pushes `main`, rebuilds and restarts only the services whose code changed, then waits for them to be healthy.
+The script pushes the branch, fast-forwards `main` in the primary checkout, merges the branch into it, pushes `main`, refreshes the graphify graph (`scripts/graph.sh build`, so `graphify-out/graph.json` is built at the new `main` HEAD), rebuilds and restarts only the services whose code changed, then waits for them to be healthy.
 
 ## 4. Report
 
@@ -59,6 +60,7 @@ Answer the Creator in Vietnamese, in a few lines:
 
 - the commit hash and subject;
 - whether the merge into `main` and the push succeeded;
+- whether the graphify graph was refreshed (the commit it was built at);
 - which services were rebuilt and whether they are healthy, or "no rebuild needed".
 
 If the script exits non-zero, give its error lines and the likely cause, and STOP. Do not retry, and do not resolve conflicts:
@@ -70,5 +72,6 @@ If the script exits non-zero, give its error lines and the likely cause, and STO
 | 3 | merge conflict (already aborted, `main` unchanged) |
 | 4 | `docker compose build/up` failed |
 | 5 | a service is not healthy (the last log lines are printed) |
+| 6 | merge, push and rebuild succeeded, but the graphify refresh failed: tell the Creator to run `make graph` |
 
 If the output has `WARN: docker-compose.yml changed`, ask the Creator whether to recreate the whole stack.
