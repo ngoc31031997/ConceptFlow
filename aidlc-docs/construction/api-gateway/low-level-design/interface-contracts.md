@@ -1,10 +1,11 @@
 # Interface Contracts — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Routing Table (GUI-facing REST/SSE, tất cả prefix `/v1/`)
 
 | Path | Method | Proxy tới | Ghi chú |
 |---|---|---|---|
-| `/v1/plugins` | GET | Content Plugin Service (`GET /v1/plugins`) | passthrough |
 | `/v1/sagas/render` | POST | Orchestrator Service (`POST /v1/sagas/render`) | passthrough |
 | `/v1/sagas/publish` | POST | Orchestrator Service (`POST /v1/sagas/publish`) | passthrough |
 | `/v1/projects/{project_id}` | GET | Orchestrator Service (`GET /v1/projects/{project_id}`) | passthrough |

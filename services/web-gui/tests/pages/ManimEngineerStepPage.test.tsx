@@ -150,6 +150,8 @@ describe("ManimEngineerStepPage", () => {
     // prompt role (remotion_engineer instead of manim_engineer).
     // CR-031 — thu gọn sau PipelineSettingsBar's "Đổi".
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
+    // CR-051: screen titles name the step as the rail does.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 6 — Code");
     expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("render-engine-remotion"));
     await waitFor(() =>

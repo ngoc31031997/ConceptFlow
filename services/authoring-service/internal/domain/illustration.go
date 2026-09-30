@@ -7,20 +7,17 @@ import (
 	"strings"
 )
 
-// The channel's illustration style rules, the building blocks a drawing may
-// use, and three reference drawings (CR-044). The rules are what the AI drawer
-// is held to and what web-gui shows; rendering/domain/illustration_style.py
-// checks the [S..] rules it can check mechanically, and the rendering test
-// suite holds the reference drawings to zero findings.
+// The channel's illustration style rules and the building blocks a drawing may
+// use (CR-044). The rules are what the AI drawer is held to and what web-gui
+// shows; rendering/domain/illustration_style.py checks the [S..] rules it can
+// check mechanically. The reference drawings (Hình mẫu) are library rows the
+// Creator picks (CR-052), not text shipped with the image.
 //
 //go:embed prompts/illustration_style_vi.txt
 var illustrationStyleVI string
 
 //go:embed prompts/illustration_helpers_vi.txt
 var illustrationHelpersVI string
-
-//go:embed prompts/illustration_exemplars_vi.txt
-var illustrationExemplarsVI string
 
 // IllustrationStyleGuide is the rule text, as shown to the Creator and the model.
 func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyleVI) }
@@ -71,16 +68,68 @@ type Illustration struct {
 	Description string   `json:"description"` // what it looks like and when to use it
 	Usage       string   `json:"usage"`       // one-line API: props and box aspect
 	Code        string   `json:"code,omitempty"`
-	// Builtin rows are read-only: the CR-043 kit (code ships in the image,
-	// Code is empty) and the style exemplars (Exemplar, code in the row).
-	Builtin    bool               `json:"builtin"`
-	Exemplar   bool               `json:"exemplar"`
-	Warnings   []CodeFinding      `json:"warnings"`
-	Status     IllustrationStatus `json:"status"`
-	Version    int                `json:"version"`
-	HasPreview bool               `json:"has_preview"`
-	CreatedAt  string             `json:"created_at"`
-	UpdatedAt  string             `json:"updated_at"`
+	// Builtin rows are the CR-043 kit: code ships in the image, Code is empty.
+	Builtin bool `json:"builtin"`
+	// Exemplar rows are the Hình mẫu the AI drawer learns from (CR-052), filed
+	// in ExemplarFolderID. A copy made by "Đặt làm mẫu" carries SourceID (empty
+	// again once its source is deleted); one of the three original exemplars
+	// carries HomeFolderID, where "Bỏ làm mẫu" files it back.
+	Exemplar     bool               `json:"exemplar"`
+	SourceID     string             `json:"source_id,omitempty"`
+	HomeFolderID string             `json:"home_folder_id,omitempty"`
+	Warnings     []CodeFinding      `json:"warnings"`
+	Status       IllustrationStatus `json:"status"`
+	Version      int                `json:"version"`
+	HasPreview   bool               `json:"has_preview"`
+	CreatedAt    string             `json:"created_at"`
+	UpdatedAt    string             `json:"updated_at"`
+}
+
+// CR-052 — the Hình mẫu folder and how many drawings it holds at most.
+const (
+	ExemplarFolderID = "hinh-mau"
+	MaxExemplars     = 5
+)
+
+// ReadOnly rows cannot be edited, redrawn, re-reviewed or deleted: the kit
+// ships in the image, and an exemplar is changed by picking another one.
+func (i Illustration) ReadOnly() bool { return i.Builtin || i.Exemplar }
+
+// IsExemplarCopy is an exemplar made by "Đặt làm mẫu". It only teaches the AI
+// drawer: its source is still in the library, so videos are offered the source.
+func (i Illustration) IsExemplarCopy() bool { return i.Exemplar && i.HomeFolderID == "" }
+
+var exportFunctionRe = regexp.MustCompile(`(?m)^export function ([A-Z][A-Za-z0-9]*)(\s*\()`)
+
+// ExemplarCopyName is the component name of an exemplar copy of name:
+// <name>Mau, then <name>Mau2, <name>Mau3... while taken says it is used.
+func ExemplarCopyName(name string, taken func(string) bool) string {
+	for n := 1; ; n++ {
+		suffix := "Mau"
+		if n > 1 {
+			suffix += fmt.Sprint(n)
+		}
+		base := name
+		if room := 41 - len(suffix); len(base) > room {
+			base = base[:room]
+		}
+		if candidate := base + suffix; !taken(candidate) {
+			return candidate
+		}
+	}
+}
+
+// RenameExport renames the exported component of a drawing's code, and the
+// usage line's tags, so a copy can live next to its source under its own name.
+func RenameExport(code, usage, to string) (string, string, error) {
+	m := exportFunctionRe.FindStringSubmatchIndex(code)
+	if m == nil {
+		return code, usage, fmt.Errorf("code không có dòng \"export function <Tên>(\" để đổi tên")
+	}
+	from := code[m[2]:m[3]]
+	code = code[:m[2]] + to + code[m[3]:]
+	usage = regexp.MustCompile(`<`+from+`\b`).ReplaceAllLiteralString(usage, "<"+to)
+	return code, usage, nil
 }
 
 var illustrationNameRe = regexp.MustCompile(`^[A-Z][A-Za-z0-9]{1,40}$`)
@@ -123,6 +172,8 @@ func NormalizeTags(tags []string) []string {
 // agreed with the Creator 2026-09-27). The Creator can add more.
 func SystemIllustrationFolders() []IllustrationFolder {
 	rows := []IllustrationFolder{
+		// CR-052: filled only through "Đặt làm mẫu", never by saving a drawing into it.
+		{ID: ExemplarFolderID, Name: "Hình mẫu", Description: "hình mẫu chuẩn AI vẽ học theo (tối đa 5)"},
 		{ID: "con-nguoi", Name: "Con người", Description: "người, nghề nghiệp, nhóm người"},
 		{ID: "dong-vat", Name: "Động vật", Description: "thú, chim, cá, côn trùng"},
 		{ID: "thuc-vat", Name: "Thực vật", Description: "cây, hoa, lá, chậu cây"},
@@ -192,31 +243,4 @@ func BuiltinIllustrations() []Illustration {
 		b("Toothbrush", "Bàn chải đánh răng", "co-the-suc-khoe", "bàn chải,đánh răng,vệ sinh", "Bàn chải có kem, lông quay lên hoặc xuống.", "<Toothbrush color paste bristlesDown /> — 400×100"),
 		b("Toothpaste", "Kem đánh răng", "co-the-suc-khoe", "kem đánh răng,vệ sinh", "Tuýp kem đánh răng.", "<Toothpaste color /> — 300×120"),
 	}
-}
-
-var exemplarRe = regexp.MustCompile("(?s)=== (\\w+) — ([^=]*?) ===\n```tsx\n(.*?)```")
-
-// ExemplarIllustrations are the reference drawings of the style guide, seeded
-// as read-only library rows so the Creator sees them rendered and videos can
-// use them. Their code is the text the AI drawer is shown.
-func ExemplarIllustrations() []Illustration {
-	meta := map[string]struct{ title, folder, tags, usage string }{
-		"SchoolBus":  {"Xe buýt", "phuong-tien", "xe,xe buýt,trường học,giao thông", "<SchoolBus color mood moving /> — 320×210"},
-		"Cat":        {"Con mèo", "dong-vat", "mèo,thú cưng,con vật", "<Cat color mood /> — 220×240"},
-		"Microscope": {"Kính hiển vi", "khoa-hoc-cong-nghe", "kính hiển vi,khoa học,phòng thí nghiệm", "<Microscope color /> — 180×240"},
-	}
-	var out []Illustration
-	for _, m := range exemplarRe.FindAllStringSubmatch(illustrationExemplarsVI, -1) {
-		info, ok := meta[m[1]]
-		if !ok {
-			continue
-		}
-		out = append(out, Illustration{
-			ID: "exemplar-" + m[1], Name: m[1], Title: info.title, FolderID: info.folder,
-			Tags: NormalizeTags(strings.Split(info.tags, ",")), Description: "Hình mẫu chuẩn của luật style: " + strings.TrimSpace(m[2]) + ".",
-			Usage: info.usage, Code: strings.TrimSpace(m[3]) + "\n",
-			Builtin: true, Exemplar: true, Status: IllustrationApproved, Version: 1,
-		})
-	}
-	return out
 }

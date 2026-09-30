@@ -55,6 +55,13 @@ func TestDrawPromptCarriesRulesHelpersExemplarsAndTheCreatorsApprovedDrawings(t 
 		Code: "export function Scooter() {}", Status: domain.IllustrationApproved}
 	repo.rows["other"] = domain.Illustration{ID: "other", Name: "Dog", FolderID: "dong-vat",
 		Code: "export function Dog() {}", Status: domain.IllustrationApproved}
+	// CR-052: the Hình mẫu are library rows the Creator picked.
+	for n, name := range []string{"SchoolBus", "Cat", "Microscope"} {
+		id := "exemplar-" + name
+		repo.rows[id] = domain.Illustration{ID: id, Name: name, FolderID: domain.ExemplarFolderID, Exemplar: true,
+			Code: "export function " + name + "() {}", Status: domain.IllustrationApproved,
+			CreatedAt: "2026-09-2" + string(rune('1'+n)) + "T00:00:00Z"}
+	}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
 	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
@@ -69,6 +76,52 @@ func TestDrawPromptCarriesRulesHelpersExemplarsAndTheCreatorsApprovedDrawings(t 
 	}
 	if strings.Contains(sys, "export function Dog") || strings.Contains(sys, "{{") {
 		t.Error("drawer prompt holds another folder's drawing or an unfilled placeholder")
+	}
+	if a, b := strings.Index(sys, "SchoolBus"), strings.Index(sys, "Microscope"); a > b {
+		t.Error("Hình mẫu must come oldest first")
+	}
+}
+
+func TestDrawPromptWithoutExemplarsSaysSoAndKeepsAtMostTwoOwnDrawings(t *testing.T) {
+	repo := newFakeIllustrationRepo()
+	for _, name := range []string{"Scooter", "Truck", "Van"} {
+		repo.rows[name] = domain.Illustration{ID: name, Name: name, FolderID: "phuong-tien",
+			Code: "export function " + name + "() {}", Status: domain.IllustrationApproved}
+	}
+	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
+		t.Fatal(err)
+	}
+	if n := strings.Count(llm.calls[0].System, "hình Creator đã duyệt, cùng thư mục"); n != maxOwnReferences {
+		t.Fatalf("want %d own references, got %d", maxOwnReferences, n)
+	}
+
+	empty := newFakeIllustrationRepo()
+	llm = &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
+	uc = NewIllustrationsUseCase(empty, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(llm.calls[0].System, "Chưa có hình tham chiếu") {
+		t.Fatal("an empty reference section must say so")
+	}
+}
+
+func TestDrawAndRedrawRefuseTheExemplarFolderAndExemplars(t *testing.T) {
+	repo := newFakeIllustrationRepo()
+	repo.rows["ex"] = domain.Illustration{ID: "ex", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true,
+		Code: busCode, Status: domain.IllustrationApproved}
+	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe", FolderID: domain.ExemplarFolderID}); !errors.Is(err, ErrExemplarFolder) {
+		t.Fatalf("draw into Hình mẫu: %v", err)
+	}
+	if _, err := uc.Redraw(context.Background(), "ex", "", ""); !errors.Is(err, ErrIllustrationReadOnly) {
+		t.Fatalf("redraw an exemplar: %v", err)
+	}
+	if len(llm.calls) != 0 {
+		t.Fatal("the model must not be called")
 	}
 }
 

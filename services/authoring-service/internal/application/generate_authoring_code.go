@@ -32,7 +32,7 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		return GeneratedStep{}, fmt.Errorf("load storyboard: %w", err)
 	}
 	if strings.TrimSpace(storyboard) == "" {
-		return GeneratedStep{}, errors.New("chưa có storyboard — hãy chạy bước 1b trước")
+		return GeneratedStep{}, errors.New("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
 	}
 	topic, err := uc.projects.GetAuthoringTopic(ctx, projectID)
 	if err != nil {

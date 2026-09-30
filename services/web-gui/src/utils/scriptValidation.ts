@@ -67,8 +67,8 @@ export function stripMarkdownCodeFence(script: string): string {
 
 /**
  * Dấu hiệu còn sót dòng backtick mở đầu dù không khớp trọn khối (ví dụ
- * Creator xóa mất dòng ``` đóng, hoặc dán thêm chữ phía trước). ScriptEditor
- * tự gỡ khối trọn vẹn qua `stripMarkdownCodeFence`; kiểm tra này chỉ để bắt
+ * Creator xóa mất dòng ``` đóng, hoặc dán thêm chữ phía trước). Ô code ở bước
+ * Kỹ sư tự gỡ khối trọn vẹn qua `stripMarkdownCodeFence`; kiểm tra này chỉ để bắt
  * phần còn sót và nói đúng vấn đề thay vì để lỗi cú pháp Python mơ hồ ở
  * `ast.parse` (dòng 1: invalid syntax) là thứ đầu tiên Creator nhìn thấy.
  */

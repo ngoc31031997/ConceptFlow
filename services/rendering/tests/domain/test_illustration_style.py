@@ -7,8 +7,9 @@ import pytest
 
 from domain.illustration_style import check_style
 
-EXEMPLARS = (Path(__file__).resolve().parents[3] / "authoring-service" / "internal" / "domain" / "prompts"
-             / "illustration_exemplars_vi.txt")
+# CR-052: ba hình mẫu gốc giờ là dữ liệu trong DB của authoring-service; bản
+# code của chúng được giữ ở đây làm dữ liệu kiểm thử cho bộ kiểm tra style.
+EXEMPLARS = Path(__file__).resolve().parents[1] / "fixtures" / "illustration_exemplars_vi.txt"
 
 CLEAN = """import React from 'react';
 import {useCurrentFrame} from 'remotion';
@@ -42,7 +43,6 @@ def test_hinh_sach_khong_co_gi():
     assert rules(CLEAN) == ([], [])
 
 
-@pytest.mark.skipif(not EXEMPLARS.exists(), reason="authoring-service không có trong cây này")
 def test_ba_hinh_mau_chuan_sach_hoan_toan():
     found = exemplars()
     assert [n for n, _ in found] == ["SchoolBus", "Cat", "Microscope"]

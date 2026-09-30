@@ -1,36 +1,38 @@
 # Integration Test Instructions
 
 ## Status: NOT executed in this pass
+> **Cập nhật (CR-055, 2026-09-30)**: service hiện có — Python: `tts`, `rendering`, `video-assembly`, `publisher`, `llm-service`; Go: `orchestrator`, `authoring-service`; Node: `api-gateway`, `web-gui`; cộng `rabbitmq`, 6 Postgres (orchestrator, authoring-service, tts, rendering, video-assembly, publisher), `ollama` (+ `ollama-pull` chạy một lần), `loki`/`promtail`/`grafana` — 22 mục trong `docker compose config --services`, 9 image tự build. `content-plugin` (gỡ ở CR-020) và `script-processing` (gỡ ở CR-040) không còn.
+
 This pass (and the original 2026-08-31 pass) validated `docker compose config` (full 16-container topology, now including api-gateway and web-gui) but did **not** run `docker compose up` for the full stack and did **not** execute any cross-service integration test. Reasons:
 1. Full stack startup requires real secrets (`GOOGLE_OAUTH_CLIENT_ID`/`SECRET`/`REDIRECT_URI` for the `publisher` service's YouTube upload flow) that are not available in this environment.
-2. Starting the full stack would leave 16 containers (9 app services + rabbitmq + 6 postgres sidecars — content-plugin, script-processing, tts, rendering, video-assembly, publisher each have their own DB) running, which the Build and Test task scope explicitly asked to avoid.
+2. Starting the full stack would leave the full container set (xem ghi chú trên) running, which the Build and Test task scope explicitly asked to avoid.
 3. Docker Desktop was not running on the verification machine during this pass.
 
 All 10 units are now built, so a true end-to-end browser-driven path (Web GUI → API Gateway → Orchestrator) exists for the first time. The scenarios below are written from the Saga message flow documented in `aidlc-docs/construction/orchestrator-service/low-level-design/sequence-flows.md` and the Web GUI's `sequence-flows.md`, as **instructions for a future integration-test run**, not results of an actual run.
 
 ## Prerequisites (for when this is actually run)
 - `.env` populated with real `RABBITMQ_USER`/`PASS`, `POSTGRES_USER`/`PASS`, and Google OAuth credentials (`GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`) — a real Google Cloud project with the YouTube Data API enabled and an OAuth consent screen configured is needed to actually exercise the publisher's upload step.
-- Docker Desktop running with enough resources for 16 containers (9 services + rabbitmq + 6 Postgres instances).
+- Docker Desktop running with enough resources for the full stack (xem ghi chú trên; ollama cần vài GB RAM khi được dùng).
 - Sagas can now be triggered either directly against `orchestrator`'s REST API (via API Gateway's `/v1/sagas/render` proxy route, e.g. `curl`/Postman) or end-to-end through the browser at `http://localhost:3000` (Web GUI) — the latter is the more representative real-user path and should be preferred once available.
 
 ## Test Scenarios (derived from sequence-flows.md)
 
-### Scenario 1: Start Render Saga → Parse Script (Flow 1)
-- **Description**: Orchestrator accepts a new render saga, persists a `draft` Project + `parse_script` SagaStep, enqueues a `parse_script` command via the transactional outbox, and script-processing picks it up off RabbitMQ.
-- **Setup**: Full stack up (`docker compose up -d`); orchestrator and script-processing healthy.
+### Scenario 1: Start Render Saga → Validate Script (Flow 1, CR-040)
+- **Description**: Orchestrator accepts a new render saga, persists the `validate_script` SagaStep, enqueues a `validate_script` command via the transactional outbox, and rendering picks it up off RabbitMQ.
+- **Setup**: Full stack up (`docker compose up -d`); orchestrator and rendering healthy.
 - **Test Steps**:
   1. `POST /v1/sagas/render` on orchestrator with a script payload.
   2. Assert `201 {saga_id, status: started}`.
-  3. Poll orchestrator's Postgres (`saga_steps` table) or RabbitMQ management UI to confirm `parse_script` command was published within ~500ms (outbox poll interval).
-  4. Confirm script-processing consumed the message (check its logs / inbox table for `message_id`).
-- **Expected Results**: Project status transitions to `parsing_script`; script-processing receives exactly one `parse_script` command.
+  3. Poll orchestrator's Postgres (`saga_steps` table) or RabbitMQ management UI to confirm `validate_script` command was published on `rendering.commands` within ~500ms (outbox poll interval).
+  4. Confirm rendering consumed the message (check its logs / inbox table for `message_id`).
+- **Expected Results**: rendering receives exactly one `validate_script` command and replies `script_validated` (or `validation_failed` → Project `failed_at_validate_script`).
 - **Cleanup**: `docker compose down -v` to drop volumes/state between test runs.
 
-### Scenario 2: Classify Scenes → Synthesize Speech (Flow 2, content-plugin → tts)
-- **Description**: content-plugin classifies scenes and emits `scenes_classified`; orchestrator advances the saga and enqueues `synthesize_speech` for tts.
-- **Setup**: Continue from Scenario 1's saga (or seed a Project already at `classify_scenes` step).
-- **Test Steps**: Publish/await `scenes_classified` event, verify orchestrator's inbox dedupes on `message_id`, verify Project status becomes `synthesizing_speech`, verify tts receives `synthesize_speech`.
-- **Expected Results**: Exactly-once processing (inbox dedup), correct state transition, progress event published to the `PROG` publisher (would be consumed by API Gateway's SSE fanout, not yet built).
+### Scenario 2: Validate Script → Synthesize Speech (Flow 2, rendering → tts)
+- **Description**: rendering emits `script_validated`; orchestrator advances the saga and enqueues `synthesize_speech` for tts.
+- **Setup**: Continue from Scenario 1's saga.
+- **Test Steps**: Await `script_validated` event, verify orchestrator's inbox dedupes on `message_id`, verify the `synthesize_speech` step starts, verify tts receives `synthesize_speech`.
+- **Expected Results**: Exactly-once processing (inbox dedup), correct state transition, progress event on `progress.fanout` reaches API Gateway's SSE.
 - **Cleanup**: as above.
 
 ### Scenario 3: Render Failure → Retry (Flows 4 & 5, rendering → orchestrator)
@@ -39,8 +41,8 @@ All 10 units are now built, so a true end-to-end browser-driven path (Web GUI �
 - **Expected Results**: No duplicate artifacts for already-succeeded scenes; saga eventually reaches `rendering` → later steps.
 
 ### Scenario 4: Out-of-Order / Duplicate Event Safeguard (Flow 6)
-- **Description**: A `scenes_classified` event redelivered (or arriving late) for a step already `completed` is logged as unexpected and skipped rather than corrupting state.
-- **Test Steps**: Manually republish a `scenes_classified` message with a `saga_id` whose step is already `completed`; confirm orchestrator logs a warning and does not re-advance the state machine; confirm the message is still acked.
+- **Description**: A `script_validated` event redelivered (or arriving late) for a step already `completed` is logged as unexpected and skipped rather than corrupting state.
+- **Test Steps**: Manually republish a `script_validated` message with a `saga_id` whose step is already `completed`; confirm orchestrator logs a warning and does not re-advance the state machine; confirm the message is still acked.
 
 ### Scenario 5: Full Saga → Publish (Flow 7, video-assembly → publisher → YouTube)
 - **Description**: End-to-end saga from render through publish, exercising every service and requiring real YouTube OAuth credentials.
@@ -49,10 +51,10 @@ All 10 units are now built, so a true end-to-end browser-driven path (Web GUI �
 - **Note**: This is the only scenario that truly requires external network access and real secrets; the others can run against a fully local Docker Compose stack with RabbitMQ/Postgres only.
 
 ### Scenario 6: End-to-End via Web GUI (browser-driven, new — Web GUI's sequence-flows.md Flows 1-4)
-- **Description**: A Creator opens `http://localhost:3000`, composes a script, selects a plugin, submits render, watches live progress via SSE, previews the resulting video, connects YouTube, and publishes — with zero direct API calls from the tester.
+- **Description**: A Creator opens `http://localhost:3000`, composes a script through the authoring wizard, submits render, watches live progress via SSE, previews the resulting video, connects YouTube, and publishes — with zero direct API calls from the tester.
 - **Setup**: Full stack up (`docker compose up -d`), all services healthy, real Google OAuth credentials configured.
 - **Test Steps**:
-  1. Open `http://localhost:3000`, fill in script + plugin + language, submit.
+  1. Open `http://localhost:3000`, tạo project theo wizard (chủ đề, soạn kịch bản), duyệt, bấm render.
   2. Confirm navigation to `/projects/:id/render` and that `ProgressTracker` updates live as steps complete (verifies API Gateway's SSE fanout end-to-end, not just at the orchestrator level).
   3. Confirm auto-navigation to `/projects/:id/result` once `ready_to_publish`.
   4. Play the video via `VideoPlayer`, click "Kết nối YouTube", complete the OAuth consent flow, fill in `PublishForm`, submit.

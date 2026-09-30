@@ -129,7 +129,7 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
   });
 
   it("'Nhờ AI sửa' on a tile opens the editor with the warnings in the redraw note", async () => {
-    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "- [S3] BO TRÒN: góc bo.", exemplar_ids: [] });
+    vi.spyOn(apiClient, "getIllustrationStyle").mockResolvedValue({ rules: "- [S3] BO TRÒN: góc bo.", exemplar_ids: [], max_exemplars: 5 });
     const warned = { ...MOTO, illustration: ill({ id: "m1", name: "Motorbike", title: "Xe máy", warnings: [{ message: "[S3] <rect> không bo góc (thêm rx)", line: 7 }] }) };
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [warned], ready: false });
     renderPanel();
@@ -138,5 +138,19 @@ describe("ProjectIllustrationsPanel (CR-044)", () => {
     fireEvent.click(screen.getByTestId("illustration-warnings-fix-Motorbike"));
     const note = await screen.findByTestId("illustration-redraw-note");
     await waitFor(() => expect((note as HTMLTextAreaElement).value).toContain("- S3 · Bo tròn — dòng 7: <rect> không bo góc (thêm rx)"));
+  });
+
+  // CR-052: an original Hình mẫu reused by a video is read-only, like the kit.
+  it("offers no edit or approve on a reused Hình mẫu", async () => {
+    const cat: apiClient.ProjectIllustration = {
+      id: "r4", position: 1, name: "Cat", description: "Mèo", folder_id: "hinh-mau", shots: [], state: "reused",
+      illustration_id: "exemplar-Cat",
+      illustration: ill({ id: "exemplar-Cat", name: "Cat", title: "Con mèo", exemplar: true, folder_id: "hinh-mau", status: "approved" }),
+    };
+    vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [cat, MOTO], ready: false });
+    renderPanel();
+    expect(await screen.findByTestId("pi-edit-Motorbike")).toBeInTheDocument();
+    expect(screen.queryByTestId("pi-edit-Cat")).toBeNull();
+    expect(screen.queryByTestId("pi-approve-Cat")).toBeNull();
   });
 });

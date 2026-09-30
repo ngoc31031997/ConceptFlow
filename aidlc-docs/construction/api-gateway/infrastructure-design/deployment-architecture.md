@@ -1,5 +1,7 @@
 # Deployment Architecture — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Dockerfile (reference for Code Generation)
 ```dockerfile
 FROM node:20-alpine
@@ -20,7 +22,7 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       ORCHESTRATOR_URL: http://orchestrator:8000
-      CONTENT_PLUGIN_URL: http://content-plugin:8000
+      AUTHORING_SERVICE_URL: http://authoring-service:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
     ports:
@@ -35,7 +37,7 @@ services:
         condition: service_healthy
       orchestrator:
         condition: service_healthy
-      content-plugin:
+      authoring-service:
         condition: service_healthy
       publisher:
         condition: service_healthy

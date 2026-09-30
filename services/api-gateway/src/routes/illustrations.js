@@ -45,7 +45,11 @@ function illustrationsRouter(authoringClient, authoringSlowClient) {
     express.raw({ type: ['application/zip', 'application/x-zip-compressed', 'application/octet-stream'], limit: BACKUP_LIMIT }),
     slow,
   );
+  // CR-052: refused (409) while a video before its result screen uses the drawing.
   router.delete('/v1/admin/illustrations/:id', fast);
+  // CR-052 — Hình mẫu: making one copies and renders the drawing; undoing is a database change.
+  router.post('/v1/admin/illustrations/:id/exemplar', slow);
+  router.delete('/v1/admin/illustrations/:id/exemplar', fast);
   // A video's own drawing list: planning and drawing call a model.
   router.get('/v1/projects/:id/illustrations', fast);
   router.post('/v1/projects/:id/illustrations/plan', slow);

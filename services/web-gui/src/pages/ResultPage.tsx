@@ -17,13 +17,14 @@ import type { RenderQuality, VideoOutputMode } from "../context/ProjectDraftCont
 import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
+import { FLOW_RESULT, flowTitle } from "../utils/flow";
 
 /**
- * Bước 5 — "Kết quả" (bug report, 2026-09-12): trước đây trang này vừa xem
+ * Bước 13 — "Kết quả" (bug report, 2026-09-12): trước đây trang này vừa xem
  * lại video vừa đăng bài cùng lúc, nên "chỉ muốn xem/chỉnh sửa" và "chỉ muốn
  * đăng" luôn phải đi qua chung một trang dài. Tách ra: trang này CHỈ xem lại
  * và các thao tác khác (render lại, tạo bản Shorts, xem input, xóa) — đăng
- * bài chuyển hẳn sang `PublishPage` (Bước 6), tới đây bằng nút "Tiếp tục để
+ * bài chuyển hẳn sang `PublishPage` (bước 14), tới đây bằng nút "Tiếp tục để
  * đăng" hoặc link "Xem chi tiết" khi đã đăng rồi.
  */
 export function ResultPage() {
@@ -75,8 +76,8 @@ export function ResultPage() {
         video_format_id: project.video_format_id,
         background_music_volume: project.background_music_volume,
       });
-      // Render lại chạy lại saga TỪ ĐẦU, nên nó bắt đầu ở bước 4 (chạy thử +
-      // duyệt dàn ý), không phải bước 5.
+      // Render lại chạy lại saga TỪ ĐẦU, nên nó bắt đầu ở bước 7 (chạy thử, rồi
+      // duyệt dàn ý ở 8), không phải bước 9.
       navigate(`/projects/${projectId}/validate`);
     } catch (err) {
       setRerenderError(err instanceof ApiError ? err.message : String(err));
@@ -113,9 +114,9 @@ export function ResultPage() {
   return (
     <div data-testid="result-page">
       <AppShell
-        currentStep={12}
+        currentStep={FLOW_RESULT}
         wide
-        title="Xem kết quả"
+        title={flowTitle(FLOW_RESULT)}
         subtitle="Xem lại video, cắt clip hoặc dựng lại. Đăng video ở bước tiếp theo."
       >
         {error && (

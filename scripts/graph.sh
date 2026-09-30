@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Local code knowledge graph (graphify) used by agents to orient themselves and by
-# /cr-review to list the callers of changed files. See docs/agentic/graphify.md.
+# Local code knowledge graph (graphify) that agents query to orient themselves
+# before reading code. See docs/agentic/graphify.md.
 #
 #   scripts/graph.sh build   build or refresh graphify-out/ for the working tree
 #                            (code and markdown structure via local tree-sitter AST;

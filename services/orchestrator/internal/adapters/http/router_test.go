@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http/httptest"
 	"strings"
@@ -237,6 +238,65 @@ func TestHandleListProjects_OK(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
 	if len(resp.Projects) != 1 || resp.Projects[0].ProjectID != "p1" {
 		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func pagedListRouter(n int) *Router {
+	list := make([]domain.ProjectSummary, n)
+	for i := range list {
+		list[i] = domain.ProjectSummary{ProjectID: fmt.Sprintf("p%02d", i), FlowStep: domain.FlowRender, RunState: domain.RunRunning}
+	}
+	list[0].RunState = domain.RunFailed
+	return NewRouter(
+		&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+		&fakeProjectReader{listOut: list}, nil, nil)
+}
+
+func getProjectList(t *testing.T, router *Router, target string) (*httptest.ResponseRecorder, projectListResponse) {
+	t.Helper()
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", target, nil))
+	var resp projectListResponse
+	_ = json.Unmarshal(rec.Body.Bytes(), &resp)
+	return rec, resp
+}
+
+func TestHandleListProjects_Paged(t *testing.T) {
+	rec, resp := getProjectList(t, pagedListRouter(25), "/v1/projects?page=2&page_size=10")
+	if rec.Code != 200 {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	if len(resp.Projects) != 10 || resp.Projects[0].ProjectID != "p10" {
+		t.Fatalf("page 2 must hold p10..p19, got %+v", resp.Projects)
+	}
+	if resp.Total == nil || *resp.Total != 25 || *resp.Page != 2 || *resp.PageSize != 10 {
+		t.Fatalf("unexpected paging fields: %s", rec.Body.String())
+	}
+	if resp.Counts == nil || resp.Counts.All != 25 || resp.Counts.Running != 24 || resp.Counts.Problem != 1 {
+		t.Fatalf("unexpected counts: %+v", resp.Counts)
+	}
+}
+
+func TestHandleListProjects_PagedFilter(t *testing.T) {
+	_, resp := getProjectList(t, pagedListRouter(25), "/v1/projects?page=1&filter=problem&steps=10")
+	if len(resp.Projects) != 1 || resp.Projects[0].ProjectID != "p00" || *resp.Total != 1 || *resp.PageSize != 20 {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestHandleListProjects_InvalidQuery(t *testing.T) {
+	for _, q := range []string{"page=0", "page=x", "page=1&page_size=500", "page=1&page_size=0", "page=1&filter=x", "page=1&steps=abc", "page=1&steps=15"} {
+		rec, _ := getProjectList(t, pagedListRouter(3), "/v1/projects?"+q)
+		if rec.Code != 400 || !strings.Contains(rec.Body.String(), "invalid_query") {
+			t.Fatalf("%s: expected 400 invalid_query, got %d: %s", q, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestHandleListProjects_LegacyHasNoPaging(t *testing.T) {
+	rec, resp := getProjectList(t, pagedListRouter(25), "/v1/projects")
+	if len(resp.Projects) != 25 || strings.Contains(rec.Body.String(), `"total"`) || strings.Contains(rec.Body.String(), `"counts"`) {
+		t.Fatalf("without ?page the full list must come back unchanged: %s", rec.Body.String())
 	}
 }
 
@@ -496,5 +556,49 @@ func TestInternalGetProject_NotFoundIs404(t *testing.T) {
 	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/internal/v1/projects/nope", nil))
 	if rec.Code != 404 {
 		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+// stubAuthored answers flowFor's authoring summary with a fixed JSON body, so
+// the json tag of illustrations_ready is exercised as it is on the wire.
+type stubAuthored struct{ body string }
+
+func (s stubAuthored) Summaries(_ context.Context, ids []string) (map[string]application.AuthoringSummary, error) {
+	var sum application.AuthoringSummary
+	if err := json.Unmarshal([]byte(s.body), &sum); err != nil {
+		return nil, err
+	}
+	return map[string]application.AuthoringSummary{ids[0]: sum}, nil
+}
+
+// CR-051: GET /v1/projects/:id places a Remotion draft whose drawings are not
+// ready at Hình minh hoạ (5); Manim, or ready drawings, stay at Code (6).
+func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
+	cases := []struct {
+		name   string
+		engine domain.RenderEngine
+		body   string
+		want   int
+	}{
+		{"remotion, drawings not ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":false}`, domain.FlowIllustrations},
+		{"remotion, drawings ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":true}`, domain.FlowCode},
+		{"manim", domain.RenderEngineManim, `{"story":true,"storyboard":true,"illustrations_ready":false}`, domain.FlowCode},
+	}
+	for _, c := range cases {
+		p := &domain.Project{ProjectID: "p1", Status: domain.StatusDraft, WizardStep: domain.WizardStepScript, RenderEngine: c.engine}
+		router := NewRouter(&fakeStartRenderSaga{}, &fakeStartPublishSaga{}, &fakeRetryStep{},
+			&fakeProjectReader{project: p}, nil, nil).WithAuthoredContent(stubAuthored{c.body})
+
+		rec := httptest.NewRecorder()
+		router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/projects/p1", nil))
+		var got struct {
+			FlowStep int `json:"flow_step"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil || rec.Code != 200 {
+			t.Fatalf("%s: status %d, body %s", c.name, rec.Code, rec.Body.String())
+		}
+		if got.FlowStep != c.want {
+			t.Errorf("%s: flow_step %d, want %d", c.name, got.FlowStep, c.want)
+		}
 	}
 }

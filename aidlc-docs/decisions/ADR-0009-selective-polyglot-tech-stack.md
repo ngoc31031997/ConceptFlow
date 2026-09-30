@@ -53,5 +53,5 @@ Cân bằng giữa mục tiêu học tập (polyglot có chủ đích ở 2 đi�
 - **Follow-ups**: Khi thiết kế Low-Level Design của Unit 8 (Orchestrator, Go) và Unit 9 (API Gateway, Node.js), cần định nghĩa lại tech-stack-decisions.md riêng cho từng unit theo ngôn ngữ tương ứng; `infrastructure-design.md` (Unit 1, RabbitMQ) cần bổ sung ghi chú client AMQP tương ứng cho Go (`amqp091-go`) và Node.js (`amqplib`) bên cạnh `aio-pika` (Python).
 
 ## Related
-- Design artifact: `aidlc-docs/inception/high-level-design/technology-direction.md` (cập nhật), `aidlc-docs/construction/content-plugin-service/nfr-requirements/tech-stack-decisions.md`
+- Design artifact: `aidlc-docs/inception/high-level-design/technology-direction.md` (cập nhật), `aidlc-docs/construction/content-plugin-service/nfr-requirements/tech-stack-decisions.md` (đã gỡ cùng service ở CR-020; bản cũ: `git show dff096c:aidlc-docs/construction/content-plugin-service/nfr-requirements/tech-stack-decisions.md`)
 - Related ADRs: Refines ADR-0003 (không supersede hoàn toàn — Rendering/TTS/GUI vẫn giữ nguyên theo ADR-0003)

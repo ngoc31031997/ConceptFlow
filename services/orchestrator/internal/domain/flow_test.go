@@ -16,6 +16,18 @@ func TestFlowStateFor(t *testing.T) {
 		{"story done → visual is next", StatusDraft, 3, AuthoredContent{Story: true}, FlowState{FlowVisual, RunIdle}},
 		{"storyboard done → code is next", StatusDraft, 3, AuthoredContent{Story: true, Storyboard: true}, FlowState{FlowCode, RunIdle}},
 		{"code beats stale route", StatusDraft, 3, AuthoredContent{Story: true, Storyboard: true, Code: true}, FlowState{FlowCode, RunIdle}},
+		{"remotion, drawings not ready → illustrations", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true, NeedsIllustrations: true}, FlowState{FlowIllustrations, RunIdle}},
+		{"remotion, drawings ready → code", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true, NeedsIllustrations: true, Illustrations: true}, FlowState{FlowCode, RunIdle}},
+		{"remotion with code but no drawing list stays at code", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true, Code: true, NeedsIllustrations: true}, FlowState{FlowCode, RunIdle}},
+		{"remotion before the storyboard is still visual", StatusDraft, 3,
+			AuthoredContent{Story: true, NeedsIllustrations: true}, FlowState{FlowVisual, RunIdle}},
+		// CR-051: code is checked first, so a draft with the Creator's own code
+		// and no storyboard stands at Code (it used to report step 3/4).
+		{"own code without a storyboard stands at code", StatusDraft, 3,
+			AuthoredContent{Code: true}, FlowState{FlowCode, RunIdle}},
 		{"validating", StatusValidatingScript, 3, AuthoredContent{}, FlowState{FlowValidate, RunRunning}},
 		{"validate failed", StatusFailedValidateScript, 3, AuthoredContent{}, FlowState{FlowValidate, RunFailed}},
 		{"review", StatusAwaitingReview, 3, AuthoredContent{}, FlowState{FlowReview, RunIdle}},

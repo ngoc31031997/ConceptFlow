@@ -263,8 +263,8 @@ func TestCodeStepNeedsAStoryboardAndAPipeline(t *testing.T) {
 	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, "   ")
 	gen := &stubCodegen{}
 	uc.WithPipeline(&stubFinalizer{}, gen)
-	if _, err := uc.Execute(context.Background(), "p1", "code"); err == nil || !strings.Contains(err.Error(), "1b") {
-		t.Fatalf("err = %v, want a 'run step 1b first' error", err)
+	if _, err := uc.Execute(context.Background(), "p1", "code"); err == nil || !strings.Contains(err.Error(), "Bước 4 — Visual") {
+		t.Fatalf("err = %v, want a 'run Bước 4 — Visual first' error", err)
 	}
 	if gen.calls != 0 {
 		t.Errorf("pipeline called %d times with no storyboard", gen.calls)

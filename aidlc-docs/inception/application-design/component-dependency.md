@@ -4,17 +4,21 @@
 
 **Revision (2026-08-07, ADR-0014)**: Rendering↔TTS REST (dòng/edge dưới đây) đã bị loại bỏ — TTS Service nay message-driven hoàn toàn qua RabbitMQ, không còn ngoại lệ REST nào trong phạm vi Saga.
 
+**Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (gỡ ở CR-020) và Script Processing Service (gỡ ở CR-040) không còn; thêm Authoring Service (CR-040, ADR-0029) và LLM Service (CR-039). Nội dung dưới đây theo hệ đang chạy.
+
 ## Dependency Matrix
 
 | Component | Depends On | Communication |
 |---|---|---|
 | Web GUI | API Gateway | REST (sync) + SSE (server push) |
 | API Gateway | Orchestrator Service | REST (sync, khởi tạo Saga + truy vấn trạng thái) |
-| API Gateway | Content Plugin Service | REST (sync, chỉ cho `GET /plugins`, ngoài Saga) |
+| API Gateway | Authoring Service | REST (sync, soạn kịch bản, prompt, hình minh hoạ) |
 | API Gateway | Publisher Service | REST (sync, chỉ cho luồng OAuth, ngoài Saga) |
 | Orchestrator Service | RabbitMQ | AMQP (publish command / consume event) |
-| Script Processing Service | RabbitMQ | AMQP (consume command / publish event) |
-| Content Plugin Service | RabbitMQ | AMQP (consume command / publish event) |
+| Orchestrator Service ↔ Authoring Service | — | HTTP nội bộ hai chiều (ADR-0029), không `depends_on` |
+| Authoring Service | LLM Service | REST (sync) |
+| Authoring Service, LLM Service | Rendering Service | REST nội bộ (`/v1/check/*`, `/v1/illustrations/preview`) |
+| LLM Service | Hive API (external) / Ollama | HTTPS / HTTP (OpenAI SDK) |
 | Rendering Service | RabbitMQ | AMQP (consume command / publish event) |
 | Video Assembly Service | RabbitMQ | AMQP (consume command / publish event) |
 | Publisher Service | RabbitMQ | AMQP (consume command / publish event) |
@@ -33,8 +37,8 @@ flowchart TB
     GW["API Gateway"]
     ORCH["Orchestrator<br/>Service"]
     MQ[("RabbitMQ")]
-    CP["Content Plugin<br/>Service"]
-    SP["Script Processing<br/>Service"]
+    AU["Authoring<br/>Service"]
+    LLM["LLM Service"]
     RD["Rendering Service"]
     TTS["TTS Service"]
     VA["Video Assembly<br/>Service"]
@@ -44,12 +48,14 @@ flowchart TB
 
     GUI -->|REST + SSE| GW
     GW -->|REST| ORCH
-    GW -->|REST: GET /plugins| CP
+    GW -->|REST| AU
+    ORCH <-->|HTTP nội bộ| AU
+    AU -->|REST| LLM
+    LLM -->|check| RD
+    AU -->|preview| RD
     GW -->|REST: OAuth flow| PB
 
     ORCH <-->|AMQP| MQ
-    MQ <-->|AMQP| SP
-    MQ <-->|AMQP| CP
     MQ <-->|AMQP| RD
     MQ <-->|AMQP| TTS
     MQ <-->|AMQP| VA
@@ -69,5 +75,6 @@ flowchart TB
 ## Coupling Notes
 - Không có dependency vòng (circular dependency) giữa các service.
 - **RabbitMQ là điểm phụ thuộc chung** của Orchestrator và mọi service nghiệp vụ trong Saga — đây là điểm hạ tầng quan trọng nhất cần đảm bảo hoạt động ổn định (single point of failure tiềm ẩn dù chạy local; cần cấu hình restart policy trong docker-compose).
-- Content Plugin Service có 2 kiểu giao tiếp khác nhau: REST trực tiếp từ Gateway (`GET /plugins`, ngoài Saga) và AMQP command từ Orchestrator (`classify_scenes`, trong Saga) — cần lưu ý khi thiết kế service này để tách rõ 2 luồng.
+- Rendering Service có 2 kiểu giao tiếp: AMQP command từ Orchestrator (trong Saga) và REST nội bộ từ LLM/Authoring Service (kiểm biên dịch, preview) — cùng một tiến trình, giới hạn đồng thời bằng `CHECK_CONCURRENCY`.
+- Orchestrator và Authoring Service gọi nhau hai chiều qua HTTP nhưng không phải vòng phụ thuộc lúc khởi động: mỗi bên tự suy giảm khi bên kia down (ADR-0029).
 - Shared Docker Volume là "dependency ngầm" giữa Rendering/TTS/Video Assembly/Publisher — có thể thay bằng object storage (S3/MinIO) sau này (theo Application Design Q1) mà không ảnh hưởng domain core (Hexagonal).

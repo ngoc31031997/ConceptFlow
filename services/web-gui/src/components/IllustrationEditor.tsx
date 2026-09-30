@@ -3,6 +3,7 @@ import {
   ApiError,
   createIllustration,
   deleteIllustration,
+  EXEMPLAR_FOLDER_ID,
   redrawIllustration,
   tryIllustration,
   updateIllustration,
@@ -78,8 +79,13 @@ function toInput(ill: Illustration | null, folderId: string, draft?: Partial<Ill
  */
 export function IllustrationEditor({ illustration, draft, folders, defaultFolderId, onSaved, onDeleted, onClose, redrawNote }: IllustrationEditorProps) {
   const creating = illustration === null;
-  const readOnly = illustration?.builtin === true;
-  const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft));
+  // CR-052: a Hình mẫu is read-only like the kit; it changes by picking another one.
+  const exemplar = illustration?.exemplar === true;
+  const readOnly = illustration?.builtin === true || exemplar;
+  // The Hình mẫu folder only takes drawings through "Đặt làm mẫu".
+  const writable = folders.filter((f) => f.id !== EXEMPLAR_FOLDER_ID);
+  const startFolder = defaultFolderId && defaultFolderId !== EXEMPLAR_FOLDER_ID ? defaultFolderId : (writable[0]?.id ?? "");
+  const [form, setForm] = useState<IllustrationInput>(() => toInput(illustration, startFolder, draft));
   const [tagsText, setTagsText] = useState(form.tags.join(", "));
   const [busy, setBusy] = useState<"" | "try" | "save" | "delete" | "redraw">("");
   const [note, setNote] = useState("");
@@ -90,7 +96,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const shownWarnings = useStyleWarnings(tried?.warnings ?? illustration?.warnings ?? []);
 
   useEffect(() => {
-    const next = toInput(illustration, defaultFolderId ?? folders[0]?.id ?? "", draft);
+    const next = toInput(illustration, startFolder, draft);
     setForm(next);
     setTagsText(next.tags.join(", "));
     setDiagnostics([]);
@@ -157,15 +163,19 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
     });
   };
 
-  const folderOptions = folders.map((f) => ({ value: f.id, label: f.name, hint: f.description }));
+  const folderOptions = (readOnly ? folders : writable).map((f) => ({ value: f.id, label: f.name, hint: f.description }));
 
   return (
     <Card
-      title={creating ? "Hình mới" : readOnly ? `${illustration.title} (có sẵn)` : `Sửa: ${illustration.title}`}
+      title={
+        creating ? "Hình mới" : exemplar ? `${illustration.title} (Hình mẫu)` : readOnly ? `${illustration.title} (có sẵn)` : `Sửa: ${illustration.title}`
+      }
       hint={
-        readOnly
-          ? "Hình có sẵn của bộ minh hoạ: chỉ xem. Code nằm trong conceptflow-mini/illustration.tsx."
-          : "Sửa code rồi bấm Xem trước để dựng thử — chưa lưu gì. Lưu thì hình quay về 'Chờ duyệt'."
+        exemplar
+          ? "Hình mẫu AI vẽ học theo: chỉ xem. Muốn đổi thì bỏ làm mẫu, rồi đặt làm mẫu một hình khác."
+          : readOnly
+            ? "Hình có sẵn của bộ minh hoạ: chỉ xem. Code nằm trong conceptflow-mini/illustration.tsx."
+            : "Sửa code rồi bấm Xem trước để dựng thử — chưa lưu gì. Lưu thì hình quay về 'Chờ duyệt'."
       }
       headerAction={
         <Button variant="ghost" onClick={onClose} data-testid="illustration-editor-close">
@@ -205,7 +215,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
       <FormField label="Cách gọi (tham số, tỉ lệ khung) — Kỹ sư Remotion đọc dòng này" className={glass.mtSm}>
         <TextInput value={form.usage} onChange={(e) => set("usage", e.target.value)} readOnly={readOnly} data-testid="illustration-usage-input" />
       </FormField>
-      {!readOnly && (
+      {(!readOnly || exemplar) && (
         <FormField label="Code TSX" className={glass.mtSm}>
           <TextArea
             rows={20}
@@ -213,6 +223,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
             className={styles.code}
             value={form.code}
             onChange={(e) => set("code", e.target.value)}
+            readOnly={readOnly}
             data-testid="illustration-code-input"
           />
         </FormField>

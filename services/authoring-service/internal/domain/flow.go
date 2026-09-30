@@ -17,9 +17,9 @@ const (
 	FlowValidate      = 7  // Validate (parse + dry run)
 	FlowReview        = 8  // Review — screen only
 	FlowTTS           = 9  // TTS
-	FlowRender        = 10 // Render hoạt hình
+	FlowRender        = 10 // Render
 	FlowMerge         = 11 // Merge (+ QC)
-	FlowSplit         = 12 // Cắt video short
+	FlowSplit         = 12 // Cắt short
 	FlowResult        = 13 // Kết quả
 	FlowPublish       = 14 // Publish
 	FlowStepsTotal    = 14
@@ -52,9 +52,15 @@ func RunStateOf(status ProjectStatus, errorMessage *string) RunState {
 	return st
 }
 
-// AuthoredContent says which of the three authoring artefacts a draft holds.
+// AuthoredContent says which authoring artefacts a draft holds.
+//
+// CR-051: NeedsIllustrations is set for a Remotion project, the only engine
+// that has an illustrations step (5); Illustrations says its drawing list is
+// planned and every drawing approved or skipped — the same rule that gates
+// the code step.
 type AuthoredContent struct {
-	Story, Storyboard, Code bool
+	Story, Storyboard, Code           bool
+	NeedsIllustrations, Illustrations bool
 }
 
 // FlowState is where a project stands in the 14-step flow.
@@ -63,12 +69,13 @@ type FlowState struct {
 	State RunState `json:"run_state"`
 }
 
-// A draft on the script steps stands at the first of 3/4/5 whose result is
-// still missing (story done → Visual; storyboard done → Code), so a project
+// A draft on the script steps stands at the first of 3/4/5/6 whose result is
+// still missing (story done → Visual; storyboard done → Hình minh hoạ for a
+// Remotion project whose drawings are not ready, else Code), so a project
 // forked "from Visual" sits at step 4 and an opened draft resumes where work is.
 //
 // FlowStateFor derives the flow position. storedWizardStep is the raw wizard
-// step of a draft (1, 2 or 3); content decides which of 3/4/5 a draft on the
+// step of a draft (1, 2 or 3); content decides which of 3/4/5/6 a draft on the
 // script step is really at, so a draft whose route says "outline" but whose
 // storyboard and code already exist reports the true step.
 func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredContent) FlowState {
@@ -80,9 +87,14 @@ func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredCo
 			// (the row is created by "Tiếp tục"), so the earliest place it can
 			// be is Config. FlowInit is a client-only state before the row.
 			return FlowState{FlowConfig, RunIdle}
+		case content.Code:
+			// Code exists: the draft waits for the Creator to start validation.
+			// Checked before the drawings so a Remotion project from before the
+			// illustrations step (code, no drawing list) is not pulled back to 5.
+			return FlowState{FlowCode, RunIdle}
+		case content.Storyboard && content.NeedsIllustrations && !content.Illustrations:
+			return FlowState{FlowIllustrations, RunIdle}
 		case content.Storyboard:
-			// Storyboard done: what is left is the code (also where a draft with
-			// code already sits, waiting for the Creator to start validation).
 			return FlowState{FlowCode, RunIdle}
 		case content.Story:
 			return FlowState{FlowVisual, RunIdle}
@@ -139,6 +151,6 @@ func FlowStepForAuthoring(step string) int {
 var FlowStepLabel = map[int]string{
 	FlowInit: "Khởi tạo", FlowConfig: "Cấu hình", FlowStory: "Kịch bản", FlowVisual: "Visual",
 	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "TTS",
-	FlowRender: "Render hoạt hình", FlowMerge: "Merge", FlowSplit: "Cắt video short",
+	FlowRender: "Render", FlowMerge: "Merge", FlowSplit: "Cắt short",
 	FlowResult: "Kết quả", FlowPublish: "Publish",
 }

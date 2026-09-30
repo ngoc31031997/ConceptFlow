@@ -232,12 +232,13 @@ export function ProjectIllustrationsPanel({
                 }}
                 actions={
                   <>
-                    {!ill.builtin && ill.status === "draft" && (
+                    {!ill.builtin && !ill.exemplar && ill.status === "draft" && (
                       <Button onClick={() => act(r.id, () => setIllustrationStatus(ill.id, "approved"))} disabled={busy[r.id]} data-testid={`pi-approve-${r.name}`}>
                         Duyệt
                       </Button>
                     )}
-                    {!ill.builtin && (
+                    {/* CR-052: a Hình mẫu is read-only like the kit. */}
+                    {!ill.builtin && !ill.exemplar && (
                       <Button variant="ghost" onClick={() => setOpenId(r.id)} data-testid={`pi-edit-${r.name}`}>
                         Sửa / Vẽ lại
                       </Button>

@@ -8,8 +8,8 @@ Requirements: `aidlc-docs/inception/requirements/cr-050-llm-call-chunking-resume
 
 | Unit | FR | Nội dung | Thiết kế cần trước khi code | Trạng thái |
 |---|---|---|---|---|
-| U1 | FR-17..FR-20 | Sửa lỗi từ review: danh sách hình cũ, không xoá khi lỗi, rào chắn chọn model cho bước Code, chuỗi dừng khi storyboard có cảnh báo | Mục "Thiết kế Unit 1" bên dưới. Không đổi contract giữa service, chỉ thêm một cột DB | Code xong, chờ duyệt |
-| U2 | FR-1..FR-9, FR-21, FR-22 | Lưu từng đoạn Code vào DB, chạy tiếp khi lỗi, chạy lại hoặc dùng AI ngoài từng đoạn, ghi usage từng lượt, lưu chẩn đoán, UI danh sách đoạn | **ADR-0030** (bảng đoạn, contract HTTP theo đoạn giữa `authoring-service` ↔ `llm-service`, dấu vân tay) + Functional Design | Chờ thiết kế |
+| U1 | FR-17..FR-20 | Sửa lỗi từ review: danh sách hình cũ, không xoá khi lỗi, rào chắn chọn model cho bước Code, chuỗi dừng khi storyboard có cảnh báo | Mục "Thiết kế Unit 1" bên dưới. Không đổi contract giữa service, chỉ thêm một cột DB | Đã duyệt, commit `8da16f7` |
+| U2 | FR-1..FR-9, FR-21, FR-22 | Lưu từng đoạn Code vào DB, chạy tiếp khi lỗi, chạy lại hoặc dùng AI ngoài từng đoạn, ghi usage từng lượt, lưu chẩn đoán, UI danh sách đoạn | **ADR-0030** + `aidlc-docs/construction/plans/cr-050-u2-code-segments-design.md` | Thiết kế đã duyệt, đang code |
 | U3 | FR-10, FR-11 | Storyboard theo cảnh: khung chung, rồi mỗi cảnh một lượt; ghép và finalize | Functional Design (prompt khung chung, prompt cảnh), dùng lại hạ tầng đoạn của U2 | Sau U2 |
 | U4 | FR-12..FR-15 | Shot Spec: schema, trình biên dịch, kiểm trên spec, Pha 0 đo trên `f7103848` | **ADR-0031** (định dạng Shot Spec, nơi đặt trình biên dịch, versioning) + Functional Design | Sau U2 (dùng đoạn của U2) |
 | U5 | FR-16 | Shot Spec vào luồng chính, chọn được theo project | Theo kết quả Pha 0 | Sau khi Creator chấm Pha 0 |

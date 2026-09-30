@@ -1,7 +1,7 @@
 # ADR-0006: Dynamic Plugin Loading for Content Plugin Service
 
 ## Status
-Accepted
+Superseded — Content Plugin Service đã gỡ ở CR-020 (commit 59cb813)
 
 ## Date
 2026-08-04

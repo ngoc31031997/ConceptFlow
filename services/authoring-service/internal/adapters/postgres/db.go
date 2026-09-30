@@ -123,6 +123,11 @@ CREATE INDEX IF NOT EXISTS illustrations_folder_idx ON illustrations (folder_id)
 -- style findings of the current version that did not block saving.
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS exemplar BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAULT '[]';
+-- CR-052: a Hình mẫu copy points at the drawing it was made from (NULL once
+-- that one is deleted); an original exemplar remembers the folder it goes
+-- back to when it stops being one.
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS source_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL;
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS home_folder_id TEXT;
 
 -- CR-044: the drawings one video needs, planned from its storyboard. No FK to
 -- the project (it lives in the orchestrator); deleting the project deletes

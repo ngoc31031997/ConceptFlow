@@ -66,6 +66,29 @@ describe("api/client", () => {
     expect(projects).toEqual([{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }]);
   });
 
+  it("listProjectsPage asks for one filtered page and returns it as is", async () => {
+    const page = {
+      projects: [{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z" }],
+      total: 21, page: 2, page_size: 20,
+      counts: { all: 30, running: 1, waiting: 5, problem: 3, done: 21 },
+    };
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => page }) as unknown as typeof fetch;
+
+    await expect(client.listProjectsPage({ page: 2, pageSize: 20, filter: "done", steps: [10, 13] })).resolves.toEqual(page);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/v1/projects?page=2&page_size=20&filter=done&steps=10%2C13"),
+      undefined,
+    );
+  });
+
+  it("listProjectsPage leaves steps out when no step is picked", async () => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }) as unknown as typeof fetch;
+
+    await client.listProjectsPage({ page: 1, pageSize: 50, filter: "all", steps: [] });
+    const url = (global.fetch as unknown as { mock: { calls: [string][] } }).mock.calls[0][0];
+    expect(url).toMatch(/\/v1\/projects\?page=1&page_size=50&filter=all$/);
+  });
+
   it("deleteProject sends a DELETE request and resolves on 204", async () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: true, status: 204 }) as unknown as typeof fetch;
 

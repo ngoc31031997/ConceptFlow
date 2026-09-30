@@ -9,7 +9,7 @@
  * https://www.remotion.dev/docs/ssr-node.
  *
  * Args: --entry <path to the Creator's .tsx, already written to disk>
- *       --id <composition id, from script-processing's parsed scene_class_name>
+ *       --id <composition id, located by domain/script_locator.py>
  *       --props <path to a JSON file: {"segments": [{startFrame, durationInFrames}, ...]}>
  *       --out <path to write the .mp4>
  */

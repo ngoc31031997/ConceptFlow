@@ -6,7 +6,7 @@
 - **Consistency với system-wide direction**: Khớp với `technology-direction.md` (HLD) — không có polyglot deviation nào ở unit này.
 
 ## Client Library (cho các service khác kết nối RabbitMQ)
-- **Python**: `aio-pika` (async AMQP client cho Python, tương thích FastAPI/asyncio) — dùng chung cho tất cả service Python (Orchestrator, Content Plugin, Script Processing, Rendering, Video Assembly, Publisher).
+- **Python**: `aio-pika` (async AMQP client cho Python, tương thích FastAPI/asyncio) — dùng cho các service Python có AMQP (TTS, Rendering, Video Assembly, Publisher — `aio-pika==9.4.*`). Orchestrator (Go) dùng `amqp091-go` (ADR-0018), API Gateway dùng thư viện Node (ADR-0020).
   - **Ecosystem**: mature, hỗ trợ tốt asyncio, phù hợp FastAPI (đã chọn ở ADR-0003)
   - **Alternative cân nhắc**: `pika` (sync client) — không chọn vì các service dùng FastAPI (async), `aio-pika` khớp tự nhiên hơn, tránh block event loop
   - **Team familiarity**: Không có ràng buộc kinh nghiệm trước đó (dự án mới); `aio-pika` có tài liệu rõ ràng, cộng đồng ổn định

@@ -56,7 +56,7 @@
 }
 
 /* Tiến độ chạy: thanh chạy liên tục (server không báo %), cộng một stepper
-   ngang cho chuỗi 1a → 1b → 1c. */
+   ngang cho chuỗi bước 3 → 6. */
 .runPanel {
   display: flex;
   flex-direction: column;
@@ -81,7 +81,7 @@
 
 .stepper {
   display: grid;
-  /* One row whatever the chain's length: 3 steps, or 4 with Hình minh hoạ (CR-045). */
+  /* One row of four steps (3–6); Hình minh hoạ is a dimmed "Không dùng" cell on Manim (CR-051). */
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
   gap: 10px;
@@ -110,6 +110,17 @@
 .stepItem_done {
   border-color: var(--ok);
   box-shadow: var(--shadow-sm);
+}
+
+/* CR-051: a step the chain does not run (Hình minh hoạ on a Manim video) —
+   dimmed and struck through, as the step rail shows it. */
+.stepItem_skipped {
+  opacity: 0.45;
+}
+
+.stepItem_skipped .stepName {
+  color: var(--ink-faint);
+  text-decoration: line-through;
 }
 
 .stepName {

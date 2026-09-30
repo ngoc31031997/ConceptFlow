@@ -2003,6 +2003,222 @@ Trả lời câu hỏi của Creator: trước thay đổi này UI **không** bi
 **Impact Assessment**: `go test ./...` (authoring-service) pass; `pytest` style + previewer của rendering: 12 pass, 2 skip (cần node_modules/REMOTION_BROWSER cục bộ). Đã rebuild authoring-service (healthy), prompt mới phục vụ qua `/v1/prompts/*`, ảnh xem trước exemplar-Cat v2 dựng được, 0 cảnh báo. Hình đã vẽ trước đây trong thư viện (vd Pyramid, Worm) KHÔNG tự đổi — cần "Vẽ lại".
 **Artifacts Affected**: `services/authoring-service/internal/domain/prompts/{illustration_style_vi,illustration_exemplars_vi,illustration_helpers_vi}.txt`, `services/authoring-service/internal/application/{drawer_prompt_vi,planner_prompt_vi}.txt`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai,golden_prompts_test}.go`, `aidlc-docs/audit.md`.
 
+## CR-051 — Rà soát quy trình server + giao diện: chỗ gây nhầm lẫn về bước và tiến độ
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "kiểm tra lại giúp tôi toàn bộ quy trình server và giao diện xem có gây confuse gì ko, ví dụ bước 3 4 5 6 là 4 bước riêng nhưng loading lại hiện 3 bước và hiện chung"
+**AI Response**: Mở CR-051 trên nhánh `feature/cr-051-pipeline-progress-ux-audit` (worktree riêng `.claude/worktrees/cr-051`, base `main` 1fe7e44; checkout chính đang là nhánh CR-050 của agent khác nên không đụng). Requirements Analysis (Standard), rà soát bằng cách đọc code, chưa xem UI chạy thật. Phát hiện: F1 chuỗi AI bước 3–6 đánh số riêng "Bước 1/3" và bỏ bước 5 với Manim; F2 tracker màn Validate hiện số 1/2; F3 tên và số bước trên tiêu đề màn không thống nhất với thanh bước; F4 code và comment "wizard 7 bước" còn sót; F5 các màn dùng chung cho nhiều bước; F6 server: `flow.go` của hai service giống hệt nhau, chỉ có rủi ro lệch về sau. Đã tạo 4 câu hỏi làm rõ.
+**Impact Assessment**: Chủ yếu `web-gui`; server chỉ bị đụng nếu Creator chọn Q3-C. Chưa sửa code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-pipeline-progress-ux-audit.md`, `aidlc-docs/inception/requirements/cr-051-questions.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Câu trả lời vòng 1 + phát hiện thêm
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "1 ok\n2 hiện nhưng làm mờ ghi ko dùng\n3 C\n4 đánh 7.1 7.2"
+**AI Response**: Ghi nhận Q1=A (AI hiểu "ok" là A và đã báo lại Creator), Q2=A, Q3=C, Q4=A. Khi xem kỹ phía server, phát hiện thêm F7 (`FlowStepLabel` server "Render hoạt hình"/"Cắt video short" khác web "Render"/"Cắt short", lộ ra ở trang Nhật ký) và F8 (`FlowStateFor` không bao giờ trả về bước 5: dự án Remotion nháp đã có storyboard bị xếp vào bước 6, bước 5 hiện ✓ dù hình chưa xong). F7 đưa vào phạm vi C (FR7). F8 cần đổi hợp đồng nội bộ authoring → orchestrator nên hỏi thêm ở Question 5. Q3-C làm bằng test hợp đồng ở `tests/contracts/`, không gom thành module Go dùng chung (ADR-0001).
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-*.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Duyệt Requirements (vòng 2)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "Câu 1 \"ok\": ... => ok\nF7 — một bước có hai tên. ... =>ok\nF8 — server không biết tới bước 5. ... => đúng như vậy. cần tách nó thành làm step riêng thật sự\nA — sửa luôn: authoring-service gửi thêm cờ \"hình minh hoạ đã sẵn sàng\" sang orchestrator, để server xếp dự án đúng vào bước 5. Việc này chỉ thêm một trường vào hợp đồng nội bộ, bản cũ vẫn đọc được, và phải rebuild 2 service."
+**AI Response**: Requirements chốt: Q1=A, Q2=A, Q3=C, Q4=A, Q5=A; FR1–FR9. Phát hiện thêm F9 (`ResumeProjectPage` chặn trần ở bước 5, sót lại từ luồng 13 bước) và đưa vào phạm vi (FR9). Commit giai đoạn Requirements, chuyển sang Functional Design.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-051-*.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Functional Design (chờ duyệt)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: (tiếp nối sau khi duyệt Requirements)
+**AI Response**: Soạn `aidlc-docs/construction/plans/cr-051-functional-design.md`: D1 cờ `illustrations_ready` (thêm trường vào summaries nội bộ; orchestrator đọc là `*bool`, thiếu thì coi là sẵn sàng), D2 `FlowStateFor` trả về bước 5 cho dự án Remotion nháp chưa sẵn sàng hình (có code thì vẫn 6), D3 nhãn server "Render"/"Cắt short", D4 test hợp đồng: hai `flow.go` giống hệt từng byte và khớp `flow.ts`, D5 chuỗi AI dùng "Bước N — tên" + dòng 5 "Không dùng" cho Manim, D6 tracker 7.1/7.2, D7 tiêu đề màn thống nhất qua `flowTitle`, D8 dọn wizard 7 bước, D9 resume trần ở bước 6.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-051-functional-design.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Duyệt Functional Design
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Functional Design được duyệt; commit và chuyển sang Code Generation.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-051-functional-design.md`, `aidlc-docs/audit.md`.
+
+## CR-051 — Code Generation (chờ rebuild + duyệt)
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: (tiếp nối sau khi duyệt Functional Design)
+**AI Response**: Triển khai D1–D9. Server: `illustrations_ready` trong summaries (SQL = Gate/Ready), orchestrator đọc `*bool` (thiếu = sẵn sàng) qua `AuthoringSummary.Content`, `FlowStateFor` trả bước 5, nhãn "Render"/"Cắt short", hai `flow.go` giống hệt; test hợp đồng `tests/contracts/test_flow_steps_contract.py` + kích hoạt trong `scripts/check.sh`; câu lỗi "hãy chạy Bước 4 — Visual trước". Web: `flowTitle`, chuỗi AI theo số bước 3–6 (bước 5 "Không dùng" với Manim), tracker 7.1/7.2, tiêu đề màn thống nhất, xoá `wizardStepLabel`, resume trần ở bước 6. Lệch nhỏ so với thiết kế: dòng phụ màn Review không lặp "Duyệt dàn ý trước khi sản xuất" vì thẻ dàn ý đã có tiêu đề đó. Comment "1a/1b/1c" ở các file không bị CR này đụng (AuthoringModelPicker, PipelineSettingsBar, ScriptAssistant, useRequireScript, storyboard_warnings.go, illustration_keywords.go) giữ nguyên.
+**Impact Assessment**: `make check` (đầy đủ) 23/23 pass. Test Postgres của authoring-service (gồm test mới cho `Summaries`) chạy trên Postgres tạm: pass. Kiểm ngược: test hợp đồng hỏng khi nhãn lệch; test resume hỏng với trần cũ. Chưa rebuild Docker: stack `conceptflow` dựng từ checkout chính; `scripts/rebuild.sh` chạy trong worktree sẽ tạo một project compose mới và không có file env — cần Creator quyết định.
+**Artifacts Affected**: xem `git diff` của nhánh `feature/cr-051-pipeline-progress-ux-audit`.
+
+## CR-051 — Duyệt Code Generation, merge
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "chưa cần rebuild bạn chứ merge vào main cho tôi"
+**AI Response**: Creator duyệt phần code và yêu cầu merge vào `main`; **chưa rebuild Docker** (authoring-service, orchestrator, web-gui) theo quyết định của Creator — stack đang chạy vẫn là code trước CR-051 cho tới lần rebuild sau. Chạy /cr-finish.
+**Artifacts Affected**: nhánh `feature/cr-051-pipeline-progress-ux-audit`.
+
+## Fix — Các lỗi nhỏ review CR-051 để lại
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "sửa thành 1 fix nhỏ" (trả lời câu hỏi sửa ngay hay để backlog các lỗi nhỏ từ review CR-051: (1) test SQL `illustrations_ready` không chạy trong make check/CI; (2) `flowTitle` không có dự phòng khi step ngoài khoảng — "Bước 99 — undefined" trên `/render?view=1&step=99`; (3) comment cũ "Render hoạt hình"/"Cắt video short" trong hai `flow.go`; (4) nhãn việc con `render_scenes` "Render hoạt hình" dưới tiêu đề "Bước 10 — Render"; (5) thiếu test: wiring `Content()` ở router/list orchestrator, tiêu đề "Cách làm các bước 3–6" và tiêu đề các màn, case chỉ có code; (6) thụt lề `ValidatePage.tsx:200`).
+**AI Response**: Nguyên nhân và cách sửa theo từng mục:
+- (2) `flowTitle` (`services/web-gui/src/utils/flow.ts`) đọc `FLOW_LABELS[step - 1]` mà không có dự phòng. Sửa: nếu bước không có nhãn thì trả về "Bước N".
+- (4) `STEP_LABELS.render_scenes` (`pipelineLabels.ts`) vẫn giữ tên cũ. Sửa: đổi thành "Render".
+- (3) Comment cạnh `FlowRender` và `FlowSplit` trong hai file `flow.go` được sửa theo tên mới; hai file vẫn giống hệt nhau.
+- (6) Sửa thụt lề ở `ValidatePage.tsx`.
+- (5) Thêm test:
+  - `FlowStateFor` với dự án chỉ có code, chưa có storyboard: đứng ở bước 6, đúng hành vi CR-051 đã đưa vào nhưng trước đây không có test;
+  - `TestHandleGetProject_PlacesTheIllustrationsStep`: đi qua `flowFor` với JSON thật;
+  - client test kiểm key `illustrations_ready`;
+  - tiêu đề h1 của các màn 1, 3, 4, 5, 6, 10, 13, 14;
+  - aria-label "Cách làm các bước 3–6".
+- (1) CI (`.github/workflows/ci.yml`) có thêm service Postgres 16 và `TEST_DATABASE_URL` cho bước `make check-all`, nên 4 test repository của authoring-service (gồm test SQL `illustrations_ready`) chạy trong CI. `make check` ở máy local vẫn bỏ qua chúng khi không có DB.
+**Impact Assessment**:
+- Test mới cho (2) và (4) hỏng trước khi sửa, pass sau khi sửa.
+- Kiểm ngược test router: cố tình làm `flowFor` bỏ qua engine thì test hỏng.
+- 4 test Postgres pass trên một Postgres 16 mới tinh, dựng giống cấu hình CI.
+- `make check` 23/23 pass.
+- Chưa kiểm được trên CI thật: CI chỉ chạy khi nhánh được push, sau khi Creator duyệt.
+- Không rebuild Docker: stack chung vẫn đang để hoãn theo quyết định của Creator ở CR-051.
+**Artifacts Affected**: `.github/workflows/ci.yml`, `services/{authoring-service,orchestrator}/internal/domain/flow{,_test}.go`, `services/orchestrator/internal/adapters/{http/router_test.go,authoring/client_test.go}`, `services/web-gui/src/{utils/flow.ts,utils/pipelineLabels.ts,pages/ValidatePage.tsx}`, `services/web-gui/tests/{utils/flowLabels.test.ts,pages/*.test.tsx}`, `aidlc-docs/audit.md`.
+**Approval**: Creator trả lời "ok" — commit, /cr-finish.
+**Review round 1 (/cr-review)**: reviewer FAIL — Major: `ResultPage`/`PublishPage`/`OAuthCallbackPage` passed `currentStep` 12/13 (13-step leftover since CR-046), so the rail highlighted "Cắt short" under "Bước 13 — Kết quả". Fixed with `FLOW_RESULT`/`FLOW_PUBLISH`; regression test `tests/pages/OutputStepsRail.test.tsx` (failed before, passes after). Also fixed two minors: `flowTitle` guards non-integers ("Bước"); the SQL test cleans up with `t.Cleanup` and up front (verified: two runs in a row on the same DB pass). Left: `chainRows` would label a non-contiguous chain's gap "Không dùng" even on Remotion — not reachable (only `authoringChainSteps` builds chains). `make check` 23/23; branch CI (Postgres service) success.
+
+## CR-052 — Thư viện hình: nút Xoá trên từng hình, cho phép thay đổi Hình mẫu
+**Timestamp**: 2026-09-29T00:00:00Z
+**User Input**: "ở màn hình thư viện hình ko có button xoá hình, ở mục hình mẫu có thể cho phép thay đổi không". Trả lời lượt 1: "1 chỉ không được xoá khi hình được dùng trong dự án đang trong quá trình render hoặc đó là hình minh hoạ (bước 5-11) 2 hiện tại ko có phân quyền trên hệ thống hình minh hoạ để promt tham chiếu đến sửa url tham chiếu là được mà đúng ko"
+**AI Response**: Mở CR-052 trên nhánh `feature/cr-052-image-library-delete-and-edit-samples` (worktree riêng vì CR-050 đang được làm ở checkout chính). Phân tích hiện trạng: nút Xoá chỉ có trong trình sửa code, không có trên ô hình. API xoá không kiểm tra hình đang được dự án dùng. Hình mẫu là code TSX nhúng trong image, không phải URL, và prompt hoạ sĩ dán nguyên code đó. Vì vậy muốn đổi Hình mẫu phải chuyển danh sách mẫu vào DB. Đã hỏi Q1–Q4 (phạm vi "đang dùng", nghĩa của "thay đổi Hình mẫu", xoá hình builtin, cách hiển thị khi bị chặn).
+**Impact Assessment**: Dự kiến `web-gui` (IllustrationLibraryPage, IllustrationTile) và `authoring-service` (use case xoá, lưu Hình mẫu, prompt hoạ sĩ). Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Trả lời lượt 2, hỏi F1–F3
+**Timestamp**: 2026-09-29T00:10:00Z
+**User Input**: "Thế nào là "đang dùng ở bước 5–11": ... => đúng / "Thay đổi Hình mẫu" là gì: ... => tối đa 5 hình nhưng các hình mẫu sẽ được clone vào 1 folder và dc ref đến qua url hoặc 1 cách nào đó chứ ko viết cứng trong txt nữa / Hình có sẵn của hệ thống có được xoá không: ... => chỉ có hình mẫu là ko xoá dc / Khi hình bị chặn xoá: ... => dúngd"
+**AI Response**: Chốt Q1 = A, Q4 = A. Q2: tối đa 5 Hình mẫu, là bản clone nằm trong thư mục hệ thống "Hình mẫu"; prompt hoạ sĩ đọc Hình mẫu từ DB, bỏ file `illustration_exemplars_vi.txt`. Q3: Hình mẫu không xoá được. Hỏi thêm F1 (kit nằm trong image render và mọi video import toàn bộ kit, nên xoá hàng kit chỉ làm ẩn, và seeder sẽ thêm lại), F2 (cách bỏ một hình khỏi danh sách mẫu khi Hình mẫu không xoá được), F3 (bản clone có sửa được không).
+**Impact Assessment**: Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Trả lời lượt 3, chốt bản yêu cầu
+**Timestamp**: 2026-09-29T00:20:00Z
+**User Input**: "F1 : không dc xoá / F2 làm theo đề xuất, hình mâux là bản clone / f3 đi theo B"
+**AI Response**: Chốt: kit không xoá được; Hình mẫu có "Bỏ làm mẫu" (bỏ bản clone, hình gốc còn; Hình mẫu gốc thì chuyển về thư mục chủ đề); Hình mẫu chỉ đọc. Viết bản yêu cầu cuối (FR1–FR10, tiêu chí chấp nhận, ngoài phạm vi), chờ Creator duyệt.
+**Impact Assessment**: `authoring-service` và `web-gui`. `llm-service` và `rendering` không đổi. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-052-image-library-delete-and-edit-samples.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Yêu cầu được duyệt, soạn thiết kế
+**Timestamp**: 2026-09-29T00:30:00Z
+**User Input**: "ok"
+**AI Response**: Commit bản yêu cầu (`9b088ab`) và push nhánh. Soạn thiết kế `aidlc-docs/construction/plans/cr-052-image-library-delete-and-edit-samples-design.md`. Nội dung: kiểm "đang dùng" gồm tìm dự án ứng viên trong DB authoring rồi hỏi trạng thái qua `orchestrator.GetStatus` sẵn có (lỗi thì từ chối xoá); cột mới `source_id` và `home_folder_id`; chuyển 3 Hình mẫu seed sang thư mục `hinh-mau` một lần; bỏ `illustration_exemplars_vi.txt`; bản clone đổi tên `<Tên>Mau`; bản clone không vào danh sách chọn ở bước 5 và danh sách của Kỹ sư; thêm 2 route mới ở api-gateway. Chờ Creator duyệt.
+**Impact Assessment**: `authoring-service`, `api-gateway`, `web-gui`. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-052-image-library-delete-and-edit-samples-design.md`, `aidlc-docs/audit.md`.
+
+## CR-052 — Thiết kế được duyệt, code xong, chờ duyệt
+**Timestamp**: 2026-09-29T20:30:00Z
+**User Input**: "... => ok / ... => ok / ... => ko cần,. code đi"
+**AI Response**: Commit thiết kế (`8f9ff47`) rồi code theo mục 6 của thiết kế.
+- authoring-service: cột `source_id` và `home_folder_id`. Thư mục hệ thống `hinh-mau`. Bước chuyển một lần: 3 hình mẫu seed cũ trở thành dữ liệu, seeder không tạo lại. Bỏ `illustration_exemplars_vi.txt` và `ExemplarIllustrations()`. Xoá hình kiểm "đang dùng" qua `project_illustrations` và `code_content`, hỏi trạng thái qua `orchestrator.GetStatus`, chặn khi chưa tới bước 12; orchestrator lỗi thì từ chối (503). Câu DELETE tự từ chối khi có dự án chưa được kiểm liên kết hình. Thêm "Đặt làm mẫu" / "Bỏ làm mẫu" (tối đa 5, khoá hàng thư mục khi đếm), bản chép `<Tên>Mau` được dựng lại qua renderer. Hình mẫu chỉ đọc. Prompt hoạ sĩ đọc Hình mẫu từ DB (tối đa 5 + 2 hình cùng thư mục). Bản chép không vào catalog bước 5 và danh sách `ForCode`. Sao lưu / khôi phục giữ Hình mẫu. Route mới `POST`/`DELETE /v1/admin/illustrations/{id}/exemplar`.
+- api-gateway: 2 route mới.
+- web-gui: nút Xoá trên ô hình (lỗi 409 hiện tên dự án); "Đặt làm mẫu" / "Bỏ làm mẫu"; mục "Hình mẫu (x/5)"; trình sửa chỉ đọc cho Hình mẫu; thư mục `hinh-mau` không có trong danh sách chọn khi lưu hoặc AI vẽ.
+- rendering: chỉ đổi test. Code 3 hình mẫu chuyển sang `tests/fixtures/illustration_exemplars_vi.txt` để test bộ kiểm style vẫn chạy.
+**Impact Assessment**: `make check` pass cả 10 bước (api-gateway, authoring-service, rendering, web-gui). Test Postgres chạy trên DB tạm (`TEST_DATABASE_URL`, container tạm đã dừng): 4/4 pass. Đã rebuild và khởi động lại authoring-service, api-gateway (healthy) và web-gui (đang chạy; không có healthcheck). Kiểm tra trực tiếp: 3 hình mẫu đã sang `hinh-mau` và nhớ thư mục gốc; xoá kit hoặc Hình mẫu trả 403; đặt mẫu `Car` tạo `CarMau` (201), đặt lần hai trả 409, bỏ mẫu xoá bản chép (204) và `Car` còn nguyên; lưu hình vào `hinh-mau` trả 422; hình tạm không ai dùng xoá được (204). CHƯA kiểm trực tiếp trường hợp 409 "đang dùng": mọi hình Creator đang liên kết đều thuộc dự án đã ở bước Kết quả (xoá sẽ mất dữ liệu thật), nên trường hợp này chỉ được kiểm bằng unit test và test Postgres.
+**Artifacts Affected**: services/authoring-service (domain, application, adapters/http, adapters/postgres, cmd), services/api-gateway (routes + test), services/web-gui (client, IllustrationLibraryPage, IllustrationEditor, IllustrationTile + test), services/rendering/tests, `aidlc-docs/audit.md`.
+
+## CR-052 — Được duyệt, review PASS, sửa các lỗi nhỏ review nêu, merge
+**Timestamp**: 2026-09-29T21:00:00Z
+**User Input**: "ok" (duyệt code); "ok" (gộp audit khi merge main); "xong toàn bộ thì commit push và merge main đi"
+**AI Response**: /cr-finish: merge `origin/main` (CR-051 và các sửa sau review CR-051) vào nhánh; `audit.md` bị trùng chỗ ghi ở cuối file, giữ cả hai (main trước, CR-052 sau). Sửa test `summaries_cr051_test.go` cho khớp chữ ký mới của `DeleteIllustration`. /cr-review trên cây `cb1e0ef`: reviewer, security-reviewer, tester đều PASS, không Blocker/Major. Trước khi merge, sửa luôn các lỗi nhỏ rõ ràng mà review nêu:
+- bảng hình ở bước 5 không còn hiện "Sửa / Vẽ lại" và "Duyệt" trên Hình mẫu;
+- `SetSkipped` gắn nhãn "reused" cho cả Hình mẫu;
+- lỗi 503 không còn gửi nội dung lỗi của orchestrator ra trình duyệt (chỉ ghi log);
+- file sao lưu không được đặt thư mục cũ của Hình mẫu là `hinh-mau`;
+- chú thích "bước 12" đổi thành "Kết quả" (sau CR-051 Kết quả là bước 13).
+Các lỗi nhỏ còn lại để làm sau:
+- `RenameExport` đổi tên hàm export đầu tiên thay vì hàm trùng tên hình;
+- tìm tên hình trong code khớp cả chú thích và chuỗi (thiên về chặn xoá);
+- câu DELETE chưa kiểm lại phần code tham chiếu;
+- lỗi khi lưu ảnh xem trước sau khi đã tạo bản chép;
+- `/v1/illustration-style` trả 500 khi DB lỗi;
+- chưa có test hai lần "Đặt làm mẫu" song song;
+- chưa có test "Dựng lại" trên Hình mẫu.
+**Impact Assessment**: `go test ./...` (authoring-service) pass; web-gui tsc + vitest 402 test pass; /cr-check và /cr-review chạy lại trên cây cuối trước khi merge.
+**Artifacts Affected**: services/authoring-service (http/illustrations.go, application/{illustration_backup,project_illustrations}.go, domain/project.go + test), services/web-gui (ProjectIllustrationsPanel + test), `aidlc-docs/audit.md`.
+
+## CR-053 — Rà soát và xoá file không dùng
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "review lại toàn bộ dự án xem file nào không dùng thì remove hết giúp tôi nhé"
+**AI Response**: Mở nhánh `feature/cr-053-remove-unused-files`. Rà bằng graphify rồi kiểm lại từng loại file (import Python theo module, import TS/JS phân giải ra file, `go list` + symbol Go, tên asset), vì graphify bỏ sót nhiều import Python. Kết quả: nhóm A — code chết thật (web-gui `ScriptEditor`, `useRequireScript`, `useVoiceCalibration` + `fetchVoiceCalibration`, `favicon-48.png`; rendering `conceptflow/fonts.py`; package `adapters/logging` của authoring-service và orchestrator; bản sao sót lại sau CR-040 trong authoring-service: `idgen.go`, `topic.go`, `clip_rules.go`, `script_edit.go`; `orchestrator/internal/domain/testdata/`) — đề xuất xoá. Nhóm B (công cụ chạy tay), `scripts/migrate-authoring-data.sh` và nhóm C (bản nháp prompt/format trong `docs/`) cần Creator quyết. Hỏi 3 câu: (1) nhóm B giữ hết / xoá gallery + benchmark / xoá hết — đề xuất giữ hết; (2) script migrate đã chạy chưa — đã chạy thì xoá; (3) nhóm C — đề xuất xoá. Chờ trả lời.
+**Impact Assessment**: web-gui, rendering, authoring-service, orchestrator (chỉ xoá file). Không đổi contract, DB. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-053-remove-unused-files-design.md`, `aidlc-docs/audit.md`.
+
+## CR-053 — Thiết kế được duyệt
+**Timestamp**: 2026-09-30T00:30:00Z
+**User Input**: "1 chọn a / 2 chạy rồi xoá đi / 3 xoá đi / ok làm đi"
+**AI Response**: Cập nhật thiết kế: giữ toàn bộ nhóm B (công cụ chạy tay); xoá `scripts/migrate-authoring-data.sh` (Creator đã chạy) và 2 bản nháp trong `docs/`; nhóm A xoá như đề xuất. Commit thiết kế, chuyển sang /code.
+**Impact Assessment**: web-gui, rendering, authoring-service, orchestrator, repo gốc (chỉ xoá file). Không đổi contract, DB.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-053-remove-unused-files-design.md`, `aidlc-docs/audit.md`.
+
+## CR-053 — Code xong, chờ duyệt
+**Timestamp**: 2026-09-30T01:00:00Z
+**User Input**: "ok làm đi" (sau khi chọn 1a, 2a, 3a)
+**AI Response**: Xoá file theo mục 7 của thiết kế (22 file):
+- web-gui: `ScriptEditor.tsx` + `.module.css` + test, `useRequireScript.ts` + test, `useVoiceCalibration.ts`, `public/favicon-48.png`; bỏ `fetchVoiceCalibration` trong `src/api/client.ts`. Sửa 4 chú thích còn nhắc tên `ScriptEditor` (`ManimEngineerStepPage.tsx`, `WizardSteps.module.css`, `scriptValidation.ts`, `tests/utils/scriptValidation.test.ts`); không đổi code.
+- rendering: `conceptflow/fonts.py`.
+- authoring-service: `internal/adapters/logging/correlation.go`, `internal/application/idgen.go`, `internal/domain/topic.go`, `clip_rules.go` + test, `script_edit.go` + test.
+- orchestrator: `internal/adapters/logging/correlation.go`, `internal/domain/testdata/` (4 file).
+- Repo gốc: `scripts/migrate-authoring-data.sh`, `docs/story_architect_tu_lieu.txt`, `docs/format_case_study_essay.json`; bỏ dòng `Bash(*migrate-authoring-data.sh*)` trong `.claude/settings.json`.
+Giữ nguyên nhóm B (công cụ chạy tay) theo lựa chọn 1a. `git grep` không còn tham chiếu tới file đã xoá ngoài `aidlc-docs/`.
+**Impact Assessment**: authoring-service `go vet` + `go test ./...` pass; orchestrator `go vet` + `go test ./...` pass; web-gui `tsc -b` sạch, vitest 62 file / 393 test pass (trước là 402 test, bớt 9 test của 2 file đã xoá); rendering pytest 351 pass, 11 skipped (chạy bằng `.venv/bin/python -m pytest` vì script `.venv/bin/pytest` trỏ tới đường dẫn cũ `ConcertFlow/...`). Rebuild authoring-service, rendering (healthy), web-gui (đang chạy; không có healthcheck); orchestrator build ra image giống hệt image đang chạy (`2aee15d1…`) nên container không cần tạo lại, vẫn healthy. Kiểm trực tiếp: web-gui `/`, `favicon.ico`, `favicon-16/32.png`, `site.webmanifest` trả 200; gateway `/v1/projects`, `/v1/script-templates` trả 200. Chưa đi tay qua wizard trên trình duyệt.
+**Artifacts Affected**: services/web-gui, services/rendering, services/authoring-service, services/orchestrator, scripts/, docs/, `.claude/settings.json`, `aidlc-docs/audit.md`.
+
+## CR-054 — Phân trang danh sách video
+**Timestamp**: 2026-09-30T02:00:00Z
+**User Input**: "phân danh sách video thêm paging"
+**AI Response**: Mở nhánh `feature/cr-054-video-list-paging`. Rà bằng graphify: `VideoListPage` tải toàn bộ dự án qua `listProjects()` (`GET /v1/projects`, orchestrator `ProjectRepository.List` không có LIMIT), lọc theo trạng thái/bước ở client và vẽ mọi hàng (hiện 124 dự án). Đưa 2 phương án: A — phân trang ở client, giữ API (đề xuất); B — phân trang ở server, phải chuyển lọc `run_state`/`flow_step` và số đếm sang orchestrator, sửa contract/gateway. Thiết kế A: 20 video/trang (chọn 10/20/50), thanh phân trang dưới danh sách, về trang 1 khi đổi lọc, "Chọn tất cả" chỉ theo trang đang xem, kẹp trang khi xoá. Chờ duyệt.
+**Impact Assessment**: web-gui (component `Pagination` mới, `utils/pagination.ts` mới, `VideoListPage`). Không đổi contract, DB, api-gateway, orchestrator. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-054-video-list-paging-design.md`, `aidlc-docs/audit.md`.
+
+## CR-054 — Thiết kế được duyệt (phương án B)
+**Timestamp**: 2026-09-30T02:30:00Z
+**User Input**: "B chia trang trên servier"
+**AI Response**: Viết lại thiết kế theo phương án B. `flow_step`/`run_state` được tính trong Go (bản nháp cần dữ liệu authoring-service), nên không `LIMIT/OFFSET` bằng SQL: orchestrator vẫn đọc bản tóm tắt nhẹ, rồi lọc (`filter`, `steps`), đếm (`counts`) và cắt trang trong domain (`PageProjects`) trước khi trả. `GET /v1/projects` thêm `page`, `page_size`, `filter`, `steps`; không có `page` thì trả như cũ (Nhật ký, dự án gần nhất không đổi). Thêm `forked_from_topic`. Web: component `Pagination` (10/20/50, mặc định 20), `listProjectsPage`, `VideoListPage` tải theo trang, bỏ lọc client, "Chọn tất cả" theo trang, tải lại sau khi xoá. Gateway không đổi code (proxy chuyển nguyên query). Commit thiết kế, chuyển sang /code.
+**Impact Assessment**: orchestrator (domain + HTTP), web-gui. Contract `GET /v1/projects` mở rộng tương thích ngược. Không đổi DB, migration, RabbitMQ, api-gateway.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-054-video-list-paging-design.md`, `aidlc-docs/audit.md`.
+
+## CR-054 — Code xong, chờ duyệt
+**Timestamp**: 2026-09-30T03:30:00Z
+**User Input**: "B chia trang trên servier"
+**AI Response**: Làm theo mục 6 của thiết kế:
+- orchestrator: `internal/domain/project_list.go` mới (`ListFilter` + `Matches`, `ParseListFilter`, `ProjectListQuery`, `ProjectListCounts`, `ProjectPage`, `FillForkedFromTopics`, `PageProjects`); `ProjectSummary.ForkedFromTopic`; `handleListProjects` + `parseProjectListQuery` (không `page` → trả toàn bộ như cũ; có `page` → lọc/đếm/cắt trang); `dto.go` thêm `total`, `page`, `page_size`, `counts`, `forked_from_topic`.
+- web-gui: `listProjectsPage`, kiểu `ProjectPage`/`ProjectListFilter`/`ProjectListCounts`, `utils/pagination.ts`, component `ui/Pagination` (+ css); `VideoListPage` tải theo trang từ server, bỏ lọc client (`matches`, `nameOf`), số trên chip từ `counts`, "Chọn tất cả" theo trang, bỏ phản hồi cũ bằng `requestSeq`, tải lại sau khi xoá (qua ref để `onDone` của `DeleteProgressCard` giữ nguyên).
+- Contract `GET /v1/projects` ghi vào `aidlc-docs/construction/orchestrator-service/low-level-design/interface-contracts.md`.
+Lệch so với thiết kế: (1) lỗi 400 trả `{"error": <thông báo>, "code": "invalid_query"}` theo `writeErrorCode` sẵn có của service, thay vì `{"error":"invalid_query","message":…}`; (2) ví dụ `pageItems(4,7)=[1,"…",3,4,5,"…",7]` trong thiết kế mâu thuẫn với luật "trống 1 trang thì hiện số" nên đã giữ luật (`[1..7]`) và dùng ví dụ `pageItems(5,9)=[1,"…",4,5,6,"…",9]`; (3) test component đặt ở `tests/components/ui/Pagination.test.tsx` như kế hoạch (thư mục mới).
+**Impact Assessment**: orchestrator `go vet ./...` sạch, `go test ./...` pass (thêm test domain `project_list_test.go` và 4 test HTTP). web-gui `tsc -b` sạch, vitest 64 file / 411 test pass (thêm pagination, Pagination, 2 test client, 8 test VideoListPage; test "phản hồi cũ" đã thử bỏ chốt `seq` thì fail, rồi khôi phục). Rebuild orchestrator (healthy) và web-gui (đang chạy, không có healthcheck; `/` trả 200). Kiểm trực tiếp qua gateway (128 dự án thật, chỉ đọc): `?page=1&page_size=20` → 20 hàng, `total=128`, `counts` đủ 5 nhóm; `page=7` → 8 hàng; `page=99` → trả trang 7; `filter=problem` → 0 (khớp `counts.problem=0`); `steps=10,13` → 9 hàng đều bước 13; không `page` → 128 hàng, chỉ khoá `projects`; `page=0` và `steps=15` → 400 `invalid_query`. Chưa kiểm: `forked_from_topic` trên dữ liệu thật (không có dự án fork nào; đã có unit test); chưa đi tay qua màn "Danh sách video" trên trình duyệt; chưa xoá video thật để thử tải lại trang (không đụng dữ liệu thật).
+**Artifacts Affected**: services/orchestrator, services/web-gui, `aidlc-docs/construction/orchestrator-service/low-level-design/interface-contracts.md`, `aidlc-docs/audit.md`.
+
+## CR-055 — Rà soát cấu trúc toàn dự án
+**Timestamp**: 2026-09-30T04:00:00Z
+**User Input**: "review và kiểm tra sruture toàn bộ dư án xem dự án đã được tổ chức đúng chưa cần sửa chỗ nào không"
+**AI Response**: Mở nhánh `feature/cr-055-project-structure-review`. Rà bằng graphify (graph `dff096c`, không có import cycle), `git ls-files`, `git status --ignored` và `diff` giữa các service. Kết luận: ranh giới service, hexagonal/layout Go, test soi gương và test hợp đồng chéo service đều đúng. Vấn đề: (1) tài liệu không theo kịp việc gỡ content-plugin (CR-020), script-processing (CR-040) và lớp agentic — README gốc, ADR-0006/0012 còn `Accepted`, mục lục ADR thiếu 0016–0022/0026–0028, `aidlc-state.md` dừng ở CR-051, `docs/contracts/` chỉ có 1 file dù CLAUDE.md trỏ tới đó, dashboard Grafana còn panel `script-processing`, 2 chú thích rendering trỏ tới file không còn, `CLAUDE.MD` viết hoa; (2) mã hạ tầng Python chép tay giữa tts/rendering/video-assembly/publisher (outbox, relay giống hệt ×4; inbox, db, cancellation, purge, fake_postgres gần giống) không có gì giữ khớp; (3) rác cục bộ (`services/content-plugin/` chỉ còn cache, `services/web-gui/services/`, worktree cr-052, 99 nhánh local đã merge) và 5 nhánh chưa merge. Đề xuất: sửa hết nhóm 1, thêm test chống lệch cho nhóm 2 (thay vì tách thư viện chung), dọn nhóm 3. Hỏi Creator 4 câu (phương án nhóm 2, thiết kế service đã gỡ, 5 nhánh chưa merge, xoá nhánh đã merge). Chờ duyệt.
+**Impact Assessment**: Chỉ tài liệu, chú thích, dashboard Grafana, docstring và một test hợp đồng mới. Không đổi contract, DB, message, API. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-055-project-structure-review-design.md`, `aidlc-docs/audit.md`.
+
+## CR-055 — Thiết kế được duyệt
+**Timestamp**: 2026-09-30T04:30:00Z
+**User Input**: "1 => chọn a
+2 => update hoặc xoá lại tài liệu thiết kế cho đúng
+3 => tôi chưa nhớ nữa, bạn có thể compare nhánh nào không làm thì xoá đi
+4 => ok đồng ý"
+**AI Response**: 1a: thêm `tests/contracts/test_python_infra_copies.py` giữ các bản mã hạ tầng Python chép tay khớp nhau. 2: xoá 41 file thiết kế riêng của content-plugin-service và script-processing-service (sửa 5 link trong ADR-0008/0009/0011/0012/0013), cập nhật tài liệu kiến trúc chung (high-level-design, application-design, build-and-test, rabbitmq-infrastructure, api-gateway, orchestrator-service) cho khớp 9 service hiện tại. 3: so sánh 5 nhánh chưa merge — `feature/cr-029-progress-percent`, `cr-034-qc-severity-threshold`, `cr-035-validate-script-cache`, `cr-036-auto-approve-outline` là việc bỏ dở (1 commit từ 22–23/09, không có audit trên main, xung đột với main sau CR-040) → gắn tag `archive/<slug>` lên origin rồi xoá nhánh local + remote; `feature/cr-050-llm-call-chunking-resume` đang làm dở (29/09, Unit 1 chờ duyệt) → giữ. 4a: xoá nhánh local đã merge + worktree cr-052, giữ nhánh remote. Commit thiết kế, chuyển sang /code.
+**Impact Assessment**: Tài liệu, chú thích, dashboard Grafana, docstring `inbox.py` (video-assembly, publisher), một test hợp đồng mới, nhánh/tag git. Không đổi contract, DB, message, API.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-055-project-structure-review-design.md`, `aidlc-docs/audit.md`.
+
+## CR-055 — Code xong, chờ duyệt
+**Timestamp**: 2026-09-30T06:00:00Z
+**User Input**: (tiếp theo lượt duyệt "1 => chọn a / 2 => update hoặc xoá lại tài liệu thiết kế cho đúng / 3 => … nhánh nào không làm thì xoá đi / 4 => ok đồng ý")
+**AI Response**: Làm theo mục 7 của thiết kế:
+- Bước 1–2: `CLAUDE.MD` → `CLAUDE.md` (git mv hai bước), hai câu trỏ tới `docs/contracts/README.md`; thêm `docs/contracts/README.md` (mục lục hợp đồng volume, RabbitMQ, HTTP, DB).
+- Bước 3: `README.md` viết lại mục Running the Project (bảng 9 service + ollama + hạ tầng, cổng ra host), Running Tests (thêm Go authoring-service, llm-service, `tests/contracts`), Project Structure, CI/CD (không có CI).
+- Bước 4: ADR-0006, ADR-0012 → `Superseded — Content Plugin Service đã gỡ ở CR-020`; **thêm ngoài kế hoạch** ADR-0010 → `Superseded by ADR-0024` (file ghi `Accepted` trong khi mục lục cũ và ADR-0024 đều nói đã bị thay). `decisions/README.md` thành một bảng 29 ADR.
+- Bước 5: xoá 41 file thiết kế của content-plugin-service và script-processing-service; 5 tham chiếu trong ADR-0008/0009/0011/0012/0013 ghi "đã gỡ … bản cũ: `git show dff096c:<đường dẫn>`".
+- Bước 6: cập nhật high-level-design (architecture-overview viết lại theo 10 thành phần hiện tại + sơ đồ; integration-boundaries: bảng tích hợp, bước saga `validate_script → synthesize_speech → render_scenes → assemble_video`, bảng sở hữu dữ liệu; system-context thêm Hive/Edge/Azure; technology-direction, architectural-style, high-level-design), application-design (application-design, components, component-dependency, services viết lại phần service/saga; unit-of-work*, component-methods thêm đoạn "Hiện trạng" và đánh dấu Unit 2/4 đã gỡ), build-and-test (build/unit-test/integration instructions theo danh sách service hiện tại; kết quả cũ đánh dấu lịch sử), rabbitmq-infrastructure (topology theo `definitions.json`: bỏ 2 queue đã gỡ, thêm `tts.commands` vốn thiếu, `control.fanout`, `orchestrator.events.dlq`), api-gateway (8 file: Authoring Service thay Content Plugin, bỏ route `/v1/plugins`, ghi chú route thật ở `src/routes/`), orchestrator-service interface-contracts (command/event hiện tại).
+- Bước 7: `aidlc-state.md` thêm CR-052…055.
+- Bước 8: dashboard Grafana bỏ biến/panel/regex `script-processing`, dời panel `llm-service` vào chỗ trống và kéo các hàng dưới lên 4 ô.
+- Bước 9: hai chú thích trong rendering trỏ về `domain/script_locator.py`.
+- Bước 10: docstring `inbox.py` của video-assembly, publisher chép đúng bản tts; thêm `tests/contracts/test_python_infra_copies.py`.
+- Bước 13: `make graph`.
+**Chưa làm (bị từ chối quyền chạy lệnh, không thử cách khác)**: bước 11 — gắn tag `archive/*` và xoá 4 nhánh bỏ dở `feature/cr-029-progress-percent`, `cr-034-qc-severity-threshold`, `cr-035-validate-script-cache`, `cr-036-auto-approve-outline` (local + origin); bước 12 — `rm -rf services/content-plugin services/web-gui/services`, `git worktree remove .claude/worktrees/cr-052`, xoá nhánh local đã merge. Chờ Creator cho phép hoặc tự chạy.
+**Impact Assessment**: `pytest tests/contracts` 12 passed; thử thêm một dòng vào `rendering/adapters/persistence/relay.py` → test mới fail đúng file, khôi phục → pass. rendering 351 passed, 11 skipped; video-assembly 186 passed; publisher 88 passed. Rebuild rendering, video-assembly, publisher → healthy; restart grafana, API Grafana xác nhận dashboard "ConceptFlow Pipeline" không còn panel/biến `script-processing`. `git grep` ngoài `aidlc-docs/`: chỉ còn chú thích lịch sử trong `script_locator.py` và test của nó, và `docs/review/data-flow-review.md` (báo cáo rà soát có ghi ngày, giữ nguyên). Không còn link tới tài liệu đã xoá. Không đổi contract, DB, message, API.
+**Artifacts Affected**: `CLAUDE.md`, `README.md`, `docs/contracts/README.md`, `aidlc-docs/decisions/*`, `aidlc-docs/inception/{high-level-design,application-design}/*`, `aidlc-docs/construction/{build-and-test,rabbitmq-infrastructure,api-gateway,orchestrator-service}/*`, 41 file xoá trong `aidlc-docs/construction/`, `aidlc-docs/aidlc-state.md`, `infra/observability/grafana/.../pipeline-overview.json`, `services/rendering` (2 chú thích), `services/{video-assembly,publisher}/adapters/persistence/inbox.py`, `tests/contracts/test_python_infra_copies.py`, `aidlc-docs/audit.md`.
+
 ## CR-050 — Rà soát các tác vụ gọi LLM; chia nhỏ bước sinh code để lỗi chỉ phải chạy lại đúng đoạn lỗi
 **Timestamp**: 2026-09-29T00:00:00Z
 **User Input**: "kiểm tra lại các tác vụ có gọi api llm xem có hợp lý hay chưa, hiện nay ở đoạn code hay bị ngắt và lỗi, ở đoạn đó có thể chia nhỏ ra để chạy song song hoặc tuần tự để khi có lỗi chỉ cần chạy lại đúng đoạn lỗi ko phải toàn bộ như hiện tại"
@@ -2080,5 +2296,36 @@ c3b mặc định là 3"
 - FR-20: chuỗi dừng (`Waiting`, `WaitingStep=storyboard`) khi storyboard có cảnh báo và còn bước sau. Test cũ `TestChainKeepsStepWarnings` được sửa theo hành vi mới.
 Kiểm thử: `make check` qua 6/6 (gofmt, go vet, go test, eslint, tsc, vitest). Test Postgres của repo bị bỏ qua (không có `TEST_DATABASE_URL`); câu SQL thống kê đã chạy thử (chỉ đọc) trên DB thật. Đã rebuild `authoring-service` (healthy) và `web-gui` (running). Kiểm tra trực tiếp: cột mới có; `/v1/llm/status` trả `code_ok` và số liệu thật; PUT model `ollama` cho code trả 400 và không đổi dữ liệu; danh sách hình trả `stale: false` với danh sách cũ chưa có hash. Chưa kiểm tra trực tiếp: nhánh `stale: true` và việc chuỗi dừng ở storyboard (cần sửa storyboard hoặc chạy AI thật; đã có unit test).
 **Context**: CONSTRUCTION — CR-050 Unit 1, chờ Creator duyệt trước khi commit.
+
+---
+
+## CR-050 — Merge main vào nhánh, thiết kế Unit 2 (FR-1..FR-9, FR-21, FR-22)
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "tiếp tục feature/cr-050-llm-call-chunking-resume"
+**AI Response**:
+- Merge `main` @ `39f1f26` (CR-051..055, gỡ lớp agentic) vào nhánh. Có 3 xung đột, đều giữ cả hai phía:
+  - `aidlc-state.md` (dòng bảng CR);
+  - `audit.md` (nhật ký);
+  - `project_illustrations_test.go` (test FR-17 và test CR-052).
+- Sửa một chỗ lệch chữ ký sau merge: `summaries_cr051_test.go` gọi `MarkIllustrationsPlanned` thiếu tham số `storyboardSHA` mà Unit 1 thêm.
+- Kiểm sau merge:
+  - `go vet`, `go test ./...` (authoring-service) qua;
+  - 5 test Postgres qua trên DB tạm `postgres:16-alpine`;
+  - web-gui `tsc` sạch, vitest 418/418.
+- Merge chưa commit, chờ duyệt.
+- Thiết kế Unit 2:
+  - `aidlc-docs/decisions/ADR-0030-code-segments-and-v2-code-contract.md` (Proposed): `authoring-service` lưu từng đoạn trong `authoring_segments`; `llm-service` không còn trạng thái (bỏ `ChunkCache`); contract `/v2/code/*` stream kết quả từng đoạn, từng lượt gọi (`llm_usage` ghi ngay) và từng lần kiểm (`code_check_diagnostics`); dấu vân tay không chứa model và hình thư viện.
+  - `aidlc-docs/construction/plans/cr-050-u2-code-segments-design.md`.
+**Impact Assessment**: `rendering` (thêm `rule` vào diagnostic), `llm-service` (pipeline, route v2, bỏ v1), `authoring-service` (2 bảng + 1 cột, use case, route), `web-gui` (panel các đoạn). Không đổi RabbitMQ, orchestrator, gateway.
+**Artifacts Affected**: ADR-0030, thiết kế U2 (mới); merge `main`.
+**Context**: CONSTRUCTION — CR-050 Unit 2 Application/Functional Design, chờ Creator duyệt.
+
+---
+
+## CR-050 — Duyệt merge main và thiết kế Unit 2
+**Timestamp**: 2026-09-30T00:00:00Z
+**User Input**: "ok duyệt"
+**AI Response**: ADR-0030 chuyển Accepted, thêm vào `decisions/README.md`. Commit merge `main` cùng thiết kế U2, rồi chuyển sang code U2 (skill `/code`).
+**Context**: CONSTRUCTION — CR-050 Unit 2, thiết kế đã duyệt.
 
 ---

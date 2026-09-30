@@ -30,6 +30,9 @@ export const FLOW_LABELS = [
 ] as const;
 
 export const FLOW_INIT = 1;
+export const FLOW_CONFIG = 2;
+export const FLOW_STORY = 3;
+export const FLOW_VISUAL = 4;
 export const FLOW_ILLUSTRATIONS = 5;
 export const FLOW_CODE = 6;
 export const FLOW_VALIDATE = 7;
@@ -37,6 +40,19 @@ export const FLOW_REVIEW = 8;
 export const FLOW_TTS = 9;
 export const FLOW_RESULT = 13;
 export const FLOW_PUBLISH = 14;
+
+/**
+ * CR-051 — "Bước 4 — Visual": the one way a step is named to the Creator, on a
+ * screen title, in the AI chain's progress, anywhere. The name is the step
+ * rail's, so a screen can never call a step something the rail does not.
+ */
+export function flowTitle(step: number): string {
+  // A step outside the flow (a stale or hand-edited ?step=) keeps its number
+  // rather than printing "undefined".
+  if (!Number.isInteger(step)) return "Bước";
+  const label = FLOW_LABELS[step - 1];
+  return label ? `Bước ${step} — ${label}` : `Bước ${step}`;
+}
 
 export type RunState = "idle" | "running" | "failed" | "done";
 

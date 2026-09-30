@@ -1,5 +1,7 @@
 # Infrastructure Design — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Deployment Environment
 Docker container, `node:20-alpine`, network `backend` — chạy local, không cloud provider.
 
@@ -31,4 +33,4 @@ Unit 9 LÀ implementation cụ thể của quyết định "API Gateway" tại `
 Không có stack riêng — `docker-compose logs` + `pino` JSON logging.
 
 ## Shared Infrastructure
-Dùng lại: `rabbitmq` (Unit 1), `backend` network. Kết nối trực tiếp tới 3 service downstream đã build (`orchestrator:8000`, `content-plugin:8000`, `publisher:8000` — nội bộ network).
+Dùng lại: `rabbitmq` (Unit 1), `backend` network. Kết nối trực tiếp tới 3 service downstream đã build (`orchestrator:8000`, `authoring-service:8000`, `publisher:8000` — nội bộ network).

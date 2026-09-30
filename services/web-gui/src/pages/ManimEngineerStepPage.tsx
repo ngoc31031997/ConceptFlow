@@ -16,19 +16,19 @@ import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
+import { FLOW_CODE, flowTitle } from "../utils/flow";
 
 
 /**
- * Bước 1c (Engineer) — third tab of the "Bước 3 — Script" sub-wizard (see
- * ScriptPipelineTabs): fetch the current template, fill it with the
+ * Bước 6 — Code (Engineer), the last authoring step (see ScriptPipelineTabs): fetch the current template, fill it with the
  * previous tabs' saved output (story + storyboard), let the Creator copy it
  * out and paste the AI's code back, then save it server-side, store it as
- * the draft's scriptContent, and start the validate saga — 1c is the
- * last tab of bước 3 since the "Xem lại" step was removed (settings now live
- * in bước 2, so nothing is left to collect before submitting).
+ * the draft's scriptContent, and start the validate saga (step 7) — there is
+ * no review step in between since the "Xem lại" step was removed (settings
+ * now live in step 2, so nothing is left to collect before submitting).
  *
  * feature/remotion-engine: the render engine picker lives HERE, not on the
- * situation-chooser page — tabs 1a/1b (story/storyboard) are identical
+ * situation-chooser page — steps 3/4 (story/storyboard) are identical
  * either way; this is the only tab whose prompt role (manim_engineer vs
  * remotion_engineer) and lint behavior (validateScript only understands
  * Manim's self.narrate/ConceptFlowScene conventions; Remotion has no
@@ -109,8 +109,7 @@ export function ManimEngineerStepPage() {
   // fence — pasting that whole block (fence included) is the single most
   // common way this round trip fails: the fence markers are not valid
   // Python/TSX, so esbuild/ast.parse chokes on line 1 with a syntax error
-  // that says nothing about the real cause. Strip it the same way
-  // ScriptEditor already does for the "draft"/"ready" situations.
+  // that says nothing about the real cause. Strip it before storing.
   const setCode = (value: string) => dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(value) });
   // validateScript only understands Manim's self.narrate/ConceptFlowScene
   // conventions; validateRemotionScript checks the structural rules the
@@ -179,7 +178,7 @@ export function ManimEngineerStepPage() {
         ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
         : validation.message;
 
-  // CR-027 FR79 — cùng lựa chọn chế độ với các tab khác của bước 1.
+  // CR-027 FR79 — cùng lựa chọn chế độ với các bước soạn 3–5.
   const llm = useLlmStatus();
   // CR-027 FR79 — chế độ lấy từ project ở server (qua draft), nên mở lại dự án
   // ở bất cứ tab nào, trình duyệt nào, sau restart nào cũng đúng chế độ đã chọn.
@@ -192,7 +191,7 @@ export function ManimEngineerStepPage() {
     <div data-testid="manim-engineer-step-page">
       <AppShell
         currentStep={6}
-        title="Bước 6 — Code"
+        title={flowTitle(FLOW_CODE)}
         subtitle={
           hasOwnCode
             ? `Dán code ${isRemotion ? "Remotion" : "Manim"} của bạn, hệ thống sẽ kiểm tra ngay.`

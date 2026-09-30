@@ -224,6 +224,25 @@ export interface ProjectSummary {
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   forked_from?: string;
+  /** Tên dự án nguồn — có thể nằm ở trang khác (CR-054). */
+  forked_from_topic?: string;
+}
+
+/** Nhóm lọc của danh sách video (CR-054: lọc ở server). */
+export type ProjectListFilter = "all" | "running" | "waiting" | "problem" | "done";
+
+/** Số dự án trong từng nhóm lọc, tính trên toàn bộ danh sách. */
+export type ProjectListCounts = Record<ProjectListFilter, number>;
+
+/** Một trang của GET /v1/projects?page=… (CR-054). */
+export interface ProjectPage {
+  projects: ProjectSummary[];
+  /** Số dự án sau khi lọc. */
+  total: number;
+  /** Trang server thật sự trả (trang vượt quá cuối thì là trang cuối). */
+  page: number;
+  page_size: number;
+  counts: ProjectListCounts;
 }
 
 

@@ -10,7 +10,7 @@ Tài liệu này tổng hợp các artifact High-Level Design chi tiết. Xem t�
 → Chi tiết: `system-context.md`
 
 ## 2. Architecture Overview
-Kiến trúc **Microservices** (ADR-0001) gồm 10 thành phần: Web GUI, API Gateway, **Orchestrator Service** (mới), **Message Queue/RabbitMQ** (mới), Content Plugin Service, Script Processing Service, Rendering Service, TTS Service, Video Assembly Service, Publisher Service.
+Kiến trúc **Microservices** (ADR-0001). Hiện tại (CR-055): Web GUI, API Gateway, Orchestrator Service, Authoring Service, LLM Service (+ Ollama), Message Queue/RabbitMQ, Rendering Service, TTS Service, Video Assembly Service, Publisher Service. Content Plugin Service (gỡ ở CR-020) và Script Processing Service (gỡ ở CR-040) có trong thiết kế ban đầu nhưng không còn.
 → Chi tiết: `architecture-overview.md`
 
 ## 3. Technology Direction
@@ -22,7 +22,7 @@ GUI↔Gateway: REST (cấu hình) + SSE (tiến trình). Gateway↔Orchestrator:
 → Chi tiết: `integration-boundaries.md`
 
 ## 5. Architectural Style
-**Hexagonal / Ports & Adapters** (ADR-0002) áp dụng nội bộ mỗi service, đặc biệt Content Plugin Service, Rendering Service, TTS Service — phục vụ trực tiếp yêu cầu NFR1 (Extensibility). Constructor injection thủ công cho DI.
+**Hexagonal / Ports & Adapters** (ADR-0002) áp dụng nội bộ mỗi service, đặc biệt Rendering Service, TTS Service (thiết kế ban đầu còn gồm Content Plugin Service, đã gỡ) — phục vụ trực tiếp yêu cầu NFR1 (Extensibility). Constructor injection thủ công cho DI.
 → Chi tiết: `architectural-style.md`
 
 ## 6. Key Architectural Decisions (ADRs)
@@ -33,7 +33,7 @@ GUI↔Gateway: REST (cấu hình) + SSE (tiến trình). Gateway↔Orchestrator:
 | ADR-0003 | Python/FastAPI + React thay vì Desktop app Python thuần |
 | ADR-0004 | API Gateway (reverse proxy) thay vì gọi trực tiếp từng service |
 | ADR-0005 | *(Superseded by ADR-0007)* Orchestration qua Gateway thay vì Choreography/message broker |
-| ADR-0006 | Dynamic plugin loading thay vì static registry |
+| ADR-0006 | *(Superseded — Content Plugin Service gỡ ở CR-020)* Dynamic plugin loading thay vì static registry |
 | ADR-0007 | Saga Orchestration qua Orchestrator Service riêng + Message Queue (RabbitMQ), thay thế ADR-0005 |
 
 ## 7. Traceability to Requirements
@@ -41,6 +41,6 @@ Mọi Functional Requirement (FR1-FR8) trong `requirements.md` được ánh x�
 
 ## 8. Open Items chuyển tiếp sang Application Design
 - Định nghĩa cụ thể REST endpoint contract giữa GUI ↔ Gateway ↔ mỗi service
-- Định nghĩa port/adapter interface cụ thể cho Content Plugin Service, TTS Service, Rendering Service
+- Định nghĩa port/adapter interface cụ thể cho TTS Service, Rendering Service (và Content Plugin Service, sau này đã gỡ)
 - Định nghĩa state machine của "video project" mà Gateway quản lý (draft/processing/failed-at-step/published)
 - Xác định cơ chế lưu trữ file trung gian (animation clip, audio clip) giữa các service (shared volume trong docker-compose)

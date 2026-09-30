@@ -347,4 +347,8 @@ type AuthoringSummary struct {
 	Story      bool   `json:"story"`
 	Storyboard bool   `json:"storyboard"`
 	Code       bool   `json:"code"`
+	// IllustrationsReady (CR-051): the drawing list is planned and every drawing
+	// approved or skipped — what the code step's gate asks. Engine-agnostic; the
+	// orchestrator only reads it for a Remotion project.
+	IllustrationsReady bool `json:"illustrations_ready"`
 }

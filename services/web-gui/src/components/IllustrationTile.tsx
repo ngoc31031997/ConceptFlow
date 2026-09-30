@@ -20,7 +20,7 @@ interface IllustrationTileProps {
 }
 
 function badgeClass(ill: Illustration): string {
-  if (ill.builtin) return glass.badgeNeutral;
+  if (ill.builtin || ill.exemplar) return glass.badgeNeutral;
   return ill.status === "approved" ? glass.badgeSuccess : glass.badgeProgress;
 }
 

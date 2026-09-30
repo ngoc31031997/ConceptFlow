@@ -1,7 +1,7 @@
 # ADR-0012: Content Plugin Integration via Orchestrator (Not Direct REST)
 
 ## Status
-Accepted
+Superseded — Content Plugin Service đã gỡ ở CR-020 (commit 59cb813)
 
 ## Date
 2026-08-07
@@ -35,5 +35,5 @@ This preserves the Saga design already approved in Application Design, avoids re
 - **Follow-ups**: When Unit 8 (Orchestrator) reaches Low-Level Design, its persistence layer should store both `script_parsed` and `scenes_classified` payloads so retries and GUI display don't require re-invoking Script Processing Service or Content Plugin Service for already-completed steps.
 
 ## Related
-- Design artifact: `aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md`
+- Design artifact: `aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md` (đã gỡ cùng service ở CR-040; bản cũ: `git show dff096c:aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md`)
 - Related ADRs: Reaffirms the Saga design underlying ADR-0007 (Saga Orchestrator Service + Message Queue)

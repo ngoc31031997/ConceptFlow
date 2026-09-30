@@ -19,10 +19,11 @@ import type { PublishMetadata } from "../types";
 import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishPage.module.css";
+import { FLOW_PUBLISH, flowTitle } from "../utils/flow";
 
 /**
- * Bước 6 — "Đăng" (bug report, 2026-09-12): tách khỏi ResultPage (Bước 5,
- * "Kết quả"), để trang này CHỈ làm một việc — kết nối YouTube, điền
+ * Bước 14 — "Publish" (bug report, 2026-09-12): tách khỏi ResultPage (bước
+ * 13, "Kết quả"), để trang này CHỈ làm một việc — kết nối YouTube, điền
  * tiêu đề/mô tả, xem báo cáo QC, và đăng. Mọi thứ khác (render lại, tạo bản
  * Shorts, xem input, xóa) ở lại ResultPage.
  */
@@ -152,9 +153,9 @@ export function PublishPage() {
   return (
     <div data-testid="publish-page">
       <AppShell
-        currentStep={13}
+        currentStep={FLOW_PUBLISH}
         wide
-        title="Đăng video"
+        title={flowTitle(FLOW_PUBLISH)}
         subtitle="Kết nối YouTube và điền thông tin để đăng video."
         headerAction={
           <Link to={`/projects/${projectId}/result`} className={glass.ghostBtn} style={{ textDecoration: "none" }}>

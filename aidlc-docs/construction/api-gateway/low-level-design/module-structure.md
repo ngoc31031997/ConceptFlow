@@ -1,5 +1,7 @@
 # Module Structure — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Layering (Layered đơn giản — không phải Hexagonal, Question 1)
 Gateway không có domain logic — chỉ routing/proxy/SSE fan-out, nên không cần ports/adapters đầy đủ như Unit 2–8.
 
@@ -8,14 +10,13 @@ services/api-gateway/
 ├── src/
 │   ├── server.js              # Composition root — Express app, wiring clients, start HTTP server + AMQP consumer
 │   ├── routes/
-│   │   ├── plugins.js          # GET /v1/plugins
 │   │   ├── sagas.js            # POST /v1/sagas/render, POST /v1/sagas/publish
 │   │   ├── projects.js         # GET /v1/projects/:id, POST /v1/projects/:id/retry
 │   │   ├── auth.js             # GET /v1/auth/youtube/start, GET /v1/auth/youtube/callback
 │   │   ├── progress.js         # GET /v1/progress/:id (SSE)
 │   │   └── health.js           # GET /health
 │   ├── handlers/
-│   │   ├── proxyHandler.js     # Generic passthrough proxy handler (dùng chung cho plugins/sagas/projects/auth)
+│   │   ├── proxyHandler.js     # Generic passthrough proxy handler (dùng chung cho sagas/projects/auth/…)
 │   │   └── progressHandler.js  # SSE connection lifecycle + fan-out lookup
 │   ├── clients/
 │   │   ├── httpClient.js       # Generic HTTP client wrapper (fetch/axios) tới service downstream, forward headers
@@ -39,8 +40,7 @@ services/api-gateway/
 
 | Module | Responsibility |
 |---|---|
-| `server.js` | Composition root: tạo Express app, khởi tạo `httpClient` (3 base URL: Orchestrator/ContentPlugin/Publisher), khởi tạo `amqpClient`, đăng ký middleware + route, start HTTP server + AMQP consumer |
-| `routes/plugins.js` | `GET /v1/plugins` → `proxyHandler` với target = Content Plugin Service |
+| `server.js` | Composition root: tạo Express app, khởi tạo `httpClient` (3 base URL: Orchestrator/Authoring Service/Publisher), khởi tạo `amqpClient`, đăng ký middleware + route, start HTTP server + AMQP consumer |
 | `routes/sagas.js` | `POST /v1/sagas/render`, `POST /v1/sagas/publish` → `proxyHandler` với target = Orchestrator Service |
 | `routes/projects.js` | `GET /v1/projects/:id`, `POST /v1/projects/:id/retry` → `proxyHandler` với target = Orchestrator Service |
 | `routes/auth.js` | `GET /v1/auth/youtube/start`, `GET /v1/auth/youtube/callback` → `proxyHandler` với target = Publisher Service (bao gồm forward `302` redirect nguyên trạng) |
@@ -51,4 +51,4 @@ services/api-gateway/
 | `clients/httpClient.js` | Wrapper HTTP client (Node's `fetch`, built-in từ Node 18+), forward header, timeout mặc định |
 | `clients/amqpClient.js` | Consume `progress.fanout` (exclusive queue riêng của Gateway), gọi callback `progressHandler` khi nhận message |
 | `middleware/correlation.js` | Sinh `X-Request-ID` (UUID) nếu request chưa có header này; set vào `req` để mọi handler/log dùng chung |
-| `config/config.js` | Đọc env var: `ORCHESTRATOR_URL`, `CONTENT_PLUGIN_URL`, `PUBLISHER_URL`, `RABBITMQ_URL` |
+| `config/config.js` | Đọc env var: `ORCHESTRATOR_URL`, `AUTHORING_SERVICE_URL`, `PUBLISHER_URL`, `RABBITMQ_URL`, `SHARED_DIR`, `WEB_GUI_ORIGIN`, `PORT` |

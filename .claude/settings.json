@@ -13,12 +13,7 @@
       "Bash(git push origin *)",
       "Bash(git push -u origin *)",
       "Bash(make help)",
-      "Bash(make setup)",
-      "Bash(make setup *)",
-      "Bash(make build)",
-      "Bash(make check)",
-      "Bash(make check *)",
-      "Bash(make check-all)"
+      "Bash(.claude/skills/deliver/deliver.sh *)"
     ],
     "ask": [
       "Bash(git checkout -- *)",
@@ -28,16 +23,9 @@
       "Bash(git clean *)",
       "Bash(git branch -D *)",
       "Bash(docker exec *)",
-      "Bash(*migrate-authoring-data.sh*)",
       "Edit(/.github/**)",
       "Edit(/.claude/settings.json)",
-      "Edit(/.claude/settings.local.json)",
-      "Edit(/.claude/agents/**)",
-      "Edit(/.claude/skills/**)",
-      "Edit(/scripts/hooks/**)",
-      "Edit(/scripts/check.sh)",
-      "Edit(/scripts/review-prep.sh)",
-      "Edit(/scripts/review-status.sh)"
+      "Edit(/.claude/settings.local.json)"
     ],
     "deny": [
       "Bash(git push --force*)",
@@ -71,38 +59,6 @@
       "Edit(**/client_secret_*.json)",
       "Edit(/.git/conceptflow/**)",
       "Edit(~/.claude/projects/**/subagents/**)"
-    ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/guard_bash.py", "timeout": 30 }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Edit|MultiEdit|Write",
-        "hooks": [
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/lint-edited.sh", "timeout": 60 }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          { "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/scripts/hooks/stop-check.sh", "timeout": 600 }
-        ]
-      }
-    ],
-    "SubagentStop": [
-      {
-        "hooks": [
-          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR\"/scripts/hooks/record_review.py", "timeout": 30 }
-        ]
-      }
     ]
   }
 }

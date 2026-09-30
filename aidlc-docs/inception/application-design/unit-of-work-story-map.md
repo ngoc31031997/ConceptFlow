@@ -1,5 +1,7 @@
 # Unit of Work — Story Map
 
+> **Hiện trạng (CR-055, 2026-09-30)** — tài liệu này ghi kế hoạch chia unit lúc Inception và được giữ như lịch sử. Từ đó: Unit 2 Content Plugin Service gỡ ở CR-020; Unit 4 Script Processing Service gỡ ở CR-040 (việc tìm Scene chuyển vào `validate_script` của Rendering); thêm Authoring Service (CR-040, ADR-0029) và LLM Service + Ollama (CR-039), không đi theo quy trình unit. Kiến trúc hiện tại: `aidlc-docs/inception/high-level-design/architecture-overview.md`.
+
 Ánh xạ toàn bộ 17 story trong `stories.md` tới unit tương ứng, đảm bảo mọi story đều có unit sở hữu.
 
 | Story | Epic | Unit(s) chịu trách nhiệm chính |

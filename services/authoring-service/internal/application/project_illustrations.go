@@ -207,7 +207,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		return nil, fmt.Errorf("load storyboard: %w", err)
 	}
 	if strings.TrimSpace(storyboard) == "" {
-		return nil, fmt.Errorf("chưa có storyboard — hãy chạy bước Visual trước")
+		return nil, fmt.Errorf("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
 	}
 	all, err := uc.library.List(ctx, IllustrationFilter{})
 	if err != nil {
@@ -223,11 +223,17 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		if !i.Builtin && i.Status != domain.IllustrationApproved {
 			continue // a draft is not something to reuse yet
 		}
+		if i.IsExemplarCopy() {
+			continue // CR-052: a Hình mẫu copy; its source is in the catalog
+		}
 		byName[i.Name] = i
 		fmt.Fprintf(&catalog, "- %s — %s — %s — %s\n", i.Name, i.Title, i.FolderID, strings.Join(i.Tags, ", "))
 	}
 	folderIDs := map[string]bool{}
 	for _, f := range folders {
+		if f.ID == domain.ExemplarFolderID {
+			continue // CR-052: filled only by "Đặt làm mẫu"
+		}
 		folderIDs[f.ID] = true
 		fmt.Fprintf(&folderText, "- %s — %s — %s\n", f.ID, f.Name, f.Description)
 	}
@@ -386,7 +392,7 @@ func (uc *ProjectIllustrationsUseCase) SetSkipped(ctx context.Context, projectID
 		r.State = domain.PISkipped
 	case r.IllustrationID == "":
 		r.State = domain.PIPlanned
-	case r.Illustration != nil && r.Illustration.Builtin:
+	case r.Illustration != nil && r.Illustration.ReadOnly(): // the kit, or a Hình mẫu (CR-052)
 		r.State = domain.PIReused
 	default:
 		r.State = domain.PIDrawn
@@ -562,7 +568,7 @@ func (uc *ProjectIllustrationsUseCase) DeleteDrawing(ctx context.Context, projec
 	if r.State != domain.PIDrawn || ill == nil || ill.Builtin || ill.Status != domain.IllustrationDraft {
 		return r, ErrIllustrationNotDeletable
 	}
-	if err := uc.library.Delete(ctx, ill.ID); err != nil && !errors.Is(err, ErrIllustrationNotFound) {
+	if err := uc.library.deleteDrawing(ctx, ill.ID, projectID); err != nil && !errors.Is(err, ErrIllustrationNotFound) {
 		return r, err
 	}
 	r.State, r.IllustrationID, r.Error, r.Illustration = domain.PISkipped, "", "", nil
@@ -574,8 +580,8 @@ func (uc *ProjectIllustrationsUseCase) DeleteDrawing(ctx context.Context, projec
 
 // ForCode lists the approved drawings with code the Remotion Engineer may use:
 // this video's own first (all of them), then up to maxCodeLibraryDrawings more
-// from the rest of the library (exemplars included).
-// Kit built-ins are not listed: they are always imported.
+// from the rest of the library (original exemplars included; CR-052 copies are
+// not, their source is). Kit built-ins are not listed: they are always imported.
 func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID string) ([]LibraryDrawing, error) {
 	rows, err := uc.repo.ListProjectIllustrations(ctx, projectID)
 	if err != nil {
@@ -589,7 +595,7 @@ func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID st
 	seen := map[string]bool{}
 	extra := 0
 	take := func(i domain.Illustration, own bool) {
-		if seen[i.Name] || strings.TrimSpace(i.Code) == "" {
+		if seen[i.Name] || strings.TrimSpace(i.Code) == "" || i.IsExemplarCopy() {
 			return
 		}
 		if !i.Builtin && i.Status != domain.IllustrationApproved {
