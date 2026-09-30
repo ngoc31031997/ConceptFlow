@@ -2158,3 +2158,17 @@ Các lỗi nhỏ còn lại để làm sau:
 Giữ nguyên nhóm B (công cụ chạy tay) theo lựa chọn 1a. `git grep` không còn tham chiếu tới file đã xoá ngoài `aidlc-docs/`.
 **Impact Assessment**: authoring-service `go vet` + `go test ./...` pass; orchestrator `go vet` + `go test ./...` pass; web-gui `tsc -b` sạch, vitest 62 file / 393 test pass (trước là 402 test, bớt 9 test của 2 file đã xoá); rendering pytest 351 pass, 11 skipped (chạy bằng `.venv/bin/python -m pytest` vì script `.venv/bin/pytest` trỏ tới đường dẫn cũ `ConcertFlow/...`). Rebuild authoring-service, rendering (healthy), web-gui (đang chạy; không có healthcheck); orchestrator build ra image giống hệt image đang chạy (`2aee15d1…`) nên container không cần tạo lại, vẫn healthy. Kiểm trực tiếp: web-gui `/`, `favicon.ico`, `favicon-16/32.png`, `site.webmanifest` trả 200; gateway `/v1/projects`, `/v1/script-templates` trả 200. Chưa đi tay qua wizard trên trình duyệt.
 **Artifacts Affected**: services/web-gui, services/rendering, services/authoring-service, services/orchestrator, scripts/, docs/, `.claude/settings.json`, `aidlc-docs/audit.md`.
+
+## CR-054 — Phân trang danh sách video
+**Timestamp**: 2026-09-30T02:00:00Z
+**User Input**: "phân danh sách video thêm paging"
+**AI Response**: Mở nhánh `feature/cr-054-video-list-paging`. Rà bằng graphify: `VideoListPage` tải toàn bộ dự án qua `listProjects()` (`GET /v1/projects`, orchestrator `ProjectRepository.List` không có LIMIT), lọc theo trạng thái/bước ở client và vẽ mọi hàng (hiện 124 dự án). Đưa 2 phương án: A — phân trang ở client, giữ API (đề xuất); B — phân trang ở server, phải chuyển lọc `run_state`/`flow_step` và số đếm sang orchestrator, sửa contract/gateway. Thiết kế A: 20 video/trang (chọn 10/20/50), thanh phân trang dưới danh sách, về trang 1 khi đổi lọc, "Chọn tất cả" chỉ theo trang đang xem, kẹp trang khi xoá. Chờ duyệt.
+**Impact Assessment**: web-gui (component `Pagination` mới, `utils/pagination.ts` mới, `VideoListPage`). Không đổi contract, DB, api-gateway, orchestrator. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-054-video-list-paging-design.md`, `aidlc-docs/audit.md`.
+
+## CR-054 — Thiết kế được duyệt (phương án B)
+**Timestamp**: 2026-09-30T02:30:00Z
+**User Input**: "B chia trang trên servier"
+**AI Response**: Viết lại thiết kế theo phương án B. `flow_step`/`run_state` được tính trong Go (bản nháp cần dữ liệu authoring-service), nên không `LIMIT/OFFSET` bằng SQL: orchestrator vẫn đọc bản tóm tắt nhẹ, rồi lọc (`filter`, `steps`), đếm (`counts`) và cắt trang trong domain (`PageProjects`) trước khi trả. `GET /v1/projects` thêm `page`, `page_size`, `filter`, `steps`; không có `page` thì trả như cũ (Nhật ký, dự án gần nhất không đổi). Thêm `forked_from_topic`. Web: component `Pagination` (10/20/50, mặc định 20), `listProjectsPage`, `VideoListPage` tải theo trang, bỏ lọc client, "Chọn tất cả" theo trang, tải lại sau khi xoá. Gateway không đổi code (proxy chuyển nguyên query). Commit thiết kế, chuyển sang /code.
+**Impact Assessment**: orchestrator (domain + HTTP), web-gui. Contract `GET /v1/projects` mở rộng tương thích ngược. Không đổi DB, migration, RabbitMQ, api-gateway.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-054-video-list-paging-design.md`, `aidlc-docs/audit.md`.
