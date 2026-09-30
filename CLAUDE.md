@@ -41,12 +41,12 @@ When implementing:
   3. Locate: `graphify query "<question>"` / `graphify explain "<symbol>"` to find the files and symbols involved; `graphify path "<A>" "<B>"` for a call chain; `graphify affected "<symbol>"` for callers before changing behaviour.
   4. Read only the files (and, for large files, only the line ranges) the graph points to, plus the code you will change. Do not re-read a file already read in this session unless it changed.
 - Fall back to `grep` for exact strings the graph cannot answer (config keys, error messages, SQL, env names), scoped to the service directory, not the whole repo.
-- For what the graph cannot see (RabbitMQ messages, HTTP between services, DB access) go straight to `docs/contracts/` and the relevant ADR instead of scanning services.
+- For what the graph cannot see (RabbitMQ messages, HTTP between services, DB access) go straight to the contract index `docs/contracts/README.md` and the relevant ADR instead of scanning services.
 
 ## Code knowledge graph (graphify)
 - `graphify-out/` (git-ignored) holds a local graph of the code and markdown structure, built with tree-sitter AST: no LLM, nothing leaves the machine. Refresh it with `make graph`; after `make graph-hooks` the graphify git hooks keep it in step with commits and branch switches. Details: `docs/agentic/graphify.md`.
 - Use it to orient before reading many files, not instead of reading the code you change: `graphify query "<question>"`, `graphify explain "<symbol>"`, `graphify path "<A>" "<B>"`, `graphify affected "<symbol>"` (who depends on it), `graphify-out/GRAPH_REPORT.md` for the architecture overview.
-- It only knows static edges (imports, calls, references). RabbitMQ messages, HTTP calls between services and DB access are not in it; check `docs/contracts/` and the ADRs for those. If `graph.json`'s `built_at_commit` is not HEAD, run `make graph` first.
+- It only knows static edges (imports, calls, references). RabbitMQ messages, HTTP calls between services and DB access are not in it; check the contract index `docs/contracts/README.md` and the ADRs for those. If `graph.json`'s `built_at_commit` is not HEAD, run `make graph` first.
 - The agentic layer (skills `/cr-*`, `/fix-bug`, `/rebuild`, role agents, hooks, review gate, `make setup/build/check/check-all`, CI workflow) was removed on 2026-09-29/30; do not invoke or recreate it. Rebuild with `docker compose build/up` directly. The exceptions are three skills, added back on 2026-09-30:
   - `/cr` (`.claude/skills/cr/`, Opus 5.5, medium effort): for a new request, opens the `feature/cr-<NNN>-<slug>` branch, analyses the codebase through graphify and writes a proposed solution (`aidlc-docs/construction/plans/cr-<NNN>-<slug>-design.md`); after the Creator approves, commits it and invokes `/code`.
   - `/code` (`.claude/skills/code/`, Sonnet, medium effort): implements the approved design, runs tests, rebuilds the changed services, reports; commits nothing.

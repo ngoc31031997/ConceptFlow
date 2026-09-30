@@ -1,26 +1,28 @@
 # Dependency Injection — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Mechanism
 Constructor injection thủ công qua factory function (Node.js idiom) — không dùng DI container (`InversifyJS`, `tsyringe`). Nhất quán tinh thần constructor injection thủ công đã dùng ở Unit 8 (Go), chuyển sang idiom Node.js/Express.
 
 ## What Gets Injected vs Constructed Directly
-- **Injected**: `httpClient` (3 instance, mỗi instance gắn 1 base URL — Orchestrator/ContentPlugin/Publisher) truyền vào `proxyHandler` factory qua tham số; `amqpClient` (kết nối RabbitMQ) truyền vào `progressHandler` factory.
+- **Injected**: `httpClient` (3 instance, mỗi instance gắn 1 base URL — Orchestrator/Authoring Service/Publisher) truyền vào `proxyHandler` factory qua tham số; `amqpClient` (kết nối RabbitMQ) truyền vào `progressHandler` factory.
 - **Constructed trực tiếp**: Express `app`, route router objects — đây là framework infrastructure, không phải business abstraction cần test độc lập.
 
 ## Composition Root
 `src/server.js`:
 1. Load config từ env var (`config/config.js`).
-2. Khởi tạo `httpClient` cho 3 target: `orchestratorClient`, `contentPluginClient`, `publisherClient`.
+2. Khởi tạo `httpClient` cho 3 target: `orchestratorClient`, `authoringClient`, `publisherClient`.
 3. Kết nối RabbitMQ (`amqpClient`), declare exclusive queue bind vào `progress.fanout`.
 4. Khởi tạo Express `app`, đăng ký `middleware/correlation.js`.
-5. Đăng ký route: `routes/plugins.js(contentPluginClient)`, `routes/sagas.js(orchestratorClient)`, `routes/projects.js(orchestratorClient)`, `routes/auth.js(publisherClient)`, `routes/progress.js(amqpClient)`, `routes/health.js()`.
+5. Đăng ký route: `routes/sagas.js(orchestratorClient)`, `routes/projects.js(orchestratorClient)`, `routes/auth.js(publisherClient)`, `routes/progress.js(amqpClient)`, `routes/health.js()`.
 6. Start HTTP server (`app.listen`), start AMQP consumer loop.
 
 ## Wiring Diagram
 ```
 server.js
   ├── httpClient(ORCHESTRATOR_URL) ──┐
-  ├── httpClient(CONTENT_PLUGIN_URL) ─┤── injected into → routes/*.js → proxyHandler
+  ├── httpClient(AUTHORING_SERVICE_URL) ┤── injected into → routes/*.js → proxyHandler
   ├── httpClient(PUBLISHER_URL) ─────┘
   │
   └── amqpClient(RABBITMQ_URL) ── injected into → routes/progress.js → progressHandler

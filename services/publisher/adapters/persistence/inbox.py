@@ -1,8 +1,8 @@
 """InboxRepository — durable message dedupe (ADR-0013).
 
-The processed_messages table survives a restart, so a redelivered message
-is still recognized as already-handled even if the service crashed and
-restarted in between.
+Replaces the previous in-memory IdempotencyStore: the processed_messages
+table survives a restart, so a redelivered message is still recognized
+as already-handled even if the service crashed and restarted in between.
 """
 
 from __future__ import annotations

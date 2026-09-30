@@ -1,5 +1,8 @@
 # Build and Test Summary
 
+> **Cập nhật (CR-055, 2026-09-30)**: service hiện có — Python: `tts`, `rendering`, `video-assembly`, `publisher`, `llm-service`; Go: `orchestrator`, `authoring-service`; Node: `api-gateway`, `web-gui`; cộng `rabbitmq`, 6 Postgres (orchestrator, authoring-service, tts, rendering, video-assembly, publisher), `ollama` (+ `ollama-pull` chạy một lần), `loki`/`promtail`/`grafana` — 22 mục trong `docker compose config --services`, 9 image tự build. `content-plugin` (gỡ ở CR-020) và `script-processing` (gỡ ở CR-040) không còn.
+> Phần dưới là tổng kết lần build/test 2026-08-31, giữ làm lịch sử.
+
 ## Scope
 All 10 planned units have now completed Code Generation: `rabbitmq`, `content-plugin`, `script-processing`, `tts`, `rendering`, `video-assembly`, `publisher`, `orchestrator`, `api-gateway`, `web-gui`. This pass extends the 2026-08-31 pass (which covered the first 8 units) to add `api-gateway` and `web-gui`, completing full-project Build and Test coverage.
 

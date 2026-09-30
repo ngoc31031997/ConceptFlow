@@ -2,17 +2,22 @@
 
 ## Run Unit Tests
 
-### Python services (content-plugin, script-processing, tts, rendering, video-assembly, publisher)
+### Python services (tts, rendering, video-assembly, publisher, llm-service)
 ```bash
 cd services/<service-name>
 source .venv/bin/activate   # venv created per build-instructions.md, Python 3.12
 python -m pytest tests/ -q
 ```
 
-### Go service (orchestrator)
+### Go services (orchestrator, authoring-service)
 ```bash
-cd services/orchestrator
-go test ./...
+cd services/<orchestrator|authoring-service>
+go vet ./... && go test ./...
+```
+
+### Test hợp đồng chéo service (gốc repo)
+```bash
+python -m pytest tests/contracts -q   # dùng venv của một service Python bất kỳ
 ```
 
 ### Node.js services (api-gateway, web-gui)
@@ -27,6 +32,8 @@ npm test
 Infrastructure-only unit (no application code) — no unit tests apply. Its `infra/rabbitmq/rabbitmq.conf` and `infra/rabbitmq/definitions.json` were reviewed manually: `rabbitmq.conf` points `management.load_definitions` at `definitions.json`, both are correctly mounted read-only into the container per `docker-compose.yml`, and `docker compose config` confirms the mount paths resolve. No further "tests" exist for this unit at this stage.
 
 ## Actual Results Observed
+
+> Kết quả của lần chạy 2026-08-31 / 2026-09-05, giữ làm lịch sử. Hai dòng `content-plugin`, `script-processing` là service đã gỡ; `authoring-service`, `llm-service` chưa tồn tại lúc đó. Kết quả mới nhất của từng service nằm trong mục "Code xong" tương ứng của `aidlc-docs/audit.md`.
 
 | Service | Command | Result | Date |
 |---|---|---|---|

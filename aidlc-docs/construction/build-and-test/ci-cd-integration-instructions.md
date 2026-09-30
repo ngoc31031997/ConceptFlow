@@ -1,7 +1,7 @@
 # CI/CD Integration Instructions
 
 > **Status (2026-09-30): no CI.** The `.github/workflows/ci.yml` pipeline (`make setup` / `make build` / `make check-all`) added on 2026-09-28 was removed on 2026-09-30 together with the rest of the agentic verification layer; see git history.
-> Section 2 below is the original proposal and is out of date: it lists `content-plugin` and `script-processing`, which no longer run, and it omits `authoring-service` and `llm-service`. SonarQube and OWASP (sections 3–4) are in the **backlog**; deploy stages are not implemented.
+> Section 2 below is the original proposal and is out of date: it lists `content-plugin` (gỡ ở CR-020) and `script-processing` (gỡ ở CR-040), which no longer run, and it omits `authoring-service` and `llm-service`. Không sửa section 2 vì không có CI để áp dụng; nếu dựng lại CI thì lấy danh sách service từ `docker compose config --services`. SonarQube and OWASP (sections 3–4) are in the **backlog**; deploy stages are not implemented.
 
 ## Pipeline Stages Overview
 [Checkout] → [Install Dependencies] → [Build] → [Unit Tests] → [SonarQube Analysis] → [OWASP Dependency Check] → [Integration/E2E Tests] → [Package/Artifact] → [Deploy]

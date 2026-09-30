@@ -5,10 +5,9 @@ Unlike Manim, whose dry pass has to actually RUN the script (narration calls
 can live inside loops/conditions, so only real execution order is trustworthy
 — see manim_renderer.py), a Remotion composition is React-declarative: the
 Creator's script must export a plain module-level `narrations: string[]`
-array alongside their `registerRoot()`/`<Composition>` (script-processing's
-`ManimScriptParser` already requires the Composition/registerRoot pair to
-even accept the script as Remotion — see
-script-processing/adapters/parsing/manim_script_parser.py). That array can be
+array alongside their `registerRoot()`/`<Composition>` (`validate_script`
+already requires the Composition/registerRoot pair to even accept the script
+as Remotion — see domain/script_locator.py). That array can be
 read straight off the source text with a regex, no Node process needed at
 all for dry_run() — faster, and it means a broken dry pass can never be a
 Remotion/Chromium problem, only a script problem.

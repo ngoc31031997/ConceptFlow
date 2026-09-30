@@ -33,10 +33,6 @@
             "value": "orchestrator"
           },
           {
-            "text": "script-processing",
-            "value": "script-processing"
-          },
-          {
             "text": "tts",
             "value": "tts"
           },
@@ -66,7 +62,7 @@
             "value": "llm-service"
           }
         ],
-        "query": "api-gateway,orchestrator,script-processing,tts,rendering,video-assembly,publisher,web-gui,authoring-service,llm-service",
+        "query": "api-gateway,orchestrator,tts,rendering,video-assembly,publisher,web-gui,authoring-service,llm-service",
         "includeAll": false,
         "multi": false
       }
@@ -140,45 +136,6 @@
       "targets": [
         {
           "expr": "sum(count_over_time({container=\"orchestrator\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
-          "refId": "A"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          }
-        },
-        "overrides": []
-      }
-    },
-    {
-      "id": 13,
-      "type": "stat",
-      "title": "script-processing",
-      "datasource": {
-        "type": "loki",
-        "uid": "Loki"
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 9,
-        "y": 1
-      },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({container=\"script-processing\"} |~ `(?i)error|exception|traceback|panic|fatal` [15m]))",
           "refId": "A"
         }
       ],
@@ -407,8 +364,8 @@
       "gridPos": {
         "h": 4,
         "w": 3,
-        "x": 0,
-        "y": 5
+        "x": 9,
+        "y": 1
       },
       "targets": [
         {
@@ -443,7 +400,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 5
       }
     },
     {
@@ -458,11 +415,11 @@
         "h": 8,
         "w": 24,
         "x": 0,
-        "y": 10
+        "y": 6
       },
       "targets": [
         {
-          "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|script-processing|tts|rendering|video-assembly|publisher|web-gui|authoring-service|llm-service\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))",
+          "expr": "sum by (container) (count_over_time({container=~\"api-gateway|orchestrator|tts|rendering|video-assembly|publisher|web-gui|authoring-service|llm-service\"} |~ `(?i)error|exception|traceback|panic|fatal` [1m]))",
           "refId": "A"
         }
       ]
@@ -475,7 +432,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 14
       }
     },
     {
@@ -490,7 +447,7 @@
         "h": 10,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 15
       },
       "options": {
         "showTime": true,
@@ -516,7 +473,7 @@
         "h": 10,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 15
       },
       "options": {
         "showTime": true,

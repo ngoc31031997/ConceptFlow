@@ -1,5 +1,7 @@
 # Logical Components — Unit 9: API Gateway
 
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
 ## Component Diagram (logical, technology-agnostic)
 
 ```
@@ -19,13 +21,13 @@
 │           ▼                                 ▼                   │
 │  ┌─────────────────┐          ┌──────────────────────────┐    │
 │  │  httpClient × 3    │          │  SSE Connection Registry   │    │
-│  │  (Orch/CP/Pub)     │          │  Map<project_id, Res[]>    │    │
+│  │  (Orch/Auth/Pub)   │          │  Map<project_id, Res[]>    │    │
 │  └────────┬─────────┘          └────────────┬──────────────┘    │
 └───────────┼──────────────────────────────────┼───────────────────┘
             │                                  │
     ┌───────┴────────┬─────────────┐           ▼
     ▼                ▼             ▼      SSE stream tới GUI
-Orchestrator   Content Plugin   Publisher
+Orchestrator   Authoring Svc    Publisher
 ```
 
 ## Components
@@ -36,7 +38,7 @@ Orchestrator   Content Plugin   Publisher
 | AMQP Consumer | Adapter, inbound | Consume `progress.fanout` (exclusive queue riêng Gateway), gọi `progressHandler` |
 | `proxyHandler` | Handler | Forward request nguyên trạng tới service downstream qua `httpClient`, trả response nguyên trạng |
 | `progressHandler` | Handler | Đăng ký/hủy SSE connection theo `project_id`, ghi event khi nhận AMQP message |
-| `httpClient` × 3 | Adapter, outbound | HTTP client tới Orchestrator/Content Plugin/Publisher, forward header (bao gồm `X-Request-ID`) |
+| `httpClient` × 3 | Adapter, outbound | HTTP client tới Orchestrator/Authoring Service/Publisher, forward header (bao gồm `X-Request-ID`) |
 | SSE Connection Registry | In-memory state | `Map<project_id, Response[]>` — không persist, mất khi Gateway restart (client tự reconnect) |
 
 ## Infrastructure Elements — Không áp dụng

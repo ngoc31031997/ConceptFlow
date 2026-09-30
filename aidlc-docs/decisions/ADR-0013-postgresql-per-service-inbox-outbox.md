@@ -35,5 +35,5 @@ The user explicitly confirmed this trade-off (client-server DB per service vs. e
 - **Follow-ups**: Units 2 and 3 (already built) need their NFR Design, Infrastructure Design, and Code Generation revisited to add this. Unit 4 (in progress) adopts it from the start. Future units (5–8) should default to this pattern when they need Inbox/Outbox.
 
 ## Related
-- Design artifact: retrofit plan (session-local), applied first in `aidlc-docs/construction/script-processing-service/`
+- Design artifact: retrofit plan (session-local), applied first in `aidlc-docs/construction/script-processing-service/` (đã gỡ cùng service ở CR-040; bản cũ: `git show dff096c:aidlc-docs/construction/script-processing-service/`)
 - Related ADRs: None (new infrastructure decision)

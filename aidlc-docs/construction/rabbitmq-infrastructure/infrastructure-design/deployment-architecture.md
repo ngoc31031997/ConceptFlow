@@ -46,4 +46,4 @@ N/A trong phạm vi unit này — xem `aidlc-docs/inception/high-level-design/in
 - **Trigger**: N/A
 
 ## Dependent Services (consume this infrastructure)
-Content Plugin (Unit 2), Script Processing (Unit 4), Rendering (Unit 5), Video Assembly (Unit 6), Publisher (Unit 7), Orchestrator (Unit 8) — tất cả dùng `depends_on: rabbitmq: condition: service_healthy` trong `docker-compose.yml` gốc (theo `unit-of-work.md`, code organization strategy).
+TTS (Unit 3), Rendering (Unit 5), Video Assembly (Unit 6), Publisher (Unit 7), Orchestrator (Unit 8), API Gateway (Unit 9) — tất cả dùng `depends_on: rabbitmq: condition: service_healthy` trong `docker-compose.yml` gốc (theo `unit-of-work.md`, code organization strategy).

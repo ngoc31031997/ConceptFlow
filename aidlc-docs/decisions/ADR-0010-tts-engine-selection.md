@@ -1,7 +1,7 @@
 # ADR-0010: TTS Engine Selection — Piper for MVP
 
 ## Status
-Accepted
+Superseded by ADR-0024
 
 ## Date
 2026-08-05

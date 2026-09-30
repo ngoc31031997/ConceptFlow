@@ -1,5 +1,7 @@
 # Unit of Work Dependency
 
+> **Hiện trạng (CR-055, 2026-09-30)** — tài liệu này ghi kế hoạch chia unit lúc Inception và được giữ như lịch sử. Từ đó: Unit 2 Content Plugin Service gỡ ở CR-020; Unit 4 Script Processing Service gỡ ở CR-040 (việc tìm Scene chuyển vào `validate_script` của Rendering); thêm Authoring Service (CR-040, ADR-0029) và LLM Service + Ollama (CR-039), không đi theo quy trình unit. Kiến trúc hiện tại: `aidlc-docs/inception/high-level-design/architecture-overview.md`.
+
 **Revision (2026-08-07, ADR-0012, ADR-0014)**: TTS Service (Unit 3) là message-driven, Script Processing Service (Unit 4) không còn gọi Content Plugin Service trực tiếp, Rendering Service (Unit 5) không còn gọi TTS Service trực tiếp — Orchestrator điều phối các bước này. Bảng dưới đã cập nhật; đồ thị dependency đơn giản hơn (mọi business service chỉ phụ thuộc Unit 1).
 
 ## Dependency Matrix
@@ -7,14 +9,14 @@
 | Unit | Depends On | Reason |
 |---|---|---|
 | 1. RabbitMQ Infrastructure | — | Hạ tầng nền, không phụ thuộc unit khác |
-| 2. Content Plugin Service | 1 | Consumer command `classify_scenes` qua RabbitMQ |
+| 2. Content Plugin Service *(gỡ ở CR-020)* | 1 | Consumer command `classify_scenes` qua RabbitMQ |
 | 3. TTS Service | 1 | Consumer command `synthesize_speech` qua RabbitMQ (ADR-0014) |
-| 4. Script Processing Service | 1 | Consumer command `parse_script` qua RabbitMQ; không còn gọi Content Plugin Service trực tiếp (ADR-0012) |
+| 4. Script Processing Service *(gỡ ở CR-040)* | 1 | Consumer command `parse_script` qua RabbitMQ; không còn gọi Content Plugin Service trực tiếp (ADR-0012) |
 | 5. Rendering Service | 1 | Consumer command `render_scenes` qua RabbitMQ; không còn gọi TTS Service trực tiếp (ADR-0014) |
 | 6. Video Assembly Service | 1 | Consumer command `assemble_video` qua RabbitMQ |
 | 7. Publisher Service | 1 | Consumer command `publish_video` qua RabbitMQ |
 | 8. Orchestrator Service | 1, 2, 3, 4, 5, 6, 7 | Cần publish/consume message với tất cả service nghiệp vụ để test đầy đủ 2 Saga |
-| 9. API Gateway | 2, 7, 8 | Proxy REST tới Orchestrator (khởi tạo Saga), Content Plugin (`GET /plugins`), Publisher (OAuth) |
+| 9. API Gateway | 7, 8 (+ Authoring Service) | Proxy REST tới Orchestrator (khởi tạo Saga), Publisher (OAuth), Authoring Service (từ CR-040); route Content Plugin `GET /plugins` gỡ ở CR-020 |
 | 10. Web GUI | 9 | Gọi REST/SSE tới API Gateway |
 
 ## Development Sequence (theo Question 2 — dependency-first)

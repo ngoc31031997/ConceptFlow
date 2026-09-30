@@ -35,5 +35,5 @@ Story A1 already frames the input as "script/markdown" that Creators write direc
 - **Follow-ups**: If future FRs need richer per-scene metadata, the grammar will need extension (e.g., additional blockquote-prefixed lines) without breaking existing scripts (additive-only).
 
 ## Related
-- Design artifact: `aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md`
+- Design artifact: `aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md` (đã gỡ cùng service ở CR-040; bản cũ: `git show dff096c:aidlc-docs/construction/script-processing-service/low-level-design/interface-contracts.md`)
 - Related ADRs: None

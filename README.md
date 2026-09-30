@@ -42,92 +42,79 @@ Biến môi trường cấu hình qua file `.env` (xem `.env.example` cho danh s
 ## Running the Project
 ```bash
 docker compose up -d
+docker compose ps   # chờ các service báo healthy
 ```
-- RabbitMQ Management UI: http://localhost:15672 (đăng nhập bằng `RABBITMQ_USER`/`RABBITMQ_PASS`)
-- Content Plugin Service: nội bộ (`content-plugin:8000` trong docker network), không expose ra host — dùng `docker compose logs content-plugin` hoặc `docker exec` để kiểm tra. DB riêng: `content-plugin-db` (Postgres, Inbox/Outbox — ADR-0013)
-- TTS Service: message-driven qua RabbitMQ (queue `tts.commands`), không có port HTTP nào (ADR-0014) — dùng `docker compose logs tts`. DB riêng: `tts-db` (Postgres, Inbox/Outbox — ADR-0013)
-- Rendering Service: message-driven qua RabbitMQ (queue `rendering.commands`), sinh animation Manim, không có port HTTP nào — dùng `docker compose logs rendering`. DB riêng: `rendering-db` (Postgres, Inbox/Outbox — ADR-0013). Lưu animation clip vào volume `shared_artifacts` (dùng chung với TTS Service)
-- Video Assembly Service: message-driven qua RabbitMQ (queue `video_assembly.commands`), ghép animation + audio + nhạc nền (ffmpeg), không có port HTTP nào — dùng `docker compose logs video-assembly`. DB riêng: `video-assembly-db` (Postgres, Inbox/Outbox — ADR-0013). Đọc animation/audio clip và ghi video hoàn chỉnh vào volume `shared_artifacts` (dùng chung với TTS/Rendering Service)
-- Publisher Service: REST (`/v1/auth/youtube/{start,callback}`, OAuth flow) + message-driven qua RabbitMQ (queue `publisher.commands`), đăng video lên YouTube — nội bộ (`publisher:8000`), không expose ra host (được API Gateway proxy tới khi Unit 9 hoàn thành) — dùng `docker compose logs publisher`. DB riêng: `publisher-db` (Postgres, Inbox/Outbox + `oauth_credentials` — ADR-0013, ADR-0016). Đọc video hoàn chỉnh (read-only) từ volume `shared_artifacts`. **Yêu cầu**: đăng ký Google OAuth Client trước khi dùng tính năng đăng video (xem `GOOGLE_OAUTH_*` ở mục Configuration)
-- Orchestrator Service: Saga orchestrator (Go, không phải Python — ADR-0018) điều phối Render Saga (5 bước) + Publish Saga (1 bước) qua REST (`POST /v1/sagas/render`, `POST /v1/sagas/publish`, `GET /v1/projects/{id}`, `POST /v1/projects/{id}/retry`) + message-driven qua RabbitMQ (`orchestrator.events` + 6 `*.commands.dlq`) — nội bộ (`orchestrator:8000`), không expose ra host, được API Gateway proxy tới — dùng `docker compose logs orchestrator`. DB riêng: `orchestrator-db` (Postgres, Inbox cho event nhận vào + Outbox cho command gửi đi — ADR-0013, ADR-0019)
-- API Gateway (Unit 9): reverse-proxy + AMQP-to-SSE bridge (Node.js/Express — ADR-0020), stateless, entry point duy nhất cho Web GUI. Proxy nguyên trạng REST tới Content Plugin/Orchestrator/Publisher (`/v1/plugins`, `/v1/sagas/render`, `/v1/sagas/publish`, `/v1/projects/{id}`, `/v1/projects/{id}/retry`, `/v1/auth/youtube/{start,callback}`), tự xử lý `GET /v1/progress/{id}` (SSE, consume `progress.fanout` từ RabbitMQ) và `GET /health` (không phụ thuộc downstream). Publish port ra host: `8080:8080` — dùng `docker compose logs api-gateway`. Không có database riêng (hoàn toàn stateless ngoại trừ in-memory SSE connection registry).
-- Web GUI (Unit 10): React 18 + TypeScript SPA (Vite build, serve tĩnh qua nginx). Giao diện Creator: soạn script + chọn plugin/ngôn ngữ/nhạc nền (`NewProjectPage`), theo dõi tiến trình render qua SSE (`RenderPage`), xem video + kết nối YouTube + đăng (`ResultPage`). Gọi API Gateway qua `VITE_API_BASE_URL` (build-time env). Publish port ra host: `3000:80` — dùng `docker compose logs web-gui`. Không có database, hoàn toàn stateless phía server.
-- Centralized Logging (Grafana + Loki + Promtail): Promtail tự phát hiện toàn bộ container qua Docker socket và gửi log tới Loki (không cần sửa code service nào). Grafana UI tại http://localhost:3001 (đăng nhập bằng `GRAFANA_USER`/`GRAFANA_PASS`), datasource Loki đã auto-provision sẵn — vào Explore, query LogQL vd. `{container="orchestrator"}` để xem log 1 service, hoặc `{container=~".+"}` để xem tất cả. Loki không expose port ra host (chỉ truy cập qua Grafana). Xem `aidlc-docs/construction/observability/code/README.md` để biết chi tiết.
+Cổng mở ra host: Web GUI http://localhost:3000, API Gateway http://localhost:8080, RabbitMQ Management UI http://localhost:15672 (`RABBITMQ_USER`/`RABBITMQ_PASS`), Grafana http://localhost:3001 (`GRAFANA_USER`/`GRAFANA_PASS`). Mọi service khác chỉ nằm trong network `backend`; xem log bằng `docker compose logs <service>`.
+
+| Service | Ngôn ngữ | Vai trò | Giao tiếp | DB riêng (ADR-0013) |
+|---|---|---|---|---|
+| `web-gui` | React 18 + TypeScript (Vite, nginx) | Giao diện Creator: wizard tạo project, soạn kịch bản cùng AI, duyệt, render, xem video, đăng YouTube, thư viện prompt/hình | Gọi API Gateway (`VITE_API_BASE_URL`, build-time) | — |
+| `api-gateway` | Node.js/Express (ADR-0020) | Điểm vào duy nhất: proxy REST tới orchestrator, authoring-service, publisher; SSE tiến độ từ `progress.fanout` (ADR-0017); upload thumbnail/nhạc vào `shared_artifacts` | REST + SSE | — |
+| `orchestrator` | Go (ADR-0018) | Saga coordinator và chủ sở hữu project: tạo/fork/xoá project, huỷ/retry bước, channel asset | REST nội bộ; RabbitMQ command/event (Outbox cho command, ADR-0019) | `orchestrator-db` |
+| `authoring-service` | Go (ADR-0029) | Thư viện prompt, chuỗi soạn kịch bản (câu chuyện → storyboard → code), wizard, gợi ý metadata/short, thư viện hình minh hoạ, nhật ký dùng LLM | REST nội bộ; gọi orchestrator, llm-service, rendering | `authoring-service-db` |
+| `llm-service` | Python (CR-039) | Nơi duy nhất gọi mô hình ngôn ngữ (Hive qua OpenAI SDK, hoặc Ollama); pipeline sinh code chia đoạn | REST nội bộ; gọi rendering để kiểm biên dịch | — |
+| `ollama` | image `ollama/ollama` | Mô hình local cho llm-service khi chọn provider `ollama` (`ollama-pull` tải model một lần) | HTTP nội bộ | — |
+| `rendering` | Python (Manim, Remotion) | Bước `validate_script` và `render_scenes`, render channel asset; HTTP nội bộ `/v1/check/*`, `/v1/illustrations/preview` | RabbitMQ `rendering.commands` + HTTP nội bộ | `rendering-db` |
+| `tts` | Python (Edge, Azure — ADR-0024, ADR-0025) | Bước `synthesize_speech` | RabbitMQ `tts.commands` (ADR-0014) | `tts-db` |
+| `video-assembly` | Python (ffmpeg) | Bước `assemble_video`, `qc_video`, `generate_clips`, chuẩn hoá channel asset | RabbitMQ `video_assembly.commands` | `video-assembly-db` |
+| `publisher` | Python (YouTube Data API — ADR-0016, ADR-0026) | OAuth YouTube (nhiều app, nhiều kênh), bước `publish_video` | REST nội bộ + RabbitMQ `publisher.commands` | `publisher-db` |
+
+Hạ tầng: `rabbitmq` (topology ở `infra/rabbitmq/definitions.json`), volume `shared_artifacts` (hợp đồng ở `docs/contracts/shared-artifacts.md`), log tập trung Loki + Promtail + Grafana (datasource Loki auto-provision; query LogQL vd. `{container="orchestrator"}`). Mục lục mọi hợp đồng giữa service: `docs/contracts/README.md`.
 
 ## Running Tests
-Mỗi service có test suite riêng (pytest). Ví dụ cho Content Plugin Service:
+Python (`tts`, `rendering`, `video-assembly`, `publisher`, `llm-service`), Python 3.12:
 ```bash
-cd services/content-plugin
-pip install -r requirements-dev.txt
-pytest -q
+cd services/<service>
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+.venv/bin/python -m pytest -q
 ```
-Tương tự cho TTS Service, Script Processing Service, và Rendering Service:
-```bash
-cd services/tts && pip install -r requirements-dev.txt && pytest -q
-cd services/rendering && pip install -r requirements-dev.txt && pytest -q
-cd services/video-assembly && pip install -r requirements-dev.txt && pytest -q
-cd services/publisher && pip install -r requirements-dev.txt && pytest -q
-```
-Rendering Service's `requirements.txt` bao gồm `manim` (native dependencies: ffmpeg, cairo, pango) — nếu chỉ chạy unit test (không cần render Manim thật), có thể bỏ qua `manim` khi cài cục bộ vì test suite dùng fake/mock cho toàn bộ tương tác Manim thật (`_render_to_file` được monkeypatch trong test, không import `manim` khi chạy `pytest`).
-Video Assembly Service's test suite tương tự không cần cài `ffmpeg` cục bộ — mọi tương tác `subprocess.run`/ffmpeg/ffprobe được mock trong test.
-Publisher Service's test suite không cần Google OAuth Client thật hay kết nối mạng — mọi tương tác `google-api-python-client`/`google-auth-oauthlib`/`psycopg2` được mock trong test.
-Toàn bộ service Python yêu cầu Python 3.12 (dùng `from datetime import UTC` và union type `X | Y` không cần `from __future__ import annotations` cho runtime — chạy test suite trên Python < 3.12 sẽ lỗi import).
+Rendering Service's `requirements.txt` bao gồm `manim` (native dependencies: ffmpeg, cairo, pango); test suite dùng fake cho tương tác Manim thật. Video Assembly và Publisher cũng mock ffmpeg/Google API/psycopg2 nên không cần cài ffmpeg hay credential thật.
 
-Orchestrator Service (Go, không dùng pytest):
+Go (`orchestrator`, `authoring-service`):
 ```bash
-cd services/orchestrator
-go mod tidy
-go build ./...
-go vet ./...
-go test ./...
+cd services/<service>
+go vet ./... && go test ./...
 ```
 
-API Gateway (Node.js, không dùng pytest):
+Node (`api-gateway` — Jest, `web-gui` — Vitest):
 ```bash
-cd services/api-gateway
-npm install
-npx eslint .
-npm test
+cd services/<service>
+npm install && npx eslint . && npm test
 ```
 
-Web GUI (React/TypeScript, Vitest):
+Test hợp đồng chéo service ở gốc repo (volume `shared_artifacts`, luồng bước, các bản chép mã hạ tầng Python):
 ```bash
-cd services/web-gui
-npm install
-npx eslint .
-npm test
+services/tts/.venv/bin/python -m pytest tests/contracts -q
 ```
 
-Hướng dẫn test tổng hợp toàn hệ thống sẽ được bổ sung ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/`, sau khi tất cả unit hoàn thành).
+Hướng dẫn build/test chi tiết: `aidlc-docs/construction/build-and-test/`.
 
 ## Project Structure
 ```
 .
-├── docker-compose.yml       # Định nghĩa toàn bộ service (bắt đầu với RabbitMQ)
+├── docker-compose.yml        # Toàn bộ service + hạ tầng
 ├── .env.example              # Mẫu biến môi trường
-├── infra/
-│   └── rabbitmq/              # Cấu hình topology RabbitMQ (exchange/queue/DLQ)
+├── Makefile                  # make graph / make graph-hooks (graphify)
 ├── services/
-│   ├── content-plugin/         # Content Plugin Service (Python/FastAPI, Hexagonal)
-│   │                             # domain/ → application/ → adapters/{api,messaging,persistence,plugins}/
-│   ├── tts/                     # TTS Service (Python, Hexagonal, Edge TTS engine, message-driven — ADR-0014)
-│   │                             # domain/ → application/ → adapters/{messaging,persistence,tts_engines,storage,logging}/
-│   │                             # domain/ → application/ → adapters/{messaging,persistence,parsing,logging}/
-│   ├── rendering/                # Rendering Service (Python, Hexagonal, Manim engine, dynamic templates — ADR-0015)
-│   │                             # domain/ → application/ → adapters/{messaging,persistence,rendering,storage,logging}/
-│   ├── video-assembly/           # Video Assembly Service (Python, Hexagonal, ffmpeg/ffprobe)
-│   │                             # domain/ → application/ → adapters/{messaging,persistence,assembly,storage,logging}/
-│   ├── publisher/                # Publisher Service (Python/FastAPI, Hexagonal, YouTube Data API — ADR-0016)
-│   │                             # domain/ → application/ → adapters/{api,messaging,persistence,youtube,logging}/
-│   ├── orchestrator/             # Orchestrator Service (Go, Hexagonal, Saga coordinator — ADR-0018)
-│   │                             # cmd/orchestrator/ (composition root) + internal/domain → application → adapters/{http,amqp,postgres,logging}/
-│   ├── api-gateway/              # API Gateway (Node.js/Express, layered — ADR-0020)
-│   │                             # src/{routes,handlers,clients,middleware,config}/ — reverse-proxy + AMQP-to-SSE bridge, không có domain logic riêng
-│   └── web-gui/                  # Web GUI (React 18/TypeScript, Vite, feature-based)
-│                                 # src/{pages,components,hooks,api,context,types}/ — SPA, không có backend logic
-├── shared/                    # Schema/type dùng chung giữa service (nếu cần)
-└── aidlc-docs/                 # Toàn bộ tài liệu AI-DLC (requirements, design, ADR, audit trail)
+│   ├── web-gui/              # React/TypeScript — src/{pages,components,hooks,api,context,utils,types,styles}
+│   ├── api-gateway/          # Node/Express, phân lớp — src/{routes,handlers,clients,middleware,config}
+│   ├── orchestrator/         # Go, hexagonal — cmd/orchestrator + internal/{domain,application,adapters,config}
+│   ├── authoring-service/    # Go, hexagonal — cmd/authoring + internal/{domain,application,adapters,config}
+│   ├── llm-service/          # Python, layout phẳng — app/
+│   ├── rendering/            # Python, hexagonal — domain/ application/ adapters/; conceptflow/ (thư viện chạy trong script Manim), remotion_project/, tools/
+│   ├── tts/                  # Python, hexagonal — domain/ application/ adapters/
+│   ├── video-assembly/       # Python, hexagonal — domain/ application/ adapters/
+│   └── publisher/            # Python, hexagonal — domain/ application/ adapters/
+├── tests/                    # contracts/ (test hợp đồng chéo service), fixtures/, benchmark_render.py
+├── infra/                    # rabbitmq/ (topology), observability/ (Loki, Promtail, Grafana)
+├── docs/                     # contracts/, setup/ (lấy credential), brand/, review/, agentic/, ux-ui-design-rules.md
+├── scripts/                  # graph.sh (graphify)
+├── data/shared_artifacts/    # Nơi bind-mount video ra host (git-ignored)
+├── secrets/                  # OAuth client YouTube (git-ignored, xem secrets/README.md)
+├── aidlc-docs/               # Tài liệu AI-DLC: requirements, design, ADR, audit trail
+├── .ai-dlc/                  # Quy tắc quy trình AI-DLC
+└── .claude/skills/           # /cr, /code, /deliver
 ```
 
 ## CI/CD
-Chưa thiết lập — sẽ được cấu hình ở giai đoạn Build and Test (`aidlc-docs/construction/build-and-test/ci-cd-integration-instructions.md`, sau khi tất cả unit hoàn thành Construction Phase).
+Không có CI. Lớp kiểm tra tự động (`make setup/build/check`, GitHub Actions) đã gỡ ngày 2026-09-30; mỗi thay đổi được kiểm bằng test của từng service và test hợp đồng ở trên.

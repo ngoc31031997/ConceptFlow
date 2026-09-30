@@ -1,25 +1,27 @@
 # Sequence Flows — Unit 9: API Gateway
 
-## Flow 1: Generic REST Proxy (vd. GET /v1/plugins)
+> **Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (và route `GET /v1/plugins`) gỡ ở CR-020; từ CR-040 Gateway proxy thêm tới Authoring Service (`AUTHORING_SERVICE_URL`). Danh sách route thật (≈90 route) ở `services/api-gateway/src/routes/`; bảng dưới chỉ giữ các route gốc của Unit 9.
+
+## Flow 1: Generic REST Proxy (vd. GET /v1/projects/:id)
 
 ```mermaid
 sequenceDiagram
     participant GUI as Web GUI
     participant MW as middleware/correlation.js
-    participant RT as routes/plugins.js
+    participant RT as routes/projects.js
     participant PH as handlers/proxyHandler.js
     participant CL as clients/httpClient.js
-    participant CP as Content Plugin Service
+    participant CP as Orchestrator Service
 
-    GUI->>MW: GET /v1/plugins
+    GUI->>MW: GET /v1/projects/:id
     MW->>MW: X-Request-ID có sẵn? Nếu không, sinh mới
     MW->>RT: forward (req có X-Request-ID)
-    RT->>PH: proxyHandler(contentPluginClient).handle(req)
+    RT->>PH: proxyHandler(orchestratorClient).handle(req)
     PH->>CL: request({method, headers, body})
-    CL->>CP: GET /v1/plugins (forward header)
-    CP-->>CL: 200 [...plugins]
+    CL->>CP: GET /v1/projects/:id (forward header)
+    CP-->>CL: 200 {project}
     CL-->>PH: response
-    PH-->>GUI: 200 [...plugins] (nguyên trạng)
+    PH-->>GUI: 200 {project} (nguyên trạng)
 ```
 
 ## Flow 2: OAuth Redirect (GET /v1/auth/youtube/start)

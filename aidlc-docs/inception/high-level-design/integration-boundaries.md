@@ -2,18 +2,27 @@
 
 **Cập nhật theo ADR-0007**: Orchestration được tách khỏi API Gateway sang Orchestrator Service riêng, giao tiếp với service nghiệp vụ qua Message Queue (RabbitMQ) theo mô hình Saga orchestration-based.
 
+**Cập nhật (CR-055, 2026-09-30)**: Content Plugin Service (gỡ ở CR-020) và Script Processing Service (gỡ ở CR-040) không còn; Authoring Service (CR-040, ADR-0029), LLM Service và Ollama (CR-039) được thêm. Bảng dưới đây theo hệ đang chạy.
+
 **Revision (2026-08-07, ADR-0014)**: Rendering ↔ TTS REST đồng bộ (dòng dưới đây) đã bị loại bỏ — TTS Service nay là bước Saga độc lập ("Synthesize Speech"), message-driven hoàn toàn qua RabbitMQ, không còn bất kỳ tương tác trực tiếp nào giữa Rendering Service và TTS Service.
 
 ## Integration Points
 
 | From | To | Style | Protocol | Purpose |
 |---|---|---|---|---|
-| GUI | API Gateway | Synchronous | REST/HTTP+JSON | Thao tác cấu hình đơn giản (soạn script, chọn plugin, cấu hình publish) |
-| GUI | API Gateway | Asynchronous (server push) | SSE | Cập nhật tiến trình render/publish real-time |
-| API Gateway | Orchestrator Service | Synchronous (khởi tạo) | REST/HTTP+JSON | Khởi chạy 1 Saga (render pipeline hoặc publish) |
-| API Gateway | Content Plugin Service | Synchronous | REST/HTTP+JSON | Truy vấn danh sách plugin (không thuộc luồng Saga) |
-| Orchestrator Service | Content Plugin Service, Script Processing Service, Rendering Service, TTS Service, Video Assembly Service, Publisher Service | Asynchronous | Message Queue (RabbitMQ) — command message | Gửi lệnh thực hiện từng bước Saga |
-| Content Plugin Service, Script Processing Service, Rendering Service, TTS Service, Video Assembly Service, Publisher Service | Orchestrator Service | Asynchronous | Message Queue (RabbitMQ) — event message | Xác nhận hoàn tất/lỗi từng bước, dùng để Orchestrator quyết định bước tiếp theo hoặc kích hoạt compensating action |
+| GUI | API Gateway | Synchronous | REST/HTTP+JSON | Tạo/cấu hình project, soạn kịch bản, duyệt, cấu hình publish |
+| GUI | API Gateway | Asynchronous (server push) | SSE | Cập nhật tiến trình render/publish/soạn real-time |
+| API Gateway | Orchestrator Service | Synchronous | REST/HTTP+JSON | Khởi chạy Saga (render, publish), đọc/sửa project, huỷ/retry bước |
+| API Gateway | Authoring Service | Synchronous | REST/HTTP+JSON | Soạn kịch bản (1a/1b/1c), prompt, gợi ý metadata, hình minh hoạ |
+| API Gateway | Publisher Service | Synchronous | REST/HTTP+JSON | OAuth YouTube (app, tài khoản) |
+| Orchestrator Service ↔ Authoring Service | — | Synchronous | HTTP nội bộ (`/internal/v1/authoring/*` và API project của Orchestrator) | Mỗi bên đọc phần dữ liệu bên kia sở hữu (ADR-0029); không `depends_on`, mỗi bên tự suy giảm khi bên kia down |
+| Authoring Service | LLM Service | Synchronous | REST/HTTP+JSON | Mọi lượt gọi mô hình ngôn ngữ |
+| LLM Service | Hive API / Ollama | Synchronous | HTTPS / HTTP (OpenAI SDK) | Sinh văn bản/code |
+| LLM Service, Authoring Service | Rendering Service | Synchronous | HTTP nội bộ (`/v1/check/*`, `/v1/illustrations/preview`) | Kiểm biên dịch code sinh ra, preview hình minh hoạ |
+| Orchestrator Service | TTS, Rendering, Video Assembly, Publisher Service | Asynchronous | Message Queue (RabbitMQ) — command message | Gửi lệnh thực hiện từng bước Saga |
+| TTS, Rendering, Video Assembly, Publisher Service | Orchestrator Service | Asynchronous | Message Queue (RabbitMQ) — event message | Xác nhận hoàn tất/lỗi từng bước, dùng để Orchestrator quyết định bước tiếp theo hoặc kích hoạt compensating action |
+| Orchestrator Service | TTS, Rendering, Video Assembly | Asynchronous | RabbitMQ `control.fanout` | Lệnh huỷ bước đang chạy |
+| Các service | API Gateway | Asynchronous | RabbitMQ `progress.fanout` (ADR-0017) | Tiến độ cho SSE |
 | Publisher Service | YouTube Data API | Synchronous | HTTPS/OAuth 2.0 | Xác thực và upload video |
 
 ## Communication Style Rationale
@@ -24,8 +33,8 @@
 ## Orchestration Pattern: Saga (Orchestration-based)
 Xem ADR-0007 cho phân tích đầy đủ. Tóm tắt:
 - **Orchestrator Service** là Saga coordinator duy nhất — biết toàn bộ định nghĩa các bước và thứ tự.
-- **Saga Steps** (luồng Render, ADR-0014): `ParseScript → ClassifyScenes (Content Plugin) → SynthesizeSpeech (TTS) → RenderScenes (Rendering, animation-only) → AssembleVideo → (kết thúc: ready_to_publish)`
-- **Saga Steps** (luồng Publish): `AuthenticateYouTube (nếu chưa) → UploadVideo (Publisher) → (kết thúc: published)`
+- **Saga Steps** (luồng Render, sau CR-020/CR-040): `ValidateScript (Rendering) → SynthesizeSpeech (TTS) → RenderScenes (Rendering, animation-only) → AssembleVideo (Video Assembly) → (kết thúc: ready_to_publish)`; `GenerateClips` (Video Assembly) chạy theo yêu cầu. Danh sách bước: `services/orchestrator/internal/domain/project.go` (`StepName`).
+- **Saga Steps** (luồng Publish): `PublishVideo (Publisher) → (kết thúc: published)`; OAuth làm trước qua REST, không phải bước saga.
 - **Compensating Actions** (ví dụ, chi tiết hóa ở Low-Level Design):
   - Nếu `RenderScenes` thất bại giữa chừng → giữ scene đã render thành công, đánh dấu scene lỗi, cho phép retry chỉ scene đó (không cần compensating xóa dữ liệu vì animation clip hợp lệ không cần rollback)
   - Nếu `AssembleVideo` thất bại → giữ animation/audio clip trong shared volume, cho phép Orchestrator retry riêng bước Assembly
@@ -40,14 +49,13 @@ Xem ADR-0007 cho phân tích đầy đủ. Tóm tắt:
 
 | Data Entity | Owning Service |
 |---|---|
-| Content Plugin definitions & scene classification | Content Plugin Service |
-| Script & parsed Scene structure | Script Processing Service |
-| Animation render output (video clip per scene) | Rendering Service |
+| Prompt, kịch bản đang soạn (câu chuyện, storyboard, code), hình minh hoạ, nhật ký dùng LLM | Authoring Service |
+| Animation render output (`rendered.mp4`, `timing.json`) | Rendering Service |
 | Audio output (voice-over clip per scene) | TTS Service |
 | Final assembled video (.mp4) | Video Assembly Service |
 | YouTube OAuth credential & upload metadata | Publisher Service |
 | Video project state / Saga state (trạng thái tổng thể: draft/rendering/failed-at-step/published) | **Orchestrator Service** (thay đổi từ Gateway → Orchestrator theo ADR-0007) |
 
-Mỗi entity chỉ có đúng 1 service sở hữu — không có shared database giữa các service; mỗi service quản lý storage riêng (file-based cho các artifact media qua Shared Docker Volume, hoặc DB nhẹ cho metadata/Saga state — quyết định cụ thể ở NFR Design/Infrastructure Design).
+Mỗi entity chỉ có đúng 1 service sở hữu — không có shared database giữa các service; mỗi service quản lý storage riêng: Postgres riêng (ADR-0013) cho metadata/Saga state, file media qua volume `shared_artifacts` theo hợp đồng `docs/contracts/shared-artifacts.md`.
 
 Xem ADR-0007 cho quyết định orchestration pattern (supersedes ADR-0005).

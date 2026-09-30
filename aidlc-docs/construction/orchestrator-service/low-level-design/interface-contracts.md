@@ -35,18 +35,19 @@ Header `X-Request-ID` — Orchestrator không tự sinh REST correlation (Gatewa
 
 ## AMQP Interface
 
-### Commands Published (6 loại, tới `commands.direct`)
+> **Cập nhật (CR-055)**: `parse_script` (script-processing, gỡ ở CR-040) và `classify_scenes` (content-plugin, gỡ ở CR-020) không còn; bước đầu saga là `validate_script` tới `rendering`. Danh sách command/event thật: `StepName` trong `internal/domain/project.go` và bảng event → step trong `internal/application/handle_step_event.go`.
+
+### Commands Published (tới `commands.direct`)
 | Command | Routing Key | Payload (tóm tắt, xem từng unit's interface-contracts.md để biết đầy đủ) |
 |---|---|---|
-| `parse_script` | `script_processing` | `{ script_content }` |
-| `classify_scenes` | `content_plugin` | `{ plugin_id, scenes }` (từ `script_parsed`) |
-| `synthesize_speech` | `tts` | `{ scenes: [{scene_index, narration_text, language}] }` (từ `scenes_classified` + `voice_language`) |
-| `render_scenes` | `rendering` | `{ scenes: [...] }` — Orchestrator GỘP dữ liệu từ `script_parsed`+`scenes_classified`+`speech_synthesized` (đã ghi nhận là ràng buộc thiết kế cho Unit 8 từ Unit 5's Functional Design) |
+| `validate_script` | `rendering` | script đã chốt; rendering tự tìm tên Scene/composition (CR-040) |
+| `synthesize_speech` | `tts` | `{ scenes: [{scene_index, narration_text, language}] }` (từ `script_validated` + cấu hình giọng của project) |
+| `render_scenes` | `rendering` | `{ scenes: [...] }` — Orchestrator GỘP dữ liệu từ `script_validated`+`speech_synthesized` (đã ghi nhận là ràng buộc thiết kế cho Unit 8 từ Unit 5's Functional Design) |
 | `assemble_video` | `video_assembly` | `{ scenes: [{scene_index, clip_path, audio_path}], background_music_path? }` — từ `rendering_completed` |
 | `publish_video` | `publisher` | `{ video_path, title, description, tags, visibility }` — từ `video_assembled` + Saga Publish's input |
 
-### Events Consumed (12 loại, từ `orchestrator.events`)
-6 success (`script_parsed`, `scenes_classified`, `speech_synthesized`, `rendering_completed`, `video_assembled`, `video_published`) + 6 failure (`parse_failed`, `classification_failed`, `synthesis_failed`, `rendering_failed`, `assembly_failed`, `publish_failed`). Progress event `scene_rendered` (Rendering Service, per-scene) cũng consume để forward qua `progress.fanout` (không advance state machine).
+### Events Consumed (từ `orchestrator.events`)
+Success: `script_validated`, `speech_synthesized`, `rendering_completed`, `video_assembled`, `qc_completed`, `clips_generated`, `video_published`, `artifacts_purged`. Failure: `validation_failed`, `synthesis_failed`, `rendering_failed`, `assembly_failed`, `publish_failed`, `purge_failed`. Progress event `scene_rendered` (Rendering Service, per-scene) cũng consume để forward qua `progress.fanout` (không advance state machine).
 
 **Revision (2026-09-05)**: `scene_rendered` không chỉ forward progress — nó là nguồn DUY NHẤT của `clip_path` mỗi scene (field `animation_path` trong payload, theo Rendering Service's đã-duyệt `interface-contracts.md`). `rendering_completed` chỉ mang `scene_count`, KHÔNG có `scene_clip_paths` như thiết kế ban đầu giả định — 2 đặc tả trôi lệch nhau vì duyệt độc lập, phát hiện qua kiểm thử E2E thật (saga bị treo). `HandleStepEventUseCase` giờ merge `ClipPath` ngay khi mỗi `scene_rendered` đến (`Scene.ClipPath` từ `payload.animation_path`), thay vì đợi `rendering_completed`.
 
@@ -74,7 +75,7 @@ Saga Publish (thành công): 1 command + 1 event.
 At-least-once (kế thừa Unit 1). **Inbox**: dedupe `message_id` của event NHẬN VÀO (`processed_messages`), tránh xử lý trùng khi RabbitMQ requeue. **Outbox**: dùng để gửi COMMAND (không phải event như các unit khác) — đảm bảo command được publish đúng 1 lần dù Orchestrator crash giữa lúc cập nhật state và gửi command; `OutboxRelay` poll `outbox_events` (semantic: "commands to send") và publish qua `amqp.Publisher`.
 
 ## Saga Instance Tracking (Question 5)
-Mỗi event envelope có `saga_id`+`project_id`. `HandleStepEventUseCase` tra `saga_steps` theo `saga_id`+`step_name` (suy từ `event_type`, vd. `scenes_classified` → step `classify_scenes`) để xác nhận bước đang `in_progress` — event không khớp bước đang chờ → log warning, KHÔNG xử lý (chống race condition/redelivery bất thường), vẫn ack message (Inbox đã dedupe theo `message_id`, không phải theo step).
+Mỗi event envelope có `saga_id`+`project_id`. `HandleStepEventUseCase` tra `saga_steps` theo `saga_id`+`step_name` (suy từ `event_type`, vd. `script_validated` → step `validate_script`) để xác nhận bước đang `in_progress` — event không khớp bước đang chờ → log warning, KHÔNG xử lý (chống race condition/redelivery bất thường), vẫn ack message (Inbox đã dedupe theo `message_id`, không phải theo step).
 
 ## Internal Port Contracts (internal/domain/ports.go)
 ```go

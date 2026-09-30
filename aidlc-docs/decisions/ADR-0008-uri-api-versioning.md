@@ -42,5 +42,5 @@ Người dùng chủ động yêu cầu versioning ngay từ đầu thay vì tr�
 - **Follow-ups**: Áp dụng `/v1/` prefix khi thiết kế Low-Level Design của API Gateway (Unit 9) và mọi endpoint REST khác trong hệ thống; cập nhật `component-methods.md` (Application Design) để phản ánh tiền tố `/v1/` khi các unit đó được thiết kế.
 
 ## Related
-- Design artifact: `aidlc-docs/construction/content-plugin-service/low-level-design/interface-contracts.md`
+- Design artifact: `aidlc-docs/construction/content-plugin-service/low-level-design/interface-contracts.md` (đã gỡ cùng service ở CR-020; bản cũ: `git show dff096c:aidlc-docs/construction/content-plugin-service/low-level-design/interface-contracts.md`)
 - Related ADRs: Không có (quyết định độc lập ở Low-Level Design)

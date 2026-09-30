@@ -1,5 +1,7 @@
 # Component Methods (API Contracts & Message Schemas)
 
+> **Hiện trạng (CR-055, 2026-09-30)** — tài liệu này ghi kế hoạch chia unit lúc Inception và được giữ như lịch sử. Từ đó: Unit 2 Content Plugin Service gỡ ở CR-020; Unit 4 Script Processing Service gỡ ở CR-040 (việc tìm Scene chuyển vào `validate_script` của Rendering); thêm Authoring Service (CR-040, ADR-0029) và LLM Service + Ollama (CR-039), không đi theo quy trình unit. Kiến trúc hiện tại: `aidlc-docs/inception/high-level-design/architecture-overview.md`.
+
 Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, và **message schema** (RabbitMQ command/event) cho giao tiếp Saga bất đồng bộ — theo quyết định tại `application-design-plan.md` Question 4 (mức API contract) và ADR-0007 (Saga qua Message Queue). Business rule chi tiết sẽ được định nghĩa ở Functional Design (per-unit, Construction Phase).
 
 ## API Gateway (REST + SSE, cho GUI)
@@ -84,7 +86,7 @@ Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, v�
 ### Message: Event `video_published` / `publish_failed` ← queue `orchestrator.events`
 - **Payload (success)**: `{ saga_id, project_id, youtube_video_url }`
 
-## Content Plugin Service
+## Content Plugin Service *(gỡ ở CR-020)*
 
 ### `GET /plugins` (REST, gọi trực tiếp bởi Gateway — ngoài Saga)
 - **Purpose**: Liệt kê plugin content-type hiện có (nạp động từ thư mục `plugins/`).
@@ -93,7 +95,7 @@ Mô tả ở mức API contract (REST endpoint) cho giao tiếp đồng bộ, v�
 ### Consumer: command `classify_scenes` (từ `content_plugin.commands`)
 - **Purpose**: Gắn loại minh họa (category) cho từng scene dựa trên plugin đã chọn; publish `scenes_classified`/`classification_failed`.
 
-## Script Processing Service
+## Script Processing Service *(gỡ ở CR-040 — thay bằng command `validate_script` của Rendering Service, event `script_validated`/`validation_failed`)*
 
 ### Consumer: command `parse_script` (từ `script_processing.commands`)
 - **Purpose**: Phân tích script thô thành danh sách scene chuẩn hóa; publish `script_parsed` (scene CHƯA có category) /`parse_failed`. Việc gắn category do Orchestrator điều phối như bước Saga riêng tiếp theo (`classify_scenes` tới Content Plugin Service) — Script Processing Service không gọi Content Plugin Service trực tiếp (ADR-0012).
