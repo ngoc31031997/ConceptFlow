@@ -2651,3 +2651,25 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-058, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-059 — Lỗi bước Code theo từng shot, giữ shot đã viết, chẩn đoán shot không viết được
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "xem dự án này Các cấp độ của nền văn minh sao có shot 3.3-3.5 lại không chạy được nhỉ." / "làm sao có thể tránh những kịch bản kiểu này nhỉ, hoặc ít nhất trả lỗi cụ thể cho shot đó như cách bạn đã phân tích." / "làm mục 1 trước đi"
+**AI Response**:
+- Phân tích: dự án `6deec24f…`, đoạn `3.3-3.5` lỗi `budget`; pipeline chia thành `[3.3, 3.4]` và `[3.5]`, shot 3.5 vẫn vượt trần 60 000 ký tự reasoning nên cả đoạn `failed` và kết quả 3.3, 3.4 bị bỏ (`run.py` `write()`). Visual shot 3.5 mâu thuẫn với 3.2/3.4 và đòi động tác nhân vật.
+- Đề xuất (chờ duyệt): đoạn lỗi mang nội dung dở + `failed_shots` (phương án A, không đổi khoá/vân tay); chạy hết các nửa khi chia; câu lỗi theo shot; một lượt chẩn đoán (`phase: "diagnose"`) cho shot riêng lẻ lỗi `budget`/`truncated`, dùng đuôi 4 000 ký tự reasoning; hiển thị trong `CodeSegmentsPanel`.
+**Impact Assessment**: llm-service, authoring-service (2 cột mới ở `authoring_segments`), web-gui; hợp đồng `/v2/code/generate` chỉ thêm trường.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-059-per-shot-code-failure-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION/DESIGN — CR-059, chờ Creator duyệt.
+
+---
+
+## CR-059 — Duyệt thiết kế (bỏ chẩn đoán tự động)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "chưa cần [trích mục 3: Chẩn đoán tự động …] llàm 1 2 4 nhé"
+**AI Response**: Bỏ FR-3 (lượt chẩn đoán, đuôi reasoning, biến `CODE_DIAGNOSE_*`, cột `diagnosis`, khối chẩn đoán trên UI) khỏi thiết kế. Giữ FR-1 (giữ shot đã viết, chạy lại chỉ shot thiếu), FR-2 (lỗi theo shot), FR-4 (hiển thị). Commit thiết kế, chuyển sang `/code`.
+**Impact Assessment**: llm-service (`run.py`), authoring-service (cột `failed_shots`), web-gui; hợp đồng chỉ thêm trường; không thêm lượt gọi model.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-059-per-shot-code-failure-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-059, thiết kế đã duyệt.
+
+---
