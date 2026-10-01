@@ -2540,3 +2540,23 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-057, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-058 — Sắp xếp lại luồng tạo video cho dễ hiểu, dễ thao tác (đề xuất)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "review và sắp xếp lại workflow tạo video, tôi muốn tách biệt thành các bước và màn hình riêng biệt hoặc bằng cách nào đó làm cho quy trình tạo video trở nên dễ dàng thao tác và dễ hiểu hơn cho người dùng. nói chung là tối ưu trải nghiệm UX UI cho người dùng đó"
+**AI Response**: Mở nhánh `feature/cr-058-video-workflow-ux`. Review 14 màn của luồng qua graphify: tìm 7 vấn đề (14 bước ngang hàng tên kỹ thuật, không phân biệt bước tự động; cài đặt rải ở 4 chỗ; chủ đề nhập hai nơi; bố cục bước 3–6 không thống nhất; nhánh `scriptSource` không bao giờ chạy; màn Duyệt quá dày và "Quay lại sửa script" về bước 1; màn Sản xuất chẻ 4). Đề xuất 3 hướng, khuyến nghị B: 5 giai đoạn có thanh định hướng, tên bước bằng lời thường, nhãn "Tự động", bước 2 chia 3 nhóm và nhận bộ chọn kiểu video, bỏ ô chủ đề ở bước 3, thống nhất bố cục 3–6, bỏ code chết, tách màn Duyệt thành 2 phần, gộp tracker Sản xuất. Ba câu hỏi chờ chốt: hướng (A/B/C), bỏ hay khôi phục nhánh "đã có sẵn", tracker Sản xuất chung hay tách.
+**Impact Assessment**: chỉ web-gui; không đổi API, DB, contract, migration, `flow_step` server.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-058-video-workflow-ux-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-058, chờ Creator duyệt thiết kế.
+
+---
+
+## CR-058 — Creator duyệt thiết kế
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "làm B đi"
+**AI Response**: Chốt hướng B; câu 2 (bỏ hẳn nhánh "đã có sẵn dàn ý / storyboard / code") và câu 3 (một tracker chung cho Sản xuất) theo mặc định đề xuất. Commit thiết kế và chuyển sang `/code CR-058`.
+**Impact Assessment**: như thiết kế; chỉ web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-058-video-workflow-ux-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-058, thiết kế đã duyệt.
+
+---
