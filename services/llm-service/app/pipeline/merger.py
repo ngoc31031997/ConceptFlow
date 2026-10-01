@@ -154,22 +154,34 @@ def remotion_stub(shot_id: str) -> str:
 
 _IMPORT_LINE = re.compile(r"^\s*import\b[^;]*;?\s*$", re.M)
 _TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b|backdrop=\{([A-Z][A-Za-z0-9]*)\}")
+_EXPORT = re.compile(r"^\s*export\s+(function|const|type|interface)\s+([A-Za-z_$][\w$]*)", re.M)
 
 
 def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
     """The library drawings the shots actually use, pasted into the
     script so it renders without any file beside it. Their imports are the
-    frame's own (react, remotion, the illustration kit), so they are dropped;
-    `export` is dropped so the only exports stay the frame's."""
+    frame's own (react, remotion, the illustration kit), so they are dropped.
+
+    Each drawing is written as a self-contained module, free to name its own
+    top-level helpers (`LAND`, `Gear`, ...), so it is pasted inside its own
+    namespace: two drawings using the same helper name cannot clash. Only
+    the names it exports are lifted into the script, as before."""
     used = set()
     for code in shots.values():
         for tag, backdrop in _TAG.findall(code):
             used.add(tag or backdrop)
     blocks = []
     for name in sorted(n for n in library if n in used):
-        code = _IMPORT_LINE.sub("", library[name])
-        code = re.sub(r"^export\s+function\s+", "function ", code, flags=re.M).strip("\n")
-        blocks.append(f"// Hình thư viện: {name}\n{code}\n")
+        code = _IMPORT_LINE.sub("", library[name]).strip("\n")
+        scope = f"Library_{name}"
+        lifted = [
+            f"type {export} = {scope}.{export};" if kind in ("type", "interface")
+            else f"const {export} = {scope}.{export};"
+            for kind, export in _EXPORT.findall(code)
+        ]
+        blocks.append(
+            f"// Hình thư viện: {name}\nnamespace {scope} {{\n{code}\n}}\n" + "".join(l + "\n" for l in lifted)
+        )
     return "\n".join(blocks)
 
 

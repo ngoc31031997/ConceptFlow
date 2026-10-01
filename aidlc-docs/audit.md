@@ -2747,3 +2747,20 @@ bỏ example vào gitignore"
 **Context**: CONSTRUCTION — CR-060, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## Fix — Hình thư viện trùng tên hằng phụ làm hỏng render
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "lỗi render trong dự án 6deec24f xem nó bị lỗi gì và ngăn chặn đó" — rồi "ok sửa theo hướng này đi => Bây giờ: sửa bằng cách bọc phạm vi riêng cho từng hình (nhỏ, an toàn, chặn được mọi trường hợp trùng tên)." — rồi "cr 60 xong rồi làm đi"
+**AI Response**:
+- **Lỗi**: rendering báo `Script syntax error (esbuild): CreatorEntry.tsx:1750:6: The symbol "LAND" has already been declared` cho project `6deec24f-8030-4423-8a27-b5c52791c997`. Script có hai hình thư viện `VietnamMap` (dòng 1615) và `WorldMap` (dòng 1750), mỗi hình tự khai báo `const LAND` ở cấp ngoài cùng.
+- **Nguyên nhân gốc**: `library_block` (`services/llm-service/app/pipeline/merger.py`) dán code của mọi hình thư viện được dùng vào chung một phạm vi của script, nên hằng/hàm phụ cấp ngoài cùng của các hình va nhau. Rà 189 hình có code: `LAND` (WorldMap, VietnamMap) và `Gear` (hàm phụ trong `Machine` trùng hình `Gear`) đều làm hỏng script nếu dùng chung.
+- **Sửa**: mỗi hình được dán trong `namespace Library_<Tên> { … }` (giữ nguyên `export` bên trong), rồi chỉ các tên nó export được đưa ra script: hàm/const thành `const X = Library_<Tên>.X;`, type/interface thành `type X = Library_<Tên>.X;`. Shot vẫn gọi `<VietnamMap/>`, kiểu export (`CoreState`, ...) vẫn dùng được. Không đổi hợp đồng, DB hay dữ liệu thư viện.
+- **Test**: thêm `test_library_drawings_sharing_a_helper_name_are_pasted_into_separate_scopes` (fail khi bỏ bản sửa, pass khi có); cập nhật hai test kiểm dạng dán cũ (`test_pipeline.py`, `test_backdrops.py`). llm-service `pytest`: 157 pass.
+- **Kiểm biên dịch thật** (trong container rendering): code thật của VietnamMap + WorldMap + Machine + Gear + GlowingCore — bản cũ esbuild lỗi trùng `Gear`, bản sửa esbuild OK và `tsc --noEmit` sạch; toàn bộ 189 hình dán chung một file — esbuild OK, tsc sạch (đã xác nhận tsc thật sự chạy bằng một lỗi cố ý).
+- **Rebuild**: llm-service healthy, container chạy code mới.
+- **Chưa làm**: chưa chạy lại bước Code của project 6deec24f (gọi LLM và ghi đè script đã lưu) — script đang lưu vẫn là bản hỏng, Creator chạy lại bước Code để có script mới.
+**Impact Assessment**: chỉ llm-service (ghép script Remotion); mọi project dùng hình thư viện có hằng phụ trùng tên.
+**Artifacts Affected**: `services/llm-service/app/pipeline/merger.py`, `services/llm-service/tests/test_pipeline.py`, `services/llm-service/tests/test_backdrops.py`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: Fix trên nhánh `fix/library-drawing-scope`, chờ Creator duyệt rồi `/deliver`.
+
+---

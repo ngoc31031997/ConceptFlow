@@ -362,10 +362,32 @@ async def test_library_drawings_reach_the_prompt_and_the_ones_used_are_pasted_in
     res = await pipeline(provider, checker).run(r, emit_none)
     assert all("## C4. HÌNH THƯ VIỆN" in c.system and "<SchoolBus color /> — 320×210" in c.system for c in provider.calls)
     code = res.code
-    assert "// Hình thư viện: SchoolBus\nfunction SchoolBus(" in code
-    assert "export function SchoolBus" not in code and "function Cat(" not in code  # only what is used
+    assert "// Hình thư viện: SchoolBus\nnamespace Library_SchoolBus {\n" in code
+    assert "const SchoolBus = Library_SchoolBus.SchoolBus;" in code
+    assert "function Cat(" not in code  # only what is used
     assert code.count("from './conceptflow-mini/illustration'") == 2  # the frame's own imports only
     assert code.index("function SchoolBus(") < code.index("function Shot1_1(")
+
+
+def test_library_drawings_sharing_a_helper_name_are_pasted_into_separate_scopes():
+    # VietnamMap and WorldMap both declare their own top-level `const LAND`;
+    # pasted side by side without a scope, the script does not compile.
+    library = {
+        "VietnamMap": "import React from 'react';\nconst LAND = 'M0 0';\n"
+                      "export function VietnamMap() {\n  return <path d={LAND} />;\n}\n",
+        "WorldMap": "const LAND = ['M1 1'];\nexport type Region = 'asia' | 'europe';\n"
+                    "export function WorldMap({lit}: {lit?: Region[]}) {\n  return <g>{LAND.length}</g>;\n}\n",
+    }
+    shots = {"1.1": "function Shot1_1() {\n  return <><VietnamMap /><WorldMap /></>;\n}"}
+    block = merger.library_block(library, shots)
+    scopes = re.findall(r"namespace (\w+) \{\n(.*?)\n\}\n", block, re.S)
+    assert [s for s, _ in scopes] == ["Library_VietnamMap", "Library_WorldMap"]
+    assert all(body.count("const LAND") == 1 for _, body in scopes)
+    assert "const LAND" not in re.sub(r"namespace \w+ \{\n.*?\n\}\n", "", block, flags=re.S)
+    assert "const VietnamMap = Library_VietnamMap.VietnamMap;" in block
+    assert "const WorldMap = Library_WorldMap.WorldMap;" in block
+    assert "type Region = Library_WorldMap.Region;" in block
+    assert "import " not in block
 
 
 async def test_manim_ignores_library_drawings():

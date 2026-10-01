@@ -36,5 +36,6 @@ def test_a_library_backdrop_used_by_a_scene_is_pasted_into_the_script():
     library = {"OrchardBackdrop": "import React from 'react';\nexport function OrchardBackdrop() {\n  return null;\n}\n",
                "Unused": "export function Unused() {}\n"}
     code = merger.merge_remotion(sb, "const LAYOUT = {};", shot, library=library).code
-    assert "// Hình thư viện: OrchardBackdrop\nfunction OrchardBackdrop()" in code
+    assert "// Hình thư viện: OrchardBackdrop\nnamespace Library_OrchardBackdrop {\nexport function OrchardBackdrop()" in code
+    assert "const OrchardBackdrop = Library_OrchardBackdrop.OrchardBackdrop;" in code
     assert "Unused" not in code
