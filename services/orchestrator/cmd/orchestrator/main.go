@@ -223,6 +223,10 @@ func (a projectDraftAdapter) Save(ctx context.Context, project *domain.Project) 
 	return a.projects.Save(ctx, project)
 }
 
+func (a projectDraftAdapter) Get(ctx context.Context, projectID string) (*domain.Project, error) {
+	return a.projects.Get(ctx, projectID)
+}
+
 func (a projectDraftAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
 	return a.projects.GetStatus(ctx, projectID)
 }
@@ -272,6 +276,14 @@ type wizardAdapter struct {
 
 func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
 	return a.projects.GetStatus(ctx, projectID)
+}
+
+func (a wizardAdapter) Get(ctx context.Context, projectID string) (*domain.Project, error) {
+	return a.projects.Get(ctx, projectID)
+}
+
+func (a wizardAdapter) GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error) {
+	return a.projects.GetVideoFormat(ctx, formatID, version)
 }
 
 func (a wizardAdapter) PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {

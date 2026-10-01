@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"authoring/internal/application"
+	"authoring/internal/domain"
 )
 
 type Client struct {
@@ -30,6 +31,7 @@ type previewRequest struct {
 	Code  string         `json:"code"`
 	Props map[string]any `json:"props"`
 	GIF   bool           `json:"gif"`
+	Kind  string         `json:"kind"`
 }
 
 type previewResponse struct {
@@ -42,12 +44,12 @@ type previewResponse struct {
 }
 
 func (c *Client) PreviewIllustration(
-	ctx context.Context, name, code string, props map[string]any, gif bool,
+	ctx context.Context, name, code string, props map[string]any, gif bool, kind domain.IllustrationKind,
 ) (application.IllustrationPreview, error) {
 	if props == nil {
 		props = map[string]any{}
 	}
-	body, _ := json.Marshal(previewRequest{Name: name, Code: code, Props: props, GIF: gif})
+	body, _ := json.Marshal(previewRequest{Name: name, Code: code, Props: props, GIF: gif, Kind: string(domain.KindOrFigure(kind))})
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/illustrations/preview", bytes.NewReader(body))
 	if err != nil {
 		return application.IllustrationPreview{}, err

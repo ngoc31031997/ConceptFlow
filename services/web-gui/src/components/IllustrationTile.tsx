@@ -65,6 +65,11 @@ export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0
           <span className={glass.badgeDot} aria-hidden="true" />
           {illustrationStatusLabel(ill)}
         </span>
+        {ill.kind === "backdrop" && (
+          <span className={`${glass.badge} ${glass.badgeNeutral}`} data-testid={`illustration-kind-${ill.name}`}>
+            Nền
+          </span>
+        )}
         {ill.warnings?.length > 0 && (
           <StyleWarnings
             warnings={ill.warnings}

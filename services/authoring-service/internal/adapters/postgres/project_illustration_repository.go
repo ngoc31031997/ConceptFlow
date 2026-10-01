@@ -14,7 +14,7 @@ import (
 
 func (r *PromptTemplateRepository) ListProjectIllustrations(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, project_id, position, name, description, folder_id, shots, state, error, COALESCE(illustration_id, '')
+		SELECT id, project_id, position, name, description, folder_id, shots, state, error, COALESCE(illustration_id, ''), kind
 		FROM project_illustrations WHERE project_id = $1 ORDER BY position
 	`, projectID)
 	if err != nil {
@@ -23,13 +23,14 @@ func (r *PromptTemplateRepository) ListProjectIllustrations(ctx context.Context,
 	var out []domain.ProjectIllustration
 	for rows.Next() {
 		var p domain.ProjectIllustration
-		var state string
+		var state, kind string
 		if err := rows.Scan(&p.ID, &p.ProjectID, &p.Position, &p.Name, &p.Description, &p.FolderID, &p.Shots,
-			&state, &p.Error, &p.IllustrationID); err != nil {
+			&state, &p.Error, &p.IllustrationID, &kind); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		p.State = domain.ProjectIllustrationState(state)
+		p.Kind = domain.KindOrFigure(domain.IllustrationKind(kind))
 		if p.Shots == nil {
 			p.Shots = []string{}
 		}
@@ -69,9 +70,10 @@ func (r *PromptTemplateRepository) ReplaceProjectIllustrations(ctx context.Conte
 				shots = []string{}
 			}
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO project_illustrations (project_id, position, name, description, folder_id, shots, state, error, illustration_id)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-			`, projectID, p.Position, p.Name, p.Description, p.FolderID, shots, string(p.State), p.Error, ill); err != nil {
+				INSERT INTO project_illustrations (project_id, position, name, description, folder_id, shots, state, error, illustration_id, kind)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			`, projectID, p.Position, p.Name, p.Description, p.FolderID, shots, string(p.State), p.Error, ill,
+				string(domain.KindOrFigure(p.Kind))); err != nil {
 				return err
 			}
 		}

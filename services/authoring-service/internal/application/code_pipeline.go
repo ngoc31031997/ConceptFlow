@@ -16,7 +16,7 @@ import (
 // StoryboardFinalizerPort validates the Visual Director's JSON (and gets one
 // model repair turn if it is invalid) and returns the canonical text to save.
 type StoryboardFinalizerPort interface {
-	FinalizeStoryboard(ctx context.Context, content, model string, maxTokens int) (FinalizedStoryboard, error)
+	FinalizeStoryboard(ctx context.Context, content, model string, maxTokens int, frame domain.Frame) (FinalizedStoryboard, error)
 }
 
 type FinalizedStoryboard struct {
@@ -65,6 +65,9 @@ type CodeGenRequest struct {
 	// them. Remotion only.
 	SubtitleBand *domain.SubtitleBand
 	VideoFont    string
+	// Frame is the canvas the video is built on; the merged script registers a
+	// composition of its size and the storyboard's layout is checked against it.
+	Frame domain.Frame
 	// ChunkShots is the Creator's shots per segment.
 	ChunkShots int
 	// Done are the stored segments sent back so they are not written again.

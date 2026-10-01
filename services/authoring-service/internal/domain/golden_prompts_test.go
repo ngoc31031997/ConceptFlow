@@ -15,9 +15,9 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // manual templates; a deliberate wording change updates the hash here.
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
-	RoleVisualDirector:   "bbf4c69b3304ef766656bbf565914835b89718df78ffe9d5ddf25e030536d8dd",
+	RoleVisualDirector:   "9d081cc6329d5876b7d8805a0074db9448d049869b9a624578df90677e40ffa4",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
-	RoleRemotionEngineer: "4004796be72d3d260877c22708511d55c5ce8bb12d0b58505da64f79214776a6",
+	RoleRemotionEngineer: "0c6ae8d48c08d8830cd4c78bf2d7e38eba884098fabbebc9b18d13d8421e29d8",
 }
 
 func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {
@@ -49,6 +49,7 @@ func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 	known := map[string]bool{
 		"topic": true, "previous_output": true, "narration_language_rule": true,
 		"channel_identity": true, "format_beats": true, "subtitle_zone": true, "video_archetypes": true,
+		"frame": true, "frame_width": true, "frame_height": true, "safe_area": true, "frame_rules": true,
 	}
 	for _, role := range []PromptRole{RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI} {
 		text := aiTemplate(t, role)

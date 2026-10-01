@@ -25,7 +25,7 @@ type illustrationsUseCase interface {
 	DeleteFolder(ctx context.Context, id string) error
 	List(ctx context.Context, f application.IllustrationFilter) ([]domain.Illustration, error)
 	Get(ctx context.Context, id string) (domain.Illustration, error)
-	Try(ctx context.Context, name, code string) (application.IllustrationPreview, error)
+	Try(ctx context.Context, name, code string, kind domain.IllustrationKind) (application.IllustrationPreview, error)
 	Create(ctx context.Context, i domain.Illustration) (domain.Illustration, error)
 	Update(ctx context.Context, id string, i domain.Illustration) (domain.Illustration, error)
 	SetStatus(ctx context.Context, id string, status domain.IllustrationStatus) (domain.Illustration, error)
@@ -246,14 +246,15 @@ func (rt *Router) handleTryIllustration(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var b struct {
-		Name string `json:"name"`
-		Code string `json:"code"`
+		Name string                  `json:"name"`
+		Code string                  `json:"code"`
+		Kind domain.IllustrationKind `json:"kind"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	out, err := rt.illustrations.Try(r.Context(), b.Name, b.Code)
+	out, err := rt.illustrations.Try(r.Context(), b.Name, b.Code, b.Kind)
 	if err != nil {
 		illustrationError(w, err)
 		return
@@ -391,17 +392,18 @@ func (rt *Router) handleDrawIllustration(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	var b struct {
-		Description string `json:"description"`
-		FolderID    string `json:"folder_id"`
-		Name        string `json:"name"`
-		Model       string `json:"model"`
+		Description string                  `json:"description"`
+		FolderID    string                  `json:"folder_id"`
+		Name        string                  `json:"name"`
+		Model       string                  `json:"model"`
+		Kind        domain.IllustrationKind `json:"kind"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
 	out, err := rt.illustrations.Draw(r.Context(), application.DrawRequest{
-		Description: b.Description, FolderID: b.FolderID, Name: b.Name, Model: b.Model,
+		Description: b.Description, FolderID: b.FolderID, Name: b.Name, Model: b.Model, Kind: b.Kind,
 	})
 	if err != nil {
 		illustrationError(w, err)

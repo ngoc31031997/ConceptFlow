@@ -2,7 +2,7 @@
 của Code Merger phải khớp nhau.
 
 Ba nơi cùng mô tả một bộ component:
-  - remotion_project/src/conceptflow-mini/illustration.tsx — code thật;
+  - remotion_project/src/conceptflow-mini/illustration.tsx và scene.tsx — code thật;
   - authoring-service/.../prompts/illustration_kit_vi.txt — thứ Kỹ sư Remotion đọc;
   - llm-service/app/pipeline/merger.py ILLUSTRATION_KIT — thứ khung code import sẵn.
 Lệch một trong ba là: model gọi một component không tồn tại (build lỗi), hoặc có
@@ -20,6 +20,8 @@ from adapters.rendering.typescript_checker import TypeScriptChecker
 RENDERING = Path(__file__).resolve().parents[2]
 SERVICES = RENDERING.parent
 KIT = RENDERING / "remotion_project" / "src" / "conceptflow-mini" / "illustration.tsx"
+SCENE = KIT.with_name("scene.tsx")
+BACKDROPS = KIT.with_name("backdrops.tsx")
 DOC = SERVICES / "authoring-service" / "internal" / "domain" / "prompts" / "illustration_kit_vi.txt"
 MERGER = SERVICES / "llm-service" / "app" / "pipeline" / "merger.py"
 
@@ -40,6 +42,16 @@ def kit_exports() -> set[str]:
     return {n for n in all_exports() if n[0].isupper() and not n.isupper()} - HELPERS
 
 
+def scene_exports() -> tuple[set[str], set[str]]:
+    """(component, hook) của scene.tsx."""
+    names = set(re.findall(r"^export function (\w+)", SCENE.read_text(encoding="utf-8"), re.M))
+    return {n for n in names if n[0].isupper()}, {n for n in names if n.startswith("use")}
+
+
+def backdrop_exports() -> set[str]:
+    return set(re.findall(r"^export function (\w+Backdrop)\(", BACKDROPS.read_text(encoding="utf-8"), re.M))
+
+
 def test_bo_minh_hoa_co_du_cac_hinh_toi_thieu():
     # Những hình mà ví dụ trong prompt và luật "minh hoạ đúng cái đang nói" dựa vào.
     assert {"Backdrop", "Panel", "Person", "Tooth", "Germ", "Toothbrush", "Candy", "Bubble"} <= kit_exports()
@@ -49,6 +61,7 @@ def test_bo_minh_hoa_co_du_cac_hinh_toi_thieu():
 def test_moi_component_deu_duoc_mo_ta_trong_prompt_va_nguoc_lai():
     doc = DOC.read_text(encoding="utf-8")
     exports = kit_exports()
+    exports |= scene_exports()[0] | backdrop_exports()
     documented = set(re.findall(r"<([A-Z]\w*)", doc)) - NOT_KIT_TAGS
     assert exports - documented == set(), "component chưa có trong illustration_kit_vi.txt"
     assert documented - exports == set(), "prompt nhắc tới component không tồn tại"
@@ -65,6 +78,13 @@ def test_khung_code_cua_merger_import_dung_bo_minh_hoa():
     assert helpers, "merger.py không còn ILLUSTRATION_HELPERS"
     # Mọi thứ còn lại mà bộ minh hoạ xuất ra: hình của thư viện được dán vào script cần chúng.
     assert set(re.findall(r'"(\w+)"', helpers.group(1))) == all_exports() - kit_exports()
+    components, hooks = scene_exports()
+    scene = re.search(r"SCENE_KIT = \((.*?)\)", text, re.S)
+    assert scene and set(re.findall(r'"(\w+)"', scene.group(1))) == components
+    scene_helpers = re.search(r"SCENE_HELPERS = \((.*?)\)", text, re.S)
+    assert scene_helpers and set(re.findall(r'"(\w+)"', scene_helpers.group(1))) == hooks
+    backdrops = re.search(r"BACKDROP_KIT = \((.*?)\)", text, re.S)
+    assert backdrops and set(re.findall(r'"(\w+)"', backdrops.group(1))) == backdrop_exports()
 
 
 REAL = RENDERING / "remotion_project"

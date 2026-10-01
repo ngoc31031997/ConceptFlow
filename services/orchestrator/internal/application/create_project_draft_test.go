@@ -61,6 +61,15 @@ func (f *fakeDraftRepo) FindSimilarTopics(_ context.Context, _ domain.ContentLan
 	return nil, nil
 }
 
+func (f *fakeDraftRepo) Get(_ context.Context, projectID string) (*domain.Project, error) {
+	p, ok := f.saved[projectID]
+	if !ok {
+		return nil, domain.ErrProjectNotFound
+	}
+	copied := *p
+	return &copied, nil
+}
+
 func (f *fakeDraftRepo) SaveRenderEngine(_ context.Context, projectID string, engine domain.RenderEngine) error {
 	f.renderEngine[projectID] = engine
 	return nil
@@ -125,5 +134,38 @@ func TestCreateProjectDraft_InvalidRenderEngineIsRejected(t *testing.T) {
 	}
 	if _, ok := repo.renderEngine["p1"]; ok {
 		t.Fatal("an invalid render_engine must not be saved")
+	}
+}
+
+func TestCreateProjectDraft_AShortOfALongVideoStartsAsALinkedShort(t *testing.T) {
+	repo := newFakeDraftRepo()
+	repo.saved["long-1"] = &domain.Project{ProjectID: "long-1", Status: domain.StatusReadyToPublish, VideoOutputMode: domain.ModeLongOnly}
+	uc := application.NewCreateProjectDraftUseCase(repo)
+	out, err := uc.Execute(context.Background(), application.CreateProjectDraftInput{
+		ProjectID: "short-1", Topic: "Vì sao gọi là tiểu đường", ContentLanguage: domain.LanguageVietnamese, ShortOf: "long-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	short := repo.saved[out.ProjectID]
+	if short.VideoOutputMode != domain.ModeShortOnly || short.VideoFormatID != domain.FormatVerticalShort60s.ID ||
+		short.RenderEngine != domain.RenderEngineRemotion || short.SubtitleMode != domain.SubtitleModeOff {
+		t.Errorf("short draft = mode %s format %s engine %s subtitles %s", short.VideoOutputMode, short.VideoFormatID, short.RenderEngine, short.SubtitleMode)
+	}
+	if short.CompanionProjectID == nil || *short.CompanionProjectID != "long-1" {
+		t.Error("the short must point at its long video")
+	}
+	if long := repo.saved["long-1"]; long.CompanionProjectID == nil || *long.CompanionProjectID != "short-1" {
+		t.Error("the long video must point back at its short")
+	}
+}
+
+func TestCreateProjectDraft_AShortOfAnUnknownVideoIsRefused(t *testing.T) {
+	uc := application.NewCreateProjectDraftUseCase(newFakeDraftRepo())
+	_, err := uc.Execute(context.Background(), application.CreateProjectDraftInput{
+		ProjectID: "short-1", Topic: "x", ContentLanguage: domain.LanguageVietnamese, ShortOf: "missing",
+	})
+	if err == nil {
+		t.Fatal("a short of a project that does not exist must be refused")
 	}
 }

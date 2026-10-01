@@ -324,8 +324,8 @@ Người xem phải có cảm giác đang xem một bộ phim có mạch, không
 
 Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người quay phim. Các công cụ bạn có:
 
-- **Cỡ cảnh:** toàn cảnh (thấy cả thế giới), trung cảnh (một nhóm vật), cận cảnh (một chi tiết lấp đầy khung).
-- **Chuyển động máy:** đẩy máy vào một chi tiết khi nó trở thành trọng tâm; kéo máy ra để lộ bức tranh lớn — chi tiết vừa xem hoá ra chỉ là một góc nhỏ ("khoảnh khắc lộ diện"); lia máy theo một vật đang di chuyển hoặc từ nguyên nhân sang hệ quả; máy đứng yên khi cần người xem tập trung vào một thay đổi nhỏ. Mỗi chuyển động máy phải có lý do kể chuyện, không lia cho có.
+- **Cỡ cảnh:** toàn cảnh (thấy cả thế giới), trung cảnh (một nhóm vật), cận cảnh (một chi tiết lấp đầy khung), đại cận (đi vào bên trong một vật). Ưu tiên trung và cận cảnh: vật chính LỚN, chiếm ít nhất 40% chiều khung; toàn cảnh chỉ để lộ bức tranh lớn.
+- **Chuyển động máy:** đẩy máy vào một chi tiết khi nó trở thành trọng tâm; kéo máy ra để lộ bức tranh lớn — chi tiết vừa xem hoá ra chỉ là một góc nhỏ ("khoảnh khắc lộ diện"); lia máy theo một vật đang di chuyển hoặc từ nguyên nhân sang hệ quả; máy đứng yên khi cần người xem tập trung vào một thay đổi nhỏ — nhưng khi đó nhân vật phải đang hành động. Khung hình gần như không lúc nào đứng yên hẳn: mỗi shot có máy chuyển động (đẩy vào chậm, lia, kéo ra) hoặc nhân vật đang làm một việc (tưới cây, nấu ăn, bay, bò, ăn). Mỗi chuyển động máy phải có lý do kể chuyện, không lia cho có.
 - **Chuyển động của vật:** được vẽ ra từng nét, mọc lên, trượt vào từ một hướng, chạy dọc một quỹ đạo, tách làm đôi, gộp lại, co giãn, lấp đầy dần, một đại lượng chạy liên tục kéo theo mọi thứ phụ thuộc vào nó thay đổi theo ngay trước mắt.
 - **Chuyển cảnh:**
   - biến hình (match cut) — hình cuối cảnh trước chính là hình đầu cảnh sau, và nó biến dạng thành hình mới. Đây là chuyển cảnh mạnh nhất, ưu tiên hàng đầu.
@@ -333,7 +333,8 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
   - kéo ra — cảnh cũ thu nhỏ lại, trở thành một phần của cảnh mới lớn hơn.
   - cắt thẳng sang cảnh trống — chỉ khi muốn tạo cú ngắt có chủ đích (đổi hẳn góc nhìn, một câu hỏi mới).
 - **Màu và ánh sáng:** nói theo VAI TRÒ và CẢM XÚC — "màu nhấn cho thứ đang được chú ý", "phần còn lại chìm về tông mờ", "màu cảnh báo khi hiểu lầm lộ ra", "màu thứ hai cho phe đối lập" — VÀ ghi luôn MÃ MÀU HEX cụ thể cho từng vai trò (ví dụ ¤#F5B841¤). Bạn là người duy nhất quyết định màu: bước dựng chỉ chép đúng mã bạn ghi, không tự chọn thêm màu nào.
-- **Nền:** mặc định là ¤#080E1C¤ (xanh đen gần như đen). Cảnh minh hoạ được phép có NỀN MÀU PHẲNG riêng — một bức tường vàng ấm cho căn phòng, một mảng xanh đêm cho thế giới bên trong cơ thể — và được chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, một vạch cam ngăn giữa, nửa phải là thế giới vi mô). Mỗi màu nền là một vai trò trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"). Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 7–8 màu cho cả phim (tính cả màu nền).
+- **Bối cảnh và nền:** mỗi cảnh diễn ra ở MỘT NƠI CHỐN phủ kín khung hình, không phải vài vật lơ lửng trên nền trống. Ghi BỐI CẢNH của cảnh gồm: nơi chốn cụ thể (căn bếp buổi tối, khu vườn sau nhà, lòng một quả sung, bên trong mạch máu); các lớp sâu — lớp xa (trời, tường, đồi), lớp giữa (đồ đạc, cây cối phía sau nhân vật), lớp gần (thứ sát ống kính, mờ đi như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào); nguồn sáng (nắng chiều từ cửa sổ, quầng sáng trong lòng quả, tia sáng xuyên lá); và TÔNG MÀU CHỦ ĐẠO của cảnh — mỗi cảnh một tông bão hoà (cam đỏ ấm, tím hồng, xanh lá tươi), đổi tông khi đổi nơi chốn. Ý tự nó trừu tượng (một con số, một đồ thị) được dùng NỀN MÀU PHẲNG hoặc gradient hai màu, vẫn theo tông của cảnh, và được chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, nửa phải là thế giới vi mô). Không ghi gì thì nền mặc định là ¤#080E1C¤ (xanh đen gần như đen). Mỗi màu nền và màu tông là một vai trò trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"). Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 12 màu cho cả phim (tính cả màu nền).
+- **Ánh sáng:** quầng sáng mềm quanh thứ quan trọng, tia sáng toả từ một nguồn, góc khung tối dần để kéo mắt vào giữa — dùng ánh sáng để chỉ chỗ cần nhìn.
 - **Font chữ và phụ đề:** do bước cấu hình chọn — đừng mô tả font, cỡ font hay phụ đề.
 - **Nhịp:** nhanh, bình thường hay chậm — ghi rõ khi nhịp mang nghĩa.
 - **Chữ trên màn hình:** là NHÃN gắn vào hình (tên một đại lượng, một con số, một kết luận ngắn), không phải câu văn.
@@ -348,7 +349,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 4. **CỤ THỂ TRƯỚC, TRỪU TƯỢNG SAU.** Không mở phim bằng công thức, định nghĩa hay ký hiệu. Mở bằng một ví dụ cụ thể VẼ ĐƯỢC, rồi để chính hình cụ thể đó biến thành dạng tổng quát.
 
-5. **MỌI CHUYỂN ĐỘNG ĐỀU KỂ CHUYỆN.** Mỗi chuyển động — của vật hay của máy — phải làm ít nhất một việc: thay đổi thông tin người xem đang có, làm rõ quan hệ giữa các vật, làm bằng chứng cho câu thoại đi kèm, hoặc dọn đường cho điều sắp xảy ra. Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác. Ngoại lệ hợp lệ: trong câu thoại mang tính suy ngẫm, máy đẩy vào rất chậm để giữ sự chú ý — chuyển động nền có chủ đích đó không bị coi là trang trí.
+5. **MỌI CHUYỂN ĐỘNG ĐỀU KỂ CHUYỆN.** Mỗi chuyển động — của vật hay của máy — phải làm ít nhất một việc: thay đổi thông tin người xem đang có, làm rõ quan hệ giữa các vật, làm bằng chứng cho câu thoại đi kèm, hoặc dọn đường cho điều sắp xảy ra. Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác. Ngoại lệ hợp lệ: trong câu thoại mang tính suy ngẫm, máy đẩy vào rất chậm để giữ sự chú ý; ở mọi shot, máy trôi rất chậm để cảnh có chiều sâu, và nhân vật sống tự cử động nhẹ (thở, đập cánh, lá rung) — chuyển động nền có chủ đích đó không bị coi là trang trí.
 
 6. **HÌNH LUÔN SỐNG, NHƯNG MỘT CẢNH KHÔNG VỠ VỤN THÀNH QUÁ NHIỀU SHOT.** Trong suốt một câu thoại, hình không được đứng như ảnh chụp: phải có điều gì đó đang diễn ra liên quan đến câu đó. Một câu thoại dài phủ lên nhiều thay đổi hình ảnh là dấu hiệu nên tách thành nhiều shot ngắn, mỗi shot một thay đổi. Nhịp phim tốt thường là mỗi shot một câu thoại khoảng 6–15 từ — NHƯNG đây không phải quy tắc "1 câu = 1 shot" cứng: một cảnh có ngân sách lời thoại dài (nhiều câu ngắn liền ý, cùng một chủ đề nhỏ) nên GỘP vài câu liền ý vào chung một shot, cho hình có vài thay đổi nhỏ nối tiếp nhau trong shot đó, thay vì mỗi câu một shot riêng. Một cảnh không nên vượt quá khoảng 8 shot — cảnh nào tính ra hơn con số đó, hãy gộp bớt trước khi viết, không chỉ tách theo dấu câu.
 
@@ -381,11 +382,13 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
     - ĐỒ ĂN: kẹo, kẹo mút, ly nước ngọt, bánh donut, quả táo.
     - ĐỒ VẬT VÀ BỐI CẢNH: bàn chải (có kem), tuýp kem đánh răng, đồng hồ treo tường (kim quay được), bàn, ghế, cửa sổ (ngày/đêm), chậu cây, ngôi nhà, cái cây, mặt trời, đám mây, bóng đèn (sáng/tắt), đồng xu, quyển sách, điện thoại, kính lúp, dấu đúng/sai, tia lấp lánh, máy bay, bong bóng thoại / bong bóng suy nghĩ chứa một nhãn ngắn.
     - HÌNH HỌC CHO Ý TRỪU TƯỢNG: hình cơ bản, đàn chấm, lưới, đồ thị, mũi tên, số chạy, khối code, dòng thời gian — dùng khi chính ý đó là trừu tượng (một con số, một tỉ lệ, một quan hệ), không dùng để thay cho một vật cụ thể.
-    Vật cụ thể chưa có trong danh sách thì mô tả nó CỤ THỂ đến mức người vẽ không phải đoán: loại cụ thể (không phải "một ngôi nhà" mà "ngôi nhà sàn gỗ mái lá"), góc nhìn và dáng, hình phẳng ghép từ vài khối nào (một chiếc xe buýt = thân chữ nhật bo góc + cửa sổ vuông + hai bánh tròn), 2–3 đặc điểm giúp nhận ra ngay (kim tự tháp: khối tam giác màu cát, các bậc đá ngang, một mặt tối hơn), màu thật của vật, và có mặt hay không (luật 14). Không viết chung chung kiểu "hình minh hoạ về X", "biểu tượng của Y" — ý trừu tượng thì chọn MỘT vật cụ thể tượng trưng cho nó và tả vật đó. Tránh cảnh 3D, hạt/khói, ảnh chụp, và cử động phức tạp như nhảy múa hay đánh nhau.
+    Vật cụ thể chưa có trong danh sách thì mô tả nó CỤ THỂ đến mức người vẽ không phải đoán: loại cụ thể (không phải "một ngôi nhà" mà "ngôi nhà sàn gỗ mái lá"), góc nhìn và dáng, hình phẳng ghép từ vài khối nào (một chiếc xe buýt = thân chữ nhật bo góc + cửa sổ vuông + hai bánh tròn), 2–3 đặc điểm giúp nhận ra ngay (kim tự tháp: khối tam giác màu cát, các bậc đá ngang, một mặt tối hơn), màu thật của vật, và có mặt hay không (luật 14). Không viết chung chung kiểu "hình minh hoạ về X", "biểu tượng của Y" — ý trừu tượng thì chọn MỘT vật cụ thể tượng trưng cho nó và tả vật đó. Tránh cảnh 3D phối cảnh, ảnh chụp, và cử động phức tạp như nhảy múa hay đánh nhau. Quầng sáng, tia sáng, lớp tiền cảnh mờ, bụi phấn hay đốm sáng lơ lửng thì dựng tốt.
 
 19. **MINH HOẠ ĐÚNG CÁI ĐANG NÓI.** Đây là luật quan trọng nhất về nội dung hình. Khi THOẠI nhắc tới một người, một vật, một bộ phận cơ thể, một món ăn, một nơi chốn hay một việc đang xảy ra, HÌNH phải cho thấy CHÍNH thứ đó — hoặc một hình ảnh mà người xem nhận ra ngay là nó — chứ không phải một hình tròn hay mũi tên tượng trưng. Nói về sâu răng thì thấy chiếc răng, vi khuẩn, viên kẹo, bàn chải; nói về một ông cụ ngồi chờ thì thấy ông cụ ngồi bên bàn và chiếc đồng hồ. Phép thử: tắt tiếng, chỉ nhìn hình — người xem có đoán được câu thoại đang nói về cái gì không? Nếu không, vẽ lại shot đó. Hình trừu tượng chỉ dành cho ý tự nó trừu tượng, và ngay cả khi đó, gắn nó vào vật cụ thể đã có trên màn hình (con số hiện cạnh chiếc răng, không trôi giữa khung trống).
 
-`
+20. **CẢNH KÍN KHUNG, CÓ CHIỀU SÂU VÀ ÁNH SÁNG.** Không shot nào là một vật nhỏ lọt thỏm giữa nền một màu. Nhân vật đứng TRONG bối cảnh của cảnh (lớp xa, lớp giữa phía sau, lớp gần mờ phía trước), máy di chuyển qua các lớp đó, ánh sáng chỉ vào thứ quan trọng. Chuyển cảnh mạnh nhất cho phim kiểu này là đi xuyên qua: máy đẩy thẳng vào một chi tiết (quả sung, tế bào, ô cửa) và chi tiết đó mở ra thành bối cảnh của cảnh sau.
+
+{{frame_rules}}`
 
 const visualDirectorOutputProseVI = `## OUTPUT — KỊCH BẢN PHÂN CẢNH (KHÔNG PHẢI CODE)
 
@@ -400,6 +403,7 @@ CẢNH <n> — <tên beat, giữ đúng id beat của Story Architect>
 Ý nghĩa bất biến: <điều người xem BẮT BUỘC phải hiểu sau cảnh này — một câu. Đây là hợp đồng với bước dựng: người dựng được tự chọn cách thực hiện, nhưng KHÔNG được làm đổi ý nghĩa này.>
 Chuyển cảnh vào: <hình nào của cảnh trước trở thành gì ở cảnh này, bằng kiểu chuyển cảnh nào> (bỏ qua ở cảnh 1)
 Không khí: <cảm xúc và nhịp của cảnh — tò mò, căng dần, vỡ lẽ, lắng lại...>
+Bối cảnh: <nơi chốn kín khung; lớp xa / lớp giữa / lớp gần mờ; nguồn sáng; tông màu chủ đạo theo vai trò trong BẢNG MÀU>
 Các shot:
   <n>.1 | MÁY: <cỡ cảnh + chuyển động máy> | HÌNH: <nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp> | THOẠI: "<câu thoại>"
   <n>.2 | MÁY: ... | HÌNH: ... | THOẠI: "..."
@@ -423,9 +427,11 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
 12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Trước mỗi cú lật đã có nhịp cho người xem đoán chưa?
 13. Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không?
-14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D, hạt/khói, ảnh chụp, cử động phức tạp) không? Diễn đạt lại bằng tranh phẳng đơn giản.
+14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D phối cảnh, ảnh chụp, cử động phức tạp) không? Diễn đạt lại bằng tranh phẳng đơn giản.
 15. Tắt tiếng và chỉ nhìn HÌNH từng shot: có shot nào mà THOẠI nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng HÌNH lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 16. Mỗi vật cụ thể lần đầu xuất hiện đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
+17. Mỗi cảnh đã có "Bối cảnh" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) chưa? Có shot nào là vật nhỏ lọt thỏm giữa nền trống, hay vật chính nhỏ hơn 40% chiều khung ngoài toàn cảnh không? (luật 20)
+18. Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động chưa? Có shot nào khung đứng yên hoàn toàn quá 2 giây không?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
 
@@ -615,7 +621,7 @@ const remoAVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG T�
 
 1. **Một shot = một đoạn.** Mỗi dòng shot ¤<n>.<m> | MÁY | HÌNH | THOẠI¤ trở thành ĐÚNG MỘT phần tử trong ¤narrations¤ (chép nguyên câu THOẠI) và ĐÚNG MỘT component ¤Shot<n>_<m>¤ vẽ phần HÌNH. Giữ nguyên thứ tự. Không gộp hai shot, không tách một shot, không bỏ shot, không thêm shot.
 2. **HÌNH dựng đúng như chữ:** đúng những vật được nêu, đúng vị trí tương đối (bên phải, ngay dưới, sát mép trên...), đúng thứ tự xuất hiện, đúng kiểu chuyển động (mọc lên, trượt vào từ hướng nào, tách đôi, gộp lại, lấp đầy...), đúng nhịp (nhanh/chậm). KHÔNG thêm vật trang trí, hiệu ứng, icon, nền hoạ tiết mà kịch bản không nói tới. KHÔNG bỏ vật nào kịch bản có.
-3. **MÁY:** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → ¤transform: translate(...) scale(...)¤ nội suy theo frame trên MỘT ¤<div>¤ "camera" bọc toàn bộ nội dung của shot (xem luật L8). Máy đứng yên thì không transform.
+3. **MÁY:** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → prop ¤camera¤ của ¤<Scene>¤ (hoặc ¤<Camera>¤ khi shot không có Scene) — xem luật L8. "Máy đứng yên" vẫn cho máy trôi rất chậm (zoom 1 → 1.04) để cảnh có chiều sâu, trừ khi kịch bản nói rõ khung phải đứng im.
 4. **Chuyển cảnh vào:** biến hình / đi xuyên qua / kéo ra → frame 0 của shot sau PHẢI vẽ lại y hệt hình cuối của shot trước (cùng toạ độ, cùng kích thước, cùng màu — lấy từ cùng hằng số trong ¤LAYOUT¤), rồi nội suy sang hình mới. Chỉ "cắt thẳng" mới được bắt đầu từ khung trống.
 5. **Kết cảnh:** hình ghi ở "Kết cảnh" phải là thứ còn trên màn hình ở frame cuối của shot cuối cảnh đó.
 6. **Ý nghĩa bất biến:** nếu một chi tiết không dựng được chính xác bằng JSX/SVG/CSS, chọn cách gần nhất vẫn giữ nguyên dòng "Ý nghĩa bất biến" của cảnh — không đổi ý nghĩa.
@@ -636,7 +642,7 @@ const remoBVI = `## B. MÀU — CHÉP NGUYÊN BẢNG MÀU CỦA ĐẠO DIỄN
 
 const remoCVI = `## C. NHỮNG THỨ CỐ ĐỊNH — KHÔNG ĐƯỢC TỰ ĐẶT
 
-- **Nền:** ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤ cho toàn video. Cảnh mà kịch bản cho một nền màu riêng hay chia khung thành nhiều mảng màu → dùng ¤<Backdrop>¤ và ¤<Panel>¤ của bộ minh hoạ (mục C3), màu lấy từ ¤PALETTE¤. Ngoài hai component đó, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) thì có màu nền của nó từ ¤PALETTE¤.
+- **Nền và bối cảnh:** mỗi shot kể chuyện ở một nơi chốn được dựng trong ¤<Scene>¤ (mục C3) theo BỐI CẢNH của cảnh: ¤sky¤ là một ¤<Backdrop>¤ (gradient ¤color¤ → ¤to¤ theo tông của cảnh), ¤far¤/¤mid¤ là cảnh phía sau nhân vật, ¤near¤ là thứ sát ống kính (tự mờ), ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤ — mọi màu lấy từ ¤PALETTE¤. Shot của ý trừu tượng (đồ thị, con số, chia khung thành nhiều mảng màu) dùng ¤<Backdrop>¤ và ¤<Panel>¤, máy bằng ¤<Camera>¤. ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤ khi không có gì. Ngoài ¤Scene¤, ¤Backdrop¤, ¤Panel¤, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) thì có màu nền của nó từ ¤PALETTE¤.
 - **Font:** ¤<Stage>¤ đã đặt font Creator chọn ở bước cấu hình; mọi chữ tự thừa hưởng. KHÔNG đặt ¤fontFamily¤ ở đâu cả. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
 - **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤ theo cấu hình của Creator. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX). Chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
 - **Vùng phụ đề:** {{subtitle_zone}}
@@ -679,6 +685,7 @@ import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors,
 import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
 import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
 import {Backdrop, Person} from './conceptflow-mini/illustration';
+import {Camera} from './conceptflow-mini/scene';
 
 // BẢNG MÀU — chép nguyên từ kịch bản của Đạo diễn.
 const PALETTE = {
@@ -717,18 +724,18 @@ function Shot1_1({duration}: ShotProps) {
 // Shot 1.2 — MÁY: đẩy vào | HÌNH: hình vuông (giữ nguyên chỗ) chuyển sang màu mờ, nhãn hiện bên phải
 function Shot1_2({duration}: ShotProps) {
   const frame = useCurrentFrame();
-  const zoom = interpolate(frame, [0, duration * 0.8], [1, 1.3], {...clamp, easing: Easing.inOut(Easing.cubic)});
+  const {width, height} = useVideoConfig();
   const color = interpolateColors(frame, [0, duration * 0.4], [PALETTE.accent, PALETTE.muted]);
   const labelIn = interpolate(frame, [duration * 0.3, duration * 0.5], [0, 1], clamp);
   const {x, y, size} = LAYOUT.hero;
   return (
     <AbsoluteFill>
-      <div style={{position: 'absolute', inset: 0, transformOrigin: ¤${x}px ${y}px¤, transform: ¤scale(${zoom})¤}}>
+      <Camera duration={duration} from={{x: width / 2, y: height / 2, zoom: 1}} to={{x, y, zoom: 1.3}} end={0.8}>
         <div style={{position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, backgroundColor: color}} />
         <div style={{position: 'absolute', left: x + size / 2 + 32, top: y - 30, width: 360, fontSize: 44, fontWeight: 700, lineHeight: 1.25, color: PALETTE.ink, opacity: labelIn}}>
           Nhãn ngắn
         </div>
-      </div>
+      </Camera>
     </AbsoluteFill>
   );
 }
@@ -752,8 +759,8 @@ registerRoot(() => (
   <Composition
     id="creator"
     component={CreatorComposition}
-    width={1920}
-    height={1080}
+    width={{{frame_width}}}
+    height={{{frame_height}}}
     fps={30}
     durationInFrames={150}
     calculateMetadata={calculateMetadataFromSegments}
@@ -764,7 +771,7 @@ registerRoot(() => (
 Bắt buộc về cấu trúc:
 1. ¤export const narrations: string[]¤ — đúng một mảng, mỗi phần tử là câu THOẠI của một shot theo đúng thứ tự. Hệ thống lấy lời đọc TTS và phụ đề CHỈ từ mảng này. Thiếu hoặc rỗng là bị từ chối.
 2. ¤SHOTS.length === narrations.length¤, và ¤SHOTS[i]¤ vẽ đúng shot có câu thoại ¤narrations[i]¤.
-3. ¤<Composition id="creator" ...>¤ đúng ¤id="creator"¤, có ¤calculateMetadata={calculateMetadataFromSegments}¤, width 1920, height 1080, fps 30. Không tự đặt ¤durationInFrames¤ khác — độ dài thật do giọng đọc quyết định.
+3. ¤<Composition id="creator" ...>¤ đúng ¤id="creator"¤, có ¤calculateMetadata={calculateMetadataFromSegments}¤, width {{frame_width}}, height {{frame_height}}, fps 30. Không tự đặt ¤durationInFrames¤ khác — độ dài thật do giọng đọc quyết định.
 4. Toàn bộ nằm trong ¤<Stage>¤ → ¤<Segments>¤. Mỗi shot nhận ¤duration¤ = số frame THẬT của đoạn đó (không biết trước khi viết code) — mọi mốc thời gian trong shot tính theo TỈ LỆ của ¤duration¤ (vd. ¤duration * 0.3¤), không viết số frame cố định có thể vượt quá độ dài đoạn. Bên trong shot, ¤useCurrentFrame()¤ đếm từ 0 ở đầu shot.
 5. Ngay trên mỗi component shot có một comment ¤// Shot n.m — MÁY: ... | HÌNH: ...¤ tóm tắt đúng dòng kịch bản nó dựng.
 
@@ -775,17 +782,18 @@ const remoEVI = `## E. THƯ VIỆN ĐƯỢC IMPORT
 - ¤react¤.
 - ¤remotion¤ — mọi API của nó, hay dùng nhất: ¤AbsoluteFill¤, ¤interpolate¤, ¤interpolateColors¤, ¤spring¤, ¤Easing¤, ¤useCurrentFrame¤, ¤useVideoConfig¤, ¤random¤ (ngẫu nhiên có seed).
 - ¤./conceptflow-mini/segments¤: ¤Segments¤, ¤calculateMetadataFromSegments¤.
-- ¤./conceptflow-mini/primitives¤: ¤Stage¤, ¤SAFE_MARGIN¤ (96), ¤WIDTH¤ (1920), ¤HEIGHT¤ (1080), ¤BACKGROUND¤.
+- ¤./conceptflow-mini/primitives¤: ¤Stage¤, ¤BACKGROUND¤, ¤useFrameBox()¤ (kích thước khung và vùng an toàn của video này); ¤WIDTH¤ (1920), ¤HEIGHT¤ (1080), ¤SAFE_MARGIN¤ (96) chỉ đúng với khung ngang — trong shot dùng ¤useVideoConfig()¤ để lấy ¤width¤, ¤height¤.
 - ¤./conceptflow-mini/illustration¤: bộ minh hoạ phẳng ở mục C3.
+- ¤./conceptflow-mini/scene¤: ¤Scene¤, ¤Camera¤, ¤Glow¤, ¤LightRays¤, ¤Vignette¤, ¤KeywordText¤ ở mục C3.
 - KHÔNG import package nào khác (chưa được cài — build lỗi ngay). KHÔNG ảnh/video/font/âm thanh từ file hay URL (không ¤<Img>¤, ¤staticFile¤, ¤fetch¤). Hình vẽ bằng JSX + CSS hoặc SVG inline (¤<svg>¤, ¤<path>¤, ¤<circle>¤, ¤<line>¤, ¤<rect>¤, ¤<polygon>¤, ¤<text>¤).
 
 `
 
 const remoFVI = `## F. LUẬT BỐ CỤC — CHỐNG ĐÈ CHỮ, TRÀN KHUNG, LỆCH HÌNH
 
-Khung hình 1920×1080, gốc toạ độ ở góc trên-trái, trục y đi xuống.
+Khung hình {{frame}}, gốc toạ độ ở góc trên-trái, trục y đi xuống.
 
-L1. **Vùng an toàn.** Mọi vật và chữ có nghĩa nằm TRỌN trong hình chữ nhật từ (96, 96) đến (1824, 984) — tức cách mỗi mép ít nhất ¤SAFE_MARGIN¤ — và cả vùng phụ đề ở mục C. Kiểm tra ở CẢ vị trí đầu, vị trí cuối, và lúc vật to nhất (spring có thể vọt quá 1 một chút — chừa thêm 5%). Ngoại lệ duy nhất: vật kịch bản nói rõ là "trượt vào từ ngoài khung" / "trượt ra khỏi khung".
+L1. **Vùng an toàn.** Mọi vật và chữ có nghĩa nằm TRỌN trong hình chữ nhật từ {{safe_area}} — và ngoài vùng phụ đề ở mục C. Kiểm tra ở CẢ vị trí đầu, vị trí cuối, và lúc vật to nhất (spring có thể vọt quá 1 một chút — chừa thêm 5%). Ngoại lệ: vật kịch bản nói rõ là "trượt vào từ ngoài khung" / "trượt ra khỏi khung"; các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤ và ánh sáng (¤Glow¤, ¤LightRays¤, ¤Vignette¤) là phông cảnh, được tràn mép.
 
 L2. **Một gốc bố cục cho mỗi shot.** Mỗi shot trả về MỘT ¤<AbsoluteFill>¤ duy nhất. Không đặt hai ¤<AbsoluteFill>¤ có nội dung làm anh em — chúng chồng khít lên nhau.
 
@@ -804,7 +812,7 @@ L6. **Nhãn đi theo vật.** Nhãn gắn với một vật thì nằm TRONG cù
 
 L7. **Độ tương phản.** Chữ luôn dùng màu vai trò sáng trong ¤PALETTE¤ và không bao giờ nằm trên một mảng cùng tông. Chữ đặt lên một khối màu → màu chữ phải khác hẳn độ sáng của khối.
 
-L8. **Máy quay.** Chuyển động máy = một ¤<div style={{position: 'absolute', inset: 0, transformOrigin, transform}}>¤ bọc mọi vật của shot. ¤transformOrigin¤ đặt ở điểm máy đẩy vào (toạ độ px của vật trọng tâm). Không lồng nhiều lớp scale. Sau khi zoom, vật trọng tâm và nhãn của nó vẫn phải nằm trong vùng an toàn (tính: vị trí sau zoom = origin + (vị trí − origin) × scale).
+L8. **Máy quay.** Chuyển động máy = prop ¤camera={{from: {x, y, zoom}, to: {x, y, zoom}, start, end}}¤ của ¤<Scene>¤, hoặc ¤<Camera duration from to start end>¤ bọc mọi vật khi shot không có Scene — KHÔNG tự viết ¤div¤ transform. ¤(x, y)¤ là điểm hiện ở GIỮA khung, ¤zoom¤ ≥ 1; điểm máy nhìn vào là toạ độ của vật trọng tâm. Không lồng Camera trong Scene. Sau khi zoom, vật trọng tâm và nhãn của nó vẫn phải nằm trong vùng an toàn (vị trí trên màn hình = giữa khung + (vị trí − (x, y)) × zoom).
 
 L9. **Chuyển động theo frame, tất định.**
   - Mọi chuyển động tính từ ¤useCurrentFrame()¤. KHÔNG dùng CSS ¤transition¤/¤animation¤/¤@keyframes¤, ¤setTimeout¤, ¤useEffect¤ để tạo chuyển động.
@@ -821,7 +829,11 @@ L12. **Ký tự cấm trong chữ JSX.** Chữ nằm GIỮA hai thẻ JSX không
 
 L13. **TypeScript sạch.** Không ¤any¤ ẩn gây lỗi build; hằng số ¤as const¤ khi cần kiểu literal; không biến khai báo mà không dùng tới trong import (bỏ import thừa).
 
-L14. **Kích thước tối thiểu — chống khung trống.** Vật đang là TRỌNG TÂM của shot (vật gắn với mục ¤LAYOUT¤ chính của shot, hoặc vật lớn nhất khi shot chỉ có một vật) phải có ¤size¤/¤width¤ hoặc ¤height¤ tối thiểu khoảng 30% chiều tương ứng của khung (≥ khoảng 320px chiều cao cho trung cảnh/cận cảnh trên khung 1080px cao) — trừ khi kịch bản ghi rõ đây là toàn cảnh nhiều vật nhỏ, hoặc vật đang "trượt vào/trượt ra khỏi khung". Không dựng một shot mà phần lớn khung 1920×1080 chỉ là nền phẳng một màu với một vật nhỏ lọt thỏm giữa khoảng trống — nếu ¤LAYOUT¤ ghi ¤size¤ nhỏ hơn mức này cho vật trọng tâm của shot đang viết, phóng to nó lên khi vẽ (giữ tâm ¤x, y¤, chỉ đổi kích thước hiển thị), không chép nguyên số nhỏ.
+L14. **Kích thước tối thiểu — chống khung trống.** Vật đang là TRỌNG TÂM của shot (vật gắn với mục ¤LAYOUT¤ chính của shot, hoặc vật lớn nhất khi shot chỉ có một vật) phải có ¤size¤/¤width¤ hoặc ¤height¤ tối thiểu khoảng 40% chiều tương ứng của khung ở trung cảnh/cận cảnh — trừ khi kịch bản ghi rõ đây là toàn cảnh nhiều vật nhỏ, hoặc vật đang "trượt vào/trượt ra khỏi khung". Không dựng một shot mà phần lớn khung chỉ là nền phẳng một màu với một vật nhỏ lọt thỏm giữa khoảng trống — nếu ¤LAYOUT¤ ghi ¤size¤ nhỏ hơn mức này cho vật trọng tâm của shot đang viết, phóng to nó lên khi vẽ (giữ tâm ¤x, y¤, chỉ đổi kích thước hiển thị), không chép nguyên số nhỏ.
+
+L15. **Khung không đứng yên.** Không đoạn nào quá 2 giây mà khung hình đứng yên hoàn toàn: luôn có máy trôi (Scene/Camera), nhân vật cử động (¤talking¤, ¤pose¤ đổi, vật dời chỗ), hay ánh sáng thở (¤Glow pulse¤). Chuyển động chính vẫn xong trước ~85% ¤duration¤ (L9); phần còn lại là máy trôi chậm.
+
+{{frame_rules}}
 
 `
 
@@ -835,7 +847,8 @@ const remoGVI = `## G. TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mụ
 6. Có ¤fontFamily¤ nào, ¤backgroundColor¤ phủ toàn khung nào, hay ¤{narrations[...]}¤ nào trong JSX không? Nếu có → xoá.
 7. Với từng shot, liệt kê hộp bao các vật cùng lúc trên màn hình: có hai hộp nào giao nhau ngoài ý đồ kịch bản? Có hộp nào ra ngoài vùng an toàn hay lấn vào vùng phụ đề — kể cả lúc zoom lớn nhất?
 8. Với từng khối chữ: ước lượng bề rộng/chiều cao theo L5 — có tràn ¤width¤ hay đè xuống vật bên dưới không? Có chữ nào dưới 32px?
-8b. Theo L14: vật trọng tâm của từng shot có đạt kích thước tối thiểu (khoảng 30% chiều khung, ~320px trở lên ở trung/cận cảnh) không, hay phần lớn khung đang là nền phẳng trống với một vật nhỏ lọt thỏm? Nếu ¤LAYOUT¤ ghi size nhỏ hơn mức đó cho vật đang vẽ, đã phóng to nó lên khi dựng thay vì chép nguyên số chưa?
+8b. Theo L14: vật trọng tâm của từng shot có đạt kích thước tối thiểu (khoảng 40% chiều khung ở trung/cận cảnh) không, hay phần lớn khung đang là nền phẳng trống với một vật nhỏ lọt thỏm? Nếu ¤LAYOUT¤ ghi size nhỏ hơn mức đó cho vật đang vẽ, đã phóng to nó lên khi dựng thay vì chép nguyên số chưa?
+8c. Shot kể chuyện ở một nơi chốn đã dựng trong ¤<Scene>¤ đủ lớp theo bối cảnh của cảnh, máy bằng prop ¤camera¤ (L8), và không đoạn nào đứng yên quá 2 giây (L15) chưa?
 9. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
 10. Chỉ import từ ¤react¤, ¤remotion¤ và ¤./conceptflow-mini/*¤ (kể cả ¤lottie¤, ¤illustration¤)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
 10b. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong HÌNH mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như HÌNH mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?

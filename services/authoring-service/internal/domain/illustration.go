@@ -19,6 +19,18 @@ var illustrationStyleVI string
 //go:embed prompts/illustration_helpers_vi.txt
 var illustrationHelpersVI string
 
+//go:embed prompts/backdrop_style_vi.txt
+var backdropStyleVI string
+
+//go:embed prompts/backdrop_helpers_vi.txt
+var backdropHelpersVI string
+
+// BackdropStyleGuide is the rule text of a backdrop ([B..] on top of [S..]).
+func BackdropStyleGuide() string { return strings.TrimSpace(backdropStyleVI) }
+
+// BackdropHelpers documents what a new backdrop is built from, with its frame.
+func BackdropHelpers() string { return strings.TrimSpace(backdropHelpersVI) }
+
 // IllustrationStyleGuide is the rule text, as shown to the Creator and the model.
 func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyleVI) }
 
@@ -58,16 +70,37 @@ const (
 	IllustrationApproved IllustrationStatus = "approved" // offered to the Remotion Engineer
 )
 
+// IllustrationKind is what a library drawing is for.
+type IllustrationKind string
+
+const (
+	// IllustrationFigure is a figure placed in a shot (a person, a fig, a bus).
+	IllustrationFigure IllustrationKind = "figure"
+	// IllustrationBackdrop is a place that fills the whole frame, drawn in the
+	// depth layers of a Scene (sky, far, mid, near).
+	IllustrationBackdrop IllustrationKind = "backdrop"
+)
+
+// KindOrFigure is k, or IllustrationFigure for an empty or unknown kind.
+func KindOrFigure(k IllustrationKind) IllustrationKind {
+	if k == IllustrationBackdrop {
+		return k
+	}
+	return IllustrationFigure
+}
+
 // Illustration is one drawing of the library.
 type Illustration struct {
-	ID          string   `json:"id"`
-	Name        string   `json:"name"` // the exported component, PascalCase
-	Title       string   `json:"title"`
-	FolderID    string   `json:"folder_id"`
-	Tags        []string `json:"tags"`
-	Description string   `json:"description"` // what it looks like and when to use it
-	Usage       string   `json:"usage"`       // one-line API: props and box aspect
-	Code        string   `json:"code,omitempty"`
+	ID string `json:"id"`
+	// Kind says whether the drawing is a figure or a backdrop.
+	Kind        IllustrationKind `json:"kind"`
+	Name        string           `json:"name"` // the exported component, PascalCase
+	Title       string           `json:"title"`
+	FolderID    string           `json:"folder_id"`
+	Tags        []string         `json:"tags"`
+	Description string           `json:"description"` // what it looks like and when to use it
+	Usage       string           `json:"usage"`       // one-line API: props and box aspect
+	Code        string           `json:"code,omitempty"`
 	// Builtin rows are the illustration kit: code ships in the image, Code is empty.
 	Builtin bool `json:"builtin"`
 	// Exemplar rows are the Hình mẫu the AI drawer learns from, filed
@@ -186,7 +219,7 @@ func SystemIllustrationFolders() []IllustrationFolder {
 		{ID: "tien-kinh-te", Name: "Tiền & kinh tế", Description: "tiền, ví, biểu đồ giá, cửa hàng, thẻ"},
 		{ID: "khoa-hoc-cong-nghe", Name: "Khoa học & công nghệ", Description: "máy tính, điện thoại, ống nghiệm, nguyên tử"},
 		{ID: "bieu-tuong", Name: "Biểu tượng", Description: "dấu tích/sai, tim, bóng đèn, lấp lánh, bong bóng thoại"},
-		{ID: "boi-canh", Name: "Bối cảnh", Description: "nền màu, mảng màu, màn chia đôi"},
+		{ID: "boi-canh", Name: "Bối cảnh", Description: "nền môi trường kín khung (ngoài trời, trong nhà, bên trong cơ thể, dưới nước, vũ trụ), nền màu, mảng màu"},
 	}
 	for i := range rows {
 		rows[i].Position = i + 1
@@ -195,8 +228,26 @@ func SystemIllustrationFolders() []IllustrationFolder {
 	return rows
 }
 
-// BuiltinIllustrations are the 34 figures of the illustration kit, filed into the
-// system folders. Name must match an export of illustration.tsx; the rendering
+// SceneKitComponents are the frame-level parts of the kit
+// (rendering/remotion_project/src/conceptflow-mini/scene.tsx): the depth
+// layers, the camera, the light and the keyword text. The prompt documents
+// them next to the figures, but they are the stage a shot is built on, not
+// drawings, so they have no library row and no narration keywords.
+var SceneKitComponents = []string{"Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText"}
+
+// IsSceneKitComponent reports whether name is one of SceneKitComponents.
+func IsSceneKitComponent(name string) bool {
+	for _, c := range SceneKitComponents {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+// BuiltinIllustrations are the 34 figures and the 6 backdrops of the kit,
+// filed into the system folders. Name must match an export of illustration.tsx
+// or backdrops.tsx; the rendering
 // test suite checks the kit against the prompt, and illustration_test.go
 // checks this list against the same prompt text.
 func BuiltinIllustrations() []Illustration {
@@ -206,6 +257,11 @@ func BuiltinIllustrations() []Illustration {
 			Tags: NormalizeTags(strings.Split(tags, ",")), Description: desc, Usage: usage,
 			Builtin: true, Status: IllustrationApproved, Version: 1,
 		}
+	}
+	bd := func(name, title, tags, desc string) Illustration {
+		row := b(name, title, "boi-canh", tags, desc, "<Scene backdrop={"+name+"} backdropProps={{color, ground, light}} /> — kín khung")
+		row.Kind = IllustrationBackdrop
+		return row
 	}
 	return []Illustration{
 		b("Backdrop", "Nền màu phẳng", "boi-canh", "nền,sàn,phòng", "Nền màu phẳng phủ cả khung, tuỳ chọn một dải sàn.", "<Backdrop color floor floorY />"),
@@ -242,5 +298,11 @@ func BuiltinIllustrations() []Illustration {
 		b("Bubble", "Bong bóng thoại", "bieu-tuong", "nói,thoại,suy nghĩ", "Bong bóng thoại/suy nghĩ chứa nhãn ngắn.", "<Bubble x y w h thought flip>Nhãn</Bubble>"),
 		b("Toothbrush", "Bàn chải đánh răng", "co-the-suc-khoe", "bàn chải,đánh răng,vệ sinh", "Bàn chải có kem, lông quay lên hoặc xuống.", "<Toothbrush color paste bristlesDown /> — 400×100"),
 		b("Toothpaste", "Kem đánh răng", "co-the-suc-khoe", "kem đánh răng,vệ sinh", "Tuýp kem đánh răng.", "<Toothpaste color /> — 300×120"),
+		bd("MeadowBackdrop", "Đồng cỏ ngày nắng", "ngoài trời,đồng cỏ,đồi,cây,trời", "Trời và mặt trời, đồi xa, cây hai bên, cỏ phía trước."),
+		bd("RoomBackdrop", "Căn phòng", "trong nhà,phòng,cửa sổ,kệ,nhà", "Tường ấm, cửa sổ nắng, kệ sách bên cạnh, mép bàn phía trước."),
+		bd("StreetBackdrop", "Đường phố", "phố,thành phố,nhà,đèn đường", "Dãy nhà có cửa sổ sáng đèn, vỉa hè, cột đèn, bụi cây phía trước."),
+		bd("InsideBodyBackdrop", "Bên trong cơ thể", "cơ thể,tế bào,mạch máu,bên trong", "Mô ấm sáng từ trong, tế bào trôi, thành mạch, tế bào lớn sát ống kính."),
+		bd("UnderwaterBackdrop", "Dưới nước", "biển,dưới nước,rong,san hô", "Ánh sáng từ mặt nước, đá xa, rong biển đung đưa, bọt nước."),
+		bd("SpaceBackdrop", "Vũ trụ", "vũ trụ,sao,hành tinh,không gian", "Trời sao, hành tinh có vành, thiên thạch trôi gần."),
 	}
 }

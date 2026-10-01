@@ -157,6 +157,7 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 	req := CodeGenRequest{
 		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
 		System: system, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
+		Frame: domain.FrameFor(project.VideoOutputMode),
 	}
 	if project.RenderEngine == domain.RenderEngineRemotion {
 		// The same subtitle strip {{subtitle_zone}} told the model

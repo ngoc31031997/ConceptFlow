@@ -17,20 +17,22 @@ import (
 
 const illustrationColumns = `id, name, title, folder_id, tags, description, usage, code, builtin, exemplar,
 	COALESCE(source_id, ''), COALESCE(home_folder_id, ''), warnings, status, version,
-	(preview_png IS NOT NULL AND preview_version = version), created_at, updated_at`
+	(preview_png IS NOT NULL AND preview_version = version), created_at, updated_at, kind`
 
 func scanIllustration(row pgx.Row) (domain.Illustration, error) {
 	var i domain.Illustration
-	var status string
+	var status, kind string
 	var created, updated time.Time
 	if err := row.Scan(&i.ID, &i.Name, &i.Title, &i.FolderID, &i.Tags, &i.Description, &i.Usage, &i.Code,
-		&i.Builtin, &i.Exemplar, &i.SourceID, &i.HomeFolderID, &i.Warnings, &status, &i.Version, &i.HasPreview, &created, &updated); err != nil {
+		&i.Builtin, &i.Exemplar, &i.SourceID, &i.HomeFolderID, &i.Warnings, &status, &i.Version, &i.HasPreview, &created, &updated,
+		&kind); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return domain.Illustration{}, application.ErrIllustrationNotFound
 		}
 		return domain.Illustration{}, err
 	}
 	i.Status = domain.IllustrationStatus(status)
+	i.Kind = domain.KindOrFigure(domain.IllustrationKind(kind))
 	if i.Tags == nil {
 		i.Tags = []string{}
 	}
@@ -83,14 +85,15 @@ func (r *PromptTemplateRepository) SeedIllustrations(ctx context.Context) error 
 	// The kit.
 	for _, b := range domain.BuiltinIllustrations() {
 		if _, err := r.pool.Exec(ctx, `
-			INSERT INTO illustrations (id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, status, version)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, 'approved', 1)
-			ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, folder_id = EXCLUDED.folder_id,
+			INSERT INTO illustrations (id, name, title, folder_id, tags, description, usage, code, builtin, exemplar, status, version, kind)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, $9, 'approved', 1, $10)
+			ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, folder_id = EXCLUDED.folder_id, kind = EXCLUDED.kind,
 			    tags = EXCLUDED.tags, description = EXCLUDED.description, usage = EXCLUDED.usage,
 			    exemplar = EXCLUDED.exemplar, code = EXCLUDED.code,
 			    version = illustrations.version + (illustrations.code IS DISTINCT FROM EXCLUDED.code)::int,
 			    updated_at = now()
-		`, b.ID, b.Name, b.Title, b.FolderID, b.Tags, b.Description, b.Usage, b.Code, b.Exemplar); err != nil {
+		`, b.ID, b.Name, b.Title, b.FolderID, b.Tags, b.Description, b.Usage, b.Code, b.Exemplar,
+			string(domain.KindOrFigure(b.Kind))); err != nil {
 			if errors.Is(mapIllustrationErr(err), application.ErrIllustrationNameTaken) {
 				continue
 			}
@@ -162,10 +165,10 @@ func (r *PromptTemplateRepository) GetIllustration(ctx context.Context, id strin
 
 func (r *PromptTemplateRepository) CreateIllustration(ctx context.Context, i domain.Illustration) (domain.Illustration, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, status, version, warnings)
-		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, $8, $9, $10)
+		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, status, version, warnings, kind)
+		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, $8, $9, $10, $11)
 		RETURNING `+illustrationColumns, i.Name, i.Title, i.FolderID, i.Tags, i.Description, i.Usage, i.Code,
-		string(i.Status), i.Version, findings(i.Warnings))
+		string(i.Status), i.Version, findings(i.Warnings), string(domain.KindOrFigure(i.Kind)))
 	out, err := scanIllustration(row)
 	return out, mapIllustrationErr(err)
 }
@@ -173,10 +176,10 @@ func (r *PromptTemplateRepository) CreateIllustration(ctx context.Context, i dom
 func (r *PromptTemplateRepository) UpdateIllustration(ctx context.Context, i domain.Illustration) (domain.Illustration, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE illustrations SET name = $2, title = $3, folder_id = $4, tags = COALESCE($5::text[], '{}'), description = $6, usage = $7,
-		    code = $8, status = $9, version = $10, warnings = $11, updated_at = now()
+		    code = $8, status = $9, version = $10, warnings = $11, kind = $12, updated_at = now()
 		WHERE id = $1 AND NOT builtin
 		RETURNING `+illustrationColumns, i.ID, i.Name, i.Title, i.FolderID, i.Tags, i.Description, i.Usage, i.Code,
-		string(i.Status), i.Version, findings(i.Warnings))
+		string(i.Status), i.Version, findings(i.Warnings), string(domain.KindOrFigure(i.Kind)))
 	out, err := scanIllustration(row)
 	return out, mapIllustrationErr(err)
 }
@@ -259,10 +262,10 @@ func (r *PromptTemplateRepository) CreateExemplar(ctx context.Context, i domain.
 	}
 	out, err := scanIllustration(tx.QueryRow(ctx, `
 		INSERT INTO illustrations (name, title, folder_id, tags, description, usage, code, builtin, exemplar,
-		    source_id, home_folder_id, status, version, warnings)
-		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, true, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12)
+		    source_id, home_folder_id, status, version, warnings, kind)
+		VALUES ($1, $2, $3, COALESCE($4::text[], '{}'), $5, $6, $7, false, true, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12, $13)
 		RETURNING `+illustrationColumns, i.Name, i.Title, domain.ExemplarFolderID, i.Tags, i.Description, i.Usage, i.Code,
-		i.SourceID, i.HomeFolderID, string(i.Status), i.Version, findings(i.Warnings)))
+		i.SourceID, i.HomeFolderID, string(i.Status), i.Version, findings(i.Warnings), string(domain.KindOrFigure(i.Kind))))
 	if err != nil {
 		return out, mapIllustrationErr(err)
 	}

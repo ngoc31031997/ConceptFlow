@@ -121,24 +121,28 @@ export function GroundShadow({cx, cy, rx}: {cx: number; cy: number; rx: number})
 // --- scene ------------------------------------------------------------------
 
 /**
- * A full-frame flat background for an illustrated scene, painted over the
- * Stage's default. `floor` adds a flat floor band from `floorY` down, the way
- * a story-book room sits its furniture on one line.
+ * A full-frame background for an illustrated scene, painted over the Stage's
+ * default. `to` turns it into a soft top-to-bottom gradient from `color` to
+ * `to` (a sky, a glowing interior). `floor` adds a flat floor band from
+ * `floorY` down, the way a story-book room sits its furniture on one line.
  */
 export function Backdrop({
   color = '#FFC857',
+  to,
   floor,
   floorY = 820,
   opacity = 1,
 }: {
   color?: string;
+  to?: string;
   floor?: string;
   floorY?: number;
   opacity?: number;
 }) {
+  const fill = to ? {backgroundImage: `linear-gradient(180deg, ${color} 0%, ${to} 100%)`} : {backgroundColor: color};
   return (
     <AbsoluteFill style={{opacity}}>
-      <div style={{position: 'absolute', inset: 0, backgroundColor: color}} />
+      <div style={{position: 'absolute', inset: 0, ...fill}} />
       {floor ? (
         <div style={{position: 'absolute', left: 0, right: 0, top: floorY, bottom: 0, backgroundColor: floor}} />
       ) : null}

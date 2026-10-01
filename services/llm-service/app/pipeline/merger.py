@@ -12,6 +12,7 @@ import json
 import re
 from dataclasses import dataclass
 
+from app.frame import LANDSCAPE, Frame
 from app.pipeline import naming
 from app.storyboard import Storyboard
 
@@ -64,11 +65,22 @@ ILLUSTRATION_KIT = (
     "Chair", "Window", "Plant", "House", "Tree", "Sun", "Cloud", "Lightbulb", "Coin", "Book",
     "Phone", "Magnifier", "Mark", "Sparkle", "Airplane", "Bubble",
 )
+# Every component of conceptflow-mini/scene.tsx: the depth layers, the camera,
+# the light and the keyword text. Held to the file by the same test.
+SCENE_KIT = ("Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText")
 # The building blocks a library drawing (pasted into the script) uses.
 ILLUSTRATION_HELPERS = (
     "Figure", "Face", "GroundShadow", "useBlink", "phaseOf", "shadeOf", "useSvgId",
     "INK", "SHADE", "BLUSH", "WHITE",
 )
+# Every backdrop of conceptflow-mini/backdrops.tsx: whole-frame places a Scene
+# draws in its depth layers. Held to the file by the same test.
+BACKDROP_KIT = (
+    "MeadowBackdrop", "RoomBackdrop", "StreetBackdrop", "InsideBodyBackdrop", "UnderwaterBackdrop",
+    "SpaceBackdrop",
+)
+# Hooks of the scene kit a library backdrop drawing uses.
+SCENE_HELPERS = ("useCamera", "useLayerBox")
 
 _REMOTION_HEAD = """import React from 'react';
 import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
@@ -77,6 +89,8 @@ import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
 import {LottieClip} from './conceptflow-mini/lottie';
 """ + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n" + (
     "import type {FigureProps, Mood, PersonPose} from './conceptflow-mini/illustration';\n"
+    "import {" + ", ".join(SCENE_KIT + SCENE_HELPERS) + "} from './conceptflow-mini/scene';\n"
+    "import {" + ", ".join(BACKDROP_KIT) + "} from './conceptflow-mini/backdrops';\n"
 )
 
 _REMOTION_TAIL = """
@@ -97,8 +111,8 @@ registerRoot(() => (
   <Composition
     id="creator"
     component={CreatorComposition}
-    width={1920}
-    height={1080}
+    width={WIDTH_PX}
+    height={HEIGHT_PX}
     fps={30}
     durationInFrames={150}
     calculateMetadata={calculateMetadataFromSegments}
@@ -139,7 +153,7 @@ def remotion_stub(shot_id: str) -> str:
 
 
 _IMPORT_LINE = re.compile(r"^\s*import\b[^;]*;?\s*$", re.M)
-_TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b")
+_TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b|backdrop=\{([A-Z][A-Za-z0-9]*)\}")
 
 
 def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
@@ -149,7 +163,8 @@ def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
     `export` is dropped so the only exports stay the frame's."""
     used = set()
     for code in shots.values():
-        used.update(_TAG.findall(code))
+        for tag, backdrop in _TAG.findall(code):
+            used.add(tag or backdrop)
     blocks = []
     for name in sorted(n for n in library if n in used):
         code = _IMPORT_LINE.sub("", library[name])
@@ -160,8 +175,10 @@ def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
 
 def merge_remotion(
     sb: Storyboard, layout: str, shots: dict[str, str], *, stub_missing: bool = False,
-    library: dict[str, str] | None = None,
+    library: dict[str, str] | None = None, canvas: Frame = LANDSCAPE,
 ) -> Merged:
+    """The whole Remotion script: the fixed frame around `layout` and the shot
+    functions, in storyboard order, registered as a `canvas`-sized composition."""
     ordered = [sh.id for _, sh in sb.all_shots()]
     missing = [i for i in ordered if i not in shots]
     if missing and not stub_missing:
@@ -191,7 +208,8 @@ def merge_remotion(
         text += code + "\n\n"
         line += n + 1
     names = ", ".join(remotion_fn(s) for s in ordered)
-    text += f"const SHOTS: React.FC<ShotProps>[] = [{names}];\n" + _REMOTION_TAIL
+    tail = _REMOTION_TAIL.replace("WIDTH_PX", str(canvas.width)).replace("HEIGHT_PX", str(canvas.height))
+    text += f"const SHOTS: React.FC<ShotProps>[] = [{names}];\n" + tail
     return Merged(code=text, lines=lines)
 
 

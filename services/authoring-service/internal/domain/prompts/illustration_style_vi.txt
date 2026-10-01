@@ -1,17 +1,17 @@
 # LUẬT STYLE HÌNH MINH HOẠ CỦA KÊNH
 
-Mọi hình trong thư viện phải trông như do CÙNG MỘT NGƯỜI vẽ: tranh vector phẳng kiểu truyện tranh thiếu nhi được làm động, giống kênh "Vẽ Chuyện". Luật dưới đây áp dụng cho hình AI vẽ, hình bạn tự viết code và hình SVG tải lên. Mã [S..] là mã luật mà bộ kiểm tra tự động dùng khi báo lỗi hay cảnh báo.
+Mọi hình trong thư viện phải trông như do CÙNG MỘT NGƯỜI vẽ: tranh vector phẳng kiểu truyện tranh thiếu nhi được làm động, màu bão hoà, có ánh sáng mềm (bóng, điểm sáng, quầng sáng), giống kênh "Vẽ Chuyện". Luật dưới đây áp dụng cho hình AI vẽ, hình bạn tự viết code và hình SVG tải lên. Mã [S..] là mã luật mà bộ kiểm tra tự động dùng khi báo lỗi hay cảnh báo.
 
 ## 1. Hình khối
-- [S1] PHẲNG: mỗi mảng là một màu đặc. KHÔNG gradient (linearGradient, radialGradient), KHÔNG pattern, KHÔNG filter (blur, drop-shadow, glow), KHÔNG ảnh nhúng (<image>), KHÔNG chữ vẽ trong hình (<text>, foreignObject). → LỖI, chặn lưu.
+- [S1] KHỐI PHẲNG, ÁNH SÁNG MỀM: mảng chính là màu đặc; gradient (linearGradient, radialGradient) chỉ dùng cho bóng mềm, điểm sáng và quầng sáng, TỐI ĐA 4 gradient một hình (quá thì cảnh báo); làm mờ chỉ bằng <filter> chứa <feGaussianBlur> (quầng sáng, vệt sáng). KHÔNG pattern, KHÔNG bộ lọc nào khác (feDropShadow, feTurbulence...), KHÔNG ảnh nhúng (<image>), KHÔNG chữ vẽ trong hình (<text>, foreignObject). → LỖI, chặn lưu.
 - [S2] KHÔNG VIỀN quanh khối: khối có màu (fill) không có stroke. Nét (stroke) chỉ dùng cho chi tiết mảnh: mắt nhắm, miệng, lông mày, que, dây, tia sáng, lông bàn chải. → cảnh báo.
 - [S3] BO TRÒN: góc chữ nhật có rx ≥ 6 (khối lớn rx 20–40); đầu nét strokeLinecap="round", góc nét strokeLinejoin="round". Tránh góc nhọn trừ khi vật thật sự nhọn (gai, mũi tên, mái nhà). → cảnh báo.
 - [S4] ÍT CHI TIẾT: một vật 5–25 hình con là đủ. Không vẽ hoạ tiết nhỏ hơn 1/40 cạnh hộp, vì chúng biến mất khi hình nhỏ trên màn hình. → cảnh báo khi quá 60 hình con.
 - [S5] HÌNH KHỐI TO, RÕ SILHOUETTE: nhìn bóng đen của hình vẫn đoán được là vật gì. Ưu tiên góc nhìn thẳng hoặc nhìn ngang, không phối cảnh 3D, không nghiêng xa gần.
 
 ## 2. Tô bóng
-- [S6] MỘT MẢNG BÓNG cho mỗi khối lớn, cùng phía PHẢI (hoặc phải-dưới) cho cả kênh: màu thân tối đi 10–20% bằng shadeOf(màu, -0.12), hoặc một hình màu đen opacity 0.06–0.12 đè lên. Không tô bóng hai phía.
-- [S7] ĐIỂM SÁNG tuỳ chọn: một vệt trắng opacity 0.3–0.5 ở phía TRÁI-TRÊN cho vật bóng (táo, kẹo, kính).
+- [S6] MỘT MẢNG BÓNG cho mỗi khối lớn, cùng phía PHẢI (hoặc phải-dưới) cho cả kênh — ánh sáng đến từ TRÁI-TRÊN: màu thân tối đi 10–20% bằng shadeOf(màu, -0.12), một hình màu đen opacity 0.06–0.12 đè lên, hoặc một gradient tuyến tính từ màu thân sang shadeOf(màu, -0.18) theo hướng trái-trên → phải-dưới. Không tô bóng hai phía.
+- [S7] ĐIỂM SÁNG VÀ VIỀN SÁNG tuỳ chọn: một vệt trắng opacity 0.3–0.5 ở phía TRÁI-TRÊN cho vật bóng (táo, kẹo, kính, vỏ côn trùng); vật phát sáng hoặc đứng trước nguồn sáng có thể có một quầng radialGradient màu sáng, mờ dần ra ngoài, hoặc một viền sáng mảnh ở mép trái-trên.
 - [S8] BÓNG ĐỔ dưới vật đứng trên sàn: <GroundShadow cx cy rx /> (elip đen opacity 0.12) ở đáy hộp. Vật bay/lơ lửng thì không có.
 
 ## 3. Màu
@@ -38,6 +38,8 @@ Bảng màu kênh (mặc định cho hình):
 - [S20] Chuyển động NHỎ và ĐỀU: không quá 5% cạnh hộp, lặp liền mạch, không giật. Mọi chuyển động tắt được bằng prop still.
 - [S21] Trạng thái mang nghĩa là PROP, không phải chuyển động tự động: mood, open, decay, on, level... để Kỹ sư điều khiển theo câu thoại.
 - [S22] Chỉ dùng useCurrentFrame, interpolate, spring của remotion. KHÔNG Math.random, Date.now, CSS animation, setTimeout. → LỖI.
+
+- [S25] Id của gradient, filter, clipPath, mask PHẢI sinh bằng const id = useSvgId('ten') rồi dùng id={id} và fill={`url(#${id})`} — không viết id="..." cố định: cùng một hình xuất hiện hai lần trên một khung sẽ trùng id và hình thứ hai tô sai màu. → cảnh báo.
 
 ## 7. Đặt tên và mô tả
 - [S23] Tên component tiếng Anh PascalCase, là danh từ của vật (SchoolBus, Microscope, Cat) — không mang màu hay trạng thái (không RedCar, SadCat).

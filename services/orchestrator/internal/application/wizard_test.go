@@ -10,12 +10,25 @@ import (
 )
 
 type fakeWizardRepo struct {
-	status domain.ProjectStatus
-	patch  *domain.WizardSettingsPatch
+	status  domain.ProjectStatus
+	patch   *domain.WizardSettingsPatch
+	project domain.Project
 }
 
 func (f *fakeWizardRepo) GetStatus(context.Context, string) (domain.ProjectStatus, error) {
 	return f.status, nil
+}
+func (f *fakeWizardRepo) Get(context.Context, string) (*domain.Project, error) {
+	p := f.project
+	return &p, nil
+}
+func (f *fakeWizardRepo) GetVideoFormat(_ context.Context, id string, _ int) (domain.VideoFormat, error) {
+	for _, format := range domain.BuiltinFormats() {
+		if format.ID == id {
+			return format, nil
+		}
+	}
+	return domain.VideoFormat{}, errors.New("no such format")
 }
 func (f *fakeWizardRepo) PatchWizardSettings(_ context.Context, _ string, p domain.WizardSettingsPatch) error {
 	f.patch = &p
@@ -146,5 +159,43 @@ func TestPatchWizardSettings_MixedPatchRefusedWhole(t *testing.T) {
 		domain.WizardSettingsPatch{RenderQuality: &q, SubtitleMode: &mode})
 	if !errors.Is(err, domain.ErrInvalidStatus) || repo.patch != nil {
 		t.Errorf("err = %v, stored = %v; want refused and nothing stored", err, repo.patch != nil)
+	}
+}
+
+func TestPatchWizardSettings_ChoosingTheShortBringsWhatAShortNeeds(t *testing.T) {
+	repo := &fakeWizardRepo{status: domain.StatusDraft}
+	short := domain.ModeShortOnly
+	if err := application.NewPatchWizardSettingsUseCase(repo).Execute(
+		context.Background(), "p1", domain.WizardSettingsPatch{VideoOutputMode: &short}); err != nil {
+		t.Fatal(err)
+	}
+	p := repo.patch
+	if *p.VideoFormatID != domain.FormatVerticalShort60s.ID || *p.RenderEngine != domain.RenderEngineRemotion || *p.SubtitleMode != domain.SubtitleModeOff {
+		t.Errorf("short defaults not applied: format %v engine %v subtitles %v", *p.VideoFormatID, *p.RenderEngine, *p.SubtitleMode)
+	}
+}
+
+func TestPatchWizardSettings_ConfirmRefusesAShortItCannotBuild(t *testing.T) {
+	ctx := context.Background()
+	manim := domain.RenderEngineManim
+	cases := map[string]struct {
+		project domain.Project
+		patch   domain.WizardSettingsPatch
+	}{
+		"short on a long format":   {domain.Project{VideoOutputMode: domain.ModeShortOnly, VideoFormatID: "quick_explainer_3min", RenderEngine: domain.RenderEngineRemotion}, domain.WizardSettingsPatch{Confirm: true}},
+		"long on the short format": {domain.Project{VideoOutputMode: domain.ModeLongOnly, VideoFormatID: domain.FormatVerticalShort60s.ID}, domain.WizardSettingsPatch{Confirm: true}},
+		"short with Manim":         {domain.Project{VideoOutputMode: domain.ModeShortOnly, VideoFormatID: domain.FormatVerticalShort60s.ID}, domain.WizardSettingsPatch{RenderEngine: &manim, Confirm: true}},
+	}
+	for name, c := range cases {
+		repo := &fakeWizardRepo{status: domain.StatusDraft, project: c.project}
+		err := application.NewPatchWizardSettingsUseCase(repo).Execute(ctx, "p1", c.patch)
+		if !errors.Is(err, domain.ErrInvalidWizardInput) || repo.patch != nil {
+			t.Errorf("%s: err = %v, saved = %v", name, err, repo.patch != nil)
+		}
+	}
+	ok := &fakeWizardRepo{status: domain.StatusDraft, project: domain.Project{
+		VideoOutputMode: domain.ModeShortOnly, VideoFormatID: domain.FormatVerticalShort60s.ID, RenderEngine: domain.RenderEngineRemotion}}
+	if err := application.NewPatchWizardSettingsUseCase(ok).Execute(ctx, "p1", domain.WizardSettingsPatch{Confirm: true}); err != nil {
+		t.Errorf("a buildable short must confirm: %v", err)
 	}
 }

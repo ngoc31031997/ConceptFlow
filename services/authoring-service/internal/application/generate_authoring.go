@@ -463,7 +463,8 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		if uc.finalizer == nil {
 			return GeneratedStep{}, errors.New("the storyboard finalizer is not wired")
 		}
-		fin, finErr := uc.finalizer.FinalizeStoryboard(ctx, content, model, uc.maxOutputTokens)
+		frame := domain.FrameFor(project.VideoOutputMode)
+		fin, finErr := uc.finalizer.FinalizeStoryboard(ctx, content, model, uc.maxOutputTokens, frame)
 		if finErr != nil {
 			fixed := billedUsage(finErr)
 			uc.recordPhase(ctx, string(role), step, "storyboard_fix", projectID, fixed, started, finErr)

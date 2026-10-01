@@ -17,23 +17,22 @@ interface VideoOutputModePickerProps {
 }
 
 /**
- * A clip is always cut from the rendered 16:9 video (no standalone vertical
- * production), so "short" still runs the exact
- * same long-form pipeline as source; the choice here only decides whether
- * generate_clips runs at all, and which output step 5 puts front and center.
- * Publishing a clip is a manual upload either way — this app never auto-
- * publishes to Shorts/TikTok.
+ * The two shapes a new video is made in. A short is built vertically at
+ * 1080x1920 from the start, with its own script and storyboard (ADR-0031); a
+ * short from an existing long video starts from that video's Result screen.
+ * Publishing a short is a manual upload — this app never auto-publishes to
+ * Shorts/TikTok.
  */
 const OPTIONS: { value: VideoOutputMode; label: string; hint: string }[] = [
-  { value: "long", label: "Chỉ video dài", hint: "Video ngang 16:9 chuẩn" },
+  { value: "long", label: "Video dài 16:9", hint: "Video ngang cho YouTube" },
   {
     value: "short",
-    label: "Chỉ video ngắn (Shorts/TikTok)",
-    hint: "Tập trung vào clip dọc để đăng Shorts/TikTok",
+    label: "Short dọc 9:16",
+    hint: "Dựng thẳng khung dọc 30–60 giây cho Shorts/TikTok, kịch bản riêng",
   },
-  { value: "both", label: "Cả hai", hint: "Video dài cho YouTube, kèm clip dọc cho Shorts/TikTok" },
 ];
 
+/** Picks whether the video is a long 16:9 video or a vertical short. */
 export function VideoOutputModePicker({ value, onChange, bare = false }: VideoOutputModePickerProps) {
   return (
     <div
@@ -60,9 +59,9 @@ export function VideoOutputModePicker({ value, onChange, bare = false }: VideoOu
         ))}
       </div>
 
-      {(value === "short" || value === "both") && (
+      {value === "short" && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Clip dọc chỉ được cắt từ phần script có đánh dấu <code>with self.clip(&quot;tên&quot;):</code> .
+          Short dọc dùng format ngắn, dựng bằng Remotion và không đốt phụ đề — chữ từ khoá nằm ngay trong hình.
         </p>
       )}
     </div>

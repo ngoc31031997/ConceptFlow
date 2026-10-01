@@ -462,6 +462,7 @@ func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Reques
 		Topic:           req.Topic,
 		ContentLanguage: lang,
 		RenderEngine:    domain.RenderEngine(req.RenderEngine),
+		ShortOf:         req.ShortOf,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

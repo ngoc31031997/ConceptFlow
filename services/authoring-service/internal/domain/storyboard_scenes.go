@@ -18,8 +18,24 @@ type StoryboardShot struct {
 
 // StoryboardScene is one scene; its ID is the Story Architect's beat id.
 type StoryboardScene struct {
-	ID    string           `json:"id"`
-	Shots []StoryboardShot `json:"shots"`
+	ID string `json:"id"`
+	// Setting is the place the scene happens in; empty in a storyboard
+	// written before the director was asked for it.
+	Setting string           `json:"setting"`
+	Shots   []StoryboardShot `json:"shots"`
+}
+
+// CheckSceneSettings warns about every scene the director gave no setting:
+// its shots are drawn on a flat colour instead of in a place.
+func CheckSceneSettings(scenes []StoryboardScene) []string {
+	var warnings []string
+	for _, sc := range scenes {
+		if strings.TrimSpace(sc.Setting) == "" {
+			warnings = append(warnings, fmt.Sprintf(
+				"Cảnh %s chưa có bối cảnh (setting): các shot của cảnh sẽ dựng trên nền màu thay vì một nơi chốn kín khung.", sc.ID))
+		}
+	}
+	return warnings
 }
 
 // ParseStoryboardScenes reads the scenes out of a canonical storyboard.

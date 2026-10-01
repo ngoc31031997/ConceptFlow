@@ -406,7 +406,7 @@ func (c *Client) SuggestShortScript(
 // --- StoryboardFinalizerPort ---------------------------------------------------
 
 func (c *Client) FinalizeStoryboard(
-	ctx context.Context, content, model string, maxTokens int,
+	ctx context.Context, content, model string, maxTokens int, frame domain.Frame,
 ) (application.FinalizedStoryboard, error) {
 	var out struct {
 		Storyboard string    `json:"storyboard"`
@@ -415,7 +415,7 @@ func (c *Client) FinalizeStoryboard(
 		Usage      wireUsage `json:"usage"`
 	}
 	if err := c.post(ctx, "/v1/storyboard/finalize", map[string]any{
-		"content": content, "model": model, "max_tokens": maxTokens,
+		"content": content, "model": model, "max_tokens": maxTokens, "frame": frameBody(frame),
 	}, &out); err != nil {
 		return application.FinalizedStoryboard{}, err
 	}
@@ -426,16 +426,30 @@ func (c *Client) FinalizeStoryboard(
 
 // --- CodePipelinePort ----------------------------------------------------------
 
+// frameBody is the `frame` of a request: the canvas size. A zero Frame is the
+// landscape one.
+func frameBody(f domain.Frame) map[string]int {
+	if f.Width == 0 {
+		f = domain.LandscapeFrame
+	}
+	return map[string]int{"width": f.Width, "height": f.Height}
+}
+
 // codeBody is the /v2/code/* request (docs/contracts/authoring-llm-code-v2.md).
 func codeBody(req application.CodeGenRequest) map[string]any {
 	body := map[string]any{
 		"engine": req.Engine, "topic": req.Topic, "storyboard": req.Storyboard, "system": req.System,
 		"model": req.Model, "max_tokens": req.MaxTokens, "chunk_shots": req.ChunkShots,
+		"frame": frameBody(req.Frame),
 	}
 	if len(req.Illustrations) > 0 {
-		ills := make([]map[string]string, 0, len(req.Illustrations))
+		ills := make([]map[string]any, 0, len(req.Illustrations))
 		for _, d := range req.Illustrations {
-			ills = append(ills, map[string]string{"name": d.Name, "usage": d.Usage, "description": d.Description, "code": d.Code})
+			ill := map[string]any{"name": d.Name, "usage": d.Usage, "description": d.Description, "code": d.Code}
+			if d.Backdrop {
+				ill["kind"], ill["shots"] = "backdrop", d.Shots
+			}
+			ills = append(ills, ill)
 		}
 		body["illustrations"] = ills
 	}

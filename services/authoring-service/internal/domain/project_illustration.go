@@ -16,12 +16,14 @@ const (
 // storyboard, then drawn or matched to the library, and reviewed before the
 // code step may use it.
 type ProjectIllustration struct {
-	ID             string                   `json:"id"`
-	ProjectID      string                   `json:"project_id"`
-	Position       int                      `json:"position"`
-	Name           string                   `json:"name"` // proposed or reused component name
-	Description    string                   `json:"description"`
-	FolderID       string                   `json:"folder_id"`
+	ID          string `json:"id"`
+	ProjectID   string `json:"project_id"`
+	Position    int    `json:"position"`
+	Name        string `json:"name"` // proposed or reused component name
+	Description string `json:"description"`
+	FolderID    string `json:"folder_id"`
+	// Kind is a figure of some shots or the backdrop of a whole scene.
+	Kind           IllustrationKind         `json:"kind"`
 	Shots          []string                 `json:"shots"`
 	State          ProjectIllustrationState `json:"state"`
 	Error          string                   `json:"error,omitempty"`

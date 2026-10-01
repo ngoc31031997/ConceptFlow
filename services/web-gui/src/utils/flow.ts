@@ -149,7 +149,7 @@ export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled"
 /**
  * Trạng thái của bước `step` cho dự án ở (flowStep, runState). Bước trước bước
  * hiện tại là xong, bước hiện tại mang trạng thái chạy của nó, các bước sau
- * chưa tới. Bước cắt short bị bỏ qua khi dự án không làm video dọc. Bước Hình
+ * chưa tới. Bước cắt short chỉ chạy cho dự án "both" (video dài kèm clip cắt từ nó). Bước Hình
  * minh hoạ bị bỏ qua ("Không dùng") khi dự án không dùng Remotion.
  */
 export function stepStatus(
@@ -159,7 +159,7 @@ export function stepStatus(
   outputMode?: string,
   renderEngine?: string,
 ): StepStatus {
-  if (step === 12 && outputMode === "long") return "skipped";
+  if (step === 12 && outputMode !== "both") return "skipped";
   if (step === FLOW_ILLUSTRATIONS && renderEngine !== undefined && renderEngine !== "remotion") return "skipped";
   if (!flowStep || step > flowStep) return "pending";
   if (step < flowStep) return "done";
@@ -178,8 +178,9 @@ export function stepStatus(
 }
 
 /** Why a step marked "Không dùng" does not apply to this video. */
-export function skippedReason(step: number): string {
+export function skippedReason(step: number, outputMode?: string): string {
   if (step === FLOW_ILLUSTRATIONS) return "Video dựng bằng Manim không có bước này; chỉ video Remotion mới có hình minh hoạ.";
+  if (outputMode === "short") return "Short dọc được dựng thẳng ở khung 9:16, không cần cắt clip.";
   return "Video này chỉ làm bản dài, không cắt clip dọc.";
 }
 

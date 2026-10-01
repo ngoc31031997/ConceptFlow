@@ -132,6 +132,9 @@ ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS warnings JSONB NOT NULL DEFAU
 -- back to when it stops being one.
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS source_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL;
 ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS home_folder_id TEXT;
+-- 'figure' (placed in a shot) or 'backdrop' (a whole-frame place in the depth
+-- layers of a Scene).
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'figure';
 
 -- The drawings one video needs, planned from its storyboard. No FK to
 -- the project (it lives in the orchestrator); deleting the project deletes
@@ -149,6 +152,8 @@ CREATE TABLE IF NOT EXISTS project_illustrations (
     illustration_id TEXT REFERENCES illustrations(id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS project_illustrations_project_idx ON project_illustrations (project_id, position);
+-- 'figure' (drawn for some shots) or 'backdrop' (the place of a whole scene).
+ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'figure';
 -- When the video's drawing list was last planned, so the code step can
 -- tell "planned, needs no drawing" from "never planned".
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS illustrations_planned_at TIMESTAMPTZ;

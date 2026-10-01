@@ -64,6 +64,7 @@ export function VisualDirectorStepPage() {
     role: directorRole,
     language: draft.voiceLanguage,
     previous_output: draft.authoringStory,
+    video_output_mode: draft.videoOutputMode,
   });
   const prompt = rendered.prompt ?? (rendered.failed ? `Không tải được template ${directorRole}.` : "Đang tải...");
 

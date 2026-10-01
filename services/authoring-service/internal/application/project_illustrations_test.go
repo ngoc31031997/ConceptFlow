@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -558,5 +559,81 @@ func TestDeleteDrawingIgnoresItsOwnProjectButNotOthers(t *testing.T) {
 	lib.linked[drawn.IllustrationID] = []string{"p1"}
 	if _, err := uc.DeleteDrawing(ctx, "p1", "r1"); err != nil {
 		t.Fatalf("its own project must not block it: %v", err)
+	}
+}
+
+const backdropStoryboard = `{"scenes":[
+ {"id":"s1","setting":"đồng cỏ","shots":[{"id":"1.1"},{"id":"1.2"}]},
+ {"id":"s2","setting":"vườn sung","shots":[{"id":"2.1"}]},
+ {"id":"s3","setting":"vườn sung lúc chiều","shots":[{"id":"3.1"}]},
+ {"id":"s4","shots":[{"id":"4.1"}]}]}`
+
+const backdropPlanJSON = `{"reuse": [], "draw": [], "backdrops": [
+ {"scene": "s1", "reuse": "MeadowBackdrop"},
+ {"scene": "s2", "name": "OrchardBackdrop", "description": "vườn sung, quầng sáng chiều"},
+ {"scene": "s3", "name": "OrchardBackdrop", "description": "vườn sung, quầng sáng chiều"},
+ {"scene": "s4", "reuse": "Tooth"}]}`
+
+func TestPlanGivesEachPlaceOneBackdropRowCoveringItsScenes(t *testing.T) {
+	llm := &scriptedLLM{replies: []string{backdropPlanJSON}}
+	lib := newFakeIllustrationRepo()
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
+	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(backdropStoryboard), llm, nil, 1000)
+
+	got, err := uc.Plan(context.Background(), "p1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	byName := map[string]domain.ProjectIllustration{}
+	for _, r := range got {
+		byName[r.Name] = r
+	}
+	meadow, orchard := byName["MeadowBackdrop"], byName["OrchardBackdrop"]
+	if meadow.Kind != domain.IllustrationBackdrop || meadow.State != domain.PIReused || strings.Join(meadow.Shots, ",") != "1.1,1.2" {
+		t.Errorf("reused backdrop = %+v", meadow)
+	}
+	if orchard.Kind != domain.IllustrationBackdrop || orchard.State != domain.PIPlanned || orchard.FolderID != "boi-canh" ||
+		strings.Join(orchard.Shots, ",") != "2.1,3.1" {
+		t.Errorf("new backdrop shared by two scenes = %+v", orchard)
+	}
+	if _, ok := byName["Tooth"]; ok {
+		t.Error("a figure named as a scene's backdrop must be dropped")
+	}
+	if !strings.Contains(llm.calls[0].System, "- MeadowBackdrop — Đồng cỏ ngày nắng — boi-canh — ") ||
+		!strings.Contains(llm.calls[0].System, " — NỀN") {
+		t.Error("the planner's catalog does not mark the backdrops")
+	}
+
+	drawings, err := uc.ForCode(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var handed []string
+	for _, d := range drawings {
+		if d.Backdrop {
+			handed = append(handed, d.Name+":"+strings.Join(d.Shots, ","))
+		}
+	}
+	if strings.Join(handed, " ") != "MeadowBackdrop:1.1,1.2" {
+		t.Errorf("code step backdrops = %v, want only the approved one with its shots", handed)
+	}
+}
+
+func TestABackdropIsDrawnWithTheBackdropRules(t *testing.T) {
+	reply := "TÊN: OrchardBackdrop\nTÊN HIỂN THỊ: Vườn sung\nTHẺ: vườn\nMÔ TẢ: vườn sung\nCÁCH GỌI: <Scene backdrop={OrchardBackdrop} />\n" +
+		"```tsx\nexport function OrchardBackdrop({layer}: {layer: string}) { return null; }\n```"
+	llm := &scriptedLLM{replies: []string{reply}}
+	library := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithDrawer(llm, nil, 1000)
+	made, err := library.Draw(context.Background(), DrawRequest{Description: "vườn sung", FolderID: "boi-canh", Kind: domain.IllustrationBackdrop})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if made.Kind != domain.IllustrationBackdrop {
+		t.Errorf("kind = %q", made.Kind)
+	}
+	sys := llm.calls[0].System
+	if !strings.Contains(sys, "HOẠ SĨ BỐI CẢNH") || !strings.Contains(sys, "[B1]") || regexp.MustCompile(`\{\{[a-z_]+\}\}`).MatchString(sys) {
+		t.Error("a backdrop must be drawn from the backdrop prompt, fully filled")
 	}
 }

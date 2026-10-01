@@ -8,6 +8,13 @@ Linh kiện dùng chung, import từ './conceptflow-mini/illustration' (KHÔNG i
 - useBlink(still: boolean, phase: number): boolean — true trong vài frame mỗi khoảng 3 giây (chớp mắt).
 - phaseOf(x, y): number — độ lệch pha theo vị trí, để hai hình cùng loại không chớp/nhún cùng lúc. Dùng: phaseOf(fig.x ?? 960, fig.y ?? 540).
 - shadeOf(hex, amount): string — màu tối hơn (amount âm, vd -0.12) hoặc sáng hơn (dương). Dùng cho mảng bóng.
-- useSvgId(prefix): string — id duy nhất cho clipPath (nếu cần cắt hình).
+- useSvgId(prefix): string — id duy nhất cho gradient, filter, clipPath (luật S25). Ví dụ bóng mềm và quầng sáng:
+  const shade = useSvgId('shade'); const glow = useSvgId('glow');
+  <defs>
+    <linearGradient id={shade} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={color} /><stop offset="1" stopColor={shadeOf(color, -0.18)} /></linearGradient>
+    <radialGradient id={glow}><stop offset="0" stopColor="#FFF4C2" stopOpacity={0.8} /><stop offset="1" stopColor="#FFF4C2" stopOpacity={0} /></radialGradient>
+  </defs>
+  <ellipse cx={100} cy={100} rx={90} ry={90} fill={`url(#${glow})`} />
+  <rect x={40} y={40} width={120} height={120} rx={36} fill={`url(#${shade})`} />
 - Hằng màu: INK (#3A1F4B, nét và mắt), WHITE, SHADE (đen dùng cho bóng với opacity thấp), BLUSH.
 - Từ 'remotion' chỉ dùng: useCurrentFrame, interpolate, spring, Easing.

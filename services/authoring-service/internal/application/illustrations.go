@@ -118,7 +118,7 @@ type IllustrationPreview struct {
 // IllustrationRendererPort renders a drawing (rendering's /v1/illustrations/preview).
 // code "" renders a built-in kit component by name.
 type IllustrationRendererPort interface {
-	PreviewIllustration(ctx context.Context, name, code string, props map[string]any, gif bool) (IllustrationPreview, error)
+	PreviewIllustration(ctx context.Context, name, code string, props map[string]any, gif bool, kind domain.IllustrationKind) (IllustrationPreview, error)
 }
 
 // InvalidIllustrationError carries the renderer's diagnostics.
@@ -246,10 +246,11 @@ func normalizeIllustration(i domain.Illustration) (domain.Illustration, error) {
 	return i, nil
 }
 
-// render checks and previews code; a refused drawing is an
-// InvalidIllustrationError, a renderer that cannot run is a plain error.
-func (uc *IllustrationsUseCase) render(ctx context.Context, name, code string) (IllustrationPreview, error) {
-	out, err := uc.renderer.PreviewIllustration(ctx, name, code, nil, true)
+// render checks and previews code as a figure or a backdrop (kind); a
+// refused drawing is an InvalidIllustrationError, a renderer that cannot run
+// is a plain error.
+func (uc *IllustrationsUseCase) render(ctx context.Context, name, code string, kind domain.IllustrationKind) (IllustrationPreview, error) {
+	out, err := uc.renderer.PreviewIllustration(ctx, name, code, nil, true, domain.KindOrFigure(kind))
 	if err != nil {
 		return out, fmt.Errorf("dựng xem trước: %w", err)
 	}
@@ -260,11 +261,11 @@ func (uc *IllustrationsUseCase) render(ctx context.Context, name, code string) (
 }
 
 // Try renders code without saving anything — the editor's "Xem trước" button.
-func (uc *IllustrationsUseCase) Try(ctx context.Context, name, code string) (IllustrationPreview, error) {
+func (uc *IllustrationsUseCase) Try(ctx context.Context, name, code string, kind domain.IllustrationKind) (IllustrationPreview, error) {
 	if err := domain.ValidateIllustrationName(strings.TrimSpace(name)); err != nil {
 		return IllustrationPreview{}, err
 	}
-	return uc.render(ctx, strings.TrimSpace(name), code)
+	return uc.render(ctx, strings.TrimSpace(name), code, kind)
 }
 
 // Create stores a new library drawing as a draft. The code must pass the
@@ -277,7 +278,7 @@ func (uc *IllustrationsUseCase) Create(ctx context.Context, i domain.Illustratio
 	if err := uc.writableFolder(ctx, i.FolderID); err != nil {
 		return i, err
 	}
-	preview, err := uc.render(ctx, i.Name, i.Code)
+	preview, err := uc.render(ctx, i.Name, i.Code, i.Kind)
 	if err != nil {
 		return i, err
 	}
@@ -325,7 +326,7 @@ func (uc *IllustrationsUseCase) Update(ctx context.Context, id string, i domain.
 	codeChanged := i.Code != existing.Code || i.Name != existing.Name
 	var preview IllustrationPreview
 	if codeChanged {
-		if preview, err = uc.render(ctx, i.Name, i.Code); err != nil {
+		if preview, err = uc.render(ctx, i.Name, i.Code, i.Kind); err != nil {
 			return i, err
 		}
 		i.Status, i.Version, i.Warnings = domain.IllustrationDraft, existing.Version+1, preview.Warnings
@@ -487,13 +488,13 @@ func (uc *IllustrationsUseCase) MakeExemplar(ctx context.Context, id string) (do
 	if err != nil {
 		return src, err
 	}
-	preview, err := uc.render(ctx, name, code)
+	preview, err := uc.render(ctx, name, code, src.Kind)
 	if err != nil {
 		return src, err
 	}
 	saved, err := uc.repo.CreateExemplar(ctx, domain.Illustration{
 		Name: name, Title: src.Title, FolderID: domain.ExemplarFolderID, Tags: src.Tags,
-		Description: src.Description, Usage: usage, Code: code, Exemplar: true, SourceID: src.ID,
+		Description: src.Description, Usage: usage, Code: code, Exemplar: true, SourceID: src.ID, Kind: src.Kind,
 		Status: domain.IllustrationApproved, Version: 1, Warnings: preview.Warnings,
 	}, domain.MaxExemplars)
 	if err != nil {
@@ -548,7 +549,7 @@ func (uc *IllustrationsUseCase) Rerender(ctx context.Context, id string) (png, g
 		return nil, nil, err
 	}
 	// Kit built-ins have no code (it ships in the image); exemplars carry theirs.
-	out, err := uc.render(ctx, existing.Name, existing.Code)
+	out, err := uc.render(ctx, existing.Name, existing.Code, existing.Kind)
 	if err != nil {
 		return nil, nil, err
 	}

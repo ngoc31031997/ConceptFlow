@@ -51,7 +51,8 @@ def test_ba_hinh_mau_chuan_sach_hoan_toan():
 
 
 @pytest.mark.parametrize("change, rule", [
-    ('fill={color} />', 'fill="url(#g)" /><linearGradient id="g" />'),
+    ('<Face', '<pattern id={p} /><Face'),
+    ('<Face', '<filter id={f}><feDropShadow dx={2} /></filter><Face'),
     ('<Face', '<text x={1}>Hi</text><Face'),
     ('<Face', '<image href="x.png" /><Face'),
     ("Math.sin(frame / 14)", "Math.random()"),
@@ -93,3 +94,75 @@ def test_qua_nhieu_mau_va_mau_khong_doi_duoc():
     code = code.replace("fill={color}", 'fill="#FF9F43"')
     _, warnings = rules(code)
     assert "S10" in warnings and "S12" in warnings
+
+
+GRADIENT = """  const glow = useSvgId('glow');
+  const blur = useSvgId('blur');
+  return (
+    <Figure {...fig} size={fig.size ?? 200} vw={200} vh={200}>
+      <defs>
+        <radialGradient id={glow}>
+          <stop offset="0" stopColor={color} /><stop offset="1" stopColor={color} stopOpacity={0} />
+        </radialGradient>
+        <filter id={blur}><feGaussianBlur stdDeviation={6} /></filter>
+      </defs>
+      <circle cx={100} cy={100} r={90} fill={`url(#${glow})`} filter={`url(#${blur})`} />"""
+
+
+def with_gradient(code: str = CLEAN) -> str:
+    code = code.replace("{Figure, Face,", "{Figure, Face, useSvgId,", 1)
+    return code.replace("""  return (
+    <Figure {...fig} size={fig.size ?? 200} vw={200} vh={200}>""", GRADIENT, 1)
+
+
+def test_gradient_va_lam_mo_qua_useSvgId_la_sach():
+    assert rules(with_gradient()) == ([], [])
+
+
+def test_id_viet_cung_canh_bao_S25():
+    errors, warnings = rules(with_gradient().replace("id={glow}", 'id="glow"', 1))
+    assert errors == [] and warnings == ["S25"]
+
+
+def test_qua_nhieu_gradient_canh_bao():
+    extra = "".join(f"<linearGradient id={{g{i}}} />" for i in range(4))
+    errors, warnings = rules(with_gradient().replace("</defs>", extra + "</defs>", 1))
+    assert errors == [] and warnings == ["S1"]
+
+
+BACKDROP = """import React from 'react';
+import {useVideoConfig} from 'remotion';
+import {shadeOf} from './conceptflow-mini/illustration';
+import {useLayerBox} from './conceptflow-mini/scene';
+
+export function OrchardBackdrop({layer, color = '#8FD3FF'}: {layer: 'sky' | 'far' | 'mid' | 'near'; color?: string}) {
+  const {width, height} = useVideoConfig();
+  const box = useLayerBox();
+  if (layer !== 'sky') return null;
+  return (
+    <svg viewBox={`${box.left} ${box.top} ${box.width} ${box.height}`}>
+      <rect x={box.left} y={box.top} width={box.width} height={box.height} rx={0} fill={shadeOf(color, -0.1)} />
+      <circle cx={width * 0.8} cy={height * 0.2} r={60} fill="#FFD23F" />
+    </svg>
+  );
+}
+"""
+
+
+def test_mot_nen_khong_can_figure_va_khong_canh_bao_prop_color():
+    errors, _ = rules_kind(BACKDROP)
+    assert errors == []
+
+
+def test_nen_thieu_layer_hoac_kich_thuoc_khung_hoac_co_mat_la_loi():
+    no_layer = BACKDROP.replace("{layer, color = '#8FD3FF'}: {layer: 'sky' | 'far' | 'mid' | 'near'; color?: string}",
+                                "{color = '#8FD3FF'}: {color?: string}").replace("if (layer !== 'sky') ", "")
+    assert "B1" in rules_kind(no_layer)[0]
+    fixed = BACKDROP.replace("useLayerBox", "fixedBox").replace("useVideoConfig", "fixedSize")
+    assert "B2" in rules_kind(fixed)[0]
+    assert "B5" in rules_kind(BACKDROP.replace("</svg>", "<Face mood=\"happy\" /></svg>"))[0]
+
+
+def rules_kind(code):
+    errors, warnings = check_style(code, "backdrop")
+    return sorted(f.rule for f in errors), sorted(f.rule for f in warnings)

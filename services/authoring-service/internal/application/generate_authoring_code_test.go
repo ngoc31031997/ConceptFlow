@@ -21,7 +21,7 @@ type stubFinalizer struct {
 	gotIn    string
 }
 
-func (f *stubFinalizer) FinalizeStoryboard(_ context.Context, content, _ string, _ int) (application.FinalizedStoryboard, error) {
+func (f *stubFinalizer) FinalizeStoryboard(_ context.Context, content, _ string, _ int, _ domain.Frame) (application.FinalizedStoryboard, error) {
 	f.gotIn = content
 	if f.err != nil {
 		return application.FinalizedStoryboard{}, f.err

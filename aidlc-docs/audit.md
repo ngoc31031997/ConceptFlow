@@ -2726,3 +2726,24 @@ bỏ example vào gitignore"
 **Context**: CONSTRUCTION — CR-060, thiết kế đã duyệt.
 
 ---
+
+## CR-060 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "tiếp tucj" (theo thiết kế đã duyệt, cả ba đợt; Q6 = tách gỡ cắt clip sang CR-061)
+**AI Response**:
+- **rendering**: kit `scene.tsx` (`Scene` 4 lớp + parallax + tiền cảnh mờ + vignette, `Camera`, `Glow`, `LightRays`, `Vignette`, `KeywordText`, `useCamera`, `useLayerBox`; `Scene` nhận `backdrop`), `backdrops.tsx` (6 nền dựng sẵn, tự co theo khung ngang/dọc), `Backdrop` có gradient `to`, `primitives.tsx` `FRAMES`/`frameFor`/`useFrameBox`; `domain/frame.py`; `layout_rules` theo khung, vật chính 40%; harness của probe bỏ qua phần tử trong `[data-cf-layer]`, nạp module scene/backdrops; bộ kiểm style cho phép gradient/feGaussianBlur (tối đa 4, id qua `useSvgId` — S25), luật nền B1/B2/B5; xem trước nền 1280×720 trong `Scene`; thư viện được import `./conceptflow-mini/scene`; gallery `scene-demo.tsx` + `render_gallery.mjs scene`.
+- **authoring-service**: luật style v2 + luật/linh kiện/prompt hoạ sĩ cho nền; prompt Đạo diễn (bối cảnh, ánh sáng, luật 20, `setting` trong JSON) và Kỹ sư (Scene/Camera, L1 ngoại lệ phông cảnh, L8, L14 40%, L15, khuôn code theo khung); `domain/frame.go` + biến `{{frame}}` `{{frame_width}}` `{{frame_height}}` `{{safe_area}}` `{{frame_rules}}`; dải phụ đề theo chiều cao khung; gửi `frame` cho llm-service; `illustrations.kind`/`project_illustrations.kind` (cột mới có mặc định), 6 hàng nền builtin; lập danh sách nền theo cảnh (`backdrops`), vẽ nền với prompt riêng, bước Code nhận nền + shot; cảnh báo cảnh thiếu bối cảnh; format `vertical_short_60s`; hash golden 2 prompt thủ công cập nhật.
+- **llm-service**: `app/frame.py`, `frame` trong body (chỉ 1920×1080 / 1080×1920), storyboard `setting` + kiểm layout theo khung, merger viết kích thước khung + import scene/backdrops + dán nền thư viện dùng qua `backdrop={...}`, mục C5 "nền của từng shot"; vân tay khung ngang không đổi.
+- **orchestrator**: format short seed; chọn short tự đặt format/Remotion/phụ đề tắt; "Tiếp tục" từ chối tổ hợp không dựng được; short không chạy `generate_clips`, không ghép intro/outro 16:9; tạo nháp với `short_of` nối hai project.
+- **web-gui**: bộ chọn đầu ra (Video dài 16:9 / Short dọc 9:16, chọn trước format), lọc format theo chế độ, khoá Remotion khi short, nút "Làm bản short dọc" ở màn Kết quả, dựng lại giữ nguyên chế độ, nhãn "Nền" và nhóm "Nền của cảnh", lý do "Không dùng" của bước 12 cho short, gợi ý đốt phụ đề không khuyến nghị.
+- **Tài liệu**: ADR-0031, `docs/contracts/authoring-llm-code-v2.md`, `.gitignore` (`example/`).
+- **Test**: rendering 360 pass/11 skip (máy) và 364 pass/3 skip trong container có node (bỏ `test_channel_idents.py` vì đường dẫn khi gắn thư mục, không phải lỗi code); authoring-service `go test ./...` pass, vet/gofmt sạch; llm-service 156 pass, ruff sạch; orchestrator `go test ./...` pass; web-gui vitest 69 file/473 test pass, tsc sạch, eslint 0 lỗi/20 cảnh báo (bằng main); prettier: 87 file đã lệch sẵn trên main, chỉ format 2 file mới; Remotion tsc sạch.
+- **Rebuild**: rendering, authoring-service, llm-service, orchestrator healthy; web-gui HTTP 200.
+- **Kiểm trực tiếp**: gallery demo 4 shot render ở 1920×1080 và 1080×1920 (~20 s cho cả hai); prompt Kỹ sư cho short ra `width={1080} height={1920}`, có luật khung dọc, không sót biến; 6 nền và format short đã seed; xem trước `MeadowBackdrop`/`InsideBodyBackdrop` 1280×720 qua gateway; tạo nháp short từ một nháp dài tạm (nối hai chiều, format/engine/phụ đề đúng), "Tiếp tục" với Manim bị 400, rồi xoá cả hai project tạm.
+- **Chưa làm / chưa kiểm**: chưa chạy AI thật một video dài và một short (tốn token — để Creator bấm); chưa đo thời gian render trước/sau trên cùng một nội dung; xem trước nền chỉ có bản 16:9 (chưa có 9:16); `ShortScriptAssistant`/cắt clip còn trong code nhưng không lối nào dẫn tới (gỡ ở CR-061).
+- **Lệch so với thiết kế**: `Scene` tự giữ máy quay (prop `camera`) để vignette đứng yên; probe bỏ qua lớp phông cảnh ngay trong harness thay vì trong `layout_rules.py`; rendering đọc khung từ `<Composition>` nên body kiểm không cần `frame`; `Scene`/`Camera`/ánh sáng không thành hàng thư viện (là phần cấp khung); `Scene` nhận `backdrop={...}` để vẽ đủ 4 lớp.
+**Impact Assessment**: 5 service (rendering, authoring-service, llm-service, orchestrator, web-gui); hợp đồng v2 thêm trường tuỳ chọn; migration thêm cột `kind` có mặc định.
+**Artifacts Affected**: các file trên, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-060, chờ Creator duyệt rồi `/deliver`.
+
+---

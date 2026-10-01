@@ -16,12 +16,13 @@ from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app import storyboard as sbm
 from app import tasks
 from app.config import Config
 from app.errors import LLMError, Usage
+from app.frame import LANDSCAPE, MAX_HEIGHT, Frame, frame_of
 from app.pipeline.checker import CheckerPort, RenderingChecker
 from app.pipeline.checker import CheckerUnavailable as _CheckerUnavailable
 from app.pipeline.extract import ExtractError
@@ -65,24 +66,47 @@ class ShortScriptBody(BaseModel):
     stream: bool = False
 
 
+class FrameIn(BaseModel):
+    """The frame the video is built on: 1920x1080 or 1080x1920."""
+    width: int
+    height: int
+
+    def frame(self) -> Frame:
+        return frame_of(self.width, self.height)
+
+    @model_validator(mode="after")
+    def _known(self) -> FrameIn:
+        frame_of(self.width, self.height)
+        return self
+
+
+def _canvas(frame: FrameIn | None) -> Frame:
+    return frame.frame() if frame is not None else LANDSCAPE
+
+
 class StoryboardBody(BaseModel):
     content: str
     model: str = ""
     max_tokens: int = Field(0, ge=0)
+    # No frame = the landscape long-form frame.
+    frame: FrameIn | None = None
 
 
 class IllustrationIn(BaseModel):
-    """One approved library drawing the code step may use."""
+    """One approved library drawing the code step may use, or the backdrop of
+    some shots (`kind` "backdrop"; a built-in backdrop has no code)."""
     name: str
     usage: str = ""
     description: str = ""
-    code: str
+    code: str = ""
+    kind: Literal["figure", "backdrop"] = "figure"
+    shots: list[str] = []
 
 
 class SubtitleBandIn(BaseModel):
     """The strip burned-in subtitles cover, from the frame edge."""
     edge: Literal["top", "bottom"]
-    px: int = Field(gt=0, lt=1080)
+    px: int = Field(gt=0, lt=MAX_HEIGHT)
 
 
 class SegmentIn(BaseModel):
@@ -110,6 +134,8 @@ class CodeBody(BaseModel):
     # What the caller already has, and the only segments to run.
     segments: list[SegmentIn] = []
     only: list[str] | None = None
+    # No frame = the landscape long-form frame.
+    frame: FrameIn | None = None
 
     def request(self, model: str, max_reasoning_chars: int) -> CodeRequest:
         return CodeRequest(
@@ -120,7 +146,7 @@ class CodeBody(BaseModel):
             subtitle_band=self.subtitle_band.model_dump() if self.subtitle_band else None,
             video_font=self.video_font, chunk_shots=self.chunk_shots,
             done={s.key: DoneSegment(s.fingerprint, s.content) for s in self.segments},
-            only=set(self.only) if self.only is not None else None)
+            only=set(self.only) if self.only is not None else None, canvas=_canvas(self.frame))
 
 
 class SegmentPromptBody(CodeBody):
@@ -270,7 +296,7 @@ def create_app(
         provider, model = providers.for_model(providers.hive, body.model)
         for attempt in range(2):
             try:
-                sb = sbm.parse(content)
+                sb = sbm.parse(content, _canvas(body.frame))
             except sbm.StoryboardError as exc:
                 if attempt == 1:
                     return _error_response(

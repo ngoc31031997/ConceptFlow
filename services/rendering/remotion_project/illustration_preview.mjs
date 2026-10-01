@@ -5,7 +5,7 @@
  * Bundles src/illustration-preview/host.tsx and opens the browser once, then
  * answers one JSON request per stdin line with one JSON reply per stdout line:
  *
- *   -> {"id", "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool}
+ *   -> {"id", "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool, "kind"?: "figure" or "backdrop"}
  *   <- {"id", "ok": true, "png": base64, "gif"?: base64}
  *   <- {"id", "ok": false, "error": "..."}
  *
@@ -40,7 +40,7 @@ async function handle(req) {
       throw new Error(`syntax error: ${msgs.join('; ') || err.message}`);
     }
   }
-  const inputProps = {js, name: req.name, props: req.props ?? {}, background: req.background};
+  const inputProps = {js, name: req.name, props: req.props ?? {}, background: req.background, kind: req.kind ?? 'figure'};
   const composition = await selectComposition({serveUrl, id: 'asset', inputProps, puppeteerInstance: browser});
   const dir = mkdtempSync(join(tmpdir(), 'asset-'));
   try {

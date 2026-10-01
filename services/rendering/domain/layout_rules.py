@@ -9,12 +9,15 @@ Luật lấy từ mục F của prompt Remotion Engineer (L1, L4, L5, L14):
 
   chặn (vào vòng sửa lỗi)                    | chỉ cảnh báo
   -------------------------------------------+-------------------------------
-  vùng an toàn (96,96)–(1824,984)            | vật lớn nhất của shot < 30%
+  vùng an toàn của khung (domain/frame.py)   | vật lớn nhất của shot < 40%
   vùng phụ đề in lên hình                     |   chiều khung (L14)
   hai khối chữ đè nhau                        | còn tài nguyên chưa tải xong
   chữ tràn khung (scrollWidth > clientWidth+1)|   (số đo có thể thiếu vật)
   chữ nhỏ hơn 32px                            |
   shot ném lỗi khi chạy ở một frame           |
+
+Khung (ngang hay dọc) lấy từ `composition` của chính lần đo. Lớp nền và ánh
+sáng của `Scene` (`data-cf-layer`) không có trong số đo: harness bỏ qua chúng.
 
 Vài điều không hiển nhiên, đều vì hoạt hình:
 
@@ -34,11 +37,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-SAFE_LEFT, SAFE_TOP, SAFE_RIGHT, SAFE_BOTTOM = 96, 96, 1824, 984
+from domain.frame import MAX_HEIGHT, SafeArea, frame_for
+
 # Nửa pixel: hộp bao được làm tròn 0.1px, và 96.0 chạm mép thì vẫn là trong.
 EDGE_TOLERANCE = 0.5
 MIN_FONT_PX = 32
-MIN_HERO_FRACTION = 0.30
+MIN_HERO_FRACTION = 0.40
 SETTLED_PCT = 0.85
 OVERLAP_MIN_OPACITY = 0.6
 # Chữ lấn một pixel ra ngoài hộp của chính nó chưa phải là tràn.
@@ -67,8 +71,8 @@ class SubtitleBand:
     def __post_init__(self) -> None:
         if self.edge not in ("top", "bottom"):
             raise ValueError(f"subtitle band edge must be top or bottom, got {self.edge!r}")
-        if not 0 < self.px < 1080:
-            raise ValueError(f"subtitle band height must be between 0 and 1080 px, got {self.px}")
+        if not 0 < self.px < MAX_HEIGHT:
+            raise ValueError(f"subtitle band height must be between 0 and {MAX_HEIGHT} px, got {self.px}")
 
 
 @dataclass
@@ -132,6 +136,7 @@ def _identity(e: dict) -> tuple:
 class _Frame:
     def __init__(self, width: float, height: float) -> None:
         self.w, self.h = width, height
+        self.safe: SafeArea = frame_for(width, height).safe
 
     def beyond(self, b: dict) -> bool:
         """Có phần nào của hộp nằm ngoài khung hình."""
@@ -143,23 +148,23 @@ class _Frame:
         return b["x"] + b["w"] <= 0 or b["y"] + b["h"] <= 0 or b["x"] >= self.w or b["y"] >= self.h
 
 
-def _safe_area_excess(b: dict) -> tuple[list[str], float]:
+def _safe_area_excess(b: dict, safe: SafeArea) -> tuple[list[str], float]:
     t = EDGE_TOLERANCE
     parts: list[str] = []
     worst = 0.0
     right, bottom = b["x"] + b["w"], b["y"] + b["h"]
-    if b["x"] < SAFE_LEFT - t:
-        parts.append(f"trái x={round(b['x'])} < {SAFE_LEFT}")
-        worst = max(worst, SAFE_LEFT - b["x"])
-    if b["y"] < SAFE_TOP - t:
-        parts.append(f"trên y={round(b['y'])} < {SAFE_TOP}")
-        worst = max(worst, SAFE_TOP - b["y"])
-    if right > SAFE_RIGHT + t:
-        parts.append(f"phải x={round(right)} > {SAFE_RIGHT}")
-        worst = max(worst, right - SAFE_RIGHT)
-    if bottom > SAFE_BOTTOM + t:
-        parts.append(f"dưới y={round(bottom)} > {SAFE_BOTTOM}")
-        worst = max(worst, bottom - SAFE_BOTTOM)
+    if b["x"] < safe.left - t:
+        parts.append(f"trái x={round(b['x'])} < {safe.left}")
+        worst = max(worst, safe.left - b["x"])
+    if b["y"] < safe.top - t:
+        parts.append(f"trên y={round(b['y'])} < {safe.top}")
+        worst = max(worst, safe.top - b["y"])
+    if right > safe.right + t:
+        parts.append(f"phải x={round(right)} > {safe.right}")
+        worst = max(worst, right - safe.right)
+    if bottom > safe.bottom + t:
+        parts.append(f"dưới y={round(bottom)} > {safe.bottom}")
+        worst = max(worst, bottom - safe.bottom)
     return parts, worst
 
 
@@ -286,7 +291,7 @@ def _check_placement(
 ) -> None:
     """Vùng an toàn và vùng phụ đề."""
     box, ident, line = _box(e), _identity(e), e.get("line")
-    parts, worst = _safe_area_excess(box)
+    parts, worst = _safe_area_excess(box, frame.safe)
     if parts:
         detail = f"{_describe(e)} ra ngoài vùng an toàn ({', '.join(parts)})"
         col.add((SAFE_AREA, ident), ctx.finding(SAFE_AREA, line, detail, worst), pct)

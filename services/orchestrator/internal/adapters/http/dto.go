@@ -343,6 +343,8 @@ type createProjectDraftRequest struct {
 	// RenderEngine is optional: "" means "unchanged" — see
 	// CreateProjectDraftInput.RenderEngine's doc comment.
 	RenderEngine string `json:"render_engine,omitempty"`
+	// ShortOf is the long video a new draft is the vertical short of.
+	ShortOf string `json:"short_of,omitempty"`
 }
 
 // updateProjectTopicRequest is the body of PATCH

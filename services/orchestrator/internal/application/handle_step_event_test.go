@@ -1033,7 +1033,7 @@ func TestHandleStepEventUseCase_VideoAssembled_WithClipsDispatchesGenerateClips(
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1", Status: domain.StatusAssemblingVideo,
 		RenderedVideoPath: &rendered,
-		VideoOutputMode:   domain.ModeShortOnly,
+		VideoOutputMode:   domain.ModeBoth,
 	}
 	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
 
@@ -1267,5 +1267,51 @@ func TestHandleStepEventUseCase_RepoErrorStillSurfaces(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected an infrastructure error to surface for retry")
+	}
+}
+
+// A vertical short is already the clip: nothing is cut from it.
+func TestHandleStepEventUseCase_VideoAssembled_AVerticalShortIsReadyWithoutClips(t *testing.T) {
+	uc, repo, _, _ := newTestUseCase()
+	rendered := "/shared/proj-1/rendered.mp4"
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusAssemblingVideo,
+		RenderedVideoPath: &rendered,
+		VideoOutputMode:   domain.ModeShortOnly,
+	}
+	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
+	if err := uc.Execute(context.Background(), StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "video_assembled",
+		Payload: map[string]interface{}{"video_path": "/shared/proj-1/video/final.mp4"},
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusReadyToPublish {
+		t.Fatalf("a short must be ready to publish after assembly, got %s", project.Status)
+	}
+	for _, w := range project.ValidationWarnings {
+		if strings.Contains(w, "self.clip") {
+			t.Errorf("a short must not be warned about missing clip marks: %q", w)
+		}
+	}
+}
+
+// The channel intro and outro are 16:9: a vertical short is assembled without them.
+func TestResolveChannelAssets_AVerticalShortGetsNoLandscapeIntroOrOutro(t *testing.T) {
+	pointers := newFakeChannelAssetPointers()
+	for _, kind := range []string{"intro", "outro"} {
+		_ = pointers.UpsertChannelAssetPointer(context.Background(), kind, domain.Quality1080p60, kind+"-asset", 1)
+	}
+	uc := NewHandleStepEventUseCase(newFakeRepo(), &fakePublisher{}, &fakeProgress{}, pointers, nil)
+	long := &domain.Project{ProjectID: "a", IntroEnabled: true, OutroEnabled: true, VideoOutputMode: domain.ModeLongOnly}
+	short := &domain.Project{ProjectID: "b", IntroEnabled: true, OutroEnabled: true, VideoOutputMode: domain.ModeShortOnly}
+	uc.resolveChannelAssets(context.Background(), long)
+	uc.resolveChannelAssets(context.Background(), short)
+	if long.IntroAssetID == nil || long.OutroAssetID == nil {
+		t.Fatal("a long video must still get the channel intro and outro")
+	}
+	if short.IntroAssetID != nil || short.OutroAssetID != nil {
+		t.Errorf("a short got intro %v / outro %v", short.IntroAssetID, short.OutroAssetID)
 	}
 }

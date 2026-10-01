@@ -24,7 +24,9 @@ Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `ser
   "system": "<prompt *_engineer_ai đã render>",
   "model": "",
   "max_tokens": 0,
-  "illustrations": [{"name": "…", "usage": "…", "description": "…", "code": "…"}],
+  "illustrations": [{"name": "…", "usage": "…", "description": "…", "code": "…"},
+                    {"name": "MeadowBackdrop", "description": "…", "code": "", "kind": "backdrop", "shots": ["1.1", "1.2"]}],
+  "frame": {"width": 1920, "height": 1080},
   "subtitle_band": {"edge": "top | bottom", "px": 240},
   "video_font": "",
   "chunk_shots": 3,
@@ -35,7 +37,10 @@ Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `ser
 - `chunk_shots`: từ 0 đến 10; 0 nghĩa là dùng `CODE_CHUNK_SHOTS`.
 - `segments`: các đoạn `done` đã lưu, và các đoạn shot `failed` có **nội dung dở** (thiếu một số shot). Nội dung khung là `{"code": "…"}`, nội dung đoạn shot là `{"shots": {"1.1": "…"}}`. Với đoạn dở có vân tay khớp, `llm-service` chỉ viết các shot còn thiếu rồi trả `segment_done` với đủ shot.
 - `only`: nếu có thì chỉ chạy các đoạn này; bỏ trống thì chạy mọi đoạn còn thiếu.
-- `subtitle_band` và `video_font` chỉ dùng cho Remotion.
+- `subtitle_band` và `video_font` chỉ dùng cho Remotion. `subtitle_band.px` nhỏ hơn chiều cao khung lớn nhất (1920).
+- `frame`: khung video được dựng, chỉ nhận `1920×1080` (video dài) hoặc `1080×1920` (short dọc); không có thì là khung ngang. Merger viết `<Composition>` đúng kích thước này, storyboard được kiểm toạ độ `layout` theo nó, prompt LAYOUT/sửa lỗi nêu đúng vùng an toàn của nó. Khung dọc thêm kích thước khung vào vân tay khung (nên mọi đoạn được viết lại khi đổi khung); khung ngang giữ nguyên vân tay cũ. Rendering đọc khung từ `<Composition>` của script khi kiểm bố cục, không cần trường riêng. Xem ADR-0031.
+- `illustrations[].kind`: `"figure"` (mặc định) hoặc `"backdrop"`. Một nền mang `shots` (các shot dựng trong nền đó); nền dựng sẵn trong kit có `code` rỗng. Prompt liệt kê nền theo shot (mục C5); merger dán code của nền thư viện khi shot dùng nó qua `backdrop={Tên}`.
+- Storyboard: mỗi cảnh có thể có `setting` (bối cảnh kín khung). Có `setting` thì nó vào JSON của shot dưới tên `scene_setting`; không có thì JSON shot (và vân tay đoạn) như cũ.
 
 ## `POST /v2/code/generate` (NDJSON)
 Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trường `type`.

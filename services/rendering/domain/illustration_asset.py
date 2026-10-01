@@ -1,7 +1,8 @@
 """Luật cho một hình trong thư viện minh hoạ.
 
 Một hình là MỘT file TSX xuất đúng một component tên PascalCase, chỉ import từ
-react, remotion và bộ minh hoạ (để dùng lại Figure/Face/useBlink...). Hình này
+react, remotion, bộ minh hoạ (để dùng lại Figure/Face/useBlink...) và bộ cảnh (useLayerBox
+cho một nền). Hình này
 về sau được Code Merger dán thẳng vào script của video, nên nó không được mang
 theo import nào khác và không được khai báo gì trùng tên với khung script.
 """
@@ -12,7 +13,7 @@ import re
 from dataclasses import dataclass
 
 NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]{1,40}$")
-ALLOWED_MODULES = {"react", "remotion", "./conceptflow-mini/illustration"}
+ALLOWED_MODULES = {"react", "remotion", "./conceptflow-mini/illustration", "./conceptflow-mini/scene"}
 IMPORT_RE = re.compile(r"^\s*import\b[^;]*?\bfrom\s*['\"]([^'\"]+)['\"]", re.M | re.S)
 BARE_IMPORT_RE = re.compile(r"^\s*import\s*['\"]([^'\"]+)['\"]", re.M)
 TOP_DECL_RE = re.compile(
@@ -47,7 +48,7 @@ def validate_asset_code(name: str, code: str) -> list[AssetIssue]:
         if m.group(1) not in ALLOWED_MODULES:
             issues.append(AssetIssue(
                 f"import '{m.group(1)}' không được phép — "
-                "chỉ react, remotion, ./conceptflow-mini/illustration",
+                "chỉ react, remotion, ./conceptflow-mini/illustration, ./conceptflow-mini/scene",
                 _line_of(code, m.start())))
     if not re.search(rf"^export\s+function\s+{re.escape(name)}\s*\(", code, re.M):
         issues.append(AssetIssue(f"thiếu 'export function {name}(' ở đầu dòng"))

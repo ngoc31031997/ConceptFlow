@@ -44,6 +44,11 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   previous_output: "(nội dung bước trước — dàn ý/storyboard/code — sẽ hiện ở đây)",
   script: "(code có sẵn Creator dán vào sẽ hiện ở đây)",
   subtitle_zone: "(vùng phụ đề theo cấu hình của video sẽ hiện ở đây)",
+  frame: "1920×1080 (ngang)",
+  frame_width: "1920",
+  frame_height: "1080",
+  safe_area: "(96, 96) đến (1824, 984)",
+  frame_rules: "(luật khung dọc — chỉ có khi video là short dọc — sẽ hiện ở đây)",
   narrate_example: "Nội dung lời thoại cho đoạn này",
   thumbnail_audience: "(khán giả theo ngôn ngữ video sẽ hiện ở đây)",
 };

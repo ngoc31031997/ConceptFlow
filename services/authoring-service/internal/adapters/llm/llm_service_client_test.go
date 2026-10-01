@@ -158,9 +158,12 @@ func TestFinalizeStoryboard(t *testing.T) {
 		if body["content"] != "RAW" || body["model"] != "m" {
 			t.Errorf("body = %v", body)
 		}
+		if frame, _ := body["frame"].(map[string]any); frame["width"] != float64(1080) || frame["height"] != float64(1920) {
+			t.Errorf("frame = %v, want the portrait 1080x1920", body["frame"])
+		}
 		_, _ = w.Write([]byte(`{"storyboard":"{}","shots":12,"repaired":true,"usage":{"prompt_tokens":7,"completion_tokens":9}}`))
 	})
-	got, err := c.FinalizeStoryboard(context.Background(), "RAW", "m", 1000)
+	got, err := c.FinalizeStoryboard(context.Background(), "RAW", "m", 1000, domain.PortraitFrame)
 	if err != nil || got.Storyboard != "{}" || got.Shots != 12 || !got.Repaired || got.Usage.PromptTokens != 7 {
 		t.Fatalf("got %+v err %v", got, err)
 	}
@@ -169,7 +172,7 @@ func TestFinalizeStoryboard(t *testing.T) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		_, _ = w.Write([]byte(`{"error":{"kind":"malformed","message":"still invalid","usage":{"prompt_tokens":4}}}`))
 	})
-	_, err = bad.FinalizeStoryboard(context.Background(), "RAW", "", 0)
+	_, err = bad.FinalizeStoryboard(context.Background(), "RAW", "", 0, domain.LandscapeFrame)
 	var llmErr *application.LLMError
 	if !asLLMError(err, &llmErr) || llmErr.Kind != application.ErrKindMalformed || llmErr.Usage.PromptTokens != 4 {
 		t.Fatalf("err = %v", err)

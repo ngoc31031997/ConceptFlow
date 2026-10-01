@@ -94,7 +94,7 @@ def probe(elements, font_ok=True, line=10):
             "shots": [{"index": 0, "id": "1.1", "component": "Shot1_1", "line": line, "samples": samples}]}
 
 
-TOOTH_OUT = {"kind": "kit", "component": "Tooth", "line": 12, "rect": box(1500, 300, 420, 420), "opacity": 1}
+TOOTH_OUT = {"kind": "kit", "component": "Tooth", "line": 12, "rect": box(1460, 300, 460, 460), "opacity": 1}
 SMALL_APPLE = {"kind": "kit", "component": "Apple", "line": 13, "rect": box(800, 400, 200, 200), "opacity": 1}
 
 
@@ -122,7 +122,7 @@ def test_non_blocking_findings_are_warnings_and_the_check_passes():
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(probe([SMALL_APPLE]))).check(
         "remotion", "code", "creator")
     assert out.ok and out.diagnostics == []
-    assert out.warnings == ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (< 30%) — "
+    assert out.warnings == ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (< 40%) — "
                             "khung dễ thành nền trống với vật nhỏ lọt thỏm (dòng 13)"]
 
 

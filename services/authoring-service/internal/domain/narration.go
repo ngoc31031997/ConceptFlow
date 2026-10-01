@@ -138,7 +138,8 @@ func ValidVideoFont(font string) bool {
 }
 
 // subtitleBandPx is how tall a strip, measured from the frame edge, burned-in
-// subtitles can occupy on a 1920x1080 frame: Video Assembly's vertical margin
+// subtitles can occupy (the same on either frame; the subtitle file is laid
+// out in the video's own pixels): Video Assembly's vertical margin
 // (60) + two wrapped lines at its font size (subtitle_file.py FONT_SIZES) +
 // the background box's padding.
 var subtitleBandPx = map[string]int{"small": 200, "medium": 240, "large": 280}
@@ -149,7 +150,7 @@ var subtitleBandPx = map[string]int{"small": 200, "medium": 240, "large": 280}
 // is drawn by the player, off the video, and needs no room.
 func SubtitleZone(project *Project, language string) string {
 	mode, style := projectSubtitleSettings(project)
-	return SubtitleZoneFor(mode, style, language)
+	return SubtitleZoneIn(mode, style, FrameFor(project.VideoOutputMode), language)
 }
 
 // projectSubtitleSettings reads a project's subtitle mode and style, falling
@@ -166,8 +167,7 @@ func projectSubtitleSettings(project *Project) (SubtitleMode, SubtitleStyle) {
 	return mode, style
 }
 
-// SubtitleBand is the strip of a 1920x1080 frame that burned-in subtitles
-// cover: Px pixels measured from the Edge ("top" or "bottom") of the frame.
+// SubtitleBand is the strip of the frame that burned-in subtitles cover: Px pixels measured from the Edge ("top" or "bottom") of the frame.
 type SubtitleBand struct {
 	Edge string
 	Px   int
@@ -199,9 +199,14 @@ func ProjectSubtitleBand(project *Project) (SubtitleBand, bool) {
 	return SubtitleBandFor(projectSubtitleSettings(project))
 }
 
-// SubtitleZoneFor is SubtitleZone for explicit settings — what the wizard has
-// in its draft before anything is saved to the project.
+// SubtitleZoneFor is SubtitleZone for explicit settings on the landscape
+// frame — what the wizard has in its draft before anything is saved.
 func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) string {
+	return SubtitleZoneIn(mode, style, LandscapeFrame, language)
+}
+
+// SubtitleZoneIn is SubtitleZoneFor on the given frame.
+func SubtitleZoneIn(mode SubtitleMode, style SubtitleStyle, frame Frame, language string) string {
 	sb, burned := SubtitleBandFor(mode, style)
 	if !burned {
 		if language == "vi" {
@@ -216,10 +221,11 @@ func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) st
 		}
 		return fmt.Sprintf("subtitles are burned in at the TOP of the frame — the strip from y = 0 to %d px must stay completely EMPTY (no text, no meaningful object). Your safe area starts at y = %d.", band, band+24)
 	}
+	h := frame.Height
 	if language == "vi" {
-		return fmt.Sprintf("phụ đề được in ở MÉP DƯỚI khung — dải y từ %d đến 1080 px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = %d.", 1080-band, 1080-band-24)
+		return fmt.Sprintf("phụ đề được in ở MÉP DƯỚI khung — dải y từ %d đến %d px phải để TRỐNG hoàn toàn (không chữ, không vật có nghĩa). Vùng an toàn của bạn kết thúc ở y = %d.", h-band, h, h-band-24)
 	}
-	return fmt.Sprintf("subtitles are burned in at the BOTTOM of the frame — the strip from y = %d to 1080 px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = %d.", 1080-band, 1080-band-24)
+	return fmt.Sprintf("subtitles are burned in at the BOTTOM of the frame — the strip from y = %d to %d px must stay completely EMPTY (no text, no meaningful object). Your safe area ends at y = %d.", h-band, h, h-band-24)
 }
 
 // SubtitleMode is how subtitle_cues get delivered to the viewer (see

@@ -26,6 +26,8 @@ import * as Segments from '../conceptflow-mini/segments';
 import * as Primitives from '../conceptflow-mini/primitives';
 import * as Kit from '../conceptflow-mini/illustration';
 import * as Lottie from '../conceptflow-mini/lottie';
+import * as SceneKit from '../conceptflow-mini/scene';
+import * as Backdrops from '../conceptflow-mini/backdrops';
 
 type Rect = {x: number; y: number; w: number; h: number};
 
@@ -67,6 +69,10 @@ type Sample = {
 // Kit parts that render inside an <svg> (a <g>, an <ellipse>): wrapping them in
 // a <div> would break the drawing, so they stay unlabelled.
 const SVG_PARTS = new Set(['Face', 'GroundShadow']);
+// Frame-wide parts: the camera, the depth layers and the light. They are the
+// stage the figures stand on, not a figure, so they get no box of their own;
+// what they draw carries `data-cf-layer` and is skipped when measuring.
+const STAGE_PARTS = new Set(['Scene', 'Camera', 'Glow', 'LightRays', 'Vignette']);
 
 /**
  * A kit component wrapped so its box can be found and named: a
@@ -89,7 +95,8 @@ function tagged(name: string, Comp: React.ComponentType<Record<string, unknown>>
 function tagModule(mod: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(mod)) {
-    const isComponent = typeof value === 'function' && /^[A-Z]/.test(name) && !SVG_PARTS.has(name);
+    const isComponent =
+      typeof value === 'function' && /^[A-Z]/.test(name) && !SVG_PARTS.has(name) && !STAGE_PARTS.has(name);
     out[name] = isComponent ? tagged(name, value as React.ComponentType<Record<string, unknown>>) : value;
   }
   return out;
@@ -112,6 +119,8 @@ const MODULES: Record<string, unknown> = {
   './conceptflow-mini/primitives': esm(Primitives),
   './conceptflow-mini/illustration': esm(tagModule(Kit as unknown as Record<string, unknown>)),
   './conceptflow-mini/lottie': esm(tagModule(Lottie as unknown as Record<string, unknown>)),
+  './conceptflow-mini/scene': esm(tagModule(SceneKit as unknown as Record<string, unknown>)),
+  './conceptflow-mini/backdrops': esm(tagModule(Backdrops as unknown as Record<string, unknown>)),
 };
 
 type Loaded = {
@@ -234,6 +243,7 @@ function collect(stage: HTMLElement, width: number, height: number): Box[] {
   for (const el of Array.from(stage.querySelectorAll('*'))) {
     const owner = el.closest('[data-cf-line]');
     if (!owner) continue; // Thumbnail / Stage scaffolding, not drawn by the script
+    if (el.closest('[data-cf-layer]')) continue; // scenery and light, not an object of the shot
     const tag = el.tagName.toLowerCase();
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden') continue;

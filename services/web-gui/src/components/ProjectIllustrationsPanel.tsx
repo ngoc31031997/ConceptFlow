@@ -154,62 +154,11 @@ export function ProjectIllustrationsPanel({
   const opened = rows.find((r) => r.id === openId)?.illustration ?? null;
   const locked = planning || starting || chainDrawing;
 
-  return (
-    <Card
-      title="Hình minh hoạ của video"
-      hint="Lập từ storyboard: hình thư viện đã có thì dùng lại, còn thiếu thì AI vẽ theo luật style. Bước Code chỉ chạy khi mọi hình đã duyệt hoặc bỏ qua."
-      headerAction={
-        <div className={styles.headerActions}>
-          {missing > 0 && (
-            <Button variant="ghost" onClick={drawAllMissing} disabled={locked} data-testid="pi-draw-all">
-              {starting ? "Đang bắt đầu…" : `Vẽ ${missing} hình còn thiếu`}
-            </Button>
-          )}
-          <Button variant="ghost" onClick={plan} disabled={locked} data-testid="pi-plan">
-            {planning ? "Đang đọc storyboard…" : rows.length ? "Lập lại danh sách" : "Lập danh sách từ storyboard"}
-          </Button>
-        </div>
-      }
-      data-testid="project-illustrations"
-    >
-      <p className={rows.length > 0 && ready === rows.length && !stale ? styles.ok : styles.waiting} data-testid="pi-summary">
-        {rows.length === 0
-          ? chainDrawing
-            ? "AI đang lập danh sách hình từ storyboard…"
-            : "Chưa có danh sách — chạy bước Hình minh hoạ bằng AI, hoặc bấm “Lập danh sách từ storyboard”."
-          : ready === rows.length && !stale
-            ? `Đủ ${rows.length} hình — bước Code chạy được.`
-            : ready === rows.length
-            ? `Đủ ${rows.length} hình nhưng danh sách lập từ storyboard cũ.`
-            : `${ready}/${rows.length} hình sẵn sàng — bước Code đang chờ bạn duyệt hoặc bỏ qua các hình còn lại.`}
-      </p>
-      {stale && rows.length > 0 && (
-        <p className={styles.error} role="status" data-testid="pi-stale">
-          Storyboard đã đổi sau khi lập danh sách này — bước Code sẽ không chạy với danh sách cũ. Bấm “Lập lại danh sách”,
-          hoặc chạy lại bước Hình minh hoạ (hình đã vẽ vẫn được giữ).
-        </p>
-      )}
-      {message && <p className={styles.error} role="status">{message}</p>}
-      {openId && (
-        <div className={glass.mtSm}>
-          <IllustrationEditor
-            illustration={opened}
-            folders={folders}
-            onSaved={(saved) => {
-              setBust((b) => ({ ...b, [saved.id]: (b[saved.id] ?? 0) + 1 }));
-              void reload();
-            }}
-            onDeleted={() => {
-              setOpenId(null);
-              void reload();
-            }}
-            onClose={() => setOpenId(null)}
-            redrawNote={fixNote && fixNote.id === openId ? fixNote : undefined}
-          />
-        </div>
-      )}
-      <ul className={`${styles.grid} ${glass.mtSm}`} data-testid="pi-grid">
-        {rows.map((r) => {
+  // Backdrops first: the place of a scene is decided before what stands in it.
+  const backdropRows = rows.filter((r) => r.kind === "backdrop");
+  const figureRows = rows.filter((r) => r.kind !== "backdrop");
+
+  function renderRow(r: ProjectIllustration) {
           const ill = r.illustration;
           const skip = (
             <Button variant="ghost" onClick={() => act(r.id, () => skipProjectIllustration(projectId, r.id, r.state !== "skipped"))} disabled={busy[r.id]} data-testid={`pi-skip-${r.name}`}>
@@ -287,7 +236,75 @@ export function ProjectIllustrationsPanel({
               </div>
             </li>
           );
-        })}
+  }
+
+  return (
+    <Card
+      title="Hình minh hoạ của video"
+      hint="Lập từ storyboard: hình thư viện đã có thì dùng lại, còn thiếu thì AI vẽ theo luật style. Bước Code chỉ chạy khi mọi hình đã duyệt hoặc bỏ qua."
+      headerAction={
+        <div className={styles.headerActions}>
+          {missing > 0 && (
+            <Button variant="ghost" onClick={drawAllMissing} disabled={locked} data-testid="pi-draw-all">
+              {starting ? "Đang bắt đầu…" : `Vẽ ${missing} hình còn thiếu`}
+            </Button>
+          )}
+          <Button variant="ghost" onClick={plan} disabled={locked} data-testid="pi-plan">
+            {planning ? "Đang đọc storyboard…" : rows.length ? "Lập lại danh sách" : "Lập danh sách từ storyboard"}
+          </Button>
+        </div>
+      }
+      data-testid="project-illustrations"
+    >
+      <p className={rows.length > 0 && ready === rows.length && !stale ? styles.ok : styles.waiting} data-testid="pi-summary">
+        {rows.length === 0
+          ? chainDrawing
+            ? "AI đang lập danh sách hình từ storyboard…"
+            : "Chưa có danh sách — chạy bước Hình minh hoạ bằng AI, hoặc bấm “Lập danh sách từ storyboard”."
+          : ready === rows.length && !stale
+            ? `Đủ ${rows.length} hình — bước Code chạy được.`
+            : ready === rows.length
+            ? `Đủ ${rows.length} hình nhưng danh sách lập từ storyboard cũ.`
+            : `${ready}/${rows.length} hình sẵn sàng — bước Code đang chờ bạn duyệt hoặc bỏ qua các hình còn lại.`}
+      </p>
+      {stale && rows.length > 0 && (
+        <p className={styles.error} role="status" data-testid="pi-stale">
+          Storyboard đã đổi sau khi lập danh sách này — bước Code sẽ không chạy với danh sách cũ. Bấm “Lập lại danh sách”,
+          hoặc chạy lại bước Hình minh hoạ (hình đã vẽ vẫn được giữ).
+        </p>
+      )}
+      {message && <p className={styles.error} role="status">{message}</p>}
+      {openId && (
+        <div className={glass.mtSm}>
+          <IllustrationEditor
+            illustration={opened}
+            folders={folders}
+            onSaved={(saved) => {
+              setBust((b) => ({ ...b, [saved.id]: (b[saved.id] ?? 0) + 1 }));
+              void reload();
+            }}
+            onDeleted={() => {
+              setOpenId(null);
+              void reload();
+            }}
+            onClose={() => setOpenId(null)}
+            redrawNote={fixNote && fixNote.id === openId ? fixNote : undefined}
+          />
+        </div>
+      )}
+      {backdropRows.length > 0 && (
+        <>
+          <h3 className={`${glass.cardTitle} ${glass.mtSm}`} data-testid="pi-backdrops-title">
+            Nền của cảnh
+          </h3>
+          <ul className={`${styles.grid} ${glass.mtSm}`} data-testid="pi-backdrops-grid">
+            {backdropRows.map(renderRow)}
+          </ul>
+          <h3 className={`${glass.cardTitle} ${glass.mtSm}`}>Hình</h3>
+        </>
+      )}
+      <ul className={`${styles.grid} ${glass.mtSm}`} data-testid="pi-grid">
+        {figureRows.map(renderRow)}
       </ul>
     </Card>
   );

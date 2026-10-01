@@ -212,6 +212,9 @@ func (uc *RenderPromptUseCase) variablesFor(
 		"video_archetypes":        "",
 		"subtitle_zone":           domain.SubtitleZone(project, language),
 	}
+	for name, value := range domain.FramePromptVars(domain.FrameFor(project.VideoOutputMode), language) {
+		vars[name] = value
+	}
 
 	// The beat sheet only means something for the step that writes the
 	// outline; fetching a format for the others would be work whose result

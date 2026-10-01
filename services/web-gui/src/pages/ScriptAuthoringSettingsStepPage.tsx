@@ -19,11 +19,13 @@ import {
   ProjectDraftContext,
   ProjectDraftDispatchContext,
   saveLastUsedSettings,
+  type VideoOutputMode,
 } from "../context/ProjectDraftContext";
 import { createProjectDraft, patchWizardSettings, type SimilarProject, type WizardSettingsPatch } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
 import { FLOW_CONFIG, flowTitle } from "../utils/flow";
+import { DEFAULT_LONG_FORMAT_ID, SHORT_FORMAT_ID, formatsFor, isShortFormat } from "../utils/outputMode";
 
 interface SettingsSectionProps {
   /** "1. Nội dung video": số thứ tự là thứ tự quyết định. */
@@ -73,6 +75,8 @@ export function ScriptAuthoringSettingsStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const isRemotion = draft.renderEngine === "remotion";
+  const isShort = draft.videoOutputMode === "short";
+  const modeFormats = formatsFor(draft.videoOutputMode, formats);
   // Dự án trùng chủ đề, do Bước 1 chuyển sang lúc tạo project.
   const location = useLocation();
   const similarProjects = (location.state as { similarProjects?: SimilarProject[] } | null)?.similarProjects ?? [];
@@ -122,6 +126,27 @@ export function ScriptAuthoringSettingsStepPage() {
   function handleFormatChange(formatId: string) {
     dispatch({ type: "SET_VIDEO_FORMAT", payload: formatId });
     void send({ videoFormatId: formatId });
+  }
+
+  // A short is built vertically from the start: the short format, Remotion
+  // (Manim has no portrait frame) and no burned subtitles. The server applies
+  // the same defaults to the same patch; the draft follows so the screen shows them.
+  function handleOutputModeChange(mode: VideoOutputMode) {
+    dispatch({ type: "SET_VIDEO_OUTPUT_MODE", payload: mode });
+    if (mode === "short") {
+      dispatch({ type: "SET_VIDEO_FORMAT", payload: SHORT_FORMAT_ID });
+      dispatch({ type: "SET_RENDER_ENGINE", payload: "remotion" });
+      dispatch({ type: "SET_SUBTITLE_MODE", payload: "off" });
+      void send({ videoOutputMode: mode });
+      return;
+    }
+    const current = formats.find((f) => f.id === draft.videoFormatId);
+    if (current && isShortFormat(current)) {
+      dispatch({ type: "SET_VIDEO_FORMAT", payload: DEFAULT_LONG_FORMAT_ID });
+      void send({ videoOutputMode: mode, videoFormatId: DEFAULT_LONG_FORMAT_ID });
+      return;
+    }
+    void send({ videoOutputMode: mode });
   }
 
   function handleEngineChange(engine: "manim" | "remotion") {
@@ -185,21 +210,15 @@ export function ScriptAuthoringSettingsStepPage() {
               <VideoArchetypePicker
                 topic={draft.authoringTopic}
                 onTopicChange={handleTopicChange}
-                formats={formats}
+                formats={modeFormats}
                 formatId={draft.videoFormatId}
                 onFormatChange={handleFormatChange}
               />
             </div>
           </div>
           <div className={styles.settingsRow}>
-            <VideoFormatPicker formats={formats} value={draft.videoFormatId} onChange={handleFormatChange} />
-            <VideoOutputModePicker
-              value={draft.videoOutputMode}
-              onChange={(mode) => {
-                dispatch({ type: "SET_VIDEO_OUTPUT_MODE", payload: mode });
-                void send({ videoOutputMode: mode });
-              }}
-            />
+            <VideoOutputModePicker value={draft.videoOutputMode} onChange={handleOutputModeChange} />
+            <VideoFormatPicker formats={modeFormats} value={draft.videoFormatId} onChange={handleFormatChange} />
           </div>
         </SettingsSection>
 
@@ -229,7 +248,12 @@ export function ScriptAuthoringSettingsStepPage() {
           testId="settings-section-authoring"
         >
           <div className={styles.settingsRow}>
-            <RenderEnginePicker value={draft.renderEngine} onChange={handleEngineChange} />
+            <RenderEnginePicker value={draft.renderEngine} onChange={handleEngineChange} disabled={isShort} />
+            {isShort && (
+              <p className={glass.helperText} role="status" data-testid="short-engine-note">
+                Short dọc chỉ dựng được bằng Remotion.
+              </p>
+            )}
           </div>
           <div className={styles.settingsRow}>
             <AuthoringModeBar

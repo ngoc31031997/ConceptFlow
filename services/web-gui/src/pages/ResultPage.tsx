@@ -3,17 +3,16 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { VideoPlayer } from "../components/VideoPlayer";
 import { AppShell } from "../components/AppShell";
 import { RenderQualityPicker } from "../components/RenderQualityPicker";
-import { VideoOutputModePicker } from "../components/VideoOutputModePicker";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useProject } from "../hooks/useProject";
 import { ProjectInputPanel } from "../components/ProjectInputPanel";
 import { ClipsPanel } from "../components/ClipsPanel";
-import { ShortScriptAssistant } from "../components/ShortScriptAssistant";
+import { MakeShortButton } from "../components/MakeShortButton";
 import { CompanionProjectCard } from "../components/CompanionProjectCard";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
 import { Disclosure } from "../components/Disclosure";
 import { startRenderSaga, deleteProject, getProjectVideoUrl, ApiError } from "../api/client";
-import type { RenderQuality, VideoOutputMode } from "../context/ProjectDraftContext";
+import type { RenderQuality } from "../context/ProjectDraftContext";
 import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
@@ -30,15 +29,11 @@ export function ResultPage() {
   const projectId = id ?? "";
   const navigate = useNavigate();
   const { project } = useProject(projectId);
+  const outputMode = project?.video_output_mode ?? "long";
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [rerenderQuality, setRerenderQuality] = useState<RenderQuality>("1080p60");
-  // null = "not touched yet": the sensible default is "carry over this
-  // project's current mode", which is not known until `project` loads.
-  const [rerenderOutputModeOverride, setRerenderOutputModeOverride] = useState<VideoOutputMode | null>(
-    null,
-  );
   const [isRerendering, setIsRerendering] = useState(false);
   const [rerenderError, setRerenderError] = useState<string | null>(null);
 
@@ -70,7 +65,9 @@ export function ResultPage() {
         subtitle_style: project.subtitle_style,
         render_quality: rerenderQuality,
         render_engine: project.render_engine,
-        video_output_mode: rerenderOutputMode,
+        // The frame (16:9 or 9:16) was fixed when the code was written, so a
+        // re-render keeps the project's own output mode.
+        video_output_mode: outputMode,
         video_format_id: project.video_format_id,
         background_music_volume: project.background_music_volume,
       });
@@ -103,11 +100,9 @@ export function ResultPage() {
 
   const isPublished = project.status === "published" || Boolean(project.youtube_video_url);
 
-  // A clip only ever comes from `with self.clip(...)` in
-  // the script — picking "short"/"both" alone never produces one.
-  const outputMode = project.video_output_mode ?? "long";
-  const wantsClips = outputMode === "short" || outputMode === "both";
-  const rerenderOutputMode = rerenderOutputModeOverride ?? outputMode;
+  // Clips are only cut from a "both" project, and only from `with
+  // self.clip(...)` in its script; a short is already vertical.
+  const wantsClips = outputMode === "both";
 
   return (
     <div data-testid="result-page">
@@ -187,17 +182,11 @@ export function ResultPage() {
 
           {project.video_path && (
             <Disclosure
-              title="Dựng lại với chất lượng hoặc loại video khác"
+              title="Dựng lại với chất lượng khác"
               hint="Video sẽ được tạo lại từ đầu, mất thời gian như lần đầu."
               testId="rerender"
             >
               <RenderQualityPicker value={rerenderQuality} onChange={setRerenderQuality} />
-              <div className={glass.mtSm}>
-                <div className={glass.cardTitle} style={{ marginBottom: 10 }}>
-                  Loại video
-                </div>
-                <VideoOutputModePicker value={rerenderOutputMode} onChange={setRerenderOutputModeOverride} bare />
-              </div>
               {rerenderError && (
                 <p role="alert" className={`${glass.helperText} ${glass.mtXs}`}>
                   {rerenderError}
@@ -211,18 +200,13 @@ export function ResultPage() {
             </Disclosure>
           )}
 
-          {!project.companion_project_id && project.video_path && (
+          {!project.companion_project_id && project.video_path && outputMode !== "short" && (
             <Disclosure
-              title="Tạo bản Shorts/TikTok riêng cho video này"
-              hint="Một kịch bản riêng, ngắn gọn và tự hoàn chỉnh, không cắt từ video này."
+              title="Làm bản short dọc cho video này"
+              hint="Một video dọc 9:16 cùng chủ đề, kịch bản riêng, không cắt từ video này."
               testId="short-companion"
             >
-              <ShortScriptAssistant
-                sourceProjectId={projectId}
-                sourceScriptContent={project.script_content}
-                contentLanguage={project.voice_language}
-                onCreated={(newProjectId) => navigate(`/projects/${newProjectId}/validate`)}
-              />
+              <MakeShortButton projectId={projectId} contentLanguage={project.voice_language} />
             </Disclosure>
           )}
 

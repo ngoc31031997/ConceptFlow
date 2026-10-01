@@ -1,5 +1,7 @@
 package domain
 
+import "fmt"
+
 // Wizard steps the Creator walks through. The GUI shows exactly seven; the
 // backend stores which one a project has reached so a reload, another browser
 // or a restart of the stack resumes in the right place.
@@ -53,6 +55,46 @@ type WizardSettingsPatch struct {
 	BackgroundMusicVolume *float64
 	VideoFont             *string
 	Confirm               bool
+}
+
+// ApplyShortDefaults completes a patch that switches the project to the
+// vertical short with what a short needs and the Creator did not pick in the
+// same patch: the short format, the Remotion engine (Manim has no portrait
+// frame) and no subtitles (a short carries its keywords in the picture).
+func ApplyShortDefaults(p *WizardSettingsPatch) {
+	if p.VideoOutputMode == nil || *p.VideoOutputMode != ModeShortOnly {
+		return
+	}
+	if p.VideoFormatID == nil {
+		id := FormatVerticalShort60s.ID
+		p.VideoFormatID = &id
+	}
+	if p.RenderEngine == nil {
+		engine := RenderEngineRemotion
+		p.RenderEngine = &engine
+	}
+	if p.SubtitleMode == nil {
+		off := SubtitleModeOff
+		p.SubtitleMode = &off
+	}
+}
+
+// CheckOutputSettings refuses a combination the render saga cannot build: a
+// short needs a short format and the Remotion engine, and a short format
+// belongs to a short.
+func CheckOutputSettings(mode VideoOutputMode, format VideoFormat, engine RenderEngine) error {
+	short := mode == ModeShortOnly
+	switch {
+	case short && !format.IsShort():
+		return fmt.Errorf("%w: short dọc cần format ngắn (tối đa %d giây), đang chọn %q",
+			ErrInvalidWizardInput, ShortFormatMaxSeconds, format.Name)
+	case !short && format.IsShort():
+		return fmt.Errorf("%w: format %q dành cho short dọc — chọn đầu ra Short dọc hoặc một format video dài",
+			ErrInvalidWizardInput, format.Name)
+	case short && engine != RenderEngineRemotion:
+		return fmt.Errorf("%w: short dọc chỉ dựng được bằng Remotion", ErrInvalidWizardInput)
+	}
+	return nil
 }
 
 // failedStageOrder ranks each failed_at_<step> status by how far the saga got,

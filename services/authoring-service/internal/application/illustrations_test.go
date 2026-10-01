@@ -161,7 +161,7 @@ type fakeRenderer struct {
 	fail  bool
 }
 
-func (f *fakeRenderer) PreviewIllustration(_ context.Context, name, code string, _ map[string]any, _ bool) (IllustrationPreview, error) {
+func (f *fakeRenderer) PreviewIllustration(_ context.Context, name, code string, _ map[string]any, _ bool, _ domain.IllustrationKind) (IllustrationPreview, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, name+"|"+code)

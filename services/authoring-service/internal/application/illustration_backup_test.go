@@ -216,7 +216,7 @@ func TestImportNeverOverwritesABuiltinAndReportsBrokenDrawings(t *testing.T) {
 
 type unreachableRenderer struct{ calls int }
 
-func (u *unreachableRenderer) PreviewIllustration(context.Context, string, string, map[string]any, bool) (IllustrationPreview, error) {
+func (u *unreachableRenderer) PreviewIllustration(context.Context, string, string, map[string]any, bool, domain.IllustrationKind) (IllustrationPreview, error) {
 	u.calls++
 	return IllustrationPreview{}, errors.New("rendering unreachable")
 }

@@ -128,6 +128,15 @@ async def test_storyboard_finalize_fails_with_422_when_repair_is_still_invalid(c
     assert r.status_code == 422 and r.json()["error"]["problems"]
 
 
+async def test_a_frame_that_is_neither_landscape_nor_portrait_is_refused(client):
+    r = await client.post("/v1/storyboard/finalize", json={
+        "content": storyboard(1), "frame": {"width": 1280, "height": 720}})
+    assert r.status_code == 422
+    r = await client.post("/v2/code/plan", json={
+        "engine": "remotion", "storyboard": storyboard(1), "system": "S", "frame": {"width": 1080, "height": 1920}})
+    assert r.status_code == 200
+
+
 async def test_code_generate_streams_phases_and_the_final_code(client):
     with respx.mock:
         respx.post("https://hive.test/v3/chat/completions").mock(side_effect=lambda req: _fake_hive(req))

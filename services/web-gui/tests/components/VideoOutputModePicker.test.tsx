@@ -8,7 +8,7 @@ describe("VideoOutputModePicker", () => {
 
     expect(screen.getByTestId("video-output-mode-long")).toHaveAttribute("aria-checked", "true");
     expect(screen.getByTestId("video-output-mode-short")).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByTestId("video-output-mode-both")).toHaveAttribute("aria-checked", "false");
+    expect(screen.queryByTestId("video-output-mode-both")).toBeNull();
   });
 
   it("reports the chosen mode", () => {
@@ -20,9 +20,11 @@ describe("VideoOutputModePicker", () => {
     expect(onChange).toHaveBeenCalledWith("short");
   });
 
-  it("warns that a clip needs self.clip(...) markers when short or both is picked", () => {
+  it("says what a vertical short is built with when short is picked", () => {
     render(<VideoOutputModePicker value="short" onChange={vi.fn()} />);
-    expect(screen.getByRole("status").textContent).toContain("self.clip");
+    const note = screen.getByRole("status").textContent ?? "";
+    expect(note).toContain("Remotion");
+    expect(note).not.toContain("self.clip");
   });
 
   it("shows no warning for long-only", () => {

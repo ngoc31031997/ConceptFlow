@@ -71,8 +71,33 @@ var FormatQuickExplainer3Min = VideoFormat{
 	},
 }
 
+// FormatVerticalShort60s is the vertical short: one idea, a hook in the first
+// seconds, built at 1080x1920 from the start (see ADR-0031).
+var FormatVerticalShort60s = VideoFormat{
+	ID:         "vertical_short_60s",
+	Name:       "Short dọc — 30 đến 60 giây",
+	Version:    1,
+	MinSeconds: 30,
+	MaxSeconds: 60,
+	Beats: []FormatBeat{
+		{ID: "hook", Role: "hook", MinSeconds: 2, MaxSeconds: 5, Required: true, MaxRepeat: 1},
+		{ID: "concrete", Role: "example", MinSeconds: 20, MaxSeconds: 40, Required: true, MaxRepeat: 1},
+		{ID: "recap", Role: "summary", MinSeconds: 5, MaxSeconds: 12, Required: true, MaxRepeat: 1},
+	},
+}
+
+// ShortFormatMaxSeconds is the longest a short's format may run: a format that
+// fits under it is for the vertical short, anything longer for a long video.
+const ShortFormatMaxSeconds = 90
+
+// IsShort reports whether f is a format for the vertical short.
+func (f VideoFormat) IsShort() bool {
+	return f.MaxSeconds > 0 && f.MaxSeconds <= ShortFormatMaxSeconds
+}
+
+// BuiltinFormats are the formats seeded on first start.
 func BuiltinFormats() []VideoFormat {
-	return []VideoFormat{FormatCaseStudyEssay8Min, FormatQuickExplainer3Min}
+	return []VideoFormat{FormatCaseStudyEssay8Min, FormatQuickExplainer3Min, FormatVerticalShort60s}
 }
 
 // DefaultVideoFormatID is what a project gets when the Creator did not choose,

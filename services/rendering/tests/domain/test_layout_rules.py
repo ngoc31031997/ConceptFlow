@@ -35,6 +35,12 @@ def load(name: str) -> tuple[dict, dict[str, list[int]]]:
     return probe, lines
 
 
+def without_hero(found: list) -> list:
+    """Các phát hiện trừ cảnh báo cỡ vật chính: số đo mẫu được ghi khi ngưỡng
+    còn 30%, nên chiếc răng 39% của chúng giờ có cảnh báo L14 riêng."""
+    return [f for f in found if f.rule != HERO_SIZE]
+
+
 def owner(lines: dict[str, list[int]], line: int) -> str | None:
     """Merged.shot_at của llm-service."""
     return next((sid for sid, (a, b) in lines.items() if a <= line <= b), None)
@@ -45,12 +51,14 @@ def owner(lines: dict[str, list[int]], line: int) -> str | None:
 
 def test_clean_script_has_no_finding():
     probe, _ = load("clean")
-    assert evaluate(probe) == []
+    found = evaluate(probe)
+    assert without_hero(found) == []
+    assert all(not f.blocking and "(< 40%)" in f.detail for f in found)
 
 
 def test_the_three_planted_faults_block_on_the_right_shots():
     probe, lines = load("problems")
-    found = evaluate(probe)
+    found = without_hero(evaluate(probe))
     assert all(f.blocking for f in found)
     got = sorted((owner(lines, f.line), f.rule, f.line) for f in found)
     assert got == [
@@ -70,7 +78,7 @@ def test_the_three_planted_faults_block_on_the_right_shots():
 def test_spring_overshoot_between_the_old_four_samples_is_caught():
     # 0/50/85/100% bỏ sót; mặt trời spring({damping: 6}) vọt ra ở frame 10.
     probe, lines = load("overshoot")
-    [f] = evaluate(probe)
+    [f] = without_hero(evaluate(probe))
     assert f.blocking and f.rule == SAFE_AREA and owner(lines, f.line) == "1.1"
     assert f.frames == ["7%"]
     assert "hình Sun ra ngoài vùng an toàn (trên y=94 < 96, phải x=1846 > 1824)" in f.message
@@ -78,7 +86,7 @@ def test_spring_overshoot_between_the_old_four_samples_is_caught():
 
 def test_subtitle_band_uses_the_strip_from_the_frame_edge():
     probe, lines = load("clean")
-    found = evaluate(probe, SubtitleBand("bottom", 240))
+    found = without_hero(evaluate(probe, SubtitleBand("bottom", 240)))
     assert found and all(f.rule == SUBTITLE_ZONE and f.blocking for f in found)
     panel = next(f for f in found if owner(lines, f.line) == "2.3")
     assert "lấn vùng phụ đề ở mép dưới khung (mép dưới y=960 > 840)" in panel.message
@@ -107,7 +115,7 @@ def kit(line, name, box, **over):
     return {"kind": "kit", "component": name, "line": line, "rect": box, "opacity": 1, **over}
 
 
-BIG = kit(12, "Tooth", rect(700, 300, 420, 420))  # đủ lớn để không có cảnh báo L14
+BIG = kit(12, "Tooth", rect(700, 290, 460, 460))  # đủ lớn để không có cảnh báo L14
 
 PCTS = [0, 5 / 149, 10 / 149, 0.5, 127 / 149, 1]
 
@@ -207,7 +215,7 @@ def test_hero_size_is_only_a_warning_and_text_only_shots_are_not_judged():
     small = kit(14, "Apple", rect(800, 400, 200, 200))
     [f] = evaluate(probe_of(lambda p: [small]))
     assert f.rule == HERO_SIZE and not f.blocking
-    assert f.message == ("Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (< 30%) — "
+    assert f.message == ("Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (< 40%) — "
                          "khung dễ thành nền trống với vật nhỏ lọt thỏm")
     assert evaluate(probe_of(lambda p: [text(13, "Chương 2", rect(400, 400, 1000, 100))])) == []
 
@@ -226,8 +234,8 @@ def test_a_shot_that_throws_blocks_on_its_declaration_line_and_pending_assets_wa
 
 def test_the_line_is_the_offending_tag_inside_the_shot_else_the_shot_declaration():
     # Hai shot: 1.1 khai báo ở dòng 40, 1.2 ở dòng 60, `const SHOTS` ở dòng 80.
-    inside = kit(45, "Tooth", rect(1700, 300, 420, 420))
-    from_library = kit(20, "SchoolBus", rect(1700, 300, 420, 420))  # hình thư viện dán phía trên các shot
+    inside = kit(45, "Tooth", rect(1700, 300, 460, 460))
+    from_library = kit(20, "SchoolBus", rect(1700, 300, 460, 460))  # hình thư viện dán phía trên các shot
     probe = probe_of(lambda p: [inside], lambda p: [from_library], lines=(40, 60), shots_line=80)
     found = sorted(evaluate(probe), key=lambda f: f.shot)
     assert [(f.shot, f.line, f.element_line) for f in found] == [("1.1", 45, 45), ("1.2", 60, 20)]
@@ -239,7 +247,20 @@ def test_long_frame_lists_are_shortened():
     assert f.message.startswith("Shot 1.1, frame 3%…100% (5/6 mẫu):")
 
 
-@pytest.mark.parametrize("edge,px", [("left", 200), ("bottom", 0), ("top", 1080)])
+@pytest.mark.parametrize("edge,px", [("left", 200), ("bottom", 0), ("top", 1920)])
 def test_a_nonsense_subtitle_band_is_refused(edge, px):
     with pytest.raises(ValueError):
         SubtitleBand(edge, px)
+
+
+def test_a_portrait_frame_uses_the_shorts_safe_area():
+    # Khung dọc: chừa 200px trên, 360px dưới, 140px phải cho giao diện Shorts.
+    hero = kit(12, "Person", rect(200, 500, 600, 900))  # mép phải 800, mép dưới 1400: trong vùng an toàn dọc
+    probe = probe_of(lambda p: [hero])
+    probe["composition"] = {"width": 1080, "height": 1920, "fps": 30}
+    assert evaluate(probe) == []
+    beside_buttons = kit(14, "Germ", rect(800, 600, 200, 200))  # mép phải 1000 > 940
+    probe = probe_of(lambda p: [hero, beside_buttons])
+    probe["composition"] = {"width": 1080, "height": 1920, "fps": 30}
+    [f] = evaluate(probe)
+    assert f.rule == SAFE_AREA and "phải x=1000 > 940" in f.message

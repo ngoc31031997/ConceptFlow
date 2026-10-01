@@ -1,0 +1,34 @@
+Import được: 'react'; 'remotion' (useCurrentFrame, useVideoConfig, interpolate, random với seed cố định); './conceptflow-mini/illustration' (shadeOf, useSvgId); './conceptflow-mini/scene' (useLayerBox). KHÔNG import gì khác.
+
+- useVideoConfig(): {width, height} — kích thước khung của video (ngang hoặc dọc).
+- useLayerBox(): {left, top, width, height} — hộp của lớp đang vẽ, rộng hơn khung 12% mỗi phía để lớp trôi theo máy mà không lộ mép; vẽ <svg> phủ đúng hộp này với viewBox theo toạ độ khung.
+- shadeOf(hex, amount): màu tối hơn (âm) hoặc sáng hơn (dương).
+- useSvgId(prefix): id duy nhất cho gradient (luật S25).
+- random('seed-co-dinh'): số ngẫu nhiên tất định 0..1 để rải sao, tế bào, bọt.
+
+Khung một nền (theo đúng cấu trúc này):
+
+export function OrchardBackdrop({layer, color = '#8FD3FF', ground = '#4CAF50', light = '#FFD23F', still = false}: {layer: 'sky' | 'far' | 'mid' | 'near'; color?: string; ground?: string; light?: string; still?: boolean}) {
+  const {width: W, height: H} = useVideoConfig();
+  const box = useLayerBox();
+  const frame = useCurrentFrame();
+  const sky = useSvgId('sky');
+  const sway = still ? 0 : Math.sin(frame / 22);
+  const svg = (children: React.ReactNode) => (
+    <svg width={box.width} height={box.height} viewBox={`${box.left} ${box.top} ${box.width} ${box.height}`}
+      style={{position: 'absolute', left: box.left, top: box.top, overflow: 'visible'}}>{children}</svg>
+  );
+  if (layer === 'sky') {
+    return svg(<>
+      <defs><linearGradient id={sky} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={shadeOf(color, -0.1)} /><stop offset="1" stopColor={shadeOf(color, 0.45)} /></linearGradient></defs>
+      <rect x={box.left} y={box.top} width={box.width} height={box.height} fill={`url(#${sky})`} />
+    </>);
+  }
+  if (layer === 'mid') {
+    return svg(<rect x={box.left} y={H * 0.7} width={box.width} height={box.top + box.height - H * 0.7} fill={ground} />);
+  }
+  if (layer === 'near') {
+    return svg(<ellipse cx={W * 0.02 + sway * 6} cy={H} rx={W * 0.1} ry={H * 0.16} fill={shadeOf(ground, -0.3)} />);
+  }
+  return null;
+}

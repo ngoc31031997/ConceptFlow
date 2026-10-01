@@ -32,3 +32,4 @@
 | [ADR-0028](ADR-0028-force-ssl-scope-and-degradation.md) | Nâng scope lên youtube.force-ssl, và suy giảm êm cho kênh chưa nối lại | Proposed | Low-Level Design (CR-015) | 2026-09-09 |
 | [ADR-0029](ADR-0029-authoring-service-boundary.md) | Tách authoring-service khỏi orchestrator | Accepted | Requirements Analysis → Construction (CR-040 FR111) | 2026-09-26 |
 | [ADR-0030](ADR-0030-code-segments-and-v2-code-contract.md) | Lưu từng đoạn của bước Code trong authoring-service, llm-service chạy không trạng thái (contract `/v2/code/*`) | Accepted | Application Design (CR-050 Unit 2) | 2026-09-30 |
+| [ADR-0031](ADR-0031-frame-orientation-by-output-mode.md) | Khung hình theo chế độ đầu ra; short dựng dọc riêng từ đầu | Accepted | Application Design (CR-060) | 2026-10-01 |

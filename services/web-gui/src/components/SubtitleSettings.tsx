@@ -30,7 +30,7 @@ const SUBTITLE_MODE_OPTIONS: { value: SubtitleMode; label: string; hint: string 
   {
     value: "burn_in",
     label: "Ghi cứng vào hình",
-    hint: "Chữ nằm cố định trên hình, phù hợp nền tảng không hỗ trợ phụ đề rời",
+    hint: "Chữ nằm cố định trên hình, phù hợp nền tảng không hỗ trợ phụ đề rời — không khuyến nghị cho video dài",
   },
   {
     value: "both",

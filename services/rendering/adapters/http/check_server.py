@@ -31,6 +31,8 @@ class IllustrationBody(BaseModel):
     code: str = ""  # trống = hình dựng sẵn của bộ minh hoạ
     props: dict = {}
     gif: bool = True
+    # "figure" (a figure of a shot) or "backdrop" (a whole-frame place).
+    kind: Literal["figure", "backdrop"] = "figure"
 
 
 class SubtitleBandBody(BaseModel):
@@ -131,7 +133,8 @@ def create_check_app(
             return JSONResponse({"error": "illustration preview is not enabled"}, status_code=404)
         async with preview_gate:
             try:
-                out = await asyncio.to_thread(illustrations.run, body.name, body.code, body.props, body.gif)
+                out = await asyncio.to_thread(
+                    illustrations.run, body.name, body.code, body.props, body.gif, body.kind)
             except (IllustrationPreviewError, TypeScriptCheckError) as exc:
                 logger.error("illustration preview could not run: %s", exc)
                 return JSONResponse({"error": str(exc)}, status_code=503)

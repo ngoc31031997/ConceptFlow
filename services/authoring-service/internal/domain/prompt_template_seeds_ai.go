@@ -35,6 +35,7 @@ Cấu trúc:
       "invariant": "<ý nghĩa bất biến: điều người xem BẮT BUỘC phải hiểu sau cảnh này — một câu>",
       "transition_in": "<hình nào của cảnh trước trở thành gì ở cảnh này, bằng kiểu chuyển cảnh nào>",
       "mood": "<cảm xúc và nhịp của cảnh>",
+      "setting": "<bối cảnh kín khung: nơi chốn; lớp xa / lớp giữa / lớp gần mờ; nguồn sáng; tông màu chủ đạo theo vai trò trong palette>",
       "end_frame": "<hình còn lại trên màn hình khi cảnh kết thúc — cũng là điểm khởi đầu của cảnh sau>",
       "shots": [
         {
@@ -58,7 +59,7 @@ Quy tắc của cấu trúc:
 - "id" của shot có dạng "<số cảnh>.<số thứ tự shot>" (ví dụ "1.1", "1.2", "2.1"), duy nhất trong toàn phim, đánh số theo thứ tự xuất hiện. Số shot do lượng thay đổi hình quyết định, không thêm cho đủ số.
 - "transition_in" của cảnh 1 là null. Mọi trường chuỗi khác không được để trống.
 - Trong chuỗi JSON, dấu ngoặc kép thẳng phải viết \", xuống dòng viết \n; câu thoại không chứa xuống dòng.
-- "layout": chỗ đứng cố định của mọi vật SỐNG QUA NHIỀU SHOT (nhân vật chính, khối lặp lại, nhãn cố định). Các shot được dựng SONG SONG bởi nhiều người, mỗi người chỉ thấy vài shot, nên đây là thứ duy nhất giữ cho một vật đứng đúng một chỗ từ shot này sang shot khác. Mỗi mục: khoá camelCase ASCII mô tả vai trò (ví dụ "hero", "counterLabel"), giá trị là toạ độ TÂM "x", "y" và kích thước "size" (hoặc "w" và "h"), tính bằng px trên khung 1920x1080, chỉ là số. Cả vật (tâm cộng nửa kích thước) phải nằm trọn trong vùng an toàn từ (96, 96) đến (1824, 984). Vùng phụ đề: {{subtitle_zone}} Vật chỉ xuất hiện trong một shot thì không ghi. Không có vật nào xuyên suốt thì ghi "layout": {}.
+- "layout": chỗ đứng cố định của mọi vật SỐNG QUA NHIỀU SHOT (nhân vật chính, khối lặp lại, nhãn cố định). Các shot được dựng SONG SONG bởi nhiều người, mỗi người chỉ thấy vài shot, nên đây là thứ duy nhất giữ cho một vật đứng đúng một chỗ từ shot này sang shot khác. Mỗi mục: khoá camelCase ASCII mô tả vai trò (ví dụ "hero", "counterLabel"), giá trị là toạ độ TÂM "x", "y" và kích thước "size" (hoặc "w" và "h"), tính bằng px trên khung {{frame}}, chỉ là số. Cả vật (tâm cộng nửa kích thước) phải nằm trọn trong vùng an toàn từ {{safe_area}}. Vùng phụ đề: {{subtitle_zone}} Vật chỉ xuất hiện trong một shot thì không ghi. Không có vật nào xuyên suốt thì ghi "layout": {}.
 
 `
 
@@ -78,6 +79,7 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
 13. Tắt tiếng và chỉ nhìn "visual" từng shot: có shot nào mà "narration" nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 14. Mỗi vật cụ thể lần đầu xuất hiện trong "visual" đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
+14b. Mỗi cảnh đã có "setting" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) chưa? Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động, vật chính ≥ 40% chiều khung (trừ toàn cảnh) chưa? (luật 20)
 15. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
 16. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
@@ -107,7 +109,8 @@ const remoAAIVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG 
 
 1. **Một shot = một hàm.** Mỗi shot trở thành ĐÚNG MỘT component ¤ShotN_M¤ (số cảnh N, số thứ tự shot M lấy từ id shot, ví dụ shot ¤2.3¤ → ¤Shot2_3¤) vẽ phần "visual" và "camera" của shot đó. Không gộp hai shot, không tách một shot, không bỏ shot, không thêm shot. Câu thoại (narration) KHÔNG nằm trong code bạn viết — hệ thống tự đưa vào.
 2. **"visual" dựng đúng như chữ:** đúng những vật được nêu, đúng vị trí tương đối (bên phải, ngay dưới, sát mép trên...), đúng thứ tự xuất hiện, đúng kiểu chuyển động (mọc lên, trượt vào từ hướng nào, tách đôi, gộp lại, lấp đầy...), đúng nhịp (nhanh/chậm). KHÔNG thêm vật trang trí, hiệu ứng, icon, nền hoạ tiết mà kịch bản không nói tới. KHÔNG bỏ vật nào kịch bản có.
-3. **"camera":** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → ¤transform: translate(...) scale(...)¤ nội suy theo frame trên MỘT ¤<div>¤ "camera" bọc toàn bộ nội dung của shot (xem luật L8). Máy đứng yên thì không transform.
+3. **"camera":** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → prop ¤camera¤ của ¤<Scene>¤ (hoặc ¤<Camera>¤ khi shot không có Scene) — xem luật L8. "Máy đứng yên" vẫn cho máy trôi rất chậm (zoom 1 → 1.04) để cảnh có chiều sâu, trừ khi kịch bản nói rõ khung phải đứng im.
+3b. **"scene_setting":** bối cảnh của cảnh (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) → các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤, ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤; mọi shot của cùng một cảnh dựng cùng một bối cảnh.
 4. **"scene_transition_in":** biến hình / đi xuyên qua / kéo ra → frame 0 của shot đầu cảnh PHẢI vẽ lại y hệt hình cuối của shot trước (cùng toạ độ, cùng kích thước, cùng màu — lấy từ cùng mục trong ¤LAYOUT¤), rồi nội suy sang hình mới. Chỉ "cắt thẳng" mới được bắt đầu từ khung trống. Tin nhắn của người dùng luôn cho biết shot ngay trước lô bạn đang viết — dùng nó để nối.
 5. **"scene_end_frame":** hình ghi ở đó phải là thứ còn trên màn hình ở frame cuối của shot cuối cảnh đó.
 6. **"scene_invariant":** nếu một chi tiết không dựng được chính xác bằng JSX/SVG/CSS, chọn cách gần nhất vẫn giữ nguyên ý nghĩa bất biến của cảnh — không đổi ý nghĩa.
@@ -128,9 +131,9 @@ const remoBAIVI = `## B. MÀU — CHỈ DÙNG BẢNG MÀU CỦA ĐẠO DIỄN
 const remoDAIVI = `## D. KHUNG CODE DO HỆ THỐNG DỰNG — bạn chỉ viết phần ruột của từng hàm shot
 
 Hệ thống đã có sẵn, bạn dùng được mà không cần khai báo:
-- các import: ¤react¤; ¤remotion¤ (registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig); ¤./conceptflow-mini/segments¤; ¤./conceptflow-mini/primitives¤ (Stage, SAFE_MARGIN, WIDTH, HEIGHT); ¤./conceptflow-mini/lottie¤ (LottieClip); ¤./conceptflow-mini/illustration¤ (MỌI component của bộ minh hoạ ở mục C3). Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤ và kiểu ¤ShotProps = {duration: number}¤.
+- các import: ¤react¤; ¤remotion¤ (registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig); ¤./conceptflow-mini/segments¤; ¤./conceptflow-mini/primitives¤ (Stage, SAFE_MARGIN, WIDTH, HEIGHT); ¤./conceptflow-mini/lottie¤ (LottieClip); ¤./conceptflow-mini/illustration¤ và ¤./conceptflow-mini/scene¤ (MỌI component của bộ minh hoạ và cảnh ở mục C3). Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤ và kiểu ¤ShotProps = {duration: number}¤.
 - ¤PALETTE¤ (mục B) và ¤LAYOUT¤ (toạ độ dùng chung giữa các shot).
-¤LottieClip¤ (mục C2) và toàn bộ bộ minh hoạ (mục C3: ¤Backdrop¤, ¤Panel¤, ¤Person¤, ¤Tooth¤, ¤Germ¤...) cũng đã được import sẵn — dùng thẳng, không viết thêm dòng import nào (câu "Import:" ở mục C3 là cho người viết cả file).
+¤LottieClip¤ (mục C2) và toàn bộ bộ minh hoạ và cảnh (mục C3: ¤Scene¤, ¤Camera¤, ¤Glow¤, ¤Backdrop¤, ¤Panel¤, ¤Person¤, ¤Tooth¤, ¤Germ¤...) cũng đã được import sẵn — dùng thẳng, không viết thêm dòng import nào (câu "Import:" ở mục C3 là cho người viết cả file).
 
 Dạng của một hàm shot (đúng cấu trúc này):
 
@@ -138,18 +141,18 @@ Dạng của một hàm shot (đúng cấu trúc này):
 // Shot 1.2 — MÁY: đẩy vào | HÌNH: hình vuông (giữ nguyên chỗ) chuyển sang màu mờ, nhãn hiện bên phải
 function Shot1_2({duration}: ShotProps) {
   const frame = useCurrentFrame();
-  const zoom = interpolate(frame, [0, duration * 0.8], [1, 1.3], {...clamp, easing: Easing.inOut(Easing.cubic)});
+  const {width, height} = useVideoConfig();
   const color = interpolateColors(frame, [0, duration * 0.4], [PALETTE.accent, PALETTE.muted]);
   const labelIn = interpolate(frame, [duration * 0.3, duration * 0.5], [0, 1], clamp);
   const {x, y, size} = LAYOUT.hero;
   return (
     <AbsoluteFill>
-      <div style={{position: 'absolute', inset: 0, transformOrigin: ¤${x}px ${y}px¤, transform: ¤scale(${zoom})¤}}>
+      <Camera duration={duration} from={{x: width / 2, y: height / 2, zoom: 1}} to={{x, y, zoom: 1.3}} end={0.8}>
         <div style={{position: 'absolute', left: x - size / 2, top: y - size / 2, width: size, height: size, backgroundColor: color}} />
         <div style={{position: 'absolute', left: x + size / 2 + 32, top: y - 30, width: 360, fontSize: 44, fontWeight: 700, lineHeight: 1.25, color: PALETTE.ink, opacity: labelIn}}>
           Nhãn ngắn
         </div>
-      </div>
+      </Camera>
     </AbsoluteFill>
   );
 }
@@ -173,6 +176,7 @@ const remoGAIVI = `## G. SOÁT MỘT LƯỢT TRƯỚC KHI TRẢ LỜI
 7. Mọi ¤interpolate¤ đã clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc thời gian tính theo ¤duration¤?
 8. Không viết dòng import nào (khung đã import sẵn)? Không ¤<Img>¤/¤staticFile¤/¤fetch¤?
 9. Với từng shot: mọi người, bộ phận cơ thể, món ăn, đồ vật, bối cảnh trong "visual" mà bộ minh hoạ (mục C3) có — đã dùng đúng component đó chưa, hay đang vẽ tay bằng ¤<svg>¤/hình tròn thay thế? Nét mặt/dáng (¤mood¤, ¤pose¤, ¤decay¤) có đúng như "visual" mô tả? Tắt tiếng mà nhìn hình, người xem có nhận ra thoại đang nói về cái gì không?
+9b. Shot kể chuyện ở một nơi chốn đã dựng trong ¤<Scene>¤ theo "scene_setting", máy bằng prop ¤camera¤ (L8), vật chính ≥ 40% chiều khung (L14), không đoạn nào đứng yên quá 2 giây (L15) chưa?
 10. Chữ giữa các thẻ JSX có ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần?
 11. Code là TSX hợp lệ 100% để trình biên dịch TypeScript nhận (đủ ngoặc, không cắt cụt), không có chữ giải thích lọt vào ngoài comment?
 

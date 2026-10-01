@@ -21,6 +21,9 @@ func TestBuiltinIllustrationsMatchTheKitAndLiveInSystemFolders(t *testing.T) {
 		documented[m[1]] = true
 	}
 	delete(documented, "AbsoluteFill")
+	for _, c := range SceneKitComponents {
+		delete(documented, c)
+	}
 	seen := map[string]bool{}
 	for _, b := range BuiltinIllustrations() {
 		if !folders[b.FolderID] {

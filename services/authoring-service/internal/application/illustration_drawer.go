@@ -26,12 +26,17 @@ const (
 //go:embed drawer_prompt_vi.txt
 var drawerPromptVI string
 
+//go:embed drawer_backdrop_prompt_vi.txt
+var drawerBackdropPromptVI string
+
 // DrawRequest asks the AI drawer for a new drawing.
 type DrawRequest struct {
 	Description string // what to draw, in the Creator's words
 	FolderID    string
 	Name        string // optional; the model proposes one otherwise
 	Model       string // optional model override
+	// Kind is a figure (default) or a backdrop: it picks the drawer's rules.
+	Kind domain.IllustrationKind
 	// OnProgress, when set, hears each attempt's phase as it happens.
 	OnProgress func(domain.DrawProgress)
 }
@@ -91,9 +96,10 @@ func parseDrawnReply(text string) (drawnReply, error) {
 	return r, nil
 }
 
-// references is the reference text: the Hình mẫu the Creator picked,
-// then the Creator's own approved drawings in the same folder.
-func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID string) (string, error) {
+// references is the reference text: the Hình mẫu the Creator picked (for a
+// figure), then the Creator's own approved drawings of the same kind in the
+// same folder.
+func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID string, kind domain.IllustrationKind) (string, error) {
 	var b strings.Builder
 	add := func(i domain.Illustration, why string) bool {
 		if i.Code == "" || i.ID == skipID {
@@ -105,6 +111,9 @@ func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID
 	exemplars, err := uc.Exemplars(ctx)
 	if err != nil {
 		return "", fmt.Errorf("đọc Hình mẫu: %w", err)
+	}
+	if kind == domain.IllustrationBackdrop {
+		exemplars = nil // the Hình mẫu are figures; a backdrop learns from backdrops
 	}
 	for n, e := range exemplars {
 		if n >= domain.MaxExemplars {
@@ -119,7 +128,7 @@ func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID
 		}
 		own := 0
 		for _, i := range mine {
-			if own < maxOwnReferences && !i.ReadOnly() && add(i, "hình Creator đã duyệt, cùng thư mục") {
+			if own < maxOwnReferences && !i.ReadOnly() && domain.KindOrFigure(i.Kind) == kind && add(i, "hình Creator đã duyệt, cùng thư mục") {
 				own++
 			}
 		}
@@ -127,13 +136,22 @@ func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID
 	return strings.TrimSpace(b.String()), nil
 }
 
-func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string) (string, error) {
-	refs, err := uc.references(ctx, folderID, skipID)
+// drawerSystem is the drawer's system prompt for a figure or a backdrop.
+func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string, kind domain.IllustrationKind) (string, error) {
+	refs, err := uc.references(ctx, folderID, skipID, kind)
 	if err != nil {
 		return "", err
 	}
 	if refs == "" {
 		refs = "(Chưa có hình tham chiếu — dựng đúng theo luật style và linh kiện ở trên.)"
+	}
+	if kind == domain.IllustrationBackdrop {
+		return strings.NewReplacer(
+			"{{style}}", domain.BackdropStyleGuide(),
+			"{{figure_style}}", domain.IllustrationStyleGuide(),
+			"{{helpers}}", domain.BackdropHelpers(),
+			"{{references}}", refs,
+		).Replace(drawerBackdropPromptVI), nil
 	}
 	return strings.NewReplacer(
 		"{{style}}", domain.IllustrationStyleGuide(),
@@ -145,7 +163,7 @@ func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skip
 // draw runs the model until the renderer accepts the drawing. user is the
 // first turn; each failed attempt adds the code it produced and the errors.
 func (uc *IllustrationsUseCase) draw(
-	ctx context.Context, system, user, model string, onProgress func(domain.DrawProgress),
+	ctx context.Context, system, user, model string, kind domain.IllustrationKind, onProgress func(domain.DrawProgress),
 ) (drawnReply, IllustrationPreview, error) {
 	if uc.drawer == nil {
 		return drawnReply{}, IllustrationPreview{}, ErrDrawerDisabled
@@ -195,7 +213,7 @@ func (uc *IllustrationsUseCase) draw(
 			continue
 		}
 		report(domain.DrawProgress{Attempt: attempt, Phase: "checking", ContentChars: len(res.Content)})
-		preview, rerr := uc.render(ctx, reply.Name, reply.Code)
+		preview, rerr := uc.render(ctx, reply.Name, reply.Code, kind)
 		if rerr == nil {
 			return reply, preview, nil
 		}
@@ -219,17 +237,18 @@ func (uc *IllustrationsUseCase) Draw(ctx context.Context, req DrawRequest) (doma
 	if n := strings.TrimSpace(req.Name); n != "" {
 		user += "\nTên component bắt buộc: " + n
 	}
-	system, err := uc.drawerSystem(ctx, req.FolderID, "")
+	kind := domain.KindOrFigure(req.Kind)
+	system, err := uc.drawerSystem(ctx, req.FolderID, "", kind)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
-	reply, preview, err := uc.draw(ctx, system, user, req.Model, req.OnProgress)
+	reply, preview, err := uc.draw(ctx, system, user, req.Model, kind, req.OnProgress)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
 	i := domain.Illustration{
 		Name: reply.Name, Title: reply.Title, FolderID: req.FolderID, Tags: strings.Split(reply.Tags, ","),
-		Description: reply.Description, Usage: reply.Usage, Code: reply.Code,
+		Description: reply.Description, Usage: reply.Usage, Code: reply.Code, Kind: kind,
 	}
 	if i, err = normalizeIllustration(i); err != nil {
 		return i, err
@@ -263,11 +282,11 @@ func (uc *IllustrationsUseCase) Redraw(ctx context.Context, id, note, model stri
 	} else {
 		user += "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn."
 	}
-	system, err := uc.drawerSystem(ctx, existing.FolderID, existing.ID)
+	system, err := uc.drawerSystem(ctx, existing.FolderID, existing.ID, existing.Kind)
 	if err != nil {
 		return existing, err
 	}
-	reply, preview, err := uc.draw(ctx, system, user, model, nil)
+	reply, preview, err := uc.draw(ctx, system, user, model, existing.Kind, nil)
 	if err != nil {
 		return existing, err
 	}

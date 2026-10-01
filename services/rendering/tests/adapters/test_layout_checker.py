@@ -189,10 +189,16 @@ def _check(real_checker, name: str, band=None):
     return use_case.check("remotion", code, "creator", LayoutContext(subtitle_band=band)), lines
 
 
+def _only_hero_size(warnings: list[str]) -> bool:
+    """The sample scripts were written when the hero threshold was 30%: their
+    39% tooth now carries the L14 warning, and nothing else may."""
+    return all("chiều khung (< 40%)" in w for w in warnings)
+
+
 @needs_real
 def test_real_problems_script_gives_the_three_planted_faults_on_the_right_shots(real_checker):
     out, lines = _check(real_checker, "problems")
-    assert not out.ok and out.warnings == []
+    assert not out.ok and _only_hero_size(out.warnings)
     got = sorted(
         (_owner(lines, d.line), d.kind, d.message.split(": ", 1)[1].split(" (")[0])
         for d in out.diagnostics
@@ -208,7 +214,7 @@ def test_real_problems_script_gives_the_three_planted_faults_on_the_right_shots(
 @needs_real
 def test_real_clean_script_passes_with_no_warning(real_checker):
     out, _ = _check(real_checker, "clean")
-    assert out.ok and out.diagnostics == [] and out.warnings == []
+    assert out.ok and out.diagnostics == [] and _only_hero_size(out.warnings)
 
 
 @needs_real

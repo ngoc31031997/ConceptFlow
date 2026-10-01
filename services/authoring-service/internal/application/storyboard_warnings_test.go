@@ -61,6 +61,7 @@ func TestStoryboardStepReturnsLengthAndIllustrationWarnings(t *testing.T) {
 	want := []string{
 		"Cảnh hook: ~13 giây, ngân sách 6–8 giây (+66%)",
 		"Shot 1.2: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có",
+		"Cảnh hook chưa có bối cảnh (setting): các shot của cảnh sẽ dựng trên nền màu thay vì một nơi chốn kín khung.",
 	}
 	if strings.Join(got.Warnings, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("warnings = %q, want %q", got.Warnings, want)

@@ -54,6 +54,7 @@ func (uc *GenerateAuthoringUseCase) storyboardWarnings(ctx context.Context, proj
 	}
 	if checkIllustrated {
 		warnings = append(warnings, domain.CheckIllustratedNarration(scenes)...)
+		warnings = append(warnings, domain.CheckSceneSettings(scenes)...)
 	}
 	if len(warnings) > 0 {
 		slog.Info("storyboard warnings", "project_id", project.ProjectID, "count", len(warnings))

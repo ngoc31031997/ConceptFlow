@@ -82,6 +82,7 @@ export function ManimEngineerStepPage() {
     subtitle_mode: draft.subtitleMode,
     subtitle_font_size: draft.subtitleStyle.fontSize,
     subtitle_position: draft.subtitleStyle.position,
+    video_output_mode: draft.videoOutputMode,
   });
   const prompt = rendered.prompt ?? (rendered.failed ? `Không tải được template ${engineerRole}.` : "Đang tải...");
 

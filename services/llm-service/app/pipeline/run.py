@@ -44,6 +44,7 @@ from dataclasses import dataclass, field, replace
 
 from app import errors
 from app.errors import LLMError, Usage
+from app.frame import LANDSCAPE, Frame
 from app.pipeline import extract, merger, prompts
 from app.pipeline.checker import (
     CheckerPort,
@@ -124,6 +125,8 @@ class CodeRequest:
     done: dict[str, DoneSegment] = field(default_factory=dict)
     #: Run only these segments; None = every missing one.
     only: set[str] | None = None
+    #: The frame the video is built on (Remotion): its size and safe area.
+    canvas: Frame = LANDSCAPE
 
     def layout(self) -> LayoutContext | None:
         if self.engine != "remotion":
@@ -131,20 +134,38 @@ class CodeRequest:
         return LayoutContext(subtitle_band=self.subtitle_band, video_font=self.video_font)
 
 
+def _is_backdrop(i: dict) -> bool:
+    return i.get("kind") == "backdrop"
+
+
 def library_section(illustrations: list[dict]) -> str:
-    """The Remotion Engineer's list of library drawings beyond the built-in kit."""
+    """The Remotion Engineer's list of library drawings beyond the built-in kit,
+    then which backdrop each shot is drawn in."""
     rows = [
         f"- {i['usage'] or '<' + i['name'] + ' />'} — {i.get('description', '').strip()}"
-        for i in illustrations if i.get("name") and i.get("code")
+        for i in illustrations if i.get("name") and i.get("code") and not _is_backdrop(i)
     ]
-    if not rows:
-        return ""
-    return (
-        "\n\n## C4. HÌNH THƯ VIỆN ĐÃ DUYỆT CHO VIDEO NÀY — dùng như bộ minh hoạ ở mục C3\n\n"
-        "Các hình dưới đây đã được Creator duyệt; khung code tự đưa chúng vào file, bạn KHÔNG import và KHÔNG "
-        "viết lại chúng. Cùng quy ước x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity, still. "
-        "Vật nào trong \"visual\" có ở đây thì BẮT BUỘC dùng đúng component này.\n\n" + "\n".join(rows) + "\n"
-    )
+    backdrops = [
+        f"- {i['name']} — {i.get('description', '').strip()} — shot: {', '.join(i.get('shots') or []) or '(chưa gán)'}"
+        for i in illustrations if i.get("name") and _is_backdrop(i)
+    ]
+    out = ""
+    if rows:
+        out += (
+            "\n\n## C4. HÌNH THƯ VIỆN ĐÃ DUYỆT CHO VIDEO NÀY — dùng như bộ minh hoạ ở mục C3\n\n"
+            "Các hình dưới đây đã được Creator duyệt; khung code tự đưa chúng vào file, bạn KHÔNG import và KHÔNG "
+            "viết lại chúng. Cùng quy ước x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity, still. "
+            "Vật nào trong \"visual\" có ở đây thì BẮT BUỘC dùng đúng component này.\n\n" + "\n".join(rows) + "\n"
+        )
+    if backdrops:
+        out += (
+            "\n\n## C5. NỀN CỦA TỪNG SHOT — đã duyệt cho video này\n\n"
+            "Mỗi shot có trong danh sách dưới đây được dựng trong ¤<Scene duration={duration} backdrop={TênNền} "
+            "camera={...}>¤ với đúng nền ghi cho nó (màu đổi qua ¤backdropProps={{color, ground, light}}¤, giá "
+            "trị là ¤PALETTE.xxx¤). Khung code đã có sẵn các nền; bạn KHÔNG import và KHÔNG vẽ lại chúng.\n\n"
+            + "\n".join(backdrops) + "\n"
+        ).replace("¤", "`")
+    return out
 
 
 @dataclass
@@ -309,7 +330,7 @@ def _dump(obj) -> str:
 
 def _storyboard(req: CodeRequest) -> Storyboard:
     try:
-        return parse_storyboard(req.storyboard)
+        return parse_storyboard(req.storyboard, req.canvas)
     except StoryboardError as exc:
         raise PipelineFailure(
             "storyboard is not valid JSON — it was written for the manual flow; run step 1b with AI "
@@ -373,6 +394,10 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
         frame_fp = _sha("frame-sb", given)
     else:
         frame_fp = _sha("frame", req.engine, prompt_fp, req.storyboard)
+    if req.canvas != LANDSCAPE:
+        # Code written for one frame does not fit the other; the landscape
+        # fingerprints stay what they were before the portrait frame existed.
+        frame_fp = _sha(frame_fp, req.canvas.size)
     all_shots = sb.all_shots()
     ordered = [sh.id for _, sh in all_shots]
     by_id = {sh.id: (sc, sh) for sc, sh in all_shots}
@@ -414,7 +439,7 @@ def _chunk_prompt(req: CodeRequest, plan: Plan, frame: str, ids: list[str], retr
 
 def _frame_prompt(req: CodeRequest, plan: Plan, retry: str | None) -> str:
     if req.engine == "remotion":
-        return prompts.remotion_layout(plan.sb, retry)
+        return prompts.remotion_layout(plan.sb, retry, req.canvas)
     return prompts.manim_cast(plan.sb, retry)
 
 
@@ -730,7 +755,7 @@ class CodePipeline:
         # 3. merge + check + repair
         def merge() -> merger.Merged:
             if remotion:
-                return merger.merge_remotion(sb, frame, shots, library=library)
+                return merger.merge_remotion(sb, frame, shots, library=library, canvas=req.canvas)
             return merger.merge_manim(sb, req.topic, frame, shots)
 
         await emit({"type": "phase", "phase": "merge"})
@@ -786,7 +811,8 @@ class CodePipeline:
         the checker being unreachable) is left to the full-file check."""
         rounds = 0
         while True:
-            merged = merger.merge_remotion(plan.sb, frame, shots, stub_missing=True, library=self._library)
+            merged = merger.merge_remotion(
+                plan.sb, frame, shots, stub_missing=True, library=self._library, canvas=req.canvas)
             try:
                 check = await self._checker.check("remotion", merged.code, merged.scene_class_name, req.layout())
             except CheckerUnavailable:
@@ -819,7 +845,7 @@ class CodePipeline:
             is_frame = key in (merger.LAYOUT_KEY, merger.CAST_KEY)
             current = frame if is_frame else shots[key]
             if remotion:
-                build = lambda r: prompts.remotion_repair(sb, frame, key, current, diags, [])  # noqa: E731
+                build = lambda r: prompts.remotion_repair(sb, frame, key, current, diags, [], req.canvas)  # noqa: E731
             else:
                 build = lambda r: prompts.manim_repair(sb, frame, key, current, diags, check.raw)  # noqa: E731
 

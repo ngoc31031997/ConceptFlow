@@ -1,0 +1,11 @@
+# LUẬT NỀN MÔI TRƯỜNG CỦA KÊNH
+
+Một NỀN là một NƠI CHỐN kín khung (khu vườn, căn bếp, lòng quả sung, bên trong mạch máu, đáy biển) mà nhân vật của shot đứng bên trong. Nền vẽ cùng lối tranh vector phẳng với các hình của kênh (luật S1–S11, S22: khối phẳng bo tròn, ánh sáng mềm bằng gradient, không chữ, không ảnh, chuyển động theo frame). Ngoài ra nền có luật riêng. Mã [B..] là mã luật bộ kiểm tra tự động dùng.
+
+- [B1] BỐN LỚP: component nhận prop layer ('sky' | 'far' | 'mid' | 'near') và chỉ vẽ lớp đó. sky: trời/tường xa nhất, phủ kín bằng gradient; far: cảnh xa (đồi, dãy nhà, tế bào mờ), nhạt và ít chi tiết; mid: cảnh phía sau nhân vật, dồn về hai bên mép và mặt đất/sàn; near: vài khối lớn sát ống kính ở các góc khung (lá, mép bàn, bọt nước) — Scene tự làm mờ lớp này. Lớp nào không có gì thì trả về null. → LỖI khi thiếu prop layer.
+- [B2] KÍN KHUNG, CO THEO KHUNG: lấy kích thước bằng const {width, height} = useVideoConfig() và hộp của lớp bằng const box = useLayerBox(); vẽ mọi thứ theo tỉ lệ width/height (đường chân trời ở height * 0.7, cây ở width * 0.08...) và phủ kín box (box.left, box.top, box.width, box.height) — cùng một nền phải đẹp ở khung ngang 1920×1080 và khung dọc 1080×1920. Không dùng Figure, không toạ độ cố định. → LỖI khi không đọc kích thước khung.
+- [B3] CHỪA GIỮA KHUNG: khoảng giữa khung (từ 25% đến 75% bề ngang, phía trên mặt đất) để trống cho nhân vật; chi tiết dồn về mép và mặt đất.
+- [B4] NỀN LÙI, NHÂN VẬT NỔI: màu nền dịu và tối hơn màu nhân vật một bậc (dùng shadeOf); lớp càng xa càng nhạt. Một nguồn sáng rõ (mặt trời, cửa sổ, đèn, quầng sáng bên trong) bằng radialGradient.
+- [B5] KHÔNG MẶT: nơi chốn không có mặt người, không <Face>. → LỖI.
+- [B6] MÀU ĐỔI ĐƯỢC: nhận các prop color (màu chính: trời, tường, nước, mô), ground (đất, sàn), light (nắng, đèn), mỗi prop có mặc định; và prop still tắt chuyển động tự thân (lá rung, rong đung đưa, bọt nổi) — chuyển động nhỏ và chậm.
+- [B7] TÊN: tiếng Anh PascalCase kết thúc bằng Backdrop (OrchardBackdrop, KitchenBackdrop, BloodVesselBackdrop).

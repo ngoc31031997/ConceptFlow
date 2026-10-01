@@ -15,10 +15,11 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
+from app.frame import LANDSCAPE, Frame
+
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 SHOT_ID = re.compile(r"^\d+\.\d+$")
 LAYOUT_KEY = re.compile(r"^[a-z][A-Za-z0-9]*$")
-FRAME_W, FRAME_H = 1920, 1080
 _FENCE = re.compile(r"```[a-zA-Z0-9]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 
@@ -73,6 +74,9 @@ class Scene(BaseModel):
     invariant: str = ""
     transition_in: str | None = None
     mood: str = ""
+    # The place the scene happens in, filling the frame: layers, light, tone.
+    # Empty for a storyboard written before the director was asked for it.
+    setting: str = ""
     end_frame: str = ""
     shots: list[Shot]
 
@@ -106,8 +110,8 @@ def _extract_json(text: str) -> str:
     return text
 
 
-def parse(content: str) -> Storyboard:
-    """Parse and validate. Raises StoryboardError listing every problem."""
+def parse(content: str, frame: Frame = LANDSCAPE) -> Storyboard:
+    """Parse and validate against `frame`. Raises StoryboardError listing every problem."""
     try:
         data = json.loads(_extract_json(content))
     except json.JSONDecodeError as exc:
@@ -140,7 +144,7 @@ def parse(content: str) -> Storyboard:
                 problems.append(f"duplicate shot id {sh.id}")
             seen.add(sh.id)
     if sb.layout is not None:
-        problems += layout_problems(sb.layout)
+        problems += layout_problems(sb.layout, frame)
     if problems:
         raise StoryboardError(problems)
     return sb
@@ -150,7 +154,7 @@ def _number(v: Any) -> bool:
     return isinstance(v, int | float) and not isinstance(v, bool) and math.isfinite(v)
 
 
-def layout_problems(layout: dict[str, dict[str, Any]]) -> list[str]:
+def layout_problems(layout: dict[str, dict[str, Any]], frame: Frame = LANDSCAPE) -> list[str]:
     problems: list[str] = []
     for key, entry in layout.items():
         where = f"layout.{key}"
@@ -167,8 +171,8 @@ def layout_problems(layout: dict[str, dict[str, Any]]) -> list[str]:
         x, y = entry.get("x"), entry.get("y")
         if not (_number(x) and _number(y)):
             problems.append(f"{where}: needs numeric x and y (px of the centre)")
-        elif not (0 <= x <= FRAME_W and 0 <= y <= FRAME_H):
-            problems.append(f"{where}: centre ({x}, {y}) is outside the {FRAME_W}x{FRAME_H} frame")
+        elif not (0 <= x <= frame.width and 0 <= y <= frame.height):
+            problems.append(f"{where}: centre ({x}, {y}) is outside the {frame.size} frame")
     return problems
 
 
@@ -176,10 +180,13 @@ def dumps(sb: Storyboard) -> str:
     data = sb.model_dump()
     if data.get("layout") is None:
         data.pop("layout", None)  # a storyboard written before layout existed stays byte-identical
+    for scene in data["scenes"]:
+        if not scene.get("setting"):
+            scene.pop("setting", None)  # likewise for one written before scene settings
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def to_prose(sb: Storyboard) -> str:
+def to_prose(sb: Storyboard, frame: Frame = LANDSCAPE) -> str:
     lines: list[str] = []
     if sb.hero:
         lines.append(f"NHÂN VẬT CHÍNH: {sb.hero}")
@@ -189,7 +196,7 @@ def to_prose(sb: Storyboard) -> str:
     for p in sb.palette:
         lines.append(f"  {p.role} — {p.hex} — {p.meaning}")
     if sb.layout:
-        lines.append("BỐ CỤC (toạ độ tâm, px trên khung 1920x1080):")
+        lines.append(f"BỐ CỤC (toạ độ tâm, px trên khung {frame.size}):")
         for key, entry in sb.layout.items():
             lines.append(f"  {key}: " + ", ".join(f"{k}={v}" for k, v in entry.items()))
     for i, sc in enumerate(sb.scenes, 1):
@@ -200,6 +207,8 @@ def to_prose(sb: Storyboard) -> str:
             lines.append(f"Chuyển cảnh vào: {sc.transition_in}")
         if sc.mood:
             lines.append(f"Không khí: {sc.mood}")
+        if sc.setting:
+            lines.append(f"Bối cảnh: {sc.setting}")
         lines.append("Các shot:")
         for sh in sc.shots:
             lines.append(f'  {sh.id} | MÁY: {sh.camera} | HÌNH: {sh.visual} | THOẠI: "{sh.narration}"')

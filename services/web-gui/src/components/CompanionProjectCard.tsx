@@ -26,7 +26,7 @@ export function CompanionProjectCard({ companionProjectId }: CompanionProjectCar
   return (
     <Card
       data-testid="companion-project-card"
-      title={project?.video_output_mode === "short" ? "Bản Shorts/TikTok riêng" : "Video cùng chủ đề"}
+      title={project?.video_output_mode === "short" ? "Bản short dọc" : "Video dài cùng chủ đề"}
       headerAction={project && <StatusBadge status={project.status} />}
     >
       {error && (
@@ -45,7 +45,7 @@ export function CompanionProjectCard({ companionProjectId }: CompanionProjectCar
             </div>
           )}
 
-          {(project.video_output_mode === "short" || project.video_output_mode === "both") && (
+          {project.video_output_mode === "both" && (
             <ClipsPanel
               projectId={companionProjectId}
               clips={project.clips ?? []}

@@ -98,6 +98,10 @@ type StoryboardReaderPort interface {
 // LibraryDrawing is one approved drawing handed to the code step.
 type LibraryDrawing struct {
 	Name, Usage, Description, Code string
+	// Backdrop marks the place of some scenes; Shots are the shots drawn in
+	// it. A built-in backdrop carries no code (it ships with rendering).
+	Backdrop bool
+	Shots    []string
 }
 
 type ProjectIllustrationsUseCase struct {
@@ -178,7 +182,18 @@ type plannedReply struct {
 		FolderID    string   `json:"folder_id"`
 		Shots       []string `json:"shots"`
 	} `json:"draw"`
+	// Backdrops is one place per scene: a library backdrop to reuse, or a
+	// new one to draw.
+	Backdrops []struct {
+		Scene       string `json:"scene"`
+		Reuse       string `json:"reuse"`
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	} `json:"backdrops"`
 }
+
+// backdropFolderID is where every backdrop is filed.
+const backdropFolderID = "boi-canh"
 
 var jsonObjectRe = regexp.MustCompile(`(?s)\{.*\}`)
 
@@ -192,6 +207,55 @@ func parsePlan(text string) (plannedReply, error) {
 		return p, fmt.Errorf("JSON lập danh sách hình không đọc được: %w", err)
 	}
 	return p, nil
+}
+
+// backdropRows turns the plan's backdrops into rows, one per place: a place
+// several scenes share is one row whose shots are all of theirs. A reused
+// name the library does not have, or a new one with a bad name or no
+// description, is dropped like a bad "draw" entry.
+func backdropRows(plan plannedReply, storyboard string, library map[string]domain.Illustration) []domain.ProjectIllustration {
+	shotsOf := map[string][]string{}
+	if scenes, err := domain.ParseStoryboardScenes(storyboard); err == nil {
+		for _, sc := range scenes {
+			for _, sh := range sc.Shots {
+				shotsOf[sc.ID] = append(shotsOf[sc.ID], sh.ID)
+			}
+		}
+	}
+	var rows []domain.ProjectIllustration
+	index := map[string]int{}
+	for _, b := range plan.Backdrops {
+		var row domain.ProjectIllustration
+		if name := strings.TrimSpace(b.Reuse); name != "" {
+			existing, ok := library[name]
+			if !ok || existing.Kind != domain.IllustrationBackdrop {
+				continue
+			}
+			row = domain.ProjectIllustration{Name: existing.Name, Description: existing.Description,
+				FolderID: existing.FolderID, State: domain.PIReused, IllustrationID: existing.ID}
+		} else {
+			name := strings.TrimSpace(b.Name)
+			if domain.ValidateIllustrationName(name) != nil || strings.TrimSpace(b.Description) == "" {
+				continue
+			}
+			row = domain.ProjectIllustration{Name: name, Description: strings.TrimSpace(b.Description),
+				FolderID: backdropFolderID, State: domain.PIPlanned}
+			if existing, ok := library[name]; ok && existing.Kind == domain.IllustrationBackdrop {
+				row = domain.ProjectIllustration{Name: name, Description: existing.Description,
+					FolderID: existing.FolderID, State: domain.PIReused, IllustrationID: existing.ID}
+			}
+		}
+		row.Kind = domain.IllustrationBackdrop
+		shots := shotsOf[strings.TrimSpace(b.Scene)]
+		if i, ok := index[row.Name]; ok {
+			rows[i].Shots = append(rows[i].Shots, shots...)
+			continue
+		}
+		row.Shots = append([]string{}, shots...)
+		index[row.Name] = len(rows)
+		rows = append(rows, row)
+	}
+	return rows
 }
 
 // Plan reads the storyboard against the library and replaces the video's list.
@@ -227,7 +291,11 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 			continue // a Hình mẫu copy; its source is in the catalog
 		}
 		byName[i.Name] = i
-		fmt.Fprintf(&catalog, "- %s — %s — %s — %s\n", i.Name, i.Title, i.FolderID, strings.Join(i.Tags, ", "))
+		mark := ""
+		if i.Kind == domain.IllustrationBackdrop {
+			mark = " — NỀN"
+		}
+		fmt.Fprintf(&catalog, "- %s — %s — %s — %s%s\n", i.Name, i.Title, i.FolderID, strings.Join(i.Tags, ", "), mark)
 	}
 	folderIDs := map[string]bool{}
 	for _, f := range folders {
@@ -291,7 +359,7 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		if existing, ok := byName[name]; ok {
 			// The model proposed drawing something the library already has.
 			add(domain.ProjectIllustration{Name: name, Description: existing.Description, FolderID: existing.FolderID,
-				Shots: d.Shots, State: domain.PIReused, IllustrationID: existing.ID})
+				Shots: d.Shots, State: domain.PIReused, IllustrationID: existing.ID, Kind: domain.KindOrFigure(existing.Kind)})
 			continue
 		}
 		folder := d.FolderID
@@ -307,8 +375,12 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	for _, name := range plan.Reuse {
 		if existing, ok := byName[strings.TrimSpace(name)]; ok {
 			add(domain.ProjectIllustration{Name: existing.Name, Description: existing.Description,
-				FolderID: existing.FolderID, State: domain.PIReused, IllustrationID: existing.ID})
+				FolderID: existing.FolderID, State: domain.PIReused, IllustrationID: existing.ID,
+				Kind: domain.KindOrFigure(existing.Kind)})
 		}
+	}
+	for _, r := range backdropRows(plan, storyboard, byName) {
+		add(r)
 	}
 	if err := uc.repo.ReplaceProjectIllustrations(ctx, projectID, rows); err != nil {
 		return nil, err
@@ -360,6 +432,7 @@ func (uc *ProjectIllustrationsUseCase) Draw(ctx context.Context, projectID, rowI
 		return r, err
 	}
 	made, drawErr := uc.library.Draw(ctx, DrawRequest{Description: r.Description, FolderID: r.FolderID, Name: r.Name, Model: model,
+		Kind:       r.Kind,
 		OnProgress: func(p domain.DrawProgress) { uc.setProgress(rowID, p) }})
 	if drawErr != nil {
 		r.State, r.Error = domain.PIFailed, drawErr.Error()
@@ -611,12 +684,22 @@ func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID st
 		out = append(out, LibraryDrawing{Name: i.Name, Usage: i.Usage, Description: i.Description, Code: i.Code})
 	}
 	for _, r := range rows {
-		if r.State != domain.PISkipped && r.Illustration != nil {
-			take(*r.Illustration, true)
+		if r.State == domain.PISkipped || r.Illustration == nil {
+			continue
 		}
+		if r.Kind == domain.IllustrationBackdrop {
+			i := *r.Illustration
+			out = append(out, LibraryDrawing{Name: i.Name, Usage: i.Usage, Description: i.Description, Code: i.Code,
+				Backdrop: true, Shots: r.Shots})
+			seen[i.Name] = true
+			continue
+		}
+		take(*r.Illustration, true)
 	}
 	for _, i := range all {
-		take(i, false)
+		if i.Kind != domain.IllustrationBackdrop {
+			take(i, false)
+		}
 	}
 	return out, nil
 }

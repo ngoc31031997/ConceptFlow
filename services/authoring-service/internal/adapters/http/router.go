@@ -933,6 +933,8 @@ type promptRenderRequest struct {
 	FormatID         string `json:"format_id"`
 	FormatVersion    int    `json:"format_version"`
 	VoiceID          string `json:"voice_id"`
+	// "long" | "short": which frame {{frame}} and the other frame variables describe.
+	VideoOutputMode string `json:"video_output_mode"`
 }
 
 // handlePromptRenders serves POST /v1/prompt-renders: the
@@ -959,6 +961,7 @@ func (rt *Router) handlePromptRenders(w http.ResponseWriter, r *http.Request) {
 		PreviousOutput: req.PreviousOutput, SubtitleMode: req.SubtitleMode,
 		SubtitleFontSize: req.SubtitleFontSize, SubtitlePosition: req.SubtitlePosition,
 		FormatID: req.FormatID, FormatVersion: req.FormatVersion, VoiceID: req.VoiceID,
+		VideoOutputMode: req.VideoOutputMode,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())

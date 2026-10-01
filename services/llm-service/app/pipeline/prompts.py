@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 
+from app.frame import LANDSCAPE, Frame
 from app.pipeline import merger
 from app.pipeline.checker import LAYOUT, Diagnostic
 from app.storyboard import Scene, Shot, Storyboard
@@ -32,7 +33,7 @@ def _shot_json(scene: Scene, shot: Shot) -> dict:
         "camera": shot.camera,
         "visual": shot.visual,
         "narration": shot.narration,
-    }
+    } | ({"scene_setting": scene.setting} if scene.setting else {})
 
 
 def _dump(obj) -> str:
@@ -56,7 +57,7 @@ def _retry_note(problem: str | None) -> str:
 
 # --- Remotion ---------------------------------------------------------------
 
-def remotion_layout(sb: Storyboard, retry: str | None = None) -> str:
+def remotion_layout(sb: Storyboard, retry: str | None = None, canvas: Frame = LANDSCAPE) -> str:
     shots = [_shot_json(sc, sh) for sc, sh in sb.all_shots()]
     return f"""NHIỆM VỤ HIỆN TẠI: LAYOUT (bước 1/2 của bước dựng code).
 
@@ -75,7 +76,7 @@ Hãy trả về ĐÚNG MỘT khai báo TypeScript, không gì khác:
 const LAYOUT = {{ ... }};
 
 Yêu cầu:
-- Mỗi vật / nhân vật SỐNG QUA NHIỀU SHOT (nhân vật chính, các khối lặp lại, nhãn cố định) có một mục với toạ độ TÂM và kích thước bằng px trong khung 1920x1080, đặt trong vùng an toàn và tránh vùng phụ đề như đã mô tả ở luật bố cục. Ví dụ: hero: {{x: 960, y: 480, size: 320}}.
+- Mỗi vật / nhân vật SỐNG QUA NHIỀU SHOT (nhân vật chính, các khối lặp lại, nhãn cố định) có một mục với toạ độ TÂM và kích thước bằng px trong khung {canvas.size}, đặt trong vùng an toàn {canvas.safe_text()} và tránh vùng phụ đề như đã mô tả ở luật bố cục. Ví dụ: hero: {{x: 960, y: 480, size: 320}}.
 - Vật chỉ xuất hiện trong một shot thì KHÔNG cần mục ở đây.
 - Chỉ dùng số và đối tượng thuần; không import, không hàm, không tham chiếu PALETTE.
 - Tên khoá camelCase ASCII, mô tả đúng vai trò.{_retry_note(retry)}"""
@@ -127,7 +128,8 @@ def _listed(diags: list[Diagnostic]) -> str:
 
 
 def remotion_repair(
-    sb: Storyboard, layout: str, key: str, code: str, diags: list[Diagnostic], shot_ids_context: list[str]
+    sb: Storyboard, layout: str, key: str, code: str, diags: list[Diagnostic], shot_ids_context: list[str],
+    canvas: Frame = LANDSCAPE,
 ) -> str:
     listed = _listed(diags)
     if key == merger.LAYOUT_KEY:
@@ -155,7 +157,7 @@ Trả về ĐÚNG khai báo `const LAYOUT = {{ ... }};` đã sửa trong một k
         # Measured on the shot as it is really drawn, at the moments named.
         sections.append(
             "Lỗi bố cục — đo trên hình thật của shot, ở các thời điểm ghi trong từng dòng (số dòng là dòng trong "
-            "FILE ĐẦY ĐỦ; vùng an toàn (96, 96)–(1824, 984); chữ tối thiểu 32px):\n" + _listed(layout_diags)
+            f"FILE ĐẦY ĐỦ; vùng an toàn {canvas.safe_text()}; chữ tối thiểu 32px):\n" + _listed(layout_diags)
             + "\nSửa bằng cách đổi vị trí, kích thước, width, cỡ chữ hoặc biên độ chuyển động (spring vọt lố) "
             "của đúng vật được nêu; không bỏ vật hay chữ mà kịch bản yêu cầu.")
     what = "BIÊN DỊCH" if not layout_diags else "BỐ CỤC" if not compile_diags else "BIÊN DỊCH VÀ BỐ CỤC"

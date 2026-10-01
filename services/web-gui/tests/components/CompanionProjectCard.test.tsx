@@ -30,14 +30,14 @@ describe("CompanionProjectCard", () => {
 
     renderCard();
 
-    await waitFor(() => expect(screen.getByText(/Bản Shorts\/TikTok riêng/)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Bản short dọc/)).toBeInTheDocument());
     expect(screen.getByText(/Sẵn sàng đăng/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Xem đầy đủ" })).toHaveAttribute(
       "href",
       "/projects/proj-short/result",
     );
-    // ClipsPanel dùng lại nguyên vẹn — clip đã cắt phải hiện ra ở đây luôn.
-    expect(screen.getByTestId("clip-short-short")).toBeInTheDocument();
+    // A short is already vertical: there are no cut clips to list.
+    expect(screen.queryByTestId("clip-short-short")).toBeNull();
   });
 
   it("báo lỗi rõ ràng khi không tải được project liên kết", async () => {

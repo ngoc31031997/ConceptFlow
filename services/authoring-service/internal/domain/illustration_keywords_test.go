@@ -19,7 +19,9 @@ func kitComponents(t *testing.T) []string {
 			continue
 		}
 		for _, m := range tag.FindAllStringSubmatch(line, -1) {
-			seen[m[1]] = true
+			if !IsSceneKitComponent(m[1]) {
+				seen[m[1]] = true
+			}
 		}
 	}
 	out := make([]string, 0, len(seen))

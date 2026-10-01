@@ -899,13 +899,16 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 }
 
 // resolveChannelAssets looks up the active intro/outro asset for each toggle
-// the project has enabled (both default true) and sets
+// the project has enabled (both default true), unless the project is a
+// vertical short, and sets
 // IntroAssetID/OutroAssetID on project. Best-effort: a lookup failure or a
 // missing asset is logged and leaves the field nil, never fails the saga —
 // video-assembly is asked to attach an asset if one is there, not required to
 // have one.
 func (uc *HandleStepEventUseCase) resolveChannelAssets(ctx context.Context, project *domain.Project) {
-	if uc.channelAssets == nil {
+	// The channel intro and outro are 16:9; a vertical short is assembled
+	// without them rather than with a landscape clip spliced in.
+	if uc.channelAssets == nil || project.VideoOutputMode == domain.ModeShortOnly {
 		return
 	}
 	quality := project.RenderQuality

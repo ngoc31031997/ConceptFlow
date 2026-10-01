@@ -29,6 +29,8 @@ type ProjectDraftPort interface {
 	// from tab 1a would otherwise always see the "manim" default even when
 	// the Creator picked Remotion at "/".
 	SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error
+	// Get loads a whole project; used to link a new short to its long video.
+	Get(ctx context.Context, projectID string) (*domain.Project, error)
 }
 
 // CreateProjectDraftInput is the parsed body of POST /v1/projects.
@@ -48,6 +50,10 @@ type CreateProjectDraftInput struct {
 	// leave whatever is already on the row untouched, same "only touch what
 	// was sent" rule the topic field already follows.
 	RenderEngine domain.RenderEngine
+	// ShortOf, when set, is the long video this new draft is the vertical
+	// short of: the draft starts as a short (domain.ApplyShortDefaults) and the
+	// two projects are linked as companions both ways.
+	ShortOf string
 }
 
 // CreateProjectDraftOutput is returned to the HTTP layer for the 201
@@ -108,6 +114,11 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 			IntroEnabled:    true,
 			OutroEnabled:    true,
 		}
+		if input.ShortOf != "" {
+			if err := uc.makeShortOf(ctx, project, input.ShortOf); err != nil {
+				return nil, err
+			}
+		}
 		if err := uc.repo.Save(ctx, project); err != nil {
 			return nil, err
 		}
@@ -136,6 +147,25 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 	}
 
 	return &CreateProjectDraftOutput{ProjectID: projectID, SimilarProjects: similar}, nil
+}
+
+// makeShortOf turns the new draft into the vertical short of the long video
+// longID and links that video back to it.
+func (uc *CreateProjectDraftUseCase) makeShortOf(ctx context.Context, project *domain.Project, longID string) error {
+	long, err := uc.repo.Get(ctx, longID)
+	if err != nil {
+		return fmt.Errorf("load the long video: %w", err)
+	}
+	short := domain.ModeShortOnly
+	patch := domain.WizardSettingsPatch{VideoOutputMode: &short}
+	domain.ApplyShortDefaults(&patch)
+	project.VideoOutputMode = short
+	project.VideoFormatID = *patch.VideoFormatID
+	project.RenderEngine = *patch.RenderEngine
+	project.SubtitleMode = *patch.SubtitleMode
+	project.CompanionProjectID = &long.ProjectID
+	long.CompanionProjectID = &project.ProjectID
+	return uc.repo.Save(ctx, long)
 }
 
 // UpdateProjectTopicInput is the parsed body of PATCH /v1/projects/{id}/topic.

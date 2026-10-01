@@ -388,7 +388,7 @@ func (uc *IllustrationsUseCase) importIllustration(
 		return item, err
 	}
 
-	preview, err := uc.render(ctx, ill.Name, ill.Code)
+	preview, err := uc.render(ctx, ill.Name, ill.Code, ill.Kind)
 	var invalid *InvalidIllustrationError
 	if errors.As(err, &invalid) {
 		item.Diagnostics = invalid.Diagnostics

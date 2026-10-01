@@ -31,13 +31,14 @@ class PreviewIllustrationUseCase:
         self._preview = previewer
 
     def run(
-        self, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        self, name: str, code: str = "", props: dict | None = None, gif: bool = True, kind: str = "figure",
     ) -> IllustrationPreview:
+        """Kiểm tra rồi dựng một hình (`kind` "figure") hay một nền ("backdrop")."""
         if code:
             issues = validate_asset_code(name, code)
             if issues:
                 return IllustrationPreview(False, [{"message": i.message, "line": i.line} for i in issues])
-            style_errors, style_warnings = check_style(code)
+            style_errors, style_warnings = check_style(code, kind)
             warnings = [{"message": f.text(), "line": f.line} for f in style_warnings]
             if style_errors:
                 found = [{"message": f.text(), "line": f.line} for f in style_errors]
@@ -48,7 +49,7 @@ class PreviewIllustrationUseCase:
                 return IllustrationPreview(False, found)
         else:
             warnings = []  # hình có sẵn của bộ minh hoạ: đã duyệt tay
-        out = self._preview.preview(name, code, props, gif)
+        out = self._preview.preview(name, code, props, gif, kind)
         if not out.ok:
             return IllustrationPreview(False, [{"message": out.error, "line": None}], warnings=warnings)
         return IllustrationPreview(True, png=out.png, gif=out.gif, warnings=warnings)

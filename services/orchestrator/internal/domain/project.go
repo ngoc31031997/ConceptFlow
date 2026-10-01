@@ -241,12 +241,11 @@ func (q RenderQuality) IsValid() bool {
 	return false
 }
 
-// VideoOutputMode is which of the two shapes a project produces: the standard 16:9 long-form video, the vertical Shorts/TikTok
-// clip(s) cut from it, or both. A clip is always derived from the assembled
-// 16:9 video (no standalone vertical production), so
-// ModeShortOnly still runs the full render pipeline as source material; the
-// mode only decides whether generate_clips runs at all, and which output the
-// Result screen puts front and center.
+// VideoOutputMode is which shape a project produces: the 16:9 long-form
+// video, or the vertical short built at 1080x1920 from the start (its own
+// script, storyboard and render; see ADR-0031). ModeBoth is the long video
+// with vertical clips cut from it; the wizard no longer offers it, and
+// generate_clips only runs for it.
 type VideoOutputMode string
 
 const (
@@ -269,9 +268,10 @@ func (m VideoOutputMode) IsValid() bool {
 	return false
 }
 
-// WantsClips reports whether the saga should run generate_clips at all.
+// WantsClips reports whether the saga should run generate_clips at all. A
+// short is already vertical: there is nothing to cut.
 func (m VideoOutputMode) WantsClips() bool {
-	return m == ModeShortOnly || m == ModeBoth
+	return m == ModeBoth
 }
 
 // Visibility restricts youtube visibility to the three values accepted by

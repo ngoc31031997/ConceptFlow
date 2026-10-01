@@ -499,6 +499,8 @@ export interface PromptRenderInput {
   format_id?: string;
   format_version?: number;
   voice_id?: string;
+  /** "long" | "short": which frame the frame variables describe. */
+  video_output_mode?: string;
 }
 
 export interface RenderedPromptResult {
@@ -625,8 +627,13 @@ export interface IllustrationFolder {
 export type IllustrationStatus = "draft" | "approved";
 
 /** Một hình của thư viện: có sẵn trong bộ minh hoạ, hoặc do AI/Creator vẽ. */
+/** A figure placed in a shot, or a whole-frame place a Scene is drawn in. */
+export type IllustrationKind = "figure" | "backdrop";
+
 export interface Illustration {
   id: string;
+  /** "backdrop" for a whole-frame place; absent or "figure" for a figure. */
+  kind?: IllustrationKind;
   /** Tên component (PascalCase) mà Kỹ sư Remotion gọi. */
   name: string;
   title: string;
@@ -838,6 +845,8 @@ export type ProjectIllustrationState = "planned" | "drawing" | "drawn" | "reused
 
 export interface ProjectIllustration {
   id: string;
+  /** "backdrop": the place of the scenes its shots belong to. */
+  kind?: IllustrationKind;
   position: number;
   name: string;
   description: string;
@@ -1280,6 +1289,9 @@ export async function createProjectDraft(
   // 1a→1b→1c ở tab 1a — server đọc project.RenderEngine để chọn đúng vai trò
   // Manim/Remotion cho 1b/1c, nên nó phải có mặt trước khi bước 1a chạy xong.
   renderEngine?: "manim" | "remotion",
+  // Optional: the long video this new draft is the vertical short of. The
+  // server then creates it as a short, linked to that video both ways.
+  shortOf?: string,
 ): Promise<{ similarProjects: SimilarProject[] }> {
   const res = await apiFetch<{ project_id: string; similar_projects: similarProjectsWire[] }>(
     "/v1/projects",
@@ -1291,6 +1303,7 @@ export async function createProjectDraft(
         topic,
         content_language: contentLanguage,
         ...(renderEngine ? { render_engine: renderEngine } : {}),
+        ...(shortOf ? { short_of: shortOf } : {}),
       }),
     },
   );

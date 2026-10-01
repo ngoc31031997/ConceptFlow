@@ -31,6 +31,10 @@ type RenderInput struct {
 	FormatID      string
 	FormatVersion int
 	VoiceID       string
+
+	// VideoOutputMode picks the frame the frame variables describe: "short"
+	// is the portrait frame, anything else the landscape one.
+	VideoOutputMode string
 }
 
 const (
@@ -110,7 +114,8 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		archetypes = uc.archetypeSection(ctx)
 	}
 
-	r := strings.NewReplacer(
+	frame := domain.FrameFor(domain.VideoOutputMode(in.VideoOutputMode))
+	pairs := []string{
 		"{{topic}}", topic,
 		"{{script}}", script,
 		"{{previous_output}}", previous,
@@ -120,8 +125,12 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		"{{thumbnail_audience}}", domain.ThumbnailAudience(language),
 		"{{format_beats}}", beats,
 		"{{video_archetypes}}", archetypes,
-		"{{subtitle_zone}}", domain.SubtitleZoneFor(domain.SubtitleMode(in.SubtitleMode), style, language),
-	)
+		"{{subtitle_zone}}", domain.SubtitleZoneIn(domain.SubtitleMode(in.SubtitleMode), style, frame, language),
+	}
+	for name, value := range domain.FramePromptVars(frame, language) {
+		pairs = append(pairs, "{{"+name+"}}", value)
+	}
+	r := strings.NewReplacer(pairs...)
 	return RenderedPrompt{
 		Role: in.Role, Language: language, Prompt: r.Replace(effective.TemplateText),
 		PromptID: effective.ID, PromptName: effective.Name, IsSystem: effective.IsSystem,

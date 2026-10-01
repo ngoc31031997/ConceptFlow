@@ -97,14 +97,14 @@ class IllustrationPreviewer:
                 return reply
 
     def preview(
-        self, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        self, name: str, code: str = "", props: dict | None = None, gif: bool = True, kind: str = "figure",
     ) -> PreviewResult:
         with self._lock:
             if self._proc is None or self._proc.poll() is not None:
                 self._start()
             assert self._proc is not None and self._proc.stdin is not None
             rid = uuid.uuid4().hex
-            msg = {"id": rid, "name": name, "props": props or {}, "gif": gif}
+            msg = {"id": rid, "name": name, "props": props or {}, "gif": gif, "kind": kind}
             if code:
                 msg["code"] = code
             try:

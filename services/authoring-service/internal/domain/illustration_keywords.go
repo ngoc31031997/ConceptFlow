@@ -74,6 +74,13 @@ var illustrationKitUnkeyed = map[string]string{
 	"Bubble":   "bong bóng thoại chứa nhãn, không phải vật",
 	"Mark":     "dấu đúng/sai là ký hiệu, lời thoại không gọi tên nó",
 	"Sparkle":  "tia lấp lánh trang trí",
+	// Places are the director's scene setting, not a thing the narration names.
+	"MeadowBackdrop":     "nền của cảnh",
+	"RoomBackdrop":       "nền của cảnh",
+	"StreetBackdrop":     "nền của cảnh",
+	"InsideBodyBackdrop": "nền của cảnh",
+	"UnderwaterBackdrop": "nền của cảnh",
+	"SpaceBackdrop":      "nền của cảnh",
 }
 
 // CheckIllustratedNarration flags shots whose narration names a thing the
