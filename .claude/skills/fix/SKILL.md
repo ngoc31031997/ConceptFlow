@@ -1,6 +1,6 @@
 ---
 name: fix
-description: Fix a bug the Creator reports - open a fix/<slug> branch, find the root cause through graphify, apply the smallest correct fix with a regression test, rebuild the changed Docker services, and report. Use when the Creator types /fix or reports something that is broken (an error, a crash, wrong output, a screen that misbehaves), not a request for new behaviour. Commits nothing; the Creator runs /deliver after approving.
+description: Fix a bug the Creator reports - open a fix/<slug> branch in its own git worktree, find the root cause through graphify, apply the smallest correct fix with a regression test, rebuild the changed Docker services, and report. Use when the Creator types /fix or reports something that is broken (an error, a crash, wrong output, a screen that misbehaves), not a request for new behaviour. Commits nothing; the Creator runs /deliver after approving.
 argument-hint: "<the bug, in the Creator's own words: what happened, where, what was expected>"
 model: claude-opus-5-5
 effort: medium
@@ -12,17 +12,14 @@ The bug: `$ARGUMENTS`
 
 Answer the Creator in Vietnamese. This skill fixes broken behaviour. A request for new or changed behaviour is a CR: tell the Creator and suggest `/cr` instead.
 
-## 1. Clean start, branch
+## 1. Own worktree and branch
 
-```bash
-git status --porcelain
-git rev-parse --abbrev-ref HEAD
-```
+Every fix is worked on in its own git worktree, so it can run beside open CRs (`.ai-dlc/aws-aidlc-rule-details/construction/git-branching.md`). The primary checkout (first line of `git worktree list`) stays on a clean `main`: never check out, stash, commit or edit anything there, even when it has uncommitted changes from another CR.
 
-- Uncommitted changes: STOP. List them and ask whether they belong to an open CR or fix. Never discard or stash them on your own.
-- Sync main: `git fetch origin && git checkout main && git pull --ff-only origin main`. If it is not a fast-forward, STOP and report.
-- Pick a short kebab-case slug for the bug and `git checkout -b fix/<slug>`. If the branch already exists locally or on `origin`, STOP and ask.
+- Pick a short kebab-case slug for the bug. `scripts/worktree.sh add fix/<slug>` creates the branch from `origin/main` in `.claude/worktrees/`, builds its graphify graph and prints its path. If it reports that the branch exists, STOP and ask.
+- Switch the session into it: `EnterWorktree` with `path` = that path. From here on every command, read and edit happens in the worktree.
 - If the bug is in code that exists only on an open CR branch (not on `main`), STOP and ask whether to fix it on that CR branch instead.
+- Once the root cause is known (step 2), check the open CRs and fixes (`git branch -a --no-merged origin/main --list '*feature/cr-*' '*fix/*' '*chore/*'`, `scripts/worktree.sh list` and their uncommitted changes): if one changes the same files or feature, tell the Creator in the report (or STOP and ask, when the fix would clash with it).
 
 ## 2. Reproduce and find the root cause
 
@@ -62,11 +59,11 @@ Otherwise go straight to step 4.
 ## 5. Verify
 
 - Run the tests of every changed service (`go test ./...`, `pytest`, `npm test`, ...). Report failures with their output; do not make them pass dishonestly.
-- Rebuild only the changed services (`git status` / `git diff main --stat` to scope): `docker compose build <service>` then `docker compose up -d <service>`, and confirm healthy (`docker compose ps`).
+- Rebuild only the changed services (`git status` / `git diff origin/main --stat` to scope) with `scripts/worktree.sh rebuild <service>...`, run in the worktree: it builds the images from the worktree's code, restarts them in the primary checkout (where `.env`, secrets and volumes live) and waits until they are healthy. Do not run `docker compose up` in a worktree. The live stack is shared: the rebuild replaces whatever another open branch last deployed to that service, so name the branch now live in the report.
 - Re-run the reproduction from step 2 live when it is safe, and confirm the symptom is gone.
 
 ## 6. Record and report
 
 - Add a `## Fix — <tiêu đề ngắn>` entry at the end of `aidlc-docs/audit.md` in the existing format (Timestamp, User Input verbatim, AI Response: root cause and fix, Impact Assessment, Artifacts Affected), including the real test results and rebuilt services.
-- Report to the Creator: the branch, the root cause (`file:line`, why), what changed per service, the regression test, test results, rebuilt services and their health, the live check result, and anything not done or not checked and why. Then wait.
+- Report to the Creator: the branch and worktree path, the root cause (`file:line`, why), what changed per service, the regression test, test results, rebuilt services and their health, the live check result, and anything not done or not checked and why. Then wait.
 - Commit nothing. After the Creator approves, they run `/deliver`. If they ask for changes, apply them, verify again, and report again.

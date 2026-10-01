@@ -1,6 +1,6 @@
 ---
 name: code
-description: Implement an approved Change Request design - follow the "Kế hoạch thực hiện" of aidlc-docs/construction/plans/cr-NNN-*-design.md on its feature branch, run the tests, rebuild the changed Docker services, and report. Invoked by the /cr skill after the Creator approves the solution, or by the Creator with /code CR-NNN.
+description: Implement an approved Change Request design - follow the "Kế hoạch thực hiện" of aidlc-docs/construction/plans/cr-NNN-*-design.md on its feature branch in the CR's own worktree, run the tests, rebuild the changed Docker services, and report. Invoked by the /cr skill after the Creator approves the solution, or by the Creator with /code CR-NNN.
 argument-hint: "CR-<NNN>"
 model: sonnet
 effort: medium
@@ -13,7 +13,8 @@ CR: `$ARGUMENTS`. Answer the Creator in Vietnamese.
 ## 1. Preconditions
 
 - The design `aidlc-docs/construction/plans/cr-<NNN>-*-design.md` exists and the Creator approved it in this conversation (or the audit records the approval). No approval: STOP and ask.
-- Current branch is `feature/cr-<NNN>-<slug>`. Otherwise, check it out; if it does not exist, STOP and ask. Never code on `main`.
+- Work in the CR's own worktree (`git-branching.md`): `scripts/worktree.sh path feature/cr-<NNN>-<slug>`; if the session is not already in it, switch with `EnterWorktree` (`path`). If the branch or its worktree does not exist, STOP and ask. Never code on `main` or in the primary checkout, and never check out the CR branch there.
+- Re-check the design's **Phụ thuộc**: if a branch it depends on is still not in `origin/main`, STOP and tell the Creator.
 
 ## 2. Implement the plan
 
@@ -28,8 +29,8 @@ Follow "Kế hoạch thực hiện" step by step:
 
 ## 3. Verify
 
-- Run the tests of every changed service (the service's own test command: `go test ./...`, `pytest`, `npm test`, ...). Report failures with their output; do not make them pass dishonestly.
-- Rebuild only the changed services (`git status` / `git diff main --stat` to scope): `docker compose build <service>` then `docker compose up -d <service>`, and confirm healthy (`docker compose ps`).
+- Run the tests of every changed service (the service's own test command: `go test ./...`, `pytest`, `npm test`, ...) in the worktree. Git-ignored dependencies are per worktree: install them there when missing (e.g. `npm ci`), never link them from the primary checkout. Report failures with their output; do not make them pass dishonestly.
+- Rebuild only the changed services (`git status` / `git diff origin/main --stat` to scope) with `scripts/worktree.sh rebuild <service>...`, run in the worktree: it builds the images from the worktree's code, restarts them in the primary checkout (where `.env`, secrets and volumes live) and waits until they are healthy. Do not run `docker compose up` in a worktree. The live stack is shared: the rebuild replaces whatever another open branch last deployed to that service, so name the branch now live in the report.
 - Run the live checks in the design's "Kiểm tra" when they are safe. Never delete or overwrite the Creator's real data to test.
 
 ## 4. Record and report

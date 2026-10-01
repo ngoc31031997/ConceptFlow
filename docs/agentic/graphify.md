@@ -33,9 +33,9 @@ make graph                                   # dựng graphify-out/ lần đầu
 make graph-hooks                             # hook git cho clone này
 ```
 
-`make graph-hooks` ghi vào `.git/hooks/post-commit` và `.git/hooks/post-checkout` (nối thêm, không đè hook có sẵn) và đăng ký `merge.graphify` trong `git config`. graphify còn tạo `.gitattributes` cho merge driver của `graph.json`; vì đồ thị không được commit, `scripts/graph.sh` xoá file đó nếu chính lệnh này vừa tạo ra nó. Tắt hook cho một lệnh: `GRAPHIFY_SKIP_HOOK=1 git commit …`. Gỡ: `graphify hook uninstall`.
+`make graph-hooks` ghi vào `.git/hooks/post-commit` và `.git/hooks/post-checkout` (nối thêm, không đè hook có sẵn) và đăng ký `merge.graphify` trong `git config`. graphify còn ghi dòng merge driver cho `graph.json` vào `.gitattributes`; vì đồ thị không được commit, `scripts/graph.sh` bỏ dòng đó (giữ nguyên `.gitattributes` đã commit, hoặc xoá file nếu chính lệnh này vừa tạo ra nó). Tắt hook cho một lệnh: `GRAPHIFY_SKIP_HOOK=1 git commit …`. Gỡ: `graphify hook uninstall`.
 
-Mỗi worktree có `graphify-out/` riêng (chạy `make graph` trong worktree đó).
+Mỗi worktree có `graphify-out/` riêng: `scripts/worktree.sh add` dựng sẵn khi tạo worktree; sau đó chạy `make graph` trong chính worktree đó.
 
 ## 4. Dùng hằng ngày
 

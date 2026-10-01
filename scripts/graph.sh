@@ -34,11 +34,14 @@ case "${1:-build}" in
     [ -e .gitattributes ] && had_attributes=1
     "$GRAPHIFY" hook install
     # hook install also registers a union merge driver for a committed graph.json in
-    # .gitattributes. Our graph is git-ignored, so the line has no use; drop the file
-    # if the install created it, rather than leave an untracked file in the tree.
+    # .gitattributes. Our graph is git-ignored, so the line has no use: drop the file
+    # if the install created it, or put the committed one back if it edited that.
     if [ "$had_attributes" = 0 ] && [ -e .gitattributes ] && [ -z "$(git ls-files .gitattributes)" ]; then
       rm .gitattributes
       echo "graph: removed .gitattributes created by graphify (graph.json is not committed, no merge driver needed)"
+    elif [ -n "$(git ls-files .gitattributes)" ] && ! git diff --quiet -- .gitattributes; then
+      git checkout -- .gitattributes
+      echo "graph: restored the committed .gitattributes (graph.json is not committed, no merge driver needed)"
     fi
     ;;
   *)
