@@ -10,6 +10,18 @@ Trả lời đề xuất:
 
 Chốt: hướng B; câu 2 và 3 theo mặc định (bỏ hẳn nhánh "đã có sẵn"; một tracker chung cho Sản xuất).
 
+Sau khi xem bản code đầu, Creator xem bản mẫu HTML (https://claude.ai/artifact/SDR1QRjERhPvm67wGWxG82) và đổi phần điều hướng:
+
+> tôi đang muốn đưa các step về menu sibar bên trái hết mà, tốt nhất bạn nên render thử 1 file html ý tưởng của bạn hoặc artiface dơn giản để tôi review trướ
+
+> ko xem màn đi detail của mỗi menu con được hả
+
+> tôi cũng thích ý tương 2 menu như cũ hơn vì như hiện tại mỗi lần muốn xem danh sách tôi phải scroll khá mệt
+
+> ok theo ý tưởng này đi
+
+Chốt (bản mẫu phiên bản 3): giữ hai lớp menu bên trái; các bước nằm ở menu bước; bỏ thanh giai đoạn ở đầu màn (FR3 thay bằng FR3a–FR3d).
+
 ## Hiện trạng
 
 Luồng đã có 14 bước, mỗi bước một URL (`services/web-gui/src/App.tsx:53-85`). Server tự suy ra bước hiện tại (`flow_step`, `run_state`) từ trạng thái saga (`services/orchestrator/internal/domain/flow.go:81`), nên **thứ tự và số bước là của server, giao diện chỉ hiển thị**. Các vấn đề tìm thấy khi đọc code:
@@ -50,7 +62,13 @@ Bước 3 đặt thanh chạy AI **dưới** hai thẻ (`ScriptOutlineStepPage.t
 
 **FR2. Tên bước bằng lời thường.** 1 Ý tưởng · 2 Cấu hình · 3 Kịch bản · 4 Hình ảnh · 5 Hình minh hoạ · 6 Code · 7 Kiểm tra tự động · 8 Duyệt nội dung · 9 Giọng đọc · 10 Dựng hình · 11 Ghép video · 12 Cắt short · 13 Kết quả · 14 Đăng video. Mọi nơi dùng `FLOW_LABELS` (tiêu đề màn, menu bước, danh sách video, nhật ký, hộp "tạo bản mới") tự đổi theo.
 
-**FR3. Thanh giai đoạn ở đầu mọi màn của luồng**, kể cả bước 1–2 khi chưa có project: 5 ô, ô hiện tại nổi bật, ô đã qua có dấu ✓, dưới ô hiện tại ghi "Bước n/m của giai đoạn: <tên bước>".
+**FR3a. Hai lớp menu bên trái.** Menu chính (Tạo video mới, Tiếp tục, Danh sách video, Nhật ký, nhóm Cài đặt) giữ nguyên chỗ và luôn ngắn. Các bước nằm ở menu bước (cột thứ hai). Không có thanh giai đoạn ở đầu màn; đầu màn chỉ có dòng nhỏ "<GIAI ĐOẠN> · BƯỚC n/14" trên tiêu đề.
+
+**FR3b. Menu bước hiện trên mọi màn của luồng, kể cả bước 1** khi chưa có project. Đầu menu: tên video (hoặc "Video mới"), dòng "<giai đoạn> · <bước> · x/y bước", thanh tiến độ.
+
+**FR3c. Menu bước chia 5 giai đoạn thu gọn được.** Mỗi giai đoạn có số (✓ khi xong), tên, "đã xong/tổng" (không tính bước "Không dùng"). Giai đoạn chứa bước đang xem tự mở; bấm tên giai đoạn để mở/đóng. Ở chế độ thu gọn menu (64px), mọi bước vẫn hiện dạng dấu tròn.
+
+**FR3d. Bấm được mọi bước.** Bước đã tới mở màn thật như hiện nay. Bước chưa tới, hoặc "Không dùng", mở màn xem trước (`/projects/:id/preview/:step`, hoặc `/create/preview/:step` khi chưa có project): tiêu đề bước, bước đó làm gì, dòng báo "Chưa tới bước này" hoặc lý do "Không dùng", và nút quay lại. Màn xem trước không có ô nhập hay nút hành động.
 
 **FR4. Bước tự động được đánh dấu.** Trong menu bước, bước 7, 9, 10, 11, 12 có nhãn "Tự động" và kiểu chữ nhạt hơn, để Creator biết mình không phải làm gì ở đó.
 
@@ -71,7 +89,7 @@ Bước 3 đặt thanh chạy AI **dưới** hai thẻ (`ScriptOutlineStepPage.t
 
 **FR11. Màn Sản xuất cho thấy cả 4 việc** (giọng đọc, dựng hình, ghép video, cắt short) trong một tracker; việc đang chạy nổi bật. "Cắt short" không hiện khi dự án chỉ làm video dài. Bấm bước 9/10/11/12 trên menu đều mở màn này.
 
-**FR12. Nút "Tiếp tục" ở thanh bên trái** ghi "▶ Tiếp tục · <giai đoạn> · <tên bước>" thay vì "bước n/14".
+**FR12. Nút "Tiếp tục" ở menu chính** ghi "▶ Tiếp tục · <giai đoạn> · <tên bước>" thay vì "bước n/14".
 
 ### Tiêu chí chấp nhận
 - Một Creator mới, không đọc tài liệu, nhìn đầu màn bất kỳ biết mình ở giai đoạn nào và còn mấy giai đoạn.
@@ -179,6 +197,16 @@ Theo `docs/ux-ui-design-rules.md` (trên→dưới, Neubrutalism, token trong `t
     - Xoá `components/ScriptAssistant.test.tsx` (và `OutlineActions` test nếu có).
 14. Chạy `npx tsc --noEmit`, `npx eslint src tests`, `npx vitest run` trong `services/web-gui`.
 15. `docker compose build web-gui && docker compose up -d web-gui`.
+
+### Bổ sung theo bản mẫu đã chốt (FR3a–FR3d)
+
+16. Xoá `PhaseStepper` (+ CSS, test); chuyển test nhãn nút "Tiếp tục" sang `AppShell`/`StepRail` test.
+17. `AppShell`: dòng "<GIAI ĐOẠN> · BƯỚC n/14" trên `h1` khi có `currentStep`; menu bước hiện khi có `currentStep` (bỏ điều kiện `hasProject`); prop `preview` truyền xuống `useStepNav`.
+18. `utils/flow.ts`: `FLOW_STEP_PURPOSE` (một câu cho mỗi bước), `skippedReason(step)`, `previewRoute(step, projectId)`.
+19. `useStepNav(currentStep, { preview })`: `isClickable` = mọi bước khác bước đang xem; `go` mở màn thật nếu bước đã tới (luật cũ), ngược lại mở `previewRoute`. Ở màn xem trước, "đã tới" tính theo server (`flow.flowStep`), không theo bước đang xem.
+20. `StepRail`: đầu menu có tiến độ; giai đoạn thu gọn được (state cục bộ, mở theo bước đang xem).
+21. `StepPreviewPage` (mới) + route `/projects/:id/preview/:step` và `/create/preview/:step`.
+22. Test: `StepRail` (hiện ở bước 1, đếm và thu gọn giai đoạn, bấm bước chưa tới mở xem trước), `StepPreviewPage`, `useStepNav`, `AppShell` (dòng giai đoạn, nhãn Tiếp tục).
 
 ## Kiểm tra
 
