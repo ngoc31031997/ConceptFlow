@@ -2764,3 +2764,25 @@ bỏ example vào gitignore"
 **Context**: Fix trên nhánh `fix/library-drawing-scope`, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-061 — Gỡ đường cắt clip dọc cũ
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "Phần cắt clip cũ vẫn còn trong code. Việc gỡ nó thuộc CR-061, bạn bảo là mình mở => làm cái này đi"
+**AI Response**: Mở nhánh `feature/cr-061-remove-clip-cutting`. Kiểm dữ liệu thật: 27/27 project `long`, không clip/clip_request/clip_mark, không saga `generate_clips`, không script gọi `self.clip`, không thư mục `/shared/*/clips`; `project_events` 9 hàng ở bước 13, 0 ở 12/14; 1 hàng prompt `short_script`. Đề xuất gỡ toàn bộ đường cắt clip ở 7 service (rendering `self.clip`/`clip_marks`; video-assembly worker `generate_clips`, `vertical_clip.py`, `clip_rules`, `intro_duration_seconds` trên `video_assembled`; orchestrator trạng thái/bước/API clip/`ModeBoth`; authoring-service + llm-service trợ lý và prompt `short_script`; api-gateway route tải clip; web-gui `ClipsPanel`, `ShortScriptAssistant`, bước "Cắt short"). Ba lựa chọn kèm đề xuất: A1 đánh lại luồng thành 13 bước + migration `project_events` (13→12, 14→13); B1 màn Đăng video của short hiện form YouTube như video dài; C1 drop 4 cột `clip_marks`, `clip_requests`, `clips`, `intro_duration_seconds`. Thêm migration `both`→`long` và xoá hàng prompt `short_script`.
+**Impact Assessment**: 7 service (orchestrator, authoring-service, llm-service, rendering, video-assembly, api-gateway, web-gui); bỏ lệnh/sự kiện `generate_clips`/`clips_generated`, trường `clip_marks`, `intro_duration_seconds`, `clip_index/clip_total`, 3 route clip + 2 route short-script; migration DB orchestrator (đổi số bước, `both`→`long`, drop 4 cột) và authoring-service (xoá prompt). Dữ liệu mất: không (đã kiểm rỗng).
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-061-remove-clip-cutting-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-061, chờ Creator duyệt thiết kế.
+
+---
+
+## CR-061 — Duyệt thiết kế (A1, B1, C1)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "A luồng còn 13 bước
+B chọn B1
+C C1 xoá hẳn"
+**AI Response**: Chốt A1 (luồng 13 bước + migration đổi số `project_events`), B1 (màn Đăng video của short hiện form YouTube), C1 (drop `clip_marks`, `clip_requests`, `clips`, `intro_duration_seconds`). Ghi vào thiết kế, commit, chuyển sang `/code`.
+**Impact Assessment**: như mục thiết kế CR-061.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-061-remove-clip-cutting-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-061, thiết kế đã duyệt.
+
+---
