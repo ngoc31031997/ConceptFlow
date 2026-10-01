@@ -15,7 +15,10 @@ A segment that fails does not stop the others: the run ends
 `incomplete` with the failed keys, and the Creator re-runs only those. A dead
 key, an empty balance or the Creator cancelling still stops everything at once.
 A chunk that ran out of token budget is written again as two halves, down to
-one shot.
+one shot; every half is tried even when an earlier one failed. A segment that
+still has shots missing fails with the shots that were written as its partial
+content and the ids of the shots that were not: the next run writes only the
+missing ones.
 
 Remotion takes two shortcuts off the critical path: a storyboard that already
 carries `layout` skips the LAYOUT call, and each chunk is compiled (against
@@ -196,6 +199,78 @@ class CodeResult:
             "failed": self.failed,
             "missing": self.missing,
         }
+
+
+@dataclass(frozen=True)
+class ShotFailure:
+    """Shots of a chunk the model could not write.
+
+    `tried` lists the shot groups asked for on the way down to these shots,
+    from the first call to the last (the chunk, then each half it was split
+    into)."""
+
+    ids: tuple[str, ...]
+    kind: str
+    message: str
+    error: LLMError | None
+    tried: tuple[tuple[str, ...], ...]
+
+
+@dataclass
+class ChunkOutcome:
+    """What writing a chunk produced: the shots written, and the shots that
+    failed with why."""
+
+    shots: dict[str, str] = field(default_factory=dict)
+    failures: list[ShotFailure] = field(default_factory=list)
+
+
+# The Creator-facing reason for a failure kind; other kinds keep the error's
+# own message.
+_TRUNCATED_REASON = "câu trả lời bị cắt giữa chừng vì hết token"
+
+
+def _shot_label(ids: tuple[str, ...] | list[str]) -> str:
+    return f"shot {ids[0]}" if len(ids) == 1 else f"shot {ids[0]}–{ids[-1]}"
+
+
+def _failure_reason(f: ShotFailure, max_reasoning_chars: int) -> str:
+    if f.kind == errors.BUDGET:
+        if max_reasoning_chars > 0:
+            return f"model suy nghĩ quá {max_reasoning_chars} ký tự mà chưa viết được chữ nào"
+        return "model dùng hết token để suy nghĩ mà chưa viết được chữ nào"
+    if f.kind == errors.TRUNCATED:
+        return _TRUNCATED_REASON
+    return f.error.message if f.error is not None else f.message
+
+
+def _tried_text(tried: tuple[tuple[str, ...], ...], segment_shots: tuple[str, ...]) -> str:
+    steps = []
+    for ids in tried:
+        if tuple(ids) == segment_shots and len(ids) > 1:
+            steps.append(f"cả đoạn {ids[0]}-{ids[-1]}")
+        elif len(ids) == 1:
+            steps.append(f"riêng shot {ids[0]}")
+        else:
+            steps.append(_shot_label(ids))
+    return ", rồi ".join(steps)
+
+
+def shot_failure_message(
+    failures: list[ShotFailure], saved: list[str], segment_shots: tuple[str, ...], max_reasoning_chars: int,
+) -> str:
+    """The Creator-facing error of a segment whose shots failed: which shots,
+    why, what was tried, and which shots were saved."""
+    parts = []
+    for f in failures:
+        text = f"{_shot_label(f.ids).capitalize()}: {_failure_reason(f, max_reasoning_chars)}"
+        if len(f.tried) > 1:
+            text += f" (đã thử {_tried_text(f.tried, segment_shots)})"
+        parts.append(text)
+    msg = "; ".join(parts) + "."
+    if saved:
+        msg += f" Đã lưu shot {', '.join(saved)}."
+    return msg
 
 
 class PipelineFailure(Exception):
@@ -504,8 +579,23 @@ class CodePipeline:
         async def segment_failed(seg: Segment, exc: PipelineFailure) -> None:
             failed.append(seg.key)
             err = exc.error.to_dict() if exc.error else {"kind": exc.kind, "message": exc.message}
-            await emit({"type": "segment_failed", "key": seg.key,
+            await emit({"type": "segment_failed", "key": seg.key, "failed_shots": [],
                         "error": {**err, "kind": exc.kind, "message": exc.message}})
+
+        async def shots_failed(seg: Segment, written: dict[str, str], failures: list[ShotFailure]) -> None:
+            """A chunk with shots still missing: the written shots go out as
+            the segment's partial content, under its fingerprint."""
+            failed.append(seg.key)
+            first = failures[0]
+            saved = [i for i in seg.shots if i in written]
+            message = shot_failure_message(failures, saved, seg.shots, req.max_reasoning_chars)
+            err = first.error.to_dict() if first.error else {}
+            await emit({
+                "type": "segment_failed", "key": seg.key, "fingerprint": seg.fingerprint,
+                "content": {"shots": {i: written[i] for i in saved}} if saved else None,
+                "failed_shots": [i for f in failures for i in f.ids],
+                "error": {**err, "kind": first.kind, "message": message},
+            })
 
         # 1. shared frame: LAYOUT (Remotion) / cast (Manim)
         frame_seg = plan.frame
@@ -544,14 +634,18 @@ class CodePipeline:
         shots: dict[str, str] = {}
         have_keys: set[str] = set()
         todo: list[Segment] = []
+        # Shots a segment already has from an earlier run that failed part-way.
+        partial: dict[str, dict[str, str]] = {}
         for seg in plan.chunks:
             content = stored(seg)
             got = content.get("shots") if content else None
-            if isinstance(got, dict) and all(isinstance(got.get(i), str) for i in seg.shots):
-                shots.update({i: got[i] for i in seg.shots})
+            have = {i: got[i] for i in seg.shots if isinstance(got, dict) and isinstance(got.get(i), str)}
+            if len(have) == len(seg.shots):
+                shots.update(have)
                 have_keys.add(seg.key)
             elif wanted(seg):
                 todo.append(seg)
+                partial[seg.key] = have
 
         sem = asyncio.Semaphore(self._concurrency)
         done = 0
@@ -559,40 +653,49 @@ class CodePipeline:
         early_check = remotion and len(plan.chunks) > 1
         chunk_rounds: dict[str, int] = {}
 
-        async def write(n: int, seg: Segment, ids: list[str], first: bool) -> dict[str, str]:
-            """One chunk's shots. A chunk the model could not finish within its
-            token budget is written again as two halves, down to one shot."""
+        async def write(
+            n: int, seg: Segment, ids: list[str], first: bool, tried: tuple[tuple[str, ...], ...],
+        ) -> ChunkOutcome:
+            """Some of one chunk's shots. A group the model could not finish
+            within its token budget is written again as two halves, down to
+            one shot; both halves are tried whatever happens to the first.
+            Only the errors that stop the whole run are raised."""
+            tried = (*tried, tuple(ids))
             async with sem:
                 if first:
                     await emit({"type": "segment_start", "key": seg.key})
                     await emit({"type": "chunk_start", "index": n + 1, "total": len(todo), "shots": ids})
                 try:
-                    return await self._ask(
+                    return ChunkOutcome(shots=await self._ask(
                         ask_req, "chunk", f"{ids[0]}-{ids[-1]}", seg.key,
                         lambda r: _chunk_prompt(req, plan, frame, ids, r),
-                        lambda text: parse_shots(req.engine, ids, text), record)
+                        lambda text: parse_shots(req.engine, ids, text), record))
                 except PipelineFailure as exc:
-                    if exc.kind not in SPLIT_KINDS or len(ids) < 2:
+                    if exc.kind in STOP_NOW_KINDS:
                         raise
+                    if exc.kind not in SPLIT_KINDS or len(ids) < 2:
+                        return ChunkOutcome(failures=[ShotFailure(tuple(ids), exc.kind, exc.message, exc.error, tried)])
             # Outside the semaphore: each half takes a slot of its own.
             half = (len(ids) + 1) // 2
             parts = [ids[:half], ids[half:]]
             await emit({"type": "chunk_split", "index": n + 1, "total": len(todo), "shots": ids, "into": parts})
-            out: dict[str, str] = {}
+            out = ChunkOutcome()
             for part in parts:
-                out.update(await write(n, seg, part, False))
+                got = await write(n, seg, part, False, tried)
+                out.shots.update(got.shots)
+                out.failures.extend(got.failures)
             return out
 
         async def do_chunk(n: int, seg: Segment) -> None:
             nonlocal done
             began = time.monotonic()
-            try:
-                mine = await write(n, seg, list(seg.shots), True)
-            except PipelineFailure as exc:
-                if exc.kind in STOP_NOW_KINDS:
-                    raise
-                await segment_failed(seg, exc)
+            have = partial[seg.key]
+            outcome = await write(n, seg, [i for i in seg.shots if i not in have], True, ())
+            written = {**have, **outcome.shots}
+            if outcome.failures:
+                await shots_failed(seg, written, outcome.failures)
                 return
+            mine = {i: written[i] for i in seg.shots}
             if early_check:
                 # Outside the semaphore: the check does not hold a generation slot;
                 # its repair calls take one each, like any other call.

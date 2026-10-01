@@ -498,6 +498,7 @@ func codeEvent(kind string, raw json.RawMessage) (application.CodeEvent, error) 
 		Repaired    bool             `json:"repaired"`
 		DurationMs  int              `json:"duration_ms"`
 		Error       wireError        `json:"error"`
+		FailedShots []string         `json:"failed_shots"`
 		Segments    []wirePlanned    `json:"segments"`
 		Segment     string           `json:"segment"`
 		Diagnostics []wireDiagnostic `json:"diagnostics"`
@@ -508,7 +509,10 @@ func codeEvent(kind string, raw json.RawMessage) (application.CodeEvent, error) 
 	out := application.CodeEvent{
 		Type: kind, Phase: e.Phase, Index: e.Index, Total: e.Total, Done: e.Done, Round: e.Round, Targets: e.Targets,
 		Key: e.Key, Fingerprint: e.Fingerprint, Content: e.Content, Source: e.Source, Repaired: e.Repaired,
-		DurationMS: e.DurationMs, ErrorKind: e.Error.Kind, ErrorText: e.Error.Message,
+		DurationMS: e.DurationMs, ErrorKind: e.Error.Kind, ErrorText: e.Error.Message, FailedShots: e.FailedShots,
+	}
+	if string(out.Content) == "null" {
+		out.Content = nil
 	}
 	switch kind {
 	case "plan":

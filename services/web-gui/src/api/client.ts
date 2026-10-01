@@ -1066,6 +1066,8 @@ export interface CodeSegment {
   content?: { code?: string; shots?: Record<string, string> };
   error_kind: string;
   error_message: string;
+  /** Shots a failed chunk could not write; `content` then holds the ones it did. */
+  failed_shots: string[];
   duration_ms: number;
   updated_at: string;
 }

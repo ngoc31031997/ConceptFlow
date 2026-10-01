@@ -502,8 +502,125 @@ async def test_a_one_shot_chunk_over_budget_fails_its_segment_with_budget():
     ev = Events()
     res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard_with_layout(2)), ev)
     assert res.status == "incomplete" and res.failed == ["1.1-1.2"]
-    assert ev.of("segment_failed")[0]["error"]["kind"] == errors.BUDGET
+    [failed] = ev.of("segment_failed")
+    assert failed["error"]["kind"] == errors.BUDGET and failed["failed_shots"] == ["1.2"]
     assert [(c.label, c.ok) for c in res.calls] == [("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", False)]
+
+
+def storyboard_3_scenes() -> str:
+    """Shots 3.3, 3.4, 3.5 as one chunk of three, like the scene that failed."""
+    shots = [{"id": f"3.{i}", "visual": f"v{i}", "narration": f"Câu {i}."} for i in (3, 4, 5)]
+    return json.dumps({"hero": "h", "palette": [{"role": "accent", "hex": "#F5B841"}],
+                       "scenes": [{"id": "s3", "shots": shots}],
+                       "layout": {"hero": {"x": 960, "y": 480, "size": 320}}})
+
+
+class SceneThree(FakeProvider):
+    """Writes shots 3.x; `fail(ids)` as in Scripted."""
+
+    def __init__(self, fail=None):
+        super().__init__()
+        self.fail = fail or (lambda ids: None)
+
+    async def chat(self, req, on_progress=None):
+        self.calls.append(req)
+        m = re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", req.user)
+        assert m, "unrecognised prompt: " + req.user[:80]
+        lo, hi = int(m.group(1).split(".")[1]), int(m.group(2).split(".")[1])
+        ids = [f"3.{i}" for i in range(lo, hi + 1)]
+        if (err := self.fail(ids)) is not None:
+            raise err
+        return ChatResult("```tsx\n" + "\n\n".join(tsx(i) for i in ids) + "\n```",
+                          Usage(model="m", prompt_tokens=10, completion_tokens=5))
+
+
+def scene_three_turns(prov):
+    out = []
+    for c in prov.calls:
+        m = re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", c.user)
+        out.append((m.group(1), m.group(2)))
+    return out
+
+
+async def test_a_split_chunk_keeps_the_shots_written_before_one_shot_fails():
+    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if "3.5" in ids else None)
+    ev = Events()
+    r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS",
+                    max_reasoning_chars=60000)
+    res = await pipeline(prov, FakeChecker(), chunk=3).run(r, ev)
+    assert res.status == "incomplete" and res.failed == ["3.3-3.5"]
+    assert scene_three_turns(prov) == [("3.3", "3.5"), ("3.3", "3.4"), ("3.5", "3.5")]
+    [failed] = ev.of("segment_failed")
+    assert failed["failed_shots"] == ["3.5"]
+    assert sorted(failed["content"]["shots"]) == ["3.3", "3.4"]
+    assert failed["fingerprint"] == make_plan(r, 3).get("3.3-3.5").fingerprint
+    assert failed["error"]["kind"] == errors.BUDGET
+    assert failed["error"]["message"] == (
+        "Shot 3.5: model suy nghĩ quá 60000 ký tự mà chưa viết được chữ nào "
+        "(đã thử cả đoạn 3.3-3.5, rồi riêng shot 3.5). Đã lưu shot 3.3, 3.4.")
+    assert not ev.of("segment_done") or all(e["key"] == "frame" for e in ev.of("segment_done"))
+
+
+async def test_both_halves_run_when_the_first_half_fails():
+    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if ids != ["3.5"] else None)
+    ev = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=3).run(
+        CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS"), ev)
+    assert res.failed == ["3.3-3.5"]
+    assert scene_three_turns(prov) == [("3.3", "3.5"), ("3.3", "3.4"), ("3.3", "3.3"), ("3.4", "3.4"), ("3.5", "3.5")]
+    [failed] = ev.of("segment_failed")
+    assert failed["failed_shots"] == ["3.3", "3.4"] and list(failed["content"]["shots"]) == ["3.5"]
+    assert failed["error"]["message"] == (
+        "Shot 3.3: model dùng hết token để suy nghĩ mà chưa viết được chữ nào "
+        "(đã thử cả đoạn 3.3-3.5, rồi shot 3.3–3.4, rồi riêng shot 3.3); "
+        "Shot 3.4: model dùng hết token để suy nghĩ mà chưa viết được chữ nào "
+        "(đã thử cả đoạn 3.3-3.5, rồi shot 3.3–3.4, rồi riêng shot 3.4). Đã lưu shot 3.5.")
+
+
+async def test_a_partly_written_segment_writes_only_its_missing_shots():
+    first = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if "3.5" in ids else None)
+    ev = Events()
+    r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS")
+    await pipeline(first, FakeChecker(), chunk=3).run(r, ev)
+    [failed] = ev.of("segment_failed")
+
+    again = SceneThree()
+    r2 = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS",
+                     done={"3.3-3.5": DoneSegment(failed["fingerprint"], failed["content"])}, only={"3.3-3.5"})
+    ev2 = Events()
+    res = await pipeline(again, FakeChecker(), chunk=3).run(r2, ev2)
+    assert scene_three_turns(again) == [("3.5", "3.5")]
+    assert res.status == "done" and res.check_ok
+    [done] = [e for e in ev2.of("segment_done") if e["key"] == "3.3-3.5"]
+    assert list(done["content"]["shots"]) == ["3.3", "3.4", "3.5"]
+    assert done["content"]["shots"]["3.3"] == failed["content"]["shots"]["3.3"]
+
+
+async def test_partial_content_under_an_old_fingerprint_is_not_reused():
+    again = SceneThree()
+    r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS",
+                    done={"3.3-3.5": DoneSegment("stale", {"shots": {"3.3": tsx("3.3")}})})
+    await pipeline(again, FakeChecker(), chunk=3).run(r, emit_none)
+    assert scene_three_turns(again) == [("3.3", "3.5")]
+
+
+async def test_a_stop_now_error_inside_a_split_still_stops_the_run():
+    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 3 else (
+        llm_err(errors.BALANCE) if ids == ["3.5"] else None))
+    with pytest.raises(PipelineFailure) as e:
+        await pipeline(prov, FakeChecker(), chunk=3).run(
+            CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS"), Events())
+    assert e.value.kind == errors.BALANCE
+
+
+async def test_a_failure_that_is_not_split_names_its_shots_with_the_error():
+    prov = SceneThree(fail=lambda ids: llm_err(errors.SERVER))
+    ev = Events()
+    await pipeline(prov, FakeChecker(), chunk=3).run(
+        CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS"), ev)
+    [failed] = ev.of("segment_failed")
+    assert failed["failed_shots"] == ["3.3", "3.4", "3.5"] and failed["content"] is None
+    assert failed["error"]["message"] == "Shot 3.3–3.5: server failure."
 
 
 async def test_other_error_kinds_are_not_split():

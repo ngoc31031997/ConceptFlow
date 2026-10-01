@@ -111,6 +111,12 @@
   font-size: 13px;
 }
 
+.saved {
+  margin: var(--space-xs) 0 0;
+  color: var(--success);
+  font-size: 13px;
+}
+
 .notice {
   margin: 0 0 var(--space-xs);
   color: var(--ok);

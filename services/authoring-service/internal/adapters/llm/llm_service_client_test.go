@@ -199,6 +199,8 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 			`{"type":"segment_done","key":"1.3-1.4","fingerprint":"f2","content":{"shots":{"1.3":"a","1.4":"b"}},"source":"ai","repaired":false,"duration_ms":2000}`,
 			`{"type":"segment_failed","key":"1.5-1.5","error":{"kind":"timeout","message":"slow"}}`,
 			`{"type":"chunk_done","index":1,"total":1,"done":1}`,
+			`{"type":"segment_failed","key":"1.6-1.8","fingerprint":"f3","content":{"shots":{"1.6":"a"}},"failed_shots":["1.7","1.8"],"error":{"kind":"budget","message":"Shot 1.7–1.8"}}`,
+			`{"type":"segment_failed","key":"1.9-1.9","fingerprint":"f4","content":null,"failed_shots":["1.9"],"error":{"kind":"server","message":"Shot 1.9"}}`,
 			`{"type":"result","status":"done","code":"CODE","check_ok":false,"repair_rounds":3,"scene_class_name":"XScene","warnings":["w"],`+
 				`"diagnostics":[{"message":"boom","line":9,"rule":"TS1"},{"message":"no line","line":null}],"failed":[],"missing":[]}`)
 	})
@@ -210,7 +212,7 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateCode: %v", err)
 	}
-	if len(events) != 8 {
+	if len(events) != 10 {
 		t.Fatalf("events = %+v", events)
 	}
 	if p := events[0].Plan; len(p) != 2 || p[1].Key != "1.3-1.4" || p[1].Position != 1 || p[1].Fingerprint != "f2" || len(p[1].Shots) != 2 {
@@ -227,8 +229,15 @@ func TestGenerateCodeStreamsEventsAndReturnsTheResult(t *testing.T) {
 		string(d.Content) != `{"shots":{"1.3":"a","1.4":"b"}}` {
 		t.Errorf("segment_done = %+v", d)
 	}
-	if f := events[6]; f.Key != "1.5-1.5" || f.ErrorKind != "timeout" || f.ErrorText != "slow" {
+	if f := events[6]; f.Key != "1.5-1.5" || f.ErrorKind != "timeout" || f.ErrorText != "slow" || len(f.FailedShots) != 0 {
 		t.Errorf("segment_failed = %+v", f)
+	}
+	if f := events[8]; f.Key != "1.6-1.8" || f.Fingerprint != "f3" || string(f.Content) != `{"shots":{"1.6":"a"}}` ||
+		strings.Join(f.FailedShots, ",") != "1.7,1.8" || f.ErrorKind != "budget" {
+		t.Errorf("partly written segment_failed = %+v content=%s", f, f.Content)
+	}
+	if f := events[9]; f.Content != nil || strings.Join(f.FailedShots, ",") != "1.9" {
+		t.Errorf("segment_failed without written shots must carry no content: %+v content=%s", f, f.Content)
 	}
 	if res.Status != application.CodeGenDone || res.Code != "CODE" || res.CheckOK || res.RepairRounds != 3 || res.SceneClassName != "XScene" {
 		t.Errorf("result = %+v", res)

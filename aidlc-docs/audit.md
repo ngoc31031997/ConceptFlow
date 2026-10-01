@@ -2673,3 +2673,20 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-059, thiết kế đã duyệt.
 
 ---
+
+## CR-059 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: (theo thiết kế đã duyệt: FR-1, FR-2, FR-4; bỏ FR-3)
+**AI Response**:
+- **llm-service** (`app/pipeline/run.py`): `write()` trả `ChunkOutcome` (shot đã viết + `ShotFailure`), khi chia đôi thì chạy hết các nửa; chỉ `auth`/`balance`/`not_configured` còn dừng cả lượt. `segment_failed` của đoạn shot mang `fingerprint`, `content` (shot đã viết, `null` khi không có), `failed_shots`, và câu lỗi tiếng Việt theo shot (`shot_failure_message`). Đoạn có nội dung dở cùng vân tay chỉ viết lại shot thiếu. Docstring module cập nhật.
+- **authoring-service**: cột `authoring_segments.failed_shots`; `domain.SegmentFailure`, `HasEveryShot`, `FailedContent` (lượt chạy lại lỗi không vứt kết quả đầy đủ); `SaveSegmentFailed` mới (transaction); `failed_shots` được xoá khi chạy/xong/đổi vân tay; `sendStoredSegments` gửi lại đoạn lỗi có nội dung dở; câu "Bước Code chưa xong" nêu shot lỗi; client đọc `failed_shots`, `content: null`.
+- **web-gui** (`CodeSegmentsPanel`): câu lỗi theo shot (không lặp tiền tố kind), dòng "Đã lưu: shot …" (`--success`), nút "Chạy lại shot …" khi đoạn có nội dung dở.
+- **Hợp đồng**: `docs/contracts/authoring-llm-code-v2.md` cập nhật.
+- **Test**: llm-service `pytest` 146 pass (6 test mới, 1 test sửa), `ruff check` sạch (`ruff format --check` báo 16 file, bằng `main`). authoring-service `go test ./...` pass, `go vet`/gofmt sạch; `TestCodeSegmentsAgainstPostgres` chạy pass trên Postgres 16 tạm (container riêng, đã dừng). web-gui `tsc` sạch, eslint 0 lỗi/20 cảnh báo (bằng `main`), vitest 67 file/469 test pass (2 test mới); prettier báo 3 file đã lệch sẵn trên `main`.
+- **Rebuild**: `llm-service`, `authoring-service` healthy; `web-gui` Up, HTTP 200. Cột `failed_shots` đã có trong DB thật.
+- **Chưa kiểm trực tiếp nhánh lỗi**: đoạn `3.3-3.5` của dự án `6deec24f…` đã được chạy lại lúc 12:52–13:01 UTC (bằng code cũ, trước rebuild) và đã `done`, nên không còn đoạn lỗi để quan sát; không chạy lại để thử vì sẽ tốn token và ghi đè kết quả thật. Nhánh lỗi chỉ được chứng minh bằng test.
+**Impact Assessment**: llm-service, authoring-service (thêm cột, có mặc định), web-gui; hợp đồng chỉ thêm trường.
+**Artifacts Affected**: các file trên, `aidlc-docs/audit.md`; chưa commit code.
+**Context**: CONSTRUCTION — CR-059, chờ Creator duyệt rồi `/deliver`.
+
+---

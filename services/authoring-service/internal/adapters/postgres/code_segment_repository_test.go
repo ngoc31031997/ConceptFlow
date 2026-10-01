@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"authoring/internal/domain"
@@ -73,14 +74,41 @@ func TestCodeSegmentsAgainstPostgres(t *testing.T) {
 	if err := r.MarkSegmentRunning(ctx, pid, step, "a"); err != nil {
 		t.Fatal(err)
 	}
-	if err := r.SaveSegmentFailed(ctx, pid, step, "a", "timeout", "slow", 5); err != nil {
+	if err := r.SaveSegmentFailed(ctx, pid, step, "a", domain.SegmentFailure{Kind: "timeout", Message: "slow", DurationMS: 5}); err != nil {
 		t.Fatal(err)
 	}
 	if s := get("a"); s.Status != domain.SegmentFailed || s.ErrorKind != "timeout" || len(s.Content) == 0 {
 		t.Fatalf("failed = %+v", s)
 	}
-	if err := r.SaveSegmentFailed(ctx, pid, step, "nope", "x", "y", 0); err == nil {
+	// a complete result is kept even when the failed re-run wrote some shots
+	if err := r.SaveSegmentFailed(ctx, pid, step, "a", domain.SegmentFailure{Kind: "budget", Fingerprint: "fa",
+		Content: json.RawMessage(`{"shots":{}}`), FailedShots: []string{"a"}}); err != nil {
+		t.Fatal(err)
+	}
+	if s := get("a"); string(s.Content) != `{"shots": {"a": "FIXED"}}` || strings.Join(s.FailedShots, ",") != "a" {
+		t.Fatalf("complete content replaced: %+v content=%s", s, s.Content)
+	}
+	if err := r.SaveSegmentFailed(ctx, pid, step, "nope", domain.SegmentFailure{Kind: "x", Message: "y"}); err == nil {
 		t.Error("failing an unknown segment must be an error")
+	}
+
+	// a chunk that failed part-way stores the shots it wrote; running it clears the failed shots
+	if err := r.ApplySegmentPlan(ctx, pid, step, []domain.CodeSegment{seg("frame", "f", 0), seg("a", "fa", 1), seg("b", "fb", 2),
+		{Key: "p", Kind: domain.SegmentKindShots, Position: 3, Shots: []string{"p1", "p2"}, Fingerprint: "fp"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.SaveSegmentFailed(ctx, pid, step, "p", domain.SegmentFailure{Kind: "budget", Message: "Shot p2", Fingerprint: "fp",
+		Content: json.RawMessage(`{"shots":{"p1":"P1"}}`), FailedShots: []string{"p2"}}); err != nil {
+		t.Fatal(err)
+	}
+	if s := get("p"); s.Status != domain.SegmentFailed || string(s.Content) != `{"shots": {"p1": "P1"}}` || strings.Join(s.FailedShots, ",") != "p2" {
+		t.Fatalf("partial = %+v content=%s", s, s.Content)
+	}
+	if err := r.MarkSegmentRunning(ctx, pid, step, "p"); err != nil {
+		t.Fatal(err)
+	}
+	if s := get("p"); len(s.FailedShots) != 0 || len(s.Content) == 0 {
+		t.Fatalf("running = %+v", s)
 	}
 
 	// same fingerprint: untouched; changed fingerprint: back to pending, empty; gone key: deleted

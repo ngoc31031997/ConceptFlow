@@ -33,7 +33,7 @@ Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `ser
 }
 ```
 - `chunk_shots`: từ 0 đến 10; 0 nghĩa là dùng `CODE_CHUNK_SHOTS`.
-- `segments`: các đoạn `done` đã lưu. Nội dung khung là `{"code": "…"}`, nội dung đoạn shot là `{"shots": {"1.1": "…"}}`.
+- `segments`: các đoạn `done` đã lưu, và các đoạn shot `failed` có **nội dung dở** (thiếu một số shot). Nội dung khung là `{"code": "…"}`, nội dung đoạn shot là `{"shots": {"1.1": "…"}}`. Với đoạn dở có vân tay khớp, `llm-service` chỉ viết các shot còn thiếu rồi trả `segment_done` với đủ shot.
 - `only`: nếu có thì chỉ chạy các đoạn này; bỏ trống thì chạy mọi đoạn còn thiếu.
 - `subtitle_band` và `video_font` chỉ dùng cho Remotion.
 
@@ -45,7 +45,7 @@ Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trườn
 | `plan` | `segments: [{key, kind: "frame"\|"shots", shots, fingerprint}]` | Xoá đoạn có khoá không còn trong plan; thêm đoạn mới ở trạng thái `pending`; đoạn lệch vân tay về `pending` và xoá nội dung. |
 | `segment_start` | `key` | Đoạn thành `running`. |
 | `segment_done` | `key, fingerprint, content, source ("ai"\|"storyboard"), repaired, duration_ms` | Lưu `done`. Với `repaired: true`, giữ nguyên `source` và `duration_ms` cũ. |
-| `segment_failed` | `key, error: {kind, message, …}` | Lưu `failed`, giữ nội dung cũ nếu có. |
+| `segment_failed` | `key, failed_shots, error: {kind, message, …}`; đoạn shot thêm `fingerprint, content` | Lưu `failed` và `failed_shots`. `content` (`{"shots": …}` các shot đã viết, `null` khi không có) được lưu làm nội dung dở, trừ khi nội dung đang lưu cùng vân tay đã đủ mọi shot (lượt chạy lại lỗi không vứt kết quả đầy đủ). Không có `content` thì giữ nội dung cũ. |
 | `call` | `phase, label, segment, ok, usage, error_kind, error_message, duration_ms` | Ghi một dòng `llm_usage` ngay. `usage` = `{model, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens, reasoning_chars, usage_reported}`; hai trường cuối thêm ở CR-056 (xem dưới). |
 | `check` | `phase ("chunk"\|"final"), round, segment, diagnostics: [{message, line, kind, rule, shot, segment}]` | Ghi vào `code_check_diagnostics`. |
 | `phase`, `chunk_start`, `chunk_done`, `chunk_split`, `chunk_repair` | như CR-039/CR-048 | Chỉ dùng cho thanh tiến độ. |
@@ -53,6 +53,7 @@ Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trườn
 | `error` | `error: {kind, message, …}`, `calls: []` | Lỗi dừng cả lượt: `auth`, `balance`, `not_configured`, storyboard không đọc được, lỗi bất ngờ. Không ghi lại `calls`, vì mọi lượt gọi đã có sự kiện `call` riêng. |
 
 - **Lỗi một đoạn** không dừng các đoạn khác. Lượt chạy kết thúc với `result.status = "incomplete"` và `failed` liệt kê các đoạn lỗi.
+- **Chia đôi**: đoạn lỗi `budget`/`truncated` được viết lại thành hai nửa, đệ quy tới một shot; nửa nào lỗi thì nửa kia vẫn chạy. `segment_failed` của đoạn đó có `failed_shots` là các shot không viết được, `content` là các shot đã viết, và `error.message` (tiếng Việt) nêu shot, lý do, các lượt đã thử và các shot đã lưu, ví dụ: `Shot 3.5: model suy nghĩ quá 60000 ký tự mà chưa viết được chữ nào (đã thử cả đoạn 3.3-3.5, rồi riêng shot 3.5). Đã lưu shot 3.3, 3.4.` Lỗi khung có `failed_shots: []`, không có `content`.
 - **Khung lỗi**: không đoạn shot nào chạy được; `missing` liệt kê các đoạn còn thiếu.
 
 ## `POST /v2/code/plan` (JSON)

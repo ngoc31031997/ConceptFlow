@@ -15,7 +15,8 @@ import (
 
 // fakeSegments is the code segment store in memory, with the same rules as
 // the Postgres one (ApplySegmentPlan resets a segment whose fingerprint changed;
-// a repaired segment keeps its source; a failed one keeps its content).
+// a repaired segment keeps its source; a failed one keeps its content by the
+// rule of domain.FailedContent).
 type fakeSegments struct {
 	mu          sync.Mutex
 	rows        map[string]domain.CodeSegment // key -> segment (one project, step code)
@@ -63,14 +64,16 @@ func (f *fakeSegments) ApplySegmentPlan(_ context.Context, _, _ string, plan []d
 }
 
 func (f *fakeSegments) MarkSegmentRunning(_ context.Context, _, _, key string) error {
-	return f.update(key, func(s *domain.CodeSegment) { s.Status, s.ErrorKind, s.ErrorMessage = domain.SegmentRunning, "", "" })
+	return f.update(key, func(s *domain.CodeSegment) {
+		s.Status, s.ErrorKind, s.ErrorMessage, s.FailedShots = domain.SegmentRunning, "", "", nil
+	})
 }
 
 func (f *fakeSegments) SaveSegmentDone(_ context.Context, _, _ string, s domain.CodeSegment, repaired bool) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	have, ok := f.rows[s.Key]
-	s.Status, s.ErrorKind, s.ErrorMessage = domain.SegmentDone, "", ""
+	s.Status, s.ErrorKind, s.ErrorMessage, s.FailedShots = domain.SegmentDone, "", "", nil
 	if ok && repaired {
 		s.Source, s.DurationMS = have.Source, have.DurationMS
 	}
@@ -78,9 +81,11 @@ func (f *fakeSegments) SaveSegmentDone(_ context.Context, _, _ string, s domain.
 	return nil
 }
 
-func (f *fakeSegments) SaveSegmentFailed(_ context.Context, _, _, key, kind, message string, ms int) error {
+func (f *fakeSegments) SaveSegmentFailed(_ context.Context, _, _, key string, failure domain.SegmentFailure) error {
 	return f.update(key, func(s *domain.CodeSegment) {
-		s.Status, s.ErrorKind, s.ErrorMessage, s.DurationMS = domain.SegmentFailed, kind, message, ms
+		s.Status, s.ErrorKind, s.ErrorMessage, s.DurationMS = domain.SegmentFailed, failure.Kind, failure.Message, failure.DurationMS
+		s.FailedShots = failure.FailedShots
+		s.Fingerprint, s.Content = domain.FailedContent(s.Fingerprint, s.Content, s.Shots, failure)
 	})
 }
 
@@ -249,6 +254,77 @@ func TestCodeRunOptionsDecideWhatIsSentBack(t *testing.T) {
 	}
 	if store.deleted != 1 || len(gen.req.Done) != 0 {
 		t.Errorf("fresh run: deleted %d, sent %d done segments", store.deleted, len(gen.req.Done))
+	}
+}
+
+// A chunk that failed part-way keeps the shots it wrote; the next run sends
+// them back so only the missing shot is written, and the step names the shot.
+func TestAPartlyWrittenChunkIsStoredAndSentBack(t *testing.T) {
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
+	plan := application.CodeEvent{Type: "plan", Plan: []domain.CodeSegment{
+		{Key: "frame", Kind: domain.SegmentKindFrame, Position: 0, Fingerprint: "fp-frame", Shots: []string{}},
+		{Key: "1.1-2.1", Kind: domain.SegmentKindShots, Position: 1, Fingerprint: "fp-a", Shots: []string{"1.1", "1.2", "2.1"}},
+		{Key: "2.2-2.2", Kind: domain.SegmentKindShots, Position: 2, Fingerprint: "fp-b", Shots: []string{"2.2"}},
+	}}
+	written := json.RawMessage(`{"shots":{"1.1":"A","1.2":"B"}}`)
+	gen := &stubCodegen{events: []application.CodeEvent{
+		plan, doneEvent("frame"), doneEvent("2.2-2.2"),
+		{Type: "segment_start", Key: "1.1-2.1"},
+		{Type: "segment_failed", Key: "1.1-2.1", ErrorKind: "budget", Fingerprint: "fp-a", Content: written,
+			FailedShots: []string{"2.1"}, ErrorText: "Shot 2.1: model suy nghĩ quá 60000 ký tự. Đã lưu shot 1.1, 1.2."},
+	}, result: application.CodeGenResult{Status: application.CodeGenIncomplete, Failed: []string{"1.1-2.1"}}}
+	uc.WithPipeline(&stubFinalizer{}, gen)
+
+	_, err := uc.Execute(context.Background(), "p1", "code")
+	if err == nil || !strings.Contains(err.Error(), "1/3 đoạn lỗi (shot 2.1: budget)") {
+		t.Fatalf("the step error must name the failed shot, got %v", err)
+	}
+	s := store.get("1.1-2.1")
+	if s.Status != domain.SegmentFailed || string(s.Content) != string(written) || s.Fingerprint != "fp-a" ||
+		strings.Join(s.FailedShots, ",") != "2.1" {
+		t.Errorf("failed chunk = %+v content=%s", s, s.Content)
+	}
+
+	gen.events, gen.result = nil, application.CodeGenResult{Code: "x", CheckOK: true}
+	if _, err := uc.ExecuteCode(context.Background(), "p1", application.CodeRunOptions{Segment: "1.1-2.1"}); err != nil {
+		t.Fatal(err)
+	}
+	if keys := doneKeys(gen.req); keys != "1.1-2.1,2.2-2.2,frame" {
+		t.Errorf("re-running the chunk sent %q; its written shots must go back with it", keys)
+	}
+}
+
+// A re-run of a complete chunk that fails part-way keeps the complete
+// result, and that result is not sent back as if the chunk were half done.
+func TestAFailedRerunKeepsACompleteChunk(t *testing.T) {
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
+	shots := []string{"1.1", "1.2"}
+	complete := json.RawMessage(`{"shots":{"1.1":"A","1.2":"B"}}`)
+	plan := application.CodeEvent{Type: "plan", Plan: []domain.CodeSegment{
+		{Key: "frame", Kind: domain.SegmentKindFrame, Position: 0, Fingerprint: "fp-frame", Shots: []string{}},
+		{Key: "1.1-1.2", Kind: domain.SegmentKindShots, Position: 1, Fingerprint: "fp-a", Shots: shots},
+	}}
+	gen := &stubCodegen{events: []application.CodeEvent{plan, doneEvent("frame"),
+		{Type: "segment_done", Key: "1.1-1.2", Fingerprint: "fp-a", Content: complete, Source: "ai"}},
+		result: application.CodeGenResult{Code: "x", CheckOK: true}}
+	uc.WithPipeline(&stubFinalizer{}, gen)
+	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil {
+		t.Fatal(err)
+	}
+
+	gen.events = []application.CodeEvent{plan, {Type: "segment_start", Key: "1.1-1.2"},
+		{Type: "segment_failed", Key: "1.1-1.2", ErrorKind: "budget", Fingerprint: "fp-a",
+			Content: json.RawMessage(`{"shots":{"1.1":"NEW"}}`), FailedShots: []string{"1.2"}}}
+	gen.result = application.CodeGenResult{Status: application.CodeGenIncomplete, Failed: []string{"1.1-1.2"}}
+	_, _ = uc.ExecuteCode(context.Background(), "p1", application.CodeRunOptions{Segment: "1.1-1.2"})
+	if s := store.get("1.1-1.2"); string(s.Content) != string(complete) {
+		t.Errorf("a failed re-run replaced the complete chunk with %s", s.Content)
+	}
+
+	gen.events, gen.result = nil, application.CodeGenResult{Code: "x", CheckOK: true}
+	_, _ = uc.Execute(context.Background(), "p1", "code")
+	if keys := doneKeys(gen.req); keys != "frame" {
+		t.Errorf("a failed complete chunk sent back as %q; it is written again like any failed chunk", keys)
 	}
 }
 

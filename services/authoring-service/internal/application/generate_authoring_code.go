@@ -175,14 +175,20 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 }
 
 // sendStoredSegments adds the finished segments to req, except `skip` (the
-// segment the Creator asked to write again).
+// segment the Creator asked to write again), and the shots a failed chunk
+// did write, so the run writes only its missing shots.
 func (uc *GenerateAuthoringUseCase) sendStoredSegments(ctx context.Context, projectID string, req *CodeGenRequest, skip string) error {
 	stored, err := uc.segments.ListSegments(ctx, projectID, "code")
 	if err != nil {
 		return fmt.Errorf("load the code segments: %w", err)
 	}
 	for _, s := range stored {
-		if s.Status == domain.SegmentDone && len(s.Content) > 0 && s.Key != skip {
+		if len(s.Content) == 0 {
+			continue
+		}
+		done := s.Status == domain.SegmentDone && s.Key != skip
+		partial := s.Status == domain.SegmentFailed && s.Kind == domain.SegmentKindShots && !domain.HasEveryShot(s.Content, s.Shots)
+		if done || partial {
 			req.Done = append(req.Done, DoneSegment{Key: s.Key, Fingerprint: s.Fingerprint, Content: s.Content})
 		}
 	}
@@ -222,7 +228,7 @@ type CodeSegmentPort interface {
 	ApplySegmentPlan(ctx context.Context, projectID, step string, plan []domain.CodeSegment) error
 	MarkSegmentRunning(ctx context.Context, projectID, step, key string) error
 	SaveSegmentDone(ctx context.Context, projectID, step string, s domain.CodeSegment, repaired bool) error
-	SaveSegmentFailed(ctx context.Context, projectID, step, key, kind, message string, durationMS int) error
+	SaveSegmentFailed(ctx context.Context, projectID, step, key string, f domain.SegmentFailure) error
 	FailRunningSegments(ctx context.Context, projectID, step, kind, message string) (int64, error)
 	FailAllRunningSegments(ctx context.Context, kind, message string) (int64, error)
 	DeleteSegments(ctx context.Context, projectID, step string) error
@@ -255,6 +261,10 @@ func (e *ErrSegmentsIncomplete) Error() string {
 		reason := s.ErrorKind
 		if reason == "" {
 			reason = "lỗi"
+		}
+		if len(s.FailedShots) > 0 {
+			parts = append(parts, fmt.Sprintf("shot %s: %s", strings.Join(s.FailedShots, ", "), reason))
+			continue
 		}
 		parts = append(parts, fmt.Sprintf("%s: %s", s.Key, reason))
 	}
@@ -317,7 +327,11 @@ func (r *codeRun) onEvent(ev CodeEvent) {
 			r.fail(fmt.Errorf("store segment %s: %w", ev.Key, err))
 		}
 	case "segment_failed":
-		if err := uc.segments.SaveSegmentFailed(r.ctx, r.projectID, step, ev.Key, ev.ErrorKind, ev.ErrorText, ev.DurationMS); err != nil {
+		failure := domain.SegmentFailure{
+			Kind: ev.ErrorKind, Message: ev.ErrorText, DurationMS: ev.DurationMS,
+			Fingerprint: ev.Fingerprint, Content: ev.Content, FailedShots: ev.FailedShots,
+		}
+		if err := uc.segments.SaveSegmentFailed(r.ctx, r.projectID, step, ev.Key, failure); err != nil {
 			r.fail(fmt.Errorf("mark segment %s failed: %w", ev.Key, err))
 		}
 	case "call":

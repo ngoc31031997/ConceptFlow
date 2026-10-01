@@ -84,7 +84,8 @@ type DoneSegment struct {
 // CodeEvent is one event of a run. Progress types: "phase", "chunk_start",
 // "chunk_done", "chunk_repair", "chunk_split". Segment types:
 // "plan" (Plan), "segment_start", "segment_done" (Key, Fingerprint, Content,
-// Source, Repaired, DurationMS), "segment_failed" (Key, Error), "call" (Call)
+// Source, Repaired, DurationMS), "segment_failed" (Key, Error, FailedShots,
+// Fingerprint, Content), "call" (Call)
 // and "check" (Check). Types a consumer does not use are ignored.
 type CodeEvent struct {
 	Type    string
@@ -104,6 +105,9 @@ type CodeEvent struct {
 	DurationMS  int
 	ErrorKind   string
 	ErrorText   string
+	// FailedShots are the shots a "segment_failed" chunk could not write;
+	// its Fingerprint and Content then carry the shots it did write.
+	FailedShots []string
 	Call        *CodeCall
 	Check       *CodeCheck
 }

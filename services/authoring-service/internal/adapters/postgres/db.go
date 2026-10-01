@@ -177,6 +177,9 @@ CREATE TABLE IF NOT EXISTS authoring_segments (
     PRIMARY KEY (project_id, step, key)
 );
 CREATE INDEX IF NOT EXISTS authoring_segments_running_idx ON authoring_segments (status) WHERE status = 'running';
+-- The shots a failed chunk could not write; its content then holds the
+-- shots it did write, so the next run writes only the missing ones.
+ALTER TABLE authoring_segments ADD COLUMN IF NOT EXISTS failed_shots TEXT[] NOT NULL DEFAULT '{}';
 -- Shots per code segment, chosen by the Creator.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_chunk_shots INTEGER NOT NULL DEFAULT 3;
 -- Every failed check of a code run, for statistics. Kept when

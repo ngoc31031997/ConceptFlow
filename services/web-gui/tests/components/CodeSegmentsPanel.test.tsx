@@ -7,7 +7,7 @@ import * as apiClient from "../../src/api/client";
 
 const seg = (over: Partial<apiClient.CodeSegment>): apiClient.CodeSegment => ({
   key: "frame", kind: "frame", position: 0, shots: [], status: "pending", source: "",
-  error_kind: "", error_message: "", duration_ms: 0, updated_at: "2026-09-30T00:00:00Z", ...over,
+  error_kind: "", error_message: "", failed_shots: [], duration_ms: 0, updated_at: "2026-09-30T00:00:00Z", ...over,
 });
 
 const FRAME = seg({ status: "done", source: "ai", content: { code: "const LAYOUT = {};" }, duration_ms: 42000 });
@@ -50,6 +50,31 @@ describe("CodeSegmentsPanel", () => {
     expect(screen.getByTestId("code-segment-1.4-1.6-error")).toHaveTextContent("timeout: AI không trả lời kịp");
     expect(screen.getByTestId("code-segment-2.1-2.1")).toHaveTextContent("Shot 2.1");
     expect(screen.getByTestId("code-segments-run-missing")).toHaveTextContent("Chạy các đoạn còn thiếu (2)");
+  });
+
+  it("names the failed shot, lists the shots kept, and offers to run only the missing shot", async () => {
+    const partly = seg({
+      key: "3.3-3.5", kind: "shots", position: 2, shots: ["3.3", "3.4", "3.5"], status: "failed", error_kind: "budget",
+      error_message: "Shot 3.5: model suy nghĩ quá 60000 ký tự mà chưa viết được chữ nào. Đã lưu shot 3.3, 3.4.",
+      failed_shots: ["3.5"], content: { shots: { "3.3": "function Shot3_3() {}", "3.4": "function Shot3_4() {}" } },
+    });
+    vi.spyOn(apiClient, "getCodeSegments").mockResolvedValue(view([FRAME, partly]));
+    const start = vi.spyOn(apiClient, "startAuthoringChain").mockResolvedValue();
+    renderPanel();
+    const error = await screen.findByTestId("code-segment-3.3-3.5-error");
+    expect(error).toHaveTextContent(/^Shot 3\.5: model suy nghĩ quá 60000 ký tự/);
+    expect(screen.getByTestId("code-segment-3.3-3.5-saved")).toHaveTextContent("Đã lưu: shot 3.3, 3.4");
+    const runButton = screen.getByTestId("code-segment-3.3-3.5-run");
+    expect(runButton).toHaveTextContent("Chạy lại shot 3.5");
+    fireEvent.click(runButton);
+    await waitFor(() => expect(start).toHaveBeenCalledWith("p1", ["code"], { segment: "3.3-3.5" }));
+  });
+
+  it("a failed segment without kept shots shows no saved line and the plain run label", async () => {
+    vi.spyOn(apiClient, "getCodeSegments").mockResolvedValue(view([FRAME, FAILED]));
+    renderPanel();
+    expect(await screen.findByTestId("code-segment-1.4-1.6-run")).toHaveTextContent("Chạy đoạn này");
+    expect(screen.queryByTestId("code-segment-1.4-1.6-saved")).toBeNull();
   });
 
   it("names the Manim frame cast, and a storyboard-given LAYOUT has nothing to run", async () => {

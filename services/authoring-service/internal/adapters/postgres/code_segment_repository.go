@@ -13,14 +13,14 @@ import (
 // per segment, and the failed-check log.
 
 const segmentColumns = `key, kind, position, shots, status, source, fingerprint, content,
-	error_kind, error_message, duration_ms, updated_at`
+	error_kind, error_message, failed_shots, duration_ms, updated_at`
 
 func scanSegment(row pgx.Row) (domain.CodeSegment, error) {
 	var s domain.CodeSegment
 	var status string
 	var content []byte
 	if err := row.Scan(&s.Key, &s.Kind, &s.Position, &s.Shots, &status, &s.Source, &s.Fingerprint, &content,
-		&s.ErrorKind, &s.ErrorMessage, &s.DurationMS, &s.UpdatedAt); err != nil {
+		&s.ErrorKind, &s.ErrorMessage, &s.FailedShots, &s.DurationMS, &s.UpdatedAt); err != nil {
 		return s, err
 	}
 	s.Status = domain.SegmentStatus(status)
@@ -29,6 +29,9 @@ func scanSegment(row pgx.Row) (domain.CodeSegment, error) {
 	}
 	if s.Shots == nil {
 		s.Shots = []string{}
+	}
+	if s.FailedShots == nil {
+		s.FailedShots = []string{}
 	}
 	return s, nil
 }
@@ -85,6 +88,8 @@ func (r *PromptTemplateRepository) ApplySegmentPlan(ctx context.Context, project
 						THEN authoring_segments.error_kind ELSE '' END,
 					error_message = CASE WHEN authoring_segments.fingerprint = EXCLUDED.fingerprint
 						THEN authoring_segments.error_message ELSE '' END,
+					failed_shots = CASE WHEN authoring_segments.fingerprint = EXCLUDED.fingerprint
+						THEN authoring_segments.failed_shots ELSE '{}' END,
 					updated_at = CASE WHEN authoring_segments.fingerprint = EXCLUDED.fingerprint
 						THEN authoring_segments.updated_at ELSE now() END,
 					fingerprint = EXCLUDED.fingerprint
@@ -98,7 +103,7 @@ func (r *PromptTemplateRepository) ApplySegmentPlan(ctx context.Context, project
 
 func (r *PromptTemplateRepository) MarkSegmentRunning(ctx context.Context, projectID, step, key string) error {
 	return r.updateSegment(ctx, `UPDATE authoring_segments
-		SET status = 'running', error_kind = '', error_message = '', updated_at = now()
+		SET status = 'running', error_kind = '', error_message = '', failed_shots = '{}', updated_at = now()
 		WHERE project_id = $1 AND step = $2 AND key = $3`, projectID, step, key)
 }
 
@@ -115,7 +120,7 @@ func (r *PromptTemplateRepository) SaveSegmentDone(ctx context.Context, projectI
 		VALUES ($1, $2, $3, $4, $5, $6, 'done', $7, $8, $9, $10)
 		ON CONFLICT (project_id, step, key) DO UPDATE SET
 			status = 'done', content = EXCLUDED.content, fingerprint = EXCLUDED.fingerprint,
-			error_kind = '', error_message = '',
+			error_kind = '', error_message = '', failed_shots = '{}',
 			source = CASE WHEN $11 THEN authoring_segments.source ELSE EXCLUDED.source END,
 			duration_ms = CASE WHEN $11 THEN authoring_segments.duration_ms ELSE EXCLUDED.duration_ms END,
 			updated_at = now()
@@ -123,12 +128,39 @@ func (r *PromptTemplateRepository) SaveSegmentDone(ctx context.Context, projectI
 	return err
 }
 
-// SaveSegmentFailed marks a segment failed. Its last content, if any, is kept:
-// a failed re-run must not throw away what was there.
-func (r *PromptTemplateRepository) SaveSegmentFailed(ctx context.Context, projectID, step, key, kind, message string, durationMS int) error {
-	return r.updateSegment(ctx, `UPDATE authoring_segments
-		SET status = 'failed', error_kind = $4, error_message = $5, duration_ms = $6, updated_at = now()
-		WHERE project_id = $1 AND step = $2 AND key = $3`, projectID, step, key, kind, message, durationMS)
+// SaveSegmentFailed marks a segment failed with the shots it could not
+// write, and stores the shots it did write as its content by the rule of
+// domain.FailedContent: a failed re-run never throws away a complete result.
+func (r *PromptTemplateRepository) SaveSegmentFailed(ctx context.Context, projectID, step, key string, f domain.SegmentFailure) error {
+	failedShots := f.FailedShots
+	if failedShots == nil {
+		failedShots = []string{}
+	}
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		var fingerprint string
+		var content []byte
+		var shots []string
+		err := tx.QueryRow(ctx, `SELECT fingerprint, content, shots FROM authoring_segments
+			WHERE project_id = $1 AND step = $2 AND key = $3 FOR UPDATE`, projectID, step, key).
+			Scan(&fingerprint, &content, &shots)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return errors.New("segment not found")
+		}
+		if err != nil {
+			return err
+		}
+		keepFingerprint, keepContent := domain.FailedContent(fingerprint, content, shots, f)
+		var stored any
+		if len(keepContent) > 0 {
+			stored = []byte(keepContent)
+		}
+		_, err = tx.Exec(ctx, `UPDATE authoring_segments
+			SET status = 'failed', error_kind = $4, error_message = $5, duration_ms = $6,
+				failed_shots = $7, fingerprint = $8, content = $9, updated_at = now()
+			WHERE project_id = $1 AND step = $2 AND key = $3`,
+			projectID, step, key, f.Kind, f.Message, f.DurationMS, failedShots, keepFingerprint, stored)
+		return err
+	})
 }
 
 func (r *PromptTemplateRepository) updateSegment(ctx context.Context, sql string, args ...any) error {

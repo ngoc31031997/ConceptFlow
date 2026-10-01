@@ -46,6 +46,20 @@ function segmentText(s: CodeSegment): string {
   return s.shots.map((id) => shots[id] ?? "").filter(Boolean).join("\n\n");
 }
 
+/** The shots a failed chunk did write and keeps for its next run. */
+function savedShots(s: CodeSegment): string[] {
+  if (s.status !== "failed") return [];
+  const shots = s.content?.shots ?? {};
+  return s.shots.filter((id) => Boolean(shots[id]));
+}
+
+function runLabel(s: CodeSegment, saved: string[]): string {
+  if (s.status === "done") return "Chạy lại đoạn này";
+  const failedShots = s.failed_shots ?? [];
+  if (saved.length > 0 && failedShots.length > 0) return `Chạy lại shot ${failedShots.join(", ")}`;
+  return "Chạy đoạn này";
+}
+
 function seconds(ms: number): string {
   if (ms <= 0) return "";
   const s = Math.round(ms / 1000);
@@ -312,6 +326,8 @@ export function CodeSegmentsPanel({
           const hasCode = s.status === "done" && segmentText(s) !== "";
           const isEditing = editing?.key === s.key;
           const rowBusy = busy === s.key;
+          const saved = savedShots(s);
+          const namesShots = (s.failed_shots ?? []).length > 0;
           return (
             <li key={s.key} className={styles.row} data-testid={`code-segment-${s.key}`}>
               <div className={styles.head}>
@@ -324,8 +340,13 @@ export function CodeSegmentsPanel({
               </div>
               {s.status === "failed" && (
                 <p className={styles.error} data-testid={`code-segment-${s.key}-error`}>
-                  {s.error_kind ? `${s.error_kind}: ` : ""}
+                  {s.error_kind && !namesShots ? `${s.error_kind}: ` : ""}
                   {s.error_message || "lỗi không rõ"}
+                </p>
+              )}
+              {saved.length > 0 && (
+                <p className={styles.saved} data-testid={`code-segment-${s.key}-saved`}>
+                  Đã lưu: shot {saved.join(", ")}
                 </p>
               )}
               {!fromStoryboard && (
@@ -336,7 +357,7 @@ export function CodeSegmentsPanel({
                     disabled={locked || rowBusy}
                     data-testid={`code-segment-${s.key}-run`}
                   >
-                    {s.status === "done" ? "Chạy lại đoạn này" : "Chạy đoạn này"}
+                    {runLabel(s, saved)}
                   </Button>
                   <Button variant="ghost" onClick={() => void copyPrompt(s)} disabled={rowBusy} data-testid={`code-segment-${s.key}-copy`}>
                     Sao chép prompt

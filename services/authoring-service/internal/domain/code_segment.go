@@ -64,8 +64,55 @@ type CodeSegment struct {
 	Content      json.RawMessage `json:"content,omitempty"`
 	ErrorKind    string          `json:"error_kind"`
 	ErrorMessage string          `json:"error_message"`
-	DurationMS   int             `json:"duration_ms"`
-	UpdatedAt    time.Time       `json:"updated_at"`
+	// FailedShots are the shots a failed chunk could not write; its Content
+	// then holds the shots it did write. Empty for any other state.
+	FailedShots []string  `json:"failed_shots"`
+	DurationMS  int       `json:"duration_ms"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+// SegmentFailure is what a run reports for a segment it could not finish.
+type SegmentFailure struct {
+	Kind       string
+	Message    string
+	DurationMS int
+	// Fingerprint and Content are the shots the run did write, under the
+	// segment's fingerprint; Content is nil when it wrote none.
+	Fingerprint string
+	Content     json.RawMessage
+	FailedShots []string
+}
+
+// HasEveryShot reports whether a chunk's content ({"shots": {...}}) holds
+// code for every one of its shots. Unreadable content holds none.
+func HasEveryShot(content json.RawMessage, shots []string) bool {
+	if len(content) == 0 || len(shots) == 0 {
+		return false
+	}
+	var c struct {
+		Shots map[string]string `json:"shots"`
+	}
+	if err := json.Unmarshal(content, &c); err != nil {
+		return false
+	}
+	for _, id := range shots {
+		if c.Shots[id] == "" {
+			return false
+		}
+	}
+	return true
+}
+
+// FailedContent is the fingerprint and content a segment keeps when a run
+// fails it. Content that already holds every shot under the same
+// fingerprint stays, since a failed re-run must not throw away a complete
+// result; otherwise the shots the run did write replace what was there, and
+// a run that wrote nothing leaves the stored content as it was.
+func FailedContent(storedFingerprint string, stored json.RawMessage, shots []string, f SegmentFailure) (string, json.RawMessage) {
+	if len(f.Content) == 0 || (storedFingerprint == f.Fingerprint && HasEveryShot(stored, shots)) {
+		return storedFingerprint, stored
+	}
+	return f.Fingerprint, f.Content
 }
 
 // CheckDiagnosticRecord is one failed-check finding of a code run, kept for
