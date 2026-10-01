@@ -55,18 +55,29 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     vi.restoreAllMocks();
   });
 
-  it("mỗi bước 9-12 là một màn riêng: đang render thì chỉ hiện bước Render", async () => {
-    stubProject({ project_id: "p1", status: "rendering", scenes: [] });
+  it("cả giai đoạn sản xuất trong một tracker: video dài có ba việc, không có Cắt short", async () => {
+    stubProject({ project_id: "p1", status: "rendering", scenes: [], video_output_mode: "long" });
 
     renderRenderPage();
 
-    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(1));
-    const steps = screen.getByTestId("progress-tracker-steps");
-    expect(steps).toHaveTextContent("10Render");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 10 — Render");
-    expect(steps).not.toHaveTextContent("Tạo giọng đọc");
-    expect(steps).not.toHaveTextContent("Ghép video hoàn chỉnh");
-    expect(steps).not.toHaveTextContent("Phân tích kịch bản");
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(3));
+    const items = Array.from(screen.getByTestId("progress-tracker-steps").querySelectorAll("li"));
+    expect(items[0]).toHaveTextContent("Tạo giọng đọc");
+    expect(items[1]).toHaveTextContent("Dựng hình");
+    expect(items[2]).toHaveTextContent("Ghép video hoàn chỉnh");
+    expect(screen.getByTestId("progress-tracker-steps")).not.toHaveTextContent("Cắt clip dọc");
+    expect(screen.getByTestId("progress-tracker-steps")).not.toHaveTextContent("Phân tích kịch bản");
+    // The rail and the title follow the step that is running.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 10 — Dựng hình");
+  });
+
+  it("video có clip dọc thì tracker có thêm việc Cắt short", async () => {
+    stubProject({ project_id: "p1", status: "synthesizing_speech", scenes: [], video_output_mode: "both" });
+
+    renderRenderPage();
+
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(4));
+    expect(screen.getByTestId("progress-tracker-steps")).toHaveTextContent("Cắt clip dọc Shorts/TikTok");
   });
 
   it("cho thử lại khi một bước sản xuất hỏng, và không rủ quay về sửa script", async () => {

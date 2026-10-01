@@ -183,4 +183,20 @@ describe("ManimEngineerStepPage", () => {
     expect(screen.getByText("Quay lại Hình minh hoạ")).toBeInTheDocument();
     window.localStorage.clear();
   });
+  it("nói rõ cần dán code gì ở chế độ tự làm, và quay lại đúng bước trước", async () => {
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <ManimEngineerStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    expect(await screen.findByText("Dán code Manim Engineer từ AI để tiếp tục.")).toBeInTheDocument();
+    expect(screen.getByTestId("wizard-back")).toHaveTextContent("Quay lại Hình ảnh");
+    // The "already have code" helper is gone from this step.
+    expect(screen.queryByTestId("existing-code-assistant")).not.toBeInTheDocument();
+  });
 });

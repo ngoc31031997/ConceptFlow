@@ -9,15 +9,15 @@ import { FLOW_VALIDATE } from "./flow";
 
 /** Saga step ids, as they arrive on the SSE progress stream. */
 export const STEP_LABELS: Record<string, string> = {
-  // Hai bước này có nhãn riêng: chúng là toàn bộ nội dung của bước 7 (Validate) — đó là màn hình
+  // Hai bước này có nhãn riêng: chúng là toàn bộ nội dung của bước 7 (Kiểm tra tự động) — đó là màn hình
   // Creator ngồi đợi, nên biết đang phân tích hay đang chạy thử là khác biệt
   // thật: một cái tính bằng giây, một cái tính bằng phút.
   parse_script: "Phân tích kịch bản",
   validate_script: "Chạy thử & kiểm tra",
   classify_scenes: "Phân loại cảnh",
   synthesize_speech: "Tạo giọng đọc",
-  // The rail's name — this is the only saga step of "Bước 10 — Render".
-  render_scenes: "Render",
+  // The rail's name — this is the only saga step of "Bước 10 — Dựng hình".
+  render_scenes: "Dựng hình",
   assemble_video: "Ghép video hoàn chỉnh",
   // Không nằm trong luồng chính — nhãn giữ lại để hiển thị đúng cho project
   // đã chạy qua bước này.
@@ -84,7 +84,7 @@ export function statusLabel(status: string): string {
 }
 
 /**
- * Bước 7 — "Validate": phần rẻ của saga. Chạy xong hai việc này là đã biết
+ * Bước 7 — "Kiểm tra tự động": phần rẻ của saga. Chạy xong hai việc này là đã biết
  * script có chạy được không và dàn ý ra sao, mà chưa tốn một giây TTS hay
  * render nào. Cổng duyệt dàn ý (bước 8 — Review) dừng đúng ở cuối danh sách này.
  */

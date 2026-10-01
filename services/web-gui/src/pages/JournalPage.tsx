@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Card } from "../components/ui";
 import { listRecentEvents, listProjects, ApiError, type ProjectEvent } from "../api/client";
-import { FLOW_LABELS } from "../utils/flow";
+import { FLOW_LABELS, eventStepLabel } from "../utils/flow";
 import glass from "../styles/glass.module.css";
 import styles from "./JournalPage.module.css";
 
@@ -152,7 +152,7 @@ export function JournalPage() {
       // trạng thái đó — nhưng dòng này ghi theo bước ĐÍCH nên chỉ cộng cho
       // authoring; thời gian saga hiện ở cột riêng trong bảng.
       if (e.source !== "authoring" && e.source !== "illustrations") continue;
-      const label = e.source === "illustrations" ? "Hình minh hoạ" : e.step_label;
+      const label = e.source === "illustrations" ? "Hình minh hoạ" : eventStepLabel(e);
       const cur = by.get(label) ?? { label, ms: 0, tokens: 0, failed: 0 };
       cur.ms += e.duration_ms ?? 0;
       cur.tokens += (e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0);
@@ -237,7 +237,7 @@ export function JournalPage() {
                     {topics[p.id] && <span className={styles.projectTopic}>{topics[p.id]}</span>}
                     <span className={styles.projectId}>{p.id.slice(0, 8)}</span>
                     <span className={styles.projectMeta}>
-                      {p.last.step_label} · {STATE_LABEL[p.last.run_state]} · {p.count} sự kiện
+                      {eventStepLabel(p.last)} · {STATE_LABEL[p.last.run_state]} · {p.count} sự kiện
                     </span>
                   </button>
                 ))}
@@ -293,9 +293,10 @@ function TimelineChart({ events }: { events: ProjectEvent[] }) {
 
   const rows: { label: string; segs: Segment[]; tokens: number }[] = [];
   for (const sg of segs) {
-    let row = rows.find((r) => r.label === sg.event.step_label);
+    const label = eventStepLabel(sg.event);
+    let row = rows.find((r) => r.label === label);
     if (!row) {
-      row = { label: sg.event.step_label, segs: [], tokens: 0 };
+      row = { label, segs: [], tokens: 0 };
       rows.push(row);
     }
     row.segs.push(sg);
@@ -334,7 +335,7 @@ function TimelineChart({ events }: { events: ProjectEvent[] }) {
               const e = sg.event;
               const tokens = (e.prompt_tokens ?? 0) + (e.completion_tokens ?? 0);
               const tip = [
-                `${e.step_label} · ${STATE_LABEL[e.run_state]}`,
+                `${eventStepLabel(e)} · ${STATE_LABEL[e.run_state]}`,
                 formatTime(e.at),
                 e.duration_ms ? `Thời gian: ${formatDuration(e.duration_ms)}${e.source === "saga" ? " (ở bước trước)" : ""}` : "",
                 e.content_chars ? `Ký tự: ${e.content_chars.toLocaleString("vi-VN")}` : "",
@@ -362,7 +363,7 @@ function TimelineChart({ events }: { events: ProjectEvent[] }) {
         <ul className={styles.failList}>
           {failures.map((e) => (
             <li key={e.id} className={styles.detail}>
-              {formatTime(e.at)} · {e.step_label}: {e.detail}
+              {formatTime(e.at)} · {eventStepLabel(e)}: {e.detail}
             </li>
           ))}
         </ul>

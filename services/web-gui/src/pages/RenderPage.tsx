@@ -8,7 +8,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
-import { FLOW_TTS, flowTitle } from "../utils/flow";
+import { FLOW_LABELS, FLOW_TTS, flowTitle } from "../utils/flow";
 
 /**
  * Settings that may still change after a stop at this saga step: the ones read
@@ -31,13 +31,12 @@ const SAGA_FLOW_STEP: Record<string, number> = {
 };
 
 /**
- * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chạy sau khi Creator
- * duyệt dàn ý ở bước 8.
+ * Bước 9–12 (Giọng đọc, Dựng hình, Ghép video, Cắt short): giai đoạn Sản xuất,
+ * phần đắt, chạy sau khi Creator duyệt ở bước 8.
  *
- * Màn này từng ôm cả lượt chạy thử kịch bản lẫn cổng duyệt dàn ý.
- * Cả hai đã sang bước 7/8 (ValidatePage), nên ở đây không còn nhánh nào dừng
- * chờ người: mọi thứ từ lúc này tới `ready_to_publish` đều tự chạy, và việc
- * duy nhất của trang là cho thấy nó chạy tới đâu.
+ * Không có nhánh nào dừng chờ người: mọi thứ từ lúc này tới `ready_to_publish`
+ * đều tự chạy, nên trang cho thấy cả giai đoạn trong một tracker (đã xong gì,
+ * đang chạy gì, còn gì). Cả bốn bước 9–12 trên menu bước đều mở màn này.
  *
  * Lỗi ở đây khác hẳn lỗi ở bước 7. TTS/render/ghép hỏng thường vì hạ tầng —
  * hết quota, worker chết, hết đĩa — nên "Thử lại" là việc đúng, và không có
@@ -97,11 +96,17 @@ export function RenderPage() {
       : progressState;
 
   const activeFlowStep = SAGA_FLOW_STEP[displayStep ?? ""] ?? FLOW_TTS;
-  // Each sidebar step (9-12) is its own screen: it shows only its saga step(s).
   const shownFlowStep = viewOnly ? viewStep : activeFlowStep;
-  const shownSteps = PROCESS_STEPS.filter((s) => SAGA_FLOW_STEP[s] === shownFlowStep);
-  const isShownActive = !reviewingPast && shownFlowStep === activeFlowStep;
-  const isShownDone = reviewingPast || shownFlowStep < activeFlowStep;
+  // The whole phase in one tracker; "Cắt short" only for a video that has
+  // vertical clips (empty output mode means "long").
+  const longOnly = (project?.video_output_mode || "long") === "long";
+  const shownSteps = PROCESS_STEPS.filter((s) => s !== "generate_clips" || !longOnly);
+  // QC runs inside "Ghép video" and has no row of its own.
+  const trackerState =
+    displayProgressState.currentStep === "qc_video"
+      ? { ...displayProgressState, currentStep: "assemble_video" }
+      : displayProgressState;
+  const isShownActive = !reviewingPast;
 
   const stopped = (isFailed || isCancelled) && !viewOnly;
   const editableStages = stopped ? (EDITABLE_AFTER_STOP[displayStep ?? ""] ?? []) : [];
@@ -124,15 +129,13 @@ export function RenderPage() {
         currentStep={shownFlowStep}
         title={flowTitle(shownFlowStep)}
         subtitle={
-          !isShownActive
-            ? isShownDone
-              ? "Bước này đã chạy xong."
-              : "Bước này chưa tới lượt."
+          reviewingPast
+            ? "Giai đoạn sản xuất đã chạy xong."
             : isCancelled
-            ? "Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
+            ? `Bạn đã dừng bước ${FLOW_LABELS[activeFlowStep - 1]}. Bấm Chạy tiếp ở thanh trạng thái phía trên.`
             : isFailed
-            ? "Bước này chưa hoàn tất."
-            : "Hệ thống đang chạy bước này."
+            ? `Bước ${FLOW_LABELS[activeFlowStep - 1]} chưa hoàn tất.`
+            : `Hệ thống tự chạy, bạn không cần làm gì. Đang: ${FLOW_LABELS[activeFlowStep - 1]}.`
         }
       >
         {/*
@@ -164,12 +167,11 @@ export function RenderPage() {
           />
         )}
         <ProgressTracker
-          progressState={displayProgressState}
+          progressState={trackerState}
           steps={shownSteps}
           stepNumbers={SAGA_FLOW_STEP}
           isFailed={isShownActive && isFailed}
-          allDone={isShownDone}
-          waitingLabel={!isShownActive && !isShownDone ? "Chưa tới lượt" : undefined}
+          allDone={reviewingPast}
         />
       </AppShell>
     </div>

@@ -56,16 +56,15 @@ describe("IllustrationsStepPage", () => {
     expect(await screen.findByText("trang code")).toBeInTheDocument();
   });
 
-  it("the running chain lists four steps and counts the drawings as they are drawn", async () => {
+  it("while the chain draws, this screen shows only its own step and counts the drawings", async () => {
     vi.spyOn(apiClient, "getAuthoringProgress").mockResolvedValue({
       running: true, phase: "draw", reasoning_chars: 0, content_chars: 0, elapsed_seconds: 75,
       drawings_total: 5, drawings_done: 2, drawings_failed: 1, drawings_reused: 3, drawings_planned: 8,
     });
     renderPage("remotion", { running: true, steps: ["story", "storyboard", "illustrations", "code"], current_index: 2, finished: false });
-    const step = await screen.findByTestId("authoring-run-panel-illustrations");
-    expect(screen.getAllByRole("listitem").filter((li) => li.getAttribute("data-testid")?.startsWith("authoring-run-panel-"))).toHaveLength(4);
+    const step = await screen.findByTestId("authoring-live-progress");
+    expect(screen.queryByTestId(/^authoring-run-panel-/)).not.toBeInTheDocument();
     await waitFor(() => expect(step).toHaveTextContent("Đang vẽ 2/5 hình · 1 lỗi · 3 hình dùng lại · 1m 15s"));
-    expect(step).toHaveAttribute("aria-current", "step");
     const bar = step.querySelector('[role="progressbar"]');
     expect(bar).toHaveAttribute("aria-valuenow", "40");
   });

@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
+
+/** Step 2 stand-in that shows the router state step 1 handed over. */
+function SettingsStub() {
+  const state = useLocation().state as { similarProjects?: { topic: string }[] } | null;
+  return (
+    <div data-testid="landed-on-settings">{(state?.similarProjects ?? []).map((p) => p.topic).join(", ")}</div>
+  );
+}
 
 function renderPage(fetchImpl: () => Promise<unknown>) {
   const fetchMock = vi.fn(fetchImpl);
@@ -15,7 +23,7 @@ function renderPage(fetchImpl: () => Promise<unknown>) {
         <ProjectDraftProvider>
           <Routes>
             <Route path="/" element={<ScriptStepPage />} />
-            <Route path="/create/script/settings" element={<div data-testid="landed-on-settings" />} />
+            <Route path="/create/script/settings" element={<SettingsStub />} />
           </Routes>
         </ProjectDraftProvider>
       </MemoryRouter>
@@ -44,7 +52,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
   it("khoá Tiếp tục khi chủ đề còn trống hoặc chỉ có khoảng trắng", () => {
     renderPage(createdOk);
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 1 — Khởi tạo");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 1 — Ý tưởng");
 
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
     typeTopic("   ");
@@ -71,6 +79,24 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(url).toMatch(/\/v1\/projects$/);
     expect(init.method).toBe("POST");
     expect(JSON.parse(init.body as string)).toMatchObject({ topic: "Vòng lặp for trong Java" });
+  });
+
+  it("chuyển danh sách dự án trùng chủ đề sang Bước 2, nơi cảnh báo hiện ra", async () => {
+    renderPage(() =>
+      Promise.resolve({
+        ok: true,
+        status: 201,
+        json: async () => ({
+          project_id: "p1",
+          similar_projects: [{ project_id: "old-1", topic: "Vòng lặp for", status: "published" }],
+        }),
+      }),
+    );
+
+    typeTopic("Vòng lặp for");
+    fireEvent.click(screen.getByTestId("script-step-next"));
+
+    await waitFor(() => expect(screen.getByTestId("landed-on-settings")).toHaveTextContent("Vòng lặp for"));
   });
 
   it("báo lỗi và ở lại trang khi không tạo được project", async () => {

@@ -54,7 +54,7 @@ describe("StatusStrip", () => {
     renderStrip(project({ status: "rendering", flow_step: 10, run_state: "running" }), 3);
 
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đang chạy"));
-    expect(screen.getByTestId("status-strip")).toHaveTextContent("Render");
+    expect(screen.getByTestId("status-strip")).toHaveTextContent("Dựng hình");
     fireEvent.click(screen.getByTestId("strip-goto"));
     expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/render");
   });

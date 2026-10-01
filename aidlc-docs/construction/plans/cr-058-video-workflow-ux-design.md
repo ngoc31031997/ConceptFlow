@@ -22,6 +22,14 @@ Sau khi xem bản code đầu, Creator xem bản mẫu HTML (https://claude.ai/a
 
 Chốt (bản mẫu phiên bản 3): giữ hai lớp menu bên trái; các bước nằm ở menu bước; bỏ thanh giai đoạn ở đầu màn (FR3 thay bằng FR3a–FR3d).
 
+Sau khi chạy thử chuỗi AI ở bước 3:
+
+> mà này có nên tách ra 4 bước 4 màn riêng để đỡ bị confuse ko nhỉ
+
+> ý này đi Giữ chạy liền như hiện tại, chỉ bỏ 4 thẻ và để mỗi màn hiện tiến độ của bước mình.
+
+Chốt: thêm FR13.
+
 ## Hiện trạng
 
 Luồng đã có 14 bước, mỗi bước một URL (`services/web-gui/src/App.tsx:53-85`). Server tự suy ra bước hiện tại (`flow_step`, `run_state`) từ trạng thái saga (`services/orchestrator/internal/domain/flow.go:81`), nên **thứ tự và số bước là của server, giao diện chỉ hiển thị**. Các vấn đề tìm thấy khi đọc code:
@@ -62,7 +70,7 @@ Bước 3 đặt thanh chạy AI **dưới** hai thẻ (`ScriptOutlineStepPage.t
 
 **FR2. Tên bước bằng lời thường.** 1 Ý tưởng · 2 Cấu hình · 3 Kịch bản · 4 Hình ảnh · 5 Hình minh hoạ · 6 Code · 7 Kiểm tra tự động · 8 Duyệt nội dung · 9 Giọng đọc · 10 Dựng hình · 11 Ghép video · 12 Cắt short · 13 Kết quả · 14 Đăng video. Mọi nơi dùng `FLOW_LABELS` (tiêu đề màn, menu bước, danh sách video, nhật ký, hộp "tạo bản mới") tự đổi theo.
 
-**FR3a. Hai lớp menu bên trái.** Menu chính (Tạo video mới, Tiếp tục, Danh sách video, Nhật ký, nhóm Cài đặt) giữ nguyên chỗ và luôn ngắn. Các bước nằm ở menu bước (cột thứ hai). Không có thanh giai đoạn ở đầu màn; đầu màn chỉ có dòng nhỏ "<GIAI ĐOẠN> · BƯỚC n/14" trên tiêu đề.
+**FR3a. Hai lớp menu bên trái.** Menu chính (Tạo video mới, Tiếp tục, Danh sách video, Nhật ký, nhóm Cài đặt) giữ nguyên chỗ và luôn ngắn. Các bước nằm ở menu bước (cột thứ hai). Không có thanh giai đoạn ở đầu màn; đầu màn chỉ có dòng nhỏ "<GIAI ĐOẠN> · BƯỚC n/14" trên tiêu đề. Cả hai menu cố định khi cuộn trang (không cuộn theo nội dung); menu bước dài thì cuộn bên trong chính nó.
 
 **FR3b. Menu bước hiện trên mọi màn của luồng, kể cả bước 1** khi chưa có project. Đầu menu: tên video (hoặc "Video mới"), dòng "<giai đoạn> · <bước> · x/y bước", thanh tiến độ.
 
@@ -90,6 +98,8 @@ Bước 3 đặt thanh chạy AI **dưới** hai thẻ (`ScriptOutlineStepPage.t
 **FR11. Màn Sản xuất cho thấy cả 4 việc** (giọng đọc, dựng hình, ghép video, cắt short) trong một tracker; việc đang chạy nổi bật. "Cắt short" không hiện khi dự án chỉ làm video dài. Bấm bước 9/10/11/12 trên menu đều mở màn này.
 
 **FR12. Nút "Tiếp tục" ở menu chính** ghi "▶ Tiếp tục · <giai đoạn> · <tên bước>" thay vì "bước n/14".
+
+**FR13. Mỗi màn chỉ hiện tiến độ AI của bước mình.** Nút chạy ở bước 3 vẫn chạy liền chuỗi 3 → 6 và màn vẫn tự chuyển theo bước đang chạy như hiện nay. Nhưng khung tiến độ trên mỗi màn (3, 4, 5, 6) chỉ hiện thẻ của chính bước đó, không còn 4 thẻ của cả chuỗi. Khi bước của màn đã xong mà chuỗi còn chạy tiếp, màn ghi một dòng ngắn đang chạy bước nào, kèm nút mở bước đó. Lỗi và cảnh báo của chuỗi hiện ở màn của bước gây ra chúng. Màn của bước không đang chạy không có vòng xoay, nút "AI đang chạy…" hay nút Dừng; menu bước ghi "Đang chạy" ở đúng bước AI đang làm.
 
 ### Tiêu chí chấp nhận
 - Một Creator mới, không đọc tài liệu, nhìn đầu màn bất kỳ biết mình ở giai đoạn nào và còn mấy giai đoạn.

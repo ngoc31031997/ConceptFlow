@@ -2560,3 +2560,94 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-058, thiết kế đã duyệt.
 
 ---
+
+## CR-058 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: (tiếp theo lần duyệt thiết kế; `/code CR-058`)
+**AI Response**:
+- **web-gui** (service duy nhất thay đổi):
+  - `utils/flow.ts`: tên bước bằng lời thường (Ý tưởng, Cấu hình, Kịch bản, Hình ảnh, Hình minh hoạ, Code, Kiểm tra tự động, Duyệt nội dung, Giọng đọc, Dựng hình, Ghép video, Cắt short, Kết quả, Đăng video); `FLOW_PHASES` 5 giai đoạn; `AUTO_STEPS`; `phaseOf`; `eventStepLabel`. `pipelineLabels`: `render_scenes` = "Dựng hình".
+  - `PhaseStepper` (mới), gắn vào `AppShell` cho mọi màn của luồng, kể cả bước 1 chưa có project. Nút "Tiếp tục" ở sidebar ghi giai đoạn và tên bước.
+  - `StepRail`: nhãn "Tự động" ở bước 7, 9–12.
+  - Bước 1 chuyển danh sách dự án trùng chủ đề sang bước 2 qua router state. Bước 2 chia ba nhóm có đánh số, chủ đề chỉ đọc (`TopicSummary`, mới) kèm "Sửa", banner trùng chủ đề, bộ chọn kiểu video chuyển từ bước 3 về đây.
+  - Bước 3: bỏ ô chủ đề, kiểu video và effect lưu chủ đề theo debounce; bố cục giống bước 4–6 (thanh AI ở trên). Lời nhắc theo chế độ ở bước 3/4/6 (`utils/authoringHint.ts`).
+  - Bỏ code chết: `scriptSource` / `SET_SCRIPT_SOURCE`, các nhánh `hasOwn*`, `ScriptAssistant` (+ test), `useScriptTemplates`, `getScriptTemplates`.
+  - Màn Duyệt tách hai phần (`?part=settings`). "Quay lại sửa script" mở `/projects/:id/resume?step=6`. `OutlineActions` bị xoá vì nút đã chuyển xuống `WizardNav`. `WizardNav` có thêm `allowWhenLocked`, `backTestId`, `backDisabled`.
+  - Màn Sản xuất: một tracker cho cả giai đoạn; Cắt short chỉ hiện với video có clip dọc; `qc_video` hiển thị dưới Ghép video.
+  - Nhật ký: tên bước lấy theo `flow_step` ở client (`eventStepLabel`), không dùng `step_label` của server.
+- **Khác thiết kế / bổ sung**:
+  - Nhật ký: thiết kế ghi "tự đổi theo `FLOW_LABELS`", nhưng thực tế nhật ký đọc `step_label` từ server (`domain.FlowStepLabel`, còn tên cũ). Đã xử lý ở client bằng `eventStepLabel`, không đổi server.
+  - Xoá thêm `useScriptTemplates` + `getScriptTemplates` (không còn ai dùng sau khi bỏ `ScriptAssistant`). Endpoint `/v1/script-templates` ở authoring-service vẫn còn nhưng UI không gọi nữa, ngoài phạm vi CR này.
+  - Bước 2 dùng tiêu đề nhóm có đánh số thay vì `Card`, vì các bộ chọn bên trong đã là thẻ riêng (lồng thẻ trông rối).
+- **Test**: `tsc --noEmit` sạch. eslint 0 lỗi, 20 cảnh báo (bằng `main`). vitest 67 file / 452 test pass. Test mới: `PhaseStepper.test.tsx`, `ScriptAuthoringSettingsStepPage.test.tsx`, test giai đoạn/`AUTO_STEPS`/`phaseOf`, nhãn "Tự động", hai phần màn Duyệt và đích của "Quay lại sửa script", tracker Sản xuất (3 việc / 4 việc), lời nhắc theo chế độ ở bước 3/4/6, bố cục bước 3, `eventStepLabel`. Prettier: chỉ format file mới, vì các file cũ trên `main` vốn chưa theo prettier.
+- **Rebuild**: `web-gui` (build + up), trả HTTP 200 (không có healthcheck); bundle mới có các chuỗi "Soạn nội dung", "Tiếp: cài đặt xuất video". Docker daemon đang tắt nên đã bật Docker Desktop, rồi `docker compose up -d --no-build` cho các service khác bằng image có sẵn: tất cả healthy.
+- **Kiểm trực tiếp**: GET qua gateway `/v1/projects?page=1`, `/v1/formats`, `/v1/video-archetypes`, `/v1/voices`, `/v1/llm/status` đều 200; web-gui `/`, `/create/script/settings`, `/videos`, `/journal` đều 200. **Chưa kiểm**: đi qua giao diện trên trình duyệt (6 mục ở phần "Kiểm tra" của thiết kế), vì phiên này không có công cụ trình duyệt; không tạo dự án thật để tránh ghi dữ liệu.
+**Impact Assessment**: chỉ web-gui; không đổi API, DB, contract, migration.
+**Artifacts Affected**: khoảng 45 file trong `services/web-gui` (src + tests), `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-058, chờ Creator duyệt rồi `/deliver`.
+
+---
+
+## CR-058 — Creator đổi phần điều hướng sau khi xem bản mẫu
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "tôi đang muốn đưa các step về menu sibar bên trái hết mà, tốt nhất bạn nên render thử 1 file html ý tưởng của bạn hoặc artiface dơn giản để tôi review trướ" · "ko xem màn đi detail của mỗi menu con được hả" · "tôi cũng thích ý tương 2 menu như cũ hơn vì như hiện tại mỗi lần muốn xem danh sách tôi phải scroll khá mệt" · "ok theo ý tưởng này đi"
+**AI Response**: Dựng bản mẫu HTML (https://claude.ai/artifact/SDR1QRjERhPvm67wGWxG82), qua 3 phiên bản: một sidebar → bấm được mọi bước → hai lớp menu. Chốt phiên bản 3: giữ hai lớp menu; bỏ thanh giai đoạn ở đầu màn; menu bước hiện từ bước 1, chia 5 giai đoạn thu gọn được, có tiến độ; bấm được mọi bước, bước chưa tới mở màn xem trước. Cập nhật thiết kế (FR3a–FR3d, bước 16–22).
+**Impact Assessment**: vẫn chỉ web-gui; thêm route xem trước phía client, không đổi API.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-058-video-workflow-ux-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-058, thiết kế điều chỉnh đã duyệt.
+
+---
+
+## CR-058 — Code điều hướng theo bản mẫu, chờ duyệt
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "ok theo ý tưởng này đi" · "à nhớ scroll thì 2 menu vẫn phải giữ nguyên không được scroll theo nha"
+**AI Response**:
+- **web-gui**:
+  - Bỏ `PhaseStepper` (thanh giai đoạn ở đầu màn) cùng CSS và test. Đầu màn có dòng "<GIAI ĐOẠN> · BƯỚC n/14" trên tiêu đề.
+  - Menu bước (`StepRail`) hiện trên mọi màn của luồng, kể cả bước 1 khi chưa có project ("Video mới"). Đầu menu có giai đoạn, bước, số bước đã xong và thanh tiến độ. 5 giai đoạn thu gọn được: giai đoạn của bước đang xem tự mở, mở/đóng trượt bằng `.reveal`/`usePresence`, mỗi giai đoạn ghi số bước đã xong (không tính bước "Không dùng"). Khi menu thu gọn (64px), mọi bước vẫn hiện.
+  - `useStepNav`: mọi bước đều bấm được. Bước đã tới mở màn thật như cũ; bước chưa tới hoặc "Không dùng" mở màn xem trước. Thêm `isReached`, `open` và tuỳ chọn `preview`.
+  - `StepPreviewPage` (mới) + route `/projects/:id/preview/:step` và `/create/preview/:step`: tên bước, bước làm gì (`FLOW_STEP_PURPOSE`), "Chưa tới bước này" hoặc lý do "Không dùng" (`skippedReason`), nhãn bước tự động, nút "Về bước đang làm". Không có ô nhập hay nút hành động. Tự chuyển sang màn thật nếu project đã tới bước đó; số bước sai thì về "/".
+  - Hai menu cố định khi cuộn trang: `.sidebar` và `.rail` vẫn `position: fixed`, menu bước dài thì cuộn bên trong; có test giữ quy tắc CSS này. Trên điện thoại (≤640px), hai menu xếp tĩnh ở trên như trước.
+- **Test**: `tsc` sạch; eslint 0 lỗi, 20 cảnh báo (bằng `main`); vitest 67 file / 463 test pass. Test mới hoặc sửa: `StepRail` (thu gọn giai đoạn, đếm bước, hiện ở bước 1, mở xem trước, menu cố định), `AppShell` (dòng giai đoạn, bước 1 có menu bước, bấm bước chưa tới mở xem trước, nhãn nút Tiếp tục), `StepPreviewPage` (6 test), `previewRoute`/`skippedReason`/`FLOW_STEP_PURPOSE`.
+- **Rebuild**: `web-gui` build + up, HTTP 200 ở `/`, `/create/preview/4`, `/videos`; bundle có "Video đang làm", "Chưa tới bước này". Các service khác không đổi, vẫn healthy.
+- **Chưa kiểm**: xem trực tiếp trên trình duyệt (phiên này không có công cụ trình duyệt).
+**Impact Assessment**: chỉ web-gui; thêm route phía client, không đổi API, DB, contract.
+**Artifacts Affected**: `services/web-gui` (StepRail, AppShell, useStepNav, flow.ts, StepPreviewPage, App.tsx, test), `aidlc-docs/audit.md`, `aidlc-docs/construction/plans/cr-058-video-workflow-ux-design.md`; chưa commit code.
+**Context**: CONSTRUCTION — CR-058, chờ Creator duyệt rồi `/deliver`.
+
+---
+
+## CR-058 — Mỗi màn chỉ hiện tiến độ AI của bước mình (FR13)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "mà này có nên tách ra 4 bước 4 màn riêng để đỡ bị confuse ko nhỉ" · "ý này đi Giữ chạy liền như hiện tại, chỉ bỏ 4 thẻ và để mỗi màn hiện tiến độ của bước mình."
+**AI Response**:
+- **web-gui** (`AuthoringModeBar`): chuỗi 3 → 6 vẫn chạy liền và tự chuyển màn như cũ. Khung tiến độ bỏ 4 thẻ của cả chuỗi:
+  - AI đang chạy bước của màn này: thẻ tiến độ của bước đó (số ký tự, số hình đã vẽ…).
+  - AI đang chạy bước khác: một dòng "Bước 3 — Kịch bản đã xong. AI đang chạy Bước 4 — Hình ảnh." (hoặc "…; bước này chạy sau."), kèm nút "Mở <bước>". Nút Dừng vẫn ở mọi màn.
+  - Lỗi của chuỗi hiện nguyên văn ở màn của bước gây lỗi; màn khác chỉ ghi "Chuỗi AI dừng vì lỗi ở <bước>" kèm nút mở bước đó.
+  - Cảnh báo của storyboard hiện ở màn Hình ảnh và Code, không còn hiện ở Kịch bản; tiêu đề đổi thành "Cảnh báo ở bước Hình ảnh".
+  - Xoá `chainRows`, `stepLiveNote` và CSS stepper không còn dùng.
+- **Test**: `tsc` sạch; eslint 0 lỗi, 20 cảnh báo (bằng `main`); vitest 67 file / 466 test pass. Viết lại các test chuỗi ở `ScriptOutlineStepPage` (5 test mới), `IllustrationsStepPage`; thêm test cảnh báo storyboard ở `VisualDirectorStepPage`.
+- **Rebuild**: `web-gui`, HTTP 200.
+- **Chưa làm**: menu bước vẫn ghi "Đang chờ bạn" ở bước mà AI đang chạy (Creator chọn phương án chỉ bỏ 4 thẻ, nên không sửa phần này). Chưa xem trực tiếp trên trình duyệt.
+**Impact Assessment**: chỉ web-gui; không đổi API.
+**Artifacts Affected**: `services/web-gui/src/components/AuthoringModeBar.tsx`, `.module.css`, test liên quan, thiết kế (FR13), `aidlc-docs/audit.md`; chưa commit code.
+**Context**: CONSTRUCTION — CR-058, chờ Creator duyệt rồi `/deliver`.
+
+---
+
+## CR-058 — Màn của bước không chạy thì không trông như đang chạy
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "thanh render này cũng vậy, mỗi bước một thanh riêng, ví dụ qua bước  4 dang chạy thì bước ko hiển thị là đang render nữa"
+**AI Response**:
+- **web-gui**:
+  - `AuthoringModeBar`: khi AI đang chạy bước khác, màn này bỏ vòng xoay, chữ "AI đang chạy…", câu "Đang chạy Bước …" và nút Dừng. Nút chạy giữ nhãn của nó và bị khoá; chỉ còn dòng "… đã xong. AI đang chạy <bước>." kèm nút "Mở <bước>". Dừng nằm ở màn của bước đang chạy.
+  - Menu bước (`useStepNav`) ghi "Đang chạy" ở đúng bước AI đang làm, lấy từ lượt chạy AI hiện tại, vì `flow_step` của bản nháp ở server vẫn là "idle".
+  - Ánh xạ bước soạn → số bước chuyển sang `AUTHORING_STEP_FLOW` trong `utils/flow.ts`, dùng chung.
+- **Test**: `tsc` sạch; eslint 0 lỗi, 20 cảnh báo (bằng `main`); vitest 67 file / 467 test pass (thêm test "màn bước 3 không còn trông như đang chạy" và trạng thái "Đang chạy" ở menu bước).
+- **Rebuild**: `web-gui`, HTTP 200. Chưa xem trực tiếp trên trình duyệt.
+**Impact Assessment**: chỉ web-gui.
+**Artifacts Affected**: `AuthoringModeBar.tsx`, `useStepNav.ts`, `utils/flow.ts`, test, thiết kế (FR13), `aidlc-docs/audit.md`; chưa commit code.
+**Context**: CONSTRUCTION — CR-058, chờ Creator duyệt rồi `/deliver`.
+
+---

@@ -20,23 +20,7 @@ export interface SubtitleStyle {
 export type SubtitleMode = "off" | "track" | "burn_in" | "both";
 
 /**
- * Bốn tình huống của bước 1, mỗi cái là một điểm vào khác nhau của
- * chuỗi 1a → 1b → 1c:
- *
- *   idea       — chưa có gì, chỉ có ý tưởng      → vào 1a, nhập chủ đề
- *   outline    — đã có dàn ý                     → vào 1a, dán dàn ý sẵn có
- *   storyboard — đã có storyboard                → vào 1b, dán storyboard
- *   code       — đã có code Manim/Remotion       → vào 1c, dán code
- *
- * Chỉ có một nguồn "code": code đã đúng chuẩn hệ thống hay chưa là thứ lint
- * ở tab 1c tự trả lời sau khi dán, nên Creator không phải tự phân loại trước.
- * Dàn ý và storyboard là hai điểm vào riêng.
- */
-export type ScriptSource = "idea" | "outline" | "storyboard" | "code";
-
-/**
- * How the Creator works ALL FOUR tabs of "Bước 3 — Script",
- * not one tab at a time:
+ * How the Creator works ALL the authoring steps 3–6, not one step at a time:
  *
  *   manual — copy each prompt into ChatGPT/Claude/Gemini and paste the answer
  *            back. The way that works with no API key, no credit, or a provider outage.
@@ -59,7 +43,6 @@ export type { AuthoringMode };
 export interface ProjectDraft {
   projectId: string;
   scriptContent: string;
-  scriptSource: ScriptSource;
   voiceLanguage: "vi" | "en";
   backgroundMusicPath: string | null;
   ttsEnabled: boolean;
@@ -141,7 +124,6 @@ export type VideoOutputMode = "long" | "short" | "both";
 
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }
-  | { type: "SET_SCRIPT_SOURCE"; payload: ScriptSource }
   | { type: "SET_VOICE_LANGUAGE"; payload: "vi" | "en" }
   | { type: "SET_BACKGROUND_MUSIC"; payload: string | null }
   | { type: "SET_TTS_ENABLED"; payload: boolean }
@@ -176,7 +158,6 @@ export const defaultSubtitleStyle: SubtitleStyle = {
 const initialDraft: ProjectDraft = {
   projectId: "",
   scriptContent: "",
-  scriptSource: "idea",
   voiceLanguage: "vi",
   backgroundMusicPath: null,
   ttsEnabled: true,
@@ -346,8 +327,6 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
   switch (action.type) {
     case "SET_SCRIPT":
       return { ...state, scriptContent: action.payload };
-    case "SET_SCRIPT_SOURCE":
-      return { ...state, scriptSource: action.payload };
     case "SET_VOICE_LANGUAGE":
       return { ...state, voiceLanguage: action.payload };
     case "SET_BACKGROUND_MUSIC":

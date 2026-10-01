@@ -16,6 +16,15 @@ interface WizardNavProps {
   nextTestId?: string;
   /** Rendered between the hint and the primary button — e.g. "Xem lỗi". */
   extraAction?: ReactNode;
+  /** Test id of the back button; "wizard-back" when not given. */
+  backTestId?: string;
+  backDisabled?: boolean;
+  /**
+   * Keep the buttons usable on a project whose authoring inputs are locked.
+   * For screens whose actions belong to the saga rather than to an authoring
+   * edit, such as approving the outline while it waits for review.
+   */
+  allowWhenLocked?: boolean;
 }
 
 function ArrowRight() {
@@ -48,11 +57,14 @@ export function WizardNav({
   nextDisabled,
   nextTestId,
   extraAction,
+  backTestId = "wizard-back",
+  backDisabled,
+  allowWhenLocked = false,
 }: WizardNavProps) {
   // Màn soạn ở chế độ chỉ xem (server sẽ từ chối sửa): nút tiếp tục có thể gọi
   // lưu hoặc chạy render, nên khoá nó thay vì để bấm rồi mới báo lỗi.
   const flow = useProjectFlow();
-  const viewOnly = flow.project !== null && !flow.editable;
+  const viewOnly = !allowWhenLocked && flow.project !== null && !flow.editable;
   if (viewOnly) {
     nextDisabled = true;
     hint = "Chỉ xem — dự án này không còn sửa được ở bước soạn.";
@@ -79,7 +91,7 @@ export function WizardNav({
     <div className={styles.bar}>
       <div className={styles.inner}>
         {onBack && (
-          <Button variant="ghost" onClick={onBack} data-testid="wizard-back">
+          <Button variant="ghost" onClick={onBack} disabled={backDisabled} data-testid={backTestId}>
             <ArrowLeft />
             {backLabel}
           </Button>

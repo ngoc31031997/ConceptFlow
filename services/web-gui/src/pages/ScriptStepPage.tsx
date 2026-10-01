@@ -8,10 +8,11 @@ import { createProjectDraft } from "../api/client";
 import { FLOW_INIT, flowTitle } from "../utils/flow";
 
 /**
- * Bước 1 — tình huống "chưa có gì, chỉ có ý tưởng". Ngôn ngữ, render engine
- * và cách làm (manual/AI) chọn ở Bước 2
- * (ScriptAuthoringSettingsStepPage) — chọn xong ở đây là tạo project ngay,
- * để projectId sẵn sàng trước khi vào Bước 2.
+ * Bước 1 — Ý tưởng: chỉ có chủ đề, và đây là chỗ duy nhất sửa chủ đề. Ngôn
+ * ngữ, kiểu video, giọng đọc và cách soạn chọn ở Bước 2
+ * (ScriptAuthoringSettingsStepPage). "Tiếp tục" tạo project ngay, để
+ * projectId sẵn sàng trước khi vào Bước 2, và chuyển danh sách dự án trùng
+ * chủ đề sang đó qua router state.
  */
 export function ScriptStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -42,8 +43,14 @@ export function ScriptStepPage() {
     setError(null);
     setCreating(true);
     try {
-      await createProjectDraft(draft.projectId, topic.trim(), draft.voiceLanguage, draft.renderEngine);
-      navigate("/create/script/settings");
+      const { similarProjects } = await createProjectDraft(
+        draft.projectId,
+        topic.trim(),
+        draft.voiceLanguage,
+        draft.renderEngine,
+      );
+      // Bước 2 hiện cảnh báo trùng chủ đề ngay đầu màn.
+      navigate("/create/script/settings", { state: { similarProjects } });
     } catch {
       setError("Không tạo được dự án. Vui lòng kiểm tra kết nối và thử lại.");
     } finally {

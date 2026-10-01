@@ -8,10 +8,8 @@ import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/Pro
 import { getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
 import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
+import { authoringHint } from "../utils/authoringHint";
 import { Card, Button, TextArea } from "../components/ui";
-import { Disclosure } from "../components/Disclosure";
-import { ScriptAssistant } from "../components/ScriptAssistant";
-import { useScriptTemplates } from "../hooks/useScriptTemplates";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { CodeChunkShotsField, CodeSegmentsPanel } from "../components/CodeSegmentsPanel";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -21,25 +19,20 @@ import { FLOW_CODE, flowTitle } from "../utils/flow";
 
 
 /**
- * Bước 6 — Code (Engineer), the last authoring step (see ScriptPipelineTabs): fetch the current template, fill it with the
- * previous tabs' saved output (story + storyboard), let the Creator copy it
- * out and paste the AI's code back, then save it server-side, store it as
- * the draft's scriptContent, and start the validate saga (step 7) — there is
- * no review step in between since the "Xem lại" step was removed (settings
- * now live in step 2, so nothing is left to collect before submitting).
+ * Bước 6 — Code (Engineer), the last authoring step: the server fills the
+ * template with the saved outline and storyboard; the Creator runs the AI or
+ * copies the prompt out and pastes the code back. "Kiểm tra kịch bản" saves it
+ * server-side, stores it as the draft's scriptContent and starts the validate
+ * saga (step 7).
  *
- * feature/remotion-engine: the render engine picker lives HERE, not on the
- * situation-chooser page — steps 3/4 (story/storyboard) are identical
- * either way; this is the only tab whose prompt role (manim_engineer vs
- * remotion_engineer) and lint behavior (validateScript only understands
- * Manim's self.narrate/ConceptFlowScene conventions; Remotion has no
- * client-side lint yet) actually depend on which engine renders the video.
+ * The engine can still be changed here: this step's prompt role
+ * (manim_engineer vs remotion_engineer) and its client-side lint
+ * (validateScript vs validateRemotionScript) both depend on it.
  */
 export function ManimEngineerStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
-  const scriptTemplates = useScriptTemplates();
   const isRemotion = draft.renderEngine === "remotion";
   const engineerRole = isRemotion ? "remotion_engineer" : "manim_engineer";
   const engineerLabel = isRemotion ? "Remotion Engineer" : "Manim Engineer";
@@ -102,9 +95,8 @@ export function ManimEngineerStepPage() {
     }
   }
 
-  // Bound directly to draft.scriptContent (not a local buffer) so switching
-  // to another tab and back — now that all 4 tabs are freely reachable —
-  // never loses code that hasn't been through "Tiếp tục" yet.
+  // Bound directly to draft.scriptContent (not a local buffer) so moving to
+  // another step and back never loses code that has not been submitted yet.
   const code = draft.scriptContent;
   // The engineer prompt asks the AI to wrap its answer in a ```python/```tsx
   // fence — pasting that whole block (fence included) is the single most
@@ -123,10 +115,6 @@ export function ManimEngineerStepPage() {
   const validation = isRemotion ? validateRemotionScript(code) : validateScript(code, draft.voiceLanguage);
   const isEmpty = code.trim().length === 0;
   const isValid = !isEmpty && validation.isValid;
-  // Tình huống "Đã có code" vào thẳng tab này. Trước đây nó có màn
-  // riêng ở "/" kèm ScriptAssistant; giờ trợ lý đó sống ở đây, cạnh đúng ô
-  // soạn thảo mà kết quả của nó phải được dán vào.
-  const hasOwnCode = draft.scriptSource === "code";
 
   async function handleContinue() {
     if (!isValid) return;
@@ -171,14 +159,6 @@ export function ManimEngineerStepPage() {
     }
   }
 
-  const hint = saveError
-    ? saveError
-    : isEmpty
-      ? `Dán code ${engineerLabel} từ AI để tiếp tục`
-      : validation.isValid
-        ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
-        : validation.message;
-
   // Cùng lựa chọn chế độ với các bước soạn 3–5.
   const llm = useLlmStatus();
   // Chế độ lấy từ project ở server (qua draft), nên mở lại dự án
@@ -188,7 +168,15 @@ export function ManimEngineerStepPage() {
   // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
   const aiMode = authoringMode === "ai" && llm?.enabled === true;
   // The segments panel and the shots-per-segment setting, AI mode only.
-  const showSegments = aiMode && !hasOwnCode && !!draft.projectId;
+  const showSegments = aiMode && !!draft.projectId;
+
+  const hint =
+    saveError ??
+    (isEmpty
+      ? authoringHint({ aiMode, isEmpty, what: `code ${engineerLabel}`, ready: "" })
+      : validation.isValid
+        ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
+        : validation.message);
   const [segmentsVersion, setSegmentsVersion] = useState(0);
 
   return (
@@ -196,11 +184,7 @@ export function ManimEngineerStepPage() {
       <AppShell
         currentStep={6}
         title={flowTitle(FLOW_CODE)}
-        subtitle={
-          hasOwnCode
-            ? `Dán code ${isRemotion ? "Remotion" : "Manim"} của bạn, hệ thống sẽ kiểm tra ngay.`
-            : `Tạo code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`
-        }
+        subtitle={`Tạo code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`}
         wide
       >
         {/* Read by the next run, so it sits before the run button. */}
@@ -229,41 +213,13 @@ export function ManimEngineerStepPage() {
             steps={["code"]}
             what={`code ${isRemotion ? "Remotion" : "Manim"}`}
             runDisabled={draft.authoringStoryboard.trim().length === 0}
-            runDisabledReason="Cần hoàn thành bước Visual trước."
+            runDisabledReason="Cần hoàn thành bước Hình ảnh trước."
             onGenerated={(step, content) => {
               if (step === "code") setCode(content);
             }}
             onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}
           />
         </div>
-
-        {/* Chỉ hiện cho tình huống "Đã có code": đây là đường đi khi code sẵn
-            có chưa đúng chuẩn hệ thống (thiếu self.narrate / thiếu
-            narrations+Composition). Mở sẵn khi ô code còn trống, vì lúc đó nó
-            chính là việc tiếp theo; đã dán code rồi thì thu lại để không che
-            mất kết quả lint. */}
-        {hasOwnCode && (
-          <div className={styles.settingsRow}>
-            <Disclosure
-              title={`Code chưa đúng chuẩn? Nhờ AI chỉnh lại code ${isRemotion ? "Remotion" : "Manim"}`}
-              hint="Dán code cũ vào đây để nhận prompt giúp AI sửa lại cho đúng chuẩn."
-              defaultOpen={isEmpty}
-              testId="existing-code-assistant"
-            >
-              <ScriptAssistant contentLanguage={draft.voiceLanguage} renderEngine={draft.renderEngine} />
-              {!isRemotion && (
-                <Button
-                  variant="ghost"
-                  disabled={!scriptTemplates}
-                  onClick={() => scriptTemplates && setCode(scriptTemplates.starter_script[draft.voiceLanguage])}
-                  data-testid="script-assistant-template"
-                >
-                  Hoặc dùng một script mẫu chạy được ngay
-                </Button>
-              )}
-            </Disclosure>
-          </div>
-        )}
 
         {/* The drawings have their own step; this only says where they stand. */}
         {isRemotion && draft.projectId && (
@@ -327,16 +283,8 @@ export function ManimEngineerStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
-        onBack={() =>
-          navigate(
-            hasOwnCode
-              ? "/create/script/settings"
-              : isRemotion
-                ? AUTHORING_STEP_PATHS.illustrations
-                : AUTHORING_STEP_PATHS.storyboard,
-          )
-        }
-        backLabel={hasOwnCode ? "Quay lại cấu hình" : isRemotion ? "Quay lại Hình minh hoạ" : "Quay lại Storyboard"}
+        onBack={() => navigate(isRemotion ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS.storyboard)}
+        backLabel={isRemotion ? "Quay lại Hình minh hoạ" : "Quay lại Hình ảnh"}
         onNext={handleContinue}
         nextLabel={saving ? "Đang gửi..." : "Kiểm tra kịch bản"}
         nextDisabled={!isValid || saving}

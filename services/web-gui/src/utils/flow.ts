@@ -1,3 +1,5 @@
+import type { AuthoringStep } from "../api/client";
+
 /**
  * The 14-step production flow, as the Creator sees it. The server decides where
  * a project stands (`flow_step` + `run_state` on GET /v1/projects/:id, derived
@@ -12,20 +14,38 @@
  * Code (6): illustrations run first and Code reads what they drew.
  */
 export const FLOW_LABELS = [
-  "Khởi tạo",
+  "Ý tưởng",
   "Cấu hình",
   "Kịch bản",
-  "Visual",
+  "Hình ảnh",
   "Hình minh hoạ",
   "Code",
-  "Validate",
-  "Review",
-  "TTS",
-  "Render",
-  "Merge",
+  "Kiểm tra tự động",
+  "Duyệt nội dung",
+  "Giọng đọc",
+  "Dựng hình",
+  "Ghép video",
   "Cắt short",
   "Kết quả",
-  "Publish",
+  "Đăng video",
+] as const;
+
+/** What each step does, one sentence, for the preview of a step not reached yet. */
+export const FLOW_STEP_PURPOSE = [
+  "Nhập ý tưởng hoặc chủ đề của video. Đây là chỗ duy nhất sửa chủ đề.",
+  "Chọn ngôn ngữ, kiểu video, format, giọng đọc và cách soạn (AI làm giúp hay tự làm).",
+  "Dựng dàn ý cho video từ chủ đề: câu hỏi cốt lõi và các beat theo format đã chọn.",
+  "Dựng storyboard: mỗi cảnh có lời đọc và những gì xuất hiện trên màn hình.",
+  "Chuẩn bị hình minh hoạ cho video Remotion: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt.",
+  "Viết code dựng video từ storyboard; hệ thống tự kiểm tra code trước khi gửi đi.",
+  "Hệ thống tự phân tích và chạy thử kịch bản. Chưa tốn chi phí.",
+  "Đọc và sửa lời thoại, chọn chất lượng, phụ đề, nhạc nền, rồi duyệt để bắt đầu tạo video.",
+  "Hệ thống tự tạo giọng đọc cho từng đoạn lời thoại.",
+  "Hệ thống tự dựng hình từng cảnh.",
+  "Hệ thống tự ghép hình, giọng đọc, phụ đề và nhạc nền thành video, rồi chấm chất lượng.",
+  "Hệ thống tự cắt các clip dọc cho Shorts/TikTok từ video dài.",
+  "Xem lại video đã xong, cắt thêm clip hoặc dựng lại với cấu hình khác.",
+  "Kết nối kênh YouTube, điền tiêu đề, mô tả và đăng video.",
 ] as const;
 
 export const FLOW_INIT = 1;
@@ -38,10 +58,18 @@ export const FLOW_VALIDATE = 7;
 export const FLOW_REVIEW = 8;
 export const FLOW_TTS = 9;
 export const FLOW_RESULT = 13;
+
+/** The flow step of each authoring step the AI can run. */
+export const AUTHORING_STEP_FLOW: Record<AuthoringStep, number> = {
+  story: 3,
+  storyboard: 4,
+  illustrations: 5,
+  code: 6,
+};
 export const FLOW_PUBLISH = 14;
 
 /**
- * "Bước 4 — Visual": the one way a step is named to the Creator, on a
+ * "Bước 4 — Hình ảnh": the one way a step is named to the Creator, on a
  * screen title, in the AI chain's progress, anywhere. The name is the step
  * rail's, so a screen can never call a step something the rail does not.
  */
@@ -51,6 +79,14 @@ export function flowTitle(step: number): string {
   if (!Number.isInteger(step)) return "Bước";
   const label = FLOW_LABELS[step - 1];
   return label ? `Bước ${step} — ${label}` : `Bước ${step}`;
+}
+
+/**
+ * The name of a logged event's step as the step rail shows it. The server's
+ * `step_label` is the fallback for a flow step the web app does not know.
+ */
+export function eventStepLabel(event: { flow_step: number; step_label: string }): string {
+  return FLOW_LABELS[event.flow_step - 1] ?? event.step_label;
 }
 
 export type RunState = "idle" | "running" | "failed" | "done";
@@ -77,13 +113,35 @@ export function authoringRoute(step: number): string {
   return "/create/script/code";
 }
 
-/** Giai đoạn của từng bước: nhóm theo ranh giới chi phí và khả năng sửa. */
+/**
+ * The five phases the Creator sees, grouping the 14 server steps by boundary of
+ * cost and editability: preparing, writing content, reviewing, producing (runs
+ * on its own) and the finished video.
+ */
 export const FLOW_PHASES = [
-  { name: "Soạn", steps: [1, 2, 3, 4, 5, 6] },
-  { name: "Kiểm tra", steps: [7, 8] },
+  { name: "Chuẩn bị", steps: [1, 2] },
+  { name: "Soạn nội dung", steps: [3, 4, 5, 6] },
+  { name: "Duyệt", steps: [7, 8] },
   { name: "Sản xuất", steps: [9, 10, 11, 12] },
-  { name: "Đầu ra", steps: [13, 14] },
+  { name: "Hoàn tất", steps: [13, 14] },
 ] as const;
+
+/** Steps a worker runs with nothing for the Creator to do. */
+export const AUTO_STEPS: ReadonlySet<number> = new Set([FLOW_VALIDATE, FLOW_TTS, FLOW_TTS + 1, FLOW_TTS + 2, FLOW_TTS + 3]);
+
+/** A phase of the flow with its position (0-based) in FLOW_PHASES. */
+export interface FlowPhase {
+  index: number;
+  name: string;
+  steps: readonly number[];
+}
+
+/** The phase that holds `step`, or null for a step outside the flow. */
+export function phaseOf(step: number): FlowPhase | null {
+  const index = FLOW_PHASES.findIndex((phase) => (phase.steps as readonly number[]).includes(step));
+  if (index < 0) return null;
+  return { index, name: FLOW_PHASES[index].name, steps: FLOW_PHASES[index].steps };
+}
 
 /** Hiển thị của một bước trong thanh bước / menu dọc. */
 export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled" | "pending" | "skipped";
@@ -119,6 +177,21 @@ export function stepStatus(
   }
 }
 
+/** Why a step marked "Không dùng" does not apply to this video. */
+export function skippedReason(step: number): string {
+  if (step === FLOW_ILLUSTRATIONS) return "Video dựng bằng Manim không có bước này; chỉ video Remotion mới có hình minh hoạ.";
+  return "Video này chỉ làm bản dài, không cắt clip dọc.";
+}
+
+/**
+ * The read-only preview of a step: for a step the project has not reached, or
+ * one marked "Không dùng". Under /projects/:id when a project exists, so the
+ * step menu keeps following that project.
+ */
+export function previewRoute(step: number, projectId: string): string {
+  return projectId ? `/projects/${projectId}/preview/${step}` : `/create/preview/${step}`;
+}
+
 /**
  * Whether the authoring inputs (steps 1-5) of a project can still be changed.
  * Mirrors the server's own lock (domain.IsAuthoringEditable): a draft, or a
@@ -134,7 +207,7 @@ export function isAuthoringEditable(status: string | undefined): boolean {
 /** Why the inputs are read-only, in words for the banner. */
 export function readOnlyReason(status: string): string {
   if (status === "awaiting_review") {
-    return "Dự án đang chờ duyệt, chỉ có thể xem. Muốn sửa, chọn “Quay lại sửa script” ở bước Kiểm tra.";
+    return "Dự án đang chờ duyệt, chỉ có thể xem. Muốn sửa, chọn “Quay lại sửa script” ở bước Duyệt nội dung.";
   }
   if (status === "ready_to_publish" || status === "publishing" || status === "published") {
     return "Video đã hoàn tất, các bước trước chỉ để xem. Muốn thay đổi, hãy tạo bản mới.";

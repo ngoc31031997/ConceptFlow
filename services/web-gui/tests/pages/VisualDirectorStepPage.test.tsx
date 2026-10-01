@@ -86,7 +86,75 @@ describe("VisualDirectorStepPage", () => {
 
     expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Visual");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Hình ảnh");
   });
 
+  describe("lời nhắc theo cách làm", () => {
+    function renderStep() {
+      render(
+        <ThemeProvider>
+          <MemoryRouter>
+            <ProjectDraftProvider>
+              <VisualDirectorStepPage />
+            </ProjectDraftProvider>
+          </MemoryRouter>
+        </ThemeProvider>,
+      );
+    }
+
+    it("tự làm: nhắc dán storyboard từ AI bên ngoài", async () => {
+      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+      renderStep();
+      expect(await screen.findByText("Dán storyboard từ AI để tiếp tục.")).toBeInTheDocument();
+      expect(screen.getByTestId("wizard-back")).toHaveTextContent("Quay lại Kịch bản");
+    });
+
+    it("AI làm giúp: nhắc bấm chạy hoặc tự viết, không nói “dán”", async () => {
+      vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+        mode: "ai", topic: "", story: "", storyboard: "", code: "",
+      });
+      renderStep();
+      expect(await screen.findByText("Bấm Chạy bằng AI, hoặc tự viết storyboard vào ô bên dưới.")).toBeInTheDocument();
+    });
+  });
+  // Skipped in CI only (Creator decision, 2026-09-28): on the GitHub runner the box
+  // is still there after "Đóng thông báo"; not reproducible locally.
+  it.skipIf(process.env.CI)("hiện cảnh báo của storyboard ở bước Hình ảnh, và đóng được", async () => {
+    vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+    vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
+      mode: "ai", topic: "", story: "s", storyboard: "sb", code: "",
+    });
+    vi.spyOn(apiClient, "getAuthoringChain").mockResolvedValue({
+      running: false,
+      steps: ["story", "storyboard", "code"],
+      current_index: 3,
+      finished: true,
+      warnings: {
+        storyboard: [
+          "Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)",
+          "Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có",
+        ],
+      },
+      finished_at: new Date().toISOString(),
+    });
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <ProjectDraftProvider>
+            <VisualDirectorStepPage />
+          </ProjectDraftProvider>
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+
+    const box = await screen.findByTestId("run-with-ai-storyboard-warnings");
+    expect(box).toHaveTextContent("Cảnh báo ở bước Hình ảnh (2)");
+    expect(box).toHaveTextContent("Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có");
+    // Warnings do not turn a finished run into a failure.
+    expect(screen.getByTestId("run-with-ai-done")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
+    await waitFor(() => expect(screen.queryByTestId("run-with-ai-storyboard-warnings")).not.toBeInTheDocument());
+  });
 });

@@ -11,14 +11,7 @@
   align-items: start;
 }
 
-/*
-  Source "blank" has no editor column — the 2-column grid above would still
-  reserve that column's ~1.4fr, leaving the assistant cramped into a narrow
-  strip with the rest of the page empty beside it. Full width instead: since
-  ScriptAssistant itself now splits into form + live prompt preview when
-  `wide` (see ScriptAssistant.tsx), it needs the room rather than a capped
-  reading width.
-*/
+/* AI mode: no prompt card, so the result card takes the full width. */
 .scriptLayoutSingle {
   display: block;
   width: 100%;
@@ -30,21 +23,6 @@
 */
 .assistantColumn {
   min-width: 0;
-}
-
-/*
-  Step 2: narration is easily twice as tall as render quality and background
-  music combined (voice list, subtitle preview, subtitle fields all live in
-  one card). Splitting the page into two side-by-side columns left the short
-  column with a slab of empty space beside narration's overflow. Full width
-  for narration, then the two short cards side by side below, uses the wide
-  column without that imbalance.
-*/
-.settingsLayout {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  width: 100%;
 }
 
 .settingsRow {
@@ -161,4 +139,25 @@
   .summary {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* Bước 2: a numbered group of settings, decided top to bottom. */
+.settingsSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.settingsSectionHead h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.settingsSectionHead p {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
 }

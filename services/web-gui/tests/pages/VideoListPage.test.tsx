@@ -231,7 +231,7 @@ describe("VideoListPage", () => {
       await waitFor(() => expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toBeInTheDocument());
 
       expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toHaveTextContent("thiên kiến sống sót");
-      expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toHaveTextContent("Bước 10 — Render");
+      expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toHaveTextContent("Bước 10 — Dựng hình");
       expect(screen.getAllByTestId("flow-mini")).toHaveLength(4);
       expect(screen.getByTestId("video-row-cccccccc-3333")).toHaveTextContent("Bản mới từ “thiên kiến sống sót”");
       // No topic yet: say so instead of showing only a UUID.

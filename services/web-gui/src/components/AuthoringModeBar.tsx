@@ -20,26 +20,17 @@ import { formatChars, formatClock } from "../lib/formatProgress";
 import { useAuthoringProgress } from "../hooks/useAuthoringProgress";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import { usePresence } from "../hooks/usePresence";
-import { FLOW_CODE, FLOW_ILLUSTRATIONS, FLOW_STORY, FLOW_VISUAL, flowTitle } from "../utils/flow";
+import { AUTHORING_STEP_FLOW, FLOW_CODE, FLOW_STORY, flowTitle } from "../utils/flow";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModeBar.module.css";
 
 /** Thứ tự các bước; "illustrations" chỉ có ở video Remotion. */
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "illustrations", "code"];
 
-/**
- * Số của từng bước trong luồng 14 bước. Chuỗi AI từng tự đánh số
- * "Bước 1/3", "2/3"… trong khi thanh bước bên trái ghi 3/4/5/6, nên Creator
- * thấy hai danh sách bước khác nhau cho cùng một việc.
- */
-const STEP_FLOW: Record<AuthoringStep, number> = {
-  story: FLOW_STORY,
-  storyboard: FLOW_VISUAL,
-  illustrations: FLOW_ILLUSTRATIONS,
-  code: FLOW_CODE,
-};
+/** Số của từng bước trong luồng 14 bước, đúng như menu bước đánh số. */
+const STEP_FLOW = AUTHORING_STEP_FLOW;
 
-/** "Bước 4 — Visual": tên một bước soạn đúng như thanh bước gọi nó. */
+/** "Bước 4 — Hình ảnh": tên một bước soạn đúng như thanh bước gọi nó. */
 function stepTitle(step: AuthoringStep): string {
   return flowTitle(STEP_FLOW[step]);
 }
@@ -47,16 +38,6 @@ function stepTitle(step: AuthoringStep): string {
 /** "3–6": dải bước của chuỗi, theo số trên thanh bước. */
 const CHAIN_RANGE = `${FLOW_STORY}–${FLOW_CODE}`;
 
-/**
- * Các ô của stepper chuỗi: mọi bước soạn từ bước đầu tới bước cuối của chuỗi,
- * kể cả bước chuỗi bỏ qua (Hình minh hoạ của video Manim), để các ô luôn khớp
- * với thanh bước.
- */
-function chainRows(chain: AuthoringStep[]): AuthoringStep[] {
-  const first = ALL_STEPS.indexOf(chain[0]);
-  const last = ALL_STEPS.indexOf(chain[chain.length - 1]);
-  return ALL_STEPS.slice(first, last + 1);
-}
 
 /** Tab của từng bước, để chuỗi AI tự đưa Creator theo đúng bước đang chạy. */
 export const AUTHORING_STEP_PATHS: Record<AuthoringStep, string> = {
@@ -346,7 +327,10 @@ export function AuthoringModeBar({
       : null;
   // Cảnh báo của bước Visual, không chặn: xem trước khi tốn
   // tiền cho bước Code. Giữ bản cuối để khối còn nội dung khi đang thu lại.
-  const storyboardWarnings = outcome?.warnings?.storyboard ?? [];
+  // Shown on the screens they concern: the storyboard they are about and Code,
+  // which they should be read before.
+  const storyboardWarnings =
+    steps[0] === "storyboard" || steps[0] === "code" ? (outcome?.warnings?.storyboard ?? []) : [];
   const shownWarnings = useRef<string[]>([]);
   if (storyboardWarnings.length > 0) shownWarnings.current = storyboardWarnings;
   const warningsPresence = usePresence(storyboardWarnings.length > 0 && !run.running);
@@ -367,8 +351,21 @@ export function AuthoringModeBar({
     ? outcome.error + (outcome.error_step && outcome.steps.length > 1 ? ` (dừng ở ${stepTitle(outcome.error_step)})` : "")
     : null;
   const outcomeNote = outcome?.note ?? null;
+  // The step this screen is for: a screen passes its own step first (step 3
+  // passes the whole chain, which starts with "story").
+  const ownStep: AuthoringStep | null = steps[0] ?? null;
+  // The step the AI works on right now, when it is not this screen's.
+  const runningStep = run.currentIndex >= 0 ? (run.steps[run.currentIndex] ?? null) : null;
+  const runningOther = running && runningStep !== null && runningStep !== ownStep;
+  const ownIndex = ownStep ? run.steps.indexOf(ownStep) : -1;
+  // A chain error belongs to the screen of the step that failed; the others
+  // say where it stopped and lead there.
+  const errorElsewhere =
+    !error && outcome?.error && outcome.error_step && outcome.steps.length > 1 && outcome.error_step !== ownStep
+      ? outcome.error_step
+      : null;
   const outcomeWaiting = outcome?.waiting ?? null;
-  const shownError = error ?? outcomeError;
+  const shownError = error ?? (errorElsewhere ? null : outcomeError);
 
   async function handleCancel() {
     setConfirmingCancel(false);
@@ -467,10 +464,10 @@ export function AuthoringModeBar({
                         : "Chạy bằng AI"
                   }
                 >
-                  {running ? "AI đang chạy…" : runLabel}
+                  {running && !runningOther ? "AI đang chạy…" : runLabel}
                 </Button>
-                {running && <span className={styles.spinner} role="status" aria-label="AI đang chạy" />}
-                {running && (
+                {running && !runningOther && <span className={styles.spinner} role="status" aria-label="AI đang chạy" />}
+                {running && !runningOther && (
                   <p className={styles.status} data-testid="run-with-ai-running">
                     {runningElsewhere
                       ? `Đang chạy ở ${
@@ -490,6 +487,16 @@ export function AuthoringModeBar({
                 <p className={styles.error} data-testid="run-with-ai-error">
                   {shownError}
                 </p>
+              )}
+              {errorElsewhere && !running && (
+                <div className={styles.waitingRow} data-testid="run-with-ai-error-elsewhere">
+                  <p className={styles.error}>Chuỗi AI dừng vì lỗi ở {stepTitle(errorElsewhere)}.</p>
+                  {onFollow && (
+                    <Button variant="ghost" onClick={() => onFollow(errorElsewhere)} data-testid="run-with-ai-open-error">
+                      Mở {stepTitle(errorElsewhere)}
+                    </Button>
+                  )}
+                </div>
               )}
               {outcomeNote && !error && (
                 <p className={styles.status} data-testid="run-with-ai-note">
@@ -512,7 +519,7 @@ export function AuthoringModeBar({
                   data-testid="run-with-ai-storyboard-warnings"
                 >
                   <p className={styles.warningsTitle}>
-                    Cảnh báo ở bước Visual ({shownWarnings.current.length}) — không chặn, nên xem trước khi chạy Code:
+                    Cảnh báo ở bước Hình ảnh ({shownWarnings.current.length}) — không chặn, nên xem trước khi chạy Code:
                   </p>
                   <ul>
                     {shownWarnings.current.map((w, i) => (
@@ -541,18 +548,18 @@ export function AuthoringModeBar({
             </>
           )}
 
-          {/* Chạy cả chuỗi (bước 3 → 6): Creator bấm chạy ở bước 3 rồi có thể
-              chuyển sang màn 4/5/6 xem tiến độ. Panel này
-              hiện trên cả bốn màn bất cứ khi nào một chuỗi đang chạy, nên đứng ở
-              màn nào cũng thấy đủ các bước và biết đang chờ đúng bước nào.
-              Mỗi ô mang số và tên của thanh bước, và bước chuỗi không
-              chạy (Hình minh hoạ của video Manim) vẫn hiện, mờ, "Không dùng" —
-              như thanh bước — thay vì biến mất khiến 4 bước thành 3. */}
+          {/* Mỗi màn chỉ hiện tiến độ của bước mình. Chuỗi 3 → 6 vẫn chạy liền
+              và tự chuyển màn theo bước đang chạy (onFollow). Khi AI đang làm
+              bước khác, màn này không trông như đang chạy (không vòng xoay,
+              không nút Dừng): chỉ một dòng nói AI đang ở bước nào, bước mình
+              đã xong hay chạy sau, và nút mở bước đang chạy — Dừng nằm ở đó. */}
           {running && steps.length > 0 && (
             <div className={styles.runPanel} data-testid="authoring-run-panel">
-              <Button onClick={() => setConfirmingCancel(true)} disabled={cancelling} data-testid="run-with-ai-cancel">
-                {cancelling ? "Đang dừng…" : "Dừng"}
-              </Button>
+              {!runningOther && (
+                <Button onClick={() => setConfirmingCancel(true)} disabled={cancelling} data-testid="run-with-ai-cancel">
+                  {cancelling ? "Đang dừng…" : "Dừng"}
+                </Button>
+              )}
               <ConfirmModal
                 isOpen={confirmingCancel}
                 onClose={() => setConfirmingCancel(false)}
@@ -563,54 +570,27 @@ export function AuthoringModeBar({
                 cancelLabel="Tiếp tục chạy"
                 isDangerous
               />
-              {run.steps.length <= 1 && (
-                <>
-                  <OperationProgressCard
-                    subtitle={live?.running ? liveProgressText(live) : null}
-                    {...liveCounts(live)}
-                    testId="authoring-live-progress"
-                  />
-                </>
-              )}
-              {run.steps.length > 1 && (
-                <ol className={styles.stepper}>
-                  {chainRows(run.steps).map((step) => {
-                    const index = run.steps.indexOf(step);
-                    const status =
-                      index < 0
-                        ? "skipped"
-                        : index < run.currentIndex
-                          ? "done"
-                          : index === run.currentIndex
-                            ? "running"
-                            : "pending";
-                    return (
-                      <li
-                        key={step}
-                        className={`${styles.stepItem} ${styles[`stepItem_${status}`]}`}
-                        data-testid={`authoring-run-panel-${step}`}
-                        data-state={status}
-                        aria-current={status === "running" ? "step" : undefined}
-                      >
-                        <span className={styles.stepName}>{stepTitle(step)}</span>
-                        <span className={styles.stepNote}>
-                          {status === "skipped"
-                            ? "Không dùng"
-                            : status === "done"
-                            ? ["xong", runs[step] ? formatClock(runs[step]!.durationMs / 1000) : null, runs[step]?.chars ? `${formatChars(runs[step]!.chars)} ký tự` : null]
-                                .filter(Boolean)
-                                .join(" · ")
-                            : status === "running"
-                            ? stepLiveNote(live)
-                            : "chờ"}
-                        </span>
-                        {status === "running" && (
-                          <OperationProgressCard variant="step" {...liveCounts(live)} />
-                        )}
-                      </li>
-                    );
-                  })}
-                </ol>
+              {runningOther && runningStep ? (
+                <div className={styles.waitingRow} data-testid="authoring-run-elsewhere">
+                  <p className={styles.status}>
+                    {ownIndex >= 0 && ownIndex < run.currentIndex
+                      ? `${stepTitle(ownStep as AuthoringStep)} đã xong. AI đang chạy ${stepTitle(runningStep)}.`
+                      : ownIndex > run.currentIndex
+                        ? `AI đang chạy ${stepTitle(runningStep)}; bước này chạy sau.`
+                        : `AI đang chạy ${stepTitle(runningStep)}.`}
+                  </p>
+                  {onFollow && (
+                    <Button variant="ghost" onClick={() => onFollow(runningStep)} data-testid="authoring-run-open-current">
+                      Mở {stepTitle(runningStep)}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <OperationProgressCard
+                  subtitle={live?.running ? liveProgressText(live) : null}
+                  {...liveCounts(live)}
+                  testId="authoring-live-progress"
+                />
               )}
             </div>
           )}
@@ -690,16 +670,6 @@ function drawingText(p: AuthoringProgress): string {
   ]
     .filter(Boolean)
     .join(" · ");
-}
-
-/** Dòng phụ của thẻ đang chạy: "AI đang viết · 14,3k ký tự · 2m 5s". */
-function stepLiveNote(p: AuthoringProgress | null): string {
-  if (!p?.running) return "đang chạy";
-  const time = formatClock(p.elapsed_seconds);
-  if (p.phase === "writing") return `AI đang viết · ${formatChars(p.content_chars)} ký tự · ${time}`;
-  if (p.phase === "reasoning") return `AI đang phân tích · ${formatChars(p.reasoning_chars)} ký tự · ${time}`;
-  if (p.phase === "plan" || p.phase === "draw") return `${drawingText(p)} · ${time}`;
-  return `${liveProgressText(p).replace(/….*$/, "").replace(/:.*$/, "")} · ${time}`;
 }
 
 /** Câu tiến độ từ luồng streaming: pha hiện tại, lượng chữ đã nhận, thời gian. */

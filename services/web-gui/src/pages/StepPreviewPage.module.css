@@ -1,0 +1,25 @@
+.notice {
+  margin: 0 0 var(--space-sm);
+  padding: 10px 14px;
+  border: var(--border-w) dashed var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-size: 13.5px;
+}
+
+.purpose {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  max-width: 70ch;
+}
+
+.auto {
+  margin: var(--space-xs) 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.actions {
+  margin-top: var(--space-sm);
+}

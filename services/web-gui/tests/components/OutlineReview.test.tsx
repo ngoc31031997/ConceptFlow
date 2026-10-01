@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { OutlineReview } from "../../src/components/OutlineReview";
-import { OutlineActions } from "../../src/components/OutlineActions";
 import { useOutlineReview } from "../../src/hooks/useOutlineReview";
 import type { Project } from "../../src/types";
 
@@ -21,18 +20,21 @@ const PROJECT: Project = {
 };
 
 /**
- * OutlineReview (danh sách, cột trái) và OutlineActions (nút Duyệt/Từ chối,
- * cột phải cạnh ProgressTracker) chia nhau một instance
- * `useOutlineReview` duy nhất, đúng như RenderPage lắp chúng thật. Test ở
- * đây dựng lại đúng cặp đó thay vì test OutlineReview một mình, vì hành vi
- * (busy khoá cả hai phía, approve/reject) giờ sống ở hook chung.
+ * OutlineReview (danh sách) và hai nút Duyệt/Từ chối chia nhau một instance
+ * `useOutlineReview` duy nhất, như ValidatePage lắp chúng. Harness dựng lại
+ * cặp đó, với hai nút trơn đứng thay thanh dưới đáy màn.
  */
 function Harness({ onDecided, onRejected }: { onDecided: () => void; onRejected: () => void }) {
   const outline = useOutlineReview(PROJECT, onDecided, onRejected);
   return (
     <>
       <OutlineReview project={PROJECT} outline={outline} />
-      <OutlineActions outline={outline} />
+      <button type="button" onClick={() => void outline.approve()} data-testid="outline-approve">
+        Duyệt
+      </button>
+      <button type="button" onClick={() => void outline.reject()} data-testid="outline-reject">
+        Từ chối
+      </button>
     </>
   );
 }
@@ -101,7 +103,7 @@ describe("OutlineReview", () => {
   });
 });
 
-describe("OutlineActions", () => {
+describe("useOutlineReview: duyệt / từ chối", () => {
   it("duyệt thì gọi endpoint approve", async () => {
     const onDecided = vi.fn();
     render(<Harness onDecided={onDecided} onRejected={vi.fn()} />);
@@ -117,7 +119,7 @@ describe("OutlineActions", () => {
 
   it("từ chối thì gọi endpoint reject và onRejected, không phải onDecided", async () => {
     // "Quay lại sửa script" phải gọi callback riêng, khác nút Duyệt, để trang
-    // gọi nó (RenderPage) biết phải điều hướng Creator về đâu thay vì để họ
+    // gọi nó (ValidatePage) biết phải điều hướng Creator về đâu thay vì để họ
     // kẹt lại ở một trang đã hết việc để hiện.
     const onDecided = vi.fn();
     const onRejected = vi.fn();

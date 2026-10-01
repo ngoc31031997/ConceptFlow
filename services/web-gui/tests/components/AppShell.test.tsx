@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, waitFor, fireEvent } from "@testing-library/react";
-import { MemoryRouter, Routes, Route } from "react-router-dom";
+import { MemoryRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AppShell } from "../../src/components/AppShell";
 import { WizardNav } from "../../src/components/WizardNav";
 import { TextArea, TextInput, Select } from "../../src/components/ui";
@@ -8,17 +8,24 @@ import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ProjectFlowProvider } from "../../src/context/ProjectFlowContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
-import type { Project } from "../../src/types";
+import type { Project, ProjectSummary } from "../../src/types";
+import { openAllPhases } from "../helpers/stepRail";
+
+/** Where the router is, for the navigation assertions. */
+function Where() {
+  return <span data-testid="where">{useLocation().pathname}</span>;
+}
 
 function project(over: Partial<Project>): Project {
   return { project_id: "p1", status: "draft", voice_language: "vi", scenes: [], ...over } as Project;
 }
 
-function renderShell(p: Project | null, currentStep: number) {
+function renderShell(p: Project | null, currentStep: number, recent: ProjectSummary[] = []) {
   window.localStorage.setItem("conceptflow.draft.v1", JSON.stringify({ projectId: "p1", voiceLanguage: "vi" }));
   if (p) vi.spyOn(apiClient, "getProject").mockResolvedValue(p);
   else vi.spyOn(apiClient, "getProject").mockRejectedValue(new apiClient.ApiError("not found"));
   vi.spyOn(apiClient, "listProjectErrors").mockResolvedValue([]);
+  vi.spyOn(apiClient, "listProjects").mockResolvedValue(recent);
   return render(
     <ThemeProvider>
       <MemoryRouter initialEntries={["/create/script/outline"]}>
@@ -39,6 +46,7 @@ function renderShell(p: Project | null, currentStep: number) {
                       </Select>
                     </AppShell>
                     <WizardNav hint="h" onNext={() => {}} nextLabel="Tiếp tục" nextTestId="next" />
+                    <Where />
                   </>
                 }
               />
@@ -58,17 +66,50 @@ describe("AppShell — 14-step flow", () => {
 
   it("shows all 14 steps, with the current one marked", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
+    await openAllPhases();
     for (let i = 1; i <= 14; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step");
   });
 
-  it("lets the Creator open any step the project has reached, but not one it has not", async () => {
+  it("opens a step the project has reached, and only a preview of one it has not", async () => {
     renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 5);
-    await waitFor(() => expect(screen.getByTestId("rail-step-9")).not.toBeDisabled());
-    expect(screen.getByTestId("rail-step-10")).not.toBeDisabled();
-    expect(screen.getByTestId("rail-step-11")).toBeDisabled();
-    expect(screen.getByTestId("rail-step-14")).toBeDisabled();
+    await openAllPhases();
+    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-reached", "true"));
+    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-reached", "true");
+    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-reached", "false");
+    expect(screen.getByTestId("rail-step-14")).not.toBeDisabled();
+
+    fireEvent.click(screen.getByTestId("rail-step-14"));
+    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/preview\/14$/);
+    fireEvent.click(screen.getByTestId("rail-step-10"));
+    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/render$/);
+  });
+
+  it("shows the phase and step above the title", async () => {
+    renderShell(project({ status: "draft", flow_step: 4, run_state: "idle" }), 4);
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Soạn nội dung · Bước 4/14");
+  });
+
+  it("shows the step menu on step 1, before the server has a project", async () => {
+    renderShell(null, 1);
+    await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
+    expect(screen.getByTestId("step-rail")).toHaveTextContent("Video mới");
+    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("Nhập ý tưởng để bắt đầu");
+    // Nothing runs yet, so there is no status strip.
+    expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
+    await openAllPhases();
+    fireEvent.click(screen.getByTestId("rail-step-4"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/create/preview/4");
+  });
+
+  it("names the phase and the step on the sidebar's resume link, not a bare step count", async () => {
+    renderShell(null, 1, [
+      { project_id: "p9", topic: "Cây nhị phân", status: "rendering", flow_step: 10, run_state: "running" } as ProjectSummary,
+    ]);
+
+    const link = await screen.findByTestId("resume-recent-project");
+    expect(link).toHaveTextContent("Tiếp tục · đang chạy · Sản xuất · Dựng hình");
+    expect(link).not.toHaveTextContent("/14");
   });
 
   it("locks the authoring screens read-only while the project is rendering, and says why", async () => {
@@ -80,6 +121,7 @@ describe("AppShell — 14-step flow", () => {
     // The bar that would save or start a render is locked too.
     expect(screen.getByTestId("next")).toBeDisabled();
     // Navigation stays usable: looking around is the point.
+    await openAllPhases();
     expect(screen.getByTestId("rail-step-2")).not.toBeDisabled();
   });
 
@@ -99,14 +141,16 @@ describe("AppShell — 14-step flow", () => {
 
   it("keeps real inputs for a draft", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await waitFor(() => expect(screen.getByTestId("rail-step-2")).not.toBeDisabled());
+    await openAllPhases();
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-reached", "true"));
     expect(screen.getByTestId("story").tagName).toBe("TEXTAREA");
     expect(screen.getByTestId("lang").tagName).toBe("SELECT");
   });
 
   it("leaves a draft fully editable", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await waitFor(() => expect(screen.getByTestId("rail-step-2")).not.toBeDisabled());
+    await openAllPhases();
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-reached", "true"));
     expect(screen.queryByTestId("read-only-banner")).not.toBeInTheDocument();
     expect(screen.getByTestId("an-input")).not.toBeDisabled();
     expect(screen.getByTestId("next")).not.toBeDisabled();
@@ -114,7 +158,8 @@ describe("AppShell — 14-step flow", () => {
 
   it("keeps a project that failed at render editable, so the Creator can go fix an earlier step", async () => {
     renderShell(project({ status: "failed_at_render_scenes", flow_step: 10, run_state: "failed" }), 5);
-    await waitFor(() => expect(screen.getByTestId("rail-step-10")).not.toBeDisabled());
+    await openAllPhases();
+    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-reached", "true"));
     expect(screen.queryByTestId("read-only-banner")).not.toBeInTheDocument();
     expect(screen.getByTestId("an-input")).not.toBeDisabled();
   });
@@ -122,7 +167,8 @@ describe("AppShell — 14-step flow", () => {
   it("opens a past step of a locked project through resume (no API write on the way)", async () => {
     const put = vi.spyOn(globalThis, "fetch");
     renderShell(project({ status: "ready_to_publish", flow_step: 13, run_state: "idle" }), 13);
-    await waitFor(() => expect(screen.getByTestId("rail-step-3")).not.toBeDisabled());
+    await openAllPhases();
+    await waitFor(() => expect(screen.getByTestId("rail-step-3")).toHaveAttribute("data-reached", "true"));
     put.mockClear();
     fireEvent.click(screen.getByTestId("rail-step-3"));
     // Navigating is a client-side route change; nothing is sent to the server.

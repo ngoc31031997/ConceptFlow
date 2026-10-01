@@ -55,8 +55,8 @@
   height: 12px;
 }
 
-/* Tiến độ chạy: thanh chạy liên tục (server không báo %), cộng một stepper
-   ngang cho chuỗi bước 3 → 6. */
+/* Tiến độ chạy: nút Dừng và tiến độ của bước thuộc màn này, hoặc một dòng
+   nói AI đang chạy bước nào khác. */
 .runPanel {
   display: flex;
   flex-direction: column;
@@ -77,80 +77,6 @@
   border-radius: inherit;
   background: var(--accent);
   animation: amb-slide 1.4s ease-in-out infinite;
-}
-
-.stepper {
-  display: grid;
-  /* One row of four steps (3–6); Hình minh hoạ is a dimmed "Không dùng" cell on Manim. */
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
-  gap: 10px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.stepItem {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border-radius: var(--radius);
-  border: var(--border-w) solid var(--border-color);
-  background: var(--card);
-  color: var(--ink-faint);
-  transition: background 0.2s ease;
-}
-
-.stepItem_running {
-  background: var(--run-soft);
-  box-shadow: var(--shadow);
-}
-
-.stepItem_done {
-  border-color: var(--ok);
-  box-shadow: var(--shadow-sm);
-}
-
-/* A step the chain does not run (Hình minh hoạ on a Manim video) —
-   dimmed and struck through, as the step rail shows it. */
-.stepItem_skipped {
-  opacity: 0.45;
-}
-
-.stepItem_skipped .stepName {
-  color: var(--ink-faint);
-  text-decoration: line-through;
-}
-
-.stepName {
-  font-family: var(--font-display);
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--ink);
-}
-
-.stepNote {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--ink-soft);
-}
-
-.stepItem_running .progressTrack {
-  margin-top: 2px;
-  border: var(--border-w) solid var(--border-color);
-  background: var(--card);
-}
-
-.stepItem_running .progressBar {
-  background: var(--run);
-}
-
-@media (max-width: 640px) {
-  .stepper {
-    grid-auto-flow: row;
-    grid-template-columns: 1fr;
-  }
 }
 
 @keyframes amb-spin {

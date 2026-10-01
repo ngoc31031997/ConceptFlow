@@ -517,17 +517,6 @@ export function renderPrompt(input: PromptRenderInput): Promise<RenderedPromptRe
   });
 }
 
-/** Starter scripts and insertable snippets, served by authoring-service. */
-export interface ScriptTemplates {
-  starter_script: Record<"vi" | "en", string>;
-  hook_snippet: Record<"vi" | "en", string>;
-  end_screen_snippet: Record<"vi" | "en", string>;
-}
-
-export function getScriptTemplates(): Promise<ScriptTemplates> {
-  return apiFetch<ScriptTemplates>("/v1/script-templates");
-}
-
 /** Toàn bộ thư viện prompt (mọi vai trò) cho màn cài đặt. */
 export async function listPrompts(): Promise<Prompt[]> {
   const result = await apiFetch<{ prompts: Prompt[] }>("/v1/admin/prompts");

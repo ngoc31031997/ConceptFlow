@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { JournalPage, aggregateByStep } from "../../src/pages/JournalPage";
+import { eventStepLabel } from "../../src/utils/flow";
 import type { ProjectEvent } from "../../src/api/client";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 
@@ -75,5 +76,19 @@ describe("JournalPage", () => {
     );
     await waitFor(() => expect(screen.getByTestId("journal-overview")).toBeInTheDocument());
     expect(screen.getByTestId("overview-row-6")).toHaveTextContent("1m 30s");
+  });
+});
+
+describe("eventStepLabel", () => {
+  const event = (flow_step: number, step_label: string) =>
+    ({ id: 1, project_id: "p", at: "t", flow_step, step_label, run_state: "done", source: "saga" }) as ProjectEvent;
+
+  it("names a step as the step rail does, not with the server's older label", () => {
+    expect(eventStepLabel(event(10, "Render"))).toBe("Dựng hình");
+    expect(eventStepLabel(event(9, "TTS"))).toBe("Giọng đọc");
+  });
+
+  it("falls back to the server's label for a step the web app does not know", () => {
+    expect(eventStepLabel(event(99, "Bước lạ"))).toBe("Bước lạ");
   });
 });

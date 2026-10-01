@@ -42,6 +42,14 @@ function mockServerChain(outcome: Partial<apiClient.AuthoringChainState> = {}) {
   return start;
 }
 
+/**
+ * The topic is typed on step 1; here it arrives from the server, the way the
+ * page rehydrates it.
+ */
+function seedTopic(topic: string) {
+  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic, story: "", storyboard: "", code: "" });
+}
+
 function renderPage() {
   return render(
     <ThemeProvider>
@@ -70,14 +78,13 @@ describe("ScriptOutlineStepPage", () => {
     window.localStorage.clear();
   });
 
-  it("copies the server-rendered prompt for the topic the Creator typed", async () => {
+  it("copies the server-rendered prompt for the project's topic", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
+    seedTopic("Vòng lặp for trong Java");
     renderPage();
 
-    fireEvent.change(screen.getByTestId("script-outline-topic"), {
-      target: { value: "Vòng lặp for trong Java" },
-    });
+    await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for trong Java"));
     await waitFor(() =>
       expect(apiClient.renderPrompt).toHaveBeenCalledWith(
         expect.objectContaining({ role: "story_architect", topic: "Vòng lặp for trong Java" }),
@@ -115,12 +122,11 @@ describe("ScriptOutlineStepPage", () => {
 
   // The server renders {{topic}} itself, so the topic must reach it. These
   // two cover the round trip: it goes up with the outline, and it comes back down.
-  it("sends the Creator's topic to the server alongside the outline", async () => {
-    renderPage();
+  it("sends the project's topic to the server alongside the outline", async () => {
+    seedTopic("Vì sao bầu trời có màu xanh");
+      renderPage();
 
-    fireEvent.change(screen.getByTestId("script-outline-topic"), {
-      target: { value: "Vì sao bầu trời có màu xanh" },
-    });
+    await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vì sao bầu trời có màu xanh"));
     fireEvent.change(screen.getByTestId("script-outline-story-input"), {
       target: { value: "CÂU HỎI CỐT LÕI: ..." },
     });
@@ -153,8 +159,37 @@ describe("ScriptOutlineStepPage", () => {
     renderPage();
 
     await waitFor(() => {
-      expect(screen.getByTestId("script-outline-topic")).toHaveValue("Thuật toán sắp xếp nổi bọt");
+      expect(screen.getByTestId("topic-summary")).toHaveTextContent("Thuật toán sắp xếp nổi bọt");
     });
+  });
+
+  it("shows the topic read-only: it is edited on step 1, and the video kind on step 2", async () => {
+    seedTopic("Vòng lặp for");
+    renderPage();
+
+    await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
+    expect(screen.queryByTestId("script-outline-topic")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("video-archetype-picker")).not.toBeInTheDocument();
+  });
+
+  it("puts the settings and AI bar above the prompt and result cards, as on steps 4–6", async () => {
+    renderPage();
+
+    const bar = await screen.findByTestId("pipeline-settings-bar");
+    const result = screen.getByTestId("script-outline-story-input");
+    expect(bar.compareDocumentPosition(result) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("topic-summary").compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("asks to paste from an outside AI in manual mode, and to run or write it in AI mode", async () => {
+    vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
+    renderPage();
+
+    expect(await screen.findByText("Dán dàn ý từ AI để tiếp tục.")).toBeInTheDocument();
+    expandSettings();
+    await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("authoring-mode-ai"));
+    expect(await screen.findByText("Bấm Chạy bằng AI, hoặc tự viết dàn ý vào ô bên dưới.")).toBeInTheDocument();
   });
 
   it("has no 1a/1b/1c tab bar: the three script steps are steps 3/4/5 of the flow", () => {
@@ -187,6 +222,7 @@ describe("ScriptOutlineStepPage", () => {
       const createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
       mockServerChain();
+      seedTopic("Vòng lặp for");
       renderPage();
       expandSettings();
 
@@ -194,7 +230,7 @@ describe("ScriptOutlineStepPage", () => {
       await waitFor(() => expect(createDraft).toHaveBeenCalledWith(expect.any(String), "", "vi", "remotion"));
       createDraft.mockClear();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
@@ -209,8 +245,9 @@ describe("ScriptOutlineStepPage", () => {
       vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
       vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
       const start = mockServerChain();
+      seedTopic("Vòng lặp for");
       renderPage();
-      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
       expandSettings();
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
@@ -279,9 +316,7 @@ describe("ScriptOutlineStepPage", () => {
       renderPage();
       expandSettings();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), {
-        target: { value: "Vòng lặp for" },
-      });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
@@ -309,7 +344,7 @@ describe("ScriptOutlineStepPage", () => {
       renderPage();
       expandSettings();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "Vòng lặp for" } });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
@@ -332,9 +367,7 @@ describe("ScriptOutlineStepPage", () => {
       renderPage();
       expandSettings();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), {
-        target: { value: "Vòng lặp for" },
-      });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Vòng lặp for"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
@@ -351,18 +384,17 @@ describe("ScriptOutlineStepPage", () => {
         .spyOn(apiClient, "createProjectDraft")
         .mockResolvedValue({ similarProjects: [] });
       mockServerChain();
+      seedTopic("Cây nhị phân");
       renderPage();
       expandSettings();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), {
-        target: { value: "Cây nhị phân" },
-      });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("Cây nhị phân"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
 
       await waitFor(() =>
-        expect(saveDraft).toHaveBeenCalledWith(expect.any(String), "Cây nhị phân", "vi"),
+        expect(saveDraft).toHaveBeenCalledWith(expect.any(String), "Cây nhị phân", "vi", "manim"),
       );
     });
 
@@ -390,10 +422,11 @@ describe("ScriptOutlineStepPage", () => {
       vi.spyOn(apiClient, "startAuthoringChain").mockRejectedValue(
         new apiClient.ApiError("Tài khoản Hive hết số dư — nạp thêm ở dashboard Hive. Hoặc dùng nút Sao chép prompt như cũ."),
       );
+      seedTopic("X");
       renderPage();
       expandSettings();
 
-      fireEvent.change(screen.getByTestId("script-outline-topic"), { target: { value: "X" } });
+      await waitFor(() => expect(screen.getByTestId("topic-summary")).toHaveTextContent("X"));
       await waitFor(() => expect(screen.getByTestId("authoring-mode-ai")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("authoring-mode-ai"));
       fireEvent.click(screen.getByTestId("run-with-ai-story"));
@@ -468,37 +501,53 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
   }
 
   it("thấy chuỗi đang chạy dù trang này không bấm chạy, và nút chạy bị khoá", async () => {
-    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
+    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 0, finished: false });
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId("run-with-ai-running")).toBeInTheDocument());
-    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Đang chạy Bước 4 — Visual");
+    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Đang chạy Bước 3 — Kịch bản");
     expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
+    expect(screen.getByTestId("run-with-ai-cancel")).toBeInTheDocument();
   });
 
-  // The chain shows the rail's step numbers and keeps Hình minh hoạ (dimmed)
-  // on Manim, so it shows as many steps as the rail.
-  it("chuỗi Manim vẫn hiện đủ bước 3–6 theo số của thanh bước, bước 5 mờ “Không dùng”", async () => {
+  it("khi AI đã sang bước 4, màn bước 3 không còn trông như đang chạy", async () => {
     setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
     renderPage();
 
-    const rows = await screen.findAllByTestId(/^authoring-run-panel-/);
-    expect(rows.map((r) => r.getAttribute("data-testid"))).toEqual([
-      "authoring-run-panel-story",
-      "authoring-run-panel-storyboard",
-      "authoring-run-panel-illustrations",
-      "authoring-run-panel-code",
-    ]);
-    expect(rows.map((r) => r.getAttribute("data-state"))).toEqual(["done", "running", "skipped", "pending"]);
-    expect(rows[0]).toHaveTextContent("Bước 3 — Kịch bản");
-    expect(rows[1]).toHaveTextContent("Bước 4 — Visual");
-    expect(rows[2]).toHaveTextContent("Bước 5 — Hình minh hoạ");
-    expect(rows[2]).toHaveTextContent("Không dùng");
-    expect(rows[3]).toHaveTextContent("Bước 6 — Code");
-    expect(screen.getByTestId("authoring-run-panel")).not.toHaveTextContent(/Bước \d\/\d/);
+    await screen.findByTestId("authoring-run-elsewhere");
+    expect(screen.queryByTestId("run-with-ai-running")).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "AI đang chạy" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("run-with-ai-cancel")).not.toBeInTheDocument();
+    // The button keeps its own label and stays locked while the chain runs.
+    expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy bằng AI các bước 3–6");
+    expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
+    // The step menu says which step the AI is on.
+    await waitFor(() => expect(screen.getByTestId("rail-step-4")).toHaveAttribute("data-status", "running"));
+    expect(screen.getByTestId("rail-step-3")).not.toHaveAttribute("data-status", "running");
   });
 
-  it("hiện lỗi của lượt chạy đã dừng khi trang được mở lại, và đóng được", async () => {
+  // Each screen shows only its own step's progress: once the outline is done
+  // and the chain moved on, step 3 says where the AI is and leads there.
+  it("chỉ hiện tiến độ của bước mình: dàn ý xong thì nói AI đang chạy bước nào và mở được bước đó", async () => {
+    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 1, finished: false });
+    renderPage();
+
+    const elsewhere = await screen.findByTestId("authoring-run-elsewhere");
+    expect(elsewhere).toHaveTextContent("Bước 3 — Kịch bản đã xong. AI đang chạy Bước 4 — Hình ảnh.");
+    expect(screen.queryByTestId(/^authoring-run-panel-/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId("authoring-live-progress")).not.toBeInTheDocument();
+    expect(screen.getByTestId("authoring-run-open-current")).toHaveTextContent("Mở Bước 4 — Hình ảnh");
+  });
+
+  it("khi AI đang chạy chính bước này, hiện thẻ tiến độ của nó", async () => {
+    setup({ running: true, steps: ["story", "storyboard", "code"], current_index: 0, finished: false });
+    renderPage();
+
+    expect(await screen.findByTestId("authoring-live-progress")).toBeInTheDocument();
+    expect(screen.queryByTestId("authoring-run-elsewhere")).not.toBeInTheDocument();
+  });
+
+  it("lỗi ở bước khác: chỉ nói chuỗi dừng ở đâu và mở được bước đó, đóng được", async () => {
     setup({
       running: false,
       steps: ["story", "storyboard", "code"],
@@ -510,42 +559,45 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     });
     renderPage();
 
-    const err = await screen.findByTestId("run-with-ai-error");
-    expect(err).toHaveTextContent("hết số dư");
-    expect(err).toHaveTextContent("dừng ở Bước 4 — Visual");
+    const row = await screen.findByTestId("run-with-ai-error-elsewhere");
+    expect(row).toHaveTextContent("Chuỗi AI dừng vì lỗi ở Bước 4 — Hình ảnh");
+    expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument();
+    expect(screen.getByTestId("run-with-ai-open-error")).toHaveTextContent("Mở Bước 4 — Hình ảnh");
 
     fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
-    await waitFor(() => expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByTestId("run-with-ai-error-elsewhere")).not.toBeInTheDocument());
   });
 
-  // Skipped in CI only (Creator decision, 2026-09-28): on the GitHub runner the box
-  // is still there after "Đóng thông báo"; not reproducible locally. Backlog:
-  // docs/agentic/implementation-audit.md §8 (file removed 2026-09-30; see git history).
-  it.skipIf(process.env.CI)("hiện cảnh báo của bước Visual cùng kết cục, và đóng được", async () => {
+  it("lỗi ở chính bước này hiện nguyên văn", async () => {
+    setup({
+      running: false,
+      steps: ["story", "storyboard", "code"],
+      current_index: 0,
+      finished: true,
+      error: "Tài khoản Hive hết số dư.",
+      error_step: "story",
+      finished_at: new Date().toISOString(),
+    });
+    renderPage();
+
+    const err = await screen.findByTestId("run-with-ai-error");
+    expect(err).toHaveTextContent("hết số dư");
+    expect(err).toHaveTextContent("dừng ở Bước 3 — Kịch bản");
+  });
+
+  it("không hiện cảnh báo của storyboard ở bước Kịch bản", async () => {
     setup({
       running: false,
       steps: ["story", "storyboard", "code"],
       current_index: 3,
       finished: true,
-      warnings: {
-        storyboard: [
-          "Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)",
-          "Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có",
-        ],
-      },
+      warnings: { storyboard: ["Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)"] },
       finished_at: new Date().toISOString(),
     });
     renderPage();
 
-    const box = await screen.findByTestId("run-with-ai-storyboard-warnings");
-    expect(box).toHaveTextContent("Cảnh báo ở bước Visual (2)");
-    expect(box).toHaveTextContent("Cảnh concrete: ~58 giây, ngân sách 30–45 giây (+29%)");
-    expect(box).toHaveTextContent("Shot 2.3: lời thoại nhắc 'vi khuẩn' nhưng HÌNH không có");
-    // Warnings do not turn a finished run into a failure.
-    expect(screen.getByTestId("run-with-ai-done")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
-    await waitFor(() => expect(screen.queryByTestId("run-with-ai-storyboard-warnings")).not.toBeInTheDocument());
+    expect(await screen.findByTestId("run-with-ai-done")).toBeInTheDocument();
+    expect(screen.queryByTestId("run-with-ai-storyboard-warnings")).not.toBeInTheDocument();
   });
 
   it("shows how the last AI run of each step went — time, size, tokens — from the journal", async () => {

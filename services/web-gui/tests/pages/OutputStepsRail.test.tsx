@@ -47,9 +47,9 @@ describe("the rail highlights the step the title names on the output screens", (
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Kết quả");
   });
 
-  it("Publish is step 14", async () => {
+  it("Đăng video is step 14", async () => {
     renderAt("/projects/p1/publish", "published", 14);
     expect(await screen.findByTestId("rail-step-14")).toHaveAttribute("aria-current", "step");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Publish");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Đăng video");
   });
 });

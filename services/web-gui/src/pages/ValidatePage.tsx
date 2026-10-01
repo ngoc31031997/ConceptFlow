@@ -2,19 +2,18 @@ import { useContext, useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { ProgressTracker } from "../components/ProgressTracker";
 import { OutlineReview } from "../components/OutlineReview";
-import { OutlineActions } from "../components/OutlineActions";
 import { ErrorBanner } from "../components/ErrorBanner";
 import { ProductionSettingsPanel } from "../components/ProductionSettingsPanel";
 import { AppShell } from "../components/AppShell";
+import { WizardNav } from "../components/WizardNav";
 import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { statusToStep, projectPhase, projectPath, VALIDATE_STEPS, VALIDATE_SUBSTEP_NUMBERS } from "../utils/pipelineLabels";
-import { FLOW_REVIEW, FLOW_VALIDATE, flowTitle } from "../utils/flow";
+import { FLOW_CODE, FLOW_REVIEW, FLOW_VALIDATE, flowTitle } from "../utils/flow";
 import type { Project } from "../types";
-import glass from "../styles/glass.module.css";
 import styles from "./ValidatePage.module.css";
 
 // useOutlineReview cannot be called conditionally (Rules of Hooks) even
@@ -23,9 +22,18 @@ import styles from "./ValidatePage.module.css";
 // nothing renders the actions until isAwaitingReview && project are true.
 const EMPTY_PROJECT: Project = { project_id: "", status: "draft", voice_language: "vi", scenes: [] };
 
+/** Phần của màn Duyệt nội dung đang mở (?part=settings là phần 2). */
+type ReviewPart = "review" | "settings";
+
 /**
- * Bước 7 — "Validate" (và 8 — "Review", cùng màn): phần rẻ của saga, và điểm
- * dừng trước phần đắt.
+ * Bước 7 — "Kiểm tra tự động" (và 8 — "Duyệt nội dung", cùng màn): phần rẻ của
+ * saga, và điểm dừng trước phần đắt.
+ *
+ * Bước 8 chia hai phần, mỗi phần một việc, cùng URL (`?part=settings`) để nút
+ * Back của trình duyệt và tải lại trang giữ đúng phần đang xem: phần 1 duyệt
+ * lời thoại, phần 2 chọn cài đặt xuất video (chất lượng, font, phụ đề, nhạc
+ * nền) ngay trước nút "Duyệt và bắt đầu tạo video", vì bước Dựng hình và Ghép
+ * video đọc chúng và là phần bắt đầu tốn tiền.
  *
  * Màn này dừng ở đúng ranh giới mà saga vốn đã có: chạy
  * thử kịch bản (parse_script → validate_script, vài giây, không tốn gì) rồi
@@ -45,7 +53,8 @@ export function ValidatePage() {
   const navigate = useNavigate();
   // ?view=1: mở chỉ để XEM lại bước 7/8 của một dự án đã đi xa hơn — không đẩy
   // sang màn đang sở hữu dự án, và không có nút hành động nào.
-  const [search] = useSearchParams();
+  const [search, setSearch] = useSearchParams();
+  const part: ReviewPart = search.get("part") === "settings" ? "settings" : "review";
   const viewOnly = search.get("view") === "1";
   const viewStep = Number(search.get("step")) === FLOW_VALIDATE ? FLOW_VALIDATE : FLOW_REVIEW;
   const progressState = useSSE(projectId);
@@ -60,12 +69,11 @@ export function ValidatePage() {
   const isAwaitingReview = project?.status === "awaiting_review";
 
   const outline = useOutlineReview(project ?? EMPTY_PROJECT, refetch, () => {
-    // Server has already put this project_id back to draft (review_outline.go
-    // Reject). RESUME_EDITING keeps the script and project_id intact — only
-    // clears hasSubmitted — so ScriptStepPage does not wipe them via its own
-    // reset-on-mount.
+    // Server has already put this project back to draft (review_outline.go
+    // Reject). The script is what needs fixing, so reopen the Code step; the
+    // resume screen reloads the draft from the server first.
     dispatchDraft({ type: "RESUME_EDITING" });
-    navigate("/");
+    navigate(`/projects/${projectId}/resume?step=${FLOW_CODE}`);
   });
 
   // Duyệt xong là sang bước 5, nhưng KHÔNG điều hướng từ callback của nút
@@ -123,7 +131,7 @@ export function ValidatePage() {
     <div data-testid="validate-page">
       <AppShell
         currentStep={shownStep}
-        wide={isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)}
+        wide={(isAwaitingReview && part === "review") || (reviewingPast && viewStep === FLOW_REVIEW)}
         // The title names the step as the rail does; what is happening
         // at it moves to the subtitle.
         title={flowTitle(shownStep)}
@@ -135,50 +143,36 @@ export function ValidatePage() {
             : reviewingPast
             ? "Bước này đã chạy xong."
             : isAwaitingReview
-              ? "Bạn có thể chỉnh sửa thoải mái ở bước này. Sau khi duyệt, hệ thống bắt đầu tạo video."
+              ? part === "settings"
+                ? "Phần 2/2 · Chọn chất lượng, phụ đề và nhạc nền cho video, rồi duyệt."
+                : "Phần 1/2 · Đọc và sửa lời thoại. Chưa tốn chi phí nào."
               : "Đang kiểm tra kịch bản của bạn."
         }
       >
-        {(isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
+        {isAwaitingReview && project && part === "settings" ? (
+          <ProductionSettingsPanel
+            key={project.project_id}
+            project={project}
+            stages={["render", "merge"]}
+            hint="Dùng ở bước Dựng hình và Ghép video. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
+          />
+        ) : (isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
           /*
-            Two columns only while there is an outline to review: it can run
-            to dozens of lines, and stacking it above the tracker would push
-            status far down a wall of text. The tracker moves to a sticky
-            side column instead of disappearing.
-
-            OutlineActions (Duyệt/Từ chối) sits at the TOP of that side
-            column, above the tracker: at the bottom of the outline list, which
-            can run to dozens of lines, they would scroll out of view.
+            Two columns while there is an outline to review: it can run to
+            dozens of lines, and stacking it above the tracker would push
+            status far down a wall of text. The tracker moves to a sticky side
+            column instead of disappearing.
           */
           <div className={styles.layout}>
             <OutlineReview project={project} outline={outline} />
             <div className={styles.tracker}>
-              {/*
-                Render/merge settings are chosen here, not in step 2: only the
-                production steps read them, and this is the last stop before
-                anything costly runs. Above the approve button, which starts
-                the steps that consume them (docs/ux-ui-design-rules.md §1).
-              */}
-              {isAwaitingReview && (
-                <div style={{ marginBottom: "var(--space-sm)" }}>
-                  <ProductionSettingsPanel
-                    key={project.project_id}
-                    project={project}
-                    stages={["render", "merge"]}
-                    hint="Dùng ở bước Render và Merge. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
-                  />
-                </div>
-              )}
-              {isAwaitingReview && <OutlineActions outline={outline} />}
-              <div className={glass.mtSm}>
-                <ProgressTracker
-                  progressState={displayProgressState}
-                  steps={VALIDATE_STEPS}
-                  stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
-                  isFailed={isFailed}
-                  allDone={reviewingPast}
-                />
-              </div>
+              <ProgressTracker
+                progressState={displayProgressState}
+                steps={VALIDATE_STEPS}
+                stepNumbers={VALIDATE_SUBSTEP_NUMBERS}
+                isFailed={isFailed}
+                allDone={reviewingPast}
+              />
             </div>
           </div>
         ) : (
@@ -202,6 +196,36 @@ export function ValidatePage() {
           </>
         )}
       </AppShell>
+
+      {isAwaitingReview && project && !viewOnly && (
+        part === "review" ? (
+          <WizardNav
+            allowWhenLocked
+            hint="Đọc lại lời thoại, bấm vào một câu để sửa. Xong thì sang cài đặt xuất video."
+            onBack={() => void outline.reject()}
+            backLabel="Quay lại sửa script"
+            backDisabled={outline.busy}
+            backTestId="outline-reject"
+            onNext={() => setSearch({ part: "settings" })}
+            nextLabel="Tiếp: cài đặt xuất video"
+            nextDisabled={outline.busy || outline.editing !== null}
+            nextTestId="review-next"
+          />
+        ) : (
+          <WizardNav
+            allowWhenLocked
+            hint={outline.error ?? "Bấm duyệt là hệ thống bắt đầu tạo giọng đọc, dựng hình và ghép video."}
+            isBlocked={!!outline.error}
+            onBack={() => setSearch({})}
+            backLabel="Quay lại duyệt lời thoại"
+            backTestId="review-back"
+            onNext={() => void outline.approve()}
+            nextLabel="Duyệt và bắt đầu tạo video"
+            nextDisabled={outline.busy}
+            nextTestId="outline-approve"
+          />
+        )
+      )}
     </div>
   );
 }

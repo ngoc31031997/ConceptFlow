@@ -8,7 +8,7 @@ import { useRecentProject } from "../hooks/useRecentProject";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
 import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
-import { readOnlyReason } from "../utils/flow";
+import { FLOW_LABELS, phaseOf, readOnlyReason } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
 import { AccentPicker } from "./AccentPicker";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
@@ -28,13 +28,15 @@ interface AppShellProps {
   wide?: boolean;
   /** Page-specific action rendered at the right of the top bar. */
   headerAction?: ReactNode;
+  /** This screen previews `currentStep`, a step the video has not reached. */
+  preview?: boolean;
   children: ReactNode;
 }
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
   [styles.sideLink, isActive ? styles.sideLinkActive : ""].filter(Boolean).join(" ");
 
-export function AppShell({ currentStep, title, subtitle, wide, headerAction, children }: AppShellProps) {
+export function AppShell({ currentStep, title, subtitle, wide, headerAction, preview, children }: AppShellProps) {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   // Reset ngay khi bấm, không chỉ dựa vào router state: bấm khi đang ở "/" thì
@@ -51,13 +53,19 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
   const flow = useProjectFlow();
   const recent = useRecentProject(routeProjectId || draft.projectId);
   const recentName = recent ? recent.topic?.trim() || recent.project_id.slice(0, 8) : "";
-  const nav = useStepNav(currentStep);
+  // "Soạn nội dung · Hình ảnh": the phase and the step, not a bare "4/14".
+  const recentStep = recent?.flow_step ?? 0;
+  const recentPhase = phaseOf(recentStep);
+  const recentWhere = recentPhase ? ` · ${recentPhase.name} · ${FLOW_LABELS[recentStep - 1]}` : "";
+  const nav = useStepNav(currentStep, { preview });
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
   // Áp cho các màn soạn (1-6); màn 7-14 tự quản lý hành động của chúng.
   const readOnly = !!currentStep && currentStep <= 6 && nav.hasProject && !flow.editable;
-  // Menu dọc thứ hai chỉ có nghĩa khi đã có một project để đặt vào 14 bước.
-  const showRail = !!currentStep && nav.hasProject;
+  // Menu bước hiện trên mọi màn của luồng, kể cả bước 1 trước khi có project,
+  // để Creator thấy trước cả chặng đường.
+  const showRail = !!currentStep;
+  const currentPhase = currentStep ? phaseOf(currentStep) : null;
 
   const toggleRail = () => {
     setRailCollapsed((c) => {
@@ -97,7 +105,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
             >
               <span className={styles.resumeLabel}>
                 ▶ Tiếp tục{recent.run_state === "running" ? " · đang chạy" : ""}
-                {recent.flow_step ? ` · bước ${recent.flow_step}/14` : ""}
+                {recentWhere}
               </span>
               <span className={styles.resumeName}>{recentName}</span>
             </NavLink>
@@ -116,7 +124,8 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
       {showRail && currentStep && (
         <StepRail
           currentStep={currentStep}
-          title={projectName || flow.projectId.slice(0, 8)}
+          title={projectName || (nav.hasProject ? flow.projectId.slice(0, 8) : "Video mới")}
+          preview={preview}
           collapsed={railCollapsed}
           onToggle={toggleRail}
         />
@@ -143,6 +152,11 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
                   <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
                 )}
               </div>
+              {currentPhase && (
+                <span className={styles.phaseLine} data-testid="phase-line">
+                  {currentPhase.name} · Bước {currentStep}/{FLOW_LABELS.length}
+                </span>
+              )}
               <h1>{title}</h1>
           </div>
           <div className={styles.headerActions}>
@@ -156,7 +170,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, chi
           <div className={styles.heading}>
             <p>{subtitle}</p>
           </div>
-          {showRail && currentStep && <StatusStrip currentStep={currentStep} />}
+          {showRail && currentStep && nav.hasProject && <StatusStrip currentStep={currentStep} />}
           {readOnly && flow.status && (
             <p className={styles.readOnlyBanner} role="status" data-testid="read-only-banner">
               {readOnlyReason(flow.status)}

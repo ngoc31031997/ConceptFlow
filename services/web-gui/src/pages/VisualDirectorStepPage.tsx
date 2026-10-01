@@ -10,14 +10,15 @@ import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
+import { authoringHint } from "../utils/authoringHint";
 import styles from "./WizardSteps.module.css";
 import { FLOW_VISUAL, flowTitle } from "../utils/flow";
 
 /**
- * Bước 4 — Visual (Visual Director), the second authoring step (see
- * ScriptPipelineTabs): fetch the current template, fill it
- * with the previous tab's saved output, let the Creator copy it out and
- * paste the AI's storyboard back, then save it server-side and advance.
+ * Bước 4 — Hình ảnh (Visual Director), the second authoring step: the server
+ * fills the template with the saved outline; the Creator runs the AI or copies
+ * the prompt out and pastes the storyboard back, then it is saved server-side
+ * and the flow advances.
  */
 export function VisualDirectorStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -77,10 +78,6 @@ export function VisualDirectorStepPage() {
   }
 
   const storyboardIsEmpty = draft.authoringStoryboard.trim().length === 0;
-  // "Đã có storyboard" vào thẳng tab này để dán, không để sinh. Dàn ý
-  // ở 1a có thể trống hẳn trong trường hợp đó, và đấy là hợp lệ: storyboard là
-  // thứ duy nhất bước 6 (Code) cần đọc.
-  const hasOwnStoryboard = draft.scriptSource === "storyboard";
 
   async function handleContinue() {
     setSaving(true);
@@ -119,24 +116,21 @@ export function VisualDirectorStepPage() {
   // chưa cấu hình key phải quay về đường copy tay, chứ không mất cả hai.
   const aiMode = authoringMode === "ai" && llm?.enabled === true;
 
-  const hint = saveError
-    ? saveError
-    : storyboardIsEmpty
-      ? hasOwnStoryboard
-        ? "Dán storyboard của bạn để tiếp tục"
-        : "Dán storyboard từ AI để tiếp tục"
-      : `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`;
+  const hint =
+    saveError ??
+    authoringHint({
+      aiMode,
+      isEmpty: storyboardIsEmpty,
+      what: "storyboard",
+      ready: `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`,
+    });
 
   return (
     <div data-testid="visual-director-step-page">
       <AppShell
         currentStep={4}
         title={flowTitle(FLOW_VISUAL)}
-        subtitle={
-          hasOwnStoryboard
-            ? "Dán storyboard của bạn vào ô bên phải."
-            : "Dựng storyboard hình ảnh từ dàn ý."
-        }
+        subtitle="Dựng storyboard hình ảnh từ dàn ý."
         wide
       >
         <div className={styles.settingsRow}>
@@ -182,13 +176,11 @@ export function VisualDirectorStepPage() {
           )}
 
           <Card
-            title={hasOwnStoryboard ? "Storyboard của bạn" : aiMode ? "Storyboard" : "2. Dán kết quả"}
+            title={aiMode ? "Storyboard" : "2. Dán kết quả"}
             hint={
-              hasOwnStoryboard
-                ? "Dán storyboard vào đây, rồi bấm Tiếp tục."
-                : aiMode
-                  ? "Kết quả của AI hiện ở đây để bạn chỉnh sửa, rồi bấm Tiếp tục."
-                  : "Dán storyboard từ AI vào đây, rồi bấm Tiếp tục."
+              aiMode
+                ? "Kết quả của AI hiện ở đây để bạn chỉnh sửa, rồi bấm Tiếp tục."
+                : "Dán storyboard từ AI vào đây, rồi bấm Tiếp tục."
             }
           >
             <TextArea
@@ -208,8 +200,8 @@ export function VisualDirectorStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
-        onBack={() => navigate(hasOwnStoryboard ? "/create/script/settings" : "/create/script/outline")}
-        backLabel={hasOwnStoryboard ? "Quay lại cấu hình" : "Quay lại Dàn ý"}
+        onBack={() => navigate("/create/script/outline")}
+        backLabel="Quay lại Kịch bản"
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}
         nextDisabled={storyboardIsEmpty || saving}

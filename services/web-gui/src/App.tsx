@@ -23,6 +23,7 @@ import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
+import { StepPreviewPage } from "./pages/StepPreviewPage";
 
 /**
  * The wizard draft lives only in memory (see ProjectDraftContext), so a page
@@ -64,6 +65,8 @@ export function App() {
             {/* Remotion only: the video's drawings, between Visual and Code. */}
             <Route path="/create/script/illustrations" element={<IllustrationsStepPage />} />
             <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
+            {/* Read-only preview of a step not reached yet (or not used). */}
+            <Route path="/create/preview/:step" element={<StepPreviewPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
             <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />
 
@@ -77,6 +80,7 @@ export function App() {
             {/* Bước 4 (chạy thử + duyệt dàn ý) và bước 5 (sản xuất)
                 là hai màn riêng. Mỗi trang tự đẩy sang trang kia khi trạng
                 thái project không thuộc về nó (projectPath). */}
+            <Route path="/projects/:id/preview/:step" element={<StepPreviewPage />} />
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />
             <Route path="/projects/:id/validate" element={<ValidatePage />} />
             <Route path="/projects/:id/render" element={<RenderPage />} />

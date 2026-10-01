@@ -13,11 +13,8 @@ import styles from "./WizardSteps.module.css";
 import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
 
 /**
- * Bước Hình minh hoạ, giữa Visual và Code, chỉ cho video Remotion.
- *
- * Trước đây việc lập danh sách và vẽ hình chạy ngầm ở đầu bước Code, nên thẻ
- * "Code" đứng vài phút mà chưa viết dòng code nào. Giờ nó là một tab riêng:
- * chạy bằng AI thì server lập danh sách từ storyboard và vẽ hình còn thiếu
+ * Bước Hình minh hoạ, giữa Hình ảnh và Code, chỉ cho video Remotion. Chạy
+ * bằng AI thì server lập danh sách từ storyboard và vẽ hình còn thiếu
  * (nhiều hình cùng lúc, mỗi hình một thanh tiến độ), Creator duyệt / sửa / bỏ
  * qua / xoá ngay tại đây, rồi mới sang Code.
  *
@@ -57,7 +54,7 @@ export function IllustrationsStepPage() {
 
   const hasStoryboard = draft.authoringStoryboard.trim().length > 0;
   const hint = !hasStoryboard
-    ? "Cần hoàn thành bước Visual trước."
+    ? "Cần hoàn thành bước Hình ảnh trước."
     : !summary || summary.total === 0
       ? "Chưa có danh sách hình — chạy bằng AI hoặc lập danh sách từ storyboard."
       : summary.ready === summary.total
@@ -82,7 +79,7 @@ export function IllustrationsStepPage() {
             steps={["illustrations"]}
             what="hình minh hoạ"
             runDisabled={!hasStoryboard}
-            runDisabledReason="Cần hoàn thành bước Visual trước."
+            runDisabledReason="Cần hoàn thành bước Hình ảnh trước."
             onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS[step])}
           />
         </div>
@@ -97,7 +94,7 @@ export function IllustrationsStepPage() {
       <WizardNav
         hint={hint}
         onBack={() => navigate(AUTHORING_STEP_PATHS.storyboard)}
-        backLabel="Quay lại Visual"
+        backLabel="Quay lại Hình ảnh"
         onNext={() => navigate(AUTHORING_STEP_PATHS.code)}
         nextLabel="Sang bước Code"
         nextDisabled={!hasStoryboard}
