@@ -29,3 +29,6 @@ media/
 # graphify code knowledge graph: local only, rebuilt by `make graph` and the
 # graphify git hooks (docs/agentic/graphify.md)
 graphify-out/
+
+# Reference videos the Creator keeps locally to compare output against
+example/

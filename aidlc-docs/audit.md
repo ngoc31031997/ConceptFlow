@@ -2690,3 +2690,39 @@ giai đoạn ở dự án thử nghiêm nên ko cần quan tâm quá nhiều đ�
 **Context**: CONSTRUCTION — CR-059, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-060 — Đưa video đầu ra tiến gần hai video mẫu trong `example/` (phân tích, chờ trả lời câu hỏi)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "trong thư mục example là 2 video (1 dài 1 ngắn) tôi muốn huớng đến khi làm dự án này. bạn có thể xem có cách nào để dự án hiện tại cho ra kết quả như thế không"
+**AI Response**: Phân tích hai video mẫu (dài 9:05 16:9; ngắn 58 s dựng dọc 9:16, không phụ đề đốt, chữ động từ khoá) và so với hai video mới nhất hệ thống render. Khoảng cách nằm ở: luật style [S1] cấm gradient/glow/blur; không có khái niệm cảnh/môi trường (Backdrop chỉ màu phẳng); chuyển động và máy quay quá ít; short cắt từ 16:9 + nền mờ thay vì dựng dọc. Nhịp cắt không phải chỗ thiếu. Đề xuất ba hướng (A nâng cấp trong kiến trúc hiện tại — đề xuất; B thêm model sinh ảnh nền; C nhập tài sản làm tay) và 5 câu hỏi cần chốt (hướng, đổi luật S1, cách làm short, phụ đề video dài, phạm vi CR). Nói rõ giới hạn: không đạt độ chi tiết tranh vẽ tay của mẫu bằng SVG do AI viết.
+**Impact Assessment**: dự kiến authoring-service (prompt, luật style), rendering (kit Remotion, bộ kiểm style); đợt short dọc sẽ đụng video_format, canvas Remotion, có thể hợp đồng render (cần ADR). Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-060-reference-video-style-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION/DESIGN — CR-060, chờ Creator trả lời câu hỏi.
+
+---
+
+## CR-060 — Trả lời câu hỏi vòng 1, thiết kế đủ ba đợt (chờ duyệt)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "1. A
+2. có chứ
+3. chọn a
+4. bỏ 
+làm luôn ba đợt
+bỏ example vào gitignore"
+**AI Response**: Chốt hướng A; nới [S1]; short dựng dọc riêng; video dài không đốt phụ đề; cả ba đợt trong CR-060. Viết thiết kế chi tiết: đợt 1 (luật style v2 cho gradient/blur qua `useSvgId`, kit `Scene`/`Camera`/`Glow`/`LightRays`/`Vignette`, Đạo diễn thêm `setting` mỗi cảnh, Kỹ sư dùng `Scene` + `Camera`, L14 40%, L15 không đứng yên quá 2 s, probe bỏ qua lớp nền); đợt 2 (`kind: backdrop` trong thư viện hình, 6 nền dựng sẵn, lập danh sách/vẽ/duyệt nền ở bước Hình minh hoạ, bước Code dùng nền); đợt 3 (khung theo chế độ đầu ra, `short` = dựng 1080×1920 từ đầu, format `vertical_short_60s`, `frame` qua hợp đồng llm-service/rendering, bỏ intro/outro 16:9 cho short, nút "Làm bản short dọc" ở màn Kết quả, bỏ "Cả hai" khỏi bộ chọn, ADR-0031). Thêm `example/` vào `.gitignore`. Hỏi thêm Q6: đường cắt clip cũ — đề xuất tách gỡ sang CR-061.
+**Impact Assessment**: rendering, authoring-service (prompt, luật style, cột `kind`, format, khung), llm-service (hợp đồng v2 thêm `frame`, storyboard `setting`), orchestrator (format, bỏ intro/outro cho short), web-gui; video-assembly chỉ kiểm. Migration: thêm cột `kind` có mặc định. Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-060-reference-video-style-design.md`, `aidlc-docs/audit.md`, `.gitignore`.
+**Context**: INCEPTION/DESIGN — CR-060, chờ Creator duyệt thiết kế và trả lời Q6.
+
+---
+
+## CR-060 — Duyệt thiết kế (Q6: tách gỡ cắt clip sang CR-061)
+**Timestamp**: 2026-10-01T00:00:00Z
+**User Input**: "chọn (a) Mình đề xuất: gỡ nó trong một CR riêng (CR-061) làm ngay sau. Việc gỡ đổi luồng 14 bước của server nên cần review riêng. Giữa hai CR, đoạn code này vẫn còn nhưng không chạy.
+(b) Gỡ luôn trong CR-060."
+**AI Response**: Hiểu là chọn (a) (câu mở đầu "chọn (a)"; dòng (b) chép kèm). Ghi Q6 vào thiết kế, coi thiết kế ba đợt là đã duyệt. Commit thiết kế, chuyển sang `/code`. Gỡ đường cắt clip để CR-061.
+**Impact Assessment**: như mục thiết kế; CR-061 (gỡ cắt clip, đổi luồng 14 bước) theo sau.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-060-reference-video-style-design.md`, `aidlc-docs/audit.md`, `.gitignore`.
+**Context**: CONSTRUCTION — CR-060, thiết kế đã duyệt.
+
+---
