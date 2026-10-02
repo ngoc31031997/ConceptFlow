@@ -157,21 +157,82 @@ _TAG = re.compile(r"<([A-Z][A-Za-z0-9]*)\b|backdrop=\{([A-Z][A-Za-z0-9]*)\}")
 _EXPORT = re.compile(r"^\s*export\s+(function|const|type|interface)\s+([A-Za-z_$][\w$]*)", re.M)
 
 
+_IMPORT_STMT = re.compile(r"^\s*import\s+(type\s+)?(.*?)\s+from\s+['\"]([^'\"]+)['\"]\s*;?\s*$")
+
+
+def _used_drawings(library: dict[str, str], shots: dict[str, str]) -> list[str]:
+    used = set()
+    for code in shots.values():
+        for tag, backdrop in _TAG.findall(code):
+            used.add(tag or backdrop)
+    return sorted(n for n in library if n in used)
+
+
+def _local_name(spec: str) -> str:
+    return spec.replace("type ", "").split(" as ")[-1].strip()
+
+
+def _clause_specs(clause: str) -> tuple[list[str], list[str]]:
+    """(default / namespace imports, named specifiers) of an import clause."""
+    bare, named = clause, ""
+    if "{" in clause:
+        bare = clause[:clause.index("{")]
+        named = clause[clause.index("{") + 1:clause.rindex("}")]
+    return ([s.strip() for s in bare.split(",") if s.strip()],
+            [s.strip() for s in named.split(",") if s.strip()])
+
+
+def head_with_library_imports(head: str, library: dict[str, str], shots: dict[str, str]) -> str:
+    """The frame's import lines plus every name a pasted drawing imports that
+    the frame does not, since a drawing's own import lines cannot stay inside
+    its namespace. A name the frame already imports is not imported twice; a
+    new name joins the frame's line for the same module, or a new line."""
+    lines = head.rstrip("\n").split("\n")
+    have: set[str] = set()
+    for line in lines:
+        m = _IMPORT_STMT.match(line)
+        if m:
+            bare, named = _clause_specs(m.group(2))
+            have.update(_local_name(s.removeprefix("* as ")) for s in bare + named)
+    for name in _used_drawings(library, shots):
+        for stmt in _IMPORT_LINE.findall(library[name]):
+            stmt = " ".join(stmt.split())
+            m = _IMPORT_STMT.match(stmt)
+            if not m:
+                if stmt not in lines:
+                    lines.append(stmt)
+                continue
+            is_type, module = bool(m.group(1)), m.group(3)
+            bare, named = _clause_specs(m.group(2))
+            for spec in bare:
+                if _local_name(spec.removeprefix("* as ")) not in have:
+                    have.add(_local_name(spec.removeprefix("* as ")))
+                    lines.append(f"import {'type ' if is_type else ''}{spec} from '{module}';")
+            prefix, suffix = ("import type {" if is_type else "import {"), f"}} from '{module}';"
+            for spec in named:
+                if _local_name(spec) in have:
+                    continue
+                have.add(_local_name(spec))
+                at = next((i for i, l in enumerate(lines) if l.startswith(prefix) and l.endswith(suffix)), None)
+                if at is None:
+                    lines.append(f"{prefix}{spec}{suffix}")
+                else:
+                    lines[at] = lines[at][:-len(suffix)] + f", {spec}" + suffix
+    return "\n".join(lines) + "\n"
+
+
 def library_block(library: dict[str, str], shots: dict[str, str]) -> str:
     """The library drawings the shots actually use, pasted into the
-    script so it renders without any file beside it. Their imports are the
-    frame's own (react, remotion, the illustration kit), so they are dropped.
+    script so it renders without any file beside it. Their import lines are
+    dropped here; `head_with_library_imports` carries what they import into
+    the frame's own import lines.
 
     Each drawing is written as a self-contained module, free to name its own
     top-level helpers (`LAND`, `Gear`, ...), so it is pasted inside its own
     namespace: two drawings using the same helper name cannot clash. Only
     the names it exports are lifted into the script, as before."""
-    used = set()
-    for code in shots.values():
-        for tag, backdrop in _TAG.findall(code):
-            used.add(tag or backdrop)
     blocks = []
-    for name in sorted(n for n in library if n in used):
+    for name in _used_drawings(library, shots):
         code = _IMPORT_LINE.sub("", library[name]).strip("\n")
         scope = f"Library_{name}"
         lifted = [
@@ -198,7 +259,8 @@ def merge_remotion(
 
     layout = layout.strip()
     palette = remotion_frame_text(sb)["palette"]
-    parts: list[str] = [_REMOTION_HEAD, palette, "", layout, ""]
+    head = head_with_library_imports(_REMOTION_HEAD, library or {}, shots)
+    parts: list[str] = [head, palette, "", layout, ""]
     # Derive the layout's line range from the text actually emitted, not from
     # arithmetic on the pieces.
     first = "\n".join(parts[:3]).count("\n") + 2

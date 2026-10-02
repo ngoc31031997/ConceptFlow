@@ -2810,3 +2810,29 @@ C C1 xoá hẳn"
 **Context**: CONSTRUCTION — CR-061, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## Fix — Bản vẽ thư viện mất import khi dán vào script
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "kiểm tra Liệu còn người có thật sự cô đơn trong vũ trụ rộng lớn này? 257acc58 dự này đang bị lỗi gì yậy", rồi "sửa khi khi merge import trùng thì chỉ bỏ 1 bên chứ sao lại bỏ 2 bên".
+**AI Response**:
+- **Triệu chứng**: project 257acc58 dừng ở `failed_at_render_scenes`, Remotion báo `ReferenceError: random is not defined` trong `NightRidgeBackdrop`; bước code đã báo `TS2304: Cannot find name 'random'`.
+- **Nguyên nhân**: `library_block` (`services/llm-service/app/pipeline/merger.py`) xoá mọi dòng import của bản vẽ thư viện khi dán vào namespace, coi như khung script đã import đủ; nhưng `_REMOTION_HEAD` không có `random` của remotion, mà `NightRidgeBackdrop` và `CityPlanetBackdrop` import nó (prompt vẽ nền cho phép).
+- **Sửa**: thêm `head_with_library_imports`: tên bản vẽ import mà khung đã có thì bỏ, tên chưa có thì gộp vào dòng import cùng module của khung (hoặc thêm dòng mới); `merge_remotion` dùng khung đã gộp. Không đổi prompt.
+- **Test**: 2 test mới trong `tests/test_backdrops.py`; llm-service 155 pass, 1 skip (chạy trong container python:3.12-slim). Chưa chạy được test mới trên code cũ để chứng minh nó fail (lệnh bị từ chối).
+- **Rebuild**: llm-service healthy (code từ `fix/library-random-import`).
+- **Kiểm trực tiếp**: chạy hàm gộp trong llm-service mới với code thật của 2 bản vẽ → dòng import remotion có `random`, không tên nào trùng. Chưa chạy lại bước code/render của project 257acc58.
+**Impact Assessment**: chỉ llm-service; không đổi contract, DB hay prompt.
+**Artifacts Affected**: `services/llm-service/app/pipeline/merger.py`, `services/llm-service/tests/test_backdrops.py`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — fix, chờ Creator duyệt rồi `/deliver`.
+
+---
+
+## Fix — Sửa script đã lưu của project 257acc58
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "sửa lại phâân code đó cho dư án 257acc58 luôn để tôi chạy lại render dc ko"
+**AI Response**: Sao lưu script (giống hệt nhau ở `orchestrator.projects.script_content` và `authoring.project_authoring.code_content`) vào scratchpad, rồi thêm `random` vào dòng import remotion ở cả hai. Kiểm tra `/v1/check/remotion`: không còn lỗi biên dịch; còn 29 cảnh báo bố cục `safe_area` (bố cục, có sẵn từ trước).
+**Impact Assessment**: dữ liệu một project; không đổi code.
+**Artifacts Affected**: 2 hàng DB của project 257acc58, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — fix, chờ Creator chạy lại render.
+
+---

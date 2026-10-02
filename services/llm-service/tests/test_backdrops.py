@@ -39,3 +39,34 @@ def test_a_library_backdrop_used_by_a_scene_is_pasted_into_the_script():
     assert "// Hình thư viện: OrchardBackdrop\nnamespace Library_OrchardBackdrop {\nexport function OrchardBackdrop()" in code
     assert "const OrchardBackdrop = Library_OrchardBackdrop.OrchardBackdrop;" in code
     assert "Unused" not in code
+
+
+def _import_lines(code: str) -> list[str]:
+    return [line for line in code.splitlines() if line.startswith("import ")]
+
+
+def test_a_pasted_drawing_brings_the_imports_the_frame_lacks_without_duplicates():
+    sb = sbm.parse(json.dumps({"hero": "h", "palette": [{"role": "a", "hex": "#000000"}],
+                               "scenes": [{"id": "s", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}]}))
+    shot = {"1.1": "function Shot1_1({duration}: ShotProps) {\n"
+                   "  return <Scene duration={duration} backdrop={StarBackdrop} />;\n}"}
+    library = {"StarBackdrop": "import React from 'react';\n"
+                               "import {useVideoConfig, random} from 'remotion';\n"
+                               "import {\n  shadeOf,\n  useSvgId,\n} from './conceptflow-mini/illustration';\n"
+                               "import {useLayerBox} from './conceptflow-mini/scene';\n"
+                               "export function StarBackdrop() {\n  return random('star') > 2 ? <g /> : null;\n}\n"}
+    imports = _import_lines(merger.merge_remotion(sb, "const LAYOUT = {};", shot, library=library).code)
+    remotion = [line for line in imports if line.endswith("from 'remotion';")]
+    assert len(remotion) == 1
+    assert remotion[0].endswith(", useVideoConfig, random} from 'remotion';")
+    assert remotion[0].count("useVideoConfig") == 1
+    # Every other line is the frame's own: nothing the frame imports is imported twice.
+    assert [l for l in imports if l not in remotion] == \
+        [l for l in merger._REMOTION_HEAD.strip().split("\n") if not l.endswith("from 'remotion';")]
+
+
+def test_a_drawing_import_from_a_module_the_frame_lacks_gets_its_own_line():
+    head = "import React from 'react';\n"
+    library = {"Clock": "import {clsx} from 'clsx';\nimport Lottie from 'lottie';\nexport function Clock() {}\n"}
+    out = merger.head_with_library_imports(head, library, {"1.1": "<Clock />"})
+    assert out == "import React from 'react';\nimport {clsx} from 'clsx';\nimport Lottie from 'lottie';\n"
