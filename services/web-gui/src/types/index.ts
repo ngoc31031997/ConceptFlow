@@ -15,8 +15,8 @@ export interface RenderInput {
   video_font?: string;
   video_format_id?: string;
   background_music_volume?: number;
-  /** "long" | "short" | "both" — empty means "long". */
-  video_output_mode?: "long" | "short" | "both";
+  /** "long" | "short" — empty means "long". */
+  video_output_mode?: "long" | "short";
   /** Links this project to another covering the same topic. */
   companion_project_id?: string;
   /**
@@ -72,7 +72,7 @@ export interface Project {
   wizard_step?: number;
   /** Màn wizard mở lần cuối trên draft; "" / vắng mặt nếu chưa ghi. Không còn dùng: vị trí lấy từ flow_step. */
   wizard_route?: string;
-  /** Vị trí trong flow 14 bước (server suy ra từ trạng thái + nội dung đã có). */
+  /** Vị trí trong flow 13 bước (server suy ra từ trạng thái + nội dung đã có). */
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   /** Project mà bản này được tạo từ đó (fork); vắng mặt nếu không phải bản fork. */
@@ -115,22 +115,10 @@ export interface Project {
   /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
   video_font?: string;
   video_format_id?: string;
-  /** "long" | "short" | "both" — empty means "long". */
-  video_output_mode?: "long" | "short" | "both";
-  /** Kết quả generate_clips, nếu saga đã chạy tới bước đó. */
-  clips?: Clip[];
+  /** "long" | "short" — empty means "long". */
+  video_output_mode?: "long" | "short";
   /** Id của project cùng chủ đề (bản dài/bản ngắn kia), nếu có. */
   companion_project_id?: string;
-}
-
-/** Một clip dọc Shorts/TikTok cắt từ video 16:9 đã render. */
-export interface Clip {
-  name: string;
-  preset: "short" | "long";
-  status: "ok" | "error";
-  output_path?: string;
-  duration_seconds?: number;
-  error_message?: string;
 }
 
 /** Một beat lượt dry quan sát được, gắn vào câu lời thoại mở đầu nó. */
@@ -156,9 +144,6 @@ export interface ProgressMessage {
   render_percent?: number;
   /** 0-100, assemble_video: ffmpeg's own -progress position over the target length. */
   merge_percent?: number;
-  // generate_clips reports by clip cut.
-  clip_index?: number;
-  clip_total?: number;
   error_message?: string;
 }
 
@@ -219,7 +204,7 @@ export interface ProjectSummary {
   wizard_step?: number;
   /** Chủ đề (ý tưởng) — dùng làm tên project trong danh sách. */
   topic?: string;
-  /** Vị trí trong flow 14 bước và trạng thái chạy. */
+  /** Vị trí trong flow 13 bước và trạng thái chạy. */
   flow_step?: number;
   run_state?: "idle" | "running" | "failed" | "done" | "cancelled";
   forked_from?: string;

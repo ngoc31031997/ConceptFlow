@@ -69,5 +69,5 @@ SCENE_METHODS = frozenset({
     "focus", "restore_view", "pace",
     # Beat dựng sẵn
     "hook", "hook_card", "recap", "recap_card", "call_to_action",
-    "narrate", "beat", "chapter", "clip",
+    "narrate", "beat", "chapter",
 })

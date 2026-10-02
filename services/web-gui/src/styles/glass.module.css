@@ -210,12 +210,8 @@
 }
 
 /*
-  Disclosure toggle (UX review #5) — one "show more" affordance (chevron that
-  rotates open) shared by every collapsible section, replacing three
-  different patterns that had grown up independently (a custom chevron
-  button in ProjectInputPanel, a plain ghostBtn swapped for a card in
-  ResultPage's rerender/Shorts-companion boxes, and a native
-  <details>/<summary> in ShortScriptAssistant's prompt preview).
+  Disclosure toggle: one "show more" affordance (a chevron that rotates open)
+  shared by every collapsible section.
 */
 .discloseBtn {
   display: flex;

@@ -1,7 +1,7 @@
 import type { AuthoringStep } from "../api/client";
 
 /**
- * The 14-step production flow, as the Creator sees it. The server decides where
+ * The 13-step production flow, as the Creator sees it. The server decides where
  * a project stands (`flow_step` + `run_state` on GET /v1/projects/:id, derived
  * by domain.FlowStateFor); this file only names the steps, says which screen
  * shows each, and whether the inputs behind a screen may still be edited.
@@ -25,7 +25,6 @@ export const FLOW_LABELS = [
   "Giọng đọc",
   "Dựng hình",
   "Ghép video",
-  "Cắt short",
   "Kết quả",
   "Đăng video",
 ] as const;
@@ -43,8 +42,7 @@ export const FLOW_STEP_PURPOSE = [
   "Hệ thống tự tạo giọng đọc cho từng đoạn lời thoại.",
   "Hệ thống tự dựng hình từng cảnh.",
   "Hệ thống tự ghép hình, giọng đọc, phụ đề và nhạc nền thành video, rồi chấm chất lượng.",
-  "Hệ thống tự cắt các clip dọc cho Shorts/TikTok từ video dài.",
-  "Xem lại video đã xong, cắt thêm clip hoặc dựng lại với cấu hình khác.",
+  "Xem lại video đã xong hoặc dựng lại với cấu hình khác.",
   "Kết nối kênh YouTube, điền tiêu đề, mô tả và đăng video.",
 ] as const;
 
@@ -57,7 +55,7 @@ export const FLOW_CODE = 6;
 export const FLOW_VALIDATE = 7;
 export const FLOW_REVIEW = 8;
 export const FLOW_TTS = 9;
-export const FLOW_RESULT = 13;
+export const FLOW_RESULT = 12;
 
 /** The flow step of each authoring step the AI can run. */
 export const AUTHORING_STEP_FLOW: Record<AuthoringStep, number> = {
@@ -66,7 +64,7 @@ export const AUTHORING_STEP_FLOW: Record<AuthoringStep, number> = {
   illustrations: 5,
   code: 6,
 };
-export const FLOW_PUBLISH = 14;
+export const FLOW_PUBLISH = 13;
 
 /**
  * "Bước 4 — Hình ảnh": the one way a step is named to the Creator, on a
@@ -94,7 +92,7 @@ export type RunState = "idle" | "running" | "failed" | "done";
 /** Screen that shows a step of an existing project. `view` = opened only to look. */
 export function flowRoute(step: number, projectId: string, opts: { view?: boolean } = {}): string {
   // `step` tells a view-only screen which of its steps was asked for (validate
-  // and review share a screen; so do TTS/render/merge/split).
+  // and review share a screen; so do TTS/render/merge).
   const q = opts.view ? `?view=1&step=${step}` : "";
   if (step <= FLOW_CODE) return `/projects/${projectId}/resume?step=${step}&view=1`;
   if (step === FLOW_VALIDATE || step === FLOW_REVIEW) return `/projects/${projectId}/validate${q}`;
@@ -114,7 +112,7 @@ export function authoringRoute(step: number): string {
 }
 
 /**
- * The five phases the Creator sees, grouping the 14 server steps by boundary of
+ * The five phases the Creator sees, grouping the 13 server steps by boundary of
  * cost and editability: preparing, writing content, reviewing, producing (runs
  * on its own) and the finished video.
  */
@@ -122,12 +120,12 @@ export const FLOW_PHASES = [
   { name: "Chuẩn bị", steps: [1, 2] },
   { name: "Soạn nội dung", steps: [3, 4, 5, 6] },
   { name: "Duyệt", steps: [7, 8] },
-  { name: "Sản xuất", steps: [9, 10, 11, 12] },
-  { name: "Hoàn tất", steps: [13, 14] },
+  { name: "Sản xuất", steps: [9, 10, 11] },
+  { name: "Hoàn tất", steps: [12, 13] },
 ] as const;
 
 /** Steps a worker runs with nothing for the Creator to do. */
-export const AUTO_STEPS: ReadonlySet<number> = new Set([FLOW_VALIDATE, FLOW_TTS, FLOW_TTS + 1, FLOW_TTS + 2, FLOW_TTS + 3]);
+export const AUTO_STEPS: ReadonlySet<number> = new Set([FLOW_VALIDATE, FLOW_TTS, FLOW_TTS + 1, FLOW_TTS + 2]);
 
 /** A phase of the flow with its position (0-based) in FLOW_PHASES. */
 export interface FlowPhase {
@@ -149,17 +147,10 @@ export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled"
 /**
  * Trạng thái của bước `step` cho dự án ở (flowStep, runState). Bước trước bước
  * hiện tại là xong, bước hiện tại mang trạng thái chạy của nó, các bước sau
- * chưa tới. Bước cắt short chỉ chạy cho dự án "both" (video dài kèm clip cắt từ nó). Bước Hình
- * minh hoạ bị bỏ qua ("Không dùng") khi dự án không dùng Remotion.
+ * chưa tới. Bước Hình minh hoạ bị bỏ qua ("Không dùng") khi dự án không dùng
+ * Remotion.
  */
-export function stepStatus(
-  step: number,
-  flowStep: number,
-  runState: string | undefined,
-  outputMode?: string,
-  renderEngine?: string,
-): StepStatus {
-  if (step === 12 && outputMode !== "both") return "skipped";
+export function stepStatus(step: number, flowStep: number, runState: string | undefined, renderEngine?: string): StepStatus {
   if (step === FLOW_ILLUSTRATIONS && renderEngine !== undefined && renderEngine !== "remotion") return "skipped";
   if (!flowStep || step > flowStep) return "pending";
   if (step < flowStep) return "done";
@@ -177,11 +168,9 @@ export function stepStatus(
   }
 }
 
-/** Why a step marked "Không dùng" does not apply to this video. */
-export function skippedReason(step: number, outputMode?: string): string {
-  if (step === FLOW_ILLUSTRATIONS) return "Video dựng bằng Manim không có bước này; chỉ video Remotion mới có hình minh hoạ.";
-  if (outputMode === "short") return "Short dọc được dựng thẳng ở khung 9:16, không cần cắt clip.";
-  return "Video này chỉ làm bản dài, không cắt clip dọc.";
+/** Why a step marked "Không dùng" does not apply to this video: only Hình minh hoạ is ever skipped. */
+export function skippedReason(): string {
+  return "Video dựng bằng Manim không có bước này; chỉ video Remotion mới có hình minh hoạ.";
 }
 
 /**

@@ -7,7 +7,6 @@ import { PublishForm } from "../components/PublishForm";
 import { AppShell } from "../components/AppShell";
 import { useProject } from "../hooks/useProject";
 import { QCReportPanel } from "../components/QCReportPanel";
-import { ClipsPanel } from "../components/ClipsPanel";
 import {
   startPublishSaga,
   retryProject,
@@ -35,11 +34,6 @@ export function PublishPage() {
   const [error, setError] = useState<string | null>(null);
   const [thumbnailPath, setThumbnailPath] = useState<string | null>(null);
   const [channelId, setChannelId] = useState<string | null>(null);
-  // Collapsed by default only for "short" — a Creator who
-  // picked "chỉ video ngắn" is here for the clip, not the YouTube form. null
-  // means "not touched yet" so the default can depend on `project`, which is
-  // not loaded yet on the render that mounts this state.
-  const [youtubePublishOverride, setYoutubePublishOverride] = useState<boolean | null>(null);
   /*
     State lands a render behind the click, so two fast clicks can both read
     isSubmitting === false and fire two POSTs. The ref flips synchronously.
@@ -133,17 +127,6 @@ export function PublishPage() {
   const isPublishing = isSubmitting || project.status === "publishing";
   const hasPublishFailed = project.status === "failed_at_publish_video";
 
-  // "short" still renders the full long-form pipeline as
-  // clip source, but the Creator picked this project to only care
-  // about the vertical clip — the YouTube publish UI would just be clutter in
-  // front of the thing they actually want, so it collapses behind a toggle.
-  const outputMode = project.video_output_mode ?? "long";
-  const wantsClips = outputMode === "short" || outputMode === "both";
-  const showYoutubePublish = youtubePublishOverride ?? outputMode !== "short";
-  const clipsPanel = wantsClips && (
-    <ClipsPanel projectId={projectId} clips={project.clips ?? []} videoOutputMode={outputMode} />
-  );
-
   const errorBanner = error && (
     <p role="alert" className={glass.helperText}>
       {error}
@@ -182,7 +165,6 @@ export function PublishPage() {
                 <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} />
               </div>
             )}
-            {clipsPanel}
           </Card>
         ) : (
           /*
@@ -195,19 +177,10 @@ export function PublishPage() {
               {project.video_path && (
                 <VideoPlayer videoSrc={getProjectVideoUrl(projectId)} videoRef={videoRef} />
               )}
-              {clipsPanel}
             </div>
 
             <div className={styles.publishColumn}>
-              {outputMode === "short" && !showYoutubePublish ? (
-                <Button
-                  variant="ghost"
-                  onClick={() => setYoutubePublishOverride(true)}
-                  data-testid="result-show-youtube-publish"
-                >
-                  Cũng muốn đăng bản dài này lên YouTube?
-                </Button>
-              ) : isPublishing ? (
+              {isPublishing ? (
                 <div
                   className={`${glass.card} ${styles.publishStatus}`}
                   data-testid="result-publishing-status"

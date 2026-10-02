@@ -8,7 +8,7 @@ import { isAuthoringEditable } from "../utils/flow";
 const POLL_MS = 5000;
 
 /**
- * Where the project on screen stands in the 14-step flow, as the SERVER says.
+ * Where the project on screen stands in the 13-step flow, as the SERVER says.
  * One place fetches it so the step bar, the wizard's "next" bar and the
  * read-only banner cannot disagree; no page has to pass it around.
  *
@@ -20,7 +20,7 @@ export interface ProjectFlow {
   project: Project | null;
   projectId: string;
   status: string | undefined;
-  /** 1-14, or 0 when unknown. */
+  /** 1-13, or 0 when unknown. */
   flowStep: number;
   runState: Project["run_state"] | undefined;
   /** False once the server would refuse authoring edits (see isAuthoringEditable). */

@@ -4,7 +4,6 @@ const express = require('express');
 const multer = require('multer');
 const { proxyHandler } = require('../handlers/proxyHandler');
 const { videoHandler } = require('../handlers/videoHandler');
-const { clipHandler } = require('../handlers/clipHandler');
 const { deleteProjectHandler } = require('../handlers/deleteProjectHandler');
 const {
   thumbnailUploadHandler,
@@ -20,14 +19,10 @@ const musicUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize
  * `GET /v1/projects`, `GET /v1/projects/:id`, `GET /v1/voice-calibration` and
  * `POST /v1/projects/:id/retry` → Orchestrator Service.
  * `GET /v1/projects/:id/qc-report` → Orchestrator Service.
- * `POST/GET /v1/projects/:id/clips` → Orchestrator Service.
- * `GET /v1/projects/:id/clips/:name/:preset` streams one generated clip from the shared volume.
  * `GET /v1/projects/:id/video` streams the assembled video from the shared volume.
  * `POST /v1/projects/:id/suggest-metadata` drafts SEO title/description/tags via Ollama —
  * proxied through `orchestratorAiClient` (a longer timeout than the default
  * 30s, since local LLM generation can take up to ~2 minutes).
- * `POST /v1/short-script-suggestions` drafts a standalone Shorts/TikTok
- * script via Ollama — same `orchestratorAiClient`, no :id.
  * `POST /v1/projects/:id/thumbnail` (multipart, field "thumbnail", max 2MB,
  * jpeg/png) saves a manually-uploaded thumbnail to the shared volume;
  * `GET /v1/projects/:id/thumbnail` serves it back for preview.
@@ -82,9 +77,6 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/reject', proxyHandler(orchestratorClient, 'orchestrator'));
   router.post('/v1/projects/:id/narration', proxyHandler(orchestratorClient, 'orchestrator'));
   router.get('/v1/projects/:id/qc-report', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.post('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.get('/v1/projects/:id/clips', proxyHandler(orchestratorClient, 'orchestrator'));
-  router.get('/v1/projects/:id/clips/:name/:preset', clipHandler(orchestratorClient, sharedDir));
   // Step 1 — saves the Story Architect output a Creator pasted back
   // after the external-AI round trip.
   router.post('/v1/projects/:id/authoring/story', proxyHandler(authoring, 'authoring-service'));
@@ -129,14 +121,6 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   );
   router.post(
     '/v1/projects/:id/suggest-metadata',
-    proxyHandler(authoringAi, 'authoring-service'),
-  );
-  // Same longer-timeout client as suggest-metadata: drafting a
-  // whole script via the local model takes longer than a title/description.
-  // No :id in the path (unlike suggest-metadata) — a Creator can draft a
-  // short from a bare topic without an existing project.
-  router.post(
-    '/v1/short-script-suggestions',
     proxyHandler(authoringAi, 'authoring-service'),
   );
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));

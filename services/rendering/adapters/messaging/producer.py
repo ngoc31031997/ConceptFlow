@@ -34,7 +34,6 @@ def rendering_completed_envelope(
     wait_offsets: list[float],
     video_duration_seconds: float,
     layout_marks: list[dict] | None = None,
-    clip_marks: list[dict] | None = None,
 ) -> dict:
     """The `rendering_completed` event.
 
@@ -45,12 +44,6 @@ def rendering_completed_envelope(
     layout_marks: the on-screen geometry at each
     narration mark, which the Orchestrator stores and hands to `qc_video`.
     Best-effort upstream, so an empty list is a normal value, not an error.
-
-    clip_marks: the `with self.clip(...)` selections
-    the script made, one dict per clip
-    ({"kind","name","index","t_start","t_end"}). The Orchestrator merges these
-    with any GUI-entered clip requests before handing them to the
-    `generate_clips` saga step. Best-effort, same posture as layout_marks.
     """
     return build_envelope(
         saga_id,
@@ -61,7 +54,6 @@ def rendering_completed_envelope(
             "wait_offsets": wait_offsets,
             "video_duration_seconds": video_duration_seconds,
             "layout_marks": layout_marks or [],
-            "clip_marks": clip_marks or [],
         },
     )
 
@@ -80,7 +72,6 @@ def script_validated_envelope(
     beats: list[tuple[int, str]],
     chapters: list[tuple[int, str]],
     warnings: list[str],
-    clip_marks: list[dict] | None = None,
     layout_warnings: list[dict] | None = None,
     scene_class_name: str = "",
     engine: str = "manim",
@@ -91,12 +82,6 @@ def script_validated_envelope(
     và các bước phía sau không phải đổi cách đọc. Khác biệt nằm ở nguồn: danh
     sách này đến từ việc **chạy** script (thứ tự runtime), không phải từ việc
     quét comment (thứ tự dòng).
-
-    clip_marks: lượt dry đã tính được `with self.clip(...)`. Gửi kèm ở đây
-    (không đợi `rendering_completed`, tức SAU khi đã tốn TTS) để
-    Orchestrator/GUI cảnh báo ngay tại màn duyệt dàn ý khi một project chọn
-    `video_output_mode` short/both mà script không đánh dấu clip nào — cho
-    Creator cơ hội sửa script trước khi tốn gì.
     """
     return build_envelope(
         saga_id,
@@ -122,7 +107,6 @@ def script_validated_envelope(
             "chapters": [{"scene_index": i, "title": value} for i, value in chapters],
             # Cảnh báo không chặn Saga; Orchestrator chuyển tiếp để GUI hiện ra.
             "warnings": warnings,
-            "clip_marks": clip_marks or [],
             # Bug report (2026-09-12): chồng lấn hình ảnh phát hiện ở lượt dry
             # (ConceptFlowScene._check_overlaps) — không chặn Saga, cùng nguyên
             # tắc như `warnings` ở trên, chỉ tách field vì nguồn gốc khác

@@ -24,7 +24,6 @@ describe("CompanionProjectCard", () => {
         scenes: [],
         video_output_mode: "short",
         video_path: "/shared/proj-short/video/final.mp4",
-        clips: [{ name: "short", preset: "short", status: "ok", output_path: "x", duration_seconds: 40 }],
       }),
     }) as never;
 
@@ -36,8 +35,6 @@ describe("CompanionProjectCard", () => {
       "href",
       "/projects/proj-short/result",
     );
-    // A short is already vertical: there are no cut clips to list.
-    expect(screen.queryByTestId("clip-short-short")).toBeNull();
   });
 
   it("báo lỗi rõ ràng khi không tải được project liên kết", async () => {

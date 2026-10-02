@@ -2786,3 +2786,27 @@ C C1 xoá hẳn"
 **Context**: CONSTRUCTION — CR-061, thiết kế đã duyệt.
 
 ---
+
+## CR-061 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "bạn stash lại rồi merge main mới nhất về là được mà đúng ko?" (sau khi một phiên khác đổi nhánh làm commit thiết kế rơi vào `main` local; nhánh CR được fast-forward lên `main` 7388f8b, gồm cả fix 48b3225), rồi "tep tuc".
+**AI Response**:
+- **rendering**: gỡ `ConceptFlowScene.clip`, `narration.clip` + `open_clip`, `clip` khỏi `SCENE_METHODS`, `_read_clip_marks`, trường `clip_marks` (models, producer `rendering_completed`/`script_validated`, consumer); xoá test clip.
+- **video-assembly**: xoá `adapters/clips/`, `domain/clip_rules.py`, `GenerateClipsCommandHandler`, `clips_generated_envelope`, `publish_clip_progress`, `clip_output_path`; bỏ `intro_duration_seconds` khỏi `video_assembled` (vẫn dùng nội bộ cho `effective_lead_in`); purge không còn xoá thư mục `clips` (`_remove` chỉ còn xoá file).
+- **orchestrator**: luồng 13 bước (Kết quả 12, Đăng 13); bỏ trạng thái/bước `generate_clips`, `ModeBoth`, `WantsClips`, `ClipMarks/ClipRequests/Clips/IntroDurationSeconds/ClipResult`, `clip_rules.go`, route `/clips`, DTO clip và short-script thừa, `Save` khỏi port của router; `video_assembled`/`qc_completed` → `ready_to_publish`; `db.go`: migration `remove_clip_step_flow_numbers` (12→11, 13→12, 14→13 cho `flow_step`/`from_flow_step`), `remove_output_mode_both`, drop 4 cột.
+- **authoring-service**: bản sao domain cập nhật như orchestrator; gỡ `suggest_short_script` (use case, route, DTO, client, wiring), prompt `short_script` (role, seed, file, 6 mục golden); `PurgeLegacyPrompts` xoá mọi hàng của vai trò đã bỏ (`retiredPromptRoles`) + test chạy với Postgres thật.
+- **llm-service**: gỡ route/task/prompt short-script và `strip_code_fence` (không còn ai dùng); 2 test đường lỗi `/suggest-*` chuyển sang `/v1/suggest-metadata`.
+- **api-gateway**: xoá `clipHandler.js`, 3 route clip, route `/v1/short-script-suggestions`.
+- **web-gui**: luồng 13 bước (`flow.ts`, phases, AUTO_STEPS), `stepStatus`/`skippedReason` bỏ tham số output mode; RenderPage 3 việc; bỏ `ClipsPanel` ở Result/Publish/Companion; PublishPage hiện form YouTube cho short (B1); xoá `ClipsPanel`, `ShortScriptAssistant`, `getProjectClipUrl`, `suggestShortScript`, `Clip`, `clip_index/total`, mục prompt `short_script`; chú thích "14 bước" → "13 bước"; viết lại chú thích Disclosure/glass.
+- **Tài liệu**: ADR-0031 (đã gỡ), `shared-artifacts.md`, `README.md`, chú thích `docker-compose.yml`.
+- **Test**: rendering 349 pass/11 skip; video-assembly 164 pass; orchestrator `go test ./...` pass, vet/gofmt sạch; authoring-service `go test ./...` pass (kể cả test DB với Postgres tạm), vet/gofmt sạch; llm-service 154 pass; api-gateway 107 pass, eslint sạch; web-gui vitest 67 file/466 test pass, tsc sạch, eslint 0 lỗi; prettier: 27 file đã đụng đều đã lệch format sẵn trên main, không file nào lệch thêm. Ruff: file đã đụng sạch; lỗi E501/E741 có sẵn ở file khác (`check_server.py`, `check_script.py`, `merger.py` của fix 48b3225…).
+- **Migration thử trên Postgres tạm**: dữ liệu kiểu cũ (sự kiện 11–14, mode `both`, cột clip) → 12→11, 13→12, 14→13, `both`→`long`, 4 cột bị drop; chạy lần hai không đổi gì.
+- **Rebuild**: orchestrator, authoring-service, llm-service, rendering, video-assembly, api-gateway healthy; web-gui Up.
+- **Kiểm trực tiếp**: DB thật có 2 migration id mới, `project_events` không còn bước 13/14 (9 hàng 13 → 12), không còn 4 cột, 43 project đều `long`, 0 hàng prompt `short_script`; PATCH settings `both` → 400; GET `/clips`, `/clips/a/short`, POST `/v1/short-script-suggestions` → 404; project `ready_to_publish` ở `flow_step` 12; response không còn `clips`.
+- **Chưa kiểm**: nhãn màn Nhật ký của project đã tới Kết quả và giao diện web-gui trên trình duyệt — Docker daemon dừng giữa chừng (không do thay đổi này) nên bước kiểm cuối không chạy được.
+- **Lệch so với thiết kế**: (1) `POST /v1/sagas/render` với mode lạ (kể cả `both`) vẫn lặng lẽ về `long` như trước — chỉ PATCH settings trả 400; không đổi hành vi này vì nằm ngoài phạm vi. (2) Purge của video-assembly xoá thư mục `clips` đích danh (không phải cả thư mục project) — bỏ dòng đó. (3) Gỡ thêm `strip_code_fence` (llm-service), `Save` khỏi port router, DTO short-script thừa trong orchestrator, `SCENE_METHODS["clip"]` — đều chỉ phần đã gỡ dùng.
+**Impact Assessment**: 7 service; hợp đồng message/HTTP bỏ trường và route clip/short-script; migration DB orchestrator + xoá hàng prompt authoring; dữ liệu mất: không.
+**Artifacts Affected**: các file trên, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-061, chờ Creator duyệt rồi `/deliver`.
+
+---

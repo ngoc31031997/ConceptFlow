@@ -56,6 +56,15 @@ describe("PublishPage publish state", () => {
     expect(screen.queryByTestId("publish-form-submit-button")).not.toBeInTheDocument();
   });
 
+  it("shows the YouTube publish form for a vertical short, as for a long video", async () => {
+    global.fetch = mockProjectFetch({ status: "ready_to_publish", video_output_mode: "short" });
+
+    renderPublishPage();
+
+    await waitFor(() => expect(screen.getByTestId("publish-form-submit-button")).toBeInTheDocument());
+    expect(screen.queryByTestId("result-show-youtube-publish")).not.toBeInTheDocument();
+  });
+
   it("sends only one publish request when the button is clicked twice in a row", async () => {
     let publishCalls = 0;
     global.fetch = mockProjectFetch({ status: "ready_to_publish" }, () => {
@@ -97,7 +106,7 @@ describe("PublishPage publish state", () => {
 
     await waitFor(() => expect(screen.getByText("https://youtu.be/abc")).toBeInTheDocument());
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Đăng video");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Đăng video");
   });
 
   it("warns when the caption track was skipped for lacking scope", async () => {

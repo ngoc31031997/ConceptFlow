@@ -10,8 +10,6 @@ export interface ProgressState {
   animationIndex: number | null;
   renderPercent: number | null;
   mergePercent: number | null;
-  clipIndex: number | null;
-  clipTotal: number | null;
   status: "in_progress" | "completed" | "failed" | null;
   errorMessage: string | null;
 }
@@ -24,8 +22,6 @@ const initialState: ProgressState = {
   animationIndex: null,
   renderPercent: null,
   mergePercent: null,
-  clipIndex: null,
-  clipTotal: null,
   status: null,
   errorMessage: null,
 };
@@ -43,8 +39,6 @@ export function useSSE(projectId: string): ProgressState {
         animationIndex: msg.animation_index ?? null,
         renderPercent: msg.render_percent ?? null,
         mergePercent: msg.merge_percent ?? null,
-        clipIndex: msg.clip_index ?? null,
-        clipTotal: msg.clip_total ?? null,
         status: msg.status,
         errorMessage: msg.status === "failed" ? (msg.error_message ?? null) : null,
       });

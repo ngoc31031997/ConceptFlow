@@ -59,13 +59,6 @@ class MetadataBody(BaseModel):
     stream: bool = False  # emit `progress` events like /v1/chat
 
 
-class ShortScriptBody(BaseModel):
-    topic: str = ""
-    source_script_content: str = ""
-    language: str = "en"
-    stream: bool = False
-
-
 class FrameIn(BaseModel):
     """The frame the video is built on: 1920x1080 or 1080x1920."""
     width: int
@@ -274,15 +267,6 @@ def create_app(
         async def run(on_progress=None):
             out = await tasks.suggest_metadata(
                 providers.light, body.script_content, body.category_hint, body.language, on_progress)
-            return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
-
-        return await _suggestion(body.stream, run)
-
-    @app.post("/v1/suggest-short-script")
-    async def suggest_short_script(body: ShortScriptBody):
-        async def run(on_progress=None):
-            out = await tasks.suggest_short_script(
-                providers.light, body.topic, body.source_script_content, body.language, on_progress)
             return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
 
         return await _suggestion(body.stream, run)

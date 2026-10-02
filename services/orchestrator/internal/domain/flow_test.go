@@ -34,7 +34,6 @@ func TestFlowStateFor(t *testing.T) {
 		{"tts", StatusSynthesizingSpeech, 3, AuthoredContent{}, FlowState{FlowTTS, RunRunning}},
 		{"render failed", StatusFailedRenderScenes, 3, AuthoredContent{}, FlowState{FlowRender, RunFailed}},
 		{"qc is part of merge", StatusRunningQC, 3, AuthoredContent{}, FlowState{FlowMerge, RunRunning}},
-		{"clips", StatusGeneratingClips, 3, AuthoredContent{}, FlowState{FlowSplit, RunRunning}},
 		{"result", StatusReadyToPublish, 3, AuthoredContent{}, FlowState{FlowResult, RunIdle}},
 		{"published", StatusPublished, 3, AuthoredContent{}, FlowState{FlowPublish, RunDone}},
 	}
@@ -45,9 +44,29 @@ func TestFlowStateFor(t *testing.T) {
 	}
 }
 
+func TestResultAndPublishCloseTheThirteenStepFlow(t *testing.T) {
+	if FlowStepsTotal != 13 {
+		t.Fatalf("flow has %d steps, want 13", FlowStepsTotal)
+	}
+	if got := FlowStateFor(StatusReadyToPublish, 3, AuthoredContent{}); got != (FlowState{12, RunIdle}) {
+		t.Errorf("ready_to_publish: got %+v, want step 12 idle", got)
+	}
+	if got := FlowStateFor(StatusPublished, 3, AuthoredContent{}); got != (FlowState{13, RunDone}) {
+		t.Errorf("published: got %+v, want step 13 done", got)
+	}
+	if len(FlowStepLabel) != FlowStepsTotal {
+		t.Errorf("FlowStepLabel names %d steps, want one per step (%d)", len(FlowStepLabel), FlowStepsTotal)
+	}
+	for step := 1; step <= FlowStepsTotal; step++ {
+		if FlowStepLabel[step] == "" {
+			t.Errorf("flow step %d has no label", step)
+		}
+	}
+}
+
 func TestFlowStateCoversEveryFailedStatus(t *testing.T) {
 	steps := []StepName{StepParseScript, StepValidateScript, StepSynthesizeSpeech, StepRenderScenes,
-		StepAssembleVideo, StepQCVideo, StepGenerateClips, StepPublishVideo}
+		StepAssembleVideo, StepQCVideo, StepPublishVideo}
 	for _, s := range steps {
 		st := FlowStateFor(FailedStatusForStep(s), 3, AuthoredContent{})
 		if st.State != RunFailed {

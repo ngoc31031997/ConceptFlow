@@ -36,9 +36,8 @@ CREATE TABLE IF NOT EXISTS project_authoring (
 );
 CREATE INDEX IF NOT EXISTS project_authoring_topic_lang ON project_authoring (language);
 
--- One row per LLM call. project_id is nullable and has no FK:
--- suggest-short-script runs before any project exists, and deleting a project
--- must not erase the record of what it cost.
+-- One row per LLM call. project_id is nullable and has no FK: deleting a
+-- project must not erase the record of what it cost.
 CREATE TABLE IF NOT EXISTS llm_usage (
     id                BIGSERIAL PRIMARY KEY,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),

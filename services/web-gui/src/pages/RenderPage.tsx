@@ -21,22 +21,21 @@ const EDITABLE_AFTER_STOP: Record<string, ProductionStage[]> = {
   assemble_video: ["merge"],
 };
 
-/** Saga step → its number in the 14-step sidebar (TTS, Render, Merge + QC, Cắt short). */
+/** Saga step → its number in the 13-step sidebar (TTS, Render, Merge + QC). */
 const SAGA_FLOW_STEP: Record<string, number> = {
   synthesize_speech: FLOW_TTS,
   render_scenes: FLOW_TTS + 1,
   assemble_video: FLOW_TTS + 2,
   qc_video: FLOW_TTS + 2,
-  generate_clips: FLOW_TTS + 3,
 };
 
 /**
- * Bước 9–12 (Giọng đọc, Dựng hình, Ghép video, Cắt short): giai đoạn Sản xuất,
+ * Bước 9–11 (Giọng đọc, Dựng hình, Ghép video): giai đoạn Sản xuất,
  * phần đắt, chạy sau khi Creator duyệt ở bước 8.
  *
  * Không có nhánh nào dừng chờ người: mọi thứ từ lúc này tới `ready_to_publish`
  * đều tự chạy, nên trang cho thấy cả giai đoạn trong một tracker (đã xong gì,
- * đang chạy gì, còn gì). Cả bốn bước 9–12 trên menu bước đều mở màn này.
+ * đang chạy gì, còn gì). Cả ba bước 9–11 trên menu bước đều mở màn này.
  *
  * Lỗi ở đây khác hẳn lỗi ở bước 7. TTS/render/ghép hỏng thường vì hạ tầng —
  * hết quota, worker chết, hết đĩa — nên "Thử lại" là việc đúng, và không có
@@ -46,7 +45,7 @@ export function RenderPage() {
   const { id } = useParams<{ id: string }>();
   const projectId = id ?? "";
   const navigate = useNavigate();
-  // ?view=1&step=N: mở chỉ để XEM lại bước 9-12 của dự án đã chạy xong.
+  // ?view=1&step=N: mở chỉ để XEM lại bước 9-11 của dự án đã chạy xong.
   const [search] = useSearchParams();
   const viewOnly = search.get("view") === "1";
   const viewStep = Number(search.get("step")) || FLOW_TTS;
@@ -97,10 +96,7 @@ export function RenderPage() {
 
   const activeFlowStep = SAGA_FLOW_STEP[displayStep ?? ""] ?? FLOW_TTS;
   const shownFlowStep = viewOnly ? viewStep : activeFlowStep;
-  // The whole phase in one tracker; "Cắt short" only for a video that has
-  // vertical clips (empty output mode means "long").
-  const longOnly = (project?.video_output_mode || "long") === "long";
-  const shownSteps = PROCESS_STEPS.filter((s) => s !== "generate_clips" || !longOnly);
+  // The whole phase in one tracker.
   // QC runs inside "Ghép video" and has no row of its own.
   const trackerState =
     displayProgressState.currentStep === "qc_video"
@@ -168,7 +164,7 @@ export function RenderPage() {
         )}
         <ProgressTracker
           progressState={trackerState}
-          steps={shownSteps}
+          steps={PROCESS_STEPS}
           stepNumbers={SAGA_FLOW_STEP}
           isFailed={isShownActive && isFailed}
           allDone={reviewingPast}

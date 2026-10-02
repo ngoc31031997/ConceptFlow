@@ -69,7 +69,7 @@ function phaseIndex(step: number): number {
 /**
  * Menu dọc thứ hai — lớp nằm cạnh menu chính (Tạo video / Danh sách / Nhật ký),
  * xếp chồng lên nó thay vì trộn vào cùng một danh sách. Menu chính nói "đang ở
- * đâu trong ứng dụng"; lớp này nói "video này đang ở đâu trong 14 bước", từ
+ * đâu trong ứng dụng"; lớp này nói "video này đang ở đâu trong 13 bước", từ
  * bước 1 (trước khi có project) tới lúc đăng.
  *
  * Đầu menu là tên video, giai đoạn và bước hiện tại, số bước đã xong và thanh

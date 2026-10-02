@@ -54,7 +54,7 @@ export function StepPreviewPage() {
         <p className={styles.notice} role="status" data-testid="step-preview-notice">
           {skipped ? (
             <>
-              <b>Không dùng.</b> {skippedReason(step, flow.project?.video_output_mode)}
+              <b>Không dùng.</b> {skippedReason()}
             </>
           ) : (
             <>

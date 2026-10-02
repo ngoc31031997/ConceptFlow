@@ -38,19 +38,19 @@ describe("StepRail — second-layer vertical menu", () => {
     window.localStorage.clear();
   });
 
-  it("lists the 14 steps grouped in five phases, each with its own state", async () => {
+  it("lists the 13 steps grouped in five phases, each with its own state", async () => {
     renderRail(rendering);
     await openAllPhases();
 
-    for (let i = 1; i <= 14; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    for (let i = 1; i <= 13; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("rail-step-14")).not.toBeInTheDocument();
     const rail = within(screen.getByTestId("step-rail"));
     for (const phase of ["Chuẩn bị", "Soạn nội dung", "Duyệt", "Sản xuất", "Hoàn tất"]) expect(rail.getByText(phase)).toBeInTheDocument();
 
     expect(screen.getByTestId("rail-step-3")).toHaveAttribute("data-status", "done");
     expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "running");
     expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "pending");
-    // No vertical clips for this project: the split step is marked unused.
-    expect(screen.getByTestId("rail-step-12")).toHaveAttribute("data-status", "skipped");
+    expect(screen.getByTestId("rail-step-12")).toHaveAttribute("data-status", "pending");
   });
 
   it("opens only the phase of the step on screen; the others open and close on click", async () => {
@@ -80,10 +80,10 @@ describe("StepRail — second-layer vertical menu", () => {
   it("tags the steps a worker runs on its own as automatic", async () => {
     renderRail(rendering);
     await openAllPhases();
-    for (const step of [7, 9, 10, 11, 12]) {
+    for (const step of [7, 9, 10, 11]) {
       expect(screen.getByTestId(`rail-auto-${step}`)).toHaveTextContent("Tự động");
     }
-    for (const step of [1, 2, 3, 4, 5, 6, 8, 13, 14]) {
+    for (const step of [1, 2, 3, 4, 5, 6, 8, 12, 13]) {
       expect(screen.queryByTestId(`rail-auto-${step}`)).not.toBeInTheDocument();
     }
   });
@@ -94,7 +94,7 @@ describe("StepRail — second-layer vertical menu", () => {
     for (const step of [2, 9, 10]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toHaveAttribute("data-reached", "true");
     }
-    for (const step of [11, 12, 14]) {
+    for (const step of [11, 12, 13]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toHaveAttribute("data-reached", "false");
       expect(screen.getByTestId(`rail-step-${step}`)).not.toBeDisabled();
     }

@@ -1,18 +1,18 @@
-"""Progress publisher for assemble_video/generate_clips.
+"""Progress publisher for assemble_video.
 
 Mirrors services/rendering/adapters/messaging/progress.py and
-services/tts/adapters/messaging/progress.py: both steps here run one or more
+services/tts/adapters/messaging/progress.py: assembly runs one or more
 blocking ffmpeg subprocesses in a worker thread (asyncio.to_thread), long
-enough that silence between the "assembling_video"/"generating_clips" status
-and the final event reads as a hang.
+enough that silence between the "assembling_video" status and the final
+event reads as a hang.
 
 Published to `progress.fanout` (ADR-0017), fire-and-forget and deliberately
 NOT routed through the Outbox — progress is UX-only, never part of the
 durable, exactly-once state Outbox/Inbox exist to protect
 (messaging-design.md).
 
-publish_merge_progress/publish_clip_progress are called from a worker thread
-(the assembler/clip loop runs via asyncio.to_thread), so they schedule the
+publish_merge_progress is called from a worker thread (the assembler runs
+via asyncio.to_thread), so it schedules the
 actual publish onto the event loop with run_coroutine_threadsafe rather than
 awaiting directly — there is no running loop in that thread to await on.
 """
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 PROGRESS_EXCHANGE = "progress.fanout"
 ASSEMBLE_VIDEO_STEP = "assemble_video"
-GENERATE_CLIPS_STEP = "generate_clips"
 
 
 class ProgressPublisher:
@@ -46,18 +45,6 @@ class ProgressPublisher:
                 "step": ASSEMBLE_VIDEO_STEP,
                 "status": "in_progress",
                 "merge_percent": percent,
-            }
-        )
-
-    def publish_clip_progress(self, project_id: str, clip_index: int, clip_total: int) -> None:
-        """One event per finished (request, preset) clip cut."""
-        self._schedule(
-            {
-                "project_id": project_id,
-                "step": GENERATE_CLIPS_STEP,
-                "status": "in_progress",
-                "clip_index": clip_index,
-                "clip_total": clip_total,
             }
         )
 

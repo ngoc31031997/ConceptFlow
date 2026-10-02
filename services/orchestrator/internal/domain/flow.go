@@ -1,6 +1,6 @@
 package domain
 
-// The 14-step production flow the Creator sees. It is derived from the saga
+// The 13-step production flow the Creator sees. It is derived from the saga
 // status plus what the draft already holds, never stored: one function decides
 // where a project is, so the wizard, the project list and the event log cannot
 // disagree.
@@ -19,10 +19,9 @@ const (
 	FlowTTS           = 9  // TTS
 	FlowRender        = 10 // Render
 	FlowMerge         = 11 // Merge (+ QC)
-	FlowSplit         = 12 // Cắt short
-	FlowResult        = 13 // Kết quả
-	FlowPublish       = 14 // Publish
-	FlowStepsTotal    = 14
+	FlowResult        = 12 // Kết quả
+	FlowPublish       = 13 // Publish
+	FlowStepsTotal    = 13
 )
 
 // RunState is what is happening at the current flow step.
@@ -63,7 +62,7 @@ type AuthoredContent struct {
 	NeedsIllustrations, Illustrations bool
 }
 
-// FlowState is where a project stands in the 14-step flow.
+// FlowState is where a project stands in the 13-step flow.
 type FlowState struct {
 	Step  int      `json:"step"`
 	State RunState `json:"run_state"`
@@ -118,10 +117,6 @@ func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredCo
 		return FlowState{FlowMerge, RunRunning}
 	case StatusFailedAssembleVideo, StatusFailedQCVideo:
 		return FlowState{FlowMerge, RunFailed}
-	case StatusGeneratingClips:
-		return FlowState{FlowSplit, RunRunning}
-	case StatusFailedGenerateClips:
-		return FlowState{FlowSplit, RunFailed}
 	case StatusReadyToPublish:
 		return FlowState{FlowResult, RunIdle}
 	case StatusPublishing:
@@ -151,6 +146,6 @@ func FlowStepForAuthoring(step string) int {
 var FlowStepLabel = map[int]string{
 	FlowInit: "Khởi tạo", FlowConfig: "Cấu hình", FlowStory: "Kịch bản", FlowVisual: "Visual",
 	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "TTS",
-	FlowRender: "Render", FlowMerge: "Merge", FlowSplit: "Cắt short",
+	FlowRender: "Render", FlowMerge: "Merge",
 	FlowResult: "Kết quả", FlowPublish: "Publish",
 }

@@ -40,7 +40,6 @@ describe('routing between orchestrator and authoring-service', () => {
     ['delete', '/v1/projects/p1/authoring/chain', 'authoring'],
     ['post', '/v1/projects/p1/authoring/story/generate', 'authoringAi'],
     ['post', '/v1/projects/p1/suggest-metadata', 'authoringAi'],
-    ['post', '/v1/short-script-suggestions', 'authoringAi'],
     ['get', '/v1/prompts/story_architect', 'authoring'],
     ['post', '/v1/prompt-renders', 'authoring'],
     ['get', '/v1/script-templates', 'authoring'],

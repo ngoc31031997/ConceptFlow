@@ -22,7 +22,7 @@ import (
 )
 
 // Client implements application.LLMProviderPort, MetadataSuggesterPort,
-// ShortScriptSuggesterPort, StoryboardFinalizerPort and CodePipelinePort.
+// StoryboardFinalizerPort and CodePipelinePort.
 type Client struct {
 	baseURL string
 	// timeout bounds a whole call; 0 waits as long as llm-service does (Hive
@@ -336,7 +336,7 @@ func (c *Client) Chat(ctx context.Context, req application.ChatRequest) (applica
 	return application.ChatResult{Content: res.Content, Usage: res.Usage.usage()}, nil
 }
 
-// --- MetadataSuggesterPort / ShortScriptSuggesterPort ------------------------
+// --- MetadataSuggesterPort ----------------------------------------------------
 
 // suggestCall posts a suggestion request. When ctx carries a progress callback
 // it asks llm-service to stream and forwards the reply's size as
@@ -386,21 +386,6 @@ func (c *Client) Suggest(
 		out.Tags = []string{} // the API contract says tags is an array, never null
 	}
 	return out.Title, out.Description, out.Tags, nil
-}
-
-func (c *Client) SuggestShortScript(
-	ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage,
-) (string, error) {
-	var out struct {
-		Script string `json:"script"`
-	}
-	err := c.suggestCall(ctx, "/v1/suggest-short-script", map[string]any{
-		"topic": topic, "source_script_content": sourceScriptContent, "language": string(language),
-	}, &out)
-	if err != nil {
-		return "", err
-	}
-	return out.Script, nil
 }
 
 // --- StoryboardFinalizerPort ---------------------------------------------------

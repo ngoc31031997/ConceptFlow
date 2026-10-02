@@ -27,7 +27,7 @@ import styles from "./AuthoringModeBar.module.css";
 /** Thứ tự các bước; "illustrations" chỉ có ở video Remotion. */
 const ALL_STEPS: AuthoringStep[] = ["story", "storyboard", "illustrations", "code"];
 
-/** Số của từng bước trong luồng 14 bước, đúng như menu bước đánh số. */
+/** Số của từng bước trong luồng 13 bước, đúng như menu bước đánh số. */
 const STEP_FLOW = AUTHORING_STEP_FLOW;
 
 /** "Bước 4 — Hình ảnh": tên một bước soạn đúng như thanh bước gọi nó. */

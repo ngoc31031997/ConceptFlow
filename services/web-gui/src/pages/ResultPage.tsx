@@ -6,7 +6,6 @@ import { RenderQualityPicker } from "../components/RenderQualityPicker";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { useProject } from "../hooks/useProject";
 import { ProjectInputPanel } from "../components/ProjectInputPanel";
-import { ClipsPanel } from "../components/ClipsPanel";
 import { MakeShortButton } from "../components/MakeShortButton";
 import { CompanionProjectCard } from "../components/CompanionProjectCard";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
@@ -100,17 +99,13 @@ export function ResultPage() {
 
   const isPublished = project.status === "published" || Boolean(project.youtube_video_url);
 
-  // Clips are only cut from a "both" project, and only from `with
-  // self.clip(...)` in its script; a short is already vertical.
-  const wantsClips = outputMode === "both";
-
   return (
     <div data-testid="result-page">
       <AppShell
         currentStep={FLOW_RESULT}
         wide
         title={flowTitle(FLOW_RESULT)}
-        subtitle="Xem lại video, cắt clip hoặc dựng lại. Đăng video ở bước tiếp theo."
+        subtitle="Xem lại video hoặc dựng lại. Đăng video ở bước tiếp theo."
       >
         {error && (
           <p role="alert" className={glass.helperText}>
@@ -126,9 +121,6 @@ export function ResultPage() {
                 scenes={project.scenes}
                 contentLanguage={project.voice_language}
               />
-            )}
-            {wantsClips && (
-              <ClipsPanel projectId={projectId} clips={project.clips ?? []} videoOutputMode={outputMode} />
             )}
           </div>
 

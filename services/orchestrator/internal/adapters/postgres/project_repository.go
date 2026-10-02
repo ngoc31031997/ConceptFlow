@@ -31,7 +31,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine, wizard_step, video_font, wizard_route
+		       video_output_mode, companion_project_id, render_engine, wizard_step, video_font, wizard_route
 		FROM projects WHERE project_id = $1`, projectID)
 
 	var (
@@ -48,9 +48,6 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		beatsJSON             []byte
 		warningsJSON          []byte
 		layoutMarksJSON       []byte
-		clipMarksJSON         []byte
-		clipRequestsJSON      []byte
-		clipsJSON             []byte
 		videoOutputMode       string
 		renderEngine          string
 	)
@@ -60,7 +57,7 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
 		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON, &p.CaptionPath, &subtitleMode, &p.CaptionStatus,
 		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID, &layoutMarksJSON,
-		&clipMarksJSON, &clipRequestsJSON, &clipsJSON, &p.IntroDurationSeconds, &videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep, &p.VideoFont, &p.WizardRoute)
+		&videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep, &p.VideoFont, &p.WizardRoute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
 	}
@@ -107,21 +104,6 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	}
 	if len(layoutMarksJSON) > 0 {
 		if err := json.Unmarshal(layoutMarksJSON, &p.LayoutMarks); err != nil {
-			return nil, err
-		}
-	}
-	if len(clipMarksJSON) > 0 {
-		if err := json.Unmarshal(clipMarksJSON, &p.ClipMarks); err != nil {
-			return nil, err
-		}
-	}
-	if len(clipRequestsJSON) > 0 {
-		if err := json.Unmarshal(clipRequestsJSON, &p.ClipRequests); err != nil {
-			return nil, err
-		}
-	}
-	if len(clipsJSON) > 0 {
-		if err := json.Unmarshal(clipsJSON, &p.Clips); err != nil {
 			return nil, err
 		}
 	}
@@ -361,26 +343,6 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		}
 	}
 
-	// NULL when there is nothing yet — a project whose
-	// script never used `with self.clip(...)` and whose Creator never
-	// entered a manual selection.
-	var clipMarksJSON, clipRequestsJSON, clipsJSON []byte
-	if len(project.ClipMarks) > 0 {
-		if clipMarksJSON, err = json.Marshal(project.ClipMarks); err != nil {
-			return err
-		}
-	}
-	if len(project.ClipRequests) > 0 {
-		if clipRequestsJSON, err = json.Marshal(project.ClipRequests); err != nil {
-			return err
-		}
-	}
-	if len(project.Clips) > 0 {
-		if clipsJSON, err = json.Marshal(project.Clips); err != nil {
-			return err
-		}
-	}
-
 	var waitOffsetsJSON []byte
 	if project.WaitOffsets != nil {
 		if waitOffsetsJSON, err = json.Marshal(project.WaitOffsets); err != nil {
@@ -395,8 +357,8 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		                       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
 		                       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
-		                       clip_marks, clip_requests, clips, intro_duration_seconds, video_output_mode, companion_project_id, render_engine, video_font, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51, now())
+		                       video_output_mode, companion_project_id, render_engine, video_font, updated_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
 		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
@@ -427,10 +389,6 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    intro_asset_id = EXCLUDED.intro_asset_id,
 		    outro_asset_id = EXCLUDED.outro_asset_id,
 		    layout_marks = EXCLUDED.layout_marks,
-		    clip_marks = EXCLUDED.clip_marks,
-		    clip_requests = EXCLUDED.clip_requests,
-		    clips = EXCLUDED.clips,
-		    intro_duration_seconds = EXCLUDED.intro_duration_seconds,
 		    video_output_mode = EXCLUDED.video_output_mode,
 		    companion_project_id = EXCLUDED.companion_project_id,
 		    render_engine = EXCLUDED.render_engine,
@@ -446,7 +404,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		waitOffsetsJSON, project.RenderedVideoSeconds, string(project.RenderQuality),
 		project.BackgroundMusicVolume, chaptersJSON, project.CaptionPath, string(project.SubtitleMode), project.CaptionStatus,
 		project.IntroEnabled, project.OutroEnabled, project.IntroAssetID, project.OutroAssetID, layoutMarksJSON,
-		clipMarksJSON, clipRequestsJSON, clipsJSON, project.IntroDurationSeconds, string(project.VideoOutputMode), project.CompanionProjectID, string(renderEngine), project.VideoFont)
+		string(project.VideoOutputMode), project.CompanionProjectID, string(renderEngine), project.VideoFont)
 	return err
 }
 

@@ -18,7 +18,6 @@ from adapters.assembly.ffmpeg_assembler import DEFAULT_ASSEMBLY_TIMEOUT_SECONDS,
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
-    GenerateClipsCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
     RegisterChannelAssetCommandHandler,
@@ -34,7 +33,6 @@ from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
 from adapters.storage.artifact_paths import purge_project_artifacts
 from application.assemble_video import AssembleVideoUseCase
-from domain.clip_rules import ClipThresholds
 from domain.qc_rules import QCThresholds
 
 logging.basicConfig(level=logging.WARNING)
@@ -68,7 +66,7 @@ async def run() -> None:
     def make_persistent_message(body: bytes) -> aio_pika.Message:
         return aio_pika.Message(body, delivery_mode=aio_pika.DeliveryMode.PERSISTENT)
 
-    # assemble_video/generate_clips run their ffmpeg work in a worker
+    # assemble_video runs its ffmpeg work in a worker
     # thread (asyncio.to_thread) — ProgressPublisher needs the running loop
     # itself to marshal a publish back onto it from that thread.
     progress = ProgressPublisher(progress_exchange, asyncio.get_running_loop())
@@ -82,16 +80,11 @@ async def run() -> None:
     # scores and reports the real severity; whether a blocking finding actually
     # stops a publish is Orchestrator's call.
     qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
-    # Preset thresholds read from the environment once, here —
-    # same convention as QC_ENFORCE-adjacent QCThresholds above.
-    generate_clips_handler = GenerateClipsCommandHandler(
-        pool, inbox, outbox, ClipThresholds.from_env(), progress
-    )
     register_channel_asset_handler = RegisterChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
     command_dispatcher = VideoAssemblyCommandDispatcher(
-        assemble_video_handler, normalize_handler, qc_handler, generate_clips_handler,
+        assemble_video_handler, normalize_handler, qc_handler,
         register_channel_asset_handler,
-        # Dọn final.mp4/final.srt/clips của project bị xoá.
+        # Dọn final.mp4/final.srt của project bị xoá.
         purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
             purge_project_artifacts, pool, inbox, outbox
         ),

@@ -93,7 +93,7 @@ async def test_suggest_metadata_can_stream_progress(client):
 @respx.mock
 async def test_suggest_stream_reports_the_error_kind(client):
     respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=httpx.Response(500, json={}))
-    r = await client.post("/v1/suggest-short-script", json={"topic": "t", "stream": True})
+    r = await client.post("/v1/suggest-metadata", json={"script_content": "s", "stream": True})
     ev = events(r)
     assert ev[-1]["type"] == "error" and ev[-1]["error"]["kind"] == "server"
 
@@ -101,7 +101,7 @@ async def test_suggest_stream_reports_the_error_kind(client):
 @respx.mock
 async def test_suggest_error_is_a_502_with_the_kind(client):
     respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=httpx.Response(500, json={}))
-    r = await client.post("/v1/suggest-short-script", json={"topic": "t"})
+    r = await client.post("/v1/suggest-metadata", json={"script_content": "s"})
     assert r.status_code == 502 and r.json()["error"]["kind"] == "server"
 
 

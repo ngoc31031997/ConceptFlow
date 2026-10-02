@@ -10,9 +10,9 @@ import (
 // model. One adapter implements it: the llm-service client,
 // which is the only thing that talks to Hive or Ollama.
 //
-// Deliberately narrower than either adapter's own surface. The metadata and
-// short-script use cases keep their task-shaped ports (MetadataSuggesterPort,
-// ShortScriptSuggesterPort) with their own prompts and response shapes; this
+// Deliberately narrower than the adapter's own surface. The metadata use case
+// keeps its task-shaped port (MetadataSuggesterPort) with its own prompt and
+// response shape; this
 // one carries a prompt and hands back text, because the authoring pipeline's
 // prompts already live in the database and the caller assembles them.
 type LLMProviderPort interface {

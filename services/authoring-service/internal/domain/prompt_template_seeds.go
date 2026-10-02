@@ -27,7 +27,6 @@ func DefaultPromptTemplates() []PromptTemplate {
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
-		{Role: RoleShortScript, Language: "vi", Version: 1, TemplateText: shortScriptTemplate},
 		{Role: RoleThumbnailDesign, Language: "vi", Version: 1, TemplateText: thumbnailDesignTemplate},
 	}
 }

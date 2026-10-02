@@ -29,20 +29,33 @@ func scanPrompt(row pgx.Row) (domain.Prompt, error) {
 }
 
 // PurgeLegacyPrompts removes what the pre-library override system left
-// behind: the "migrated-*" Creator rows it produced and the renamed *_legacy
-// tables. Idempotent — with nothing left it is a no-op.
+// behind (the "migrated-*" Creator rows it produced and the renamed *_legacy
+// tables) and every row, system or Creator, of a role that no longer exists:
+// such a row cannot be listed, edited or rendered anywhere. Returns how many
+// rows it deleted. Idempotent — with nothing left it is a no-op.
 func (r *PromptTemplateRepository) PurgeLegacyPrompts(ctx context.Context) (int, error) {
-	tag, err := r.pool.Exec(ctx, `DELETE FROM prompts WHERE id LIKE 'migrated-%' AND NOT is_system`)
+	migrated, err := r.pool.Exec(ctx, `DELETE FROM prompts WHERE id LIKE 'migrated-%' AND NOT is_system`)
 	if err != nil {
 		return 0, err
 	}
+	deleted := int(migrated.RowsAffected())
+	retired, err := r.pool.Exec(ctx, `DELETE FROM prompts WHERE role = ANY($1)`, retiredPromptRoles)
+	if err != nil {
+		return deleted, err
+	}
+	deleted += int(retired.RowsAffected())
 	for _, t := range []string{"prompt_overrides_legacy", "prompt_templates_legacy", "prompt_overrides", "prompt_templates"} {
 		if _, err := r.pool.Exec(ctx, `DROP TABLE IF EXISTS `+t); err != nil {
-			return int(tag.RowsAffected()), err
+			return deleted, err
 		}
 	}
-	return int(tag.RowsAffected()), nil
+	return deleted, nil
 }
+
+// retiredPromptRoles are roles the prompt library once had and no longer
+// knows: "short_script" drafted a script for a vertical clip cut from a long
+// video, a path the pipeline no longer has.
+var retiredPromptRoles = []string{"short_script"}
 
 // SeedPrompts writes the system prompts, overwriting their wording on every
 // start so a rebuilt binary is the whole deploy.

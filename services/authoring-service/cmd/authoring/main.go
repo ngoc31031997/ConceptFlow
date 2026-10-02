@@ -1,6 +1,6 @@
 // Command authoring is authoring-service's composition root: the prompt library,
 // the 1a/1b/1c authoring chain (story → storyboard → code) with its LLM calls,
-// the metadata and short-script suggestions, and the LLM usage log.
+// the metadata suggestions, and the LLM usage log.
 //
 // It owns its own database. Everything about the project itself — status,
 // settings, video formats, voice calibration and the project journal — is read
@@ -67,7 +67,6 @@ func main() {
 	llmUsageRecorder := application.NewLLMUsageRecorder(llmUsageRepo, logger)
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient)
-	suggestShortScript := application.NewSuggestShortScriptUseCase(llmClient)
 
 	if err := authoringRepo.SeedVideoArchetypes(ctx); err != nil {
 		logger.Warn("could not seed system video archetypes", "error", err)
@@ -124,7 +123,6 @@ func main() {
 	}
 
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
-		WithShortScriptSuggester(suggestShortScript).
 		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
 		WithArchetypes(archetypes).

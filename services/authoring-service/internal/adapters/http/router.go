@@ -34,7 +34,6 @@ type InternalAuthoring interface {
 // Router holds authoring-service's REST handlers' use case dependencies.
 type Router struct {
 	suggestPublishMetadata  suggestPublishMetadataUseCase
-	suggestShortScript      suggestShortScriptUseCase
 	prompts                 promptsUseCase
 	archetypes              archetypesUseCase
 	illustrations           illustrationsUseCase
@@ -65,7 +64,6 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/health", rt.handleHealth)
 	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
-	r.Post("/v1/short-script-suggestions", rt.handleSuggestShortScript)
 	// Prompt wording lives in the DB. Public read (the wizard fetches the
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
@@ -217,13 +215,6 @@ func (rt *Router) handleInternalSummaries(w http.ResponseWriter, r *http.Request
 
 type suggestPublishMetadataUseCase interface {
 	Execute(ctx context.Context, projectID string) (*application.SuggestPublishMetadataOutput, error)
-}
-
-// suggestShortScriptUseCase backs the short-script assistant —
-// no project_id, unlike suggestPublishMetadataUseCase, since a Creator can
-// start a short from a bare topic without an existing project.
-type suggestShortScriptUseCase interface {
-	Execute(ctx context.Context, topic, sourceScriptContent string, language domain.ContentLanguage) (string, error)
 }
 
 // promptsUseCase backs the prompt library: a list of prompts per
@@ -464,14 +455,6 @@ func (rt *Router) WithAuthoringState(getAuthoringState getAuthoringStateUseCase)
 	return rt
 }
 
-// WithShortScriptSuggester attaches the short-script assistant,
-// enabling POST /v1/short-script-suggestions. Without it the route answers
-// 404 — same "unwired means absent, not broken" posture as WithQCReports.
-func (rt *Router) WithShortScriptSuggester(suggestShortScript suggestShortScriptUseCase) *Router {
-	rt.suggestShortScript = suggestShortScript
-	return rt
-}
-
 // WithOperations attaches the registry behind GET /v1/operations/{id}.
 // Without it suggestions still work, just without a live
 // progress card.
@@ -527,34 +510,6 @@ func (rt *Router) handleSuggestMetadata(w http.ResponseWriter, r *http.Request) 
 		Description: out.Description,
 		Tags:        out.Tags,
 	})
-}
-
-func (rt *Router) handleSuggestShortScript(w http.ResponseWriter, r *http.Request) {
-	if rt.suggestShortScript == nil {
-		writeError(w, http.StatusNotFound, "short script suggestions are not enabled")
-		return
-	}
-
-	var req suggestShortScriptRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	lang := domain.ContentLanguage(req.Language)
-	if lang != domain.LanguageVietnamese && lang != domain.LanguageEnglish {
-		writeError(w, http.StatusBadRequest, "language must be 'vi' or 'en'")
-		return
-	}
-
-	ctx, finish := rt.trackOperation(r, "suggest_short_script")
-	script, err := rt.suggestShortScript.Execute(ctx, req.Topic, req.SourceScriptContent, lang)
-	finish(err)
-	if err != nil {
-		slog.Error("suggest-short-script failed", "error", err.Error())
-		writeError(w, http.StatusBadRequest, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusOK, suggestShortScriptResponse{ScriptContent: script})
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {

@@ -265,10 +265,6 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             chapters=[
                 (int(r["index"]), r["title"]) for r in records if r.get("kind") == "chapter"
             ],
-            # Bug report: `records` already has "clip" entries from this same
-            # dry pass (self.clip() writes marks regardless of dry/real) —
-            # just never extracted before. Same filter as _read_clip_marks.
-            clip_marks=[r for r in records if r.get("kind") == "clip"],
             # Bug report (2026-09-12): ConceptFlowScene.play() writes one
             # "overlap" record per colliding pair it finds while CF_MODE=dry
             # (conceptflow/scene.py._check_overlaps) — surface them here so
@@ -321,7 +317,6 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             rendered_path = self._find_rendered_file(media_dir)
             wait_offsets = self._read_wait_offsets(marks_path, expected=len(durations))
             layout_marks = self._read_layout_marks(marks_path)
-            clip_marks = self._read_clip_marks(marks_path)
             video_duration = _probe_duration(rendered_path)
             shutil.move(rendered_path, output_path)
         finally:
@@ -334,7 +329,6 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
             wait_offsets=wait_offsets,
             video_duration_seconds=video_duration,
             layout_marks=layout_marks,
-            clip_marks=clip_marks,
         )
 
     def render_channel_asset(
@@ -568,17 +562,6 @@ class ManimScriptRenderer(ManimScriptRendererPort, ChannelAssetRendererPort):
         failing a render that produced a perfectly good video.
         """
         return [r for r in _read_marks(marks_path) if r.get("kind") == "layout"]
-
-    @staticmethod
-    def _read_clip_marks(marks_path: str) -> list[dict]:
-        """The clip selections `with self.clip(...)` recorded.
-
-        Same best-effort posture as `_read_layout_marks`: a script that never
-        calls `self.clip(...)` is a perfectly normal (non-Shorts) video, so a
-        missing or empty list here is not an error — it just means Video
-        Assembly has nothing to derive vertical clips from.
-        """
-        return [r for r in _read_marks(marks_path) if r.get("kind") == "clip"]
 
     @staticmethod
     def _find_rendered_file(media_dir: str) -> str:

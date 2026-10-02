@@ -101,7 +101,7 @@ describe("ResultPage continue-to-publish handoff", () => {
 
     await waitFor(() => expect(screen.getByTestId("result-continue-to-publish")).toBeInTheDocument());
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Kết quả");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 12 — Kết quả");
     expect(screen.queryByTestId("publish-form-submit-button")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("result-continue-to-publish-link"));

@@ -7,7 +7,6 @@ the application/adapter layers rather than injected (dependency-injection.md).
 from __future__ import annotations
 
 import os
-import shutil
 
 SHARED_VOLUME_ROOT = "/shared"
 
@@ -53,13 +52,6 @@ def channel_asset_with_music_path(kind: str, render_quality: str, version: int) 
     )
 
 
-def clip_output_path(project_id: str, slug: str, preset: str) -> str:
-    """Conventional path for a vertical clip:
-    /shared/{project_id}/clips/{slug}_{preset}.mp4 — the download route reads
-    the same shared volume, so the shape here is the contract with it."""
-    return os.path.join(SHARED_VOLUME_ROOT, project_id, "clips", f"{slug}_{preset}.mp4")
-
-
 def video_exists(video_path: str) -> bool:
     return os.path.isfile(video_path)
 
@@ -81,13 +73,10 @@ def _safe_project_id(project_id: str) -> str:
 
 
 def _remove(path: str) -> None:
-    if os.path.isdir(path) and not os.path.islink(path):
-        shutil.rmtree(path, ignore_errors=True)
-    else:
-        try:
-            os.remove(path)
-        except FileNotFoundError:
-            pass
+    try:
+        os.remove(path)
+    except FileNotFoundError:
+        pass
 
 
 def _rmdir_if_empty(path: str) -> None:
@@ -99,13 +88,12 @@ def _rmdir_if_empty(path: str) -> None:
 
 def purge_project_artifacts(project_id: str) -> None:
     """Remove what Video Assembly owns for a deleted project —
-    final.mp4, final.srt and the clips directory. Never touches rendered.mp4 or
+    final.mp4 and final.srt. Never touches rendered.mp4 or
     timing.json (rendering's) or audio (tts's). Idempotent."""
     pid = _safe_project_id(project_id)
     project_dir = os.path.join(SHARED_VOLUME_ROOT, pid)
     video_dir = os.path.join(project_dir, "video")
     _remove(os.path.join(video_dir, "final.mp4"))
     _remove(os.path.join(video_dir, "final.srt"))
-    _remove(os.path.join(project_dir, "clips"))
     _rmdir_if_empty(video_dir)
     _rmdir_if_empty(project_dir)

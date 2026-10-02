@@ -93,11 +93,6 @@ func (f *fakeProjectReader) Delete(_ context.Context, _ string) error {
 	return f.deleteErr
 }
 
-func (f *fakeProjectReader) Save(_ context.Context, project *domain.Project) error {
-	f.project = project
-	return nil
-}
-
 func TestHandleStartRenderSaga_Created(t *testing.T) {
 	router := NewRouter(
 		&fakeStartRenderSaga{out: &application.StartRenderSagaOutput{SagaID: "saga-1", Status: domain.StatusParsingScript}},

@@ -55,7 +55,7 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     vi.restoreAllMocks();
   });
 
-  it("cả giai đoạn sản xuất trong một tracker: video dài có ba việc, không có Cắt short", async () => {
+  it("cả giai đoạn sản xuất trong một tracker: ba việc, không có Cắt short", async () => {
     stubProject({ project_id: "p1", status: "rendering", scenes: [], video_output_mode: "long" });
 
     renderRenderPage();
@@ -71,13 +71,13 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 10 — Dựng hình");
   });
 
-  it("video có clip dọc thì tracker có thêm việc Cắt short", async () => {
-    stubProject({ project_id: "p1", status: "synthesizing_speech", scenes: [], video_output_mode: "both" });
+  it("short dọc có cùng ba việc sản xuất như video dài", async () => {
+    stubProject({ project_id: "p1", status: "synthesizing_speech", scenes: [], video_output_mode: "short" });
 
     renderRenderPage();
 
-    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(4));
-    expect(screen.getByTestId("progress-tracker-steps")).toHaveTextContent("Cắt clip dọc Shorts/TikTok");
+    await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(3));
+    expect(screen.getByTestId("progress-tracker-steps")).not.toHaveTextContent("Cắt clip dọc");
   });
 
   it("cho thử lại khi một bước sản xuất hỏng, và không rủ quay về sửa script", async () => {

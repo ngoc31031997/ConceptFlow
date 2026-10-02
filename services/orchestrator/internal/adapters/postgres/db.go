@@ -173,31 +173,8 @@ CREATE TABLE IF NOT EXISTS channel_asset_pointers (
 -- needing the original event again — exactly the reason wait_offsets is stored.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS layout_marks JSONB;
 
--- The with-self.clip(...) selections Rendering
--- measured, carried verbatim on rendering_completed exactly like
--- layout_marks — stored so generate_clips can be rebuilt from Project alone
--- (Rule 5). clip_requests holds the Creator-entered selections from POST
--- /v1/projects/{id}/clips separately (the two are merged at dispatch time,
--- GUI wins on a matching name). clips is generate_clips's own result, one
--- row's worth of (name, preset, status, output_path, duration_seconds,
--- error_message) entries — a clip-level failure never blocks the saga,
--- so this is just the audit trail the Creator sees on the results screen.
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_marks JSONB;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS clip_requests JSONB;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS clips JSONB;
-
--- video-assembly is the only place that knows the channel
--- intro's real length (it resolved intro_asset_id and folded it into
--- effective_lead_in), and Orchestrator has no synchronous way to ask
--- it again (no HTTP between the two). Stored from
--- video_assembled so generate_clips can shift a Creator's clip selection by
--- the same amount narration/subtitles were already shifted — omit it and a
--- clip is off by exactly the intro's length. 0 when the project has no intro.
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS intro_duration_seconds DOUBLE PRECISION NOT NULL DEFAULT 0;
-
--- "long" | "short" | "both" — which output(s) this project
--- produces. Default 'long' reproduces the only behaviour that existed before
--- this column did: generate_clips never ran unless a Creator opted in.
+-- "long" | "short" — the 16:9 long-form video or the vertical short this
+-- project produces. Default 'long' is the mode of a project that never chose.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DEFAULT 'long';
 
 -- Links two independent projects covering the same topic (a
@@ -394,8 +371,7 @@ DROP TABLE IF EXISTS project_authoring_history;
 -- answering a one-sentence question. A screen that hides that cannot
 -- explain why one model costs twice another for the same visible output.
 --
--- project_id is nullable and carries NO foreign key: suggest-short-script
--- runs before any project exists, and deleting a project must
+-- project_id is nullable and carries NO foreign key: deleting a project must
 -- not erase the record of what it cost.
 CREATE TABLE IF NOT EXISTS llm_usage (
     id                BIGSERIAL PRIMARY KEY,
@@ -442,7 +418,7 @@ CREATE TABLE IF NOT EXISTS prompts (
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_active_per_role ON prompts (role) WHERE is_active;
 CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) WHERE is_system;
 
--- Append-only journey of every project through the 14-step flow (a status
+-- Append-only journey of every project through the 13-step flow (a status
 -- change, or an authoring run finishing). Read by the "Nhật ký" screen; no
 -- code path makes a decision from it. duration_ms on a status change is the
 -- time the project spent in from_status.
@@ -502,6 +478,38 @@ BEGIN
         INSERT INTO schema_migrations (id) VALUES ('cr046b_swap_code_illustrations');
     END IF;
 END $$;
+
+-- The flow has no vertical-clip step any more: Result is 12 and Publish 13.
+-- Stored rows of 13/14 shift down by one; a row at the old step 12 belongs
+-- to the step before it, Merge (11). A CASE moves all three in one pass.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE id = 'remove_clip_step_flow_numbers') THEN
+        UPDATE project_events SET flow_step = CASE flow_step WHEN 12 THEN 11 WHEN 13 THEN 12 WHEN 14 THEN 13 END
+            WHERE flow_step IN (12, 13, 14);
+        UPDATE project_events SET from_flow_step = CASE from_flow_step WHEN 12 THEN 11 WHEN 13 THEN 12 WHEN 14 THEN 13 END
+            WHERE from_flow_step IN (12, 13, 14);
+        INSERT INTO schema_migrations (id) VALUES ('remove_clip_step_flow_numbers');
+    END IF;
+END $$;
+
+-- 'both' (the long video plus vertical clips cut from it) is no longer an
+-- output mode; a row still holding it is read as the long video it always
+-- produced.
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE id = 'remove_output_mode_both') THEN
+        UPDATE projects SET video_output_mode = 'long' WHERE video_output_mode = 'both';
+        INSERT INTO schema_migrations (id) VALUES ('remove_output_mode_both');
+    END IF;
+END $$;
+
+-- Columns of the removed vertical-clip step.
+ALTER TABLE projects
+    DROP COLUMN IF EXISTS clip_marks,
+    DROP COLUMN IF EXISTS clip_requests,
+    DROP COLUMN IF EXISTS clips,
+    DROP COLUMN IF EXISTS intro_duration_seconds;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

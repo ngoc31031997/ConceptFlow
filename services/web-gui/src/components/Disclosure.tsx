@@ -13,10 +13,8 @@ interface DisclosureProps {
 }
 
 /**
- * Một affordance "thu gọn/mở rộng" duy nhất (UX review #5) — thay cho 3 kiểu
- * khác nhau đã mọc lên độc lập: chevron tự chế ở ProjectInputPanel, ghostBtn
- * hoán bằng cả một card ở khu render-lại/tạo bản Shorts của ResultPage, và
- * <details>/<summary> gốc ở ShortScriptAssistant.
+ * Affordance "thu gọn/mở rộng" dùng chung cho mọi phần có thể gập lại: một
+ * nút tiêu đề có chevron xoay khi mở, nội dung chỉ được dựng khi đang mở.
  */
 export function Disclosure({ title, hint, defaultOpen = false, children, testId }: DisclosureProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);

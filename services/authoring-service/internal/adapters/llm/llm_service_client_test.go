@@ -103,7 +103,7 @@ func TestAnUnreachableServiceIsAServerErrorAndATimeoutIsATimeout(t *testing.T) {
 	}
 }
 
-func TestSuggestMetadataAndShortScript(t *testing.T) {
+func TestSuggestMetadata(t *testing.T) {
 	c := serve(t, func(w http.ResponseWriter, r *http.Request) {
 		var body map[string]any
 		_ = json.NewDecoder(r.Body).Decode(&body)
@@ -113,8 +113,6 @@ func TestSuggestMetadataAndShortScript(t *testing.T) {
 				t.Errorf("metadata body = %v", body)
 			}
 			_, _ = w.Write([]byte(`{"title":"T","description":"D","tags":null,"usage":{}}`))
-		case "/v1/suggest-short-script":
-			_, _ = w.Write([]byte(`{"script":"from conceptflow import *","usage":{}}`))
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -125,10 +123,6 @@ func TestSuggestMetadataAndShortScript(t *testing.T) {
 	}
 	if tags == nil || len(tags) != 0 {
 		t.Errorf("tags = %#v, want an empty non-nil slice (the API contract says array, never null)", tags)
-	}
-	script, err := c.SuggestShortScript(context.Background(), "topic", "", domain.LanguageEnglish)
-	if err != nil || script != "from conceptflow import *" {
-		t.Fatalf("SuggestShortScript: %q %v", script, err)
 	}
 }
 
@@ -146,7 +140,7 @@ func TestANon200AnswerCarriesTheServicesErrorKind(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`<html>boom</html>`))
 	})
-	if _, err := bad.SuggestShortScript(context.Background(), "t", "", domain.LanguageEnglish); application.LLMErrorKindOf(err) != application.ErrKindServer {
+	if _, _, _, err := bad.Suggest(context.Background(), "S", "C", domain.LanguageEnglish); application.LLMErrorKindOf(err) != application.ErrKindServer {
 		t.Fatalf("err = %v, want server", err)
 	}
 }

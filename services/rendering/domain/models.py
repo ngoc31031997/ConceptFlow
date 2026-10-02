@@ -105,13 +105,6 @@ class DryRunResult:
     visuals: list[str] = field(default_factory=list)
     beats: list[tuple[int, str]] = field(default_factory=list)
     chapters: list[tuple[int, str]] = field(default_factory=list)
-    # Bug report (2026-09-12): `with self.clip(...)` đã ghi ra marks file từ
-    # lượt dry rồi (script chạy y hệt, chỉ không render hình) — chỉ là trước
-    # đây dry_run() không đọc lại. Hệ quả: một project chọn video_output_mode
-    # short/both mà script quên đánh dấu self.clip() phải render xong (tốn cả
-    # TTS) mới biết "Chưa có clip nào". Đọc ở đây để Orchestrator cảnh báo
-    # ngay tại màn duyệt dàn ý, trước khi TTS chạy.
-    clip_marks: list[dict] = field(default_factory=list)
     # The outline review gate is the only screen
     # a Creator sees between writing a script and paying for TTS/render — so
     # any script-authoring mistake a static lint or a human reviewer could
@@ -138,10 +131,6 @@ class ScriptRenderResult:
     # đã ghi ra ({"kind","index","t","mobjects"}). Best-effort, nên rỗng là
     # trạng thái hợp lệ — QC khi đó chỉ chấm được phần audio.
     layout_marks: list[dict] = field(default_factory=list)
-    # Một bản ghi cho mỗi `with self.clip(...)` script mở ra,
-    # giữ nguyên shape script đã ghi ({"kind","name","index","t_start","t_end"}).
-    # Best-effort như layout_marks — rỗng nghĩa là script không cắt clip nào.
-    clip_marks: list[dict] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

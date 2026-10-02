@@ -29,5 +29,5 @@ B.
 
 ## Consequences
 - Khung dọc thêm kích thước khung vào vân tay đoạn khung ở bước Code; khung ngang giữ nguyên vân tay, nên code đã lưu của các dự án đang làm không bị coi là cũ.
-- Chế độ `both` (video dài kèm clip cắt) không còn trong bộ chọn; đường cắt clip (bước 12, `generate_clips`, `ClipsPanel`, `self.clip`, prompt `short_script`) còn trong code nhưng không lựa chọn mới nào dẫn tới, và được gỡ ở CR-061.
+- Chế độ `both` (video dài kèm clip cắt) không còn trong bộ chọn; đường cắt clip (bước 12, `generate_clips`, `ClipsPanel`, `self.clip`, prompt `short_script`) còn trong code nhưng không lựa chọn mới nào dẫn tới, và được gỡ ở CR-061. Đã gỡ ở CR-061: `video_output_mode` chỉ còn `long` | `short`, luồng còn 13 bước (Kết quả = 12, Đăng video = 13).
 - Thẻ thương hiệu cuối short và intro/outro dọc của kênh chưa có; cần tài sản kênh dọc.

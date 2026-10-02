@@ -75,9 +75,6 @@ var manimAdjustTemplate string
 //go:embed prompts/remotion_adjust.txt
 var remotionAdjustTemplate string
 
-//go:embed prompts/short_script.txt
-var shortScriptTemplate string
-
 //go:embed prompts/thumbnail_design.txt
 var thumbnailDesignTemplate string
 

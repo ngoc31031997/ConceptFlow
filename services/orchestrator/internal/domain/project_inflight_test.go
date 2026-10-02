@@ -4,7 +4,7 @@ import "testing"
 
 func TestProjectStatusIsInFlight(t *testing.T) {
 	inFlight := []ProjectStatus{StatusParsingScript, StatusValidatingScript, StatusSynthesizingSpeech,
-		StatusRendering, StatusAssemblingVideo, StatusRunningQC, StatusGeneratingClips, StatusPublishing}
+		StatusRendering, StatusAssemblingVideo, StatusRunningQC, StatusPublishing}
 	idle := []ProjectStatus{StatusDraft, StatusAwaitingReview, StatusReadyToPublish, StatusPublished,
 		StatusFailedRenderScenes, StatusFailedPublishVideo}
 	for _, s := range inFlight {

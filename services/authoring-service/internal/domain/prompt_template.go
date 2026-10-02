@@ -32,7 +32,6 @@ const (
 	// of the authoring pipeline; each is a "copy this to an external AI" prompt.
 	RoleManimAdjust     PromptRole = "manim_adjust"     // fix an existing Manim script (narrate calls, design system)
 	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
-	RoleShortScript     PromptRole = "short_script"     // draft a Shorts/TikTok script
 	RoleThumbnailDesign PromptRole = "thumbnail_design" // write an image-generation prompt for the thumbnail
 )
 
@@ -41,7 +40,7 @@ func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
 		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI,
-		RoleManimAdjust, RoleRemotionAdjust, RoleShortScript, RoleThumbnailDesign:
+		RoleManimAdjust, RoleRemotionAdjust, RoleThumbnailDesign:
 		return true
 	default:
 		return false

@@ -22,7 +22,6 @@ export const STEP_LABELS: Record<string, string> = {
   // Không nằm trong luồng chính — nhãn giữ lại để hiển thị đúng cho project
   // đã chạy qua bước này.
   qc_video: "Chấm chất lượng video",
-  generate_clips: "Cắt clip dọc Shorts/TikTok",
   publish_video: "Đăng lên YouTube",
 };
 
@@ -37,7 +36,6 @@ const STATUS_LABELS: Record<string, string> = {
   rendering: "Đang render",
   assembling_video: "Đang ghép video",
   running_qc: "Đang chấm chất lượng video",
-  generating_clips: "Đang cắt clip dọc",
   ready_to_publish: "Sẵn sàng đăng",
   publishing: "Đang đăng",
   published: "Đã đăng",
@@ -70,7 +68,6 @@ export function statusToStep(status: string): string | null {
     rendering: "render_scenes",
     assembling_video: "assemble_video",
     running_qc: "qc_video",
-    generating_clips: "generate_clips",
   };
   return map[status] ?? null;
 }
@@ -100,20 +97,15 @@ export const VALIDATE_SUBSTEP_NUMBERS: Record<(typeof VALIDATE_STEPS)[number], s
 };
 
 /**
- * Bước 9–12 (TTS, Render, Merge, Cắt short): phần đắt, chỉ chạy sau khi
+ * Bước 9–11 (TTS, Render, Merge): phần đắt, chỉ chạy sau khi
  * Creator duyệt ở bước 8. qc_video không có ở đây (không nằm trong luồng chính).
  */
-export const PROCESS_STEPS = [
-  "synthesize_speech",
-  "render_scenes",
-  "assemble_video",
-  "generate_clips",
-] as const;
+export const PROCESS_STEPS = ["synthesize_speech", "render_scenes", "assemble_video"] as const;
 
 /**
  * Màn hình nào đang sở hữu một project ở trạng thái này.
  *
- * Validate (7–8) và sản xuất (9–12) là hai màn riêng cùng theo dõi một saga, nên "project này
+ * Validate (7–8) và sản xuất (9–11) là hai màn riêng cùng theo dõi một saga, nên "project này
  * thuộc màn nào" phải trả lời được từ một chỗ duy nhất: nếu không, một Creator
  * mở lại bookmark cũ, hoặc bấm back sau khi duyệt, sẽ ngồi trên màn hình theo
  * dõi những bước đã chạy xong từ lâu mà không bao giờ thấy động tĩnh gì.
@@ -158,7 +150,7 @@ export function projectPath(projectId: string, status: string): string {
   const phase = projectPhase(status);
   if (phase === "validate") return `/projects/${projectId}/validate`;
   if (phase === "process") return `/projects/${projectId}/render`;
-  // Bước 14 (đang đăng / đã đăng / đăng lỗi) có màn riêng.
+  // Bước 13 (đang đăng / đã đăng / đăng lỗi) có màn riêng.
   if (phase === "publish") return `/projects/${projectId}/publish`;
   return `/projects/${projectId}/result`;
 }

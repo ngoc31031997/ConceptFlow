@@ -56,7 +56,7 @@ Cổng mở ra host: Web GUI http://localhost:3000, API Gateway http://localhost
 | `ollama` | image `ollama/ollama` | Mô hình local cho llm-service khi chọn provider `ollama` (`ollama-pull` tải model một lần) | HTTP nội bộ | — |
 | `rendering` | Python (Manim, Remotion) | Bước `validate_script` và `render_scenes`, render channel asset; HTTP nội bộ `/v1/check/*`, `/v1/illustrations/preview` | RabbitMQ `rendering.commands` + HTTP nội bộ | `rendering-db` |
 | `tts` | Python (Edge, Azure — ADR-0024, ADR-0025) | Bước `synthesize_speech` | RabbitMQ `tts.commands` (ADR-0014) | `tts-db` |
-| `video-assembly` | Python (ffmpeg) | Bước `assemble_video`, `qc_video`, `generate_clips`, chuẩn hoá channel asset | RabbitMQ `video_assembly.commands` | `video-assembly-db` |
+| `video-assembly` | Python (ffmpeg) | Bước `assemble_video`, `qc_video`, chuẩn hoá channel asset | RabbitMQ `video_assembly.commands` | `video-assembly-db` |
 | `publisher` | Python (YouTube Data API — ADR-0016, ADR-0026) | OAuth YouTube (nhiều app, nhiều kênh), bước `publish_video` | REST nội bộ + RabbitMQ `publisher.commands` | `publisher-db` |
 
 Hạ tầng: `rabbitmq` (topology ở `infra/rabbitmq/definitions.json`), volume `shared_artifacts` (hợp đồng ở `docs/contracts/shared-artifacts.md`), log tập trung Loki + Promtail + Grafana (datasource Loki auto-provision; query LogQL vd. `{container="orchestrator"}`). Mục lục mọi hợp đồng giữa service: `docs/contracts/README.md`.

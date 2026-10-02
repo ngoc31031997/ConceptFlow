@@ -113,14 +113,10 @@ export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 export type RenderEngine = "manim" | "remotion";
 
 /**
- * Which output(s) this project produces. A short clip is
- * always cut from the rendered 16:9 video (no standalone vertical
- * production), so "short" still renders the full long-form pipeline as
- * source; it only changes what generate_clips does and what step 5
- * (ResultPage) puts front and center — publishing a Shorts/TikTok clip stays
- * a manual upload outside this app either way (no auto-publish adapter).
+ * Which video this project produces: the 16:9 long-form video, or the
+ * vertical short built at 1080x1920 from the start (see ADR-0031).
  */
-export type VideoOutputMode = "long" | "short" | "both";
+export type VideoOutputMode = "long" | "short";
 
 export type ProjectDraftAction =
   | { type: "SET_SCRIPT"; payload: string }

@@ -33,7 +33,7 @@ export interface StepNavOptions {
 }
 
 /**
- * Điều hướng theo 14 bước, dùng chung cho menu bước và thanh trạng thái: cùng
+ * Điều hướng theo 13 bước, dùng chung cho menu bước và thanh trạng thái: cùng
  * một luật "bước nào đã tới" và "bước này đang ở trạng thái gì", để hai chỗ
  * không bao giờ nói khác nhau. Bước đã tới mở màn thật; bước chưa tới hoặc
  * "Không dùng" mở màn xem trước (chỉ đọc).
@@ -56,14 +56,7 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
   const status = (step: number): StepStatus =>
     step === aiFlowStep
       ? "running"
-      : stepStatus(
-      step,
-      flow.flowStep,
-      flow.runState,
-      // Empty means "long" (a video with no vertical clips).
-      flow.project ? flow.project.video_output_mode || "long" : undefined,
-      renderEngine,
-    );
+      : stepStatus(step, flow.flowStep, flow.runState, renderEngine);
 
   const isReached = (step: number) => {
     if (status(step) === "skipped") return false;

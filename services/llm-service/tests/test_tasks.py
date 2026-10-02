@@ -48,17 +48,6 @@ def test_normalize_tags_never_returns_none():
     assert tasks.normalize_tags([]) == []
 
 
-def test_strip_code_fence():
-    assert tasks.strip_code_fence("```python\nx = 1\n```") == "x = 1"
-    assert tasks.strip_code_fence("x = 1") == "x = 1"
-
-
-def test_short_script_prompt_requires_clip_wrapper_and_uses_source_as_context_only():
-    p = tasks.build_short_script_prompt("Topic", "LONG-SOURCE", "vi")
-    assert 'with self.clip("short")' in p and "for context only" in p and "LONG-SOURCE" in p
-    assert "for context only" not in tasks.build_short_script_prompt("Topic", "", "vi")
-
-
 @respx.mock
 async def test_suggest_metadata_retries_when_title_empty_and_uses_json_mode(no_sleep):
     route = respx.post(URL).mock(side_effect=[
@@ -92,15 +81,6 @@ async def test_suggest_metadata_does_not_retry_a_dead_key(no_sleep):
     with pytest.raises(LLMError) as e:
         await tasks.suggest_metadata(make(no_sleep), "s", "t", "vi")
     assert e.value.kind == errors.AUTH and route.call_count == 1
-
-
-@respx.mock
-async def test_short_script_strips_fence_retries_empty_and_does_not_force_json(no_sleep):
-    route = respx.post(URL).mock(side_effect=[reply("   "), reply("```python\nfrom conceptflow import *\n```")])
-    out = await tasks.suggest_short_script(make(no_sleep), "topic", "", "vi")
-    assert out.value["script"] == "from conceptflow import *"
-    assert route.call_count == 2
-    assert "response_format" not in json.loads(route.calls.last.request.content)
 
 
 def test_unknown_language_falls_back_to_english_like_the_orchestrator_domain():

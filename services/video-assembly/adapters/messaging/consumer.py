@@ -34,13 +34,11 @@ from adapters.assembly.ffmpeg_assembler import (
     VIDEO_ENCODE_ARGS,
     FfmpegVideoAssembler,
 )
-from adapters.clips.vertical_clip import ClipRequest, generate_clip
 from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.cancellation import REGISTRY
 from adapters.messaging.producer import (
     assembly_failed_envelope,
     channel_asset_normalized_envelope,
-    clips_generated_envelope,
     qc_completed_envelope,
     video_assembled_envelope,
 )
@@ -60,7 +58,6 @@ from adapters.storage.artifact_paths import (
     normalized_channel_asset_path,
 )
 from application.assemble_video import AssembleVideoUseCase
-from domain.clip_rules import ClipThresholds
 from domain.errors import AssemblyEngineError, MissingArtifactError
 from domain.models import (
     ChannelAsset,
@@ -264,7 +261,6 @@ class AssembleVideoCommandHandler:
                 project_id,
                 result.video_path,
                 result.caption_path,
-                intro_duration_seconds,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():
@@ -787,116 +783,6 @@ class QCVideoCommandHandler:
         return status, serialized, None
 
 
-class GenerateClipsCommandHandler:
-    """Handles `generate_clips`, the saga step between `qc_video` and
-    `publish_video`.
-
-    One `clips_generated` event per command, carrying one entry per
-    `(request, preset)` pair with its own status — there is no global
-    failure branch (same shape as QCVideoCommandHandler): a
-    clip that fails validation or ffmpeg does not stop the rest, and never
-    blocks publish.
-    """
-
-    def __init__(
-        self,
-        pool: asyncpg.Pool,
-        inbox: InboxRepository,
-        outbox: OutboxRepository,
-        thresholds: ClipThresholds | None = None,
-        progress: ProgressPublisher | None = None,
-    ) -> None:
-        self._pool = pool
-        self._inbox = inbox
-        self._outbox = outbox
-        self._thresholds = thresholds or ClipThresholds.from_env()
-        self._progress = progress
-
-    async def handle(self, message: AckableMessage) -> None:
-        envelope = json.loads(message.body)
-        message_id = envelope["message_id"]
-        saga_id = envelope["saga_id"]
-        project_id = envelope["project_id"]
-        set_correlation_id(saga_id)
-
-        if await self._inbox.has_processed(message_id):
-            logger.info("Skipping already-processed message_id=%s", message_id)
-            await message.ack()
-            return
-
-        payload = envelope["payload"]
-        try:
-            clips = await asyncio.to_thread(self._generate_all, project_id, payload)
-        except (KeyError, TypeError, ValueError) as exc:
-            # A malformed top-level field (e.g. missing video_path) affects
-            # every request/preset pair at once, unlike a single clip's own
-            # ffmpeg failure (see class docstring) — publish an empty
-            # clips_generated rather than let the exception escape `handle`
-            # and leave the delivery unacked.
-            logger.warning(
-                "generate_clips payload malformed for project_id=%s: %s", project_id, exc
-            )
-            clips = []
-
-        out_envelope = clips_generated_envelope(saga_id, project_id, clips)
-
-        async with self._pool.acquire() as conn, conn.transaction():
-            await self._outbox.enqueue(
-                conn, aggregate_id=project_id, event_type="clips_generated", envelope=out_envelope
-            )
-            await self._inbox.mark_processed(conn, message_id)
-
-        await message.ack()
-
-    def _generate_all(self, project_id: str, payload: dict) -> list[dict]:
-        """Runs synchronously in a thread — six ffmpeg re-encodes (three clips
-        x two presets) is exactly the blocking work that must
-        not sit on the event loop."""
-        video_path = payload["video_path"]
-        intro_duration_seconds = float(payload.get("intro_duration_seconds") or 0.0)
-        subtitle_cues = _parse_subtitle_cues(payload.get("subtitle_cues")) or []
-        raw_requests = payload.get("requests") or []
-        clip_total = sum(len(r.get("presets") or []) for r in raw_requests)
-        clip_index = 0
-
-        results: list[dict] = []
-        for raw_request in raw_requests:
-            request = ClipRequest(
-                name=raw_request["name"],
-                start_seconds=float(raw_request["start_seconds"]),
-                end_seconds=float(raw_request["end_seconds"]),
-            )
-            for preset in raw_request.get("presets") or []:
-                # One (request, preset) at a time — an exception from ffmpeg
-                # or an unreadable video must not take the sibling presets
-                # (or the next request) down with it.
-                try:
-                    result = generate_clip(
-                        project_id=project_id,
-                        video_path=video_path,
-                        request=request,
-                        preset=preset,
-                        intro_duration_seconds=intro_duration_seconds,
-                        subtitle_cues=subtitle_cues,
-                        thresholds=self._thresholds,
-                    )
-                except Exception as exc:  # noqa: BLE001 — see class docstring
-                    logger.exception(
-                        "generate_clips: unexpected failure for %r/%s", request.name, preset
-                    )
-                    result = {
-                        "name": request.name,
-                        "preset": preset,
-                        "status": "error",
-                        "error_message": str(exc),
-                    }
-                results.append(result)
-                clip_index += 1
-                if self._progress is not None:
-                    self._progress.publish_clip_progress(project_id, clip_index, clip_total)
-        return results
-
-
 class VideoAssemblyCommandDispatcher:
     """One queue for all of this service's commands (mirrors
     RenderingCommandDispatcher on the Rendering side):
@@ -912,7 +798,6 @@ class VideoAssemblyCommandDispatcher:
         assemble_video: AssembleVideoCommandHandler,
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
         qc_video: QCVideoCommandHandler | None = None,
-        generate_clips: GenerateClipsCommandHandler | None = None,
         register_channel_asset: RegisterChannelAssetCommandHandler | None = None,
         purge_project_artifacts=None,
     ) -> None:
@@ -925,8 +810,6 @@ class VideoAssemblyCommandDispatcher:
             self._handlers["normalize_channel_asset"] = normalize_channel_asset.handle
         if qc_video is not None:
             self._handlers["qc_video"] = qc_video.handle
-        if generate_clips is not None:
-            self._handlers["generate_clips"] = generate_clips.handle
 
     async def handle(self, message: AckableMessage) -> None:
         try:

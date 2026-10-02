@@ -79,18 +79,15 @@ def test_unsafe_project_id_is_refused(bad):
         artifact_paths.purge_project_artifacts(bad)
 
 
-def test_purge_removes_final_and_clips_but_not_rendered(tmp_path, monkeypatch):
+def test_purge_removes_final_but_not_rendered(tmp_path, monkeypatch):
     monkeypatch.setattr(artifact_paths, "SHARED_VOLUME_ROOT", str(tmp_path))
     video = tmp_path / "p" / "video"
     video.mkdir(parents=True)
     for name in ("final.mp4", "final.srt", "rendered.mp4"):
         (video / name).write_bytes(b"x")
-    (tmp_path / "p" / "clips").mkdir()
-    (tmp_path / "p" / "clips" / "a_tiktok.mp4").write_bytes(b"x")
 
     artifact_paths.purge_project_artifacts("p")
     artifact_paths.purge_project_artifacts("p")
 
     assert not (video / "final.mp4").exists() and not (video / "final.srt").exists()
-    assert not (tmp_path / "p" / "clips").exists()
     assert (video / "rendered.mp4").exists()

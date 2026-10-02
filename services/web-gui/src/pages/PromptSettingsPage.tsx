@@ -28,7 +28,6 @@ const ROLES: { value: PromptRole; label: string }[] = [
   // Các prompt "chép sang AI ngoài", do server dựng.
   { value: "manim_adjust", label: "Phụ trợ — chuẩn hoá script Manim có sẵn" },
   { value: "remotion_adjust", label: "Phụ trợ — chuẩn hoá code Remotion có sẵn" },
-  { value: "short_script", label: "Phụ trợ — soạn script Shorts/TikTok" },
   { value: "thumbnail_design", label: "Phụ trợ — prompt sinh ảnh thumbnail" },
 ];
 

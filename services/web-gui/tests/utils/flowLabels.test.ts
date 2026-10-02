@@ -5,7 +5,8 @@ import { stepLabel } from "../../src/utils/pipelineLabels";
 describe("flowTitle", () => {
   it("names a step as the step rail does", () => {
     expect(flowTitle(4)).toBe("Bước 4 — Hình ảnh");
-    expect(flowTitle(FLOW_LABELS.length)).toBe("Bước 14 — Đăng video");
+    expect(flowTitle(FLOW_LABELS.length)).toBe("Bước 13 — Đăng video");
+    expect(flowTitle(12)).toBe("Bước 12 — Kết quả");
   });
 
   // A hand-edited or stale ?step= reaches flowTitle unchecked (RenderPage view mode).
@@ -25,21 +26,23 @@ describe("saga step labels under the flow titles", () => {
 });
 
 describe("phases of the flow", () => {
-  it("groups all 14 steps into five phases, each step exactly once", () => {
+  it("groups all 13 steps into five phases, each step exactly once", () => {
     expect(FLOW_PHASES.map((p) => p.name)).toEqual(["Chuẩn bị", "Soạn nội dung", "Duyệt", "Sản xuất", "Hoàn tất"]);
     const steps = FLOW_PHASES.flatMap((p) => [...p.steps]);
-    expect(steps).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+    expect(steps).toEqual(Array.from({ length: 13 }, (_, i) => i + 1));
+    expect(FLOW_PHASES[3].steps).toEqual([9, 10, 11]);
+    expect(FLOW_PHASES[4].steps).toEqual([12, 13]);
   });
 
   it("finds the phase of a step, and none for a step outside the flow", () => {
     expect(phaseOf(4)).toEqual({ index: 1, name: "Soạn nội dung", steps: [3, 4, 5, 6] });
-    expect(phaseOf(14)?.name).toBe("Hoàn tất");
+    expect(phaseOf(13)?.name).toBe("Hoàn tất");
     expect(phaseOf(0)).toBeNull();
-    expect(phaseOf(15)).toBeNull();
+    expect(phaseOf(14)).toBeNull();
   });
 
   it("marks only the worker-run steps as automatic", () => {
-    expect([...AUTO_STEPS].sort((a, b) => a - b)).toEqual([7, 9, 10, 11, 12]);
+    expect([...AUTO_STEPS].sort((a, b) => a - b)).toEqual([7, 9, 10, 11]);
   });
 });
 
@@ -53,8 +56,7 @@ describe("step previews", () => {
     expect(previewRoute(9, "")).toBe("/create/preview/9");
   });
 
-  it("says why each unused step does not apply", () => {
-    expect(skippedReason(5)).toContain("Remotion");
-    expect(skippedReason(12)).toContain("clip dọc");
+  it("says why the illustrations step does not apply", () => {
+    expect(skippedReason()).toContain("Remotion");
   });
 });

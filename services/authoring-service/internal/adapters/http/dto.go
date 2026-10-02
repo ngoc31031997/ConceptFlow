@@ -36,7 +36,7 @@ type startRenderSagaRequest struct {
 	ReviewEnabled         *bool   `json:"review_enabled,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
 	VideoFont             string  `json:"video_font,omitempty"`
-	// "long" | "short" | "both" — empty means DefaultVideoOutputMode ("long").
+	// "long" | "short" — empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode string `json:"video_output_mode,omitempty"`
 	// project_id of the companion video covering the same
 	// topic (the other of the long-form/short-form pair), if any.
@@ -113,7 +113,7 @@ type sceneResponse struct {
 // projectResponse is the GET /v1/projects/{project_id} response
 // (interface-contracts.md).
 type projectResponse struct {
-	// FlowStep/RunState place the project in the 14-step flow (see
+	// FlowStep/RunState place the project in the 13-step flow (see
 	// domain.FlowStateFor); the GUI resumes and locks from these, not from
 	// wizard_route.
 	FlowStep int    `json:"flow_step"`
@@ -144,9 +144,6 @@ type projectResponse struct {
 	// "uploaded" | "skipped_no_scope" | "failed".
 	CaptionStatus *string `json:"caption_status,omitempty"`
 	ErrorMessage  *string `json:"error_message,omitempty"`
-	// The vertical clips generate_clips produced, if the saga has
-	// reached that step yet.
-	Clips []clipResultResponse `json:"clips,omitempty"`
 	// ScriptContent, BackgroundMusicPath and BackgroundMusicVolume round out
 	// what StartRenderSagaInput needs — the GUI's "render lại ở chất lượng
 	// khác" resubmits POST /v1/sagas/render for this same
@@ -156,8 +153,7 @@ type projectResponse struct {
 	BackgroundMusicPath   *string `json:"background_music_path,omitempty"`
 	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
 	VideoFont             string  `json:"video_font,omitempty"`
-	// "long" | "short" | "both" — which output(s) the
-	// Result screen should feature, and whether generate_clips ran at all.
+	// "long" | "short" — the shape of video this project produces.
 	VideoOutputMode string `json:"video_output_mode"`
 	// Id only, not the nested project: the GUI re-fetches it
 	// through the same GET /v1/projects/{id} it already calls for anything
@@ -185,7 +181,7 @@ type projectSummaryResponse struct {
 	// "Bước N — …" next to the saga status.
 	WizardStep int `json:"wizard_step"`
 	// Topic names the project by its idea; FlowStep/RunState place it in the
-	// 14-step flow; ForkedFrom links a fork to its source.
+	// 13-step flow; ForkedFrom links a fork to its source.
 	Topic      string `json:"topic,omitempty"`
 	FlowStep   int    `json:"flow_step"`
 	RunState   string `json:"run_state"`
@@ -197,71 +193,12 @@ type projectListResponse struct {
 	Projects []projectSummaryResponse `json:"projects"`
 }
 
-// suggestShortScriptRequest is the body of POST /v1/short-script-suggestions.
-// No project_id: a Creator can draft a short from a bare
-// topic without an existing project. SourceScriptContent is optional context
-// pulled from an existing long-form project when called from its Result
-// screen — the topic alone is enough to draft something without it.
-type suggestShortScriptRequest struct {
-	Topic               string `json:"topic"`
-	Language            string `json:"language"`
-	SourceScriptContent string `json:"source_script_content,omitempty"`
-}
-
-// suggestShortScriptResponse is the 200 response of
-// POST /v1/short-script-suggestions.
-type suggestShortScriptResponse struct {
-	ScriptContent string `json:"script_content"`
-}
-
 // suggestMetadataResponse is the 200 response of
 // POST /v1/projects/{project_id}/suggest-metadata.
 type suggestMetadataResponse struct {
 	Title       string   `json:"title"`
 	Description string   `json:"description"`
 	Tags        []string `json:"tags"`
-}
-
-// createClipRequest is the body of POST /v1/projects/{project_id}/clips —
-// a Creator-entered clip selection.
-type createClipRequest struct {
-	Name         string   `json:"name"`
-	StartSeconds float64  `json:"start_seconds"`
-	EndSeconds   float64  `json:"end_seconds"`
-	Presets      []string `json:"presets"`
-}
-
-// clipResultResponse mirrors domain.ClipResult for
-// GET /v1/projects/{project_id}/clips.
-type clipResultResponse struct {
-	Name            string  `json:"name"`
-	Preset          string  `json:"preset"`
-	Status          string  `json:"status"`
-	OutputPath      string  `json:"output_path,omitempty"`
-	DurationSeconds float64 `json:"duration_seconds,omitempty"`
-	ErrorMessage    string  `json:"error_message,omitempty"`
-}
-
-// createClipResponse is the 200/202 response of
-// POST /v1/projects/{project_id}/clips. AcceptedPresets/RejectedPresets let
-// the GUI show exactly which preset(s) were saved and which were refused and
-// why (one bad preset must never sink the request the Creator did
-// get right).
-type createClipResponse struct {
-	Name            string            `json:"name"`
-	AcceptedPresets []string          `json:"accepted_presets"`
-	RejectedPresets map[string]string `json:"rejected_presets,omitempty"`
-}
-
-func toClipResultResponses(clips []domain.ClipResult) []clipResultResponse {
-	out := make([]clipResultResponse, 0, len(clips))
-	for _, c := range clips {
-		out = append(out, clipResultResponse{
-			Name: c.Name, Preset: c.Preset, Status: c.Status,
-			OutputPath: c.OutputPath, DurationSeconds: c.DurationSeconds, ErrorMessage: c.ErrorMessage,
-		})
-	}
-	return out
 }
 
 // errorResponse is the JSON body for non-2xx responses.
@@ -423,7 +360,6 @@ func toProjectResponse(p *domain.Project) projectResponse {
 		YoutubeVideoURL:  p.YoutubeVideoURL,
 		CaptionStatus:    p.CaptionStatus,
 		ErrorMessage:     p.ErrorMessage,
-		Clips:            toClipResultResponses(p.Clips),
 
 		ScriptContent:         p.ScriptContent,
 		BackgroundMusicPath:   p.BackgroundMusicPath,

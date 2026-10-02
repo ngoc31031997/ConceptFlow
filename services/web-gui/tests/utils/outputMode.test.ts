@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatsFor, isShortFormat } from "../../src/utils/outputMode";
-import { skippedReason, stepStatus } from "../../src/utils/flow";
+import { FLOW_LABELS, stepStatus } from "../../src/utils/flow";
 import type { VideoFormat } from "../../src/types";
 
 const format = (id: string, max: number): VideoFormat => ({
@@ -21,9 +21,8 @@ describe("formats by output mode", () => {
     expect(isShortFormat(format("x", 91))).toBe(false);
   });
 
-  it("step 12 (cutting clips) does not apply to a vertical short, and says why", () => {
-    expect(stepStatus(12, 13, "done", "short")).toBe("skipped");
-    expect(stepStatus(12, 13, "done", "both")).toBe("done");
-    expect(skippedReason(12, "short")).toContain("9:16");
+  it("no production step is skipped for either output: the flow has no clip-cutting step", () => {
+    expect(FLOW_LABELS).not.toContain("Cắt short");
+    for (const step of [9, 10, 11]) expect(stepStatus(step, 12, "idle", "remotion")).toBe("done");
   });
 });

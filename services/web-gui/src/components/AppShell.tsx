@@ -15,13 +15,13 @@ import { ProjectErrorBadge } from "./ProjectErrorBadge";
 import styles from "./AppShell.module.css";
 
 /*
-  Hành trình 14 bước (xem utils/flow.ts): mỗi pill là một bước Creator đi qua.
+  Hành trình 13 bước (xem utils/flow.ts): mỗi pill là một bước Creator đi qua.
   Bấm được mọi bước đã tới (tới bước xa nhất server ghi nhận) — để XEM lại. Có
   sửa được hay không là chuyện của server: chỉ draft hoặc dự án lỗi mới sửa
   được; còn lại mở ở chế độ chỉ đọc (xem `readOnly` bên dưới).
 */
 interface AppShellProps {
-  /** Bước trong flow 14 bước mà màn này đang hiển thị (1-14). */
+  /** Bước trong flow 13 bước mà màn này đang hiển thị (1-13). */
   currentStep?: number;
   title: string;
   subtitle: string;

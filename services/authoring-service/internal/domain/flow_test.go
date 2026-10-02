@@ -34,7 +34,6 @@ func TestFlowStateFor(t *testing.T) {
 		{"tts", StatusSynthesizingSpeech, 3, AuthoredContent{}, FlowState{FlowTTS, RunRunning}},
 		{"render failed", StatusFailedRenderScenes, 3, AuthoredContent{}, FlowState{FlowRender, RunFailed}},
 		{"qc is part of merge", StatusRunningQC, 3, AuthoredContent{}, FlowState{FlowMerge, RunRunning}},
-		{"clips", StatusGeneratingClips, 3, AuthoredContent{}, FlowState{FlowSplit, RunRunning}},
 		{"result", StatusReadyToPublish, 3, AuthoredContent{}, FlowState{FlowResult, RunIdle}},
 		{"published", StatusPublished, 3, AuthoredContent{}, FlowState{FlowPublish, RunDone}},
 	}
@@ -47,7 +46,7 @@ func TestFlowStateFor(t *testing.T) {
 
 func TestFlowStateCoversEveryFailedStatus(t *testing.T) {
 	steps := []StepName{StepParseScript, StepValidateScript, StepSynthesizeSpeech, StepRenderScenes,
-		StepAssembleVideo, StepQCVideo, StepGenerateClips, StepPublishVideo}
+		StepAssembleVideo, StepQCVideo, StepPublishVideo}
 	for _, s := range steps {
 		st := FlowStateFor(FailedStatusForStep(s), 3, AuthoredContent{})
 		if st.State != RunFailed {

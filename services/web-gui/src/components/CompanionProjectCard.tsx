@@ -2,7 +2,6 @@ import { Link } from "react-router-dom";
 import { useProject } from "../hooks/useProject";
 import { getProjectVideoUrl } from "../api/client";
 import { VideoPlayer } from "./VideoPlayer";
-import { ClipsPanel } from "./ClipsPanel";
 import { StatusBadge } from "./StatusBadge";
 import { Card } from "./ui";
 import glass from "../styles/glass.module.css";
@@ -43,14 +42,6 @@ export function CompanionProjectCard({ companionProjectId }: CompanionProjectCar
             <div className={glass.mtSm}>
               <VideoPlayer videoSrc={getProjectVideoUrl(companionProjectId)} />
             </div>
-          )}
-
-          {project.video_output_mode === "both" && (
-            <ClipsPanel
-              projectId={companionProjectId}
-              clips={project.clips ?? []}
-              videoOutputMode={project.video_output_mode}
-            />
           )}
 
           <Link

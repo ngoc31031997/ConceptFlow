@@ -18,9 +18,9 @@ function matches(p: Row, filter: string): boolean {
     case "problem":
       return p.run_state === "failed" || p.run_state === "cancelled";
     case "done":
-      return step >= 13 && p.run_state !== "failed";
+      return step >= 12 && p.run_state !== "failed";
     case "waiting":
-      return p.run_state === "idle" && step > 0 && step < 13;
+      return p.run_state === "idle" && step > 0 && step < 12;
     default:
       return true;
   }
@@ -213,19 +213,19 @@ describe("VideoListPage", () => {
     expect(screen.getByTestId("bulk-delete-button")).not.toBeDisabled();
   });
 
-  describe("theo flow 14 bước", () => {
+  describe("theo flow 13 bước", () => {
     const base = { updated_at: "2026-01-01T00:00:00Z", render_engine: "manim" };
     const rows = (): Row[] => [
       { ...base, project_id: "aaaaaaaa-1111", status: "rendering", topic: "thiên kiến sống sót", flow_step: 10, run_state: "running" },
       { ...base, project_id: "bbbbbbbb-2222", status: "failed_at_render_scenes", topic: "Vòng lặp for", flow_step: 10, run_state: "cancelled" },
       {
-        ...base, project_id: "cccccccc-3333", status: "ready_to_publish", topic: "Cây nhị phân", flow_step: 13, run_state: "idle",
+        ...base, project_id: "cccccccc-3333", status: "ready_to_publish", topic: "Cây nhị phân", flow_step: 12, run_state: "idle",
         forked_from: "aaaaaaaa-1111", forked_from_topic: "thiên kiến sống sót",
       },
       { ...base, project_id: "dddddddd-4444", status: "draft", flow_step: 2, run_state: "idle" },
     ];
 
-    it("names a project by its topic, shows where it is in the 14 steps, and links a fork to its source", async () => {
+    it("names a project by its topic, shows where it is in the 13 steps, and links a fork to its source", async () => {
       serve(rows());
       renderPage();
       await waitFor(() => expect(screen.getByTestId("video-row-aaaaaaaa-1111")).toBeInTheDocument());

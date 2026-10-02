@@ -16,7 +16,6 @@ Mount tại `/shared` (`/shared:ro` với publisher).
 | `/shared/.manim-media/{project_id}/` | rendering | cache Manim (`RENDER_CACHE_ROOT`) |
 | `/shared/{project_id}/video/final.mp4` | video-assembly | |
 | `/shared/{project_id}/video/final.srt` | video-assembly | |
-| `/shared/{project_id}/clips/{slug}_{preset}.mp4` | video-assembly | |
 | `/shared/{project_id}/thumbnail/` | api-gateway | upload của Creator |
 | `/shared/{project_id}/music/` | api-gateway | upload của Creator |
 | `/shared/channel-assets/{kind}/{quality}/rendered.mp4` | rendering | không thuộc project nào |

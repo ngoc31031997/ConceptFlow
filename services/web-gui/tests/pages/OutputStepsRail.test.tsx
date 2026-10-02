@@ -34,22 +34,23 @@ function renderAt(path: string, status: string, flowStep: number) {
 }
 
 // Result and Publish must tell the rail their own step numbers, or it
-// highlights "Cắt short" under "Bước 13 — Kết quả".
+// highlights another step under "Bước 12 — Kết quả".
 describe("the rail highlights the step the title names on the output screens", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
-  it("Kết quả is step 13", async () => {
-    renderAt("/projects/p1/result", "ready_to_publish", 13);
-    expect(await screen.findByTestId("rail-step-13")).toHaveAttribute("aria-current", "step");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Kết quả");
+  it("Kết quả is step 12", async () => {
+    renderAt("/projects/p1/result", "ready_to_publish", 12);
+    expect(await screen.findByTestId("rail-step-12")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 12 — Kết quả");
   });
 
-  it("Đăng video is step 14", async () => {
-    renderAt("/projects/p1/publish", "published", 14);
-    expect(await screen.findByTestId("rail-step-14")).toHaveAttribute("aria-current", "step");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 14 — Đăng video");
+  it("Đăng video is step 13", async () => {
+    renderAt("/projects/p1/publish", "published", 13);
+    expect(await screen.findByTestId("rail-step-13")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Đăng video");
+    expect(screen.queryByTestId("rail-step-14")).toBeNull();
   });
 });

@@ -11,8 +11,6 @@ const base: ProgressState = {
   animationIndex: null,
   renderPercent: null,
   mergePercent: null,
-  clipIndex: null,
-  clipTotal: null,
   status: "in_progress",
   errorMessage: null,
 };

@@ -82,8 +82,8 @@ describe("StatusStrip", () => {
     expect(cancel).not.toHaveBeenCalled();
   });
 
-  it("offers no cancel for a step with no worker to stop (cắt short, publish)", async () => {
-    renderStrip(project({ status: "generating_clips", flow_step: 12, run_state: "running" }), 12);
+  it("offers no cancel for a step with no worker to stop (publish)", async () => {
+    renderStrip(project({ status: "publishing", flow_step: 13, run_state: "running" }), 13);
     await waitFor(() => expect(screen.getByTestId("strip-pill")).toHaveTextContent("Đang chạy"));
     expect(screen.queryByTestId("strip-cancel")).not.toBeInTheDocument();
   });
@@ -107,7 +107,7 @@ describe("StatusStrip", () => {
 
   it("forks from the chosen step and opens the new project there", async () => {
     const fork = vi.spyOn(apiClient, "forkProject").mockResolvedValue({ project_id: "new-1", from_step: 4, needs_music_reselect: false });
-    renderStrip(project({ status: "ready_to_publish", flow_step: 13, run_state: "idle" }), 13);
+    renderStrip(project({ status: "ready_to_publish", flow_step: 12, run_state: "idle" }), 12);
 
     await waitFor(() => expect(screen.getByTestId("strip-fork")).toBeInTheDocument());
     fireEvent.click(screen.getByTestId("strip-fork"));

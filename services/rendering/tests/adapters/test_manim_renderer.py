@@ -390,40 +390,6 @@ def test_read_layout_marks_is_empty_when_the_script_recorded_none(tmp_path):
     assert ManimScriptRenderer._read_layout_marks(str(tmp_path / "nope.jsonl")) == []
 
 
-def test_read_clip_marks_collects_only_clip_records(tmp_path):
-    """Clip selections ride the same JSONL, picked out by
-    `kind` like layout marks already are."""
-    marks = tmp_path / "cf_marks.jsonl"
-    marks.write_text(
-        '{"kind": "mark", "index": 0, "t": 0.0}\n'
-        '{"kind": "clip", "name": "vi du chay that", "index": 0, '
-        '"t_start": 1.0, "t_end": 5.0}\n'
-        '{"kind": "mark", "index": 1, "t": 6.0}\n'
-    )
-
-    clips = ManimScriptRenderer._read_clip_marks(str(marks))
-
-    assert clips == [
-        {
-            "kind": "clip",
-            "name": "vi du chay that",
-            "index": 0,
-            "t_start": 1.0,
-            "t_end": 5.0,
-        }
-    ]
-
-
-def test_read_clip_marks_is_empty_when_the_script_recorded_none(tmp_path):
-    """Most scripts never call `self.clip(...)` — an empty list here just
-    means there is nothing for Video Assembly to derive vertical clips from."""
-    marks = tmp_path / "cf_marks.jsonl"
-    marks.write_text('{"kind": "mark", "index": 0, "t": 0.0}\n')
-
-    assert ManimScriptRenderer._read_clip_marks(str(marks)) == []
-    assert ManimScriptRenderer._read_clip_marks(str(tmp_path / "nope.jsonl")) == []
-
-
 def test_cache_prune_evicts_oldest_projects_over_budget(tmp_path):
     """A persistent per-project media_dir is a cache; without a ceiling it
     grows until the shared volume fills."""
@@ -672,55 +638,6 @@ def test_dry_run_collects_narration_beats_and_chapters(tmp_path, monkeypatch):
         "PATH", "HOME", "CF_MARKS_PATH", "PYTHONPATH", "CF_MODE",
     }
     assert not os.path.exists(os.path.join(str(tmp_path), "out.mp4"))
-
-
-def test_dry_run_collects_clip_marks(tmp_path, monkeypatch):
-    """Bug report (2026-09-12): a project that picked video_output_mode
-    short/both with a script that never called self.clip(...) only found out
-    "Chưa có clip nào" after TTS + render had already run — because dry_run()
-    discarded "clip" records the same marks file already had. This locks the
-    fix: clip_marks must come back from the dry pass, same shape as
-    _read_clip_marks reads for the real render."""
-    import json
-
-    renderer = ManimScriptRenderer(cache_root=None)
-
-    def fake_popen(cmd, **kwargs):
-        with open(kwargs["env"]["CF_MARKS_PATH"], "w", encoding="utf-8") as f:
-            for record in [
-                {"kind": "narration", "index": 0, "text": "dòng một"},
-                {
-                    "kind": "clip", "name": "vi du", "index": 0,
-                    "t_start": 1.0, "t_end": 5.0,
-                },
-            ]:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        return FakePopen()
-
-    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
-
-    result = renderer.dry_run(make_request())
-
-    assert result.clip_marks == [
-        {"kind": "clip", "name": "vi du", "index": 0, "t_start": 1.0, "t_end": 5.0},
-    ]
-
-
-def test_dry_run_clip_marks_empty_when_script_never_calls_self_clip(tmp_path, monkeypatch):
-    import json
-
-    renderer = ManimScriptRenderer(cache_root=None)
-
-    def fake_popen(cmd, **kwargs):
-        with open(kwargs["env"]["CF_MARKS_PATH"], "w", encoding="utf-8") as f:
-            f.write(json.dumps({"kind": "narration", "index": 0, "text": "x"}) + "\n")
-        return FakePopen()
-
-    monkeypatch.setattr("adapters.rendering.manim_renderer.subprocess.Popen", fake_popen)
-
-    result = renderer.dry_run(make_request())
-
-    assert result.clip_marks == []
 
 
 def test_dry_run_fails_when_script_produces_no_narration(monkeypatch):

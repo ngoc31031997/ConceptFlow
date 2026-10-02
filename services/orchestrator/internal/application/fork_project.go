@@ -151,14 +151,10 @@ func blankFork(src *domain.Project) *domain.Project {
 	dst.RenderedVideoPath = nil
 	dst.CaptionPath = nil
 	dst.CaptionStatus = nil
-	dst.ClipMarks = nil
-	dst.ClipRequests = nil
-	dst.Clips = nil
 	dst.LayoutMarks = nil
 	dst.WaitOffsets = nil
 	dst.Chapters = nil
 	dst.RenderedVideoSeconds = 0
-	dst.IntroDurationSeconds = 0
 	dst.CompanionProjectID = nil
 	dst.YoutubeTitle, dst.YoutubeDescription, dst.YoutubeVisibility = nil, nil, nil
 	dst.YoutubeTags, dst.YoutubePublishAt, dst.YoutubeThumbnailPath = nil, nil, nil

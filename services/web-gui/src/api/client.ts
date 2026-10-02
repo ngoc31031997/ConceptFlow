@@ -102,11 +102,6 @@ export function getProjectThumbnailUrl(projectId: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/thumbnail`;
 }
 
-/** Streams one generated vertical clip from the shared volume. */
-export function getProjectClipUrl(projectId: string, name: string, preset: string): string {
-  return `${GATEWAY_URL}/v1/projects/${projectId}/clips/${encodeURIComponent(name)}/${preset}`;
-}
-
 export interface ThumbnailInfo {
   exists: boolean;
   thumbnail_path: string | null;
@@ -278,7 +273,7 @@ export interface ProjectPageQuery {
   page: number;
   pageSize: number;
   filter: ProjectListFilter;
-  /** Các bước (1-14) cần lọc; rỗng = mọi bước. */
+  /** Các bước (1-13) cần lọc; rỗng = mọi bước. */
   steps: number[];
 }
 
@@ -365,25 +360,6 @@ export function suggestPublishMetadata(id: string, operationId?: string): Promis
   });
 }
 
-export interface SuggestShortScriptInput {
-  topic: string;
-  language: "vi" | "en";
-  /** Ngữ cảnh tuỳ chọn — script dài đã có, dùng để rút chủ đề. */
-  source_script_content?: string;
-}
-
-/** Soạn nháp script Shorts/TikTok bằng AI nội bộ (Ollama). */
-export function suggestShortScript(
-  input: SuggestShortScriptInput,
-  operationId?: string,
-): Promise<{ script_content: string }> {
-  return apiFetch<{ script_content: string }>("/v1/short-script-suggestions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}) },
-    body: JSON.stringify(input),
-  });
-}
-
 export function getYoutubeAuthStartUrl(projectId: string, clientId?: string): string {
   const params = new URLSearchParams({ state: projectId });
   // Omitted when there is only one configured client — the Publisher picks
@@ -454,7 +430,6 @@ export type PromptRole =
   // "Copy to an external AI" prompts, rendered by the server.
   | "manim_adjust"
   | "remotion_adjust"
-  | "short_script"
   | "thumbnail_design";
 
 /**
@@ -1397,7 +1372,7 @@ export function subscribeProgress(
   return () => source.close();
 }
 
-/** One line of a project's journey through the 14-step flow (project_events). */
+/** One line of a project's journey through the 13-step flow (project_events). */
 export interface ProjectEvent {
   id: number;
   project_id: string;

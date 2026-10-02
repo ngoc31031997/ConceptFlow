@@ -33,7 +33,7 @@ class Config:
     ollama_url: str
     ollama_model: str
     ollama_timeout: int
-    # Which provider serves the light tasks (suggest-metadata, suggest-short-script).
+    # Which provider serves the light task (suggest-metadata).
     light_provider: str
     # Code pipeline.
     code_chunk_shots: int

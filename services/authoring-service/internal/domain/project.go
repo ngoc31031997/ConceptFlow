@@ -43,20 +43,8 @@ const (
 	// ready_to_publish. Trạng thái này chỉ dùng khi chính message hỏng (không
 	// dựng nổi envelope), đúng ngữ nghĩa các bước khác. Một cổng hỏng không
 	// được biến thành cổng khoá.
-	StatusFailedQCVideo ProjectStatus = "failed_at_qc_video"
-	// generate_clips sits between qc_video and publish_video —
-	// cutting vertical clips from a video QC already flagged just multiplies
-	// the same defect into two or three clips, and clips should exist before
-	// the Creator reaches the results screen.
-	StatusGeneratingClips ProjectStatus = "generating_clips"
-	// StatusFailedGenerateClips is used only when the generate_clips MESSAGE
-	// itself is broken (undeliverable command, dead-lettered) — never when an
-	// individual clip fails. A clip's own failure is carried as
-	// status="error" on that one entry of clips_generated, and the saga still
-	// proceeds to ready_to_publish (a vertical clip is a derivative product,
-	// not the main video).
-	StatusFailedGenerateClips ProjectStatus = "failed_at_generate_clips"
-	StatusFailedPublishVideo  ProjectStatus = "failed_at_publish_video"
+	StatusFailedQCVideo      ProjectStatus = "failed_at_qc_video"
+	StatusFailedPublishVideo ProjectStatus = "failed_at_publish_video"
 	// Delete is a saga. The project stays `deleting` (hidden
 	// from the list, not in flight) until every service that writes to
 	// shared_artifacts has confirmed it removed its own files.
@@ -71,7 +59,7 @@ func (s ProjectStatus) IsInFlight() bool {
 	switch s {
 	case StatusParsingScript, StatusValidatingScript, StatusSynthesizingSpeech,
 		StatusRendering, StatusAssemblingVideo, StatusRunningQC,
-		StatusGeneratingClips, StatusPublishing:
+		StatusPublishing:
 		return true
 	}
 	return false
@@ -124,11 +112,8 @@ const (
 	// Bước riêng, nhưng worker sống trong video-assembly (nơi đã có
 	// sẵn ffmpeg/ffprobe và chính file video vừa ghép). Lệnh `qc_video` đi trên
 	// đúng queue `video_assembly.commands` mà `assemble_video` đang đi.
-	StepQCVideo StepName = "qc_video"
-	// Worker lives in video-assembly (same queue/dispatcher as
-	// assemble_video/qc_video/normalize_channel_asset — event_type tells them apart).
-	StepGenerateClips StepName = "generate_clips"
-	StepPublishVideo  StepName = "publish_video"
+	StepQCVideo      StepName = "qc_video"
+	StepPublishVideo StepName = "publish_video"
 )
 
 // IsFailedStatus reports whether s is any failed_at_<step> status.
@@ -159,8 +144,6 @@ func FailedStatusForStep(step StepName) ProjectStatus {
 		return StatusFailedAssembleVideo
 	case StepQCVideo:
 		return StatusFailedQCVideo
-	case StepGenerateClips:
-		return StatusFailedGenerateClips
 	case StepPublishVideo:
 		return StatusFailedPublishVideo
 	default:
@@ -255,35 +238,25 @@ func (q RenderQuality) IsValid() bool {
 
 // VideoOutputMode is which shape a project produces: the 16:9 long-form
 // video, or the vertical short built at 1080x1920 from the start (its own
-// script, storyboard and render; see ADR-0031). ModeBoth is the long video
-// with vertical clips cut from it; the wizard no longer offers it, and
-// generate_clips only runs for it.
+// script, storyboard and render; see ADR-0031).
 type VideoOutputMode string
 
 const (
 	ModeLongOnly  VideoOutputMode = "long"
 	ModeShortOnly VideoOutputMode = "short"
-	ModeBoth      VideoOutputMode = "both"
 )
 
-// DefaultVideoOutputMode preserves the only behaviour that existed before
-// this field did: every project produces its long-form video, and never
-// spends the extra generate_clips round-trip unless the Creator opts in.
+// DefaultVideoOutputMode is the mode of a project that never chose one: the
+// long-form video.
 const DefaultVideoOutputMode = ModeLongOnly
 
 // IsValid reports whether m is a mode the saga knows how to route.
 func (m VideoOutputMode) IsValid() bool {
 	switch m {
-	case ModeLongOnly, ModeShortOnly, ModeBoth:
+	case ModeLongOnly, ModeShortOnly:
 		return true
 	}
 	return false
-}
-
-// WantsClips reports whether the saga should run generate_clips at all. A
-// short is already vertical: there is nothing to cut.
-func (m VideoOutputMode) WantsClips() bool {
-	return m == ModeBoth
 }
 
 // Visibility restricts youtube visibility to the three values accepted by
@@ -376,8 +349,8 @@ type Project struct {
 	// DefaultRenderEngine everywhere it is read.
 	RenderEngine RenderEngine
 
-	// Which shape(s) of output this project produces — long-form, short
-	// clips, or both. Drives whether generate_clips runs at all.
+	// Which shape of output this project produces: the 16:9 long-form video
+	// or the vertical short.
 	VideoOutputMode VideoOutputMode
 
 	// Whether the fixed channel intro/outro sting is
@@ -433,35 +406,6 @@ type Project struct {
 	// code that reads a bbox is `video-assembly/domain/qc_rules.py`.
 	LayoutMarks []map[string]interface{}
 
-	// The `with self.clip(...)` selections Rendering measured
-	// on the real render pass, carried verbatim on rendering_completed
-	// (kind="clip", name, t_start, t_end) exactly like LayoutMarks: Orchestrator
-	// never reads a field inside, only stores it and hands it to
-	// generate_clips's request-merging logic.
-	ClipMarks []map[string]interface{}
-
-	// IntroDurationSeconds is the channel intro's real length, as measured by
-	// video-assembly when it resolved IntroAssetID and folded it into
-	// effective_lead_in — carried out on video_assembled. It is
-	// the only source of this number: Orchestrator's channel_asset_pointers
-	// projection stores no duration, and Orchestrator does not call
-	// video-assembly over HTTP. generate_clips needs it
-	// to shift a Creator's clip selection by the same amount the narration
-	// and subtitles were already shifted — without it, a clip cut from a
-	// project with an intro enabled would be off by exactly the intro's
-	// length.
-	IntroDurationSeconds float64
-	// ClipRequests holds the Creator-entered clip selections from
-	// POST /v1/projects/{id}/clips — {name, start_seconds, end_seconds,
-	// presets}. Kept separate from ClipMarks (script-sourced) so "trùng
-	// tên thì GUI thắng" can be resolved at generate_clips dispatch time
-	// without the two sources overwriting each other on arrival.
-	ClipRequests []map[string]interface{}
-	// Clips is the outcome of generate_clips, stored verbatim from
-	// clips_generated (one entry per requested (name, preset) pair, "ok" or
-	// "error" — a clip failure never blocks the saga).
-	Clips []ClipResult
-
 	// CompanionProjectID links two independent projects that
 	// cover the same topic as two different outputs — a long-form video and
 	// a short-form one with its own dedicated script (not a crop of the
@@ -494,17 +438,6 @@ type Project struct {
 	WizardRoute string
 }
 
-// ClipResult is one (name, preset) outcome of the generate_clips step,
-// stored verbatim from clips_generated's "clips" array.
-type ClipResult struct {
-	Name            string  `json:"name"`
-	Preset          string  `json:"preset"`
-	Status          string  `json:"status"` // "ok" | "error"
-	OutputPath      string  `json:"output_path,omitempty"`
-	DurationSeconds float64 `json:"duration_seconds,omitempty"`
-	ErrorMessage    string  `json:"error_message,omitempty"`
-}
-
 // ProjectSummary is the lightweight projection returned by GET /v1/projects
 // (list view) — deliberately excludes Scenes/ScriptContent so listing every
 // project never pulls their (potentially large) JSONB payload into memory.
@@ -519,7 +452,7 @@ type ProjectSummary struct {
 	WizardStep int
 	// Topic is the Creator's idea, so the list can name a project by it.
 	Topic string
-	// FlowStep/RunState place it in the 14-step flow (see FlowStateFor).
+	// FlowStep/RunState place it in the 13-step flow (see FlowStateFor).
 	FlowStep int
 	RunState RunState
 	// ForkedFrom is the project this one was forked from, "" if none.

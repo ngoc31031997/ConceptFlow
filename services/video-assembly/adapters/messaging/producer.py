@@ -32,17 +32,10 @@ def video_assembled_envelope(
     project_id: str,
     video_path: str,
     caption_path: str | None = None,
-    intro_duration_seconds: float = 0.0,
 ) -> dict:
     payload = {
         "event_type": "video_assembled",
         "video_path": video_path,
-        # Nguồn thật duy nhất của intro_duration — AssembleVideoCommandHandler
-        # đã resolve nó để dịch timeline (effective_lead_in). Không mang nó ra
-        # thì generate_clips sau này (Orchestrator không có cách nào khác biết
-        # con số này — nó không gọi HTTP sang video-assembly) sẽ cắt lệch đúng
-        # bằng độ dài intro. 0.0 khi project không bật intro.
-        "intro_duration_seconds": intro_duration_seconds,
     }
     if caption_path:
         # Absent rather than null when there is no caption track — mirrors
@@ -83,16 +76,6 @@ def qc_completed_envelope(
             "reason": reason,
             "findings": findings,
         },
-    )
-
-
-def clips_generated_envelope(saga_id: str, project_id: str, clips: list[dict]) -> dict:
-    """The ONLY event `generate_clips` produces. There is no global
-    `generate_clips_failed` (same shape as qc_video): each
-    clip in `clips` carries its own status="ok"/"error", so one bad clip
-    never keeps the good ones (or publish) from going through."""
-    return build_envelope(
-        saga_id, project_id, {"event_type": "clips_generated", "clips": clips}
     )
 
 
