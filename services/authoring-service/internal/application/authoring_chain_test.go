@@ -79,6 +79,51 @@ func TestChainCheckFailedIsANoteNotAnError(t *testing.T) {
 	}
 }
 
+func TestChainCheckFailedNoteNamesTheKindOfIssueLeft(t *testing.T) {
+	cases := []struct {
+		name string
+		out  GeneratedStep
+		want []string
+		not  []string
+	}{
+		{
+			name: "layout only",
+			out:  GeneratedStep{CheckFailed: true, Diagnostics: []string{"Shot 2.1: ra ngoài vùng an toàn"}, LayoutIssues: 1, RepairRounds: 2},
+			want: []string{"còn 1 lỗi bố cục sau 2 vòng sửa", "không chặn render", "Shot 2.1: ra ngoài vùng an toàn"},
+			not:  []string{"lỗi biên dịch"},
+		},
+		{
+			name: "compile only",
+			out:  GeneratedStep{CheckFailed: true, Diagnostics: []string{"dòng 4: TS2304"}, CompileIssues: 1, RepairRounds: 3},
+			want: []string{"vẫn lỗi biên dịch sau 3 vòng sửa: dòng 4: TS2304"},
+			not:  []string{"bố cục", "không chặn render"},
+		},
+		{
+			name: "both",
+			out:  GeneratedStep{CheckFailed: true, Diagnostics: []string{"dòng 4: TS2304", "Shot 3.1: lấn"}, CompileIssues: 1, LayoutIssues: 1, RepairRounds: 3},
+			want: []string{"vẫn lỗi biên dịch", "trong đó 1 lỗi bố cục"},
+			not:  []string{"không chặn render"},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := NewAuthoringChainRunner(&fakeStepRunner{result: map[string]GeneratedStep{"code": tc.out}}, nil)
+			_ = c.Start("p", []string{"code"})
+			st := waitFinished(t, c, "p")
+			for _, w := range tc.want {
+				if !strings.Contains(st.Note, w) {
+					t.Errorf("note %q lacks %q", st.Note, w)
+				}
+			}
+			for _, n := range tc.not {
+				if strings.Contains(st.Note, n) {
+					t.Errorf("note %q must not say %q", st.Note, n)
+				}
+			}
+		})
+	}
+}
+
 func TestChainRejectsSecondStartWhileRunning(t *testing.T) {
 	f := &fakeStepRunner{release: make(chan struct{})}
 	c := NewAuthoringChainRunner(f, nil)

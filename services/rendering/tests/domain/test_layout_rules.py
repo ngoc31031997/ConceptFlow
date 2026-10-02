@@ -59,14 +59,15 @@ def test_clean_script_has_no_finding():
 def test_the_three_planted_faults_block_on_the_right_shots():
     probe, lines = load("problems")
     found = without_hero(evaluate(probe))
-    assert all(f.blocking for f in found)
-    got = sorted((owner(lines, f.line), f.rule, f.line) for f in found)
+    got = sorted((owner(lines, f.line), f.rule, f.line, f.blocking) for f in found)
     assert got == [
-        ("1.2", TEXT_OVERFLOW, 62),   # nhãn 'Lớp men răng bảo vệ' rộng 502px trong width 360
-        ("1.3", SAFE_AREA, 77),       # Tooth mép phải 1891
-        ("1.3", SAFE_AREA, 78),       # Germ mép phải 1830 (cũng thật sự vượt)
-        ("2.1", TEXT_OVERLAP, 96),    # hai nhãn đè nhau
+        ("1.2", TEXT_OVERFLOW, 62, True),   # nhãn 'Lớp men răng bảo vệ' rộng 502px trong width 360
+        ("1.3", SAFE_AREA, 77, True),       # Tooth mép phải 1891
+        ("1.3", SAFE_AREA, 78, False),      # Germ mép phải 1830: lấn 6px, chỉ cảnh báo
+        ("2.1", TEXT_OVERLAP, 96, True),    # hai nhãn đè nhau
     ]
+    germ = next(f for f in found if f.line == 78)
+    assert "lấn nhẹ ≤ 11px, chỉ cảnh báo" in germ.message
     by_rule = {f.rule: f.message for f in found}
     assert by_rule[TEXT_OVERFLOW].startswith("Shot 1.2, frame ")
     assert "nhãn 'Lớp men răng bảo vệ' tràn khung chữ (rộng 502px > width 360px)" in by_rule[TEXT_OVERFLOW]
@@ -264,3 +265,55 @@ def test_a_portrait_frame_uses_the_shorts_safe_area():
     probe["composition"] = {"width": 1080, "height": 1920, "fps": 30}
     [f] = evaluate(probe)
     assert f.rule == SAFE_AREA and "phải x=1000 > 940" in f.message
+
+
+def test_an_object_that_slides_out_at_the_end_is_not_judged_while_leaving():
+    def leave(p):  # đứng ở x=400, cuối shot trượt ra mép trái
+        x = 400 if p < 0.5 else 40 if p < 0.9 else -150
+        return [BIG, kit(14, "Germ", rect(x, 400, 200, 200))]
+
+    assert evaluate(probe_of(leave)) == []
+
+    def sits_off_edge(p):  # đặt lệch ra ngoài khung suốt shot: không phải vật trượt ra
+        return [BIG, kit(14, "Germ", rect(-60, 400, 200, 200))]
+
+    [f] = evaluate(probe_of(sits_off_edge))
+    assert f.rule == SAFE_AREA and f.blocking and f.frames == ["85%", "100%"]
+
+
+def test_bands_and_dividers_that_cross_the_whole_safe_area_are_frame_decoration():
+    band = {"kind": "shape", "tag": "div", "line": 13, "rect": rect(-140, 350, 2200, 380), "opacity": 0.16}
+    divider = {"kind": "shape", "tag": "div", "line": 14, "rect": rect(959, 0, 2, 1080), "opacity": 1}
+    assert evaluate(probe_of(lambda p: [BIG, band, divider]), SubtitleBand("bottom", 240)) == []
+    # Vẫn không được chọn làm vật trọng tâm: shot chỉ còn vật nhỏ thì có cảnh báo L14.
+    small = kit(15, "Apple", rect(800, 400, 200, 200))
+    [f] = evaluate(probe_of(lambda p: [small, band]))
+    assert f.rule == HERO_SIZE and "hình Apple" in f.message
+
+
+def test_the_camera_pushing_a_side_object_out_only_warns_but_the_main_object_still_blocks():
+    side = kit(14, "Germ", rect(-60, 400, 200, 200), camera_moved=True)
+    hero_in = kit(12, "Tooth", rect(700, 290, 460, 460), camera_moved=True)
+    [f] = evaluate(probe_of(lambda p: [hero_in, side]))
+    assert f.rule == SAFE_AREA and not f.blocking
+    assert "máy quay zoom/lia đẩy vật phụ ra mép, chỉ cảnh báo" in f.message
+
+    hero_out = kit(12, "Tooth", rect(1500, 290, 460, 460), camera_moved=True)
+    [f] = evaluate(probe_of(lambda p: [hero_out]))
+    assert f.rule == SAFE_AREA and f.blocking
+
+    def zoom_in(p):  # máy zoom dần, cuối shot đẩy vật trọng tâm qua mép phải khung
+        moved = p > 0
+        return [kit(12, "Tooth", rect(700 + (1000 if p >= 0.85 else 0), 290, 460, 460), camera_moved=moved)]
+
+    [f] = evaluate(probe_of(zoom_in))
+    assert f.rule == SAFE_AREA and f.blocking and f.frames == ["85%", "100%"]
+
+
+def test_a_slight_excess_only_warns_and_one_hard_sample_makes_it_block():
+    [f] = evaluate(probe_of(lambda p: [BIG, kit(14, "Star", rect(91, 400, 200, 200))]))
+    assert f.rule == SAFE_AREA and not f.blocking and "lấn nhẹ ≤ 11px" in f.message
+
+    [f] = evaluate(probe_of(lambda p: [BIG, kit(14, "Star", rect(91 if p < 0.5 else 56, 400, 200, 200))]))
+    assert f.rule == SAFE_AREA and f.blocking and "trái x=56 < 96" in f.message
+    assert "chỉ cảnh báo" not in f.message

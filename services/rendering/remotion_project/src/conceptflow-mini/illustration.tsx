@@ -121,10 +121,17 @@ export function GroundShadow({cx, cy, rx}: {cx: number; cy: number; rx: number})
 // --- scene ------------------------------------------------------------------
 
 /**
+ * `data-cf-layer` value of the frame regions below: the layout check reads
+ * what carries it as scenery, which may reach the frame edge.
+ */
+const REGION_LAYER = 'scene';
+
+/**
  * A full-frame background for an illustrated scene, painted over the Stage's
  * default. `to` turns it into a soft top-to-bottom gradient from `color` to
  * `to` (a sky, a glowing interior). `floor` adds a flat floor band from
  * `floorY` down, the way a story-book room sits its furniture on one line.
+ * It is scenery for the layout check, not an object held to the safe area.
  */
 export function Backdrop({
   color = '#FFC857',
@@ -141,7 +148,7 @@ export function Backdrop({
 }) {
   const fill = to ? {backgroundImage: `linear-gradient(180deg, ${color} 0%, ${to} 100%)`} : {backgroundColor: color};
   return (
-    <AbsoluteFill style={{opacity}}>
+    <AbsoluteFill data-cf-layer={REGION_LAYER} style={{opacity}}>
       <div style={{position: 'absolute', inset: 0, ...fill}} />
       {floor ? (
         <div style={{position: 'absolute', left: 0, right: 0, top: floorY, bottom: 0, backgroundColor: floor}} />
@@ -153,7 +160,8 @@ export function Backdrop({
 /**
  * A flat coloured rectangle: one side of a split screen, a window onto
  * another place, a stripe between two panels. `x`, `y` are its top-left
- * corner (it is a region of the frame, not a figure).
+ * corner (it is a region of the frame, not a figure). Its colour is scenery
+ * for the layout check; what is drawn inside it is measured like any object.
  */
 export function Panel({
   x,
@@ -182,13 +190,14 @@ export function Panel({
         top: y,
         width: w,
         height: h,
-        backgroundColor: color,
         borderRadius: radius,
         overflow: 'hidden',
         opacity,
       }}
     >
-      {children}
+      <div data-cf-layer={REGION_LAYER} style={{position: 'absolute', inset: 0, backgroundColor: color}} />
+      {/* Positioned like the colour so in-flow children still paint over it. */}
+      <div style={{position: 'absolute', inset: 0}}>{children}</div>
     </div>
   );
 }

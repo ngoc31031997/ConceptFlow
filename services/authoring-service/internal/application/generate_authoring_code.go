@@ -95,6 +95,11 @@ func (uc *GenerateAuthoringUseCase) runCode(
 		// diagnostics and fix the script by hand. Flagged, never passed off as clean.
 		out.CheckFailed = true
 		for _, d := range result.Diagnostics {
+			if d.Kind == CheckKindLayout {
+				out.LayoutIssues++
+			} else {
+				out.CompileIssues++
+			}
 			if d.Line > 0 {
 				out.Diagnostics = append(out.Diagnostics, fmt.Sprintf("dòng %d: %s", d.Line, d.Message))
 			} else {

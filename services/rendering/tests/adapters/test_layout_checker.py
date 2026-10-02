@@ -198,14 +198,16 @@ def _only_hero_size(warnings: list[str]) -> bool:
 @needs_real
 def test_real_problems_script_gives_the_three_planted_faults_on_the_right_shots(real_checker):
     out, lines = _check(real_checker, "problems")
-    assert not out.ok and _only_hero_size(out.warnings)
+    assert not out.ok
+    # Germ lấn 6px qua mép phải: lấn nhẹ, chỉ cảnh báo.
+    slight = [w for w in out.warnings if "chiều khung (< 40%)" not in w]
+    assert len(slight) == 1 and "hình Germ ra ngoài vùng an toàn" in slight[0] and "lấn nhẹ" in slight[0]
     got = sorted(
         (_owner(lines, d.line), d.kind, d.message.split(": ", 1)[1].split(" (")[0])
         for d in out.diagnostics
     )
     assert got == [
         ("1.2", "layout", "nhãn 'Lớp men răng bảo vệ' tràn khung chữ"),
-        ("1.3", "layout", "hình Germ ra ngoài vùng an toàn"),
         ("1.3", "layout", "hình Tooth ra ngoài vùng an toàn"),
         ("2.1", "layout", "nhãn 'Đánh răng hai lần mỗi ngày'"),
     ]

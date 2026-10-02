@@ -2848,3 +2848,21 @@ C C1 xoá hẳn"
 **AI Response (duyệt)**: Chốt Phương án 1; Q2, Q3 theo khuyến nghị (a)/(a). Commit tài liệu thiết kế, chuyển sang `/code`.
 
 ---
+
+## CR-062 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "làm theo mục 1 đi"
+**AI Response**:
+- **rendering**:
+  - `Backdrop` và màu của `Panel` mang `data-cf-layer`. Con của Panel nằm trong một lớp `absolute inset 0` phía trên màu, nên vẫn được đo như vật thường. Harness không gói `Backdrop`/`Panel` như hình kit (`REGION_PARTS`). Bước này thiết kế chỉ ghi gắn thuộc tính, nhưng cần thêm vì nếu không, harness vẫn đo hộp kit của chúng.
+  - `Camera` và lớp hình của `Scene` mang `data-cf-camera="moved"` khi máy zoom hoặc lệch tâm; harness ghi `camera_moved`.
+  - `layout_rules.py`: (a) khối cắt ngang trọn vùng an toàn theo một chiều là trang trí, không xét vùng an toàn/phụ đề, không làm vật trọng tâm; (b) vật trượt ra (đã nằm trọn trong khung rồi kết thúc ngoài khung, không do máy quay) không bị xét; (c) vật phụ bị máy quay đẩy ra chỉ cảnh báo, vật trọng tâm vẫn chặn; (d) lấn ≤ 1% cạnh ngắn (11px) chỉ cảnh báo; một mẫu lấn nặng thì cả vi phạm vẫn chặn.
+- **authoring-service**: `GeneratedStep` thêm `compile_issues`/`layout_issues`. Khi chỉ còn lỗi bố cục, ghi chú chuỗi AI là "còn N lỗi bố cục … (không chặn render …)"; nhật ký và log cũng gọi đúng loại. Khi có lỗi biên dịch thì giữ câu cũ, thêm "trong đó N lỗi bố cục".
+- **Test**: rendering 355 pass, 5 skip (chạy trong container rendering vừa build); `tests/conceptflow/test_channel_idents.py` không chạy được trong container (cần cây repo đầy đủ, `IndexError` khi tìm gốc repo) nên **chưa chạy** — file này không liên quan thay đổi. Có 5 test luật mới và 2 test cũ được sửa: Germ lấn 6px của mẫu `problems` nay là cảnh báo, đúng Q3 = (a). authoring-service `go test ./...` pass; `go vet`, `gofmt` sạch. `tsc --noEmit` của remotion_project sạch. `ruff check` sạch; `ruff format --check` báo `layout_rules.py` chưa format, kể cả các dòng có sẵn trên main, nên không format lại cả file.
+- **Rebuild**: rendering và authoring-service healthy (code từ `feature/cr-062-layout-warnings-non-blocking`).
+- **Kiểm trực tiếp**: `/v1/check/remotion` trên script hiện tại của 257acc58: 29 lỗi chặn → 6 lỗi chặn + 13 cảnh báo bố cục mới. 6 lỗi còn lại đều là vật trọng tâm của shot bị lấn: 2.4, 4.5 (máy quay đẩy hình chính ra mép), 2.6 (AntennaDish lấn 18px), 7.2 (vạch dòng thời gian 1720×8), 9.3 (dải sáng 1600×100), 10.2 (khối div). Ở 7.2/9.3/10.2, "vật trọng tâm" theo luật có sẵn (cạnh dài nhất) là vạch/dải trang trí. Đo thử cách chọn theo diện tích: chỉ đổi được 7.2, nên giữ như thiết kế. Ảnh tĩnh `Panel`: khối thường và khối absolute bên trong đều hiện trên màu nền, bo góc vẫn cắt.
+**Impact Assessment**: rendering, authoring-service. Không đổi contract (chỉ thêm trường JSON), DB, prompt.
+**Artifacts Affected**: `services/rendering/remotion_project/src/conceptflow-mini/{illustration,scene}.tsx`, `services/rendering/remotion_project/src/layout-probe/harness.tsx`, `services/rendering/domain/layout_rules.py`, `services/rendering/tests/domain/test_layout_rules.py`, `services/rendering/tests/adapters/test_layout_checker.py`, `services/authoring-service/internal/application/{code_pipeline,generate_authoring,generate_authoring_code,authoring_chain}.go` + test, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-062, chờ Creator duyệt rồi `/deliver`.
+
+---

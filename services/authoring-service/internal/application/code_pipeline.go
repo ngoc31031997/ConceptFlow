@@ -127,10 +127,14 @@ type CodeCall struct {
 	ErrorMessage string
 }
 
+// CheckKindLayout is the CodeDiagnostic.Kind of a layout issue found by
+// drawing the shots; every other kind ("compile", "") fails the build itself.
+const CheckKindLayout = "layout"
+
 type CodeDiagnostic struct {
 	Message string
-	Line    int // 0 = none
-	Kind    string
+	Line    int    // 0 = none
+	Kind    string // "compile" | CheckKindLayout
 	Rule    string
 	// Shot and Segment the failing line belongs to ("" = none / the frame).
 	Shot    string

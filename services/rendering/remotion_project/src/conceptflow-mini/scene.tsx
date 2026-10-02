@@ -15,7 +15,10 @@
  * Coordinates are the frame's own (0..width, 0..height of the composition),
  * so the same code fits a landscape and a portrait video. Layers and lights
  * carry `data-cf-layer`: the layout check reads them as scenery, not as
- * objects that must stay inside the safe area.
+ * objects that must stay inside the safe area. The figures' layer and
+ * `Camera` carry `data-cf-camera="moved"` while the camera is off its rest
+ * point: an object it pushes past the safe area is the shot's framing, and
+ * the layout check only warns about it unless it is the shot's main object.
  */
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
@@ -41,6 +44,9 @@ const OVERSCAN = 0.12;
 const DEPTH = {sky: 0, far: 0.3, mid: 0.7, near: 1.35} as const;
 const SCENERY = 'scene';
 const LIGHT = 'light';
+const CAMERA_MOVED = 'moved';
+/** Half a pixel: closer than this to the rest point counts as not moved. */
+const CAMERA_REST_TOLERANCE = 0.5;
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
 
 /**
@@ -62,6 +68,18 @@ export function useCamera(move: CameraMove | undefined, duration: number): Camer
     y: from.y + (to.y - from.y) * t,
     zoom: Math.max(1, (from.zoom ?? 1) + ((to.zoom ?? 1) - (from.zoom ?? 1)) * t),
   };
+}
+
+/**
+ * `data-cf-camera` for the figures seen through `cam`: set while the camera
+ * is zoomed in or looks away from the frame centre, else absent.
+ */
+function cameraMark(cam: CameraState, width: number, height: number): string | undefined {
+  const moved =
+    cam.zoom - 1 > 1e-3 ||
+    Math.abs(cam.x - width / 2) > CAMERA_REST_TOLERANCE ||
+    Math.abs(cam.y - height / 2) > CAMERA_REST_TOLERANCE;
+  return moved ? CAMERA_MOVED : undefined;
 }
 
 /**
@@ -91,7 +109,10 @@ export function Camera({
   const {width, height} = useVideoConfig();
   const cam = useCamera({from, to, start, end}, duration);
   return (
-    <AbsoluteFill style={{transformOrigin: '0 0', transform: lensTransform(cam, 1, width, height)}}>
+    <AbsoluteFill
+      data-cf-camera={cameraMark(cam, width, height)}
+      style={{transformOrigin: '0 0', transform: lensTransform(cam, 1, width, height)}}
+    >
       {children}
     </AbsoluteFill>
   );
@@ -132,6 +153,7 @@ function Layer({
   return (
     <AbsoluteFill
       data-cf-layer={overscan ? SCENERY : undefined}
+      data-cf-camera={overscan ? undefined : cameraMark(cam, width, height)}
       style={{transformOrigin: '0 0', transform: lensTransform(cam, depth, width, height), filter: blur ? `blur(${blur}px)` : undefined}}
     >
       <LayerContext.Provider value={box}>

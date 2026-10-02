@@ -159,13 +159,17 @@ type GeneratedStep struct {
 	// editor rather than buy it a second time.
 	SaveError string `json:"save_error,omitempty"`
 	// Set by the code step. CheckFailed means the script was saved but
-	// still fails the compile check after the last repair round; the Creator can
-	// read Diagnostics and fix it by hand.
-	CheckFailed  bool     `json:"check_failed,omitempty"`
-	Diagnostics  []string `json:"diagnostics,omitempty"`
-	RepairRounds int      `json:"repair_rounds,omitempty"`
-	Warnings     []string `json:"warnings,omitempty"`
-	ModelCalls   int      `json:"model_calls,omitempty"`
+	// still fails the check after the last repair round; the Creator can
+	// read Diagnostics and fix it by hand. CompileIssues and LayoutIssues
+	// count Diagnostics by kind: a script with layout issues only still
+	// renders, some drawings may just reach past the safe area.
+	CheckFailed   bool     `json:"check_failed,omitempty"`
+	Diagnostics   []string `json:"diagnostics,omitempty"`
+	CompileIssues int      `json:"compile_issues,omitempty"`
+	LayoutIssues  int      `json:"layout_issues,omitempty"`
+	RepairRounds  int      `json:"repair_rounds,omitempty"`
+	Warnings      []string `json:"warnings,omitempty"`
+	ModelCalls    int      `json:"model_calls,omitempty"`
 	// Set by the illustrations step when it finished drawing but some
 	// drawings still wait for the Creator; Message says which.
 	AwaitingReview bool   `json:"awaiting_review,omitempty"`
@@ -236,7 +240,7 @@ func (uc *GenerateAuthoringUseCase) execute(
 		uc.recordEvent(ctx, projectID, step, domain.RunFailed, started, out, info, out.SaveError)
 	} else if out.CheckFailed {
 		uc.recordEvent(ctx, projectID, step, domain.RunFailed, started, out, info,
-			"code đã lưu nhưng vẫn lỗi biên dịch: "+strings.Join(out.Diagnostics, " · "))
+			out.checkFailedHead()+": "+strings.Join(out.Diagnostics, " · "))
 	} else {
 		uc.recordEvent(ctx, projectID, step, domain.RunDone, started, out, info, "")
 	}
@@ -248,10 +252,36 @@ func (uc *GenerateAuthoringUseCase) execute(
 		uc.logError(ctx, projectID, step, &LLMError{
 			Kind: ErrKindCheckFailed, Provider: "llm-service",
 			Diag: strings.Join(out.Diagnostics, "\n"),
-			Err:  fmt.Errorf("the script was saved but still fails the compile check after %d repair round(s)", out.RepairRounds),
+			Err:  fmt.Errorf("the script was saved but still fails the %s check after %d repair round(s)", out.failedCheck(), out.RepairRounds),
 		}, info, started)
 	}
 	return out, err
+}
+
+// LayoutOnly reports whether the issues left after a failed check are all
+// layout issues: the script compiles and renders.
+func (g GeneratedStep) LayoutOnly() bool {
+	return g.CheckFailed && g.CompileIssues == 0 && g.LayoutIssues > 0
+}
+
+// failedCheck names the check a saved script still fails, for the logs.
+func (g GeneratedStep) failedCheck() string {
+	if g.LayoutOnly() {
+		return "layout"
+	}
+	return "compile"
+}
+
+// checkFailedHead is the journal's one-line verdict on a saved script that
+// still fails the check, naming the kind of issue that is left.
+func (g GeneratedStep) checkFailedHead() string {
+	if g.LayoutOnly() {
+		return fmt.Sprintf("code đã lưu, còn %d lỗi bố cục (không chặn render)", g.LayoutIssues)
+	}
+	if g.LayoutIssues > 0 {
+		return fmt.Sprintf("code đã lưu nhưng vẫn lỗi biên dịch (kèm %d lỗi bố cục)", g.LayoutIssues)
+	}
+	return "code đã lưu nhưng vẫn lỗi biên dịch"
 }
 
 // recordEvent journals a run's start or end. Best-effort, like logError: a lost

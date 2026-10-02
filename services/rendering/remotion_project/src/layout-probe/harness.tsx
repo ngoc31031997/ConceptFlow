@@ -38,6 +38,8 @@ type Box = {
   rect: Rect;
   opacity: number;
   full_frame?: boolean;
+  /** Drawn through a camera that is zoomed in or off the frame centre. */
+  camera_moved?: boolean;
   component?: string;
   tag?: string;
   // text only
@@ -73,6 +75,9 @@ const SVG_PARTS = new Set(['Face', 'GroundShadow']);
 // stage the figures stand on, not a figure, so they get no box of their own;
 // what they draw carries `data-cf-layer` and is skipped when measuring.
 const STAGE_PARTS = new Set(['Scene', 'Camera', 'Glow', 'LightRays', 'Vignette']);
+// Regions of the frame: a backdrop and a split-screen panel. Their colour
+// carries `data-cf-layer`; what a panel holds is measured on its own.
+const REGION_PARTS = new Set(['Backdrop', 'Panel']);
 
 /**
  * A kit component wrapped so its box can be found and named: a
@@ -96,7 +101,7 @@ function tagModule(mod: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(mod)) {
     const isComponent =
-      typeof value === 'function' && /^[A-Z]/.test(name) && !SVG_PARTS.has(name) && !STAGE_PARTS.has(name);
+      typeof value === 'function' && /^[A-Z]/.test(name) && !SVG_PARTS.has(name) && !STAGE_PARTS.has(name) && !REGION_PARTS.has(name);
     out[name] = isComponent ? tagged(name, value as React.ComponentType<Record<string, unknown>>) : value;
   }
   return out;
@@ -299,6 +304,7 @@ function collect(stage: HTMLElement, width: number, height: number): Box[] {
     if (!entry || (entry.rect.w <= 0 && entry.rect.h <= 0)) continue;
     const {x, y, w, h} = entry.rect;
     if (x <= 0.5 && y <= 0.5 && x + w >= width - 0.5 && y + h >= height - 0.5) entry.full_frame = true;
+    if (el.closest('[data-cf-camera="moved"]')) entry.camera_moved = true;
     if (entry.kind === 'text') {
       let p = el.parentElement;
       entry.text_parent = null;

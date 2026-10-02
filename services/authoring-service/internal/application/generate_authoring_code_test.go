@@ -286,6 +286,25 @@ func TestCodeStepSavesAScriptThatStillFailsTheCheckButFlagsIt(t *testing.T) {
 	}
 }
 
+func TestCodeStepCountsLeftoverIssuesByKind(t *testing.T) {
+	uc, _, _, _ := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
+	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{
+		Code: "laid out badly", CheckOK: false, RepairRounds: 2,
+		Diagnostics: []application.CodeDiagnostic{
+			{Message: "Shot 2.1: ra ngoài vùng an toàn", Line: 40, Kind: application.CheckKindLayout, Rule: "safe_area"},
+			{Message: "Shot 3.1: ra ngoài vùng an toàn", Line: 70, Kind: application.CheckKindLayout, Rule: "safe_area"},
+		},
+	}})
+
+	got, err := uc.Execute(context.Background(), "p1", "code")
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if !got.CheckFailed || got.LayoutIssues != 2 || got.CompileIssues != 0 || !got.LayoutOnly() {
+		t.Errorf("checkFailed=%v layout=%d compile=%d layoutOnly=%v", got.CheckFailed, got.LayoutIssues, got.CompileIssues, got.LayoutOnly())
+	}
+}
+
 func TestCodeStepBillsTheCallsOfARunThatFailed(t *testing.T) {
 	uc, _, code, usage := codeFixture(t, domain.RenderEngineRemotion, `{"scenes":[]}`)
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{

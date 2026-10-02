@@ -202,8 +202,15 @@ func (c *AuthoringChainRunner) run(ctx context.Context, projectID string, steps 
 				shown = shown[:5]
 			}
 			note := fmt.Sprintf("Đã sinh và lưu code nhưng vẫn lỗi biên dịch sau %d vòng sửa: %s", out.RepairRounds, strings.Join(shown, " · "))
+			if out.LayoutOnly() {
+				note = fmt.Sprintf("Đã sinh và lưu code; còn %d lỗi bố cục sau %d vòng sửa (không chặn render — vài hình có thể lấn mép khung): %s",
+					out.LayoutIssues, out.RepairRounds, strings.Join(shown, " · "))
+			}
 			if extra := len(out.Diagnostics) - len(shown); extra > 0 {
 				note += fmt.Sprintf(" (+%d lỗi nữa)", extra)
+			}
+			if !out.LayoutOnly() && out.LayoutIssues > 0 {
+				note += fmt.Sprintf(" — trong đó %d lỗi bố cục", out.LayoutIssues)
 			}
 			c.finish(projectID, func(st *ChainState) { st.Note = note + ". Sửa tay trong ô soạn thảo, hoặc chạy lại." })
 			return

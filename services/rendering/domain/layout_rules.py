@@ -13,19 +13,30 @@ Luật lấy từ mục F của prompt Remotion Engineer (L1, L4, L5, L14):
   vùng phụ đề in lên hình                     |   chiều khung (L14)
   hai khối chữ đè nhau                        | còn tài nguyên chưa tải xong
   chữ tràn khung (scrollWidth > clientWidth+1)|   (số đo có thể thiếu vật)
-  chữ nhỏ hơn 32px                            |
-  shot ném lỗi khi chạy ở một frame           |
+  chữ nhỏ hơn 32px                            | lấn vùng an toàn ≤ 1% cạnh ngắn
+  shot ném lỗi khi chạy ở một frame           |   của khung
+                                              | vật phụ bị máy quay (zoom, lia)
+                                              |   đẩy ra ngoài vùng an toàn
 
 Khung (ngang hay dọc) lấy từ `composition` của chính lần đo. Lớp nền và ánh
-sáng của `Scene` (`data-cf-layer`) không có trong số đo: harness bỏ qua chúng.
+sáng của `Scene`, màu của `Backdrop` và `Panel` (`data-cf-layer`) không có
+trong số đo: harness bỏ qua chúng. Khối không phải chữ cắt ngang trọn vùng an
+toàn theo một chiều (dải sáng rộng hơn khung, vạch chia cao bằng khung) là
+trang trí của khung: không xét vùng an toàn, vùng phụ đề, cũng không được
+chọn làm vật trọng tâm.
 
 Vài điều không hiển nhiên, đều vì hoạt hình:
 
 * **Vật trượt vào/ra khỏi khung** là ngoại lệ duy nhất của L1. Code không đọc
   được kịch bản, nên vật nào có lúc nằm (một phần) ngoài khung hình ở một mẫu
   bất kỳ được coi là vật trượt: với nó, vùng an toàn/vùng phụ đề chỉ xét ở các
-  mẫu đã yên (≥ 85% shot). Vật không bao giờ ra khỏi khung thì xét ở mọi mẫu —
-  nhờ vậy spring vọt lố qua mép vùng an toàn vẫn bị bắt.
+  mẫu đã yên (≥ 85% shot). Vật đã nằm trọn trong khung rồi kết thúc ở ngoài
+  khung là vật trượt ra: các mẫu đã yên của nó là lúc nó đang trượt ra, nên
+  không xét. Vật không bao giờ ra khỏi khung thì xét ở mọi mẫu — nhờ vậy
+  spring vọt lố qua mép vùng an toàn vẫn bị bắt.
+* **Máy quay** zoom hay lia thì cắt bớt vật ở mép khung: đó là cú máy, nên vật
+  phụ bị đẩy ra ngoài vùng an toàn chỉ là cảnh báo. Vật trọng tâm (vật lớn
+  nhất của shot) vẫn phải nằm trong vùng an toàn (L8).
 * **Cỡ chữ** xét ở các mẫu đã yên: bong bóng thoại đang phóng lên có chữ 25px
   ở giữa chuyển động là bình thường (T6a, mục 8.5). Cỡ là cỡ HIỂN THỊ (sau
   scale), vì đó là cái người xem thấy.
@@ -47,6 +58,8 @@ SETTLED_PCT = 0.85
 OVERLAP_MIN_OPACITY = 0.6
 # Chữ lấn một pixel ra ngoài hộp của chính nó chưa phải là tràn.
 OVERFLOW_TOLERANCE_PX = 1
+# Lấn vùng an toàn tới chừng này (phần của cạnh ngắn khung) mắt khó thấy: cảnh báo.
+SOFT_EXCESS_FRACTION = 0.01
 
 SAFE_AREA = "safe_area"
 SUBTITLE_ZONE = "subtitle_zone"
@@ -85,16 +98,19 @@ class LayoutFinding:
     frames: list[str] = field(default_factory=list)
     total_samples: int = 0
     score: float = 0.0  # độ nặng, để giữ lại số đo tệ nhất khi gộp các mẫu
+    # Vì sao một vi phạm của luật chặn chỉ là cảnh báo; "" = chặn như luật.
+    soft_reason: str = ""
 
     @property
     def blocking(self) -> bool:
-        return self.rule in BLOCKING_RULES
+        return self.rule in BLOCKING_RULES and not self.soft_reason
 
     @property
     def message(self) -> str:
+        detail = f"{self.detail} — {self.soft_reason}" if self.soft_reason else self.detail
         if not self.frames:  # cả shot (kích thước vật trọng tâm)
-            return f"Shot {self.shot}: {self.detail}"
-        return f"Shot {self.shot}, {_frames_label(self.frames, self.total_samples)}: {self.detail}"
+            return f"Shot {self.shot}: {detail}"
+        return f"Shot {self.shot}, {_frames_label(self.frames, self.total_samples)}: {detail}"
 
 
 def _pct_label(pct: float) -> str:
@@ -146,6 +162,18 @@ class _Frame:
     def outside(self, b: dict) -> bool:
         """Cả hộp nằm ngoài khung hình (không ai nhìn thấy)."""
         return b["x"] + b["w"] <= 0 or b["y"] + b["h"] <= 0 or b["x"] >= self.w or b["y"] >= self.h
+
+    def spans(self, b: dict) -> bool:
+        """Hộp vượt qua cả hai mép đối diện của vùng an toàn, theo chiều ngang
+        hoặc chiều dọc: một dải, một vạch chia của khung, không phải một vật."""
+        t, safe = EDGE_TOLERANCE, self.safe
+        across = b["x"] < safe.left - t and b["x"] + b["w"] > safe.right + t
+        down = b["y"] < safe.top - t and b["y"] + b["h"] > safe.bottom + t
+        return across or down
+
+    @property
+    def soft_excess_px(self) -> float:
+        return SOFT_EXCESS_FRACTION * min(self.w, self.h)
 
 
 def _safe_area_excess(b: dict, safe: SafeArea) -> tuple[list[str], float]:
@@ -225,8 +253,12 @@ class _Collector:
             return
         if label not in prev.frames:
             prev.frames.append(label)
+        # Chặn ở một mẫu là chặn cả vi phạm.
+        soft = prev.soft_reason and finding.soft_reason
         if finding.score > prev.score:
-            prev.detail, prev.score = finding.detail, finding.score
+            prev.detail, prev.score, prev.soft_reason = finding.detail, finding.score, finding.soft_reason
+        if not soft:
+            prev.soft_reason = ""
 
 
 def evaluate(probe: dict, subtitle_band: SubtitleBand | None = None) -> list[LayoutFinding]:
@@ -244,13 +276,40 @@ def _evaluate_shot(
     shot: dict, ctx: _Shot, frame: _Frame, band: SubtitleBand | None,
 ) -> list[LayoutFinding]:
     samples = shot.get("samples", [])
-    # Vật trượt vào/ra: có lúc nằm (một phần) ngoài khung hình.
-    sliding = {
-        _identity(e) for s in samples for e in s.get("elements", [])
-        if not e.get("full_frame") and frame.beyond(_box(e))
-    }
-    col = _Collector()
+
+    def judged(e: dict) -> bool:
+        """Phần tử có được xét không: không phủ trọn khung, còn thấy được."""
+        return not e.get("full_frame") and not frame.outside(_box(e))
+
+    # Lượt 1: vật trượt, vật trượt ra (nằm trọn trong khung rồi mới ra), vật trọng tâm.
+    sliding: set[tuple] = set()
+    first_inside: dict[tuple, int] = {}
+    last_beyond: dict[tuple, int] = {}
+    last_seen: dict[tuple, int] = {}
     largest, hero = -1.0, None
+    for i, s in enumerate(samples):
+        for e in s.get("elements", []):
+            if e.get("full_frame"):
+                continue
+            ident = _identity(e)
+            last_seen[ident] = i
+            if frame.beyond(_box(e)):
+                sliding.add(ident)
+                last_beyond[ident] = i
+            else:
+                first_inside.setdefault(ident, i)
+            if e.get("kind") != "text" and judged(e) and not frame.spans(_box(e)):
+                size = max(e["rect"]["w"] / frame.w, e["rect"]["h"] / frame.h)
+                if size > largest:
+                    largest, hero = size, e
+    hero_ident = _identity(hero) if hero is not None else None
+    sliding_out = {
+        ident for ident in sliding
+        if ident in first_inside and first_inside[ident] < last_beyond[ident] == last_seen[ident]
+    }
+
+    # Lượt 2: chấm từng mẫu.
+    col = _Collector()
     for s in samples:
         pct = float(s.get("pct", 0))
         settled = pct >= SETTLED_PCT - 1e-9
@@ -264,14 +323,14 @@ def _evaluate_shot(
                 f"còn {s['pending_delay_render']} tài nguyên (font, Lottie) chưa tải xong sau 5 giây — "
                 "số đo có thể thiếu vật"), pct)
         for e in s.get("elements", []):
-            if e.get("full_frame") or frame.outside(_box(e)):
+            if not judged(e):
                 continue
-            if e.get("kind") != "text":
-                size = max(e["rect"]["w"] / frame.w, e["rect"]["h"] / frame.h)
-                if size > largest:
-                    largest, hero = size, e
-            if settled or _identity(e) not in sliding:
-                _check_placement(e, ctx, frame, band, col, pct)
+            ident = _identity(e)
+            # Vật bị máy quay đẩy ra khỏi khung không phải vật trượt ra: luật máy quay xét nó.
+            leaving = ident in sliding_out and not e.get("camera_moved")
+            placed = ident not in sliding or (settled and not leaving)
+            if placed and (e.get("kind") == "text" or not frame.spans(_box(e))):
+                _check_placement(e, ctx, frame, band, col, pct, is_hero=ident == hero_ident)
             if e.get("kind") == "text":
                 _check_text(e, ctx, settled, col, pct)
         _check_overlaps(s.get("elements", []), ctx, frame, col, pct)
@@ -288,13 +347,22 @@ def _evaluate_shot(
 
 def _check_placement(
     e: dict, ctx: _Shot, frame: _Frame, band: SubtitleBand | None, col: _Collector, pct: float,
+    is_hero: bool = False,
 ) -> None:
-    """Vùng an toàn và vùng phụ đề."""
+    """Vùng an toàn và vùng phụ đề.
+
+    Lấn vùng an toàn chỉ là cảnh báo khi lấn rất ít, hoặc khi máy quay đang
+    zoom/lia đẩy một vật không phải vật trọng tâm ra mép."""
     box, ident, line = _box(e), _identity(e), e.get("line")
     parts, worst = _safe_area_excess(box, frame.safe)
     if parts:
         detail = f"{_describe(e)} ra ngoài vùng an toàn ({', '.join(parts)})"
-        col.add((SAFE_AREA, ident), ctx.finding(SAFE_AREA, line, detail, worst), pct)
+        finding = ctx.finding(SAFE_AREA, line, detail, worst)
+        if e.get("camera_moved") and not is_hero:
+            finding.soft_reason = "máy quay zoom/lia đẩy vật phụ ra mép, chỉ cảnh báo"
+        elif worst <= frame.soft_excess_px:
+            finding.soft_reason = f"lấn nhẹ ≤ {round(frame.soft_excess_px)}px, chỉ cảnh báo"
+        col.add((SAFE_AREA, ident), finding, pct)
     if band is None:
         return
     if band.edge == "top":
