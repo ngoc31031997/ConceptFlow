@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Deliver an approved, already committed branch: push it, merge it into main in the
 # primary checkout, push main, refresh the graphify code graph for the new main,
-# then rebuild and restart only the Docker services whose code changed, and wait
-# until they report healthy.
+# then rebuild and restart only the Docker services whose code changed, wait
+# until they report healthy, and remove the branch's worktree if it has one.
 #
 # Usage: .claude/skills/deliver/deliver.sh <branch>
 # Exit codes: 1 bad input/state, 2 push failed, 3 merge conflict (merge aborted),
@@ -18,6 +18,17 @@ git rev-parse --verify --quiet "refs/heads/$branch" >/dev/null || { echo "ERROR:
 # The first worktree is the primary checkout; main and the compose project live there.
 main_wt=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
 echo "== primary checkout: $main_wt"
+
+# Once merged, the branch's own worktree (scripts/worktree.sh add) has served its
+# purpose. A failed removal (e.g. stray untracked files) is only reported.
+remove_worktree() {
+  local wt
+  wt=$(cd "$main_wt" && scripts/worktree.sh path "$branch" 2>/dev/null) || return 0
+  [ "$wt" != "$main_wt" ] || return 0
+  (cd "$main_wt" && scripts/worktree.sh remove "$branch") \
+    || echo "WARN: worktree $wt not removed; remove it with scripts/worktree.sh remove $branch" >&2
+  echo "== continue from the primary checkout: $main_wt"
+}
 
 git -C "$main_wt" diff --quiet && git -C "$main_wt" diff --cached --quiet \
   || { echo "ERROR: primary checkout has uncommitted changes" >&2; git -C "$main_wt" status -s >&2; exit 1; }
@@ -64,6 +75,7 @@ fi
 changed=$(git -C "$main_wt" diff --name-only "$before" HEAD)
 if [ -z "$changed" ]; then
   echo "== $branch was already in main; nothing changed, no rebuild"
+  remove_worktree
   exit "$graph_status"
 fi
 
@@ -82,35 +94,12 @@ done
 
 if [ "${#svcs[@]}" -eq 0 ]; then
   echo "== no service code changed; no rebuild"
+  remove_worktree
   exit "$graph_status"
 fi
 
-echo "== rebuild: ${svcs[*]}"
-(cd "$main_wt" && docker compose build "${svcs[@]}" && docker compose up -d "${svcs[@]}") \
-  || { echo "ERROR: docker compose build/up failed" >&2; exit 4; }
+(cd "$main_wt" && scripts/worktree.sh rebuild "${svcs[@]}") || exit $?
 
-echo "== waiting for health (up to 300s)"
-deadline=$(( $(date +%s) + 300 ))
-while :; do
-  pending=0; failed=()
-  for s in "${svcs[@]}"; do
-    cid=$(cd "$main_wt" && docker compose ps -q "$s")
-    st=$(docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$cid" 2>/dev/null || echo "missing none")
-    case "$st" in
-      "running healthy"|"running none") ;;
-      "running starting") pending=1 ;;
-      *) failed+=("$s ($st)") ;;
-    esac
-  done
-  [ "${#failed[@]}" -eq 0 ] && [ "$pending" -eq 0 ] && break
-  if [ "${#failed[@]}" -gt 0 ] || [ "$(date +%s)" -ge "$deadline" ]; then
-    echo "ERROR: not healthy: ${failed[*]:-} $([ "$pending" -eq 1 ] && echo '(some still starting at timeout)')" >&2
-    for s in "${svcs[@]}"; do (cd "$main_wt" && docker compose logs --tail 30 "$s") >&2 || true; done
-    exit 5
-  fi
-  sleep 5
-done
-
-(cd "$main_wt" && docker compose ps "${svcs[@]}")
 echo "== delivered $branch -> main ($(git -C "$main_wt" rev-parse --short HEAD)); healthy: ${svcs[*]}"
+remove_worktree
 exit "$graph_status"

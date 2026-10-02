@@ -1,0 +1,4 @@
+# aidlc-docs/audit.md is an append-only log, and CRs/fixes worked on in parallel
+# worktrees each append their own entries at its end. The union driver keeps both
+# sides' entries instead of reporting a conflict on every merge.
+aidlc-docs/audit.md merge=union

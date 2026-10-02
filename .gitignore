@@ -32,3 +32,6 @@ graphify-out/
 
 # Reference videos the Creator keeps locally to compare output against
 example/
+
+# One git worktree per CR/fix (scripts/worktree.sh); each is its own checkout
+.claude/worktrees/

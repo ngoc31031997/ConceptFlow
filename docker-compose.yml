@@ -8,6 +8,11 @@
 # allocation is at or below 8G, raise it (or lower the *_MEMORY_LIMIT vars
 # below via .env) before running a render and an assembly concurrently.
 # Override any of them per-host via .env, same pattern as .env.window.
+
+# Pinned so an image built from a git worktree (scripts/worktree.sh rebuild) gets the
+# same name the primary checkout's `docker compose up` starts.
+name: conceptflow
+
 services:
   rabbitmq:
     image: rabbitmq:3.13-management
