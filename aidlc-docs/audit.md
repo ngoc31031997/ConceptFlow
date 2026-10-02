@@ -2836,3 +2836,15 @@ C C1 xoá hẳn"
 **Context**: CONSTRUCTION — fix, chờ Creator chạy lại render.
 
 ---
+
+## CR-062 — Lỗi bố cục safe_area báo nhầm và thông báo sai tên
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "kiểm tra các lỗi bố cục  Kiểm tra vẫn báo 29 lỗi bố cục: một số khối nằm ngoài vùng an toàn ở các shot 2.x và 3.x. Lần trước các lỗi này không chặn dự án đi tới render. Chúng chỉ làm vài hình bị lấn ra mép khung, không làm render hỏng."
+**AI Response**: Chạy lại `/v1/check/remotion` trên script của project 257acc58: 29 `safe_area`, chia 4 nhóm. A: `Panel`/`Backdrop`/dải trang trí phủ tới mép khung bị đo như hình (11 lỗi, báo nhầm). B: máy quay zoom/lia đẩy vật phụ ra mép. C: vật trượt ra lúc cuối shot bị xét đúng lúc đang trượt ra (luật vật trượt chỉ tính vật trượt vào). D: lấn nhẹ 2–40px. Render không bị chặn (nút "Kiểm tra kịch bản" không xét `check_failed`). Nhưng vòng sửa đốt token mà không hội tụ (29 → 34 → 16 → 1, file gộp vẫn còn 29), và chuỗi AI lẫn nhật ký gọi lỗi bố cục là "lỗi biên dịch". Đề xuất PA1 (khuyến nghị): vùng khung là phông cảnh; vật trượt ra không bị báo; vật phụ bị máy quay đẩy ra và chỗ lấn nhẹ thành cảnh báo; vật trọng tâm vẫn chặn; ghi chú nói đúng "N lỗi bố cục (không chặn render)". PA2: `safe_area` chỉ còn cảnh báo. PA3: chỉ sửa thông báo. Hỏi Creator Q1 (phương án), Q2 (vật bị máy quay đẩy ra), Q3 (ngưỡng lấn nhẹ). Kiểm tra phụ thuộc: độc lập (không có nhánh CR/fix mở).
+**Impact Assessment**: rendering (kit `Panel`/`Backdrop`/`Camera`, harness, `layout_rules.py`), authoring-service (ghi chú chuỗi, nhật ký). Không đổi contract, DB, prompt.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-062-layout-warnings-non-blocking-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-062, chờ Creator trả lời Q1–Q3 và duyệt.
+**User Input (duyệt)**: "làm theo mục 1 đi"
+**AI Response (duyệt)**: Chốt Phương án 1; Q2, Q3 theo khuyến nghị (a)/(a). Commit tài liệu thiết kế, chuyển sang `/code`.
+
+---
