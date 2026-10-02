@@ -17,7 +17,7 @@ var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
 	RoleVisualDirector:   "9d081cc6329d5876b7d8805a0074db9448d049869b9a624578df90677e40ffa4",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
-	RoleRemotionEngineer: "0c6ae8d48c08d8830cd4c78bf2d7e38eba884098fabbebc9b18d13d8421e29d8",
+	RoleRemotionEngineer: "0396cce2050c946f43225990b0b7438ab8d9d8d05a7c67f9f390fc7f9bf6225c",
 }
 
 func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {

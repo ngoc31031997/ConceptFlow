@@ -51,6 +51,7 @@ Chọn **phương án 1**.
 - Mất khả năng "nhớ đoạn này quá lớn, chia đôi luôn" giữa các lượt (trước đây nằm trong cache). Đoạn hết budget vẫn được chia đôi ngay trong lượt đó như hiện nay.
 - Manim, hoặc Remotion không có `layout` trong storyboard: sửa storyboard sẽ đổi dấu vân tay của khung, nên mọi đoạn đều phải sinh lại. Đây là hệ quả đúng, vì mọi đoạn dựa trên khung.
 - Đổi số shot mỗi đoạn làm đổi cách chia. Đoạn có khoá không còn trong cách chia mới sẽ bị bỏ.
+- Repair gộp theo đoạn (2026-10-02): các shot lỗi của cùng một đoạn được sửa trong một lượt gọi để system prompt chỉ gửi một lần cho mỗi đoạn; LAYOUT/cast vẫn sửa riêng. Hàm thiếu trong reply giữ code cũ; lượt bị cắt vì `budget`/`truncated` được chia đôi tới từng shot. Nhãn `label` của lượt `repair` thành danh sách shot nối bằng dấu phẩy.
 - Deploy theo thứ tự nào cũng được:
   - `llm-service` mới + `authoring-service` cũ: `authoring-service` vẫn gọi `/v1` như trước;
   - `authoring-service` mới + `llm-service` cũ: bước Code chạy qua `/v1`, còn panel đoạn báo `llm-service` chưa hỗ trợ (HTTP 501).

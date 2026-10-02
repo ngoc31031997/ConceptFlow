@@ -127,6 +127,71 @@ def _listed(diags: list[Diagnostic]) -> str:
     return "\n".join(f"- dòng {d.line}: {d.message}" if d.line else f"- {d.message}" for d in diags)
 
 
+def _remotion_errors(diags: list[Diagnostic], canvas: Frame) -> tuple[str, str]:
+    """The compile errors and the measured layout errors of one shot as two
+    labelled lists, and the word naming which kinds are present."""
+    compile_diags = [d for d in diags if d.kind != LAYOUT]
+    layout_diags = [d for d in diags if d.kind == LAYOUT]
+    sections: list[str] = []
+    if compile_diags:
+        sections.append(
+            "Lỗi trình biên dịch TypeScript (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):\n"
+            + _listed(compile_diags))
+    if layout_diags:
+        # Measured on the shot as it is really drawn, at the moments named.
+        sections.append(
+            "Lỗi bố cục — đo trên hình thật của shot, ở các thời điểm ghi trong từng dòng (số dòng là dòng trong "
+            f"FILE ĐẦY ĐỦ; vùng an toàn {canvas.safe_text()}; chữ tối thiểu 32px):\n" + _listed(layout_diags)
+            + "\nSửa bằng cách đổi vị trí, kích thước, width, cỡ chữ hoặc biên độ chuyển động (spring vọt lố) "
+            "của đúng vật được nêu; không bỏ vật hay chữ mà kịch bản yêu cầu.")
+    what = "BIÊN DỊCH" if not layout_diags else "BỐ CỤC" if not compile_diags else "BIÊN DỊCH VÀ BỐ CỤC"
+    return what, "\n\n".join(sections)
+
+
+def remotion_repair_many(
+    sb: Storyboard, layout: str, items: list[tuple[str, str, list[Diagnostic]]], canvas: Frame = LANDSCAPE,
+) -> str:
+    """One repair turn for several failing shots of the same segment.
+
+    `items` is `(shot id, current code, diagnostics)` per shot. A single item
+    gives the one-shot turn; several share one palette and LAYOUT block and
+    ask for every function back in one code block.
+    """
+    if len(items) == 1:
+        key, code, diags = items[0]
+        return remotion_repair(sb, layout, key, code, diags, [], canvas)
+    by_id = {sh.id: (sc, sh) for sc, sh in sb.all_shots()}
+    keys = [key for key, _, _ in items]
+    blocks = []
+    for key, code, diags in items:
+        what, errors_block = _remotion_errors(diags, canvas)
+        blocks.append(f"""### Shot {key} — lỗi {what}
+
+Shot theo kịch bản:
+{_dump(_shot_json(*by_id[key]))}
+
+{errors_block}
+
+Code hiện tại của shot:
+```tsx
+{code}
+```""")
+    names = ", ".join(merger.remotion_fn(k) for k in keys)
+    return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI trong {len(keys)} shot: {", ".join(keys)}.
+
+Mỗi shot dưới đây có lỗi riêng của nó; sửa từng shot, không đụng sang shot khác.
+
+{chr(10).join(blocks)}
+
+Bảng màu hợp lệ (chỉ dùng PALETTE.<khoá> dưới đây):
+{_palette_table(sb)}
+
+LAYOUT hiện có:
+{layout.strip()}
+
+Sửa CHỈ lỗi đã nêu, giữ nguyên hình và chuyển động đã dựng. Trả về ĐÚNG các hàm {names} đã sửa (mỗi hàm kèm comment `// Shot n.m — ...` phía trên) trong MỘT khối ```tsx, không gì khác."""
+
+
 def remotion_repair(
     sb: Storyboard, layout: str, key: str, code: str, diags: list[Diagnostic], shot_ids_context: list[str],
     canvas: Frame = LANDSCAPE,
@@ -146,22 +211,7 @@ Code hiện tại:
 Trả về ĐÚNG khai báo `const LAYOUT = {{ ... }};` đã sửa trong một khối ```tsx, giữ nguyên mọi khoá đang có (các shot đang dùng chúng)."""
     by_id = {sh.id: (sc, sh) for sc, sh in sb.all_shots()}
     shot = _dump(_shot_json(*by_id[key]))
-    compile_diags = [d for d in diags if d.kind != LAYOUT]
-    layout_diags = [d for d in diags if d.kind == LAYOUT]
-    sections: list[str] = []
-    if compile_diags:
-        sections.append(
-            "Lỗi trình biên dịch TypeScript (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):\n"
-            + _listed(compile_diags))
-    if layout_diags:
-        # Measured on the shot as it is really drawn, at the moments named.
-        sections.append(
-            "Lỗi bố cục — đo trên hình thật của shot, ở các thời điểm ghi trong từng dòng (số dòng là dòng trong "
-            f"FILE ĐẦY ĐỦ; vùng an toàn {canvas.safe_text()}; chữ tối thiểu 32px):\n" + _listed(layout_diags)
-            + "\nSửa bằng cách đổi vị trí, kích thước, width, cỡ chữ hoặc biên độ chuyển động (spring vọt lố) "
-            "của đúng vật được nêu; không bỏ vật hay chữ mà kịch bản yêu cầu.")
-    what = "BIÊN DỊCH" if not layout_diags else "BỐ CỤC" if not compile_diags else "BIÊN DỊCH VÀ BỐ CỤC"
-    errors_block = "\n\n".join(sections)
+    what, errors_block = _remotion_errors(diags, canvas)
     return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI {what} trong shot {key}.
 
 Shot theo kịch bản:
@@ -249,6 +299,47 @@ Mỗi shot chạy nối tiếp shot trước trên cùng một khung hình: đ�
 ĐỊNH DẠNG TRẢ VỀ — chỉ một khối ```python, gồm ĐÚNG các method sau, viết ở cột 0 (KHÔNG thụt vào trong class, hệ thống tự thụt), mỗi method là `def shot_N_M(self):`:
 {names}
 Không khai báo gì khác ở cấp cao nhất.{_retry_note(retry)}"""
+
+
+def manim_repair_many(
+    sb: Storyboard, cast: str, items: list[tuple[str, str, list[Diagnostic]]], raw: str,
+) -> str:
+    """One repair turn for several failing shots of the same segment: the
+    Manim counterpart of `remotion_repair_many`. The trace of the test run is
+    shared, so it is printed once."""
+    if len(items) == 1:
+        key, code, diags = items[0]
+        return manim_repair(sb, cast, key, code, diags, raw)
+    by_id = {sh.id: (sc, sh) for sc, sh in sb.all_shots()}
+    keys = [key for key, _, _ in items]
+    blocks = []
+    for key, code, diags in items:
+        blocks.append(f"""### Shot {key}
+
+Shot theo kịch bản:
+{_dump(_shot_json(*by_id[key]))}
+
+Lỗi khi chạy thử (số dòng là dòng trong FILE ĐẦY ĐỦ, không phải trong đoạn dưới):
+{_listed(diags)}
+
+Code hiện tại của shot (viết ở cột 0):
+```python
+{code}
+```""")
+    tail = f"\n\nĐầu ra của lượt chạy thử:\n{raw[-3000:]}" if raw else ""
+    names = ", ".join(f"`def {merger.manim_fn(k)}(self):`" for k in keys)
+    return f"""NHIỆM VỤ HIỆN TẠI: SỬA LỖI trong {len(keys)} shot: {", ".join(keys)}.
+
+Mỗi shot dưới đây có lỗi riêng của nó; sửa từng shot, không đụng sang shot khác.
+
+{chr(10).join(blocks)}{tail}
+
+Vật xuyên suốt do `setup_cast` tạo:
+```python
+{cast.strip()}
+```
+
+Sửa CHỈ lỗi đã nêu, giữ nguyên hình và lời thoại đã dựng. Trả về ĐÚNG các method {names} đã sửa, ở cột 0, trong MỘT khối ```python, không gì khác."""
 
 
 def manim_repair(

@@ -20,10 +20,10 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleStoryArchitect, Language: "vi", Version: 10, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleVisualDirector, Language: "vi", Version: 11, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 8, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
-		{Role: RoleRemotionEngineer, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
+		{Role: RoleRemotionEngineer, Language: "vi", Version: 7, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 5, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
-		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 3, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
+		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
@@ -641,9 +641,9 @@ const remoBVI = `## B. MÀU — CHÉP NGUYÊN BẢNG MÀU CỦA ĐẠO DIỄN
 
 const remoCVI = `## C. NHỮNG THỨ CỐ ĐỊNH — KHÔNG ĐƯỢC TỰ ĐẶT
 
-- **Nền và bối cảnh:** mỗi shot kể chuyện ở một nơi chốn được dựng trong ¤<Scene>¤ (mục C3) theo BỐI CẢNH của cảnh: ¤sky¤ là một ¤<Backdrop>¤ (gradient ¤color¤ → ¤to¤ theo tông của cảnh), ¤far¤/¤mid¤ là cảnh phía sau nhân vật, ¤near¤ là thứ sát ống kính (tự mờ), ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤ — mọi màu lấy từ ¤PALETTE¤. Shot của ý trừu tượng (đồ thị, con số, chia khung thành nhiều mảng màu) dùng ¤<Backdrop>¤ và ¤<Panel>¤, máy bằng ¤<Camera>¤. ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤ khi không có gì. Ngoài ¤Scene¤, ¤Backdrop¤, ¤Panel¤, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) thì có màu nền của nó từ ¤PALETTE¤.
-- **Font:** ¤<Stage>¤ đã đặt font Creator chọn ở bước cấu hình; mọi chữ tự thừa hưởng. KHÔNG đặt ¤fontFamily¤ ở đâu cả. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
-- **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤ theo cấu hình của Creator. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX). Chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
+- **Nền và bối cảnh:** mỗi shot kể chuyện ở một nơi chốn dựng trong ¤<Scene>¤ (mục C3) theo BỐI CẢNH của cảnh: ¤sky¤ là ¤<Backdrop>¤ (gradient ¤color¤ → ¤to¤ theo tông cảnh), ¤far¤/¤mid¤ phía sau nhân vật, ¤near¤ sát ống kính (tự mờ), ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤ — mọi màu lấy từ ¤PALETTE¤. Shot ý trừu tượng (đồ thị, con số, chia khung thành mảng màu) dùng ¤<Backdrop>¤ và ¤<Panel>¤, máy bằng ¤<Camera>¤. ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤. Ngoài ¤Scene¤, ¤Backdrop¤, ¤Panel¤, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) có màu nền từ ¤PALETTE¤.
+- **Font:** ¤<Stage>¤ đã đặt font Creator chọn; KHÔNG đặt ¤fontFamily¤. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
+- **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX); chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
 - **Vùng phụ đề:** {{subtitle_zone}}
 
 `
@@ -654,13 +654,12 @@ const remoC2VI = `## C2. CLIP HOẠT HÌNH DỰNG SẴN (LOTTIE) — TUỲ CHỌ
 
 Cách dùng (chỉ khi danh sách trên có clip):
 
-1. **Chỉ dùng khi HÌNH của shot mô tả đúng chủ thể của một clip** (ví dụ shot ghi "chú mèo nghiêng đầu" và có ¤cat.thinking¤). Không thêm clip để trang trí, không thay một hình mà kịch bản đã mô tả rõ bằng hình học. Nếu không clip nào khớp thì vẽ bằng JSX/SVG như bình thường — đó là mặc định.
-2. Import: ¤import {LottieClip} from './conceptflow-mini/lottie';¤ Dùng: ¤<LottieClip id="cat.thinking" x={1500} y={620} size={360} />¤ — ¤x¤, ¤y¤ là TÂM clip, ¤size¤ là cạnh dài nhất, cùng quy ước với ¤LAYOUT¤ (đặt toạ độ clip trong ¤LAYOUT¤ để các shot chia sẻ).
-3. ¤id¤ phải là chuỗi literal, chép NGUYÊN VĂN từ danh sách; id không có trong danh sách làm script bị chặn.
-4. Tuỳ chọn: ¤loop¤ (đổi mặc định), ¤playbackRate¤, ¤startFrame¤ (trễ bắt đầu, tính bằng frame), ¤flip¤ (lật ngang), ¤opacity¤.
-5. **Màu:** clip mang màu riêng. Muốn khớp bảng màu của đạo diễn thì đổi qua ¤colors¤: ¤colors={{'#F5A623': PALETTE.accent}}¤ (khoá là màu gốc trong danh sách "màu đổi được", giá trị PHẢI là ¤PALETTE.xxx¤). Không đổi màu thì để nguyên; không tự viết hex nào khác.
-6. Clip đứng trong khung an toàn và không chồng lên vùng phụ đề, như mọi vật khác.
-7. Khoảng thời gian: clip chạy theo frame của shot đang chứa nó, nên đặt nó bên trong ¤ShotN_M¤ tương ứng, không ở ngoài.
+1. **Chỉ dùng khi HÌNH của shot mô tả đúng chủ thể của một clip** (shot ghi "chú mèo nghiêng đầu" và có ¤cat.thinking¤). Không thêm clip để trang trí, không thay hình mà kịch bản đã mô tả rõ bằng hình học. Không clip nào khớp thì vẽ bằng JSX/SVG — đó là mặc định.
+2. Dùng: ¤<LottieClip id="cat.thinking" x={1500} y={620} size={360} />¤ — ¤x¤, ¤y¤ là TÂM clip, ¤size¤ là cạnh dài nhất, cùng quy ước với ¤LAYOUT¤ (đặt toạ độ clip trong ¤LAYOUT¤ để các shot chia sẻ). Khi viết cả file: ¤import {LottieClip} from './conceptflow-mini/lottie';¤.
+3. ¤id¤ là chuỗi literal chép NGUYÊN VĂN từ danh sách; id không có trong danh sách làm script bị chặn.
+4. Tuỳ chọn: ¤loop¤, ¤playbackRate¤, ¤startFrame¤ (trễ, tính bằng frame), ¤flip¤, ¤opacity¤.
+5. **Màu:** clip mang màu riêng. Muốn khớp bảng màu của đạo diễn thì đổi qua ¤colors¤: ¤colors={{'#F5A623': PALETTE.accent}}¤ (khoá là màu gốc trong "màu đổi được", giá trị PHẢI là ¤PALETTE.xxx¤). Không đổi thì để nguyên; không tự viết hex nào khác.
+6. Clip nằm trong khung an toàn, không chồng lên vùng phụ đề; đặt nó BÊN TRONG ¤ShotN_M¤ tương ứng vì nó chạy theo frame của shot chứa nó.
 
 `
 
@@ -778,13 +777,11 @@ Bắt buộc về cấu trúc:
 
 const remoEVI = `## E. THƯ VIỆN ĐƯỢC IMPORT
 
-- ¤react¤.
-- ¤remotion¤ — mọi API của nó, hay dùng nhất: ¤AbsoluteFill¤, ¤interpolate¤, ¤interpolateColors¤, ¤spring¤, ¤Easing¤, ¤useCurrentFrame¤, ¤useVideoConfig¤, ¤random¤ (ngẫu nhiên có seed).
+- ¤react¤; ¤remotion¤ — mọi API, hay dùng nhất: ¤AbsoluteFill¤, ¤interpolate¤, ¤interpolateColors¤, ¤spring¤, ¤Easing¤, ¤useCurrentFrame¤, ¤useVideoConfig¤, ¤random¤ (ngẫu nhiên có seed).
 - ¤./conceptflow-mini/segments¤: ¤Segments¤, ¤calculateMetadataFromSegments¤.
 - ¤./conceptflow-mini/primitives¤: ¤Stage¤, ¤BACKGROUND¤, ¤useFrameBox()¤ (kích thước khung và vùng an toàn của video này); ¤WIDTH¤ (1920), ¤HEIGHT¤ (1080), ¤SAFE_MARGIN¤ (96) chỉ đúng với khung ngang — trong shot dùng ¤useVideoConfig()¤ để lấy ¤width¤, ¤height¤.
-- ¤./conceptflow-mini/illustration¤: bộ minh hoạ phẳng ở mục C3.
-- ¤./conceptflow-mini/scene¤: ¤Scene¤, ¤Camera¤, ¤Glow¤, ¤LightRays¤, ¤Vignette¤, ¤KeywordText¤ ở mục C3.
-- KHÔNG import package nào khác (chưa được cài — build lỗi ngay). KHÔNG ảnh/video/font/âm thanh từ file hay URL (không ¤<Img>¤, ¤staticFile¤, ¤fetch¤). Hình vẽ bằng JSX + CSS hoặc SVG inline (¤<svg>¤, ¤<path>¤, ¤<circle>¤, ¤<line>¤, ¤<rect>¤, ¤<polygon>¤, ¤<text>¤).
+- ¤./conceptflow-mini/illustration¤, ¤./conceptflow-mini/scene¤: bộ minh hoạ phẳng và cảnh ở mục C3.
+- KHÔNG import package nào khác (build lỗi ngay). KHÔNG ảnh/video/font/âm thanh từ file hay URL (không ¤<Img>¤, ¤staticFile¤, ¤fetch¤): hình vẽ bằng JSX + CSS hoặc SVG inline.
 
 `
 
@@ -792,45 +789,45 @@ const remoFVI = `## F. LUẬT BỐ CỤC — CHỐNG ĐÈ CHỮ, TRÀN KHUNG, L�
 
 Khung hình {{frame}}, gốc toạ độ ở góc trên-trái, trục y đi xuống.
 
-L1. **Vùng an toàn.** Mọi vật và chữ có nghĩa nằm TRỌN trong hình chữ nhật từ {{safe_area}} — và ngoài vùng phụ đề ở mục C. Kiểm tra ở CẢ vị trí đầu, vị trí cuối, và lúc vật to nhất (spring có thể vọt quá 1 một chút — chừa thêm 5%). Ngoại lệ: vật kịch bản nói rõ là "trượt vào từ ngoài khung" / "trượt ra khỏi khung"; các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤ và ánh sáng (¤Glow¤, ¤LightRays¤, ¤Vignette¤) là phông cảnh, được tràn mép.
+L1. **Vùng an toàn.** Mọi vật và chữ có nghĩa nằm TRỌN trong hình chữ nhật {{safe_area}} — và ngoài vùng phụ đề ở mục C. Kiểm tra ở vị trí đầu, vị trí cuối và lúc vật to nhất (spring có thể vọt quá 1 — chừa thêm 5%). Ngoại lệ: vật kịch bản nói rõ "trượt vào từ ngoài khung" / "trượt ra khỏi khung"; các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤ và ánh sáng (¤Glow¤, ¤LightRays¤, ¤Vignette¤) là phông cảnh, được tràn mép.
 
-L2. **Một gốc bố cục cho mỗi shot.** Mỗi shot trả về MỘT ¤<AbsoluteFill>¤ duy nhất. Không đặt hai ¤<AbsoluteFill>¤ có nội dung làm anh em — chúng chồng khít lên nhau.
+L2. **Một gốc bố cục cho mỗi shot.** Mỗi shot trả về MỘT ¤<AbsoluteFill>¤; hai ¤<AbsoluteFill>¤ có nội dung làm anh em sẽ chồng khít lên nhau.
 
-L3. **Đặt vật bằng toạ độ tường minh.** Với vật định vị tuyệt đối, luôn ghi đủ ¤left¤, ¤top¤, ¤width¤, ¤height¤ bằng số (px) tính từ ¤LAYOUT¤ hoặc hằng số — không dựa vào kích thước tự co giãn của nội dung để đặt vật khác cạnh nó. Với nhóm vật xếp hàng/lưới, dùng MỘT container flex/grid có ¤width¤/¤height¤ cố định và ¤gap¤ rõ ràng. Không trộn cả hai cách trong cùng một nhóm vật.
+L3. **Đặt vật bằng toạ độ tường minh.** Vật định vị tuyệt đối luôn ghi đủ ¤left¤, ¤top¤, ¤width¤, ¤height¤ bằng số (px) tính từ ¤LAYOUT¤ hoặc hằng số, không dựa vào kích thước tự co giãn của nội dung. Nhóm vật xếp hàng/lưới dùng MỘT container flex/grid có ¤width¤/¤height¤ cố định và ¤gap¤ rõ ràng; không trộn hai cách trong một nhóm.
 
-L4. **Không giao nhau.** Trước khi viết, tính hộp bao (x, y, rộng, cao) của mọi vật cùng có mặt trong shot. Hai hộp bao KHÔNG được chạm nhau, trừ khi kịch bản nói rõ vật này nằm TRÊN/TRONG/ĐÈ LÊN vật kia. Khoảng cách tối thiểu giữa hai vật: 32px; giữa nhãn và vật nó gắn: 16–24px.
+L4. **Không giao nhau.** Tính hộp bao (x, y, rộng, cao) của mọi vật cùng có mặt. Hai hộp KHÔNG được chạm nhau, trừ khi kịch bản nói vật này nằm TRÊN/TRONG/ĐÈ LÊN vật kia. Cách nhau tối thiểu 32px; nhãn cách vật nó gắn 16–24px.
 
 L5. **Chữ không bao giờ tràn.**
   - Mọi khối chữ có ¤width¤ (hoặc ¤maxWidth¤) cố định bằng px, ¤lineHeight¤ 1.2–1.35, ¤textAlign¤ rõ ràng.
-  - Ước lượng bề rộng một dòng ≈ số ký tự × 0.58 × ¤fontSize¤ (chữ đậm × 0.62). Nếu vượt ¤width¤: chữ sẽ xuống dòng — tính luôn chiều cao = số dòng × ¤fontSize¤ × ¤lineHeight¤ và đảm bảo không đè lên vật bên dưới. Nhãn một dòng thì đặt ¤whiteSpace: 'nowrap'¤ CHỈ khi đã tính là vừa.
-  - Cỡ chữ: nhãn ≥ 36px, con số/tiêu đề 56–96px, không có chữ nào dưới 32px. Tối đa ~8 từ chữ trên màn hình cùng lúc.
+  - Bề rộng một dòng ≈ số ký tự × 0.58 × ¤fontSize¤ (chữ đậm × 0.62). Vượt ¤width¤ thì chữ xuống dòng: tính chiều cao = số dòng × ¤fontSize¤ × ¤lineHeight¤ và không để đè vật bên dưới. ¤whiteSpace: 'nowrap'¤ chỉ khi đã tính là vừa.
+  - Cỡ chữ: nhãn ≥ 36px, con số/tiêu đề 56–96px, không chữ nào dưới 32px. Tối đa ~8 từ chữ trên màn hình cùng lúc.
   - Không dùng ¤overflow: 'hidden'¤ hay ¤textOverflow¤ để giấu chữ tràn — sửa bố cục.
-  - Chữ tiếng Việt có dấu cao hơn chữ Latin: chừa thêm 15% chiều cao cho mỗi dòng.
+  - Chữ tiếng Việt có dấu cao hơn chữ Latin: chừa thêm 15% chiều cao mỗi dòng.
 
-L6. **Nhãn đi theo vật.** Nhãn gắn với một vật thì nằm TRONG cùng container với vật đó (cùng transform), đặt ở phía kịch bản nói (mặc định: bên phải hoặc ngay dưới), không đè lên nét vẽ của vật.
+L6. **Nhãn đi theo vật.** Nhãn gắn với một vật nằm TRONG cùng container (cùng transform), ở phía kịch bản nói (mặc định: bên phải hoặc ngay dưới), không đè nét vẽ của vật.
 
-L7. **Độ tương phản.** Chữ luôn dùng màu vai trò sáng trong ¤PALETTE¤ và không bao giờ nằm trên một mảng cùng tông. Chữ đặt lên một khối màu → màu chữ phải khác hẳn độ sáng của khối.
+L7. **Độ tương phản.** Chữ dùng màu vai trò sáng trong ¤PALETTE¤, không nằm trên mảng cùng tông; chữ trên một khối màu phải khác hẳn độ sáng của khối.
 
-L8. **Máy quay.** Chuyển động máy = prop ¤camera={{from: {x, y, zoom}, to: {x, y, zoom}, start, end}}¤ của ¤<Scene>¤, hoặc ¤<Camera duration from to start end>¤ bọc mọi vật khi shot không có Scene — KHÔNG tự viết ¤div¤ transform. ¤(x, y)¤ là điểm hiện ở GIỮA khung, ¤zoom¤ ≥ 1; điểm máy nhìn vào là toạ độ của vật trọng tâm. Không lồng Camera trong Scene. Sau khi zoom, vật trọng tâm và nhãn của nó vẫn phải nằm trong vùng an toàn (vị trí trên màn hình = giữa khung + (vị trí − (x, y)) × zoom).
+L8. **Máy quay.** Chuyển động máy = prop ¤camera={{from: {x, y, zoom}, to: {x, y, zoom}, start, end}}¤ của ¤<Scene>¤, hoặc ¤<Camera duration from to start end>¤ bọc mọi vật khi shot không có Scene — KHÔNG tự viết ¤div¤ transform. ¤(x, y)¤ là điểm hiện ở GIỮA khung, ¤zoom¤ ≥ 1; điểm máy nhìn vào là toạ độ vật trọng tâm. Không lồng Camera trong Scene. Sau khi zoom, vật trọng tâm và nhãn của nó vẫn nằm trong vùng an toàn (vị trí trên màn hình = giữa khung + (vị trí − (x, y)) × zoom).
 
 L9. **Chuyển động theo frame, tất định.**
-  - Mọi chuyển động tính từ ¤useCurrentFrame()¤. KHÔNG dùng CSS ¤transition¤/¤animation¤/¤@keyframes¤, ¤setTimeout¤, ¤useEffect¤ để tạo chuyển động.
-  - Mọi ¤interpolate¤ có ¤extrapolateLeft: 'clamp', extrapolateRight: 'clamp'¤ (trừ khi cố ý cho chạy tiếp); ¤inputRange¤ tăng NGHIÊM NGẶT (hai mốc không trùng nhau — cẩn thận khi ¤duration¤ nhỏ).
-  - Không ¤Math.random()¤, ¤Date.now()¤ — ngẫu nhiên thì dùng ¤random('seed-cố-định')¤ của remotion.
-  - Chuyển động chính của shot hoàn tất trước ~85% ¤duration¤, để người xem kịp nhìn kết quả trước khi sang shot sau. Vật xuất hiện theo đúng thứ tự kịch bản, không cùng lúc nếu kịch bản kể lần lượt.
-  - Số đếm lên: ¤Math.round(...)¤ hoặc ¤.toFixed(n)¤ — không hiện số thập phân lộn xộn. Con số đổi độ dài (9 → 10) thì cố định ¤width¤ và ¤fontVariantNumeric: 'tabular-nums'¤ để không làm xô vật bên cạnh.
+  - Mọi chuyển động tính từ ¤useCurrentFrame()¤. KHÔNG dùng CSS ¤transition¤/¤animation¤/¤@keyframes¤, ¤setTimeout¤, ¤useEffect¤.
+  - Mọi ¤interpolate¤ có ¤extrapolateLeft: 'clamp', extrapolateRight: 'clamp'¤ (trừ khi cố ý chạy tiếp); ¤inputRange¤ tăng NGHIÊM NGẶT (hai mốc không trùng nhau — cẩn thận khi ¤duration¤ nhỏ).
+  - Không ¤Math.random()¤, ¤Date.now()¤ — ngẫu nhiên dùng ¤random('seed-cố-định')¤ của remotion.
+  - Chuyển động chính hoàn tất trước ~85% ¤duration¤; vật xuất hiện theo đúng thứ tự kịch bản, không cùng lúc nếu kịch bản kể lần lượt.
+  - Số đếm lên: ¤Math.round(...)¤ hoặc ¤.toFixed(n)¤. Con số đổi độ dài (9 → 10): cố định ¤width¤ và ¤fontVariantNumeric: 'tabular-nums'¤.
 
-L10. **Hình vẽ SVG.** ¤<svg>¤ luôn có ¤width¤, ¤height¤ bằng px và ¤viewBox¤ cùng tỉ lệ. Nét ¤strokeWidth¤ ≥ 4 (đọc được trên điện thoại). Vẽ nét dần → ¤strokeDasharray¤ = độ dài đường + ¤strokeDashoffset¤ nội suy. Mũi tên: ¤<path>¤ + đầu mũi tên là ¤<polygon>¤ hoặc ¤<marker>¤, dừng cách vật đích 12px (không đâm vào vật).
+L10. **Hình vẽ SVG.** ¤<svg>¤ luôn có ¤width¤, ¤height¤ bằng px và ¤viewBox¤ cùng tỉ lệ. ¤strokeWidth¤ ≥ 4. Vẽ nét dần → ¤strokeDasharray¤ = độ dài đường + ¤strokeDashoffset¤ nội suy. Mũi tên: ¤<path>¤ + đầu mũi tên ¤<polygon>¤ hoặc ¤<marker>¤, dừng cách vật đích 12px.
 
-L11. **Liền mạch giữa các shot.** Vật sống qua nhiều shot (nhân vật chính) lấy toạ độ, kích thước, màu từ CÙNG một mục trong ¤LAYOUT¤/¤PALETTE¤ ở mọi shot, để lúc chuyển đoạn không bị giật hay nhảy chỗ.
+L11. **Liền mạch giữa các shot.** Vật sống qua nhiều shot lấy toạ độ, kích thước, màu từ CÙNG một mục ¤LAYOUT¤/¤PALETTE¤ ở mọi shot, để chuyển đoạn không giật hay nhảy chỗ.
 
-L12. **Ký tự cấm trong chữ JSX.** Chữ nằm GIỮA hai thẻ JSX không được chứa ¤<¤, ¤>¤, ¤{¤, ¤}¤ trần (build lỗi). Viết bằng chữ ("lớn hơn") hoặc bọc: ¤{'>'}¤. Luật này không áp dụng cho chuỗi trong ¤narrations¤ hay trong ¤style={{...}}¤.
+L12. **Ký tự cấm trong chữ JSX.** Chữ GIỮA hai thẻ JSX không chứa ¤<¤, ¤>¤, ¤{¤, ¤}¤ trần (build lỗi): viết bằng chữ ("lớn hơn") hoặc bọc ¤{'>'}¤. Không áp dụng cho chuỗi trong ¤narrations¤ hay ¤style={{...}}¤.
 
-L13. **TypeScript sạch.** Không ¤any¤ ẩn gây lỗi build; hằng số ¤as const¤ khi cần kiểu literal; không biến khai báo mà không dùng tới trong import (bỏ import thừa).
+L13. **TypeScript sạch.** Không ¤any¤ ẩn gây lỗi build; ¤as const¤ khi cần kiểu literal; bỏ import thừa.
 
-L14. **Kích thước tối thiểu — chống khung trống.** Vật đang là TRỌNG TÂM của shot (vật gắn với mục ¤LAYOUT¤ chính của shot, hoặc vật lớn nhất khi shot chỉ có một vật) phải có ¤size¤/¤width¤ hoặc ¤height¤ tối thiểu khoảng 40% chiều tương ứng của khung ở trung cảnh/cận cảnh — trừ khi kịch bản ghi rõ đây là toàn cảnh nhiều vật nhỏ, hoặc vật đang "trượt vào/trượt ra khỏi khung". Không dựng một shot mà phần lớn khung chỉ là nền phẳng một màu với một vật nhỏ lọt thỏm giữa khoảng trống — nếu ¤LAYOUT¤ ghi ¤size¤ nhỏ hơn mức này cho vật trọng tâm của shot đang viết, phóng to nó lên khi vẽ (giữ tâm ¤x, y¤, chỉ đổi kích thước hiển thị), không chép nguyên số nhỏ.
+L14. **Kích thước tối thiểu — chống khung trống.** Vật TRỌNG TÂM của shot (gắn với mục ¤LAYOUT¤ chính, hoặc vật lớn nhất khi chỉ có một vật) có ¤size¤/¤width¤ hoặc ¤height¤ tối thiểu khoảng 40% chiều tương ứng của khung ở trung cảnh/cận cảnh — trừ khi kịch bản ghi rõ toàn cảnh nhiều vật nhỏ, hoặc vật đang "trượt vào/ra khỏi khung". Không để phần lớn khung là nền phẳng với một vật nhỏ lọt thỏm; nếu ¤LAYOUT¤ ghi ¤size¤ nhỏ hơn mức này cho vật trọng tâm đang viết, phóng to khi vẽ (giữ tâm ¤x, y¤, chỉ đổi kích thước hiển thị).
 
-L15. **Khung không đứng yên.** Không đoạn nào quá 2 giây mà khung hình đứng yên hoàn toàn: luôn có máy trôi (Scene/Camera), nhân vật cử động (¤talking¤, ¤pose¤ đổi, vật dời chỗ), hay ánh sáng thở (¤Glow pulse¤). Chuyển động chính vẫn xong trước ~85% ¤duration¤ (L9); phần còn lại là máy trôi chậm.
+L15. **Khung không đứng yên.** Không đoạn nào quá 2 giây mà khung đứng yên hoàn toàn: luôn có máy trôi (Scene/Camera), nhân vật cử động (¤talking¤, ¤pose¤ đổi, vật dời chỗ) hay ánh sáng thở (¤Glow pulse¤). Chuyển động chính vẫn xong trước ~85% ¤duration¤ (L9); phần còn lại là máy trôi chậm.
 
 {{frame_rules}}
 

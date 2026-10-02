@@ -485,6 +485,21 @@ def parse_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
     return {i: got[i] for i in expected}  # extras are dropped
 
 
+def parse_repaired_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
+    """The repaired shots of a reply that may not hold all of them.
+
+    Returns the functions present among `expected` (extras are dropped); a shot
+    the model left out is simply absent, so the caller keeps its old code.
+    Raises ExtractError only when no expected shot is there at all.
+    """
+    pattern = merger.REMOTION_SHOT if engine == "remotion" else merger.MANIM_SHOT
+    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), pattern))
+    found = {i: got[i] for i in expected if i in got}
+    if not found:
+        raise extract.ExtractError(f"none of the shot function(s) asked for is in the reply: {', '.join(expected)}")
+    return found
+
+
 # -- one segment outside a run: copy its prompt, check a pasted reply ---------
 
 def segment_prompt(req: CodeRequest, key: str, default_chunk_shots: int) -> tuple[str, str]:
@@ -834,35 +849,63 @@ class CodePipeline:
         targets: dict[str, list[Diagnostic]], check: CheckResult, record: Record,
         sem: asyncio.Semaphore,
     ) -> str:
-        """Ask for a fix of each failing section, in parallel. A section whose
-        fix cannot be parsed keeps its old code (the failed call is recorded)
-        and will fail the next check again rather than being dropped."""
+        """Ask for a fix of every failing section, in parallel: the frame
+        (LAYOUT / cast) in a turn of its own, and all the failing shots of one
+        segment together in one turn, so the system prompt is sent once per
+        segment instead of once per shot.
+
+        A shot whose fix is missing or cannot be parsed keeps its old code (the
+        failed call is recorded) and fails the next check again rather than
+        being dropped. A turn that ran out of budget is asked again as two
+        halves, down to one shot.
+        """
         sb = plan.sb
         new_frame = frame
         results: dict[str, str] = {}
 
-        async def fix(key: str, diags: list[Diagnostic]) -> None:
-            is_frame = key in (merger.LAYOUT_KEY, merger.CAST_KEY)
-            current = frame if is_frame else shots[key]
-            if remotion:
-                build = lambda r: prompts.remotion_repair(sb, frame, key, current, diags, [], req.canvas)  # noqa: E731
+        async def fix_frame(key: str, diags: list[Diagnostic]) -> None:
+            if req.engine == "remotion":
+                build = lambda r: prompts.remotion_repair(sb, frame, key, frame, diags, [], req.canvas)  # noqa: E731
+                parse = parse_layout
             else:
-                build = lambda r: prompts.manim_repair(sb, frame, key, current, diags, check.raw)  # noqa: E731
-
-            def parse(text: str) -> str:
-                if is_frame:
-                    return parse_layout(text) if remotion else parse_cast(text)
-                return parse_shots(req.engine, [key], text)[key]
-
+                build = lambda r: prompts.manim_repair(sb, frame, key, frame, diags, check.raw)  # noqa: E731
+                parse = parse_cast
             async with sem:
                 try:
-                    results[key] = await self._ask(req, "repair", key, plan.owner(key), build, parse, record)
+                    results[key] = await self._ask(req, "repair", key, FRAME_KEY, build, parse, record)
                 except PipelineFailure as exc:
                     if exc.kind in STOP_NOW_KINDS:
                         raise
                     # unusable repair reply: keep the old code, already recorded as a call
 
-        await asyncio.gather(*(fix(k, d) for k, d in targets.items()))
+        async def fix_shots(ids: list[str]) -> None:
+            items = [(k, shots[k], targets[k]) for k in ids]
+            if remotion:
+                build = lambda r: prompts.remotion_repair_many(sb, frame, items, req.canvas)  # noqa: E731
+            else:
+                build = lambda r: prompts.manim_repair_many(sb, frame, items, check.raw)  # noqa: E731
+            async with sem:
+                try:
+                    results.update(await self._ask(
+                        req, "repair", ",".join(ids), plan.owner(ids[0]), build,
+                        lambda text: parse_repaired_shots(req.engine, ids, text), record))
+                    return
+                except PipelineFailure as exc:
+                    if exc.kind in STOP_NOW_KINDS:
+                        raise
+                    if exc.kind not in SPLIT_KINDS or len(ids) < 2:
+                        return  # unusable repair reply: keep the old code, already recorded as a call
+            # Outside the semaphore: each half takes a slot of its own.
+            half = (len(ids) + 1) // 2
+            await asyncio.gather(fix_shots(ids[:half]), fix_shots(ids[half:]))
+
+        by_segment: dict[str, list[str]] = {}
+        for key in sorted((k for k in targets if k not in (merger.LAYOUT_KEY, merger.CAST_KEY)),
+                          key=plan.ordered.index):
+            by_segment.setdefault(plan.owner(key), []).append(key)
+        await asyncio.gather(
+            *(fix_frame(k, d) for k, d in targets.items() if k in (merger.LAYOUT_KEY, merger.CAST_KEY)),
+            *(fix_shots(ids) for ids in by_segment.values()))
         for key, code in results.items():
             if key in (merger.LAYOUT_KEY, merger.CAST_KEY):
                 new_frame = code

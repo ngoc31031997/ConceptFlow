@@ -1,73 +1,57 @@
 Import: ¤import {Backdrop, Panel, Person, Tooth, Germ, ...} from './conceptflow-mini/illustration';¤ và ¤import {Scene, Camera, Glow, ...} from './conceptflow-mini/scene';¤ — chỉ import tên bạn dùng.
 
-Quy ước chung của mọi hình (giống ¤LottieClip¤ và ¤LAYOUT¤): ¤x¤, ¤y¤ là TÂM hộp bao của hình trên khung hình của video (toạ độ px từ góc trên-trái); ¤size¤ là CẠNH DÀI của hộp bao, tính bằng px; tỉ lệ hộp (rộng × cao) cố định theo từng hình, ghi ở dưới — dùng nó để tính hộp bao khi kiểm tra đè nhau. Mọi hình nhận thêm ¤rotate¤ (độ), ¤flip¤ (lật ngang), ¤scale¤, ¤opacity¤ — là số bạn nội suy theo frame để làm hình xuất hiện, trượt, nảy, xoay. Người, vi khuẩn, cây, mặt trời... tự thở/chớp mắt/lắc nhẹ; ¤still¤ tắt chuyển động tự thân đó.
-
-Màu: mỗi hình đã có màu mặc định hài hoà (da, tóc, men răng...) — cứ để nguyên. Tham số màu (¤color¤, ¤shirt¤, ¤pants¤, ¤hair¤, ¤skin¤, ¤lips¤, ¤frameColor¤, ¤handColor¤, ¤pot¤, ¤roof¤, ¤textColor¤) chỉ dùng khi kịch bản gán vai trò màu cho vật đó, và giá trị PHẢI là ¤PALETTE.xxx¤.
+Quy ước chung (giống ¤LottieClip¤ và ¤LAYOUT¤): ¤x¤, ¤y¤ là TÂM hộp bao của hình trên khung video (px từ góc trên-trái); ¤size¤ là CẠNH DÀI của hộp bao; tỉ lệ rộng × cao cố định theo từng hình, ghi ở dưới — dùng để tính hộp bao khi kiểm tra đè nhau. Mọi hình nhận thêm ¤rotate¤ (độ), ¤flip¤ (lật ngang), ¤scale¤, ¤opacity¤ để nội suy theo frame; người, vi khuẩn, cây... tự thở/chớp mắt, ¤still¤ tắt chuyển động đó. Mỗi hình đã có màu mặc định hài hoà — để nguyên; tham số màu (¤color¤, ¤shirt¤, ¤pants¤, ¤hair¤, ¤skin¤, ¤lips¤, ¤frameColor¤, ¤handColor¤, ¤pot¤, ¤roof¤, ¤textColor¤) chỉ dùng khi kịch bản gán vai trò màu cho vật đó, và giá trị PHẢI là ¤PALETTE.xxx¤.
 
 ### Cảnh, máy quay, ánh sáng (từ ¤./conceptflow-mini/scene¤)
-- ¤<Scene duration={duration} sky={...} far={...} mid={...} near={...} camera={{from: {x, y, zoom}, to: {x, y, zoom}, start, end}} vignette={0.35} blurNear={10}>...vật của shot...</Scene>¤ — dựng shot thành MỘT NƠI CHỐN kín khung, nhiều lớp sâu: ¤sky¤ (xa nhất, đứng yên: một ¤<Backdrop>¤ hay lớp trời của một nền), ¤far¤ và ¤mid¤ (cảnh phía sau nhân vật: đồi, tường, kệ), rồi các vật của shot (con của Scene), rồi ¤near¤ (cảnh phía TRƯỚC nhân vật, tự làm mờ như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào — đặt sát mép khung). Mỗi lớp phủ rộng hơn khung 12% mỗi phía và trôi theo máy với tốc độ riêng (lớp xa trôi chậm, lớp gần trôi nhanh) — đó là chiều sâu. ¤camera¤: máy nhìn vào điểm ¤(x, y)¤ ở giữa khung với ¤zoom¤ ≥ 1, chạy từ ¤from¤ sang ¤to¤ trong khoảng ¤start¤–¤end¤ (tỉ lệ của ¤duration¤, mặc định 0–0.85); ở zoom 1 chỉ lia trong khoảng 10% khung, muốn lia xa hơn thì zoom lên trước. ¤vignette¤ (0–0.6) làm tối bốn góc. Lớp nền và ánh sáng của Scene KHÔNG tính là vật trong luật vùng an toàn — được tràn mép.
-- ¤<Camera duration={duration} from={{x, y, zoom}} to={{x, y, zoom}} start end>...</Camera>¤ — cùng chuyển động máy cho shot KHÔNG dùng Scene (cảnh trừu tượng trên một Backdrop). Thay cho ¤div¤ transform tự viết.
-- ¤<Glow x y r color opacity pulse />¤ — quầng sáng mềm tâm ¤(x, y)¤, bán kính ¤r¤: ánh sáng trong lòng quả, hào quang quanh một ý tưởng, đèn. ¤pulse¤ thở chậm. ¤color¤ là ¤PALETTE.xxx¤ (mã #RRGGBB).
-- ¤<LightRays x y count length color opacity still />¤ — các tia sáng toả ra từ ¤(x, y)¤ và xoay chậm: nắng xuyên qua lá, khoảnh khắc vỡ lẽ.
-- ¤<Vignette strength color />¤ — làm tối bốn góc khung, đứng yên dù máy chạy (Scene đã có sẵn, chỉ dùng riêng khi không có Scene).
-- ¤<KeywordText x y width duration size color background start tilt>Từ khoá</KeywordText>¤ — một TỪ KHOÁ (1–3 từ) bật lên trên một mảng màu, hơi nghiêng: tên khái niệm đang được nói, không bao giờ là câu thoại. ¤x¤, ¤y¤ là tâm, ¤width¤ cố định (chữ xuống dòng bên trong), ¤start¤ là tỉ lệ ¤duration¤ lúc nó xuất hiện. Nó là chữ: tuân luật chữ ở mục F.
+- ¤<Scene duration={duration} sky={...} far={...} mid={...} near={...} camera={{from: {x, y, zoom}, to: {x, y, zoom}, start, end}} vignette={0.35} blurNear={10}>...vật của shot...</Scene>¤ — dựng shot thành MỘT NƠI CHỐN kín khung, nhiều lớp sâu: ¤sky¤ (xa nhất, đứng yên: một ¤<Backdrop>¤), ¤far¤ và ¤mid¤ (cảnh sau nhân vật), các vật của shot (con của Scene), ¤near¤ (cảnh TRƯỚC nhân vật, tự mờ: tán lá, mép bàn — đặt sát mép khung). Mỗi lớp phủ rộng hơn khung 12% mỗi phía và trôi theo máy với tốc độ riêng. ¤camera¤: máy nhìn vào điểm ¤(x, y)¤ ở giữa khung với ¤zoom¤ ≥ 1, chạy từ ¤from¤ sang ¤to¤ trong ¤start¤–¤end¤ (tỉ lệ của ¤duration¤, mặc định 0–0.85); ở zoom 1 chỉ lia được khoảng 10% khung, muốn lia xa hơn thì zoom lên trước. ¤vignette¤ (0–0.6) tối bốn góc. Lớp nền và ánh sáng của Scene được tràn mép, không tính vào luật vùng an toàn.
+- ¤<Camera duration={duration} from={{x, y, zoom}} to={{x, y, zoom}} start end>...</Camera>¤ — chuyển động máy cho shot KHÔNG dùng Scene.
+- ¤<Glow x y r color opacity pulse />¤ — quầng sáng mềm tâm ¤(x, y)¤, bán kính ¤r¤ (ánh sáng trong lòng quả, hào quang quanh một ý tưởng); ¤pulse¤ thở chậm. ¤<LightRays x y count length color opacity still />¤ — tia sáng toả ra từ ¤(x, y)¤, xoay chậm (nắng xuyên lá, khoảnh khắc vỡ lẽ). ¤<Vignette strength color />¤ — tối bốn góc (Scene đã có sẵn; chỉ dùng riêng khi không có Scene).
+- ¤<KeywordText x y width duration size color background start tilt>Từ khoá</KeywordText>¤ — một TỪ KHOÁ (1–3 từ) bật lên trên một mảng màu, hơi nghiêng: tên khái niệm đang nói, không bao giờ là câu thoại. ¤x¤, ¤y¤ là tâm, ¤width¤ cố định, ¤start¤ là tỉ lệ ¤duration¤ lúc xuất hiện. Là chữ nên tuân luật chữ ở mục F.
 
 ### Nền môi trường dựng sẵn (từ ¤./conceptflow-mini/backdrops¤) — dùng trong ¤<Scene backdrop={...}>¤
-Mỗi nền là một NƠI CHỐN kín khung, tự vẽ đủ 4 lớp của Scene (trời/tường xa, cảnh xa, cảnh giữa hai bên mép, tiền cảnh mờ ở góc) và tự co theo khung ngang hay dọc; giữa khung để trống cho nhân vật. Dùng: ¤<Scene duration={duration} backdrop={MeadowBackdrop} backdropProps={{color: PALETTE.troi, ground: PALETTE.co, light: PALETTE.nang}} camera={...}>...</Scene>¤. Mọi nền nhận ¤color¤ (màu chính: trời, tường, nước, mô), ¤ground¤ (đất, sàn), ¤light¤ (nắng, đèn, ánh sáng), ¤still¤. Lớp nào truyền riêng (¤sky¤, ¤far¤...) thì thay lớp đó của nền.
-- ¤<MeadowBackdrop />¤ — ngoài trời ngày nắng: trời và mặt trời, đồi xa, cây hai bên, cỏ phía trước.
-- ¤<RoomBackdrop />¤ — trong nhà: tường ấm, cửa sổ nắng, kệ sách bên cạnh, mép bàn phía trước.
-- ¤<StreetBackdrop />¤ — phố: dãy nhà có cửa sổ sáng đèn, vỉa hè, cột đèn, bụi cây phía trước.
-- ¤<InsideBodyBackdrop />¤ — bên trong cơ thể: mô ấm sáng từ trong, tế bào trôi, thành mạch, tế bào lớn sát ống kính.
-- ¤<UnderwaterBackdrop />¤ — dưới nước: ánh sáng từ mặt nước, đá xa, rong biển đung đưa, bọt nước.
-- ¤<SpaceBackdrop />¤ — vũ trụ: trời sao, hành tinh có vành, thiên thạch trôi gần.
-Nơi chốn không có nền dựng sẵn hay nền trong thư viện → tự dựng các lớp bằng ¤Backdrop¤ (gradient) cho ¤sky¤ và các hình của bộ (cây, cửa sổ, nhà...) cho ¤far¤/¤mid¤/¤near¤.
+Mỗi nền là một NƠI CHỐN kín khung, tự vẽ đủ 4 lớp của Scene và tự co theo khung ngang/dọc; giữa khung để trống cho nhân vật. Dùng: ¤<Scene duration={duration} backdrop={MeadowBackdrop} backdropProps={{color: PALETTE.troi, ground: PALETTE.co, light: PALETTE.nang}} camera={...}>...</Scene>¤. Mọi nền nhận ¤color¤ (màu chính), ¤ground¤ (đất, sàn), ¤light¤ (nắng, đèn), ¤still¤; lớp nào truyền riêng (¤sky¤, ¤far¤...) thì thay lớp đó của nền.
+- ¤<MeadowBackdrop />¤ ngoài trời ngày nắng. ¤<RoomBackdrop />¤ trong nhà (tường ấm, cửa sổ, kệ sách, mép bàn). ¤<StreetBackdrop />¤ phố (nhà sáng đèn, vỉa hè, cột đèn). ¤<InsideBodyBackdrop />¤ trong cơ thể (mô ấm sáng, tế bào trôi, thành mạch). ¤<UnderwaterBackdrop />¤ dưới nước. ¤<SpaceBackdrop />¤ vũ trụ (sao, hành tinh có vành).
+Nơi chốn không có nền dựng sẵn hay nền trong thư viện → tự dựng bằng ¤Backdrop¤ (gradient) cho ¤sky¤ và các hình của bộ cho ¤far¤/¤mid¤/¤near¤.
 
 ### Nền và bố cục cảnh
-- ¤<Backdrop color={PALETTE.troiTren} to={PALETTE.troiDuoi} floor={PALETTE.sanNha} floorY={830} />¤ — nền phủ cả khung; có ¤to¤ thì là gradient dọc từ ¤color¤ xuống ¤to¤ (bầu trời, lòng quả phát sáng); tuỳ chọn một dải sàn từ ¤floorY¤ trở xuống. Trong Scene thì đặt nó vào ¤sky¤; không có Scene thì đặt ĐẦU TIÊN trong ¤<AbsoluteFill>¤ của shot. Không có Backdrop thì nền là ¤#080E1C¤ mặc định.
-- ¤<Panel x={990} y={0} w={930} h={1080} color={PALETTE.nenDem}>...</Panel>¤ — một mảng màu chữ nhật: nửa khung của màn chia đôi, vạch ngăn giữa hai mảng, một ô cửa nhìn sang nơi khác. RIÊNG Panel thì ¤x¤, ¤y¤ là GÓC TRÊN-TRÁI. Hình đặt bên trong Panel tính toạ độ theo góc của Panel và bị cắt ở mép Panel.
+- ¤<Backdrop color={PALETTE.troiTren} to={PALETTE.troiDuoi} floor={PALETTE.sanNha} floorY={830} />¤ — nền phủ cả khung; có ¤to¤ thì là gradient dọc từ ¤color¤ xuống ¤to¤; tuỳ chọn dải sàn từ ¤floorY¤ trở xuống. Trong Scene đặt vào ¤sky¤; không có Scene thì đặt ĐẦU TIÊN trong ¤<AbsoluteFill>¤.
+- ¤<Panel x={990} y={0} w={930} h={1080} color={PALETTE.nenDem}>...</Panel>¤ — mảng màu chữ nhật (nửa khung của màn chia đôi, vạch ngăn, ô cửa nhìn sang nơi khác). RIÊNG Panel thì ¤x¤, ¤y¤ là GÓC TRÊN-TRÁI; hình bên trong tính toạ độ theo góc Panel và bị cắt ở mép Panel.
 
 ### Người
-- ¤<Person x y size pose mood age outfit hairStyle talking glasses shirt pants skin hair />¤ — người nhìn thẳng, đầu to thân nhỏ kiểu truyện tranh. Tỉ lệ 260 × 420 (rộng ≈ 0.62 × size). Chân chạm đáy hộp, có bóng dưới chân.
-  - ¤pose¤: ¤'stand'¤ đứng | ¤'sit'¤ ngồi trên ghế đẩu nhỏ (ghế vẽ sẵn) | ¤'wave'¤ vẫy tay | ¤'point'¤ chỉ tay sang phải người xem (¤flip¤ để chỉ sang trái) | ¤'think'¤ tay chống cằm | ¤'cheer'¤ giơ hai tay mừng | ¤'ouch'¤ tay ôm má (đau răng, đau đầu) | ¤'shrug'¤ nhún vai | ¤'walk'¤ đi bộ tại chỗ (dời ¤x¤ để đi thật).
-  - ¤mood¤: ¤'neutral'¤ | ¤'happy'¤ | ¤'sad'¤ (có giọt nước mắt) | ¤'worried'¤ (có giọt mồ hôi) | ¤'surprised'¤ | ¤'pain'¤ (mắt nhắm chặt, nghiến răng) | ¤'angry'¤.
-  - ¤age¤: ¤'child'¤ | ¤'adult'¤ | ¤'elder'¤ (tóc bạc hai bên, đeo kính). ¤outfit¤: ¤'shirt'¤ | ¤'coat'¤ (áo blouse trắng — bác sĩ, nhà khoa học) | ¤'dress'¤. ¤hairStyle¤: ¤'short'¤ | ¤'long'¤ | ¤'bald'¤ | ¤'bun'¤.
-  - ¤talking¤: miệng mấp máy — bật khi người đó đang là người nói trong câu thoại.
+- ¤<Person x y size pose mood age outfit hairStyle talking glasses shirt pants skin hair />¤ — người nhìn thẳng, đầu to thân nhỏ kiểu truyện tranh. Tỉ lệ 260 × 420 (rộng ≈ 0.62 × size). Chân chạm đáy hộp, có bóng.
+  - ¤pose¤: ¤'stand'¤ | ¤'sit'¤ (ngồi ghế đẩu vẽ sẵn) | ¤'wave'¤ | ¤'point'¤ chỉ sang phải (¤flip¤ để chỉ sang trái) | ¤'think'¤ | ¤'cheer'¤ | ¤'ouch'¤ ôm má | ¤'shrug'¤ | ¤'walk'¤ đi tại chỗ (dời ¤x¤ để đi thật). ¤mood¤: ¤'neutral'¤ | ¤'happy'¤ | ¤'sad'¤ | ¤'worried'¤ | ¤'surprised'¤ | ¤'pain'¤ | ¤'angry'¤.
+  - ¤age¤: ¤'child'¤ | ¤'adult'¤ | ¤'elder'¤. ¤outfit¤: ¤'shirt'¤ | ¤'coat'¤ (áo blouse — bác sĩ, nhà khoa học) | ¤'dress'¤. ¤hairStyle¤: ¤'short'¤ | ¤'long'¤ | ¤'bald'¤ | ¤'bun'¤. ¤talking¤: miệng mấp máy — bật khi người đó đang nói.
 
 ### Cơ thể và sức khoẻ
-- ¤<Tooth decay={0..1} mood shine face />¤ — chiếc răng hàm có mặt. Tỉ lệ 200 × 220. ¤decay¤: 0 trắng khoẻ, 0.3 đốm nâu, 0.6 lỗ sâu đen, 1 lỗ lớn + nứt + ố vàng — nội suy ¤decay¤ theo frame để thấy sâu răng LAN DẦN. Nét mặt tự đi theo ¤decay¤ (vui → lo → buồn → đau) trừ khi đặt ¤mood¤. ¤shine¤ thêm tia lấp lánh khi răng sạch. ¤face={false}¤ bỏ mặt.
-- ¤<Germ color mood variant />¤ — vi khuẩn: khối mềm lúc nhúc có gai, mắt và miệng. Tỉ lệ 1 : 1. ¤mood¤: ¤'evil'¤ (mặc định — kẻ xấu, cười nhe răng) | ¤'happy'¤ | ¤'sad'¤. ¤variant¤ 0–3 đổi hình dạng để một đám vi khuẩn không giống hệt nhau.
-- ¤<OpenMouth decayed={[1, 8]} decay={0.6} lips />¤ — miệng há nhìn thẳng: môi, hàm trên (răng 0–5, trái sang phải), hàm dưới (răng 6–11), lưỡi. ¤decayed¤: răng nào bị sâu; ¤decay¤: sâu tới đâu. Tỉ lệ 400 × 260.
-- ¤<Drop color face />¤ — giọt chất lỏng (axit, nước, mồ hôi, nước mắt); ¤face¤ thêm mặt gian. Tỉ lệ 140 × 180.
-- ¤<Shield color check />¤ — khiên bảo vệ (flo bảo vệ men răng, hệ miễn dịch...), ¤check¤ có dấu tích. Tỉ lệ 160 × 190.
-- ¤<Heart color beat />¤ — trái tim, ¤beat¤ đập nhịp. Tỉ lệ 200 × 180.
+- ¤<Tooth decay={0..1} mood shine face />¤ — răng hàm có mặt, 200 × 220. ¤decay¤: 0 trắng khoẻ, 0.3 đốm nâu, 0.6 lỗ sâu, 1 lỗ lớn + nứt + ố vàng — nội suy theo frame để sâu răng LAN DẦN; nét mặt tự đi theo ¤decay¤ trừ khi đặt ¤mood¤. ¤shine¤ lấp lánh khi răng sạch; ¤face={false}¤ bỏ mặt.
+- ¤<Germ color mood variant />¤ — vi khuẩn, 1 : 1. ¤mood¤: ¤'evil'¤ (mặc định) | ¤'happy'¤ | ¤'sad'¤. ¤variant¤ 0–3 đổi dạng để một đám không giống hệt nhau.
+- ¤<OpenMouth decayed={[1, 8]} decay={0.6} lips />¤ — miệng há nhìn thẳng: hàm trên (răng 0–5, trái sang phải), hàm dưới (6–11), lưỡi; ¤decayed¤ là răng nào sâu. 400 × 260.
+- ¤<Drop color face />¤ giọt chất lỏng (axit, nước, mồ hôi, nước mắt), 140 × 180. ¤<Shield color check />¤ khiên bảo vệ (flo, miễn dịch), 160 × 190. ¤<Heart color beat />¤ trái tim, ¤beat¤ đập nhịp, 200 × 180.
 
 ### Đồ ăn
-- ¤<Candy color />¤ kẹo gói, tỉ lệ 240 × 110. ¤<Lollipop color />¤ kẹo mút, 140 × 260. ¤<Soda color />¤ ly nước ngọt có ống hút, 160 × 260. ¤<Donut color />¤ bánh donut, 1 : 1. ¤<Apple color />¤ quả táo, 1 : 1.
+- ¤<Candy color />¤ kẹo gói, 240 × 110. ¤<Lollipop color />¤ kẹo mút, 140 × 260. ¤<Soda color />¤ ly nước ngọt, 160 × 260. ¤<Donut color />¤ bánh donut, 1 : 1. ¤<Apple color />¤ quả táo, 1 : 1.
 
 ### Đồ vật và bối cảnh
-- ¤<Toothbrush color paste bristlesDown />¤ — bàn chải nằm ngang, đầu bên phải; ¤bristlesDown¤ quay lông bàn chải xuống (chải một chiếc răng nằm dưới). Nội suy ¤x¤ qua lại để chải. Tỉ lệ 400 × 100.
-- ¤<Toothpaste color />¤ tuýp kem đánh răng, 300 × 120.
-- ¤<Clock hour minute frameColor handColor />¤ — đồng hồ treo tường vuông; nội suy ¤minute¤ để kim chạy (thời gian trôi). 1 : 1.
-- ¤<Table color />¤ bàn nhìn chính diện, 400 × 200. ¤<Chair color />¤ ghế, 200 × 260. ¤<Window time="day"|"night" />¤ cửa sổ có trời, 220 × 260. ¤<Plant />¤ chậu cây, 160 × 240. ¤<House />¤ ngôi nhà, 240 × 220. ¤<Tree />¤ cái cây, 180 × 260.
-- ¤<Sun />¤ mặt trời, 1 : 1. ¤<Cloud />¤ đám mây, 260 × 140. ¤<Lightbulb on />¤ bóng đèn (ý tưởng, hiểu ra), 160 × 240.
-- ¤<Coin />¤ đồng xu, 1 : 1. ¤<Book />¤ quyển sách, 200 × 160. ¤<Phone glow />¤ điện thoại, 120 × 220. ¤<Magnifier />¤ kính lúp (soi kỹ), 1 : 1.
+- ¤<Toothbrush color paste bristlesDown />¤ — bàn chải nằm ngang, đầu bên phải; ¤bristlesDown¤ quay lông xuống; nội suy ¤x¤ qua lại để chải. 400 × 100. ¤<Toothpaste color />¤ tuýp kem đánh răng, 300 × 120.
+- ¤<Clock hour minute frameColor handColor />¤ — đồng hồ treo tường; nội suy ¤minute¤ để kim chạy. 1 : 1.
+- ¤<Table color />¤ bàn, 400 × 200. ¤<Chair color />¤ ghế, 200 × 260. ¤<Window time="day"|"night" />¤ cửa sổ, 220 × 260. ¤<Plant />¤ chậu cây, 160 × 240. ¤<House />¤ nhà, 240 × 220. ¤<Tree />¤ cây, 180 × 260.
+- ¤<Sun />¤ mặt trời, 1 : 1. ¤<Cloud />¤ mây, 260 × 140. ¤<Lightbulb on />¤ bóng đèn (ý tưởng, hiểu ra), 160 × 240.
+- ¤<Coin />¤ đồng xu, 1 : 1. ¤<Book />¤ sách, 200 × 160. ¤<Phone glow />¤ điện thoại, 120 × 220. ¤<Magnifier />¤ kính lúp, 1 : 1.
 - ¤<Mark kind="check"|"cross" />¤ huy hiệu đúng / sai, 1 : 1. ¤<Sparkle />¤ tia lấp lánh bốn cánh, 1 : 1. ¤<Airplane color />¤ máy bay cánh quạt nhìn ngang, mũi bên phải, 320 × 120.
 
 ### Bong bóng thoại
-- ¤<Bubble x y w h thought flip textColor fontSize>Nhãn ngắn</Bubble>¤ — bong bóng thoại (¤thought¤: bong bóng suy nghĩ), đuôi chỉ xuống-trái về phía người nói (¤flip¤: xuống-phải). ¤x¤, ¤y¤ là tâm, ¤w¤ × ¤h¤ là kích thước px. Bên trong chỉ một NHÃN tối đa ~4 từ hoặc một hình — không bao giờ là câu thoại.
+- ¤<Bubble x y w h thought flip textColor fontSize>Nhãn ngắn</Bubble>¤ — bong bóng thoại (¤thought¤: suy nghĩ), đuôi chỉ xuống-trái về phía người nói (¤flip¤: xuống-phải). ¤x¤, ¤y¤ là tâm, ¤w¤ × ¤h¤ px. Bên trong chỉ một NHÃN tối đa ~4 từ hoặc một hình — không bao giờ là câu thoại.
 
 Cách dùng:
-1. **Vật nào trong HÌNH có trong bộ này thì BẮT BUỘC dùng component của bộ**, không tự vẽ lại bằng ¤<svg>¤/¤<path>¤. Chỉ vẽ tay bằng SVG/JSX những thứ bộ này không có — và vẽ theo cùng lối: hình phẳng, không viền, góc bo tròn.
-2. Dùng ĐÚNG vật kịch bản nói: kịch bản ghi "em bé ngồi bên bàn ăn kẹo" → ¤<Person pose="sit" age="child" mood="happy" />¤ + ¤<Table />¤ + ¤<Candy />¤, không thay bằng hình tròn có nhãn "em bé".
-3. Hình cùng có mặt vẫn tuân luật bố cục ở mục F: tính hộp bao từ ¤size¤ và tỉ lệ ở trên, không để hai hình đè nhau ngoài ý đồ (người NGỒI SAU bàn, kẹo NẰM TRÊN mặt bàn là ý đồ).
-4. Vật sống qua nhiều shot (nhân vật chính) lấy ¤x¤, ¤y¤, ¤size¤ từ cùng một mục ¤LAYOUT¤ — viết ¤<Person {...LAYOUT.kid} pose="sit" />¤.
-5. Cảm xúc đổi giữa shot (răng từ vui sang đau, người từ vui sang ôm má) → đổi ¤mood¤/¤pose¤/¤decay¤ tại một mốc theo ¤duration¤, hoặc nội suy ¤decay¤ liên tục.
-6. Shot kể chuyện ở một nơi chốn (căn phòng, khu vườn, lòng quả, bên trong cơ thể) → dựng bằng ¤<Scene>¤ đủ lớp theo bối cảnh của cảnh, với máy chuyển động; vật chính lớn, chiếm ít nhất 40% chiều khung.
+1. **Vật nào trong HÌNH có trong bộ này thì BẮT BUỘC dùng component của bộ**, không tự vẽ lại bằng ¤<svg>¤/¤<path>¤. Chỉ vẽ tay những thứ bộ không có — theo cùng lối: hình phẳng, không viền, góc bo tròn. Dùng ĐÚNG vật kịch bản nói: "em bé ngồi bên bàn ăn kẹo" → ¤<Person pose="sit" age="child" mood="happy" />¤ + ¤<Table />¤ + ¤<Candy />¤, không thay bằng hình tròn có nhãn "em bé".
+2. Hình cùng có mặt vẫn tuân luật bố cục ở mục F: tính hộp bao từ ¤size¤ và tỉ lệ ở trên; không để hai hình đè nhau ngoài ý đồ (người NGỒI SAU bàn, kẹo NẰM TRÊN bàn là ý đồ).
+3. Vật sống qua nhiều shot lấy ¤x¤, ¤y¤, ¤size¤ từ cùng một mục ¤LAYOUT¤: ¤<Person {...LAYOUT.kid} pose="sit" />¤. Cảm xúc đổi giữa shot → đổi ¤mood¤/¤pose¤ tại một mốc theo ¤duration¤, hoặc nội suy ¤decay¤ liên tục.
+4. Shot kể chuyện ở một nơi chốn → dựng bằng ¤<Scene>¤ đủ lớp theo bối cảnh của cảnh, máy chuyển động; vật chính chiếm ít nhất 40% chiều khung.
 
-Ví dụ một shot minh hoạ:
+Ví dụ một shot:
 
 ¤¤¤tsx
-// Shot 2.1 — MÁY: trung cảnh, đẩy chậm vào em bé | HÌNH: căn phòng chiều vàng, cửa sổ và chậu cây phía sau, mép bàn mờ phía trước; em bé ngồi bên bàn, viên kẹo nảy lên mặt bàn, quầng sáng ấm quanh viên kẹo
+// Shot 2.1 — MÁY: trung cảnh, đẩy chậm vào em bé | HÌNH: căn phòng chiều vàng, cửa sổ phía sau, mép bàn mờ phía trước; em bé ngồi bên bàn, viên kẹo nảy lên mặt bàn
 function Shot2_1({duration}: ShotProps) {
   const frame = useCurrentFrame();
   const {fps} = useVideoConfig();
@@ -78,13 +62,11 @@ function Shot2_1({duration}: ShotProps) {
         duration={duration}
         sky={<Backdrop color={PALETTE.tuongSang} to={PALETTE.tuongToi} floor={PALETTE.sanNha} floorY={830} />}
         far={<Window x={1500} y={380} size={420} time="day" />}
-        mid={<Plant x={1720} y={700} size={360} />}
         near={<Table x={1700} y={1000} size={700} />}
         camera={{from: {x: 960, y: 540, zoom: 1}, to: {x: 760, y: 600, zoom: 1.15}}}
       >
         <Table x={620} y={760} size={520} />
         <Person {...LAYOUT.kid} pose="sit" age="child" mood="happy" />
-        <Glow x={660} y={600} r={160} color={PALETTE.anhKeo} opacity={candyIn * 0.6} />
         <Candy x={660} y={600} size={180} scale={candyIn} />
       </Scene>
     </AbsoluteFill>

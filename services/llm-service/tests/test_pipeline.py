@@ -37,8 +37,11 @@ class FakeProvider:
 
     name = "hive"
 
-    def __init__(self, engine="remotion", broken=None, fail_repair=False, bad_first_chunk=False):
+    def __init__(self, engine="remotion", broken=None, fail_repair=False, bad_first_chunk=False,
+                 skip_in_group=(), budget_above=0):
         self.engine = engine
+        self.skip_in_group = set(skip_in_group)  # shots a multi-shot repair reply leaves out
+        self.budget_above = budget_above  # a repair turn for more shots than this runs out of budget
         self.calls: list[ChatRequest] = []
         self.broken = broken or set()  # shot ids whose FIRST version has a compile error
         self.fail_repair = fail_repair
@@ -68,6 +71,15 @@ class FakeProvider:
         if "SỬA LỖI" in u:
             if self.fail_repair:
                 return ChatResult("no code here", usage)
+            if m := re.search(r"SỬA LỖI trong \d+ shot: ([\d., ]+)\.", u):
+                ids = [i.strip() for i in m.group(1).split(",")]
+                if self.budget_above and len(ids) > self.budget_above:
+                    raise LLMError(errors.BUDGET, "hive", "reasoning budget", Usage())
+                ids = [i for i in ids if i not in self.skip_in_group]
+                if self.engine == "remotion":
+                    return ChatResult("```tsx\n" + "\n\n".join(tsx(i) for i in ids) + "\n```", usage)
+                return ChatResult("```python\n" + "\n\n".join(
+                    f"def shot_{i.replace('.', '_')}(self):\n    self.narrate('fixed')" for i in ids) + "\n```", usage)
             sid = re.search(r"trong shot (\d+\.\d+)", u).group(1)
             if self.engine == "remotion":
                 return ChatResult("```tsx\n" + tsx(sid) + "\n```", usage)
@@ -171,6 +183,58 @@ async def test_repair_only_touches_the_failing_shot_and_then_passes():
     assert len(repairs) == 1 and "trong shot 1.3" in repairs[0].user
     assert [c.label for c in res.calls if c.phase == "repair"] == ["1.3"]
     assert len(chk.codes) == 2 and "BROKEN" not in res.code
+
+
+async def test_failing_shots_of_one_segment_are_repaired_in_one_turn():
+    prov, chk = FakeProvider(broken={"1.2", "1.3"}), FakeChecker()
+    res = await pipeline(prov, chk, chunk=5).run(req(storyboard(5)), emit_none)
+    assert res.check_ok and res.repair_rounds == 1
+    repairs = [c for c in prov.calls if "SỬA LỖI" in c.user]
+    assert len(repairs) == 1 and "trong 2 shot: 1.2, 1.3" in repairs[0].user
+    assert repairs[0].user.count("LAYOUT hiện có") == 1 and repairs[0].user.count("Bảng màu hợp lệ") == 1
+    assert [c.label for c in res.calls if c.phase == "repair"] == ["1.2,1.3"]
+    assert "BROKEN" not in res.code
+
+
+async def test_failing_shots_of_different_segments_are_repaired_in_one_turn_each():
+    prov, chk = FakeProvider(broken={"1.1", "1.2", "1.3"}), FakeChecker()
+    res = await pipeline(prov, chk, chunk=2).run(req(storyboard(4)), emit_none)
+    assert res.check_ok
+    assert sorted(c.label for c in res.calls if c.phase == "repair") == ["1.1,1.2", "1.3"]
+
+
+async def test_a_manim_segment_with_two_failing_shots_is_repaired_in_one_turn():
+    prov, chk = FakeProvider(engine="manim", broken={"1.2", "1.3"}), FakeChecker(raw_for_manim=True)
+    res = await pipeline(prov, chk).run(req(storyboard(4), "manim"), emit_none)
+    assert res.check_ok
+    assert [c.label for c in res.calls if c.phase == "repair"] == ["1.2,1.3"]
+    assert res.code.count("self.narrate('fixed')") == 2
+
+
+async def test_a_grouped_repair_reply_missing_a_shot_keeps_that_shots_old_code():
+    prov, chk = FakeProvider(broken={"1.2", "1.3"}, skip_in_group={"1.3"}), FakeChecker()
+    res = await pipeline(prov, chk, chunk=5, rounds=1).run(req(storyboard(4)), emit_none)
+    assert not res.check_ok and "BROKEN" in res.code  # 1.3 was not repaired and still fails the check
+    assert res.code.count("BROKEN") == 1
+    assert all(c.ok for c in res.calls if c.phase == "repair")
+
+
+async def test_a_grouped_repair_that_runs_out_of_budget_is_split_down_to_single_shots():
+    prov, chk = FakeProvider(broken={"1.1", "1.2", "1.3"}, budget_above=1), FakeChecker()
+    res = await pipeline(prov, chk, chunk=5).run(req(storyboard(4)), emit_none)
+    assert res.check_ok and "BROKEN" not in res.code
+    labels = [c.label for c in res.calls if c.phase == "repair"]
+    assert labels.count("1.1,1.2,1.3") == 1  # the group that ran out of budget
+    assert sorted(lab for lab in labels if "," not in lab) == ["1.1", "1.2", "1.3"]  # every shot was asked again alone
+    assert {c.error_kind for c in res.calls if c.phase == "repair" and not c.ok} == {errors.BUDGET}
+
+
+async def test_a_group_with_no_usable_function_in_the_reply_is_retried_then_kept_as_is():
+    prov, chk = FakeProvider(broken={"1.2", "1.3"}, fail_repair=True), FakeChecker()
+    res = await pipeline(prov, chk, chunk=5, rounds=1).run(req(storyboard(4)), emit_none)
+    assert not res.check_ok
+    repair_calls = [c for c in res.calls if c.phase == "repair"]
+    assert len(repair_calls) == 2 and all(c.error_kind == errors.MALFORMED for c in repair_calls)
 
 
 async def test_repair_gives_up_after_max_rounds_and_reports_check_failed_not_pass():

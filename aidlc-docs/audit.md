@@ -2891,3 +2891,29 @@ q4 a"
 **Context**: INCEPTION → CONSTRUCTION — CR-063.
 
 ---
+
+## CR-063 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "chắc tách các phân khác ra làm cái nào clear trước đi" (phạm vi: gộp repair + thu gọn prompt; trần suy nghĩ tách ra backlog)
+**AI Response**:
+- **llm-service (gộp repair, FR-2)**: `prompts.remotion_repair_many` / `manim_repair_many` (một shot → prompt cũ nguyên văn; nhiều shot → lỗi và code từng shot, bảng màu/LAYOUT/trace in một lần). `run.parse_repaired_shots` chấp nhận reply thiếu hàm. `_repair` nhóm shot lỗi theo `plan.owner`, mỗi đoạn một lượt (nhãn `1.3,1.4`); LAYOUT/cast vẫn riêng; lượt bị cắt (`BUDGET`/`TRUNCATED`) chia đôi tới một shot. Áp cho repair sớm và repair cuối.
+- **authoring-service (thu gọn prompt, FR-3)**: viết gọn `remoIntroAIVI`, `remoAAIVI`, `remoBAIVI`, `remoDAIVI`, `remoGAIVI` (chỉ AI) và `remoCVI`, `remoC2VI`, `remoEVI`, `remoFVI`, `illustration_kit_vi.txt` (dùng chung với `remotion_engineer` thủ công). Giữ nguyên tên component, props, số luật L1–L15 và mọi con số. Version seed `remotion_engineer_ai` 3→4, `remotion_engineer` 6→7. Hash golden của `remotion_engineer` cập nhật theo (đổi chủ ý vì khối dùng chung đổi).
+- **Kết quả đo**: `remotion_engineer_ai` 33 833 → **28 973** ký tự (−14,4%), chưa đạt mục tiêu −25% của thiết kế. Phần còn lại chủ yếu là bộ minh hoạ (khoảng 9 000, mọi component/props cần thiết) và catalog Lottie (3 554, file sinh tự động, không sửa tay).
+- **Test**: llm-service `pytest` 168 pass (162 cũ + 6 mới); `ruff` không thêm lỗi (còn 4 lỗi E741 có sẵn ở `merger.py`, `test_backdrops.py`). authoring-service `go test ./...`, `go vet`, `gofmt` sạch. rendering `tests/domain/test_illustration_kit.py` 3 pass, 1 skip.
+- **Rebuild**: `llm-service`, `authoring-service` healthy (code từ `feature/cr-063-code-gen-token-tuning`). DB: `remotion_engineer_ai` bản hệ thống đang bật, 28 973 ký tự; không có prompt của Creator đè lên.
+- **Chưa làm / chưa kiểm**: chưa chạy bước code trên project thật nên chưa đo số lượt repair/token giảm thật và chưa so chất lượng video; mục tiêu −25% của prompt chưa đạt (xem trên).
+**Impact Assessment**: llm-service, authoring-service. Prompt `remotion_engineer` thủ công cũng gọn hơn (32 275 ký tự). Không đổi HTTP contract (chỉ `label` của `repair`), DB, giao diện.
+**Artifacts Affected**: `services/llm-service/app/pipeline/{prompts,run}.py`, `services/llm-service/tests/test_pipeline.py`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai}.go`, `prompts/illustration_kit_vi.txt`, `golden_prompts_test.go`, `docs/contracts/authoring-llm-code-v2.md`, ADR-0030, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-063, chờ Creator duyệt rồi `/deliver`.
+
+---
+
+## CR-063 — Duyệt, thêm backlog, chuyển /deliver
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "thêm lỗi này vào backlog rồi /deliver  phần còn lại lên trước"
+**AI Response**: Thêm hai mục backlog vào `aidlc-state.md`: (1) kiểm bố cục từng đoạn báo sai khi máy lia/zoom đẩy vật ra mép (project `a46c47d3`, shot 3.4), (2) giới hạn thời gian cho lượt gọi model bước code (`HIVE_TIMEOUT_SECONDS=0`). Phần trần suy nghĩ (Q5) vẫn ở backlog. Chuyển `/deliver` cho phần gộp repair và thu gọn prompt đã code xong; thu gọn prompt dừng ở −14,4% theo quyết định của Creator.
+**Impact Assessment**: chỉ tài liệu.
+**Artifacts Affected**: `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION → delivery — CR-063.
+
+---
