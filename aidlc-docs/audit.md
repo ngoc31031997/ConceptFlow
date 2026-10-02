@@ -2866,3 +2866,28 @@ C C1 xoá hẳn"
 **Context**: CONSTRUCTION — CR-062, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## CR-063 — Giảm token bước code: trần suy nghĩ, gộp repair, thu gọn system prompt
+**Timestamp**: 2026-10-02T00:00:00Z
+**User Input**: "Hiệu chỉnh CODE_MAX_REASONING_CHARS (CR-056): đang 60 000, cần dựa trên tỉ lệ reasoning_chars / reasoning_tokens đo được trong llm_usage.
+Gộp shot lỗi cùng đoạn vào một lượt repair (CR-056): mỗi lượt repair hiện gửi lại khoảng 21k token system prompt.
+Thu gọn system prompt remotion_engineer_ai (CR-056): hiện 28 500 ký tự."
+**AI Response**: Mở nhánh `feature/cr-063-code-gen-token-tuning` trong worktree riêng. Phân tích qua graphify: trần ở `config.py:72`/`provider.py:210`; repair mỗi shot một lượt (`run.py:804-871`), khoảng 18k trong 21k token prompt mỗi lượt là cache-hit (số CR-056); system prompt hiện khoảng 34 000 ký tự cố định (bộ minh hoạ 11 400, luật F 5 791). Docker tắt nên chưa đo được `llm_usage`. Dừng lại hỏi Q1–Q4: nguồn số đo, cách đặt trần, phạm vi gộp repair, mức thu gọn prompt.
+**Impact Assessment**: dự kiến llm-service (pipeline repair, config), authoring-service (seed prompt), `.env.example`/compose. Không đổi contract HTTP/DB dự kiến. Kiểm phụ thuộc: độc lập (không có nhánh mở nào khác).
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-063-code-gen-token-tuning-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-063, chờ Creator trả lời Q1–Q4.
+**User Input (trả lời)**: "q1 tôi đã bật docker
+q2 a
+q3 a
+q4 a"
+**AI Response (trả lời)**: Khởi động riêng `authoring-service-db` và truy vấn `llm_usage` (312 lượt thành công có số đo). Tỉ lệ ≈ 3,1 ký tự/token (không phải 4). Chunk: 28% bị cắt ở 60 000; mọi lượt thành công đều dưới 60 000 nên phân bố bị kiểm duyệt phải, công thức p95 × 1,3 của Q2(a) không dùng được. Repair gộp còn làm suy nghĩ mỗi lượt tăng. Viết đầy đủ thiết kế (FR-1..3, kế hoạch, rủi ro), đề xuất trần 100 000 và hỏi Q5 (a/b/c). Đã dừng `authoring-service-db`.
+**Impact Assessment**: như trên; không đổi contract HTTP/DB.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-063-code-gen-token-tuning-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-063, chờ Creator chốt Q5 và duyệt.
+**User Input (tách phạm vi, duyệt)**: "chắc tách các phân khác ra làm cái nào clear trước đi"
+**AI Response (tách phạm vi, duyệt)**: Hiểu là: làm phần đã rõ trước. CR-063 chỉ còn FR-2 (gộp repair theo đoạn, Q3-a) và FR-3 (thu gọn prompt, Q4-a); FR-1 (trần suy nghĩ) tách ra backlog chờ Q5, kèm số đo. Vì trần vẫn 60 000, thêm quy tắc lùi cho repair gộp: bị cắt thì chia đôi tới một shot. Backlog trong `aidlc-state.md` cập nhật. Commit thiết kế rồi chuyển `/code`.
+**Impact Assessment**: llm-service (repair), authoring-service (seed prompt). Không đổi config, contract HTTP, DB.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-063-code-gen-token-tuning-design.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION → CONSTRUCTION — CR-063.
+
+---
