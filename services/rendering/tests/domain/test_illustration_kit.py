@@ -30,7 +30,12 @@ NOT_KIT_TAGS = {"AbsoluteFill"}
 
 
 # Linh kiện để vẽ hình mới, không phải hình để đặt lên khung.
-HELPERS = {"Figure", "Face", "GroundShadow"}
+HELPERS = {"Figure", "Face", "GroundShadow", "HeldAt"}
+RIG = KIT.with_name("rig.tsx")
+
+
+def rig_exports() -> set[str]:
+    return set(re.findall(r"^export function ([A-Z]\w*)\(", RIG.read_text(encoding="utf-8"), re.M))
 
 
 def all_exports() -> set[str]:
@@ -61,7 +66,7 @@ def test_bo_minh_hoa_co_du_cac_hinh_toi_thieu():
 def test_moi_component_deu_duoc_mo_ta_trong_prompt_va_nguoc_lai():
     doc = DOC.read_text(encoding="utf-8")
     exports = kit_exports()
-    exports |= scene_exports()[0] | backdrop_exports()
+    exports |= scene_exports()[0] | backdrop_exports() | rig_exports()
     documented = set(re.findall(r"<([A-Z]\w*)", doc)) - NOT_KIT_TAGS
     assert exports - documented == set(), "component chưa có trong illustration_kit_vi.txt"
     assert documented - exports == set(), "prompt nhắc tới component không tồn tại"
@@ -78,6 +83,9 @@ def test_khung_code_cua_merger_import_dung_bo_minh_hoa():
     assert helpers, "merger.py không còn ILLUSTRATION_HELPERS"
     # Mọi thứ còn lại mà bộ minh hoạ xuất ra: hình của thư viện được dán vào script cần chúng.
     assert set(re.findall(r'"(\w+)"', helpers.group(1))) == all_exports() - kit_exports()
+    rig = re.search(r"RIG_KIT = \((.*?)\)", text, re.S)
+    assert rig, "merger.py không còn RIG_KIT"
+    assert set(re.findall(r'"(\w+)"', rig.group(1))) == rig_exports()
     components, hooks = scene_exports()
     scene = re.search(r"SCENE_KIT = \((.*?)\)", text, re.S)
     assert scene and set(re.findall(r'"(\w+)"', scene.group(1))) == components

@@ -178,7 +178,11 @@ type SubtitleBand struct {
 // one source of the numbers both {{subtitle_zone}} (what the Remotion
 // Engineer is told) and the rendering layout check (what the drawn frame is
 // held to) use.
-func SubtitleBandFor(mode SubtitleMode, style SubtitleStyle) (SubtitleBand, bool) {
+//
+// On a portrait frame, subtitles at the top are laid out below the Shorts
+// player's own controls (Video Assembly's top margin there is the frame's top
+// safe inset), so the strip reaches that much further down.
+func SubtitleBandFor(mode SubtitleMode, style SubtitleStyle, frame Frame) (SubtitleBand, bool) {
 	if mode != SubtitleModeBurnIn && mode != SubtitleModeBoth {
 		return SubtitleBand{}, false
 	}
@@ -186,17 +190,20 @@ func SubtitleBandFor(mode SubtitleMode, style SubtitleStyle) (SubtitleBand, bool
 	if !ok {
 		band = subtitleBandPx["medium"]
 	}
-	edge := "bottom"
 	if style.Position == "top" {
-		edge = "top"
+		if frame.Portrait() {
+			band += frame.Safe.Top
+		}
+		return SubtitleBand{Edge: "top", Px: band}, true
 	}
-	return SubtitleBand{Edge: edge, Px: band}, true
+	return SubtitleBand{Edge: "bottom", Px: band}, true
 }
 
-// ProjectSubtitleBand is SubtitleBandFor for a saved project, with the same
-// legacy fallbacks SubtitleZone applies.
+// ProjectSubtitleBand is SubtitleBandFor for a saved project on its own
+// frame, with the same legacy fallbacks SubtitleZone applies.
 func ProjectSubtitleBand(project *Project) (SubtitleBand, bool) {
-	return SubtitleBandFor(projectSubtitleSettings(project))
+	mode, style := projectSubtitleSettings(project)
+	return SubtitleBandFor(mode, style, FrameFor(project.VideoOutputMode))
 }
 
 // SubtitleZoneFor is SubtitleZone for explicit settings on the landscape
@@ -207,7 +214,7 @@ func SubtitleZoneFor(mode SubtitleMode, style SubtitleStyle, language string) st
 
 // SubtitleZoneIn is SubtitleZoneFor on the given frame.
 func SubtitleZoneIn(mode SubtitleMode, style SubtitleStyle, frame Frame, language string) string {
-	sb, burned := SubtitleBandFor(mode, style)
+	sb, burned := SubtitleBandFor(mode, style, frame)
 	if !burned {
 		if language == "vi" {
 			return "video này KHÔNG in phụ đề lên hình — được dùng toàn bộ vùng an toàn."

@@ -13,13 +13,18 @@ import math
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
 from app.frame import LANDSCAPE, Frame
 
 HEX = re.compile(r"^#[0-9A-Fa-f]{6}$")
 SHOT_ID = re.compile(r"^\d+\.\d+$")
 LAYOUT_KEY = re.compile(r"^[a-z][A-Za-z0-9]*$")
+# A shot is read in at most this many lines; each line is one TTS clip and
+# one visible change, so more means the shot should be split.
+MAX_LINES_PER_SHOT = 4
+# A line longer than this is no longer "one sentence or clause".
+MAX_WORDS_PER_LINE = 30
 _FENCE = re.compile(r"```[a-zA-Z0-9]*\r?\n(.*?)\r?\n?```", re.DOTALL)
 
 
@@ -45,12 +50,43 @@ class PaletteEntry(BaseModel):
         return v.upper()
 
 
+class Line(BaseModel):
+    """One sentence or clause of a shot's narration and the change on screen
+    while it is read. Each line is synthesized as its own audio clip, so its
+    start is known to the frame."""
+
+    model_config = ConfigDict(extra="ignore")
+    say: str
+    show: str
+
+    @field_validator("say", "show")
+    @classmethod
+    def _non_empty(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("must not be empty")
+        return v
+
+    @field_validator("say")
+    @classmethod
+    def _one_sentence(cls, v: str) -> str:
+        if "\n" in v:
+            raise ValueError("a line must not contain a line break")
+        if len(v.split()) > MAX_WORDS_PER_LINE:
+            raise ValueError(f"a line is one sentence or clause of at most {MAX_WORDS_PER_LINE} words")
+        return v
+
+
 class Shot(BaseModel):
+    """One shot. With `lines`, `narration` is always their `say` joined by a
+    space; without them (a storyboard written before lines existed) the shot
+    is read as one line, its `narration`."""
+
     model_config = ConfigDict(extra="ignore")
     id: str
     camera: str = ""
     visual: str
-    narration: str
+    narration: str = ""
+    lines: list[Line] = []
 
     @field_validator("id")
     @classmethod
@@ -59,12 +95,31 @@ class Shot(BaseModel):
             raise ValueError(f"shot id must look like n.m, got {v!r}")
         return v
 
-    @field_validator("narration", "visual")
+    @field_validator("visual")
     @classmethod
     def _non_empty(cls, v: str) -> str:
         if not v.strip():
             raise ValueError("must not be empty")
         return v
+
+    @field_validator("lines")
+    @classmethod
+    def _few_lines(cls, v: list[Line]) -> list[Line]:
+        if len(v) > MAX_LINES_PER_SHOT:
+            raise ValueError(f"a shot has at most {MAX_LINES_PER_SHOT} lines — split it into more shots")
+        return v
+
+    @model_validator(mode="after")
+    def _narration_from_lines(self) -> Shot:
+        if self.lines:
+            self.narration = " ".join(line.say.strip() for line in self.lines)
+        elif not self.narration.strip():
+            raise ValueError("narration: must not be empty (or give lines)")
+        return self
+
+    def spoken_lines(self) -> list[str]:
+        """The narration as it is read: one entry per TTS clip."""
+        return [line.say.strip() for line in self.lines] if self.lines else [self.narration]
 
 
 class Scene(BaseModel):
@@ -183,6 +238,9 @@ def dumps(sb: Storyboard) -> str:
     for scene in data["scenes"]:
         if not scene.get("setting"):
             scene.pop("setting", None)  # likewise for one written before scene settings
+        for shot in scene["shots"]:
+            if not shot.get("lines"):
+                shot.pop("lines", None)  # and for shots written before narration lines
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
@@ -211,7 +269,8 @@ def to_prose(sb: Storyboard, frame: Frame = LANDSCAPE) -> str:
             lines.append(f"Bối cảnh: {sc.setting}")
         lines.append("Các shot:")
         for sh in sc.shots:
-            lines.append(f'  {sh.id} | MÁY: {sh.camera} | HÌNH: {sh.visual} | THOẠI: "{sh.narration}"')
+            spoken = " / ".join(f'"{said}"' for said in sh.spoken_lines())
+            lines.append(f"  {sh.id} | MÁY: {sh.camera} | HÌNH: {sh.visual} | THOẠI: {spoken}")
         if sc.end_frame:
             lines.append(f"Kết cảnh: {sc.end_frame}")
     return "\n".join(lines)

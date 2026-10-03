@@ -14,10 +14,25 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // factored into parts for the AI flow. These are the SHA-256 of the shipped
 // manual templates; a deliberate wording change updates the hash here.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "0f1ba6b2adf29803baf869fb2a1e084c2e3ebf2bfc209eee4da8bde29dae1bc6",
-	RoleVisualDirector:   "9d081cc6329d5876b7d8805a0074db9448d049869b9a624578df90677e40ffa4",
+	RoleStoryArchitect:   "7f831e761dca2b49f3dc5a65d6ee91d7f9055875cad6a831086284b18d34237e",
+	RoleVisualDirector:   "54cda71ec1f61c8c7a4edf5024999bbf1bb7fd941ca2f1c7c38e653226c7eb39",
 	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
-	RoleRemotionEngineer: "0396cce2050c946f43225990b0b7438ab8d9d8d05a7c67f9f390fc7f9bf6225c",
+	RoleRemotionEngineer: "f3a2fa10f958f3729585b066e914b70be014489397d1128c00586d95b854affe",
+}
+
+// Every scene declares its own background colour, bright unless the setting
+// says why it is dark: no Remotion-side prompt falls back to a default dark one.
+func TestPromptsHaveNoDefaultDarkBackground(t *testing.T) {
+	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI, RoleRemotionEngineer, RoleRemotionEngineerAI} {
+		if text := aiTemplate(t, role); strings.Contains(text, "#080E1C") {
+			t.Errorf("%s still falls back to the default background #080E1C", role)
+		}
+	}
+	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
+		if text := aiTemplate(t, role); !strings.Contains(text, "MỖI CẢNH BẮT BUỘC có một vai trò màu nền") {
+			t.Errorf("%s does not require a background role per scene", role)
+		}
+	}
 }
 
 func TestManualPromptsAreByteIdenticalToTheShippedOnes(t *testing.T) {
@@ -66,7 +81,8 @@ func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 
 func TestVisualDirectorAIAsksForJSONAndKeepsTheCreativeBrief(t *testing.T) {
 	ai, manual := aiTemplate(t, RoleVisualDirectorAI), aiTemplate(t, RoleVisualDirector)
-	for _, want := range []string{`"scenes"`, `"palette"`, `"narration"`, "#RRGGBB", "JSON", `"layout"`, "{{subtitle_zone}}"} {
+	for _, want := range []string{`"scenes"`, `"palette"`, `"lines"`, `"say"`, `"show"`, "1 đến 4 câu mỗi shot",
+		"#RRGGBB", "JSON", `"layout"`, "{{subtitle_zone}}"} {
 		if !strings.Contains(ai, want) {
 			t.Errorf("visual_director_ai lacks %q", want)
 		}
@@ -84,7 +100,9 @@ func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 	remo, manim := aiTemplate(t, RoleRemotionEngineerAI), aiTemplate(t, RoleManimEngineerAI)
 	for _, want := range []string{"KHÔNG viết cả file", "ShotN_M", "LAYOUT", "PALETTE.", "L1. **Vùng an toàn.**", "LottieClip",
 		"không bao giờ tự đặt tên khác như `PALETTE_NEN_TROI`", "không có tên `PALETTE_...` nào?",
-		"không có `div` nào mang `transform: scale(...)` để tự zoom/lia?"} {
+		"không có `div` nào mang `transform: scale(...)` để tự zoom/lia?",
+		"function ShotN_M({duration, lines}: ShotProps)", "ShotProps = {duration: number; lines: number[]}",
+		"lineSpan(lines, i, duration)", "trong 12 frame đầu kể từ `lines[i]`"} {
 		if !strings.Contains(remo, want) {
 			t.Errorf("remotion_engineer_ai lacks %q", want)
 		}
@@ -146,7 +164,7 @@ func TestStoryArchitectAsksForAnArchetypeAndKeepsTheFormatsBeats(t *testing.T) {
 	text := aiTemplate(t, RoleStoryArchitect)
 	for _, want := range []string{
 		"KIỂU VIDEO: <mã kiểu>", "CẢNH BÁO FORMAT", "{{format_beats}}",
-		"{{video_archetypes}}", "kiểu: <mã>",
+		"{{video_archetypes}}", "kiểu: <mã>", "VIẾT ĐỂ VẼ", "tối đa 20 từ",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("story_architect lacks %q", want)

@@ -42,7 +42,9 @@ Cấu trúc:
           "id": "<n.m>",
           "camera": "<cỡ cảnh + chuyển động máy>",
           "visual": "<nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp>",
-          "narration": "<câu thoại>"
+          "lines": [
+            {"say": "<một câu hoặc một vế thoại, tối đa 20 từ>", "show": "<thay đổi NHÌN THẤY ĐƯỢC trong lúc câu này được đọc>"}
+          ]
         }
       ]
     }
@@ -54,9 +56,10 @@ Cấu trúc:
 
 Quy tắc của cấu trúc:
 - Đúng một trong hai: điền "hero" (và "world": null) HOẶC điền "world" (và "hero": null) khi chủ đề không có vật biến đổi tự nhiên.
-- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Màu nền riêng của cảnh cũng là một vai trò; nền mặc định #080E1C không khai báo lại.
+- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Mỗi cảnh có đúng một vai trò màu nền (sáng, bão hoà, trừ khi bối cảnh ghi lý do phải tối); không có nền mặc định.
 - Trong "visual" gọi màu bằng TÊN VAI TRÒ đã khai báo trong "palette", không phát minh màu mới giữa chừng.
 - "id" của shot có dạng "<số cảnh>.<số thứ tự shot>" (ví dụ "1.1", "1.2", "2.1"), duy nhất trong toàn phim, đánh số theo thứ tự xuất hiện. Số shot do lượng thay đổi hình quyết định, không thêm cho đủ số.
+- "lines": lời thoại của shot, chia theo CÂU ĐỌC — 1 đến 4 câu mỗi shot, mỗi "say" là một câu hoặc một vế (tối đa 20 từ, đọc không quá khoảng 4 giây), nối các "say" lại là đúng lời thoại của shot. Mỗi câu được đọc thành một đoạn tiếng riêng và hình biết chính xác lúc câu bắt đầu, nên "show" của câu là MỘT thay đổi cụ thể bắt đầu đúng lúc câu đó được đọc: vật vào/ra, biến hình, tách đôi, nhân lên, đếm, xếp lại, đổi màu theo nghĩa, bàn tay cầm/rút/chỉ/đếm ngón, nhân vật đổi dáng, máy đẩy vào một chi tiết. Không "show" nào chỉ là "vẫn hiển thị", "giữ nguyên". Ưu tiên ẩn dụ bằng đồ vật đời thường, con số và bàn tay người cận cảnh thay cho sơ đồ.
 - "transition_in" của cảnh 1 là null. Mọi trường chuỗi khác không được để trống.
 - Trong chuỗi JSON, dấu ngoặc kép thẳng phải viết \", xuống dòng viết \n; câu thoại không chứa xuống dòng.
 - "layout": chỗ đứng cố định của mọi vật SỐNG QUA NHIỀU SHOT (nhân vật chính, khối lặp lại, nhãn cố định). Các shot được dựng SONG SONG bởi nhiều người, mỗi người chỉ thấy vài shot, nên đây là thứ duy nhất giữ cho một vật đứng đúng một chỗ từ shot này sang shot khác. Mỗi mục: khoá camelCase ASCII mô tả vai trò (ví dụ "hero", "counterLabel"), giá trị là toạ độ TÂM "x", "y" và kích thước "size" (hoặc "w" và "h"), tính bằng px trên khung {{frame}}, chỉ là số. Cả vật (tâm cộng nửa kích thước) phải nằm trọn trong vùng an toàn từ {{safe_area}}. Vùng phụ đề: {{subtitle_zone}} Vật chỉ xuất hiện trong một shot thì không ghi. Không có vật nào xuyên suốt thì ghi "layout": {}.
@@ -66,8 +69,8 @@ Quy tắc của cấu trúc:
 const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi từng mục, đừng bỏ qua)
 
 1. Xem lướt cả kịch bản như xem phim: có chỗ nào giống lật slide — hình đứng yên, chữ hiện ra, rồi xoá đi làm lại — không? Viết lại thành một thay đổi liền mạch.
-2. Có shot nào mà trong lúc đọc thoại, hình không có gì diễn ra ("vẫn hiển thị", "giữ nguyên", "cho thấy")? Thêm một thay đổi có nghĩa, hoặc tách/gộp shot.
-3. Có câu thoại nào dài và phủ lên nhiều thay đổi hình? Tách thành nhiều shot. Ngược lại, có cảnh nào đang vượt khoảng 8 shot vì tách một câu ngắn thành một shot riêng không? Gộp các câu liền ý, cùng một thay đổi hình nhỏ, vào chung một shot.
+2. Có câu nào trong "lines" mà lúc đọc nó, hình không có gì diễn ra ("vẫn hiển thị", "giữ nguyên", "cho thấy")? Viết lại "show" thành một thay đổi cụ thể, hoặc gộp câu đó vào câu trước.
+3. Có "say" nào dài quá 20 từ hoặc ôm nhiều ý? Tách thành nhiều câu, mỗi câu một thay đổi. Câu cùng một khung hình (cùng nơi, cùng máy) nằm chung một shot; đổi khung hình thì sang shot mới. Có cảnh nào vượt khoảng 8 shot chỉ vì mỗi câu một shot không? Gộp các câu cùng khung vào chung shot.
 4. Có chuyển động nào — của vật hay của máy — không đổi thông tin, không làm rõ quan hệ, không làm bằng chứng và không dọn đường cho điều gì? Bỏ đi.
 5. Có câu thoại nào chỉ đang tả lại hình thay vì nói ý nghĩa? Viết lại.
 6. Mỗi cảnh từ 2 trở đi đã có "transition_in", và nó có nối từ hình cảnh trước thay vì cắt sạch không?
@@ -76,8 +79,8 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 9. Có cảnh nào chỉ toàn chữ, không có hình nào đang diễn ra? Dựng lại cảnh đó bằng hình.
 10. Mỗi cảnh đã có "invariant", và các shot có thật sự truyền tải đúng ý đó không?
 11. Kịch bản có giữ nguyên câu hỏi cốt lõi, insight, hiểu lầm, khoảnh khắc aha và thứ tự nhận thức của Story Architect không?
-12. Cứ 3–5 giây có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
-13. Tắt tiếng và chỉ nhìn "visual" từng shot: có shot nào mà "narration" nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
+12. Mỗi câu (tối đa khoảng 4 giây) có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Ý trừu tượng đã được kể bằng đồ vật, con số hay bàn tay cụ thể chưa? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
+13. Tắt tiếng và chỉ nhìn "visual" và các "show" từng shot: có shot nào mà lời thoại nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 14. Mỗi vật cụ thể lần đầu xuất hiện trong "visual" đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
 14b. Mỗi cảnh đã có "setting" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) chưa? Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động, vật chính ≥ 40% chiều khung (trừ toàn cảnh) chưa? (luật 20)
 15. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
@@ -109,6 +112,7 @@ const remoAAIVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG 
 
 1. **Một shot = một hàm.** Mỗi shot thành ĐÚNG MỘT component ¤ShotN_M¤ (số cảnh N, số thứ tự M lấy từ id shot: shot ¤2.3¤ → ¤Shot2_3¤) vẽ phần "visual" và "camera". Không gộp, không tách, không bỏ, không thêm shot. Câu thoại KHÔNG nằm trong code bạn viết — hệ thống tự đưa vào.
 2. **"visual" dựng đúng như chữ:** đúng vật được nêu, vị trí tương đối, thứ tự xuất hiện, kiểu chuyển động (mọc lên, trượt vào từ hướng nào, tách đôi, gộp lại...), nhịp. KHÔNG thêm vật trang trí, hiệu ứng, icon, nền hoạ tiết kịch bản không nói tới; KHÔNG bỏ vật nào kịch bản có.
+2b. **"lines":** mỗi câu thoại có một "show" — thay đổi đó bắt đầu đúng lúc câu được đọc, tức trong 12 frame đầu kể từ ¤lines[i]¤ (mục D), và xong trước câu sau. Không câu nào trôi qua mà hình đứng nguyên.
 3. **"camera":** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → prop ¤camera¤ của ¤<Scene>¤ (hoặc ¤<Camera>¤ khi không có Scene) — luật L8. "Máy đứng yên" vẫn cho máy trôi rất chậm (zoom 1 → 1.04), trừ khi kịch bản nói rõ khung phải đứng im.
 3b. **"scene_setting":** bối cảnh của cảnh (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) → các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤, ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤; mọi shot của cùng một cảnh dựng cùng một bối cảnh.
 4. **"scene_transition_in":** biến hình / đi xuyên qua / kéo ra → frame 0 của shot đầu cảnh PHẢI vẽ lại y hệt hình cuối của shot trước (cùng toạ độ, kích thước, màu — từ cùng mục ¤LAYOUT¤), rồi nội suy sang hình mới. Chỉ "cắt thẳng" mới được bắt đầu từ khung trống. Tin nhắn của người dùng cho biết shot ngay trước lô bạn viết — dùng nó để nối.
@@ -131,17 +135,18 @@ const remoDAIVI = `## D. KHUNG CODE DO HỆ THỐNG DỰNG — bạn chỉ viế
 
 Hệ thống đã có sẵn, bạn dùng thẳng mà không viết dòng import nào (câu "Import:" ở mục C3 là cho người viết cả file):
 - ¤react¤; ¤remotion¤ (registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig); ¤Segments¤; ¤Stage¤, ¤SAFE_MARGIN¤, ¤WIDTH¤, ¤HEIGHT¤; ¤LottieClip¤ (C2); MỌI component của bộ minh hoạ và cảnh (C3: ¤Scene¤, ¤Camera¤, ¤Glow¤, ¤Backdrop¤, ¤Panel¤, ¤Person¤...).
-- Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤, kiểu ¤ShotProps = {duration: number}¤, ¤PALETTE¤ (mục B) và ¤LAYOUT¤ (toạ độ dùng chung giữa các shot).
+- Hằng ¤clamp¤ = ¤{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const¤, kiểu ¤ShotProps = {duration: number; lines: number[]}¤, ¤PALETTE¤ (mục B) và ¤LAYOUT¤ (toạ độ dùng chung giữa các shot).
+- ¤lines[i]¤ là frame bắt đầu câu thoại thứ i của shot (¤lines[0] = 0¤), đo từ tiếng đọc thật; ¤lineSpan(lines, i, duration)¤ trả ¤[bắt đầu, kết thúc]¤ của câu i.
 
-Dạng của một hàm shot:
+Dạng của một hàm shot (shot có hai câu thoại: câu 1 đổi màu hình vuông, câu 2 hiện nhãn):
 
 ¤¤¤tsx
 // Shot 1.2 — MÁY: đẩy vào | HÌNH: hình vuông (giữ nguyên chỗ) chuyển sang màu mờ, nhãn hiện bên phải
-function Shot1_2({duration}: ShotProps) {
+function Shot1_2({duration, lines}: ShotProps) {
   const frame = useCurrentFrame();
   const {width, height} = useVideoConfig();
-  const color = interpolateColors(frame, [0, duration * 0.4], [PALETTE.accent, PALETTE.muted]);
-  const labelIn = interpolate(frame, [duration * 0.3, duration * 0.5], [0, 1], clamp);
+  const color = interpolateColors(frame, [lines[0], lines[0] + 20], [PALETTE.accent, PALETTE.muted]);
+  const labelIn = interpolate(frame, [lines[1], lines[1] + 12], [0, 1], clamp);
   const {x, y, size} = LAYOUT.hero;
   return (
     <AbsoluteFill>
@@ -157,8 +162,8 @@ function Shot1_2({duration}: ShotProps) {
 ¤¤¤
 
 Bắt buộc:
-1. Mỗi hàm bắt đầu ở cột 0 với đúng chữ ¤function ShotN_M({duration}: ShotProps)¤, ngay phía trên là một dòng comment ¤// Shot n.m — MÁY: ... | HÌNH: ...¤ tóm tắt đúng shot nó dựng.
-2. Mỗi hàm trả về MỘT ¤<AbsoluteFill>¤ duy nhất. ¤duration¤ là số frame THẬT của đoạn (không biết trước): mọi mốc thời gian tính theo TỈ LỆ của ¤duration¤ (vd. ¤duration * 0.3¤), không viết số frame cố định. ¤useCurrentFrame()¤ đếm từ 0 ở đầu shot.
+1. Mỗi hàm bắt đầu ở cột 0 với đúng chữ ¤function ShotN_M({duration, lines}: ShotProps)¤, ngay phía trên là một dòng comment ¤// Shot n.m — MÁY: ... | HÌNH: ...¤ tóm tắt đúng shot nó dựng.
+2. Mỗi hàm trả về MỘT ¤<AbsoluteFill>¤ duy nhất. ¤duration¤ và ¤lines¤ là số frame THẬT (không biết trước). Thay đổi gắn với một câu thoại bắt đầu ở ¤lines[i]¤ (cộng vài frame cho độ dài chuyển động, vd. ¤[lines[1], lines[1] + 15]¤); chuyển động không gắn với câu nào (máy trôi, vật thở, nền) tính theo TỈ LỆ của ¤duration¤. Không viết mốc frame tuyệt đối. Shot chỉ có một câu thì ¤lines¤ là ¤[0]¤. ¤useCurrentFrame()¤ đếm từ 0 ở đầu shot.
 3. Không khai báo gì khác ở cấp cao nhất (không hằng, hàm phụ, kiểu): đặt hằng phụ BÊN TRONG hàm shot — hàm phụ dùng chung là nguồn trùng tên khi nhiều lô được viết song song.
 
 `
@@ -168,7 +173,7 @@ const remoGAIVI = `## G. SOÁT MỘT LƯỢT TRƯỚC KHI TRẢ LỜI
 1. Đúng các hàm được giao — không thiếu, không thừa, đúng tên ¤ShotN_M¤, đúng thứ tự, đúng định dạng của tin nhắn người dùng?
 2. Mỗi shot: đủ vật trong "visual", không thêm vật kịch bản không nói; vị trí, thứ tự, chuyển động, máy quay đúng mô tả; frame 0 nối được với hình cuối shot trước (chuyển cảnh biến hình), hình cuối cảnh khớp "scene_end_frame"?
 3. Màu: mọi chuỗi ¤#¤, ¤rgb¤, ¤hsl¤, tên màu đều là khoá ¤PALETTE¤ được cấp, viết dạng ¤PALETTE.khoá¤ — không có tên ¤PALETTE_...¤ nào? Không ¤fontFamily¤, không ¤backgroundColor¤ phủ khung, không in câu thoại lên hình?
-4. Bố cục theo ¤LAYOUT¤ và mục F, chọn phương án an toàn (khoảng cách rộng, chữ ngắn); mọi ¤interpolate¤ có clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc tính theo ¤duration¤?
+4. Bố cục theo ¤LAYOUT¤ và mục F, chọn phương án an toàn (khoảng cách rộng, chữ ngắn); mọi ¤interpolate¤ có clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc tính theo ¤lines[i]¤ hoặc ¤duration¤? Mỗi câu trong "lines" có thay đổi riêng của nó, bắt đầu ở ¤lines[i]¤?
 5. Mọi người, vật, bối cảnh trong "visual" mà bộ minh hoạ (C3) có đều dùng đúng component, không vẽ tay thay thế; mood/pose/decay đúng mô tả; shot ở một nơi chốn có ¤<Scene>¤ + ¤camera¤, vật chính ≥ 40% chiều khung, không đoạn nào đứng yên quá 2 giây? Máy quay chỉ bằng prop ¤camera¤ của ¤<Scene>¤ hoặc ¤<Camera>¤ (L8) — không có ¤div¤ nào mang ¤transform: scale(...)¤ để tự zoom/lia?
 6. Không dòng import, không ¤<Img>¤/¤staticFile¤/¤fetch¤; không ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần trong chữ JSX; TSX hợp lệ 100%, không cắt cụt, không chữ giải thích ngoài comment?
 

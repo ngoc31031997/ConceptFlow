@@ -8,9 +8,10 @@ import (
 )
 
 // The channel's illustration style rules and the building blocks a drawing may
-// use. The rules are what the AI drawer is held to and what web-gui
-// shows; rendering/domain/illustration_style.py checks the [S..] rules it can
-// check mechanically. The reference drawings (Hình mẫu) are library rows the
+// use. The rules file is the shipped row of the illustration_style prompt
+// role; the active row of that role is what the AI drawer is held to and what
+// web-gui shows. rendering/domain/illustration_style.py checks the [S..] rules
+// it can check mechanically. The reference drawings (Hình mẫu) are library rows the
 // Creator picks, not text shipped with the image.
 //
 //go:embed prompts/illustration_style_vi.txt
@@ -31,7 +32,9 @@ func BackdropStyleGuide() string { return strings.TrimSpace(backdropStyleVI) }
 // BackdropHelpers documents what a new backdrop is built from, with its frame.
 func BackdropHelpers() string { return strings.TrimSpace(backdropHelpersVI) }
 
-// IllustrationStyleGuide is the rule text, as shown to the Creator and the model.
+// IllustrationStyleGuide is the shipped rule text: the system row of the
+// illustration_style prompt role. What the AI illustrator and the library
+// use is that role's active row, which a Creator may have replaced.
 func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyleVI) }
 
 // IllustrationHelpers documents the kit's building blocks for a new drawing.
@@ -229,11 +232,12 @@ func SystemIllustrationFolders() []IllustrationFolder {
 }
 
 // SceneKitComponents are the frame-level parts of the kit
-// (rendering/remotion_project/src/conceptflow-mini/scene.tsx): the depth
-// layers, the camera, the light and the keyword text. The prompt documents
-// them next to the figures, but they are the stage a shot is built on, not
-// drawings, so they have no library row and no narration keywords.
-var SceneKitComponents = []string{"Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText"}
+// (rendering/remotion_project/src/conceptflow-mini/scene.tsx and rig.tsx):
+// the depth layers, the camera, the light, the keyword text and the
+// close-up hand. The prompt documents them next to the figures, but they are
+// the stage a shot is built on, not drawings, so they have no library row
+// and no narration keywords.
+var SceneKitComponents = []string{"Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText", "ReachingHand"}
 
 // IsSceneKitComponent reports whether name is one of SceneKitComponents.
 func IsSceneKitComponent(name string) bool {

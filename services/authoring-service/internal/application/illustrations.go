@@ -139,11 +139,18 @@ func (e *InvalidIllustrationError) Error() string {
 func (e *InvalidIllustrationError) Unwrap() error { return ErrIllustrationInvalid }
 
 // IllustrationsUseCase manages the library.
+// StylePromptPort reads the active row of a prompt role: here, the
+// illustration style rules the Creator may have rewritten in the prompt library.
+type StylePromptPort interface {
+	GetActive(ctx context.Context, role domain.PromptRole) (domain.Prompt, error)
+}
+
 type IllustrationsUseCase struct {
 	repo     IllustrationRepoPort
 	renderer IllustrationRendererPort
 	drawer   *illustrationDrawer // nil = AI drawing disabled
 	projects ProjectStatusPort   // nil = a drawing any project uses cannot be deleted
+	styles   StylePromptPort     // nil = the style rules cannot be read
 }
 
 func NewIllustrationsUseCase(repo IllustrationRepoPort, renderer IllustrationRendererPort) *IllustrationsUseCase {
@@ -154,6 +161,27 @@ func NewIllustrationsUseCase(repo IllustrationRepoPort, renderer IllustrationRen
 func (uc *IllustrationsUseCase) WithProjectStatus(p ProjectStatusPort) *IllustrationsUseCase {
 	uc.projects = p
 	return uc
+}
+
+// WithStylePrompts gives the use case the prompt library the style rules are read from.
+func (uc *IllustrationsUseCase) WithStylePrompts(p StylePromptPort) *IllustrationsUseCase {
+	uc.styles = p
+	return uc
+}
+
+// StyleRules is the illustration style text in force: the active row of the
+// illustration_style prompt role. It is what the AI illustrator is held to
+// and what the library shows; reading it failing is an error, never a quiet
+// fall back to other text.
+func (uc *IllustrationsUseCase) StyleRules(ctx context.Context) (string, error) {
+	if uc.styles == nil {
+		return "", errors.New("illustration style rules: no prompt library configured")
+	}
+	p, err := uc.styles.GetActive(ctx, domain.RoleIllustrationStyle)
+	if err != nil {
+		return "", fmt.Errorf("illustration style rules: %w", err)
+	}
+	return strings.TrimSpace(p.TemplateText), nil
 }
 
 func (uc *IllustrationsUseCase) Folders(ctx context.Context) ([]domain.IllustrationFolder, error) {

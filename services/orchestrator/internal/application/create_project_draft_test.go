@@ -149,8 +149,10 @@ func TestCreateProjectDraft_AShortOfALongVideoStartsAsALinkedShort(t *testing.T)
 	}
 	short := repo.saved[out.ProjectID]
 	if short.VideoOutputMode != domain.ModeShortOnly || short.VideoFormatID != domain.FormatVerticalShort60s.ID ||
-		short.RenderEngine != domain.RenderEngineRemotion || short.SubtitleMode != domain.SubtitleModeOff {
-		t.Errorf("short draft = mode %s format %s engine %s subtitles %s", short.VideoOutputMode, short.VideoFormatID, short.RenderEngine, short.SubtitleMode)
+		short.RenderEngine != domain.RenderEngineRemotion || short.SubtitleMode != domain.SubtitleModeBurnIn ||
+		short.SubtitleStyle == nil || short.SubtitleStyle.Position != "top" {
+		t.Errorf("short draft = mode %s format %s engine %s subtitles %s style %+v",
+			short.VideoOutputMode, short.VideoFormatID, short.RenderEngine, short.SubtitleMode, short.SubtitleStyle)
 	}
 	if short.CompanionProjectID == nil || *short.CompanionProjectID != "long-1" {
 		t.Error("the short must point at its long video")

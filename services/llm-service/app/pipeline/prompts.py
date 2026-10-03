@@ -33,7 +33,9 @@ def _shot_json(scene: Scene, shot: Shot) -> dict:
         "camera": shot.camera,
         "visual": shot.visual,
         "narration": shot.narration,
-    } | ({"scene_setting": scene.setting} if scene.setting else {})
+    } | ({"scene_setting": scene.setting} if scene.setting else {}) | (
+        {"lines": [{"say": line.say, "show": line.show} for line in shot.lines]} if shot.lines else {}
+    )
 
 
 def _dump(obj) -> str:
@@ -102,8 +104,8 @@ NHIỆM VỤ HIỆN TẠI: VIẾT CODE CHO SHOT {shot_ids[0]} → {shot_ids[-1]}
 Bạn chỉ viết {len(shot_ids)} hàm shot. Hệ thống tự ghép mọi thứ còn lại. ĐÃ CÓ SẴN trong file, TUYỆT ĐỐI KHÔNG viết lại:
 - các dòng import ({merger.available_names_text()})
 - `const clamp = {{extrapolateLeft: 'clamp', extrapolateRight: 'clamp'}} as const;`
-- `type ShotProps = {{duration: number}};`
-- `export const narrations`, `SHOTS`, `CreatorComposition`, `registerRoot`
+- `type ShotProps = {{duration: number; lines: number[]}};` — `lines[i]` là frame bắt đầu câu thoại thứ i của shot (tính từ đầu shot, `lines[0] = 0`); shot có mục "lines" thì mỗi câu một mốc
+- `export const narrations`, `shotLineCounts`, `SHOTS`, `CreatorComposition`, `registerRoot`
 - PALETTE (chỉ dùng các khoá dưới đây, không màu nào khác):
 {_palette_table(sb)}
 - LAYOUT (dùng đúng các khoá này cho vật xuất hiện ở nhiều shot):
@@ -120,7 +122,7 @@ SHOT NGAY SAU lô này (chỉ để biết hình cuối của shot cuối lô ph
 
 ĐỊNH DẠNG TRẢ VỀ — chỉ một khối ```tsx, gồm ĐÚNG các hàm sau và không gì khác ở cấp cao nhất:
 {names}
-Mỗi hàm có dạng `function ShotN_M({{duration}}: ShotProps) {{ ... }}` bắt đầu ở cột 0, và ngay phía trên nó là một dòng comment `// Shot n.m — MÁY: ... | HÌNH: ...`. Không khai báo hằng, hàm hay kiểu nào khác ở cấp cao nhất (đặt hằng phụ vào BÊN TRONG hàm shot).{_retry_note(retry)}"""
+Mỗi hàm có dạng `function ShotN_M({{duration, lines}}: ShotProps) {{ ... }}` bắt đầu ở cột 0, và ngay phía trên nó là một dòng comment `// Shot n.m — MÁY: ... | HÌNH: ...`. Không khai báo hằng, hàm hay kiểu nào khác ở cấp cao nhất (đặt hằng phụ vào BÊN TRONG hàm shot).{_retry_note(retry)}"""
 
 
 def _listed(diags: list[Diagnostic]) -> str:

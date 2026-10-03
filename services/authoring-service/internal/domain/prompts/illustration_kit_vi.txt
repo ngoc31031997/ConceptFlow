@@ -1,4 +1,4 @@
-Import: ¤import {Backdrop, Panel, Person, Tooth, Germ, ...} from './conceptflow-mini/illustration';¤ và ¤import {Scene, Camera, Glow, ...} from './conceptflow-mini/scene';¤ — chỉ import tên bạn dùng.
+Import: ¤import {Backdrop, Panel, Person, Tooth, Germ, ...} from './conceptflow-mini/illustration';¤, ¤import {Scene, Camera, Glow, ...} from './conceptflow-mini/scene';¤ và ¤import {ReachingHand} from './conceptflow-mini/rig';¤ — chỉ import tên bạn dùng.
 
 Quy ước chung (giống ¤LottieClip¤ và ¤LAYOUT¤): ¤x¤, ¤y¤ là TÂM hộp bao của hình trên khung video (px từ góc trên-trái); ¤size¤ là CẠNH DÀI của hộp bao; tỉ lệ rộng × cao cố định theo từng hình, ghi ở dưới — dùng để tính hộp bao khi kiểm tra đè nhau. Mọi hình nhận thêm ¤rotate¤ (độ), ¤flip¤ (lật ngang), ¤scale¤, ¤opacity¤ để nội suy theo frame; người, vi khuẩn, cây... tự thở/chớp mắt, ¤still¤ tắt chuyển động đó. Mỗi hình đã có màu mặc định hài hoà — để nguyên; tham số màu (¤color¤, ¤shirt¤, ¤pants¤, ¤hair¤, ¤skin¤, ¤lips¤, ¤frameColor¤, ¤handColor¤, ¤pot¤, ¤roof¤, ¤textColor¤) chỉ dùng khi kịch bản gán vai trò màu cho vật đó, và giá trị PHẢI là ¤PALETTE.xxx¤.
 
@@ -21,6 +21,12 @@ Nơi chốn không có nền dựng sẵn hay nền trong thư viện → tự d
 - ¤<Person x y size pose mood age outfit hairStyle talking glasses shirt pants skin hair />¤ — người nhìn thẳng, đầu to thân nhỏ kiểu truyện tranh. Tỉ lệ 260 × 420 (rộng ≈ 0.62 × size). Chân chạm đáy hộp, có bóng.
   - ¤pose¤: ¤'stand'¤ | ¤'sit'¤ (ngồi ghế đẩu vẽ sẵn) | ¤'wave'¤ | ¤'point'¤ chỉ sang phải (¤flip¤ để chỉ sang trái) | ¤'think'¤ | ¤'cheer'¤ | ¤'ouch'¤ ôm má | ¤'shrug'¤ | ¤'walk'¤ đi tại chỗ (dời ¤x¤ để đi thật). ¤mood¤: ¤'neutral'¤ | ¤'happy'¤ | ¤'sad'¤ | ¤'worried'¤ | ¤'surprised'¤ | ¤'pain'¤ | ¤'angry'¤.
   - ¤age¤: ¤'child'¤ | ¤'adult'¤ | ¤'elder'¤. ¤outfit¤: ¤'shirt'¤ | ¤'coat'¤ (áo blouse — bác sĩ, nhà khoa học) | ¤'dress'¤. ¤hairStyle¤: ¤'short'¤ | ¤'long'¤ | ¤'bald'¤ | ¤'bun'¤. ¤talking¤: miệng mấp máy — bật khi người đó đang nói.
+  - ¤pose="hold"¤: hai tay đưa ra trước ngực cầm một vật — vật là con của Person, toạ độ ¤x¤, ¤y¤ của nó tính từ điểm giữa hai bàn tay: ¤<Person pose="hold"><Book x={0} y={-20} size={120} /></Person>¤.
+  - ĐỔI DÁNG TRONG SHOT: ¤toPose¤ + ¤poseT¤ (0 → 1, nội suy từ ¤lines[i]¤): tay đi dần từ ¤pose¤ sang ¤toPose¤ — ¤<Person pose="think" toPose="shrug" poseT={interpolate(frame, [lines[1], lines[1] + 12], [0, 1], clamp)} />¤.
+  - CẬN CẢNH: ¤framing="bust"¤ — từ ngực trở lên, đầu và vai lấp hộp 260 × 234; dùng cho cận cảnh biểu cảm (¤size¤ lớn, 60–90% chiều khung).
+
+### Bàn tay cận cảnh (từ ¤./conceptflow-mini/rig¤)
+- ¤<ReachingHand edge target reach pose count size flip skin sleeve still>vật đang cầm</ReachingHand>¤ — một cánh tay đi vào từ mép khung (¤edge¤: ¤'bottom'¤ | ¤'left'¤ | ¤'right'¤ | ¤'top'¤) tới lòng bàn tay ở ¤target={{x, y}}¤ (px của khung). ¤reach¤ 0 = còn ngoài khung, 1 = tới nơi: nội suy để thò tay vào / rút ra. ¤pose¤: ¤'open'¤ | ¤'point'¤ (ngón trỏ) | ¤'grip'¤ (nắm) | ¤'pinch'¤ (nhón bằng hai ngón) | ¤'count'¤ (giơ ¤count¤ ngón, 1–5). ¤size¤ là dài bàn tay (mặc định 260). Vật con đặt toạ độ tính từ giữa lòng bàn tay và đi theo tay: ¤<ReachingHand edge="bottom" target={{x: 960, y: 520}} reach={reachIn} pose="pinch"><Lightbulb x={0} y={-40} size={120} /></ReachingHand>¤. Dùng cho cận cảnh cầm, rút, chỉ, đếm thay cho mũi tên.
 
 ### Cơ thể và sức khoẻ
 - ¤<Tooth decay={0..1} mood shine face />¤ — răng hàm có mặt, 200 × 220. ¤decay¤: 0 trắng khoẻ, 0.3 đốm nâu, 0.6 lỗ sâu, 1 lỗ lớn + nứt + ố vàng — nội suy theo frame để sâu răng LAN DẦN; nét mặt tự đi theo ¤decay¤ trừ khi đặt ¤mood¤. ¤shine¤ lấp lánh khi răng sạch; ¤face={false}¤ bỏ mặt.

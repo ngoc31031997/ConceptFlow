@@ -102,7 +102,7 @@ def test_remotion_stubs_the_shots_a_chunk_does_not_own():
     else:
         raise AssertionError("missing shots must still be refused without stub_missing")
     m = merger.merge_remotion(SB, "const LAYOUT = {};", only, stub_missing=True)
-    assert "function Shot1_1({duration}: ShotProps) {\n  return null;\n}" in m.code
+    assert "function Shot1_1({duration, lines}: ShotProps) {\n  return null;\n}" in m.code
     assert "const SHOTS: React.FC<ShotProps>[] = [Shot1_1, Shot1_2, Shot2_1];" in m.code
     a, b = m.lines["1.2"]
     assert m.code.splitlines()[a - 1] == "// Shot 1.2"

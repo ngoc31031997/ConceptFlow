@@ -29,6 +29,8 @@ const ROLES: { value: PromptRole; label: string }[] = [
   { value: "manim_adjust", label: "Phụ trợ — chuẩn hoá script Manim có sẵn" },
   { value: "remotion_adjust", label: "Phụ trợ — chuẩn hoá code Remotion có sẵn" },
   { value: "thumbnail_design", label: "Phụ trợ — prompt sinh ảnh thumbnail" },
+  // Luật AI vẽ hình phải theo, và là luật trang Thư viện hình hiển thị.
+  { value: "illustration_style", label: "Thư viện hình — luật style hình minh hoạ (AI vẽ)" },
 ];
 
 const NEW_ROW = "new";

@@ -1,7 +1,8 @@
 """Bộ kiểm tra style cho hình của thư viện minh hoạ.
 
-Luật đầy đủ nằm ở authoring-service/.../prompts/illustration_style_vi.txt;
-mã [S..] ở đây là mã luật trong file đó. Vi phạm làm hỏng style của cả kênh
+Luật đầy đủ là vai trò `illustration_style` trong thư viện prompt của
+authoring-service (bản hệ thống là authoring-service/.../prompts/illustration_style_vi.txt);
+mã [S..] ở đây là mã luật trong văn bản đó. Vi phạm làm hỏng style của cả kênh
 (gradient, filter, ảnh, chữ, ngẫu nhiên theo đồng hồ) là LỖI và chặn lưu; phần
 còn lại là CẢNH BÁO — Creator quyết định. Màu ngoài bảng
 màu kênh (S9) không bị kiểm tra.

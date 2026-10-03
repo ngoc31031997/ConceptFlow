@@ -17,11 +17,13 @@ see that module's docstring for the rationale):
 - dry_run(): regex-extract `narrations` from script_content. No video, no
   Node/Chromium spent.
 - render(): convert each narration_segment's real TTS duration_seconds into
-  frames (fixed FPS), lay them out back-to-back as a `segments` prop, run the
-  Node driver (bundle -> selectComposition -> renderMedia, per
-  https://www.remotion.dev/docs/ssr-node) to produce the real video, and
-  report wait_offsets — each segment's start time in seconds — the same
-  contract Video Assembly already reads from the Manim path.
+  frames (fixed FPS), group them into shots by the script's `shotLineCounts`
+  (one line per shot when absent) and lay the shots out back-to-back as a
+  `segments` prop, run the Node driver (bundle -> selectComposition ->
+  renderMedia, per https://www.remotion.dev/docs/ssr-node) to produce the real
+  video, and report wait_offsets — each narration line's start time in
+  seconds — the same contract Video Assembly already reads from the Manim
+  path. See ADR-0032.
 """
 
 from __future__ import annotations
@@ -65,6 +67,10 @@ _PROGRESS_LINE_RE = re.compile(r"^CF_PROGRESS (\d+)\s*$")
 # llm-service -> here. Tracked as backlog in cr-047-video-quality-fixes.md
 # instead of half-implementing it here.
 INTER_SHOT_GAP_SECONDS = 0.3
+# Between two narration lines of the same shot: each line is its own TTS
+# clip, and a short breath keeps two clips from running into one another
+# without the hold the gap between shots gives.
+LINE_GAP_SECONDS = 0.1
 
 CACHE_ROOT = "/shared/.remotion-media"
 ENTRY_FILENAME = "CreatorEntry.tsx"
@@ -85,6 +91,12 @@ _NARRATIONS_HEADER_RE = re.compile(
 # REMOTION_STRING_LITERAL_RE exactly, including the backtick (without it a
 # `narrations` array of template literals would silently count as empty).
 _STRING_LITERAL_RE = re.compile(r"""(['"`])((?:(?!\1)[^\\]|\\.)*)\1""")
+# How many narration lines each shot is read in, in shot order, written by
+# the code step's frame next to `narrations`. A script without it reads each
+# narration line as one shot.
+_SHOT_LINE_COUNTS_RE = re.compile(
+    r"export\s+const\s+shotLineCounts\s*(?::\s*number\s*\[\s*\]\s*)?=\s*\[([^\]]*)\]"
+)
 
 
 _FENCE_LINE_RE = re.compile(r"^[ \t]*`{3,}[ \t]*[A-Za-z]*[ \t]*$", re.MULTILINE)
@@ -201,7 +213,9 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
         return DryRunResult(narrations=narrations)
 
     def render(self, request: ScriptRenderRequest, output_path: str) -> ScriptRenderResult:
-        segments = _segments_from(request.narration_segments)
+        segments, wait_offsets = _segments_from(
+            request.narration_segments, _extract_shot_line_counts(request.script_content)
+        )
         if not segments:
             raise AnimationEngineError(
                 "render() called with no narration_segments — nothing to time the "
@@ -239,7 +253,6 @@ class RemotionScriptRenderer(ManimScriptRendererPort):
 
                 shutil.rmtree(media_dir, ignore_errors=True)
 
-        wait_offsets = [seg["startFrame"] / FPS for seg in segments]
         return ScriptRenderResult(
             video_path=output_path,
             wait_offsets=wait_offsets,
@@ -351,21 +364,62 @@ def _extract_narrations(script_content: str) -> list[str]:
     return [m.group(2) for m in _STRING_LITERAL_RE.finditer(body)]
 
 
-def _segments_from(narration_segments) -> list[dict]:
+def _extract_shot_line_counts(script_content: str) -> list[int] | None:
+    """`shotLineCounts` of the script, or None when it declares none."""
+    match = _SHOT_LINE_COUNTS_RE.search(_strip_comments(script_content))
+    if match is None:
+        return None
+    counts: list[int] = []
+    for item in (part.strip() for part in match.group(1).split(",")):
+        if not item:
+            continue
+        if not item.isdigit() or int(item) < 1:
+            raise AnimationEngineError(f"shotLineCounts must list whole numbers >= 1, got {item!r}")
+        counts.append(int(item))
+    return counts
+
+
+def _segments_from(
+    narration_segments, shot_line_counts: list[int] | None = None
+) -> tuple[list[dict], list[float]]:
+    """The composition's `segments` prop and the second each narration line
+    starts at (`wait_offsets`: one per narration line, in order).
+
+    Without `shot_line_counts` every narration line is one shot. With them,
+    the lines of a shot are laid end to end inside its segment,
+    LINE_GAP_SECONDS apart, and the segment carries `lines`: the frame, from
+    the start of the shot, each of its lines starts at.
+    """
     ordered = sorted(narration_segments, key=lambda s: s.scene_index)
-    gap_frames = round(INTER_SHOT_GAP_SECONDS * FPS)
-    segments = []
+    counts = shot_line_counts if shot_line_counts is not None else [1] * len(ordered)
+    if sum(counts) != len(ordered):
+        raise AnimationEngineError(
+            f"shotLineCounts adds up to {sum(counts)} lines but the script has "
+            f"{len(ordered)} narration lines"
+        )
+    shot_gap_frames = round(INTER_SHOT_GAP_SECONDS * FPS)
+    line_gap_frames = round(LINE_GAP_SECONDS * FPS)
+    segments: list[dict] = []
+    wait_offsets: list[float] = []
     frame_cursor = 0
-    for index, seg in enumerate(ordered):
-        duration_frames = max(1, round(seg.duration_seconds * FPS))
-        segments.append({
-            "startFrame": frame_cursor,
-            "durationInFrames": duration_frames,
-        })
-        frame_cursor += duration_frames
-        if index < len(ordered) - 1:
-            frame_cursor += gap_frames
-    return segments
+    position = 0
+    for shot_index, count in enumerate(counts):
+        shot_start = frame_cursor
+        lines: list[int] = []
+        for line_index, seg in enumerate(ordered[position:position + count]):
+            if line_index > 0:
+                frame_cursor += line_gap_frames
+            lines.append(frame_cursor - shot_start)
+            wait_offsets.append(frame_cursor / FPS)
+            frame_cursor += max(1, round(seg.duration_seconds * FPS))
+        position += count
+        segment: dict = {"startFrame": shot_start, "durationInFrames": frame_cursor - shot_start}
+        if shot_line_counts is not None:
+            segment["lines"] = lines
+        segments.append(segment)
+        if shot_index < len(counts) - 1:
+            frame_cursor += shot_gap_frames
+    return segments, wait_offsets
 
 
 def _probe_duration(video_path: str) -> float:

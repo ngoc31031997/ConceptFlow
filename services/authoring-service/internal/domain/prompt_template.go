@@ -33,6 +33,11 @@ const (
 	RoleManimAdjust     PromptRole = "manim_adjust"     // fix an existing Manim script (narrate calls, design system)
 	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
 	RoleThumbnailDesign PromptRole = "thumbnail_design" // write an image-generation prompt for the thumbnail
+
+	// The illustration style rules the AI illustrator's system prompt is built
+	// from (figures and backdrops), and what the illustration library shows as
+	// its rules. Not a prompt to copy to an external AI, so it is never rendered.
+	RoleIllustrationStyle PromptRole = "illustration_style"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -40,11 +45,18 @@ func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
 		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI,
-		RoleManimAdjust, RoleRemotionAdjust, RoleThumbnailDesign:
+		RoleManimAdjust, RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle:
 		return true
 	default:
 		return false
 	}
+}
+
+// IsRenderablePromptRole reports whether role is a known role whose prompt
+// can be rendered with a project's or the Creator's values: every role but
+// the illustration style rules, which are read as they are.
+func IsRenderablePromptRole(role string) bool {
+	return ValidPromptRole(role) && PromptRole(role) != RoleIllustrationStyle
 }
 
 // PromptTemplate is one role/language's editable prompt text.

@@ -70,7 +70,7 @@ ILLUSTRATION_KIT = (
 SCENE_KIT = ("Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText")
 # The building blocks a library drawing (pasted into the script) uses.
 ILLUSTRATION_HELPERS = (
-    "Figure", "Face", "GroundShadow", "useBlink", "phaseOf", "shadeOf", "useSvgId",
+    "Figure", "Face", "GroundShadow", "HeldAt", "figurePoint", "useBlink", "phaseOf", "shadeOf", "useSvgId",
     "INK", "SHADE", "BLUSH", "WHITE",
 )
 # Every backdrop of conceptflow-mini/backdrops.tsx: whole-frame places a Scene
@@ -89,6 +89,12 @@ REMOTION_API = (
 )
 # conceptflow-mini/primitives names the rule book offers the shots.
 PRIMITIVES = ("Stage", "SAFE_MARGIN", "WIDTH", "HEIGHT", "BACKGROUND", "useFrameBox")
+# conceptflow-mini/segments: the composition's timing, plus the helpers a shot
+# uses to time a change to one of its narration lines.
+SEGMENT_API = ("calculateMetadataFromSegments", "Segments", "evenLines", "lineSpan")
+# Every component of conceptflow-mini/rig.tsx: close-up body parts that act.
+# Held to the file by the same test as the other kits.
+RIG_KIT = ("ReachingHand",)
 
 
 def _named_import(names: tuple[str, ...], module: str) -> str:
@@ -98,13 +104,14 @@ def _named_import(names: tuple[str, ...], module: str) -> str:
 _REMOTION_HEAD = (
     "import React from 'react';\n"
     + _named_import(REMOTION_API, "remotion")
-    + "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';\n"
+    + _named_import(SEGMENT_API, "./conceptflow-mini/segments")
     + _named_import(PRIMITIVES, "./conceptflow-mini/primitives")
     + "import {LottieClip} from './conceptflow-mini/lottie';\n"
     + _named_import(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS, "./conceptflow-mini/illustration")
     + "import type {FigureProps, Mood, PersonPose} from './conceptflow-mini/illustration';\n"
     + _named_import(SCENE_KIT + SCENE_HELPERS, "./conceptflow-mini/scene")
     + _named_import(BACKDROP_KIT, "./conceptflow-mini/backdrops")
+    + _named_import(RIG_KIT, "./conceptflow-mini/rig")
 )
 
 
@@ -115,22 +122,24 @@ def available_names_text() -> str:
     return "; ".join([
         "react",
         "remotion: " + ", ".join(REMOTION_API),
-        "./conceptflow-mini/segments",
+        "./conceptflow-mini/segments: " + ", ".join(SEGMENT_API),
         "./conceptflow-mini/primitives: " + ", ".join(PRIMITIVES),
         "./conceptflow-mini/lottie: LottieClip",
         "./conceptflow-mini/illustration: " + ", ".join(ILLUSTRATION_KIT),
         "./conceptflow-mini/scene: " + ", ".join(SCENE_KIT),
         "./conceptflow-mini/backdrops: " + ", ".join(BACKDROP_KIT),
+        "./conceptflow-mini/rig: " + ", ".join(RIG_KIT),
     ])
 
 _REMOTION_TAIL = """
-function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number}[]}) {
+function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number; lines?: number[]}[]}) {
   return (
     <Stage>
       <Segments segments={segments}>
         {(index, segment) => {
           const Shot = SHOTS[index];
-          return Shot ? <Shot duration={segment.durationInFrames} /> : null;
+          const lines = segment.lines ?? evenLines(segment.durationInFrames, shotLineCounts[index] ?? 1);
+          return Shot ? <Shot duration={segment.durationInFrames} lines={lines} /> : null;
         }}
       </Segments>
     </Stage>
@@ -179,7 +188,7 @@ def layout_from_storyboard(sb: Storyboard) -> str | None:
 def remotion_stub(shot_id: str) -> str:
     """Placeholder for a shot another chunk owns, so one chunk can be
     type-checked on its own before the rest exist."""
-    return f"function {remotion_fn(shot_id)}({{duration}}: ShotProps) {{\n  return null;\n}}"
+    return f"function {remotion_fn(shot_id)}({{duration, lines}}: ShotProps) {{\n  return null;\n}}"
 
 
 _IMPORT_LINE = re.compile(r"^\s*import\b[^;]*;?\s*$", re.M)
@@ -296,9 +305,14 @@ def merge_remotion(
     first = "\n".join(parts[:3]).count("\n") + 2
     lines: dict[str, tuple[int, int]] = {LAYOUT_KEY: (first, first + layout.count("\n"))}
     parts.append("const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;\n")
-    narrations = ",\n".join("  " + json.dumps(sh.narration, ensure_ascii=False) for _, sh in sb.all_shots())
+    # One narration entry per line: each is synthesized as its own clip, and
+    # shotLineCounts tells rendering which lines make up which shot.
+    spoken = [said for _, sh in sb.all_shots() for said in sh.spoken_lines()]
+    narrations = ",\n".join("  " + json.dumps(said, ensure_ascii=False) for said in spoken)
     parts.append(f"export const narrations: string[] = [\n{narrations},\n];\n")
-    parts.append("type ShotProps = {duration: number};\n")
+    counts = ", ".join(str(len(sh.spoken_lines())) for _, sh in sb.all_shots())
+    parts.append(f"export const shotLineCounts: number[] = [{counts}];\n")
+    parts.append("type ShotProps = {duration: number; lines: number[]};\n")
     drawings = library_block(library or {}, shots)
     if drawings:
         parts.append(drawings)
