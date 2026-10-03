@@ -2967,3 +2967,17 @@ q4 a"
 **Context**: CONSTRUCTION — CR-065, chờ Creator duyệt rồi `/deliver`.
 
 ---
+
+## Fix — Bỏ cảnh báo S3 (rect không rx) và S10 (quá 6 màu gốc) của hình minh hoạ
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "bỏ các cảnh báo này của hình minh hoạ — S3 · Bo tròn — dòng 59/174/185/196/344/354: <rect> không bo góc (thêm rx); S10 · Tối đa 6 màu gốc trong một hình — 10 màu gốc — tối đa 6 (dùng shadeOf cho màu tối/sáng)"
+**AI Response**:
+- Nguyên nhân: `check_style` (`services/rendering/domain/illustration_style.py`) tự sinh hai cảnh báo này.
+- Sửa: bỏ nhánh `<rect>` không `rx` (S3) và bỏ đếm màu gốc (S10), cùng `HEX_RE`/`_expand` không còn dùng. Giữ cảnh báo S3 "nét thiếu strokeLinecap" và các luật khác. Luật S3/S10 trong `illustration_style_vi.txt` giữ nguyên làm gợi ý cho AI vẽ.
+- Test: `tests/domain/test_illustration_style.py` 18 pass (bỏ case S3 rect khỏi bảng cảnh báo; thay test S10 bằng test khẳng định rect không rx và 7 màu không còn cảnh báo, tách test S12). Chạy cả `tests/` chưa được vì môi trường local thiếu `manim`; chỉ chạy file style.
+- Rebuild: `rendering` healthy (code từ `fix/drop-rect-radius-and-colour-count-warnings`).
+**Impact Assessment**: rendering. Hình đã lưu giữ cảnh báo cũ trong DB tới khi được kiểm lại/lưu lại.
+**Artifacts Affected**: `services/rendering/domain/illustration_style.py`, `services/rendering/tests/domain/test_illustration_style.py`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — fix.
+
+---

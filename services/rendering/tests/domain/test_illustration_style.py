@@ -70,7 +70,6 @@ def test_thieu_figure_la_loi():
 
 @pytest.mark.parametrize("change, replacement, rule", [
     ('rx={40} fill={color}', 'rx={40} fill={color} stroke="#3A1F4B"', "S2"),
-    ('rx={40} fill={color}', 'fill={color}', "S3"),
     ("fig.still ? 0 : ", "", "S20"),
 ])
 def test_canh_bao_khong_chan(change, replacement, rule):
@@ -85,15 +84,18 @@ def test_mau_ngoai_bang_mau_kenh_khong_canh_bao():
     assert errors == [] and warnings == []
 
 
-def test_qua_nhieu_mau_va_mau_khong_doi_duoc():
+def test_rect_khong_rx_va_nhieu_mau_khong_canh_bao():
     many = "".join(f'<circle cx={{1}} cy={{1}} r={{1}} fill="{c}" />' for c in
                    ["#FFC857", "#FF9F43", "#E8453C", "#FF5C8A", "#7B3FC4", "#2D5BFF", "#2BB673"])
-    code = CLEAN.replace("<Face", many + "<Face")
+    code = CLEAN.replace("rx={40} fill={color}", "fill={color}", 1).replace("<Face", many + "<Face")
+    errors, warnings = rules(code)
+    assert errors == [] and "S3" not in warnings and "S10" not in warnings
+
+
+def test_mau_chinh_khong_doi_duoc_qua_prop_color():
     props = "{color = '#FF9F43', ...fig}: FigureProps & {color?: string}"
-    code = code.replace(props, "{...fig}: FigureProps")
-    code = code.replace("fill={color}", 'fill="#FF9F43"')
-    _, warnings = rules(code)
-    assert "S10" in warnings and "S12" in warnings
+    code = CLEAN.replace(props, "{...fig}: FigureProps").replace("fill={color}", 'fill="#FF9F43"')
+    assert "S12" in rules(code)[1]
 
 
 GRADIENT = """  const glow = useSvgId('glow');

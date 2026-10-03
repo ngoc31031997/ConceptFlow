@@ -29,7 +29,6 @@ MAX_GRADIENTS = 4
 FORBIDDEN_CALLS = {"Math.random(": "S22", "Date.now(": "S22", "setTimeout(": "S22", "setInterval(": "S22"}
 
 TAG_RE = re.compile(r"<([A-Za-z][\w.]*)\b([^<>]*?)/?>", re.S)
-HEX_RE = re.compile(r"['\"]#([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})['\"]")
 SHAPES = {"rect", "circle", "ellipse", "path", "polygon"}
 
 
@@ -50,11 +49,6 @@ def _line(code: str, index: int) -> int:
 def _attr(attrs: str, name: str) -> str | None:
     m = re.search(rf"\b{name}\s*=\s*(\{{[^}}]*\}}|\"[^\"]*\"|'[^']*')", attrs)
     return m.group(1).strip("{}\"'").strip() if m else None
-
-
-def _expand(hex6: str) -> str:
-    h = hex6.upper()
-    return "".join(c * 2 for c in h) if len(h) == 3 else h
 
 
 BACKDROP = "backdrop"
@@ -92,10 +86,6 @@ def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], li
         fill, stroke = _attr(attrs, "fill"), _attr(attrs, "stroke")
         if stroke and fill and fill != "none":
             warnings.append(StyleFinding("S2", f"<{tag}> vừa tô màu vừa có viền — khối không có viền", line))
-        if tag == "rect" and _attr(attrs, "rx") is None:
-            w, h = _attr(attrs, "width"), _attr(attrs, "height")
-            if not (w and h and w.isdigit() and h.isdigit() and min(int(w), int(h)) <= 6):
-                warnings.append(StyleFinding("S3", "<rect> không bo góc (thêm rx)", line))
         if stroke and _attr(attrs, "strokeLinecap") is None and tag == "path":
             warnings.append(StyleFinding("S3", "nét thiếu strokeLinecap=\"round\"", line))
 
@@ -122,15 +112,8 @@ def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], li
     if shapes > 60:
         warnings.append(StyleFinding("S4", f"{shapes} hình con — quá chi tiết (nên 5–25)"))
 
-    colours: dict[str, int] = {}
-    for m in HEX_RE.finditer(code):
-        colours.setdefault(_expand(m.group(1)), _line(code, m.start()))
-    # S9 (bảng màu kênh) không phải cảnh báo: hình minh hoạ được
-    # dùng màu của chính vật, bảng màu chỉ là gợi ý cho AI vẽ.
-    base = {c for c in colours if c not in {"FFFFFF", "000000", "3A1F4B"}}
-    if len(base) > 6:
-        warnings.append(StyleFinding(
-            "S10", f"{len(base)} màu gốc — tối đa 6 (dùng shadeOf cho màu tối/sáng)"))
+    # Bảng màu kênh (S9) và số màu gốc (S10) chỉ là gợi ý cho AI vẽ, không kiểm tra:
+    # hình minh hoạ được dùng màu của chính vật.
     black_fill = re.search(r"fill\s*=\s*['\"{]*['\"]#0{6}['\"]", code)
     if black_fill and not re.search(r"#000000['\"][^>]*opacity", code):
         warnings.append(StyleFinding("S11", "đen thuần làm mảng màu — dùng INK hoặc bóng opacity thấp"))
