@@ -2917,3 +2917,23 @@ q4 a"
 **Context**: CONSTRUCTION → delivery — CR-063.
 
 ---
+
+## CR-064 — Rút gọn system prompt Biên kịch (story_architect)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "review system promt biên kịch xem có tối ưu gì hoặc rút gọn nhưng không gây ảnh hưởng đến chất lượng nội dung được không."
+**AI Response**: Mở nhánh `feature/cr-064-screenwriter-prompt-trim` (worktree riêng). Review `storyArchitectVI` (14 284 ký tự; DB chỉ có bản hệ thống, không có prompt Creator đè lên): cùng một quy tắc được nhắc 3–5 lần (mục MẠCH NHẬN THỨC và TRÁNH TUYỆT ĐỐI gần như toàn bộ là nhắc lại); KHUNG BÀI có 5 trường không được định nghĩa, trong đó `Thế giới chính` được bước code đọc; chú thích Go phía trên prompt đã cũ. Đề xuất 3 phương án: A (khuyến nghị) gộp phần lặp + viết gọn TỰ KIỂM, OUTPUT giữ nguyên, đo được −7,2%; B = A + bỏ 4 trường trùng của KHUNG BÀI (đổi output, khoảng −10%); C rút cả các bước suy nghĩ (không khuyến nghị). Thêm test giữ các nhãn mà bước code đọc và trần độ dài. Kiểm phụ thuộc: không CR/fix nào đang mở → độc lập.
+**Impact Assessment**: chỉ authoring-service (seed prompt, version 10 → 11, test golden). Không đổi contract, DB, giao diện.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-064-screenwriter-prompt-trim-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-064, chờ Creator duyệt.
+
+---
+
+## CR-064 — Duyệt thiết kế (phương án A)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "tôi chọn bước A"
+**AI Response**: Chốt phương án A: gộp phần lặp, xoá MẠCH NHẬN THỨC và TRÁNH TUYỆT ĐỐI sau khi chuyển ý, viết gọn TỰ KIỂM (đủ 10 mục), định nghĩa `Thế giới chính`, OUTPUT giữ nguyên; sửa chú thích Go; test giữ nhãn bước code đọc và trần ≤ 13 300 ký tự. Commit thiết kế, chuyển `/code`.
+**Impact Assessment**: chỉ authoring-service.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-064-screenwriter-prompt-trim-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION → CONSTRUCTION — CR-064.
+
+---
