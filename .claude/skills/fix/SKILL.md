@@ -2,7 +2,7 @@
 name: fix
 description: Fix a bug the Creator reports - open a fix/<slug> branch in its own git worktree, find the root cause through graphify, apply the smallest correct fix with a regression test, rebuild the changed Docker services, and report. Use when the Creator types /fix or reports something that is broken (an error, a crash, wrong output, a screen that misbehaves), not a request for new behaviour. Commits nothing; the Creator runs /deliver after approving.
 argument-hint: "<the bug, in the Creator's own words: what happened, where, what was expected>"
-model: claude-opus-5-5
+model: sonnet
 effort: medium
 ---
 
