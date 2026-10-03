@@ -3078,3 +3078,20 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-068.
 
 ---
+
+## CR-068 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: (sau khi duyệt task, `/code CR-068`)
+**AI Response**:
+- **llm-service**: module mới `app/pipeline/autofix.py` (`Fix`, `fix_palette_names`, `fix_tsc_suggestions`); `merger.frame_names()`; `run.py`: sửa tên `PALETTE_<X>` sau mỗi lượt chunk và repair, áp gợi ý tsc (TS2552 tên thuộc khung code / TS2551 chỉ khác hoa-thường, `_`) trước khi repair trong `_settle_chunk` và kiểm tra cuối (không tăng `rounds`, tập `applied` chặn lặp), mỗi lần sửa phát sự kiện `check` phase `autofix`; `_repair` nhận thêm `emit`, `round_`; `SPLIT_KINDS = (errors.TRUNCATED,)` — bỏ chia đôi khi `budget`; mặc định `CODE_MAX_REASONING_CHARS` 100000 (config.py, docker-compose.yml, .env.example).
+- **authoring-service**: prompt `remotion_engineer_ai` B.2/G.3 không còn tên `PALETTE_...`; golden test đổi câu bắt buộc và cấm chuỗi `PALETTE_`.
+- **Tài liệu**: `docs/contracts/authoring-llm-code-v2.md` thêm phase `autofix`.
+- **Test**: llm-service `pytest` 199 pass (10 test autofix mới, 1 test merger mới, 4 test pipeline autofix mới, 7 test chia đôi cũ chuyển sang `truncated`, 3 test `budget` không chia mới). `ruff`: 4 lỗi E741 có sẵn trên main (`merger.py` hàm thư viện hình, `tests/test_backdrops.py`), không thuộc thay đổi này. authoring-service `go test ./...` pass, `go vet` sạch, `gofmt -l` rỗng.
+- **Rebuild**: llm-service, authoring-service healthy — code của nhánh `feature/cr-068-ai-output-guardrails`.
+- **Kiểm trực tiếp**: prompt `remotion_engineer_ai` active trong DB: `position('PALETTE_')=0`, có câu mới. Container `llm-service` có `CODE_MAX_REASONING_CHARS=60000` — `.env` ở bản checkout chính đặt sẵn 60000 và đè mặc định 100000; không đọc/sửa được `.env` (bị chặn quyền), chờ Creator sửa.
+- **Chưa kiểm**: chưa chạy lại 5 đoạn hỏng của project 47745562 (tốn token — để Creator bấm).
+**Impact Assessment**: 2 service; không migration; hợp đồng chỉ thêm giá trị.
+**Artifacts Affected**: các file trên, `aidlc-docs/construction/plans/cr-068-ai-output-guardrails-tasks.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-068, chờ Creator duyệt và sửa `.env`.
+
+---

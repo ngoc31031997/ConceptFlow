@@ -14,8 +14,10 @@ for is lost when the run is cut off.
 A segment that fails does not stop the others: the run ends
 `incomplete` with the failed keys, and the Creator re-runs only those. A dead
 key, an empty balance or the Creator cancelling still stops everything at once.
-A chunk that ran out of token budget is written again as two halves, down to
-one shot; every half is tried even when an earlier one failed. A segment that
+A chunk cut off mid-answer (max_tokens) is written again as two halves, down
+to one shot; every half is tried even when an earlier one failed. A chunk that
+ran past the reasoning limit is not split: a smaller turn thinks as long, so
+the segment fails with every unwritten shot. A segment that
 still has shots missing fails with the shots that were written as its partial
 content and the ids of the shots that were not: the next run writes only the
 missing ones.
@@ -45,7 +47,7 @@ from dataclasses import dataclass, field, replace
 from app import errors
 from app.errors import LLMError, Usage
 from app.frame import LANDSCAPE, Frame
-from app.pipeline import extract, library_props, merger, prompts
+from app.pipeline import autofix, extract, library_props, merger, prompts
 from app.pipeline.checker import (
     CheckerPort,
     CheckerUnavailable,
@@ -63,8 +65,8 @@ Record = Callable[["Call"], Awaitable[None]]
 
 EXTRACT_ATTEMPTS = 2
 
-# A chunk that failed with one of these is written again as two halves.
-SPLIT_KINDS = (errors.BUDGET, errors.TRUNCATED)
+# A chunk or repair turn cut off mid-answer is written again as two halves.
+SPLIT_KINDS = (errors.TRUNCATED,)
 # Errors that fail every other segment the same way: the other segments are
 # cancelled at once instead of being allowed to finish.
 STOP_NOW_KINDS = (errors.AUTH, errors.BALANCE, errors.NOT_CONFIGURED)
@@ -705,9 +707,8 @@ class CodePipeline:
         async def write(
             n: int, seg: Segment, ids: list[str], first: bool, tried: tuple[tuple[str, ...], ...],
         ) -> ChunkOutcome:
-            """Some of one chunk's shots. A group the model could not finish
-            within its token budget is written again as two halves, down to
-            one shot; both halves are tried whatever happens to the first.
+            """Some of one chunk's shots. A group whose answer was cut off
+            mid-answer is written again as two halves, down to one shot; both halves are tried whatever happens to the first.
             Only the errors that stop the whole run are raised."""
             tried = (*tried, tuple(ids))
             async with sem:
@@ -741,6 +742,8 @@ class CodePipeline:
             have = partial[seg.key]
             outcome = await write(n, seg, [i for i in seg.shots if i not in have], True, ())
             written = {**have, **outcome.shots}
+            if remotion and (fixes := self._fix_palette(plan, written, list(outcome.shots))):
+                await emit(_autofix_event(0, seg.key, plan, fixes))
             if outcome.failures:
                 await shots_failed(seg, written, outcome.failures)
                 return
@@ -787,12 +790,22 @@ class CodePipeline:
         # Rounds spent on a chunk before the merge count against the same cap:
         # the cap bounds how many repair turns a shot can wait for.
         rounds = max(chunk_rounds.values(), default=0)
+        applied: set[tuple[str, str, str]] = set()
         check: CheckResult
         while True:
             await emit({"type": "phase", "phase": "check", "round": rounds})
             check = await self._checker.check(req.engine, merged.code, merged.scene_class_name, req.layout())
             if not check.ok:
                 await emit(_check_event("final", rounds, "", plan, merged, check))
+                if remotion and (fixed := await self._apply_suggestions(
+                        plan, shots, merged, check, applied, rounds, "", emit)):
+                    # Fixed without a model call: check again, no repair round spent.
+                    for key in sorted({plan.owner(i) for i in fixed}):
+                        seg = plan.get(key)
+                        await emit({"type": "segment_done", "key": key, "fingerprint": seg.fingerprint,
+                                    "content": {"shots": {i: shots[i] for i in seg.shots}}, "repaired": False})
+                    merged = merge()
+                    continue
             if check.ok or rounds >= self._repair_rounds:
                 break
             targets, unmapped = _map_failures(req.engine, merged, check)
@@ -805,7 +818,8 @@ class CodePipeline:
             rounds += 1
             await emit({"type": "phase", "phase": "repair", "round": rounds, "total": self._repair_rounds,
                         "targets": sorted(targets)})
-            new_frame = await self._repair(ask_req, plan, remotion, frame, shots, targets, check, record, sem)
+            new_frame = await self._repair(
+                ask_req, plan, remotion, frame, shots, targets, check, record, sem, emit, rounds)
             changed = {plan.owner(k) for k in targets}
             frame = new_frame
             # The repaired sections overwrite the segments that own them.
@@ -832,8 +846,10 @@ class CodePipeline:
         """Compile one Remotion chunk (`shots` holds exactly its shots) against stubs
         for every other shot and repair its own failing shots, up to the repair cap. Returns the rounds
         used. What it cannot settle here (an error in LAYOUT or outside the chunk,
-        the checker being unreachable) is left to the full-file check."""
+        the checker being unreachable) is left to the full-file check. A fix
+        made without a model call is compiled again and spends no round."""
         rounds = 0
+        applied: set[tuple[str, str, str]] = set()
         while True:
             merged = merger.merge_remotion(
                 plan.sb, frame, shots, stub_missing=True, library=self._library, canvas=req.canvas)
@@ -844,6 +860,8 @@ class CodePipeline:
             if check.ok:
                 return rounds
             await emit(_check_event("chunk", rounds, seg.key, plan, merged, check))
+            if await self._apply_suggestions(plan, shots, merged, check, applied, rounds, seg.key, emit):
+                continue
             targets, _ = _map_failures("remotion", merged, check)
             mine = {k: v for k, v in targets.items() if k in shots}
             if not mine or rounds >= self._repair_rounds:
@@ -851,12 +869,36 @@ class CodePipeline:
             rounds += 1
             await emit({"type": "chunk_repair", "index": index + 1, "total": total, "round": rounds,
                         "max": self._repair_rounds, "targets": sorted(mine)})
-            await self._repair(ask_req, plan, True, frame, shots, mine, check, record, sem)
+            await self._repair(ask_req, plan, True, frame, shots, mine, check, record, sem, emit, rounds)
+
+    def _fix_palette(self, plan: Plan, shots: dict[str, str], ids: list[str]) -> list[autofix.Fix]:
+        """Rewrite the made-up `PALETTE_<X>` names in the Remotion shots `ids`
+        of `shots`, in place. Returns the changes made."""
+        keys = list(merger.palette_keys(plan.sb).values())
+        fixes: list[autofix.Fix] = []
+        for i in ids:
+            shots[i], found = autofix.fix_palette_names(i, shots[i], keys)
+            fixes.extend(found)
+        return fixes
+
+    async def _apply_suggestions(
+        self, plan: Plan, shots: dict[str, str], merged: merger.Merged, check: CheckResult,
+        applied: set[tuple[str, str, str]], round_: int, segment: str, emit: Emit,
+    ) -> set[str]:
+        """Apply the compiler's certain suggestions to `shots` in place and log
+        them. Returns the ids of the shots that changed."""
+        names = merger.frame_names() | frozenset(self._library)
+        changed, fixes = autofix.fix_tsc_suggestions(shots, merged, check.diagnostics, names, applied)
+        if not changed:
+            return set()
+        shots.update(changed)
+        await emit(_autofix_event(round_, segment, plan, fixes))
+        return set(changed)
 
     async def _repair(
         self, req: CodeRequest, plan: Plan, remotion: bool, frame: str, shots: dict[str, str],
         targets: dict[str, list[Diagnostic]], check: CheckResult, record: Record,
-        sem: asyncio.Semaphore,
+        sem: asyncio.Semaphore, emit: Emit, round_: int,
     ) -> str:
         """Ask for a fix of every failing section, in parallel: the frame
         (LAYOUT / cast) in a turn of its own, and all the failing shots of one
@@ -865,8 +907,8 @@ class CodePipeline:
 
         A shot whose fix is missing or cannot be parsed keeps its old code (the
         failed call is recorded) and fails the next check again rather than
-        being dropped. A turn that ran out of budget is asked again as two
-        halves, down to one shot.
+        being dropped. A turn cut off mid-answer is asked again as two halves,
+        down to one shot.
         """
         sb = plan.sb
         new_frame = frame
@@ -920,7 +962,23 @@ class CodePipeline:
                 new_frame = code
             else:
                 shots[key] = code
+        if remotion:
+            repaired = [k for k in results if k not in (merger.LAYOUT_KEY, merger.CAST_KEY)]
+            by_owner: dict[str, list[autofix.Fix]] = {}
+            for fix in self._fix_palette(plan, shots, repaired):
+                by_owner.setdefault(plan.owner(fix.shot), []).append(fix)
+            for owner, fixes in sorted(by_owner.items()):
+                await emit(_autofix_event(round_, owner, plan, fixes))
         return new_frame
+
+
+def _autofix_event(round_: int, segment: str, plan: Plan, fixes: list[autofix.Fix]) -> dict:
+    """What the run changed on its own, in the shape of a check event so the
+    caller logs it with the diagnostics."""
+    return {"type": "check", "phase": autofix.KIND_AUTOFIX, "round": round_, "segment": segment,
+            "diagnostics": [{"message": f"{f.before} → {f.after}", "line": f.line, "kind": autofix.KIND_AUTOFIX,
+                             "rule": f.rule, "shot": f.shot, "segment": plan.owner(f.shot) or segment}
+                            for f in fixes]}
 
 
 def _check_event(

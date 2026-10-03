@@ -18,7 +18,7 @@ def config(**over):
         hive_max_retries=0, hive_rate_per_second=1000, ollama_url="http://ollama.test:11434",
         ollama_model="llama", ollama_timeout=5, light_provider="ollama", code_chunk_shots=10,
         code_chunk_concurrency=2, code_repair_max_rounds=1, rendering_url="http://rendering.test", rendering_check_timeout=5,
-        code_max_reasoning_chars=60000, chat_max_reasoning_chars=0)
+        code_max_reasoning_chars=100000, chat_max_reasoning_chars=0)
     base.update(over)
     return Config(**base)
 
@@ -287,7 +287,7 @@ def test_reasoning_limits_from_env(monkeypatch):
     monkeypatch.delenv("CODE_MAX_REASONING_CHARS", raising=False)
     monkeypatch.delenv("CHAT_MAX_REASONING_CHARS", raising=False)
     cfg = Config.from_env()
-    assert (cfg.code_max_reasoning_chars, cfg.chat_max_reasoning_chars) == (60000, 0)
+    assert (cfg.code_max_reasoning_chars, cfg.chat_max_reasoning_chars) == (100000, 0)
 
     monkeypatch.setenv("CODE_MAX_REASONING_CHARS", "0")
     monkeypatch.setenv("CHAT_MAX_REASONING_CHARS", "90000")

@@ -38,10 +38,14 @@ class FakeProvider:
     name = "hive"
 
     def __init__(self, engine="remotion", broken=None, fail_repair=False, bad_first_chunk=False,
-                 skip_in_group=(), budget_above=0):
+                 skip_in_group=(), budget_above=0, truncated_above=0, palette_typo=(), typo_name=(), repair_body="return null;"):
         self.engine = engine
+        self.palette_typo = set(palette_typo)  # shots whose first version names a colour PALETTE_ACCENT
+        self.typo_name = set(typo_name)  # shots whose first version calls useCurrentFrameSafe()
+        self.repair_body = repair_body
         self.skip_in_group = set(skip_in_group)  # shots a multi-shot repair reply leaves out
         self.budget_above = budget_above  # a repair turn for more shots than this runs out of budget
+        self.truncated_above = truncated_above  # a repair turn for more shots than this is cut off mid-answer
         self.calls: list[ChatRequest] = []
         self.broken = broken or set()  # shot ids whose FIRST version has a compile error
         self.fail_repair = fail_repair
@@ -63,8 +67,7 @@ class FakeProvider:
             lo, hi = m.group(1), m.group(2)
             ids = [f"1.{i}" for i in range(int(lo.split(".")[1]), int(hi.split(".")[1]) + 1)]
             if self.engine == "remotion":
-                return ChatResult("```tsx\n" + "\n\n".join(
-                    tsx(i, "BROKEN" if i in self.broken else "return null;") for i in ids) + "\n```", usage)
+                return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self._first_body(i)) for i in ids) + "\n```", usage)
             return ChatResult("```python\n" + "\n\n".join(
                 f"def shot_{i.replace('.', '_')}(self):\n    self.narrate('{'BROKEN' if i in self.broken else 'ok'}')"
                 for i in ids) + "\n```", usage)
@@ -75,20 +78,34 @@ class FakeProvider:
                 ids = [i.strip() for i in m.group(1).split(",")]
                 if self.budget_above and len(ids) > self.budget_above:
                     raise LLMError(errors.BUDGET, "hive", "reasoning budget", Usage())
+                if self.truncated_above and len(ids) > self.truncated_above:
+                    raise LLMError(errors.TRUNCATED, "hive", "cut off", Usage())
                 ids = [i for i in ids if i not in self.skip_in_group]
                 if self.engine == "remotion":
-                    return ChatResult("```tsx\n" + "\n\n".join(tsx(i) for i in ids) + "\n```", usage)
+                    return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self.repair_body) for i in ids) + "\n```",
+                                      usage)
                 return ChatResult("```python\n" + "\n\n".join(
                     f"def shot_{i.replace('.', '_')}(self):\n    self.narrate('fixed')" for i in ids) + "\n```", usage)
             sid = re.search(r"trong shot (\d+\.\d+)", u).group(1)
             if self.engine == "remotion":
-                return ChatResult("```tsx\n" + tsx(sid) + "\n```", usage)
+                return ChatResult("```tsx\n" + tsx(sid, self.repair_body) + "\n```", usage)
             return ChatResult(f"```python\ndef shot_{sid.replace('.', '_')}(self):\n    self.narrate('fixed')\n```", usage)
         raise AssertionError("unrecognised prompt: " + u[:80])
+
+    def _first_body(self, i):
+        if i in self.broken:
+            return "BROKEN"
+        if i in self.palette_typo:
+            return "return <div style={{color: PALETTE_ACCENT}} />;"
+        if i in self.typo_name:
+            return "const f = useCurrentFrameSafe(); return null;"
+        return "return null;"
 
 
 class FakeChecker:
     """Fails while any 'BROKEN' marker is in the merged code, reporting its line."""
+
+    SUGGEST = "TS2552: Cannot find name 'useCurrentFrameSafe'. Did you mean 'useCurrentFrame'?"
 
     def __init__(self, raw_for_manim=False):
         self.codes: list[str] = []
@@ -100,11 +117,14 @@ class FakeChecker:
         self.layouts.append(layout)
         diags = [Diagnostic("Cannot find name 'BROKEN'", i)
                  for i, ln in enumerate(code.splitlines(), 1) if "BROKEN" in ln]
+        diags += [Diagnostic(self.SUGGEST, i, rule="TS2552")
+                  for i, ln in enumerate(code.splitlines(), 1) if "useCurrentFrameSafe" in ln]
         raw = ""
         if self.raw_for_manim and diags:
             raw = "\n".join(f'  File "s.py", line {d.line}, in {_fn(code, d.line)}' for d in diags)
             diags = []
-        return CheckResult(ok=not diags and "BROKEN" not in code, diagnostics=diags, raw=raw)
+        return CheckResult(ok=not diags and "BROKEN" not in code and "useCurrentFrameSafe" not in code,
+                           diagnostics=diags, raw=raw)
 
 
 def _fn(code, line):
@@ -219,14 +239,23 @@ async def test_a_grouped_repair_reply_missing_a_shot_keeps_that_shots_old_code()
     assert all(c.ok for c in res.calls if c.phase == "repair")
 
 
-async def test_a_grouped_repair_that_runs_out_of_budget_is_split_down_to_single_shots():
+async def test_a_grouped_repair_over_the_reasoning_limit_keeps_the_old_code():
     prov, chk = FakeProvider(broken={"1.1", "1.2", "1.3"}, budget_above=1), FakeChecker()
+    res = await pipeline(prov, chk, chunk=5).run(req(storyboard(4)), emit_none)
+    assert not res.check_ok and res.code.count("BROKEN") == 3
+    labels = [c.label for c in res.calls if c.phase == "repair"]
+    assert labels == ["1.1,1.2,1.3"] * 3  # one turn a round, never asked again in smaller groups
+    assert {c.error_kind for c in res.calls if c.phase == "repair"} == {errors.BUDGET}
+
+
+async def test_a_grouped_repair_cut_off_mid_answer_is_split_down_to_single_shots():
+    prov, chk = FakeProvider(broken={"1.1", "1.2", "1.3"}, truncated_above=1), FakeChecker()
     res = await pipeline(prov, chk, chunk=5).run(req(storyboard(4)), emit_none)
     assert res.check_ok and "BROKEN" not in res.code
     labels = [c.label for c in res.calls if c.phase == "repair"]
-    assert labels.count("1.1,1.2,1.3") == 1  # the group that ran out of budget
+    assert labels.count("1.1,1.2,1.3") == 1  # the group that was cut off
     assert sorted(lab for lab in labels if "," not in lab) == ["1.1", "1.2", "1.3"]  # every shot was asked again alone
-    assert {c.error_kind for c in res.calls if c.phase == "repair" and not c.ok} == {errors.BUDGET}
+    assert {c.error_kind for c in res.calls if c.phase == "repair" and not c.ok} == {errors.TRUNCATED}
 
 
 async def test_a_group_with_no_usable_function_in_the_reply_is_retried_then_kept_as_is():
@@ -462,7 +491,7 @@ async def test_manim_ignores_library_drawings():
     assert all("C4." not in c.system for c in provider.calls)
 
 
-# --- a failing chunk does not throw away the others; split on budget ----------
+# --- a failing chunk does not throw away the others; split when cut off ------
 
 def chunk_ids(user: str) -> list[str] | None:
     m = re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", user)
@@ -545,8 +574,8 @@ async def test_every_failed_chunk_is_reported():
     assert sorted(c.error_kind for c in res.calls if not c.ok) == [errors.SERVER, errors.TIMEOUT]
 
 
-async def test_a_chunk_over_budget_is_split_in_two_and_the_run_succeeds():
-    prov = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 5 else None)
+async def test_a_chunk_cut_off_mid_answer_is_split_in_two_and_the_run_succeeds():
+    prov = Scripted(fail=lambda ids: llm_err(errors.TRUNCATED) if len(ids) == 5 else None)
     events = []
 
     async def emit(ev):
@@ -557,7 +586,7 @@ async def test_a_chunk_over_budget_is_split_in_two_and_the_run_succeeds():
     assert sorted(chunk_turns(prov)) == sorted([
         ["1.1", "1.2", "1.3", "1.4", "1.5"], ["1.6", "1.7"], ["1.1", "1.2", "1.3"], ["1.4", "1.5"]])
     chunk_calls = [(c.label, c.ok, c.error_kind) for c in res.calls if c.phase == "chunk"]
-    assert ("1.1-1.5", False, errors.BUDGET) in chunk_calls  # the failed call stays billed
+    assert ("1.1-1.5", False, errors.TRUNCATED) in chunk_calls  # the failed call stays billed
     assert ("1.1-1.3", True, "") in chunk_calls and ("1.4-1.5", True, "") in chunk_calls
     assert next(c for c in res.calls if c.label == "1.1-1.5").usage.prompt_tokens == 7
     split = [ev for ev in events if ev["type"] == "chunk_split"]
@@ -589,8 +618,29 @@ async def test_a_one_shot_chunk_over_budget_fails_its_segment_with_budget():
     res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard_with_layout(2)), ev)
     assert res.status == "incomplete" and res.failed == ["1.1-1.2"]
     [failed] = ev.of("segment_failed")
-    assert failed["error"]["kind"] == errors.BUDGET and failed["failed_shots"] == ["1.2"]
-    assert [(c.label, c.ok) for c in res.calls] == [("1.1-1.2", False), ("1.1-1.1", True), ("1.2-1.2", False)]
+    assert failed["error"]["kind"] == errors.BUDGET and failed["failed_shots"] == ["1.1", "1.2"]
+    assert [(c.label, c.ok) for c in res.calls] == [("1.1-1.2", False)]  # not asked again in halves
+
+
+async def test_a_chunk_over_the_reasoning_limit_fails_its_segment_without_splitting():
+    prov = Scripted(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 5 else None)
+    ev = Events()
+    res = await pipeline(prov, FakeChecker(), chunk=5).run(req(storyboard_with_layout(7)), ev)
+    assert res.status == "incomplete" and res.failed == ["1.1-1.5"]
+    assert sorted(chunk_turns(prov)) == [["1.1", "1.2", "1.3", "1.4", "1.5"], ["1.6", "1.7"]]
+    assert not ev.of("chunk_split")
+    [failed] = ev.of("segment_failed")
+    assert failed["failed_shots"] == ["1.1", "1.2", "1.3", "1.4", "1.5"] and failed["content"] is None
+
+
+async def test_a_budget_failure_message_names_the_chunk_only():
+    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET))
+    ev = Events()
+    r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS",
+                    max_reasoning_chars=100000)
+    await pipeline(prov, FakeChecker(), chunk=3).run(r, ev)
+    [failed] = ev.of("segment_failed")
+    assert failed["error"]["message"] == "Shot 3.3–3.5: model suy nghĩ quá 100000 ký tự mà chưa viết được chữ nào."
 
 
 def storyboard_3_scenes() -> str:
@@ -629,7 +679,7 @@ def scene_three_turns(prov):
 
 
 async def test_a_split_chunk_keeps_the_shots_written_before_one_shot_fails():
-    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if "3.5" in ids else None)
+    prov = SceneThree(fail=lambda ids: llm_err(errors.TRUNCATED) if "3.5" in ids else None)
     ev = Events()
     r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS",
                     max_reasoning_chars=60000)
@@ -640,15 +690,15 @@ async def test_a_split_chunk_keeps_the_shots_written_before_one_shot_fails():
     assert failed["failed_shots"] == ["3.5"]
     assert sorted(failed["content"]["shots"]) == ["3.3", "3.4"]
     assert failed["fingerprint"] == make_plan(r, 3).get("3.3-3.5").fingerprint
-    assert failed["error"]["kind"] == errors.BUDGET
+    assert failed["error"]["kind"] == errors.TRUNCATED
     assert failed["error"]["message"] == (
-        "Shot 3.5: model suy nghĩ quá 60000 ký tự mà chưa viết được chữ nào "
+        "Shot 3.5: câu trả lời bị cắt giữa chừng vì hết token "
         "(đã thử cả đoạn 3.3-3.5, rồi riêng shot 3.5). Đã lưu shot 3.3, 3.4.")
     assert not ev.of("segment_done") or all(e["key"] == "frame" for e in ev.of("segment_done"))
 
 
 async def test_both_halves_run_when_the_first_half_fails():
-    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if ids != ["3.5"] else None)
+    prov = SceneThree(fail=lambda ids: llm_err(errors.TRUNCATED) if ids != ["3.5"] else None)
     ev = Events()
     res = await pipeline(prov, FakeChecker(), chunk=3).run(
         CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS"), ev)
@@ -657,14 +707,14 @@ async def test_both_halves_run_when_the_first_half_fails():
     [failed] = ev.of("segment_failed")
     assert failed["failed_shots"] == ["3.3", "3.4"] and list(failed["content"]["shots"]) == ["3.5"]
     assert failed["error"]["message"] == (
-        "Shot 3.3: model dùng hết token để suy nghĩ mà chưa viết được chữ nào "
+        "Shot 3.3: câu trả lời bị cắt giữa chừng vì hết token "
         "(đã thử cả đoạn 3.3-3.5, rồi shot 3.3–3.4, rồi riêng shot 3.3); "
-        "Shot 3.4: model dùng hết token để suy nghĩ mà chưa viết được chữ nào "
+        "Shot 3.4: câu trả lời bị cắt giữa chừng vì hết token "
         "(đã thử cả đoạn 3.3-3.5, rồi shot 3.3–3.4, rồi riêng shot 3.4). Đã lưu shot 3.5.")
 
 
 async def test_a_partly_written_segment_writes_only_its_missing_shots():
-    first = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if "3.5" in ids else None)
+    first = SceneThree(fail=lambda ids: llm_err(errors.TRUNCATED) if "3.5" in ids else None)
     ev = Events()
     r = CodeRequest(engine="remotion", topic="t", storyboard=storyboard_3_scenes(), system="SYS")
     await pipeline(first, FakeChecker(), chunk=3).run(r, ev)
@@ -691,7 +741,7 @@ async def test_partial_content_under_an_old_fingerprint_is_not_reused():
 
 
 async def test_a_stop_now_error_inside_a_split_still_stops_the_run():
-    prov = SceneThree(fail=lambda ids: llm_err(errors.BUDGET) if len(ids) == 3 else (
+    prov = SceneThree(fail=lambda ids: llm_err(errors.TRUNCATED) if len(ids) == 3 else (
         llm_err(errors.BALANCE) if ids == ["3.5"] else None))
     with pytest.raises(PipelineFailure) as e:
         await pipeline(prov, FakeChecker(), chunk=3).run(
@@ -987,3 +1037,52 @@ def test_a_pasted_reply_is_checked_and_fingerprinted():
     assert content == {"code": "const LAYOUT = {a: {x: 1}};"}
     with pytest.raises(SegmentNotReady):
         parse_segment(req(storyboard_with_layout(2)), "frame", "const LAYOUT = {};", 2)
+
+
+# --- fixes made without a model call ------------------------------------------
+
+def autofix_events(ev):
+    return [e for e in ev.of("check") if e["phase"] == "autofix"]
+
+
+async def test_a_palette_name_written_as_a_constant_is_fixed_before_the_check():
+    prov, ev = FakeProvider(palette_typo={"1.2"}), Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    assert res.check_ok and "PALETTE_ACCENT" not in res.code and "color: PALETTE.accent" in res.code
+    [stored] = [e for e in ev.of("segment_done") if e["key"] == "1.1-1.2"]
+    assert "PALETTE.accent" in stored["content"]["shots"]["1.2"]
+    [fixed] = autofix_events(ev)
+    assert fixed["segment"] == "1.1-1.2"
+    assert fixed["diagnostics"] == [{"message": "PALETTE_ACCENT → PALETTE.accent", "line": 3, "kind": "autofix",
+                                     "rule": "palette_name", "shot": "1.2", "segment": "1.1-1.2"}]
+    assert not [c for c in res.calls if c.phase == "repair"]
+
+
+async def test_a_palette_name_in_a_repair_reply_is_fixed():
+    prov, ev = FakeProvider(broken={"1.2"}, repair_body="return <div style={{color: PALETTE_ACCENT}} />;"), Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    assert res.check_ok and "PALETTE_ACCENT" not in res.code and "color: PALETTE.accent" in res.code
+    assert [c.label for c in res.calls if c.phase == "repair"] == ["1.2"]
+    assert [(d["shot"], d["rule"]) for e in autofix_events(ev) for d in e["diagnostics"]] == [("1.2", "palette_name")]
+
+
+async def test_a_name_tsc_suggests_is_fixed_without_a_repair_turn():
+    prov, ev = FakeProvider(typo_name={"1.2"}), Events()
+    res = await pipeline(prov, FakeChecker(), chunk=2).run(req(storyboard(4)), ev)
+    assert res.check_ok and "useCurrentFrameSafe" not in res.code and "useCurrentFrame()" in res.code
+    assert res.repair_rounds == 0 and not [c for c in res.calls if c.phase == "repair"]
+    [fixed] = autofix_events(ev)
+    assert [(d["shot"], d["rule"], d["message"]) for d in fixed["diagnostics"]] == [
+        ("1.2", "tsc_suggestion", "useCurrentFrameSafe → useCurrentFrame")]
+    [stored] = [e for e in ev.of("segment_done") if e["key"] == "1.1-1.2"]
+    assert "useCurrentFrame()" in stored["content"]["shots"]["1.2"]
+
+
+async def test_a_single_chunk_run_fixes_the_suggestion_at_the_final_check():
+    prov, ev = FakeProvider(typo_name={"1.2"}), Events()
+    res = await pipeline(prov, FakeChecker(), chunk=10).run(req(storyboard(4)), ev)
+    assert res.check_ok and "useCurrentFrameSafe" not in res.code
+    assert res.repair_rounds == 0 and not [c for c in res.calls if c.phase == "repair"]
+    assert [e["phase"] for e in ev.of("check")] == ["final", "autofix"]
+    last = [e for e in ev.of("segment_done") if e["key"] == "1.1-1.4"][-1]
+    assert last["repaired"] is False and "useCurrentFrame()" in last["content"]["shots"]["1.2"]

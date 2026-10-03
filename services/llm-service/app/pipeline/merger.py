@@ -131,6 +131,18 @@ def available_names_text() -> str:
         "./conceptflow-mini/rig: " + ", ".join(RIG_KIT),
     ])
 
+
+def frame_names() -> frozenset[str]:
+    """Every name the Remotion frame puts in scope for the shot functions:
+    the imports of the head and the constants the frame declares. Built from
+    the same tuples as the head, so a name the head imports is always here."""
+    return frozenset((
+        "React", *REMOTION_API, *SEGMENT_API, *PRIMITIVES, "LottieClip",
+        *ILLUSTRATION_KIT, *ILLUSTRATION_HELPERS, "FigureProps", "Mood", "PersonPose",
+        *SCENE_KIT, *SCENE_HELPERS, *BACKDROP_KIT, *RIG_KIT,
+        "PALETTE", "LAYOUT", "clamp", "ShotProps",
+    ))
+
 _REMOTION_TAIL = """
 function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number; lines?: number[]}[]}) {
   return (

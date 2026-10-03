@@ -5,7 +5,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 Đường dẫn dưới đây tính từ gốc repo. Lệnh test llm-service chạy trong `services/llm-service` (`pytest`, `ruff check app tests`); authoring-service trong `services/authoring-service` (`go test ./...`, `go vet ./...`, `gofmt -l .`).
 
 ### T1 — `merger.frame_names()`: tập tên khung code đưa cho shot
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/merger.py` — hàm mới `frame_names()` đặt ngay sau `available_names_text()` (khoảng dòng 118-132).
 - **Thay đổi**: trả `frozenset[str]` gồm mọi tên `_REMOTION_HEAD` import cho shot và các hằng khung code khai báo, dựng từ chính các tuple để không lệch:
@@ -25,7 +25,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: —
 
 ### T2 — `autofix.fix_palette_names`: đổi `PALETTE_<X>` thành `PALETTE.<khoá>`
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/autofix.py` (mới).
 - **Thay đổi**:
@@ -47,7 +47,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: —
 
 ### T3 — `autofix.fix_tsc_suggestions`: áp gợi ý "Did you mean" của tsc
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/autofix.py`.
 - **Thay đổi**:
@@ -69,7 +69,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: T1
 
 ### T4 — Gắn sửa tên màu sau mỗi lượt chunk và repair, phát sự kiện `autofix`
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/run.py`.
 - **Thay đổi**:
@@ -95,7 +95,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: T2
 
 ### T5 — Áp gợi ý tsc trước khi gọi repair (chunk và kiểm tra cuối)
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/run.py` — `_settle_chunk` (dòng 828-854) và vòng `while True` trong `run` (dòng 791-819).
 - **Thay đổi**:
@@ -111,7 +111,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: T3, T4
 
 ### T6 — Bỏ chia đôi khi vượt trần suy nghĩ
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service
 - **File**: `services/llm-service/app/pipeline/run.py`.
 - **Thay đổi**:
@@ -132,7 +132,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: — (làm sau T4/T5 để tránh xung đột sửa cùng file)
 
 ### T7 — Trần suy nghĩ 100 000
-- [ ] Xong
+- [x] Xong
 - **Service**: llm-service, hạ tầng
 - **File**: `services/llm-service/app/config.py:72`; `docker-compose.yml:458`; `.env.example:82`; `services/llm-service/tests/test_api.py:21,290`.
 - **Thay đổi**: `_non_negative("CODE_MAX_REASONING_CHARS", 100000)`; compose `${CODE_MAX_REASONING_CHARS:-100000}`; `.env.example` `# CODE_MAX_REASONING_CHARS=100000`; test: fixture dòng 21 `code_max_reasoning_chars=100000`, assert dòng 290 `(100000, 0)`.
@@ -141,7 +141,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: —
 
 ### T8 — Prompt `remotion_engineer_ai`: bỏ tên sai làm ví dụ
-- [ ] Xong
+- [x] Xong
 - **Service**: authoring-service
 - **File**: `services/authoring-service/internal/domain/prompt_template_seeds_ai.go:128,175`; `services/authoring-service/internal/domain/golden_prompts_test.go:101-102`.
 - **Thay đổi**:
@@ -153,7 +153,7 @@ Thiết kế: [cr-068-ai-output-guardrails-design.md](cr-068-ai-output-guardrail
 - **Phụ thuộc**: —
 
 ### T9 — Hợp đồng sự kiện `check` phase `autofix`
-- [ ] Xong
+- [x] Xong
 - **Service**: tài liệu
 - **File**: `docs/contracts/authoring-llm-code-v2.md:62`.
 - **Thay đổi**: dòng `check`: `phase ("chunk"|"final"|"autofix")`; thêm câu: "`autofix`: những gì llm-service tự sửa không gọi model; mỗi diagnostic `kind: "autofix"`, `rule: "palette_name"|"tsc_suggestion"`, `message: "<trước> → <sau>"`, `line` là dòng trong code của shot." Không đổi code authoring-service (ghi nguyên `phase`/`kind`).

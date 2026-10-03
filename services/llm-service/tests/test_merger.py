@@ -1,4 +1,5 @@
 import json
+import re
 
 from app import storyboard as sbm
 from app.pipeline import merger
@@ -117,3 +118,13 @@ def test_frame_imports_every_name_the_rule_book_offers_the_shots():
     primitives = next(line for line in imports if line.endswith("from './conceptflow-mini/primitives';"))
     assert ", random}" in remotion
     assert "BACKGROUND" in primitives and "useFrameBox" in primitives
+
+
+def test_frame_names_cover_every_import_of_the_head():
+    imported = {"React"}
+    for clause in re.findall(r"import (?:type )?\{([^}]*)\}", merger._REMOTION_HEAD):
+        imported.update(n.strip() for n in clause.split(",") if n.strip())
+    names = merger.frame_names()
+    assert imported <= names, f"the head imports names frame_names() lacks: {sorted(imported - names)}"
+    assert {"useCurrentFrame", "PALETTE", "LAYOUT", "clamp"} <= names
+    assert "useCurrentFrameSafe" not in names

@@ -69,6 +69,6 @@ class Config:
             code_repair_max_rounds=_int("CODE_REPAIR_MAX_ROUNDS", 3),
             rendering_url=os.environ.get("RENDERING_URL", "http://rendering:8000"),
             rendering_check_timeout=_int("RENDERING_CHECK_TIMEOUT_SECONDS", 180),
-            code_max_reasoning_chars=_non_negative("CODE_MAX_REASONING_CHARS", 60000),
+            code_max_reasoning_chars=_non_negative("CODE_MAX_REASONING_CHARS", 100000),
             chat_max_reasoning_chars=_non_negative("CHAT_MAX_REASONING_CHARS", 0),
         )
