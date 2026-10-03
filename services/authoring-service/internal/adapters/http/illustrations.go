@@ -31,6 +31,7 @@ type illustrationsUseCase interface {
 	SetStatus(ctx context.Context, id string, status domain.IllustrationStatus) (domain.Illustration, error)
 	Delete(ctx context.Context, id string) error
 	Exemplars(ctx context.Context) ([]domain.Illustration, error)
+	StyleRules(ctx context.Context) (string, error)
 	MakeExemplar(ctx context.Context, id string) (domain.Illustration, error)
 	UnmakeExemplar(ctx context.Context, id string) (*domain.Illustration, error)
 	Preview(ctx context.Context, id string) (png, gif []byte, err error)
@@ -338,22 +339,29 @@ func (rt *Router) handleDeleteIllustration(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleIllustrationStyle serves the channel's style rules and the ids of the
-// Hình mẫu (read from the library), which web-gui shows
-// with their previews.
+// handleIllustrationStyle serves the style rules in force (the active
+// illustration_style prompt, the same text the AI illustrator is given) and
+// the ids of the Hình mẫu (read from the library), which web-gui shows with
+// their previews.
 func (rt *Router) handleIllustrationStyle(w http.ResponseWriter, r *http.Request) {
-	ids := []string{}
-	if rt.illustrations != nil {
-		exemplars, err := rt.illustrations.Exemplars(r.Context())
-		if err != nil {
-			illustrationError(w, err)
-			return
-		}
-		for _, e := range exemplars {
-			ids = append(ids, e.ID)
-		}
+	if !rt.illustrationsEnabled(w) {
+		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"rules": domain.IllustrationStyleGuide(), "exemplar_ids": ids, "max_exemplars": domain.MaxExemplars})
+	rules, err := rt.illustrations.StyleRules(r.Context())
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	exemplars, err := rt.illustrations.Exemplars(r.Context())
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	ids := []string{}
+	for _, e := range exemplars {
+		ids = append(ids, e.ID)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"rules": rules, "exemplar_ids": ids, "max_exemplars": domain.MaxExemplars})
 }
 
 // handleMakeExemplar copies an approved drawing into the Hình mẫu.

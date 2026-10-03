@@ -854,6 +854,10 @@ func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "unknown role")
 		return
 	}
+	if !domain.IsRenderablePromptRole(role) {
+		writeError(w, http.StatusBadRequest, "role is not renderable")
+		return
+	}
 
 	rendered, err := rt.renderPrompt.Execute(r.Context(), projectID, domain.PromptRole(role))
 	if err != nil {
@@ -909,6 +913,10 @@ func (rt *Router) handlePromptRenders(w http.ResponseWriter, r *http.Request) {
 	}
 	if !domain.ValidPromptRole(req.Role) {
 		writeError(w, http.StatusBadRequest, "unknown role")
+		return
+	}
+	if !domain.IsRenderablePromptRole(req.Role) {
+		writeError(w, http.StatusBadRequest, "role is not renderable")
 		return
 	}
 	rendered, err := renderer.Render(r.Context(), application.RenderInput{

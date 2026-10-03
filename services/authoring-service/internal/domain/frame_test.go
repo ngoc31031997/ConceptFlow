@@ -51,3 +51,22 @@ func TestBurnedSubtitlesSitAtTheBottomOfTheRealFrame(t *testing.T) {
 		t.Error("SubtitleZoneFor must stay the landscape zone")
 	}
 }
+
+// A short's captions at the top sit below the Shorts player's controls, so
+// the strip kept empty for them reaches past the 200 px those cover.
+func TestTopSubtitlesOfAShortSitBelowTheShortsControls(t *testing.T) {
+	style := SubtitleStyle{FontSize: "medium", Position: "top"}
+	if band, _ := SubtitleBandFor(SubtitleModeBurnIn, style, PortraitFrame); band.Edge != "top" || band.Px != 240+200 {
+		t.Errorf("portrait top band = %+v", band)
+	}
+	if band, _ := SubtitleBandFor(SubtitleModeBurnIn, style, LandscapeFrame); band.Px != 240 {
+		t.Errorf("landscape top band = %+v", band)
+	}
+	if got := SubtitleZoneIn(SubtitleModeBurnIn, style, PortraitFrame, "vi"); !strings.Contains(got, "dải y từ 0 đến 440 px") {
+		t.Errorf("portrait top zone = %q", got)
+	}
+	short := &Project{VideoOutputMode: ModeShortOnly, SubtitleMode: SubtitleModeBurnIn, SubtitleStyle: &style}
+	if band, burned := ProjectSubtitleBand(short); !burned || band.Px != 440 {
+		t.Errorf("project band = %+v %v", band, burned)
+	}
+}

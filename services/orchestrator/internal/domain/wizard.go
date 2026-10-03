@@ -60,7 +60,8 @@ type WizardSettingsPatch struct {
 // ApplyShortDefaults completes a patch that switches the project to the
 // vertical short with what a short needs and the Creator did not pick in the
 // same patch: the short format, the Remotion engine (Manim has no portrait
-// frame) and no subtitles (a short carries its keywords in the picture).
+// frame) and short captions burned in at the top, one per narration line,
+// below the Shorts player's own controls.
 func ApplyShortDefaults(p *WizardSettingsPatch) {
 	if p.VideoOutputMode == nil || *p.VideoOutputMode != ModeShortOnly {
 		return
@@ -74,8 +75,13 @@ func ApplyShortDefaults(p *WizardSettingsPatch) {
 		p.RenderEngine = &engine
 	}
 	if p.SubtitleMode == nil {
-		off := SubtitleModeOff
-		p.SubtitleMode = &off
+		burnIn := SubtitleModeBurnIn
+		p.SubtitleMode = &burnIn
+	}
+	if p.SubtitleStyle == nil {
+		style := DefaultSubtitleStyle()
+		style.Position = "top"
+		p.SubtitleStyle = &style
 	}
 }
 

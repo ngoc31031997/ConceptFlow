@@ -81,7 +81,9 @@ func main() {
 		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
 		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
 		// A drawing a video still working uses cannot be deleted.
-		WithProjectStatus(projects)
+		WithProjectStatus(projects).
+		// The style rules the illustrator is held to are the active illustration_style prompt.
+		WithStylePrompts(authoringRepo)
 	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).

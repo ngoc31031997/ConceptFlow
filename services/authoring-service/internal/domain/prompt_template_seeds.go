@@ -17,17 +17,18 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the pipeline roles.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 10, TemplateText: bt(storyArchitectVI)},
-		{Role: RoleVisualDirector, Language: "vi", Version: 11, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 11, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleVisualDirector, Language: "vi", Version: 12, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleManimEngineer, Language: "vi", Version: 8, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
-		{Role: RoleRemotionEngineer, Language: "vi", Version: 7, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 5, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleRemotionEngineer, Language: "vi", Version: 8, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 6, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
-		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 5, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
+		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
 		{Role: RoleThumbnailDesign, Language: "vi", Version: 1, TemplateText: thumbnailDesignTemplate},
+		{Role: RoleIllustrationStyle, Language: "vi", Version: 1, TemplateText: IllustrationStyleGuide()},
 	}
 }
 
@@ -202,6 +203,10 @@ Với mỗi beat, viết:
   - Không ngoặc đơn, gạch đầu dòng, emoji, dấu "..." trang trí.
   - Trích lời nhân vật lịch sử thì diễn đạt lại bằng lời thoại tự nhiên, không đặt trong ngoặc kép dài.
   - Thuật ngữ tiếng Anh trong lời thoại tiếng Việt viết PHIÊN ÂM theo cách người Việt đọc (vd "ây-ai" cho "AI" nếu cần), trừ từ đã quen thuộc (internet, video, email). Trong các trường khác giữ nguyên thuật ngữ gốc.
+- VIẾT ĐỂ VẼ: mỗi câu được đọc thành một đoạn tiếng riêng và hình đổi theo từng câu, nên:
+  - Câu ngắn, tối đa 20 từ; câu dài nhiều mệnh đề thì tách thành nhiều câu.
+  - Mỗi câu nói MỘT ý vẽ được thành một thay đổi trên hình: một con số, một đồ vật, một hành động, một so sánh.
+  - Ý trừu tượng đi kèm vật cụ thể người xem tự hình dung ra được (hộp mười hai quả trứng, ngón tay đếm, chiếc đồng hồ), không chỉ là khái niệm.
 
 ## TRÁNH TUYỆT ĐỐI
 
@@ -332,7 +337,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
   - kéo ra — cảnh cũ thu nhỏ lại, trở thành một phần của cảnh mới lớn hơn.
   - cắt thẳng sang cảnh trống — chỉ khi muốn tạo cú ngắt có chủ đích (đổi hẳn góc nhìn, một câu hỏi mới).
 - **Màu và ánh sáng:** nói theo VAI TRÒ và CẢM XÚC — "màu nhấn cho thứ đang được chú ý", "phần còn lại chìm về tông mờ", "màu cảnh báo khi hiểu lầm lộ ra", "màu thứ hai cho phe đối lập" — VÀ ghi luôn MÃ MÀU HEX cụ thể cho từng vai trò (ví dụ ¤#F5B841¤). Bạn là người duy nhất quyết định màu: bước dựng chỉ chép đúng mã bạn ghi, không tự chọn thêm màu nào.
-- **Bối cảnh và nền:** mỗi cảnh diễn ra ở MỘT NƠI CHỐN phủ kín khung hình, không phải vài vật lơ lửng trên nền trống. Ghi BỐI CẢNH của cảnh gồm: nơi chốn cụ thể (căn bếp buổi tối, khu vườn sau nhà, lòng một quả sung, bên trong mạch máu); các lớp sâu — lớp xa (trời, tường, đồi), lớp giữa (đồ đạc, cây cối phía sau nhân vật), lớp gần (thứ sát ống kính, mờ đi như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào); nguồn sáng (nắng chiều từ cửa sổ, quầng sáng trong lòng quả, tia sáng xuyên lá); và TÔNG MÀU CHỦ ĐẠO của cảnh — mỗi cảnh một tông bão hoà (cam đỏ ấm, tím hồng, xanh lá tươi), đổi tông khi đổi nơi chốn. Ý tự nó trừu tượng (một con số, một đồ thị) được dùng NỀN MÀU PHẲNG hoặc gradient hai màu, vẫn theo tông của cảnh, và được chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, nửa phải là thế giới vi mô). Không ghi gì thì nền mặc định là ¤#080E1C¤ (xanh đen gần như đen). Mỗi màu nền và màu tông là một vai trò trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"). Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 12 màu cho cả phim (tính cả màu nền).
+- **Bối cảnh và nền:** mỗi cảnh diễn ra ở MỘT NƠI CHỐN phủ kín khung hình, không phải vài vật lơ lửng trên nền trống. Ghi BỐI CẢNH của cảnh gồm: nơi chốn cụ thể (căn bếp buổi tối, khu vườn sau nhà, lòng một quả sung, bên trong mạch máu); các lớp sâu — lớp xa (trời, tường, đồi), lớp giữa (đồ đạc, cây cối phía sau nhân vật), lớp gần (thứ sát ống kính, mờ đi như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào); nguồn sáng (nắng chiều từ cửa sổ, quầng sáng trong lòng quả, tia sáng xuyên lá); và TÔNG MÀU CHỦ ĐẠO của cảnh — mỗi cảnh một tông bão hoà (cam đỏ ấm, tím hồng, xanh lá tươi), đổi tông khi đổi nơi chốn. Ý tự nó trừu tượng (một con số, một đồ thị, một phép so sánh) được dùng MỘT MÀU NỀN SÁNG, BÃO HOÀ phủ kín khung — gợi ý vàng ¤#FFD84D¤, xanh cyan ¤#2EC4F0¤, hồng ¤#FF9EC4¤, tím ¤#B48CFF¤, xanh lá ¤#8BD86B¤, cam ¤#FFB25B¤ — đổi màu nền khi đổi ý, và có thể chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, nửa phải là thế giới vi mô). MỖI CẢNH BẮT BUỘC có một vai trò màu nền trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"); không có nền mặc định. Phim tông tối chỉ khi chủ đề đòi (đêm, hang động, vũ trụ, đáy biển) và BỐI CẢNH phải ghi lý do; còn lại nền sáng, tươi. Mỗi màu tông cũng là một vai trò trong BẢNG MÀU. Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 12 màu cho cả phim (tính cả màu nền).
 - **Ánh sáng:** quầng sáng mềm quanh thứ quan trọng, tia sáng toả từ một nguồn, góc khung tối dần để kéo mắt vào giữa — dùng ánh sáng để chỉ chỗ cần nhìn.
 - **Font chữ và phụ đề:** do bước cấu hình chọn — đừng mô tả font, cỡ font hay phụ đề.
 - **Nhịp:** nhanh, bình thường hay chậm — ghi rõ khi nhịp mang nghĩa.
@@ -394,7 +399,7 @@ const visualDirectorOutputProseVI = `## OUTPUT — KỊCH BẢN PHÂN CẢNH (KH
 Mở đầu bằng đúng hai dòng:
 
 NHÂN VẬT CHÍNH: <người/vật sống xuyên suốt, và hành trình biến đổi của nó qua cả phim> (hoặc "THẾ GIỚI: <sơ đồ/không gian xuyên suốt>" nếu chủ đề không có vật biến đổi tự nhiên)
-BẢNG MÀU: <mỗi dòng một vai trò, dạng "tên vai trò — #RRGGBB — ý nghĩa trong phim này"; màu nền riêng của cảnh cũng là một vai trò; nền mặc định #080E1C không khai báo lại>
+BẢNG MÀU: <mỗi dòng một vai trò, dạng "tên vai trò — #RRGGBB — ý nghĩa trong phim này"; mỗi cảnh có đúng một vai trò màu nền>
 
 Rồi với mỗi beat:
 
@@ -635,13 +640,13 @@ const remoBVI = `## B. MÀU — CHÉP NGUYÊN BẢNG MÀU CỦA ĐẠO DIỄN
 2. MỌI màu trong code (fill, stroke, color, background của vật, border, boxShadow) phải là ¤PALETTE.xxx¤. Không viết mã hex/rgb/tên màu nào khác ở bất kỳ đâu. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu mới. (Màu mặc định BÊN TRONG các hình của bộ minh hoạ ở mục C3 — da, tóc, men răng... — không tính: chúng thuộc bộ hình, bạn không viết chúng.)
 3. Shot nói "tô màu nhấn", "chìm về tông mờ"... → dùng đúng khoá vai trò đó. Một vai trò = một màu từ đầu đến cuối.
 4. Chuyển màu theo nghĩa (vd. "đổi sang màu cảnh báo khi hiểu lầm lộ ra") → ¤interpolateColors(frame, [a, b], [PALETTE.x, PALETTE.y])¤.
-5. Nếu kịch bản thiếu mã hex cho một vai trò (lỗi của bước trước): chọn một màu sáng đọc rõ trên nền ¤#080E1C¤, khai báo nó trong ¤PALETTE¤ kèm comment ¤// thiếu mã trong storyboard¤ — không im lặng bịa màu rải rác.
+5. Nếu kịch bản thiếu mã hex cho một vai trò (lỗi của bước trước): chọn một màu đọc rõ trên nền của cảnh, khai báo nó trong ¤PALETTE¤ kèm comment ¤// thiếu mã trong storyboard¤ — không im lặng bịa màu rải rác.
 
 `
 
 const remoCVI = `## C. NHỮNG THỨ CỐ ĐỊNH — KHÔNG ĐƯỢC TỰ ĐẶT
 
-- **Nền và bối cảnh:** mỗi shot kể chuyện ở một nơi chốn dựng trong ¤<Scene>¤ (mục C3) theo BỐI CẢNH của cảnh: ¤sky¤ là ¤<Backdrop>¤ (gradient ¤color¤ → ¤to¤ theo tông cảnh), ¤far¤/¤mid¤ phía sau nhân vật, ¤near¤ sát ống kính (tự mờ), ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤ — mọi màu lấy từ ¤PALETTE¤. Shot ý trừu tượng (đồ thị, con số, chia khung thành mảng màu) dùng ¤<Backdrop>¤ và ¤<Panel>¤, máy bằng ¤<Camera>¤. ¤<Stage>¤ đã tô nền mặc định ¤#080E1C¤. Ngoài ¤Scene¤, ¤Backdrop¤, ¤Panel¤, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) có màu nền từ ¤PALETTE¤.
+- **Nền và bối cảnh:** mỗi shot kể chuyện ở một nơi chốn dựng trong ¤<Scene>¤ (mục C3) theo BỐI CẢNH của cảnh: ¤sky¤ là ¤<Backdrop>¤ (gradient ¤color¤ → ¤to¤ theo tông cảnh), ¤far¤/¤mid¤ phía sau nhân vật, ¤near¤ sát ống kính (tự mờ), ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤ — mọi màu lấy từ ¤PALETTE¤. Shot ý trừu tượng (đồ thị, con số, chia khung thành mảng màu) dùng ¤<Backdrop>¤ và ¤<Panel>¤, máy bằng ¤<Camera>¤. MỌI shot tự đặt nền của cảnh (¤<Scene>¤ hoặc ¤<Backdrop color={PALETTE.nen...}>¤) — không dựa vào nền tối của ¤<Stage>¤. Ngoài ¤Scene¤, ¤Backdrop¤, ¤Panel¤, KHÔNG tự tô nền phủ toàn khung (không ¤backgroundColor¤ trên ¤AbsoluteFill¤ hay div phủ khung). Vật cụ thể (một ô, một thanh) có màu nền từ ¤PALETTE¤.
 - **Font:** ¤<Stage>¤ đã đặt font Creator chọn; KHÔNG đặt ¤fontFamily¤. Chỉ đặt ¤fontSize¤, ¤fontWeight¤ (400 hoặc 700).
 - **Phụ đề:** hệ thống tự in phụ đề từ ¤narrations¤. KHÔNG BAO GIỜ in câu thoại lên hình (không ¤{narrations[index]}¤ trong JSX); chữ trên hình chỉ là NHÃN kịch bản yêu cầu.
 - **Vùng phụ đề:** {{subtitle_zone}}

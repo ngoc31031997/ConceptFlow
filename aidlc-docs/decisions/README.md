@@ -33,3 +33,4 @@
 | [ADR-0029](ADR-0029-authoring-service-boundary.md) | Tách authoring-service khỏi orchestrator | Accepted | Requirements Analysis → Construction (CR-040 FR111) | 2026-09-26 |
 | [ADR-0030](ADR-0030-code-segments-and-v2-code-contract.md) | Lưu từng đoạn của bước Code trong authoring-service, llm-service chạy không trạng thái (contract `/v2/code/*`) | Accepted | Application Design (CR-050 Unit 2) | 2026-09-30 |
 | [ADR-0031](ADR-0031-frame-orientation-by-output-mode.md) | Khung hình theo chế độ đầu ra; short dựng dọc riêng từ đầu | Accepted | Application Design (CR-060) | 2026-10-01 |
+| [ADR-0032](ADR-0032-narration-lines-time-remotion-shots.md) | Câu thoại là đơn vị thời gian của shot Remotion | Accepted | Application Design (CR-067) | 2026-10-03 |

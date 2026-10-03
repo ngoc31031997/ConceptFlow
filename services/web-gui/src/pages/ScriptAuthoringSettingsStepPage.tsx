@@ -136,7 +136,9 @@ export function ScriptAuthoringSettingsStepPage() {
     if (mode === "short") {
       dispatch({ type: "SET_VIDEO_FORMAT", payload: SHORT_FORMAT_ID });
       dispatch({ type: "SET_RENDER_ENGINE", payload: "remotion" });
-      dispatch({ type: "SET_SUBTITLE_MODE", payload: "off" });
+      // Same defaults the server applies: short captions burned in at the top.
+      dispatch({ type: "SET_SUBTITLE_MODE", payload: "burn_in" });
+      dispatch({ type: "SET_SUBTITLE_STYLE", payload: { position: "top" } });
       void send({ videoOutputMode: mode });
       return;
     }

@@ -98,7 +98,7 @@ export function compile(source, fileName = 'script.tsx') {
 
 /** The placeholder llm-service's merger writes for a shot another chunk owns
  * (merger.remotion_stub): it draws nothing, so a one-chunk check skips it. */
-const STUB = /^function\s+\w+\s*\(\s*\{\s*duration\s*\}\s*:\s*ShotProps\s*\)\s*\{\s*return\s+null;\s*\}\s*$/;
+const STUB = /^function\s+\w+\s*\(\s*\{\s*duration\s*(?:,\s*lines\s*)?\}\s*:\s*ShotProps\s*\)\s*\{\s*return\s+null;\s*\}\s*$/;
 
 /** Shot order and declaration lines, read from the merged file the same way the
  * merger writes it: `const SHOTS ... = [Shot1_1, ...]` and `function ShotN_M(`. */

@@ -53,18 +53,26 @@ export interface FigureProps {
   still?: boolean;
 }
 
+/**
+ * The box a figure is drawn in. `vx`/`vy` move the box's top-left corner
+ * inside the drawing (a close-up framing of a larger figure), and `clip`
+ * hides whatever falls outside the box instead of letting it spill over.
+ */
 export function Figure({
   x = 960,
   y = 540,
   size,
   vw,
   vh,
+  vx = 0,
+  vy = 0,
+  clip = false,
   rotate = 0,
   flip = false,
   scale = 1,
   opacity = 1,
   children,
-}: FigureProps & {size: number; vw: number; vh: number; children: React.ReactNode}) {
+}: FigureProps & {size: number; vw: number; vh: number; vx?: number; vy?: number; clip?: boolean; children: React.ReactNode}) {
   const long = Math.max(vw, vh);
   const w = (size * vw) / long;
   const h = (size * vh) / long;
@@ -72,12 +80,12 @@ export function Figure({
     <svg
       width={w}
       height={h}
-      viewBox={`0 0 ${vw} ${vh}`}
+      viewBox={`${vx} ${vy} ${vw} ${vh}`}
       style={{
         position: 'absolute',
         left: x - w / 2,
         top: y - h / 2,
-        overflow: 'visible',
+        overflow: clip ? 'hidden' : 'visible',
         opacity,
         transformOrigin: 'center',
         transform: `rotate(${rotate}deg) scale(${flip ? -scale : scale}, ${scale})`,
@@ -112,6 +120,32 @@ export function shadeOf(hex: string, amount: number): string {
     Math.max(0, Math.min(255, Math.round(amount < 0 ? c * (1 + amount) : c + (255 - c) * amount))),
   );
   return '#' + ch.map((c) => c.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Where a point of a figure's drawing lands on the frame, in px, given the
+ * box the figure was drawn in and its rotate/flip/scale — so something the
+ * figure holds can be placed at that point.
+ */
+export function figurePoint(
+  fig: FigureProps & {size: number; vw: number; vh: number; vx?: number; vy?: number},
+  point: Pt,
+): Pt {
+  const {x = 960, y = 540, size, vw, vh, vx = 0, vy = 0, rotate = 0, flip = false, scale = 1} = fig;
+  const k = (size / Math.max(vw, vh)) * scale;
+  const dx = (point[0] - vx - vw / 2) * k * (flip ? -1 : 1);
+  const dy = (point[1] - vy - vh / 2) * k;
+  const a = (rotate * Math.PI) / 180;
+  return [x + dx * Math.cos(a) - dy * Math.sin(a), y + dx * Math.sin(a) + dy * Math.cos(a)];
+}
+
+/**
+ * Places `children` (kit figures, whose x/y are then measured from `at`) at a
+ * point of the frame: what a hand holds rides with the hand.
+ */
+export function HeldAt({at, children}: {at: Pt; children?: React.ReactNode}) {
+  if (!children) return null;
+  return <div style={{position: 'absolute', left: at[0], top: at[1], width: 0, height: 0}}>{children}</div>;
 }
 
 export function GroundShadow({cx, cy, rx}: {cx: number; cy: number; rx: number}) {
@@ -204,11 +238,18 @@ export function Panel({
 
 // --- people -----------------------------------------------------------------
 
-export type PersonPose = 'stand' | 'sit' | 'wave' | 'point' | 'think' | 'cheer' | 'ouch' | 'shrug' | 'walk';
+export type PersonPose = 'stand' | 'sit' | 'wave' | 'point' | 'think' | 'cheer' | 'ouch' | 'shrug' | 'walk' | 'hold';
 export type Mood = 'neutral' | 'happy' | 'sad' | 'worried' | 'surprised' | 'pain' | 'angry';
 
 export interface PersonProps extends FigureProps {
   pose?: PersonPose;
+  /** The pose the person is moving into; `poseT` runs 0 (`pose`) → 1 (`toPose`). */
+  toPose?: PersonPose;
+  poseT?: number;
+  /** `bust`: a close-up from the chest up, the head and shoulders filling the box. */
+  framing?: 'full' | 'bust';
+  /** What the person holds in the `hold` pose; its x/y are measured from the point between the hands. */
+  children?: React.ReactNode;
   mood?: Mood;
   age?: 'child' | 'adult' | 'elder';
   outfit?: 'shirt' | 'coat' | 'dress';
@@ -222,7 +263,7 @@ export interface PersonProps extends FigureProps {
   hair?: string;
 }
 
-type Pt = [number, number];
+export type Pt = [number, number];
 
 export function Face({
   mood,
@@ -374,10 +415,19 @@ export function Face({
  * Box aspect: 260 x 420 (standing adult) — width ≈ 0.62 × size.
  * Poses: stand, sit (on a small stool), wave, point (to the viewer's right —
  * flip to point left), think (hand on chin), cheer (both arms up), ouch (hand
- * holding the cheek: toothache, headache), shrug, walk.
+ * holding the cheek: toothache, headache), shrug, walk, hold (both hands in
+ * front of the chest, holding `children`).
+ * Moving between poses: give `toPose` and animate `poseT` 0 → 1; the arms
+ * travel between the two poses, the body (standing, sitting, walking) takes
+ * the new pose half way.
+ * `framing="bust"`: a close-up from the chest up, box 260 x 234.
  */
 export function Person({
-  pose = 'stand',
+  pose: fromPose = 'stand',
+  toPose,
+  poseT = 0,
+  framing = 'full',
+  children,
   mood = 'neutral',
   age = 'adult',
   outfit = 'shirt',
@@ -394,6 +444,8 @@ export function Person({
   const frame = useCurrentFrame();
   const phase = phaseOf(fig.x ?? 960, fig.y ?? 540);
   const blink = useBlink(still, phase);
+  const t = toPose ? Math.min(1, Math.max(0, poseT)) : 0;
+  const pose: PersonPose = toPose && t >= 0.5 ? toPose : fromPose;
   const style = hairStyle ?? (age === 'elder' ? 'bald' : 'short');
   const hairColor = hair ?? (age === 'elder' ? '#B9B4C7' : '#5B2C6F');
   const wearGlasses = glasses ?? age === 'elder';
@@ -439,8 +491,12 @@ export function Person({
       [cx + 50 - walkT * 10, sy + 55 * k],
       [cx + 44 - walkT * 22, sy + 102 * k],
     ],
+    hold: [[cx - 58, sy + 48 * k], [cx - 22, sy + 74 * k], [cx + 58, sy + 48 * k], [cx + 22, sy + 74 * k]],
   };
-  const [le, lh, re, rh] = arms[pose];
+  const lerp = (a: Pt, b: Pt): Pt => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+  const from = arms[fromPose];
+  const to = toPose ? arms[toPose] : from;
+  const [le, lh, re, rh] = from.map((p, i) => lerp(p, to[i])) as [Pt, Pt, Pt, Pt];
   const arm = (s: Pt, e: Pt, h: Pt, key: string) => (
     <g key={key}>
       <path
@@ -557,29 +613,40 @@ export function Person({
     }
   })();
 
+  const bust = framing === 'bust';
+  // The bust box is measured from the still body so breathing does not shake the framing.
+  const box = bust
+    ? {vx: 0, vy: headTop - 24, vw: 260, vh: 234, clip: true}
+    : {vx: 0, vy: 0, vw: 260, vh: 420, clip: false};
+  const placed = {...fig, size: fig.size ?? (bust ? 260 : 420), ...box};
+  const holding = [(lh[0] + rh[0]) / 2, (lh[1] + rh[1]) / 2] as Pt;
+
   return (
-    <Figure {...fig} size={fig.size ?? 420} vw={260} vh={420}>
-      <GroundShadow cx={cx} cy={floorY} rx={sit ? 90 : 70} />
-      {legs}
-      {torso}
-      {hairBack}
-      <rect x={cx - 12} y={headTop + headH - 10} width={24} height={24} fill={shadeOf(skin, -0.12)} />
-      <circle cx={hx - 2} cy={headTop + headH * 0.55} r={10} fill={skin} />
-      <circle cx={hx + headW + 2} cy={headTop + headH * 0.55} r={10} fill={skin} />
-      <rect x={hx} y={headTop} width={headW} height={headH} rx={40} fill={skin} />
-      {hairFront}
-      <Face
-        mood={mood}
-        blink={blink}
-        talking={talking}
-        frame={frame}
-        cx={cx}
-        cy={headTop + headH * 0.58}
-        glasses={wearGlasses}
-      />
-      {arm(L, le, lh, 'l')}
-      {arm(R, re, rh, 'r')}
-    </Figure>
+    <>
+      <Figure {...placed}>
+        {bust ? null : <GroundShadow cx={cx} cy={floorY} rx={sit ? 90 : 70} />}
+        {bust ? null : legs}
+        {torso}
+        {hairBack}
+        <rect x={cx - 12} y={headTop + headH - 10} width={24} height={24} fill={shadeOf(skin, -0.12)} />
+        <circle cx={hx - 2} cy={headTop + headH * 0.55} r={10} fill={skin} />
+        <circle cx={hx + headW + 2} cy={headTop + headH * 0.55} r={10} fill={skin} />
+        <rect x={hx} y={headTop} width={headW} height={headH} rx={40} fill={skin} />
+        {hairFront}
+        <Face
+          mood={mood}
+          blink={blink}
+          talking={talking}
+          frame={frame}
+          cx={cx}
+          cy={headTop + headH * 0.58}
+          glasses={wearGlasses}
+        />
+        {arm(L, le, lh, 'l')}
+        {arm(R, re, rh, 'r')}
+      </Figure>
+      {pose === 'hold' ? <HeldAt at={figurePoint(placed, holding)}>{children}</HeldAt> : null}
+    </>
   );
 }
 

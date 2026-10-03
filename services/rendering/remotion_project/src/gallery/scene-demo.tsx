@@ -1,7 +1,8 @@
 /**
  * Gallery sample of the scene kit: four shots, each a place filling the frame
  * (a built-in backdrop in the Scene's depth layers), a camera move with
- * parallax, light and a keyword. The same shots are registered landscape
+ * parallax, light and a keyword; then two close-ups timed by narration lines
+ * (a person changing pose, a hand reaching in). The same shots are registered landscape
  * (`scene-wide`) and portrait (`scene-tall`): the backdrops and the shots
  * place everything from the frame's own size.
  *
@@ -10,9 +11,11 @@
 import React from 'react';
 import {registerRoot, Composition, AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {Stage} from '../conceptflow-mini/primitives';
-import {Candy, Germ, Person, Table, Tooth} from '../conceptflow-mini/illustration';
+import {Backdrop, Book, Candy, Germ, Lightbulb, Person, Table, Tooth} from '../conceptflow-mini/illustration';
 import {Glow, KeywordText, LightRays, Scene} from '../conceptflow-mini/scene';
 import {InsideBodyBackdrop, MeadowBackdrop, RoomBackdrop, SpaceBackdrop} from '../conceptflow-mini/backdrops';
+import {ReachingHand} from '../conceptflow-mini/rig';
+import {evenLines} from '../conceptflow-mini/segments';
 
 const SHOT = 90;
 const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
@@ -65,7 +68,58 @@ function Space({duration}: {duration: number}) {
   );
 }
 
-const SHOTS = [Meadow, Room, InsideBody, Space];
+/** A close-up person read in three lines: thinks, then shrugs, then holds up a book. */
+function Talk({duration}: {duration: number}) {
+  const frame = useCurrentFrame();
+  const {width: W, height: H} = useVideoConfig();
+  const lines = evenLines(duration, 3);
+  const toShrug = interpolate(frame, [lines[1], lines[1] + 12], [0, 1], clamp);
+  const toHold = interpolate(frame, [lines[2], lines[2] + 12], [0, 1], clamp);
+  return (
+    <AbsoluteFill>
+      <Backdrop color="#2EC4F0" />
+      <Person
+        x={W / 2}
+        y={H * 0.55}
+        size={Math.min(W, H) * 0.9}
+        framing="bust"
+        pose={frame < lines[2] ? 'think' : 'shrug'}
+        toPose={frame < lines[2] ? 'shrug' : 'hold'}
+        poseT={frame < lines[2] ? toShrug : toHold}
+        mood={frame < lines[1] ? 'worried' : 'happy'}
+      >
+        <Book x={0} y={-Math.min(W, H) * 0.05} size={Math.min(W, H) * 0.2} />
+      </Person>
+    </AbsoluteFill>
+  );
+}
+
+/** A hand reaches in from below, pulls a pencil out, then counts three fingers. */
+function Reach({duration}: {duration: number}) {
+  const frame = useCurrentFrame();
+  const {width: W, height: H} = useVideoConfig();
+  const lines = evenLines(duration, 2);
+  const reach = interpolate(frame, [0, duration * 0.25], [0, 1], clamp);
+  const pull = interpolate(frame, [duration * 0.25, lines[1]], [0, 1], clamp);
+  return (
+    <AbsoluteFill>
+      <Backdrop color="#FFD84D" />
+      <ReachingHand
+        edge="bottom"
+        target={{x: W * 0.5, y: H * (0.5 - pull * 0.12)}}
+        reach={reach}
+        size={Math.min(W, H) * 0.32}
+        pose={frame < lines[1] ? 'pinch' : 'count'}
+        count={3}
+        sleeve="#2D5BFF"
+      >
+        {frame < lines[1] ? <Lightbulb x={0} y={-Math.min(W, H) * 0.08} size={Math.min(W, H) * 0.12} /> : null}
+      </ReachingHand>
+    </AbsoluteFill>
+  );
+}
+
+const SHOTS = [Meadow, Room, InsideBody, Space, Talk, Reach];
 
 function Demo() {
   return (

@@ -41,6 +41,13 @@ Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `ser
 - `frame`: khung video được dựng, chỉ nhận `1920×1080` (video dài) hoặc `1080×1920` (short dọc); không có thì là khung ngang. Merger viết `<Composition>` đúng kích thước này, storyboard được kiểm toạ độ `layout` theo nó, prompt LAYOUT/sửa lỗi nêu đúng vùng an toàn của nó. Khung dọc thêm kích thước khung vào vân tay khung (nên mọi đoạn được viết lại khi đổi khung); khung ngang giữ nguyên vân tay cũ. Rendering đọc khung từ `<Composition>` của script khi kiểm bố cục, không cần trường riêng. Xem ADR-0031.
 - `illustrations[].kind`: `"figure"` (mặc định) hoặc `"backdrop"`. Một nền mang `shots` (các shot dựng trong nền đó); nền dựng sẵn trong kit có `code` rỗng. Prompt liệt kê nền theo shot (mục C5); merger dán code của nền thư viện khi shot dùng nó qua `backdrop={Tên}`.
 - Storyboard: mỗi cảnh có thể có `setting` (bối cảnh kín khung). Có `setting` thì nó vào JSON của shot dưới tên `scene_setting`; không có thì JSON shot (và vân tay đoạn) như cũ.
+- Storyboard: mỗi shot có thể có `lines: [{"say", "show"}]` (1–4 câu thoại, mỗi `say` ≤ 30 từ). Khi có, `narration` của shot do llm-service ghép từ các `say` lúc chuẩn hoá, và `lines` vào JSON của shot; không có thì shot là một câu (`narration`) và JSON shot như cũ. Xem ADR-0032.
+
+## Khung script Remotion do merger viết
+- `export const narrations: string[]` — **mỗi câu thoại một dòng** (các câu của mọi shot, theo thứ tự). Mỗi dòng là một đoạn TTS riêng và một mốc `wait_offsets` riêng.
+- `export const shotLineCounts: number[]` — số câu của từng shot, theo thứ tự `SHOTS`; tổng bằng số dòng `narrations`. Rendering dùng nó để gom câu thành đoạn của shot; script không có nó thì mỗi dòng là một shot (script cũ, luồng thủ công).
+- `type ShotProps = {duration: number; lines: number[]}` — `lines[i]` là frame bắt đầu câu i, tính từ đầu shot (`lines[0] = 0`). `CreatorComposition` truyền `segment.lines`, hoặc `evenLines(duration, shotLineCounts[i])` khi đoạn không có mốc thật (layout probe).
+- Shot stub của một lượt kiểm một lô: `function ShotN_M({duration, lines}: ShotProps) { return null; }`.
 
 ## `POST /v2/code/generate` (NDJSON)
 Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trường `type`.

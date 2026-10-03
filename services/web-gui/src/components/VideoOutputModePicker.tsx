@@ -61,7 +61,8 @@ export function VideoOutputModePicker({ value, onChange, bare = false }: VideoOu
 
       {value === "short" && (
         <p className={glass.helperText} style={{ marginRight: 0, marginTop: 10 }} role="status">
-          Short dọc dùng format ngắn, dựng bằng Remotion và không đốt phụ đề — chữ từ khoá nằm ngay trong hình.
+          Short dọc dùng format ngắn, dựng bằng Remotion và mặc định đốt phụ đề ở phía trên khung — mỗi câu thoại
+          một cụm ngắn, nằm dưới vùng nút của Shorts. Bạn vẫn đổi được ở mục Phụ đề.
         </p>
       )}
     </div>

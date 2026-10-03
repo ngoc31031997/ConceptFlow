@@ -137,7 +137,12 @@ func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID
 }
 
 // drawerSystem is the drawer's system prompt for a figure or a backdrop.
+// Without a drawer there is nothing to prompt, which is reported as such
+// before the style rules are read.
 func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string, kind domain.IllustrationKind) (string, error) {
+	if uc.drawer == nil {
+		return "", ErrDrawerDisabled
+	}
 	refs, err := uc.references(ctx, folderID, skipID, kind)
 	if err != nil {
 		return "", err
@@ -145,16 +150,20 @@ func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skip
 	if refs == "" {
 		refs = "(Chưa có hình tham chiếu — dựng đúng theo luật style và linh kiện ở trên.)"
 	}
+	style, err := uc.StyleRules(ctx)
+	if err != nil {
+		return "", fmt.Errorf("load illustration style: %w", err)
+	}
 	if kind == domain.IllustrationBackdrop {
 		return strings.NewReplacer(
 			"{{style}}", domain.BackdropStyleGuide(),
-			"{{figure_style}}", domain.IllustrationStyleGuide(),
+			"{{figure_style}}", style,
 			"{{helpers}}", domain.BackdropHelpers(),
 			"{{references}}", refs,
 		).Replace(drawerBackdropPromptVI), nil
 	}
 	return strings.NewReplacer(
-		"{{style}}", domain.IllustrationStyleGuide(),
+		"{{style}}", style,
 		"{{helpers}}", domain.IllustrationHelpers(),
 		"{{references}}", refs,
 	).Replace(drawerPromptVI), nil

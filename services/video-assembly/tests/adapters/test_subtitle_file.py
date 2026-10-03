@@ -69,6 +69,27 @@ def test_vertical_frame_scales_by_width_not_height(tmp_path):
     assert vertical < baseline
 
 
+def margin_v_of(content: str) -> int:
+    return int(content.split("Style: Default,")[1].split("\n")[0].split(",")[-2])
+
+
+def test_top_captions_of_a_portrait_video_start_below_the_shorts_controls(tmp_path):
+    def written(position: str, play_res: tuple[int, int]) -> str:
+        path = str(tmp_path / f"{position}-{play_res[0]}.ass")
+        write_subtitle_file(
+            [SubtitleCue(scene_index=0, text="hello", start_time=0.0, end_time=2.0)],
+            SubtitleStyle(position=position),
+            path,
+            play_res=play_res,
+        )
+        with open(path, encoding="utf-8") as f:
+            return f.read()
+
+    assert margin_v_of(written("top", (1080, 1920))) == 260
+    assert margin_v_of(written("bottom", (1080, 1920))) == round(60 * 1080 / 1920)
+    assert margin_v_of(written("top", (1920, 1080))) == 60
+
+
 def test_width_based_scaling_matches_height_based_for_16_9(tmp_path):
     """Every existing (long-form, always 16:9) resolution must render
     identically after this fix — width and height scale together 1:1 for any

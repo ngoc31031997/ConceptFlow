@@ -3016,3 +3016,25 @@ q6 => làm hết tron cr 067"
 **Context**: INCEPTION → CONSTRUCTION — CR-067.
 
 ---
+
+## CR-067 — Code xong, chờ duyệt (FR13 chờ Creator chọn cách)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: (sau khi duyệt thiết kế, `/code CR-067`)
+**AI Response**:
+- **llm-service**: storyboard `Line{say, show}`, `Shot.lines` (1–4 câu, ≤ 30 từ), `narration` ghép từ các câu, `spoken_lines()`, bản prose hiện từng câu, `dumps` bỏ `lines` rỗng; merger: `narrations` theo câu, `shotLineCounts`, `ShotProps = {duration, lines}`, stub `({duration, lines})`, `CreatorComposition` truyền `lines` (hoặc `evenLines`), import `SEGMENT_API` (thêm `evenLines`, `lineSpan`) và `RIG_KIT` (`ReachingHand`), helpers thêm `HeldAt`, `figurePoint`; tin nhắn chunk mang `lines` và mô tả prop `lines`.
+- **rendering**: `remotion_renderer` đọc `shotLineCounts`, gom câu thành đoạn shot (câu cách 0,1 s, shot cách 0,3 s), `lines` trong đoạn, `wait_offsets` từng câu, tổng sai → lỗi; `segments.tsx` (`lines`, `evenLines`, `lineSpan`); `Person` (`toPose`/`poseT`, `framing="bust"`, `pose="hold"` + `children`), `Figure` có `vx/vy/clip`, `figurePoint`, `HeldAt`; module mới `rig.tsx` (`ReachingHand`); layout probe nạp module rig, regex stub nhận `({duration, lines})`; gallery thêm 2 shot (Talk, Reach).
+- **authoring-service**: prompt Đạo diễn AI v6 (`lines`, mỗi câu một thay đổi, ẩn dụ đồ vật/bàn tay), Kỹ sư AI v6 (`ShotProps.lines`, mốc `lines[i]`, ví dụ mới), Biên kịch v11 ("VIẾT ĐỂ VẼ"), Đạo diễn v12 + Kỹ sư v8 (bỏ nền mặc định `#080E1C`, mỗi cảnh bắt buộc vai trò nền sáng); tài liệu kit thêm `Person` mới, `ReachingHand`; `ReachingHand` vào `SceneKitComponents`; vai trò `illustration_style` (seed từ Phụ lục A), `IsRenderablePromptRole`, `StyleRules`/`WithStylePrompts`, AI vẽ và `/v1/illustration-style` đọc dòng active, 2 route render trả 400 "role is not renderable"; `SubtitleBandFor(..., frame)` lệch 200 px cho phụ đề trên của khung dọc.
+- **orchestrator**: `ApplyShortDefaults` → `burn_in` + style `top`; bản nháp short tạo từ video dài nay chép cả `SubtitleStyle` (trước đó bị bỏ sót).
+- **video-assembly**: phụ đề `top` trên video dọc `MarginV` 260 px.
+- **web-gui**: chọn short đặt `burn_in`/`top`, chữ gợi ý mới; vai trò "Thư viện hình — luật style hình minh hoạ (AI vẽ)".
+- **Tài liệu**: ADR-0032, `docs/contracts/authoring-llm-code-v2.md` (mục khung script), mục lục ADR.
+- **Test**: llm-service 181 pass; rendering 365 pass/14 skip (máy; 5 test probe thật chạy trong container bằng runner tạm: 5/5 PASS); authoring-service, orchestrator `go test ./...` pass, vet/gofmt sạch; video-assembly 165 pass; web-gui vitest 68 file/467 test pass, tsc sạch, eslint 0 lỗi/20 cảnh báo (bằng main); Remotion tsc sạch. Ruff: lỗi E741/E501 còn lại có sẵn trên main (merger.py, test_backdrops.py, check_server.py). Prettier: 4 file web-gui đã lệch sẵn trên main, chỉ format file test mới.
+- **Rebuild**: llm-service, rendering, authoring-service, orchestrator, video-assembly healthy; web-gui HTTP 200 — code của nhánh `feature/cr-067-reference-video-style`.
+- **Kiểm trực tiếp**: `/v1/illustration-style` trả văn bản mới từ DB; render thật một script 5 câu `shotLineCounts [1,1,1,2]` qua `RemotionScriptRenderer`: đoạn cuối `lines [0, 39]`, `wait_offsets` 5 mốc, video 6,0 s (đã xoá file thử); gallery 16:9 và 9:16 render được, đã xem khung hình `Person`/`ReachingHand` (chỉnh ngón tay đếm cho tách rõ sau lần xem đầu).
+- **Chưa làm — FR13 (đo hình đứng yên)**: code mâu thuẫn với thiết kế: bước `qc_video` không được orchestrator gửi đi (tắt sau khi ghép, `handle_step_event.go:922-930`), và QC trả "không chấm" khi không có `layout_marks` (Remotion không sinh). Luật `still_picture` trong `evaluate_all` sẽ không bao giờ chạy. Dừng, hỏi Creator chọn cách.
+- **Chưa kiểm**: chưa chạy AI thật một video dài và một short theo luồng mới (tốn token — để Creator bấm); chưa xem tận mắt phụ đề short burn-in trên video dọc thật; các test probe thật cũ (`test_layout_checker` real) không chạy được trong container (không có pytest) — chỉ chạy bộ của CR này bằng runner.
+**Impact Assessment**: 6 service; không migration; hợp đồng chỉ thêm trường tuỳ chọn.
+**Artifacts Affected**: các file trên, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-067, chờ Creator duyệt và chọn cách cho FR13.
+
+---

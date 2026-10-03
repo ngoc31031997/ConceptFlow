@@ -28,6 +28,7 @@ import * as Kit from '../conceptflow-mini/illustration';
 import * as Lottie from '../conceptflow-mini/lottie';
 import * as SceneKit from '../conceptflow-mini/scene';
 import * as Backdrops from '../conceptflow-mini/backdrops';
+import * as Rig from '../conceptflow-mini/rig';
 
 type Rect = {x: number; y: number; w: number; h: number};
 
@@ -126,6 +127,7 @@ const MODULES: Record<string, unknown> = {
   './conceptflow-mini/lottie': esm(tagModule(Lottie as unknown as Record<string, unknown>)),
   './conceptflow-mini/scene': esm(tagModule(SceneKit as unknown as Record<string, unknown>)),
   './conceptflow-mini/backdrops': esm(tagModule(Backdrops as unknown as Record<string, unknown>)),
+  './conceptflow-mini/rig': esm(tagModule(Rig as unknown as Record<string, unknown>)),
 };
 
 type Loaded = {

@@ -10,7 +10,7 @@ import (
 func TestVisualDirectorIllustratesWhatIsSaid(t *testing.T) {
 	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
 		text := aiTemplate(t, role)
-		for _, want := range []string{"MINH HOẠ ĐÚNG CÁI ĐANG NÓI", "TRANH PHẲNG KỂ CHUYỆN", "Tắt tiếng", "NỀN MÀU PHẲNG", "chiếc răng"} {
+		for _, want := range []string{"MINH HOẠ ĐÚNG CÁI ĐANG NÓI", "TRANH PHẲNG KỂ CHUYỆN", "Tắt tiếng", "MỘT MÀU NỀN SÁNG, BÃO HOÀ", "MỖI CẢNH BẮT BUỘC có một vai trò màu nền", "chiếc răng"} {
 			if !strings.Contains(text, want) {
 				t.Errorf("%s lacks %q", role, want)
 			}

@@ -163,6 +163,7 @@ func (uc *CreateProjectDraftUseCase) makeShortOf(ctx context.Context, project *d
 	project.VideoFormatID = *patch.VideoFormatID
 	project.RenderEngine = *patch.RenderEngine
 	project.SubtitleMode = *patch.SubtitleMode
+	project.SubtitleStyle = patch.SubtitleStyle
 	project.CompanionProjectID = &long.ProjectID
 	long.CompanionProjectID = &project.ProjectID
 	return uc.repo.Save(ctx, long)

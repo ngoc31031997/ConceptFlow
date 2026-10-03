@@ -170,8 +170,24 @@ func TestPatchWizardSettings_ChoosingTheShortBringsWhatAShortNeeds(t *testing.T)
 		t.Fatal(err)
 	}
 	p := repo.patch
-	if *p.VideoFormatID != domain.FormatVerticalShort60s.ID || *p.RenderEngine != domain.RenderEngineRemotion || *p.SubtitleMode != domain.SubtitleModeOff {
+	if *p.VideoFormatID != domain.FormatVerticalShort60s.ID || *p.RenderEngine != domain.RenderEngineRemotion || *p.SubtitleMode != domain.SubtitleModeBurnIn {
 		t.Errorf("short defaults not applied: format %v engine %v subtitles %v", *p.VideoFormatID, *p.RenderEngine, *p.SubtitleMode)
+	}
+	if p.SubtitleStyle == nil || p.SubtitleStyle.Position != "top" {
+		t.Errorf("a short's captions go at the top, got %+v", p.SubtitleStyle)
+	}
+}
+
+func TestPatchWizardSettings_AShortKeepsTheSubtitlesTheCreatorPicked(t *testing.T) {
+	repo := &fakeWizardRepo{status: domain.StatusDraft}
+	short, off := domain.ModeShortOnly, domain.SubtitleModeOff
+	style := domain.DefaultSubtitleStyle()
+	if err := application.NewPatchWizardSettingsUseCase(repo).Execute(context.Background(), "p1",
+		domain.WizardSettingsPatch{VideoOutputMode: &short, SubtitleMode: &off, SubtitleStyle: &style}); err != nil {
+		t.Fatal(err)
+	}
+	if *repo.patch.SubtitleMode != domain.SubtitleModeOff || repo.patch.SubtitleStyle.Position != "bottom" {
+		t.Errorf("the Creator's choice was overridden: %v %+v", *repo.patch.SubtitleMode, repo.patch.SubtitleStyle)
 	}
 }
 

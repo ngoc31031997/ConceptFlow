@@ -430,7 +430,9 @@ export type PromptRole =
   // "Copy to an external AI" prompts, rendered by the server.
   | "manim_adjust"
   | "remotion_adjust"
-  | "thumbnail_design";
+  | "thumbnail_design"
+  // Luật style hình minh hoạ mà AI vẽ hình phải theo; không render cho AI ngoài.
+  | "illustration_style";
 
 /**
  * Một dòng trong thư viện prompt. Mỗi vai trò có một danh sách; tại

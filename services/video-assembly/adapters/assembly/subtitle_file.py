@@ -33,6 +33,11 @@ ALIGNMENT = {"bottom": 2, "top": 8}
 
 MARGIN_VERTICAL = 60
 
+# The top of a portrait (Shorts) frame is covered by the player's own controls;
+# captions at the top start below them. Same inset as the portrait frame's top
+# safe area the shots are drawn to (authoring-service domain.PortraitFrame).
+SHORTS_TOP_UI_PX = 200
+
 
 def write_subtitle_file(
     cues: list[SubtitleCue],
@@ -67,6 +72,9 @@ def _render(cues: list[SubtitleCue], style: SubtitleStyle, play_res: tuple[int, 
     border_style = 3 if style.background_opacity > 0 else 1
 
     play_res_x, play_res_y = play_res
+    margin_vertical = round(MARGIN_VERTICAL * scale)
+    if alignment == ALIGNMENT["top"] and play_res_y > play_res_x:
+        margin_vertical = SHORTS_TOP_UI_PX + MARGIN_VERTICAL
     header = f"""[Script Info]
 ScriptType: v4.00+
 PlayResX: {play_res_x}
@@ -75,7 +83,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{font_name},{font_size},{primary},&H00000000,{back},0,{border_style},{round(2 * scale)},0,{alignment},{round(80 * scale)},{round(80 * scale)},{round(MARGIN_VERTICAL * scale)},1
+Style: Default,{font_name},{font_size},{primary},&H00000000,{back},0,{border_style},{round(2 * scale)},0,{alignment},{round(80 * scale)},{round(80 * scale)},{margin_vertical},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text

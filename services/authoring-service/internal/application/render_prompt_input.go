@@ -57,7 +57,7 @@ func isRemotionRole(role domain.PromptRole) bool {
 // Substitution is a single pass (strings.Replacer), so text the Creator pasted
 // in — a script that happens to contain "{{topic}}" — is never itself expanded.
 func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (RenderedPrompt, error) {
-	if !domain.ValidPromptRole(string(in.Role)) {
+	if !domain.IsRenderablePromptRole(string(in.Role)) {
 		return RenderedPrompt{}, fmt.Errorf("unknown role %q", in.Role)
 	}
 	language := in.Language

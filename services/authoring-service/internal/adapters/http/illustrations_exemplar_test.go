@@ -17,6 +17,7 @@ import (
 type fakeExemplars struct {
 	illustrationsUseCase
 	deleteErr error
+	styleErr  error
 	released  *domain.Illustration
 }
 
@@ -32,6 +33,12 @@ func (f *fakeExemplars) MakeExemplar(_ context.Context, id string) (domain.Illus
 }
 func (f *fakeExemplars) UnmakeExemplar(context.Context, string) (*domain.Illustration, error) {
 	return f.released, nil
+}
+func (f *fakeExemplars) StyleRules(context.Context) (string, error) {
+	if f.styleErr != nil {
+		return "", f.styleErr
+	}
+	return "- [S1] LUẬT TỪ DB: dòng đang bật", nil
 }
 
 func serve(uc illustrationsUseCase, method, url string) *httptest.ResponseRecorder {
@@ -96,6 +103,7 @@ func TestExemplarRoutes(t *testing.T) {
 func TestIllustrationStyleListsTheExemplarsFromTheLibrary(t *testing.T) {
 	rec := serve(&fakeExemplars{}, http.MethodGet, "/v1/illustration-style")
 	var body struct {
+		Rules        string   `json:"rules"`
 		ExemplarIDs  []string `json:"exemplar_ids"`
 		MaxExemplars int      `json:"max_exemplars"`
 	}
@@ -104,5 +112,15 @@ func TestIllustrationStyleListsTheExemplarsFromTheLibrary(t *testing.T) {
 	}
 	if rec.Code != http.StatusOK || strings.Join(body.ExemplarIDs, ",") != "exemplar-Cat,i7" || body.MaxExemplars != domain.MaxExemplars {
 		t.Fatalf("style: %d %+v", rec.Code, body)
+	}
+	if body.Rules != "- [S1] LUẬT TỪ DB: dòng đang bật" {
+		t.Fatalf("rules must be the active prompt row, got %q", body.Rules)
+	}
+}
+
+func TestIllustrationStyleReportsAnUnreadablePromptLibrary(t *testing.T) {
+	rec := serve(&fakeExemplars{styleErr: fmt.Errorf("illustration style rules: db down")}, http.MethodGet, "/v1/illustration-style")
+	if rec.Code != http.StatusInternalServerError || !strings.Contains(rec.Body.String(), "db down") {
+		t.Fatalf("got %d %s", rec.Code, rec.Body)
 	}
 }

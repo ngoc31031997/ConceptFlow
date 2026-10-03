@@ -244,6 +244,20 @@ func TestHandlePromptRenders_PassesTheDraftThrough(t *testing.T) {
 	}
 }
 
+func TestTheIllustrationStyleRulesAreNeverRenderedForAnExternalAI(t *testing.T) {
+	router := NewRouter(nil, nil).WithRenderPrompt(&fakePromptRenderer{})
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", strings.NewReader(`{"role":"illustration_style"}`)))
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "role is not renderable") {
+		t.Fatalf("library render: want 400 not renderable, got %d %s", rec.Code, rec.Body.String())
+	}
+	rec = httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/projects/p1/prompts/illustration_style", nil))
+	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "role is not renderable") {
+		t.Fatalf("project render: want 400 not renderable, got %d %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestHandlePromptRenders_RejectsAnUnknownRoleAnd404sWhenUnwired(t *testing.T) {
 	router := NewRouter(nil, nil).WithRenderPrompt(&fakePromptRenderer{})
 	rec := httptest.NewRecorder()
