@@ -3058,3 +3058,23 @@ q6 => làm hết tron cr 067"
 **Context**: INCEPTION → CONSTRUCTION — CR-068.
 
 ---
+
+## CR-068 — Chia task, chờ duyệt
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: (sau khi duyệt thiết kế)
+**AI Response**: 9 task: T1 `merger.frame_names()`; T2 `autofix.fix_palette_names`; T3 `autofix.fix_tsc_suggestions`; T4 gắn sửa tên màu sau chunk/repair + sự kiện `check` phase `autofix` (`_repair` nhận thêm `emit`, `round_`); T5 áp gợi ý tsc trước repair trong `_settle_chunk` và kiểm tra cuối, không tăng `rounds`; T6 `SPLIT_KINDS = (TRUNCATED,)`, sửa 7 ca test chia đôi cũ sang `truncated` và thêm ca `budget` không chia; T7 trần 100 000 (config, compose, .env.example, test_api); T8 prompt B.2/G.3 + golden test cấm `PALETTE_`; T9 hợp đồng. Chia task cho thấy: `_repair` hiện không có `emit` (phải thêm tham số); authoring-service ghi nguyên `phase`/`kind` nên không cần sửa Go ngoài prompt.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-068-ai-output-guardrails-tasks.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-068, chờ Creator duyệt task.
+
+---
+
+## CR-068 — Task đã duyệt
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Duyệt 9 task, commit tài liệu task, chuyển `/code CR-068`.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-068-ai-output-guardrails-tasks.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-068.
+
+---
