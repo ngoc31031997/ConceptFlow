@@ -2917,3 +2917,33 @@ q4 a"
 **Context**: CONSTRUCTION → delivery — CR-063.
 
 ---
+
+## CR-065 — Code Remotion hay lỗi biên dịch: prompt hứa những thứ khung code không có
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "review lại chỗ system promt code remotion sao hay bị render lỗi thế nhỉ"
+**AI Response**: Đo trên `code_check_diagnostics`, `llm_usage`, `saga_steps`. Chỉ 1 lần render thật hỏng trong 10 ngày (trùng tên `LAND`, đã sửa ở `48b3225`); "lỗi" là lỗi bước kiểm code kéo theo nhiều repair (244 repair / 141 chunk, 09-29 → 10-01). Từ sau CR-056: `random` không có trong khung (146 lỗi, làm project `257acc58` trượt check cuối), prop hình thư viện sai kiểu vì C4 chỉ có tên prop (90), tự đặt `PALETTE_xxx` (26), `interpolateColors` + `clamp` (3). Đề xuất: import `random`/`BACKGROUND`/`useFrameBox` vào khung và sinh danh sách tên có sẵn từ một nguồn; mục E riêng cho prompt AI; C4 kèm kiểu prop trích từ code hình; bảng màu ghi `PALETTE.khoá`; ghi rõ `interpolateColors` không nhận `clamp`. Phụ thuộc: CR-064 độc lập (cùng file seed nhưng khác dòng, khác vai trò); `chore/worktree-per-cr` không có thay đổi.
+**Impact Assessment**: llm-service (merger, prompts, run, module mới `library_props.py`), authoring-service (seed `remotion_engineer_ai` v5, golden test). Không đổi contract, DB, giao diện, prompt thủ công.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-065-remotion-prompt-render-errors-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-065, chờ Creator duyệt.
+
+---
+
+## CR-065 — Creator góp ý: dùng lại logic hình minh hoạ cho màu/thẻ, tách code dùng chung giữa các shot
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "nếu chỗ promt đưa ra các bảng màu hoặc các thẻ chưa tồn tại ta có thể dùng lại logic của hình minh hoạ ko nhỉ, nếu có rồi reuse còn không có thì tạo mới. cái thứ 2 ở promt code ta cũng nên áp dụng tương tự không ví dụ như một dự án video đều có một dự án vẽ svg nhỏ bên trong ta cũng apply oop hay solid và các coding stander khác để reuse tránh lặp code. code sau dùng chung 1 đoạn minh hoạ hoặc hình ảnh minh hoạ hay bất kì thứ gì có thể gọi ra để dùng lại thôi. xem đề xuất này của tôi nhé / Lỗi random: (a) import thêm vào khung, thay vì (b) bỏ random khỏi prompt. => tôi nhớ đã làm cái này rồi / Kiểu prop: (a) lấy từ code lúc dựng prompt, có tác dụng ngay với cả hình cũ; (b) sửa prompt tạo hình thì chỉ có tác dụng với hình mới. => ý tưởng này rất tốt"
+**AI Response**: Đo lại. `random`: `7b5b241` sửa 103/146 lỗi (trong hình thư viện); 43 lỗi trong code shot vẫn còn, nên giữ FR-1. Thẻ chưa có: bước Hình minh hoạ đã làm "có thì dùng lại, chưa có thì vẽ mới"; không có lỗi component không tồn tại. Màu: các tên `PALETTE_NEN_TROI`... ứng với khoá đã có (`nenTroi`), tức lỗi cú pháp chứ không thiếu màu; giữ FR-5, không cho bước code tự tạo màu. Code dùng chung: trên 3 script AI gần nhất, khối lặp giữa các shot chỉ 0–4%, dòng lặp 7–9% (chủ yếu cấu hình máy quay và zoom tự viết vi phạm L8); vật cụ thể đã dùng chung qua thư viện. Thêm FR-7 (máy quay chỉ bằng `Camera`); lớp component dùng chung cho hình trừu tượng đề xuất thành CR riêng (planner vẽ thành hình thư viện, hoặc LAYOUT viết thêm bảng component). Kiểu prop: Creator đồng ý phương án (a).
+**Impact Assessment**: thêm FR-7 (chỉ prompt AI). Phạm vi khác không đổi.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-065-remotion-prompt-render-errors-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-065, chờ Creator duyệt.
+
+---
+
+## CR-065 — Duyệt thiết kế (bỏ FR-3, FR-6)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "FR-1 => ok / FR-2 => ok / FR-4 => ok / FR-5 => ok / FR-7 => ok" rồi "ko làm 2 cái đó" (FR-3, FR-6)
+**AI Response**: Thiết kế cập nhật: làm FR-1, FR-2, FR-4, FR-5, FR-7; bỏ FR-3 (mục E riêng cho prompt AI) và FR-6 (ghi chú `interpolateColors`). Prompt AI chỉ đổi `remoBAIVI` (FR-5) và `remoGAIVI` (FR-5, FR-7); seed `remotion_engineer_ai` v5. Commit thiết kế, chuyển `/code`.
+**Impact Assessment**: llm-service (merger, prompts, run, `library_props.py`), authoring-service (seed AI, golden test). Không đổi contract, DB, giao diện, prompt thủ công.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-065-remotion-prompt-render-errors-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION → CONSTRUCTION — CR-065.
+
+---
