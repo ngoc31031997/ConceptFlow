@@ -2981,3 +2981,38 @@ q4 a"
 **Context**: CONSTRUCTION — fix.
 
 ---
+
+## CR-067 — Làm video giống hai video mẫu: nội dung và chuyển động (phân tích, chờ trả lời câu hỏi)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "xem lại 2 file video và 2 file txt dược dịch ngược từ 2 video đó về định dạng base64. xem giúp tôi nếu muốn làm video y như vậy về các nội dung và hình ảnh chuyển động. ta cần phải chỉnh sửa workflow hiện tại như thế nào?" — "2 file trong thư mục example nhé"
+**AI Response**: Giải mã hai file txt: cả hai là base64 trùng từng byte với hai mp4 (`Tại sao lại gọi là bệnh tiểu đường-.txt` thực ra là video quả sung). So hai mẫu (short Tá 58 s dọc; dài quả sung 9:05) với render mới nhất `9400f01e` và `257acc58`: độ thay đổi khung trung vị 0,76–1,03 so với 3,39 của mẫu dài; đứng yên ≥ 2 s chiếm 18–19% so với 6%; đoạn đứng yên dài nhất 13,5 s so với 5 s. Khung cảnh (Scene/Camera/nền/short dọc) đã có từ CR-060; chỗ thiếu chính là cấu trúc thời gian: mẫu đổi hình theo từng câu thoại, workflow chỉ có shot ~10 s (29,5 từ, 2,8 câu) và TTS không trả mốc câu. Thiếu thêm: nền tối mặc định `#080E1C`, nhân vật/bàn tay nhỏ, phụ đề đốt cả đoạn. Đề xuất sơ bộ 7 hướng (beat trong shot, mốc thời gian theo beat qua TTS → rendering, luật Kỹ sư theo beat, nền sáng theo cảnh, rig nhân vật/bàn tay, phụ đề theo beat, đo chuyển động sau render). Phụ thuộc: trùng phạm vi CR-066 (viết lại luật style hình, bỏ "Vẽ Chuyện" — ngược hướng với mẫu Vẽ Chuyện) và CR-064 (cùng prompt Biên kịch nếu thoại theo beat); hai fix web-gui và chore độc lập. Dừng trước khi thiết kế, hỏi Q1–Q6.
+**Impact Assessment**: dự kiến llm-service (storyboard beats, merger), authoring-service (prompt Biên kịch/Đạo diễn/Kỹ sư), tts (mốc beat), orchestrator (chuyển mốc), rendering (Segments, kit, đo chuyển động), web-gui (phụ đề); đổi hợp đồng TTS ↔ orchestrator ↔ rendering (cần ADR). Chưa đổi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-067-reference-video-style-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-067, chờ Creator trả lời Q1–Q6 và chọn cách xử lý trùng phạm vi với CR-066/CR-064.
+
+---
+
+## CR-067 — Trả lời câu hỏi vòng 1, thiết kế đủ ba đợt (chờ duyệt)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "Q1 => chọn a
+Q2 => a
+Q3 => bỏ cr 66 làm trong cr này , gộp vào CR này, tôi muốn tham khảo thôi chứ không phải tham chiếu
+Q4 => bỏ cr 64 làm theo quyết định của cr này
+q5 => a
+q6 => làm hết tron cr 067"
+**AI Response**: Chốt Q1-a (cùng nhịp/ngôn ngữ chuyển động, hình vẫn AI SVG), Q2-a (TTS đọc từng câu thành một file), Q3 gộp CR-066 vào CR-067 và bỏ CR-066 (mẫu chỉ để tham khảo, prompt không nhắc tên kênh), Q4 bỏ CR-064, Q5-a (short phụ đề cụm theo câu), Q6 làm cả ba đợt. Đọc đường đi của lời thoại: mỗi dòng `narrations` của script đã được TTS đọc riêng, có mốc riêng và cue phụ đề riêng, nên thiết kế cho mỗi câu thoại là một dòng và thêm `shotLineCounts` để rendering gom câu thành shot — không đổi hợp đồng TTS/orchestrator/video-assembly. Đơn vị mới gọi là `lines` (không dùng "beat" vì đã là id cảnh). Thiết kế: đợt 1 (storyboard `lines[{say, show}]`, merger `shotLineCounts` + `ShotProps.lines`, rendering gom câu và `wait_offsets` từng câu, kit `evenLines`/`lineSpan`, prompt Đạo diễn AI/Kỹ sư AI/Biên kịch); đợt 2 (nền sáng bão hoà theo cảnh thay nền mặc định `#080E1C`, `Person` `toPose`/`poseT`/`framing`/`hold`, `ReachingHand` mới, luật style hình vào DB theo kế hoạch CR-066 + Phụ lục A chỉnh S10, S14); đợt 3 (short mặc định `burn_in`/`top` lệch 200 px dưới giao diện Shorts, QC `still_picture` đo trên pixel). ADR-0032.
+**Impact Assessment**: llm-service, rendering, authoring-service (5 prompt tăng version + vai trò `illustration_style`), orchestrator (`ApplyShortDefaults`), video-assembly (phụ đề dọc, QC), web-gui. Không migration; hợp đồng chỉ thêm trường tuỳ chọn (storyboard `lines`, khung script `shotLineCounts`). CR-066 và CR-064 bị bỏ; nhánh/worktree của chúng chưa xoá, chờ Creator cho phép.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-067-reference-video-style-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION/DESIGN — CR-067, chờ Creator duyệt thiết kế và chữ của Phụ lục A.
+
+---
+
+## CR-067 — Duyệt thiết kế
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Coi thiết kế ba đợt và chữ Phụ lục A là đã duyệt. Commit thiết kế, chuyển `/code`. Không xoá nhánh/worktree CR-064, CR-066: "ok" không nói rõ việc xoá, và worktree CR-066 có thể còn thay đổi chưa commit — chờ Creator nói rõ.
+**Impact Assessment**: như mục thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-067-reference-video-style-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION → CONSTRUCTION — CR-067.
+
+---
