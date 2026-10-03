@@ -13,6 +13,8 @@
 #                                         this is run in, restart them in the primary checkout,
 #                                         and wait until they report healthy
 #   scripts/worktree.sh remove <branch>   remove the clean worktree of <branch>; the branch is kept
+#   scripts/worktree.sh prune             remove every worktree under .claude/worktrees/ that is delivered
+#                                         (clean, pushed, merged into main); the branches are kept
 #
 # Images are built where the code is and started where the configuration is: the compose
 # project name is pinned in docker-compose.yml, so an image built in a worktree carries the
@@ -21,7 +23,7 @@
 # Exit 0 ok; 1 bad state; 2 usage; 4 docker build/up failed; 5 a service is not healthy.
 set -euo pipefail
 
-usage() { sed -n '8,15p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
+usage() { sed -n '8,17p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2; }
 
 primary=$(git worktree list --porcelain | sed -n 's/^worktree //p' | head -1)
 root="$primary/.claude/worktrees"
@@ -117,6 +119,41 @@ case "$cmd" in
     # Without --force git refuses a worktree with uncommitted or untracked files.
     git worktree remove "$dir"
     echo "== removed $dir (branch $branch kept)"
+    ;;
+
+  prune)
+    # Other CRs and fixes may be in progress in their own worktrees, so only a worktree
+    # whose work is finished is removed: no uncommitted or untracked files, the branch
+    # tip pushed to origin and contained in main. A fresh branch from `add` has never
+    # been pushed, and /code and /fix leave their work uncommitted, so both are kept.
+    git worktree prune
+    git worktree list --porcelain | awk '
+      /^worktree / { wt = substr($0, 10) }
+      /^branch refs\/heads\// { print wt "\t" substr($0, 19) }' |
+    while IFS=$'\t' read -r dir branch; do
+      case "$dir" in "$root"/*) ;; *) continue ;; esac
+      tip=$(git rev-parse "refs/heads/$branch")
+      pushed=$(git rev-parse --verify --quiet "refs/remotes/origin/$branch" || true)
+      if [ -n "$(git -C "$dir" status --porcelain)" ]; then
+        echo "== kept $dir ($branch has uncommitted changes)"
+      elif [ "$pushed" != "$tip" ]; then
+        echo "== kept $dir ($branch is not pushed to origin)"
+      elif ! git merge-base --is-ancestor "$tip" refs/heads/main; then
+        echo "== kept $dir ($branch is not merged into main)"
+      elif git worktree remove "$dir"; then
+        echo "== removed $dir (branch $branch kept)"
+      else
+        echo "WARN: $dir not removed" >&2
+      fi
+    done
+    # A directory git does not know as a worktree may hold someone's files: report it only.
+    registered=$(git worktree list --porcelain | sed -n 's/^worktree //p')
+    for dir in "$root"/*/; do
+      [ -d "$dir" ] || continue
+      dir="${dir%/}"
+      printf '%s\n' "$registered" | grep -qxF "$dir" \
+        || echo "WARN: $dir is not a git worktree; left in place" >&2
+    done
     ;;
 
   *)

@@ -5,7 +5,7 @@ disable-model-invocation: true
 model: sonnet
 effort: low
 argument-hint: "[optional commit message hint]"
-allowed-tools: Bash(git status*), Bash(git diff*), Bash(git log*), Bash(git branch*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(.claude/skills/deliver/deliver.sh*), ExitWorktree
+allowed-tools: Bash(git status*), Bash(git diff*), Bash(git log*), Bash(git branch*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(.claude/skills/deliver/deliver.sh*), Bash(scripts/worktree.sh prune*), ExitWorktree
 ---
 
 # /deliver
@@ -56,7 +56,17 @@ The script pushes the branch, fast-forwards `main` in the primary checkout, merg
 
 When the script prints `continue from the primary checkout`, call `ExitWorktree` with `action: "keep"` so the session returns to the primary checkout (the worktree directory is already gone; the branch is kept).
 
-## 4. Report
+## 4. Clean up worktrees
+
+Only when the script exited 0 or 6, run this from the primary checkout:
+
+```
+scripts/worktree.sh prune
+```
+
+It removes every other worktree under `.claude/worktrees/` whose branch is already delivered: no uncommitted or untracked files, the tip pushed to `origin` and merged into `main`. Worktrees of CRs and fixes still in progress are kept, along with their branches. Do not remove a kept worktree by hand, and do not delete any directory it reports with `WARN`; only list them in the report.
+
+## 5. Report
 
 Answer the Creator in Vietnamese, in a few lines:
 
@@ -64,9 +74,10 @@ Answer the Creator in Vietnamese, in a few lines:
 - whether the merge into `main` and the push succeeded;
 - whether the graphify graph was refreshed (the commit it was built at);
 - which services were rebuilt and whether they are healthy, or "no rebuild needed";
-- whether the worktree was removed.
+- whether the worktree was removed;
+- which other worktrees `prune` removed, and which it kept and why.
 
-If the script exits non-zero, give its error lines and the likely cause, and STOP. Do not retry, and do not resolve conflicts:
+If the script exits non-zero, give its error lines and the likely cause, and STOP (skip step 4 unless the exit is 6). Do not retry, and do not resolve conflicts:
 
 | Exit | Meaning |
 |---|---|
