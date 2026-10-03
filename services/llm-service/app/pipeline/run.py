@@ -45,7 +45,7 @@ from dataclasses import dataclass, field, replace
 from app import errors
 from app.errors import LLMError, Usage
 from app.frame import LANDSCAPE, Frame
-from app.pipeline import extract, merger, prompts
+from app.pipeline import extract, library_props, merger, prompts
 from app.pipeline.checker import (
     CheckerPort,
     CheckerUnavailable,
@@ -138,12 +138,19 @@ def _is_backdrop(i: dict) -> bool:
     return i.get("kind") == "backdrop"
 
 
+def _library_row(drawing: dict) -> str:
+    """One drawing of section C4: its usage line, then the prop types read
+    from its code when they can be read."""
+    row = f"- {drawing['usage'] or '<' + drawing['name'] + ' />'} — {drawing.get('description', '').strip()}"
+    signature = library_props.prop_signature(drawing["code"], drawing["name"])
+    return row + (f"\n  props: {signature}" if signature else "")
+
+
 def library_section(illustrations: list[dict]) -> str:
     """The Remotion Engineer's list of library drawings beyond the built-in kit,
     then which backdrop each shot is drawn in."""
     rows = [
-        f"- {i['usage'] or '<' + i['name'] + ' />'} — {i.get('description', '').strip()}"
-        for i in illustrations if i.get("name") and i.get("code") and not _is_backdrop(i)
+        _library_row(i) for i in illustrations if i.get("name") and i.get("code") and not _is_backdrop(i)
     ]
     backdrops = [
         f"- {i['name']} — {i.get('description', '').strip()} — shot: {', '.join(i.get('shots') or []) or '(chưa gán)'}"
@@ -155,7 +162,9 @@ def library_section(illustrations: list[dict]) -> str:
             "\n\n## C4. HÌNH THƯ VIỆN ĐÃ DUYỆT CHO VIDEO NÀY — dùng như bộ minh hoạ ở mục C3\n\n"
             "Các hình dưới đây đã được Creator duyệt; khung code tự đưa chúng vào file, bạn KHÔNG import và KHÔNG "
             "viết lại chúng. Cùng quy ước x, y (tâm), size (cạnh dài), rotate, flip, scale, opacity, still. "
-            "Vật nào trong \"visual\" có ở đây thì BẮT BUỘC dùng đúng component này.\n\n" + "\n".join(rows) + "\n"
+            "Vật nào trong \"visual\" có ở đây thì BẮT BUỘC dùng đúng component này. Dòng \"props:\" là kiểu "
+            "thật của từng prop: giá trị truyền vào phải đúng kiểu đó (chuỗi trong dấu nháy là danh sách giá trị "
+            "được phép, không truyền số hay true/false thay cho chúng).\n\n" + "\n".join(rows) + "\n"
         )
     if backdrops:
         out += (

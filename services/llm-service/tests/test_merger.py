@@ -106,3 +106,14 @@ def test_remotion_stubs_the_shots_a_chunk_does_not_own():
     assert "const SHOTS: React.FC<ShotProps>[] = [Shot1_1, Shot1_2, Shot2_1];" in m.code
     a, b = m.lines["1.2"]
     assert m.code.splitlines()[a - 1] == "// Shot 1.2"
+
+
+def test_frame_imports_every_name_the_rule_book_offers_the_shots():
+    # A shot may call remotion's seeded `random` and read the frame box without
+    # any library drawing having imported them first.
+    code = merger.merge_remotion(SB, "const LAYOUT = {};", TSX).code
+    imports = [line for line in code.splitlines() if line.startswith("import ")]
+    remotion = next(line for line in imports if line.endswith("from 'remotion';"))
+    primitives = next(line for line in imports if line.endswith("from './conceptflow-mini/primitives';"))
+    assert ", random}" in remotion
+    assert "BACKGROUND" in primitives and "useFrameBox" in primitives

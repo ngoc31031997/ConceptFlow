@@ -82,7 +82,9 @@ func TestVisualDirectorAIAsksForJSONAndKeepsTheCreativeBrief(t *testing.T) {
 
 func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 	remo, manim := aiTemplate(t, RoleRemotionEngineerAI), aiTemplate(t, RoleManimEngineerAI)
-	for _, want := range []string{"KHÔNG viết cả file", "ShotN_M", "LAYOUT", "PALETTE.", "L1. **Vùng an toàn.**", "LottieClip"} {
+	for _, want := range []string{"KHÔNG viết cả file", "ShotN_M", "LAYOUT", "PALETTE.", "L1. **Vùng an toàn.**", "LottieClip",
+		"không bao giờ tự đặt tên khác như `PALETTE_NEN_TROI`", "không có tên `PALETTE_...` nào?",
+		"không có `div` nào mang `transform: scale(...)` để tự zoom/lia?"} {
 		if !strings.Contains(remo, want) {
 			t.Errorf("remotion_engineer_ai lacks %q", want)
 		}

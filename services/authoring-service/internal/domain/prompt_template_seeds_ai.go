@@ -121,7 +121,7 @@ const remoAAIVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG 
 const remoBAIVI = `## B. MÀU — CHỈ DÙNG BẢNG MÀU CỦA ĐẠO DIỄN
 
 1. Hệ thống đã ghép bảng màu thành hằng ¤PALETTE¤ ở đầu file, mỗi vai trò một khoá camelCase (tin nhắn của người dùng liệt kê đúng các khoá). Bạn KHÔNG khai báo lại ¤PALETTE¤.
-2. MỌI màu trong code (fill, stroke, color, background, border, boxShadow) phải là ¤PALETTE.xxx¤ với khoá có trong danh sách; không viết mã hex/rgb/tên màu nào khác. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu. (Màu mặc định BÊN TRONG các hình của bộ minh hoạ ở C3 không tính: chúng thuộc bộ hình.)
+2. MỌI màu trong code (fill, stroke, color, background, border, boxShadow) phải là ¤PALETTE.xxx¤ với khoá có trong danh sách — đúng hằng ¤PALETTE¤, dấu chấm, rồi khoá viết y như danh sách (¤PALETTE.nenTroi¤); không bao giờ tự đặt tên khác như ¤PALETTE_NEN_TROI¤ hay ¤PALETTE_PLACEHOLDER¤ (tên đó không tồn tại, build lỗi). Không viết mã hex/rgb/tên màu nào khác. Cần độ trong suốt → dùng ¤opacity¤ của phần tử, không tự pha màu. (Màu mặc định BÊN TRONG các hình của bộ minh hoạ ở C3 không tính: chúng thuộc bộ hình.)
 3. Shot nói "tô màu nhấn", "chìm về tông mờ"... → dùng đúng khoá của vai trò đó; một vai trò = một màu từ đầu đến cuối. Chuyển màu theo nghĩa → ¤interpolateColors(frame, [a, b], [PALETTE.x, PALETTE.y])¤.
 4. Shot nhắc tới vai trò không có khoá: chọn khoá gần nghĩa nhất đang có — KHÔNG bịa màu mới.
 
@@ -167,9 +167,9 @@ const remoGAIVI = `## G. SOÁT MỘT LƯỢT TRƯỚC KHI TRẢ LỜI
 
 1. Đúng các hàm được giao — không thiếu, không thừa, đúng tên ¤ShotN_M¤, đúng thứ tự, đúng định dạng của tin nhắn người dùng?
 2. Mỗi shot: đủ vật trong "visual", không thêm vật kịch bản không nói; vị trí, thứ tự, chuyển động, máy quay đúng mô tả; frame 0 nối được với hình cuối shot trước (chuyển cảnh biến hình), hình cuối cảnh khớp "scene_end_frame"?
-3. Màu: mọi chuỗi ¤#¤, ¤rgb¤, ¤hsl¤, tên màu đều là khoá ¤PALETTE¤ được cấp? Không ¤fontFamily¤, không ¤backgroundColor¤ phủ khung, không in câu thoại lên hình?
+3. Màu: mọi chuỗi ¤#¤, ¤rgb¤, ¤hsl¤, tên màu đều là khoá ¤PALETTE¤ được cấp, viết dạng ¤PALETTE.khoá¤ — không có tên ¤PALETTE_...¤ nào? Không ¤fontFamily¤, không ¤backgroundColor¤ phủ khung, không in câu thoại lên hình?
 4. Bố cục theo ¤LAYOUT¤ và mục F, chọn phương án an toàn (khoảng cách rộng, chữ ngắn); mọi ¤interpolate¤ có clamp, ¤inputRange¤ tăng nghiêm ngặt, mốc tính theo ¤duration¤?
-5. Mọi người, vật, bối cảnh trong "visual" mà bộ minh hoạ (C3) có đều dùng đúng component, không vẽ tay thay thế; mood/pose/decay đúng mô tả; shot ở một nơi chốn có ¤<Scene>¤ + ¤camera¤, vật chính ≥ 40% chiều khung, không đoạn nào đứng yên quá 2 giây?
+5. Mọi người, vật, bối cảnh trong "visual" mà bộ minh hoạ (C3) có đều dùng đúng component, không vẽ tay thay thế; mood/pose/decay đúng mô tả; shot ở một nơi chốn có ¤<Scene>¤ + ¤camera¤, vật chính ≥ 40% chiều khung, không đoạn nào đứng yên quá 2 giây? Máy quay chỉ bằng prop ¤camera¤ của ¤<Scene>¤ hoặc ¤<Camera>¤ (L8) — không có ¤div¤ nào mang ¤transform: scale(...)¤ để tự zoom/lia?
 6. Không dòng import, không ¤<Img>¤/¤staticFile¤/¤fetch¤; không ký tự ¤<¤ ¤>¤ ¤{¤ ¤}¤ trần trong chữ JSX; TSX hợp lệ 100%, không cắt cụt, không chữ giải thích ngoài comment?
 
 Soát ĐÚNG MỘT lượt. Chỗ còn phân vân thì chọn cách đơn giản, an toàn nhất rồi viết code ngay.

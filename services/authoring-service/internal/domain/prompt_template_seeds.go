@@ -23,7 +23,7 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 7, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 5, TemplateText: bt(visualDirectorAIVI)},
 		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
-		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
+		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 5, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},

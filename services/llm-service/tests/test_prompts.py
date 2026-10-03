@@ -4,7 +4,7 @@ carries only the story's core lines."""
 import json
 
 from app import storyboard as sbm
-from app.pipeline import prompts
+from app.pipeline import merger, prompts
 
 
 def _sb(**top):
@@ -48,5 +48,27 @@ def test_chunk_turn_lists_the_palette_key_the_storyboard_uses():
             {"id": "1.1", "visual": "thẻ màu conNguoi", "narration": "Câu một."}]}],
     }))
     turn = prompts.remotion_chunk(sb, "const LAYOUT = {};", ["1.1"], None, None)
-    assert "- conNguoi = #F5B841" in turn
+    assert "- PALETTE.conNguoi = #F5B841" in turn
     assert "connguoi" not in turn
+
+
+def test_palette_is_written_the_way_the_code_reads_it():
+    sb = _sb(hero="h")
+    repair = prompts.remotion_repair(sb, "const LAYOUT = {};", "1.2", "function Shot1_2() {}", [], [])
+    for turn in (_chunk_turns(sb)["remotion"], repair, prompts.remotion_layout(sb)):
+        assert "- PALETTE.accent = #F5B841 — accent: đang chú ý" in turn
+
+
+def test_chunk_turn_lists_every_name_the_frame_imports():
+    turn = _chunk_turns(_sb(hero="h"))["remotion"]
+    listed = turn[turn.index("- các dòng import ("):].split("\n", 1)[0]
+    head_names = set()
+    for line in merger._REMOTION_HEAD.splitlines():
+        if line.startswith("import {"):
+            head_names.update(n.strip() for n in line[len("import {"):line.index("}")].split(","))
+    shot_names = head_names - set(merger.ILLUSTRATION_HELPERS) - set(merger.SCENE_HELPERS) \
+        - {"registerRoot", "Composition", "calculateMetadataFromSegments", "Segments"}
+    for name in sorted(shot_names):
+        assert f" {name}" in listed, f"{name} is imported by the frame but not listed in the chunk turn"
+    for name in ("random", "useFrameBox", "BACKGROUND", "Scene", "Camera", "MeadowBackdrop"):
+        assert name in listed, f"{name} is missing from the chunk turn's import list"

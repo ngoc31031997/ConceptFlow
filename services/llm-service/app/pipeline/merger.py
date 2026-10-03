@@ -81,17 +81,47 @@ BACKDROP_KIT = (
 )
 # Hooks of the scene kit a library backdrop drawing uses.
 SCENE_HELPERS = ("useCamera", "useLayerBox")
-
-_REMOTION_HEAD = """import React from 'react';
-import {registerRoot, Composition, AbsoluteFill, interpolate, interpolateColors, spring, Easing, useCurrentFrame, useVideoConfig} from 'remotion';
-import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';
-import {Stage, SAFE_MARGIN, WIDTH, HEIGHT} from './conceptflow-mini/primitives';
-import {LottieClip} from './conceptflow-mini/lottie';
-""" + "import {" + ", ".join(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS) + "} from './conceptflow-mini/illustration';\n" + (
-    "import type {FigureProps, Mood, PersonPose} from './conceptflow-mini/illustration';\n"
-    "import {" + ", ".join(SCENE_KIT + SCENE_HELPERS) + "} from './conceptflow-mini/scene';\n"
-    "import {" + ", ".join(BACKDROP_KIT) + "} from './conceptflow-mini/backdrops';\n"
+# The remotion API every shot may use. The rule book tells the model to draw
+# randomness with remotion's seeded `random`, so it is imported here too.
+REMOTION_API = (
+    "registerRoot", "Composition", "AbsoluteFill", "interpolate", "interpolateColors", "spring", "Easing",
+    "useCurrentFrame", "useVideoConfig", "random",
 )
+# conceptflow-mini/primitives names the rule book offers the shots.
+PRIMITIVES = ("Stage", "SAFE_MARGIN", "WIDTH", "HEIGHT", "BACKGROUND", "useFrameBox")
+
+
+def _named_import(names: tuple[str, ...], module: str) -> str:
+    return "import {" + ", ".join(names) + "} from '" + module + "';\n"
+
+
+_REMOTION_HEAD = (
+    "import React from 'react';\n"
+    + _named_import(REMOTION_API, "remotion")
+    + "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';\n"
+    + _named_import(PRIMITIVES, "./conceptflow-mini/primitives")
+    + "import {LottieClip} from './conceptflow-mini/lottie';\n"
+    + _named_import(ILLUSTRATION_KIT + ILLUSTRATION_HELPERS, "./conceptflow-mini/illustration")
+    + "import type {FigureProps, Mood, PersonPose} from './conceptflow-mini/illustration';\n"
+    + _named_import(SCENE_KIT + SCENE_HELPERS, "./conceptflow-mini/scene")
+    + _named_import(BACKDROP_KIT, "./conceptflow-mini/backdrops")
+)
+
+
+def available_names_text() -> str:
+    """The names the frame imports for the shots to use, one module per
+    item, for the chunk prompt's "already in the file" list. Built from the
+    same tuples as the frame's import lines, so the two cannot disagree."""
+    return "; ".join([
+        "react",
+        "remotion: " + ", ".join(REMOTION_API),
+        "./conceptflow-mini/segments",
+        "./conceptflow-mini/primitives: " + ", ".join(PRIMITIVES),
+        "./conceptflow-mini/lottie: LottieClip",
+        "./conceptflow-mini/illustration: " + ", ".join(ILLUSTRATION_KIT),
+        "./conceptflow-mini/scene: " + ", ".join(SCENE_KIT),
+        "./conceptflow-mini/backdrops: " + ", ".join(BACKDROP_KIT),
+    ])
 
 _REMOTION_TAIL = """
 function CreatorComposition({segments = []}: {segments?: {startFrame: number; durationInFrames: number}[]}) {

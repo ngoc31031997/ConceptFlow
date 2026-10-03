@@ -2947,3 +2947,23 @@ q4 a"
 **Context**: INCEPTION → CONSTRUCTION — CR-065.
 
 ---
+
+## CR-065 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: (sau khi duyệt thiết kế, `/code CR-065`)
+**AI Response**:
+- **llm-service**:
+  - FR-1: `merger.py` tách `REMOTION_API` (thêm `random`) và `PRIMITIVES` (thêm `BACKGROUND`, `useFrameBox`); `_REMOTION_HEAD` dựng từ chúng.
+  - FR-2: `available_names_text()` sinh danh sách tên cho tin nhắn chunk (`prompts.remotion_chunk`), giờ có thêm `scene` và `backdrops`.
+  - FR-5: `_palette_table` ghi `- PALETTE.<khoá> = #hex — vai trò: ý nghĩa` (layout, chunk, repair).
+  - FR-4: module mới `library_props.py` (`prop_signature`) đọc khối `FigureProps & {...}` của component được export (cả dạng `props: FigureProps & {...}`), thay alias hợp literal bằng giá trị, bỏ comment, giới hạn 400 ký tự. `run.library_section` thêm dòng `props:` cho mỗi hình và một câu nhắc giá trị phải đúng kiểu. Thử trên thư viện thật: 223/223 hình có chữ ký (vd. `NarrowDoor` → `open?: 'closed' | 'ajar' | 'open'`).
+- **authoring-service**: `remoBAIVI` mục 2 (chỉ `PALETTE.khoá`, cấm `PALETTE_...`), `remoGAIVI` mục 3 (soát `PALETTE_...`) và mục 5 (máy quay chỉ bằng `camera`/`Camera`, không `div transform: scale` — FR-7). Seed `remotion_engineer_ai` v4 → v5. Golden test thêm ba câu bắt buộc; hash `remotion_engineer` thủ công không đổi.
+- **Test**: llm-service `pytest` 172 pass (10 test mới); `ruff` chỉ còn 4 lỗi E741 có sẵn ở `merger.py`, `test_backdrops.py`. authoring-service `go test ./...` pass, `go vet` và `gofmt` sạch. rendering `tests/domain/test_illustration_kit.py` 3 pass, 1 skip (test tsc cần `remotion_project/node_modules`, không có trong worktree).
+- **Rebuild**: `llm-service`, `authoring-service` healthy, code từ `feature/cr-065-remotion-prompt-render-errors`. DB: `remotion_engineer_ai` bản hệ thống đang bật, 29 362 ký tự, có câu FR-5/FR-7; không có prompt của Creator đè lên.
+- **Kiểm live**: script dựng bằng merger mới, shot dùng `random(...)`, `useFrameBox()`, `BACKGROUND` không kèm hình thư viện nào → `/v1/check/remotion` của rendering trả `ok`.
+- **Chưa làm / chưa kiểm**: chưa chạy lại bước code của project thật (`257acc58`), vì sẽ tốn lượt gọi model và ghi đè code đã lưu của Creator; nên chưa đo số lỗi biên dịch, số lượt repair giảm thật. FR-3, FR-6 không làm theo quyết định của Creator.
+**Impact Assessment**: llm-service, authoring-service. Không đổi contract HTTP, DB, giao diện, prompt thủ công.
+**Artifacts Affected**: `services/llm-service/app/pipeline/{merger,prompts,run,library_props}.py`, `services/llm-service/tests/{test_backdrops,test_merger,test_prompts,test_library_props}.py`, `services/authoring-service/internal/domain/{prompt_template_seeds,prompt_template_seeds_ai,golden_prompts_test}.go`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-065, chờ Creator duyệt rồi `/deliver`.
+
+---
