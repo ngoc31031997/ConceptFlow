@@ -3038,3 +3038,23 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-067, chờ Creator duyệt và chọn cách cho FR13.
 
 ---
+
+## CR-068 — Chặn các lỗi lặp lại trong code do AI viết (đề xuất thiết kế)
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "làm sao để ngăn chặn các lỗi từ kết quả trả về từ AI như của project 47745562 nhir"
+**AI Response**: Đọc DB của project `47745562-aad5-4134-91f5-140be148d69a` (deepseek-v4.1-flash, Remotion): 5/15 đoạn shot hỏng vì trần suy nghĩ 60 000 ký tự (18/39 lượt chunk bị cắt; lượt thành công trung vị 46 185, p90 56 436 — sát trần; cả lượt một shot cũng vượt); lỗi biên dịch `PALETTE_PLACEHOLDER` (xuất hiện cả ở vòng repair — chính system prompt `remotion_engineer_ai` đang viết tên này ra làm ví dụ cấm), `useCurrentFrameSafe` (tsc đã gợi ý `useCurrentFrame`), `'cup'` cho `HandPose`; vài lỗi `safe_area`. 14 ngày: `PALETTE_...` 69 dòng/5 project, "Did you mean" 232 dòng/5 project. Đề xuất ba lớp: (1) bỏ tên sai khỏi prompt, viết luật màu dạng khẳng định; (2) module `autofix.py` ở llm-service tự sửa không gọi model: `PALETTE_<X>` trùng đúng một khoá → `PALETTE.<khoá>`, áp gợi ý tsc TS2552 (tên thuộc khung code) / TS2551 (chỉ khi khác hoa-thường/`_`), không tính vào vòng repair, ghi mỗi lần sửa vào `code_check_diagnostics` (`kind='autofix'`); (3) trần suy nghĩ: phương án A nâng 60 000 → 100 000 (khuyến nghị), B model dự phòng, C giữ nguyên. Ngoài phạm vi: TS2322, `safe_area`, Manim. Phụ thuộc: độc lập (CR-064 chỉ sửa prompt `story_architect`, đã bị CR-067 bỏ; các nhánh khác đã merge).
+**Impact Assessment**: llm-service (pipeline, config), authoring-service (seed prompt + golden test), docker-compose/.env.example, hợp đồng `authoring-llm-code-v2.md` (thêm giá trị `"autofix"`). Không migration.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-068-ai-output-guardrails-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-068, chờ Creator duyệt thiết kế và chọn phương án trần suy nghĩ (A/B/C).
+
+---
+
+## CR-068 — Thiết kế đã duyệt
+**Timestamp**: 2026-10-03T00:00:00Z
+**User Input**: "ok duyêt, ý 3 đưa trần lên 100k nhưng tạm thời comment backoff retry" — sau câu hỏi làm rõ: "bỏ đoạn này b) Chia đôi khi vượt trần (run.py:705-736). Đây là cơ chế liên quan trực tiếp tới ý 3. Đoạn bị budget sẽ được viết lại thành hai nửa, rồi chia tiếp xuống tới từng shot. Repair cũng làm như vậy. Ở project 47745562, chính cơ chế này đẻ ra nhiều lượt bị cắt: đoạn 5.1-5.3 tốn 4 lượt, mỗi lượt khoảng 60k ký tự."
+**AI Response**: Thiết kế duyệt. Mục 3 chốt: `CODE_MAX_REASONING_CHARS` mặc định 100 000; thêm FR-6: bỏ hẳn chia đôi khi `budget` ở chunk và repair (`SPLIT_KINDS` chỉ còn `TRUNCATED`), không comment-out vì quy chuẩn code cấm; chia đôi khi `truncated` giữ nguyên. Backoff thử lại 429/5xx ở provider không đổi.
+**Impact Assessment**: thêm `run.py` (`SPLIT_KINDS`, docstring) và test pipeline chia đôi vào phạm vi.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-068-ai-output-guardrails-design.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION → CONSTRUCTION — CR-068.
+
+---
