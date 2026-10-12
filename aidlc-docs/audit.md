@@ -3185,3 +3185,23 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-071.
 
 ---
+
+## CR-071 — Chia task, chờ duyệt
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: (sau khi duyệt thiết kế)
+**AI Response**: 17 task (T0–T16): T0 đếm dữ liệu trước khi đổi (dừng nếu có project Manim đang chạy); orchestrator T1 engine/`ErrEngineRetired`, T2 migration (mặc định remotion, đổi tên cột `scene_class_name`, xoá `layout_marks`) + repository, T3 chặn thao tác trên project cũ (render, retry trừ bước đăng, fork, duyệt/sửa lời thoại, wizard, topic) + 409, T4 gỡ nhánh Manim, `layout_marks`, chuỗi `channel_asset_rendered` → `register_channel_asset`; authoring-service T5 engine + 409, T6 cổng sửa/sinh chặn project cũ (`GetLock` đọc `render_engine` từ endpoint status nội bộ), T7 gỡ vai/seed prompt Manim + migration xoá hàng prompt; llm-service T8 chỉ `remotion`, giữ `engine` trong dấu vân tay; rendering T9 `ScriptRendererPort` + tách `LintIssue`, T10 gỡ Manim, intro/outro Manim, route `/v1/check/manim`, biến môi trường, image; video-assembly T11 gỡ `RegisterChannelAssetCommandHandler` và luật QC bố cục; T12 chú thích api-gateway/tts; web-gui T13 gỡ chọn engine, T14 `CodeStepPage`, T15 nhãn/thẻ/ẩn thao tác cho project cũ; T16 ADR-0033, README, hợp đồng, biến môi trường. Chia task cho thấy: thử lại bước đăng của project cũ phải được phép (FR2 "đăng được"); `render_engine` bỏ khỏi body request của orchestrator (chỉ còn ở response); endpoint `/internal/v1/projects/{id}/status` thêm `render_engine` (chỉ thêm trường); dấu vân tay đoạn code ở llm-service phải giữ `engine` để không làm cũ đoạn đã lưu; Docker đang tắt nên T0 cần bật Docker.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-remove-manim-tasks.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-071, chờ Creator duyệt task.
+
+---
+
+## CR-071 — Task đã duyệt
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Duyệt 17 task, commit tài liệu task, chuyển `/code CR-071`.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-remove-manim-tasks.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-071.
+
+---
