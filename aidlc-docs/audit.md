@@ -3095,3 +3095,93 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-068, chờ Creator duyệt và sửa `.env`.
 
 ---
+
+## CR-071 — Pipeline đi đủ quy trình làm phim 2D: kiểm tra phụ thuộc, câu hỏi
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "tôi đi qua pipiline chi tiết như như làm phim 2d gồm cá bước [danh sách tiền kỳ / sản xuất / hậu kỳ, nguyên văn trong `cr-071-2d-film-pipeline-design.md`] làm 1 cr để đi qua hết các quy trinh này"
+**AI Response**: Mở nhánh `feature/cr-071-2d-film-pipeline` trong worktree riêng. Đối chiếu từng khâu với code: thiếu animatic, SFX, chỉnh màu cuối; một phần ở hồ sơ nhân vật, lip-sync, nhiều giọng, storyboard bằng hình, render lại từng shot. Kiểm tra phụ thuộc: trùng phạm vi với CR-069 (lộ trình storyboard v2, SFX, rig, contact sheet) và CR-070 (`Person`/`talking` chuyển vào DB, `merger.py`, prompt); trùng file với CR-064 nếu đổi prompt kịch bản. Dừng trước thiết kế, hỏi Creator về cách xử lý trùng phạm vi và phạm vi CR.
+**Impact Assessment**: chưa thiết kế; dự kiến chạm llm-service, authoring-service, rendering, tts, video-assembly, orchestrator, web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-2d-film-pipeline-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator trả lời.
+
+---
+
+## CR-071 — Đóng các CR cũ đang mở
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "đóng toàn bộ CR cũ"; trả lời câu hỏi: CR-064 "Bỏ hẳn", CR-069 "Bỏ hẳn", CR-070 "Bỏ hẳn".
+**AI Response**: Xoá (force) worktree CR-069 và CR-070 cùng thay đổi chưa commit; xoá nhánh local `feature/cr-064-screenwriter-prompt-trim` (275189d, chưa từng merge), `feature/cr-069-explainer-factory-gap`, `feature/cr-070-kit-illustrations-in-db`. Xoá nhánh remote CR-064 bị từ chối quyền, chưa làm. CR-071 không còn trùng phạm vi.
+**Impact Assessment**: main không đổi; prompt `story_architect` giữ bản hiện tại; kit hình giữ seed.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-2d-film-pipeline-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator trả lời câu hỏi phạm vi.
+
+---
+
+## CR-071 — Lộ trình 10 CR con, chờ duyệt
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "2.phạm vi chọn a / thứ tự làm tôi cần bạn lên plan sẽ làm phần gì trước. sau đó tạo các cr nhỏ hơn quyết định sẽ làm như thế nào theo chuẩn ai-dlc"
+**AI Response**: CR-071 thành CR khung (Inception: Requirements, Workflow Planning, Units Generation), không đổi code. Lộ trình 4 giai đoạn, 10 CR con giữ số CR-072 → CR-081: GĐ1 CR-072 storyboard bằng hình, CR-073 animatic; GĐ2 CR-074 SFX, CR-075 hồ sơ nhân vật, CR-076 lip-sync theo âm thanh; GĐ3 CR-077 logline/tóm tắt, CR-078 render lại từng shot; GĐ4 CR-079 nhiều giọng, CR-080 chỉnh màu cuối, CR-081 VFX 2D. Key/in-between/clean-up/tô màu ghi ngoài phạm vi (hệ thống diễn hoạt kiểu rig bằng code). Câu hỏi chưa trả lời (dạng animatic, nhiều giọng, nguồn SFX) chuyển xuống CR con.
+**Impact Assessment**: chỉ tài liệu; sau khi duyệt sẽ thêm 10 file yêu cầu CR con và dòng trong `aidlc-state.md`.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-2d-film-pipeline-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator duyệt lộ trình.
+
+---
+
+## CR-071 — Lộ trình mở rộng: mọi khâu có CR con
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "pipeline nhiều lắm mà [danh sách quy trình 2D, như trên] sao plan ít vậy?"
+**AI Response**: Bản trước chỉ lấp khâu ✗/◐ và đưa key/in-between/clean-up/tô màu ra ngoài phạm vi. Lập lại: mọi khâu (19) có CR con, khâu đã có thì nâng lên chuẩn phim với sản phẩm duyệt riêng. 21 CR con giữ số CR-072 → CR-092: GĐ0 CR-072 luồng làm phim; GĐ1 tiền kỳ CR-073 → CR-080 (logline/kịch bản, giọng nháp, hồ sơ nhân vật, tay/khẩu hình, bối cảnh/đạo cụ, color script/style guide, storyboard bằng hình, animatic); GĐ2 sản xuất CR-081 → CR-085 (layout/key pose, nhịp on 1s/2s, đúng model/màu, background nhiều lớp, rig mới); GĐ3 hậu kỳ CR-086 → CR-092 (ánh sáng/bóng/khói, VFX, dựng phim + render lại shot, SFX/nhạc/mix, lip-sync, thoại chính thức, chỉnh màu/xuất bản). Key/in-between/clean-up/tô màu tay có CR tương đương (CR-081/082/083).
+**Impact Assessment**: chỉ tài liệu.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-2d-film-pipeline-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator duyệt lộ trình.
+
+---
+
+## CR-071 — Rà lộ trình theo ý tưởng sản phẩm
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "rồi từ plan này kiểm tra lại xem có bước nào không cần với ý tưởng của chúng ta không?"
+**AI Response**: Đối chiếu 21 CR con với ý tưởng sản phẩm (README, `inception/requirements/requirements.md` §1: một người dùng, video giáo dục/giải thích đăng YouTube; CR-067: hình đổi theo từng câu thoại, một giọng dẫn, nhân vật và bàn tay minh hoạ, phong cách flat). Đề xuất giữ 8 CR (gộp một số), 1 CR tuỳ chọn, bỏ 9 CR; chờ Creator xác nhận trước khi sửa tài liệu.
+**Impact Assessment**: chỉ tài liệu.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator xác nhận danh sách giữ/bỏ.
+
+---
+
+## CR-071 — Bỏ Manim, lộ trình rút gọn 10 CR con
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "bỏ luôn manim. chỉ còn remotion"
+**AI Response**: Đo phạm vi Manim: 7 service (rendering 65 file, authoring-service 34, web-gui 32, orchestrator 21, video-assembly 9, llm-service 9, api-gateway 2, tts 1); `DefaultRenderEngine = RenderEngineManim` ở orchestrator; intro/outro kênh chỉ dựng bằng Manim (`render_channel_asset`). Lộ trình viết lại theo danh sách rà soát + bỏ Manim: CR-072 Bỏ Manim, CR-073 Giọng nháp sớm, CR-074 Xem trước (storyboard hình + animatic), CR-075 Hồ sơ nhân vật + dáng theo câu, CR-076 Màu theo mood, CR-077 Kiểm đúng model/màu, CR-078 SFX + nhạc theo cảm xúc, CR-079 Render lại từng shot, CR-080 Linh vật kênh, CR-081 (tuỳ chọn) Nhân vật nói theo giọng. Bảng "Kết quả đối chiếu" ghi giữ/đã có/bỏ cho từng khâu.
+**Impact Assessment**: chỉ tài liệu.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-2d-film-pipeline-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator duyệt lộ trình.
+
+---
+
+## CR-071 — Đổi thành "Bỏ Manim", câu hỏi
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "bỏ hết chỉ giữ lại cr bỏ manim, các CR còn lại cần đi qua AI-DLC rule từ lên ý tưởng cho nên implement"
+**AI Response**: Bỏ lộ trình 2D; các ý tưởng còn lại chờ đi trọn AI-DLC từ khâu ý tưởng khi Creator muốn làm. CR-071 đổi thành bỏ Manim: nhánh đổi tên `feature/cr-071-2d-film-pipeline` → `feature/cr-071-remove-manim` (chưa có commit), tài liệu đổi thành `cr-071-remove-manim-design.md`. Phân tích: ~110 file nguồn ở 8 service; tên chung mang chữ Manim (`ManimScriptRendererPort`, `ManimEngineerStepPage`, cột `manim_scene_class_name`); intro/outro vào qua tải file lên, nhánh dựng bằng Manim không có ai gọi; chưa đếm được dữ liệu vì Docker không chạy. Hỏi Creator: project Manim cũ, intro/outro, đổi tên chung.
+**Impact Assessment**: dự kiến rendering, authoring-service, web-gui, orchestrator, video-assembly, llm-service, api-gateway, tts; migration DB orchestrator; image rendering bỏ Manim/texlive.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-remove-manim-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-071, chờ Creator trả lời.
+
+---
+
+## CR-071 — Thiết kế bỏ Manim, chờ duyệt
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "1. Project đã làm bằng Manim […] a. (Khuyến nghị) Giữ ở chế độ chỉ xem […] 2. Intro/outro a. (Khuyến nghị) Bỏ nhánh dựng bằng Manim, giữ đường tải file lên […] 3. Ba tên chung mang chữ Manim a. (Khuyến nghị) Đổi tên luôn trong CR này […] 4. Luật QC bố cục ở video-assembly […] a. (Khuyến nghị) Xoá phần luật bố cục theo Manim, giữ phần đo âm lượng và các thông số video." (= 1a 2a 3a 4a)
+**AI Response**: Thiết kế: giá trị `manim` chỉ còn làm dấu project cũ (`RenderEngineRetiredManim`, `EngineRetired()`, `ErrEngineRetired` → 409), mặc định `remotion`; chặn mọi thao tác chạy lại ở orchestrator và authoring-service, giao diện ẩn nút và hiện nhãn "Manim (ngừng hỗ trợ)"; gỡ chuỗi intro/outro dựng bằng Manim (rendering → orchestrator → video-assembly), giữ tải lên; đổi tên `ScriptRendererPort`, `CodeStepPage`, cột `scene_class_name`; QC bỏ luật bố cục Manim và `layout_marks`; image rendering bỏ Manim/texlive; bỏ biến môi trường chỉ Manim dùng; xoá `/shared/.manim-media`; ADR-0033. `LintIssue`/`blocking_issues` chuyển sang `domain/lint_issue.py` vì lint Lottie dùng chung. Phụ thuộc: độc lập; CR-072 phụ thuộc CR-071.
+**Impact Assessment**: 8 service (rendering, llm-service, authoring-service, orchestrator, video-assembly, web-gui, api-gateway, tts); migration orchestrator (mặc định engine, đổi tên cột, xoá `layout_marks`) và authoring-service (xoá prompt Manim); bỏ 4 message type.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-remove-manim-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION (design) — CR-071, chờ Creator duyệt.
+
+---
+
+## CR-071 — Thiết kế đã duyệt
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "ok bắt đầu cr 071 nhé"
+**AI Response**: Duyệt thiết kế bỏ Manim; commit tài liệu thiết kế và audit, push nhánh; chuyển sang chia task.
+**Impact Assessment**: như thiết kế.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-071-remove-manim-design.md`, `aidlc-docs/audit.md`.
+**Context**: CONSTRUCTION — CR-071.
+
+---
