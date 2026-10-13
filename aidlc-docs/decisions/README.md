@@ -35,3 +35,11 @@
 | [ADR-0031](ADR-0031-frame-orientation-by-output-mode.md) | Khung hình theo chế độ đầu ra; short dựng dọc riêng từ đầu | Accepted | Application Design (CR-060) | 2026-10-01 |
 | [ADR-0032](ADR-0032-narration-lines-time-remotion-shots.md) | Câu thoại là đơn vị thời gian của shot Remotion | Accepted | Application Design (CR-067) | 2026-10-03 |
 | [ADR-0033](ADR-0033-remotion-only-render-engine.md) | Remotion là engine dựng video duy nhất | Accepted | Application Design (CR-071) | 2026-10-13 |
+| [ADR-0034](ADR-0034-three-phase-flow-and-art-bible.md) | Luồng ba giai đoạn và bộ thiết kế mỹ thuật hai lượt | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0035](ADR-0035-per-unit-review-and-input-fingerprints.md) | Khung sửa theo đơn vị và dấu đầu vào để chỉ làm lại phần bị ảnh hưởng | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0036](ADR-0036-channel-visual-languages.md) | Ngôn ngữ hình của kênh: luật ở DB có phiên bản, rig là kit Remotion, một ngôn ngữ bật | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0037](ADR-0037-topic-driven-worlds.md) | Phong cách theo thế giới của chủ đề, thay nền sáng bão hoà mặc định của CR-067 | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0038](ADR-0038-per-scene-render-with-overlap.md) | Render theo cảnh, mỗi cảnh một lệnh, có đoạn chồng ở chỗ nối liền mạch | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0039](ADR-0039-shared-still-api-and-browser-animatic.md) | Một API ảnh tĩnh chung ở rendering; animatic phát trong trình duyệt | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0040](ADR-0040-draft-voice-over-rabbitmq-and-dictionary.md) | Giọng sơ bộ qua RabbitMQ ngoài saga render; từ điển phát âm ở authoring-service | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0041](ADR-0041-shared-volume-as-file-store.md) | `/shared` là kho file; dữ liệu và lệnh chỉ giữ đường dẫn | Accepted | Application Design (CR-072) | 2026-10-13 |
