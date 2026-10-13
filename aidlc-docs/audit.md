@@ -3226,3 +3226,180 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-071, chờ Creator duyệt.
 
 ---
+
+## CR-072 — Ý tưởng: pipeline theo quy trình làm phim 2D
+**Timestamp**: 2026-10-12T00:00:00Z
+**User Input**: "đưa toàn bộ phàn này nào nhánh làm phim 2d nhé" (kèm nguyên văn quy trình 2D: tiền kỳ, sản xuất, hậu kỳ — chép đầy đủ trong `inception/requirements/cr-072-2d-film-pipeline.md`)
+**AI Response**: Mở nhánh `feature/cr-072-2d-film-pipeline` trong worktree riêng (CR-071 giữ việc bỏ Manim). Ghi ý tưởng nguyên văn, các chỉ dẫn trước đó của Creator, quyết định đã có (chỉ Remotion; đi trọn AI-DLC từ ý tưởng, không lấy lại lộ trình cũ) và bảng đối chiếu sơ bộ từng khâu với main `7df416a` làm tư liệu cho Requirements Analysis. Phụ thuộc: CR-071 nên deliver trước.
+**Impact Assessment**: chưa có; xác định ở Requirements Analysis.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072, chờ Creator bắt đầu Requirements Analysis.
+
+---
+
+## CR-072 — Requirements Analysis: câu hỏi làm rõ
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "quay trở lại với cr 072"
+**AI Response**: CR-071 đã vào main (`7f327d0`), nhánh `feature/cr-072-2d-film-pipeline` fast-forward lên đó (giữ lại hai file chưa commit). Bắt đầu Requirements Analysis: viết 18 câu hỏi theo `common/question-format-guide.md` (mục tiêu, ý tưởng sản phẩm, logline, nhân vật, lip-sync, color script, scratch voice, animatic, cảm giác hoạt hình, VFX, dựng theo cảnh, SFX, grading, cổng duyệt, thanh bước, thứ tự, chi phí, project cũ). Extension: giữ cấu hình đã có của dự án (Security Baseline, Property-Based Testing đều No).
+**Impact Assessment**: chưa có; xác định sau khi có câu trả lời.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-requirement-questions.md`, `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator trả lời câu hỏi.
+
+---
+
+## CR-072 — Requirements Analysis: thêm câu hỏi phong cách hình
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "néu phong cách đồ hoạ của Kurzgesagt – In a Nutshell thì còn cần chỉnh sửa gì nữa ko"
+**AI Response**: Đối chiếu Kurzgesagt với luật style hiện tại (`illustration_style_vi.txt`, `backdrop_style_vi.txt`, FR7 nền sáng của CR-067). Giống: vector phẳng, không viền, bo tròn, gradient mềm, nền 4 lớp. Khác: nền đậm và glow, ánh sáng theo nguồn, nền dày chi tiết, chuyển động mượt (không "on 2s"), nhân vật gần như không nhép miệng, SFX dày. Thêm Question 19 (giữ style / chuyển hẳn / bộ style chọn theo video) và ghi chú trả lời câu này trước vì nó đổi đáp án các câu 5, 6, 9, 10, 12, 13, 17.
+**Impact Assessment**: chưa có; xác định sau khi có câu trả lời.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-requirement-questions.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator trả lời câu hỏi.
+
+---
+
+## CR-072 — Requirements Analysis: bỏ nhép miệng, thêm câu hỏi quy trình vĩ mô
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "vậy thì bỏ phần nhép miệng đi. ý tôi là nói về việc vỹ mô làm ra một video như thế chứ ko phải nói về mặt vi mô"
+**AI Response**: Ghi Question 5 = A (không lip-sync, không mouth chart) theo lời Creator; ghi quyết định vào `cr-072-2d-film-pipeline.md`, hai dòng Mouth chart/Lip-sync trong bảng đối chiếu đánh "bỏ". Đối chiếu quy trình làm một video của xưởng kiểu Kurzgesagt với luồng ConceptFlow ở tầng vĩ mô; thêm Question 20 (nghiên cứu và kiểm chứng có nguồn), 21 (khung mẫu), 22 (hành trình máy quay liền mạch), 23 (nhạc nền theo mood / riêng mỗi video). Cập nhật trang phác thảo (bỏ mouth chart và lip-sync, luồng 18 bước có Nghiên cứu và Khung mẫu).
+**Impact Assessment**: chưa có; xác định sau khi có câu trả lời.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-requirement-questions.md`, `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator trả lời câu hỏi.
+
+---
+
+## CR-072 — Requirements Analysis: nhận câu trả lời vòng 1, hỏi vòng 2
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi đã trả lời các câu hỏi nhưng còn một số câu cần bạn xem qua rồi cho tôi thêm ý kiến nhé" (câu trả lời ghi trong `cr-072-requirement-questions.md`: 1 B+D và chất lượng tốt hơn; 2 video chuyên nghiệp nhiều chủ đề, trông như phim hoạt hình ngắn, Creator review và duyệt; 3 B, AI phải tối ưu để ít phải sửa; 4 C; 5 A; 6 cần xem thêm; 7 B; 8 C; 9 C; 10 B; 11 B; 12 hỏi nguồn SFX; 13 C; 14 B; 15 B; 16 AI đề xuất; 17 C; 18 xoá toàn bộ data cũ; 19 phong cách theo chủ đề video; 20 A; 21 B, chi tiết như xưởng phim thật; 22 B; 23 A, đưa vào backlog)
+**AI Response**: Viết `cr-072-clarification-questions.md`: ý kiến và câu hỏi C1 (hành trình màu thay cho một bảng màu rải đều), C2 (nguồn SFX có giấy phép, âm nền theo thế giới), C3 (giữ gì chung giữa các video khi phong cách theo chủ đề), C4 (cảnh giải thích ý đặt trong thế giới, thay FR7 của CR-067), C5 (bộ thiết kế mỹ thuật 6 mục và cách duyệt), C6 (nhân vật có giọng riêng không), C7 (phạm vi xoá dữ liệu cũ, sao lưu trước). Ghi hai chỗ sẽ xử lý ở thiết kế: render từng cảnh va với máy quay liền mạch; nhiều chỗ duyệt nhưng ít phải sửa.
+**Impact Assessment**: chưa có; xác định sau vòng 2.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-clarification-questions.md`, `aidlc-docs/inception/requirements/cr-072-requirement-questions.md` (câu trả lời của Creator), `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator trả lời vòng 2.
+
+---
+
+## CR-072 — Requirements Analysis: chốt vòng 2, tài liệu yêu cầu
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "câu 6 chốt như bạn đề xuất / câu 12 sfx đưa vào backlog / câu 19 chốt như bạn đề xuất / câu 21 ok chốt như bạn đề xuất / C6: … => tạm thời để 1 người kể / C7: … => xoá hết toàn bộ project, promt, luật style để làm lại từ đầu, thư viện hình tôi đã backup ra file zip nên xoá được luôn / Câu 11 B … => đúng / Câu 14 B … => ok"
+**AI Response**: Ghi câu trả lời vào `cr-072-clarification-questions.md`: C1 A, C2 backlog, C3 B, C6 A, C7 (xoá project, prompt, luật style, thư viện hình và nền; giữ archetype, cấu hình kênh, kết nối YouTube; sao lưu DB và `/shared` trước). Hai chỗ AI tự hiểu, đã báo Creator: C4 A (theo "câu 19 chốt như bạn đề xuất") và C5 B (hai lượt duyệt). Viết tài liệu yêu cầu vào `cr-072-2d-film-pipeline.md`: luồng mục tiêu, FR-1..FR-16, NFR-1..NFR-7, việc không làm, tiêu chí chấp nhận, ADR cần viết. Thêm CR-072 vào bảng CR và ba mục backlog (âm nền + nguồn SFX, nhạc theo mood, nhân vật có giọng riêng) trong `aidlc-state.md`. Đề xuất bỏ qua User Stories.
+**Impact Assessment**: toàn hệ thống (8 service, DB, `/shared`); chia CR con ở Workflow Planning.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`, `cr-072-requirement-questions.md`, `cr-072-clarification-questions.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis xong, chờ Creator duyệt.
+
+---
+
+## CR-072 — Xác nhận C4, C5; yêu cầu mockup giao diện
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "C4 = A (FR-7) … C5 = B (FR-3) … => đúng. trước khi đi vào bước tiếp theo bạn có thể render lại figma hay html trang web trước dữ liệu có thể mockup để tôi hình dung được trang web sẽ trông như thế nào flow tạo video sẽ đi qua các bước nào được không."
+**AI Response**: Ghi xác nhận C4 A, C5 B vào `cr-072-2d-film-pipeline.md` và `cr-072-clarification-questions.md`. Làm prototype HTML bấm qua được các bước của luồng mục tiêu với dữ liệu mẫu, đăng thành artifact (ngoài repo). Tài liệu yêu cầu vẫn chờ Creator duyệt.
+**Artifacts Affected**: hai file yêu cầu ở trên, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator duyệt.
+
+---
+
+## CR-072 — Góp ý của Creator sau khi xem prototype
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: Góp ý từng bước của prototype (bước 1 kiểu video; bước 3 logline tự viết, sửa dàn ý, làm lại lời thoại theo cảnh; bước 4 ngôn ngữ hình tham khảo Vẽ Chuyện và Kurzgesagt, đưa vào cài đặt, nhiều ngôn ngữ nhưng chỉ một ngôn ngữ bật, bảng tham khảo và cách sửa hình; bước 5 duyệt và sửa từng cảnh, góp ý mô tả cảnh; bước 6 sửa từng color key, khung mẫu; bước 7 gõ tay câu đọc sai rồi đọc lại đúng shot; bước 8 "làm lại" nghĩa là gì; bước 9 giữ prompt và sửa từng hình; bước 10 cơ chế sửa khi lỗi cảnh/shot; bước 11 sửa đúng chỗ validate lỗi; bước 12 bổ sung thông tin; bước 13 render làm gì và xử lý lỗi; bước 14 làm lại cảnh cần góp ý; bước 15 QC làm gì, thanh tiến độ; bước 17 thumbnail Remotion hay AI) — "xem lại toàn bộ câu hỏi và tạo 1 file md để trả lời và trao đổi bất cứ thắc mắc nào nếu bạn cần nhé"
+**AI Response**: Kiểm hiện trạng trong code (bảng Kiểu video + "Để AI tự chọn"; dàn ý/storyboard sửa tay được nhưng chạy lại cả bước; storyboard theo cảnh từ CR-050; code theo đoạn có chạy lại shot lỗi, dán AI ngoài, sửa tay; TTS Azure dùng SSML, file giọng theo nội dung câu; render lỗi cả bước; QC 6 kiểm trong `qc_rules.py`, `QC_ENFORCE` tắt; video-assembly đã gửi tiến độ ffmpeg; thumbnail là prompt cho AI ngoài + Creator tải lên). Viết `cr-072-prototype-review.md`: nguyên tắc chung sửa đúng chỗ/chỉ làm lại phần phụ thuộc (bảng đơn vị sửa), trả lời từng bước, 12 câu hỏi P-1..P-12 (nguyên tắc chung, gợi ý kiểu video, bộ ngôn ngữ hình khởi đầu, chốt ngôn ngữ trước, ảnh tham khảo tải lên, từ điển phát âm, phạm vi sửa animatic, xem nhanh từng shot, tự chạy lại lỗi render tạm thời, ghi chú theo mốc thời gian ở Dựng, bật chặn QC, thumbnail Remotion).
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-prototype-review.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ Creator trả lời P-1..P-12 rồi cập nhật yêu cầu.
+
+---
+
+## CR-072 — Câu trả lời P-1..P-12, cập nhật yêu cầu
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "toi save rồi check lại nhé" (trong `cr-072-prototype-review.md`: P-1 A; P-2 B; P-3 "làm default cho tôi đủ 4 kiểu"; P-4 A; P-5 A; P-6 A; P-7 B; P-8 "khi shot lỗi AI không tự sửa mà hiện lỗi kèm thông báo cụ thể để creator chạy lại hoặc chạy lại kèm ghi chú, sửa tay hoặc dán AI ngoài, ý tưởng xem nhanh từng shot và render shot chỉ phải render cảnh rất oke"; P-9 A; P-10 A; P-11 "B nhưng bổ sung thêm chỗ nối khớp … và không có khung đen hay khung trống"; P-12 "A nhưng nếu dùng AI ngoài tả lệnh thì vẫn phải đảm bảo prompt sinh ra tuân thủ style của video")
+**AI Response**: Cập nhật `cr-072-2d-film-pipeline.md`: thêm FR-17 (sửa đúng chỗ, chỉ làm lại phần phụ thuộc), FR-18 (ngôn ngữ hình của kênh, 4 ngôn ngữ hệ thống, một bật, chốt trước CR con đầu), FR-19 (gợi ý kiểu video, AI đề xuất kiểu mới), FR-20 (sửa giọng từng câu, từ điển phát âm), FR-21 (thumbnail Remotion, prompt AI ngoài theo style video), FR-22 (code theo cảnh, AI không tự sửa, xem nhanh từng shot), FR-23 (validate đúng chỗ), FR-24 (review đủ thông tin), FR-25 (dựng theo ghi chú mốc thời gian), FR-26 (merge có tiến độ, QC chỉ cảnh báo + chỗ nối, khung đen); sửa FR-2, FR-3, FR-5, FR-9, FR-10, FR-13, FR-14, FR-15, NFR-2, bảng không làm, tiêu chí chấp nhận 7–10, ADR. Thêm P-13: giữ hay bỏ autofix máy móc của CR-068 (P-8 nói "AI không tự sửa", autofix không phải AI).
+**Artifacts Affected**: `cr-072-2d-film-pipeline.md`, `cr-072-prototype-review.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Requirements Analysis, chờ P-13 và Creator duyệt yêu cầu.
+
+---
+
+## CR-072 — Duyệt Requirements Analysis
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "ok rồi đó"
+**AI Response**: Hiểu là Creator duyệt tài liệu yêu cầu `cr-072-2d-film-pipeline.md` (FR-1..FR-26, NFR-1..NFR-7) và đồng ý đề xuất A của AI cho P-13 (giữ autofix máy móc của CR-068, bỏ lượt AI tự sửa); P-13 chưa ghi trong file nên ghi kèm chú thích "AI hiểu" và báo Creator. User Stories bỏ qua theo đề xuất. Commit bước Requirements Analysis trên `feature/cr-072-2d-film-pipeline`; sang Workflow Planning.
+**Artifacts Affected**: `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`, `cr-072-requirement-questions.md`, `cr-072-clarification-questions.md`, `cr-072-prototype-review.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-072 Requirements Analysis đã duyệt.
+
+---
+
+## CR-072 — Workflow Planning
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: (tiếp sau khi duyệt yêu cầu)
+**AI Response**: Cập nhật graphify lên `2fbd770`. Viết `aidlc-docs/inception/plans/cr-072-workflow-plan.md`: tác động theo 8 service, dữ liệu, hợp đồng; rủi ro cao; stage: bỏ User Stories và Infrastructure Design, làm Application Design, Units Generation, Functional Design cho từng CR con, NFR cho U7 và U8. Đề xuất 9 CR con theo thứ tự U1 ngôn ngữ hình (+ xoá dữ liệu cũ) → cổng Creator bật một ngôn ngữ → U2 luồng 3 giai đoạn + khung sửa theo đơn vị (song song U1) → U3 kịch bản → U4 mỹ thuật lượt 1 → U5 storyboard + lượt 2 → U6 giọng + animatic / U7 sản xuất / U9 thumbnail → U8 hậu kỳ. Hỏi W-1 (đặt tên nhánh CR con), W-2 (thời điểm xoá dữ liệu), W-3 (thứ tự).
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-workflow-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Workflow Planning, chờ Creator duyệt.
+
+---
+
+## CR-072 — Duyệt Workflow Planning
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Hiểu là Creator duyệt `cr-072-workflow-plan.md` và đồng ý đề xuất A cho W-1 (CR con `CR-072-U<N>`, nhánh `feature/cr-072-u<N>-<slug>`), W-2 (xoá dữ liệu cũ khi U1 vào main, sau khi sao lưu), W-3 (thứ tự móng → tiền kỳ → sản xuất → hậu kỳ); ghi "AI hiểu" trong file. Commit; sang Application Design.
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-workflow-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-072 Workflow Planning đã duyệt.
+
+---
+
+## CR-072 — Application Design: kế hoạch và câu hỏi
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: (tiếp sau khi duyệt Workflow Planning)
+**AI Response**: Kiểm hiện trạng ranh giới: authoring-service giữ mọi thứ AI soạn (bảng `authoring_segments`, `code_check_diagnostics`, `illustration_folders`, `illustrations`, `llm_usage`, `project_authoring`, `project_illustrations`, `prompts`, `video_archetypes`); tts, rendering, video-assembly có DB riêng và nhận lệnh qua RabbitMQ; rendering đã dùng `renderStill`; luồng định nghĩa ở 3 chỗ có test hợp đồng. Viết `aidlc-docs/inception/plans/cr-072-application-design-plan.md`: danh sách tài liệu sẽ tạo ở `aidlc-docs/inception/application-design/cr-072/`, 5 ADR nháp (0034–0038), 9 câu hỏi AD-1..AD-9 (ai giữ đơn vị duyệt; đồ thị phụ thuộc bằng dấu đầu vào; lưu ngôn ngữ hình; API ảnh tĩnh chung; animatic phát trong trình duyệt; giọng sơ bộ qua RabbitMQ; từ điển phát âm ở authoring-service; render từng cảnh do orchestrator điều phối; định nghĩa luồng ba bản + test).
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-application-design-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Application Design, chờ Creator trả lời.
+
+---
+
+## CR-072 — Application Design: tài liệu và ADR
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi đã trả lời rồi check nhé" (AD-1 A, AD-2 A, AD-3 A, AD-4 A, AD-5 C, AD-6 A, AD-7 A, AD-8 A, AD-9 A)
+**AI Response**: Câu trả lời không có chỗ mơ hồ, không cần hỏi thêm. Kiểm thêm: authoring-service đã có client gọi orchestrator (`orchestrator.NewClient`), nên lượt 2 duyệt xong thì authoring-service gọi `POST /internal/v1/projects/{id}/draft-voice`; api-gateway đã phát file `/shared` có range (`videoHandler.js`). Tạo `aidlc-docs/inception/application-design/cr-072/` gồm `components.md` (thành phần theo service, đồ thị phụ thuộc giữa loại đơn vị), `component-methods.md` (giao diện Go/HTTP/RabbitMQ/TS/Python), `services.md` (điều phối từng chặng, sơ đồ trình tự), `component-dependency.md` (ma trận giao tiếp, thư mục `/shared` mới, đổi hợp đồng ba bước), `application-design.md` (gom, bảng quyết định, đối chiếu FR-1..FR-26). Viết 7 ADR Proposed: 0034 luồng ba giai đoạn và bộ mỹ thuật, 0035 khung sửa theo đơn vị và dấu đầu vào, 0036 ngôn ngữ hình, 0037 phong cách theo thế giới (thay FR7 CR-067), 0038 render theo cảnh, 0039 API ảnh tĩnh chung và animatic trong trình duyệt, 0040 giọng sơ bộ qua RabbitMQ và từ điển phát âm; thêm vào `decisions/README.md`. Không thêm service mới.
+**Artifacts Affected**: `aidlc-docs/inception/application-design/cr-072/*.md`, `aidlc-docs/decisions/ADR-0034..0040*.md`, `aidlc-docs/decisions/README.md`, `aidlc-docs/inception/plans/cr-072-application-design-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Application Design, chờ Creator duyệt.
+
+---
+
+## CR-072 — Application Design: `/shared` là kho file
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi muốn bổ sung thêm một tí ví dụ xem thư mục "/shared" như là 1 server lưu file rồi các data cần sử dụng thì chỉ cần lưu path của file, ai cần thì cầm path đó trỏ vào file lấy thì sao nhỉ"
+**AI Response**: Kiểm hiện trạng: orchestrator đã lưu đường dẫn tuyệt đối (`video_path`, `rendered_video_path`, `background_music_path`, `caption_path`, `youtube_thumbnail_path`), lệnh RabbitMQ chở đường dẫn, api-gateway `videoHandler.js` kiểm đường dẫn nằm trong `/shared` trước khi phát. Chốt thành luật chung cho mọi file mới của CR-072: ADR-0041 (Proposed) — file nhị phân/lớn ở `/shared`, DB và lệnh chỉ giữ đường dẫn; chữ nhỏ cần sửa/tra/hash vẫn ở DB; một chủ ghi mỗi thư mục; tên file theo hash nội dung; trình duyệt lấy file qua api-gateway có kiểm; dọn file mồ côi theo lịch; giữ đường dẫn tuyệt đối, chuyển MinIO/S3 sau này chỉ là đổi tiền tố. Thêm mục và sơ đồ ví dụ (khung tĩnh animatic) vào `component-dependency.md`, dòng vào `application-design.md`, `components.md` (phát file chung chuyển lên U1), `decisions/README.md`.
+**Artifacts Affected**: `aidlc-docs/decisions/ADR-0041-shared-volume-as-file-store.md`, `aidlc-docs/decisions/README.md`, `aidlc-docs/inception/application-design/cr-072/{component-dependency,application-design,components}.md`, `aidlc-docs/inception/plans/cr-072-application-design-plan.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Application Design, chờ Creator duyệt.
+
+---
+
+## CR-072 — Units Generation: kế hoạch và câu hỏi
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tiếp tục Units Generation."
+**AI Response**: Hiểu là Creator duyệt Application Design (`inception/application-design/cr-072/`, ADR-0034..0041) và cho sang Units Generation. Đổi trạng thái ADR sang Accepted: ADR-0036..0040 đã đổi; ADR-0034, ADR-0035, ADR-0041 bị bộ phân loại quyền chặn, chưa đổi; chưa commit, chờ Creator xác nhận đã duyệt. Viết `aidlc-docs/inception/plans/cr-072-unit-of-work-plan.md`: danh sách tài liệu sẽ tạo trong `application-design/cr-072/` (`unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md` đối chiếu FR/NFR/tiêu chí chấp nhận vì User Stories đã bỏ); 6 điểm AI suy ra (luồng lớn dần theo CR con, U3 không chờ cổng ngôn ngữ, U7 không chờ U6 theo ADR-0032, key pose và VFX chỉ cần kit của U1, mỗi CR con qua `/cr` → `/code` → `/deliver`, tiêu chí xong chung); 5 câu hỏi U-1 (tách CR con XL: đề xuất 15 CR con U1, U2a/b, U3, U4a/b/c, U5, U6, U7a/b/c, U8a/b, U9), U-2 (project dở dang khi CR con vào main), U-3 (bốn kit làm sâu tới đâu), U-4 (khung đơn vị áp lên bước nào trước), U-5 (số CR con mở cùng lúc).
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-unit-of-work-plan.md`, `aidlc-docs/decisions/ADR-0036..0040` (Status), `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Units Generation phần 1 (lập kế hoạch), chờ Creator trả lời.
+
+---
+
+## CR-072 — Units Generation: rà câu trả lời vòng 1, hỏi làm rõ
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi trả lời rồi đó" (trong `cr-072-unit-of-work-plan.md`: U-1 A; U-2 A; U-3 "vậy ưu tiên làm khoa học phát sáng trước nhưng làm detail các phần nặng luôn."; U-4 "ưu tiên làm theo kế hoạch đã duyệt hơn codebase hiện tại"; U-5 B)
+**AI Response**: U-1, U-2, U-5 rõ. Theo U-5 B, ghi thứ tự tuần tự AI suy ra: U1 → U2a → U2b → U3 → U4a → U4b → U4c → U5 → U6 → U7a → U7b → U7c → U8a → U8b → U9. U-3 và U-4 hiểu được nhiều cách, đổi phạm vi CR con, nên thêm câu hỏi làm rõ: U-3.1 (còn cổng so ảnh mẫu không, hay Khoa học phát sáng bật luôn), U-3.2 (phần nặng làm cho riêng Khoa học phát sáng, cho cả bốn kèm CR con U10, cho cả bốn trong từng CR con, hay dồn vào U1), U-4.1 (áp khung lên Kịch bản và Storyboard hiện có, gộp U2b vào U3, hay chỉ dựng khung). Application Design vẫn chưa commit, chờ Creator xác nhận đã duyệt.
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-unit-of-work-plan.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Units Generation phần 1, chờ Creator trả lời câu hỏi làm rõ.
+
+---
+
+## CR-072 — Units Generation: tài liệu CR con
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "đã trả lời nhé" (trong `cr-072-unit-of-work-plan.md`: U-3.1 A, U-3.2 A, U-4.1 A)
+**AI Response**: Câu trả lời đủ, không còn chỗ mơ hồ. Tạo trong `aidlc-docs/inception/application-design/cr-072/`: `unit-of-work.md` (quyết định chung; 15 CR con U1, U2a, U2b, U3, U4a, U4b, U4c, U5, U6, U7a, U7b, U7c, U8a, U8b, U9 với nhánh, cỡ, phụ thuộc, FR, service, phạm vi, tiêu chí xong; tiêu chí xong chung; đối chiếu với 9 CR con của kế hoạch luồng; việc để lại), `unit-of-work-dependency.md` (ma trận phụ thuộc, thứ tự tuần tự, số bước luồng sau từng CR con 13 → 17, loại đơn vị theo CR con, đổi hợp đồng, chỗ nhiều CR con đụng cùng file), `unit-of-work-story-map.md` (FR-1..FR-26, NFR-1..NFR-7, tiêu chí chấp nhận 1–10 → CR con, kiểm đủ). Ghi thay đổi so với yêu cầu: FR-18 P-4 A (Creator so ảnh mẫu rồi bật) thay bằng U-3.1 A (Khoa học phát sáng bật khi U1 vào main) và U-3.2 A (ba ngôn ngữ còn lại chỉ có ảnh mẫu). Thêm hai mục backlog vào `aidlc-state.md`: làm đủ ba kit còn lại; bỏ `render_scenes`. Application Design vẫn chưa commit, chờ Creator xác nhận đã duyệt.
+**Artifacts Affected**: `aidlc-docs/inception/application-design/cr-072/unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md`, `aidlc-docs/inception/plans/cr-072-unit-of-work-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Units Generation xong, chờ Creator duyệt.
+
+---
+
+## CR-072 — Duyệt Application Design và Units Generation
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi duyệt hết rồi"
+**AI Response**: Creator duyệt Application Design (`inception/application-design/cr-072/` gồm `application-design.md`, `components.md`, `component-methods.md`, `services.md`, `component-dependency.md`; ADR-0034..0041) và Units Generation (`unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md`). Đổi ADR-0034, ADR-0035, ADR-0041 sang Accepted (ADR-0036..0040 đã đổi trước), bảng `decisions/README.md` sang Accepted; đánh dấu đã duyệt trong `application-design.md`, `cr-072-application-design-plan.md`, `cr-072-unit-of-work-plan.md`, `aidlc-state.md`. Commit hai stage thành hai commit trên `feature/cr-072-2d-film-pipeline`. INCEPTION của CR-072 xong; theo W-1 A, nhánh tài liệu vào main, rồi mở U1 bằng `/cr`.
+**Artifacts Affected**: các file kể trên, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-072 Application Design và Units Generation đã duyệt.
+
+---
