@@ -3322,3 +3322,21 @@ q6 => làm hết tron cr 067"
 **Context**: INCEPTION — CR-072 Requirements Analysis đã duyệt.
 
 ---
+
+## CR-072 — Workflow Planning
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: (tiếp sau khi duyệt yêu cầu)
+**AI Response**: Cập nhật graphify lên `2fbd770`. Viết `aidlc-docs/inception/plans/cr-072-workflow-plan.md`: tác động theo 8 service, dữ liệu, hợp đồng; rủi ro cao; stage: bỏ User Stories và Infrastructure Design, làm Application Design, Units Generation, Functional Design cho từng CR con, NFR cho U7 và U8. Đề xuất 9 CR con theo thứ tự U1 ngôn ngữ hình (+ xoá dữ liệu cũ) → cổng Creator bật một ngôn ngữ → U2 luồng 3 giai đoạn + khung sửa theo đơn vị (song song U1) → U3 kịch bản → U4 mỹ thuật lượt 1 → U5 storyboard + lượt 2 → U6 giọng + animatic / U7 sản xuất / U9 thumbnail → U8 hậu kỳ. Hỏi W-1 (đặt tên nhánh CR con), W-2 (thời điểm xoá dữ liệu), W-3 (thứ tự).
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-workflow-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: INCEPTION — CR-072 Workflow Planning, chờ Creator duyệt.
+
+---
+
+## CR-072 — Duyệt Workflow Planning
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "ok"
+**AI Response**: Hiểu là Creator duyệt `cr-072-workflow-plan.md` và đồng ý đề xuất A cho W-1 (CR con `CR-072-U<N>`, nhánh `feature/cr-072-u<N>-<slug>`), W-2 (xoá dữ liệu cũ khi U1 vào main, sau khi sao lưu), W-3 (thứ tự móng → tiền kỳ → sản xuất → hậu kỳ); ghi "AI hiểu" trong file. Commit; sang Application Design.
+**Artifacts Affected**: `aidlc-docs/inception/plans/cr-072-workflow-plan.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+**Context**: INCEPTION — CR-072 Workflow Planning đã duyệt.
+
+---
