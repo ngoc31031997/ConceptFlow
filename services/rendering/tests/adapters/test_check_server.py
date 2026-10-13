@@ -21,12 +21,15 @@ def client(fake):
     return httpx.AsyncClient(transport=httpx.ASGITransport(app=create_check_app(fake)), base_url="http://r")
 
 
-async def test_returns_diagnostics_and_raw():
-    fake = Fake(CheckOutcome(False, [CheckDiagnostic("boom", 4)], "raw text"))
+async def test_returns_diagnostics():
+    fake = Fake(CheckOutcome(False, [CheckDiagnostic("boom", 4)]))
     r = await client(fake).post("/v1/check/remotion", json={"code": "c", "scene_class_name": "creator"})
     assert r.status_code == 200
-    assert r.json() == {"ok": False, "diagnostics": [{"message": "boom", "line": 4, "kind": "compile", "rule": ""}],
-                        "raw": "raw text", "warnings": []}
+    assert r.json() == {
+        "ok": False,
+        "diagnostics": [{"message": "boom", "line": 4, "kind": "compile", "rule": ""}],
+        "warnings": [],
+    }
     assert fake.calls == [("remotion", "c", "creator")]
     assert fake.layouts[0].subtitle_band is None and fake.layouts[0].video_font == ""
 
@@ -34,8 +37,8 @@ async def test_returns_diagnostics_and_raw():
 async def test_layout_diagnostics_warnings_and_context_cross_the_wire():
     from domain.layout_rules import SubtitleBand
 
-    fake = Fake(CheckOutcome(False, [CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout", "text_overflow")], "",
-                             ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]))
+    overflow = CheckDiagnostic("Shot 1.2, frame 85%: nhãn tràn", 62, "layout", "text_overflow")
+    fake = Fake(CheckOutcome(False, [overflow], ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]))
     r = await client(fake).post("/v1/check/remotion", json={
         "code": "c", "scene_class_name": "creator",
         "subtitle_band": {"edge": "bottom", "px": 240}, "video_font": "Montserrat"})
@@ -59,10 +62,10 @@ async def test_a_nonsense_subtitle_band_is_rejected():
     assert r.status_code == 422
 
 
-async def test_manim_route_uses_manim():
+async def test_there_is_no_manim_route():
     fake = Fake(CheckOutcome(True))
     r = await client(fake).post("/v1/check/manim", json={"code": "c", "scene_class_name": "XScene"})
-    assert r.json()["ok"] is True and fake.calls[0][0] == "manim"
+    assert r.status_code == 404 and fake.calls == []
 
 
 async def test_bad_input_is_400_and_a_broken_checker_is_503_never_ok():
@@ -81,9 +84,9 @@ async def test_metrics_report_wait_run_timeouts_and_overlap_with_render():
     app = create_check_app(Fake(CheckOutcome(True)), metrics=metrics)
     c = httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://r")
 
-    await c.post("/v1/check/manim", json={"code": "c"})
+    await c.post("/v1/check/remotion", json={"code": "c"})
     with metrics.command_running():
-        await c.post("/v1/check/manim", json={"code": "c"})
+        await c.post("/v1/check/remotion", json={"code": "c"})
     app_broken = create_check_app(
         Fake(raises=TypeScriptCheckError("tsc timed out after 90s")), metrics=metrics
     )

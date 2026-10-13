@@ -20,7 +20,6 @@ from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
-    RegisterChannelAssetCommandHandler,
     VideoAssemblyCommandDispatcher,
 )
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
@@ -80,10 +79,8 @@ async def run() -> None:
     # scores and reports the real severity; whether a blocking finding actually
     # stops a publish is Orchestrator's call.
     qc_handler = QCVideoCommandHandler(pool, inbox, outbox, QCThresholds.from_env())
-    register_channel_asset_handler = RegisterChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
     command_dispatcher = VideoAssemblyCommandDispatcher(
         assemble_video_handler, normalize_handler, qc_handler,
-        register_channel_asset_handler,
         # Dọn final.mp4/final.srt của project bị xoá.
         purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
             purge_project_artifacts, pool, inbox, outbox

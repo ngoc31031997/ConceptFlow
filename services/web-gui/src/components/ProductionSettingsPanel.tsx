@@ -88,7 +88,6 @@ function subtitleModeOf(project: Project): SubtitleMode {
  */
 export function ProductionSettingsPanel({ project, stages, hint, onSaved }: ProductionSettingsPanelProps) {
   const projectId = project.project_id;
-  const isRemotion = project.render_engine === "remotion";
 
   const [renderQuality, setRenderQuality] = useState<RenderQuality>(project.render_quality ?? "1080p60");
   const [videoFont, setVideoFont] = useState(project.video_font || DEFAULT_VIDEO_FONT);
@@ -210,11 +209,9 @@ export function ProductionSettingsPanel({ project, stages, hint, onSaved }: Prod
               )}
             </Disclosure>
           </div>
-          {isRemotion && (
-            <div className={glass.mtSm}>
-              <VideoFontPicker value={videoFont} onChange={changeFont} />
-            </div>
-          )}
+          <div className={glass.mtSm}>
+            <VideoFontPicker value={videoFont} onChange={changeFont} />
+          </div>
         </>
       )}
 

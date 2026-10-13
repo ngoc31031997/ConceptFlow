@@ -205,7 +205,7 @@ func (s projectStoreWithAuthoring) List(ctx context.Context) ([]domain.ProjectSu
 			continue
 		}
 		summaries[i].Topic = a.Topic
-		content := a.Content(summaries[i].RenderEngine)
+		content := a.Content()
 		summaries[i].FlowStep = domain.FlowStateFor(summaries[i].Status, summaries[i].WizardStep, content).Step
 	}
 	return summaries, nil
@@ -265,17 +265,9 @@ func (a projectDraftAdapter) FindSimilarTopics(ctx context.Context, language dom
 	return out, nil
 }
 
-func (a projectDraftAdapter) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
-	return a.projects.SaveRenderEngine(ctx, projectID, engine)
-}
-
-// wizardAdapter is the projects row's settings, plus its status lookup.
+// wizardAdapter is the projects row's settings.
 type wizardAdapter struct {
 	projects *postgres.ProjectRepository
-}
-
-func (a wizardAdapter) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
-	return a.projects.GetStatus(ctx, projectID)
 }
 
 func (a wizardAdapter) Get(ctx context.Context, projectID string) (*domain.Project, error) {

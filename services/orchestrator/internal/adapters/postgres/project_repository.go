@@ -25,12 +25,12 @@ func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {
 // Get loads a Project by project_id, or domain.ErrProjectNotFound.
 func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
+		SELECT project_id, saga_id, status, script_content, scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
 		       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
-		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
+		       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id,
 		       video_output_mode, companion_project_id, render_engine, wizard_step, video_font, wizard_route
 		FROM projects WHERE project_id = $1`, projectID)
 
@@ -47,16 +47,15 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 		subtitleMode          string
 		beatsJSON             []byte
 		warningsJSON          []byte
-		layoutMarksJSON       []byte
 		videoOutputMode       string
 		renderEngine          string
 	)
-	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.ManimSceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion, &p.ReviewEnabled, &beatsJSON, &warningsJSON,
+	err := row.Scan(&p.ProjectID, &p.SagaID, &status, &p.ScriptContent, &p.SceneClassName, &p.PluginID, &p.CategoryHint, &voiceLanguage, &p.VideoFormatID, &p.VideoFormatVersion, &p.ReviewEnabled, &beatsJSON, &warningsJSON,
 		&p.BackgroundMusicPath, &scenesJSON, &p.RenderedVideoPath, &p.VideoPath, &p.YoutubeTitle, &p.YoutubeDescription,
 		&tagsJSON, &youtubeVisibility, &p.YoutubePublishAt, &p.YoutubeThumbnailPath, &p.YoutubeChannelID, &p.YoutubeVideoURL, &p.ErrorMessage,
 		&p.TTSEnabled, &p.VoiceID, &p.SubtitlesEnabled, &subtitleStyleJSON, &waitOffsetsJSON, &p.RenderedVideoSeconds,
 		&renderQuality, &p.BackgroundMusicVolume, &chaptersJSON, &p.CaptionPath, &subtitleMode, &p.CaptionStatus,
-		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID, &layoutMarksJSON,
+		&p.IntroEnabled, &p.OutroEnabled, &p.IntroAssetID, &p.OutroAssetID,
 		&videoOutputMode, &p.CompanionProjectID, &renderEngine, &p.WizardStep, &p.VideoFont, &p.WizardRoute)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrProjectNotFound
@@ -99,11 +98,6 @@ func (r *ProjectRepository) Get(ctx context.Context, projectID string) (*domain.
 	}
 	if len(warningsJSON) > 0 {
 		if err := json.Unmarshal(warningsJSON, &p.ValidationWarnings); err != nil {
-			return nil, err
-		}
-	}
-	if len(layoutMarksJSON) > 0 {
-		if err := json.Unmarshal(layoutMarksJSON, &p.LayoutMarks); err != nil {
 			return nil, err
 		}
 	}
@@ -333,16 +327,6 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		}
 	}
 
-	// NULL when Rendering sent none (a project rendered before the
-	// layout marks existed), which qc_video then reports as not_scored rather
-	// than pretending an empty screen.
-	var layoutMarksJSON []byte
-	if len(project.LayoutMarks) > 0 {
-		if layoutMarksJSON, err = json.Marshal(project.LayoutMarks); err != nil {
-			return err
-		}
-	}
-
 	var waitOffsetsJSON []byte
 	if project.WaitOffsets != nil {
 		if waitOffsetsJSON, err = json.Marshal(project.WaitOffsets); err != nil {
@@ -351,17 +335,17 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 	}
 
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO projects (project_id, saga_id, status, script_content, manim_scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
+		INSERT INTO projects (project_id, saga_id, status, script_content, scene_class_name, plugin_id, category_hint, voice_language, video_format_id, video_format_version, review_enabled, beats, validation_warnings,
 		                       background_music_path, scenes, rendered_video_path, video_path, youtube_title, youtube_description,
 		                       youtube_tags, youtube_visibility, youtube_publish_at, youtube_thumbnail_path, youtube_channel_id, youtube_video_url, error_message,
 		                       tts_enabled, voice_id, subtitles_enabled, subtitle_style, wait_offsets, rendered_video_seconds,
 		                       render_quality, background_music_volume, chapters, caption_path, subtitle_mode, caption_status,
-		                       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id, layout_marks,
+		                       intro_enabled, outro_enabled, intro_asset_id, outro_asset_id,
 		                       video_output_mode, companion_project_id, render_engine, video_font, updated_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47, now())
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    saga_id = EXCLUDED.saga_id, status = EXCLUDED.status, script_content = EXCLUDED.script_content,
-		    manim_scene_class_name = EXCLUDED.manim_scene_class_name,
+		    scene_class_name = EXCLUDED.scene_class_name,
 		    plugin_id = EXCLUDED.plugin_id, category_hint = EXCLUDED.category_hint, voice_language = EXCLUDED.voice_language,
 		    video_format_id = EXCLUDED.video_format_id, video_format_version = EXCLUDED.video_format_version,
 		    review_enabled = EXCLUDED.review_enabled, beats = EXCLUDED.beats,
@@ -388,13 +372,12 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		    outro_enabled = EXCLUDED.outro_enabled,
 		    intro_asset_id = EXCLUDED.intro_asset_id,
 		    outro_asset_id = EXCLUDED.outro_asset_id,
-		    layout_marks = EXCLUDED.layout_marks,
 		    video_output_mode = EXCLUDED.video_output_mode,
 		    companion_project_id = EXCLUDED.companion_project_id,
 		    render_engine = EXCLUDED.render_engine,
 		    video_font = EXCLUDED.video_font,
 		    updated_at = now()`,
-		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.ManimSceneClassName, project.PluginID,
+		project.ProjectID, project.SagaID, string(project.Status), project.ScriptContent, project.SceneClassName, project.PluginID,
 		project.CategoryHint, string(project.ContentLanguage),
 		project.VideoFormatID, project.VideoFormatVersion, project.ReviewEnabled, beatsJSON, warningsJSON,
 		project.BackgroundMusicPath, scenesJSON, project.RenderedVideoPath, project.VideoPath,
@@ -403,7 +386,7 @@ func (r *ProjectRepository) Save(ctx context.Context, project *domain.Project) e
 		project.TTSEnabled, project.VoiceID, project.SubtitlesEnabled, subtitleStyleJSON,
 		waitOffsetsJSON, project.RenderedVideoSeconds, string(project.RenderQuality),
 		project.BackgroundMusicVolume, chaptersJSON, project.CaptionPath, string(project.SubtitleMode), project.CaptionStatus,
-		project.IntroEnabled, project.OutroEnabled, project.IntroAssetID, project.OutroAssetID, layoutMarksJSON,
+		project.IntroEnabled, project.OutroEnabled, project.IntroAssetID, project.OutroAssetID,
 		string(project.VideoOutputMode), project.CompanionProjectID, string(renderEngine), project.VideoFont)
 	return err
 }
@@ -510,20 +493,6 @@ func (r *ProjectRepository) ListRecentProjectEvents(ctx context.Context, limit i
 	return scanProjectEvents(rows)
 }
 
-// SaveRenderEngine updates only Project.RenderEngine (the wizard
-// picks the engine at step "/" / tab 1a, before any authoring content
-// exists, so this has to land on the row without touching the other columns
-// Save()'s full upsert would otherwise reset). A no-op on an unknown
-// projectID's absence is intentionally NOT an error here: this is called
-// best-effort from CreateProjectDraftUseCase, which already 404s on its own
-// terms when the project truly does not exist.
-func (r *ProjectRepository) SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error {
-	_, err := r.pool.Exec(ctx,
-		`UPDATE projects SET render_engine = $1, updated_at = now() WHERE project_id = $2`,
-		string(engine), projectID)
-	return err
-}
-
 // SaveWizardSettings writes wizard step 2's choices onto the columns the saga
 // later reads, and marks step 2 as confirmed. Touches only those columns, so —
 // unlike Save's full upsert — it cannot reset the authoring/saga fields.
@@ -585,22 +554,21 @@ func (r *ProjectRepository) PatchWizardSettings(ctx context.Context, projectID s
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE projects SET
 		    voice_language = COALESCE($1::text, voice_language),
-		    render_engine = COALESCE($2::text, render_engine),
-		    tts_enabled = COALESCE($3::boolean, tts_enabled),
-		    voice_id = COALESCE($4::text, voice_id),
-		    subtitle_mode = COALESCE($5::text, subtitle_mode),
-		    subtitles_enabled = COALESCE($6::boolean, subtitles_enabled),
-		    subtitle_style = COALESCE($7::jsonb, subtitle_style),
-		    render_quality = COALESCE($8::text, render_quality),
-		    video_format_id = COALESCE($9::text, video_format_id),
-		    video_output_mode = COALESCE($10::text, video_output_mode),
-		    background_music_path = CASE WHEN $11::text IS NULL THEN background_music_path
-		                                 WHEN $11::text = '' THEN NULL ELSE $11::text END,
-		    background_music_volume = COALESCE($12::double precision, background_music_volume),
-		    video_font = COALESCE($13::text, video_font),
-		    wizard_step = GREATEST(wizard_step, $14::int), updated_at = now()
-		WHERE project_id = $15`,
-		enumStr(p.ContentLanguage), enumStr(p.RenderEngine), p.TTSEnabled, p.VoiceID,
+		    tts_enabled = COALESCE($2::boolean, tts_enabled),
+		    voice_id = COALESCE($3::text, voice_id),
+		    subtitle_mode = COALESCE($4::text, subtitle_mode),
+		    subtitles_enabled = COALESCE($5::boolean, subtitles_enabled),
+		    subtitle_style = COALESCE($6::jsonb, subtitle_style),
+		    render_quality = COALESCE($7::text, render_quality),
+		    video_format_id = COALESCE($8::text, video_format_id),
+		    video_output_mode = COALESCE($9::text, video_output_mode),
+		    background_music_path = CASE WHEN $10::text IS NULL THEN background_music_path
+		                                 WHEN $10::text = '' THEN NULL ELSE $10::text END,
+		    background_music_volume = COALESCE($11::double precision, background_music_volume),
+		    video_font = COALESCE($12::text, video_font),
+		    wizard_step = GREATEST(wizard_step, $13::int), updated_at = now()
+		WHERE project_id = $14`,
+		enumStr(p.ContentLanguage), p.TTSEnabled, p.VoiceID,
 		mode, subtitlesEnabled, subtitleStyleJSON,
 		enumStr(p.RenderQuality), p.VideoFormatID, enumStr(p.VideoOutputMode),
 		p.BackgroundMusicPath, p.BackgroundMusicVolume, p.VideoFont,

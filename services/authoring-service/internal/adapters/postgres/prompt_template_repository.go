@@ -179,9 +179,9 @@ func (r *PromptTemplateRepository) GetAuthoringStoryboard(ctx context.Context, p
 	return content, err
 }
 
-// --- step 3: authoring code (Manim Engineer output) -----------------------
+// --- step 3: authoring code (Remotion Engineer output) --------------------
 
-// SaveAuthoringCode upserts the pasted Manim code for a project. Same
+// SaveAuthoringCode upserts the pasted code for a project. Same
 // insert-if-absent-row/update-in-place shape as SaveAuthoringStory/
 // SaveAuthoringStoryboard, sharing the same project_authoring row.
 func (r *PromptTemplateRepository) SaveAuthoringCode(ctx context.Context, projectID, content string) error {
@@ -194,7 +194,7 @@ func (r *PromptTemplateRepository) SaveAuthoringCode(ctx context.Context, projec
 	return err
 }
 
-// GetAuthoringCode returns the saved Manim code, or "" if none was saved yet.
+// GetAuthoringCode returns the saved code, or "" if none was saved yet.
 func (r *PromptTemplateRepository) GetAuthoringCode(ctx context.Context, projectID string) (string, error) {
 	var content string
 	err := r.pool.QueryRow(ctx, `

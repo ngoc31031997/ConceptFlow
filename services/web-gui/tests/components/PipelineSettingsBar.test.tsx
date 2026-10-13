@@ -7,8 +7,6 @@ const LLM_ENABLED = { enabled: true, provider: "hive" };
 function renderBar(overrides: Partial<Parameters<typeof PipelineSettingsBar>[0]> = {}) {
   return render(
     <PipelineSettingsBar
-      renderEngine="manim"
-      onEngineChange={vi.fn()}
       llm={LLM_ENABLED}
       mode="manual"
       onModeChange={vi.fn()}
@@ -18,41 +16,28 @@ function renderBar(overrides: Partial<Parameters<typeof PipelineSettingsBar>[0]>
   );
 }
 
-// Engine và cách làm đã chốt ở màn chọn tình huống (ScriptStepPage); hiện
-// lại y nguyên hai bộ chọn đầy đủ ở mỗi tab 1a/1b/1c sẽ đọc như thể Creator
-// chưa chọn gì. PipelineSettingsBar thay chúng bằng một
-// dòng tóm tắt, chỉ mở lại thành bộ chọn đầy đủ khi bấm "Đổi".
+// Cách làm đã chốt ở bước Cấu hình; hiện lại y nguyên bộ chọn đầy đủ ở mỗi
+// tab 1a/1b/1c sẽ đọc như thể Creator chưa chọn gì. PipelineSettingsBar thay
+// nó bằng một dòng tóm tắt, chỉ mở lại thành bộ chọn đầy đủ khi bấm "Đổi".
 describe("PipelineSettingsBar", () => {
-  it("mặc định thu gọn: không hiện bộ chọn engine hay công tắc chế độ", () => {
+  it("mặc định thu gọn: không hiện công tắc chế độ", () => {
     renderBar();
 
-    expect(screen.getByText("Manim", { exact: false })).toBeInTheDocument();
-    expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
     expect(screen.queryByTestId("authoring-mode-switch")).not.toBeInTheDocument();
   });
 
-  it("bấm 'Đổi' mở ra cả hai bộ chọn đầy đủ", () => {
+  it("bấm 'Đổi' mở ra công tắc chế độ; không có bộ chọn engine", () => {
     renderBar();
 
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
 
-    expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
     expect(screen.getByTestId("authoring-mode-switch")).toBeInTheDocument();
-  });
-
-  it("không cho đổi engine khi onEngineChange không được truyền (1b)", () => {
-    renderBar({ onEngineChange: undefined });
-
-    fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
-
     expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
-    expect(screen.getByTestId("authoring-mode-switch")).toBeInTheDocument();
   });
 
-  it("dòng tóm tắt nói đúng engine và chế độ đang chọn", () => {
-    renderBar({ renderEngine: "remotion", mode: "ai" });
+  it("dòng tóm tắt nói đúng chế độ đang chọn", () => {
+    renderBar({ mode: "ai" });
 
-    expect(screen.getByTestId("pipeline-settings-bar")).toHaveTextContent("Remotion");
     expect(screen.getByTestId("pipeline-settings-bar")).toHaveTextContent("Để AI làm giúp");
   });
 });

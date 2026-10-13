@@ -9,7 +9,6 @@ import (
 
 // WizardPort is the persistence the wizard's step 2 saves need.
 type WizardPort interface {
-	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 	GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error)
 	PatchWizardSettings(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error
@@ -33,9 +32,6 @@ func NewPatchWizardSettingsUseCase(repo WizardPort) *PatchWizardSettingsUseCase 
 func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
 	if p.ContentLanguage != nil && *p.ContentLanguage != domain.LanguageVietnamese && *p.ContentLanguage != domain.LanguageEnglish {
 		return fmt.Errorf("%w: voice_language must be 'vi' or 'en'", domain.ErrInvalidWizardInput)
-	}
-	if p.RenderEngine != nil && !p.RenderEngine.IsValid() {
-		return fmt.Errorf("%w: render_engine must be 'manim' or 'remotion'", domain.ErrInvalidWizardInput)
 	}
 	if p.RenderQuality != nil && !p.RenderQuality.IsValid() {
 		return fmt.Errorf("%w: unknown render_quality", domain.ErrInvalidWizardInput)
@@ -61,15 +57,15 @@ func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID str
 	if projectID == "" {
 		return fmt.Errorf("%w: project_id is required", domain.ErrInvalidWizardInput)
 	}
-	status, err := uc.repo.GetStatus(ctx, projectID)
+	project, err := uc.repo.Get(ctx, projectID)
 	if err != nil {
 		return err
 	}
-	if !domain.WizardPatchAllowed(status, p) {
+	if !domain.WizardPatchAllowed(project.Status, p) {
 		return domain.ErrInvalidStatus
 	}
 	if p.Confirm {
-		if err := uc.checkOutput(ctx, projectID, p); err != nil {
+		if err := uc.checkOutput(ctx, project, p); err != nil {
 			return err
 		}
 	}
@@ -79,27 +75,17 @@ func (uc *PatchWizardSettingsUseCase) Execute(ctx context.Context, projectID str
 // checkOutput holds the settings the project will have once p is saved to
 // domain.CheckOutputSettings. Fields are saved one by one as the Creator
 // edits them, so the combination is only judged when step 2 is confirmed.
-func (uc *PatchWizardSettingsUseCase) checkOutput(ctx context.Context, projectID string, p domain.WizardSettingsPatch) error {
-	project, err := uc.repo.Get(ctx, projectID)
-	if err != nil {
-		return err
-	}
-	mode, formatID, engine := project.VideoOutputMode, project.VideoFormatID, project.RenderEngine
+func (uc *PatchWizardSettingsUseCase) checkOutput(ctx context.Context, project *domain.Project, p domain.WizardSettingsPatch) error {
+	mode, formatID := project.VideoOutputMode, project.VideoFormatID
 	if p.VideoOutputMode != nil {
 		mode = *p.VideoOutputMode
 	}
 	if p.VideoFormatID != nil {
 		formatID = *p.VideoFormatID
 	}
-	if p.RenderEngine != nil {
-		engine = *p.RenderEngine
-	}
-	if engine == "" {
-		engine = domain.DefaultRenderEngine
-	}
 	format, err := uc.repo.GetVideoFormat(ctx, formatOrDefault(formatID), 0)
 	if err != nil {
 		return fmt.Errorf("load video format: %w", err)
 	}
-	return domain.CheckOutputSettings(mode, format, engine)
+	return domain.CheckOutputSettings(mode, format)
 }

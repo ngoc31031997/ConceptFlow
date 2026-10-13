@@ -1,5 +1,5 @@
 /*
-  Dáng thẻ lấy từ ContentLanguagePicker/RenderEnginePicker: cùng một hàng glass
+  Dáng thẻ lấy từ ContentLanguagePicker: cùng một hàng glass
   card chạy hết chiều ngang, chữ bên trái, lựa chọn bên phải. Cách làm cả bước
   1 là một quyết định ngang hàng với ngôn ngữ nội dung và công cụ render, nên
   nó phải trông như vậy — không phải một tiện ích nhỏ nhét dưới ô prompt.

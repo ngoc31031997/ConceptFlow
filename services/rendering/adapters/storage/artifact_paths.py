@@ -1,6 +1,6 @@
-"""Shared-volume path convention for Rendering's output video (Manim-script
-input mode — one project renders to one silent video, later muxed with
-narration audio by Video Assembly).
+"""Shared-volume path convention for Rendering's output video (one project
+renders to one silent video, later muxed with narration audio by Video
+Assembly).
 
 Pure filesystem helpers, no framework dependency — constructed directly
 by the application layer rather than injected (dependency-injection.md).
@@ -25,7 +25,7 @@ def compute_timing_path(project_id: str) -> str:
 
     Kept next to the video rather than only on the event, because render() is
     idempotent — a redelivered command finds the .mp4 already there and skips
-    the Manim run. Without this file that fast path would have no offsets to
+    the render. Without this file that fast path would have no offsets to
     report and would silently emit a desynchronised event.
     """
     return os.path.join(SHARED_VOLUME_ROOT, project_id, "video", "timing.json")
@@ -60,20 +60,6 @@ def ensure_parent_dir(video_path: str) -> None:
     os.makedirs(os.path.dirname(video_path), exist_ok=True)
 
 
-def compute_channel_asset_path(kind: str, render_quality: str) -> str:
-    """Conventional path for a channel-wide asset:
-    /shared/channel-assets/{kind}/{render_quality}/rendered.mp4
-
-    Not keyed by project_id — intro/outro belong to the channel, not to any
-    one project. Keyed by render_quality because there is one asset
-    per quality: splicing a 1080p60 intro onto a 4k60 body is not a concat the
-    demuxer can do, so the two cannot share a file. video-assembly is the one
-    that copies this into its own `channel_assets` table (with
-    `source_hash`/`version`); Rendering only ever produces the file.
-    """
-    return os.path.join(SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, "rendered.mp4")
-
-
 def _safe_project_id(project_id: str) -> str:
     """A project id is a single path segment. Anything else could make the
     purge delete outside the project's own directory."""
@@ -101,9 +87,9 @@ def _rmdir_if_empty(path: str) -> None:
 
 def purge_project_artifacts(project_id: str, cache_root: str | None = None) -> None:
     """Remove what Rendering owns for a deleted project — its
-    rendered video and timing sidecar, and its Manim media cache
-    (`cache_root/{project_id}`, RENDER_CACHE_ROOT). Never touches final.mp4,
-    which belongs to video-assembly. Idempotent."""
+    rendered video and timing sidecar, and its Remotion media cache
+    (`cache_root/{project_id}`). Never touches final.mp4, which belongs to
+    video-assembly. Idempotent."""
     pid = _safe_project_id(project_id)
     video_dir = os.path.join(SHARED_VOLUME_ROOT, pid, "video")
     _remove(os.path.join(video_dir, "rendered.mp4"))

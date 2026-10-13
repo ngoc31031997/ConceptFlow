@@ -71,12 +71,12 @@ func TestRetryStepUseCase_RebuildsValidateScriptPayload(t *testing.T) {
 	uc := NewRetryStepUseCase(repo, pub)
 
 	repo.projects["proj-1"] = &domain.Project{
-		ProjectID:           "proj-1",
-		SagaID:              "saga-1",
-		Status:              domain.StatusFailedValidateScript,
-		ScriptContent:       "from conceptflow import *\n",
-		ManimSceneClassName: "DemoScene",
-		RenderQuality:       domain.DefaultRenderQuality,
+		ProjectID:      "proj-1",
+		SagaID:         "saga-1",
+		Status:         domain.StatusFailedValidateScript,
+		ScriptContent:  "from conceptflow import *\n",
+		SceneClassName: "DemoScene",
+		RenderQuality:  domain.DefaultRenderQuality,
 	}
 
 	out, err := uc.Execute(context.Background(), "proj-1")

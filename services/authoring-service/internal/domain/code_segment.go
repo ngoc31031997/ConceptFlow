@@ -7,7 +7,7 @@ import (
 )
 
 // The code step is stored as segments (see ADR-0030): the shared
-// frame (LAYOUT for Remotion, cast for Manim) and one segment per chunk of
+// frame (LAYOUT) and one segment per chunk of
 // shots. llm-service decides what each segment's fingerprint is; this service
 // keeps the segments so a failed or interrupted run loses nothing already
 // written, and the Creator can re-run or paste a single segment.

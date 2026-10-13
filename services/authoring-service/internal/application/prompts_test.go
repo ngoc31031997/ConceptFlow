@@ -100,7 +100,7 @@ func TestSystemPrompts_OnePerRoleAndVietnameseOnly(t *testing.T) {
 			t.Errorf("%s: not a usable system row: %+v", p.Role, p)
 		}
 	}
-	for _, role := range []domain.PromptRole{domain.RoleStoryArchitect, domain.RoleVisualDirector, domain.RoleManimEngineer, domain.RoleRemotionEngineer} {
+	for _, role := range []domain.PromptRole{domain.RoleStoryArchitect, domain.RoleVisualDirector, domain.RoleRemotionEngineer} {
 		if seen[role] != 1 {
 			t.Errorf("role %s has %d system rows, want 1", role, seen[role])
 		}
@@ -170,12 +170,12 @@ func TestDeletingTheActivePromptHandsTheRoleBackToTheSystemOne(t *testing.T) {
 	uc := application.NewPromptsUseCase(newFakePromptLibrary())
 	ctx := context.Background()
 
-	mine, _ := uc.Create(ctx, domain.RoleManimEngineer, "của tôi", "nội dung")
+	mine, _ := uc.Create(ctx, domain.RoleRemotionEngineer, "của tôi", "nội dung")
 	_, _ = uc.Activate(ctx, mine.ID)
 	if err := uc.Delete(ctx, mine.ID); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
-	got, err := uc.Active(ctx, domain.RoleManimEngineer)
+	got, err := uc.Active(ctx, domain.RoleRemotionEngineer)
 	if err != nil || !got.IsSystem {
 		t.Errorf("active after delete = %+v, %v; want the system prompt", got, err)
 	}

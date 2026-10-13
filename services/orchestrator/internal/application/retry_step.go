@@ -133,33 +133,22 @@ func rebuildPayload(stepName domain.StepName, project *domain.Project) (map[stri
 		// onScriptParsed: rendering's consumer reads script_content and
 		// scene_class_name unconditionally, so an incomplete payload here
 		// crashes it with a KeyError instead of failing the step.
-		engine := project.RenderEngine
-		if !engine.IsValid() {
-			engine = domain.DefaultRenderEngine
-		}
 		return map[string]interface{}{
 			"script_content":   project.ScriptContent,
-			"scene_class_name": project.ManimSceneClassName,
+			"scene_class_name": project.SceneClassName,
 			"render_quality":   string(project.RenderQuality),
-			"engine":           string(engine),
+			"engine":           string(project.RenderEngine),
 		}, nil
 	case domain.StepSynthesizeSpeech:
 		return map[string]interface{}{"scenes": scenesToPayloadForSynthesis(project.Scenes, string(project.ContentLanguage), project.VoiceID)}, nil
 	case domain.StepRenderScenes:
-		// feature/remotion-engine: without "engine" here, retrying this step
-		// silently fell back to Manim (rendering's consumer.py defaults an
-		// absent engine to "manim") regardless of what render_engine the
-		// project actually picked — the render would then run the Manim AST
-		// lint against a Remotion (.tsx) script and fail immediately.
-		engine := project.RenderEngine
-		if !engine.IsValid() {
-			engine = domain.DefaultRenderEngine
-		}
+		// "engine" is sent explicitly so rendering never has to guess which
+		// engine the stored script was written for.
 		return map[string]interface{}{
 			"scenes":           scenesToPayload(project.Scenes),
 			"script_content":   project.ScriptContent,
-			"scene_class_name": project.ManimSceneClassName,
-			"engine":           string(engine),
+			"scene_class_name": project.SceneClassName,
+			"engine":           string(project.RenderEngine),
 		}, nil
 	case domain.StepAssembleVideo:
 		return assembleVideoPayload(project), nil

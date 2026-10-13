@@ -96,12 +96,12 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
         sections[i].compareDocumentPosition(sections[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
-    // Kiểu video nằm cùng nhóm với format nó gợi ý; engine nằm ở nhóm cách soạn.
+    // Kiểu video nằm cùng nhóm với format nó gợi ý; không có bộ chọn engine.
     await waitFor(() =>
       expect(sections[0]).toContainElement(screen.getByTestId("video-archetype-picker")),
     );
     expect(sections[0]).toContainElement(screen.getByTestId("video-format-picker"));
-    expect(sections[2]).toContainElement(screen.getByTestId("render-engine-picker"));
+    expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
   });
 
   it("hiện chủ đề chỉ đọc, “Sửa” đưa về bước 1", async () => {
@@ -138,7 +138,7 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
     fireEvent.click(screen.getByTestId("video-archetype-select-option-A"));
 
     await waitFor(() =>
-      expect(createDraft).toHaveBeenCalledWith(expect.any(String), "kiểu: A", "vi", "manim"),
+      expect(createDraft).toHaveBeenCalledWith(expect.any(String), "kiểu: A", "vi"),
     );
     expect(screen.getByTestId("topic-summary")).toHaveTextContent("kiểu: A");
 

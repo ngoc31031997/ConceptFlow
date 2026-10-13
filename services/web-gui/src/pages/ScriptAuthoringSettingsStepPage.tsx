@@ -4,7 +4,6 @@ import { AppShell } from "../components/AppShell";
 import { TopicSummary } from "../components/TopicSummary";
 import { VideoArchetypePicker } from "../components/VideoArchetypePicker";
 import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
-import { RenderEnginePicker } from "../components/RenderEnginePicker";
 import { AuthoringModeBar } from "../components/AuthoringModeBar";
 import { AuthoringModelPicker } from "../components/AuthoringModelPicker";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -51,7 +50,7 @@ function SettingsSection({ title, hint, testId, children }: SettingsSectionProps
 /**
  * Bước 2 — cấu hình mà các bước soạn (Kịch bản, Hình ảnh, Code) và Giọng đọc
  * đọc, chia ba nhóm theo thứ tự quyết định: nội dung video (ngôn ngữ, kiểu
- * video, format, kiểu đầu ra), giọng đọc, cách soạn (engine, AI hay tự làm,
+ * video, format, kiểu đầu ra), giọng đọc, cách soạn (AI hay tự làm,
  * model). Kiểu video nằm ngay trên format vì nó gợi ý format; lựa chọn được
  * ghi thành "kiểu: X" ở cuối chủ đề nên đổi kiểu là lưu lại chủ đề.
  *
@@ -74,8 +73,6 @@ export function ScriptAuthoringSettingsStepPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const isRemotion = draft.renderEngine === "remotion";
-  const isShort = draft.videoOutputMode === "short";
   const modeFormats = formatsFor(draft.videoOutputMode, formats);
   // Dự án trùng chủ đề, do Bước 1 chuyển sang lúc tạo project.
   const location = useLocation();
@@ -114,7 +111,7 @@ export function ScriptAuthoringSettingsStepPage() {
     if (!projectId) return;
     const run = queueRef.current.then(async () => {
       try {
-        await createProjectDraft(projectId, topic.trim(), draft.voiceLanguage, draft.renderEngine);
+        await createProjectDraft(projectId, topic.trim(), draft.voiceLanguage);
         setSaveError(null);
       } catch {
         setSaveError("Không lưu được kiểu video — kiểm tra kết nối rồi thử lại.");
@@ -128,14 +125,13 @@ export function ScriptAuthoringSettingsStepPage() {
     void send({ videoFormatId: formatId });
   }
 
-  // A short is built vertically from the start: the short format, Remotion
-  // (Manim has no portrait frame) and no burned subtitles. The server applies
+  // A short is built vertically from the start: the short format and
+  // captions burned in at the top. The server applies
   // the same defaults to the same patch; the draft follows so the screen shows them.
   function handleOutputModeChange(mode: VideoOutputMode) {
     dispatch({ type: "SET_VIDEO_OUTPUT_MODE", payload: mode });
     if (mode === "short") {
       dispatch({ type: "SET_VIDEO_FORMAT", payload: SHORT_FORMAT_ID });
-      dispatch({ type: "SET_RENDER_ENGINE", payload: "remotion" });
       // Same defaults the server applies: short captions burned in at the top.
       dispatch({ type: "SET_SUBTITLE_MODE", payload: "burn_in" });
       dispatch({ type: "SET_SUBTITLE_STYLE", payload: { position: "top" } });
@@ -149,11 +145,6 @@ export function ScriptAuthoringSettingsStepPage() {
       return;
     }
     void send({ videoOutputMode: mode });
-  }
-
-  function handleEngineChange(engine: "manim" | "remotion") {
-    dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
-    void send({ renderEngine: engine });
   }
 
   async function handleContinue() {
@@ -177,7 +168,7 @@ export function ScriptAuthoringSettingsStepPage() {
         currentStep={2}
         wide
         title={flowTitle(FLOW_CONFIG)}
-        subtitle={`${isRemotion ? "Remotion" : "Manim"} · Ba nhóm cài đặt, làm từ trên xuống. Chất lượng, phụ đề và nhạc nền chọn ở bước Duyệt nội dung. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay.`}
+        subtitle="Ba nhóm cài đặt, làm từ trên xuống. Chất lượng, phụ đề và nhạc nền chọn ở bước Duyệt nội dung. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay."
       >
         <TopicSummary topic={draft.authoringTopic} onEdit={() => navigate("/")} />
         {similarProjects.length > 0 && (
@@ -246,17 +237,9 @@ export function ScriptAuthoringSettingsStepPage() {
 
         <SettingsSection
           title="3. Cách soạn"
-          hint="Công cụ dựng hình, và AI làm giúp hay bạn tự làm với ChatGPT, Claude…"
+          hint="AI làm giúp hay bạn tự làm với ChatGPT, Claude…"
           testId="settings-section-authoring"
         >
-          <div className={styles.settingsRow}>
-            <RenderEnginePicker value={draft.renderEngine} onChange={handleEngineChange} disabled={isShort} />
-            {isShort && (
-              <p className={glass.helperText} role="status" data-testid="short-engine-note">
-                Short dọc chỉ dựng được bằng Remotion.
-              </p>
-            )}
-          </div>
           <div className={styles.settingsRow}>
             <AuthoringModeBar
               llm={llm}

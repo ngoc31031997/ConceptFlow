@@ -48,7 +48,7 @@ type CodePipelinePort interface {
 }
 
 type CodeGenRequest struct {
-	Engine     string // "remotion" | "manim"
+	Engine     string // always "remotion"; part of llm-service's segment fingerprints
 	Topic      string
 	Storyboard string // JSON
 	// System is the rendered *_engineer_ai prompt.

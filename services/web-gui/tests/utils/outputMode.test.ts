@@ -23,6 +23,6 @@ describe("formats by output mode", () => {
 
   it("no production step is skipped for either output: the flow has no clip-cutting step", () => {
     expect(FLOW_LABELS).not.toContain("Cắt short");
-    for (const step of [9, 10, 11]) expect(stepStatus(step, 12, "idle", "remotion")).toBe("done");
+    for (const step of [9, 10, 11]) expect(stepStatus(step, 12, "idle")).toBe("done");
   });
 });

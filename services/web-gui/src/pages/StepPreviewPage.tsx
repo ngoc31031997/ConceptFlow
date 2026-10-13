@@ -9,12 +9,11 @@ import {
   FLOW_LABELS,
   FLOW_STEP_PURPOSE,
   flowTitle,
-  skippedReason,
 } from "../utils/flow";
 import styles from "./StepPreviewPage.module.css";
 
 /**
- * Xem trước một bước video chưa tới, hoặc một bước "Không dùng": tên bước, bước
+ * Xem trước một bước video chưa tới: tên bước, bước
  * đó làm gì, và vì sao chưa mở được. Màn chỉ để đọc — không có ô nhập hay nút
  * hành động — nên không thể làm một bước khi các bước trước nó chưa xong.
  *
@@ -28,7 +27,6 @@ export function StepPreviewPage() {
   const navigate = useNavigate();
   const flow = useProjectFlow();
   const nav = useStepNav(valid ? step : undefined, { preview: true });
-  const status = valid ? nav.status(step) : "pending";
   const reached = valid && nav.hasProject && nav.isReached(step);
 
   useEffect(() => {
@@ -39,7 +37,6 @@ export function StepPreviewPage() {
 
   if (!valid) return <Navigate to="/" replace />;
 
-  const skipped = status === "skipped";
   const backToCurrent = () =>
     nav.hasProject && flow.flowStep ? nav.open(flow.flowStep) : navigate("/");
 
@@ -52,15 +49,7 @@ export function StepPreviewPage() {
         subtitle={FLOW_STEP_PURPOSE[step - 1]}
       >
         <p className={styles.notice} role="status" data-testid="step-preview-notice">
-          {skipped ? (
-            <>
-              <b>Không dùng.</b> {skippedReason()}
-            </>
-          ) : (
-            <>
-              <b>Chưa tới bước này.</b> Đây là xem trước; bước này mở khi video đi tới đây.
-            </>
-          )}
+          <b>Chưa tới bước này.</b> Đây là xem trước; bước này mở khi video đi tới đây.
         </p>
         <Card title="Bước này làm gì">
           <p className={styles.purpose}>{FLOW_STEP_PURPOSE[step - 1]}</p>

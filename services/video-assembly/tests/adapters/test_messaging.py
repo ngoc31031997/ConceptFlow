@@ -20,7 +20,6 @@ from adapters.messaging.consumer import (
     AssembleVideoCommandHandler,
     NormalizeChannelAssetCommandHandler,
     QCVideoCommandHandler,
-    RegisterChannelAssetCommandHandler,
 )
 from adapters.persistence.channel_assets import ChannelAssetsRepository
 from adapters.persistence.inbox import InboxRepository
@@ -492,94 +491,6 @@ async def test_normalize_video_after_music_still_caches_on_the_video_hash(shared
     assert len(pool.store.channel_assets) == 2
 
 
-def make_channel_asset_rendered_envelope(
-    message_id: str = "msg-r1",
-    kind: str = "outro",
-    video_path: str = "/shared/channel-assets/outro/1080p60/rendered.mp4",
-    video_duration_seconds: float = 18.0,
-    render_quality: str = "1080p60",
-) -> bytes:
-    envelope = {
-        "message_id": message_id,
-        "saga_id": "saga-1",
-        "project_id": "channel-asset-admin",
-        "schema_version": "1.0",
-        "timestamp": "2026-09-10T00:00:00Z",
-        "event_type": "register_channel_asset",
-        "payload": {
-            "event_type": "register_channel_asset",
-            "kind": kind,
-            "video_path": video_path,
-            "video_duration_seconds": video_duration_seconds,
-            "render_quality": render_quality,
-        },
-    }
-    return json.dumps(envelope).encode("utf-8")
-
-
-def _build_rendered_handler() -> tuple[RegisterChannelAssetCommandHandler, FakePool]:
-    pool = FakePool()
-    inbox = InboxRepository(pool)
-    outbox = OutboxRepository()
-    channel_assets = ChannelAssetsRepository(pool)
-    handler = RegisterChannelAssetCommandHandler(pool, channel_assets, inbox, outbox)
-    return handler, pool
-
-
-@pytest.mark.asyncio
-async def test_channel_asset_rendered_registers_for_the_rendered_quality_only() -> None:
-    """One asset per quality. Rendering names the quality it actually
-    rendered at, and only that row may be registered — a 1080p60 outro
-    registered as the 4k60 one would fail the concat at assembly time."""
-    handler, pool = _build_rendered_handler()
-
-    await handler.handle(FakeMessage(make_channel_asset_rendered_envelope()))
-
-    assert len(pool.store.channel_assets) == 1
-    assert len(pool.store.outbox_events) == 1
-    row = next(iter(pool.store.channel_assets.values()))
-    assert row["render_quality"] == "1080p60"
-    assert row["kind"] == "outro"
-    assert row["video_path"] == "/shared/channel-assets/outro/1080p60/rendered.mp4"
-    event = next(iter(pool.store.outbox_events.values()))
-    assert event["event_type"] == "channel_asset_normalized"
-    assert event["payload"]["payload"]["kind"] == "outro"
-    assert event["payload"]["payload"]["render_quality"] == "1080p60"
-
-
-@pytest.mark.asyncio
-async def test_channel_asset_rendered_keeps_qualities_apart() -> None:
-    """Two qualities of the same kind are two separate active assets, not one
-    superseding the other."""
-    handler, pool = _build_rendered_handler()
-
-    await handler.handle(FakeMessage(make_channel_asset_rendered_envelope(message_id="msg-r1")))
-    await handler.handle(
-        FakeMessage(
-            make_channel_asset_rendered_envelope(
-                message_id="msg-r2",
-                render_quality="4k60",
-                video_path="/shared/channel-assets/outro/4k60/rendered.mp4",
-            )
-        )
-    )
-
-    active = [row for row in pool.store.channel_assets.values() if row["superseded_at"] is None]
-    assert {row["render_quality"] for row in active} == {"1080p60", "4k60"}
-
-
-@pytest.mark.asyncio
-async def test_channel_asset_rendered_is_idempotent_on_duplicate_message_id() -> None:
-    handler, pool = _build_rendered_handler()
-    message = FakeMessage(make_channel_asset_rendered_envelope(message_id="msg-r1"))
-
-    await handler.handle(message)
-    await handler.handle(FakeMessage(make_channel_asset_rendered_envelope(message_id="msg-r1")))
-
-    assert len(pool.store.channel_assets) == 1
-    assert len(pool.store.outbox_events) == 1
-
-
 # --- qc_video ------------------------------------------------------------------
 
 
@@ -589,7 +500,6 @@ def make_qc_envelope(
     render_quality: str = "1080p60",
     narration_segments=None,
     subtitle_cues=None,
-    layout_marks=None,
 ) -> bytes:
     envelope = {
         "message_id": message_id,
@@ -606,22 +516,6 @@ def make_qc_envelope(
             if narration_segments is not None
             else [{"audio_path": "/shared/project-1/audio0.wav", "start_time": 0.0}],
             "subtitle_cues": subtitle_cues if subtitle_cues is not None else [],
-            "layout_marks": layout_marks
-            if layout_marks is not None
-            else [
-                {
-                    "index": 0,
-                    "t": 12.5,
-                    "mobjects": [
-                        {
-                            "cls": "Text",
-                            "bbox": [-9.0, -7.5, 1.0, 0.0],
-                            "color": "#F2F7FF",
-                            "font_size": 36.0,
-                        }
-                    ],
-                }
-            ],
         },
     }
     return json.dumps(envelope).encode("utf-8")
@@ -669,14 +563,14 @@ def _patch_probes(monkeypatch, *, loudness=-14.0, peak=-3.0, attributes=None, ra
 
 
 @pytest.mark.asyncio
-async def test_qc_video_reports_findings_for_a_frame_overflowing_video(
+async def test_qc_video_reports_findings_for_an_off_target_loudness(
     shared_volume_root, monkeypatch
 ) -> None:
-    """A normal qc_video with a real layout problem (bbox outside the Manim
-    frame) yields qc_completed with status=has_findings."""
+    """A normal qc_video with a real problem (master far below the LUFS
+    target) yields qc_completed with status=has_findings."""
     video_path = str(shared_volume_root / "final.mp4")
     _touch(video_path)
-    _patch_probes(monkeypatch)
+    _patch_probes(monkeypatch, loudness=-20.0)
     handler, pool = _build_qc_handler()
 
     await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path)))
@@ -687,64 +581,25 @@ async def test_qc_video_reports_findings_for_a_frame_overflowing_video(
     assert payload["event_type"] == "qc_completed"
     assert payload["status"] == QC_STATUS_HAS_FINDINGS
     assert payload["reason"] is None
-    assert any(f["rule"] == "frame_overflow" for f in payload["findings"])
+    assert any(f["rule"] == "loudness_off_target" for f in payload["findings"])
     assert all("timestamp_seconds" in f for f in payload["findings"])
 
 
 @pytest.mark.asyncio
 async def test_qc_video_reports_passed_for_a_clean_video(shared_volume_root, monkeypatch) -> None:
+    """The command carries no layout data and still gets fully scored."""
     video_path = str(shared_volume_root / "final.mp4")
     _touch(video_path)
     _patch_probes(monkeypatch)
     handler, pool = _build_qc_handler()
 
-    clean_marks = [
-        {
-            "index": 0,
-            "t": 1.0,
-            "mobjects": [
-                {
-                    "cls": "Text",
-                    "bbox": [-3.0, -0.5, 1.0, 0.0],
-                    "color": "#F2F7FF",
-                    "font_size": 36.0,
-                }
-            ],
-        }
-    ]
-    await handler.handle(
-        FakeMessage(make_qc_envelope(video_path=video_path, layout_marks=clean_marks))
-    )
+    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path)))
 
     event = next(iter(pool.store.outbox_events.values()))
     payload = event["payload"]["payload"]
     assert payload["status"] == QC_STATUS_PASSED
     assert payload["findings"] == []
     assert payload["reason"] is None
-
-
-@pytest.mark.asyncio
-async def test_qc_video_missing_layout_marks_is_not_scored_not_failed(
-    shared_volume_root, monkeypatch
-) -> None:
-    """A project with no layout_marks (e.g. an older render) still
-    produces qc_completed, never a failure event, and the reason explains
-    why nothing was scored."""
-    video_path = str(shared_volume_root / "final.mp4")
-    _touch(video_path)
-    _patch_probes(monkeypatch)
-    handler, pool = _build_qc_handler()
-
-    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path, layout_marks=[])))
-
-    assert len(pool.store.outbox_events) == 1
-    event = next(iter(pool.store.outbox_events.values()))
-    payload = event["payload"]["payload"]
-    assert payload["event_type"] == "qc_completed"
-    assert payload["status"] == QC_STATUS_NOT_SCORED
-    assert payload["findings"] == []
-    assert payload["reason"]  # non-empty explanation
-    assert "layout_marks" in payload["reason"]
 
 
 @pytest.mark.asyncio
@@ -813,13 +668,19 @@ async def test_qc_video_reports_real_severity_regardless_of_enforcement(
     _touch(video_path)
     _patch_probes(monkeypatch)
     handler, pool = _build_qc_handler(QCThresholds())
+    overlapping = [
+        {"audio_path": "/shared/project-1/audio0.wav", "start_time": 0.0},
+        {"audio_path": "/shared/project-1/audio1.wav", "start_time": 1.0},
+    ]
 
-    await handler.handle(FakeMessage(make_qc_envelope(video_path=video_path)))
+    await handler.handle(
+        FakeMessage(make_qc_envelope(video_path=video_path, narration_segments=overlapping))
+    )
 
     event = next(iter(pool.store.outbox_events.values()))
     findings = event["payload"]["payload"]["findings"]
-    overflow = [f for f in findings if f["rule"] == "frame_overflow"]
-    assert overflow and overflow[0]["severity"] == "blocking"
+    overlap = [f for f in findings if f["rule"] == "narration_overlap"]
+    assert overlap and overlap[0]["severity"] == "blocking"
     assert {f["severity"] for f in findings} <= {"blocking", "warning"}
 
 
@@ -846,20 +707,6 @@ async def test_assemble_video_missing_video_path_fails_the_saga_instead_of_leaki
     assert message.acked is True, "a malformed command must be acked, not left in limbo"
     event = next(iter(pool.store.outbox_events.values()))
     assert event["event_type"] == "assembly_failed"
-
-
-@pytest.mark.asyncio
-async def test_channel_asset_rendered_missing_kind_is_dropped_not_leaked() -> None:
-    handler, pool = _build_rendered_handler()
-    envelope = json.loads(make_channel_asset_rendered_envelope())
-    del envelope["payload"]["kind"]
-    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
-
-    await handler.handle(message)
-
-    assert message.acked is True
-    assert len(pool.store.channel_assets) == 0
-    assert len(pool.store.outbox_events) == 0
 
 
 @pytest.mark.asyncio
@@ -943,3 +790,37 @@ async def test_dispatcher_drops_a_command_the_creator_already_cancelled(shared_v
         assert ran == []
     finally:
         REGISTRY._cancelled_at.pop(envelope["project_id"], None)
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_ignores_an_unregistered_command(shared_volume_root) -> None:
+    """A command no handler is registered for (e.g. `register_channel_asset`)
+    is acked and dropped, never run as an assemble_video."""
+    from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
+
+    handler, pool = _build_handler(FakeVideoAssembler())
+    dispatcher = VideoAssemblyCommandDispatcher(assemble_video=handler)
+    envelope = json.loads(make_envelope(shared_volume_root=shared_volume_root))
+    envelope["event_type"] = "register_channel_asset"
+    message = FakeMessage(json.dumps(envelope).encode("utf-8"))
+
+    await dispatcher.handle(message)
+
+    assert message.acked is True
+    assert pool.store.outbox_events == {}
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_runs_a_command_without_event_type_as_assemble_video(
+    shared_volume_root,
+) -> None:
+    from adapters.messaging.consumer import VideoAssemblyCommandDispatcher
+
+    handler, pool = _build_handler(FakeVideoAssembler())
+    dispatcher = VideoAssemblyCommandDispatcher(assemble_video=handler)
+    message = FakeMessage(make_envelope(shared_volume_root=shared_volume_root))
+
+    await dispatcher.handle(message)
+
+    assert message.acked is True
+    assert len(pool.store.outbox_events) == 1

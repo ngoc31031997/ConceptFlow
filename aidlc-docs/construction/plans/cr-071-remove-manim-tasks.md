@@ -1,6 +1,6 @@
 # CR-071 — Bỏ engine Manim: danh sách task
 
-Thiết kế đã duyệt: `cr-071-remove-manim-design.md` (commit `4d86ad1`). Mỗi task làm và test được riêng; làm theo thứ tự. Comment trong code theo `docs/code-standards-rules.md` §1: nói code làm gì, không nhắc CR, không "trước đây/không còn".
+Thiết kế đã duyệt: `cr-071-remove-manim-design.md` (commit `4d86ad1`), cộng mục "Thay đổi trong lúc code": project Manim bị xoá, không còn phần chỉ-xem. Các task dưới đây đã sửa theo quyết định đó. Mỗi task làm và test được riêng; làm theo thứ tự. Comment trong code theo `docs/code-standards-rules.md` §1: nói code làm gì, không nhắc CR, không "trước đây/không còn".
 
 Quy ước dùng trong các task:
 
@@ -11,7 +11,7 @@ Quy ước dùng trong các task:
 ---
 
 ### T0 — Đếm dữ liệu trước khi đổi
-- [ ] Xong
+- [x] Xong
 
 - **Service**: orchestrator, video-assembly (DB), không đổi code.
 - **Thay đổi**: Bật Docker nếu đang tắt (`docker compose up -d` ở bản checkout chính). Chạy và ghi kết quả vào audit:
@@ -26,25 +26,17 @@ Quy ước dùng trong các task:
 
 ## orchestrator
 
-### T1 — Engine: Remotion là engine duy nhất, `manim` là dấu project cũ
-- [ ] Xong
+### T1 — Engine: Remotion là engine duy nhất
+- [x] Xong
 
 - **Service**: orchestrator
-- **File**: `internal/domain/project.go:190-216` (`RenderEngine`, hằng, `DefaultRenderEngine`, `IsValid`), `:337-340` (doc trường `RenderEngine`); `internal/domain/errors.go` (lỗi mới).
-- **Thay đổi**:
-  - `RenderEngineManim` → `RenderEngineRetiredManim RenderEngine = "manim"`; doc: giá trị chỉ còn trên project dựng bằng Manim, không chạy được nữa (`See ADR-0033.`).
-  - `DefaultRenderEngine = RenderEngineRemotion`.
-  - `IsValid()` (kiểm input): chỉ `RenderEngineRemotion`.
-  - Thêm `IsKnown()`: `remotion` hoặc `manim` (dùng khi đọc/ghi DB).
-  - Thêm `func (p *Project) EngineRetired() bool { return p.RenderEngine == RenderEngineRetiredManim }`.
-  - `errors.go`: `ErrEngineRetired = errors.New("Dự án này dựng bằng Manim, đã ngừng hỗ trợ: chỉ xem, đăng hoặc xoá được.")`.
-  - Doc kiểu `RenderEngine` và trường `Project.RenderEngine` viết lại theo một engine.
-- **Test**: `internal/domain/project_test.go` (hoặc file test domain đang có cho engine): `IsValid` chỉ nhận `remotion`; `IsKnown` nhận cả hai; `EngineRetired` đúng/sai. `go test ./internal/domain/...`
-- **Xong khi**: FR1, FR2 (nền).
+- **File**: `internal/domain/project.go` (`RenderEngine`, hằng, `DefaultRenderEngine`, `IsValid`, doc trường `RenderEngine`).
+- **Thay đổi**: chỉ còn `RenderEngineRemotion`; `DefaultRenderEngine = RenderEngineRemotion`; `IsValid()` chỉ nhận `remotion`. Doc viết theo một engine (`See ADR-0033.`).
+- **Test**: `internal/domain/render_engine_test.go`. `go test ./internal/domain/...`
+- **Xong khi**: FR1.
 - **Phụ thuộc**: T0
-
 ### T2 — Migration và repository
-- [ ] Xong
+- [x] Xong
 
 - **Service**: orchestrator
 - **File**: `internal/adapters/postgres/db.go` (`CREATE TABLE projects` dòng 23; dòng 53; dòng 170-174 `layout_marks`; dòng 186-189 `render_engine`; cuối chuỗi `schema`), `internal/adapters/postgres/project_repository.go` (`Get` dòng 28, 33, 54, 70-74, 106; `List` dòng 179; `Save` dòng 289-292, 340-345, 354-400; `SaveRenderEngine` dòng 520), `internal/domain/project.go:291` (`ManimSceneClassName`), `:395` (`LayoutMarks`).
@@ -73,38 +65,27 @@ Quy ước dùng trong các task:
   - Repository: mọi SQL `manim_scene_class_name` → `scene_class_name`; bỏ `layout_marks` khỏi SELECT/INSERT/UPDATE và biến `layoutMarksJSON`. Đọc/ghi engine dùng `IsKnown()` thay `IsValid()` (giữ `manim` của project cũ; rỗng/lạ → `DefaultRenderEngine`).
   - Xoá `SaveRenderEngine` (repository và port `ProjectDraftPort` ở `internal/application/create_project_draft.go:25-31`): engine không còn chọn được.
 - **Test**: test repository/adapters đang có (`internal/adapters/postgres/*_test.go` nếu chạy được với DB test; nếu không, test đọc chuỗi `schema`) cập nhật tên cột; thêm ca: `schema` chứa khối rename và `DROP COLUMN IF EXISTS layout_marks`. Sửa mọi chỗ biên dịch hỏng do đổi tên (`go build ./...`). `go test ./... && go vet ./... && gofmt -l .`
-- **Xong khi**: FR4 (cột), FR5 (bỏ `layout_marks`); schema chạy lại nhiều lần không lỗi.
+  - Thêm khối `DO $$` có `schema_migrations` id `delete_manim_projects`: xoá `saga_steps`, `outbox_events`, `project_events` rồi `projects` của các hàng `render_engine = 'manim'`.
+- **Xong khi**: FR4 (cột), FR5 (bỏ `layout_marks`); project Manim bị xoá; schema chạy lại nhiều lần không lỗi (đã chạy thử hai lần trên bản sao DB thật).
 - **Phụ thuộc**: T1
 
-### T3 — Chặn thao tác chạy lại trên project cũ
-- [ ] Xong
+### T3 — Bỏ chọn engine khỏi API và wizard
+- [x] Xong
 
 - **Service**: orchestrator
-- **File** và chỗ chèn kiểm tra (ngay sau khi nạp project):
-  - `internal/application/start_render_saga.go:88` `Execute`: trước khi tạo `project`, `existing, err := uc.repo.Get(ctx, input.ProjectID)`; `ErrProjectNotFound` → tiếp tục (project mới); lỗi khác → trả; `existing.EngineRetired()` → `ErrEngineRetired`. Bỏ trường `RenderEngine` khỏi `StartRenderSagaInput`; project mới luôn `domain.RenderEngineRemotion`.
-  - `internal/application/retry_step.go:72` `Execute`: sau `uc.repo.Get`, nếu `project.EngineRetired()` và bước lỗi không phải `domain.StepPublishVideo` → `ErrEngineRetired` (đăng lại video đã xong vẫn được).
-  - `internal/application/fork_project.go:77` sau `uc.repo.Get(ctx, sourceID)`: `src.EngineRetired()` → `ErrEngineRetired`.
-  - `internal/application/review_outline.go:54` `Approve`, `:74` `EditNarration`, `:136` `Reject`: sau `uc.repo.Get`, `project.EngineRetired()` → `domain.ErrEngineRetired`.
-  - `internal/application/wizard.go:33` `PatchWizardSettingsUseCase.Execute`: nạp project (đã nạp ở dòng ~84) trước mọi ghi; `EngineRetired()` → `ErrEngineRetired`. Bỏ `RenderEngine` khỏi `domain.WizardSettingsPatch` và nhánh kiểm dòng 37-39, 94-99.
-  - `internal/application/create_project_draft.go:80` `CreateProjectDraftUseCase.Execute`: khi `projectExists`, `uc.repo.Get` → `EngineRetired()` → `ErrEngineRetired`. Bỏ `CreateProjectDraftInput.RenderEngine` và khối dòng 127-134; project mới `RenderEngine: domain.RenderEngineRemotion`.
-  - `create_project_draft.go:197` `UpdateProjectTopicUseCase.Execute`: thêm `uc.repo.Get` (port đã có `Get`) → `EngineRetired()` → `ErrEngineRetired`.
-  - `internal/adapters/http/router.go:787` `writeUseCaseError`: thêm `case errors.Is(err, domain.ErrEngineRetired): writeError(w, http.StatusConflict, err.Error())`. `handleReviewDecision` (dòng 896) và `handleEditNarration` (dòng 934): thêm case `ErrEngineRetired` → 409 trước `default`.
-  - `router.go:449-451`, `:379`, `:457`, `:966` và `adapters/http/dto.go:34,240,282`: bỏ `render_engine` khỏi body request (giữ ở response `dto.go:136,179,335,390`).
-  - `router.go:1008` `handleInternalProjectStatus`: trả thêm `"render_engine"` (cho T7).
-- **Không chặn**: `DELETE /v1/projects/{id}`, `POST /v1/sagas/publish`, `POST /v1/projects/{id}/cancel`, mọi `GET`.
-- **Test**: thêm ca trong test của từng use case (`start_render_saga_test.go`, `retry_step_test.go`, `fork_project_test.go`, `review_outline_test.go`, `wizard_test.go`, `create_project_draft_test.go`): project cũ → `ErrEngineRetired`, không có lệnh nào được publish, không ghi gì; `retry` của project cũ lỗi ở `publish_video` → chạy. `router_test.go`: `ErrEngineRetired` → 409 với đúng thông điệp; `/internal/v1/projects/{id}/status` có `render_engine`. `go test ./...`
-- **Xong khi**: FR2 phía server, tiêu chí 2 (409).
+- **Thay đổi**: `render_engine` bỏ khỏi body request (`POST /v1/projects`, `POST /v1/sagas/render`, `PATCH /v1/projects/{id}/settings`), giữ ở response. `StartRenderSagaInput.RenderEngine`, `CreateProjectDraftInput.RenderEngine`, `WizardSettingsPatch.RenderEngine`, `SaveRenderEngine` (repository, port, adapter `main.go`) bị xoá; project mới và render luôn `remotion`. `ApplyShortDefaults`/`CheckOutputSettings` bỏ phần engine. `PatchWizardSettingsUseCase` nạp project bằng `Get` (port không còn `GetStatus`).
+- **Test**: test create draft (project mới là Remotion), start render (lệnh mang `engine: remotion`), wizard (bỏ ca engine). `go test ./...`
+- **Xong khi**: FR1 phía API.
 - **Phụ thuộc**: T1, T2
-
 ### T4 — Gỡ nhánh Manim, `layout_marks` và intro/outro dựng bằng Manim
-- [ ] Xong
+- [x] Xong
 
 - **Service**: orchestrator
 - **File**:
   - `internal/application/handle_step_event.go`: `onScriptParsed` (492-515) và `onScriptValidated` (522-528) dùng `SceneClassName`; dispatch render (776-796): bỏ `if engine == domain.RenderEngineRemotion`, luôn gửi `video_font`; `engine` gửi đúng `project.RenderEngine` (project cũ còn chạy dở sẽ bị rendering từ chối, T10). Dòng 228-235: chỉ `channel_asset_normalized` đi vào `handleChannelAssetProjection`; trong hàm đó (300-316) bỏ nhánh `channel_asset_rendered`, xoá `registerRenderedChannelAsset` (1198-1222), sửa doc. Dòng 848 (gán `LayoutMarks`) xoá; lệnh `qc_video` (985-1003) bỏ `layout_marks`.
   - `internal/application/retry_step.go:136-165`, `review_outline.go:125`: `SceneClassName`; bỏ thay engine mặc định khi `!IsValid()` (dùng `project.RenderEngine`).
   - `internal/application/fork_project.go:147,154`: `SceneClassName = ""`, bỏ dòng `LayoutMarks`.
-  - `internal/application/authoring_port.go:25-28`: `NeedsIllustrations: engine != domain.RenderEngineRetiredManim`.
+  - `internal/application/authoring_port.go`, `internal/domain/flow.go`: bỏ `AuthoredContent.NeedsIllustrations` và tham số engine của `AuthoringSummary.Content()` — bước 5 luôn áp dụng.
   - `internal/application/event_payload.go:184`: sửa comment nhắc `layout_marks`.
   - `internal/adapters/amqp/consumer.go:323-326`: comment chỉ còn `channel_asset_normalized`.
   - `internal/domain/narration.go:189`, `start_render_saga.go:41`: comment không nhắc Manim.
@@ -116,35 +97,21 @@ Quy ước dùng trong các task:
 
 ## authoring-service
 
-### T5 — Engine và chặn project cũ
-- [ ] Xong
+### T5 — Engine trong authoring-service
+- [x] Xong
 
 - **Service**: authoring-service
-- **File**: `internal/domain/project.go:203-228`, `internal/domain/errors.go`, `internal/adapters/http/router.go:119` (`writeUseCaseError`), `:1052` (`writeGenerateError`), `:1142` (`writeSegmentError`), `internal/adapters/http/dto.go:33-34,177-179,221,260-262`.
-- **Thay đổi**:
-  - Như T1 cho bản sao domain: `RenderEngineRetiredManim`, `DefaultRenderEngine = RenderEngineRemotion`, `IsValid` chỉ `remotion`, `IsKnown`, `(*Project).EngineRetired()`, `ErrEngineRetired` (cùng thông điệp).
-  - Ba hàm ghi lỗi: thêm case `ErrEngineRetired` → 409 với `err.Error()`.
-  - `dto.go`: bỏ `render_engine` khỏi request; comment response viết theo một engine.
-- **Test**: domain test như T1; router test: mỗi hàm ghi lỗi đổi `ErrEngineRetired` thành 409. `go test ./...`
-- **Xong khi**: FR2 (nền authoring).
-- **Phụ thuộc**: T3 (orchestrator trả `render_engine` ở endpoint status)
+- **File**: `internal/domain/project.go:203-228`, `internal/adapters/http/dto.go:33-34,177-179,221,260-262`.
+- **Thay đổi**: như T1 cho bản sao domain (chỉ `RenderEngineRemotion`, mặc định `remotion`, `IsValid` chỉ `remotion`); `dto.go` bỏ `render_engine` khỏi request, comment response theo một engine.
+- **Test**: domain test như T1. `go test ./...`
+- **Xong khi**: FR1 phía authoring.
+- **Phụ thuộc**: —
+### T6 — (bỏ) Cổng chặn project cũ ở authoring-service
+- [x] Xong
 
-### T6 — Cổng sửa và sinh nội dung chặn project cũ
-- [ ] Xong
-
-- **Service**: authoring-service
-- **File**: `internal/application/prompt_templates.go:21-23` (`AuthoringLockPort`), `:41-58` (`checkAuthoringUnlocked`); `internal/adapters/orchestrator/client.go:80-89`; `internal/application/generate_authoring.go:400`, `generate_authoring_segments.go:39,107,160`, `render_prompt.go:158`.
-- **Thay đổi**:
-  - `AuthoringLockPort`: thêm `GetLock(ctx, projectID) (domain.ProjectLock, error)`; `domain.ProjectLock{Status ProjectStatus; RenderEngine RenderEngine}` (file mới `internal/domain/project_lock.go` hoặc trong `project.go`). `checkAuthoringUnlocked` dùng `GetLock`: `RenderEngine == RenderEngineRetiredManim` → `ErrEngineRetired` trước kiểm trạng thái.
-  - `client.go`: `GetLock` gọi `/internal/v1/projects/{id}/status`, đọc `status` và `render_engine` (rỗng → `DefaultRenderEngine`). `GetStatus` giữ cho `illustrations.go:446`.
-  - Năm chỗ nạp project bằng `uc.projects.Get`: thêm `if project.EngineRetired() { return …, domain.ErrEngineRetired }`.
-  - Mọi fake của `AuthoringLockPort` trong test implement `GetLock`.
-- **Test**: `prompt_templates_test.go`: lưu story/storyboard/code của project cũ → `ErrEngineRetired`; `generate_authoring_test.go`, `generate_authoring_segments_test.go`, `render_prompt_test.go`: project cũ → `ErrEngineRetired`, không gọi llm-service; `adapters/orchestrator/client_test.go`: `GetLock` đọc đủ hai trường. `go test ./...`
-- **Xong khi**: FR2 phía authoring, tiêu chí 2.
-- **Phụ thuộc**: T5
-
+Không làm: project Manim bị xoá (mục "Thay đổi trong lúc code" của thiết kế), không còn gì để chặn.
 ### T7 — Gỡ prompt và nhánh Manim
-- [ ] Xong
+- [x] Xong
 
 - **Service**: authoring-service
 - **File**:
@@ -167,7 +134,7 @@ Quy ước dùng trong các task:
 ## llm-service
 
 ### T8 — Chỉ nhận engine `remotion`, gỡ pipeline Manim
-- [ ] Xong
+- [x] Xong
 
 - **Service**: llm-service
 - **File**:
@@ -185,7 +152,7 @@ Quy ước dùng trong các task:
 ## rendering
 
 ### T9 — Đổi tên port, tách `LintIssue`
-- [ ] Xong
+- [x] Xong
 
 - **Service**: rendering
 - **File**: `domain/ports.py:4,20-23,61-76`, `adapters/rendering/remotion_renderer.py:1-25,44,194`, `domain/script_lint.py`, file mới `domain/lint_issue.py`, `domain/lottie_catalog.py:244`, `application/check_script.py`, `validate_script.py:29-30`, `render_script.py:22-23`.
@@ -198,7 +165,7 @@ Quy ước dùng trong các task:
 - **Phụ thuộc**: —
 
 ### T10 — Gỡ Manim khỏi rendering
-- [ ] Xong
+- [x] Xong
 
 - **Service**: rendering
 - **File**:
@@ -228,7 +195,7 @@ Quy ước dùng trong các task:
 ## video-assembly
 
 ### T11 — Gỡ `register_channel_asset` và luật QC bố cục
-- [ ] Xong
+- [x] Xong
 
 - **Service**: video-assembly
 - **File**:
@@ -247,7 +214,7 @@ Quy ước dùng trong các task:
 ## api-gateway, tts
 
 ### T12 — Chú thích
-- [ ] Xong
+- [x] Xong
 
 - **Service**: api-gateway, tts
 - **File**: `services/api-gateway/src/server.js:60`, `src/routes/projects.js:85`; `services/tts/adapters/messaging/cancellation.py` (dòng nhắc Manim).
@@ -261,7 +228,7 @@ Quy ước dùng trong các task:
 ## web-gui
 
 ### T13 — Gỡ chọn engine
-- [ ] Xong
+- [x] Xong
 
 - **Service**: web-gui
 - **File**:
@@ -271,18 +238,19 @@ Quy ước dùng trong các task:
   - `src/context/ProjectDraftContext.tsx:53,110,167,251,291,341`: bỏ `renderEngine` khỏi `ProjectDraft`, mặc định, action và payload gửi server.
   - `src/api/client.ts:1268,1282,1297,1316`: `createProjectDraft` bỏ tham số `renderEngine`; bỏ `renderEngine` khỏi kiểu cài đặt wizard và bảng tên trường.
   - `src/hooks/useAuthoringMode.ts:74`, `src/pages/ScriptStepPage.tsx:50`: bỏ đối số engine.
-  - `src/utils/flow.ts:11-14,153-154`: bước 5 luôn dùng, trừ project cũ (`stepStatus(..., renderEngine)` trả `"skipped"` khi `renderEngine === "manim"`); comment theo đó.
+  - `src/utils/flow.ts:11-14,153-154`: bước 5 luôn dùng; `stepStatus` bỏ tham số `renderEngine`.
+  - Xoá `src/components/RenderEngineBadge.tsx` (và test) và chỗ gọi ở `src/pages/VideoListPage.tsx:7,323`.
   - `src/components/AuthoringModeBar.tsx:51-52`: `authoringChainSteps()` luôn `["story", "storyboard", "illustrations", "code"]` (bỏ tham số; cập nhật chỗ gọi).
   - `src/pages/VisualDirectorStepPage.tsx:102,126,142`, `IllustrationsStepPage.tsx:21,53,74`, `ProductionSettingsPanel.tsx:91`, `hooks/useStepNav.ts:49,59`: bỏ nhánh Manim.
   - `src/utils/scriptValidation.ts`, `src/utils/authoringHint.ts`, `src/hooks/useLlmStatus.ts`, `src/components/ProgressTracker.tsx`: bỏ nhánh/chuỗi Manim.
   - `src/pages/PromptSettingsPage.tsx:20,26,29`: xoá ba vai Manim.
-  - `src/types/index.ts:12-13,113-114,201`: `render_engine?: "remotion" | "manim"`, doc: `"manim"` chỉ có ở project cũ, không chạy lại được.
+  - `src/types/index.ts:12-13,113-114,201`: `render_engine?: "remotion"`.
 - **Test**: cập nhật test của các component/page trên (vitest); xoá ca chọn engine. `npm test`, `npx tsc -b`, `npm run lint`.
 - **Xong khi**: FR1 phía giao diện, tiêu chí 1.
 - **Phụ thuộc**: T3 (API không còn nhận `render_engine`)
 
 ### T14 — Đổi tên `CodeStepPage`
-- [ ] Xong
+- [x] Xong
 
 - **Service**: web-gui
 - **File**: `src/pages/ManimEngineerStepPage.tsx` → `src/pages/CodeStepPage.tsx` (và CSS module/test đi kèm nếu có cùng tên); `src/App.tsx:20,67`; `src/hooks/useLlmStatus.ts:5` (comment).
@@ -291,29 +259,14 @@ Quy ước dùng trong các task:
 - **Xong khi**: FR4 (màn).
 - **Phụ thuộc**: T13
 
-### T15 — Project cũ: nhãn, thông báo, ẩn thao tác chạy lại
-- [ ] Xong
+### T15 — (bỏ) Nhãn và thẻ cho project cũ ở web-gui
+- [x] Xong
 
-- **Service**: web-gui
-- **File**: file mới `src/utils/retiredEngine.ts`; `src/components/RenderEngineBadge.tsx`; `src/pages/VideoListPage.tsx:7,323`; `src/components/StatusStrip.tsx:60-…`; `src/pages/ResultPage.tsx:47-70,188`; `src/pages/ValidatePage.tsx:119`, `RenderPage.tsx:114`; `src/hooks/useOutlineReview.ts:48`; `src/pages/ResumeProjectPage.tsx:22,69-…`.
-- **Thay đổi**:
-  - `retiredEngine.ts`: `export const RETIRED_ENGINE_MESSAGE = "Dự án này dựng bằng Manim, đã ngừng hỗ trợ: chỉ xem, đăng hoặc xoá được.";` và `export function isRetiredEngine(renderEngine?: string): boolean { return renderEngine === "manim"; }` (JSDoc).
-  - `RenderEngineBadge`: chỉ render khi `isRetiredEngine`; chữ "Manim (ngừng hỗ trợ)", `title={RETIRED_ENGINE_MESSAGE}`, class `glass.badgeNeutral`. JSDoc viết lại. `VideoListPage` giữ chỗ gọi.
-  - `StatusStrip`: project cũ → nhánh đầu tiên: pill "Ngừng hỗ trợ" (`styles.warn`), message `RETIRED_ENGINE_MESSAGE`, actions chỉ `back`; không render `ForkDialog`, nút Chạy tiếp, Nhân bản.
-  - `ResultPage`: project cũ → ẩn khối Dựng lại (nút `rerender-submit` và chọn chất lượng); bỏ `render_engine: project.render_engine` khỏi `startRenderSaga` (dòng 66).
-  - `ValidatePage`, `RenderPage`: ẩn nút chạy lại khi project cũ. `PublishPage` giữ nút thử lại đăng.
-  - `useOutlineReview`: project cũ → không gọi `approveOutline`/`rejectOutline`; trả lỗi `RETIRED_ENGINE_MESSAGE` cho màn hiện.
-  - `ResumeProjectPage`: sau `getProject`, nếu `isRetiredEngine(project.render_engine)`: có video (`project.video_path`) → `navigate` tới màn Kết quả; không có → hiện thẻ (`glass` card, `.reveal` + `usePresence` theo `docs/ux-ui-design-rules.md` §3) gồm `RETIRED_ENGINE_MESSAGE` và nút Xoá (gọi hàm xoá project đang có trong `client.ts`, xác nhận trước như danh sách video đang làm), không nạp draft. Dòng 22: `renderEngine` bỏ (T13).
-- **Test**: `RenderEngineBadge.test.tsx` (project cũ có nhãn, project mới không); `StatusStrip.test.tsx` (project cũ không có nút Chạy tiếp/Nhân bản, có thông điệp); `ResultPage.test.tsx` (project cũ không có `rerender-submit`); `ResumeProjectPage.test.tsx` (project cũ chưa xong hiện thẻ và nút Xoá; đã xong chuyển tới Kết quả). `npm test`, `npx tsc -b`, `npm run lint`.
-- **Xong khi**: FR2 phía giao diện, tiêu chí 2.
-- **Phụ thuộc**: T13, T14
-
----
-
+Không làm: project Manim bị xoá. `RenderEngineBadge` và chỗ gọi ở `VideoListPage` được xoá trong T13 (mọi video đều Remotion, nhãn không còn phân biệt gì).
 ## Tài liệu và hợp đồng
 
 ### T16 — ADR-0033, README, hợp đồng, biến môi trường
-- [ ] Xong
+- [x] Xong
 
 - **Service**: tài liệu, `docker-compose.yml`, `.env.example`, `tests/contracts`
 - **File**:

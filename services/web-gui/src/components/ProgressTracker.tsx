@@ -35,8 +35,8 @@ function CheckIcon() {
 }
 
 /**
- * A Manim render_scenes reports elapsed time only (no reliable total);
- * a Remotion one carries render_percent, assemble_video merge_percent,
+ * A render_scenes carries render_percent (elapsed time only while still
+ * bundling), assemble_video merge_percent,
  * synthesize_speech a real (index, total) pair. This picks whichever one the
  * current message actually carries and gives it the right Vietnamese unit
  * word for the bar's label.
@@ -47,7 +47,7 @@ function unitProgress(progressState: ProgressState): { percent: number; label: s
     percent: Math.round((index / total) * 100),
     label: `${word} ${index}/${total}`,
   });
-  // Remotion only: renderMedia's own frame progress. Manim sends none and keeps the elapsed text.
+  // renderMedia's own frame progress.
   if (renderPercent !== null) {
     const elapsed = elapsedSeconds !== null ? ` · ${formatElapsed(elapsedSeconds)}` : "";
     return { percent: renderPercent, label: `Đã render ${renderPercent}%${elapsed}` };
@@ -67,7 +67,7 @@ export function ProgressTracker({
 }: ProgressTrackerProps) {
   const { currentStep, elapsedSeconds, animationIndex } = progressState;
   const unit = allDone || waitingLabel ? null : unitProgress(progressState);
-  // A Manim render (or Remotion still bundling) reports elapsed time, not a percentage.
+  // A render still bundling reports elapsed time, not a percentage.
   const isRendering = !allDone && !waitingLabel && unit === null && elapsedSeconds !== null;
 
   // Một bước không thuộc màn này (saga đã chạy qua, hoặc chưa tới) cho -1 —

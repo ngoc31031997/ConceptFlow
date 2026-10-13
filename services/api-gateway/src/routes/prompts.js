@@ -36,8 +36,6 @@ function promptsRouter(authoringClient) {
   router.get('/v1/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
   router.get('/v1/projects/:projectId/prompts/:role', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/prompt-renders', proxyHandler(authoringClient, 'authoring-service'));
-  // Starter scripts and hook/end-screen snippets.
-  router.get('/v1/script-templates', proxyHandler(authoringClient, 'authoring-service'));
   // Nút "Chạy bằng AI" có gọi được gì không: web-gui hỏi
   // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
   // nút bấm vào là lỗi.

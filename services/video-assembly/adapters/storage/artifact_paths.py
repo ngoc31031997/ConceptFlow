@@ -28,10 +28,8 @@ def normalized_channel_asset_path(kind: str, render_quality: str) -> str:
     NormalizeChannelAssetCommandHandler transcodes it:
     /shared/channel-assets/{kind}/{render_quality}/normalized.mp4
 
-    Deliberately keyed by render_quality too (unlike rendering's
-    compute_channel_asset_path for the Manim-rendered default, which is a
-    single file shared across qualities) — an uploaded file gets a real,
-    quality-specific transcode here, one per render_quality.
+    Keyed by render_quality: an uploaded file gets a real, quality-specific
+    transcode here, one per render_quality.
     """
     return os.path.join(SHARED_VOLUME_ROOT, "channel-assets", kind, render_quality, "normalized.mp4")
 

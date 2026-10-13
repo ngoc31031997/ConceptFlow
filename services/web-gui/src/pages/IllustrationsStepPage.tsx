@@ -1,5 +1,5 @@
 import { useContext, useEffect, useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { AUTHORING_STEP_PATHS } from "../components/AuthoringModeBar";
 import { AppShell } from "../components/AppShell";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
@@ -13,13 +13,10 @@ import styles from "./WizardSteps.module.css";
 import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
 
 /**
- * Bước Hình minh hoạ, giữa Hình ảnh và Code, chỉ cho video Remotion. Chạy
+ * Bước Hình minh hoạ, giữa Hình ảnh và Code. Chạy
  * bằng AI thì server lập danh sách từ storyboard và vẽ hình còn thiếu
  * (nhiều hình cùng lúc, mỗi hình một thanh tiến độ), Creator duyệt / sửa / bỏ
  * qua / xoá ngay tại đây, rồi mới sang Code.
- *
- * Có số bước riêng trên thanh bước, hiện "Không dùng" khi renderEngine không
- * phải Remotion.
  */
 export function IllustrationsStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -49,9 +46,6 @@ export function IllustrationsStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
-  // Manim vẽ bằng code, không có thư viện hình: bước này không tồn tại với nó.
-  if (draft.renderEngine !== "remotion") return <Navigate to={AUTHORING_STEP_PATHS.code} replace />;
-
   const hasStoryboard = draft.authoringStoryboard.trim().length > 0;
   const hint = !hasStoryboard
     ? "Cần hoàn thành bước Hình ảnh trước."
@@ -71,7 +65,6 @@ export function IllustrationsStepPage() {
       >
         <div className={styles.settingsRow}>
           <PipelineSettingsBar
-            renderEngine={draft.renderEngine}
             llm={llm}
             mode={mode}
             onModeChange={setMode}

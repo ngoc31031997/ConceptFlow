@@ -3,10 +3,7 @@ package domain
 import "strings"
 
 // PromptRole identifies which stage of the authoring pipeline a
-// template drives: Story Architect → Visual Director → Manim Engineer, with
-// remotion_engineer replacing manim_engineer when the project renders with
-// Remotion. The first two steps are engine agnostic — only the code step
-// forks by render engine.
+// template drives: Story Architect → Visual Director → Remotion Engineer.
 //
 // Không có vai trò Script Reviewer. Cột review_content và những dòng prompt
 // cũ trong DB được giữ nguyên — không gì đọc chúng, và xoá dữ liệu của Creator
@@ -16,21 +13,16 @@ type PromptRole string
 const (
 	RoleStoryArchitect PromptRole = "story_architect"
 	RoleVisualDirector PromptRole = "visual_director"
-	RoleManimEngineer  PromptRole = "manim_engineer"
-	// A single flat prompt (topic -> code) for Remotion, which has no
-	// design system or multi-step pipeline. Selected instead of story_architect when the
-	// Creator's project has render_engine=remotion (see ScriptAssistant.tsx).
+	// The code step: turns the storyboard into a Remotion composition.
 	RoleRemotionEngineer PromptRole = "remotion_engineer"
 
 	// The AI flow ("Chạy bằng AI") has its own prompts; the manual
 	// (Copy) flow keeps the four above untouched. See prompt_template_seeds_ai.go.
 	RoleVisualDirectorAI   PromptRole = "visual_director_ai"
-	RoleManimEngineerAI    PromptRole = "manim_engineer_ai"
 	RoleRemotionEngineerAI PromptRole = "remotion_engineer_ai"
 
 	// Library roles rendered by POST /v1/prompt-renders. None of them is a step
 	// of the authoring pipeline; each is a "copy this to an external AI" prompt.
-	RoleManimAdjust     PromptRole = "manim_adjust"     // fix an existing Manim script (narrate calls, design system)
 	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
 	RoleThumbnailDesign PromptRole = "thumbnail_design" // write an image-generation prompt for the thumbnail
 
@@ -43,9 +35,9 @@ const (
 // ValidPromptRole reports whether role is one of the known pipeline roles.
 func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleStoryArchitect, RoleVisualDirector, RoleManimEngineer,
-		RoleRemotionEngineer, RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI,
-		RoleManimAdjust, RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle:
+	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
+		RoleVisualDirectorAI, RoleRemotionEngineerAI,
+		RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle:
 		return true
 	default:
 		return false

@@ -63,15 +63,11 @@ describe("StepPreviewPage — xem trước bước chưa tới", () => {
     expect(screen.getByTestId("step-preview-auto")).toHaveTextContent("máy tự chạy");
   });
 
-  it("giải thích vì sao một bước không dùng", async () => {
-    renderPreview(
-      "/projects/p1/preview/5",
-      project({ flow_step: 4, run_state: "idle", render_engine: "manim" }),
-    );
+  it("bước Hình minh hoạ chưa tới chỉ là xem trước, không bị bỏ qua", async () => {
+    renderPreview("/projects/p1/preview/5", project({ flow_step: 4, run_state: "idle" }));
     await waitFor(() =>
-      expect(screen.getByTestId("step-preview-notice")).toHaveTextContent("Không dùng"),
+      expect(screen.getByTestId("step-preview-notice")).toHaveTextContent("Chưa tới bước này"),
     );
-    expect(screen.getByTestId("step-preview-notice")).toHaveTextContent("chỉ video Remotion");
   });
 
   it("“Về bước đang làm” mở bước hiện tại của project", async () => {

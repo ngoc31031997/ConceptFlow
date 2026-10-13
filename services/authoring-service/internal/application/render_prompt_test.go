@@ -72,54 +72,27 @@ func newRenderer(tmpl string, ctxData *fakeRenderContext) *application.RenderPro
 func aProject() *domain.Project {
 	return &domain.Project{
 		ContentLanguage: domain.LanguageVietnamese,
-		RenderEngine:    domain.RenderEngineManim,
+		RenderEngine:    domain.RenderEngineRemotion,
 		VideoFormatID:   "concept-explainer",
 	}
 }
 
-// TestRoleFor_StoryIsSharedByBothEngines — step 1 decides the story, not the
-// pixels, so both engines run the same role.
-func TestRoleFor_StoryIsSharedByBothEngines(t *testing.T) {
-	for _, engine := range []string{"manim", "remotion"} {
-		if got, _ := application.RoleFor("story", engine); got != domain.RoleStoryArchitect {
-			t.Fatalf("%s: want story_architect, got %q", engine, got)
+// TestRoleFor_MapsEachStepToItsManualRole — the manual (Copy) flow's role of
+// each pipeline step; the removed review step and unknown names are errors.
+func TestRoleFor_MapsEachStepToItsManualRole(t *testing.T) {
+	for step, want := range map[string]domain.PromptRole{
+		"story":      domain.RoleStoryArchitect,
+		"storyboard": domain.RoleVisualDirector,
+		"code":       domain.RoleRemotionEngineer,
+	} {
+		if got, err := application.RoleFor(step); err != nil || got != want {
+			t.Errorf("RoleFor(%s) = %q, %v; want %q", step, got, err, want)
 		}
 	}
-}
-
-// Bước duyệt đã bị bỏ khỏi sản phẩm, nên "review" phải bị từ chối
-// như bất cứ tên bước lạ nào, chứ không lặng lẽ render một prompt không ai gọi.
-func TestRoleFor_ReviewIsNoLongerAStep(t *testing.T) {
-	for _, engine := range []string{"manim", "remotion"} {
-		if _, err := application.RoleFor("review", engine); err == nil {
-			t.Fatalf("%s: want an error for the removed review step", engine)
+	for _, step := range []string{"review", "polish"} {
+		if _, err := application.RoleFor(step); err == nil {
+			t.Errorf("RoleFor(%s): want an error", step)
 		}
-	}
-}
-
-// TestRoleFor_StoryboardIsSharedAcrossEngines: there is one Visual Director.
-// It writes an engine-agnostic shooting script, and only the code step forks
-// by render engine.
-func TestRoleFor_StoryboardIsSharedAcrossEngines(t *testing.T) {
-	for _, engine := range []string{"manim", "remotion"} {
-		if got, _ := application.RoleFor("storyboard", engine); got != domain.RoleVisualDirector {
-			t.Fatalf("%s: want visual_director, got %q", engine, got)
-		}
-	}
-}
-
-func TestRoleFor_CodeBranchesByEngine(t *testing.T) {
-	if got, _ := application.RoleFor("code", "manim"); got != domain.RoleManimEngineer {
-		t.Fatalf("manim: want manim_engineer, got %q", got)
-	}
-	if got, _ := application.RoleFor("code", "remotion"); got != domain.RoleRemotionEngineer {
-		t.Fatalf("remotion: want remotion_engineer, got %q", got)
-	}
-}
-
-func TestRoleFor_RejectsAnUnknownStep(t *testing.T) {
-	if _, err := application.RoleFor("polish", "manim"); err == nil {
-		t.Fatal("expected an error for an unknown step")
 	}
 }
 
@@ -174,7 +147,7 @@ func TestRender_PreviousOutputGrowsWithThePipeline(t *testing.T) {
 	}{
 		{domain.RoleStoryArchitect, nil, []string{"DÀN Ý", "STORYBOARD", "CODE"}},
 		{domain.RoleVisualDirector, []string{"DÀN Ý"}, []string{"STORYBOARD", "CODE"}},
-		{domain.RoleManimEngineer, []string{"DÀN Ý", "STORYBOARD"}, []string{"CODE"}},
+		{domain.RoleRemotionEngineer, []string{"DÀN Ý", "STORYBOARD"}, []string{"CODE"}},
 	}
 
 	for _, tc := range cases {
@@ -205,7 +178,7 @@ func TestRender_ArtefactsAreJoinedTheWayTheGUIJoinedThem(t *testing.T) {
 		project: aProject(), story: "A", storyboard: "B",
 	})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer)
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleRemotionEngineer)
 
 	if out.Prompt != "A\n\n---\n\nB" {
 		t.Fatalf("unexpected join: %q", out.Prompt)
@@ -228,7 +201,7 @@ func TestRender_EmptyPipelineSaysSoInsteadOfLeavingABlank(t *testing.T) {
 func TestRender_BeatSheetOnlyForTheOutlineStep(t *testing.T) {
 	uc := newRenderer("{{format_beats}}", &fakeRenderContext{project: aProject()})
 
-	out, _ := uc.Execute(context.Background(), "p1", domain.RoleManimEngineer)
+	out, _ := uc.Execute(context.Background(), "p1", domain.RoleRemotionEngineer)
 
 	if strings.Contains(out.Prompt, "CẤU TRÚC BẮT BUỘC") {
 		t.Fatal("the beat sheet belongs to the outline step only")
@@ -261,28 +234,20 @@ func TestRender_RequiresAProjectID(t *testing.T) {
 // --- the AI flow's own roles -------------------------------------------------
 
 func TestAIRoleFor_UsesTheAIPromptsAndLeavesTheManualMappingAlone(t *testing.T) {
-	cases := []struct {
-		step, engine string
-		want         domain.PromptRole
-	}{
-		{"story", "manim", domain.RoleStoryArchitect},
-		{"story", "remotion", domain.RoleStoryArchitect},
-		{"storyboard", "manim", domain.RoleVisualDirectorAI},
-		{"storyboard", "remotion", domain.RoleVisualDirectorAI},
-		{"code", "manim", domain.RoleManimEngineerAI},
-		{"code", "remotion", domain.RoleRemotionEngineerAI},
-	}
-	for _, c := range cases {
-		got, err := application.AIRoleFor(c.step, c.engine)
-		if err != nil || got != c.want {
-			t.Errorf("AIRoleFor(%s,%s) = %q, %v; want %q", c.step, c.engine, got, err, c.want)
+	for step, want := range map[string]domain.PromptRole{
+		"story":      domain.RoleStoryArchitect,
+		"storyboard": domain.RoleVisualDirectorAI,
+		"code":       domain.RoleRemotionEngineerAI,
+	} {
+		if got, err := application.AIRoleFor(step); err != nil || got != want {
+			t.Errorf("AIRoleFor(%s) = %q, %v; want %q", step, got, err, want)
 		}
 	}
-	if _, err := application.AIRoleFor("review", "manim"); err == nil {
+	if _, err := application.AIRoleFor("review"); err == nil {
 		t.Error("an unknown step must be an error")
 	}
 	// The manual flow's mapping is unchanged.
-	if got, _ := application.RoleFor("storyboard", "manim"); got != domain.RoleVisualDirector {
+	if got, _ := application.RoleFor("storyboard"); got != domain.RoleVisualDirector {
 		t.Errorf("RoleFor(storyboard) = %q, want the manual visual_director", got)
 	}
 }
@@ -291,7 +256,7 @@ func TestRender_AIEngineerPromptCarriesTheStoryButNotTheStoryboard(t *testing.T)
 	ctx := &fakeRenderContext{project: aProject(), story: "STORY-TEXT", storyboard: `{"scenes":"STORYBOARD-JSON"}`}
 	r := newRenderer("PREV={{previous_output}}", ctx)
 
-	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI, domain.RoleManimEngineerAI} {
+	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI} {
 		out, err := r.Execute(context.Background(), "p1", role)
 		if err != nil {
 			t.Fatal(err)
@@ -406,7 +371,7 @@ func TestRender_AICodeStepKeepsOnlyTheStoryCore(t *testing.T) {
 	}
 	want := strings.Join(wantLines, "\n")
 
-	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI, domain.RoleManimEngineerAI} {
+	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI} {
 		out, err := r.Execute(context.Background(), "p1", role)
 		if err != nil {
 			t.Fatal(err)
@@ -425,7 +390,7 @@ func TestRender_AICodeStepKeepsOnlyTheStoryCore(t *testing.T) {
 	}
 
 	// The manual flow still gets the whole outline and the storyboard.
-	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineer, domain.RoleManimEngineer} {
+	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineer} {
 		out, _ := r.Execute(context.Background(), "p1", role)
 		if out.Prompt != sampleStory+"\n\n---\n\n"+`{"scenes":[]}` {
 			t.Errorf("%s previous_output changed:\n%s", role, out.Prompt)
@@ -439,7 +404,7 @@ func TestRender_AICodeStepKeepsOnlyTheStoryCore(t *testing.T) {
 func TestRender_AICodeStepSystemPromptSize(t *testing.T) {
 	core, missing := "", []string(nil)
 	for _, tmpl := range domain.DefaultPromptTemplates() {
-		if tmpl.Role != domain.RoleRemotionEngineerAI && tmpl.Role != domain.RoleManimEngineerAI {
+		if tmpl.Role != domain.RoleRemotionEngineerAI {
 			continue
 		}
 		project := aProject()
@@ -472,7 +437,7 @@ func TestRender_AICodeStepFallsBackToTheWholeStoryAndWarns(t *testing.T) {
 	story := "Dàn ý Creator tự viết lại, không theo mẫu nào.\n\nCảnh 1: hai người ăn kẹo.\nCảnh 2: vi khuẩn."
 	r := newRenderer("{{previous_output}}", &fakeRenderContext{project: aProject(), story: story})
 
-	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI, domain.RoleManimEngineerAI} {
+	for _, role := range []domain.PromptRole{domain.RoleRemotionEngineerAI} {
 		logs.Reset()
 		out, err := r.Execute(context.Background(), "proj-42", role)
 		if err != nil {
@@ -495,7 +460,7 @@ func TestRender_AICodeStepToleratesMarkdownAndWarnsOnMissingLabels(t *testing.T)
 		"BEAT hook — Mở đầu:\n- Lời thoại nháp: \"...\""
 	r := newRenderer("{{previous_output}}", &fakeRenderContext{project: aProject(), story: story})
 
-	out, _ := r.Execute(context.Background(), "p7", domain.RoleManimEngineerAI)
+	out, _ := r.Execute(context.Background(), "p7", domain.RoleRemotionEngineerAI)
 	want := "KIỂU VIDEO: so-sanh — vì có hai cách làm\n" +
 		"CÂU HỎI CỐT LÕI: Nên chọn cái nào?\n" +
 		"insight cốt lõi : Cái rẻ hơn không phải lúc nào cũng tiết kiệm hơn."

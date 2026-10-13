@@ -1,1 +1,1 @@
-Toàn bộ lời thoại trong `self.narrate("...")` phải viết bằng TIẾNG VIỆT.
+Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.

@@ -171,7 +171,7 @@ async def test_code_plan_is_the_cut_without_a_model_call(client):
         ("1.5-1.5", "shots", ["1.5"])]
     assert segs[0]["source"] == "storyboard" and "source" not in segs[1]
     manim = await client.post("/v2/code/plan", json={"engine": "manim", "storyboard": storyboard(2), "system": ""})
-    assert "source" not in manim.json()["segments"][0]
+    assert manim.status_code == 400 and "unknown engine" in manim.text
     bad = await client.post("/v2/code/plan", json={"engine": "remotion", "storyboard": "CẢNH 1", "system": ""})
     assert bad.status_code == 422
 
@@ -340,10 +340,12 @@ async def test_rendering_checker_sends_the_layout_context_and_reads_kinds_and_wa
     assert [d.rule for d in res.diagnostics] == ["", "text_overflow", ""]
     assert res.warnings == ["Bố cục: Shot 1.3: vật lớn nhất nhỏ"]
 
-    manim = respx.post("http://rendering.test/v1/check/manim").mock(return_value=httpx.Response(200, json={
-        "ok": True, "diagnostics": [], "raw": ""}))
     await chk.check("remotion", "code", "creator", LayoutContext())
-    res = await chk.check("manim", "code", "XScene")
     assert json.loads(route.calls[1].request.content) == {"code": "code", "scene_class_name": "creator"}
-    assert json.loads(manim.calls[0].request.content) == {"code": "code", "scene_class_name": "XScene"}
+    with pytest.raises(ValueError, match="unknown engine"):
+        await chk.check("manim", "code", "XScene")
+
+    respx.post("http://rendering-old.test/v1/check/remotion").mock(return_value=httpx.Response(200, json={
+        "ok": True, "diagnostics": []}))
+    res = await RenderingChecker("http://rendering-old.test", 5).check("remotion", "code", "creator")
     assert res.ok and res.warnings == []  # an answer without warnings (older rendering) reads as none

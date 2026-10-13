@@ -28,7 +28,7 @@ export function MakeShortButton({ projectId, contentLanguage }: MakeShortButtonP
     try {
       const { topic } = await getAuthoringState(projectId);
       const shortId = crypto.randomUUID();
-      await createProjectDraft(shortId, topic, contentLanguage, "remotion", projectId);
+      await createProjectDraft(shortId, topic, contentLanguage, projectId);
       navigate(`/projects/${shortId}/resume?step=${FLOW_CONFIG}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : String(err));

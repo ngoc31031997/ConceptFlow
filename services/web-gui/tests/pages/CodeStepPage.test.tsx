@@ -1,21 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { ManimEngineerStepPage } from "../../src/pages/ManimEngineerStepPage";
+import { CodeStepPage } from "../../src/pages/CodeStepPage";
 import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import { mockRenderPrompt } from "../helpers/renderPromptMock";
 
 const VALID_CODE = [
-  "from conceptflow import *",
+  "import {registerRoot, Composition} from 'remotion';",
+  "import {calculateMetadataFromSegments, Segments} from './conceptflow-mini/segments';",
   "",
-  "class DemoScene(ConceptFlowScene):",
-  '    def construct(self):',
-  '        self.narrate("Xin chao")',
+  'export const narrations: string[] = ["Xin chao"];',
+  "",
+  "function CreatorComposition({segments = []}) {",
+  "  return <Segments segments={segments}>{(index) => <p>{narrations[index]}</p>}</Segments>;",
+  "}",
+  "",
+  "registerRoot(() => (",
+  '  <Composition id="creator" component={CreatorComposition} width={1920} height={1080} fps={30} durationInFrames={150} calculateMetadata={calculateMetadataFromSegments} />',
+  "));",
 ].join("\n");
 
-// Step 3: fetches the manim_engineer template and rehydrates saved
+// The Code step: fetches the remotion_engineer template and rehydrates saved
 // authoring state from the server — stub both so these tests don't need a
 // live backend, mirroring VisualDirectorStepPage.test.tsx's stub.
 beforeEach(() => {
@@ -27,37 +34,38 @@ beforeEach(() => {
     code: "",
   });
   vi.spyOn(apiClient, "saveAuthoringCode").mockResolvedValue(undefined);
+  vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({ illustrations: [], ready: true });
 });
 
-describe("ManimEngineerStepPage", () => {
+describe("CodeStepPage", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("blocks the step until valid Manim code is pasted, then saves and advances", async () => {
+  it("blocks the step until valid Remotion code is pasted, then saves and advances", async () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
-    expect(screen.getByTestId("manim-engineer-step-next")).toBeDisabled();
+    expect(screen.getByTestId("code-step-next")).toBeDisabled();
 
-    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
-      target: { value: "```python\nnot valid python at all" },
+    fireEvent.change(screen.getByTestId("code-step-code-input"), {
+      target: { value: "```tsx\nnot valid tsx at all" },
     });
-    expect(screen.getByTestId("manim-engineer-step-next")).toBeDisabled();
+    expect(screen.getByTestId("code-step-next")).toBeDisabled();
 
-    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
+    fireEvent.change(screen.getByTestId("code-step-code-input"), {
       target: { value: VALID_CODE },
     });
-    expect(screen.getByTestId("manim-engineer-step-next")).not.toBeDisabled();
+    expect(screen.getByTestId("code-step-next")).not.toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("manim-engineer-step-next"));
+    fireEvent.click(screen.getByTestId("code-step-next"));
 
     await waitFor(() => {
       expect(apiClient.saveAuthoringCode).toHaveBeenCalledWith(expect.any(String), VALID_CODE);
@@ -71,16 +79,16 @@ describe("ManimEngineerStepPage", () => {
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
-    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
+    fireEvent.change(screen.getByTestId("code-step-code-input"), {
       target: { value: VALID_CODE },
     });
-    fireEvent.click(screen.getByTestId("manim-engineer-step-next"));
+    fireEvent.click(screen.getByTestId("code-step-next"));
 
     await waitFor(() => {
       expect(screen.getByText("Không lưu được code. Vui lòng thử lại.")).toBeInTheDocument();
@@ -88,26 +96,26 @@ describe("ManimEngineerStepPage", () => {
   });
 
   it("strips a pasted markdown code fence instead of saving the ``` markers as part of the script", () => {
-    // The engineer prompt asks the AI to answer with exactly one ```python
-    // (or ```tsx) fenced block. Pasting that whole block, fence included, is
-    // the single most common way this round trip fails: esbuild/ast.parse
+    // The engineer prompt asks the AI to answer with exactly one ```tsx
+    // fenced block. Pasting that whole block, fence included, is
+    // the single most common way this round trip fails: esbuild
     // chokes on line 1 with an opaque syntax error that says nothing about
     // the real cause.
     render(
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
-    fireEvent.change(screen.getByTestId("manim-engineer-code-input"), {
-      target: { value: "```python\n" + VALID_CODE + "\n```" },
+    fireEvent.change(screen.getByTestId("code-step-code-input"), {
+      target: { value: "```tsx\n" + VALID_CODE + "\n```" },
     });
 
-    expect(screen.getByTestId("manim-engineer-code-input")).toHaveValue(VALID_CODE);
+    expect(screen.getByTestId("code-step-code-input")).toHaveValue(VALID_CODE);
   });
 
   // The {{topic}} substitution lives on the server now (and is held
@@ -118,50 +126,41 @@ describe("ManimEngineerStepPage", () => {
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
     await waitFor(() => {
-      expect((screen.getByTestId("manim-engineer-prompt") as HTMLTextAreaElement).value).toContain(
-        "RENDERED[manim_engineer]",
+      expect((screen.getByTestId("code-step-prompt") as HTMLTextAreaElement).value).toContain(
+        "RENDERED[remotion_engineer]",
       );
     });
     expect(apiClient.renderPrompt).toHaveBeenCalledWith(
-      expect.objectContaining({ role: "manim_engineer", language: expect.stringMatching(/^(vi|en)$/) }),
+      expect.objectContaining({ role: "remotion_engineer", language: expect.stringMatching(/^(vi|en)$/) }),
     );
   });
 
-  it("shows the render engine picker", async () => {
+  it("has no render engine picker", () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
-    // feature/remotion-engine: the engine choice lives on THIS tab now, not
-    // on the situation-chooser page — switching it must fetch the matching
-    // prompt role (remotion_engineer instead of manim_engineer).
-    // Thu gọn sau PipelineSettingsBar's "Đổi".
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
     // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 6 — Code");
-    expect(screen.getByTestId("render-engine-picker")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("render-engine-remotion"));
-    await waitFor(() =>
-      expect(apiClient.renderPrompt).toHaveBeenCalledWith(expect.objectContaining({ role: "remotion_engineer" })),
-    );
+    expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
   });
 
   // The drawings moved to their own step; the Code tab only says where they stand.
-  it("a Remotion video's Code tab shows how many drawings are ready and leads back to the drawings step", async () => {
-    window.localStorage.setItem("conceptflow.lastUsedSettings.v1", JSON.stringify({ renderEngine: "remotion" }));
+  it("the Code tab shows how many drawings are ready and leads back to the drawings step", async () => {
     vi.spyOn(apiClient, "listProjectIllustrations").mockResolvedValue({
       illustrations: [
         { id: "r1", position: 1, name: "Candy", description: "", folder_id: "do-vat", shots: [], state: "skipped" },
@@ -173,7 +172,7 @@ describe("ManimEngineerStepPage", () => {
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
@@ -181,21 +180,20 @@ describe("ManimEngineerStepPage", () => {
     expect(await screen.findByTestId("illustrations-gate-note")).toHaveTextContent("1/2 hình sẵn sàng");
     expect(screen.queryByTestId("project-illustrations")).not.toBeInTheDocument();
     expect(screen.getByText("Quay lại Hình minh hoạ")).toBeInTheDocument();
-    window.localStorage.clear();
   });
   it("nói rõ cần dán code gì ở chế độ tự làm, và quay lại đúng bước trước", async () => {
     render(
       <ThemeProvider>
         <MemoryRouter>
           <ProjectDraftProvider>
-            <ManimEngineerStepPage />
+            <CodeStepPage />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
 
-    expect(await screen.findByText("Dán code Manim Engineer từ AI để tiếp tục.")).toBeInTheDocument();
-    expect(screen.getByTestId("wizard-back")).toHaveTextContent("Quay lại Hình ảnh");
+    expect(await screen.findByText("Dán code Remotion từ AI để tiếp tục.")).toBeInTheDocument();
+    expect(screen.getByTestId("wizard-back")).toHaveTextContent("Quay lại Hình minh hoạ");
     // The "already have code" helper is gone from this step.
     expect(screen.queryByTestId("existing-code-assistant")).not.toBeInTheDocument();
   });

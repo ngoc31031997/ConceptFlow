@@ -1,8 +1,9 @@
 """HTTP surface of the Rendering service — only the compile check.
 
 The service is otherwise a message consumer. This runs inside the same
-process and event loop, so the checks take a semaphore: a Manim dry run is
-heavy and must not stack up beside a real render.
+process and event loop, so the checks take a semaphore: a check (tsc and a
+headless-browser layout pass) is heavy and must not stack up beside a real
+render.
 """
 
 from __future__ import annotations
@@ -109,19 +110,15 @@ def create_check_app(
         return {
             "ok": out.ok,
             "diagnostics": [
-                {"message": d.message, "line": d.line, "kind": d.kind, "rule": d.rule} for d in out.diagnostics
+                {"message": d.message, "line": d.line, "kind": d.kind, "rule": d.rule}
+                for d in out.diagnostics
             ],
-            "raw": out.raw,
             "warnings": out.warnings,
         }
 
     @app.post("/v1/check/remotion")
     async def check_remotion(body: CheckBody):
         return await run("remotion", body)
-
-    @app.post("/v1/check/manim")
-    async def check_manim(body: CheckBody):
-        return await run("manim", body)
 
     # Xem trước một hình của thư viện minh hoạ. Hàng đợi riêng, một
     # yêu cầu một lúc — bộ dựng xem trước chỉ mở một tab trình duyệt.

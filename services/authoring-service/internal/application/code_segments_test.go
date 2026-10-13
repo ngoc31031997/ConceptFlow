@@ -187,7 +187,7 @@ func doneEvent(key string) application.CodeEvent {
 // Every segment is stored as it finishes; a failed one does
 // not stop the step from keeping the rest, and the step says what is left.
 func TestCodeStepStoresSegmentsAndEndsIncompleteWhenOneFailed(t *testing.T) {
-	uc, store, usage, code := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, usage, code := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	gen := &stubCodegen{
 		events: []application.CodeEvent{
 			planEvent("frame", "1.1-1.2", "2.1-2.2"),
@@ -226,7 +226,7 @@ func TestCodeStepStoresSegmentsAndEndsIncompleteWhenOneFailed(t *testing.T) {
 // The next run is sent what is done — and "re-run this segment" leaves
 // that one out and runs only it; "write everything again" drops them all first.
 func TestCodeRunOptionsDecideWhatIsSentBack(t *testing.T) {
-	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	gen := &stubCodegen{events: []application.CodeEvent{
 		planEvent("frame", "1.1-1.2", "2.1-2.2"), doneEvent("frame"), doneEvent("1.1-1.2"),
 		{Type: "segment_failed", Key: "2.1-2.2", ErrorKind: "server"},
@@ -340,7 +340,7 @@ func doneKeys(req application.CodeGenRequest) string {
 // NFR-3: a run cut off (llm-service restarted, the Creator cancelled) leaves
 // its running segments failed with the reason; what finished stays.
 func TestAnInterruptedRunFailsItsRunningSegments(t *testing.T) {
-	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{
 		events: []application.CodeEvent{planEvent("frame", "1.1-1.2", "2.1-2.2"), doneEvent("frame"),
 			{Type: "segment_start", Key: "1.1-1.2"}},
@@ -399,7 +399,7 @@ func TestRepairsKeepTheSourceAndChecksAreLogged(t *testing.T) {
 // Before any run the panel already lists every segment of the storyboard,
 // cut with the Creator's size; a storyboard-given LAYOUT needs no run.
 func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
-	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{})
 	store.chunkShots = 3
 	view, err := uc.CodeSegments(context.Background(), "p1")
@@ -429,7 +429,7 @@ func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 		t.Errorf("storyboard layout frame = %+v", f)
 	}
 
-	prose, _, _, _ := segmentFixture(t, domain.RenderEngineManim, "CẢNH 1 — văn xuôi")
+	prose, _, _, _ := segmentFixture(t, domain.RenderEngineRemotion, "CẢNH 1 — văn xuôi")
 	prose.WithPipeline(&stubFinalizer{}, &stubCodegen{})
 	var notCut *application.ErrStoryboardNotSegmentable
 	if _, err := prose.CodeSegments(context.Background(), "p1"); !errors.As(err, &notCut) {
@@ -437,7 +437,7 @@ func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 	}
 
 	// An llm-service without /v2 has no plan: said so, not a crash.
-	old, _, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	old, _, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	old.WithPipeline(&stubFinalizer{}, &stubCodegen{err: application.ErrSegmentsUnsupported})
 	if _, err := old.CodeSegments(context.Background(), "p1"); !errors.Is(err, application.ErrSegmentsUnsupported) {
 		t.Errorf("old llm-service: %v", err)
@@ -446,7 +446,7 @@ func TestCodeSegmentsListsTheCutWithWhatIsStored(t *testing.T) {
 
 // A pasted segment is checked by llm-service and stored with its source.
 func TestPasteCodeSegment(t *testing.T) {
-	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	store.chunkShots = 2
 	gen := &stubCodegen{}
 	uc.WithPipeline(&stubFinalizer{}, gen)
@@ -493,7 +493,7 @@ func TestPasteCodeSegment(t *testing.T) {
 }
 
 func TestSetCodeChunkShotsIsBounded(t *testing.T) {
-	uc, store, _, _ := segmentFixture(t, domain.RenderEngineManim, fourShots)
+	uc, store, _, _ := segmentFixture(t, domain.RenderEngineRemotion, fourShots)
 	for _, n := range []int{0, domain.MaxChunkShots + 1} {
 		if err := uc.SetCodeChunkShots(context.Background(), "p1", n); !errors.Is(err, domain.ErrInvalidChunkShots) {
 			t.Errorf("%d: %v", n, err)

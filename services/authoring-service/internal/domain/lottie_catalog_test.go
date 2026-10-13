@@ -30,8 +30,8 @@ func TestRemotionEngineerSeedExpandsLottieCatalog(t *testing.T) {
 	t.Fatal("no remotion_engineer seed found")
 }
 
-// The Visual Director stays engine-agnostic: it must never be told about a
-// clip catalog that a Manim project cannot use.
+// The Visual Director stays engine-agnostic: it is never told about the clip
+// catalog, which belongs to the code step.
 func TestVisualDirectorDoesNotSeeLottieCatalog(t *testing.T) {
 	for _, tpl := range DefaultPromptTemplates() {
 		if tpl.Role == RoleVisualDirector && strings.Contains(tpl.TemplateText, "LottieClip") {

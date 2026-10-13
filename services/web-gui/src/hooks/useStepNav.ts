@@ -46,7 +46,6 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
   const projectId = routeProjectId || flow.projectId || draft.projectId;
   const hasProject = flow.project !== null;
   const reached = options.preview ? flow.flowStep : Math.max(currentStep ?? 0, flow.flowStep);
-  const renderEngine = flow.project ? flow.project.render_engine : draft.renderEngine;
   // The server's flow step says nothing about an AI run on an authoring step
   // (the draft stays "idle"), so the step the AI works on right now comes
   // from the run in progress.
@@ -56,10 +55,9 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
   const status = (step: number): StepStatus =>
     step === aiFlowStep
       ? "running"
-      : stepStatus(step, flow.flowStep, flow.runState, renderEngine);
+      : stepStatus(step, flow.flowStep, flow.runState);
 
   const isReached = (step: number) => {
-    if (status(step) === "skipped") return false;
     if (hasProject) return step <= reached;
     // Chưa có project trên server: chỉ các bước nháp trước bước đang mở.
     const draftReached = options.preview ? 1 : (currentStep ?? 1);

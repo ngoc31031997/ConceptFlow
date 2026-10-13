@@ -37,9 +37,8 @@ class FakeProvider:
 
     name = "hive"
 
-    def __init__(self, engine="remotion", broken=None, fail_repair=False, bad_first_chunk=False,
+    def __init__(self, broken=None, fail_repair=False, bad_first_chunk=False,
                  skip_in_group=(), budget_above=0, truncated_above=0, palette_typo=(), typo_name=(), repair_body="return null;"):
-        self.engine = engine
         self.palette_typo = set(palette_typo)  # shots whose first version names a colour PALETTE_ACCENT
         self.typo_name = set(typo_name)  # shots whose first version calls useCurrentFrameSafe()
         self.repair_body = repair_body
@@ -58,19 +57,13 @@ class FakeProvider:
         usage = Usage(model="m", prompt_tokens=10, completion_tokens=5)
         if "LAYOUT (bước 1/2" in u:
             return ChatResult("```tsx\nconst LAYOUT = {hero: {x: 960, y: 480, size: 320}};\n```", usage)
-        if "CAST (bước 1/2" in u:
-            return ChatResult("```python\ndef setup_cast(self):\n    self.hero = self.shape('square')\n```", usage)
         if m := re.search(r"VIẾT CODE CHO SHOT ([\d.]+) → ([\d.]+)", u):
             self._chunk_calls += 1
             if self.bad_first_chunk and self._chunk_calls == 1:
                 return ChatResult("here is some prose with no code", usage)
             lo, hi = m.group(1), m.group(2)
             ids = [f"1.{i}" for i in range(int(lo.split(".")[1]), int(hi.split(".")[1]) + 1)]
-            if self.engine == "remotion":
-                return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self._first_body(i)) for i in ids) + "\n```", usage)
-            return ChatResult("```python\n" + "\n\n".join(
-                f"def shot_{i.replace('.', '_')}(self):\n    self.narrate('{'BROKEN' if i in self.broken else 'ok'}')"
-                for i in ids) + "\n```", usage)
+            return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self._first_body(i)) for i in ids) + "\n```", usage)
         if "SỬA LỖI" in u:
             if self.fail_repair:
                 return ChatResult("no code here", usage)
@@ -81,15 +74,10 @@ class FakeProvider:
                 if self.truncated_above and len(ids) > self.truncated_above:
                     raise LLMError(errors.TRUNCATED, "hive", "cut off", Usage())
                 ids = [i for i in ids if i not in self.skip_in_group]
-                if self.engine == "remotion":
-                    return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self.repair_body) for i in ids) + "\n```",
-                                      usage)
-                return ChatResult("```python\n" + "\n\n".join(
-                    f"def shot_{i.replace('.', '_')}(self):\n    self.narrate('fixed')" for i in ids) + "\n```", usage)
+                return ChatResult("```tsx\n" + "\n\n".join(tsx(i, self.repair_body) for i in ids) + "\n```",
+                                  usage)
             sid = re.search(r"trong shot (\d+\.\d+)", u).group(1)
-            if self.engine == "remotion":
-                return ChatResult("```tsx\n" + tsx(sid, self.repair_body) + "\n```", usage)
-            return ChatResult(f"```python\ndef shot_{sid.replace('.', '_')}(self):\n    self.narrate('fixed')\n```", usage)
+            return ChatResult("```tsx\n" + tsx(sid, self.repair_body) + "\n```", usage)
         raise AssertionError("unrecognised prompt: " + u[:80])
 
     def _first_body(self, i):
@@ -107,10 +95,9 @@ class FakeChecker:
 
     SUGGEST = "TS2552: Cannot find name 'useCurrentFrameSafe'. Did you mean 'useCurrentFrame'?"
 
-    def __init__(self, raw_for_manim=False):
+    def __init__(self):
         self.codes: list[str] = []
         self.layouts: list = []
-        self.raw_for_manim = raw_for_manim
 
     async def check(self, engine, code, scene_class_name, layout=None):
         self.codes.append(code)
@@ -119,19 +106,8 @@ class FakeChecker:
                  for i, ln in enumerate(code.splitlines(), 1) if "BROKEN" in ln]
         diags += [Diagnostic(self.SUGGEST, i, rule="TS2552")
                   for i, ln in enumerate(code.splitlines(), 1) if "useCurrentFrameSafe" in ln]
-        raw = ""
-        if self.raw_for_manim and diags:
-            raw = "\n".join(f'  File "s.py", line {d.line}, in {_fn(code, d.line)}' for d in diags)
-            diags = []
         return CheckResult(ok=not diags and "BROKEN" not in code and "useCurrentFrameSafe" not in code,
-                           diagnostics=diags, raw=raw)
-
-
-def _fn(code, line):
-    for i in range(line - 1, -1, -1):
-        m = re.match(r"\s*def (\w+)", code.splitlines()[i])
-        if m:
-            return m.group(1)
+                           diagnostics=diags)
 
 
 async def emit_none(_):
@@ -163,17 +139,16 @@ class Events:
         return out
 
 
-def req(sb, engine="remotion"):
-    return CodeRequest(engine=engine, topic="Chủ đề", storyboard=sb, system="SYS")
+def req(sb):
+    return CodeRequest(engine="remotion", topic="Chủ đề", storyboard=sb, system="SYS")
 
 
-@pytest.mark.parametrize("engine", ["remotion", "manim"])
-async def test_every_call_of_the_run_carries_the_reasoning_limit(engine):
-    # Layout/cast, chunks and repairs all get the request's limit.
-    prov, chk = FakeProvider(engine=engine, broken={"1.2"}), FakeChecker()
-    r = CodeRequest(engine=engine, topic="Chủ đề", storyboard=storyboard(4), system="SYS", max_reasoning_chars=1234)
+async def test_every_call_of_the_run_carries_the_reasoning_limit():
+    # Layout, chunks and repairs all get the request's limit.
+    prov, chk = FakeProvider(broken={"1.2"}), FakeChecker()
+    r = CodeRequest(engine="remotion", topic="Chủ đề", storyboard=storyboard(4), system="SYS", max_reasoning_chars=1234)
     res = await pipeline(prov, chk, chunk=2).run(r, emit_none)
-    assert {c.phase for c in res.calls} >= {"chunk", "repair"} and {c.phase for c in res.calls} & {"layout", "cast"}
+    assert {c.phase for c in res.calls} >= {"chunk", "repair", "layout"}
     assert prov.calls and all(c.max_reasoning_chars == 1234 for c in prov.calls)
 
 
@@ -221,14 +196,6 @@ async def test_failing_shots_of_different_segments_are_repaired_in_one_turn_each
     res = await pipeline(prov, chk, chunk=2).run(req(storyboard(4)), emit_none)
     assert res.check_ok
     assert sorted(c.label for c in res.calls if c.phase == "repair") == ["1.1,1.2", "1.3"]
-
-
-async def test_a_manim_segment_with_two_failing_shots_is_repaired_in_one_turn():
-    prov, chk = FakeProvider(engine="manim", broken={"1.2", "1.3"}), FakeChecker(raw_for_manim=True)
-    res = await pipeline(prov, chk).run(req(storyboard(4), "manim"), emit_none)
-    assert res.check_ok
-    assert [c.label for c in res.calls if c.phase == "repair"] == ["1.2,1.3"]
-    assert res.code.count("self.narrate('fixed')") == 2
 
 
 async def test_a_grouped_repair_reply_missing_a_shot_keeps_that_shots_old_code():
@@ -322,14 +289,6 @@ async def test_a_rerun_with_every_segment_stored_pays_for_no_writing_turn():
     assert [x for x in prov2.calls if "VIẾT CODE CHO SHOT" in x.user or "LAYOUT (bước 1/2" in x.user] == []
 
 
-async def test_manim_pipeline_uses_cast_and_maps_tracebacks_to_shots():
-    prov, chk = FakeProvider(engine="manim", broken={"1.2"}), FakeChecker(raw_for_manim=True)
-    res = await pipeline(prov, chk).run(req(storyboard(3), "manim"), emit_none)
-    assert res.check_ok and res.repair_rounds == 1
-    assert res.calls[0].phase == "cast" and res.scene_class_name == "ChuDeScene"
-    assert "class ChuDeScene(ConceptFlowScene):" in res.code and "self.narrate('fixed')" in res.code
-
-
 # --- storyboard layout (B) and per-chunk check (C) --------------------------------
 
 def storyboard_with_layout(n_shots: int, layout=None) -> str:
@@ -353,12 +312,6 @@ async def test_a_storyboard_layout_replaces_the_layout_call():
     chunk_turn = next(c.user for c in prov.calls if "VIẾT CODE CHO SHOT" in c.user)
     assert "hero: {x: 960, y: 480, size: 320}" in chunk_turn
     assert {"type": "phase", "phase": "layout", "source": "storyboard"} in events
-
-
-async def test_manim_still_writes_its_cast_when_the_storyboard_has_a_layout():
-    prov = FakeProvider(engine="manim")
-    res = await pipeline(prov, FakeChecker()).run(req(storyboard_with_layout(2), engine="manim"), emit_none)
-    assert res.check_ok and [c.phase for c in res.calls][0] == "cast"
 
 
 async def test_each_remotion_chunk_is_checked_against_stubs_and_repaired_before_the_merge():
@@ -481,14 +434,6 @@ def test_library_drawings_sharing_a_helper_name_are_pasted_into_separate_scopes(
     assert "const WorldMap = Library_WorldMap.WorldMap;" in block
     assert "type Region = Library_WorldMap.Region;" in block
     assert "import " not in block
-
-
-async def test_manim_ignores_library_drawings():
-    provider, checker = FakeProvider(engine="manim"), FakeChecker()
-    r = req(storyboard(1), engine="manim")
-    r.illustrations = [{"name": "SchoolBus", "usage": "", "description": "", "code": BUS}]
-    await pipeline(provider, checker).run(r, emit_none)
-    assert all("C4." not in c.system for c in provider.calls)
 
 
 # --- a failing chunk does not throw away the others; split when cut off ------
@@ -840,12 +785,6 @@ async def test_a_layout_diagnostic_is_repaired_on_its_shot_with_a_layout_prompt(
     assert res.to_dict()["diagnostics"] == []
 
 
-async def test_layout_context_is_not_sent_for_manim():
-    chk = FakeChecker()
-    await pipeline(FakeProvider(engine="manim"), chk).run(req(storyboard(2), engine="manim"), emit_none)
-    assert chk.layouts == [None]
-
-
 async def test_a_layout_check_that_could_not_run_surfaces_as_a_warning_of_the_run():
     class Unchecked(FakeChecker):
         async def check(self, engine, code, scene_class_name, layout=None):
@@ -1086,3 +1025,22 @@ async def test_a_single_chunk_run_fixes_the_suggestion_at_the_final_check():
     assert [e["phase"] for e in ev.of("check")] == ["final", "autofix"]
     last = [e for e in ev.of("segment_done") if e["key"] == "1.1-1.4"][-1]
     assert last["repaired"] is False and "useCurrentFrame()" in last["content"]["shots"]["1.2"]
+
+
+async def test_an_engine_other_than_remotion_fails_the_run_before_any_call():
+    prov = FakeProvider()
+    r = CodeRequest(engine="manim", topic="Chủ đề", storyboard=storyboard(2), system="SYS")
+    with pytest.raises(PipelineFailure, match="unknown engine 'manim'"):
+        await pipeline(prov, FakeChecker()).run(r, emit_none)
+    assert prov.calls == []
+
+
+def test_segment_fingerprints_of_a_remotion_plan_are_stable():
+    # Stored segments are reused when their fingerprint matches: these values
+    # were computed before the pipeline lost its second engine, and must not move.
+    plan = make_plan(req(storyboard(4)), 2)
+    assert [(s.key, s.fingerprint) for s in plan.segments] == [
+        ("frame", "a732826bd8c0a7124702bf30f342f2a21d83e6e92309dc4d3bf71c32c3b7ea7a"),
+        ("1.1-1.2", "af18aa0f38146c97befb5637b2f5059cdd2f34692675dad3c78ab43849afeee5"),
+        ("1.3-1.4", "10dff42525117caf9094cffd1d8cc94b1908b5c985cb7bb5a20ba56d646e1c90"),
+    ]

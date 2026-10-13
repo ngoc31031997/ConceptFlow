@@ -100,27 +100,15 @@ type RenderedPrompt struct {
 // saved. Identical to the placeholder web-gui shows.
 const TopicPlaceholder = "[DÁN CHỦ ĐỀ CỦA BẠN VÀO ĐÂY]"
 
-// RoleFor maps a pipeline step to the prompt role, which depends on the
-// project's render engine.
-//
-// This lives on the server on purpose. web-gui currently works it out in two
-// separate pages, and a third copy in a third place is how the Remotion and
-// Manim branches end up disagreeing about which prompt step 3 uses.
-func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
-	remotion := renderEngine == "remotion"
+// RoleFor maps a pipeline step to the prompt role of the manual (Copy) flow.
+func RoleFor(step string) (domain.PromptRole, error) {
 	switch step {
 	case "story":
-		// Shared: this step decides the story, not the pixels.
 		return domain.RoleStoryArchitect, nil
 	case "storyboard":
-		// Shared: the director writes an engine-agnostic shooting script;
-		// translating it into what the engine can render is the code step's job.
 		return domain.RoleVisualDirector, nil
 	case "code":
-		if remotion {
-			return domain.RoleRemotionEngineer, nil
-		}
-		return domain.RoleManimEngineer, nil
+		return domain.RoleRemotionEngineer, nil
 	default:
 		return "", fmt.Errorf("unknown step %q", step)
 	}
@@ -128,18 +116,15 @@ func RoleFor(step string, renderEngine string) (domain.PromptRole, error) {
 
 // AIRoleFor is RoleFor for the AI flow: the story step is shared, the
 // storyboard step asks for JSON, and the code step asks for shot functions
-// only. The manual (Copy) flow keeps using RoleFor.
-func AIRoleFor(step string, renderEngine string) (domain.PromptRole, error) {
+// only.
+func AIRoleFor(step string) (domain.PromptRole, error) {
 	switch step {
 	case "story":
 		return domain.RoleStoryArchitect, nil
 	case "storyboard":
 		return domain.RoleVisualDirectorAI, nil
 	case "code":
-		if renderEngine == "remotion" {
-			return domain.RoleRemotionEngineerAI, nil
-		}
-		return domain.RoleManimEngineerAI, nil
+		return domain.RoleRemotionEngineerAI, nil
 	default:
 		return "", fmt.Errorf("unknown step %q", step)
 	}
@@ -206,7 +191,7 @@ func (uc *RenderPromptUseCase) variablesFor(
 	vars := map[string]string{
 		"topic":                   topic,
 		"channel_identity":        domain.ChannelIdentity(language),
-		"narration_language_rule": domain.NarrationLanguageRuleFor(language, engineOf(role)),
+		"narration_language_rule": narrationRuleFor(role, language),
 		"previous_output":         previous,
 		"format_beats":            "",
 		"video_archetypes":        "",
@@ -269,10 +254,10 @@ func (uc *RenderPromptUseCase) previousOutputFor(
 		// Nothing comes before step 1.
 	case domain.RoleVisualDirector, domain.RoleVisualDirectorAI:
 		add(story)
-	case domain.RoleManimEngineer, domain.RoleRemotionEngineer:
+	case domain.RoleRemotionEngineer:
 		add(story)
 		add(storyboard)
-	case domain.RoleManimEngineerAI, domain.RoleRemotionEngineerAI:
+	case domain.RoleRemotionEngineerAI:
 		// The storyboard is not in the system prompt: llm-service hands each
 		// call its own slice of it, and the whole document only to the layout call.
 		//
@@ -425,12 +410,4 @@ func looksLikeStoryLabel(line string) bool {
 	}
 	n := len(strings.Fields(head))
 	return n > 0 && n <= 8
-}
-
-// engineOf is the render engine a role writes for; only Remotion's roles differ.
-func engineOf(role domain.PromptRole) string {
-	if isRemotionRole(role) {
-		return "remotion"
-	}
-	return "manim"
 }

@@ -30,8 +30,8 @@ func (uc *GenerateAuthoringUseCase) storyboardWarnings(ctx context.Context, proj
 	// No format on the project means the outline was written without a
 	// beat sheet, so there is no budget to hold the storyboard to.
 	checkLength := uc.formats != nil && project.VideoFormatID != ""
-	// The kit and its keyword table are Vietnamese and Remotion-only.
-	checkIllustrated := project.RenderEngine == domain.RenderEngineRemotion && language == "vi"
+	// The kit and its keyword table are Vietnamese.
+	checkIllustrated := language == "vi"
 	if !checkLength && !checkIllustrated {
 		return nil
 	}

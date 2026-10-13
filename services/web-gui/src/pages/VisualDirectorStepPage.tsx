@@ -55,8 +55,6 @@ export function VisualDirectorStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
-  // One director for every render engine: the shooting script is engine
-  // agnostic, and only the code step forks (manim_engineer / remotion_engineer).
   const directorRole = "visual_director";
 
   // Rendered by the server, not assembled here.
@@ -98,8 +96,8 @@ export function VisualDirectorStepPage() {
           payload: { story: draft.authoringStory, storyboard: draft.authoringStoryboard, code: "" },
         });
       }
-      // A Remotion video gets its drawings before its code.
-      navigate(draft.renderEngine === "remotion" ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS.code);
+      // The drawings come before the code.
+      navigate(AUTHORING_STEP_PATHS.illustrations);
     } catch {
       setSaveError("Không lưu được. Vui lòng thử lại.");
     } finally {
@@ -123,7 +121,7 @@ export function VisualDirectorStepPage() {
       aiMode,
       isEmpty: storyboardIsEmpty,
       what: "storyboard",
-      ready: `Storyboard đã sẵn sàng — bước tiếp theo sẽ sinh code ${draft.renderEngine === "remotion" ? "Remotion" : "Manim"}`,
+      ready: "Storyboard đã sẵn sàng — bước tiếp theo vẽ hình minh hoạ",
     });
 
   return (
@@ -135,11 +133,7 @@ export function VisualDirectorStepPage() {
         wide
       >
         <div className={styles.settingsRow}>
-          {/* Không truyền onEngineChange: storyboard đọc dàn ý, không đọc
-              engine, nên đây không phải chỗ đổi nó — chỉ tóm tắt để Creator
-              biết đang dựng cho engine nào. */}
           <PipelineSettingsBar
-            renderEngine={draft.renderEngine}
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}

@@ -132,11 +132,11 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 		return CodeGenRequest{}, fmt.Errorf("load topic: %w", err)
 	}
 
-	// A Remotion video's drawings are planned and drawn by the
+	// The video's drawings are planned and drawn by the
 	// illustrations step before this one; the code step only checks that the
 	// list exists and that the Creator approved or skipped every drawing.
 	var drawings []LibraryDrawing
-	if project.RenderEngine == domain.RenderEngineRemotion && uc.illustrations != nil {
+	if uc.illustrations != nil {
 		pending, planned, err := uc.illustrations.Gate(ctx, projectID)
 		if err != nil {
 			return CodeGenRequest{}, fmt.Errorf("check the video's drawings: %w", err)
@@ -160,18 +160,16 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 	}
 
 	req := CodeGenRequest{
-		Engine: string(project.RenderEngine), Topic: topic, Storyboard: storyboard,
+		Engine: string(domain.RenderEngineRemotion), Topic: topic, Storyboard: storyboard,
 		System: system, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
 		Frame: domain.FrameFor(project.VideoOutputMode),
 	}
-	if project.RenderEngine == domain.RenderEngineRemotion {
-		// The same subtitle strip {{subtitle_zone}} told the model
-		// to keep clear, and the video's font, for the layout check.
-		if band, burned := domain.ProjectSubtitleBand(project); burned {
-			req.SubtitleBand = &band
-		}
-		req.VideoFont = project.VideoFont
+	// The same subtitle strip {{subtitle_zone}} told the model
+	// to keep clear, and the video's font, for the layout check.
+	if band, burned := domain.ProjectSubtitleBand(project); burned {
+		req.SubtitleBand = &band
 	}
+	req.VideoFont = project.VideoFont
 	if uc.segments != nil {
 		if req.ChunkShots, err = uc.segments.GetCodeChunkShots(ctx, projectID); err != nil {
 			return CodeGenRequest{}, fmt.Errorf("load shots per segment: %w", err)
@@ -471,9 +469,6 @@ const StepIllustrations = "illustrations"
 func (uc *GenerateAuthoringUseCase) runIllustrations(ctx context.Context, project *domain.Project) (GeneratedStep, error) {
 	const step = StepIllustrations
 	projectID := project.ProjectID
-	if project.RenderEngine != domain.RenderEngineRemotion {
-		return GeneratedStep{}, errors.New("bước Hình minh hoạ chỉ dùng cho video Remotion")
-	}
 	if uc.illustrations == nil {
 		return GeneratedStep{}, errors.New("the illustrations stage is not wired")
 	}

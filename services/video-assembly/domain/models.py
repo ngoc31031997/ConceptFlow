@@ -1,6 +1,6 @@
 """Domain value objects for the Video Assembly Service.
 
-Manim-script input mode: Rendering produces one silent video for the whole
+Rendering produces one silent video for the whole
 project (not per-scene clips), so assembly's job is to lay each narration
 segment onto that video at its own offset, and optionally overlay
 background music. There is no per-scene clip:audio pairing or

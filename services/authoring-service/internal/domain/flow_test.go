@@ -14,16 +14,15 @@ func TestFlowStateFor(t *testing.T) {
 		{"config", StatusDraft, 2, AuthoredContent{}, FlowState{FlowConfig, RunIdle}},
 		{"script, nothing yet", StatusDraft, 3, AuthoredContent{}, FlowState{FlowStory, RunIdle}},
 		{"story done → visual is next", StatusDraft, 3, AuthoredContent{Story: true}, FlowState{FlowVisual, RunIdle}},
-		{"storyboard done → code is next", StatusDraft, 3, AuthoredContent{Story: true, Storyboard: true}, FlowState{FlowCode, RunIdle}},
 		{"code beats stale route", StatusDraft, 3, AuthoredContent{Story: true, Storyboard: true, Code: true}, FlowState{FlowCode, RunIdle}},
-		{"remotion, drawings not ready → illustrations", StatusDraft, 3,
-			AuthoredContent{Story: true, Storyboard: true, NeedsIllustrations: true}, FlowState{FlowIllustrations, RunIdle}},
-		{"remotion, drawings ready → code", StatusDraft, 3,
-			AuthoredContent{Story: true, Storyboard: true, NeedsIllustrations: true, Illustrations: true}, FlowState{FlowCode, RunIdle}},
-		{"remotion with code but no drawing list stays at code", StatusDraft, 3,
-			AuthoredContent{Story: true, Storyboard: true, Code: true, NeedsIllustrations: true}, FlowState{FlowCode, RunIdle}},
-		{"remotion before the storyboard is still visual", StatusDraft, 3,
-			AuthoredContent{Story: true, NeedsIllustrations: true}, FlowState{FlowVisual, RunIdle}},
+		{"storyboard done, drawings not ready → illustrations", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true}, FlowState{FlowIllustrations, RunIdle}},
+		{"drawings ready → code", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true, Illustrations: true}, FlowState{FlowCode, RunIdle}},
+		{"code but no drawing list stays at code", StatusDraft, 3,
+			AuthoredContent{Story: true, Storyboard: true, Code: true}, FlowState{FlowCode, RunIdle}},
+		{"before the storyboard is still visual", StatusDraft, 3,
+			AuthoredContent{Story: true}, FlowState{FlowVisual, RunIdle}},
 		// Code is checked first, so a draft with the Creator's own code
 		// and no storyboard stands at Code, not at step 3/4.
 		{"own code without a storyboard stands at code", StatusDraft, 3,
@@ -40,6 +39,26 @@ func TestFlowStateFor(t *testing.T) {
 	for _, c := range cases {
 		if got := FlowStateFor(c.status, c.wizard, c.content); got != c.want {
 			t.Errorf("%s: got %+v, want %+v", c.name, got, c.want)
+		}
+	}
+}
+
+func TestResultAndPublishCloseTheThirteenStepFlow(t *testing.T) {
+	if FlowStepsTotal != 13 {
+		t.Fatalf("flow has %d steps, want 13", FlowStepsTotal)
+	}
+	if got := FlowStateFor(StatusReadyToPublish, 3, AuthoredContent{}); got != (FlowState{12, RunIdle}) {
+		t.Errorf("ready_to_publish: got %+v, want step 12 idle", got)
+	}
+	if got := FlowStateFor(StatusPublished, 3, AuthoredContent{}); got != (FlowState{13, RunDone}) {
+		t.Errorf("published: got %+v, want step 13 done", got)
+	}
+	if len(FlowStepLabel) != FlowStepsTotal {
+		t.Errorf("FlowStepLabel names %d steps, want one per step (%d)", len(FlowStepLabel), FlowStepsTotal)
+	}
+	for step := 1; step <= FlowStepsTotal; step++ {
+		if FlowStepLabel[step] == "" {
+			t.Errorf("flow step %d has no label", step)
 		}
 	}
 }

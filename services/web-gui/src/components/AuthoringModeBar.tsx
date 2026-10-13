@@ -47,9 +47,9 @@ export const AUTHORING_STEP_PATHS: Record<AuthoringStep, string> = {
   code: "/create/script/code",
 };
 
-/** Chuỗi "chạy cả pipeline" của tab Kịch bản: Remotion có thêm bước Hình minh hoạ. */
-export function authoringChainSteps(renderEngine: string): AuthoringStep[] {
-  return renderEngine === "remotion" ? ["story", "storyboard", "illustrations", "code"] : ["story", "storyboard", "code"];
+/** Chuỗi "chạy cả pipeline" của tab Kịch bản. */
+export function authoringChainSteps(): AuthoringStep[] {
+  return ["story", "storyboard", "illustrations", "code"];
 }
 
 /** Kết cục của một chuỗi đã xong còn hiện bao lâu (xem `outcome` bên dưới). */
@@ -119,7 +119,7 @@ interface AuthoringModeBarProps {
   projectId: string;
   /**
    * Chuỗi bước mà một lần bấm sẽ chạy, theo đúng thứ tự. Màn bước 3
-   * truyền cả chuỗi (`authoringChainSteps`: story, storyboard, [illustrations],
+   * truyền cả chuỗi (`authoringChainSteps`: story, storyboard, illustrations,
    * code): Creator chỉ nhập chủ đề rồi bấm một lần, server chạy tuần tự, mỗi
    * bước đọc kết quả bước trước đã lưu. Màn 4/5/6 truyền đúng một bước, để
    * chạy lại riêng bước đó sau khi sửa tay.

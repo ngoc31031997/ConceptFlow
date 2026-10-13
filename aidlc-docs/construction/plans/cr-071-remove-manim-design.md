@@ -57,6 +57,12 @@ Chưa đếm được trong DB có bao nhiêu project dùng Manim và có intro/
 
 Chốt: **1a, 2a, 3a, 4a**.
 
+## Thay đổi trong lúc code (2026-10-12)
+
+> "ko cần quan tâm project cux" — trả lời câu hỏi: "Xoá hàng DB, bỏ hết code chỉ-xem (Recommended)".
+
+Thay cho 1a: **không giữ project Manim**. T0 đếm được 24 project `render_engine = 'manim'`, tất cả ở trạng thái `deleting`. Migration orchestrator xoá các hàng này cùng `saga_steps`, `outbox_events`, `project_events` của chúng (đúng các bảng `ProjectRepository.Delete` xoá). Toàn bộ phần chỉ-xem bị bỏ: không có giá trị "engine cũ", không có lỗi 409 ngừng hỗ trợ, không có nhãn/thẻ ở web-gui. FR2 và tiêu chí chấp nhận 2 dưới đây được thay bằng: *project Manim bị xoá khỏi DB orchestrator; mọi project còn lại là Remotion*. File của 24 project trên `/shared` và dữ liệu authoring-service theo `project_id` của chúng không được dọn tự động.
+
 ## Yêu cầu
 
 - **FR1 — Một engine.** Hệ thống chỉ dựng video bằng Remotion. Không còn chỗ nào cho Creator chọn engine; project mới luôn là Remotion.

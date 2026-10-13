@@ -144,14 +144,13 @@ func blankFork(src *domain.Project) *domain.Project {
 	dst.Status = domain.StatusDraft
 	dst.Scenes = nil
 	dst.ScriptContent = ""
-	dst.ManimSceneClassName = ""
+	dst.SceneClassName = ""
 	dst.Beats = nil
 	dst.ValidationWarnings = nil
 	dst.VideoPath = nil
 	dst.RenderedVideoPath = nil
 	dst.CaptionPath = nil
 	dst.CaptionStatus = nil
-	dst.LayoutMarks = nil
 	dst.WaitOffsets = nil
 	dst.Chapters = nil
 	dst.RenderedVideoSeconds = 0

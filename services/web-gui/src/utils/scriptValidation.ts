@@ -1,39 +1,19 @@
 /**
- * Kiểm tra script ngay lúc soạn, trước khi gửi đi render.
+ * Kiểm tra code Remotion ngay lúc soạn, trước khi gửi đi render.
  *
- * Đây **không phải bài toán đếm khớp**: `self.narrate()` gộp lời thoại và
- * điểm chờ làm một, nên không có gì để đếm khớp.
- *
- * Kết luận "hợp lệ" là của `rendering` (`validate_script`,
- * `script_locator`, `dry_run`). Những gì server đã bắt đúng — thiếu class Scene,
- * thiếu `<Composition id>` / `narrations` — không kiểm ở đây. Ở lại là những gì server không báo trước lúc render.
- *
- * Việc còn lại của file này là **cho Creator thấy trước video sẽ dài bao nhiêu**.
- * Con số đó vốn chỉ lộ ra ở bước 3 của Saga, sau khi TTS đã chạy.
- *
- * Lưu ý: phân tích tĩnh ở đây chỉ thấy các lời gọi `self.narrate("…")` viết
- * thẳng trong script. Lời thoại sinh ra trong vòng lặp hoặc trong hàm helper —
- * hoàn toàn hợp lệ — không đếm được từ text. Vì vậy đây là **ước
- * lượng tối thiểu**, và chỉ lượt dry bên Rendering mới biết con số thật.
+ * Kết luận "hợp lệ" là của `rendering` (`validate_script`, `script_locator`,
+ * `dry_run`). Ở đây chỉ bắt những lỗi lặp lại mà một biểu thức chính quy bắt
+ * được an toàn, để Creator sửa ngay trong ô nhập thay vì đọc log lỗi render.
  */
 
-import {
-  type ContentLanguage,
-  countWords,
-  estimateNarrationDuration,
-} from "./durationEstimate";
-
-/** Khớp `self.narrate("...")` và `self.narrate('...')` trên một dòng. */
-const NARRATE_RE = /self\.narrate\(\s*(["'])((?:(?!\1)[^\\]|\\.)*)\1\s*\)/g;
-
 /**
- * Toàn bộ nội dung được bọc trong một khối markdown ```python ... ``` (hoặc
+ * Toàn bộ nội dung được bọc trong một khối markdown ```tsx ... ``` (hoặc
  * ``` trơn). Mọi prompt trong thư viện prompt (authoring-service) đều bảo AI trả lời đúng một
  * khối như vậy — Creator copy nguyên cả khối, kể cả hai dòng backtick, là
- * đường dán phổ biến nhất từ một cửa sổ chat. Kết quả là script không còn bắt
- * đầu bằng `from conceptflow import *` mà bằng dòng "```python", nên
- * `ast.parse` phía Rendering chết ngay ở dòng 1 với "invalid syntax" — một
- * thông báo không nói cho Creator biết vấn đề thật là hai dòng thừa ở đầu/cuối.
+ * đường dán phổ biến nhất từ một cửa sổ chat. Kết quả là code không còn bắt
+ * đầu bằng `import` mà bằng dòng "```tsx", nên esbuild phía Rendering chết
+ * ngay ở dòng 1 với lỗi cú pháp — một thông báo không nói cho Creator biết
+ * vấn đề thật là hai dòng thừa ở đầu/cuối.
  */
 const MARKDOWN_FENCE_RE = /^```[a-zA-Z0-9]*\r?\n([\s\S]*?)\r?\n?```\s*$/;
 
@@ -63,68 +43,17 @@ export function stripMarkdownCodeFence(script: string): string {
  * Dấu hiệu còn sót dòng backtick mở đầu dù không khớp trọn khối (ví dụ
  * Creator xóa mất dòng ``` đóng, hoặc dán thêm chữ phía trước). Ô code ở bước
  * Kỹ sư tự gỡ khối trọn vẹn qua `stripMarkdownCodeFence`; kiểm tra này chỉ để bắt
- * phần còn sót và nói đúng vấn đề thay vì để lỗi cú pháp Python mơ hồ ở
- * `ast.parse` (dòng 1: invalid syntax) là thứ đầu tiên Creator nhìn thấy.
+ * phần còn sót và nói đúng vấn đề thay vì để lỗi cú pháp mơ hồ của esbuild
+ * (dòng 1) là thứ đầu tiên Creator nhìn thấy.
  */
 const LEADING_FENCE_RE = /^```/;
 
-export interface NarrationEstimate {
-  text: string;
-  words: number;
-  seconds: number;
-}
-
-export interface ScriptValidation {
-  narrationCount: number;
-  isValid: boolean;
-  message: string | null;
-  /** Từng đoạn lời thoại tìm thấy, kèm ước lượng thời lượng. */
-  narrations: NarrationEstimate[];
-  totalWords: number;
-  /** Tổng thời lượng lời thoại. CHƯA gồm thời gian animation. */
-  estimatedNarrationSeconds: number;
-}
-
-export function validateScript(
-  script: string,
-  language: ContentLanguage = "vi",
-  wordsPerMinute?: number,
-): ScriptValidation {
-  const narrations = extractNarrations(script, language, wordsPerMinute);
-  const totalWords = narrations.reduce((sum, n) => sum + n.words, 0);
-  const estimatedNarrationSeconds = narrations.reduce((sum, n) => sum + n.seconds, 0);
-
-  const base = {
-    narrationCount: narrations.length,
-    narrations,
-    totalWords,
-    estimatedNarrationSeconds,
-  };
-
-  if (script.trim().length === 0) {
-    return { ...base, isValid: true, message: null };
-  }
-
-  if (LEADING_FENCE_RE.test(script.trim())) {
-    return {
-      ...base,
-      isValid: false,
-      message:
-        'Script còn dính dòng markdown ``` ở đầu (thường sót lại khi copy nguyên khối code từ AI). Xóa dòng ``` (và dòng ``` đóng ở cuối nếu có) — script phải bắt đầu ngay bằng from conceptflow import *.',
-    };
-  }
-
-  return { ...base, isValid: true, message: null };
-}
-
 /**
- * feature/remotion-engine — Remotion had NO client-side check at all (any
- * non-empty text was accepted), so every one of the recurring failure modes
- * we've actually hit in production (missing `export const narrations`,
- * `<Composition>` missing `id="creator"`/`calculateMetadata`, a pasted
- * markdown fence, code truncated mid-paste) only ever surfaced minutes later
- * at real render time inside esbuild, with a stack trace instead of a plain
- * sentence. This mirrors validateScript's role for Manim: catch what a
+ * The recurring failure modes hit in production (missing `export const
+ * narrations`, `<Composition>` missing `id="creator"`/`calculateMetadata`, a
+ * pasted markdown fence, code truncated mid-paste) otherwise surface only
+ * minutes later at real render time inside esbuild, with a stack trace
+ * instead of a plain sentence. validateRemotionScript catches what a
  * regex safely can BEFORE the round trip to render, so a Creator fixes it in
  * the textarea instead of an error log. It intentionally does NOT try to
  * catch everything the prompt's self-check asks for (e.g. two overlapping
@@ -293,23 +222,3 @@ export function validateRemotionScript(script: string): RemotionScriptValidation
   return { ...base, isValid: true, message: null };
 }
 
-function extractNarrations(
-  script: string,
-  language: ContentLanguage,
-  wordsPerMinute?: number,
-): NarrationEstimate[] {
-  const found: NarrationEstimate[] = [];
-  // `matchAll` cần cờ /g và regex là hằng module, nên lastIndex phải được đặt
-  // lại — nếu không, lần gọi thứ hai sẽ bắt đầu từ giữa chuỗi trước.
-  NARRATE_RE.lastIndex = 0;
-  for (const match of script.matchAll(NARRATE_RE)) {
-    const text = match[2];
-    if (text.trim().length === 0) continue;
-    found.push({
-      text,
-      words: countWords(text),
-      seconds: estimateNarrationDuration(text, language, wordsPerMinute),
-    });
-  }
-  return found;
-}

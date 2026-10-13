@@ -4,7 +4,7 @@ export interface AuthoringHintInput {
   aiMode: boolean;
   /** The step's result box is still empty. */
   isEmpty: boolean;
-  /** The step's result, lower case: "dàn ý", "storyboard", "code Manim". */
+  /** The step's result, lower case: "dàn ý", "storyboard", "code Remotion". */
   what: string;
   /** Said once the result box has content. */
   ready: string;

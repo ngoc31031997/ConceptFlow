@@ -17,29 +17,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 
-# --- Khung hình Manim ---------------------------------------------------------
-# Manim 0.18 mặc định: `config.frame_height` = 8.0, tỉ lệ 16:9 nên
-# `config.frame_width` = 8 * 16/9 = 14.2222…  → x ∈ [-7.111, 7.111],
-# y ∈ [-4, 4]. Chép thành hằng số ở đây vì video-assembly KHÔNG cài Manim.
-# Nguồn đối chiếu: services/rendering/conceptflow/theme.py (FRAME_WIDTH,
-# FRAME_HEIGHT) — cùng hai con số, cùng lý do.
-FRAME_WIDTH = 14.222222222222221
-FRAME_HEIGHT = 8.0
-
-# Nguồn: services/rendering/conceptflow/theme.py::SAFE_MARGIN = 0.6.
-# Chép (không import) — video-assembly không phụ thuộc gói rendering. Nếu
-# theme.py đổi con số này, đổi ở đây, hoặc đặt QC_SAFE_MARGIN.
-THEME_SAFE_MARGIN = 0.6
-
-# Nguồn: services/rendering/conceptflow/theme.py::BRAND_BG — nền của mọi cảnh,
-# dùng làm màu nền để tính tương phản.
-THEME_BACKGROUND = "#080E1C"
-
-#: Chỉ những class này mới bị áp luật chồng lấn/chữ nhỏ/tương phản.
-#: `VGroup`/`Group` bị loại vì bbox của nhóm bao trùm con nó nên nhóm nào cũng
-#: "chồng" con nó, gây báo động giả.
-TEXT_CLASSES = frozenset({"Text", "MarkupText", "Tex", "MathTex", "Title", "Paragraph"})
-
 #: Khung pixel theo `render_quality` — cùng bảng với
 #: adapters/messaging/consumer.py::QUALITY_FRAME_SIZE.
 QUALITY_FRAME_SIZE = {
@@ -49,13 +26,12 @@ QUALITY_FRAME_SIZE = {
     "4k60": (3840, 2160),
 }
 QUALITY_FRAME_RATE = {"480p15": 15.0, "720p30": 30.0, "1080p60": 60.0, "4k60": 60.0}
-DEFAULT_QUALITY = "1080p60"
 
 SEVERITY_BLOCKING = "blocking"
 SEVERITY_WARNING = "warning"
 
-#: Hai luật mang severity blocking: tràn khung và chồng
-#: lấn narration. Mọi luật còn lại là cảnh báo.
+#: Luật duy nhất mang severity blocking: chồng lấn narration. Mọi luật còn lại
+#: là cảnh báo.
 #:
 #: Severity ở đây là **thuộc tính của phát hiện**, không phải của chính sách:
 #: nó luôn được ghi đúng vào báo cáo, kể cả lúc chạy chế độ chỉ-báo.
@@ -63,7 +39,7 @@ SEVERITY_WARNING = "warning"
 #: orchestrator quyết định — service này không đọc biến đó. Hạ cấp severity ở
 #: đây sẽ phá đúng mục đích của chế độ chỉ-báo: đo xem luật blocking kêu đúng
 #: bao nhiêu phần trăm trước khi bật cổng.
-BLOCKING_RULES = frozenset({"frame_overflow", "narration_overlap"})
+BLOCKING_RULES = frozenset({"narration_overlap"})
 
 
 @dataclass(frozen=True)
@@ -96,32 +72,6 @@ def _as_bool(raw: str | None, default: bool) -> bool:
 @dataclass(frozen=True)
 class QCThresholds:
     """Mọi ngưỡng ở một chỗ, cấu hình được bằng biến môi trường."""
-
-    # --- tràn khung ---
-    safe_margin: float = THEME_SAFE_MARGIN
-    #: Dung sai (đơn vị Manim) trước khi kêu — bbox Manim rộng hơn nét chữ thật
-    #: vài phần trăm, kêu ở 0.0 là kêu suốt.
-    frame_overflow_tolerance: float = 0.05
-
-    # --- chồng lấn ---
-    #: Tỉ lệ diện tích giao trên diện tích của mobject NHỎ HƠN. 0.15 nới rộng có
-    #: chủ ý: chữ có dấu tiếng Việt hay chạm nhẹ nhau mà mắt không thấy.
-    text_overlap_min_ratio: float = 0.15
-
-    # --- chữ quá nhỏ ---
-    #: Chiều cao chữ tối thiểu tính bằng pixel Ở ĐỘ PHÂN GIẢI XUẤT.
-    #: Căn cứ: màn 5,5 inch xem toàn màn hình → khung 16:9 cao
-    #: ~68 mm. 24 px trên 1080 dòng ≈ 1,5 mm chiều cao em — sàn đọc thoải mái ở
-    #: khoảng cách cầm tay ~30 cm. Ở 720p cùng cỡ chữ chỉ còn 16 px nên bị kêu,
-    #: và đó là đúng: chữ nhỏ ở bitrate thấp còn bị encode làm nhoè thêm.
-    min_text_pixel_height: float = 24.0
-
-    # --- tương phản ---
-    #: Tỉ số tương phản WCAG. 3.0 là ngưỡng WCAG AA cho chữ LỚN — chữ trên video
-    #: gần như luôn là chữ lớn, và ngưỡng 4.5 sẽ kêu cả những cặp màu theme đã
-    #: chọn có chủ ý.
-    min_contrast_ratio: float = 3.0
-    background_color: str = THEME_BACKGROUND
 
     # --- hình chết ---
     max_static_seconds: float = 12.0
@@ -157,12 +107,6 @@ class QCThresholds:
         source = os.environ if env is None else env
         get = source.get
         return cls(
-            safe_margin=_as_float(get("QC_SAFE_MARGIN"), THEME_SAFE_MARGIN),
-            frame_overflow_tolerance=_as_float(get("QC_FRAME_OVERFLOW_TOLERANCE"), 0.05),
-            text_overlap_min_ratio=_as_float(get("QC_TEXT_OVERLAP_MIN_RATIO"), 0.15),
-            min_text_pixel_height=_as_float(get("QC_MIN_TEXT_PIXEL_HEIGHT"), 24.0),
-            min_contrast_ratio=_as_float(get("QC_MIN_CONTRAST_RATIO"), 3.0),
-            background_color=get("QC_BACKGROUND_COLOR") or THEME_BACKGROUND,
             max_static_seconds=_as_float(get("QC_MAX_STATIC_SECONDS"), 12.0),
             loudness_target_lufs=_as_float(get("QC_LOUDNESS_TARGET_LUFS"), -14.0),
             loudness_tolerance_lu=_as_float(get("QC_LOUDNESS_TOLERANCE_LU"), 1.5),
@@ -181,381 +125,6 @@ class QCThresholds:
         """Severity thật luôn được ghi vào báo cáo. Cổng chặn là việc
         của orchestrator (`QC_ENFORCE`), không phải của người chấm."""
         return SEVERITY_BLOCKING if rule in BLOCKING_RULES else SEVERITY_WARNING
-
-
-# --- Tiện ích bố cục ----------------------------------------------------------
-
-
-def _bbox(mobject: dict) -> tuple[float, float, float, float] | None:
-    """(left, right, top, bottom) theo toạ độ Manim, hoặc None nếu bbox hỏng."""
-    raw = mobject.get("bbox")
-    if not raw or len(raw) != 4:
-        return None
-    try:
-        left, right, top, bottom = (float(v) for v in raw)
-    except (TypeError, ValueError):
-        return None
-    # Chuẩn hoá: một mark ghi ngược thứ tự vẫn dùng được.
-    if right < left:
-        left, right = right, left
-    if top < bottom:
-        top, bottom = bottom, top
-    return left, right, top, bottom
-
-
-def _is_text(mobject: dict) -> bool:
-    return mobject.get("cls") in TEXT_CLASSES
-
-
-def _is_visible(mobject: dict) -> bool:
-    """Mobject trong suốt bị bỏ qua — đã `FadeOut` nhưng chưa
-    remove thì bbox vẫn còn đó mà mắt không thấy gì."""
-    for key in ("opacity", "fill_opacity", "stroke_opacity"):
-        value = mobject.get(key)
-        if value is not None:
-            try:
-                if float(value) > 0.0:
-                    return True
-            except (TypeError, ValueError):
-                return True
-            return False
-    return True  # không khai báo opacity → coi như hiện
-
-
-def _mark_time(mark: dict) -> float:
-    try:
-        return float(mark.get("t") or 0.0)
-    except (TypeError, ValueError):
-        return 0.0
-
-
-def _iter_mobjects(layout_marks: list[dict]):
-    for mark in layout_marks or []:
-        timestamp = _mark_time(mark)
-        for mobject in mark.get("mobjects") or []:
-            if isinstance(mobject, dict):
-                yield timestamp, mobject
-
-
-#: Khung camera hẹp hơn toàn cảnh quá ngưỡng này mới coi là đang zoom — tránh
-#: sai số float của `restore_view()` biến một mốc toàn cảnh thành "zoom 0.9999".
-ZOOM_EPSILON = 1e-3
-
-
-def _camera_frame(mark: dict) -> tuple[float, float, float, float] | None:
-    """Khung camera của mốc nếu script đang `focus()`, ngược lại None.
-
-    Mốc cũ (trước khi có camera) không có trường `frame` → None → luật chạy
-    y như trước.
-    """
-    box = _bbox({"bbox": mark.get("frame")})
-    if box is None:
-        return None
-    left, right, _, _ = box
-    if right - left >= FRAME_WIDTH - ZOOM_EPSILON:
-        return None
-    return box
-
-
-def _zoom_factor(mark: dict) -> float:
-    """Chữ đang hiện to hơn cỡ gốc bao nhiêu lần do camera zoom."""
-    frame = _camera_frame(mark)
-    if frame is None:
-        return 1.0
-    left, right, _, _ = frame
-    return FRAME_WIDTH / (right - left)
-
-
-def _label(mobject: dict) -> str:
-    cls = mobject.get("cls") or "mobject"
-    text = (mobject.get("text") or "").strip()
-    if text:
-        snippet = text if len(text) <= 30 else text[:27] + "…"
-        return f'{cls} "{snippet}"'
-    return cls
-
-
-# --- tràn khung --------------------------------------------------------------
-
-
-def check_frame_overflow(layout_marks: list[dict], thresholds: QCThresholds) -> list[QCFinding]:
-    """Bbox vượt khung đang quay, hoặc lấn vào safe margin của theme.
-
-    Khung đang quay là khung toàn cảnh, trừ khi script đang `focus()`. Khi đó:
-    - vật có sẵn TRƯỚC lần zoom bị camera cắt đi là chủ ý (zoom để tập trung)
-      và đã được soi ở các mốc toàn cảnh trước → bỏ qua;
-    - vật xuất hiện TRONG lúc zoom (`added_during_zoom`) được soi theo khung
-      camera, safe margin thu nhỏ theo đúng tỉ lệ zoom.
-    """
-    severity = thresholds.severity_for("frame_overflow")
-    tol = thresholds.frame_overflow_tolerance
-
-    findings: list[QCFinding] = []
-    for mark in layout_marks or []:
-        timestamp = _mark_time(mark)
-        camera = _camera_frame(mark)
-        if camera is None:
-            center_x = center_y = 0.0
-            half_width, half_height = FRAME_WIDTH / 2.0, FRAME_HEIGHT / 2.0
-            margin = thresholds.safe_margin
-        else:
-            cam_left, cam_right, cam_top, cam_bottom = camera
-            center_x, center_y = (cam_left + cam_right) / 2.0, (cam_top + cam_bottom) / 2.0
-            half_width, half_height = (cam_right - cam_left) / 2.0, (cam_top - cam_bottom) / 2.0
-            margin = thresholds.safe_margin / _zoom_factor(mark)
-        where = "khung" if camera is None else "khung camera đang zoom"
-
-        for mobject in mark.get("mobjects") or []:
-            if not isinstance(mobject, dict):
-                continue
-            if camera is not None and not mobject.get("added_during_zoom"):
-                continue
-            findings += _overflow_of(
-                mobject, timestamp, severity, tol, margin,
-                center_x, center_y, half_width, half_height, where,
-            )
-    return findings
-
-
-def _overflow_of(
-    mobject: dict, timestamp: float, severity: str, tol: float, margin: float,
-    center_x: float, center_y: float, half_width: float, half_height: float, where: str,
-) -> list[QCFinding]:
-    """Tràn khung / lấn safe margin của một vật, theo toạ độ đã dời về tâm khung."""
-    findings: list[QCFinding] = []
-    if not _is_visible(mobject):
-        return findings
-    box = _bbox(mobject)
-    if box is None:
-        return findings
-    left, right, top, bottom = box
-    left, right = left - center_x, right - center_x
-    top, bottom = top - center_y, bottom - center_y
-
-    outside = (
-        left < -half_width - tol
-        or right > half_width + tol
-        or bottom < -half_height - tol
-        or top > half_height + tol
-    )
-    if outside:
-        findings.append(
-            QCFinding(
-                rule="frame_overflow",
-                severity=severity,
-                message=(
-                    f"{_label(mobject)} tràn ra ngoài {where} "
-                    f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f}, "
-                    f"khung ±{half_width:.2f} × ±{half_height:.2f})"
-                ),
-                timestamp_seconds=timestamp,
-            )
-        )
-        return findings
-
-    inner_x = half_width - margin
-    inner_y = half_height - margin
-    if (
-        left < -inner_x - tol
-        or right > inner_x + tol
-        or bottom < -inner_y - tol
-        or top > inner_y + tol
-    ):
-        findings.append(
-            QCFinding(
-                rule="frame_overflow",
-                severity=severity,
-                message=(
-                    f"{_label(mobject)} lấn vào safe margin {margin:.2f} "
-                    f"(bbox l={left:.2f} r={right:.2f} t={top:.2f} b={bottom:.2f})"
-                ),
-                timestamp_seconds=timestamp,
-            )
-        )
-    return findings
-
-
-# --- chồng lấn ---------------------------------------------------------------
-
-
-def _area(box: tuple[float, float, float, float]) -> float:
-    left, right, top, bottom = box
-    return max(0.0, right - left) * max(0.0, top - bottom)
-
-
-def _intersection_area(a, b) -> float:
-    left = max(a[0], b[0])
-    right = min(a[1], b[1])
-    top = min(a[2], b[2])
-    bottom = max(a[3], b[3])
-    return max(0.0, right - left) * max(0.0, top - bottom)
-
-
-def check_text_overlap(layout_marks: list[dict], thresholds: QCThresholds) -> list[QCFinding]:
-    """Chỉ áp cho mobject dạng chữ, hiện hình. VGroup/Group bị bỏ qua có chủ ý:
-    bbox của nhóm bao trùm con nó nên mọi nhóm đều "chồng" con mình."""
-    severity = thresholds.severity_for("text_overlap")
-    findings: list[QCFinding] = []
-
-    for mark in layout_marks or []:
-        timestamp = _mark_time(mark)
-        boxes = []
-        for mobject in mark.get("mobjects") or []:
-            if not isinstance(mobject, dict) or not _is_text(mobject) or not _is_visible(mobject):
-                continue
-            box = _bbox(mobject)
-            if box is None or _area(box) <= 0.0:
-                continue
-            boxes.append((mobject, box))
-
-        for i in range(len(boxes)):
-            for j in range(i + 1, len(boxes)):
-                mobject_a, box_a = boxes[i]
-                mobject_b, box_b = boxes[j]
-                overlap = _intersection_area(box_a, box_b)
-                if overlap <= 0.0:
-                    continue
-                ratio = overlap / min(_area(box_a), _area(box_b))
-                if ratio > thresholds.text_overlap_min_ratio:
-                    findings.append(
-                        QCFinding(
-                            rule="text_overlap",
-                            severity=severity,
-                            message=(
-                                f"{_label(mobject_a)} và {_label(mobject_b)} chồng lấn "
-                                f"{ratio * 100:.0f}% diện tích"
-                            ),
-                            timestamp_seconds=timestamp,
-                        )
-                    )
-    return findings
-
-
-# --- chữ quá nhỏ -------------------------------------------------------------
-
-
-def font_size_to_pixels(font_size: float, render_quality: str, thresholds: QCThresholds) -> float:
-    """Quy đổi `font_size` của Manim ra chiều cao pixel ở độ phân giải xuất.
-
-    Manim đặt chiều cao một em bằng `font_size / 100` đơn vị khung, và khung cao
-    `FRAME_HEIGHT` đơn vị được vẽ lên `pixel_height` dòng — nên
-    px = font_size / 100 * pixel_height / FRAME_HEIGHT.
-    Ví dụ: cỡ `caption` 20 của theme ở 1080p → 0.20 × 135 = 27 px.
-    """
-    _, pixel_height = thresholds.quality_frame_size.get(
-        render_quality, thresholds.quality_frame_size.get(DEFAULT_QUALITY, (1920, 1080))
-    )
-    return font_size / 100.0 * pixel_height / FRAME_HEIGHT
-
-
-def check_text_too_small(
-    layout_marks: list[dict], render_quality: str, thresholds: QCThresholds
-) -> list[QCFinding]:
-    severity = thresholds.severity_for("text_too_small")
-    findings: list[QCFinding] = []
-    for mark in layout_marks or []:
-        findings += _too_small_in_mark(mark, render_quality, thresholds, severity)
-    return findings
-
-
-def _too_small_in_mark(
-    mark: dict, render_quality: str, thresholds: QCThresholds, severity: str
-) -> list[QCFinding]:
-    """Cỡ chữ nhìn thấy = cỡ gốc × hệ số zoom camera của mốc."""
-    timestamp = _mark_time(mark)
-    zoom = _zoom_factor(mark)
-    findings: list[QCFinding] = []
-    for mobject in mark.get("mobjects") or []:
-        if not isinstance(mobject, dict):
-            continue
-        if not _is_text(mobject) or not _is_visible(mobject):
-            continue
-        raw = mobject.get("font_size")
-        if raw is None:
-            continue  # Manim không phải mobject nào cũng có cỡ chữ
-        try:
-            font_size = float(raw)
-        except (TypeError, ValueError):
-            continue
-        pixels = font_size_to_pixels(font_size, render_quality, thresholds) * zoom
-        if pixels < thresholds.min_text_pixel_height:
-            findings.append(
-                QCFinding(
-                    rule="text_too_small",
-                    severity=severity,
-                    message=(
-                        f"{_label(mobject)} cỡ {font_size:.0f} ≈ {pixels:.0f}px ở "
-                        f"{render_quality}, dưới ngưỡng đọc được "
-                        f"{thresholds.min_text_pixel_height:.0f}px trên màn 5,5 inch"
-                    ),
-                    timestamp_seconds=timestamp,
-                )
-            )
-    return findings
-
-
-# --- tương phản --------------------------------------------------------------
-
-
-def _parse_hex_color(value: str | None) -> tuple[float, float, float] | None:
-    if not isinstance(value, str):
-        return None
-    raw = value.strip().lstrip("#")
-    if len(raw) == 3:
-        raw = "".join(ch * 2 for ch in raw)
-    if len(raw) == 8:  # #RRGGBBAA
-        raw = raw[:6]
-    if len(raw) != 6:
-        return None
-    try:
-        return tuple(int(raw[i : i + 2], 16) / 255.0 for i in (0, 2, 4))  # type: ignore[return-value]
-    except ValueError:
-        return None
-
-
-def _relative_luminance(rgb: tuple[float, float, float]) -> float:
-    """WCAG 2.1 relative luminance."""
-
-    def channel(c: float) -> float:
-        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
-
-    r, g, b = (channel(c) for c in rgb)
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-
-def contrast_ratio(foreground: str, background: str) -> float | None:
-    """Tỉ số tương phản WCAG, 1.0 (không phân biệt) → 21.0 (đen/trắng)."""
-    fg = _parse_hex_color(foreground)
-    bg = _parse_hex_color(background)
-    if fg is None or bg is None:
-        return None
-    lighter, darker = sorted((_relative_luminance(fg), _relative_luminance(bg)), reverse=True)
-    return (lighter + 0.05) / (darker + 0.05)
-
-
-def check_low_contrast(layout_marks: list[dict], thresholds: QCThresholds) -> list[QCFinding]:
-    severity = thresholds.severity_for("low_contrast")
-    findings: list[QCFinding] = []
-    for timestamp, mobject in _iter_mobjects(layout_marks):
-        if not _is_text(mobject) or not _is_visible(mobject):
-            continue
-        ratio = contrast_ratio(mobject.get("color"), thresholds.background_color)
-        if ratio is None:
-            continue
-        if ratio < thresholds.min_contrast_ratio:
-            findings.append(
-                QCFinding(
-                    rule="low_contrast",
-                    severity=severity,
-                    message=(
-                        f"{_label(mobject)} màu {mobject.get('color')} trên nền "
-                        f"{thresholds.background_color} chỉ đạt tương phản {ratio:.2f}:1, "
-                        f"dưới ngưỡng {thresholds.min_contrast_ratio:.1f}:1"
-                    ),
-                    timestamp_seconds=timestamp,
-                )
-            )
-    return findings
 
 
 # --- hình chết ---------------------------------------------------------------
@@ -778,7 +347,6 @@ def check_publish_attributes(
 
 def evaluate_all(
     *,
-    layout_marks: list[dict] | None,
     narration_segments: list[dict] | None,
     subtitle_cues: list[dict] | None,
     render_quality: str,
@@ -790,14 +358,9 @@ def evaluate_all(
     """Chạy toàn bộ luật, trả findings đã sắp theo timestamp (báo cáo đọc từ
     trên xuống là đi dọc video)."""
     t = thresholds or QCThresholds.from_env()
-    marks = layout_marks or []
     segments = narration_segments or []
 
     findings: list[QCFinding] = []
-    findings += check_frame_overflow(marks, t)
-    findings += check_text_overlap(marks, t)
-    findings += check_text_too_small(marks, render_quality, t)
-    findings += check_low_contrast(marks, t)
     findings += check_static_frame(segments, t)
     findings += check_narration_overlap(segments, t)
     findings += check_subtitle_cue_overlap(subtitle_cues or [], t)

@@ -1,7 +1,7 @@
 import { SelectableOption } from "./SelectableOption";
 import glass from "../styles/glass.module.css";
 import selectable from "../styles/selectable.module.css";
-import styles from "./RenderEnginePicker.module.css";
+import styles from "./VideoFontPicker.module.css";
 
 interface VideoFontPickerProps {
   value: string;
@@ -19,8 +19,7 @@ const OPTIONS: { value: string; label: string }[] = [
 
 /**
  * Font for text drawn inside a Remotion video — labels, numbers, titles.
- * Subtitles have their own font in the subtitle style panel. Manim has no
- * equivalent: its fonts come from the design-system theme.
+ * Subtitles have their own font in the subtitle style panel.
  */
 export function VideoFontPicker({ value, onChange }: VideoFontPickerProps) {
   return (

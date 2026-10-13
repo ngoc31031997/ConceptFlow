@@ -15,11 +15,9 @@ type fakeWizardRepo struct {
 	project domain.Project
 }
 
-func (f *fakeWizardRepo) GetStatus(context.Context, string) (domain.ProjectStatus, error) {
-	return f.status, nil
-}
 func (f *fakeWizardRepo) Get(context.Context, string) (*domain.Project, error) {
 	p := f.project
+	p.Status = f.status
 	return &p, nil
 }
 func (f *fakeWizardRepo) GetVideoFormat(_ context.Context, id string, _ int) (domain.VideoFormat, error) {
@@ -46,7 +44,7 @@ func TestPatchWizardSettings_PassesOnlyGivenFields(t *testing.T) {
 	if repo.patch.RenderQuality == nil || *repo.patch.RenderQuality != q {
 		t.Errorf("quality not passed: %+v", repo.patch)
 	}
-	if repo.patch.ContentLanguage != nil || repo.patch.RenderEngine != nil || repo.patch.VideoFormatID != nil || repo.patch.Confirm {
+	if repo.patch.ContentLanguage != nil || repo.patch.VideoFormatID != nil || repo.patch.Confirm {
 		t.Errorf("absent fields must stay nil: %+v", repo.patch)
 	}
 }
@@ -170,8 +168,8 @@ func TestPatchWizardSettings_ChoosingTheShortBringsWhatAShortNeeds(t *testing.T)
 		t.Fatal(err)
 	}
 	p := repo.patch
-	if *p.VideoFormatID != domain.FormatVerticalShort60s.ID || *p.RenderEngine != domain.RenderEngineRemotion || *p.SubtitleMode != domain.SubtitleModeBurnIn {
-		t.Errorf("short defaults not applied: format %v engine %v subtitles %v", *p.VideoFormatID, *p.RenderEngine, *p.SubtitleMode)
+	if *p.VideoFormatID != domain.FormatVerticalShort60s.ID || *p.SubtitleMode != domain.SubtitleModeBurnIn {
+		t.Errorf("short defaults not applied: format %v subtitles %v", *p.VideoFormatID, *p.SubtitleMode)
 	}
 	if p.SubtitleStyle == nil || p.SubtitleStyle.Position != "top" {
 		t.Errorf("a short's captions go at the top, got %+v", p.SubtitleStyle)
@@ -193,14 +191,12 @@ func TestPatchWizardSettings_AShortKeepsTheSubtitlesTheCreatorPicked(t *testing.
 
 func TestPatchWizardSettings_ConfirmRefusesAShortItCannotBuild(t *testing.T) {
 	ctx := context.Background()
-	manim := domain.RenderEngineManim
 	cases := map[string]struct {
 		project domain.Project
 		patch   domain.WizardSettingsPatch
 	}{
 		"short on a long format":   {domain.Project{VideoOutputMode: domain.ModeShortOnly, VideoFormatID: "quick_explainer_3min", RenderEngine: domain.RenderEngineRemotion}, domain.WizardSettingsPatch{Confirm: true}},
 		"long on the short format": {domain.Project{VideoOutputMode: domain.ModeLongOnly, VideoFormatID: domain.FormatVerticalShort60s.ID}, domain.WizardSettingsPatch{Confirm: true}},
-		"short with Manim":         {domain.Project{VideoOutputMode: domain.ModeShortOnly, VideoFormatID: domain.FormatVerticalShort60s.ID}, domain.WizardSettingsPatch{RenderEngine: &manim, Confirm: true}},
 	}
 	for name, c := range cases {
 		repo := &fakeWizardRepo{status: domain.StatusDraft, project: c.project}

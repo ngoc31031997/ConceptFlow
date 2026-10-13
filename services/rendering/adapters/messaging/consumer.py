@@ -1,8 +1,7 @@
-"""AMQP command consumer — handles render_scenes from rendering.commands
-(Manim-script input mode).
+"""AMQP command consumer — handles the commands on rendering.commands.
 
-RenderScriptUseCase.render() can legitimately run for minutes (a full Manim
-subprocess, up to RENDER_TIMEOUT_SECONDS). Calling it directly from this
+RenderScriptUseCase.render() can legitimately run for minutes (a full Remotion
+render, up to RENDER_TIMEOUT_SECONDS). Calling it directly from this
 coroutine would block the asyncio event loop for that entire duration —
 starving RabbitMQ heartbeats and the OutboxRelay. It's therefore run via
 asyncio.to_thread().
@@ -20,8 +19,6 @@ import asyncpg
 from adapters.logging.correlation import set_correlation_id
 from adapters.messaging.cancellation import REGISTRY
 from adapters.messaging.producer import (
-    channel_asset_render_failed_envelope,
-    channel_asset_rendered_envelope,
     rendering_completed_envelope,
     rendering_failed_envelope,
     script_validated_envelope,
@@ -30,7 +27,6 @@ from adapters.messaging.producer import (
 from adapters.messaging.progress import ProgressPublisher
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
-from application.render_channel_asset import ChannelAssetRenderError, RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ScriptValidationError, ValidateScriptUseCase
 from domain.errors import AnimationEngineError, InvalidDurationError
@@ -98,7 +94,7 @@ class RenderScriptCommandHandler:
                     for s in payload["scenes"]
                 ],
                 render_quality=payload.get("render_quality"),
-                engine=payload.get("engine", "manim"),
+                engine=payload.get("engine", "remotion"),
                 video_font=payload.get("video_font"),
             )
             # The renderer's heartbeat fires on the render thread, but aio-pika
@@ -129,7 +125,6 @@ class RenderScriptCommandHandler:
                 result.video_path,
                 result.wait_offsets,
                 result.video_duration_seconds,
-                result.layout_marks,
             )
 
         async with self._pool.acquire() as conn, conn.transaction():
@@ -144,9 +139,9 @@ class RenderScriptCommandHandler:
 class ValidateScriptCommandHandler:
     """Cổng kiểm tra trước TTS.
 
-    Lượt dry là một subprocess Manim, nên cũng phải chạy qua `to_thread` như
-    lượt render thật — nếu không nó khoá event loop và bỏ đói heartbeat của
-    RabbitMQ lẫn OutboxRelay.
+    Lượt dry chạy toolchain Remotion trong một subprocess, nên cũng phải chạy qua
+    `to_thread` như lượt render thật — nếu không nó khoá event loop và bỏ đói
+    heartbeat của RabbitMQ lẫn OutboxRelay.
     """
 
     def __init__(
@@ -188,7 +183,7 @@ class ValidateScriptCommandHandler:
                 # Lượt dry không dùng tới thời lượng — nó là thứ sinh ra chúng.
                 narration_segments=[],
                 render_quality=payload.get("render_quality"),
-                engine=payload.get("engine", "manim"),
+                engine=payload.get("engine", "remotion"),
             )
             result = await asyncio.to_thread(self._use_case.validate, request)
         except (ScriptValidationError, AnimationEngineError, ValueError, KeyError, TypeError) as exc:
@@ -205,10 +200,6 @@ class ValidateScriptCommandHandler:
                 result.dry_run.beats,
                 result.dry_run.chapters,
                 [str(issue) for issue in result.warnings],
-                layout_warnings=[
-                    {"scene_index": w.narration_index, "description": w.description}
-                    for w in result.dry_run.layout_warnings
-                ],
                 scene_class_name=result.scene_class_name,
                 engine=result.engine,
             )
@@ -222,91 +213,20 @@ class ValidateScriptCommandHandler:
         await message.ack()
 
 
-class RenderChannelAssetCommandHandler:
-    """Dựng intro/outro cố định của kênh.
-
-    Đồng bộ, không qua queue riêng như `validate_script`: cùng lý do
-    — đây không phải việc chạy trong project pipeline. Vẫn dùng
-    `asyncio.to_thread`: Manim là một subprocess có thể chạy hàng chục giây,
-    và chạy trực tiếp trên coroutine này sẽ khoá event loop, bỏ đói heartbeat
-    của RabbitMQ lẫn OutboxRelay, giống lý do `RenderScriptCommandHandler` và
-    `ValidateScriptCommandHandler` đã phải làm vậy.
-    """
-
-    def __init__(
-        self,
-        use_case: RenderChannelAssetUseCase,
-        pool: asyncpg.Pool,
-        inbox: InboxRepository,
-        outbox: OutboxRepository,
-    ) -> None:
-        self._use_case = use_case
-        self._pool = pool
-        self._inbox = inbox
-        self._outbox = outbox
-
-    async def handle(self, message: AckableMessage) -> None:
-        envelope = json.loads(message.body)
-        message_id = envelope["message_id"]
-        saga_id = envelope["saga_id"]
-        project_id = envelope["project_id"]
-        set_correlation_id(saga_id)
-
-        if await self._inbox.has_processed(message_id):
-            logger.info("Skipping already-processed message_id=%s", message_id)
-            await message.ack()
-            return
-
-        payload = envelope["payload"]
-        kind = payload.get("kind")
-        render_quality = payload.get("render_quality")
-
-        try:
-            if not kind:
-                raise ValueError("payload thiếu 'kind'")
-            result = await asyncio.to_thread(self._use_case.render, kind, render_quality)
-        except (ChannelAssetRenderError, AnimationEngineError, ValueError, KeyError, TypeError) as exc:
-            logger.warning("render_channel_asset failed for kind=%s: %s", kind, exc)
-            event_type = "channel_asset_render_failed"
-            final_envelope = channel_asset_render_failed_envelope(
-                saga_id, project_id, kind, str(exc)
-            )
-        else:
-            event_type = "channel_asset_rendered"
-            final_envelope = channel_asset_rendered_envelope(
-                saga_id,
-                project_id,
-                kind,
-                result.video_path,
-                result.video_duration_seconds,
-                result.render_quality,
-            )
-
-        async with self._pool.acquire() as conn, conn.transaction():
-            await self._outbox.enqueue(
-                conn, aggregate_id=project_id, event_type=event_type, envelope=final_envelope
-            )
-            await self._inbox.mark_processed(conn, message_id)
-
-        await message.ack()
-
-
 class RenderingCommandDispatcher:
-    """Một queue, ba lệnh.
+    """Một queue cho mọi lệnh của Rendering.
 
     `rendering.commands` mang `validate_script` (lượt dry, trước TTS),
-    `render_scenes` (lượt thật, sau TTS) và `render_channel_asset`
-    (dựng intro/outro cố định của kênh). Dùng chung một queue thay
-    vì mở queue riêng vì cả ba đều là công việc của cùng service, cùng cần
-    Manim, và cùng phải xếp hàng sau nhau — nhiều queue chỉ tạo ra khả năng
-    chúng chạy song song và tranh nhau CPU của cùng một container.
+    `render_scenes` (lượt thật, sau TTS) và `purge_project_artifacts`. Dùng
+    chung một queue vì các lệnh dựng hình cùng cần toolchain Remotion và cùng
+    phải xếp hàng sau nhau — nhiều queue chỉ tạo ra khả năng chúng chạy song
+    song và tranh nhau CPU của cùng một container.
     """
 
     def __init__(
         self,
         validate: ValidateScriptCommandHandler,
         render: RenderScriptCommandHandler,
-        render_channel_asset: RenderChannelAssetCommandHandler | None = None,
         purge_project_artifacts=None,
     ) -> None:
         self._handlers = {
@@ -315,8 +235,6 @@ class RenderingCommandDispatcher:
         }
         if purge_project_artifacts is not None:
             self._handlers["purge_project_artifacts"] = purge_project_artifacts.handle
-        if render_channel_asset is not None:
-            self._handlers["render_channel_asset"] = render_channel_asset.handle
 
     async def handle(self, message: AckableMessage) -> None:
         try:

@@ -225,12 +225,11 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 		return uc.handlePurgeEvent(ctx, event)
 	}
 
-	// channel_asset_rendered/channel_asset_normalized are
-	// not saga-step events for any project — intro/outro belong to the
-	// channel, not a project (see rendering/producer.py's
-	// channel_asset_rendered_envelope docstring). They update Orchestrator's
-	// own channel_asset_pointers projection instead of eventStepMap.
-	if event.EventType == "channel_asset_rendered" || event.EventType == "channel_asset_normalized" {
+	// channel_asset_normalized is not a saga-step event for any project —
+	// intro/outro belong to the channel, not a project. It updates
+	// Orchestrator's own channel_asset_pointers projection instead of
+	// eventStepMap.
+	if event.EventType == "channel_asset_normalized" {
 		return uc.handleChannelAssetProjection(ctx, event)
 	}
 
@@ -281,9 +280,8 @@ func (uc *HandleStepEventUseCase) Execute(ctx context.Context, event StepEvent) 
 
 // handleSceneRenderedProgress publishes the live progress ping (Rule 7) for
 // a narration segment as Rendering substitutes its `self.wait(AUTO)` and
-// works through the script. There is no per-scene clip to persist anymore
-// (Manim-script input mode renders the whole script into one video) — this
-// is a progress-only event.
+// works through the script. The whole script renders into one video, so there
+// is no per-scene clip to persist — this is a progress-only event.
 func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Context, event StepEvent) error {
 	sceneIndex := intFromPayload(event.Payload, "scene_index")
 	sceneTotal := intFromPayload(event.Payload, "scene_total")
@@ -298,22 +296,10 @@ func (uc *HandleStepEventUseCase) handleSceneRenderedProgress(ctx context.Contex
 	return uc.progress.PublishProgress(ctx, msg)
 }
 
-// handleChannelAssetProjection handles the two channel-asset events.
-//
-// channel_asset_rendered (rendering's raw output: kind, video_path, duration,
-// render_quality) is turned into a register_channel_asset command to
-// video-assembly — the Orchestrator, not a second queue
-// binding on rendering.events, decides who ingests it. The command's
-// message_id is derived from the event's so a redelivered event yields the same
-// command and video-assembly's inbox drops the duplicate.
-//
-// channel_asset_normalized (video-assembly's authoritative record of the
-// registered asset, carrying asset_id + render_quality + version) upserts
-// channel_asset_pointers.
+// handleChannelAssetProjection records channel_asset_normalized —
+// video-assembly's authoritative record of a registered intro/outro, carrying
+// asset_id + render_quality + version — in channel_asset_pointers.
 func (uc *HandleStepEventUseCase) handleChannelAssetProjection(ctx context.Context, event StepEvent) error {
-	if event.EventType == "channel_asset_rendered" {
-		return uc.registerRenderedChannelAsset(ctx, event)
-	}
 	if uc.channelAssets == nil {
 		return nil
 	}
@@ -490,7 +476,7 @@ var errAwaitingReview = fmt.Errorf("saga is parked awaiting review")
 // Putting the gate here, before synthesize_speech, is the point: a script that
 // fails costs no TTS quota.
 func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event StepEvent, project *domain.Project) error {
-	project.ManimSceneClassName = stringFromPayload(event.Payload, "scene_class_name")
+	project.SceneClassName = stringFromPayload(event.Payload, "scene_class_name")
 	if err := uc.repo.Save(ctx, project); err != nil {
 		return err
 	}
@@ -502,15 +488,11 @@ func (uc *HandleStepEventUseCase) onScriptParsed(ctx context.Context, event Step
 		return err
 	}
 
-	engine := project.RenderEngine
-	if !engine.IsValid() {
-		engine = domain.DefaultRenderEngine
-	}
 	payload := map[string]interface{}{
 		"script_content":   project.ScriptContent,
-		"scene_class_name": project.ManimSceneClassName,
+		"scene_class_name": project.SceneClassName,
 		"render_quality":   string(project.RenderQuality),
-		"engine":           string(engine),
+		"engine":           string(project.RenderEngine),
 	}
 	return uc.dispatch(ctx, event.SagaID, event.ProjectID, "rendering", string(domain.StepValidateScript), payload)
 }
@@ -524,7 +506,7 @@ func (uc *HandleStepEventUseCase) onScriptValidated(ctx context.Context, event S
 	// Rendering found the class/composition while validating.
 	// Empty (an older worker) leaves whatever a legacy script_parsed stored.
 	if name := stringFromPayload(event.Payload, "scene_class_name"); name != "" {
-		project.ManimSceneClassName = name
+		project.SceneClassName = name
 	}
 	project.Scenes = parseInitialScenes(event.Payload)
 	beats := parseBeats(event.Payload)
@@ -773,25 +755,17 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 		// Covers projects with no stored render quality.
 		quality = domain.DefaultRenderQuality
 	}
-	engine := project.RenderEngine
-	if !engine.IsValid() {
-		engine = domain.DefaultRenderEngine
+	font := project.VideoFont
+	if font == "" {
+		font = domain.DefaultVideoFont
 	}
 	payload := map[string]interface{}{
 		"scenes":           scenesToPayload(project.Scenes),
 		"script_content":   project.ScriptContent,
-		"scene_class_name": project.ManimSceneClassName,
+		"scene_class_name": project.SceneClassName,
 		"render_quality":   string(quality),
-		"engine":           string(engine),
-	}
-	if engine == domain.RenderEngineRemotion {
-		// Only Remotion reads it (conceptflow-mini's useVideoFont); Manim's
-		// fonts come from its theme.
-		font := project.VideoFont
-		if font == "" {
-			font = domain.DefaultVideoFont
-		}
-		payload["video_font"] = font
+		"engine":           string(project.RenderEngine),
+		"video_font":       font,
 	}
 	if err := uc.dispatch(ctx, sagaID, projectID, "rendering", string(domain.StepRenderScenes), payload); err != nil {
 		return err
@@ -800,8 +774,7 @@ func (uc *HandleStepEventUseCase) startRenderScenes(ctx context.Context, sagaID,
 }
 
 // onRenderingCompleted stores the single rendered video path (rendering_completed
-// now carries one "video_path" for the whole script, not per-scene clips —
-// the Manim-script input mode renders one script into one video) and
+// carries one "video_path" for the whole script) and
 // dispatches assemble_video with that video plus the ordered narration
 // audio_paths from step 3.
 func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, event StepEvent, project *domain.Project) error {
@@ -842,10 +815,6 @@ func (uc *HandleStepEventUseCase) onRenderingCompleted(ctx context.Context, even
 	project.RenderedVideoPath = &videoPath
 	project.WaitOffsets = waitOffsets
 	project.RenderedVideoSeconds = floatFromPayload(event.Payload, "video_duration_seconds")
-	// on-screen geometry per scene, needed by qc_video to score
-	// the render. Never assigned before this fix — every project fell back to
-	// QC's "not_scored" path regardless of QC_ENFORCE.
-	project.LayoutMarks = mapSliceFromPayload(event.Payload, "layout_marks")
 
 	// Resolve the channel intro/outro before publishing
 	// assemble_video, and persist the resolved id on Project rather than
@@ -989,16 +958,10 @@ func qcVideoPayload(project *domain.Project) map[string]interface{} {
 		quality = domain.DefaultRenderQuality
 	}
 
-	layoutMarks := project.LayoutMarks
-	if layoutMarks == nil {
-		layoutMarks = []map[string]interface{}{}
-	}
-
 	payload := map[string]interface{}{
 		"video_path":         derefString(project.VideoPath),
 		"render_quality":     string(quality),
 		"narration_segments": narrationSegments(scenes, project.WaitOffsets),
-		"layout_marks":       layoutMarks,
 	}
 	// Subtitle cues are sent whenever they exist, regardless of delivery mode:
 	// The subtitle rule checks whether two cues overlap in time, which is wrong in a
@@ -1042,8 +1005,8 @@ func (uc *HandleStepEventUseCase) dispatch(ctx context.Context, sagaID, projectI
 // each carrying the offset in that video where it belongs, plus the
 // static background_music_path (Rule 3).
 //
-// The offsets come from Rendering, not from adding up durations here. A Manim
-// video is animation time plus narration time, so narration i starts after all
+// The offsets come from Rendering, not from adding up durations here. A
+// rendered video is animation time plus narration time, so narration i starts after all
 // the animation before it too — the old audio_segments payload, which Video
 // Assembly laid end to end, drifted by the accumulated animation time (61.6s
 // by the end of a 3.6-minute reference video).
@@ -1193,34 +1156,6 @@ func sortedScenes(scenes []domain.Scene) []domain.Scene {
 	copy(out, scenes)
 	sort.Slice(out, func(i, j int) bool { return out[i].SceneIndex < out[j].SceneIndex })
 	return out
-}
-
-// registerRenderedChannelAsset forwards a rendered intro/outro to
-// video-assembly as register_channel_asset.
-func (uc *HandleStepEventUseCase) registerRenderedChannelAsset(ctx context.Context, event StepEvent) error {
-	kind := stringFromPayload(event.Payload, "kind")
-	videoPath := stringFromPayload(event.Payload, "video_path")
-	quality := stringFromPayload(event.Payload, "render_quality")
-	if kind == "" || videoPath == "" || quality == "" {
-		uc.logger.WarnContext(ctx, "channel_asset_rendered missing kind/video_path/render_quality, ignoring",
-			"saga_id", event.SagaID, "message_id", event.MessageID)
-		return nil
-	}
-	duration, _ := event.Payload["video_duration_seconds"].(float64)
-	return uc.publisher.PublishCommand(ctx, "video_assembly", domain.Envelope{
-		MessageID: "register-" + event.MessageID,
-		SagaID:    event.SagaID,
-		ProjectID: event.ProjectID,
-		EventType: "register_channel_asset",
-		Payload: map[string]interface{}{
-			"event_type":             "register_channel_asset",
-			"kind":                   kind,
-			"video_path":             videoPath,
-			"video_duration_seconds": duration,
-			"render_quality":         quality,
-		},
-		Timestamp: time.Now().UTC().Format(time.RFC3339),
-	})
 }
 
 // handlePurgeEvent advances the delete saga. Each owner

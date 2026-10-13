@@ -28,7 +28,7 @@ import (
 // Creator to edit.
 type GenerateAuthoringUseCase struct {
 	renderer authoringPromptRenderer
-	// illustrations is the drawing stage; nil = off (Manim, or not wired).
+	// illustrations is the drawing stage; nil when not wired.
 	illustrations IllustrationStagePort
 	provider      LLMProviderPort
 	recorder      *LLMUsageRecorder
@@ -406,7 +406,7 @@ func (uc *GenerateAuthoringUseCase) runInner(
 	}
 	// Step → role is the server's decision, read off the project's
 	// engine, not the GUI's.
-	role, err := AIRoleFor(step, string(project.RenderEngine))
+	role, err := AIRoleFor(step)
 	if err != nil {
 		return GeneratedStep{}, err
 	}

@@ -3205,3 +3205,24 @@ q6 => làm hết tron cr 067"
 **Context**: CONSTRUCTION — CR-071.
 
 ---
+
+## CR-071 — Code xong, chờ duyệt
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tếp tục làm cr cr0cr7cr1" (tiếp tục `/code CR-071`)
+**AI Response**: Hoàn tất T9–T16 (T0–T8 làm ở phiên trước; T6, T15 bỏ theo mục "Thay đổi trong lúc code").
+- T0: 24 project `render_engine = 'manim'`, tất cả `deleting`, không project Manim nào đang chạy (ghi trong design doc).
+- rendering (T9, T10): `ScriptRendererPort`, `domain/lint_issue.py`; gỡ `manim_renderer`, `engine_router`, gói `conceptflow/`, `script_lint`, `render_channel_asset`, route `/v1/check/manim`, `manim` trong requirements, texlive/cairo/pango dev trong Dockerfile; `engine` khác `remotion` → `UnsupportedEngineError`. Comment còn nhắc Manim ở `remotion_project/src/conceptflow-mini/{primitives,segments}.tsx` và test được viết lại.
+- video-assembly (T11): gỡ `RegisterChannelAssetCommandHandler`, bốn luật QC bố cục, khung Manim, `layout_marks`; `BLOCKING_RULES = {narration_overlap}`. Dispatcher chỉ coi lệnh **thiếu** `event_type` là `assemble_video` (trước đó mọi `event_type` lạ, kể cả `register_channel_asset` còn sót, bị chạy như lệnh ghép video — trái với comment của chính nó); lệnh chưa đăng ký bị ack và bỏ qua.
+- api-gateway, tts (T12): comment. Docstring `_kill` của `cancellation.py` thống nhất ở tts/rendering/video-assembly (test hợp đồng bản sao).
+- web-gui (T13, T14): gỡ `RenderEnginePicker`, `RenderEngineBadge`, `renderEngine` khỏi draft/client/types, `validateScript` (Manim), nhánh Manim ở mọi page; `ManimEngineerStepPage` → `CodeStepPage` (testid `code-step-*`). Bước Hình minh hoạ luôn có nên trạng thái bước `skipped` ("Không dùng") và `skippedReason` bị gỡ khỏi `flow.ts`, `StepRail`, `StepPreviewPage`, `useStepNav`. `createProjectDraft` bỏ tham số engine (`MakeShortButton` sửa theo).
+- authoring-service: bản sao `internal/domain/flow.go`/`flow_test.go` đồng bộ với orchestrator (T4 đã bỏ `NeedsIllustrations` ở orchestrator nhưng chưa ở bản sao — test hợp đồng bắt được).
+- T16: ADR-0033 + dòng trong `decisions/README.md`; README; `docker-compose.yml` bỏ `DRY_RUN_TIMEOUT_SECONDS`, `RENDER_MEMORY_LIMIT_GB`, `RENDER_CACHE_ROOT`, `RENDER_QUALITY`, `BRAND_ASSETS_DIR` + volume `docs/brand` (chỉ intro/outro Manim dùng), các comment QC bố cục; `docs/setup/windows-host-deployment.md`; `docs/contracts/shared-artifacts.md`, `authoring-llm-code-v2.md` và test hợp đồng. Các `interface-contracts.md` trong `aidlc-docs/construction/*/low-level-design/` không chứa các message/route bị bỏ nên không sửa; phần mô tả Manim lịch sử ở đó giữ nguyên.
+- Test: orchestrator, authoring-service `go build/vet/test` qua, `gofmt -l` sạch; rendering 210 passed/16 skipped (cần node_modules/Chromium); video-assembly 138 passed; tts 104 passed; llm-service 194 passed; api-gateway 106 passed; web-gui 452 passed, `tsc -b` sạch, lint 0 lỗi (20 cảnh báo có sẵn). Ruff: rendering 3 E501 ở `tests/domain/test_illustration_style.py`, llm-service 4 E741 — đều có sẵn trên main. `tests/contracts`: 9 passed, 3 failed có sẵn trên main (nhãn bước Go ≠ web; `clip_output_path` đã bị xoá từ CR-061).
+- Rebuild: orchestrator, authoring-service, llm-service, rendering, video-assembly, web-gui, api-gateway, tts — tất cả healthy, code từ `feature/cr-071-remove-manim`. Image rendering 5.5GB → 2.13GB; `import manim` → `ModuleNotFoundError`.
+- Sau migration: không còn project Manim (22 project, đều `remotion`); cột `scene_class_name` có, `manim_scene_class_name`/`layout_marks` không còn; mặc định `render_engine = 'remotion'`; bảng `prompts` không còn vai Manim; `channel_asset_pointers` rỗng. Đã xoá `/shared/.manim-media` (12M).
+- Chưa kiểm: tạo project mới và chạy trọn tới video trên giao diện; tải lại intro/outro. File của 24 project Manim trên `/shared` và dữ liệu authoring-service theo `project_id` của chúng không được dọn.
+**Impact Assessment**: như thiết kế, cộng các điểm ở trên (dispatcher video-assembly, trạng thái bước `skipped`, biến/volume brand).
+**Artifacts Affected**: code 8 service, tài liệu ở trên, `aidlc-docs/construction/plans/cr-071-remove-manim-tasks.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-071, chờ Creator duyệt.
+
+---

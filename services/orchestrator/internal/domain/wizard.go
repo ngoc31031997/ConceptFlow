@@ -43,7 +43,6 @@ type WizardSettings struct {
 // the project on to step 3 (the Creator pressed "Tiếp tục").
 type WizardSettingsPatch struct {
 	ContentLanguage       *ContentLanguage
-	RenderEngine          *RenderEngine
 	TTSEnabled            *bool
 	VoiceID               *string
 	SubtitleMode          *SubtitleMode
@@ -59,9 +58,8 @@ type WizardSettingsPatch struct {
 
 // ApplyShortDefaults completes a patch that switches the project to the
 // vertical short with what a short needs and the Creator did not pick in the
-// same patch: the short format, the Remotion engine (Manim has no portrait
-// frame) and short captions burned in at the top, one per narration line,
-// below the Shorts player's own controls.
+// same patch: the short format and short captions burned in at the top, one
+// per narration line, below the Shorts player's own controls.
 func ApplyShortDefaults(p *WizardSettingsPatch) {
 	if p.VideoOutputMode == nil || *p.VideoOutputMode != ModeShortOnly {
 		return
@@ -69,10 +67,6 @@ func ApplyShortDefaults(p *WizardSettingsPatch) {
 	if p.VideoFormatID == nil {
 		id := FormatVerticalShort60s.ID
 		p.VideoFormatID = &id
-	}
-	if p.RenderEngine == nil {
-		engine := RenderEngineRemotion
-		p.RenderEngine = &engine
 	}
 	if p.SubtitleMode == nil {
 		burnIn := SubtitleModeBurnIn
@@ -86,9 +80,8 @@ func ApplyShortDefaults(p *WizardSettingsPatch) {
 }
 
 // CheckOutputSettings refuses a combination the render saga cannot build: a
-// short needs a short format and the Remotion engine, and a short format
-// belongs to a short.
-func CheckOutputSettings(mode VideoOutputMode, format VideoFormat, engine RenderEngine) error {
+// short needs a short format, and a short format belongs to a short.
+func CheckOutputSettings(mode VideoOutputMode, format VideoFormat) error {
 	short := mode == ModeShortOnly
 	switch {
 	case short && !format.IsShort():
@@ -97,8 +90,6 @@ func CheckOutputSettings(mode VideoOutputMode, format VideoFormat, engine Render
 	case !short && format.IsShort():
 		return fmt.Errorf("%w: format %q dành cho short dọc — chọn đầu ra Short dọc hoặc một format video dài",
 			ErrInvalidWizardInput, format.Name)
-	case short && engine != RenderEngineRemotion:
-		return fmt.Errorf("%w: short dọc chỉ dựng được bằng Remotion", ErrInvalidWizardInput)
 	}
 	return nil
 }
@@ -139,7 +130,7 @@ const (
 // touchesAuthoring reports whether p changes anything the authoring steps
 // (script, visual, code) or TTS read, or confirms step 2.
 func (p WizardSettingsPatch) touchesAuthoring() bool {
-	return p.ContentLanguage != nil || p.RenderEngine != nil || p.TTSEnabled != nil ||
+	return p.ContentLanguage != nil || p.TTSEnabled != nil ||
 		p.VoiceID != nil || p.VideoFormatID != nil || p.VideoOutputMode != nil || p.Confirm
 }
 

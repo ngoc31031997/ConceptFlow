@@ -17,7 +17,7 @@ import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { VideoListPage } from "./pages/VideoListPage";
 import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
 import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
-import { ManimEngineerStepPage } from "./pages/ManimEngineerStepPage";
+import { CodeStepPage } from "./pages/CodeStepPage";
 import { IllustrationsStepPage } from "./pages/IllustrationsStepPage";
 import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
@@ -54,7 +54,7 @@ export function App() {
           <Routes>
             {/* "/" (Bước 1) chỉ còn tình huống "chỉ có ý tưởng" — chọn xong
                 là tạo project ngay. "/create/script/settings" (Bước 2) chọn
-                ngôn ngữ, engine, cách làm rồi mới vào chuỗi 3 tab bên dưới
+                ngôn ngữ, cách làm rồi mới vào chuỗi 3 tab bên dưới
                 (xem ScriptPipelineTabs). Mỗi tab một URL riêng để Back/
                 reload/bookmark đều chạy, và tab nào cũng bấm sang được bất
                 kể tiến độ. */}
@@ -62,10 +62,10 @@ export function App() {
             <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
-            {/* Remotion only: the video's drawings, between Visual and Code. */}
+            {/* The video's drawings, between Visual and Code. */}
             <Route path="/create/script/illustrations" element={<IllustrationsStepPage />} />
-            <Route path="/create/script/code" element={<ManimEngineerStepPage />} />
-            {/* Read-only preview of a step not reached yet (or not used). */}
+            <Route path="/create/script/code" element={<CodeStepPage />} />
+            {/* Read-only preview of a step not reached yet. */}
             <Route path="/create/preview/:step" element={<StepPreviewPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
             <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />

@@ -24,7 +24,6 @@ def _chunk_turns(sb):
     shots = list(sb.all_shots())
     return {
         "remotion": prompts.remotion_chunk(sb, "const LAYOUT = {};", ["1.2"], shots[0], shots[2]),
-        "manim": prompts.manim_chunk(sb, "def setup_cast(self):\n    pass", [], ["1.2"], shots[0], shots[2]),
     }
 
 

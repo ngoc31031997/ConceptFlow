@@ -660,7 +660,7 @@ def test_a_thumbnail_candidate_is_extracted(tmp_path):
     joined = " ".join(thumbnail_call)
     assert "1280:720" in joined
     assert "-frames:v" in thumbnail_call
-    # A quarter of the way in — the opening frames of a Manim video are a title
+    # A quarter of the way in — the opening frames of a video are a title
     # card or an empty stage.
     assert thumbnail_call[thumbnail_call.index("-ss") + 1] == "50.000"
     assert thumbnail_call[-1].endswith("thumbnail/auto.jpg")

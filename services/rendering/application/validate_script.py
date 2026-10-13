@@ -2,19 +2,12 @@
 
 Chạy hai việc, theo thứ tự rẻ trước:
 
-1. **Lint** — phân tích tĩnh, mili-giây. Bắt API ngoài design
-   system, màu hex viết thẳng, cỡ chữ đặt tay.
-2. **Lượt dry** — thực sự chạy script qua Manim. Đây là thứ
-   thay thế danh sách blacklist: nó bắt **mọi** lỗi API, kể cả những cái chưa
-   ai gặp bao giờ, vì nó không đoán mà chạy thật.
+1. **Lint** — phân tích tĩnh, mili-giây: mọi id clip Lottie phải có trong
+   catalog đã duyệt.
+2. **Lượt dry** — đọc composition để biết danh sách lời thoại theo đúng thứ tự
+   chạy, thứ mà Saga cần để gọi TTS.
 
-Đồng thời lượt dry trả về danh sách lời thoại theo đúng thứ tự chạy — thứ mà
-Saga cần để gọi TTS.
-
-Vì sao bước này sống ở Rendering chứ không ở một Quality Service riêng: lượt dry
-cần Manim, và Manim kéo theo cả texlive. Dựng image thứ hai nặng như vậy chỉ để
-chạy một lệnh là cái giá không đáng. Bước chấm chất lượng **video**
-thì ngược lại — nó chỉ cần ffmpeg và file JSONL, nên sẽ sống ở service riêng.
+Bước này sống ở Rendering vì lượt dry cần chính toolchain dựng hình.
 """
 
 from __future__ import annotations
@@ -24,10 +17,11 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
+from domain.errors import UnsupportedEngineError
+from domain.lint_issue import LintIssue, blocking_issues
 from domain.lottie_catalog import lint_lottie_ids
 from domain.models import DryRunResult, ScriptRenderRequest
-from domain.ports import ManimScriptRendererPort
-from domain.script_lint import LintIssue, blocking_issues, lint_manim_script
+from domain.ports import ScriptRendererPort
 from domain.script_locator import SceneNotFoundError, locate_scene
 
 logger = logging.getLogger(__name__)
@@ -35,17 +29,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ValidationResult:
-    """Kết quả kiểm tra một script.
-
-    `warnings` không chặn Saga: đường thoát hiểm ra API thô của Manim
-    là hợp lệ, chỉ là phần đó không được theme và QC bảo vệ.
-    """
+    """Kết quả kiểm tra một script. `warnings` không chặn Saga."""
 
     dry_run: DryRunResult
-    # The class/composition the saga will render, found here
-    # (before the dry pass needs it) instead of by a separate parse step.
+    # The composition the saga will render, found here (before the dry pass
+    # needs it) instead of by a separate parse step.
     scene_class_name: str = ""
-    engine: str = "manim"
+    engine: str = "remotion"
     warnings: list[LintIssue] = field(default_factory=list)
 
 
@@ -60,16 +50,18 @@ class ScriptValidationError(Exception):
 class ValidateScriptUseCase:
     def __init__(
         self,
-        renderer: ManimScriptRendererPort,
+        renderer: ScriptRendererPort,
         approved_lottie_ids: Callable[[], set[str]] | None = None,
     ) -> None:
         self._renderer = renderer
         # Ids of the approved Lottie catalog. None disables the check
-        # (tests that never touch Remotion), an empty set means "no clip is
+        # (tests that never touch the catalog), an empty set means "no clip is
         # allowed" — which is exactly what an empty catalog should enforce.
         self._approved_lottie_ids = approved_lottie_ids
 
     def validate(self, request: ScriptRenderRequest) -> ValidationResult:
+        if request.engine != "remotion":
+            raise UnsupportedEngineError(request.engine)
         if not request.script_content.strip():
             raise ScriptValidationError("script_content rỗng")
         if not request.scene_class_name:
@@ -77,17 +69,10 @@ class ValidateScriptUseCase:
                 located = locate_scene(request.script_content)
             except SceneNotFoundError as exc:
                 raise ScriptValidationError(str(exc)) from exc
-            request = dataclasses.replace(
-                request, scene_class_name=located.scene_class_name, engine=located.engine
-            )
+            request = dataclasses.replace(request, scene_class_name=located.scene_class_name)
 
-        # feature/remotion-engine: this lint parses Python via `ast` — running
-        # it against a Remotion script's TypeScript would fail immediately on
-        # syntax it was never meant to read. Remotion has no lint of its own
-        # yet (explicitly out of scope for the first cut); its dry pass is
-        # still the real check, same as Manim's.
-        issues = lint_manim_script(request.script_content) if request.engine == "manim" else []
-        if request.engine == "remotion" and self._approved_lottie_ids is not None:
+        issues: list[LintIssue] = []
+        if self._approved_lottie_ids is not None:
             issues += [
                 LintIssue(line=line, message=message)
                 for line, message in lint_lottie_ids(request.script_content, self._approved_lottie_ids())

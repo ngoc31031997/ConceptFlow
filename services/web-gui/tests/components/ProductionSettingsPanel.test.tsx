@@ -30,12 +30,6 @@ describe("ProductionSettingsPanel", () => {
     expect(screen.queryByTestId("production-subtitles")).not.toBeInTheDocument();
   });
 
-  it("hides the video font for Manim, whose fonts come from its theme", () => {
-    render(<ProductionSettingsPanel project={{ ...PROJECT, render_engine: "manim" }} stages={["render"]} hint="h" />);
-
-    expect(screen.queryByTestId("video-font-picker")).not.toBeInTheDocument();
-  });
-
   it("saves a change on the project and remembers it as the next default", async () => {
     const patch = vi.spyOn(client, "patchWizardSettings").mockResolvedValue();
     const onSaved = vi.fn();

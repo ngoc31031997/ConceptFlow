@@ -142,6 +142,13 @@ class CodeBody(BaseModel):
             only=set(self.only) if self.only is not None else None, canvas=_canvas(self.frame))
 
 
+def _unknown_engine(body: CodeBody) -> JSONResponse | None:
+    """A 400 for any engine but Remotion, the only one the code pipeline writes."""
+    if body.engine != "remotion":
+        return _error_response(f"unknown engine {body.engine!r}", status=400)
+    return None
+
+
 class SegmentPromptBody(CodeBody):
     key: str
 
@@ -304,6 +311,8 @@ def create_app(
     async def code_plan(body: CodeBody):
         """How this storyboard is cut into segments, so authoring-service
         never keeps its own copy of the rule. Fingerprints included; no model call."""
+        if (bad := _unknown_engine(body)) is not None:
+            return bad
         try:
             plan = make_plan(body.request("", 0), body.chunk_shots or config.code_chunk_shots)
         except PipelineFailure as exc:
@@ -317,8 +326,8 @@ def create_app(
     async def code_generate(body: CodeBody):
         """Run the missing segments (or `only`), streaming each segment's
         result, each billed call and each failed check. See ADR-0030."""
-        if body.engine not in ("remotion", "manim"):
-            return _error_response(f"unknown engine {body.engine!r}", status=400)
+        if (bad := _unknown_engine(body)) is not None:
+            return bad
         provider, model = providers.for_model(providers.hive, body.model)
         pipeline = CodePipeline(
             provider, checker,
@@ -343,6 +352,8 @@ def create_app(
     @app.post("/v2/code/segment-prompt")
     async def code_segment_prompt(body: SegmentPromptBody):
         """The exact turn one segment would be asked, for an outside AI."""
+        if (bad := _unknown_engine(body)) is not None:
+            return bad
         _, model = providers.for_model(providers.hive, body.model)
         try:
             system, user = segment_prompt(
@@ -354,6 +365,8 @@ def create_app(
     @app.post("/v2/code/segment-parse")
     async def code_segment_parse(body: SegmentParseBody):
         """Check a reply written outside the pipeline for one segment."""
+        if (bad := _unknown_engine(body)) is not None:
+            return bad
         _, model = providers.for_model(providers.hive, body.model)
         try:
             fingerprint, content = parse_segment(

@@ -7,9 +7,9 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { Project } from "../../src/types";
 
-function renderResume(flowStep: number, renderEngine: "manim" | "remotion") {
+function renderResume(flowStep: number) {
   const project = {
-    project_id: "p1", status: "draft", voice_language: "vi", scenes: [], render_engine: renderEngine, flow_step: flowStep,
+    project_id: "p1", status: "draft", voice_language: "vi", scenes: [], render_engine: "remotion", flow_step: flowStep,
   } as unknown as Project;
   vi.spyOn(apiClient, "getProject").mockResolvedValue(project);
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ mode: "manual", topic: "t", story: "s", storyboard: "{}", code: "" });
@@ -33,18 +33,18 @@ function renderResume(flowStep: number, renderEngine: "manim" | "remotion") {
 describe("ResumeProjectPage mở lại đúng bước server báo", () => {
   afterEach(() => vi.restoreAllMocks());
 
-  it("dự án ở bước 6 (Code) mở màn Code, kể cả video Manim", async () => {
-    renderResume(6, "manim");
+  it("dự án ở bước 6 (Code) mở màn Code", async () => {
+    renderResume(6);
     expect(await screen.findByText("màn code")).toBeInTheDocument();
   });
 
-  it("dự án Remotion ở bước 5 mở màn Hình minh hoạ", async () => {
-    renderResume(5, "remotion");
+  it("dự án ở bước 5 mở màn Hình minh hoạ", async () => {
+    renderResume(5);
     expect(await screen.findByText("màn hình minh hoạ")).toBeInTheDocument();
   });
 
   it("dự án ở bước 4 mở màn Visual", async () => {
-    renderResume(4, "remotion");
+    renderResume(4);
     expect(await screen.findByText("màn visual")).toBeInTheDocument();
   });
 });

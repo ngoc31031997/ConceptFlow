@@ -24,16 +24,6 @@ var channelIdentityVI string
 //go:embed prompts/channel_identity_en.txt
 var channelIdentityEN string
 
-// theme_reference_*.txt are GENERATED from rendering/conceptflow/theme.py by
-// rendering/tools/gen_theme_reference.py — never edit them by hand. The
-// rendering test suite fails if they drift from the Theme they describe.
-//
-//go:embed prompts/theme_reference_vi.txt
-var themeReferenceVI string
-
-//go:embed prompts/theme_reference_en.txt
-var themeReferenceEN string
-
 // lottie_catalog_vi.txt is GENERATED from the approved clips in
 // rendering/remotion_project/lottie/manifest.json by
 // rendering/tools/lottie_catalog.py prompt — never edit it by hand.
@@ -50,14 +40,17 @@ var lottieCatalogVI string
 //go:embed prompts/illustration_kit_vi.txt
 var illustrationKitVI string
 
+// narration_rule_*.txt say which language the spoken lines are written in;
+// the steps before code (story, storyboard) read it.
+//
 //go:embed prompts/narration_rule_vi.txt
 var narrationRuleVI string
 
 //go:embed prompts/narration_rule_en.txt
 var narrationRuleEN string
 
-// Remotion has no self.narrate(...) call: its narration lives in the
-// `narrations` array, so its rule names that instead (feature/remotion-engine).
+// The code roles' rule also names where the lines live in the code: the
+// composition's `narrations` array.
 //
 //go:embed prompts/narration_rule_remotion_vi.txt
 var narrationRuleRemotionVI string
@@ -69,9 +62,6 @@ var narrationRuleRemotionEN string
 // Generated from the shipping TypeScript (see testdata/prompt_golden.json) and
 // held to it byte for byte by prompt_golden_test.go.
 //
-//go:embed prompts/manim_adjust.txt
-var manimAdjustTemplate string
-
 //go:embed prompts/remotion_adjust.txt
 var remotionAdjustTemplate string
 
@@ -104,26 +94,10 @@ func ChannelIdentity(language string) string {
 	return channelIdentityEN
 }
 
-// ThemeReference returns the block {{theme_reference}} expands to: every color,
-// measure and constant the generated Manim script may use, so the model stops
-// inventing names (self.theme.blue, CENTER) that only fail at render time.
-func ThemeReference(language string) string {
-	if language == "vi" {
-		return themeReferenceVI
-	}
-	return themeReferenceEN
-}
-
-// withThemeReference expands {{theme_reference}} at seed time. It is baked in
+// withLottieCatalog expands {{lottie_catalog}} at seed time. It is baked in
 // rather than substituted per request because the copy-the-prompt-by-hand flow
 // in web-gui reads the stored template as-is and would otherwise show the
 // literal placeholder.
-func withThemeReference(text, language string) string {
-	return strings.ReplaceAll(text, "{{theme_reference}}", ThemeReference(language))
-}
-
-// withLottieCatalog expands {{lottie_catalog}} at seed time, for the same reason
-// as withThemeReference: the copy-the-prompt flow reads the stored text as-is.
 func withLottieCatalog(text string) string {
 	return strings.ReplaceAll(text, "{{lottie_catalog}}", strings.TrimSpace(lottieCatalogVI))
 }
@@ -143,12 +117,10 @@ func NarrationLanguageRule(language string) string {
 	return narrationRuleEN
 }
 
-// NarrationLanguageRuleFor is NarrationLanguageRule for a render engine: the
-// Remotion engine's rule talks about `narrations`, not self.narrate(...).
-func NarrationLanguageRuleFor(language, renderEngine string) string {
-	if renderEngine != "remotion" {
-		return NarrationLanguageRule(language)
-	}
+// CodeNarrationLanguageRule is {{narration_language_rule}} for the roles that
+// write or fix Remotion code: the same language rule, naming the `narrations`
+// array the lines live in.
+func CodeNarrationLanguageRule(language string) string {
 	if language == "vi" {
 		return narrationRuleRemotionVI
 	}
@@ -161,15 +133,6 @@ func ThumbnailAudience(language string) string {
 		return thumbnailAudienceVI
 	}
 	return thumbnailAudienceEN
-}
-
-// NarrateExample is {{narrate_example}}: the sample line shown inside
-// self.narrate("...") in the Manim adjust prompt, in the video's language.
-func NarrateExample(language string) string {
-	if language == "vi" {
-		return "Nội dung lời thoại tiếng Việt cho đoạn này"
-	}
-	return "The English narration line for this beat"
 }
 
 // BeatSheetWordsPerMinute is the speaking rate the beat budgets are converted

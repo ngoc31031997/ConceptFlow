@@ -13,11 +13,9 @@ def _request(script_content: str) -> ScriptRenderRequest:
 
 
 def test_script_content_duoc_chuan_hoa_ve_nfc():
-    # macOS clipboard trả tiếng Việt dạng NFD (chữ cái gốc + dấu tách rời) —
-    # Manim's Text mobject build một submobject/codepoint qua Pango, và Pango
-    # có thể gộp chuỗi tách rời thành ít glyph hơn số codepoint, khiến
-    # `_gen_chars` chết với IndexError. NFC gộp lại thành đúng một codepoint
-    # mỗi chữ, khớp 1:1 với glyph Pango sinh ra.
+    # macOS clipboard trả tiếng Việt dạng NFD (chữ cái gốc + dấu tách rời);
+    # NFC gộp lại thành đúng một codepoint mỗi chữ, để mọi bước sau chỉ gặp
+    # một cách viết cho mỗi chữ có dấu.
     nfd = unicodedata.normalize("NFD", "Số lần lặp")
     assert nfd != "Số lần lặp"  # xác nhận input thật sự là NFD, không phải NFC sẵn
 
@@ -28,5 +26,5 @@ def test_script_content_duoc_chuan_hoa_ve_nfc():
 
 
 def test_script_content_da_la_nfc_thi_giu_nguyen():
-    request = _request("from conceptflow import *\n")
-    assert request.script_content == "from conceptflow import *\n"
+    request = _request("export const X = 1;\n")
+    assert request.script_content == "export const X = 1;\n"

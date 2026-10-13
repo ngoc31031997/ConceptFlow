@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 
 	"authoring/internal/application"
@@ -67,7 +68,7 @@ func TestRender_MatchesWhatTheBrowserUsedToBuild(t *testing.T) {
 func TestRender_PastedTextIsNeverExpanded(t *testing.T) {
 	uc := application.NewRenderPromptUseCase(&templateStore{text: "A={{script}} B={{topic}}"}, &fakeRenderContext{}, &fakeFormats{}, &fakeCalibration{})
 	got, err := uc.Render(context.Background(), application.RenderInput{
-		Role: domain.RoleManimAdjust, Script: "x {{topic}} y $& z", Topic: "T",
+		Role: domain.RoleRemotionAdjust, Script: "x {{topic}} y $& z", Topic: "T",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -77,11 +78,16 @@ func TestRender_PastedTextIsNeverExpanded(t *testing.T) {
 	}
 }
 
-func TestRender_RemotionRolesUseTheRemotionNarrationRule(t *testing.T) {
+// The code roles' narration rule names the `narrations` array; the steps
+// before code get the plain language rule.
+func TestRender_CodeRolesNameTheNarrationsArray(t *testing.T) {
 	uc := application.NewRenderPromptUseCase(&templateStore{text: "{{narration_language_rule}}"}, &fakeRenderContext{}, &fakeFormats{}, &fakeCalibration{})
-	manim, _ := uc.Render(context.Background(), application.RenderInput{Role: domain.RoleManimEngineer, Language: "vi"})
-	remotion, _ := uc.Render(context.Background(), application.RenderInput{Role: domain.RoleRemotionEngineer, Language: "vi"})
-	if manim.Prompt == remotion.Prompt {
-		t.Fatal("Remotion has no self.narrate(...): its rule must differ from Manim's")
+	story, _ := uc.Render(context.Background(), application.RenderInput{Role: domain.RoleStoryArchitect, Language: "vi"})
+	code, _ := uc.Render(context.Background(), application.RenderInput{Role: domain.RoleRemotionEngineer, Language: "vi"})
+	if !strings.Contains(code.Prompt, "`narrations`") || strings.Contains(story.Prompt, "narrations") {
+		t.Fatalf("story rule %q, code rule %q", story.Prompt, code.Prompt)
+	}
+	if strings.Contains(story.Prompt, "self.narrate") || strings.Contains(code.Prompt, "self.narrate") {
+		t.Fatal("no narration rule may mention self.narrate")
 	}
 }

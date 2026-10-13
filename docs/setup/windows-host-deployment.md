@@ -8,7 +8,7 @@ thời gian render**.
 ## Vì sao cần `.env.window` riêng
 
 Máy dev gốc benchmark timeout/tài nguyên (`RENDER_TIMEOUT_SECONDS`,
-`ASSEMBLY_TIMEOUT_SECONDS`, `RENDER_MEMORY_LIMIT_GB`, các `cpus`/`memory`
+`ASSEMBLY_TIMEOUT_SECONDS`, các `cpus`/`memory`
 limit trong `docker-compose.yml`) trên CPU nhiều luồng hơn. Trên CPU 2
 lõi/4 luồng, các mốc mặc định dễ khiến render/assembly bị kill giữa chừng
 trước khi xong.
@@ -16,8 +16,7 @@ trước khi xong.
 `.env.window` chỉ nới **timeout và trần tài nguyên** — không đổi bất kỳ
 tham số ảnh hưởng chất lượng nào:
 
-- `RENDER_QUALITY` giữ `1080p60` (đổi sang `4k60` nếu muốn, chấp nhận lâu
-  hơn nữa).
+- Chất lượng render vẫn do Creator chọn theo từng project trên GUI.
 - ffmpeg assembly vẫn `-preset slow -crf 18` (hardcode trong
   `services/video-assembly/adapters/assembly/ffmpeg_assembler.py`, không đổi
   theo host).
@@ -30,9 +29,7 @@ env, có default y hệt cấu hình gốc) nên không ảnh hưởng gì nếu
 
 | Biến | Mặc định gốc | Giá trị trong `.env.window` | Lý do |
 |---|---|---|---|
-| `RENDER_TIMEOUT_SECONDS` | 1800 | 10800 | CPU 2 lõi render chậm hơn nhiều so với máy đo benchmark (10 phút video @1080p60 ~276s trên máy gốc) |
-| `DRY_RUN_TIMEOUT_SECONDS` | 2000 | 7200 | Dry-run chạy toàn bộ animation ở quality thấp nhất, vẫn tốn CPU tương đương |
-| `RENDER_MEMORY_LIMIT_GB` | 4 | 4 | Giữ nguyên — RLIMIT_AS của tiến trình render, không liên quan CPU |
+| `RENDER_TIMEOUT_SECONDS` | 1800 | 10800 | CPU 2 lõi render chậm hơn nhiều so với máy đo benchmark |
 | `RENDER_CPU_LIMIT` | 6.0 | 4.0 | Máy chỉ có 4 luồng thật, đặt đúng thực tế tránh Docker lập lịch sai kỳ vọng |
 | `RENDER_MEMORY_LIMIT` | 5G | 4.5G | Trần cgroup Docker cho container rendering |
 | `ASSEMBLY_TIMEOUT_SECONDS` | 900 | 3600 | `-preset slow` vốn đã chậm hơn `medium`, cộng CPU yếu hơn |
@@ -76,6 +73,6 @@ docker compose --env-file .env.window logs rendering
 docker compose --env-file .env.window logs video-assembly
 ```
 
-Không hạ `RENDER_QUALITY` hay sửa `crf`/`preset` trong
+Không hạ chất lượng render của project hay sửa `crf`/`preset` trong
 `ffmpeg_assembler.py` để "chữa" timeout — đó là đánh đổi chất lượng, chỉ nên
 làm nếu chủ động muốn giảm chất lượng, không phải cách vá lỗi timeout.

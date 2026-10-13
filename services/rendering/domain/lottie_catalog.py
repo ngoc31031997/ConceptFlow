@@ -240,8 +240,7 @@ def credits(assets: list[LottieAsset]) -> list[str]:
 
 def lint_lottie_ids(script: str, approved_ids: set[str]) -> list[tuple[int, str]]:
     """Id không có trong danh mục đã duyệt, dạng (số dòng, thông điệp) — rẻ hơn nhiều so
-    với chết lúc render. Trả tuple thay vì `LintIssue` để module này không kéo theo
-    `conceptflow` (và manim); use case bọc lại thành LintIssue."""
+    với chết lúc render. Trả tuple; use case bọc lại thành `LintIssue`."""
     issues: list[tuple[int, str]] = []
     for match in CLIP_ID_RE.finditer(script):
         clip_id = next(g for g in match.groups() if g)

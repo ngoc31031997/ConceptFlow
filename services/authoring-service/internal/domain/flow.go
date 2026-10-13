@@ -53,13 +53,12 @@ func RunStateOf(status ProjectStatus, errorMessage *string) RunState {
 
 // AuthoredContent says which authoring artefacts a draft holds.
 //
-// NeedsIllustrations is set for a Remotion project, the only engine
-// that has an illustrations step (5); Illustrations says its drawing list is
-// planned and every drawing approved or skipped — the same rule that gates
-// the code step.
+// Illustrations says the drawing list of the illustrations step (5) is planned
+// and every drawing approved or skipped — the same rule that gates the code
+// step.
 type AuthoredContent struct {
-	Story, Storyboard, Code           bool
-	NeedsIllustrations, Illustrations bool
+	Story, Storyboard, Code bool
+	Illustrations           bool
 }
 
 // FlowState is where a project stands in the 13-step flow.
@@ -91,7 +90,7 @@ func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredCo
 			// Checked before the drawings so a Remotion project from before the
 			// illustrations step (code, no drawing list) is not pulled back to 5.
 			return FlowState{FlowCode, RunIdle}
-		case content.Storyboard && content.NeedsIllustrations && !content.Illustrations:
+		case content.Storyboard && !content.Illustrations:
 			return FlowState{FlowIllustrations, RunIdle}
 		case content.Storyboard:
 			return FlowState{FlowCode, RunIdle}

@@ -122,31 +122,9 @@ services:
     environment:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@rendering-db:5432/rendering
-      # Defaults below match the original dev machine; override per-host via
-      # .env (e.g. .env.window for a weaker CPU where quality still matters
-      # more than wall-clock time — see docs/setup/ or ask before lowering
-      # RENDER_QUALITY, that's a deliberate per-host quality/time trade-off).
+      # Wall-clock ceiling for one Remotion render. Override per-host via
+      # .env (e.g. .env.window for a weaker CPU).
       RENDER_TIMEOUT_SECONDS: "${RENDER_TIMEOUT_SECONDS:-1800}"
-      # The validate_script dry pass executes every animation, so a heavy
-      # script costs the same order of magnitude as the -ql render it gates.
-      # At the old fixed 300s such a script failed here with nothing but a
-      # timeout to show for it.
-      DRY_RUN_TIMEOUT_SECONDS: "${DRY_RUN_TIMEOUT_SECONDS:-2000}"
-      RENDER_MEMORY_LIMIT_GB: "${RENDER_MEMORY_LIMIT_GB:-4}"
-      # Manim 0.18 keeps its cache inside media_dir, so this directory is
-      # reused per project rather than being a throwaway tempdir. Set it to an
-      # empty string to disable caching. Measured 21s -> 4s on an unchanged
-      # re-render, 21s -> 6s after editing one narration line.
-      RENDER_CACHE_ROOT: "/shared/.manim-media"
-      # Fallback quality when a project does not specify one. The
-      # Creator picks per project in the GUI; this covers projects created
-      # before that field existed.
-      RENDER_QUALITY: "${RENDER_QUALITY:-1080p60}"
-      # Where conceptflow.channel_idents finds the logo for the intro/outro
-      # stings. Mounted rather than COPYed: the build context is
-      # ./services/rendering, so docs/brand/ cannot enter the image without
-      # widening the context for every service (H1, cr-016-024-execution-plan).
-      BRAND_ASSETS_DIR: "/brand"
       # The compile check llm-service calls (POST /v1/check/*). Same
       # process as the queue consumer, reachable on the backend network only.
       CHECK_HTTP_PORT: "8000"
@@ -160,11 +138,10 @@ services:
       # Trần thời gian một lượt đo (kể cả mở trình duyệt nếu phải mở lại).
       # Quá giờ → cảnh báo "không kiểm tra được bố cục", giữ kết quả tsc.
       LAYOUT_CHECK_TIMEOUT_SECONDS: "${LAYOUT_CHECK_TIMEOUT_SECONDS:-60}"
-    # Manim renders on every core it can get (Phase 0 measured CPU-time at
-    # 2.21x wall-clock), so without a cap a long render starves RabbitMQ and
-    # the Postgres instances on the same host. 5G sits just above the 4 GiB
-    # RLIMIT_AS the render subprocess is given. Override per-host via .env —
-    # e.g. a 4-thread CPU gets no benefit from cpus > 4.
+    # Remotion renders on every core it can get, so without a cap a long
+    # render starves RabbitMQ and the Postgres instances on the same host.
+    # Override per-host via .env — e.g. a 4-thread CPU gets no benefit from
+    # cpus > 4.
     deploy:
       resources:
         limits:
@@ -182,7 +159,6 @@ services:
         condition: service_healthy
     volumes:
       - shared_artifacts:/shared
-      - ./docs/brand:/brand:ro
     networks:
       - backend
 
@@ -229,16 +205,12 @@ services:
       # rộng, chạy chỉ-báo (QC_ENFORCE ở orchestrator, không ở đây), đo trên
       # video thật rồi siết dần bằng các biến dưới.
       #
-      # QC_MIN_TEXT_PIXEL_HEIGHT: "24"      # sàn đọc được trên màn 5,5 inch
-      # QC_MIN_CONTRAST_RATIO: "3.0"        # WCAG AA cho chữ lớn
       # QC_MAX_STATIC_SECONDS: "12"         # hình đứng yên bao lâu thì kêu
-      # QC_TEXT_OVERLAP_MIN_RATIO: "0.15"   # tỉ lệ giao mới coi là chồng lấn
-      # QC_SAFE_MARGIN: "0.6"               # theo theme.py, đổi cùng nhau
       # QC_LOUDNESS_TOLERANCE_LU: "1.5"     # lệch -14 LUFS bao nhiêu thì kêu
       # QC_NARRATION_OVERLAP_TOLERANCE_SECONDS: "0.15"
-    # x264 is even more parallel than Manim (Phase 0 measured 5.6x CPU-time
-    # over wall-clock when burning subtitles), so it needs a cap for the same
-    # reason. Peak RSS measured at ~1 GB.
+    # x264 is highly parallel (Phase 0 measured 5.6x CPU-time over
+    # wall-clock when burning subtitles), so it needs a cap for the same
+    # reason as rendering. Peak RSS measured at ~1 GB.
     deploy:
       resources:
         limits:

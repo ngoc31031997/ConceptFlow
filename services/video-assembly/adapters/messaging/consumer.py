@@ -71,10 +71,8 @@ from domain.qc_rules import QCThresholds, evaluate_all
 logger = logging.getLogger(__name__)
 
 # Target frame size per render_quality, for NormalizeChannelAssetCommandHandler's
-# transcode of a Creator-uploaded file. Mirrors the resolutions
-# implied by rendering/adapters/rendering/manim_renderer.py's Manim quality
-# flags (-qm/-qh/-qk), kept here as plain ffmpeg scale targets since this
-# service has no Manim dependency of its own.
+# transcode of a Creator-uploaded file: the frame sizes rendering produces for
+# each quality, as plain ffmpeg scale targets.
 QUALITY_FRAME_SIZE = {
     "480p15": (854, 480),
     "720p30": (1280, 720),
@@ -84,8 +82,7 @@ QUALITY_FRAME_SIZE = {
 DEFAULT_QUALITY_FRAME_SIZE = QUALITY_FRAME_SIZE["1080p60"]
 
 # A qc_video command whose render_quality is missing is scored against the
-# project default rather than skipped — the layout rules do not depend on it
-# and the pixel-height rule needs *some* frame size.
+# project default rather than skipped; only the publish-attribute rule reads it.
 DEFAULT_QC_RENDER_QUALITY = "1080p60"
 
 # `asset_role` on normalize_channel_asset: whether file_path is the
@@ -266,95 +263,6 @@ class AssembleVideoCommandHandler:
         async with self._pool.acquire() as conn, conn.transaction():
             await self._outbox.enqueue(
                 conn, aggregate_id=project_id, event_type=event_type, envelope=out_envelope
-            )
-            await self._inbox.mark_processed(conn, message_id)
-
-        await message.ack()
-
-
-class RegisterChannelAssetCommandHandler:
-    """Handles `register_channel_asset` — Orchestrator's command after it
-    receives rendering's `channel_asset_rendered`.
-
-    Registers the rendered file in `channel_assets` under the quality
-    rendering names (one asset per quality), then announces it as
-    `channel_asset_normalized` so Orchestrator's channel_asset_pointers
-    projection picks it up. Idempotent on message_id via the inbox.
-    """
-
-    def __init__(
-        self,
-        pool: asyncpg.Pool,
-        channel_assets: ChannelAssetsRepository,
-        inbox: InboxRepository,
-        outbox: OutboxRepository,
-    ) -> None:
-        self._pool = pool
-        self._channel_assets = channel_assets
-        self._inbox = inbox
-        self._outbox = outbox
-
-    async def handle(self, message: AckableMessage) -> None:
-        envelope = json.loads(message.body)
-        payload = envelope.get("payload", {})
-        message_id = envelope["message_id"]
-        saga_id = envelope["saga_id"]
-        project_id = envelope["project_id"]
-        set_correlation_id(saga_id)
-
-        if await self._inbox.has_processed(message_id):
-            logger.info("Skipping already-processed message_id=%s", message_id)
-            await message.ack()
-            return
-
-        try:
-            kind = payload["kind"]
-            video_path = payload["video_path"]
-            duration_seconds = float(payload.get("video_duration_seconds") or 0.0)
-            # Rendering names the quality it actually rendered at — an
-            # intro rendered at 1080p60 cannot be concatenated onto a 4k60 body,
-            # so it is registered for that one quality and no other.
-            render_quality = payload["render_quality"]
-        except (KeyError, TypeError, ValueError) as exc:
-            # Malformed rendering event: no *_failed counterpart exists for
-            # this internal projection, and it will not parse any better on
-            # redelivery — mark processed and ack rather than leak the
-            # delivery unacked (same reasoning as consumer.py's dispatcher
-            # rejecting an undecodable envelope).
-            logger.warning(
-                "register_channel_asset command malformed, dropping message_id=%s: %s",
-                message_id,
-                exc,
-            )
-            async with self._pool.acquire() as conn, conn.transaction():
-                await self._inbox.mark_processed(conn, message_id)
-            await message.ack()
-            return
-        # No real source_hash travels on this event (rendering doesn't
-        # compute one for its own Manim output) — this is descriptive only,
-        # not used for de-duplication here. The source-hash cache check applies to
-        # the Creator-upload path (NormalizeChannelAssetCommandHandler),
-        # where a real content hash is available.
-        source_hash = f"rendered:{kind}:{video_path}:{duration_seconds}"
-
-        async with self._pool.acquire() as conn, conn.transaction():
-            asset = await self._channel_assets.register_new_version(
-                conn,
-                kind=kind,
-                render_quality=render_quality,
-                source_hash=source_hash,
-                video_path=video_path,
-                music_path=None,
-                duration_seconds=duration_seconds,
-            )
-            out_envelope = channel_asset_normalized_envelope(
-                saga_id, project_id, asset.kind, asset.id, asset.render_quality, asset.version
-            )
-            await self._outbox.enqueue(
-                conn,
-                aggregate_id=asset.id,
-                event_type="channel_asset_normalized",
-                envelope=out_envelope,
             )
             await self._inbox.mark_processed(conn, message_id)
 
@@ -687,7 +595,7 @@ class QCVideoCommandHandler:
     both are already here.
 
     The load-bearing rule of this handler: there is NO failure
-    branch. Missing layout_marks, an ffmpeg error, an unreadable file — all of
+    branch. An ffmpeg error, an unreadable file — all of
     them still publish `qc_completed`, with status="not_scored" and a reason.
     A broken gate must not become a locked gate, so any exception at all is
     caught and turned into that event.
@@ -746,22 +654,9 @@ class QCVideoCommandHandler:
         loop (same reason assemble runs via to_thread)."""
         video_path = payload.get("video_path")
         render_quality = payload.get("render_quality") or DEFAULT_QC_RENDER_QUALITY
-        layout_marks = payload.get("layout_marks")
 
         if not video_path or not os.path.exists(video_path):
             return QC_STATUS_NOT_SCORED, [], f"không đọc được file video: {video_path!r}"
-
-        if not layout_marks:
-            # The layout data comes from rendering's marks file. An
-            # older project, or a render whose mark capture silently failed,
-            # has none — the audio/packaging half could still be scored, but a
-            # report missing every layout rule while claiming to have passed
-            # would be a lie about what was checked.
-            return (
-                QC_STATUS_NOT_SCORED,
-                [],
-                "lệnh qc_video không mang layout_marks — không chấm được phần bố cục",
-            )
 
         segments = measure_narration_durations(payload.get("narration_segments") or [])
         measured_lufs = measure_loudness(video_path)
@@ -769,7 +664,6 @@ class QCVideoCommandHandler:
         attributes = probe_publish_attributes(video_path)
 
         findings = evaluate_all(
-            layout_marks=layout_marks,
             narration_segments=segments,
             subtitle_cues=payload.get("subtitle_cues") or [],
             render_quality=render_quality,
@@ -798,12 +692,9 @@ class VideoAssemblyCommandDispatcher:
         assemble_video: AssembleVideoCommandHandler,
         normalize_channel_asset: NormalizeChannelAssetCommandHandler | None = None,
         qc_video: QCVideoCommandHandler | None = None,
-        register_channel_asset: RegisterChannelAssetCommandHandler | None = None,
         purge_project_artifacts=None,
     ) -> None:
         self._handlers = {"assemble_video": assemble_video.handle}
-        if register_channel_asset is not None:
-            self._handlers["register_channel_asset"] = register_channel_asset.handle
         if purge_project_artifacts is not None:
             self._handlers["purge_project_artifacts"] = purge_project_artifacts.handle
         if normalize_channel_asset is not None:
@@ -834,7 +725,7 @@ class VideoAssemblyCommandDispatcher:
         command = envelope.get("event_type")
         # A command with no event_type is the legacy assemble_video shape —
         # default to assemble_video so it is never ignored.
-        handler = self._handlers.get(command) or self._handlers.get("assemble_video")
+        handler = self._handlers.get(command or "assemble_video")
         if handler is None:
             logger.warning("Unrecognized command %r on video_assembly.commands, ignoring", command)
             await message.ack()

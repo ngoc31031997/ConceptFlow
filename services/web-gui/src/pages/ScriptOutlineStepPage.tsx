@@ -22,9 +22,7 @@ import { FLOW_STORY, flowTitle } from "../utils/flow";
  *
  * Cùng bố cục với các bước 4–6, trên xuống: chủ đề (chỉ đọc, sửa ở bước 1),
  * thanh "Đã chọn … Đổi" kèm nút chạy AI, rồi thẻ prompt + thẻ kết quả (tự làm)
- * hoặc chỉ thẻ kết quả (AI). Nút chạy AI ở đây chạy cả chuỗi 3 → 6, và các
- * bước 4–6 phụ thuộc engine (RoleFor ở server), nên thanh này vẫn cho đổi
- * engine trước khi bấm chạy.
+ * hoặc chỉ thẻ kết quả (AI). Nút chạy AI ở đây chạy cả chuỗi 3 → 6.
  */
 export function ScriptOutlineStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -141,29 +139,20 @@ export function ScriptOutlineStepPage() {
 
         <div className={styles.settingsRow}>
           <PipelineSettingsBar
-            renderEngine={draft.renderEngine}
-            onEngineChange={(engine) => {
-              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
-              if (draft.projectId) {
-                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
-              }
-            }}
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
-            steps={authoringChainSteps(draft.renderEngine)}
+            steps={authoringChainSteps()}
             what="dàn ý"
             runDisabled={topicIsEmpty}
             runDisabledReason="Chưa có chủ đề — quay lại bước 1."
             beforeRun={async () => {
-              // Chủ đề và engine lên server trước khi chuỗi chạy: prompt của
-              // bước 3 cần chủ đề, các bước 4–6 cần đúng engine.
+              // Chủ đề lên server trước khi chuỗi chạy: prompt của bước 3 cần nó.
               await createProjectDraft(
                 draft.projectId,
                 draft.authoringTopic.trim(),
                 draft.voiceLanguage,
-                draft.renderEngine,
               );
             }}
             onFollow={(step) => navigate(step === "done" ? AUTHORING_STEP_PATHS.code : AUTHORING_STEP_PATHS[step])}

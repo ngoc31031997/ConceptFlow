@@ -186,7 +186,7 @@ func SubtitleZone(project *Project, language string) string {
 //   - Off:    no subtitles.
 //   - Track:  a .srt YouTube caption track — searchable,
 //     auto-translatable, dismissable by the viewer, never painted
-//     over Manim's edge content. The GUI default for new projects.
+//     over the video's edge content. The GUI default for new projects.
 //   - BurnIn: painted into the video frames. Required for platforms with
 //     no caption-track upload path (Shorts/TikTok).
 //   - Both:   both at once. Valid (e.g. a repost target with no track

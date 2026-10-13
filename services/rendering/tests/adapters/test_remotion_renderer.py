@@ -1,6 +1,6 @@
 """RemotionScriptRenderer — feature/remotion-engine.
 
-Like test_manim_renderer.py, the subprocess layer (`node render.mjs`,
+The subprocess layer (`node render.mjs`,
 `ffprobe`) is monkeypatched in every test — these never invoke real Node or
 Remotion.
 """

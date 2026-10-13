@@ -7,9 +7,7 @@ import { AuthoringRunProvider } from "../../src/context/AuthoringRunContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
-function renderPage(engine: "remotion" | "manim", chain: apiClient.AuthoringChainState) {
-  // The draft itself is not kept across reloads; the engine comes from the last-used settings.
-  window.localStorage.setItem("conceptflow.lastUsedSettings.v1", JSON.stringify({ renderEngine: engine }));
+function renderPage(chain: apiClient.AuthoringChainState) {
   vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: true, provider: "hive" });
   vi.spyOn(apiClient, "getAuthoringChain").mockResolvedValue(chain);
   vi.spyOn(apiClient, "saveAuthoringMode").mockResolvedValue(undefined);
@@ -41,8 +39,8 @@ describe("IllustrationsStepPage", () => {
     window.localStorage.clear();
   });
 
-  it("is its own tab for a Remotion video: run bar for this step, then the drawing list", async () => {
-    renderPage("remotion", NONE);
+  it("is its own tab: run bar for this step, then the drawing list", async () => {
+    renderPage(NONE);
     expect(await screen.findByTestId("illustrations-step-page")).toBeInTheDocument();
     // Screen titles name the step as the rail does.
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 5 — Hình minh hoạ");
@@ -51,17 +49,12 @@ describe("IllustrationsStepPage", () => {
     expect(screen.getByTestId("illustrations-step-next")).toHaveTextContent("Sang bước Code");
   });
 
-  it("a Manim video has no drawings step: it goes on to Code", async () => {
-    renderPage("manim", NONE);
-    expect(await screen.findByText("trang code")).toBeInTheDocument();
-  });
-
   it("while the chain draws, this screen shows only its own step and counts the drawings", async () => {
     vi.spyOn(apiClient, "getAuthoringProgress").mockResolvedValue({
       running: true, phase: "draw", reasoning_chars: 0, content_chars: 0, elapsed_seconds: 75,
       drawings_total: 5, drawings_done: 2, drawings_failed: 1, drawings_reused: 3, drawings_planned: 8,
     });
-    renderPage("remotion", { running: true, steps: ["story", "storyboard", "illustrations", "code"], current_index: 2, finished: false });
+    renderPage({ running: true, steps: ["story", "storyboard", "illustrations", "code"], current_index: 2, finished: false });
     const step = await screen.findByTestId("authoring-live-progress");
     expect(screen.queryByTestId(/^authoring-run-panel-/)).not.toBeInTheDocument();
     await waitFor(() => expect(step).toHaveTextContent("Đang vẽ 2/5 hình · 1 lỗi · 3 hình dùng lại · 1m 15s"));
@@ -70,7 +63,7 @@ describe("IllustrationsStepPage", () => {
   });
 
   it("a chain that stopped for review says so plainly — not as an error", async () => {
-    renderPage("remotion", {
+    renderPage({
       running: false, steps: ["story", "storyboard", "illustrations", "code"], current_index: 2, finished: true,
       waiting: "Đã vẽ xong. Còn 2 hình chờ bạn duyệt hoặc bỏ qua (Motorbike, Candy) — duyệt xong thì chạy bước Code.",
       waiting_step: "illustrations", finished_at: new Date().toISOString(),

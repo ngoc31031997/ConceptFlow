@@ -109,8 +109,7 @@ export const calculateMetadataFromSegments: CalculateMetadataFunction<SegmentsPr
 /**
  * Renders `children(index, segment)` once per segment, each wrapped in its
  * own `<Sequence>` so it's only mounted for its narration's real timing
- * window — the Remotion equivalent of Manim's `self.narrate(...)` auto-timed
- * pause, just expressed as a frame range instead of a generator wait.
+ * window, so each picture holds exactly as long as its narration line plays.
  */
 export function Segments({
   segments,

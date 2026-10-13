@@ -1,9 +1,9 @@
 """The chunked code pipeline. See ADR-0030.
 
-layout/cast -> chunks of N shots in parallel -> deterministic merge ->
+LAYOUT -> chunks of N shots in parallel -> deterministic merge ->
 compile check -> repair only the shots that failed -> check again.
 
-The run is split into segments: the shared frame (LAYOUT / cast) and one
+The run is split into segments: the shared frame (LAYOUT) and one
 segment per chunk of shots. This service keeps none of them: the caller
 (authoring-service) stores every finished segment and sends the ones it has
 back with the next run. A segment whose fingerprint still matches is reused
@@ -54,7 +54,6 @@ from app.pipeline.checker import (
     CheckResult,
     Diagnostic,
     LayoutContext,
-    shots_from_manim_trace,
 )
 from app.provider import ChatRequest, Provider
 from app.storyboard import Storyboard, StoryboardError
@@ -104,14 +103,15 @@ class DoneSegment:
 
 @dataclass
 class CodeRequest:
-    engine: str  # "remotion" | "manim"
+    #: Always "remotion"; kept because it is part of every segment fingerprint.
+    engine: str
     topic: str
     storyboard: str
     system: str
     model: str = ""
     max_tokens: int = 0
     temperature: float = 0.3
-    #: Applied to every call of the run (layout/cast/chunk/repair);
+    #: Applied to every call of the run (layout/chunk/repair);
     #: 0 = no limit. See ChatRequest.max_reasoning_chars.
     max_reasoning_chars: int = 0
     #: Approved library drawings: {name, usage, description, code}.
@@ -130,9 +130,7 @@ class CodeRequest:
     #: The frame the video is built on (Remotion): its size and safe area.
     canvas: Frame = LANDSCAPE
 
-    def layout(self) -> LayoutContext | None:
-        if self.engine != "remotion":
-            return None
+    def layout(self) -> LayoutContext:
         return LayoutContext(subtitle_band=self.subtitle_band, video_font=self.video_font)
 
 
@@ -181,7 +179,7 @@ def library_section(illustrations: list[dict]) -> str:
 
 @dataclass
 class Call:
-    phase: str  # layout | cast | chunk | repair
+    phase: str  # layout | chunk | repair
     label: str
     ok: bool
     usage: Usage
@@ -373,9 +371,9 @@ class Plan:
         raise KeyError(key)
 
     def owner(self, section: str) -> str:
-        """The segment a merged-file section (a shot id, or the LAYOUT/cast
-        frame) belongs to."""
-        if section in (merger.LAYOUT_KEY, merger.CAST_KEY):
+        """The segment a merged-file section (a shot id, or the LAYOUT frame)
+        belongs to."""
+        if section == merger.LAYOUT_KEY:
             return FRAME_KEY
         for s in self.chunks:
             if section in s.shots:
@@ -398,9 +396,8 @@ def make_plan(req: CodeRequest, chunk_shots: int) -> Plan:
     """
     sb = _storyboard(req)
     n = chunk_shots if chunk_shots > 0 else 1
-    remotion = req.engine == "remotion"
     prompt_fp = _sha(req.system)
-    given = merger.layout_from_storyboard(sb) if remotion else None
+    given = merger.layout_from_storyboard(sb)
     if given is not None:
         frame_fp = _sha("frame-sb", given)
     else:
@@ -437,25 +434,17 @@ def _neighbours(plan: Plan, ids: list[str]) -> tuple:
     return prev, nxt
 
 
-def _cast_names(frame: str) -> list[str]:
-    return re.findall(r"self\.(\w+)\s*=", frame)
-
-
 def _chunk_prompt(req: CodeRequest, plan: Plan, frame: str, ids: list[str], retry: str | None) -> str:
     prev, nxt = _neighbours(plan, ids)
-    if req.engine == "remotion":
-        return prompts.remotion_chunk(plan.sb, frame, ids, prev, nxt, retry)
-    return prompts.manim_chunk(plan.sb, frame, _cast_names(frame), ids, prev, nxt, retry)
+    return prompts.remotion_chunk(plan.sb, frame, ids, prev, nxt, retry)
 
 
 def _frame_prompt(req: CodeRequest, plan: Plan, retry: str | None) -> str:
-    if req.engine == "remotion":
-        return prompts.remotion_layout(plan.sb, retry, req.canvas)
-    return prompts.manim_cast(plan.sb, retry)
+    return prompts.remotion_layout(plan.sb, retry, req.canvas)
 
 
 def _system(req: CodeRequest) -> str:
-    if req.engine == "remotion" and req.illustrations:
+    if req.illustrations:
         return req.system + library_section(req.illustrations)
     return req.system
 
@@ -480,31 +469,22 @@ def parse_layout(text: str) -> str:
     return code
 
 
-def parse_cast(text: str) -> str:
-    code = extract.strip_fence(text).strip("\n")
-    if not re.match(r"^def setup_cast\s*\(self\)\s*:", code):
-        raise extract.ExtractError("the reply must be a single `def setup_cast(self):` method at column 0")
-    return code
-
-
-def parse_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
-    pattern = merger.REMOTION_SHOT if engine == "remotion" else merger.MANIM_SHOT
-    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), pattern))
+def parse_shots(expected: list[str], text: str) -> dict[str, str]:
+    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), merger.REMOTION_SHOT))
     missing = [i for i in expected if i not in got]
     if missing:
         raise extract.ExtractError(f"missing shot function(s): {', '.join(missing)}")
     return {i: got[i] for i in expected}  # extras are dropped
 
 
-def parse_repaired_shots(engine: str, expected: list[str], text: str) -> dict[str, str]:
+def parse_repaired_shots(expected: list[str], text: str) -> dict[str, str]:
     """The repaired shots of a reply that may not hold all of them.
 
     Returns the functions present among `expected` (extras are dropped); a shot
     the model left out is simply absent, so the caller keeps its old code.
     Raises ExtractError only when no expected shot is there at all.
     """
-    pattern = merger.REMOTION_SHOT if engine == "remotion" else merger.MANIM_SHOT
-    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), pattern))
+    got = extract.shot_map(extract.split_shots(extract.strip_fence(text), merger.REMOTION_SHOT))
     found = {i: got[i] for i in expected if i in got}
     if not found:
         raise extract.ExtractError(f"none of the shot function(s) asked for is in the reply: {', '.join(expected)}")
@@ -525,7 +505,7 @@ def segment_prompt(req: CodeRequest, key: str, default_chunk_shots: int) -> tupl
         return _system(req), _frame_prompt(req, plan, None)
     frame = _stored_frame(req, plan)
     if frame is None:
-        raise SegmentNotReady("the frame (LAYOUT / cast) is not written yet — run or paste the frame segment first")
+        raise SegmentNotReady("the frame (LAYOUT) is not written yet — run or paste the frame segment first")
     return _system(req), _chunk_prompt(req, plan, frame, list(seg.shots), None)
 
 
@@ -538,9 +518,8 @@ def parse_segment(req: CodeRequest, key: str, reply: str, default_chunk_shots: i
     if seg.kind == FRAME:
         if plan.given_frame is not None:
             raise SegmentNotReady("the LAYOUT of this video comes from its storyboard; there is nothing to paste")
-        code = parse_layout(reply) if req.engine == "remotion" else parse_cast(reply)
-        return seg.fingerprint, {"code": code}
-    return seg.fingerprint, {"shots": parse_shots(req.engine, list(seg.shots), reply)}
+        return seg.fingerprint, {"code": parse_layout(reply)}
+    return seg.fingerprint, {"shots": parse_shots(list(seg.shots), reply)}
 
 
 class CodePipeline:
@@ -599,7 +578,7 @@ class CodePipeline:
     # -- the run ---------------------------------------------------------------
 
     async def run(self, req: CodeRequest, emit: Emit) -> CodeResult:
-        if req.engine not in ("remotion", "manim"):
+        if req.engine != "remotion":
             raise PipelineFailure(f"unknown engine {req.engine!r}", [])
         plan = make_plan(req, req.chunk_shots or self._chunk_shots)
         sb = plan.sb
@@ -608,14 +587,13 @@ class CodePipeline:
         calls: list[Call] = []
         warnings: list[str] = []
         failed: list[str] = []
-        remotion = req.engine == "remotion"
 
         async def record(call: Call) -> None:
             calls.append(call)
             await emit({"type": "call", **call.to_dict()})
 
         library: dict[str, str] = {}
-        if remotion and req.illustrations:
+        if req.illustrations:
             library = {i["name"]: i["code"] for i in req.illustrations if i.get("name") and i.get("code")}
         self._library = library
         ask_req = replace(req, system=_system(req))
@@ -648,7 +626,7 @@ class CodePipeline:
                 "error": {**err, "kind": first.kind, "message": message},
             })
 
-        # 1. shared frame: LAYOUT (Remotion) / cast (Manim)
+        # 1. shared frame: LAYOUT
         frame_seg = plan.frame
         frame: str | None = None
         if plan.given_frame is not None:
@@ -660,14 +638,13 @@ class CodePipeline:
         elif (have := stored(frame_seg)) is not None and isinstance(have.get("code"), str):
             frame = have["code"]
         elif wanted(frame_seg):
-            phase, label = ("layout", "LAYOUT") if remotion else ("cast", "setup_cast")
-            await emit({"type": "phase", "phase": phase})
+            await emit({"type": "phase", "phase": "layout"})
             await emit({"type": "segment_start", "key": FRAME_KEY})
             began = time.monotonic()
             try:
                 frame = await self._ask(
-                    ask_req, phase, label, FRAME_KEY, lambda r: _frame_prompt(req, plan, r),
-                    parse_layout if remotion else parse_cast, record)
+                    ask_req, "layout", "LAYOUT", FRAME_KEY, lambda r: _frame_prompt(req, plan, r),
+                    parse_layout, record)
             except PipelineFailure as exc:
                 if exc.kind in STOP_NOW_KINDS:
                     raise
@@ -701,7 +678,7 @@ class CodePipeline:
         sem = asyncio.Semaphore(self._concurrency)
         done = 0
         # One chunk's check is the final check when there is only one chunk.
-        early_check = remotion and len(plan.chunks) > 1
+        early_check = len(plan.chunks) > 1
         chunk_rounds: dict[str, int] = {}
 
         async def write(
@@ -719,7 +696,7 @@ class CodePipeline:
                     return ChunkOutcome(shots=await self._ask(
                         ask_req, "chunk", f"{ids[0]}-{ids[-1]}", seg.key,
                         lambda r: _chunk_prompt(req, plan, frame, ids, r),
-                        lambda text: parse_shots(req.engine, ids, text), record))
+                        lambda text: parse_shots(ids, text), record))
                 except PipelineFailure as exc:
                     if exc.kind in STOP_NOW_KINDS:
                         raise
@@ -742,7 +719,7 @@ class CodePipeline:
             have = partial[seg.key]
             outcome = await write(n, seg, [i for i in seg.shots if i not in have], True, ())
             written = {**have, **outcome.shots}
-            if remotion and (fixes := self._fix_palette(plan, written, list(outcome.shots))):
+            if fixes := self._fix_palette(plan, written, list(outcome.shots)):
                 await emit(_autofix_event(0, seg.key, plan, fixes))
             if outcome.failures:
                 await shots_failed(seg, written, outcome.failures)
@@ -781,9 +758,7 @@ class CodePipeline:
 
         # 3. merge + check + repair
         def merge() -> merger.Merged:
-            if remotion:
-                return merger.merge_remotion(sb, frame, shots, library=library, canvas=req.canvas)
-            return merger.merge_manim(sb, req.topic, frame, shots)
+            return merger.merge_remotion(sb, frame, shots, library=library, canvas=req.canvas)
 
         await emit({"type": "phase", "phase": "merge"})
         merged = merge()
@@ -797,7 +772,7 @@ class CodePipeline:
             check = await self._checker.check(req.engine, merged.code, merged.scene_class_name, req.layout())
             if not check.ok:
                 await emit(_check_event("final", rounds, "", plan, merged, check))
-                if remotion and (fixed := await self._apply_suggestions(
+                if (fixed := await self._apply_suggestions(
                         plan, shots, merged, check, applied, rounds, "", emit)):
                     # Fixed without a model call: check again, no repair round spent.
                     for key in sorted({plan.owner(i) for i in fixed}):
@@ -808,7 +783,7 @@ class CodePipeline:
                     continue
             if check.ok or rounds >= self._repair_rounds:
                 break
-            targets, unmapped = _map_failures(req.engine, merged, check)
+            targets, unmapped = _map_failures(merged, check)
             if not targets:
                 warnings.append(
                     "the check failed outside any AI-written section (the fixed frame or an unmapped "
@@ -819,7 +794,7 @@ class CodePipeline:
             await emit({"type": "phase", "phase": "repair", "round": rounds, "total": self._repair_rounds,
                         "targets": sorted(targets)})
             new_frame = await self._repair(
-                ask_req, plan, remotion, frame, shots, targets, check, record, sem, emit, rounds)
+                ask_req, plan, frame, shots, targets, check, record, sem, emit, rounds)
             changed = {plan.owner(k) for k in targets}
             frame = new_frame
             # The repaired sections overwrite the segments that own them.
@@ -862,14 +837,14 @@ class CodePipeline:
             await emit(_check_event("chunk", rounds, seg.key, plan, merged, check))
             if await self._apply_suggestions(plan, shots, merged, check, applied, rounds, seg.key, emit):
                 continue
-            targets, _ = _map_failures("remotion", merged, check)
+            targets, _ = _map_failures(merged, check)
             mine = {k: v for k, v in targets.items() if k in shots}
             if not mine or rounds >= self._repair_rounds:
                 return rounds
             rounds += 1
             await emit({"type": "chunk_repair", "index": index + 1, "total": total, "round": rounds,
                         "max": self._repair_rounds, "targets": sorted(mine)})
-            await self._repair(ask_req, plan, True, frame, shots, mine, check, record, sem, emit, rounds)
+            await self._repair(ask_req, plan, frame, shots, mine, check, record, sem, emit, rounds)
 
     def _fix_palette(self, plan: Plan, shots: dict[str, str], ids: list[str]) -> list[autofix.Fix]:
         """Rewrite the made-up `PALETTE_<X>` names in the Remotion shots `ids`
@@ -896,12 +871,12 @@ class CodePipeline:
         return set(changed)
 
     async def _repair(
-        self, req: CodeRequest, plan: Plan, remotion: bool, frame: str, shots: dict[str, str],
+        self, req: CodeRequest, plan: Plan, frame: str, shots: dict[str, str],
         targets: dict[str, list[Diagnostic]], check: CheckResult, record: Record,
         sem: asyncio.Semaphore, emit: Emit, round_: int,
     ) -> str:
         """Ask for a fix of every failing section, in parallel: the frame
-        (LAYOUT / cast) in a turn of its own, and all the failing shots of one
+        (LAYOUT) in a turn of its own, and all the failing shots of one
         segment together in one turn, so the system prompt is sent once per
         segment instead of once per shot.
 
@@ -915,15 +890,10 @@ class CodePipeline:
         results: dict[str, str] = {}
 
         async def fix_frame(key: str, diags: list[Diagnostic]) -> None:
-            if req.engine == "remotion":
-                build = lambda r: prompts.remotion_repair(sb, frame, key, frame, diags, [], req.canvas)  # noqa: E731
-                parse = parse_layout
-            else:
-                build = lambda r: prompts.manim_repair(sb, frame, key, frame, diags, check.raw)  # noqa: E731
-                parse = parse_cast
+            build = lambda r: prompts.remotion_repair(sb, frame, key, frame, diags, [], req.canvas)  # noqa: E731
             async with sem:
                 try:
-                    results[key] = await self._ask(req, "repair", key, FRAME_KEY, build, parse, record)
+                    results[key] = await self._ask(req, "repair", key, FRAME_KEY, build, parse_layout, record)
                 except PipelineFailure as exc:
                     if exc.kind in STOP_NOW_KINDS:
                         raise
@@ -931,15 +901,12 @@ class CodePipeline:
 
         async def fix_shots(ids: list[str]) -> None:
             items = [(k, shots[k], targets[k]) for k in ids]
-            if remotion:
-                build = lambda r: prompts.remotion_repair_many(sb, frame, items, req.canvas)  # noqa: E731
-            else:
-                build = lambda r: prompts.manim_repair_many(sb, frame, items, check.raw)  # noqa: E731
+            build = lambda r: prompts.remotion_repair_many(sb, frame, items, req.canvas)  # noqa: E731
             async with sem:
                 try:
                     results.update(await self._ask(
                         req, "repair", ",".join(ids), plan.owner(ids[0]), build,
-                        lambda text: parse_repaired_shots(req.engine, ids, text), record))
+                        lambda text: parse_repaired_shots(ids, text), record))
                     return
                 except PipelineFailure as exc:
                     if exc.kind in STOP_NOW_KINDS:
@@ -951,24 +918,23 @@ class CodePipeline:
             await asyncio.gather(fix_shots(ids[:half]), fix_shots(ids[half:]))
 
         by_segment: dict[str, list[str]] = {}
-        for key in sorted((k for k in targets if k not in (merger.LAYOUT_KEY, merger.CAST_KEY)),
+        for key in sorted((k for k in targets if k != merger.LAYOUT_KEY),
                           key=plan.ordered.index):
             by_segment.setdefault(plan.owner(key), []).append(key)
         await asyncio.gather(
-            *(fix_frame(k, d) for k, d in targets.items() if k in (merger.LAYOUT_KEY, merger.CAST_KEY)),
+            *(fix_frame(k, d) for k, d in targets.items() if k == merger.LAYOUT_KEY),
             *(fix_shots(ids) for ids in by_segment.values()))
         for key, code in results.items():
-            if key in (merger.LAYOUT_KEY, merger.CAST_KEY):
+            if key == merger.LAYOUT_KEY:
                 new_frame = code
             else:
                 shots[key] = code
-        if remotion:
-            repaired = [k for k in results if k not in (merger.LAYOUT_KEY, merger.CAST_KEY)]
-            by_owner: dict[str, list[autofix.Fix]] = {}
-            for fix in self._fix_palette(plan, shots, repaired):
-                by_owner.setdefault(plan.owner(fix.shot), []).append(fix)
-            for owner, fixes in sorted(by_owner.items()):
-                await emit(_autofix_event(round_, owner, plan, fixes))
+        repaired = [k for k in results if k != merger.LAYOUT_KEY]
+        by_owner: dict[str, list[autofix.Fix]] = {}
+        for fix in self._fix_palette(plan, shots, repaired):
+            by_owner.setdefault(plan.owner(fix.shot), []).append(fix)
+        for owner, fixes in sorted(by_owner.items()):
+            await emit(_autofix_event(round_, owner, plan, fixes))
         return new_frame
 
 
@@ -989,14 +955,14 @@ def _check_event(
     out = []
     for d in check.diagnostics:
         section = merged.shot_at(d.line) if d.line else None
-        shot = section if section and section not in (merger.LAYOUT_KEY, merger.CAST_KEY) else ""
+        shot = section if section and section != merger.LAYOUT_KEY else ""
         owner = plan.owner(section) if section else ""
         out.append({**_diag_dict(d), "shot": shot, "segment": owner or segment})
     return {"type": "check", "phase": phase, "round": round_, "segment": segment, "diagnostics": out}
 
 
 def _map_failures(
-    engine: str, merged: merger.Merged, check: CheckResult
+    merged: merger.Merged, check: CheckResult
 ) -> tuple[dict[str, list[Diagnostic]], list[Diagnostic]]:
     """Group diagnostics by the section that owns the failing line. Returns
     (section -> diagnostics, diagnostics that belong to no AI-written section)."""
@@ -1008,9 +974,4 @@ def _map_failures(
             unmapped.append(d)
         else:
             targets.setdefault(owner, []).append(d)
-    if engine == "manim" and check.raw:
-        # A traceback names the shot function on lines that carry no diagnostic.
-        for shot_id, line in shots_from_manim_trace(check.raw):
-            if shot_id in merged.lines:
-                targets.setdefault(shot_id, [Diagnostic(f"raised at line {line}", line)])
     return targets, unmapped

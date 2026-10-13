@@ -1,23 +1,14 @@
 import { useState } from "react";
 import { usePresence } from "../hooks/usePresence";
-import { RenderEnginePicker } from "./RenderEnginePicker";
 import { AuthoringModeBar, AuthoringModeSwitch } from "./AuthoringModeBar";
 import { AuthoringModelPicker } from "./AuthoringModelPicker";
 import { useAuthoringModels } from "../hooks/useAuthoringModels";
 import { useAuthoringRun } from "../context/AuthoringRunContext";
-import type { RenderEngine } from "../context/ProjectDraftContext";
 import type { AuthoringMode, AuthoringStep, LlmStatus } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./PipelineSettingsBar.module.css";
 
 interface PipelineSettingsBarProps {
-  renderEngine: RenderEngine;
-  /**
-   * Bỏ trống thì engine chỉ hiện trong dòng tóm tắt, không đổi được ở đây —
-   * dùng cho 1b, tab duy nhất không cần biết engine để dựng storyboard
-   * (storyboard đọc dàn ý, không đọc engine).
-   */
-  onEngineChange?: (engine: RenderEngine) => void;
   llm: LlmStatus | null;
   mode: AuthoringMode;
   onModeChange: (mode: AuthoringMode) => void;
@@ -32,18 +23,16 @@ interface PipelineSettingsBarProps {
 }
 
 /**
- * Creator đã chọn engine và cách làm ở bước 1; ở 1a/1b/1c hiện lại y nguyên hai
- * bộ chọn đầy đủ sẽ trông như chưa chọn gì. Hai lựa chọn này ĐỔI được ở bất cứ tab nào (đó là chủ ý), nhưng "đổi
+ * Creator đã chọn cách làm ở bước 1; ở 1a/1b/1c hiện lại y nguyên bộ chọn đầy
+ * đủ sẽ trông như chưa chọn gì. Lựa chọn này ĐỔI được ở bất cứ tab nào (đó là chủ ý), nhưng "đổi
  * được" và "phải nhìn lại từ đầu mỗi lần chuyển tab" là hai việc khác nhau.
  *
- * Ở 1a/1b/1c, control này mặc định thu gọn thành một dòng tóm tắt ("Manim ·
- * Sao chép prompt ra ngoài") — chỉ mở lại thành hai bộ chọn đầy đủ khi Creator
+ * Ở 1a/1b/1c, control này mặc định thu gọn thành một dòng tóm tắt ("Tự làm
+ * với ChatGPT, Claude…") — chỉ mở lại thành bộ chọn đầy đủ khi Creator
  * bấm "Đổi". Màn chọn tình huống (ScriptStepPage) không dùng component này:
  * ở đó là lần chọn thật đầu tiên, nên vẫn mở sẵn.
  */
 export function PipelineSettingsBar({
-  renderEngine,
-  onEngineChange,
   llm,
   mode,
   onModeChange,
@@ -61,7 +50,6 @@ export function PipelineSettingsBar({
   const { mounted: showPickers, closing } = usePresence(expanded);
   const { models, setModels } = useAuthoringModels(projectId);
   const aiOn = mode === "ai" && !!llm?.enabled;
-  const engineLabel = renderEngine === "remotion" ? "Remotion" : "Manim";
   const modeLabel = mode === "ai" && llm?.enabled ? "Để AI làm giúp" : "Tự làm với ChatGPT, Claude…";
 
   return (
@@ -81,15 +69,12 @@ export function PipelineSettingsBar({
         </button>
         <div className={styles.summaryText}>
           <span>Đã chọn:</span>
-          <span className={styles.summaryLabel}>{engineLabel}</span>
-          <span className={styles.dot}>·</span>
           <span className={styles.summaryLabel}>{modeLabel}</span>
         </div>
       </div>
 
       {showPickers && (
         <div className={`${styles.expanded} ${closing ? glass.revealOut : glass.reveal}`}>
-          {onEngineChange && <RenderEnginePicker value={renderEngine} onChange={onEngineChange} disabled={running} />}
           {llm && <AuthoringModeSwitch llm={llm} mode={mode} onModeChange={onModeChange} disabled={running} />}
           {aiOn && (
             <AuthoringModelPicker

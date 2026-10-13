@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+import dataclasses
+
 import pytest
 
 from application.render_script import RenderScriptUseCase
-from domain.errors import InvalidDurationError
+from domain.errors import InvalidDurationError, UnsupportedEngineError
 from domain.models import NarrationSegment, ScriptRenderRequest, ScriptRenderResult
-from domain.ports import ManimScriptRendererPort
+from domain.ports import ScriptRendererPort
 
 
-class FakeRenderer(ManimScriptRendererPort):
+class FakeRenderer(ScriptRendererPort):
     def __init__(self) -> None:
         self.calls: list[tuple[ScriptRenderRequest, str]] = []
         self.dry_runs: list[ScriptRenderRequest] = []
@@ -39,10 +41,7 @@ class FakeRenderer(ManimScriptRendererPort):
 def make_request(project_id: str = "proj-1") -> ScriptRenderRequest:
     return ScriptRenderRequest(
         project_id=project_id,
-        script_content=(
-            "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
-            "    def construct(self):\n        self.narrate(\"xin chào\")\n"
-        ),
+        script_content="export const narrations: string[] = ['xin chào'];\n",
         scene_class_name="DemoScene",
         narration_segments=[
             NarrationSegment(scene_index=0, audio_path="/shared/proj-1/audio/0.wav", duration_seconds=2.0)
@@ -146,10 +145,7 @@ def test_renders_when_audio_path_is_absent():
     use_case = RenderScriptUseCase(renderer)
     request = ScriptRenderRequest(
         project_id="proj-1",
-        script_content=(
-            "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
-            "    def construct(self):\n        self.narrate(\"xin chào\")\n"
-        ),
+        script_content="export const narrations: string[] = ['xin chào'];\n",
         scene_class_name="DemoScene",
         narration_segments=[NarrationSegment(scene_index=0, duration_seconds=2.0)],
     )
@@ -158,3 +154,11 @@ def test_renders_when_audio_path_is_absent():
 
     assert isinstance(result, ScriptRenderResult)
     assert len(renderer.calls) == 1
+
+
+def test_render_refuses_an_engine_other_than_remotion():
+    renderer = FakeRenderer()
+    use_case = RenderScriptUseCase(renderer)
+
+    with pytest.raises(UnsupportedEngineError, match="manim"):
+        use_case.render(dataclasses.replace(make_request(), engine="manim"))

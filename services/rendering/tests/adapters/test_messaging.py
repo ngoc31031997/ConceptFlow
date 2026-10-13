@@ -11,13 +11,14 @@ from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from application.render_script import RenderScriptUseCase
 from domain.errors import AnimationEngineError
-from domain.ports import ManimScriptRendererPort
+from domain.ports import ScriptRendererPort
 from tests.adapters.fake_postgres import FakePool
 
 
-class FakeManimScriptRenderer(ManimScriptRendererPort):
+class FakeScriptRenderer(ScriptRendererPort):
     def __init__(self, should_fail: bool = False) -> None:
         self._should_fail = should_fail
+        self.render_calls: list[str] = []
 
     def dry_run(self, request):
         from domain.models import DryRunResult
@@ -25,6 +26,7 @@ class FakeManimScriptRenderer(ManimScriptRendererPort):
         return DryRunResult(narrations=["dòng một", "dòng hai"])
 
     def render(self, request, output_path: str):
+        self.render_calls.append(output_path)
         if self._should_fail:
             raise AnimationEngineError("engine crashed")
         import os
@@ -67,10 +69,7 @@ def make_envelope(message_id: str = "msg-1", scenes: list | None = None) -> byte
         "timestamp": "2026-08-07T00:00:00Z",
         "payload": {
             "scenes": scenes,
-            "script_content": (
-                "from conceptflow import *\nclass DemoScene(ConceptFlowScene):\n"
-                "    def construct(self):\n        self.narrate(\"xin chào\")\n"
-            ),
+            "script_content": "export const narrations: string[] = ['xin chào'];\n",
             "scene_class_name": "DemoScene",
         },
     }
@@ -83,7 +82,7 @@ def shared_volume_root(tmp_path, monkeypatch):
     return tmp_path
 
 
-def _build_handler(renderer: ManimScriptRendererPort) -> tuple[RenderScriptCommandHandler, FakePool]:
+def _build_handler(renderer: ScriptRendererPort) -> tuple[RenderScriptCommandHandler, FakePool]:
     use_case = RenderScriptUseCase(renderer)
     pool = FakePool()
     inbox = InboxRepository(pool)
@@ -94,7 +93,7 @@ def _build_handler(renderer: ManimScriptRendererPort) -> tuple[RenderScriptComma
 
 @pytest.mark.asyncio
 async def test_success_enqueues_rendering_completed_with_video_path(shared_volume_root) -> None:
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     message = FakeMessage(make_envelope())
 
     await handler.handle(message)
@@ -110,7 +109,7 @@ async def test_success_enqueues_rendering_completed_with_video_path(shared_volum
 
 @pytest.mark.asyncio
 async def test_failure_enqueues_rendering_failed(shared_volume_root) -> None:
-    handler, pool = _build_handler(FakeManimScriptRenderer(should_fail=True))
+    handler, pool = _build_handler(FakeScriptRenderer(should_fail=True))
     message = FakeMessage(make_envelope())
 
     await handler.handle(message)
@@ -122,8 +121,23 @@ async def test_failure_enqueues_rendering_failed(shared_volume_root) -> None:
 
 
 @pytest.mark.asyncio
+async def test_a_command_for_another_engine_enqueues_rendering_failed(shared_volume_root) -> None:
+    renderer = FakeScriptRenderer()
+    handler, pool = _build_handler(renderer)
+    envelope = json.loads(make_envelope())
+    envelope["payload"]["engine"] = "manim"
+
+    await handler.handle(FakeMessage(json.dumps(envelope).encode("utf-8")))
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "rendering_failed"
+    assert "manim" in event["payload"]["payload"]["error_message"]
+    assert renderer.render_calls == []
+
+
+@pytest.mark.asyncio
 async def test_marks_message_processed_in_inbox(shared_volume_root) -> None:
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     message = FakeMessage(make_envelope(message_id="msg-1"))
 
     await handler.handle(message)
@@ -133,7 +147,7 @@ async def test_marks_message_processed_in_inbox(shared_volume_root) -> None:
 
 @pytest.mark.asyncio
 async def test_skips_reprocessing_duplicate_message_id(shared_volume_root) -> None:
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     pool.store.processed_message_ids.add("msg-1")
     message = FakeMessage(make_envelope(message_id="msg-1"))
 
@@ -163,7 +177,7 @@ def _malformed_envelope(drop: str, message_id: str = "msg-bad") -> bytes:
 async def test_render_missing_script_content_fails_the_saga_instead_of_leaking(
     shared_volume_root,
 ) -> None:
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     message = FakeMessage(_malformed_envelope("script_content"))
 
     await handler.handle(message)
@@ -181,7 +195,7 @@ async def test_render_malformed_scenes_fails_the_saga_instead_of_leaking(
     # comprehension — the same escape route as the missing top-level key.
     envelope = json.loads(make_envelope())
     envelope["payload"]["scenes"] = [{"scene_index": 0}]
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     message = FakeMessage(json.dumps(envelope).encode("utf-8"))
 
     await handler.handle(message)
@@ -200,7 +214,7 @@ async def test_validate_missing_script_content_enqueues_validation_failed(
 
     pool = FakePool()
     handler = ValidateScriptCommandHandler(
-        ValidateScriptUseCase(FakeManimScriptRenderer()),
+        ValidateScriptUseCase(FakeScriptRenderer()),
         pool,
         InboxRepository(pool),
         OutboxRepository(),
@@ -222,9 +236,9 @@ async def test_dispatcher_rejects_undecodable_envelope(shared_volume_root) -> No
     )
     from application.validate_script import ValidateScriptUseCase
 
-    handler, pool = _build_handler(FakeManimScriptRenderer())
+    handler, pool = _build_handler(FakeScriptRenderer())
     validate = ValidateScriptCommandHandler(
-        ValidateScriptUseCase(FakeManimScriptRenderer()),
+        ValidateScriptUseCase(FakeScriptRenderer()),
         pool,
         InboxRepository(pool),
         OutboxRepository(),

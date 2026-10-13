@@ -38,7 +38,6 @@ type RenderInput struct {
 }
 
 const (
-	manimScriptPlaceholder    = "<dán script Manim của bạn vào đây>"
 	remotionScriptPlaceholder = "<dán code Remotion của bạn vào đây>"
 	thumbnailTopicPlaceholder = "[DÁN CHỦ ĐỀ VIDEO CỦA BẠN VÀO ĐÂY]"
 
@@ -46,10 +45,18 @@ const (
 	engineerEmptyPrevious       = "(chưa có dàn ý/storyboard đã lưu ở các bước trước)"
 )
 
-// isRemotionRole reports whether role writes/repairs Remotion code, which
-// changes what the narration rule has to say.
-func isRemotionRole(role domain.PromptRole) bool {
+// isCodeRole reports whether role writes or repairs Remotion code, whose
+// narration rule also names where the lines live in the code.
+func isCodeRole(role domain.PromptRole) bool {
 	return role == domain.RoleRemotionEngineer || role == domain.RoleRemotionEngineerAI || role == domain.RoleRemotionAdjust
+}
+
+// narrationRuleFor is {{narration_language_rule}} for role in language.
+func narrationRuleFor(role domain.PromptRole, language string) string {
+	if isCodeRole(role) {
+		return domain.CodeNarrationLanguageRule(language)
+	}
+	return domain.NarrationLanguageRule(language)
 }
 
 // Render fills the role's active library prompt with the input.
@@ -69,11 +76,6 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		return RenderedPrompt{}, fmt.Errorf("load template: %w", err)
 	}
 
-	engine := "manim"
-	if isRemotionRole(in.Role) {
-		engine = "remotion"
-	}
-
 	topic := strings.TrimSpace(in.Topic)
 	if topic == "" {
 		topic = TopicPlaceholder
@@ -83,10 +85,7 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 	}
 	script := strings.TrimSpace(in.Script)
 	if script == "" {
-		script = manimScriptPlaceholder
-		if in.Role == domain.RoleRemotionAdjust {
-			script = remotionScriptPlaceholder
-		}
+		script = remotionScriptPlaceholder
 	}
 	previous := in.PreviousOutput
 	if strings.TrimSpace(previous) == "" {
@@ -120,8 +119,7 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		"{{script}}", script,
 		"{{previous_output}}", previous,
 		"{{channel_identity}}", domain.ChannelIdentity(language),
-		"{{narration_language_rule}}", domain.NarrationLanguageRuleFor(language, engine),
-		"{{narrate_example}}", domain.NarrateExample(language),
+		"{{narration_language_rule}}", narrationRuleFor(in.Role, language),
 		"{{thumbnail_audience}}", domain.ThumbnailAudience(language),
 		"{{format_beats}}", beats,
 		"{{video_archetypes}}", archetypes,

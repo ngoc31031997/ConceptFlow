@@ -17,12 +17,10 @@ from app.pipeline import naming
 from app.storyboard import Storyboard
 
 REMOTION_SHOT = re.compile(r"^function Shot(\d+)_(\d+)\s*\(")
-MANIM_SHOT = re.compile(r"^def shot_(\d+)_(\d+)\s*\(self")
 
 # Frame sections that are model-written but shared by every shot; they appear in
 # `Merged.lines` next to the shot ids so an error inside them can be repaired too.
 LAYOUT_KEY = "layout"
-CAST_KEY = "cast"
 
 
 @dataclass
@@ -42,11 +40,6 @@ class Merged:
 def remotion_fn(shot_id: str) -> str:
     a, b = shot_id.split(".")
     return f"Shot{a}_{b}"
-
-
-def manim_fn(shot_id: str) -> str:
-    a, b = shot_id.split(".")
-    return f"shot_{a}_{b}"
 
 
 def palette_keys(sb: Storyboard) -> dict[str, str]:
@@ -341,41 +334,3 @@ def merge_remotion(
     tail = _REMOTION_TAIL.replace("WIDTH_PX", str(canvas.width)).replace("HEIGHT_PX", str(canvas.height))
     text += f"const SHOTS: React.FC<ShotProps>[] = [{names}];\n" + tail
     return Merged(code=text, lines=lines)
-
-
-def manim_scene_class(topic: str) -> str:
-    return naming.pascal(topic, "Video") + "Scene"
-
-
-def merge_manim(sb: Storyboard, topic: str, cast: str, shots: dict[str, str]) -> Merged:
-    ordered = [sh.id for _, sh in sb.all_shots()]
-    missing = [i for i in ordered if i not in shots]
-    if missing:
-        raise ValueError(f"cannot merge: no code for shots {missing}")
-    cls = manim_scene_class(topic)
-
-    def indent(code: str) -> str:
-        return "\n".join(("    " + ln) if ln.strip() else "" for ln in code.strip("\n").splitlines())
-
-    out = ["from conceptflow import *", "", "", f"class {cls}(ConceptFlowScene):", "    def construct(self):"]
-    out.append("        self.setup_cast()")
-    for scene in sb.scenes:
-        out.append(f"        self.beat({json.dumps(scene.id)})")
-        for shot in scene.shots:
-            out.append(f"        self.{manim_fn(shot.id)}()")
-    out.append("")
-    text = "\n".join(out) + "\n"
-    line = text.count("\n") + 1
-
-    cast_block = indent(cast)
-    lines: dict[str, tuple[int, int]] = {CAST_KEY: (line, line + cast_block.count("\n"))}
-    text += cast_block + "\n\n"
-    line += cast_block.count("\n") + 2
-
-    for sid in ordered:
-        block = indent(shots[sid])
-        n = block.count("\n") + 1
-        lines[sid] = (line, line + n - 1)
-        text += block + "\n\n"
-        line += n + 1
-    return Merged(code=text.rstrip("\n") + "\n", lines=lines, scene_class_name=cls)

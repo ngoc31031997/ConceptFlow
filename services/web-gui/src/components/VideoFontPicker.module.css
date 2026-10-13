@@ -1,5 +1,5 @@
-/* Mirrors ContentLanguagePicker.module.css so the two header pickers on
-   Step 1 read as one pair, not two differently-shaped cards side by side. */
+/* Mirrors ContentLanguagePicker.module.css: a compact inline row with the
+   title and hint on the left, the options on the right. */
 .card {
   display: flex;
   align-items: center;
@@ -19,10 +19,4 @@
   font-size: 12.5px;
   color: var(--ink-faint);
   line-height: 1.5;
-}
-
-.options {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
 }

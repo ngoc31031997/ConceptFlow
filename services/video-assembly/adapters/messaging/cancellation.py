@@ -51,7 +51,7 @@ def _parse(ts: str | None) -> datetime | None:
 
 
 def _kill(proc: subprocess.Popen) -> None:
-    """Terminate a child and everything it spawned (Manim starts ffmpeg)."""
+    """Terminate a child and everything it spawned (its own subprocesses included)."""
     try:
         os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
     except (ProcessLookupError, PermissionError):

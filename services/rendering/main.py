@@ -20,7 +20,6 @@ from adapters.http.check_metrics import CheckMetrics
 from adapters.http.check_server import create_check_app
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
 from adapters.messaging.consumer import (
-    RenderChannelAssetCommandHandler,
     RenderingCommandDispatcher,
     RenderScriptCommandHandler,
     ValidateScriptCommandHandler,
@@ -32,23 +31,17 @@ from adapters.persistence.db import create_pool
 from adapters.persistence.inbox import InboxRepository
 from adapters.persistence.outbox import OutboxRepository
 from adapters.persistence.relay import OutboxRelay
-from adapters.rendering.engine_router import EngineRouterRenderer
 from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.layout_checker import LayoutChecker
-from adapters.rendering.manim_renderer import (
+from adapters.rendering.remotion_renderer import (
     CACHE_ROOT,
-    DEFAULT_DRY_RUN_TIMEOUT_SECONDS,
-    DEFAULT_RENDER_MEMORY_LIMIT_GB,
-    DEFAULT_RENDER_QUALITY,
     DEFAULT_RENDER_TIMEOUT_SECONDS,
-    ManimScriptRenderer,
+    RemotionScriptRenderer,
 )
-from adapters.rendering.remotion_renderer import RemotionScriptRenderer
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from adapters.storage.artifact_paths import purge_project_artifacts
 from application.check_script import CheckScriptUseCase
 from application.preview_illustration import PreviewIllustrationUseCase
-from application.render_channel_asset import RenderChannelAssetUseCase
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
 from domain import lottie_catalog
@@ -83,26 +76,7 @@ def approved_lottie_ids() -> set[str]:
 
 async def run() -> None:
     timeout_seconds = int(os.environ.get("RENDER_TIMEOUT_SECONDS", DEFAULT_RENDER_TIMEOUT_SECONDS))
-    dry_run_timeout_seconds = int(
-        os.environ.get("DRY_RUN_TIMEOUT_SECONDS", DEFAULT_DRY_RUN_TIMEOUT_SECONDS)
-    )
-    memory_limit_gb = int(os.environ.get("RENDER_MEMORY_LIMIT_GB", DEFAULT_RENDER_MEMORY_LIMIT_GB))
-    # RENDER_CACHE_ROOT="" turns caching off, restoring the old
-    # tempdir + --disable_caching behaviour without a code change.
-    cache_root = os.environ.get("RENDER_CACHE_ROOT", CACHE_ROOT) or None
-    manim_renderer = ManimScriptRenderer(
-        timeout_seconds=timeout_seconds,
-        dry_run_timeout_seconds=dry_run_timeout_seconds,
-        memory_limit_gb=memory_limit_gb,
-        cache_root=cache_root,
-        quality=os.environ.get("RENDER_QUALITY", DEFAULT_RENDER_QUALITY),
-    )
-    # feature/remotion-engine: RenderScriptUseCase/ValidateScriptUseCase go
-    # through the router so either engine can be picked per-request; channel
-    # asset idents (below) stay Manim-only, so they keep using manim_renderer
-    # directly — RemotionScriptRenderer doesn't implement that port at all.
-    remotion_renderer = RemotionScriptRenderer(timeout_seconds=timeout_seconds)
-    renderer = EngineRouterRenderer(manim=manim_renderer, remotion=remotion_renderer)
+    renderer = RemotionScriptRenderer(timeout_seconds=timeout_seconds)
     use_case = RenderScriptUseCase(renderer)
 
     pool = await create_pool()
@@ -111,17 +85,12 @@ async def run() -> None:
 
     connection = await aio_pika.connect_robust(RABBITMQ_URL)
     channel = await connection.channel()
-    # One command at a time. RenderingCommandDispatcher's docstring already
-    # states the three commands "cùng phải xếp hàng sau nhau" — but that only
-    # holds if the broker stops handing us the next one before the current
-    # render is done. Without this, aio-pika prefetches the whole queue and
-    # `queue.consume()` schedules every delivery as its own task, so N Manim
-    # subprocesses run at once: each is given RLIMIT_AS of
-    # RENDER_MEMORY_LIMIT_GB (4 GiB) inside a 5 GB container and each grabs
-    # every core it can (Phase 0: CPU-time 2.21x wall-clock). Observed live
-    # with three concurrent dry runs: a single ReplacementTransform frame went
-    # from ~0.03s to 42s, and the run blew through DRY_RUN_TIMEOUT_SECONDS
-    # having rendered 148 of its animations.
+    # One command at a time. RenderingCommandDispatcher's docstring states the
+    # commands "cùng phải xếp hàng sau nhau" — but that only holds if the
+    # broker stops handing us the next one before the current render is done.
+    # Without this, aio-pika prefetches the whole queue and `queue.consume()`
+    # schedules every delivery as its own task, so several renders would run
+    # at once and fight over the container's CPU and memory.
     await channel.set_qos(prefetch_count=1)
     exchange = await channel.get_exchange(EVENTS_EXCHANGE)
     progress_exchange = await channel.get_exchange(PROGRESS_EXCHANGE)
@@ -139,16 +108,9 @@ async def run() -> None:
         RenderScriptCommandHandler(
             use_case, pool, inbox, outbox, ProgressPublisher(progress_exchange)
         ),
-        # Dựng intro/outro cố định của kênh — cùng renderer, khác
-        # use case: không có script Creator, không có lượt dry/narration.
-        # feature/remotion-engine: dùng thẳng manim_renderer (ChannelAssetRendererPort
-        # chỉ có ManimScriptRenderer implement — xem docstring remotion_renderer.py).
-        RenderChannelAssetCommandHandler(
-            RenderChannelAssetUseCase(manim_renderer), pool, inbox, outbox
-        ),
-        # Dọn video đã dựng và cache Manim của project bị xoá.
+        # Dọn video đã dựng và cache Remotion của project bị xoá.
         purge_project_artifacts=PurgeProjectArtifactsCommandHandler(
-            lambda project_id: purge_project_artifacts(project_id, cache_root), pool, inbox, outbox
+            lambda project_id: purge_project_artifacts(project_id, CACHE_ROOT), pool, inbox, outbox
         ),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)

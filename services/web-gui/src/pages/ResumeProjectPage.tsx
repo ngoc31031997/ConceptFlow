@@ -19,7 +19,6 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
     projectId: project.project_id,
     scriptContent: project.script_content || state.code,
     voiceLanguage: project.voice_language,
-    renderEngine: project.render_engine ?? "manim",
     videoFont: project.video_font || "Be Vietnam Pro",
     ttsEnabled: project.tts_enabled ?? true,
     voiceId: project.voice_id || null,

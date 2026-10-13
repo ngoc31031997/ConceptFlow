@@ -180,30 +180,6 @@ func floatSliceFromPayload(payload map[string]interface{}, key string) []float64
 	return out
 }
 
-// mapSliceFromPayload extracts a list-of-objects field verbatim (e.g.
-// layout_marks).
-//
-// Verbatim is the point: Orchestrator carries this from rendering_completed to
-// the qc_video command without reading a single field of it. Decoding it into a
-// struct here would mean every property Rendering learns to measure needs a
-// matching Go field before it can reach the rules that use it — a coupling that
-// buys nothing, since the only reader is video-assembly's qc_rules.py.
-// Non-object entries are dropped rather than failing: a malformed mark should
-// cost that one mark, not the whole report.
-func mapSliceFromPayload(payload map[string]interface{}, key string) []map[string]interface{} {
-	raw, ok := payload[key].([]interface{})
-	if !ok {
-		return nil
-	}
-	out := make([]map[string]interface{}, 0, len(raw))
-	for _, item := range raw {
-		if m, ok := item.(map[string]interface{}); ok {
-			out = append(out, m)
-		}
-	}
-	return out
-}
-
 // parseQCFindings decodes the findings list off a qc_completed event.
 //
 // A finding whose severity is neither "blocking" nor "warning" is kept but

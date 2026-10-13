@@ -85,7 +85,7 @@ def test_purge_removes_render_output_and_cache_but_not_final(tmp_path, monkeypat
     video.mkdir(parents=True)
     for name in ("rendered.mp4", "timing.json", "final.mp4"):
         (video / name).write_bytes(b"x")
-    cache = tmp_path / ".manim-media"
+    cache = tmp_path / ".remotion-media"
     (cache / "p").mkdir(parents=True)
     (cache / "p" / "partial.mp4").write_bytes(b"x")
     (cache / "other").mkdir()

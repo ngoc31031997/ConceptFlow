@@ -16,7 +16,7 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 }
 
 // TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech
-// guards the Manim-script input mode's saga shape: classify_scenes has no
+// guards the single-script input mode's saga shape: classify_scenes has no
 // external round-trip anymore (no per-scene template to classify), so
 // script_parsed must mark it completed synchronously and dispatch
 // synthesize_speech directly — not wait for a scenes_classified event.
@@ -39,8 +39,8 @@ func TestHandleStepEventUseCase_ScriptParsed_DispatchesValidateScript(t *testing
 	if project.Status != domain.StatusValidatingScript {
 		t.Fatalf("expected validating_script, got %s", project.Status)
 	}
-	if project.ManimSceneClassName != "DemoScene" {
-		t.Fatalf("expected scene_class_name stored, got %q", project.ManimSceneClassName)
+	if project.SceneClassName != "DemoScene" {
+		t.Fatalf("expected scene_class_name stored, got %q", project.SceneClassName)
 	}
 
 	last := pub.last()
@@ -207,7 +207,7 @@ func TestHandleStepEventUseCase_SceneRenderedProgressOnly(t *testing.T) {
 }
 
 // TestHandleStepEventUseCase_RenderingCompleted_DispatchesAssembleVideoWithNarrationSegments
-// guards the Manim-script input mode's assemble_video contract: rendering
+// guards the single-script input mode's assemble_video contract: rendering
 // produces one video_path for the whole script (not per-scene clips), and
 // Video Assembly needs the narration audio from step 3 (Rule 2), each paired
 // with the offset Rendering measured for it.
@@ -813,53 +813,18 @@ func TestHandleStepEvent_ChannelAssetNormalized_UpsertsPointer(t *testing.T) {
 	}
 }
 
-// channel_asset_rendered is forwarded to video-assembly as a
-// register_channel_asset command; it must not touch the
-// pointers projection (only channel_asset_normalized does).
-func TestHandleStepEvent_ChannelAssetRendered_PublishesRegisterCommand(t *testing.T) {
-	repo := newFakeRepo()
+// TestHandleStepEvent_ChannelAssetRendered_IsIgnored: intro/outro only come
+// from uploads, so a channel_asset_rendered event changes nothing.
+func TestHandleStepEvent_ChannelAssetRendered_IsIgnored(t *testing.T) {
 	pub := &fakePublisher{}
-	prog := &fakeProgress{}
 	pointers := newFakeChannelAssetPointers()
-	uc := NewHandleStepEventUseCase(repo, pub, prog, pointers, nil)
-
+	uc := NewHandleStepEventUseCase(newFakeRepo(), pub, &fakeProgress{}, pointers, nil)
 	err := uc.Execute(context.Background(), StepEvent{
-		MessageID: "m2",
-		SagaID:    "s2",
-		ProjectID: "channel-asset-admin",
-		EventType: "channel_asset_rendered",
-		Payload: map[string]interface{}{
-			"kind":                   "outro",
-			"video_path":             "/data/renders/outro.mp4",
-			"video_duration_seconds": 3.0,
-			"render_quality":         "1080p60",
-		},
+		MessageID: "m2", SagaID: "s2", ProjectID: "channel-asset-admin", EventType: "channel_asset_rendered",
+		Payload: map[string]interface{}{"kind": "outro", "video_path": "/data/renders/outro.mp4", "render_quality": "1080p60"},
 	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(pointers.pointers) != 0 {
-		t.Fatalf("channel_asset_rendered must not populate the projection, got %+v", pointers.pointers)
-	}
-	cmd := pub.last()
-	if cmd == nil || cmd.routingKey != "video_assembly" || cmd.envelope.EventType != "register_channel_asset" {
-		t.Fatalf("expected register_channel_asset to video_assembly, got %+v", cmd)
-	}
-	if cmd.envelope.MessageID != "register-m2" {
-		t.Errorf("message_id must derive from the event's for idempotency, got %q", cmd.envelope.MessageID)
-	}
-	if got := cmd.envelope.Payload["render_quality"]; got != "1080p60" {
-		t.Errorf("render_quality = %v", got)
-	}
-}
-
-func TestHandleStepEvent_ChannelAssetRendered_MalformedIsDropped(t *testing.T) {
-	pub := &fakePublisher{}
-	uc := NewHandleStepEventUseCase(newFakeRepo(), pub, &fakeProgress{}, newFakeChannelAssetPointers(), nil)
-	err := uc.Execute(context.Background(), StepEvent{MessageID: "m3", SagaID: "s3", EventType: "channel_asset_rendered",
-		Payload: map[string]interface{}{"kind": "outro"}})
-	if err != nil || len(pub.published) != 0 {
-		t.Fatalf("malformed event must be dropped without error, err=%v published=%d", err, len(pub.published))
+	if err != nil || len(pub.published) != 0 || len(pointers.pointers) != 0 {
+		t.Fatalf("channel_asset_rendered must be ignored, err=%v published=%d pointers=%d", err, len(pub.published), len(pointers.pointers))
 	}
 }
 
@@ -872,7 +837,6 @@ func TestHandleStepEventUseCase_VideoAssembled_SkipsQCVideoAndGoesReadyToPublish
 	repo.projects["proj-1"] = &domain.Project{
 		ProjectID: "proj-1", Status: domain.StatusAssemblingVideo,
 		RenderedVideoPath: &rendered,
-		LayoutMarks:       []map[string]interface{}{{"cls": "Text", "bbox": []interface{}{-1.0, 1.0, 1.0, -1.0}}},
 	}
 	repo.steps[stepKey("saga-1", domain.StepAssembleVideo)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepAssembleVideo, Status: domain.SagaStepInProgress}
 

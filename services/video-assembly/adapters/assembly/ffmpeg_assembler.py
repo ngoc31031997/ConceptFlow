@@ -3,7 +3,7 @@ the ffmpeg CLI binary in a single pass: place each narration segment at its
 own offset on one track, mux that onto the (silent) video, and overlay
 optional background music underneath — all via one filter_complex graph.
 
-The offsets matter. A Manim video is animation time *plus* narration time,
+The offsets matter. A rendered video is animation time *plus* narration time,
 so concatenating the narration clips back to back would play every segment
 after the first early by however much animation had run before it, and the
 error accumulates (61.6s of drift by the end of a 3.6-minute reference
@@ -82,14 +82,14 @@ DEFAULT_LEAD_IN_SECONDS = 0.0
 DEFAULT_TAIL_SECONDS = 0.0
 
 # Auto-generated thumbnail candidate. YouTube wants 1280x720 and
-# under 2MB; q=3 lands comfortably inside that for a Manim frame, which is flat
-# colour and text rather than photographic detail.
+# under 2MB; q=3 lands comfortably inside that for a rendered frame, which is
+# flat illustration and text rather than photographic detail.
 THUMBNAIL_WIDTH = 1280
 THUMBNAIL_HEIGHT = 720
 THUMBNAIL_QUALITY = 3
 
 # Grabbed a quarter of the way in rather than at the start: the opening frames
-# of a Manim video are usually a title card or an empty stage, which makes a
+# of a video are usually a title card or an empty stage, which makes a
 # poor thumbnail. A quarter in is reliably inside the actual content.
 THUMBNAIL_POSITION_FRACTION = 0.25
 

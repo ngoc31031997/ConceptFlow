@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AUTO_STEPS, FLOW_LABELS, FLOW_PHASES, FLOW_STEP_PURPOSE, flowTitle, phaseOf, previewRoute, skippedReason } from "../../src/utils/flow";
+import { AUTO_STEPS, FLOW_LABELS, FLOW_PHASES, FLOW_STEP_PURPOSE, flowTitle, phaseOf, previewRoute } from "../../src/utils/flow";
 import { stepLabel } from "../../src/utils/pipelineLabels";
 
 describe("flowTitle", () => {
@@ -54,9 +54,5 @@ describe("step previews", () => {
   it("keeps the preview under the project when there is one", () => {
     expect(previewRoute(9, "p1")).toBe("/projects/p1/preview/9");
     expect(previewRoute(9, "")).toBe("/create/preview/9");
-  });
-
-  it("says why the illustrations step does not apply", () => {
-    expect(skippedReason()).toContain("Remotion");
   });
 });

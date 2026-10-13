@@ -13,7 +13,7 @@ export interface SubtitleStyle {
  * How subtitle_cues get delivered to YouTube (see ADR-0027):
  *   off     — no subtitles
  *   track   — a caption track the viewer can toggle with CC — searchable,
- *             auto-translatable, and it never paints over Manim's edge content
+ *             auto-translatable, and it never paints over the video's edge content
  *   burn_in — painted into the video frames
  *   both    — both at once, which means a viewer with CC on sees the text twice
  */
@@ -50,7 +50,6 @@ export interface ProjectDraft {
   subtitleMode: SubtitleMode;
   subtitleStyle: SubtitleStyle;
   renderQuality: RenderQuality;
-  renderEngine: RenderEngine;
   /** Font for text drawn inside a Remotion video (not the subtitles). */
   videoFont: string;
   videoFormatId: string;
@@ -85,7 +84,7 @@ export interface ProjectDraft {
   /**
    * Step 2 — the Visual Director storyboard the Creator pasted back
    * and the server has saved (POST /v1/projects/:id/authoring/storyboard).
-   * Kept here so step 3 (Manim Engineer, currently a stub) can show
+   * Kept here so the Code step can show
    * story+storyboard as {{previous_output}} without a re-fetch.
    */
   authoringStoryboard: string;
@@ -105,14 +104,6 @@ export interface ProjectDraft {
 export type RenderQuality = "480p15" | "720p30" | "1080p60" | "4k60";
 
 /**
- * feature/remotion-engine — which engine renders scriptContent. "manim"
- * stays the default; Remotion is a minimal first cut (see
- * RenderEnginePicker.tsx). Backend defaults to "manim" too when this is
- * omitted, so every project created before this field existed keeps working.
- */
-export type RenderEngine = "manim" | "remotion";
-
-/**
  * Which video this project produces: the 16:9 long-form video, or the
  * vertical short built at 1080x1920 from the start (see ADR-0031).
  */
@@ -127,7 +118,6 @@ export type ProjectDraftAction =
   | { type: "SET_SUBTITLE_MODE"; payload: SubtitleMode }
   | { type: "SET_SUBTITLE_STYLE"; payload: Partial<SubtitleStyle> }
   | { type: "SET_RENDER_QUALITY"; payload: RenderQuality }
-  | { type: "SET_RENDER_ENGINE"; payload: RenderEngine }
   | { type: "SET_VIDEO_FONT"; payload: string }
   | { type: "SET_VIDEO_OUTPUT_MODE"; payload: VideoOutputMode }
   | { type: "SET_VIDEO_FORMAT"; payload: string }
@@ -164,7 +154,6 @@ const initialDraft: ProjectDraft = {
   subtitleMode: "track",
   subtitleStyle: defaultSubtitleStyle,
   renderQuality: "1080p60",
-  renderEngine: "manim",
   videoFont: "Be Vietnam Pro",
   videoFormatId: "case_study_essay_8min",
   backgroundMusicVolume: 0.2,
@@ -232,7 +221,7 @@ function saveLastVoiceId(voiceId: string | null): void {
 }
 
 /**
- * "một bộ cấu hình lần cuối dùng" toàn cục: engine, quality,
+ * "một bộ cấu hình lần cuối dùng" toàn cục: quality,
  * TTS, giọng, sub, nhạc nền, output mode, hình dạng video. Step 2's fields are
  * saved when the Creator leaves step 2 (saveLastUsedSettings), the render/merge
  * ones whenever they are saved on a project (rememberProductionSettings); read back to prefill every new draft from then on
@@ -248,7 +237,6 @@ type LastUsedSettings = Pick<
   | "subtitleMode"
   | "subtitleStyle"
   | "renderQuality"
-  | "renderEngine"
   | "videoFont"
   | "videoFormatId"
   | "backgroundMusicPath"
@@ -288,7 +276,6 @@ export function saveLastUsedSettings(draft: ProjectDraft): void {
   writeLastUsedSettings({
     ttsEnabled: draft.ttsEnabled,
     voiceId: draft.voiceId,
-    renderEngine: draft.renderEngine,
     videoFormatId: draft.videoFormatId,
     videoOutputMode: draft.videoOutputMode,
   });
@@ -337,8 +324,6 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return { ...state, backgroundMusicVolume: action.payload };
     case "SET_RENDER_QUALITY":
       return { ...state, renderQuality: action.payload };
-    case "SET_RENDER_ENGINE":
-      return { ...state, renderEngine: action.payload };
     case "SET_VIDEO_FONT":
       return { ...state, videoFont: action.payload };
     case "SET_VIDEO_OUTPUT_MODE":

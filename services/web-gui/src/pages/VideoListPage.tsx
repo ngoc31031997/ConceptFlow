@@ -4,7 +4,6 @@ import { AppShell } from "../components/AppShell";
 import { StatusBadge } from "../components/StatusBadge";
 import { ConfirmModal } from "../components/ConfirmModal";
 import { DeleteProgressCard } from "../components/DeleteProgressCard";
-import { RenderEngineBadge } from "../components/RenderEngineBadge";
 import { deleteProject, getProjectVideoUrl, listProjectsPage, ApiError } from "../api/client";
 import type { ProjectListFilter, ProjectPage, ProjectSummary } from "../types";
 
@@ -320,7 +319,6 @@ export function VideoListPage() {
                         </span>
                       ) : null}
                       <StatusBadge status={project.status} />
-                      <RenderEngineBadge renderEngine={project.render_engine} />
                       {project.error_message && (
                         <span className={styles.errorText}>{project.error_message}</span>
                       )}

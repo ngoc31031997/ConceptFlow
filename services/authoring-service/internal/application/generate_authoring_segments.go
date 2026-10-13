@@ -89,7 +89,7 @@ func (uc *GenerateAuthoringUseCase) planSegments(ctx context.Context, project *d
 		return nil, domain.ErrInvalidChunkShots
 	}
 	cut, err := uc.codegen.PlanSegments(ctx, CodeGenRequest{
-		Engine: string(project.RenderEngine), Storyboard: storyboard, ChunkShots: n,
+		Engine: string(domain.RenderEngineRemotion), Storyboard: storyboard, ChunkShots: n,
 	})
 	var llmErr *LLMError
 	if errors.As(err, &llmErr) && llmErr.Kind == ErrKindMalformed {
@@ -108,7 +108,7 @@ func (uc *GenerateAuthoringUseCase) codeSegmentRequest(ctx context.Context, proj
 	if err != nil {
 		return CodeGenRequest{}, fmt.Errorf("load project: %w", err)
 	}
-	role, err := AIRoleFor("code", string(project.RenderEngine))
+	role, err := AIRoleFor("code")
 	if err != nil {
 		return CodeGenRequest{}, err
 	}

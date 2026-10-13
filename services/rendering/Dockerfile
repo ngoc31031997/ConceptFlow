@@ -1,27 +1,11 @@
 FROM python:3.12-slim
-# texlive-* packages are required by any Manim script using MathTex/Tex or
-# the default Integer/DecimalNumber (which renders digits via MathTex) —
-# without them, such scripts fail with "latex failed but did not produce a
-# log file" since Rendering now executes arbitrary Creator-authored scripts,
-# not just the fixed set of templates the old MVP shipped with.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
-    libcairo2-dev \
-    libpango1.0-dev \
-    pkg-config \
-    build-essential \
-    texlive \
-    texlive-latex-extra \
-    texlive-fonts-extra \
-    texlive-latex-recommended \
-    texlive-science \
-    tipa \
-    dvisvgm \
     && rm -rf /var/lib/apt/lists/*
-# Font của bộ nhận diện. Manim/Pango **im lặng thay
-# bằng font khác** khi font yêu cầu không có, nên thiếu bước này thì mọi video
-# vẫn render thành công — chỉ là bằng font của người khác, và không ai phát hiện
-# ra cho tới lúc nhìn video đã publish.
+# Font của bộ nhận diện. Chromium **im lặng thay bằng font khác** khi font yêu
+# cầu không có, nên thiếu bước này thì mọi video vẫn render thành công — chỉ là
+# bằng font của người khác, và không ai phát hiện ra cho tới lúc nhìn video đã
+# publish.
 #
 # Nguồn là repo google/fonts trên GitHub, không phải fonts.google.com/download:
 # endpoint download đó đã đổi thành một trang JS trả về HTML thay vì file zip
@@ -47,13 +31,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && fc-cache -f \
     && rm -rf /var/lib/apt/lists/*
 
-# Node + headless Chrome for the Remotion render engine (feature/remotion-engine).
-# Package list and "don't use Alpine" guidance straight from Remotion's own
-# Docker docs (https://www.remotion.dev/docs/docker) — this base image is
-# already Debian slim (python:3.12-slim), not Alpine, so no base-image change
-# was needed, just adding Node + these libs alongside the existing Python/TeX
-# toolchain in the same image (feature/remotion-engine keeps both engines in
-# one container — see the branch's design notes).
+# Node + headless Chrome for Remotion. Package list and "don't use Alpine"
+# guidance straight from Remotion's own Docker docs
+# (https://www.remotion.dev/docs/docker); python:3.12-slim is Debian slim.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     gnupg \

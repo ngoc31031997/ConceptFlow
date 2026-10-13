@@ -42,7 +42,6 @@ describe('routing between orchestrator and authoring-service', () => {
     ['post', '/v1/projects/p1/suggest-metadata', 'authoringAi'],
     ['get', '/v1/prompts/story_architect', 'authoring'],
     ['post', '/v1/prompt-renders', 'authoring'],
-    ['get', '/v1/script-templates', 'authoring'],
     ['get', '/v1/admin/prompts', 'authoring'],
     ['get', '/v1/llm/status', 'authoring'],
     ['get', '/v1/operations/op-1', 'authoring'],

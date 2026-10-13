@@ -32,7 +32,6 @@ const STATUS_TEXT: Record<StepStatus, string> = {
   failed: "Lỗi",
   cancelled: "Đã hủy",
   pending: "Chưa tới",
-  skipped: "Không dùng",
 };
 
 function Mark({ status, n }: { status: StepStatus; n: number }) {
@@ -97,7 +96,7 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
       return next;
     });
 
-  const counted = FLOW_PHASES.flatMap((phase) => phase.steps.filter((step) => nav.status(step) !== "skipped"));
+  const counted = FLOW_PHASES.flatMap((phase) => phase.steps);
   const doneCount = counted.filter((step) => nav.status(step) === "done").length;
   const atStep = flow.flowStep || 1;
   const atPhase = phaseOf(atStep);
@@ -138,9 +137,8 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
 
       <div className={styles.scroll}>
         {FLOW_PHASES.map((phase, index) => {
-          const active = phase.steps.filter((step) => nav.status(step) !== "skipped");
-          const done = active.filter((step) => nav.status(step) === "done").length;
-          const phaseDone = active.length > 0 && done === active.length;
+          const done = phase.steps.filter((step) => nav.status(step) === "done").length;
+          const phaseDone = phase.steps.length > 0 && done === phase.steps.length;
           // The narrow rail has no phase headers to open, so it lists every step.
           const expanded = collapsed || open.has(index);
           return (
@@ -163,7 +161,7 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
                   </span>
                   <span className={styles.phaseName}>{phase.name}</span>
                   <span className={styles.phaseCount} data-testid={`rail-phase-count-${index + 1}`}>
-                    {done}/{active.length}
+                    {done}/{phase.steps.length}
                   </span>
                   <span className={styles.chevron} aria-hidden="true">
                     ›

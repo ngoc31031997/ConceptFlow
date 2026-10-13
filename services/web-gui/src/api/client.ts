@@ -420,15 +420,12 @@ export async function completeYoutubeAuthCallback(
 export type PromptRole =
   | "story_architect"
   | "visual_director"
-  | "manim_engineer"
   | "remotion_engineer"
   // Luồng "Chạy bằng AI" có prompt riêng (storyboard xuất JSON, code
-  // chỉ viết các hàm shot); luồng Copy giữ bốn vai trò trên nguyên vẹn.
+  // chỉ viết các hàm shot); luồng Copy giữ ba vai trò trên nguyên vẹn.
   | "visual_director_ai"
-  | "manim_engineer_ai"
   | "remotion_engineer_ai"
   // "Copy to an external AI" prompts, rendered by the server.
-  | "manim_adjust"
   | "remotion_adjust"
   | "thumbnail_design"
   // Luật style hình minh hoạ mà AI vẽ hình phải theo; không render cho AI ngoài.
@@ -467,7 +464,7 @@ export interface PromptRenderInput {
   role: PromptRole;
   language: "vi" | "en";
   topic?: string;
-  /** The Creator's existing code, for `manim_adjust` / `remotion_adjust`. */
+  /** The Creator's existing code, for `remotion_adjust`. */
   script?: string;
   previous_output?: string;
   subtitle_mode?: string;
@@ -1155,7 +1152,7 @@ export async function saveAuthoringStoryboard(projectId: string, content: string
   });
 }
 
-/** Bước 3 — lưu code Manim (Manim Engineer) Creator dán vào. */
+/** Bước Code — lưu code Remotion Creator dán vào. */
 export async function saveAuthoringCode(projectId: string, content: string): Promise<void> {
   await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code`, {
     method: "POST",
@@ -1260,12 +1257,6 @@ export async function createProjectDraft(
   projectId: string,
   topic: string,
   contentLanguage: "vi" | "en",
-  // Optional: "" (mặc định) nghĩa là "không khai báo ở lượt gọi
-  // này", server giữ nguyên engine đã lưu chứ không reset về Manim. Truyền
-  // vào khi Creator vừa chọn engine ở "/" hoặc ngay trước khi chạy chuỗi AI
-  // 1a→1b→1c ở tab 1a — server đọc project.RenderEngine để chọn đúng vai trò
-  // Manim/Remotion cho 1b/1c, nên nó phải có mặt trước khi bước 1a chạy xong.
-  renderEngine?: "manim" | "remotion",
   // Optional: the long video this new draft is the vertical short of. The
   // server then creates it as a short, linked to that video both ways.
   shortOf?: string,
@@ -1279,7 +1270,6 @@ export async function createProjectDraft(
         project_id: projectId,
         topic,
         content_language: contentLanguage,
-        ...(renderEngine ? { render_engine: renderEngine } : {}),
         ...(shortOf ? { short_of: shortOf } : {}),
       }),
     },
@@ -1288,13 +1278,12 @@ export async function createProjectDraft(
 }
 
 /**
- * Cấu hình của project. Bước 2 lưu ngôn ngữ, engine, giọng, định dạng, kiểu đầu
+ * Cấu hình của project. Bước 2 lưu ngôn ngữ, giọng, định dạng, kiểu đầu
  * ra; chất lượng, font, phụ đề, nhạc nền được lưu ở màn Review hoặc khi bước
  * đọc chúng lỗi (ProductionSettingsPanel).
  */
 export interface WizardSettingsInput {
   voiceLanguage: "vi" | "en";
-  renderEngine: "manim" | "remotion";
   videoFont: string;
   ttsEnabled: boolean;
   voiceId: string | null;
@@ -1313,7 +1302,6 @@ export type WizardSettingsPatch = Partial<WizardSettingsInput> & { confirm?: boo
 
 const WIZARD_PATCH_WIRE_KEYS: Record<keyof WizardSettingsPatch, string> = {
   voiceLanguage: "voice_language",
-  renderEngine: "render_engine",
   videoFont: "video_font",
   ttsEnabled: "tts_enabled",
   voiceId: "voice_id",

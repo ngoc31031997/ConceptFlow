@@ -22,13 +22,6 @@ type ProjectDraftPort interface {
 	GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error)
 	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
 	FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]SimilarProject, error)
-	// SaveRenderEngine persists the engine choice as soon as the
-	// Creator makes it, instead of only at render-submit time — the
-	// server-side authoring chain (RenderPromptUseCase.RoleFor) reads
-	// project.RenderEngine to pick storyboard/code prompts, so a chain run
-	// from tab 1a would otherwise always see the "manim" default even when
-	// the Creator picked Remotion at "/".
-	SaveRenderEngine(ctx context.Context, projectID string, engine domain.RenderEngine) error
 	// Get loads a whole project; used to link a new short to its long video.
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
 }
@@ -45,11 +38,6 @@ type CreateProjectDraftInput struct {
 	ProjectID       string
 	Topic           string
 	ContentLanguage domain.ContentLanguage
-	// RenderEngine is optional: "" means the caller is not
-	// declaring an engine this call (e.g. a topic-only debounce save) —
-	// leave whatever is already on the row untouched, same "only touch what
-	// was sent" rule the topic field already follows.
-	RenderEngine domain.RenderEngine
 	// ShortOf, when set, is the long video this new draft is the vertical
 	// short of: the draft starts as a short (domain.ApplyShortDefaults) and the
 	// two projects are linked as companions both ways.
@@ -124,15 +112,6 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 		}
 	}
 
-	if input.RenderEngine != "" {
-		if !input.RenderEngine.IsValid() {
-			return nil, fmt.Errorf("render_engine must be %q or %q", domain.RenderEngineManim, domain.RenderEngineRemotion)
-		}
-		if err := uc.repo.SaveRenderEngine(ctx, projectID, input.RenderEngine); err != nil {
-			return nil, err
-		}
-	}
-
 	topic := strings.TrimSpace(input.Topic)
 	var similar []SimilarProject
 	if topic != "" {
@@ -161,7 +140,6 @@ func (uc *CreateProjectDraftUseCase) makeShortOf(ctx context.Context, project *d
 	domain.ApplyShortDefaults(&patch)
 	project.VideoOutputMode = short
 	project.VideoFormatID = *patch.VideoFormatID
-	project.RenderEngine = *patch.RenderEngine
 	project.SubtitleMode = *patch.SubtitleMode
 	project.SubtitleStyle = patch.SubtitleStyle
 	project.CompanionProjectID = &long.ProjectID

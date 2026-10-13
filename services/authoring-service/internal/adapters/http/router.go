@@ -90,7 +90,6 @@ func (rt *Router) Handler() http.Handler {
 	// not saved (draft topic, pasted script, unapplied subtitle style).
 	r.Post("/v1/prompt-renders", rt.handlePromptRenders)
 	// Starter scripts and hook/end-screen snippets (static text).
-	r.Get("/v1/script-templates", rt.handleScriptTemplates)
 	// Run a step with the API, and tell the GUI whether that
 	// option exists at all before it draws the button.
 	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
@@ -719,7 +718,7 @@ func (rt *Router) handleSaveAuthoringStoryboard(w http.ResponseWriter, r *http.R
 	writeJSON(w, http.StatusAccepted, map[string]string{"project_id": projectID})
 }
 
-// handleSaveAuthoringCode stores the Manim Engineer output a Creator pasted
+// handleSaveAuthoringCode stores the Remotion Engineer output a Creator pasted
 // back after the external-AI round trip (step 3).
 func (rt *Router) handleSaveAuthoringCode(w http.ResponseWriter, r *http.Request) {
 	if rt.saveAuthoringCode == nil {
@@ -869,10 +868,6 @@ func (rt *Router) handleRenderPrompt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, rendered)
-}
-
-func (rt *Router) handleScriptTemplates(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, domain.BuiltinScriptTemplates())
 }
 
 // promptRenderer is the stateless side of the prompt renderer.

@@ -78,7 +78,7 @@ func newGenerateFixture(t *testing.T, provider *stubProvider, story *recordingSa
 	renderCtx := &fakeRenderContext{
 		project: &domain.Project{
 			ProjectID: "p1", ContentLanguage: domain.LanguageVietnamese,
-			RenderEngine: domain.RenderEngineManim,
+			RenderEngine: domain.RenderEngineRemotion,
 		},
 		topic: "Vòng lặp for",
 	}

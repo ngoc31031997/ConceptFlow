@@ -141,13 +141,13 @@ func (uc *SaveAuthoringStoryboardUseCase) Execute(ctx context.Context, projectID
 	return uc.clearer.ClearAuthoringSteps(ctx, projectID, AuthoringStepCode)
 }
 
-// AuthoringCodePort persists step 3's pasted Manim code.
+// AuthoringCodePort persists step 3's pasted code.
 type AuthoringCodePort interface {
 	SaveAuthoringCode(ctx context.Context, projectID, content string) error
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
 }
 
-// SaveAuthoringCodeUseCase stores the Manim Engineer output a Creator pasted
+// SaveAuthoringCodeUseCase stores the Remotion Engineer output a Creator pasted
 // back after the external-AI round trip (step 3) — same "just persist
 // intent" posture as SaveAuthoringStoryUseCase/SaveAuthoringStoryboardUseCase.
 type SaveAuthoringCodeUseCase struct {

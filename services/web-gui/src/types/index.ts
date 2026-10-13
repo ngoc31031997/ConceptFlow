@@ -9,8 +9,6 @@ export interface RenderInput {
   subtitle_mode: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
-  /** feature/remotion-engine — "manim" (default) | "remotion". */
-  render_engine?: "manim" | "remotion";
   /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
   video_font?: string;
   video_format_id?: string;
@@ -110,8 +108,8 @@ export interface Project {
   subtitle_mode?: string;
   subtitle_style?: SubtitleStylePayload;
   render_quality?: "480p15" | "720p30" | "1080p60" | "4k60";
-  /** feature/remotion-engine — "manim" (default) | "remotion". */
-  render_engine?: "manim" | "remotion";
+  /** The engine that renders this project's video; always Remotion. See ADR-0033. */
+  render_engine?: "remotion";
   /** Font for text drawn inside a Remotion video; empty means Be Vietnam Pro. */
   video_font?: string;
   video_format_id?: string;
@@ -134,13 +132,12 @@ export interface ProgressMessage {
   scene_index?: number;
   scene_total?: number;
   /**
-   * Heartbeat from a long render. Carries no percentage on
-   * purpose: Manim gives no reliable total animation count, and a fabricated
-   * percentage that stalls or jumps backwards is worse than an honest clock.
+   * Heartbeat from a long render, sent while no percentage is known yet
+   * (e.g. while Remotion is still bundling).
    */
   elapsed_seconds?: number;
   animation_index?: number;
-  /** 0-100, Remotion renders only (renderMedia knows its frame total); Manim sends none. */
+  /** 0-100, renderMedia's own frame progress. */
   render_percent?: number;
   /** 0-100, assemble_video: ffmpeg's own -progress position over the target length. */
   merge_percent?: number;
@@ -198,8 +195,8 @@ export interface ProjectSummary {
   video_path?: string;
   error_message?: string;
   updated_at: string;
-  /** "manim" | "remotion" — which engine rendered (or will render) this project's video. */
-  render_engine: string;
+  /** The engine that renders this project's video; always Remotion. */
+  render_engine?: "remotion";
   /** 1-7, bước wizard project đang ở. */
   wizard_step?: number;
   /** Chủ đề (ý tưởng) — dùng làm tên project trong danh sách. */

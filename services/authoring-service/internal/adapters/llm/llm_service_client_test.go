@@ -414,7 +414,7 @@ func TestGenerateCodeFailureIsTheProviderError(t *testing.T) {
 			`{"type":"error","error":{"kind":"balance","provider":"hive","message":"out of credit"},"calls":[]}`)
 	})
 	var calls []application.CodeCall
-	_, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "manim"}, func(e application.CodeEvent) {
+	_, err := c.GenerateCode(context.Background(), application.CodeGenRequest{Engine: "remotion"}, func(e application.CodeEvent) {
 		if e.Call != nil {
 			calls = append(calls, *e.Call)
 		}

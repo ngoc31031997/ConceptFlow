@@ -171,11 +171,11 @@ const (
 // RenderQuality is the resolution/framerate the Creator chose for a project.
 // A draft pass at 720p30 is for checking the content; the
 // upload pass should be 1080p60 or better, since anything less is below what a
-// monetized channel should publish and wastes Manim's smooth motion.
+// monetized channel should publish.
 type RenderQuality string
 
 const (
-	// Quality480p15 is Manim's lowest preset (-ql) — for iterating on a script's
+	// Quality480p15 is the lowest preset — for iterating on a script's
 	// content/timing quickly, not for anything a viewer will ever see. Not the
 	// default for anything; a Creator opts into it explicitly per render.
 	Quality480p15  RenderQuality = "480p15"
@@ -188,31 +188,19 @@ const (
 // including every project created before this field existed.
 const DefaultRenderQuality = Quality1080p60
 
-// RenderEngine is which rendering backend produces this project's video —
-// Manim (Python, the original engine) or Remotion (React/TypeScript,
-// headless-Chromium via @remotion/renderer). It is orthogonal to
-// RenderQuality: both engines are driven by the same resolution/framerate
-// choice.
+// RenderEngine is the rendering backend that produces a project's video.
+// Remotion (React/TypeScript, headless Chromium) is the only one. See ADR-0033.
 type RenderEngine string
 
-const (
-	RenderEngineManim    RenderEngine = "manim"
-	RenderEngineRemotion RenderEngine = "remotion"
-)
+// RenderEngineRemotion is the one render engine.
+const RenderEngineRemotion RenderEngine = "remotion"
 
-// DefaultRenderEngine preserves the only behaviour that existed before this
-// field did — every project (including ones created before it existed) is a
-// Manim project unless the Creator opts into Remotion.
-const DefaultRenderEngine = RenderEngineManim
+// DefaultRenderEngine is the engine of every project.
+const DefaultRenderEngine = RenderEngineRemotion
 
-// IsValid reports whether e is a render engine the Rendering Service knows
-// how to run.
+// IsValid reports whether e is an engine the Rendering Service runs.
 func (e RenderEngine) IsValid() bool {
-	switch e {
-	case RenderEngineManim, RenderEngineRemotion:
-		return true
-	}
-	return false
+	return e == RenderEngineRemotion
 }
 
 // IsValid reports whether q is a quality the Rendering Service can honour.
@@ -288,7 +276,7 @@ type Project struct {
 	SagaID    string // current/most-recent saga_id (Render or Publish — a new one is generated per Saga, interface-contracts.md Question 9)
 
 	ScriptContent       string
-	ManimSceneClassName string // the Manim `Scene` subclass Rendering must execute — set from script_parsed (Manim-script input mode)
+	SceneClassName      string // the composition id Rendering runs, reported back on script_validated
 	PluginID            string
 	CategoryHint        string // business-rules.md Rule 1 — Creator-chosen, applied to every scene
 	ContentLanguage     ContentLanguage
@@ -296,8 +284,7 @@ type Project struct {
 	// Music level, 0.0-1.0. Zero means "unset"; assembly
 	// substitutes its own default so an old project keeps the previous 0.2.
 	BackgroundMusicVolume float64
-	// Font for text drawn inside a Remotion video. Empty means
-	// DefaultVideoFont. Manim ignores it: its fonts come from the theme.
+	// Font for text drawn inside the video. Empty means DefaultVideoFont.
 	VideoFont string
 
 	// Narration and subtitles are independently switchable per project.
@@ -332,9 +319,7 @@ type Project struct {
 	// resolution/framerate for this project's render.
 	RenderQuality RenderQuality
 
-	// RenderEngine is which rendering backend (Manim or Remotion) executes
-	// this project's script. Empty (pre-existing projects) is treated as
-	// DefaultRenderEngine everywhere it is read.
+	// RenderEngine is the backend this project's script runs on.
 	RenderEngine RenderEngine
 
 	// Which shape of output this project produces: the 16:9 long-form video
@@ -362,7 +347,7 @@ type Project struct {
 	// once Rendering reports where each narration actually starts.
 	Chapters []Chapter
 
-	RenderedVideoPath *string // the single Manim-rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
+	RenderedVideoPath *string // the single rendered video (silent), set by rendering_completed — distinct from VideoPath (post-assembly, with audio muxed in)
 	VideoPath         *string
 	// The .srt caption track Video Assembly wrote alongside
 	// VideoPath, or nil when subtitle_mode didn't produce one (off/burn_in
@@ -383,16 +368,6 @@ type Project struct {
 	// animation time.
 	WaitOffsets          []float64
 	RenderedVideoSeconds float64 // Rendering's measured length of RenderedVideoPath
-
-	// What was on screen at each narration mark, as measured
-	// by Rendering's `{"kind":"layout"}` records and carried out on
-	// `rendering_completed`. Orchestrator stores it and hands it straight back
-	// to the QC worker on `qc_video`; it never interprets it, which is why the
-	// element type is the raw decoded object rather than a struct. Typing it
-	// here would mean this service has to be redeployed in lockstep every time
-	// Rendering measures one more property of a mobject, for no gain: the only
-	// code that reads a bbox is `video-assembly/domain/qc_rules.py`.
-	LayoutMarks []map[string]interface{}
 
 	// CompanionProjectID links two independent projects that
 	// cover the same topic as two different outputs — a long-form video and

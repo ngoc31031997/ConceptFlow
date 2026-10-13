@@ -40,14 +40,14 @@ describe("ErrorBanner", () => {
     vi.spyOn(apiClient, "listProjectErrors").mockResolvedValue([
       { at: "t0", source: "saga", step: "render_scenes", message: "cũ", detail: "traceback cũ" },
       { at: "t1", source: "saga", step: "assemble_video", message: "khác", detail: "không liên quan" },
-      { at: "t2", source: "saga", step: "render_scenes", message: "mới", detail: "Manim: exit code 1" },
+      { at: "t2", source: "saga", step: "render_scenes", message: "mới", detail: "Remotion: exit code 1" },
     ]);
     render(
       <ErrorBanner errorMessage="Render lỗi" onRetry={vi.fn()} isRetrying={false} projectId="p1" step="render_scenes" />,
     );
 
     fireEvent.click(screen.getByTestId("error-banner-detail-toggle"));
-    await waitFor(() => expect(screen.getByTestId("error-banner-detail")).toHaveTextContent("Manim: exit code 1"));
+    await waitFor(() => expect(screen.getByTestId("error-banner-detail")).toHaveTextContent("Remotion: exit code 1"));
     expect(screen.getByTestId("error-banner-detail")).not.toHaveTextContent("không liên quan");
   });
 });

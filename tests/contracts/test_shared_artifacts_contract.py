@@ -23,7 +23,7 @@ def test_paths_match_the_contract():
     assert va.video_output_path("P") == "/shared/P/video/final.mp4"
     assert va.caption_output_path("P") == "/shared/P/video/final.srt"
     assert va.clip_output_path("P", "s", "tiktok") == "/shared/P/clips/s_tiktok.mp4"
-    assert rendering.compute_channel_asset_path("intro", "q").startswith("/shared/channel-assets/intro/q/")
+    assert not hasattr(rendering, "compute_channel_asset_path")  # intro/outro only come from uploads
     assert va.normalized_channel_asset_path("intro", "q").startswith("/shared/channel-assets/intro/q/")
 
 

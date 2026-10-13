@@ -151,7 +151,7 @@ func TestStoryboardStepSavesTheCanonicalJSONAndBillsTheRepairTurn(t *testing.T) 
 }
 
 func TestStoryboardStepNeverSavesAnInvalidStoryboard(t *testing.T) {
-	uc, sb, _, _ := codeFixture(t, domain.RenderEngineManim, "")
+	uc, sb, _, _ := codeFixture(t, domain.RenderEngineRemotion, "")
 	uc.WithPipeline(&stubFinalizer{err: &application.LLMError{
 		Kind: application.ErrKindMalformed, Provider: "llm-service", Err: errors.New("still invalid"),
 		Usage: application.TokenUsage{PromptTokens: 4},
@@ -167,7 +167,7 @@ func TestStoryboardStepNeverSavesAnInvalidStoryboard(t *testing.T) {
 }
 
 func TestStoryboardStepWithoutAFinalizerFailsLoudly(t *testing.T) {
-	uc, sb, _, _ := codeFixture(t, domain.RenderEngineManim, "")
+	uc, sb, _, _ := codeFixture(t, domain.RenderEngineRemotion, "")
 	if _, err := uc.Execute(context.Background(), "p1", "storyboard"); err == nil || !strings.Contains(err.Error(), "not wired") {
 		t.Fatalf("err = %v, want a not-wired error rather than saving unvalidated output", err)
 	}
@@ -226,7 +226,7 @@ func TestCodeStepRunsThePipelineAndBillsEveryCall(t *testing.T) {
 }
 
 // The layout check gets the same subtitle strip {{subtitle_zone}}
-// describes, and the video's font; Manim gets neither.
+// describes, and the video's font.
 func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
 	run := func(p *domain.Project) application.CodeGenRequest {
 		t.Helper()
@@ -251,19 +251,6 @@ func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
 	req = run(&domain.Project{ProjectID: "p2", RenderEngine: domain.RenderEngineRemotion, SubtitleMode: domain.SubtitleModeTrack})
 	if req.SubtitleBand != nil || req.VideoFont != "" {
 		t.Errorf("a caption track paints nothing on the frame: band %+v font %q", req.SubtitleBand, req.VideoFont)
-	}
-	req = run(&domain.Project{ProjectID: "p3", RenderEngine: domain.RenderEngineManim, SubtitleMode: domain.SubtitleModeBurnIn})
-	if req.SubtitleBand != nil {
-		t.Errorf("manim has no layout check: band %+v", req.SubtitleBand)
-	}
-}
-
-func TestCodeStepUsesTheManimEngineerForAManimProject(t *testing.T) {
-	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
-	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{Code: "from conceptflow import *", CheckOK: true}})
-	got, err := uc.Execute(context.Background(), "p1", "code")
-	if err != nil || got.Role != string(domain.RoleManimEngineerAI) {
-		t.Fatalf("err=%v role=%q, want manim_engineer_ai", err, got.Role)
 	}
 }
 
@@ -449,15 +436,6 @@ func TestCodeStepWaitsForTheVideosDrawingsThenHandsThemOver(t *testing.T) {
 	}
 }
 
-func TestManimCodeStepSkipsTheDrawingStage(t *testing.T) {
-	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
-	st := &stubStage{pending: []domain.ProjectIllustration{{Name: "X"}}}
-	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}).WithIllustrations(st)
-	if _, err := uc.Execute(context.Background(), "p1", "code"); err != nil || st.gated != 0 {
-		t.Fatalf("manim must not wait for drawings: %v, gated %d", err, st.gated)
-	}
-}
-
 // The code step does not draw; a list never planned sends the Creator
 // to the illustrations step instead.
 func TestCodeStepRefusesAVideoWhoseDrawingsWereNeverPlanned(t *testing.T) {
@@ -546,15 +524,6 @@ func (p *progressPeek) Prepare(ctx context.Context, pid, model string, report fu
 	})
 }
 
-func TestIllustrationsStepIsForRemotionOnly(t *testing.T) {
-	uc, _, _, _ := codeFixture(t, domain.RenderEngineManim, `{"scenes":[]}`)
-	st := &stubStage{}
-	uc.WithPipeline(&stubFinalizer{}, &stubCodegen{}).WithIllustrations(st)
-	if _, err := uc.Execute(context.Background(), "p1", application.StepIllustrations); err == nil || st.prepared != 0 {
-		t.Fatalf("a Manim video must not run the illustrations step: %v", err)
-	}
-}
-
 type fixedModels domain.AuthoringStepModels
 
 func (m fixedModels) GetAuthoringModels(context.Context, string) (domain.AuthoringStepModels, error) {
@@ -565,7 +534,7 @@ func (m fixedModels) GetAuthoringModels(context.Context, string) (domain.Authori
 // is stopped before any model call, with the reason.
 func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
 	renderCtx := &fakeRenderContext{
-		project: &domain.Project{ProjectID: "p1", ContentLanguage: domain.LanguageVietnamese, RenderEngine: domain.RenderEngineManim},
+		project: &domain.Project{ProjectID: "p1", ContentLanguage: domain.LanguageVietnamese, RenderEngine: domain.RenderEngineRemotion},
 		topic:   "t", storyboard: `{"scenes":[]}`,
 	}
 	gen := &stubCodegen{result: application.CodeGenResult{Code: "x", CheckOK: true}}

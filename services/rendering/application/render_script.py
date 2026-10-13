@@ -1,13 +1,6 @@
-"""RenderScriptUseCase — renders one project's whole Manim script.
-
-Replaces the former per-scene template rendering + batch orchestration:
-the Manim-script input mode has exactly one script (and one output video)
-per project, so there is nothing left to batch over.
-"""
+"""RenderScriptUseCase — renders one project's whole script into one video."""
 
 from __future__ import annotations
-
-import logging
 
 from adapters.storage.artifact_paths import (
     compute_timing_path,
@@ -17,19 +10,16 @@ from adapters.storage.artifact_paths import (
     video_exists,
     write_timing,
 )
-from domain.errors import InvalidDurationError, InvalidManimApiUsageError
+from domain.errors import InvalidDurationError, UnsupportedEngineError
 from domain.models import ScriptRenderRequest, ScriptRenderResult
-from domain.ports import ManimScriptRendererPort
-from domain.script_lint import blocking_issues, lint_manim_script
-
-logger = logging.getLogger(__name__)
+from domain.ports import ScriptRendererPort
 
 
 class RenderScriptUseCase:
-    """Orchestrates zero-trust validation, idempotency, and rendering for
-    one project's script (mirrors the former RenderSceneUseCase's shape)."""
+    """Validates, reuses a finished render when there is one, and renders
+    one project's script."""
 
-    def __init__(self, renderer: ManimScriptRendererPort) -> None:
+    def __init__(self, renderer: ScriptRendererPort) -> None:
         self._renderer = renderer
 
     def set_heartbeat(self, callback) -> None:
@@ -76,23 +66,13 @@ class RenderScriptUseCase:
             raise ValueError("scene_class_name must not be empty")
         if not request.script_content.strip():
             raise ValueError("script_content must not be empty")
-        # feature/remotion-engine: same reasoning as validate_script.py —
-        # this lint parses Python via `ast`; a Remotion script is TypeScript,
-        # so it was never a candidate for this check in the first place.
-        issues = lint_manim_script(request.script_content) if request.engine == "manim" else []
-        blocking = blocking_issues(issues)
-        if blocking:
-            raise InvalidManimApiUsageError(blocking)
-        for issue in issues:
-            # Cảnh báo không chặn render: đường thoát hiểm ra
-            # API thô của Manim là hợp lệ, chỉ là phần đó không được theme và
-            # QC bảo vệ. Chặn nó lại sẽ chặn đúng những video tham vọng nhất.
-            logger.warning("lint script (%s): %s", request.project_id, issue)
+        if request.engine != "remotion":
+            raise UnsupportedEngineError(request.engine)
         if not request.narration_segments:
             raise ValueError("narration_segments must not be empty")
         for segment in request.narration_segments:
             # audio_path may legitimately be absent (narration disabled) —
             # duration_seconds is the only field Rendering
-            # actually needs, to substitute into self.wait(AUTO).
+            # actually needs, to time the shot that reads it.
             if segment.duration_seconds <= 0:
                 raise InvalidDurationError(segment.duration_seconds)

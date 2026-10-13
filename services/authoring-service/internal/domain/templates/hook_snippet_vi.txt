@@ -1,4 +1,0 @@
-        # ---------- HOOK (5 giây đầu — giữ chân người xem) ----------
-        self.hook(
-            "Viết ở đây câu hỏi hoặc nghịch lý mở đầu, đủ cụ thể để người xem muốn biết câu trả lời.",
-        )

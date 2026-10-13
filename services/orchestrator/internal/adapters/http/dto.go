@@ -27,15 +27,13 @@ type startRenderSagaRequest struct {
 	SubtitlesEnabled bool   `json:"subtitles_enabled,omitempty"`
 	// "off" | "track" | "burn_in" | "both". Wins over
 	// SubtitlesEnabled when both are present (start_render_saga.go).
-	SubtitleMode  string                `json:"subtitle_mode,omitempty"`
-	SubtitleStyle *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
-	RenderQuality string                `json:"render_quality,omitempty"`
-	// "manim" | "remotion" — empty means DefaultRenderEngine ("manim").
-	RenderEngine          string  `json:"render_engine,omitempty"`
-	VideoFormatID         string  `json:"video_format_id,omitempty"`
-	ReviewEnabled         *bool   `json:"review_enabled,omitempty"`
-	BackgroundMusicVolume float64 `json:"background_music_volume,omitempty"`
-	VideoFont             string  `json:"video_font,omitempty"`
+	SubtitleMode          string                `json:"subtitle_mode,omitempty"`
+	SubtitleStyle         *domain.SubtitleStyle `json:"subtitle_style,omitempty"`
+	RenderQuality         string                `json:"render_quality,omitempty"`
+	VideoFormatID         string                `json:"video_format_id,omitempty"`
+	ReviewEnabled         *bool                 `json:"review_enabled,omitempty"`
+	BackgroundMusicVolume float64               `json:"background_music_volume,omitempty"`
+	VideoFont             string                `json:"video_font,omitempty"`
 	// "long" | "short" — empty means DefaultVideoOutputMode ("long").
 	VideoOutputMode string `json:"video_output_mode,omitempty"`
 	// project_id of the companion video covering the same
@@ -174,8 +172,7 @@ type projectSummaryResponse struct {
 	VideoPath    *string `json:"video_path,omitempty"`
 	ErrorMessage *string `json:"error_message,omitempty"`
 	UpdatedAt    string  `json:"updated_at"`
-	// "manim" | "remotion" — which engine rendered (or will render) this
-	// project's video, so the video list can mark which is which.
+	// The engine that renders this project's video ("remotion").
 	RenderEngine string `json:"render_engine"`
 	// WizardStep (1-7) is the step the project is at, so the list can show
 	// "Bước N — …" next to the saga status.
@@ -237,7 +234,6 @@ type errorResponse struct {
 // (the "Tiếp tục" press) moves the project on to step 3.
 type patchWizardSettingsRequest struct {
 	ContentLanguage       *string               `json:"voice_language,omitempty"`
-	RenderEngine          *string               `json:"render_engine,omitempty"`
 	TTSEnabled            *bool                 `json:"tts_enabled,omitempty"`
 	VoiceID               *string               `json:"voice_id,omitempty"`
 	SubtitleMode          *string               `json:"subtitle_mode,omitempty"`
@@ -277,9 +273,6 @@ type createProjectDraftRequest struct {
 	ProjectID       string `json:"project_id,omitempty"`
 	Topic           string `json:"topic"`
 	ContentLanguage string `json:"content_language"`
-	// RenderEngine is optional: "" means "unchanged" — see
-	// CreateProjectDraftInput.RenderEngine's doc comment.
-	RenderEngine string `json:"render_engine,omitempty"`
 	// ShortOf is the long video a new draft is the vertical short of.
 	ShortOf string `json:"short_of,omitempty"`
 }

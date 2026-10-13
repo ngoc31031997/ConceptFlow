@@ -9,9 +9,8 @@ import type { AuthoringStep } from "../api/client";
  * Review (8) is a screen, not a saved state: validate (7) finishes at
  * `awaiting_review` and nothing runs until the Creator presses start.
  *
- * "Hình minh hoạ" is its own numbered step, shown disabled ("Không dùng")
- * when renderEngine !== "remotion". It sits at step 5, BEFORE
- * Code (6): illustrations run first and Code reads what they drew.
+ * "Hình minh hoạ" is its own numbered step at 5, BEFORE Code (6):
+ * illustrations run first and Code reads what they drew.
  */
 export const FLOW_LABELS = [
   "Ý tưởng",
@@ -142,16 +141,14 @@ export function phaseOf(step: number): FlowPhase | null {
 }
 
 /** Hiển thị của một bước trong thanh bước / menu dọc. */
-export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled" | "pending" | "skipped";
+export type StepStatus = "done" | "waiting" | "running" | "failed" | "cancelled" | "pending";
 
 /**
  * Trạng thái của bước `step` cho dự án ở (flowStep, runState). Bước trước bước
  * hiện tại là xong, bước hiện tại mang trạng thái chạy của nó, các bước sau
- * chưa tới. Bước Hình minh hoạ bị bỏ qua ("Không dùng") khi dự án không dùng
- * Remotion.
+ * chưa tới.
  */
-export function stepStatus(step: number, flowStep: number, runState: string | undefined, renderEngine?: string): StepStatus {
-  if (step === FLOW_ILLUSTRATIONS && renderEngine !== undefined && renderEngine !== "remotion") return "skipped";
+export function stepStatus(step: number, flowStep: number, runState: string | undefined): StepStatus {
   if (!flowStep || step > flowStep) return "pending";
   if (step < flowStep) return "done";
   switch (runState) {
@@ -168,14 +165,8 @@ export function stepStatus(step: number, flowStep: number, runState: string | un
   }
 }
 
-/** Why a step marked "Không dùng" does not apply to this video: only Hình minh hoạ is ever skipped. */
-export function skippedReason(): string {
-  return "Video dựng bằng Manim không có bước này; chỉ video Remotion mới có hình minh hoạ.";
-}
-
 /**
- * The read-only preview of a step: for a step the project has not reached, or
- * one marked "Không dùng". Under /projects/:id when a project exists, so the
+ * The read-only preview of a step the project has not reached. Under /projects/:id when a project exists, so the
  * step menu keeps following that project.
  */
 export function previewRoute(step: number, projectId: string): string {

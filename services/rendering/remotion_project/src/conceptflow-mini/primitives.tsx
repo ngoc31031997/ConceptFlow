@@ -5,8 +5,8 @@
  *
  *   - the frame: 1920x1080 for a long video, 1080x1920 for a vertical short,
  *     each with the safe area meaningful content stays inside.
- *   - the background: fixed, the same #080E1C the Manim theme paints
- *     (conceptflow/theme.py BRAND_BG), so both engines look like one channel.
+ *   - the background: fixed #080E1C, the channel's brand background, so
+ *     every video looks like one channel.
  *     The Visual Director picks every other colour against this background.
  *   - the font: chosen per project in the settings step and handed in as the
  *     `videoFont` input prop (remotion_renderer.py). Only fonts installed in

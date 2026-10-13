@@ -82,7 +82,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/authoring/story', proxyHandler(authoring, 'authoring-service'));
   // Step 2 — same shape, for the Visual Director's pasted storyboard.
   router.post('/v1/projects/:id/authoring/storyboard', proxyHandler(authoring, 'authoring-service'));
-  // Step 3 — the Manim Engineer's pasted code.
+  // Step 3 — the Code step's pasted Remotion code.
   router.post('/v1/projects/:id/authoring/code', proxyHandler(authoring, 'authoring-service'));
   // Rehydrates every saved authoring output (story + storyboard +
   // code) so the wizard can restore state on reload/back-navigation.

@@ -247,3 +247,22 @@ func TestStartRenderSagaUseCase_PublishFailure(t *testing.T) {
 		t.Fatal("expected error when publish fails")
 	}
 }
+
+// TestStartRenderSaga_RunsOnRemotion: a render is a Remotion render, and the
+// command says so.
+func TestStartRenderSaga_RunsOnRemotion(t *testing.T) {
+	repo := newFakeRepo()
+	pub := &fakePublisher{}
+
+	if _, err := NewStartRenderSagaUseCase(repo, pub).Execute(context.Background(), StartRenderSagaInput{
+		ProjectID: "new", ScriptContent: "export const X = 1;", ContentLanguage: domain.LanguageVietnamese,
+	}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := repo.projects["new"].RenderEngine; got != domain.RenderEngineRemotion {
+		t.Fatalf("saved engine = %q, want remotion", got)
+	}
+	if got := pub.last().envelope.Payload["engine"]; got != "remotion" {
+		t.Fatalf("command engine = %v, want remotion", got)
+	}
+}

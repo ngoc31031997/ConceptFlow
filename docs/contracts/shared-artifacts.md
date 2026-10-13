@@ -13,12 +13,10 @@ Mount tại `/shared` (`/shared:ro` với publisher).
 | `/shared/{project_id}/audio/{scene}_{voice}_{hash}.wav` | tts | |
 | `/shared/{project_id}/video/rendered.mp4` | rendering | video câm |
 | `/shared/{project_id}/video/timing.json` | rendering | sidecar thời gian |
-| `/shared/.manim-media/{project_id}/` | rendering | cache Manim (`RENDER_CACHE_ROOT`) |
 | `/shared/{project_id}/video/final.mp4` | video-assembly | |
 | `/shared/{project_id}/video/final.srt` | video-assembly | |
 | `/shared/{project_id}/thumbnail/` | api-gateway | upload của Creator |
 | `/shared/{project_id}/music/` | api-gateway | upload của Creator |
-| `/shared/channel-assets/{kind}/{quality}/rendered.mp4` | rendering | không thuộc project nào |
 | `/shared/channel-assets/{kind}/{quality}/normalized.mp4`, `with_music_v{n}.mp4` | video-assembly | không thuộc project nào |
 | `/shared/channel-assets/{kind}/…` (file upload gốc) | api-gateway | không thuộc project nào |
 

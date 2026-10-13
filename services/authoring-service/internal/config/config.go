@@ -79,7 +79,7 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Generous on purpose: a full Manim script runs to several hundred lines,
+	// Generous on purpose: a full composition runs to several hundred lines,
 	// and on a reasoning model part of this budget is spent before the first
 	// character of the answer is written.
 	hiveMaxOutputTokens, err := intEnvOrDefault("HIVE_MAX_OUTPUT_TOKENS", 128000)

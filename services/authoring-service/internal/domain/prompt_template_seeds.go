@@ -5,7 +5,7 @@ import "strings"
 // bt substitutes the ¤ placeholder back to a literal backtick. The template
 // bodies below are Go raw string literals (backtick-delimited), which cannot
 // themselves contain a backtick character — ¤ stands in for every inline
-// code-formatting backtick (e.g. `self.narrate(...)`) and is restored here.
+// code-formatting backtick (e.g. `narrations`) and is restored here.
 func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 
 // DefaultPromptTemplates returns the seed rows for the authoring
@@ -19,13 +19,10 @@ func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 11, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleVisualDirector, Language: "vi", Version: 12, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleManimEngineer, Language: "vi", Version: 8, TemplateText: bt(withThemeReference(manimEngineerVI, "vi"))},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 8, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 6, TemplateText: bt(visualDirectorAIVI)},
-		{Role: RoleManimEngineerAI, Language: "vi", Version: 4, TemplateText: bt(withThemeReference(manimEngineerAIVI, "vi"))},
 		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
-		{Role: RoleManimAdjust, Language: "vi", Version: 1, TemplateText: manimAdjustTemplate},
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
 		{Role: RoleThumbnailDesign, Language: "vi", Version: 1, TemplateText: thumbnailDesignTemplate},
 		{Role: RoleIllustrationStyle, Language: "vi", Version: 1, TemplateText: IllustrationStyleGuide()},
@@ -292,11 +289,9 @@ Sửa xong hết rồi mới xuất output. Đây là bước 1/3 — Visual Dir
 // Turns the story outline into a shooting script. The role is engine
 // agnostic: it directs a short film — shots, camera movement, transitions,
 // color as meaning, one visual world that carries the argument — and knows
-// nothing about Manim or Remotion, so it designs around the viewer rather than
-// the renderer. Engine constraints live in the engineer prompts, which
-// translate the director's intent into what their engine can render (the
-// Manim Engineer, for instance, splits a long line into several narrate calls
-// so the picture keeps moving).
+// nothing about Remotion, so it designs around the viewer rather than the
+// renderer. Engine constraints live in the engineer prompt, which translates
+// the director's intent into what Remotion can render.
 //
 // The semantic layer is about the story, not the renderer: every motion must
 // carry meaning, narration states meaning rather than describing the picture,
@@ -304,9 +299,6 @@ Sửa xong hết rồi mới xuất output. Đây là bước 1/3 — Visual Dir
 // meaning` line that acts as a semantic checksum the engineer may not alter.
 // The anchor object is the film's "protagonist", and a fixed color script
 // sets the colors.
-//
-// There is one director for every render engine: only the code step forks
-// (manim_engineer / remotion_engineer).
 const visualDirectorHeadVI = `Bạn là ĐẠO DIỄN (Visual Director) của một video giải thích. Bạn nhận dàn ý câu chuyện từ Story Architect và biến nó thành một BỘ PHIM NGẮN: người xem nhìn thấy gì, máy quay nhìn vào đâu, cái gì chuyển động và vì sao, màu sắc nói lên điều gì, và cảnh này chảy sang cảnh kia ra sao.
 
 Bạn không viết code và không cần biết video sẽ được dựng bằng công cụ gì — bước sau lo chuyện đó. Việc của bạn chỉ là: nghĩ bằng hình ảnh, và kể câu chuyện này hay nhất có thể.
@@ -441,157 +433,8 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 
 const visualDirectorVI = visualDirectorHeadVI + visualDirectorOutputProseVI + visualDirectorTailVI
 
-// --- Manim Engineer --------------------------------------------------------
-// Near-verbatim copy of buildGenerationSystemPrompt's format/API/self-check/
-// output sections, with input framing changed to consume the story+storyboard
-// via {{previous_output}} instead of a raw topic.
-const manimIntroVI = `Bạn là một KỸ SƯ MANIM, dịch một câu chuyện và storyboard đã có sẵn thành code Python hoàn chỉnh. Bạn KHÔNG tự nghĩ ra nội dung mới — mọi quyết định về nội dung và hình ảnh đã được chốt ở 2 bước trước, việc của bạn là DỊCH ĐÚNG sang code hợp lệ.
-
-`
-
-const manimStoryVI = `## CÂU CHUYỆN + STORYBOARD ĐÃ CHỐT (từ Story Architect + Visual Director)
-
-{{previous_output}}
-
-NGÔN NGỮ LỜI THOẠI: {{narration_language_rule}}
-
-`
-
-const manimFormatVI = `## RÀNG BUỘC ĐỊNH DẠNG BẮT BUỘC (pipeline render tự động sẽ đọc theo đúng cú pháp này — sai là lỗi)
-
-1. Dòng import luôn là:
-   from conceptflow import *
-   (KHÔNG dùng ¤from manim import *¤ — nó che khuất API của conceptflow và script sẽ bị từ chối.)
-
-2. Định nghĩa đúng MỘT class Scene chính, kế thừa ¤ConceptFlowScene¤, tên mô tả đúng chủ đề, hậu tố "Scene":
-   class <TênMôTảChủĐề>Scene(ConceptFlowScene):
-       def construct(self):
-           ...
-   Bảng màu, font, cỡ chữ và nhịp chuyển cảnh do ConceptFlowScene lo — KHÔNG khai báo màu, KHÔNG đặt font_size, KHÔNG set background.
-
-3. Lời thoại là một LỜI GỌI HÀM, không phải comment. Ngay tại điểm cần giọng đọc:
-   self.narrate("Câu lời thoại tự nhiên, đúng ý cảnh này")
-
-   Quy tắc cứng:
-   - ¤self.narrate(...)¤ tự dừng animation đúng bằng thời lượng giọng đọc TTS thật. KHÔNG thêm ¤self.wait(...)¤ ngay sau nó.
-   - Nội dung trong ngoặc kép là câu hoàn chỉnh, nghe tự nhiên khi đọc thành tiếng, không chứa dấu ngoặc kép bên trong, không xuống dòng, dùng dấu ngoặc kép thẳng " (không phải " " kiểu chữ nghiêng).
-   - ¤self.wait(số giây cụ thể)¤ chỉ dùng cho khoảng lặng KHÔNG có lời thoại (ví dụ giữ hình cuối vài giây).
-   - Gọi được ở MỌI nơi: bên trong vòng lặp ¤for¤/¤while¤, trong nhánh ¤if¤, trong hàm helper. Không có ràng buộc về số lượng hay vị trí — danh sách lời thoại được lấy theo thứ tự chạy thật.
-   - TUYỆT ĐỐI KHÔNG dùng comment ¤# NARRATION: "..."¤ hay ¤self.wait(AUTO)¤. Quy ước cũ đó đã bị gỡ khỏi hệ thống: script dùng nó sẽ không sinh ra lời thoại nào và bị từ chối với lỗi "narration_segments must not be empty".
-
-4. Animation minh họa của một câu thoại truyền THẲNG vào ¤self.narrate("câu", obj.animate...)¤: chúng chạy đồng thời với giọng đọc (run_time tự bằng thời lượng câu, không đặt tay), nên hình chuyển động trong lúc người xem nghe. Chỉ đặt ¤self.play(...)¤ riêng TRƯỚC narrate cho phần dựng vật xuất hiện trước khi câu bắt đầu. Câu không có thay đổi hình nào thì ¤self.narrate("câu", drift=True)¤ để khung không đứng yên.
-
-`
-
-const manimSharedAVI = `## DỊCH KỊCH BẢN PHÂN CẢNH SANG MANIM
-
-Kịch bản ở trên do Đạo diễn viết bằng ngôn ngữ điện ảnh (shot, máy quay, chuyển cảnh, bảng màu), không gắn với engine nào. Việc của bạn là tìm cách gần nhất trong API bên dưới để tái hiện ĐÚNG ý đồ đó:
-
-- Vật được vẽ ra / mọc lên / trượt vào → ¤self.reveal(...)¤ (trượt vào từ một hướng: đặt vật lệch ngoài vị trí đích rồi ¤self.play(obj.animate.next_to(...))¤).
-- Biến hình / match cut / hình cảnh trước trở thành hình cảnh sau → ¤self.swap(cũ, mới)¤ trên HÌNH KHỐI. Với chữ thì ¤self.dismiss¤ rồi ¤self.reveal¤ (swap giữa hai khối chữ chỉ ra một vệt nhoè).
-- Đẩy máy vào / cận cảnh → ¤self.focus(vật)¤; lia máy → ¤self.focus(vật khác)¤ khi đang zoom; kéo máy ra / lộ toàn cảnh → ¤self.restore_view()¤. Đi xuyên qua → ¤self.focus(chi tiết)¤ rồi ¤self.swap(chi tiết, cảnh mới)¤. Không có góc máy 3D hay xoay khung.
-- Vật chạy dọc quỹ đạo → ¤self.travel(obj, self.path(...))¤; dời tới vị trí mới → ¤self.play(obj.animate.next_to(khác, RIGHT), run_time=self.pace("normal"))¤.
-- Một đại lượng chạy liên tục → ¤số = self.readout(a, label="...")¤ rồi ¤self.count(số, b)¤.
-- Chiếu sáng / khoanh vùng → ¤self.emphasize(obj, style="circle")¤; nhấn vào một vật → ¤self.emphasize(obj)¤; chìm vào nền → ¤self.play(obj.animate.set_color(self.theme.muted))¤ hoặc ¤self.dismiss¤.
-- Cắt thẳng sang cảnh trống → ¤self.clear_stage()¤ — chỉ khi kịch bản ghi rõ.
-- Người, bộ phận cơ thể, món ăn, đồ vật mà kịch bản vẽ theo lối tranh phẳng → engine này không có bộ hình minh hoạ: dựng một hình gợi dáng từ ¤self.shape(...)¤ (vd. chiếc răng = hình chữ nhật bo góc trắng + hai chân) và gắn NHÃN tên vật ngắn cạnh nó bằng ¤self.caption(...).next_to(...)¤, để người xem vẫn biết hình đang là cái gì. Nền màu riêng của cảnh → bỏ qua (nền do theme lo).
-- Nhịp nhanh / bình thường / chậm → ¤speed="fast"|"normal"|"slow"¤.
-- Màu theo vai trò trong BẢNG MÀU → ¤self.theme.accent¤, ¤self.theme.muted¤, ¤self.theme.ink¤, ¤self.theme.series_color(i)¤. Giữ đúng một vai trò = một màu như kịch bản khai báo. Mã hex đạo diễn ghi cạnh mỗi vai trò chỉ để bạn biết vai trò đó là tông gì — chọn màu theme gần nhất, KHÔNG chép mã hex vào code (theme của kênh mới là nguồn màu bên Manim).
-
-GIỚI HẠN QUAN TRỌNG NHẤT CỦA ENGINE NÀY: trong lúc ¤self.narrate(...)¤ đang phát, khung hình ĐỨNG YÊN (narrate chỉ chờ hết audio, không chạy animation). Kịch bản muốn "hình luôn sống", nên:
-- Nếu một shot có câu thoại dài hoặc nhiều thay đổi hình, TÁCH câu thoại tại ranh giới tự nhiên (dấu chấm, dấu phẩy, "rồi", "vì vậy"...) thành nhiều lời gọi ¤self.narrate(...)¤, và xen giữa chúng từng thay đổi hình của shot. Chỉ tách, KHÔNG đổi chữ.
-- Mỗi lời gọi ¤self.narrate(...)¤ nên đi sau ít nhất một animation có nghĩa; tránh hai narrate liền nhau mà không có gì thay đổi ở giữa.
-
-Nếu kịch bản đòi thứ API này không làm được, chọn cách gần nhất vẫn giữ nguyên dòng "Ý nghĩa bất biến" của cảnh đó — không bỏ cảnh, không đổi ý.
-
-## API ĐƯỢC PHÉP DÙNG (chỉ những thứ dưới đây — thứ khác sẽ bị lint từ chối)
-
-### Component dựng cảnh
-- ¤TitleCard(tiêu_đề, phụ_đề=None)¤ — thẻ tiêu đề mở đầu một phân đoạn.
-- ¤Callout(nội_dung, tone="accent"|"success"|"warning"|"danger")¤ — chú thích nhấn mạnh, có khung.
-- ¤CodePanel(mã_nguồn, "python"|"java"|...)¤ — khối code kèm nhãn ngôn ngữ.
-- ¤StepList([...])¤ — danh sách bước, mỗi bước có số trong vòng tròn.
-- ¤ComparisonSplit(tiêu_đề_trái, nội_dung_trái, tiêu_đề_phải, nội_dung_phải)¤ — so sánh hai cột.
-- ¤Recap([...])¤ — màn tóm tắt cuối video.
-- ¤FlowDiagram([bước, ...], direction="right"|"down")¤ — sơ đồ luồng: các khối nối nhau bằng mũi tên (pipeline, vòng đời, luồng dữ liệu). ¤.nodes[i]¤ là từng khối.
-- ¤BarChart([nhãn, ...], [giá_trị, ...], unit="")¤ — biểu đồ cột so sánh độ lớn (giá trị không âm). ¤.bars[i]¤ là từng cột.
-- ¤FunctionPlot(lambda x: ..., (x_min, x_max), label=None)¤ — trục toạ độ cộng đồ thị hàm số. ¤.axes¤, ¤.graph¤ để nhấn/đặt nhãn.
-- ¤DataTable([tiêu_đề_cột, ...], [[ô, ...], ...])¤ — bảng dữ liệu, một đường kẻ dưới tiêu đề. ¤.rows[i]¤ là từng hàng.
-- ¤Timeline([(mốc, mô_tả), ...])¤ — dòng thời gian ngang. ¤.marks[i]¤ là từng mốc.
-- ¤self.readout(0, label="phép so sánh", unit="lần", decimals=0, tone="accent")¤ — một con số LỚN chạy được: dùng ¤self.count(số, 128)¤ để nó đếm dần lên (đừng dựng lại chữ mới). Đây là cách diễn đạt "đại lượng này tăng/giảm" mà không cần ¤ValueTracker¤/¤DecimalNumber¤ thô.
-- ¤self.connect(a, b, label=None, style="straight"|"curved")¤ — mũi tên theo theme nối hai vật (¤curved¤ khi đường thẳng sẽ cắt qua vật khác, hoặc khi cần mũi tên chiều ngược lại); ¤self.outline(vật, tone="accent")¤ — khung khoanh quanh một vật; ¤self.brace(vật, "nhãn", direction=DOWN)¤ — dấu ngoặc chỉ vào MỘT CHIỀU của vật (độ dài một đoạn, chiều cao một cột).
-- ¤self.shape("rect"|"square"|"circle"|"dot"|"polygon", tone="accent", filled=False, width=..., height=..., radius=..., points=[...])¤ — hình cơ bản mang màu, độ dày nét và nền của theme. DÙNG CÁI NÀY thay cho ¤Rectangle/Square/Circle/Dot/Polygon¤ thô.
-- ¤self.path(điểm_hoặc_vật, ..., tone="muted", curve=0.0)¤ — đường nối các điểm (¤curve¤ khác 0 và đúng hai điểm thì thành cung). Dùng làm quỹ đạo cho ¤self.travel(...)¤, thay cho ¤Line/ArcBetweenPoints/VMobject¤ thô.
-
-Component tự co cho vừa khung an toàn, tự lấy màu và cỡ chữ từ theme. KHÔNG truyền toạ độ tuyệt đối hay font_size vào chúng.
-
-QUAN TRỌNG — KIỂU DỮ LIỆU: mọi tham số văn bản của các component trên (¤nội_dung¤, ¤tiêu_đề_trái¤, ¤nội_dung_trái¤, ¤tiêu_đề_phải¤, ¤nội_dung_phải¤, phần tử trong danh sách của ¤StepList¤/¤Recap¤...) CHỈ được là chuỗi ¤str¤. TUYỆT ĐỐI KHÔNG truyền một component/Mobject khác (ví dụ một ¤Callout(...)¤, ¤TitleCard(...)¤, hay biến giữ kết quả của chúng) vào các tham số này — code sẽ crash ngay khi chạy vì Manim gọi ¤.find()¤ trên chuỗi bên trong, không phải trên Mobject. Muốn đặt một hình minh họa cạnh chữ thì dùng ¤self.row(...)¤ hoặc ¤self.stack(...)¤ để ghép chúng lại, KHÔNG lồng Mobject vào bên trong tham số text của component khác.
-
-QUAN TRỌNG — VỊ TRÍ KHI MÀN HÌNH ĐÃ CÓ THỨ GÌ ĐÓ: khi thêm chữ (¤self.caption/body/title/heading(...)¤) hoặc bất kỳ component nào trong lúc khung hình KHÔNG rỗng (đã có hình/bảng/component khác đang hiện), BẮT BUỘC đặt vị trí của nó tường minh theo thứ đã có sẵn — ¤.to_edge(DOWN/UP/LEFT/RIGHT)¤ hoặc ¤.next_to(vật_đã_có, DIRECTION, buff=...)¤. TUYỆT ĐỐI KHÔNG để nó ở vị trí mặc định (giữa màn hình) khi màn hình không rỗng — Manim đặt mọi Mobject chưa định vị vào đúng tâm khung hình, nên hai vật cùng ở giữa sẽ chồng khít lên nhau và không đọc được.
-
-QUAN TRỌNG — MÀU SẮC, CỠ CHỮ, TOẠ ĐỘ (áp dụng ở MỌI lời gọi trong toàn script, không chỉ bên trong component):
-- KHÔNG viết màu bằng mã hex thẳng (ví dụ ¤"#3B82F6"¤) ở bất kỳ đâu — kể cả trong ¤self.title/heading/body/caption(...)¤ hay khi dùng API thô của Manim. Luôn dùng màu của theme: ¤self.theme.accent¤, ¤self.theme.ink¤, ¤self.theme.muted¤, ¤self.theme.series_color(i)¤. Script có màu hex sẽ bị lint cảnh báo ngay.
-- KHÔNG tự đặt ¤font_size=¤ bằng một số tuỳ ý ở bất kỳ lời gọi nào. Nếu thật sự cần chỉnh cỡ chữ tay (hiếm khi cần vì ¤self.title/heading/body/caption¤ đã tự chọn cỡ đúng theo vai trò), chỉ được dùng một trong bốn giá trị: 48, 36, 28, hoặc 20 — bất kỳ số nào khác sẽ bị lint cảnh báo.
-- KHÔNG dùng toạ độ tuyệt đối hardcode (ví dụ ¤move_to([2.3, -1.1, 0])¤ hay ¤shift(RIGHT * 3.7)¤ áng chừng cho vừa mắt). Luôn định vị TƯƠNG ĐỐI so với vật đã có trên khung hình bằng ¤.next_to(vật_khác, DIRECTION, buff=...)¤ hoặc theo mép khung bằng ¤.to_edge(DIRECTION)¤ — toạ độ tuyệt đối không co giãn theo nội dung thật và dễ vỡ bố cục khi nội dung dài/ngắn khác dự tính.
-
-{{theme_reference}}
-
-### Method của scene (gọi qua ¤self.¤)
-`
-
-const manimBeatsVI = `- Lời thoại và cấu trúc: ¤self.narrate("câu lời thoại")¤, ¤self.beat("<id>")¤, ¤self.chapter("Tên chapter")¤
-- HÌNH CHUYỂN ĐỘNG TRONG LÚC ĐỌC: ¤self.narrate("câu lời thoại", obj.animate.fade(0.9))¤ — animation truyền kèm chạy ĐỒNG THỜI với giọng đọc và tự kéo dài đúng bằng thời lượng câu (không đặt run_time). Câu thoại nào có thay đổi hình thì truyền thay đổi đó vào narrate thay vì ¤self.play(...)¤ rồi mới narrate — như vậy hình không đứng yên lúc người xem nghe. Câu chỉ cần khung "thở": ¤self.narrate("...", drift=True)¤ đẩy máy vào rất chậm.
-- Beat dựng sẵn — chỉ dùng khi kịch bản đạo diễn ghi rõ, còn mặc định thì dựng bằng hình và tự gọi ¤self.beat("hook")¤ / ¤self.beat("recap")¤ bằng tay:
-  - ¤self.hook("Câu hỏi mở đầu", animation...)¤ — mở beat ¤hook¤, KHÔNG hiện thẻ tiêu đề: dựng cảnh mở màn bằng hình trước, animation truyền kèm chạy lúc đọc câu hỏi
-  - ¤self.hook_card("Câu hỏi", "phụ đề")¤ — thẻ tiêu đề; chỉ khi kịch bản ghi rõ là thẻ tiêu đề
-  - ¤self.recap(narration="lời tóm tắt")¤ — mở beat ¤recap¤, quay lại toàn cảnh với nhân vật chính ở trạng thái cuối, KHÔNG hiện bảng gạch đầu dòng
-  - ¤self.recap_card(["ý 1", "ý 2"], title="Tóm lại")¤ — bảng gạch đầu dòng; chỉ khi kịch bản ghi rõ
-  - ¤self.call_to_action("Lời kêu gọi", "phụ đề tuỳ chọn")¤ — mở beat ¤cta¤, tự giữ khung cuối cho end-screen
-`
-
-const manimSharedBVI = `- Chữ: ¤self.title(...)¤, ¤self.heading(...)¤, ¤self.body(...)¤, ¤self.caption(...)¤, ¤self.formula("x^2")¤, ¤self.code(src, "python")¤
-- Bố cục: ¤self.stack(a, b, c)¤ (xếp dọc), ¤self.row(a, b)¤ (xếp ngang), ¤self.fit(obj)¤ (co cho vừa khung)
-- Chuyển cảnh: ¤self.reveal(obj)¤, ¤self.dismiss(obj)¤, ¤self.swap(cũ, mới)¤, ¤self.emphasize(obj, style="pulse"|"circle")¤, ¤self.travel(obj, đường_đi)¤, ¤self.clear_stage()¤
-  (mỗi cái nhận ¤speed="fast"|"normal"|"slow"¤; KHÔNG đặt run_time bằng tay)
-- Camera: ¤self.focus(obj)¤ / ¤self.focus(a, b)¤ (zoom vào vật hoặc nhóm; gọi lại với vật khác để lia), ¤self.restore_view()¤ (về toàn cảnh). Cũng nhận ¤speed=¤. KHÔNG chạm thẳng vào ¤self.camera.frame¤. ¤self.clear_stage()¤, ¤self.hook/hook_card/recap/recap_card/call_to_action¤ đã tự gọi ¤restore_view()¤.
-- Dịch chuyển động trong kịch bản bằng method của scene (xem mục "DỊCH KỊCH BẢN PHÂN CẢNH SANG MANIM"), KHÔNG import animation thô của Manim — các method đã tự lấy nhịp từ theme, chỉ truyền ¤speed=¤.
-- Gom nhóm và chỉ hướng: ¤VGroup¤, ¤UP¤, ¤DOWN¤, ¤LEFT¤, ¤RIGHT¤, ¤ORIGIN¤
-- Đặt vị trí tương đối: ¤obj.next_to(khác, DOWN, buff=self.theme.spacing.normal)¤, ¤obj.shift(UP * self.theme.spacing.normal)¤
-
-### Ràng buộc thi hành
-- Cần một hình mà component không diễn đạt được? TRƯỚC HẾT xem lại ¤self.shape¤, ¤self.path¤, ¤self.connect¤, ¤self.brace¤, ¤self.readout¤, ¤self.travel¤, ¤self.emphasize(style="circle")¤ — chúng có sẵn cho hầu hết hình học, mũi tên, số chạy và chuyển động, và chúng được theme lo màu/nét/nhịp. Chỉ khi vẫn không đủ mới import đích danh từ Manim (ví dụ ¤from manim import Angle¤): được phép, nhưng phần đó nằm ngoài design system nên hãy dùng thật tiết kiệm.
-- MỖI phân đoạn nên có ít nhất một hình ảnh/hình học, không chỉ toàn chữ. Video toàn chữ là thứ kênh này muốn tránh.
-- Script chạy trong subprocess giới hạn tài nguyên (timeout 1800s, RAM 4 GiB) — tránh vòng lặp/animation quá nặng, nhưng không cần cắt ngắn nội dung vì lo timeout.
-- Không import thư viện ngoài, không I/O file, không network, không subprocess/exec/eval.
-
-`
-
-const manimSharedVI = manimSharedAVI + manimBeatsVI + manimSharedBVI
-
-const manimCheckVI = `## TRƯỚC KHI TRẢ LỜI, BẮT BUỘC TỰ KIỂM TRA (làm từng bước, đừng bỏ qua)
-
-1. Tìm trong script: có còn chuỗi ¤# NARRATION¤ hoặc ¤wait(AUTO)¤ nào không? Nếu CÓ — dù chỉ một — script sẽ bị từ chối. Thay hết bằng ¤self.narrate("...")¤.
-2. Mỗi lời thoại có phải một lời gọi ¤self.narrate("...")¤ đặt ngay SAU animation minh họa cho nó không? Có ¤self.wait(...)¤ nào bị thêm thừa ngay sau một lời gọi narrate không (không được — narrate đã tự chờ)?
-3. Code có bám đúng kịch bản phân cảnh đã chốt không — đặc biệt phần chuyển cảnh giữa các cảnh, chuyển động máy và bảng màu? Có shot nào mà một câu thoại dài phủ lên nhiều thay đổi hình nhưng chưa được tách thành nhiều ¤self.narrate(...)¤ không?
-4. Mỗi cảnh có hình ảnh minh họa RIÊNG, không lặp lại animation nhàm chán?
-5. Class Scene có đúng hậu tố "Scene" và kế thừa ¤ConceptFlowScene¤ không?
-6. Rà lại: script chỉ dùng component và method trong mục "API ĐƯỢC PHÉP DÙNG"? Không có màu hex viết thẳng, không có font_size đặt tay, không có ¤from manim import *¤?
-7. Rà lại từng lời gọi component (¤TitleCard¤, ¤Callout¤, ¤CodePanel¤, ¤StepList¤, ¤ComparisonSplit¤, ¤Recap¤) và method chữ (¤self.title/heading/body/caption¤): có tham số nào đang nhận một component/Mobject khác thay vì chuỗi ¤str¤ không? Nếu có, đó là lỗi runtime chắc chắn — sửa lại bằng chuỗi text thuần.
-8. Mỗi lần thêm chữ hoặc component MỚI trong khi màn hình chưa dọn sạch (chưa gọi ¤self.clear_stage()¤ hoặc ¤self.dismiss(...)¤ cho thứ trước đó): vật mới có đang được đặt vị trí tường minh bằng ¤.to_edge(...)¤ hoặc ¤.next_to(...)¤ không? Nếu nó bị bỏ ở vị trí mặc định trong khi màn hình không rỗng, nó sẽ chồng lên đúng giữa vật đang có sẵn — sửa lại bằng cách đặt vị trí tường minh.
-9. Rà toàn bộ script một lượt cuối tìm ba lỗi cú pháp/hiển thị thường gặp: (a) có màu hex viết thẳng ở đâu không (kể cả ngoài component); (b) có ¤font_size=¤ nào không thuộc {48, 36, 28, 20} không; (c) có toạ độ tuyệt đối hardcode (¤move_to([...])¤, ¤shift(...)¤ với số áng chừng) thay vì ¤.next_to()¤/¤.to_edge()¤ không? Sửa hết trước khi trả lời.
-10. Đọc lại toàn bộ code một lượt như một trình thông dịch Python: script có hợp lệ 100%, không thiếu dấu ngoặc/thụt lề, không bị cắt cụt giữa chừng, và KHÔNG có chữ giải thích hay dấu ¤¤¤ nào lọt vào bên trong phần code không?
-
-`
-
-const manimOutputVI = `## OUTPUT
-
-Chỉ trả lời bằng đúng một khối code Python hoàn chỉnh (bọc trong ¤¤¤python ... ¤¤¤), không giải thích thêm ở ngoài code.`
-
-const manimEngineerVI = manimIntroVI + manimStoryVI + manimFormatVI + manimSharedVI + manimCheckVI + manimOutputVI
-
 // --- Remotion Engineer ----------------------------------------------------
-// The Remotion counterpart of manim_engineer, consuming story + storyboard via
-// {{previous_output}} exactly like manimEngineerVI does.
+// The code step, consuming story + storyboard via {{previous_output}}.
 //
 // The role is a pure translator. Every creative decision belongs upstream or
 // to the Creator's settings:
@@ -606,7 +449,7 @@ const manimEngineerVI = manimIntroVI + manimStoryVI + manimFormatVI + manimShare
 // It carries a long, concrete layout rulebook, because with no design system
 // and no pre-render lint, overlapping or overflowing elements are the failure
 // that only shows up after a render. It also sees the optional Lottie clip
-// catalog ({{lottie_catalog}}, baked at seed time like theme_reference) and may
+// catalog ({{lottie_catalog}}, baked at seed time) and may
 // swap in a clip where a shot's HÌNH names that clip's subject; the Visual
 // Director stays engine-agnostic and never sees the catalog.
 const remoIntroVI = `Bạn là KỸ SƯ REMOTION. Bạn nhận một kịch bản phân cảnh ĐÃ CHỐT từ Đạo diễn (Visual Director) và dựng nó thành code Remotion (React/TypeScript, https://remotion.dev) — CHÍNH XÁC, SỐNG ĐỘNG, KHÔNG LỖI HIỂN THỊ. Mọi quyết định sáng tạo (nội dung, hình, màu, chuyển động, nhịp) đã được đưa ra. Việc của bạn chỉ là CODE: dựng lại đúng từng shot như đạo diễn mô tả, không thêm, không bớt, không "cải tiến".

@@ -36,7 +36,7 @@ describe("ProgressTracker — render progress", () => {
     expect(screen.getByText("Đã ghép 72%")).toBeInTheDocument();
   });
 
-  it("keeps the elapsed text for a Manim render, which sends no percentage", () => {
+  it("keeps the elapsed text for a render that sends no percentage yet", () => {
     render(<ProgressTracker progressState={{ ...base, animationIndex: 3 }} steps={["render_scenes"]} />);
 
     expect(screen.queryByTestId("progress-tracker-bar")).not.toBeInTheDocument();

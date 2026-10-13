@@ -320,8 +320,8 @@ func (c *Consumer) logSagaFailure(ctx context.Context, projectID string, step do
 // itself uses), which this fails directly rather than calling Execute again,
 // since Execute already had 24h of attempts.
 //
-// scene_rendered (progress-only) and channel_asset_rendered/
-// channel_asset_normalized (channel projections, not saga steps) are not in
+// scene_rendered (progress-only) and channel_asset_normalized (a channel
+// projection, not a saga step) are not in
 // eventStepMap by design — StepForEventType returns !known for them, and
 // they are dropped rather than treated as a step failure.
 func (c *Consumer) handleEventsDLQDelivery(ctx context.Context, d amqp.Delivery) {

@@ -16,7 +16,6 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "7f831e761dca2b49f3dc5a65d6ee91d7f9055875cad6a831086284b18d34237e",
 	RoleVisualDirector:   "54cda71ec1f61c8c7a4edf5024999bbf1bb7fd941ca2f1c7c38e653226c7eb39",
-	RoleManimEngineer:    "20c479ccf1cb414926bba423de9721dcc04b5fc6fe68f0f094a854c7442d1e54",
 	RoleRemotionEngineer: "f3a2fa10f958f3729585b066e914b70be014489397d1128c00586d95b854affe",
 }
 
@@ -66,7 +65,7 @@ func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 		"channel_identity": true, "format_beats": true, "subtitle_zone": true, "video_archetypes": true,
 		"frame": true, "frame_width": true, "frame_height": true, "safe_area": true, "frame_rules": true,
 	}
-	for _, role := range []PromptRole{RoleVisualDirectorAI, RoleManimEngineerAI, RoleRemotionEngineerAI} {
+	for _, role := range []PromptRole{RoleVisualDirectorAI, RoleRemotionEngineerAI} {
 		text := aiTemplate(t, role)
 		for _, m := range placeholderRe.FindAllStringSubmatch(text, -1) {
 			if !known[m[1]] {
@@ -96,8 +95,8 @@ func TestVisualDirectorAIAsksForJSONAndKeepsTheCreativeBrief(t *testing.T) {
 	}
 }
 
-func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
-	remo, manim := aiTemplate(t, RoleRemotionEngineerAI), aiTemplate(t, RoleManimEngineerAI)
+func TestEngineerAIPromptWritesShotsOnly(t *testing.T) {
+	remo := aiTemplate(t, RoleRemotionEngineerAI)
 	for _, want := range []string{"KHÔNG viết cả file", "ShotN_M", "LAYOUT", "PALETTE.", "L1. **Vùng an toàn.**", "LottieClip",
 		"khoá viết y như danh sách trong tin nhắn (vd. `PALETTE.nenTroi`)", "viết dạng `PALETTE.khoá` với khoá có trong danh sách?",
 		"không có `div` nào mang `transform: scale(...)` để tự zoom/lia?",
@@ -115,22 +114,12 @@ func TestEngineerAIPromptsWriteShotsOnlyAndShareTheRulebook(t *testing.T) {
 			t.Errorf("remotion_engineer_ai section D still demands %q", gone)
 		}
 	}
-	for _, want := range []string{"KHÔNG viết cả file", "shot_N_M", "setup_cast", "self.reveal(obj)", "API ĐƯỢC PHÉP DÙNG"} {
-		if !strings.Contains(manim, want) {
-			t.Errorf("manim_engineer_ai lacks %q", want)
-		}
-	}
-	// The three prebuilt beats emit their own beat, and the system already emits one per scene.
-	if strings.Contains(manim, "Ba beat dựng sẵn — DÙNG CHÚNG") {
-		t.Error("manim_engineer_ai still tells the model to use the prebuilt beats")
-	}
-	if strings.Contains(manim, "{{theme_reference}}") || strings.Contains(remo, "{{lottie_catalog}}") {
+	if strings.Contains(remo, "{{lottie_catalog}}") {
 		t.Error("seed-time placeholders must be expanded")
 	}
 }
 
-// The director gets rules 12–18 and a list of buildable materials; the
-// Manim engineer animates during narration and does not default to title cards.
+// The director gets rules 12–18 and a list of buildable materials.
 func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
 	for _, role := range []PromptRole{RoleVisualDirector, RoleVisualDirectorAI} {
 		text := aiTemplate(t, role)
@@ -142,21 +131,6 @@ func TestCinematicRulesAndMotionDuringNarration(t *testing.T) {
 		}
 		if strings.Contains(text, "Không có chuyển động trang trí: vật lắc lư, nhấp nháy, xoay vòng mà không thêm ý nào là rác.\n") {
 			t.Errorf("%s rule 5 still bans all ambient motion", role)
-		}
-	}
-	for _, role := range []PromptRole{RoleManimEngineer, RoleManimEngineerAI} {
-		text := aiTemplate(t, role)
-		if !strings.Contains(text, `self.narrate("`) || !strings.Contains(text, "drift=True") {
-			t.Errorf("%s does not teach narrate(text, animation...) / drift", role)
-		}
-		if strings.Contains(text, "đặt TRƯỚC lời gọi") {
-			t.Errorf("%s still tells the model to play before narrating", role)
-		}
-	}
-	manual := aiTemplate(t, RoleManimEngineer)
-	for _, want := range []string{"hook_card", "recap_card", "KHÔNG hiện thẻ tiêu đề"} {
-		if !strings.Contains(manual, want) {
-			t.Errorf("manual manim engineer lacks %q", want)
 		}
 	}
 }

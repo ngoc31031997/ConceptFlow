@@ -26,10 +26,6 @@
   color: var(--ink);
 }
 
-.dot {
-  opacity: 0.5;
-}
-
 .toggle {
   flex: 0 0 auto;
   padding: 4px 12px;

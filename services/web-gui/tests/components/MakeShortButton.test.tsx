@@ -20,13 +20,13 @@ describe("MakeShortButton", () => {
     createProjectDraft.mockResolvedValue({ similarProjects: [] });
   });
 
-  it("creates a Remotion short of this video on the same topic and opens its step 2", async () => {
+  it("creates a short of this video on the same topic and opens its step 2", async () => {
     render(<MakeShortButton projectId="long-1" contentLanguage="vi" />);
     fireEvent.click(screen.getByTestId("make-short"));
 
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
-    const [shortId, topic, language, engine, shortOf] = createProjectDraft.mock.calls[0];
-    expect([topic, language, engine, shortOf]).toEqual(["Vì sao gọi là tiểu đường", "vi", "remotion", "long-1"]);
+    const [shortId, topic, language, shortOf] = createProjectDraft.mock.calls[0];
+    expect([topic, language, shortOf]).toEqual(["Vì sao gọi là tiểu đường", "vi", "long-1"]);
     expect(mockNavigate).toHaveBeenCalledWith(`/projects/${shortId}/resume?step=2`);
   });
 

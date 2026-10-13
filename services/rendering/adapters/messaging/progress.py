@@ -39,11 +39,10 @@ class ProgressPublisher:
     ) -> None:
         """Reports that a render is still running.
 
-        `render_percent` only comes from Remotion, whose renderMedia knows its
-        total frame count. Manim sends none on purpose: it gives no reliable
-        total animation count (animations inside loops make a static count of
-        `self.play` calls wrong), and a made-up percentage that stalls or jumps
-        backwards is worse than an honest elapsed time.
+        `render_percent` comes from Remotion's renderMedia, which knows its
+        total frame count. None means no percentage is known yet; a made-up
+        one that stalls or jumps backwards is worse than an honest elapsed
+        time.
         """
         message = {
             "project_id": project_id,

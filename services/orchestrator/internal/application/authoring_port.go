@@ -20,13 +20,11 @@ type AuthoringSummary struct {
 	IllustrationsReady *bool `json:"illustrations_ready"`
 }
 
-// Content is the summary as FlowStateFor reads it. Only a Remotion project has
-// the illustrations step (5).
-func (s AuthoringSummary) Content(engine domain.RenderEngine) domain.AuthoredContent {
+// Content is the summary as FlowStateFor reads it.
+func (s AuthoringSummary) Content() domain.AuthoredContent {
 	return domain.AuthoredContent{
 		Story: s.Story, Storyboard: s.Storyboard, Code: s.Code,
-		NeedsIllustrations: engine == domain.RenderEngineRemotion,
-		Illustrations:      s.IllustrationsReady == nil || *s.IllustrationsReady,
+		Illustrations: s.IllustrationsReady == nil || *s.IllustrationsReady,
 	}
 }
 

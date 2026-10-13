@@ -6,7 +6,7 @@ from application.check_script import LAYOUT_DISABLED_WARNING, CheckScriptUseCase
 from application.validate_script import ScriptValidationError
 from domain.errors import AnimationEngineError
 from domain.layout_rules import SubtitleBand
-from domain.script_lint import LintIssue
+from domain.lint_issue import LintIssue
 
 
 class FakeValidate:
@@ -62,11 +62,11 @@ def test_gate_and_tsc_failures_are_both_reported():
     assert [d.rule for d in out.diagnostics] == ["", "TS1005"]  # lint issues carry no rule code
 
 
-def test_manim_dry_run_failure_keeps_the_traceback_in_raw_and_never_runs_tsc():
-    trace = 'Traceback\n  File "s.py", line 9, in shot_1_2\nNameError: x'
+def test_a_dry_pass_that_dies_is_a_diagnostic_and_tsc_still_runs():
     ts = FakeTs()
-    out = make(FakeValidate(AnimationEngineError(trace)), ts).check("manim", "code", "TcpScene")
-    assert not out.ok and out.raw == trace and ts.seen == []
+    validate = FakeValidate(AnimationEngineError("narrations missing"))
+    out = make(validate, ts).check("remotion", "code", "creator")
+    assert not out.ok and out.diagnostics[0].message == "narrations missing" and ts.seen == ["code"]
 
 
 def test_a_checker_that_cannot_run_raises_instead_of_passing():
@@ -74,7 +74,7 @@ def test_a_checker_that_cannot_run_raises_instead_of_passing():
         make(ts=FakeTs(error=TypeScriptCheckError("tsc not found"))).check("remotion", "code", "creator")
 
 
-@pytest.mark.parametrize("engine,code", [("python", "x"), ("remotion", "  ")])
+@pytest.mark.parametrize("engine,code", [("python", "x"), ("manim", "x"), ("remotion", "  ")])
 def test_bad_input_is_a_value_error(engine, code):
     with pytest.raises(ValueError):
         make().check(engine, code, "s")
@@ -163,13 +163,11 @@ def test_a_missing_font_means_not_checked_rather_than_numbers_in_the_wrong_font(
     assert "font 'Be Vietnam Pro' không có trong trình duyệt đo" in out.warnings[0]
 
 
-def test_layout_is_not_measured_when_tsc_fails_and_never_for_manim():
+def test_layout_is_not_measured_when_tsc_fails():
     layout = FakeLayout(probe([TOOTH_OUT]))
     out = CheckScriptUseCase(FakeValidate(), FakeTs([Diag(3, "TS1005", "';' expected.")]), layout).check(
         "remotion", "code", "creator")
     assert [d.kind for d in out.diagnostics] == ["compile"] and layout.seen == []
-    out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("manim", "code", "XScene")
-    assert out.ok and out.warnings == [] and layout.seen == []
 
 
 def test_a_disabled_layout_check_says_so():

@@ -5,8 +5,8 @@ import { AppShell } from "../components/AppShell";
 import { IllustrationsGateNote } from "../components/IllustrationsGateNote";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getAuthoringState, saveAuthoringCode, createProjectDraft, startRenderSaga, ApiError } from "../api/client";
-import { validateScript, validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
+import { getAuthoringState, saveAuthoringCode, startRenderSaga, ApiError } from "../api/client";
+import { validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { authoringHint } from "../utils/authoringHint";
 import { Card, Button, TextArea } from "../components/ui";
@@ -24,18 +24,12 @@ import { FLOW_CODE, flowTitle } from "../utils/flow";
  * copies the prompt out and pastes the code back. "Kiểm tra kịch bản" saves it
  * server-side, stores it as the draft's scriptContent and starts the validate
  * saga (step 7).
- *
- * The engine can still be changed here: this step's prompt role
- * (manim_engineer vs remotion_engineer) and its client-side lint
- * (validateScript vs validateRemotionScript) both depend on it.
  */
-export function ManimEngineerStepPage() {
+export function CodeStepPage() {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   const navigate = useNavigate();
-  const isRemotion = draft.renderEngine === "remotion";
-  const engineerRole = isRemotion ? "remotion_engineer" : "manim_engineer";
-  const engineerLabel = isRemotion ? "Remotion Engineer" : "Manim Engineer";
+  const engineerRole = "remotion_engineer";
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -99,21 +93,19 @@ export function ManimEngineerStepPage() {
   // Bound directly to draft.scriptContent (not a local buffer) so moving to
   // another step and back never loses code that has not been submitted yet.
   const code = draft.scriptContent;
-  // The engineer prompt asks the AI to wrap its answer in a ```python/```tsx
+  // The engineer prompt asks the AI to wrap its answer in a ```tsx
   // fence — pasting that whole block (fence included) is the single most
   // common way this round trip fails: the fence markers are not valid
-  // Python/TSX, so esbuild/ast.parse chokes on line 1 with a syntax error
+  // TSX, so esbuild chokes on line 1 with a syntax error
   // that says nothing about the real cause. Strip it before storing.
   const setCode = (value: string) => dispatch({ type: "SET_SCRIPT", payload: stripMarkdownCodeFence(value) });
-  // validateScript only understands Manim's self.narrate/ConceptFlowScene
-  // conventions; validateRemotionScript checks the structural rules the
+  // validateRemotionScript checks the structural rules the
   // remotion_engineer prompt requires (narrations export, Composition
-  // id="creator", calculateMetadata, <Segments>, balanced braces) — same
-  // idea as validateScript, different syntax. Neither catches everything
-  // the prompt's self-check asks for (e.g. overlapping full-frame JSX), but
-  // both catch the recurring failure modes actually hit in production
-  // before wasting a render cycle on them.
-  const validation = isRemotion ? validateRemotionScript(code) : validateScript(code, draft.voiceLanguage);
+  // id="creator", calculateMetadata, <Segments>, balanced braces). It does not
+  // catch everything the prompt's self-check asks for (e.g. overlapping
+  // full-frame JSX), but it catches the recurring failure modes actually hit
+  // in production before wasting a render cycle on them.
+  const validation = validateRemotionScript(code);
   const isEmpty = code.trim().length === 0;
   const isValid = !isEmpty && validation.isValid;
 
@@ -143,7 +135,6 @@ export function ManimEngineerStepPage() {
               }
             : undefined,
         render_quality: draft.renderQuality,
-        render_engine: draft.renderEngine,
         video_font: draft.videoFont,
         video_output_mode: draft.videoOutputMode,
         video_format_id: draft.videoFormatId,
@@ -174,18 +165,18 @@ export function ManimEngineerStepPage() {
   const hint =
     saveError ??
     (isEmpty
-      ? authoringHint({ aiMode, isEmpty, what: `code ${engineerLabel}`, ready: "" })
+      ? authoringHint({ aiMode, isEmpty, what: "code Remotion", ready: "" })
       : validation.isValid
         ? `Code hợp lệ — ${validation.narrationCount} đoạn lời thoại`
         : validation.message);
   const [segmentsVersion, setSegmentsVersion] = useState(0);
 
   return (
-    <div data-testid="manim-engineer-step-page">
+    <div data-testid="code-step-page">
       <AppShell
         currentStep={6}
         title={flowTitle(FLOW_CODE)}
-        subtitle={`Tạo code ${isRemotion ? "Remotion" : "Manim"} từ storyboard.`}
+        subtitle="Tạo code Remotion từ storyboard."
         wide
       >
         {/* Read by the next run, so it sits before the run button. */}
@@ -196,23 +187,12 @@ export function ManimEngineerStepPage() {
         )}
         <div className={styles.settingsRow}>
           <PipelineSettingsBar
-            renderEngine={draft.renderEngine}
-            onEngineChange={(engine) => {
-              dispatch({ type: "SET_RENDER_ENGINE", payload: engine });
-              // Server phải biết engine trước khi render prompt cho
-              // storyboard/code (RoleFor đọc project.RenderEngine), không chỉ
-              // ở lúc nộp render. Best-effort như useAuthoringMode: lỗi mạng ở
-              // đây không được chặn Creator đổi lựa chọn trên màn hình.
-              if (draft.projectId) {
-                void createProjectDraft(draft.projectId, "", draft.voiceLanguage, engine).catch(() => {});
-              }
-            }}
             llm={llm}
             mode={authoringMode}
             onModeChange={setAuthoringMode}
             projectId={draft.projectId}
             steps={["code"]}
-            what={`code ${isRemotion ? "Remotion" : "Manim"}`}
+            what="code Remotion"
             runDisabled={draft.authoringStoryboard.trim().length === 0}
             runDisabledReason="Cần hoàn thành bước Hình ảnh trước."
             onGenerated={(step, content) => {
@@ -223,7 +203,7 @@ export function ManimEngineerStepPage() {
         </div>
 
         {/* The drawings have their own step; this only says where they stand. */}
-        {isRemotion && draft.projectId && (
+        {draft.projectId && (
           <div className={styles.settingsRow}>
             <IllustrationsGateNote projectId={draft.projectId} onOpen={() => navigate(AUTHORING_STEP_PATHS.illustrations)} />
           </div>
@@ -231,7 +211,7 @@ export function ManimEngineerStepPage() {
 
         {showSegments && (
           <div className={styles.settingsRow}>
-            <CodeSegmentsPanel projectId={draft.projectId} isRemotion={isRemotion} reloadKey={segmentsVersion} />
+            <CodeSegmentsPanel projectId={draft.projectId} reloadKey={segmentsVersion} />
           </div>
         )}
 
@@ -248,34 +228,30 @@ export function ManimEngineerStepPage() {
                 value={prompt}
                 rows={18}
                 className={styles.promptTextarea}
-                data-testid="manim-engineer-prompt"
+                data-testid="code-step-prompt"
               />
-              <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="manim-engineer-copy">
+              <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="code-step-copy">
                 {copied ? "Đã sao chép" : "Sao chép prompt"}
               </Button>
             </Card>
           )}
 
           <Card
-            title={aiMode ? `Code ${isRemotion ? "Remotion" : "Manim"}` : "2. Dán kết quả"}
+            title={aiMode ? "Code Remotion" : "2. Dán kết quả"}
             hint={
               aiMode
                 ? `Kết quả của AI hiện ở đây để bạn chỉnh sửa. Hệ thống tự kiểm tra code bên dưới.`
-                : `Dán code ${isRemotion ? "Remotion" : "Manim"} từ AI vào đây, rồi bấm Tiếp tục.`
+                : "Dán code Remotion từ AI vào đây, rồi bấm Tiếp tục."
             }
           >
             <TextArea
-              id="manim-engineer-code-input"
+              id="code-step-code-input"
               value={code}
               onChange={(event) => setCode(event.target.value)}
               rows={18}
               className={styles.promptTextarea}
-              placeholder={
-                isRemotion
-                  ? "import {registerRoot, Composition} from 'remotion';\n..."
-                  : "from conceptflow import *\n\nclass ...Scene(ConceptFlowScene):\n    def construct(self):\n        ..."
-              }
-              data-testid="manim-engineer-code-input"
+              placeholder={"import {registerRoot, Composition} from 'remotion';\n..."}
+              data-testid="code-step-code-input"
             />
           </Card>
         </div>
@@ -284,12 +260,12 @@ export function ManimEngineerStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError || (!isEmpty && !validation.isValid)}
-        onBack={() => navigate(isRemotion ? AUTHORING_STEP_PATHS.illustrations : AUTHORING_STEP_PATHS.storyboard)}
-        backLabel={isRemotion ? "Quay lại Hình minh hoạ" : "Quay lại Hình ảnh"}
+        onBack={() => navigate(AUTHORING_STEP_PATHS.illustrations)}
+        backLabel="Quay lại Hình minh hoạ"
         onNext={handleContinue}
         nextLabel={saving ? "Đang gửi..." : "Kiểm tra kịch bản"}
         nextDisabled={!isValid || saving}
-        nextTestId="manim-engineer-step-next"
+        nextTestId="code-step-next"
       />
     </div>
   );

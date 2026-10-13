@@ -71,35 +71,33 @@ func TestStoryboardStepReturnsLengthAndIllustrationWarnings(t *testing.T) {
 	}
 }
 
-func TestStoryboardIllustrationCheckIsRemotionOnly(t *testing.T) {
-	uc := storyboardWarningsFixture(t, domain.RenderEngineManim, hookFormat)
-	got, err := uc.Execute(context.Background(), "p1", "storyboard")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(got.Warnings) != 1 || !strings.HasPrefix(got.Warnings[0], "Cảnh hook:") {
-		t.Fatalf("warnings = %q, want only the length warning", got.Warnings)
-	}
-}
-
 func TestStoryboardLengthCheckSaysWhenItCannotRun(t *testing.T) {
-	uc := storyboardWarningsFixture(t, domain.RenderEngineManim, errFormats{})
+	uc := storyboardWarningsFixture(t, domain.RenderEngineRemotion, errFormats{})
 	got, err := uc.Execute(context.Background(), "p1", "storyboard")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Warnings) != 1 || !strings.Contains(got.Warnings[0], `không tải được format "fmt" (v1)`) {
-		t.Fatalf("warnings = %q", got.Warnings)
+	if len(got.Warnings) == 0 || !strings.Contains(got.Warnings[0], `không tải được format "fmt" (v1)`) {
+		t.Fatalf("warnings = %q, want the format warning first", got.Warnings)
+	}
+	for _, w := range got.Warnings {
+		if strings.HasPrefix(w, "Cảnh hook:") {
+			t.Fatalf("no length warning without a format, got %q", w)
+		}
 	}
 }
 
-func TestStoryboardWithoutChecksWiredHasNoWarnings(t *testing.T) {
-	uc := storyboardWarningsFixture(t, domain.RenderEngineManim, nil)
+// Without the format checks wired there is no length warning; the
+// illustration checks still run.
+func TestStoryboardWithoutChecksWiredHasNoLengthWarning(t *testing.T) {
+	uc := storyboardWarningsFixture(t, domain.RenderEngineRemotion, nil)
 	got, err := uc.Execute(context.Background(), "p1", "storyboard")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got.Warnings) != 0 {
-		t.Fatalf("warnings = %q", got.Warnings)
+	for _, w := range got.Warnings {
+		if strings.HasPrefix(w, "Cảnh hook:") || strings.Contains(w, "độ dài") {
+			t.Fatalf("no length warning without the checks wired, got %q", w)
+		}
 	}
 }

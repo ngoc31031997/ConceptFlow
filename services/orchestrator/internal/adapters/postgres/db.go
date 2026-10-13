@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS projects (
     saga_id TEXT NOT NULL,
     status TEXT NOT NULL,
     script_content TEXT NOT NULL DEFAULT '',
-    manim_scene_class_name TEXT NOT NULL DEFAULT '',
+    scene_class_name TEXT NOT NULL DEFAULT '',
     plugin_id TEXT NOT NULL DEFAULT '',
     category_hint TEXT NOT NULL DEFAULT '',
     voice_language TEXT NOT NULL DEFAULT '',
@@ -50,7 +50,6 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_publish_at TEXT;
 -- above — an already-bootstrapped database never re-runs CREATE TABLE.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_channel_id TEXT;
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS youtube_thumbnail_path TEXT;
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS manim_scene_class_name TEXT NOT NULL DEFAULT '';
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS rendered_video_path TEXT;
 -- Narration and subtitles are switchable per project. tts_enabled
 -- defaults to true so projects created before this column existed keep the
@@ -167,12 +166,6 @@ CREATE TABLE IF NOT EXISTS channel_asset_pointers (
     PRIMARY KEY (kind, render_quality)
 );
 
--- What was on screen at each narration mark, measured by
--- Rendering and carried on rendering_completed. Stored here purely so the
--- qc_video command can be rebuilt from Project alone (Rule 5) rather than
--- needing the original event again — exactly the reason wait_offsets is stored.
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS layout_marks JSONB;
-
 -- "long" | "short" — the 16:9 long-form video or the vertical short this
 -- project produces. Default 'long' is the mode of a project that never chose.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DEFAULT 'long';
@@ -183,10 +176,8 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS video_output_mode TEXT NOT NULL DE
 -- two projects have independent lifecycles.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS companion_project_id TEXT;
 
--- Remotion engine: which rendering backend (Manim or Remotion) runs this
--- project's script. Default 'manim' reproduces the only behaviour that
--- existed before this column did.
-ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_engine TEXT NOT NULL DEFAULT 'manim';
+-- Which rendering backend runs this project's script ('remotion').
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS render_engine TEXT NOT NULL DEFAULT 'remotion';
 
 -- Wizard progress: the furthest step (1-3) the Creator confirmed with "Tiếp
 -- tục". Steps 4-7 are derived from status, so they are never stored here.
@@ -269,7 +260,7 @@ CREATE TABLE IF NOT EXISTS project_authoring (
 -- story_content.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS storyboard_content TEXT NOT NULL DEFAULT '';
 
--- Step 3 (Manim Engineer): the pasted Manim code a Creator gets back
+-- Step 3 (Code): the pasted code a Creator gets back
 -- from the external AI, same reasoning/table as story_content/
 -- storyboard_content above.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_content TEXT NOT NULL DEFAULT '';
@@ -510,6 +501,35 @@ ALTER TABLE projects
     DROP COLUMN IF EXISTS clip_requests,
     DROP COLUMN IF EXISTS clips,
     DROP COLUMN IF EXISTS intro_duration_seconds;
+
+-- Remotion is the only render engine. Projects made with the Manim engine
+-- cannot run any more and are deleted with their saga rows, the same rows
+-- ProjectRepository.Delete removes.
+ALTER TABLE projects ALTER COLUMN render_engine SET DEFAULT 'remotion';
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE id = 'delete_manim_projects') THEN
+        DELETE FROM saga_steps WHERE saga_id IN (SELECT saga_id FROM projects WHERE render_engine = 'manim');
+        DELETE FROM outbox_events WHERE payload->>'project_id' IN (SELECT project_id FROM projects WHERE render_engine = 'manim');
+        DELETE FROM project_events WHERE project_id IN (SELECT project_id FROM projects WHERE render_engine = 'manim');
+        DELETE FROM projects WHERE render_engine = 'manim';
+        INSERT INTO schema_migrations (id) VALUES ('delete_manim_projects');
+    END IF;
+END $$;
+
+-- The class/composition id Rendering runs, under an engine-neutral name.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'projects' AND column_name = 'manim_scene_class_name')
+       AND NOT EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'projects' AND column_name = 'scene_class_name') THEN
+        ALTER TABLE projects RENAME COLUMN manim_scene_class_name TO scene_class_name;
+    END IF;
+END $$;
+
+-- Layout marks were only produced by the Manim dry run.
+ALTER TABLE projects DROP COLUMN IF EXISTS layout_marks;
 `
 
 // NewPool opens a pgx connection pool against databaseURL with the given max

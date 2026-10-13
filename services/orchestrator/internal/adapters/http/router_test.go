@@ -567,7 +567,7 @@ func (s stubAuthored) Summaries(_ context.Context, ids []string) (map[string]app
 }
 
 // GET /v1/projects/:id places a Remotion draft whose drawings are not
-// ready at Hình minh hoạ (5); Manim, or ready drawings, stay at Code (6).
+// ready at Hình minh hoạ (5); ready drawings stay at Code (6).
 func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
 	cases := []struct {
 		name   string
@@ -577,7 +577,6 @@ func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
 	}{
 		{"remotion, drawings not ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":false}`, domain.FlowIllustrations},
 		{"remotion, drawings ready", domain.RenderEngineRemotion, `{"story":true,"storyboard":true,"illustrations_ready":true}`, domain.FlowCode},
-		{"manim", domain.RenderEngineManim, `{"story":true,"storyboard":true,"illustrations_ready":false}`, domain.FlowCode},
 	}
 	for _, c := range cases {
 		p := &domain.Project{ProjectID: "p1", Status: domain.StatusDraft, WizardStep: domain.WizardStepScript, RenderEngine: c.engine}

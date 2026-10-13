@@ -376,7 +376,6 @@ func (rt *Router) handleStartRenderSaga(w http.ResponseWriter, r *http.Request) 
 		SubtitleMode:          domain.SubtitleMode(req.SubtitleMode),
 		SubtitleStyle:         req.SubtitleStyle,
 		RenderQuality:         domain.RenderQuality(req.RenderQuality),
-		RenderEngine:          domain.RenderEngine(req.RenderEngine),
 		BackgroundMusicVolume: req.BackgroundMusicVolume,
 		VideoFont:             req.VideoFont,
 		VideoOutputMode:       domain.VideoOutputMode(req.VideoOutputMode),
@@ -446,15 +445,10 @@ func (rt *Router) handleCreateProjectDraft(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusBadRequest, "content_language must be 'vi' or 'en'")
 		return
 	}
-	if req.RenderEngine != "" && !domain.RenderEngine(req.RenderEngine).IsValid() {
-		writeError(w, http.StatusBadRequest, "render_engine must be 'manim' or 'remotion'")
-		return
-	}
 	out, err := rt.createProjectDraft.Execute(r.Context(), application.CreateProjectDraftInput{
 		ProjectID:       req.ProjectID,
 		Topic:           req.Topic,
 		ContentLanguage: lang,
-		RenderEngine:    domain.RenderEngine(req.RenderEngine),
 		ShortOf:         req.ShortOf,
 	})
 	if err != nil {
@@ -515,7 +509,7 @@ func (rt *Router) flowFor(ctx context.Context, p *domain.Project) (int, string) 
 	if p.Status == domain.StatusDraft && p.WizardStep >= domain.WizardStepScript && rt.authored != nil {
 		if sums, err := rt.authored.Summaries(ctx, []string{p.ProjectID}); err == nil {
 			if st, ok := sums[p.ProjectID]; ok {
-				content = st.Content(p.RenderEngine)
+				content = st.Content()
 			}
 		}
 	}
@@ -963,7 +957,6 @@ func (rt *Router) handlePatchWizardSettings(w http.ResponseWriter, r *http.Reque
 	}
 	err := rt.saveWizardSettings.Execute(r.Context(), chi.URLParam(r, "project_id"), domain.WizardSettingsPatch{
 		ContentLanguage:       enumPtr[domain.ContentLanguage](req.ContentLanguage),
-		RenderEngine:          enumPtr[domain.RenderEngine](req.RenderEngine),
 		TTSEnabled:            req.TTSEnabled,
 		VoiceID:               req.VoiceID,
 		SubtitleMode:          enumPtr[domain.SubtitleMode](req.SubtitleMode),

@@ -1,19 +1,15 @@
-"""RemotionScriptRenderer — implements ManimScriptRendererPort for the
-Remotion engine (feature/remotion-engine).
+"""RemotionScriptRenderer — implements ScriptRendererPort with Remotion.
 
-Unlike Manim, whose dry pass has to actually RUN the script (narration calls
-can live inside loops/conditions, so only real execution order is trustworthy
-— see manim_renderer.py), a Remotion composition is React-declarative: the
-Creator's script must export a plain module-level `narrations: string[]`
+A Remotion composition is React-declarative: the script must export a plain
+module-level `narrations: string[]`
 array alongside their `registerRoot()`/`<Composition>` (`validate_script`
-already requires the Composition/registerRoot pair to even accept the script
-as Remotion — see domain/script_locator.py). That array can be
+already requires the Composition/registerRoot pair to accept the script —
+see domain/script_locator.py). That array can be
 read straight off the source text with a regex, no Node process needed at
 all for dry_run() — faster, and it means a broken dry pass can never be a
 Remotion/Chromium problem, only a script problem.
 
-Two-pass contract (mirrors manim_renderer.py's outward behaviour exactly —
-see that module's docstring for the rationale):
+Two-pass contract:
 - dry_run(): regex-extract `narrations` from script_content. No video, no
   Node/Chromium spent.
 - render(): convert each narration_segment's real TTS duration_seconds into
@@ -22,8 +18,7 @@ see that module's docstring for the rationale):
   `segments` prop, run the Node driver (bundle -> selectComposition ->
   renderMedia, per https://www.remotion.dev/docs/ssr-node) to produce the real
   video, and report wait_offsets — each narration line's start time in
-  seconds — the same contract Video Assembly already reads from the Manim
-  path. See ADR-0032.
+  seconds — the contract Video Assembly reads. See ADR-0032.
 """
 
 from __future__ import annotations
@@ -41,13 +36,13 @@ from collections.abc import Callable
 from adapters.messaging.cancellation import REGISTRY
 from domain.errors import AnimationEngineError
 from domain.models import DryRunResult, ScriptRenderRequest, ScriptRenderResult
-from domain.ports import ManimScriptRendererPort
+from domain.ports import ScriptRendererPort
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_RENDER_TIMEOUT_SECONDS = 1800
 FPS = 30
-# Shorter than Manim's 15s: this beat carries a real percentage, not just "alive".
+# Each beat carries a real percentage, not just "alive".
 HEARTBEAT_INTERVAL_SECONDS = 2
 # Printed by render.mjs's renderMedia onProgress.
 _PROGRESS_LINE_RE = re.compile(r"^CF_PROGRESS (\d+)\s*$")
@@ -191,7 +186,7 @@ def _narrations_body(script_content: str) -> str | None:
     return stripped[start : i - 1]
 
 
-class RemotionScriptRenderer(ManimScriptRendererPort):
+class RemotionScriptRenderer(ScriptRendererPort):
     def __init__(
         self,
         timeout_seconds: int = DEFAULT_RENDER_TIMEOUT_SECONDS,

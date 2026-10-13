@@ -63,7 +63,6 @@ export function ResultPage() {
         subtitle_mode: project.subtitle_mode ?? "track",
         subtitle_style: project.subtitle_style,
         render_quality: rerenderQuality,
-        render_engine: project.render_engine,
         // The frame (16:9 or 9:16) was fixed when the code was written, so a
         // re-render keeps the project's own output mode.
         video_output_mode: outputMode,

@@ -7,7 +7,7 @@ CR-050 Unit 2, [ADR-0030](../../aidlc-docs/decisions/ADR-0030-code-segments-and-
 Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `services/authoring-service/internal/adapters/llm/llm_service_client.go`.
 
 ## Đoạn và dấu vân tay
-- **Khoá**: `frame` cho khung (LAYOUT với Remotion, `setup_cast` với Manim), `"<shot đầu>-<shot cuối>"` cho mỗi nhóm `chunk_shots` shot, theo thứ tự storyboard qua các cảnh. Đoạn một shot có khoá `1.1-1.1`.
+- **Khoá**: `frame` cho khung (`LAYOUT`), `"<shot đầu>-<shot cuối>"` cho mỗi nhóm `chunk_shots` shot, theo thứ tự storyboard qua các cảnh. Đoạn một shot có khoá `1.1-1.1`.
 - **Vân tay** do `llm-service` tính; `authoring-service` chỉ so bằng nhau:
   - khung Remotion lấy từ `layout` của storyboard: `sha256("frame-sb", layout)`;
   - khung AI: `sha256("frame", engine, sha256(system), storyboard)`;
@@ -16,9 +16,10 @@ Route thật nằm ở `services/llm-service/app/main.py`. Client nằm ở `ser
 - `system` là prompt `*_engineer_ai` đã render, trước khi `llm-service` ghép phần hình thư viện.
 
 ## Body chung
+`engine` chỉ nhận `"remotion"`; giá trị khác bị trả `400` (ADR-0033). Trường vẫn nằm trong dấu vân tay nên vân tay các đoạn đã lưu không đổi.
 ```json
 {
-  "engine": "remotion | manim",
+  "engine": "remotion",
   "topic": "…",
   "storyboard": "<JSON storyboard chuẩn hoá>",
   "system": "<prompt *_engineer_ai đã render>",
@@ -84,14 +85,14 @@ Sự kiện theo thứ tự thời gian. Mỗi dòng là một JSON có trườn
 ## `POST /v2/code/segment-parse` (JSON)
 - **Body**: body chung, thêm `key` và `reply` (câu trả lời của AI ngoài, hoặc bản sửa tay).
 - **200**: `{"fingerprint", "content"}`.
-- **422**: `reply` sai khuôn (thiếu hàm shot, không phải `const LAYOUT = …` / `def setup_cast(self):`); câu lỗi nằm trong `error.message`.
+- **422**: `reply` sai khuôn (thiếu hàm shot, không phải `const LAYOUT = …`); câu lỗi nằm trong `error.message`.
 - **404 / 409**: như `segment-prompt`.
 
 ## Diagnostic của `rendering`
-`POST /v1/check/{remotion,manim}` trả thêm `rule` cho mỗi diagnostic (chỉ thêm trường, bên gọi cũ bỏ qua được):
+`POST /v1/check/remotion` trả thêm `rule` cho mỗi diagnostic (chỉ thêm trường, bên gọi cũ bỏ qua được):
 - lỗi bố cục: tên luật, ví dụ `safe_area`, `subtitle_zone`, `text_overflow`;
 - lỗi tsc: mã lỗi, ví dụ `TS2322`;
-- lỗi lint và Manim: `""`.
+- lỗi lint: `""`.
 
 ## `usage`: `reasoning_chars`, `usage_reported` (CR-056)
 Thêm trường, bên gọi cũ bỏ qua được. Áp dụng cho mọi `usage` mà `llm-service` trả về, không chỉ bước Code.

@@ -1,12 +1,11 @@
 """CheckScriptUseCase — the compile check the code-authoring pipeline runs before
 anything is saved.
 
-Remotion: Lottie-id lint and the narration dry pass (the same gate the saga
-uses), plus a real `tsc --noEmit`, then — once all of that passes — the layout
-check: every shot is drawn in headless Chromium at a dozen moments
-and the measured boxes are held to the layout rules (domain/layout_rules.py).
-Manim: the saga's own gate (lint + a dry run of the script). Both report
-line-numbered diagnostics when they can.
+Lottie-id lint and the narration dry pass (the same gate the saga uses), plus a
+real `tsc --noEmit`, then — once all of that passes — the layout check: every
+shot is drawn in headless Chromium at a dozen moments and the measured boxes
+are held to the layout rules (domain/layout_rules.py). Diagnostics carry a line
+number when they can.
 
 Layout violations that block (safe area, subtitle zone, text over text, text
 overflow, tiny font, a shot that throws) are diagnostics like a tsc error, so
@@ -43,7 +42,7 @@ class CheckDiagnostic:
     kind: str = COMPILE  # compile | layout
     # Which rule failed, for statistics — the layout rule
     # (safe_area, subtitle_zone, ...) or the tsc code (TS2322). "" when the
-    # source has no code of its own (lint, the Manim dry run).
+    # source has no code of its own (lint, the dry pass).
     rule: str = ""
 
 
@@ -51,7 +50,6 @@ class CheckDiagnostic:
 class CheckOutcome:
     ok: bool
     diagnostics: list[CheckDiagnostic] = field(default_factory=list)
-    raw: str = ""
     # Non-blocking findings and "could not check" notices; never make ok false.
     warnings: list[str] = field(default_factory=list)
 
@@ -83,12 +81,11 @@ class CheckScriptUseCase:
     def check(
         self, engine: str, code: str, scene_class_name: str, layout: LayoutContext | None = None,
     ) -> CheckOutcome:
-        if engine not in ("remotion", "manim"):
+        if engine != "remotion":
             raise ValueError(f"unknown engine {engine!r}")
         if not code.strip():
             raise ValueError("code is empty")
         diags: list[CheckDiagnostic] = []
-        raw = ""
         try:
             self._validate.validate(self._request(engine, code, scene_class_name))
         except ScriptValidationError as exc:
@@ -96,21 +93,18 @@ class CheckScriptUseCase:
                 diags += [CheckDiagnostic(i.message, i.line) for i in exc.issues]
             else:
                 diags.append(CheckDiagnostic(str(exc)))
-            raw = str(exc)
         except AnimationEngineError as exc:
-            # A Manim traceback names the failing shot function even though it
-            # carries no structured line; the caller reads it from `raw`.
             diags.append(CheckDiagnostic(str(exc)[:2000]))
-            raw = str(exc)
 
         warnings: list[str] = []
-        if engine == "remotion":
-            diags += [CheckDiagnostic(f"{d.code}: {d.message}", d.line, rule=str(d.code)) for d in self._ts.check(code)]
-            if not diags:
-                # Only a script that compiles is worth drawing.
-                layout_diags, warnings = self._check_layout(code, layout or LayoutContext())
-                diags += layout_diags
-        return CheckOutcome(ok=not diags, diagnostics=diags, raw=raw, warnings=warnings)
+        diags += [
+            CheckDiagnostic(f"{d.code}: {d.message}", d.line, rule=str(d.code)) for d in self._ts.check(code)
+        ]
+        if not diags:
+            # Only a script that compiles is worth drawing.
+            layout_diags, warnings = self._check_layout(code, layout or LayoutContext())
+            diags += layout_diags
+        return CheckOutcome(ok=not diags, diagnostics=diags, warnings=warnings)
 
     def _check_layout(self, code: str, ctx: LayoutContext) -> tuple[list[CheckDiagnostic], list[str]]:
         if self._layout is None:

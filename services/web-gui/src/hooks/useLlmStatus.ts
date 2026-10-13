@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { getLlmStatus, type LlmStatus } from "../api/client";
 
 // Bước 1 có 4 tab (ScriptStepPage, ScriptOutlineStepPage,
-// VisualDirectorStepPage, ManimEngineerStepPage) và mỗi tab tự mount hook
+// VisualDirectorStepPage, CodeStepPage) và mỗi tab tự mount hook
 // này. Không cache, mỗi lần chuyển tab component remount, status lại rơi về
 // null trong lúc chờ getLlmStatus() trả lời — mọi nơi đọc `llm?.enabled` (kể
 // cả PipelineSettingsBar's dòng tóm tắt) đọc thấy "chưa biết" và coi như

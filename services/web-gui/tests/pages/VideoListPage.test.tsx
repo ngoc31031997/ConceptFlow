@@ -80,7 +80,6 @@ function many(n: number): Row[] {
     status: "awaiting_review",
     topic: `Chủ đề ${i}`,
     updated_at: "2026-01-01T00:00:00Z",
-    render_engine: "manim",
     flow_step: 8,
     run_state: i % 5 === 0 ? "failed" : "idle",
   }));
@@ -186,17 +185,12 @@ describe("VideoListPage", () => {
     ]);
   });
 
-  it("marks which engine rendered each video", async () => {
-    serve([
-      { project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z", render_engine: "manim" },
-      { project_id: "p2", status: "published", updated_at: "2026-01-02T00:00:00Z", render_engine: "remotion" },
-    ]);
+  it("shows no engine badge: every video is rendered by Remotion", async () => {
+    serve([{ project_id: "p1", status: "published", updated_at: "2026-01-01T00:00:00Z", render_engine: "remotion" }]);
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId("video-row-p1")).toBeInTheDocument());
-    const badges = screen.getAllByTestId("render-engine-badge");
-    expect(badges[0]).toHaveTextContent("Manim");
-    expect(badges[1]).toHaveTextContent("Remotion");
+    expect(screen.queryByTestId("render-engine-badge")).not.toBeInTheDocument();
   });
 
   it("selects all videos via the header checkbox", async () => {
@@ -214,7 +208,7 @@ describe("VideoListPage", () => {
   });
 
   describe("theo flow 13 bước", () => {
-    const base = { updated_at: "2026-01-01T00:00:00Z", render_engine: "manim" };
+    const base = { updated_at: "2026-01-01T00:00:00Z" };
     const rows = (): Row[] => [
       { ...base, project_id: "aaaaaaaa-1111", status: "rendering", topic: "thiên kiến sống sót", flow_step: 10, run_state: "running" },
       { ...base, project_id: "bbbbbbbb-2222", status: "failed_at_render_scenes", topic: "Vòng lặp for", flow_step: 10, run_state: "cancelled" },

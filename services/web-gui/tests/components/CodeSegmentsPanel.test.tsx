@@ -25,11 +25,11 @@ function view(segments: apiClient.CodeSegment[], over: Partial<apiClient.CodeSeg
   return { chunk_shots: 3, running: false, segments, ...over };
 }
 
-function renderPanel(isRemotion = true) {
+function renderPanel() {
   return render(
     <ThemeProvider>
       <AuthoringRunProvider>
-        <CodeSegmentsPanel projectId="p1" isRemotion={isRemotion} reloadKey={0} />
+        <CodeSegmentsPanel projectId="p1" reloadKey={0} />
       </AuthoringRunProvider>
     </ThemeProvider>,
   );
@@ -77,7 +77,7 @@ describe("CodeSegmentsPanel", () => {
     expect(screen.queryByTestId("code-segment-1.4-1.6-saved")).toBeNull();
   });
 
-  it("names the Manim frame cast, and a storyboard-given LAYOUT has nothing to run", async () => {
+  it("a storyboard-given LAYOUT has nothing to run", async () => {
     vi.spyOn(apiClient, "getCodeSegments").mockResolvedValue(view([seg({ status: "done", source: "storyboard" }), PENDING]));
     renderPanel();
     expect(await screen.findByTestId("code-segment-frame")).toHaveTextContent("Từ storyboard");

@@ -15,7 +15,6 @@ SB = sbm.parse(json.dumps({
     ],
 }))
 TSX = {i: f"// Shot {i}\nfunction {merger.remotion_fn(i)}({{duration}}: ShotProps) {{\n  return null;\n}}" for i in ("1.1", "1.2", "2.1")}
-PY = {i: f"def {merger.manim_fn(i)}(self):\n    self.narrate('x')" for i in ("1.1", "1.2", "2.1")}
 
 
 def test_palette_keys_are_ascii_camel_and_unique():
@@ -67,22 +66,6 @@ def test_missing_shot_is_refused_not_papered_over():
     import pytest
     with pytest.raises(ValueError, match=r"\['2.1'\]"):
         merger.merge_remotion(SB, "x", {k: v for k, v in TSX.items() if k != "2.1"})
-
-
-def test_manim_scene_calls_every_shot_in_order_with_beats():
-    m = merger.merge_manim(SB, "TCP và UDP", "def setup_cast(self):\n    self.hero = None", PY)
-    assert "class TcpVaUdpScene(ConceptFlowScene):" in m.code and m.scene_class_name == "TcpVaUdpScene"
-    body = m.code.split("def setup_cast")[0]
-    order = [ln.strip() for ln in body.splitlines() if "self." in ln]
-    assert order == ['self.setup_cast()', 'self.beat("hook")', 'self.shot_1_1()', 'self.shot_1_2()',
-                     'self.beat("recap")', 'self.shot_2_1()']
-    lines = m.code.splitlines()
-    ca, cb = m.lines[merger.CAST_KEY]
-    assert lines[ca - 1] == "    def setup_cast(self):" and lines[cb - 1] == "        self.hero = None"
-    for sid, (a, _b) in m.lines.items():
-        if sid == merger.CAST_KEY:
-            continue
-        assert lines[a - 1].startswith(f"    def shot_{sid.replace('.', '_')}(self)")
 
 
 def test_layout_from_storyboard_is_a_plain_ts_declaration():

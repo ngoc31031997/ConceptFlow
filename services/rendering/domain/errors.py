@@ -12,18 +12,16 @@ class InvalidDurationError(Exception):
 
 
 class AnimationEngineError(Exception):
-    """Raised when Manim crashes, times out, or the script's
-    `self.wait(AUTO)` count doesn't match the narration segment count
+    """Raised when the render engine crashes, times out, or the script's
+    narration marks don't match the narration segment count
     (transient/content error — the Orchestrator may retry the command)."""
 
 
-class InvalidManimApiUsageError(ValueError):
-    """Raised when the script's Manim API usage matches a known-bad pattern
-    (see domain.script_lint), caught before ever invoking the `manim`
-    subprocess. A ValueError subclass so existing `except ValueError`
-    handling (consumer.py) needs no change."""
+class UnsupportedEngineError(ValueError):
+    """Raised for a command whose engine is not Remotion, the only engine
+    Rendering runs. A ValueError subclass so the consumer's `except ValueError`
+    path fails the step with this message."""
 
-    def __init__(self, issues: list) -> None:
-        self.issues = issues
-        detail = "; ".join(str(issue) for issue in issues)
-        super().__init__(f"invalid Manim API usage in script: {detail}")
+    def __init__(self, engine: str) -> None:
+        self.engine = engine
+        super().__init__(f"engine {engine!r} không còn được hỗ trợ; chỉ có remotion")

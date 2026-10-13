@@ -68,7 +68,7 @@ func TestRecordFor_SuccessfulCall(t *testing.T) {
 		PromptTokens: 31, CompletionTokens: 49, CachedTokens: 20,
 	}
 
-	rec := application.RecordFor("hive", "manim_engineer", "code", "p1", usage, started, nil)
+	rec := application.RecordFor("hive", "remotion_engineer", "code", "p1", usage, started, nil)
 
 	if !rec.OK || rec.ErrorKind != "" {
 		t.Fatalf("expected a successful row, got ok=%v kind=%q", rec.OK, rec.ErrorKind)
@@ -96,7 +96,7 @@ func TestRecordFor_AFailedCallStillRecordsWhatItCost(t *testing.T) {
 
 	// ChatResult is empty on failure, so the caller passes a zero usage —
 	// the billed numbers must come from the error itself.
-	rec := application.RecordFor("hive", "manim_engineer", "code", "p1",
+	rec := application.RecordFor("hive", "remotion_engineer", "code", "p1",
 		application.TokenUsage{}, time.Now(), err)
 
 	if rec.OK {

@@ -47,7 +47,6 @@ export function ScriptStepPage() {
         draft.projectId,
         topic.trim(),
         draft.voiceLanguage,
-        draft.renderEngine,
       );
       // Bước 2 hiện cảnh báo trùng chủ đề ngay đầu màn.
       navigate("/create/script/settings", { state: { similarProjects } });

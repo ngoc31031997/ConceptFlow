@@ -122,8 +122,9 @@ func (uc *ReviewOutlineUseCase) revalidate(ctx context.Context, project *domain.
 		EventType: string(domain.StepValidateScript),
 		Payload: map[string]interface{}{
 			"script_content":   project.ScriptContent,
-			"scene_class_name": project.ManimSceneClassName,
+			"scene_class_name": project.SceneClassName,
 			"render_quality":   string(project.RenderQuality),
+			"engine":           string(project.RenderEngine),
 		},
 	})
 }

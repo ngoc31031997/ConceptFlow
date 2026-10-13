@@ -32,8 +32,8 @@ const SOURCE_LABEL: Record<CodeSegment["source"], string> = {
 
 const MAX_CHUNK_SHOTS = 10;
 
-function segmentTitle(s: CodeSegment, isRemotion: boolean): string {
-  if (s.kind === "frame") return isRemotion ? "Khung (LAYOUT)" : "Khung (cast)";
+function segmentTitle(s: CodeSegment): string {
+  if (s.kind === "frame") return "Khung (LAYOUT)";
   const first = s.shots[0];
   const last = s.shots[s.shots.length - 1];
   return first === last ? `Shot ${first}` : `Shot ${first}–${last}`;
@@ -197,11 +197,9 @@ function Reveal({ open, children }: { open: boolean; children: React.ReactNode }
  */
 export function CodeSegmentsPanel({
   projectId,
-  isRemotion,
   reloadKey,
 }: {
   projectId: string;
-  isRemotion: boolean;
   reloadKey: number;
 }) {
   const [view, setView] = useState<CodeSegmentsView | null>(null);
@@ -268,7 +266,7 @@ export function CodeSegmentsPanel({
     try {
       const p = await getCodeSegmentPrompt(projectId, s.key);
       await navigator.clipboard.writeText(`${p.system}\n\n---\n\n${p.user}`);
-      setNotice(`Đã sao chép prompt của ${segmentTitle(s, isRemotion)} — dán vào ChatGPT, Claude hoặc Gemini, rồi dán câu trả lời về đây.`);
+      setNotice(`Đã sao chép prompt của ${segmentTitle(s)} — dán vào ChatGPT, Claude hoặc Gemini, rồi dán câu trả lời về đây.`);
     } catch (e) {
       setMessage(errorText(e, "Không sao chép được prompt của đoạn này."));
     } finally {
@@ -283,7 +281,7 @@ export function CodeSegmentsPanel({
     try {
       await putCodeSegment(projectId, s.key, text, source);
       setEditing(null);
-      setNotice(`Đã lưu ${segmentTitle(s, isRemotion)}.`);
+      setNotice(`Đã lưu ${segmentTitle(s)}.`);
       await reload();
     } catch (e) {
       setMessage(errorText(e, "Không lưu được đoạn này."));
@@ -321,7 +319,7 @@ export function CodeSegmentsPanel({
       {notice && <p className={styles.notice} role="status">{notice}</p>}
       <ul className={styles.list} data-testid="code-segments-list">
         {view.segments.map((s) => {
-          const title = segmentTitle(s, isRemotion);
+          const title = segmentTitle(s);
           const fromStoryboard = s.source === "storyboard";
           const hasCode = s.status === "done" && segmentText(s) !== "";
           const isEditing = editing?.key === s.key;
