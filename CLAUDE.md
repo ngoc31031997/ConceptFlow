@@ -55,6 +55,10 @@ When implementing:
   - `/deliver` (`.claude/skills/deliver/`, Sonnet, medium effort, Creator-invoked only): after the Creator approves, it commits, pushes, merges into main, pulls main, refreshes the graphify graph for the new main and rebuilds the changed services.
   - `/fix` (`.claude/skills/fix/`, Opus 5.5, medium effort): for a reported bug, opens a `fix/<slug>` branch, finds the root cause through graphify, applies the smallest fix with a regression test, runs the tests, rebuilds the changed services and reports; commits nothing (the Creator runs `/deliver` after approving).
 
+## File links in replies
+- Every file or folder link in a reply uses the full absolute path, e.g. `[cr-072-requirement-questions.md](/Users/hoangbaminhngoc/Documents/Project/ConceptFlow/.claude/worktrees/feature-cr-072-2d-film-pipeline/aidlc-docs/inception/requirements/cr-072-requirement-questions.md)` (a `#L42` line anchor may follow), never a path relative to the workspace.
+- Link to where the file actually is: the worktree path while working on a CR/fix branch, the primary checkout path only for files on `main`. The VSCode workspace is the primary checkout, so a relative link to a file that exists only in a worktree does not open.
+
 ## Web UI / UX design rules
 - Any UI task must follow `docs/ux-ui-design-rules.md` (screen flow order, etc.). Read it before changing or adding a screen.
 
