@@ -19,14 +19,14 @@ Bước User Stories đã bỏ (Workflow Planning), nên tài liệu này đối
 | FR-8 | Máy quay liền mạch | U5 (storyboard), U7a (code dùng chung vật nối), U8a (đoạn chồng khi render và ghép) | |
 | FR-9 | Giọng sơ bộ chạy sớm | U6 | ADR-0040 |
 | FR-10 | Animatic khung tĩnh | U6 | ADR-0039 |
-| FR-11 | Key pose | U7b | Chỉ kit Khoa học phát sáng (U-3.2 A) |
-| FR-12 | VFX Remotion | U7b | Chỉ kit Khoa học phát sáng (U-3.2 A) |
+| FR-11 | Key pose | U1 (rig, dáng, nguyên lý diễn hoạt), U7b (gọi dáng theo key pose) | Chỉ kit Khoa học phát sáng |
+| FR-12 | VFX Remotion | U7b | Chỉ kit Khoa học phát sáng |
 | FR-13 | Hình minh hoạ theo bộ mỹ thuật | U4c | |
 | FR-14 | Render từng cảnh | U8a | ADR-0038 |
-| FR-15 | Prompt và luật viết lại | U1 (luật hình, luật nền); mỗi CR con viết lại prompt của bước nó đổi; U9 rà toàn bộ | |
-| FR-16 | Xoá dữ liệu cũ | U1 | Chạy khi U1 vào main, sau sao lưu (W-2 A) |
+| FR-15 | Prompt và luật viết lại | U1 (luật hình, luật nền, luật cảnh); mỗi CR con viết lại prompt của bước nó đổi; U9 rà toàn bộ | |
+| FR-16 | Xoá dữ liệu cũ | U2a (project, dữ liệu theo project, prompt đã sửa); U1 (luật style cũ, hình vẽ theo kit cũ) | Chạy khi U2a vào main, sau sao lưu (W-2 A, dời 2026-10-17) |
 | FR-17 | Sửa đúng chỗ, chỉ làm lại phần phụ thuộc | U2b (khung); mọi CR con đăng ký loại đơn vị của mình | ADR-0035 |
-| FR-18 | Ngôn ngữ hình của kênh | U1 | Khoa học phát sáng bật khi U1 vào main (U-3.1 A); ba ngôn ngữ còn lại chỉ có ảnh mẫu (U-3.2 A) |
+| FR-18 | Ngôn ngữ hình của kênh | U1 | Khoa học phát sáng bật khi U1 vào main (U-3.1 A); chỉ một ngôn ngữ trong CR-072 (2026-10-14) |
 | FR-19 | Gợi ý kiểu video | U3 | |
 | FR-20 | Sửa giọng từng câu, từ điển phát âm | U6 | |
 | FR-21 | Thumbnail Remotion | U9 | |
@@ -63,7 +63,7 @@ Cột "Kiểm ở" là CR con mà khi xong thì tiêu chí kiểm được trọ
 | 5 | Làm lại một cảnh ở màn Dựng không render lại cả video; chỗ nối liền mạch không giật | U5, U8a, U8b | U8b |
 | 6 | Dải màu cho thấy color key đổi theo từng phần dàn ý | U5 | U5 |
 | 7 | Sửa một cảnh storyboard chỉ làm lại giọng, animatic, hình, code, render của cảnh đó | U2b, U4c, U5, U6, U7a, U8a | U8a |
-| 8 | Đổi ngôn ngữ hình đang bật không đổi video đã tạo; video mới dùng ngôn ngữ mới | U1 | U1 (đổi sang một bản sao của Khoa học phát sáng, vì ba ngôn ngữ còn lại chưa bật được) |
+| 8 | Đổi ngôn ngữ hình đang bật không đổi video đã tạo; video mới dùng ngôn ngữ mới | U1 | U1 (đổi sang một bản sao của Khoa học phát sáng, vì CR-072 chỉ có một ngôn ngữ) |
 | 9 | Shot lỗi ở Code hiện đúng shot và lỗi, không bị AI tự sửa; một cảnh lỗi khi render không dừng cảnh khác | U7a, U8a | U8a |
 | 10 | Một từ sửa trong từ điển phát âm được đọc đúng ở video sau | U6 | U6 |
 

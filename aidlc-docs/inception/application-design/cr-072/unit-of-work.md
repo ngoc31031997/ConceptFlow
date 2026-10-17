@@ -1,7 +1,7 @@
 # CR-072 — Các CR con (Units of Work)
 
 ## Date
-2026-10-13
+2026-10-13 (cập nhật 2026-10-17: thứ tự theo luồng, phạm vi U1, U2a, U7b)
 
 Đầu vào: yêu cầu `aidlc-docs/inception/requirements/cr-072-2d-film-pipeline.md`; kế hoạch luồng `aidlc-docs/inception/plans/cr-072-workflow-plan.md`; thiết kế trong thư mục này (`components.md`, `component-methods.md`, `services.md`, `component-dependency.md`); câu trả lời U-1..U-5, U-3.1, U-3.2, U-4.1 trong `aidlc-docs/inception/plans/cr-072-unit-of-work-plan.md`.
 
@@ -13,15 +13,17 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 |---|---|
 | 15 CR con. Bốn CR con cỡ XL của kế hoạch luồng được tách: U2 → U2a, U2b; U4 → U4a, U4b, U4c; U7 → U7a, U7b, U7c; U8 → U8a, U8b. Số cũ giữ, thêm chữ cái, nên cột "CR con" trong `components.md` và `application-design.md` vẫn đúng (U4 nghĩa là U4a..U4c) | U-1 A |
 | Mỗi CR con là `CR-072-U<N>`, nhánh `feature/cr-072-u<N>-<slug>`, worktree riêng, vào main riêng | W-1 A |
-| Làm tuần tự, mỗi lúc một CR con, theo thứ tự U1 → U2a → U2b → U3 → U4a → U4b → U4c → U5 → U6 → U7a → U7b → U7c → U8a → U8b → U9 | U-5 B |
+| Làm tuần tự, mỗi lúc một CR con, **theo thứ tự các bước của luồng** (Tiền kỳ → Sản xuất → Hậu kỳ), khung chung làm trước vì mọi CR con sau dựng trên nó: U2a → U2b → U3 → U1 → U4a → U4b → U5 → U6 → U4c → U7a → U7b → U7c → U8a → U8b → U9 | U-5 B; thứ tự theo luồng (Creator, 2026-10-17) |
 | Không viết code chuyển đổi cho project làm dở. Trước khi chạy `/deliver` một CR con, Creator làm xong hoặc xoá project đang dở. Project đã có video vẫn mở được Kết quả và Đăng video; mỗi CR con có test cho điều này | U-2 A |
-| **Khoa học phát sáng** là ngôn ngữ hình được bật khi U1 vào main. Không có bước chờ Creator so ảnh mẫu; ảnh mẫu của cả bốn ngôn ngữ vẫn được dựng để Creator xem | U-3.1 A |
-| Phần nặng (model sheet nhân vật, key pose, VFX, composition ảnh tĩnh) làm đầy đủ chi tiết, chỉ cho kit Khoa học phát sáng. Ba ngôn ngữ còn lại (Sách tranh tươi, Giấy cắt lớp, Đường nét tối giản) dừng ở mức ảnh mẫu, ghi "chỉ có ảnh mẫu", không bật được cho tới khi một CR riêng làm đủ kit đó (backlog). Bản sao Creator tạo từ Khoa học phát sáng thì bật được, vì dùng chung kit | U-3.2 A |
+| **Khoa học phát sáng** là ngôn ngữ hình được bật khi U1 vào main. Không có bước chờ Creator so ảnh mẫu | U-3.1 A |
+| **Chỉ một ngôn ngữ hình**: Khoa học phát sáng, làm đầy đủ chi tiết. Ba ngôn ngữ còn lại (Sách tranh tươi, Giấy cắt lớp, Đường nét tối giản) không có trong CR-072, kể cả ảnh mẫu (backlog). Kho ngôn ngữ, sao chép, bật và ghim vẫn làm đủ; bản sao của Khoa học phát sáng bật được | Creator, 2026-10-14 (thay U-3.2 A) |
+| **Vẽ bằng code Remotion**, không dùng AI tạo ảnh; AI chỉ viết code. Chất lượng đi trước, chấp nhận render chậm hơn. U1 làm năm cách nâng chất lượng trong kit: lớp chất phim, vẽ theo hạng chính/phụ/phông, vật liệu và ánh sáng do kit tính, rig cho nhân vật và máy móc, nền thủ tục. Không có vòng AI tự xem ảnh rồi sửa | Creator, 2026-10-14 |
+| **Tách cách vẽ khỏi màu**: ngôn ngữ hình quy định cách vẽ; màu đến từ bảng màu của video và ánh sáng của từng cảnh, kit không tự chọn màu. AI gợi ý bảng màu thế giới ở U4a, color key ở U5, chỉnh màu theo color key khi render ở U8a | Creator, 2026-10-17 |
 | Khung sửa theo đơn vị (U2b) áp lên cả Kịch bản và Storyboard hiện có, đúng như kế hoạch luồng. U3 và U5 chuyển các bước đó sang dạng mới, vẫn trên khung | U-4.1 A |
-| Xoá dữ liệu cũ khi U1 vào main, sau khi sao lưu | W-2 A |
+| Xoá dữ liệu cũ khi **U2a** vào main (CR con vào main đầu tiên), sau khi sao lưu. U1 gỡ thêm luật style cũ và hình vẽ theo kit cũ khi nó vào main | W-2 A; dời từ U1 sang U2a (Creator, 2026-10-17) |
 | Luồng thêm bước dần theo CR con, không có bước giả: 13 bước hiện có → 17 bước khi U8b xong | Kế hoạch luồng ("bước chưa làm thì giữ như hiện nay") |
 
-**Thay đổi so với yêu cầu đã duyệt:** FR-18 ghi "Trước CR con đầu tiên, AI dựng bộ ảnh mẫu cho cả bốn, Creator so rồi bật một (P-4 A)". Theo U-3.1 A, Creator chọn Khoa học phát sáng ngay, nên không còn cổng chọn ngôn ngữ giữa U1 và U4a. Theo U-3.2 A, ba ngôn ngữ còn lại chưa bật được cho video. Trang Ngôn ngữ hình, ảnh mẫu của cả bốn, việc chỉ một ngôn ngữ bật và việc project ghim phiên bản vẫn giữ như FR-18.
+**Thay đổi so với yêu cầu đã duyệt:** FR-18 ghi "Trước CR con đầu tiên, AI dựng bộ ảnh mẫu cho cả bốn, Creator so rồi bật một (P-4 A)". Theo U-3.1 A, Creator chọn Khoa học phát sáng ngay, nên không còn cổng chọn ngôn ngữ. Theo quyết định 2026-10-14, chỉ Khoa học phát sáng có trong CR-072; ba ngôn ngữ còn lại không có ảnh mẫu. Trang Ngôn ngữ hình, việc chỉ một ngôn ngữ bật, sao chép và việc project ghim phiên bản vẫn giữ như FR-18. FR-16 (xoá dữ liệu cũ) chuyển từ U1 sang U2a.
 
 ## Cách làm mỗi CR con
 
@@ -47,34 +49,36 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 
 ## U1 — Ngôn ngữ hình của kênh
 
-- **Nhánh**: `feature/cr-072-u1-visual-language` · **Cỡ**: L · **Phụ thuộc**: —
-- **FR**: FR-18, FR-15 (luật hình và luật nền theo ngôn ngữ), FR-16
-- **Service**: authoring-service, rendering, api-gateway, web-gui; script vận hành
+- **Nhánh**: `feature/cr-072-u1-visual-language` · **Cỡ**: XL · **Phụ thuộc**: — (làm sau U3 theo thứ tự; phải có trước U4a)
+- **FR**: FR-18, FR-15 (luật hình, luật nền, luật cảnh theo ngôn ngữ), FR-11 (rig và dáng)
+- **Service**: rendering, llm-service, authoring-service, orchestrator, api-gateway, web-gui
 - **Phạm vi**:
-  - `VisualLanguageStore` (authoring-service): ngôn ngữ hình có phiên bản; đúng một ngôn ngữ bật; ngôn ngữ hệ thống chỉ đọc, sao chép để sửa; project ghim id và phiên bản lúc tạo; ngôn ngữ "chỉ có ảnh mẫu" không bật được.
-  - Bốn ngôn ngữ hệ thống, luật hình và luật nền viết riêng cho từng ngôn ngữ. Khoa học phát sáng được gieo ở trạng thái bật.
-  - `LanguageKits` (rendering): bốn kit `phatsang`, `tuoi`, `giay`, `net` ở mức dựng được ảnh mẫu; registry theo `kit_key`; `GET /v1/kits`.
-  - `StillRenderService`: `POST /v1/stills` (composition + props → PNG, cache theo hash nội dung), ghi `/shared/stills/{hash}.png`, dọn ảnh không còn ai trỏ tới. Composition `LanguageSample` với hai cảnh thử.
-  - api-gateway: một cách phát file chung từ `/shared` (kiểm đường dẫn nằm trong `/shared` và thuộc đúng project, hỗ trợ tua), theo ADR-0041.
-  - web-gui: trang cài đặt Ngôn ngữ hình (danh sách, ảnh mẫu, bật, sao chép, sửa luật của bản sao).
-  - Luồng hiện có (Hình minh hoạ, Code) đọc luật của ngôn ngữ đã ghim và dùng kit Khoa học phát sáng (kế hoạch luồng, W-2 A).
-  - Script sao lưu và xoá dữ liệu cũ (FR-16), có bước xác nhận, chạy từ primary checkout ngay sau khi U1 vào main.
-- **Giao cho CR con sau**: `VisualLanguageStore.Active/PinForProject`, `/v1/stills`, phát file chung, kit `phatsang`.
+  - `VisualLanguageStore` (authoring-service): ngôn ngữ hình có phiên bản; đúng một ngôn ngữ bật; ngôn ngữ hệ thống chỉ đọc, sao chép để sửa; project ghim id và phiên bản lúc tạo (bước Khởi tạo).
+  - Một ngôn ngữ hệ thống: Khoa học phát sáng, với luật vẽ hình, luật vẽ nền và luật cảnh; luật cảnh chỉ nói cách dùng ánh sáng, không quy định màu.
+  - Kit `phatsang` (rendering), token chỉ giữ cách tô, chọn qua input prop `kitKey` (đi theo đường của `videoFont`); năm cách nâng chất lượng: lớp chất phim (`Shot`, `Scene`), vẽ theo hạng chính/phụ/phông, vật liệu và ánh sáng do kit tính (`Shape`), rig (bộ xương, dáng, hành động, chu kỳ, IK, biểu cảm; `Mechanism` cho máy móc), nền thủ tục (noise, shader WebGL có sẵn). Hình có sẵn và sáu nền vẽ lại. `GET /v1/kits`.
+  - Màu từ ngoài vào: `light` của từng cảnh trong storyboard (vai trò trong bảng màu), bộ ghép code sinh `LOOKS`; prompt Đạo diễn bỏ chỗ ép "nền sáng bão hoà".
+  - `StillRenderService`: `POST /v1/stills` (cache theo hash nội dung), `/shared/stills/{hash}.png`, dọn ảnh không còn ai trỏ tới. Composition `LanguageSample` với hai cảnh thử (lòng quả sung sáng, vũ trụ tối).
+  - api-gateway: một cách phát file chung từ `/shared` (ADR-0041).
+  - web-gui: trang cài đặt Ngôn ngữ hình; chọn hạng ở danh sách hình của project; huy hiệu hạng ở Thư viện hình.
+  - Luồng hiện có (Hình minh hoạ, Code, Render) đọc luật của ngôn ngữ đã ghim và dùng kit Khoa học phát sáng; gỡ vai trò `illustration_style`; xoá hình vẽ theo kit cũ.
+  - Thiết kế: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`.
+- **Giao cho CR con sau**: `VisualLanguageStore.Active/PinForProject`, `/v1/stills`, phát file chung, kit `phatsang` (lớp chất phim, vật liệu, rig, bộ sinh nền, shader), `Scene.light`/`LOOKS`.
 - **Tiêu chí xong riêng**:
-  - Trang Ngôn ngữ hình hiện ảnh mẫu của cả bốn ngôn ngữ; ba ngôn ngữ "chỉ có ảnh mẫu" không bật được, có lý do hiện trên màn.
+  - Trang Ngôn ngữ hình hiện ảnh mẫu lòng quả sung (sáng) và vũ trụ (tối) ở hai khung, cùng một lối vẽ.
   - Đổi ngôn ngữ đang bật (sang một bản sao của Khoa học phát sáng) không đổi project đã tạo; project mới ghim ngôn ngữ mới (tiêu chí chấp nhận 8).
-  - Gọi `/v1/stills` hai lần với cùng props thì lần hai dùng lại file (`cache_hit`).
-  - Sao lưu tạo được file dump DB và file nén `/shared` trước khi xoá; báo cáo ghi rõ đã xoá gì. Kiểu video, cấu hình kênh, kết nối YouTube còn nguyên.
-  - Luồng sau khi vào main: 13 bước, như hiện nay.
+  - Gọi `/v1/stills` hai lần với cùng nội dung thì lần hai dùng lại file (`cache_hit`).
+  - Hai project chủ đề vũ trụ và lòng quả sung cho hai bảng màu khác nhau, video một tối một sáng; một hình hạng chính có bộ phận chuyển động và kiểu cắt lớp; một nhân vật trên rig đi bộ và đổi biểu cảm.
+  - Luồng sau khi vào main: 13 bước.
 
 ## U2a — Luồng ba giai đoạn
 
-- **Nhánh**: `feature/cr-072-u2a-three-phase-flow` · **Cỡ**: M · **Phụ thuộc**: — (làm sau U1 theo thứ tự)
-- **FR**: FR-1 (phần thanh bước và tên bước)
-- **Service**: orchestrator, authoring-service, web-gui
+- **Nhánh**: `feature/cr-072-u2a-three-phase-flow` · **Cỡ**: M · **Phụ thuộc**: — (làm đầu tiên)
+- **FR**: FR-1 (phần thanh bước và tên bước), FR-16
+- **Service**: orchestrator, authoring-service, web-gui; script vận hành
 - **Phạm vi**: `FlowDefinition` ở ba bản chia 13 bước hiện có vào Tiền kỳ, Sản xuất, Hậu kỳ (`PhaseOf`); `StepRail` theo giai đoạn; tiêu đề màn; đổi tên các bước đã có theo tên trong luồng mục tiêu (tên cụ thể chốt ở Functional Design). Test hợp đồng giữ ba bản khớp nhau.
+- Script sao lưu và xoá dữ liệu cũ (FR-16, W-2 A): có bước xác nhận; dump DB của orchestrator và authoring-service, nén `/shared`; xoá mọi project qua saga xoá, `llm_usage`, `code_check_diagnostics`, prompt Creator đã sửa; giữ kiểu video, cấu hình kênh, kết nối YouTube, thư viện hình; chạy từ primary checkout ngay sau khi U2a vào main. Thư viện hình và luật style cũ do U1 xoá khi U1 vào main.
 - **Giao cho CR con sau**: cách thêm một bước vào một giai đoạn ở cả ba bản.
-- **Tiêu chí xong riêng**: thanh bước hiện ba giai đoạn; số bước, tên bước, nhãn sự kiện tiến độ khớp nhau giữa server và web-gui. Luồng: 13 bước.
+- **Tiêu chí xong riêng**: thanh bước hiện ba giai đoạn; số bước, tên bước, nhãn sự kiện tiến độ khớp nhau giữa server và web-gui; sao lưu tạo được file dump DB và file nén `/shared` trước khi xoá, báo cáo ghi rõ đã xoá gì, kiểu video, cấu hình kênh, kết nối YouTube còn nguyên. Luồng: 13 bước.
 
 ## U2b — Khung sửa theo đơn vị
 
@@ -124,7 +128,7 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 
 ## U4c — Hình minh hoạ theo bộ mỹ thuật
 
-- **Nhánh**: `feature/cr-072-u4c-illustrations-from-art` · **Cỡ**: M · **Phụ thuộc**: U2b, U4b
+- **Nhánh**: `feature/cr-072-u4c-illustrations-from-art` · **Cỡ**: M · **Phụ thuộc**: U2b, U4b (làm sau U6 theo thứ tự: bước 9 Hình minh hoạ)
 - **FR**: FR-13
 - **Service**: authoring-service, web-gui
 - **Phạm vi**: `IllustrationPlanner` chỉ đưa vào danh sách phần còn thiếu sau bộ mỹ thuật; hình của bộ mỹ thuật hiện là đã duyệt và chỉ sửa ở mục gốc; đơn vị `illustration` có "làm lại kèm ghi chú"; giữ vẽ song song, duyệt, sửa, bỏ, sửa prompt như hiện nay.
@@ -165,12 +169,12 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
   - **NFR**: thời gian mục tiêu của xem nhanh một shot (kế hoạch luồng: khoảng 10 giây).
 - **Tiêu chí xong riêng**: shot lỗi hiện đúng shot và lỗi, không bị AI tự sửa (tiêu chí chấp nhận 9, phần Code); một nhân vật giữ đúng model trên mọi shot (tiêu chí chấp nhận 4); xem nhanh một shot đạt mục tiêu NFR. Luồng: 16 bước.
 
-## U7b — Rig key pose và bộ VFX
+## U7b — Bộ VFX và gọi dáng theo key pose
 
 - **Nhánh**: `feature/cr-072-u7b-key-pose-vfx` · **Cỡ**: M · **Phụ thuộc**: U1 (theo thứ tự làm sau U7a)
-- **FR**: FR-11, FR-12
+- **FR**: FR-12, FR-11 (phần gọi dáng; rig ở U1)
 - **Service**: rendering, authoring-service (prompt của Kỹ sư Remotion)
-- **Phạm vi**: rig trong kit `phatsang` diễn theo key pose (giữ dáng, ease mạnh, vượt đà); bộ hiệu ứng có tên (hạt, khói, tia sáng, lấp lánh, mưa, glow…) lấy màu từ bảng màu của video; prompt Kỹ sư Remotion gọi tư thế và hiệu ứng theo tên.
+- **Phạm vi**: bộ hiệu ứng có tên (khói, lửa, mưa, lấp lánh, tia điện, nổ, bụi…) lấy màu từ bảng màu của video; prompt Kỹ sư Remotion gọi hiệu ứng theo tên và gọi dáng của rig theo key pose của animatic. Rig, thư viện dáng và nguyên lý diễn hoạt đã có từ U1.
 - **Tiêu chí xong riêng**: một cảnh có nhân vật dùng key pose và ít nhất một hiệu ứng có tên, render đúng ở cả hai khung hình; tsc và test của kit xanh. Luồng: 16 bước.
 
 ## U7c — Validate đúng chỗ, Review đủ thông tin
@@ -231,5 +235,6 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 
 | Việc | Nguồn |
 |---|---|
-| Làm đủ phần nặng cho ba ngôn ngữ hình còn lại (Sách tranh tươi, Giấy cắt lớp, Đường nét tối giản) để bật được cho video | U-3.2 A |
+| Ba ngôn ngữ hình còn lại (Sách tranh tươi, Giấy cắt lớp, Đường nét tối giản): token, luật, ảnh mẫu và phần nặng | Creator, 2026-10-14 (thay U-3.2 A) |
+| Vòng AI tự xem ảnh đã render rồi sửa hình (chỉ cho hình hạng chính, một vòng) | Creator, 2026-10-14 |
 | Bỏ lệnh `render_scenes` cả video sau khi saga theo cảnh chạy ổn trên stack thật | `component-dependency.md`, đổi hợp đồng theo ba bước |

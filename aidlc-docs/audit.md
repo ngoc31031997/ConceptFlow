@@ -3403,3 +3403,13 @@ q6 => làm hết tron cr 067"
 **Context**: INCEPTION — CR-072 Application Design và Units Generation đã duyệt.
 
 ---
+## CR-072 — Thứ tự CR con theo luồng
+**Timestamp**: 2026-10-17T00:00:00Z
+**User Input**: "sửa lại thứ tự các CR con theo hướng ưu tiên các bước đầu tiên trước ví dụ các chỉnh sủa trong tiền kì 1. khởi tạo phải được làm trước sau đó đến tiền kì 2.cấu hình ....... sản xuất đến hậu kì v.v"; sau đề xuất: "1 chốt thứ tự ưu tiên trên
+2. làm theo bạn đề xuất
+sửa tài liệu rồi mở cr đầu tiên đi"
+**AI Response**: Xếp CR con theo bước sớm nhất của luồng mục tiêu mà nó đổi, khung chung (U2a, U2b) đứng đầu vì mọi CR con từ U3 dựng trên chúng: U2a → U2b → U3 → U1 → U4a → U4b → U5 → U6 → U4c → U7a → U7b → U7c → U8a → U8b → U9 (U1 lùi từ 1 xuống 4, đứng ngay trước Mỹ thuật lượt 1; U4c chuyển xuống bước 9 Hình minh hoạ, sau U6). Mọi phụ thuộc trong ma trận vẫn đúng. Theo đề xuất được chọn, việc sao lưu và xoá dữ liệu cũ (FR-16, W-2 A) chuyển từ U1 sang U2a (CR con vào main đầu tiên), giữ thư viện hình; U1 xoá luật style cũ và hình vẽ theo kit cũ khi nó vào main. Cập nhật thêm các quyết định Creator đã chốt ngày 2026-10-14/17 vào `unit-of-work.md`: chỉ một ngôn ngữ hình (thay U-3.2 A); vẽ bằng code Remotion với năm cách nâng chất lượng trong U1 (U1 cỡ XL); tách cách vẽ khỏi màu (bảng màu ở U4a, U5, U8a); rig chuyển từ U7b sang U1, U7b còn bộ VFX và gọi dáng theo key pose; backlog: ba ngôn ngữ còn lại, vòng AI tự xem ảnh. U1 tạm dừng, thiết kế vòng 3 giữ chưa commit trong worktree của nó. Làm trên nhánh tài liệu `chore/cr-072-unit-order`, gộp vào main sau khi Creator duyệt, rồi mở U2a bằng `/cr`.
+**Impact Assessment**: chỉ tài liệu; không đổi code, không build lại service.
+**Artifacts Affected**: `aidlc-docs/inception/application-design/cr-072/unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
+
+---
