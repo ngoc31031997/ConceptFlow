@@ -7,13 +7,15 @@ Dòng gọi cột. **mới** là đường giao tiếp CR-072 thêm; ô không g
 | Bên gọi \ Bên nhận | api-gateway | orchestrator | authoring-service | llm-service | rendering | tts | video-assembly |
 |---|---|---|---|---|---|---|---|
 | web-gui | HTTP + SSE (đã có) | | | | | | |
-| api-gateway | | HTTP (route mới: render theo cảnh, dựng) | HTTP (route mới: đơn vị, mỹ thuật, ngôn ngữ hình, từ điển, animatic, thumbnail) | | | | |
+| api-gateway | | HTTP (route mới: render theo cảnh, dựng) | HTTP (route mới: đơn vị, brief, nghiên cứu, câu chuyện, beat, kịch bản, rà soát, phiên bản kịch bản, mỹ thuật, ngôn ngữ hình, từ điển, animatic, thumbnail) | | | | |
 | orchestrator | | | HTTP nội bộ (thêm: câu chờ đọc, kết quả đọc, kế hoạch dựng) | | RabbitMQ `render_scene` **mới** | RabbitMQ `synthesize_lines` **mới** | RabbitMQ `assemble_video` (thêm trường) |
 | authoring-service | | HTTP nội bộ `draft-voice` **mới** (client đã có) | | HTTP (schema storyboard mới, code theo cảnh) | HTTP `/v1/stills`, `/v1/previews/shot` **mới**, `/v1/kits` **mới** | | |
 | llm-service | | | | | HTTP `/v1/check/*` (đã có) | | |
 | rendering, tts, video-assembly | `progress.fanout` (thêm `scene_key`, `stage`) | sự kiện RabbitMQ (mới: `scene_rendered`, `scene_render_failed`, `lines_synthesized`) | | | | | |
 
 Không service nào gọi thẳng service khác ngoài các đường trên. tts và video-assembly vẫn chỉ nhận lệnh qua RabbitMQ.
+
+**Ra ngoài hệ thống (mới, U3b):** authoring-service tải trang nguồn của dữ kiện qua `SourceFetcher` (HTTP GET tới Internet). Đây là đường duy nhất tới một địa chỉ do người ngoài đưa vào; luật chặn địa chỉ nội bộ và giới hạn ở ADR-0043. Không service nào khác dùng `SourceFetcher`.
 
 ## Lưu file: `/shared` là kho file (ADR-0041)
 
@@ -57,7 +59,7 @@ Thêm vào `docs/contracts/shared-artifacts.md` (cập nhật cùng CR con tạo
 | Đường dẫn | Chủ ghi | Người đọc | CR con |
 |---|---|---|---|
 | `/shared/stills/{hash}.png` | rendering | api-gateway (phát cho trình duyệt), publisher (thumbnail đã chọn được chép sang `thumbnail/`) | U1 |
-| `/shared/{project_id}/audio/{line}_{cache_key}.wav` | tts | api-gateway (animatic), video-assembly | U6 (đổi khoá tên file) |
+| `/shared/{project_id}/audio/{line}_{cache_key}.wav` | tts | api-gateway (nghe thử ở Viết kịch bản, animatic), video-assembly | U3e (đọc từng câu, khoá theo chữ và giọng); U6 (thêm cách đọc vào khoá) |
 | `/shared/{project_id}/previews/{scene}_{shot}_{hash}.mp4` | rendering | api-gateway | U7 |
 | `/shared/{project_id}/video/scenes/{scene}.mp4` + `{scene}.json` (số khung, đoạn chồng) | rendering | video-assembly, api-gateway (màn Dựng) | U8 |
 | `/shared/{project_id}/uploads/moodboard/`, `/uploads/svg/` | api-gateway | authoring-service | U4 |
@@ -72,7 +74,17 @@ flowchart TB
     RUS[ReviewUnitStore] --> DT[DependencyTracker]
     RS[RedoService] --> RUS
     RS --> GEN{{UnitGenerator theo loại}}
-    GEN --> SA[ScriptAuthoring]
+    GEN --> CB[CreativeBrief]
+    GEN --> RD[ResearchDesk]
+    RD --> SVf[SourceVerifier] --> SFt[SourceFetcher]
+    RD --> RSrc[ResearchSource]
+    GEN --> SF2[StoryFrame] --> AA[ArchetypeAdvisor]
+    GEN --> BSh[BeatSheet]
+    GEN --> SW[ScriptWriter] --> VLN
+    GEN --> SR[ScriptReview]
+    GEN --> HN[HandoffNotes]
+    SVer[ScriptVersions] --> RUS & DT
+    AB & SB & IP & CSG --> SVer
     GEN --> AB[ArtBible]
     GEN --> SB[StoryboardStore]
     GEN --> VLN[VoiceLines]
@@ -86,8 +98,10 @@ flowchart TB
     EP[EditPlanner] --> RS
     RSum[ReviewSummary] --> RUS & VF
     TC[ThumbnailComposer] --> AB & VLS
-    SA & AB & SB & IP & CSG & EP & TC --> PS
+    CB & RD & SF2 & BSh & SW & SR & HN & AB & SB & IP & CSG & EP & TC --> PS
 ```
+
+- Từ bước 8 trở đi, `ArtBible`, `StoryboardStore`, `IllustrationPlanner`, `CodeSegments` đọc kịch bản và ghi chú bàn giao qua `ScriptVersions` (bản đã chốt), không đọc thẳng đơn vị của bước 1–7 (ADR-0044).
 
 - `ReviewUnitStore` và `DependencyTracker` không biết nội dung của từng loại đơn vị. Mỗi loại đăng ký một `UnitGenerator` khai báo đầu vào của nó. Thêm loại đơn vị mới không phải sửa khung.
 - Mọi prompt vẽ và code đọc luật từ ngôn ngữ hình đã ghim vào project, qua `VisualLanguageStore`.
@@ -96,9 +110,16 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    subgraph TK[Tiền kỳ · authoring-service]
-      K[Kịch bản] --> M1[Mỹ thuật 1] --> SBo[Storyboard] --> M2[Mỹ thuật 2]
+    subgraph ND[Tiền kỳ · Nội dung · authoring-service]
+      YT[Ý tưởng] --> NC[Nghiên cứu · tuỳ chọn] --> CC[Câu chuyện] --> BTs[Beat sheet] --> VK[Viết kịch bản] --> RC[Rà soát và chốt]
+      YT -. bỏ qua Nghiên cứu .-> CC
     end
+    NC -. tải trang nguồn .-> NET[(Internet)]
+    VK -. nghe thử · OR → tts .-> V
+    subgraph TK[Tiền kỳ · Hình ảnh · authoring-service]
+      M1[Mỹ thuật 1] --> SBo[Storyboard] --> M2[Mỹ thuật 2]
+    end
+    RC -- bản đã chốt + bộ bàn giao --> M1
     M2 --> V[Giọng sơ bộ · OR → tts]
     V --> AN[Animatic · trình duyệt]
     subgraph SX[Sản xuất · authoring-service]
@@ -116,16 +137,17 @@ flowchart LR
 
 ## Thứ tự làm và phụ thuộc giữa CR con
 
-Theo `cr-072-workflow-plan.md`. Bảng dưới ghi thành phần nào của CR con trước mà CR con sau dùng:
+Theo `cr-072-workflow-plan.md`, cập nhật 2026-10-17; thứ tự và ma trận chi tiết theo CR con ở `unit-of-work-dependency.md`. Bảng dưới ghi thành phần nào của CR con trước mà CR con sau dùng:
 
 | CR con | Dùng của CR con trước |
 |---|---|
-| U2 | — (song song U1) |
-| U3 | U2: `ReviewUnitStore`, `RedoService`, bộ thành phần đơn vị của web-gui |
-| U4 | U1: `VisualLanguageStore`, `LanguageKits`, `/v1/stills`; U2; U3: `script_scene` |
+| U2a | — |
+| U3a | U2a: thanh bước bốn nhóm, cách thêm bước |
+| U3b..U3f | U3a: khung đơn vị (`ReviewUnitStore`, `DependencyTracker`, `RedoService`, bộ thành phần đơn vị của web-gui); bước trước của chính Tiền kỳ · Nội dung (`brief` → `fact` → `story` → `beat` → `script_beat`) |
+| U4 | U1: `VisualLanguageStore`, `LanguageKits`, `/v1/stills`; U3a: khung đơn vị; U3f: `script_version` và bộ bàn giao |
 | U5 | U4: `art_*`, `CharacterLibrary`, schema storyboard có nhân vật |
-| U6 | U5: `board_scene` (câu thoại), `art_*` cho khung tĩnh |
-| U7 | U5: storyboard mới; U2: đơn vị `code_shot` |
+| U6 | U5: `board_scene` (câu thoại), `art_*` cho khung tĩnh; U3e: `SynthesizeLines`, `DraftVoiceDispatcher`, phát file chung |
+| U7 | U5: storyboard mới; U3a: khung đơn vị cho `code_shot` |
 | U8 | U7: code theo cảnh; U5: color key, cách nối cảnh |
 | U9 | U5: `style_frame`; U1: `/v1/stills` |
 

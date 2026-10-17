@@ -1,7 +1,7 @@
 # ADR-0034: Luồng ba giai đoạn và bộ thiết kế mỹ thuật hai lượt
 
 ## Status
-Accepted
+Superseded by ADR-0042
 
 ## Date
 2026-10-13

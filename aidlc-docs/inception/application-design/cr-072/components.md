@@ -1,10 +1,10 @@
 # CR-072 — Thành phần
 
-Thành phần mới (**mới**) và thành phần đổi (**đổi**) của luồng làm phim 2D. Ranh giới theo ADR-0029: authoring-service giữ mọi thứ AI soạn; orchestrator giữ project, luồng và saga; các service còn lại nhận lệnh qua RabbitMQ hoặc HTTP như hiện nay. Cột "CR con" là nơi thành phần được làm (`cr-072-workflow-plan.md`).
+Thành phần mới (**mới**) và thành phần đổi (**đổi**) của luồng làm phim 2D. Ranh giới theo ADR-0029: authoring-service giữ mọi thứ AI soạn; orchestrator giữ project, luồng và saga; các service còn lại nhận lệnh qua RabbitMQ hoặc HTTP như hiện nay. Cột "CR con" là nơi thành phần được làm (`cr-072-workflow-plan.md`; tên CR con chi tiết ở `unit-of-work.md`). Cập nhật 2026-10-17: U3 cũ thay bằng sáu CR con U3a..U3f của Tiền kỳ · Nội dung; khung đơn vị (U2b cũ) làm ở U3a; phần áp khung lên Storyboard hiện có gộp vào U5.
 
 ## Khái niệm chung: đơn vị duyệt (ADR-0035)
 
-Một **đơn vị** là thứ nhỏ nhất Creator duyệt, ghi chú, sửa tay hoặc cho làm lại. Đơn vị được gọi bằng `kind:key`, ví dụ `board_scene:3`, `voice_line:3.2`, `art_location:ostiole`.
+Một **đơn vị** là thứ nhỏ nhất Creator duyệt, ghi chú, sửa tay hoặc cho làm lại. Đơn vị được gọi bằng `kind:key`, ví dụ `beat:4`, `fact:F06`, `board_scene:3`, `voice_line:3.2`, `art_location:ostiole`.
 
 Mỗi đơn vị có:
 - **trạng thái**: `pending` (chờ duyệt), `approved`, `redoing` (AI đang làm lại), `stale` (đầu vào đã đổi, cần làm lại);
@@ -17,11 +17,16 @@ Mỗi đơn vị có:
 
 ```mermaid
 flowchart LR
-    LL[logline / summary] --> BT[beat]
-    BT --> SS[script_scene]
+    BR[brief] --> RQ[research_question] --> FA[fact]
+    BR & FA --> ST[story]
+    ST & FA --> BT[beat]
+    BT & FA --> SB[script_beat]
+    SB & BT & FA --> RC[review_check]
+    BT & SB & FA --> HO[handoff_beat]
+    BR & SB & HO & GL[glossary_term] & RC --> SV[(script_version · bản đã chốt)]
     VL[(ngôn ngữ hình đang bật)] --> AW[art_world]
-    SS --> AW --> AL[art_location] & AC[art_character] & AP[art_prop]
-    SS & AL & AC & AP --> BS[board_scene]
+    SV --> AW --> AL[art_location] & AC[art_character] & AP[art_prop]
+    SV & AL & AC & AP --> BS[board_scene]
     BS & AW --> CK[color_key]
     CK & BS & AL & AC & AP --> SF[style_frame]
     BS & PD[(từ điển phát âm)] --> VO[voice_line]
@@ -35,21 +40,33 @@ flowchart LR
 
 Đơn vị `render_scene` và ghi chú dựng do orchestrator giữ; các đơn vị còn lại do authoring-service giữ (AD-1 A).
 
+Từ bước 8 trở đi, đơn vị không trỏ thẳng vào đơn vị của bước 1–7 mà vào phần tương ứng của `script_version` đã chốt (ADR-0044): Creator sửa ở bước 1–7 chỉ tạo bản nháp; chốt bản mới thì phần nào đổi hash, đơn vị phụ thuộc phần đó mới thành `stale`. `script_version` không phải đơn vị duyệt; nó là ảnh chụp bất biến lúc Creator bấm chốt. Mỗi dữ kiện mang kết quả kiểm link (khớp, không khớp, không tải được, không có nguồn), hoặc nhãn "chưa có nguồn" khi bước Nghiên cứu bị bỏ qua.
+
 ## authoring-service (Go)
 
 | Thành phần | Mới/đổi | Trách nhiệm | FR | CR con |
 |---|---|---|---|---|
 | `VisualLanguageStore` | mới | Ngôn ngữ hình của kênh: luật hình, luật nền, mô tả, `kit_key` trỏ tới kit Remotion; phiên bản; đúng một ngôn ngữ bật; ngôn ngữ hệ thống chỉ đọc, sao chép để sửa; ghim ngôn ngữ và phiên bản vào project khi tạo (AD-3 A) | FR-18 | U1 |
-| `ReviewUnitStore` | mới | Lưu đơn vị: trạng thái, nguồn, ghi chú, dấu đầu vào, số lần làm lại | FR-17, NFR-2 | U2 |
-| `DependencyTracker` | mới | Tính dấu đầu vào, đánh `stale` khi đầu vào đổi, trả danh sách "sẽ làm lại" trước khi Creator sửa | FR-17 | U2 |
-| `RedoService` | mới | Làm lại một đơn vị kèm ghi chú, hoặc gom ghi chú của nhiều đơn vị thành một lượt; đưa đơn vị bên cạnh vào ngữ cảnh; gọi bộ sinh của từng loại đơn vị; chạy bất đồng bộ qua `/v1/operations/{id}` hiện có | FR-17 | U2 |
-| `ScriptAuthoring` | đổi | Logline, tóm tắt, dàn ý theo beat, lời thoại theo cảnh; giữ chữ Creator tự viết; mỗi cảnh một đơn vị | FR-2 | U3 |
-| `ArchetypeAdvisor` | mới | Gợi ý 3–5 kiểu video từ bảng `video_archetypes` theo chủ đề, mỗi kiểu có lý do và câu mở mẫu; đề xuất kiểu mới kèm playbook nháp, lưu vào bảng được | FR-19 | U3 |
+| `ReviewUnitStore` | mới | Lưu đơn vị: trạng thái, nguồn, ghi chú, dấu đầu vào, số lần làm lại | FR-17, NFR-2 | U3a |
+| `DependencyTracker` | mới | Tính dấu đầu vào, đánh `stale` khi đầu vào đổi, trả danh sách "sẽ làm lại" trước khi Creator sửa | FR-17 | U3a |
+| `RedoService` | mới | Làm lại một đơn vị kèm ghi chú, hoặc gom ghi chú của nhiều đơn vị thành một lượt; đưa đơn vị bên cạnh vào ngữ cảnh; gọi bộ sinh của từng loại đơn vị; chạy bất đồng bộ qua `/v1/operations/{id}` hiện có | FR-17 | U3a |
+| `CreativeBrief` | mới | Bước Ý tưởng: tạo project với chủ đề, dạng video, ngôn ngữ nội dung, thời lượng mục tiêu; AI viết brief (câu hỏi trung tâm, khán giả, biết / hiểu / cảm thấy, giọng điệu, ngoài phạm vi); đơn vị `brief`, giữ ô Creator viết | FR-27 | U3a |
+| `ResearchDesk` | mới | Bước Nghiên cứu: sinh câu hỏi từ brief (`research_question`); dựng prompt nghiên cứu và prompt bổ sung; đọc câu trả lời dán vào (tìm khối JSON `conceptflow.research.v1`, gộp theo mã, nhật ký từng lần dán, bỏ dòng lỗi kèm lý do); bảng dữ kiện (`fact`: loại, bắt buộc nói, giữ / bỏ, thêm tay); độ phủ câu hỏi; bỏ qua bước | FR-28 | U3b |
+| `SourceVerifier` | mới | Với mỗi dữ kiện có link và đoạn trích: nhờ `SourceFetcher` tải trang, chuẩn hoá chữ, tìm đoạn trích; trả khớp, không khớp (kèm câu gần nhất) hoặc không tải được (kèm lý do); chạy nền; kiểm lại từng dữ kiện | FR-28 | U3b |
+| `SourceFetcher` | mới (cổng ra Internet) | Tải trang theo luật chặn địa chỉ nội bộ, giới hạn thời gian, dung lượng, số trang cùng lúc, chỉ đọc chữ (ADR-0043) | FR-28 | U3b |
+| `ResearchSource` | mới (cổng) | Nguồn tra cứu: hiện chỉ có bản "dán kết quả từ công cụ ngoài"; API tìm kiếm cắm vào sau qua cổng này | FR-28 | U3b |
+| `StoryFrame` | mới | Bước Câu chuyện: góc tiếp cận đã chọn, câu hỏi mở đầu, lời hứa, chuỗi nhân quả có mã dữ kiện, payoff, logline, tóm tắt; dữ kiện dùng trong chuyện; khi bỏ qua Nghiên cứu thì AI tự liệt kê dữ kiện mang nhãn "chưa có nguồn"; đơn vị `story`, mỗi ô có nguồn riêng | FR-29, FR-28 mục 8 | U3c |
+| `ArchetypeAdvisor` | mới | Gợi ý 3–5 kiểu video từ bảng `video_archetypes` theo brief và bảng dữ kiện, mỗi kiểu có góc kể, lý do có mã dữ kiện và câu mở mẫu; đề xuất kiểu mới kèm playbook nháp, lưu vào bảng được | FR-19 | U3c |
+| `BeatSheet` | mới | Bước Beat sheet: beat có chức năng, mục tiêu, nội dung, dữ kiện, thời lượng, chuyển tiếp; thêm, xoá, đổi thứ tự; kiểm cấu trúc theo khung thời lượng; đơn vị `beat` | FR-30 | U3d |
+| `ScriptWriter` | mới (thay phần lời thoại của bước Kịch bản hiện có) | Bước Viết kịch bản: lời thoại theo beat (`script_beat`, mỗi câu có mã và mã dữ kiện); cờ câu dài, câu khó nghe kèm gợi ý; kiểm chỗ nối giữa hai beat kèm gợi ý; xin đọc từng câu để nghe thử và tính thời lượng (qua `DraftVoiceDispatcher`) | FR-31 | U3e |
+| `ScriptReview` | mới | Bước Rà soát: máy kiểm và AI rà soát theo sáu nhóm (`review_check`), mỗi mục chỉ tới một câu, dữ kiện hay beat; áp gợi ý, chấp nhận kèm lý do; ghi chú rà soát của AI và của Creator | FR-32 | U3f |
+| `HandoffNotes` | mới | Ghi chú bàn giao năm mục cho từng beat (`handoff_beat`) và bảng thuật ngữ (`glossary_term`); mỗi mục khai báo vai AI nào đọc | FR-32 | U3f |
+| `ScriptVersions` | mới | Chốt phiên bản (ảnh chụp bất biến, hash từng phần), bản nháp và danh sách thay đổi so với bản chốt gần nhất, lịch sử; trả cho mỗi vai AI phía sau đúng phần nó đọc của bản đã chốt (ADR-0044) | FR-32 | U3f |
 | `ArtBible` | mới | Bộ thiết kế mỹ thuật: thế giới, bối cảnh, nhân vật, đạo cụ (lượt 1); color key, khung mẫu (lượt 2); bảng tham khảo, ảnh Creator tải lên; mỗi mục một đơn vị; nhờ rendering dựng ảnh tĩnh | FR-3, FR-5, FR-6 | U4, U5 |
 | `CharacterLibrary` | mới | Thư viện nhân vật kênh: model sheet, biểu cảm, tư thế; dùng lại ở video sau; nằm cạnh thư viện hình (`illustrations`) | FR-4 | U4 |
-| `StoryboardStore` | đổi | Storyboard theo cảnh, mỗi cảnh một đơn vị; nhân vật gọi theo tên kèm biểu cảm và tư thế; color key theo cảnh; cách nối sang cảnh sau; cảnh giải thích ý đặt trong thế giới | FR-6..FR-8 | U4, U5 |
+| `StoryboardStore` | đổi | Storyboard theo cảnh, mỗi cảnh một đơn vị; nhân vật gọi theo tên kèm biểu cảm và tư thế; color key theo cảnh; cách nối sang cảnh sau; cảnh giải thích ý đặt trong thế giới; đọc lời thoại và ghi chú bàn giao từ bản kịch bản đã chốt | FR-6..FR-8, FR-32 mục 4 | U3f (đọc bản đã chốt), U4, U5 |
 | `PronunciationDictionary` | mới | Từ điển phát âm của kênh; tra từ điển cho từng câu trước khi gửi lệnh đọc (AD-7 A) | FR-20 | U6 |
-| `VoiceLines` | mới | Đơn vị câu giọng: chữ, "đọc là", tốc độ, khoảng nghỉ, đường dẫn file, thời lượng; nhận kết quả đọc do orchestrator chuyển về | FR-9, FR-20 | U6 |
+| `VoiceLines` | mới | Câu giọng: chữ, đường dẫn file, thời lượng; nhận kết quả đọc do orchestrator chuyển về (U3e, cho nghe thử và ước tính thời lượng ở Viết kịch bản). U6 thêm "đọc là", tốc độ, khoảng nghỉ và đơn vị `voice_line` | FR-9, FR-20, FR-31 | U3e, U6 |
 | `AnimaticPlan` | mới | Kế hoạch animatic: mỗi shot có khung tĩnh, thời lượng (kể cả chỉnh tay), câu, file giọng; ghi chú nhịp cảnh và đề xuất của AI. Không dựng video (AD-5 C) | FR-10 | U6 |
 | `IllustrationPlanner` | đổi | Danh sách hình chỉ gồm phần còn thiếu sau bộ mỹ thuật; hình của bộ mỹ thuật hiện là đã duyệt, sửa ở mục gốc | FR-13 | U4 |
 | `CodeSegments` | đổi | Đoạn code là một cảnh; trạng thái từng shot; bỏ lượt AI tự sửa, giữ autofix máy móc và ghi lại đã sửa gì; yêu cầu xem nhanh từng shot | FR-22 | U7 |
@@ -63,8 +80,8 @@ flowchart LR
 
 | Thành phần | Mới/đổi | Trách nhiệm | FR | CR con |
 |---|---|---|---|---|
-| `FlowDefinition` | đổi | Luồng 17 bước, 3 giai đoạn; suy ra bước và trạng thái từ nội dung đã có; giữ ba bản (đây, authoring-service, web-gui) cùng test hợp đồng (AD-9 A) | FR-1 | U2 |
-| `DraftVoiceDispatcher` | mới | Gửi lệnh đọc các câu khi storyboard được duyệt hoặc một câu đổi, ngoài saga render; nhận kết quả, chuyển cho authoring-service (AD-6 A) | FR-9 | U6 |
+| `FlowDefinition` | đổi | Luồng 21 bước, 3 giai đoạn, Tiền kỳ chia Nội dung và Hình ảnh (ADR-0042); bước tuỳ chọn và trạng thái "bỏ qua"; suy ra bước và trạng thái từ nội dung đã có; giữ ba bản (đây, authoring-service, web-gui) cùng test hợp đồng (AD-9 A) | FR-1 | U2a; mỗi CR con thêm bước của nó |
+| `DraftVoiceDispatcher` | mới | Gửi lệnh đọc các câu, ngoài saga render: khi lời thoại một beat được viết hoặc sửa ở Viết kịch bản (U3e); khi storyboard được duyệt hoặc một câu đổi (U6). Nhận kết quả, chuyển cho authoring-service (AD-6 A) | FR-9, FR-31 | U3e, U6 |
 | `RenderSaga` | đổi | Mỗi cảnh một lệnh render; trạng thái từng cảnh; tự thử lại một lần với lỗi tạm thời; huỷ, chạy lại từng cảnh; truyền đoạn chồng và color key (AD-8 A) | FR-14 | U8 |
 | `EditSession` | mới | Đơn vị `render_scene` và ghi chú dựng theo mốc thời gian; xin authoring-service đề xuất tầng sửa; chạy kế hoạch đã được Creator đồng ý | FR-25 | U8 |
 
@@ -90,7 +107,7 @@ flowchart LR
 
 | Thành phần | Mới/đổi | Trách nhiệm | FR | CR con |
 |---|---|---|---|---|
-| `SynthesizeLines` | đổi | Nhận lệnh đọc từng câu kèm "đọc là", tốc độ, khoảng nghỉ; dựng SSML Azure; cache theo nội dung và cách đọc | FR-9, FR-20 | U6 |
+| `SynthesizeLines` | đổi | Nhận lệnh đọc từng câu, cache theo nội dung và giọng (U3e). U6 thêm "đọc là", tốc độ, khoảng nghỉ bằng SSML Azure, và cache theo cả cách đọc | FR-9, FR-20, FR-31 | U3e, U6 |
 
 ## video-assembly (Python)
 
@@ -104,16 +121,21 @@ flowchart LR
 | Thành phần | Mới/đổi | Trách nhiệm | FR | CR con |
 |---|---|---|---|---|
 | Route chuyển tiếp | đổi | Chuyển các route mới tới authoring-service và orchestrator | tất cả | U1..U9 |
-| Phát file | đổi | Một cách phát file chung cho mọi file trên `/shared` (ảnh tĩnh, giọng từng câu, xem nhanh shot, video theo cảnh): lấy đường dẫn từ DB của chủ ghi, kiểm nằm trong `/shared` và thuộc đúng project, hỗ trợ tua, như `videoHandler.js` đang làm (ADR-0041) | FR-10, FR-14, FR-22 | U1 |
+| Phát file | đổi | Một cách phát file chung cho mọi file trên `/shared` (giọng từng câu, ảnh tĩnh, xem nhanh shot, video theo cảnh): lấy đường dẫn từ DB của chủ ghi, kiểm nằm trong `/shared` và thuộc đúng project, hỗ trợ tua, như `videoHandler.js` đang làm (ADR-0041). Người dùng đầu tiên là file giọng nghe thử ở Viết kịch bản | FR-10, FR-14, FR-22, FR-31 | U3e |
 | Tải file lên | mới | Ảnh tham khảo của bảng tham khảo, file SVG thay hình | FR-3 | U4 |
 
 ## web-gui (React)
 
 | Thành phần | Mới/đổi | Trách nhiệm | FR | CR con |
 |---|---|---|---|---|
-| `StepRail` theo giai đoạn | đổi | Thanh bước chia Tiền kỳ, Sản xuất, Hậu kỳ | FR-1 | U2 |
-| Bộ thành phần đơn vị | mới | Thẻ đơn vị (trạng thái, duyệt, làm lại kèm ghi chú, sửa tay), thanh gom ghi chú, hộp "sẽ làm lại", nút duyệt tất cả mục còn lại | FR-17 | U2 |
-| Màn Kịch bản | đổi | Logline, tóm tắt, beat, lời thoại theo cảnh; gợi ý kiểu video ở bước Khởi tạo | FR-2, FR-19 | U3 |
+| `StepRail` theo giai đoạn | đổi | Thanh bước bốn nhóm (Tiền kỳ · Nội dung, Tiền kỳ · Hình ảnh, Sản xuất, Hậu kỳ), dấu ◆ ở bước duyệt, nhãn "tuỳ chọn" / "bỏ qua" ở bước tuỳ chọn, "↻" ở bước có mục cần làm lại | FR-1 | U2a; "↻" ở U3a; "tuỳ chọn" ở U3b |
+| Bộ thành phần đơn vị | mới | Thẻ đơn vị (trạng thái, duyệt, làm lại kèm ghi chú, sửa tay trong hộp thoại), dấu "Bạn viết", thanh gom ghi chú, hộp "sẽ làm lại", hộp xác nhận kèm ảnh hưởng, nút duyệt tất cả mục còn lại | FR-17 | U3a |
+| Màn Ý tưởng | đổi (thay màn Khởi tạo) | Đề tài, dạng video, ngôn ngữ nội dung, thời lượng mục tiêu, "Tạo project và viết brief", brief | FR-27 | U3a |
+| Màn Nghiên cứu | mới | Câu hỏi, prompt, dán kết quả và nhật ký, bảng dữ kiện có lọc, độ phủ, prompt bổ sung, duyệt, bỏ qua | FR-28 | U3b |
+| Màn Câu chuyện | mới | Thẻ góc tiếp cận · kiểu video (chuyển từ Khởi tạo), khung câu chuyện, dữ kiện dùng | FR-19, FR-29 | U3c |
+| Màn Beat sheet | mới (thay màn dàn ý hiện có) | Dải cấu trúc và các kiểm, thẻ beat | FR-30 | U3d |
+| Màn Viết kịch bản | đổi (thay màn Kịch bản hiện có) | Toàn bộ kịch bản và các kiểm, lời thoại theo beat, nghe thử, cờ câu, chỗ nối | FR-31 | U3e |
+| Màn Rà soát và chốt | mới | Ba tab: Rà soát, Ghi chú bàn giao, Bộ bàn giao và phiên bản | FR-32 | U3f |
 | Màn Mỹ thuật lượt 1, lượt 2 | mới | Các tab thế giới, bối cảnh, nhân vật, đạo cụ; color key, khung mẫu | FR-3..FR-6 | U4, U5 |
 | Màn Storyboard | đổi | Duyệt, sửa, ghi chú theo cảnh và shot; hành trình máy quay | FR-7, FR-8, FR-17 | U5 |
 | Màn Giọng sơ bộ | mới | Bảng câu, sửa chữ, "đọc là", đọc lại một câu | FR-9, FR-20 | U6 |
@@ -127,4 +149,4 @@ flowchart LR
 
 | Việc | Trách nhiệm | FR | CR con |
 |---|---|---|---|
-| Sao lưu và xoá dữ liệu cũ | Dump DB của orchestrator và authoring-service, nén `/shared`; rồi xoá project, file project, prompt Creator sửa, luật style, thư viện hình và nền. Giữ kiểu video, cấu hình kênh, kết nối YouTube. Chạy khi U1 vào main (W-2 A). Dạng script có bước xác nhận, không phải tính năng trong app | FR-16 | U1 |
+| Sao lưu và xoá dữ liệu cũ | Dump DB, nén `/shared`; rồi xoá project, file project, dữ liệu authoring theo project, `llm_usage`, prompt Creator sửa. Giữ kiểu video, cấu hình kênh, kết nối YouTube, thư viện hình. Chạy khi U2a vào main (W-2 A, dời 2026-10-17); U1 gỡ luật style cũ và hình vẽ theo kit cũ khi nó vào main. Dạng script có bước xác nhận, không phải tính năng trong app | FR-16 | U2a, U1 |
