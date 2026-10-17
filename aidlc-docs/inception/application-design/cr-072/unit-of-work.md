@@ -19,6 +19,8 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 | **Chỉ một ngôn ngữ hình**: Khoa học phát sáng, làm đầy đủ chi tiết. Ba ngôn ngữ còn lại (Sách tranh tươi, Giấy cắt lớp, Đường nét tối giản) không có trong CR-072, kể cả ảnh mẫu (backlog). Kho ngôn ngữ, sao chép, bật và ghim vẫn làm đủ; bản sao của Khoa học phát sáng bật được | Creator, 2026-10-14 (thay U-3.2 A) |
 | **Vẽ bằng code Remotion**, không dùng AI tạo ảnh; AI chỉ viết code. Chất lượng đi trước, chấp nhận render chậm hơn. U1 làm năm cách nâng chất lượng trong kit: lớp chất phim, vẽ theo hạng chính/phụ/phông, vật liệu và ánh sáng do kit tính, rig cho nhân vật và máy móc, nền thủ tục. Không có vòng AI tự xem ảnh rồi sửa | Creator, 2026-10-14 |
 | **Tách cách vẽ khỏi màu**: ngôn ngữ hình quy định cách vẽ; màu đến từ bảng màu của video và ánh sáng của từng cảnh, kit không tự chọn màu. AI gợi ý bảng màu thế giới ở U4a, color key ở U5, chỉnh màu theo color key khi render ở U8a | Creator, 2026-10-17 |
+| **Hạng chính / phụ / phông là vai trong từng video**, không phải của bản thân vật: con ong là Chính trong video về ong thụ phấn cho sung, Phụ trong video về cánh đồng hoa. AI đề xuất hạng kèm một câu lý do từ kịch bản và storyboard của video đó; Creator đổi được. Thư viện hình chỉ lưu **mức chi tiết** của bản vẽ (Kỹ / Vừa / Bóng); một hình dùng lại được khi mức chi tiết đủ cho hạng cần (Kỹ cho mọi hạng, Vừa cho Phụ và Phông, Bóng chỉ cho Phông) | Creator, 2026-10-17 |
+| **Ba bước tạo hình làm ba việc khác nhau**: Mỹ thuật lượt 1 (trước Storyboard) thiết kế thứ dùng chung cả video — thế giới và bảng màu thế giới, bối cảnh, nhân vật, đạo cụ, và hạng của nhân vật, đạo cụ; Mỹ thuật lượt 2 (sau Storyboard) quyết định màu và ánh sáng từng phần của chuyện (color key) và chốt nhìn bằng khung mẫu; Hình minh hoạ (sản xuất, sau Animatic) vẽ nốt hình riêng của từng shot mà bộ thiết kế chưa có, và đặt hạng cho hình mới | Creator, 2026-10-17 |
 | Khung sửa theo đơn vị (U2b) áp lên cả Kịch bản và Storyboard hiện có, đúng như kế hoạch luồng. U3 và U5 chuyển các bước đó sang dạng mới, vẫn trên khung | U-4.1 A |
 | Xoá dữ liệu cũ khi **U2a** vào main (CR con vào main đầu tiên), sau khi sao lưu. U1 gỡ thêm luật style cũ và hình vẽ theo kit cũ khi nó vào main | W-2 A; dời từ U1 sang U2a (Creator, 2026-10-17) |
 | Luồng thêm bước dần theo CR con, không có bước giả: 13 bước hiện có → 17 bước khi U8b xong | Kế hoạch luồng ("bước chưa làm thì giữ như hiện nay") |
@@ -59,7 +61,8 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
   - Màu từ ngoài vào: `light` của từng cảnh trong storyboard (vai trò trong bảng màu), bộ ghép code sinh `LOOKS`; prompt Đạo diễn bỏ chỗ ép "nền sáng bão hoà".
   - `StillRenderService`: `POST /v1/stills` (cache theo hash nội dung), `/shared/stills/{hash}.png`, dọn ảnh không còn ai trỏ tới. Composition `LanguageSample` với hai cảnh thử (lòng quả sung sáng, vũ trụ tối).
   - api-gateway: một cách phát file chung từ `/shared` (ADR-0041).
-  - web-gui: trang cài đặt Ngôn ngữ hình; chọn hạng ở danh sách hình của project; huy hiệu hạng ở Thư viện hình.
+  - Hạng theo vai trong video ở danh sách hình của project (AI đề xuất kèm lý do, Creator đổi); thư viện hình lưu mức chi tiết Kỹ / Vừa / Bóng và dùng lại hình theo mức chi tiết. Khi chưa có Mỹ thuật lượt 1, mọi hạng đặt ở bước Hình minh hoạ hiện có.
+  - web-gui: trang cài đặt Ngôn ngữ hình; chọn hạng (kèm lý do của AI) ở danh sách hình của project; huy hiệu mức chi tiết ở Thư viện hình.
   - Luồng hiện có (Hình minh hoạ, Code, Render) đọc luật của ngôn ngữ đã ghim và dùng kit Khoa học phát sáng; gỡ vai trò `illustration_style`; xoá hình vẽ theo kit cũ.
   - Thiết kế: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`.
 - **Giao cho CR con sau**: `VisualLanguageStore.Active/PinForProject`, `/v1/stills`, phát file chung, kit `phatsang` (lớp chất phim, vật liệu, rig, bộ sinh nền, shader), `Scene.light`/`LOOKS`.
@@ -106,7 +109,7 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 - **FR**: FR-3 (mục 1, 2, 4), FR-5, FR-15 (phần luật thế giới), NFR-4
 - **Service**: authoring-service, rendering, api-gateway, web-gui
 - **Phạm vi**:
-  - `ArtBible` lượt 1 phần thế giới: mô tả thế giới (nơi chốn, thời đại, chất liệu, logic ánh sáng, bảng màu thế giới) và bảng tham khảo; bối cảnh (nền 4 lớp ở 16:9 và 9:16, biến thể ánh sáng khi cần); đạo cụ. Đơn vị `art_world`, `art_location`, `art_prop`.
+  - `ArtBible` lượt 1 phần thế giới: mô tả thế giới (nơi chốn, thời đại, chất liệu, logic ánh sáng, bảng màu thế giới) và bảng tham khảo; bối cảnh (nền 4 lớp ở 16:9 và 9:16, biến thể ánh sáng khi cần); đạo cụ, mỗi đạo cụ có hạng trong video này (AI đề xuất kèm lý do, Creator đổi; đổi hạng thì đạo cụ thành "cần làm lại"). Đơn vị `art_world`, `art_location`, `art_prop`.
   - Phong cách theo thế giới (ADR-0037): luật thế giới trong prompt, lớp chất liệu theo chủ đề ở nền và đạo cụ.
   - Ảnh Creator tải lên cho bảng tham khảo (`/shared/{id}/uploads/moodboard/`). Functional Design kiểm model vẽ có đọc được ảnh không (P-5 A); không đọc được thì ảnh chỉ để Creator đối chiếu.
   - Bốn cách sửa một hình: làm lại kèm ghi chú, sửa mô tả rồi vẽ lại, tải SVG lên (`/shared/{id}/uploads/svg/`), thay bằng hình trong thư viện.
@@ -120,7 +123,7 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 - **FR**: FR-3 (mục 3), FR-4
 - **Service**: authoring-service, llm-service, rendering, web-gui
 - **Phạm vi**:
-  - Nhân vật cấp video, đơn vị `art_character`: model sheet trước/nghiêng/sau, biểu cảm, tư thế tay, nhân vật đặt trên từng nền chính (`ArtSheet` nhân vật trong kit `phatsang`). Miệng giữ hình cố định theo biểu cảm, bỏ nhép miệng.
+  - Nhân vật cấp video, đơn vị `art_character`: model sheet trước/nghiêng/sau, biểu cảm, tư thế tay, nhân vật đặt trên từng nền chính (`ArtSheet` nhân vật trong kit `phatsang`); hạng của nhân vật trong video này, như đạo cụ ở U4a. Nhân vật lưu vào thư viện nhân vật không mang hạng; video sau đặt lại hạng theo chuyện của nó. Miệng giữ hình cố định theo biểu cảm, bỏ nhép miệng.
   - Schema storyboard (llm-service): khai báo nhân vật một lần; shot chỉ tham chiếu nhân vật kèm biểu cảm và tư thế. Storyboard hiện có dùng schema này.
   - `CharacterLibrary` và trang cài đặt Thư viện nhân vật; lưu nhân vật đã duyệt, dùng lại ở video sau.
   - Tab Nhân vật trong màn Mỹ thuật lượt 1, cùng bốn cách sửa hình của U4a.
@@ -131,7 +134,7 @@ Phụ thuộc giữa các CR con: [`unit-of-work-dependency.md`](unit-of-work-de
 - **Nhánh**: `feature/cr-072-u4c-illustrations-from-art` · **Cỡ**: M · **Phụ thuộc**: U2b, U4b (làm sau U6 theo thứ tự: bước 9 Hình minh hoạ)
 - **FR**: FR-13
 - **Service**: authoring-service, web-gui
-- **Phạm vi**: `IllustrationPlanner` chỉ đưa vào danh sách phần còn thiếu sau bộ mỹ thuật; hình của bộ mỹ thuật hiện là đã duyệt và chỉ sửa ở mục gốc; đơn vị `illustration` có "làm lại kèm ghi chú"; giữ vẽ song song, duyệt, sửa, bỏ, sửa prompt như hiện nay.
+- **Phạm vi**: `IllustrationPlanner` chỉ đưa vào danh sách phần còn thiếu sau bộ mỹ thuật; hình của bộ mỹ thuật hiện là đã duyệt và chỉ sửa ở mục gốc, kèm hạng đã đặt ở lượt 1; hình mới có hạng do AI đề xuất theo shot; đơn vị `illustration` có "làm lại kèm ghi chú"; giữ vẽ song song, duyệt, sửa, bỏ, sửa prompt như hiện nay.
 - **Tiêu chí xong riêng**: một project có bộ mỹ thuật đã duyệt không vẽ lại bối cảnh, nhân vật, đạo cụ đã có; sửa một mục gốc thì các hình dùng nó thành "cần làm lại". Luồng: 14 bước.
 
 ## U5 — Storyboard mới và Mỹ thuật lượt 2

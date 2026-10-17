@@ -3413,3 +3413,12 @@ sửa tài liệu rồi mở cr đầu tiên đi"
 **Artifacts Affected**: `aidlc-docs/inception/application-design/cr-072/unit-of-work.md`, `unit-of-work-dependency.md`, `unit-of-work-story-map.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`.
 
 ---
+## CR-072 — Hạng theo vai trong từng video; vai trò của ba bước tạo hình
+**Timestamp**: 2026-10-17T00:00:00Z
+**User Input**: "chính phụ phông phụ thuộc vào chủ đề và bối cảnh video chứ nếu như con ong mà trong bối cảnh nói về việc con ong giúp quả sung thụ tinh thì nó là nhân vật chính nhưng nếu video nói về cánh đồng hoa thì ong chỉ là phụ.
+mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 hay mỹ thuật lượt 2 hay hình minh hoạ mỗi bước này có nhiệm vụ gì khác nhau như thế nào"; sau giải thích và đề xuất: "ok sửa theo bạn đề xuất vào mockup và tài liệu đi"
+**AI Response**: Hạng là vai trong từng video: AI đề xuất kèm lý do từ kịch bản và storyboard, Creator đổi; thư viện hình lưu mức chi tiết (Kỹ / Vừa / Bóng) thay vì hạng, dùng lại theo mức chi tiết. Ghi vào `unit-of-work.md`: hai quyết định chung (hạng theo video; vai trò của Mỹ thuật lượt 1, lượt 2, Hình minh hoạ); U1 (hạng ở danh sách hình hiện có khi chưa có lượt 1, mức chi tiết ở thư viện), U4a (hạng của đạo cụ), U4b (hạng của nhân vật, thư viện nhân vật không mang hạng), U4c (hình của bộ mỹ thuật giữ hạng lượt 1, hình mới có hạng theo shot). Mockup bản 6: dòng "Bước này:" dưới tiêu đề mọi bước; chọn hạng kèm lý do của AI ở thẻ nhân vật và đạo cụ của Mỹ thuật lượt 1; Hình minh hoạ hiện hạng của bộ mỹ thuật "đặt ở Mỹ thuật lượt 1" và lý do cho hình mới; Thư viện hình đổi sang mức chi tiết kèm luật dùng lại và ví dụ ong mẹ Chính ở một video, Phụ ở video khác; ghi chú Bản đồ luồng cho ba bước. Thiết kế U1 sửa trong worktree U1 (chưa commit).
+**Impact Assessment**: chỉ tài liệu và mockup.
+**Artifacts Affected**: `aidlc-docs/inception/application-design/cr-072/unit-of-work.md`, `aidlc-docs/audit.md`, mockup artifact.
+
+---
