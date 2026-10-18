@@ -3403,3 +3403,84 @@ q6 => làm hết tron cr 067"
 **Context**: INCEPTION — CR-072 Application Design và Units Generation đã duyệt.
 
 ---
+
+## CR-072-U1 — Ngôn ngữ hình của kênh
+**Timestamp**: 2026-10-13T00:00:00Z
+**User Input**: "tôi duyệt hết rồi" (sau khi duyệt Application Design và Units Generation; bước tiếp theo đã nêu là mở U1 bằng `/cr`)
+**AI Response**: Mở nhánh `feature/cr-072-u1-visual-language` trong worktree riêng từ main `20419a6`. Kiểm phụ thuộc: không còn nhánh CR/fix/chore nào chưa vào main; độc lập. Đọc hiện trạng qua graphify: luật vẽ hình là vai trò prompt `illustration_style`, luật vẽ nền là file nhúng, Đạo diễn có luật "nền sáng bão hoà" viết cứng; một kit `conceptflow-mini` với màu viết cứng; xem trước hình trả base64, không ghi `/shared`; api-gateway chỉ phát video cuối; saga xoá project không xoá dữ liệu authoring theo project. Viết `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`: FR-U1-1..11, ba chỗ chọn có đề xuất (kit là bộ token trên một bộ component; code đã ghép tự mang kit qua `KitProvider`; dọn ảnh tĩnh theo danh sách giữ lại do authoring-service gửi), dữ liệu (`visual_languages`, `visual_language_versions`, `visual_language_samples`, cột ghim ở `project_authoring`, `kit_key` ở `illustrations`), luật cảnh tách khỏi luật vẽ nền, gỡ vai trò `illustration_style`, script `scripts/purge-legacy-data.sh`.
+**Impact Assessment**: authoring-service, llm-service, rendering, api-gateway, web-gui; schema authoring-service; hợp đồng `/v2/code/*` (thêm trường), `/shared/stills/` mới; xoá dữ liệu một lần sau khi vào main.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`, `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Mở lại để duyệt thiết kế
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "làm CR U1 của https://claude.ai/artifact/R7tXPyTdJx3E7tUosuE2RV"
+**AI Response**: U1 đã có nhánh `feature/cr-072-u1-visual-language`, worktree và tài liệu thiết kế từ phiên trước (chưa commit, chờ duyệt), nên không mở CR mới. Kiểm lại phụ thuộc: `origin/main` vẫn ở `20419a6`, không có nhánh `feature/cr-*`, `fix/*`, `chore/*` nào chưa vào main; vẫn độc lập. Ghi ngày kiểm lại vào mục Phụ thuộc của tài liệu thiết kế. Thiết kế không đổi; chờ Creator duyệt. Nhắc lại: theo quyết định UI-first, màn Ngôn ngữ hình trong mockup phải được chốt trước khi `/code` làm phần web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md` (mục Phụ thuộc), `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Thiết kế vòng 2: một ngôn ngữ, chọn 1A/2B/3A, luật chi tiết
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "chỉ làm 1 ngôn ngữ tại thời điểm này.
+1 A
+2.B
+3 A
+luật vẽ hình vẽ nền và vẽ cảnh sao còn đơn giản vậy, tôi muốn chi tiết và detail hơn nữa"
+**AI Response**: Sửa `cr-072-u1-visual-language-design.md`: U1 chỉ còn Khoa học phát sáng (bỏ ba ngôn ngữ "chỉ có ảnh mẫu", cờ `samples_only`, ba bộ token; thay U-3.2 A; backlog trong `aidlc-state.md` cập nhật). Ghi lựa chọn 1 A (một bộ component, kit là bộ token; thêm bảng token `phatsang` và màu mặc định sáu nền), 2 B (`kit_key` đi theo đường `videoFont`: orchestrator hỏi bản ghim từ authoring-service qua `GET /internal/v1/authoring/{id}` lúc gửi `render_scenes`, không lưu bản sao; kiểm code qua `/v2/code/*` → `LayoutContext` → `/v1/check/remotion`; xem trước và ảnh tĩnh nhận `kit_key`; thêm orchestrator vào phạm vi), 3 A. Viết toàn văn ba luật ở Phụ lục A (luật vẽ hình S0–S25 viết lại cho nền tối, nguồn sáng, viền sáng ngược, vật phát sáng, vi mô sinh học, bảng màu kit), B (luật vẽ nền B1–B10: bốn lớp chi tiết, nền sâu một sắc, một nguồn sáng ngược nhóm màu, phối cảnh không khí, vignette, hạt sáng), C (luật cảnh C1–C9 cho Đạo diễn, thay hai đoạn phong cách viết cứng ở `prompt_template_seeds.go:332` và `:375`). Bộ kiểm style: `MAX_GRADIENTS` 4 → 6, thêm cảnh báo S7b, B10. Sửa hiện trạng: saga xoá đã gọi `DeleteAuthoring` (xoá `project_authoring`, `authoring_segments`, `project_illustrations`), `llm_usage` và `code_check_diagnostics` được giữ có chủ ý; script xoá dữ liệu xoá thêm hai bảng này. Màn Ngôn ngữ hình trên mockup cần chốt lại theo một ngôn ngữ trước khi code web-gui.
+**Impact Assessment**: thêm orchestrator vào phạm vi; hợp đồng `render_scenes`, `/v2/code/*`, `/v1/check/remotion`, `/v1/illustrations/preview`, `GET /internal/v1/authoring/{id}` thêm trường `kit_key`.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Creator hỏi lại hướng vẽ hình
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "tôi thấy hướng đi này của U1 không ổn. bạn có solution nào khác để render hình nhân vật, cảnh nền v.v nói chung là ảnh minh hoạ thì còn cách nào khác không nhỉ"
+**AI Response**: Dừng thiết kế vòng 2 (chưa duyệt, chưa commit). Nêu các hướng thay cho "AI viết mã SVG/TSX cho từng hình": (A) giữ cách hiện tại; (B) AI tạo ảnh raster theo ảnh tham chiếu phong cách, Remotion ghép lớp và diễn hoạt 2.5D; (C) AI tạo ảnh vector SVG; (D) thư viện hình và nhân vật rig do người làm, AI chỉ ghép; (E) AI tạo video; (F) lai: ảnh AI cho nhân vật, nền, đạo cụ, Remotion cho sơ đồ, chữ, máy quay, hiệu ứng. Đề xuất F, kèm một thử nghiệm nhỏ (hai cảnh thử) trước khi sửa yêu cầu và Application Design. Hỏi Creator điểm nào "không ổn", ngân sách mỗi video, mức chuyển động chấp nhận được. Chờ Creator trả lời.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Creator trả lời về hướng vẽ hình, bàn giải pháp
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "1 không ổn ở chỗ hình quá đơn giản không giống phim. tôi không quan tâm cách làm phức tạp hay đơn giản nhưng tôi muốn đầu ra phải có chất lượng tốt
+2. tôi không biết ngân sách có thể tối ưu sau
+3. cái này tuỳ vào nội dung và chủ đề phải linh hoạt nếu chủ đề nói về chiếc máy bay thì ta phải mô tả nó thật rõ ràng còn nếu máy bay chỉ là nhân vật phụ thì không cần rõ ràng quá về nó
+4 tôi đang có api của hive nhưng thời điểm này tôi muốn nói về solution trước"
+**AI Response**: Đề xuất giải pháp lai: ảnh do AI tạo theo bộ phong cách (ảnh tham chiếu + mô tả) cho nhân vật, nền, đạo cụ; mỗi thứ được Đạo diễn xếp hạng theo vai trò trong chuyện (chính / phụ / phông), hạng quyết định độ chi tiết và cách diễn hoạt (rig cắt lớp có khớp, đổi dáng, đứng yên trong parallax, image-to-video cho vài shot chính); Remotion làm khâu ghép, máy quay, VFX, sơ đồ, chữ; AI thị giác kiểm ảnh trước Creator. Nêu ảnh hưởng tới CR-072 (sửa Requirements và Application Design phần mỹ thuật và ngôn ngữ hình) và các quyết định cần Creator chọn. Chưa sửa tài liệu thiết kế; chờ Creator.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Giữ vẽ bằng code Remotion, bàn cách nâng chất lượng
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "vẫn phải vẽ bằng code remotion chứ không có AI nào cả AI hive chỉ chịu trách nhiệm sinh code remotion"
+**AI Response**: Bỏ hướng ảnh AI. Chẩn đoán vì sao hình bằng code trông đơn giản: luật hiện có cố ý ép đơn giản (S1 tối đa 4 gradient, cấm feTurbulence, S4 5–25 hình con, tô bóng một mảng); kit không có lớp hậu kỳ (bloom, mờ theo độ sâu cho mọi lớp, chỉnh màu, hạt phim, motion blur); AI vẽ mỗi hình một lượt và không thấy ảnh đã render (`illustration_drawer.go:225` chỉ thử lại khi mã lỗi; PNG chỉ được lưu); không có mẫu vàng chất lượng cao; `remotion_project` chỉ có `@remotion/lottie`. Đề xuất bảy đòn bẩy, đều là code Remotion: lớp chất phim tự động, vẽ theo hạng chính/phụ/phông, vật liệu và ánh sáng do kit tính, rig nhân vật và máy móc, nền thủ tục bằng noise/shader, vẽ nhiều lượt có nhìn ảnh render, bộ mẫu vàng. Nêu ảnh hưởng tới phạm vi U1 và các câu hỏi. Chờ Creator.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Vòng nhìn-sửa và hình mẫu
+**Timestamp**: 2026-10-14T00:00:00Z
+**User Input**: "mục 6 thì có quá tốn công và nguy cơ AI mắc kẹt trong vòng lặp không
+mục 7 thì mẫu có thể chọn sau khi ảnh render được từ các video đầu tiên và có thể thay đổi hoặc xoá hình mẫu."
+**AI Response**: Mục 6: xác nhận rủi ro (mỗi vòng thêm một lần render và một lượt AI viết lại cả hình; tự chấm thường dễ dãi hoặc không bao giờ hài lòng, sửa chỗ này hỏng chỗ kia, bản sau có thể kém bản trước). Đề xuất bỏ khỏi U1: chất lượng lượt đầu nâng bằng mục 1, 2, 3 (không thêm lượt AI); AI ghi kế hoạch ngắn ngay trong cùng câu trả lời; số đo máy móc theo hạng chỉ cảnh báo; vòng thử lại hiện có chỉ cho lỗi mã (tối đa 3 lần, `illustration_drawer.go:19`); sửa chất lượng qua "Vẽ lại có ghi chú" do Creator bấm (`Redraw`, `illustration_drawer.go:279`). Mục 7: tính năng Hình mẫu đã có (`MakeExemplar`/`UnmakeExemplar`, tối đa 5, chỉ hình, không có nền; `illustrations.go:464-560`, `illustration_drawer.go:102-137`); đề xuất gắn hình mẫu với `kit_key`, thêm hình mẫu cho nền, khởi đầu rỗng (script xoá dữ liệu xoá hình mẫu cũ). Chờ Creator chốt phạm vi U1.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Màu theo chủ đề và theo cảnh
+**Timestamp**: 2026-10-17T00:00:00Z
+**User Input**: "làm vậy có khiến cho video 1 màu quá không, ví dụ nhé tôi muốn video làm về vũ trụ thì có màu tối (thực tế là như vậy) nhưng video về con sâu trong quả sung thì lại có màu sáng hồng (thực tế ruột quả sung cũng màu đó) hay làm video về rừng nhiệt đới thì hình minh hoạ phải có các gam màu như xanh lá xanh lá đậm v.v còn về đồng cỏ châu phi sẽ có màu vàng nhưng nếu ta dùng kit như hiện tại nó có đáp ứng được việc đó không hay ta phải có hướng đi khác ví dụ sau khi có kịch bản và bối cảnh câu chuyện AI sẽ tự suggest các bộ màu phù hợp với từng cảnh trong câu chuyện đó"
+**AI Response**: Xác nhận lo ngại đúng với bản vòng 2: Phụ lục B4 ("không nền sáng"), C1 ("không có cảnh nền sáng"), màu mặc định tối của sáu nền sẽ làm mọi video tối, trái FR-5 (thế giới theo chủ đề) và FR-6 (hành trình màu) đã duyệt. Đề xuất tách hai lớp: ngôn ngữ hình (cách vẽ: khối, ánh sáng, viền sáng, vật liệu, chiều sâu, hậu kỳ; cố định cho kênh) và màu (bảng màu thế giới theo chủ đề, color key theo phần dàn ý; đổi theo video và cảnh). Token kit chỉ giữ cách tô và màu dự phòng; màu đến từ bảng màu của video và ánh sáng của cảnh; vật liệu tính bóng và viền sáng theo màu ánh sáng của cảnh. AI đề xuất bảng màu theo chủ đề đã có trong kế hoạch: U4a (bảng màu thế giới), U5 (color key, dải màu, kiểm tự động), U8a (chỉnh màu theo color key khi render), ADR-0037. U1 dùng cơ chế hiện có (Đạo diễn lập BẢNG MÀU, mỗi cảnh một vai trò màu nền) và không áp tông cố định. Chờ Creator xác nhận.
+**Artifacts Affected**: `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Thiết kế vòng 3
+**Timestamp**: 2026-10-17T00:00:00Z
+**User Input**: "vậy sửa U1 theo hướng này đi" (kèm bốn điểm: bỏ ép tông tối; luật cảnh chỉ nói cách dùng ánh sáng; kit nhận màu từ ngoài vào; trước U4a/U5 dùng BẢNG MÀU hiện có, chỉ sửa đoạn "nền sáng bão hoà" thành "màu theo thực tế của nơi chốn và chủ đề")
+**AI Response**: Viết lại `cr-072-u1-visual-language-design.md` (vòng 3): vẽ bằng code Remotion; năm cách nâng chất lượng (lớp chất phim `Shot`/`Scene`; hạng hero/support/background ở `project_illustrations`/`illustrations`, bộ lập danh sách, người vẽ, bộ kiểm; vật liệu `Shape` 13 loại do kit tính sáng tối; rig sáu bộ xương, dáng, hành động, chu kỳ, IK, biểu cảm, `Mechanism`/`Part`, `Person` trên rig; nền thủ tục `@remotion/noise` và 8 shader WebGL có sẵn, `gl: 'swangle'`); màu từ ngoài vào: `Scene.light` trong storyboard JSON (vai trò trong `palette`), bộ ghép sinh `LOOKS`, mỗi shot `<Shot look>`, nền bắt buộc nhận màu, token chỉ giữ cách tô; prompt Đạo diễn sửa `:332`, `:375`; ảnh mẫu lòng quả sung sáng hồng và vũ trụ tối; giữ kho ngôn ngữ, ghim, 2 B, 3 A, ảnh tĩnh, phát file, script xoá dữ liệu; ba phụ lục luật viết lại (không quy định màu); ảnh hưởng U7b (rig chuyển sang U1), U4a, U4b, U5, U8a; điểm dừng sau bước 6 để Creator xem ảnh gallery; cỡ XL. Kiểm lại phụ thuộc 2026-10-17: độc lập.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`, `aidlc-docs/audit.md`; chưa commit.
+
+---
+## CR-072-U1 — Hạng theo vai trong video, gỡ kit cũ thay cho xoá dữ liệu
+**Timestamp**: 2026-10-17T00:00:00Z
+**User Input**: "chính phụ phông phụ thuộc vào chủ đề và bối cảnh video chứ nếu như con ong mà trong bối cảnh nói về việc con ong giúp quả sung thụ tinh thì nó là nhân vật chính nhưng nếu video nói về cánh đồng hoa thì ong chỉ là phụ. ..."; "ok sửa theo bạn đề xuất vào mockup và tài liệu đi"
+**AI Response**: Sửa thiết kế U1 vòng 3: hạng là vai trong video (`project_illustrations.tier`, `tier_reason`; AI đề xuất kèm lý do từ kịch bản và storyboard), thư viện lưu `illustrations.detail_level` (Kỹ / Vừa / Bóng), dùng lại theo mức chi tiết; hạng của nhân vật và đạo cụ chuyển lên Mỹ thuật lượt 1 khi có U4a, U4b. Theo thứ tự CR con mới, sao lưu và xoá project thuộc U2a; mục 11 của U1 thành bước `--legacy-kit` (xoá vai trò `illustration_style`, hình vẽ theo kit cũ). Ghi các quyết định đã chốt và mockup bản 6.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u1-visual-language-design.md`, `aidlc-docs/audit.md`; chưa commit.
+
+---
