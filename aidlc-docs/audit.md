@@ -3500,3 +3500,12 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **AI Response**: Ghi vào thiết kế: không thêm đường nối sang Kịch bản hiện có; mọi màn của luồng 21 bước chưa có mở ra màn "Bước này chưa phát triển". Commit phần bổ sung rồi chia task.
 **Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`.
 **Context**: CONSTRUCTION — CR-072-U3b.
+
+---
+## CR-072-U3b — Danh sách task
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "chọn C màn nào chưa có hiện chưa phát triển"
+**AI Response**: Commit phần bổ sung thiết kế (`dc545e4`), đọc code ở mức dòng và viết `cr-072-u3b-research-tasks.md`: 13 task. Backend authoring-service: T1 domain nghiên cứu (kiểu, đọc khối JSON, độ phủ); T2 so khớp đoạn trích; T3 SourceFetcher + bộ chặn địa chỉ + cổng `ResearchSource`; T4 lưu trữ (cột `input_ref/input_sha`, bảng `research_pastes`, cập nhật link có điều kiện); T5 vai prompt `research_questions`/`research_prompt` + model `research`; T6 ResearchDesk (câu hỏi, prompt, trạng thái, `CheckApprovable` nhận ctx); T7 dán kết quả, dữ kiện, kiểm link nền, bỏ qua, duyệt; T8 HTTP + nối dây + quét `run` sót + gateway. Web-gui: T9 client API; T10 bước chỉ có trên web (`screen`, `viewStep`), màn "chưa phát triển", Cấu hình mở Nghiên cứu; T11 hook; T12 màn Nghiên cứu; T13 hợp đồng/tài liệu. Lệch mockup có chủ ý: thanh bước chưa hiện "bỏ qua" cho bước 3 (cần gọi API từ mọi màn).
+**Impact Assessment**: build lại authoring-service, api-gateway, web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3b-research-tasks.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ Creator duyệt task.
