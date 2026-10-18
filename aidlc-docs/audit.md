@@ -3458,3 +3458,29 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Impact Assessment**: build lại web-gui, api-gateway, authoring-service, orchestrator, llm-service. Bảng `project_authoring` thêm `brief_model`, `publish_model`; bảng mới `app_settings`.
 **Context**: CONSTRUCTION — CR-072-U3a, Creator yêu cầu đưa lên main.
 ---
+
+---
+## CR-072-U3b — Nghiên cứu và kiểm chứng (thiết kế)
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "Cho tôi làm U3b (Nghiên cứu) khi bạn sẵn sàng."
+**AI Response**: Mở nhánh `feature/cr-072-u3b-research` (worktree riêng, từ main `57642e8`). Kiểm phụ thuộc: U1, U2a (tạm dừng), `chore/worktree-per-cr`, `chore/local-ollama-host` đều độc lập; U3b chặn U3c. Viết thiết kế `cr-072-u3b-research-design.md`: bước 3 thành bước thật của luồng (14 bước, migration dời số bước ở `project_events`); đơn vị `research:main`, `research_question`, `fact` trên `review_units` kèm cột `input_ref/input_sha` (đơn vị `stale`); mẫu `conceptflow.research.v1` và luật dán; `SourceFetcher` có bộ chặn địa chỉ (tên, địa chỉ phân giải, địa chỉ thực nối, chuyển hướng) và số liệu giới hạn; chuẩn hoá và so đoạn trích, câu gần nhất; kiểm link nền; độ phủ theo tên miền độc lập; hai vai prompt mới và `{{research_facts}}` cho bước Kịch bản hiện có; API, màn hình theo mockup (sửa trong modal theo luật 4). Ba điểm đề xuất chờ Creator đổi nếu muốn: sinh câu hỏi bằng nút, brief đổi chỉ gắn nhãn "cần sinh lại", bảng đã duyệt về chờ duyệt khi đổi.
+**Impact Assessment**: chỉ tài liệu. Khi code: build lại authoring-service, orchestrator, api-gateway, web-gui; đổi số bước sau Cấu hình (+1); authoring-service lần đầu ra Internet.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3b-research-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ Creator duyệt thiết kế.
+
+---
+## CR-072-U3b — Thu hẹp thiết kế theo mockup
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "bạn chỉ làm bước nghiên cứu theo file mockup thôi mà"
+**AI Response**: Thu hẹp về đúng màn bước 3 của mockup bản 9: bỏ dời số bước luồng chạy và migration orchestrator, bỏ phần bước Kịch bản hiện có đọc dữ kiện, ô câu hỏi sửa tại chỗ như mockup. Ghi mục "Phạm vi đã thu hẹp" ở đầu thiết kế.
+**Impact Assessment**: build lại khi code: authoring-service, api-gateway, web-gui (không còn orchestrator).
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt thiết kế.
+
+---
+## CR-072-U3b — Nút sang Câu chuyện
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "nút \"Sang xây dựng câu chuyện → vãn đi theo mockup. là mở ra Câu chuyện chưa có thì hiện chưa phát triển thôi"
+**AI Response**: Nút mở bước 4 Câu chuyện; màn đó hiện "Bước này chưa phát triển" tới U3c. Ghi vào thiết kế.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt thiết kế.
