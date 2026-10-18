@@ -247,16 +247,17 @@ func (r *PromptTemplateRepository) GetAuthoringMode(ctx context.Context, project
 // on tab 1a before any outline exists.
 func (r *PromptTemplateRepository) SaveAuthoringModels(ctx context.Context, projectID string, models domain.AuthoringStepModels) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring (project_id, story_model, storyboard_model, code_model, brief_model, publish_model, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, now())
+		INSERT INTO project_authoring (project_id, story_model, storyboard_model, code_model, brief_model, publish_model, research_model, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, now())
 		ON CONFLICT (project_id) DO UPDATE SET
 		    publish_model = EXCLUDED.publish_model,
 		    brief_model = EXCLUDED.brief_model,
+		    research_model = EXCLUDED.research_model,
 		    story_model = EXCLUDED.story_model,
 		    storyboard_model = EXCLUDED.storyboard_model,
 		    code_model = EXCLUDED.code_model,
 		    updated_at = now()
-	`, projectID, models.Story, models.Storyboard, models.Code, models.Brief, models.Publish)
+	`, projectID, models.Story, models.Storyboard, models.Code, models.Brief, models.Publish, models.Research)
 	return err
 }
 
@@ -266,8 +267,8 @@ func (r *PromptTemplateRepository) SaveAuthoringModels(ctx context.Context, proj
 func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error) {
 	var models domain.AuthoringStepModels
 	err := r.pool.QueryRow(ctx, `
-		SELECT brief_model, publish_model, story_model, storyboard_model, code_model FROM project_authoring WHERE project_id = $1
-	`, projectID).Scan(&models.Brief, &models.Publish, &models.Story, &models.Storyboard, &models.Code)
+		SELECT brief_model, publish_model, research_model, story_model, storyboard_model, code_model FROM project_authoring WHERE project_id = $1
+	`, projectID).Scan(&models.Brief, &models.Publish, &models.Research, &models.Story, &models.Storyboard, &models.Code)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.AuthoringStepModels{}, nil
 	}
@@ -325,6 +326,10 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	}
 	// And its review units (the brief and every unit of later steps).
 	if _, err := r.pool.Exec(ctx, `DELETE FROM review_units WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
+	// And the log of its pasted research answers.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM research_pastes WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
 	_, err := r.pool.Exec(ctx, `DELETE FROM project_authoring WHERE project_id = $1`, projectID)

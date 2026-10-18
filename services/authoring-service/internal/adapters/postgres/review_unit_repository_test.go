@@ -53,7 +53,7 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 		t.Fatalf("updated unit read back wrong: %+v, %v", got, err)
 	}
 
-	models := domain.AuthoringStepModels{Brief: "ollama", Publish: "zai-org/glm-5.3-flash", Story: "zai-org/glm-5.3-flash"}
+	models := domain.AuthoringStepModels{Brief: "ollama", Publish: "zai-org/glm-5.3-flash", Research: "ollama", Story: "zai-org/glm-5.3-flash"}
 	if err := r.SaveAuthoringModels(ctx, pid, models); err != nil {
 		t.Fatal(err)
 	}

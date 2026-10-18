@@ -19,6 +19,8 @@ func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 12, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
+		{Role: RoleResearchQuestions, Language: "vi", Version: 1, TemplateText: researchQuestionsVI},
+		{Role: RoleResearchPrompt, Language: "vi", Version: 1, TemplateText: researchPromptVI},
 		{Role: RoleVisualDirector, Language: "vi", Version: 13, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 9, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 7, TemplateText: bt(visualDirectorAIVI)},

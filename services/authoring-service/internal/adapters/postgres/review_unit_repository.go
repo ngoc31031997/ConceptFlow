@@ -18,12 +18,21 @@ const approvedBriefSHA = `COALESCE((
     WHERE ru.project_id = $1 AND ru.kind = 'brief' AND ru.unit_key = 'main' AND ru.status = 'approved'
 ), '')`
 
-const reviewUnitColumns = `project_id, kind, unit_key, status, content, creator_fields, redo_count, updated_at`
+// reviewUnitColumns lists a unit's columns for a query that aliases the table
+// as ru. The last column is stale: the unit was built from another unit
+// (input_ref) whose content no longer hashes to what was recorded (input_sha).
+const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.content, ru.creator_fields, ru.redo_count, ru.updated_at,
+    ru.input_ref, ru.input_sha,
+    (ru.input_ref <> '' AND ru.input_sha <> COALESCE((
+        SELECT md5(src.content::text) FROM review_units src
+        WHERE src.project_id = ru.project_id AND src.kind || ':' || src.unit_key = ru.input_ref
+    ), ''))`
 
 func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
 	var u domain.ReviewUnit
 	var status string
-	err := row.Scan(&u.ProjectID, &u.Kind, &u.Key, &status, &u.Content, &u.CreatorFields, &u.RedoCount, &u.UpdatedAt)
+	err := row.Scan(&u.ProjectID, &u.Kind, &u.Key, &status, &u.Content, &u.CreatorFields, &u.RedoCount, &u.UpdatedAt,
+		&u.InputRef, &u.InputSHA, &u.Stale)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ReviewUnit{}, domain.ErrUnitNotFound
 	}
@@ -40,8 +49,49 @@ func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
 // GetUnit returns one review unit, or domain.ErrUnitNotFound.
 func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind, key string) (domain.ReviewUnit, error) {
 	return scanReviewUnit(r.pool.QueryRow(ctx,
-		`SELECT `+reviewUnitColumns+` FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`,
+		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2 AND ru.unit_key = $3`,
 		projectID, kind, key))
+}
+
+// ListUnits returns every unit of a kind, ordered so that Q2 comes before Q10.
+func (r *PromptTemplateRepository) ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error) {
+	rows, err := r.pool.Query(ctx,
+		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2
+		 ORDER BY length(ru.unit_key), ru.unit_key`,
+		projectID, kind)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	units := []domain.ReviewUnit{}
+	for rows.Next() {
+		u, err := scanReviewUnit(rows)
+		if err != nil {
+			return nil, err
+		}
+		units = append(units, u)
+	}
+	return units, rows.Err()
+}
+
+// DeleteUnit removes one unit; a unit that is not there is not an error.
+func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, kind, key string) error {
+	_, err := r.pool.Exec(ctx,
+		`DELETE FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`, projectID, kind, key)
+	return err
+}
+
+// UnitSHA returns the md5 of a unit's content, or "" when there is no such
+// unit. It is the same hash the stale column compares against.
+func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind, key string) (string, error) {
+	var sha string
+	err := r.pool.QueryRow(ctx,
+		`SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`,
+		projectID, kind, key).Scan(&sha)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", nil
+	}
+	return sha, err
 }
 
 // SaveUnit upserts a review unit and returns it as stored.
@@ -55,16 +105,19 @@ func (r *PromptTemplateRepository) SaveUnit(ctx context.Context, unit domain.Rev
 		content = []byte("{}")
 	}
 	return scanReviewUnit(r.pool.QueryRow(ctx, `
-		INSERT INTO review_units (project_id, kind, unit_key, status, content, creator_fields, redo_count, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+		INSERT INTO review_units AS ru (project_id, kind, unit_key, status, content, creator_fields, redo_count, input_ref, input_sha, updated_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now())
 		ON CONFLICT (project_id, kind, unit_key) DO UPDATE SET
 		    status = EXCLUDED.status,
 		    content = EXCLUDED.content,
 		    creator_fields = EXCLUDED.creator_fields,
 		    redo_count = EXCLUDED.redo_count,
+		    input_ref = EXCLUDED.input_ref,
+		    input_sha = EXCLUDED.input_sha,
 		    updated_at = now()
 		RETURNING `+reviewUnitColumns,
-		unit.ProjectID, unit.Kind, unit.Key, string(unit.Status), content, creatorFields, unit.RedoCount))
+		unit.ProjectID, unit.Kind, unit.Key, string(unit.Status), content, creatorFields, unit.RedoCount,
+		unit.InputRef, unit.InputSHA))
 }
 
 // GetTargetDuration returns the saved target length, or "" when none is saved.

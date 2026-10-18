@@ -288,7 +288,7 @@ func (uc *CreativeBriefUseCase) Redo(ctx context.Context, projectID, key, note s
 }
 
 // Impact lists what a change to the brief sends back: the story outline, when
-// one was written.
+// one was written, and the research questions the AI wrote from the brief.
 func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key string) ([]string, error) {
 	if key != domain.BriefUnitKey {
 		return nil, domain.ErrUnitNotFound
@@ -297,14 +297,25 @@ func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key strin
 	if err != nil {
 		return nil, err
 	}
-	if !link.HasStory {
-		return []string{}, nil
+	items := []string{}
+	if link.HasStory {
+		items = append(items, "Dàn ý và lời thoại đã viết ở bước Viết kịch bản: cần viết lại theo brief mới")
 	}
-	return []string{"Dàn ý và lời thoại đã viết ở bước Viết kịch bản: cần viết lại theo brief mới"}, nil
+	questions, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
+	if err != nil {
+		return nil, err
+	}
+	for _, q := range questions {
+		if !q.HasCreatorField("text") {
+			items = append(items, "Câu hỏi nghiên cứu do AI sinh: cần sinh lại theo brief mới (dữ kiện đã có giữ nguyên)")
+			break
+		}
+	}
+	return items, nil
 }
 
 // CheckApprovable refuses a brief that still has empty fields.
-func (uc *CreativeBriefUseCase) CheckApprovable(unit domain.ReviewUnit) error {
+func (uc *CreativeBriefUseCase) CheckApprovable(_ context.Context, unit domain.ReviewUnit) error {
 	var brief domain.CreativeBrief
 	if err := json.Unmarshal(unit.Content, &brief); err != nil {
 		return fmt.Errorf("read stored brief: %w", err)

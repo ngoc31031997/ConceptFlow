@@ -3541,3 +3541,62 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 
 ## CR-072-U1 — Code xong, chờ duyệt (2026-10-18)
 Đã làm nhóm A–I: kit `phatsang`, store ngôn ngữ hình, hạng/mức chi tiết, trang Cài đặt, hợp đồng/ADR. Dịch vụ đã rebuild và healthy. Chưa kiểm: WebGL trong container, chạy AI thật, duyệt chất lượng hình (B7), `purge-legacy-data.sh --legacy-kit` (script chưa có trên main). Test hợp đồng shared-artifacts đỏ từ CR-071 (`clip_output_path`).
+---
+## CR-072-U3b — Nghiên cứu và kiểm chứng (thiết kế)
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "Cho tôi làm U3b (Nghiên cứu) khi bạn sẵn sàng."
+**AI Response**: Mở nhánh `feature/cr-072-u3b-research` (worktree riêng, từ main `57642e8`). Kiểm phụ thuộc: U1, U2a (tạm dừng), `chore/worktree-per-cr`, `chore/local-ollama-host` đều độc lập; U3b chặn U3c. Viết thiết kế `cr-072-u3b-research-design.md`: bước 3 thành bước thật của luồng (14 bước, migration dời số bước ở `project_events`); đơn vị `research:main`, `research_question`, `fact` trên `review_units` kèm cột `input_ref/input_sha` (đơn vị `stale`); mẫu `conceptflow.research.v1` và luật dán; `SourceFetcher` có bộ chặn địa chỉ (tên, địa chỉ phân giải, địa chỉ thực nối, chuyển hướng) và số liệu giới hạn; chuẩn hoá và so đoạn trích, câu gần nhất; kiểm link nền; độ phủ theo tên miền độc lập; hai vai prompt mới và `{{research_facts}}` cho bước Kịch bản hiện có; API, màn hình theo mockup (sửa trong modal theo luật 4). Ba điểm đề xuất chờ Creator đổi nếu muốn: sinh câu hỏi bằng nút, brief đổi chỉ gắn nhãn "cần sinh lại", bảng đã duyệt về chờ duyệt khi đổi.
+**Impact Assessment**: chỉ tài liệu. Khi code: build lại authoring-service, orchestrator, api-gateway, web-gui; đổi số bước sau Cấu hình (+1); authoring-service lần đầu ra Internet.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3b-research-design.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ Creator duyệt thiết kế.
+
+---
+## CR-072-U3b — Thu hẹp thiết kế theo mockup
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "bạn chỉ làm bước nghiên cứu theo file mockup thôi mà"
+**AI Response**: Thu hẹp về đúng màn bước 3 của mockup bản 9: bỏ dời số bước luồng chạy và migration orchestrator, bỏ phần bước Kịch bản hiện có đọc dữ kiện, ô câu hỏi sửa tại chỗ như mockup. Ghi mục "Phạm vi đã thu hẹp" ở đầu thiết kế.
+**Impact Assessment**: build lại khi code: authoring-service, api-gateway, web-gui (không còn orchestrator).
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt thiết kế.
+
+---
+## CR-072-U3b — Nút sang Câu chuyện
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "nút \"Sang xây dựng câu chuyện → vãn đi theo mockup. là mở ra Câu chuyện chưa có thì hiện chưa phát triển thôi"
+**AI Response**: Nút mở bước 4 Câu chuyện; màn đó hiện "Bước này chưa phát triển" tới U3c. Ghi vào thiết kế.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt thiết kế.
+
+---
+## CR-072-U3b — Duyệt thiết kế; bổ sung khi chia task
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "ok làm đi"
+**AI Response**: Commit thiết kế (`69ae395`) và push. Đọc code web-gui ở mức dòng để chia task thì thấy thiết kế thiếu hai điều: (1) menu bước đánh khoá theo số bước server nên màn web-only cần trường `screen` và prop `viewStep`; (2) nếu Cấu hình mở Nghiên cứu và nút sang Câu chuyện chỉ hiện "chưa phát triển" thì video mới không còn đường tới bước Kịch bản hiện có. Ghi mục "Bổ sung sau khi đọc code web-gui" vào thiết kế, đề xuất nút phụ "Tiếp tục bằng bước Viết kịch bản hiện có" ở màn Câu chuyện chưa phát triển; chưa viết task, chờ Creator duyệt lại.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit phần bổ sung.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt lại thiết kế.
+
+---
+## CR-072-U3b — Chọn (c): màn chưa có hiện "chưa phát triển"
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "chọn C màn nào chưa có hiện chưa phát triển"
+**AI Response**: Ghi vào thiết kế: không thêm đường nối sang Kịch bản hiện có; mọi màn của luồng 21 bước chưa có mở ra màn "Bước này chưa phát triển". Commit phần bổ sung rồi chia task.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`.
+**Context**: CONSTRUCTION — CR-072-U3b.
+
+---
+## CR-072-U3b — Danh sách task
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "chọn C màn nào chưa có hiện chưa phát triển"
+**AI Response**: Commit phần bổ sung thiết kế (`dc545e4`), đọc code ở mức dòng và viết `cr-072-u3b-research-tasks.md`: 13 task. Backend authoring-service: T1 domain nghiên cứu (kiểu, đọc khối JSON, độ phủ); T2 so khớp đoạn trích; T3 SourceFetcher + bộ chặn địa chỉ + cổng `ResearchSource`; T4 lưu trữ (cột `input_ref/input_sha`, bảng `research_pastes`, cập nhật link có điều kiện); T5 vai prompt `research_questions`/`research_prompt` + model `research`; T6 ResearchDesk (câu hỏi, prompt, trạng thái, `CheckApprovable` nhận ctx); T7 dán kết quả, dữ kiện, kiểm link nền, bỏ qua, duyệt; T8 HTTP + nối dây + quét `run` sót + gateway. Web-gui: T9 client API; T10 bước chỉ có trên web (`screen`, `viewStep`), màn "chưa phát triển", Cấu hình mở Nghiên cứu; T11 hook; T12 màn Nghiên cứu; T13 hợp đồng/tài liệu. Lệch mockup có chủ ý: thanh bước chưa hiện "bỏ qua" cho bước 3 (cần gọi API từ mọi màn).
+**Impact Assessment**: build lại authoring-service, api-gateway, web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3b-research-tasks.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ Creator duyệt task.
+
+---
+## CR-072-U3b — Code xong, chờ duyệt
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "ok làm đi"; "tiếp đi"
+**AI Response**: Làm 13 task của `cr-072-u3b-research-tasks.md` (đã tick). authoring-service: domain nghiên cứu (kiểu dữ kiện, đọc khối `conceptflow.research.v1`, độ phủ theo tên miền), so khớp đoạn trích (chuẩn hoá, câu gần nhất), `SourceFetcher` có bộ chặn địa chỉ nội bộ ở bốn lớp và giới hạn thời gian/dung lượng/chuyển hướng/đồng thời, kiểm link nền 4 luồng (`SourceVerifier`), `ResearchDeskUseCase` (câu hỏi, prompt đầu và bổ sung, dán kết quả, dữ kiện, bỏ qua, duyệt), ba loại đơn vị `research_question`/`fact`/`research`, cột `input_ref/input_sha` (đơn vị `stale`), bảng `research_pastes`, cột `research_model`, hai vai prompt `research_questions`/`research_prompt`, 11 route HTTP, quét link "đang kiểm" sót lúc khởi động; `CheckApprovable` nhận `ctx`; brief `Impact` thêm dòng câu hỏi nghiên cứu. api-gateway: 11 route. web-gui: bước 3 là màn riêng (`screen`, `viewStep`), màn "Bước này chưa phát triển" cho các bước chưa có, Cấu hình mở Nghiên cứu, màn Nghiên cứu (5 thẻ, các modal), hook `useResearch` (hỏi lại 2 giây khi còn link đang kiểm). Tài liệu: `docs/contracts/research-v1.md`, mục lục hợp đồng, backlog `aidlc-state.md`. Sửa kèm: handler lưu model nhận thêm `publish` (trước đây xoá model Publish về trống mỗi lần lưu) và trả `publish_model`; thông báo lỗi bỏ tiền tố tiếng Anh của sentinel khi có lý do tiếng Việt.
+**Impact Assessment**: build lại và khởi động lại authoring-service, api-gateway, web-gui (healthy; code từ `feature/cr-072-u3b-research`; trước đó stack chạy code của main `57642e8`). Orchestrator không đổi. Test: Go `go test -race ./...` xanh với Postgres tạm (`TEST_DATABASE_URL`, đã xoá); api-gateway `npm test` 130 test xanh; web-gui `vitest` 562 test xanh, `tsc` sạch, `eslint` 0 lỗi. Chưa chạy: `tests/contracts` (máy không có pytest; `flow.go` không đổi); kiểm link với Internet thật qua giao diện (chưa dán JSON mẫu vào project thật để không đụng dữ liệu của Creator); bộ chặn địa chỉ chỉ kiểm bằng test, chưa thử từ container.
+**Artifacts Affected**: `services/authoring-service/` (domain, application, adapters/http, adapters/postgres, adapters/sourcefetch, cmd), `services/api-gateway/src/routes/projects.js` và test, `services/web-gui/` (utils/flow.ts, hooks, components/research, pages, App.tsx, test), `docs/contracts/research-v1.md`, `docs/contracts/README.md`, `aidlc-docs/aidlc-state.md`, `aidlc-docs/construction/plans/cr-072-u3b-research-tasks.md`, `aidlc-docs/audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ Creator duyệt.

@@ -136,6 +136,20 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/units/:kind/:key/approve', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/units/:kind/:key/unapprove', proxyHandler(authoring, 'authoring-service'));
   router.get('/v1/projects/:id/units/:kind/:key/impact', proxyHandler(authoring, 'authoring-service'));
+  // Nghiên cứu: câu hỏi cần tra, prompt chép ra công cụ ngoài, dán kết quả và
+  // bảng dữ kiện. Chỉ việc AI sinh câu hỏi gọi model nên dùng client timeout dài;
+  // tải trang kiểm link chạy nền trong authoring-service.
+  router.get('/v1/projects/:id/research', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/research/questions/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/research/questions', proxyHandler(authoring, 'authoring-service'));
+  router.delete('/v1/projects/:id/research/questions/:qid', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/research/prompt', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/research/follow-up-prompt', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/research/paste', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/research/facts', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/research/facts/:fid', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/research/verify', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/research/skip', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));

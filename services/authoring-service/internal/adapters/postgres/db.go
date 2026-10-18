@@ -299,6 +299,23 @@ ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS detail_level TEXT NOT NULL DE
 -- AI's one-line reason for it.
 ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'support';
 ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier_reason TEXT NOT NULL DEFAULT '';
+-- The unit a review unit was built from (kind:key) and the hash of that
+-- unit's content at the time; a unit whose source has changed since is stale.
+ALTER TABLE review_units ADD COLUMN IF NOT EXISTS input_ref TEXT NOT NULL DEFAULT '';
+ALTER TABLE review_units ADD COLUMN IF NOT EXISTS input_sha TEXT NOT NULL DEFAULT '';
+-- Model the research step writes its questions with ('' = server default).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS research_model TEXT NOT NULL DEFAULT '';
+-- One row per answer the Creator pasted into the research step, numbered per
+-- project. Holds what was read from it, never the pasted text itself.
+CREATE TABLE IF NOT EXISTS research_pastes (
+    project_id TEXT NOT NULL,
+    n          INTEGER NOT NULL,
+    at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    added      TEXT[] NOT NULL DEFAULT '{}',
+    updated    TEXT[] NOT NULL DEFAULT '{}',
+    rejected   JSONB NOT NULL DEFAULT '[]',
+    PRIMARY KEY (project_id, n)
+);
 -- Colours outside the channel palette (S9) are not a warning; drop any such
 -- stored warnings so no drawing shows them.
 UPDATE illustrations SET warnings = COALESCE((

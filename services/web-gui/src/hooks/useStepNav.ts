@@ -3,7 +3,18 @@ import { useNavigate, useParams } from "react-router-dom";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useAuthoringRun } from "../context/AuthoringRunContext";
-import { AUTHORING_STEP_FLOW, authoringRoute, flowRoute, previewRoute, stepStatus, type StepStatus } from "../utils/flow";
+import {
+  AUTHORING_STEP_FLOW,
+  authoringRoute,
+  comingRoute,
+  flowRoute,
+  isBuilt,
+  previewRoute,
+  screenRoute,
+  stepStatus,
+  type FlowViewStep,
+  type StepStatus,
+} from "../utils/flow";
 
 /** Bước bản nháp (chưa có project trên server) quay lại được, theo route. */
 const DRAFT_ROUTES = ["/", "/create/script/settings", "/create/script/outline"];
@@ -22,6 +33,11 @@ export interface StepNav {
   go: (step: number) => void;
   /** Mở màn của bước `step` (thật hoặc xem trước), kể cả khi đó là bước đang xem. */
   open: (step: number) => void;
+  /**
+   * Mở màn của một bước trong 21 bước không có bước chạy phía sau: màn riêng
+   * của nó (cần project) hoặc màn "chưa phát triển".
+   */
+  openView: (view: FlowViewStep) => void;
 }
 
 export interface StepNavOptions {
@@ -30,6 +46,12 @@ export interface StepNavOptions {
    * "đã tới" chỉ tính theo server, không theo bước đang xem.
    */
   preview?: boolean;
+  /**
+   * Màn đang mở là màn của một bước trong 21 bước không có số bước chạy
+   * (Nghiên cứu, hay màn "chưa phát triển"): `currentStep` trống nhưng thanh
+   * bước vẫn bấm được.
+   */
+  webScreen?: boolean;
 }
 
 /**
@@ -64,7 +86,7 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
     return step <= draftReached && step <= DRAFT_ROUTES.length;
   };
 
-  const isClickable = (step: number) => !!currentStep && step !== currentStep;
+  const isClickable = (step: number) => (!!currentStep || !!options.webScreen) && step !== currentStep;
 
   const open = (step: number) => {
     if (!isReached(step)) {
@@ -88,6 +110,14 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
     if (isClickable(step)) open(step);
   };
 
+  const openView = (view: FlowViewStep) => {
+    if (view.screen) {
+      if (hasProject) navigate(screenRoute(view, projectId));
+      return;
+    }
+    if (!isBuilt(view)) navigate(comingRoute(view.n, hasProject ? projectId : ""));
+  };
+
   return {
     hasProject,
     reached,
@@ -96,5 +126,6 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
     isReached,
     go,
     open,
+    openView,
   };
 }

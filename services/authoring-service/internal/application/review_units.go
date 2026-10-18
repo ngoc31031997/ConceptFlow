@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"authoring/internal/domain"
@@ -12,6 +13,13 @@ import (
 type ReviewUnitPort interface {
 	GetUnit(ctx context.Context, projectID, kind, key string) (domain.ReviewUnit, error)
 	SaveUnit(ctx context.Context, unit domain.ReviewUnit) (domain.ReviewUnit, error)
+	// ListUnits returns every unit of a kind, in key order (Q2 before Q10).
+	ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error)
+	// DeleteUnit removes a unit; a unit that is not there is not an error.
+	DeleteUnit(ctx context.Context, projectID, kind, key string) error
+	// UnitSHA is the hash of a unit's content, the form a built unit records
+	// as the input it was built from; "" when the unit does not exist.
+	UnitSHA(ctx context.Context, projectID, kind, key string) (string, error)
 }
 
 // UnitKind is what one step registers for its kind of review unit: how a
@@ -22,7 +30,15 @@ type UnitKind interface {
 	Edit(ctx context.Context, projectID, key string, fields map[string]string) (domain.ReviewUnit, error)
 	Redo(ctx context.Context, projectID, key, note string) (domain.ReviewUnit, error)
 	Impact(ctx context.Context, projectID, key string) ([]string, error)
-	CheckApprovable(unit domain.ReviewUnit) error
+	CheckApprovable(ctx context.Context, unit domain.ReviewUnit) error
+}
+
+// UnitInitializer is implemented by a kind whose unit exists from the start of
+// its step even before anything was saved, such as the gate of a step. It
+// returns the unit a project has before its first save; false when the key is
+// not one it knows.
+type UnitInitializer interface {
+	Initial(ctx context.Context, projectID, key string) (domain.ReviewUnit, bool)
 }
 
 // ReviewUnitsUseCase is the one entry point for reading, editing, redoing and
@@ -115,11 +131,18 @@ func (uc *ReviewUnitsUseCase) setStatus(ctx context.Context, projectID, kind, ke
 		return domain.ReviewUnit{}, err
 	}
 	unit, err := uc.store.GetUnit(ctx, projectID, kind, key)
+	if errors.Is(err, domain.ErrUnitNotFound) {
+		if init, ok := k.(UnitInitializer); ok {
+			if initial, found := init.Initial(ctx, projectID, key); found {
+				unit, err = initial, nil
+			}
+		}
+	}
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}
 	if status == domain.UnitApproved {
-		if err := k.CheckApprovable(unit); err != nil {
+		if err := k.CheckApprovable(ctx, unit); err != nil {
 			return domain.ReviewUnit{}, err
 		}
 	}
