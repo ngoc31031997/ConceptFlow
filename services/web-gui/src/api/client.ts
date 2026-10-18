@@ -418,6 +418,8 @@ export async function completeYoutubeAuthCallback(
 }
 
 export type PromptRole =
+  // Ý tưởng: viết creative brief từ đề tài (AI chạy ở server, không chép ra ngoài).
+  | "creative_brief"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -475,6 +477,8 @@ export interface PromptRenderInput {
   voice_id?: string;
   /** "long" | "short": which frame the frame variables describe. */
   video_output_mode?: string;
+  /** The project whose approved creative brief fills `{{creative_brief}}` (story_architect). */
+  project_id?: string;
 }
 
 export interface RenderedPromptResult {
@@ -663,7 +667,7 @@ export function getIllustrationStyle(): Promise<IllustrationStyle> {
 }
 
 /** AI vẽ một hình mới theo luật style; lưu ở "Chờ duyệt". Có thể mất vài phút. */
-export function drawIllustration(input: { description: string; folder_id: string; name?: string }): Promise<Illustration> {
+export function drawIllustration(input: { description: string; folder_id: string; name?: string; model?: string }): Promise<Illustration> {
   return apiFetch<Illustration>("/v1/admin/illustrations/draw", {
     method: "POST",
     headers: JSON_HEADERS,
@@ -672,11 +676,11 @@ export function drawIllustration(input: { description: string; folder_id: string
 }
 
 /** AI vẽ lại một hình của bạn theo ghi chú; giữ tên, ra phiên bản mới ở "Chờ duyệt". */
-export function redrawIllustration(id: string, note: string): Promise<Illustration> {
+export function redrawIllustration(id: string, note: string, model?: string): Promise<Illustration> {
   return apiFetch<Illustration>(`/v1/admin/illustrations/${id}/redraw`, {
     method: "POST",
     headers: JSON_HEADERS,
-    body: JSON.stringify({ note }),
+    body: JSON.stringify({ note, ...(model ? { model } : {}) }),
   });
 }
 
@@ -1180,6 +1184,8 @@ export interface AuthoringState {
   storyboard: string;
   code: string;
   /** Model-per-step picker's đã lưu cho project này — "" nghĩa là mặc định. */
+  brief_model?: string;
+  publish_model?: string;
   story_model?: string;
   storyboard_model?: string;
   code_model?: string;
@@ -1206,6 +1212,10 @@ export async function saveAuthoringMode(projectId: string, mode: AuthoringMode):
 
 /** Model-per-step picker's cho từng tab — "" nghĩa là dùng mặc định máy chủ. */
 export interface AuthoringStepModels {
+  /** Model of the idea step's creative brief; missing or "" reads as the default. */
+  brief?: string;
+  /** Model that suggests the publish title, description and tags. */
+  publish?: string;
   story: string;
   storyboard: string;
   code: string;
@@ -1220,6 +1230,30 @@ export async function saveAuthoringModels(projectId: string, models: AuthoringSt
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(models),
+  });
+}
+
+/**
+ * The model every AI call runs on when the project and the button name none,
+ * as the Creator set it in Cài đặt ("" when they set none), and the model the
+ * server falls back to.
+ */
+export interface AiModelSetting {
+  defaultModel: string;
+  serverModel: string;
+}
+
+export async function getAiModelSetting(): Promise<AiModelSetting> {
+  const wire = await apiFetch<{ default_model: string; server_model: string }>("/v1/settings/ai-model");
+  return { defaultModel: wire.default_model, serverModel: wire.server_model };
+}
+
+/** Sets the default model; "" clears it so the server's applies. 400 for a model that cannot serve every step. */
+export async function setAiModelDefault(model: string): Promise<void> {
+  await apiFetch<undefined>("/v1/settings/ai-model", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ default_model: model }),
   });
 }
 
@@ -1428,4 +1462,198 @@ export interface OperationProgress {
 
 export function getOperation(operationId: string): Promise<OperationProgress> {
   return apiFetch<OperationProgress>(`/v1/operations/${operationId}`);
+}
+
+/** Review state of one unit: waiting for the Creator, or approved. See ADR-0035. */
+export type UnitStatus = "pending" | "approved";
+
+/**
+ * One reviewable piece of a step (the brief, later a beat or a scene): its
+ * content, the fields the Creator wrote by hand (an AI redo keeps them), and
+ * how many times the AI redid it.
+ */
+export interface ReviewUnit<C> {
+  projectId: string;
+  kind: string;
+  key: string;
+  status: UnitStatus;
+  content: C;
+  creatorFields: string[];
+  redoCount: number;
+  updatedAt: string;
+}
+
+/** Names one unit and reads its content from the wire. */
+export interface UnitRef<C> {
+  kind: string;
+  key: string;
+  parse: (content: unknown) => C;
+}
+
+interface reviewUnitWire {
+  project_id: string;
+  kind: string;
+  key: string;
+  status: UnitStatus;
+  content: unknown;
+  creator_fields: string[] | null;
+  redo_count: number;
+  updated_at: string;
+}
+
+function fromWireUnit<C>(wire: reviewUnitWire, parse: (content: unknown) => C): ReviewUnit<C> {
+  return {
+    projectId: wire.project_id,
+    kind: wire.kind,
+    key: wire.key,
+    status: wire.status,
+    content: parse(wire.content),
+    creatorFields: wire.creator_fields ?? [],
+    redoCount: wire.redo_count,
+    updatedAt: wire.updated_at,
+  };
+}
+
+/** Which unit, without how to read it. */
+export type UnitAddress = Pick<UnitRef<unknown>, "kind" | "key">;
+
+function unitPath(projectId: string, ref: UnitAddress): string {
+  return `/v1/projects/${projectId}/units/${encodeURIComponent(ref.kind)}/${encodeURIComponent(ref.key)}`;
+}
+
+/** Saves the Creator's hand edit of some fields; a changed field becomes the Creator's. */
+export async function editUnit<C>(
+  projectId: string,
+  ref: UnitRef<C>,
+  fields: Record<string, string>,
+): Promise<ReviewUnit<C>> {
+  const wire = await apiFetch<reviewUnitWire>(unitPath(projectId, ref), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  return fromWireUnit(wire, ref.parse);
+}
+
+/** Has the AI redo the unit with the Creator's note; the unit goes back to review. */
+export async function redoUnit<C>(
+  projectId: string,
+  ref: UnitRef<C>,
+  note: string,
+  operationId?: string,
+): Promise<ReviewUnit<C>> {
+  const wire = await apiFetch<reviewUnitWire>(`${unitPath(projectId, ref)}/redo`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}),
+    },
+    body: JSON.stringify({ note }),
+  });
+  return fromWireUnit(wire, ref.parse);
+}
+
+/** Approves the unit. 400 while the unit is incomplete. */
+export async function approveUnit<C>(projectId: string, ref: UnitRef<C>): Promise<ReviewUnit<C>> {
+  const wire = await apiFetch<reviewUnitWire>(`${unitPath(projectId, ref)}/approve`, { method: "POST" });
+  return fromWireUnit(wire, ref.parse);
+}
+
+/** Takes the approval back; the unit waits for review again. */
+export async function unapproveUnit<C>(projectId: string, ref: UnitRef<C>): Promise<ReviewUnit<C>> {
+  const wire = await apiFetch<reviewUnitWire>(`${unitPath(projectId, ref)}/unapprove`, { method: "POST" });
+  return fromWireUnit(wire, ref.parse);
+}
+
+/**
+ * What a change to the unit sends back in later steps, as the server's
+ * dependency tracking says, one line per item. Empty when nothing depends on it yet.
+ */
+export async function getUnitImpact(projectId: string, ref: UnitAddress): Promise<string[]> {
+  const res = await apiFetch<{ items: string[] | null }>(`${unitPath(projectId, ref)}/impact`);
+  return res.items ?? [];
+}
+
+/** The creative brief's fields, in the order the screen and the prompts show them. */
+export const BRIEF_FIELDS = ["question", "audience", "know", "understand", "feel", "tone", "out_of_scope"] as const;
+export type BriefField = (typeof BRIEF_FIELDS)[number];
+export type CreativeBrief = Record<BriefField, string>;
+
+/** Reads a stored brief; a field the server did not send reads as empty. */
+export function parseCreativeBrief(content: unknown): CreativeBrief {
+  const source = (content && typeof content === "object" ? content : {}) as Record<string, unknown>;
+  const brief = {} as CreativeBrief;
+  for (const field of BRIEF_FIELDS) {
+    const value = source[field];
+    brief[field] = typeof value === "string" ? value : "";
+  }
+  return brief;
+}
+
+/** The idea step's one unit. */
+export const BRIEF_UNIT: UnitRef<CreativeBrief> = { kind: "brief", key: "main", parse: parseCreativeBrief };
+
+/** Target length of a long video, in minutes; a short is always under 60 seconds. */
+export type TargetDuration = "3-4" | "4-5" | "5-7" | "7-10";
+export const TARGET_DURATIONS: readonly TargetDuration[] = ["3-4", "4-5", "5-7", "7-10"];
+export const DEFAULT_TARGET_DURATION: TargetDuration = "4-5";
+
+/**
+ * The idea step as the server holds it. `storyStale`: the outline on the
+ * story step was written from another brief than the approved one.
+ * `storyPromptReadsBrief`: the active story prompt has `{{creative_brief}}`
+ * (a prompt the Creator wrote may not, and then the brief never reaches it).
+ */
+export interface BriefState {
+  unit: ReviewUnit<CreativeBrief> | null;
+  targetDuration: TargetDuration;
+  storyStale: boolean;
+  storyPromptReadsBrief: boolean;
+}
+
+interface briefStateWire {
+  unit: reviewUnitWire | null;
+  target_duration: string;
+  story_stale: boolean;
+  story_prompt_reads_brief: boolean;
+}
+
+function asTargetDuration(value: string): TargetDuration {
+  return (TARGET_DURATIONS as readonly string[]).includes(value) ? (value as TargetDuration) : DEFAULT_TARGET_DURATION;
+}
+
+export async function getBriefState(projectId: string): Promise<BriefState> {
+  const wire = await apiFetch<briefStateWire>(`/v1/projects/${projectId}/brief`);
+  return {
+    unit: wire.unit ? fromWireUnit(wire.unit, parseCreativeBrief) : null,
+    targetDuration: asTargetDuration(wire.target_duration),
+    storyStale: wire.story_stale,
+    storyPromptReadsBrief: wire.story_prompt_reads_brief,
+  };
+}
+
+/** Picks the target length. 409 once a brief exists: the brief was written for the old one. */
+export async function setTargetDuration(projectId: string, targetDuration: TargetDuration): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/brief/target-duration`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ target_duration: targetDuration }),
+  });
+}
+
+/**
+ * Has the AI write the brief from the project's topic (a model call: pass an
+ * operation id to follow it). 503 when no language model is configured, 502
+ * when the reply could not be read.
+ */
+export async function generateBrief(projectId: string, operationId?: string): Promise<ReviewUnit<CreativeBrief>> {
+  const wire = await apiFetch<reviewUnitWire>(`/v1/projects/${projectId}/brief/generate`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}),
+    },
+    body: JSON.stringify({}),
+  });
+  return fromWireUnit(wire, parseCreativeBrief);
 }

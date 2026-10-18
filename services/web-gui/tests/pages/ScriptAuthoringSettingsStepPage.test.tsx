@@ -60,10 +60,10 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-function renderPage(state?: unknown) {
+function renderPage() {
   return render(
     <ThemeProvider>
-      <MemoryRouter initialEntries={[{ pathname: "/create/script/settings", state }]}>
+      <MemoryRouter initialEntries={["/create/script/settings"]}>
         <ProjectDraftProvider>
           <AuthoringRunProvider>
             <Routes>
@@ -104,30 +104,19 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
     expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
   });
 
-  it("hiện chủ đề chỉ đọc, “Sửa” đưa về bước 1", async () => {
+  it("hiện chủ đề chỉ đọc, “Xem ở Ý tưởng” đưa về bước 1", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId("topic-summary")).toBeInTheDocument());
 
-    fireEvent.click(screen.getByTestId("topic-summary-edit"));
+    fireEvent.click(screen.getByTestId("topic-summary-open"));
     expect(screen.getByTestId("step-1-stub")).toBeInTheDocument();
   });
 
-  it("cảnh báo chủ đề trùng mà bước 1 chuyển sang", async () => {
-    renderPage({
-      similarProjects: [
-        { projectId: "old-1", topic: "Vòng lặp for", status: "published", createdAt: "" },
-      ],
-    });
-
-    expect(await screen.findByTestId("topic-collision-banner")).toHaveTextContent(
-      "Vòng lặp for (published)",
-    );
-  });
-
-  it("không cảnh báo khi không có dự án trùng", async () => {
+  it("không còn chọn ngôn ngữ nội dung và dạng video: hai thứ đó chốt ở bước Ý tưởng", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("topic-summary")).toBeInTheDocument());
-    expect(screen.queryByTestId("topic-collision-banner")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("settings-section-content")).toBeInTheDocument());
+    expect(screen.queryByTestId("content-language-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("video-output-mode-picker")).not.toBeInTheDocument();
   });
 
   it("chọn kiểu video là lưu lại chủ đề có “kiểu: X”; dùng format gợi ý là lưu format", async () => {

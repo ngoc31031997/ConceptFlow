@@ -25,11 +25,17 @@ export interface ProjectFlow {
   runState: Project["run_state"] | undefined;
   /** False once the server would refuse authoring edits (see isAuthoringEditable). */
   editable: boolean;
+  /**
+   * The server has answered for this project at least once, so a null
+   * `project` means "not on the server yet" rather than "still asking".
+   */
+  loaded: boolean;
   refetch: () => void;
 }
 
 const noFlow: ProjectFlow = {
-  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, refetch: () => {},
+  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, loaded: true,
+  refetch: () => {},
 };
 
 const ProjectFlowContext = createContext<ProjectFlow>(noFlow);
@@ -39,16 +45,19 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
   const routeId = useMatch("/projects/:id/*")?.params.id;
   const projectId = routeId ?? draft.projectId;
   const [project, setProject] = useState<Project | null>(null);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
     if (!projectId) return;
     getProject(projectId)
       .then((p) => setProject(p))
-      .catch(() => setProject(null)); // no such project on the server yet
+      .catch(() => setProject(null)) // no such project on the server yet
+      .finally(() => setLoaded(true));
   }, [projectId]);
 
   useEffect(() => {
     setProject(null);
+    setLoaded(!projectId);
     load();
     if (!projectId) return;
     const t = window.setInterval(load, POLL_MS);
@@ -62,6 +71,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     flowStep: project?.flow_step ?? 0,
     runState: project?.run_state,
     editable: isAuthoringEditable(project?.status),
+    loaded,
     refetch: load,
   };
   return <ProjectFlowContext.Provider value={value}>{children}</ProjectFlowContext.Provider>;

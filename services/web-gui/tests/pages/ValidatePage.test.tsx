@@ -85,7 +85,7 @@ describe("ValidatePage (bước 7 — chạy thử, bước 8 — duyệt)", () 
     await waitFor(() => expect(screen.getByTestId("progress-tracker-steps")).toBeInTheDocument());
     const items = screen.getByTestId("progress-tracker-steps").querySelectorAll("li");
     expect(Array.from(items).map((li) => li.textContent)).toEqual(["7.1Phân tích kịch bản", "7.2Chạy thử & kiểm tra"]);
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 7 — Kiểm tra tự động");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Validate");
   });
 
   it("khi chờ duyệt, tiêu đề là “Bước 8 — Duyệt nội dung”", async () => {
@@ -93,7 +93,7 @@ describe("ValidatePage (bước 7 — chạy thử, bước 8 — duyệt)", () 
 
     renderValidatePage();
 
-    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 8 — Duyệt nội dung"));
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Review"));
     expect(screen.getByTestId("outline-review")).toHaveTextContent("Duyệt dàn ý trước khi sản xuất");
   });
 

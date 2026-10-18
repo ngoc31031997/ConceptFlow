@@ -3442,3 +3442,19 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: INCEPTION — CR-072 cập nhật Tiền kỳ · Nội dung đã duyệt.
 
 ---
+## CR-072-U3a — Ý tưởng · creative brief, khung sửa theo đơn vị (code)
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "bỏ hết các quyết định trước đó cứ implment bước Tiền kỳ đã chốt trước"; sau đó: "tiếp"
+**AI Response**: Bỏ thứ tự "U2a trước" và vòng chờ duyệt thiết kế, task; làm U3a trên nhánh `feature/cr-072-u3a-idea-brief` (worktree riêng). U2a tạm dừng, thiết kế vòng 2 vẫn chưa commit trong worktree của nó. authoring-service: bảng `review_units`, khung đơn vị (registry loại, HTTP chung `/units/{kind}/{key}`: đọc, sửa tay, làm lại kèm ghi chú, duyệt, bỏ duyệt, ảnh hưởng), loại `brief`; vai prompt `creative_brief` (seed, trả JSON bảy ô); `project_authoring.target_duration` và `story_brief_sha` (dấu md5 của brief đã duyệt lúc lưu dàn ý, để báo dàn ý viết theo brief cũ); `story_architect` bản 12 có `{{creative_brief}}`. Xoá trắng một ô thì ô đó trả lại cho AI; lỗi ô trống gọi bằng nhãn trên màn. api-gateway: chín route mới. web-gui: màn bước 1 Ý tưởng (① Đề tài: chủ đề, dạng video, ngôn ngữ, thời lượng, "Tạo project và viết brief"; ② Creative brief với chip trạng thái, Sửa tay, Làm lại kèm ghi chú, Duyệt brief / Bỏ duyệt, "Bạn viết"); "Sang cấu hình" chỉ mở khi brief đã duyệt; bước 2 bỏ chọn ngôn ngữ và dạng video; bước 3 gửi `project_id` và hiện ba lời nhắc về brief; vỏ hộp thoại dùng chung `components/ui/Dialog.tsx` (ConfirmModal dùng lại), nút `impact`, `run`, `view` và token `--impact`, `--impact-ink`, `--danger-ink`, `--run-ink`; vai `creative_brief` ở Cài đặt prompt. Lệch mockup một điểm: các ô brief sửa trong modal theo luật giao diện 4, không sửa thẳng trên trang.
+**Impact Assessment**: build lại authoring-service, api-gateway, web-gui. Seed prompt upsert `story_architect` bản 12 lúc khởi động. Project cũ chưa có brief: bước 1 cho viết brief (AI hoặc tự viết), bước 3 báo "chưa có brief đã duyệt". Ngôn ngữ và dạng video không đổi được ở bước 2 nữa.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3a-idea-brief-design.md`, code authoring-service, api-gateway, web-gui (xem `git status` trên nhánh); chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3a, chờ Creator duyệt.
+
+---
+## CR-072-U3a — Khung 21 bước theo mockup; chọn model AI theo project và mặc định
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "làm lại như mockup cho tôi chứ, toàn bộ những phần nào có call AI đều phải cho lựa chọn hoặc set model defualt ngay lúc chọn đó"; "Muốn chọn model ngay tại nút thì phải sửa thêm API của orchestrator và llm-service. => có làm luôn"; "chọn model đi theo project và trong settin cũng cho setting model default khi chạy project thì luôn chọn default nhưng user có thể thay đổi xong 2 cái này thì push lên main rồi build lại cập nhật trạng thái task"
+**AI Response**: Thanh bước và Bản đồ luồng theo 21 bước của mockup (13 bước đang chạy xếp vào bốn nhóm; 9 bước chưa làm hiện "sắp có"), tên bước đổi ở web-gui và hai `flow.go`, menu trái đủ mục (Bản đồ luồng, nhóm Cài đặt, ba mục "sắp có"). Chọn model AI: brief và Publish có model riêng theo project, ô chọn ngay tại nút AI (Ý tưởng, Publish, vẽ hình thư viện), model mặc định của app ở Cài đặt (`app_settings`), project mới theo mặc định. llm-service `suggest-metadata` nhận `model`; orchestrator không cần đổi vì gateway gọi thẳng authoring-service. Ollama chạy trên máy (GPU) qua `OLLAMA_URL`.
+**Impact Assessment**: build lại web-gui, api-gateway, authoring-service, orchestrator, llm-service. Bảng `project_authoring` thêm `brief_model`, `publish_model`; bảng mới `app_settings`.
+**Context**: CONSTRUCTION — CR-072-U3a, Creator yêu cầu đưa lên main.
+---

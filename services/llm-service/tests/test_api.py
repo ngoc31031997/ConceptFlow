@@ -81,6 +81,21 @@ async def test_suggest_metadata_goes_to_the_light_provider_ollama(client):
 
 
 @respx.mock
+async def test_suggest_metadata_runs_on_the_model_the_caller_names(client):
+    hive = respx.post("https://hive.test/v3/chat/completions").mock(return_value=stream_response(
+        chunk('{"title":"T","description":"d","tags":["a"]}', finish="stop"), usage_chunk({})))
+    r = await client.post("/v1/suggest-metadata", json={"script_content": "s", "model": "zai-org/glm-5.3-flash"})
+    assert r.status_code == 200 and r.json()["provider"] == "hive"
+    assert json.loads(hive.calls.last.request.content)["model"] == "zai-org/glm-5.3-flash"
+
+    ollama = respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=stream_response(
+        chunk('{"title":"T","description":"d","tags":["a"]}', finish="stop"), usage_chunk({})))
+    r = await client.post("/v1/suggest-metadata", json={"script_content": "s", "model": "ollama/qwen2.5:1.5b"})
+    assert r.json()["provider"] == "ollama"
+    assert json.loads(ollama.calls.last.request.content)["model"] == "qwen2.5:1.5b"
+
+
+@respx.mock
 async def test_suggest_metadata_can_stream_progress(client):
     respx.post("http://ollama.test:11434/v1/chat/completions").mock(return_value=stream_response(
         chunk('{"title":"T","description":"d","tags":["a"]}', finish="stop"), usage_chunk({})))

@@ -34,6 +34,8 @@ export function useAuthoringModels(projectId: string): {
         dispatch({
           type: "SET_AUTHORING_MODELS",
           payload: {
+            brief: state.brief_model ?? "",
+            publish: state.publish_model ?? "",
             story: state.story_model ?? "",
             storyboard: state.storyboard_model ?? "",
             code: state.code_model ?? "",

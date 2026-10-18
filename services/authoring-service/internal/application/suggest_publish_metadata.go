@@ -14,7 +14,8 @@ type MetadataSuggesterPort interface {
 	// language is the project's ContentLanguage — the metadata
 	// must come back in the language the audience speaks, not the one the
 	// prompt happens to be written in.
-	Suggest(ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage) (title, description string, tags []string, err error)
+	// model is the model id picked for this project's publish step; "" is the default.
+	Suggest(ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage, model string) (title, description string, tags []string, err error)
 }
 
 // SuggestPublishMetadataOutput carries the AI-drafted YouTube metadata back
@@ -32,11 +33,18 @@ type SuggestPublishMetadataOutput struct {
 type SuggestPublishMetadataUseCase struct {
 	repo      ProjectReaderPort
 	suggester MetadataSuggesterPort
+	models    AuthoringModelsReaderPort
 }
 
 // ProjectReaderPort reads a project from wherever it lives (the orchestrator).
 type ProjectReaderPort interface {
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
+}
+
+// WithModels lets the suggestion run on the model the project picked for it.
+func (uc *SuggestPublishMetadataUseCase) WithModels(models AuthoringModelsReaderPort) *SuggestPublishMetadataUseCase {
+	uc.models = models
+	return uc
 }
 
 func NewSuggestPublishMetadataUseCase(repo ProjectReaderPort, suggester MetadataSuggesterPort) *SuggestPublishMetadataUseCase {
@@ -52,8 +60,16 @@ func (uc *SuggestPublishMetadataUseCase) Execute(ctx context.Context, projectID 
 		return nil, fmt.Errorf("project has no script content to summarize")
 	}
 
+	model := ""
+	if uc.models != nil {
+		chosen, err := uc.models.GetAuthoringModels(ctx, projectID)
+		if err != nil {
+			return nil, fmt.Errorf("load authoring models: %w", err)
+		}
+		model = chosen.ModelFor("publish")
+	}
 	title, summary, tags, err := uc.suggester.Suggest(
-		ctx, project.ScriptContent, project.CategoryHint, project.ContentLanguage,
+		ctx, project.ScriptContent, project.CategoryHint, project.ContentLanguage, model,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("suggest metadata: %w", err)

@@ -48,13 +48,13 @@ describe("StepPreviewPage — xem trước bước chưa tới", () => {
   it("nói bước làm gì và rằng nó chưa tới, không có ô nhập hay nút hành động", async () => {
     renderPreview("/create/preview/4", null);
 
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Hình ảnh");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Storyboard");
     expect(screen.getByTestId("step-preview-notice")).toHaveTextContent("Chưa tới bước này");
-    expect(screen.getByTestId("step-preview-page")).toHaveTextContent("Dựng storyboard");
+    expect(screen.getByTestId("step-preview-page")).toHaveTextContent("Chia chuyện thành cảnh và shot");
     expect(document.querySelector("textarea, input, select")).toBeNull();
     // The step menu marks the previewed step as the one on screen.
     await waitFor(() =>
-      expect(screen.getByTestId("rail-step-4")).toHaveAttribute("aria-current", "step"),
+      expect(screen.getByTestId("rail-step-9")).toHaveAttribute("aria-current", "step"),
     );
   });
 
@@ -77,7 +77,7 @@ describe("StepPreviewPage — xem trước bước chưa tới", () => {
     );
     await waitFor(() =>
       expect(screen.getByTestId("step-preview-back")).toHaveTextContent(
-        "Về bước đang làm: Dựng hình",
+        "Về bước đang làm: Render",
       ),
     );
     fireEvent.click(screen.getByTestId("step-preview-back"));

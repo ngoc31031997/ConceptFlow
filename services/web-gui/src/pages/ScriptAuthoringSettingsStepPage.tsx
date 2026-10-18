@@ -1,61 +1,35 @@
-import { useContext, useRef, useState, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useContext, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { StepSection } from "../components/StepSection";
 import { TopicSummary } from "../components/TopicSummary";
 import { VideoArchetypePicker } from "../components/VideoArchetypePicker";
-import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
 import { AuthoringModeBar } from "../components/AuthoringModeBar";
 import { AuthoringModelPicker } from "../components/AuthoringModelPicker";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { useAuthoringModels } from "../hooks/useAuthoringModels";
 import { NarrationPanel } from "../components/NarrationPanel";
-import { VideoOutputModePicker } from "../components/VideoOutputModePicker";
 import { VideoFormatPicker } from "../components/VideoFormatPicker";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { WizardNav } from "../components/WizardNav";
-import {
-  ProjectDraftContext,
-  ProjectDraftDispatchContext,
-  saveLastUsedSettings,
-  type VideoOutputMode,
-} from "../context/ProjectDraftContext";
-import { createProjectDraft, patchWizardSettings, type SimilarProject, type WizardSettingsPatch } from "../api/client";
+import { ProjectDraftContext, ProjectDraftDispatchContext, saveLastUsedSettings } from "../context/ProjectDraftContext";
+import { createProjectDraft, patchWizardSettings, type WizardSettingsPatch } from "../api/client";
 import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
-import { FLOW_CONFIG, flowTitle } from "../utils/flow";
-import { DEFAULT_LONG_FORMAT_ID, SHORT_FORMAT_ID, formatsFor, isShortFormat } from "../utils/outputMode";
-
-interface SettingsSectionProps {
-  /** "1. Nội dung video": số thứ tự là thứ tự quyết định. */
-  title: string;
-  hint: string;
-  testId: string;
-  children: ReactNode;
-}
-
-/** Một nhóm cài đặt có đánh số trên màn Cấu hình. */
-function SettingsSection({ title, hint, testId, children }: SettingsSectionProps) {
-  return (
-    <section className={styles.settingsSection} data-testid={testId}>
-      <header className={styles.settingsSectionHead}>
-        <h2>{title}</h2>
-        <p>{hint}</p>
-      </header>
-      {children}
-    </section>
-  );
-}
+import { FLOW_CONFIG, flowStepName } from "../utils/flow";
+import { formatsFor } from "../utils/outputMode";
 
 /**
  * Bước 2 — cấu hình mà các bước soạn (Kịch bản, Hình ảnh, Code) và Giọng đọc
- * đọc, chia ba nhóm theo thứ tự quyết định: nội dung video (ngôn ngữ, kiểu
- * video, format, kiểu đầu ra), giọng đọc, cách soạn (AI hay tự làm,
- * model). Kiểu video nằm ngay trên format vì nó gợi ý format; lựa chọn được
- * ghi thành "kiểu: X" ở cuối chủ đề nên đổi kiểu là lưu lại chủ đề.
+ * đọc, chia ba nhóm theo thứ tự quyết định: nội dung video (kiểu video,
+ * format), giọng đọc, cách soạn (AI hay tự làm, model). Ngôn ngữ nội dung và
+ * dạng video (dài hay short) đã chốt ở Bước 1 lúc tạo project, vì brief được
+ * viết theo chúng. Kiểu video nằm ngay trên format vì nó gợi ý format; lựa
+ * chọn được ghi thành "kiểu: X" ở cuối chủ đề nên đổi kiểu là lưu lại chủ đề.
  *
- * Chất lượng, font chữ trong video, phụ đề và nhạc nền chỉ bước Dựng hình/Ghép
- * video đọc, nên được chọn ở màn Duyệt nội dung và sửa được ngay khi bước đó
+ * Chất lượng, font chữ trong video, phụ đề và nhạc nền chỉ bước Render/Merge
+ * + QC đọc, nên được chọn ở màn Review và sửa được ngay khi bước đó
  * lỗi (ProductionSettingsPanel). Mọi mục đều có mặc định nên đi thẳng qua
  * được. Mỗi lần đổi một mục là một lần lưu riêng lên project (đã tạo ở Bước
  * 1); "Tiếp tục" chỉ chốt bước.
@@ -74,9 +48,6 @@ export function ScriptAuthoringSettingsStepPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const modeFormats = formatsFor(draft.videoOutputMode, formats);
-  // Dự án trùng chủ đề, do Bước 1 chuyển sang lúc tạo project.
-  const location = useLocation();
-  const similarProjects = (location.state as { similarProjects?: SimilarProject[] } | null)?.similarProjects ?? [];
 
   // PATCH nối đuôi nhau để server nhận đúng thứ tự Creator đổi. Field nào lưu
   // lỗi được giữ ở `failedRef` và gửi lại cùng lần PATCH kế tiếp.
@@ -125,28 +96,6 @@ export function ScriptAuthoringSettingsStepPage() {
     void send({ videoFormatId: formatId });
   }
 
-  // A short is built vertically from the start: the short format and
-  // captions burned in at the top. The server applies
-  // the same defaults to the same patch; the draft follows so the screen shows them.
-  function handleOutputModeChange(mode: VideoOutputMode) {
-    dispatch({ type: "SET_VIDEO_OUTPUT_MODE", payload: mode });
-    if (mode === "short") {
-      dispatch({ type: "SET_VIDEO_FORMAT", payload: SHORT_FORMAT_ID });
-      // Same defaults the server applies: short captions burned in at the top.
-      dispatch({ type: "SET_SUBTITLE_MODE", payload: "burn_in" });
-      dispatch({ type: "SET_SUBTITLE_STYLE", payload: { position: "top" } });
-      void send({ videoOutputMode: mode });
-      return;
-    }
-    const current = formats.find((f) => f.id === draft.videoFormatId);
-    if (current && isShortFormat(current)) {
-      dispatch({ type: "SET_VIDEO_FORMAT", payload: DEFAULT_LONG_FORMAT_ID });
-      void send({ videoOutputMode: mode, videoFormatId: DEFAULT_LONG_FORMAT_ID });
-      return;
-    }
-    void send({ videoOutputMode: mode });
-  }
-
   async function handleContinue() {
     setSaving(true);
     try {
@@ -167,38 +116,17 @@ export function ScriptAuthoringSettingsStepPage() {
       <AppShell
         currentStep={2}
         wide
-        title={flowTitle(FLOW_CONFIG)}
-        subtitle="Ba nhóm cài đặt, làm từ trên xuống. Chất lượng, phụ đề và nhạc nền chọn ở bước Duyệt nội dung. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay."
+        title={flowStepName(FLOW_CONFIG)}
+        subtitle="Ba nhóm cài đặt, làm từ trên xuống. Chất lượng, phụ đề và nhạc nền chọn ở bước Review. Các mục đã có sẵn giá trị phù hợp, bạn có thể bấm Tiếp tục ngay."
       >
-        <TopicSummary topic={draft.authoringTopic} onEdit={() => navigate("/")} />
-        {similarProjects.length > 0 && (
-          <div className={styles.topicCollisionBanner} data-testid="topic-collision-banner">
-            Chủ đề này giống {similarProjects.length} dự án khác:{" "}
-            {similarProjects.map((p, i) => (
-              <span key={p.projectId}>
-                {i > 0 && ", "}
-                <a href="/videos" target="_blank" rel="noreferrer">
-                  {p.topic || p.projectId} ({p.status})
-                </a>
-              </span>
-            ))}
-            . Bạn vẫn có thể tiếp tục.
-          </div>
-        )}
+        <TopicSummary topic={draft.authoringTopic} onOpen={() => navigate("/")} />
 
-        <SettingsSection
+        <StepSection
           title="1. Nội dung video"
-          hint="Video nói bằng ngôn ngữ nào, theo kiểu nào, dài bao lâu."
+          hint="Video theo kiểu nào, dài bao lâu. Ngôn ngữ và dạng video đã chọn ở bước Ý tưởng."
           testId="settings-section-content"
         >
           <div className={styles.settingsRow}>
-            <ContentLanguagePicker
-              value={draft.voiceLanguage}
-              onChange={(lang) => {
-                dispatch({ type: "SET_VOICE_LANGUAGE", payload: lang });
-                void send({ voiceLanguage: lang });
-              }}
-            />
             <div className={glass.card} style={{ padding: 22 }}>
               <VideoArchetypePicker
                 topic={draft.authoringTopic}
@@ -208,14 +136,11 @@ export function ScriptAuthoringSettingsStepPage() {
                 onFormatChange={handleFormatChange}
               />
             </div>
-          </div>
-          <div className={styles.settingsRow}>
-            <VideoOutputModePicker value={draft.videoOutputMode} onChange={handleOutputModeChange} />
             <VideoFormatPicker formats={modeFormats} value={draft.videoFormatId} onChange={handleFormatChange} />
           </div>
-        </SettingsSection>
+        </StepSection>
 
-        <SettingsSection
+        <StepSection
           title="2. Giọng đọc"
           hint="Có lời đọc hay không, và giọng nào đọc."
           testId="settings-section-voice"
@@ -233,9 +158,9 @@ export function ScriptAuthoringSettingsStepPage() {
               void send({ voiceId: voiceId ?? "" });
             }}
           />
-        </SettingsSection>
+        </StepSection>
 
-        <SettingsSection
+        <StepSection
           title="3. Cách soạn"
           hint="AI làm giúp hay bạn tự làm với ChatGPT, Claude…"
           testId="settings-section-authoring"
@@ -260,7 +185,7 @@ export function ScriptAuthoringSettingsStepPage() {
               />
             </div>
           )}
-        </SettingsSection>
+        </StepSection>
       </AppShell>
 
       <WizardNav
@@ -269,7 +194,7 @@ export function ScriptAuthoringSettingsStepPage() {
         hint={
           saveError ??
           (authoringMode === "ai" && llm?.enabled
-            ? "AI sẽ giúp bạn ở các bước Kịch bản, Hình ảnh và Code."
+            ? "AI sẽ giúp bạn ở các bước Viết kịch bản, Storyboard và Code."
             : "Bạn tự làm với ChatGPT, Claude… Có thể đổi sang AI làm giúp bất cứ lúc nào.")
         }
         onBack={() => navigate("/")}

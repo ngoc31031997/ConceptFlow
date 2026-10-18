@@ -203,6 +203,39 @@ CREATE TABLE IF NOT EXISTS code_check_diagnostics (
     line        INTEGER
 );
 CREATE INDEX IF NOT EXISTS code_check_diagnostics_created_idx ON code_check_diagnostics (created_at DESC);
+-- One reviewable piece of a project's content (a brief, later facts, beats,
+-- lines...), addressed as kind:unit_key. creator_fields are the parts of
+-- content the Creator wrote, which an AI redo keeps verbatim; redo_count
+-- counts AI redos, for the first-time-approval rate. No FK, like
+-- authoring_segments: DeleteAuthoring removes a project's units. See ADR-0035.
+CREATE TABLE IF NOT EXISTS review_units (
+    project_id     TEXT NOT NULL,
+    kind           TEXT NOT NULL,
+    unit_key       TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    content        JSONB NOT NULL DEFAULT '{}',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, kind, unit_key)
+);
+-- Model that suggests the publish title and description ('' = the default).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS publish_model TEXT NOT NULL DEFAULT '';
+-- Settings of the whole app, one row each (key, value).
+CREATE TABLE IF NOT EXISTS app_settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+-- Model the idea step writes the creative brief with ('' = server default).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS brief_model TEXT NOT NULL DEFAULT '';
+-- The video's target length chosen at the idea step ('3-4', '4-5', '5-7',
+-- '7-10' minutes; '' for a short, which is always under a minute).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS target_duration TEXT NOT NULL DEFAULT '';
+-- md5 of the approved brief the saved story outline was written from, so an
+-- outline written from an older brief (or before any brief) is known to be
+-- stale. '' = no approved brief at the time.
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_brief_sha TEXT NOT NULL DEFAULT '';
 -- Colours outside the channel palette (S9) are not a warning; drop any such
 -- stored warnings so no drawing shows them.
 UPDATE illustrations SET warnings = COALESCE((

@@ -13,6 +13,8 @@ interface SelectableOptionProps {
   inline?: boolean;
   testId?: string;
   ariaLabel?: string;
+  /** The choice is made and can no longer change; the selected one stays fully visible. */
+  disabled?: boolean;
 }
 
 function CheckIcon() {
@@ -61,6 +63,7 @@ export function SelectableOption({
   inline,
   testId,
   ariaLabel,
+  disabled,
 }: SelectableOptionProps) {
   const labelRef = useShrinkToFit<HTMLSpanElement>(label, !!inline);
   const className = [
@@ -82,6 +85,7 @@ export function SelectableOption({
       data-testid={testId}
       className={className}
       onClick={onSelect}
+      disabled={disabled}
     >
       <span className={selectable.check} aria-hidden="true">
         {selected && <CheckIcon />}

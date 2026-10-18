@@ -23,6 +23,8 @@ import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
+import { FlowMapPage } from "./pages/FlowMapPage";
+import { AiModelSettingsPage } from "./pages/AiModelSettingsPage";
 import { StepPreviewPage } from "./pages/StepPreviewPage";
 
 /**
@@ -73,6 +75,7 @@ export function App() {
             {/* Admin screen to edit pipeline prompt wording, outside
                 the Creator wizard flow. */}
             <Route path="/settings/prompts" element={<PromptSettingsPage />} />
+            <Route path="/settings/ai-model" element={<AiModelSettingsPage />} />
             <Route path="/settings/video-archetypes" element={<VideoArchetypeSettingsPage />} />
             {/* The illustration library, folders of reviewed drawings. */}
             <Route path="/settings/illustrations" element={<IllustrationLibraryPage />} />
@@ -89,6 +92,7 @@ export function App() {
             <Route path="/oauth/youtube/callback" element={<OAuthCallbackPage />} />
             <Route path="/videos" element={<VideoListPage />} />
             <Route path="/journal" element={<JournalPage />} />
+            <Route path="/flow" element={<FlowMapPage />} />
           </Routes>
           </ProjectFlowProvider>
         </BrowserRouter>

@@ -8,14 +8,15 @@ import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
-import { getAuthoringState, saveAuthoringStory, createProjectDraft } from "../api/client";
+import { getAuthoringState, getBriefState, saveAuthoringStory, createProjectDraft, type BriefState } from "../api/client";
 import { stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { authoringHint } from "../utils/authoringHint";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { Card, Button, TextArea } from "../components/ui";
+import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
-import { FLOW_STORY, flowTitle } from "../utils/flow";
+import { FLOW_STORY, flowStepName } from "../utils/flow";
 
 /**
  * Bước 3 — Kịch bản (Story Architect), bước soạn đầu tiên của 3–6.
@@ -34,6 +35,7 @@ export function ScriptOutlineStepPage() {
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [brief, setBrief] = useState<BriefState | null>(null);
 
   // Reload lands here directly: the server copy is the one source of truth
   // later steps read from, so rehydrate it the same way steps 4–6 do.
@@ -61,6 +63,24 @@ export function ScriptOutlineStepPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft.projectId]);
 
+  // Whether the outline on screen was written from the approved brief, and
+  // whether the story prompt reads the brief at all. Read once per visit: the
+  // brief only changes on step 1.
+  useEffect(() => {
+    if (!draft.projectId) return;
+    let cancelled = false;
+    getBriefState(draft.projectId)
+      .then((state) => {
+        if (!cancelled) setBrief(state);
+      })
+      .catch(() => {
+        /* the banners are a hint; the step works without them */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.projectId]);
+
   // The server fills the template — channel identity, beat sheet
   // at this voice's speaking rate, narration-language rule. The browser only
   // says which topic, language, format and voice the Creator has picked.
@@ -71,6 +91,7 @@ export function ScriptOutlineStepPage() {
     format_id: format?.id,
     format_version: format?.version,
     voice_id: draft.voiceId ?? undefined,
+    project_id: draft.projectId || undefined,
   });
   const prompt = rendered.prompt ?? (rendered.failed ? "Không tải được prompt." : "Đang tải prompt...");
 
@@ -132,10 +153,26 @@ export function ScriptOutlineStepPage() {
       <AppShell
         currentStep={3}
         wide
-        title={flowTitle(FLOW_STORY)}
+        title={flowStepName(FLOW_STORY)}
         subtitle="Dựng dàn ý cho video từ chủ đề."
       >
-        <TopicSummary topic={draft.authoringTopic} onEdit={() => navigate("/")} />
+        <TopicSummary topic={draft.authoringTopic} onOpen={() => navigate("/")} />
+        {brief && brief.unit?.status !== "approved" && (
+          <div className={`${styles.noticeBanner} ${glass.reveal}`} data-testid="story-brief-missing">
+            Chưa có creative brief đã duyệt: dàn ý dựng từ chủ đề. Duyệt brief ở bước Ý tưởng để AI bám theo brief.
+          </div>
+        )}
+        {brief?.unit?.status === "approved" && brief.storyStale && !storyIsEmpty && (
+          <div className={`${styles.noticeBanner} ${glass.reveal}`} data-testid="story-brief-stale">
+            Dàn ý này viết theo brief cũ: brief ở bước Ý tưởng đã đổi từ lúc lưu dàn ý. Viết lại dàn ý theo brief mới.
+          </div>
+        )}
+        {brief && !brief.storyPromptReadsBrief && (
+          <div className={`${styles.noticeBanner} ${glass.reveal}`} data-testid="story-prompt-no-brief">
+            Prompt Story Architect đang bật không có biến {"{{creative_brief}}"}, nên brief không vào prompt. Thêm biến
+            này ở Cài đặt prompt nếu muốn AI bám theo brief.
+          </div>
+        )}
 
         <div className={styles.settingsRow}>
           <PipelineSettingsBar

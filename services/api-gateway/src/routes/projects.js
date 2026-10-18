@@ -123,6 +123,19 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(authoringAi, 'authoring-service'),
   );
+  // Ý tưởng · creative brief: state, the target length, and the AI writing the
+  // brief (a model call, so the long-timeout client).
+  router.get('/v1/projects/:id/brief', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/brief/target-duration', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/brief/generate', proxyHandler(authoringAi, 'authoring-service'));
+  // Review units of every step (read, hand edit, redo with a note, approve,
+  // impact). A redo calls the model, so it takes the long-timeout client.
+  router.get('/v1/projects/:id/units/:kind/:key', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/units/:kind/:key', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/units/:kind/:key/redo', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/units/:kind/:key/approve', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/units/:kind/:key/unapprove', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/units/:kind/:key/impact', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));

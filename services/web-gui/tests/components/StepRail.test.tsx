@@ -9,7 +9,7 @@ import { ProjectFlowProvider } from "../../src/context/ProjectFlowContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { Project } from "../../src/types";
-import { openAllPhases } from "../helpers/stepRail";
+import { waitForStepRail } from "../helpers/stepRail";
 
 function renderRail(p: Project | null, currentStep = 3) {
   if (p) vi.spyOn(apiClient, "getProject").mockResolvedValue(p);
@@ -38,63 +38,57 @@ describe("StepRail — second-layer vertical menu", () => {
     window.localStorage.clear();
   });
 
-  it("lists the 13 steps grouped in five phases, each with its own state", async () => {
+  it("lists the 21 steps of the four phases, each with its own state", async () => {
     renderRail(rendering);
-    await openAllPhases();
+    // Running steps 9 (voice) and 10 (render) both show as step 17.
+    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-status", "running"));
 
-    for (let i = 1; i <= 13; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
-    expect(screen.queryByTestId("rail-step-14")).not.toBeInTheDocument();
+    for (let i = 1; i <= 21; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("rail-step-22")).not.toBeInTheDocument();
     const rail = within(screen.getByTestId("step-rail"));
-    for (const phase of ["Chuẩn bị", "Soạn nội dung", "Duyệt", "Sản xuất", "Hoàn tất"]) expect(rail.getByText(phase)).toBeInTheDocument();
+    for (const phase of ["Tiền kỳ · Nội dung", "Tiền kỳ · Hình ảnh", "Sản xuất", "Hậu kỳ"]) expect(rail.getByText(phase)).toBeInTheDocument();
 
-    expect(screen.getByTestId("rail-step-3")).toHaveAttribute("data-status", "done");
-    expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "running");
-    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-status", "pending");
-    expect(screen.getByTestId("rail-step-12")).toHaveAttribute("data-status", "pending");
+    expect(screen.getByTestId("rail-step-6")).toHaveAttribute("data-status", "done");
+    expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-status", "pending");
+    expect(screen.getByTestId("rail-step-20")).toHaveAttribute("data-status", "pending");
   });
 
-  it("opens only the phase of the step on screen; the others open and close on click", async () => {
-    renderRail(rendering, 10);
-    await waitFor(() => expect(screen.getByTestId("step-rail")).toBeInTheDocument());
-
-    expect(screen.getByTestId("rail-phase-4")).toHaveAttribute("data-open", "true");
-    expect(screen.getByTestId("rail-step-10")).toBeInTheDocument();
-    expect(screen.getByTestId("rail-phase-2")).toHaveAttribute("data-open", "false");
-    expect(screen.queryByTestId("rail-step-4")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("rail-phase-toggle-2"));
-    expect(screen.getByTestId("rail-step-4")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("rail-phase-toggle-4"));
-    expect(screen.getByTestId("rail-phase-4")).toHaveAttribute("data-open", "false");
-  });
-
-  it("counts the finished steps of each phase and of the video, leaving unused steps out", async () => {
-    renderRail(rendering, 10);
-    await waitFor(() => expect(screen.getByTestId("rail-phase-count-4")).toHaveTextContent("1/3"));
-    expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("2/2");
-    expect(screen.getByTestId("rail-phase-count-3")).toHaveTextContent("2/2");
-    expect(screen.getByTestId("rail-phase-count-5")).toHaveTextContent("0/2");
-    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("Sản xuất · Dựng hình");
-  });
-
-  it("tags the steps a worker runs on its own as automatic", async () => {
+  it("shows the steps the app does not have yet as “sắp có”, and does not open them", async () => {
     renderRail(rendering);
-    await openAllPhases();
-    for (const step of [7, 9, 10, 11]) {
-      expect(screen.getByTestId(`rail-auto-${step}`)).toHaveTextContent("Tự động");
-    }
-    for (const step of [1, 2, 3, 4, 5, 6, 8, 12, 13]) {
-      expect(screen.queryByTestId(`rail-auto-${step}`)).not.toBeInTheDocument();
+    await waitForStepRail();
+    for (const step of [3, 4, 5, 7, 8, 10, 11, 12, 18]) {
+      const item = screen.getByTestId(`rail-step-${step}`);
+      expect(item).toHaveAttribute("data-status", "coming");
+      expect(item).toHaveTextContent("sắp có");
+      expect(item).toBeDisabled();
     }
   });
 
-  it("opens every step: the real screen of a reached one, a preview of the rest", async () => {
+  it("counts the finished steps of each phase and of the video", async () => {
+    renderRail(rendering, 10);
+    await waitFor(() => expect(screen.getByTestId("rail-phase-count-3")).toHaveTextContent("4/4"));
+    expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("3/7");
+    expect(screen.getByTestId("rail-phase-count-2")).toHaveTextContent("1/5");
+    expect(screen.getByTestId("rail-phase-count-4")).toHaveTextContent("0/5");
+    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("8/21 bước xong");
+  });
+
+  it("marks the built steps where the Creator approves with ◆", async () => {
     renderRail(rendering);
-    await openAllPhases();
-    for (const step of [2, 9, 10]) {
+    await waitForStepRail();
+    for (const step of [1, 6, 9, 16]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
+    for (const step of [2, 13, 14, 15, 17, 19, 20, 21]) {
+      expect(screen.queryByTestId(`rail-gate-${step}`)).not.toBeInTheDocument();
+    }
+  });
+
+  it("opens every built step: the real screen of a reached one, a preview of the rest", async () => {
+    renderRail(rendering);
+    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
+    for (const step of [2, 16, 17]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toHaveAttribute("data-reached", "true");
     }
-    for (const step of [11, 12, 13]) {
+    for (const step of [19, 20, 21]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toHaveAttribute("data-reached", "false");
       expect(screen.getByTestId(`rail-step-${step}`)).not.toBeDisabled();
     }
@@ -102,7 +96,7 @@ describe("StepRail — second-layer vertical menu", () => {
 
   it("marks a cancelled and a failed step differently", async () => {
     renderRail({ ...rendering, status: "failed_at_render_scenes", run_state: "cancelled" } as Project, 10);
-    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-status", "cancelled"));
+    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-status", "cancelled"));
   });
 
   it("collapses to a strip and remembers it", async () => {
@@ -113,9 +107,12 @@ describe("StepRail — second-layer vertical menu", () => {
     expect(window.localStorage.getItem("conceptflow.stepRail.collapsed")).toBe("1");
     // Labels and phase headers go; every step's mark stays and still says what it is on hover.
     await waitFor(() =>
-      expect(screen.getByTestId("rail-step-10")).toHaveAttribute("title", expect.stringContaining("Dựng hình (tự động)")),
+      expect(screen.getByTestId("rail-step-17")).toHaveAttribute(
+        "title",
+        expect.stringContaining("17. Render từng cảnh · Đang chạy · tự động"),
+      ),
     );
-    expect(screen.queryByTestId("rail-phase-toggle-1")).not.toBeInTheDocument();
+    expect(within(screen.getByTestId("step-rail")).queryByText("Hậu kỳ")).not.toBeInTheDocument();
   });
 
   it("is there on step 1, before the server knows the project (a brand-new idea)", async () => {

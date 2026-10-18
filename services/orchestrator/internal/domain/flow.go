@@ -143,8 +143,8 @@ func FlowStepForAuthoring(step string) int {
 
 // FlowStepLabel is the Creator-facing name of a flow step.
 var FlowStepLabel = map[int]string{
-	FlowInit: "Khởi tạo", FlowConfig: "Cấu hình", FlowStory: "Kịch bản", FlowVisual: "Visual",
-	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "TTS",
-	FlowRender: "Render", FlowMerge: "Merge",
+	FlowInit: "Ý tưởng", FlowConfig: "Cấu hình", FlowStory: "Viết kịch bản", FlowVisual: "Storyboard",
+	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "Giọng đọc",
+	FlowRender: "Render từng cảnh", FlowMerge: "Merge + QC",
 	FlowResult: "Kết quả", FlowPublish: "Publish",
 }

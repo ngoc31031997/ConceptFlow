@@ -15,6 +15,7 @@ import glass from "../styles/glass.module.css";
 import styles from "./PromptSettingsPage.module.css";
 
 const ROLES: { value: PromptRole; label: string }[] = [
+  { value: "creative_brief", label: "0. Creative brief — viết brief từ đề tài (bước Ý tưởng)" },
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
@@ -47,6 +48,13 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   frame_rules: "(luật khung dọc — chỉ có khi video là short dọc — sẽ hiện ở đây)",
   narrate_example: "Nội dung lời thoại cho đoạn này",
   thumbnail_audience: "(khán giả theo ngôn ngữ video sẽ hiện ở đây)",
+  creative_brief: "(creative brief đã duyệt ở bước Ý tưởng, kèm thời lượng mục tiêu, sẽ hiện ở đây)",
+  video_kind: "Video dài 16:9",
+  target_duration: "4–5 phút",
+  brief_language: "tiếng Việt",
+  current_brief: "(brief hiện có, khi làm lại, sẽ hiện ở đây)",
+  kept_fields: "(các ô Creator đã tự viết, AI giữ nguyên, sẽ hiện ở đây)",
+  redo_note: "(ghi chú của Creator khi làm lại sẽ hiện ở đây)",
 };
 
 function renderPreview(templateText: string): string {

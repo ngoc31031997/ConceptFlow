@@ -1,9 +1,7 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useRef, type ReactNode } from "react";
 import { formatShortcut } from "../hooks/useKeyboardShortcuts";
-import glass from "../styles/glass.module.css";
 import styles from "./ConfirmModal.module.css";
-import { Button } from "./ui";
+import { Button, Dialog } from "./ui";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -27,9 +25,9 @@ function AlertIcon() {
 }
 
 /**
- * Custom confirmation modal with glassmorphism design to replace native
- * window.confirm(). Supports keyboard shortcuts (ESC to cancel, Enter to
- * confirm) and focus trapping for accessibility.
+ * A confirmation in the shared dialog shell, in place of window.confirm().
+ * Focus starts on the confirm button (Enter confirms, Esc cancels), and a
+ * click on the backdrop cancels since there is nothing typed to lose.
  */
 export function ConfirmModal({
   isOpen,
@@ -42,100 +40,36 @@ export function ConfirmModal({
   isDangerous = false,
 }: ConfirmModalProps) {
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  const modalRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    // Focus the confirm button when modal opens
-    confirmButtonRef.current?.focus();
-
-    // Handle ESC key to cancel
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose();
-      }
-    };
-
-    // Trap focus within modal
-    const handleFocusTrap = (e: KeyboardEvent) => {
-      if (e.key !== "Tab" || !modalRef.current) return;
-
-      const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-      );
-      const firstElement = focusableElements[0];
-      const lastElement = focusableElements[focusableElements.length - 1];
-
-      if (e.shiftKey && document.activeElement === firstElement) {
-        e.preventDefault();
-        lastElement?.focus();
-      } else if (!e.shiftKey && document.activeElement === lastElement) {
-        e.preventDefault();
-        firstElement?.focus();
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-    document.addEventListener("keydown", handleFocusTrap);
-
-    // Prevent body scroll when modal is open
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.removeEventListener("keydown", handleFocusTrap);
-      document.body.style.overflow = "";
-    };
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
 
   const handleConfirm = () => {
     onConfirm();
     onClose();
   };
 
-  const escTooltip = formatShortcut({ key: 'Escape' });
-  const enterTooltip = formatShortcut({ key: 'Enter' });
+  const escTooltip = formatShortcut({ key: "Escape" });
+  const enterTooltip = formatShortcut({ key: "Enter" });
 
-  return createPortal(
-    <div
-      className={styles.backdrop}
-      onClick={handleBackdropClick}
-      role="presentation"
-      data-testid="confirm-modal-backdrop"
-    >
-      <div
-        ref={modalRef}
-        className={`${glass.card} ${styles.modal}`}
-        role="alertdialog"
-        aria-labelledby="modal-title"
-        aria-describedby="modal-message"
-        data-testid="confirm-modal"
-      >
-        <div className={styles.header}>
-          {isDangerous && (
-            <div className={styles.iconDanger} aria-hidden="true">
-              <AlertIcon />
-            </div>
-          )}
-          <h2 id="modal-title" className={styles.title}>
-            {title}
-          </h2>
-        </div>
-
-        <p id="modal-message" className={styles.message}>
-          {message}
-        </p>
-
-        <div className={styles.actions}>
+  return (
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      role="alertdialog"
+      size="sm"
+      title={title}
+      titleId="modal-title"
+      describedBy="modal-message"
+      testId="confirm-modal"
+      backdropTestId="confirm-modal-backdrop"
+      initialFocusRef={confirmButtonRef}
+      icon={
+        isDangerous ? (
+          <div className={styles.iconDanger} aria-hidden="true">
+            <AlertIcon />
+          </div>
+        ) : undefined
+      }
+      footer={
+        <>
           <Button
             variant="ghost"
             onClick={onClose}
@@ -144,19 +78,21 @@ export function ConfirmModal({
           >
             {cancelLabel}
           </Button>
-          <button
+          <Button
             ref={confirmButtonRef}
-            type="button"
-            className={isDangerous ? glass.dangerBtn : glass.btnPrimary}
+            variant={isDangerous ? "danger" : "primary"}
             onClick={handleConfirm}
             data-testid="confirm-modal-confirm"
             title={`${confirmLabel} (${enterTooltip})`}
           >
             {confirmLabel}
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body
+          </Button>
+        </>
+      }
+    >
+      <p id="modal-message" className={styles.message}>
+        {message}
+      </p>
+    </Dialog>
   );
 }

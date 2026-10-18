@@ -36,6 +36,13 @@
   outline-offset: 2px;
 }
 
+.option:disabled {
+  cursor: default;
+}
+.option:disabled:not(.selected) {
+  opacity: 0.5;
+}
+
 .selected {
   border-color: var(--border-color);
   background: var(--accent);

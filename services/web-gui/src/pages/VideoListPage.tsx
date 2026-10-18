@@ -8,7 +8,7 @@ import { deleteProject, getProjectVideoUrl, listProjectsPage, ApiError } from ".
 import type { ProjectListFilter, ProjectPage, ProjectSummary } from "../types";
 
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_LABELS, stepStatus } from "../utils/flow";
+import { FLOW_LABELS, flowTitle, stepStatus } from "../utils/flow";
 import { PAGE_SIZES, pageCount } from "../utils/pagination";
 import { Card, Pagination } from "../components/ui";
 import glass from "../styles/glass.module.css";
@@ -38,7 +38,7 @@ function FlowMini({ project }: { project: ProjectSummary }) {
     <span
       className={styles.mini}
       role="img"
-      aria-label={`Bước ${flowStep}/${FLOW_LABELS.length}: ${FLOW_LABELS[flowStep - 1]}`}
+      aria-label={flowTitle(flowStep)}
       data-testid="flow-mini"
     >
       {FLOW_LABELS.map((label, i) => (
@@ -315,7 +315,7 @@ export function VideoListPage() {
                     <div className={styles.meta}>
                       {project.flow_step ? (
                         <span className={glass.cardHint} data-testid="wizard-step">
-                          Bước {project.flow_step} — {FLOW_LABELS[project.flow_step - 1]}
+                          {flowTitle(project.flow_step)}
                         </span>
                       ) : null}
                       <StatusBadge status={project.status} />

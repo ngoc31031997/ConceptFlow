@@ -8,7 +8,7 @@ import {
   AUTO_STEPS,
   FLOW_LABELS,
   FLOW_STEP_PURPOSE,
-  flowTitle,
+  flowStepName,
 } from "../utils/flow";
 import styles from "./StepPreviewPage.module.css";
 
@@ -45,7 +45,7 @@ export function StepPreviewPage() {
       <AppShell
         currentStep={step}
         preview
-        title={flowTitle(step)}
+        title={flowStepName(step)}
         subtitle={FLOW_STEP_PURPOSE[step - 1]}
       >
         <p className={styles.notice} role="status" data-testid="step-preview-notice">

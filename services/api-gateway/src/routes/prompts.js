@@ -40,6 +40,9 @@ function promptsRouter(authoringClient) {
   // trước khi vẽ nút, để chỗ nào thiếu key thì giải thích chứ không hiện một
   // nút bấm vào là lỗi.
   router.get('/v1/llm/status', proxyHandler(authoringClient, 'authoring-service'));
+  // Model AI mặc định của cả app (Cài đặt): đọc và đổi.
+  router.get('/v1/settings/ai-model', proxyHandler(authoringClient, 'authoring-service'));
+  router.put('/v1/settings/ai-model', proxyHandler(authoringClient, 'authoring-service'));
   router.get('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/admin/prompts', proxyHandler(authoringClient, 'authoring-service'));
   router.post('/v1/admin/prompts/:id/copy', proxyHandler(authoringClient, 'authoring-service'));

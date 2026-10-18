@@ -159,37 +159,12 @@ const initialDraft: ProjectDraft = {
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
   authoringMode: "manual",
-  authoringModels: { story: "", storyboard: "", code: "" },
+  authoringModels: { brief: "", publish: "", story: "", storyboard: "", code: "" },
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",
   hasSubmitted: false,
 };
-
-/**
- * Model Hive cho từng tab (1a/1b/1c) lần cuối Creator chọn, dùng làm mặc định
- * cho project mới. Cùng kiểu client-only với LAST_VOICE_KEY.
- */
-const LAST_MODELS_KEY = "conceptflow.lastModels.v1";
-
-function loadLastModels(): AuthoringStepModels | null {
-  try {
-    const raw = window.localStorage.getItem(LAST_MODELS_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<AuthoringStepModels>;
-    return { ...initialDraft.authoringModels, ...parsed };
-  } catch {
-    return null;
-  }
-}
-
-function saveLastModels(models: AuthoringStepModels): void {
-  try {
-    window.localStorage.setItem(LAST_MODELS_KEY, JSON.stringify(models));
-  } catch {
-    /* storage unavailable or full — the preference simply will not persist */
-  }
-}
 
 /**
  * The Creator's last-picked voice, kept separately from the per-project draft
@@ -299,7 +274,7 @@ function loadDraft(): ProjectDraft {
   return {
     ...initialDraft,
     ...loadLastUsedSettings(),
-    authoringModels: loadLastModels() ?? initialDraft.authoringModels,
+    authoringModels: initialDraft.authoringModels,
     projectId: crypto.randomUUID(),
     // LAST_VOICE_KEY stays authoritative for voiceId specifically.
     voiceId: loadLastVoiceId(),
@@ -372,7 +347,7 @@ function projectDraftReducer(state: ProjectDraft, action: ProjectDraftAction): P
       return {
         ...initialDraft,
         ...loadLastUsedSettings(),
-        authoringModels: loadLastModels() ?? initialDraft.authoringModels,
+        authoringModels: initialDraft.authoringModels,
         projectId: crypto.randomUUID(),
         voiceId: loadLastVoiceId(),
       };
@@ -392,10 +367,6 @@ export const ProjectDraftDispatchContext = createContext<Dispatch<ProjectDraftAc
 
 export function ProjectDraftProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(projectDraftReducer, initialDraft, loadDraft);
-
-  useEffect(() => {
-    saveLastModels(state.authoringModels);
-  }, [state.authoringModels]);
 
   useEffect(() => {
     saveLastVoiceId(state.voiceId);

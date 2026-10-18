@@ -18,7 +18,7 @@ import type { PublishMetadata } from "../types";
 import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./PublishPage.module.css";
-import { FLOW_PUBLISH, flowTitle } from "../utils/flow";
+import { FLOW_PUBLISH, flowStepName } from "../utils/flow";
 
 /**
  * Bước 14 — "Publish": tách khỏi ResultPage (bước
@@ -138,7 +138,7 @@ export function PublishPage() {
       <AppShell
         currentStep={FLOW_PUBLISH}
         wide
-        title={flowTitle(FLOW_PUBLISH)}
+        title={flowStepName(FLOW_PUBLISH)}
         subtitle="Kết nối YouTube và điền thông tin để đăng video."
         headerAction={
           <Link to={`/projects/${projectId}/result`} className={glass.ghostBtn} style={{ textDecoration: "none" }}>

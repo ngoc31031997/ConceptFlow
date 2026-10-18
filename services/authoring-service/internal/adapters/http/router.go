@@ -42,6 +42,7 @@ type Router struct {
 	generateAuthoring       generateAuthoringUseCase
 	authoringChain          authoringChainUseCase
 	defaultModel            string
+	defaultModelSetting     defaultModelUseCase
 	usageStats              application.LLMUsageStatsPort
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
@@ -51,6 +52,8 @@ type Router struct {
 	getAuthoringState       getAuthoringStateUseCase
 	internal                InternalAuthoring
 	operations              *application.Operations
+	reviewUnits             reviewUnitsUseCase
+	creativeBrief           creativeBriefUseCase
 }
 
 // NewRouter constructs the router; every capability is attached with a With* method.
@@ -69,6 +72,8 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
 	rt.illustrationRoutes(r)
 	rt.projectIllustrationRoutes(r)
+	// The idea step's brief and the review units of every step. See ADR-0035.
+	rt.reviewUnitRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
@@ -334,6 +339,14 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 // ("server default") choice resolves to, so the GUI can name it.
 func (rt *Router) WithDefaultModel(id string) *Router {
 	rt.defaultModel = id
+	return rt
+}
+
+// WithDefaultModelSetting enables the app setting that names the model every
+// AI call runs on when nothing more specific was chosen, and makes
+// GET /v1/llm/status report it.
+func (rt *Router) WithDefaultModelSetting(uc defaultModelUseCase) *Router {
+	rt.defaultModelSetting = uc
 	return rt
 }
 
@@ -770,6 +783,7 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"code":       state.Code,
 		// Model-per-step picker's saved choice for each tab, "" meaning
 		// "server default" — same rehydrate-on-reload reasoning as mode.
+		"brief_model":      state.Models.Brief,
 		"story_model":      state.Models.Story,
 		"storyboard_model": state.Models.Storyboard,
 		"code_model":       state.Models.Code,
@@ -794,7 +808,7 @@ func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	models := domain.AuthoringStepModels{Story: req.Story, Storyboard: req.Storyboard, Code: req.Code}
+	models := domain.AuthoringStepModels{Brief: req.Brief, Story: req.Story, Storyboard: req.Storyboard, Code: req.Code}
 	if err := rt.saveAuthoringModels.Execute(r.Context(), projectID, models); err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
@@ -889,6 +903,8 @@ type promptRenderRequest struct {
 	VoiceID          string `json:"voice_id"`
 	// "long" | "short": which frame {{frame}} and the other frame variables describe.
 	VideoOutputMode string `json:"video_output_mode"`
+	// The project whose approved creative brief fills {{creative_brief}}.
+	ProjectID string `json:"project_id"`
 }
 
 // handlePromptRenders serves POST /v1/prompt-renders: the
@@ -919,7 +935,7 @@ func (rt *Router) handlePromptRenders(w http.ResponseWriter, r *http.Request) {
 		PreviousOutput: req.PreviousOutput, SubtitleMode: req.SubtitleMode,
 		SubtitleFontSize: req.SubtitleFontSize, SubtitlePosition: req.SubtitlePosition,
 		FormatID: req.FormatID, FormatVersion: req.FormatVersion, VoiceID: req.VoiceID,
-		VideoOutputMode: req.VideoOutputMode,
+		VideoOutputMode: req.VideoOutputMode, ProjectID: req.ProjectID,
 	})
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
@@ -962,7 +978,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := llmStatusResponse{
 		Enabled: true, Provider: rt.generateAuthoring.Provider(),
-		Models: domain.AuthoringModelCatalog, DefaultModel: rt.defaultModel,
+		Models: domain.AuthoringModelCatalog, DefaultModel: rt.effectiveDefaultModel(r.Context()),
 	}
 	if rt.usageStats != nil {
 		stats, err := rt.usageStats.ModelUsageStats(r.Context(), "code", "chunk", time.Now().Add(-codeStatsWindow))

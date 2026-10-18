@@ -161,7 +161,27 @@ describe("IllustrationLibraryPage", () => {
     fireEvent.click(await screen.findByTestId("edit-Bus"));
     fireEvent.change(screen.getByTestId("illustration-redraw-note"), { target: { value: "bánh to hơn" } });
     fireEvent.click(screen.getByTestId("illustration-redraw-button"));
-    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "bánh to hơn"));
+    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "bánh to hơn", undefined));
+  });
+
+  it("redraws on the model chosen next to the button, and remembers it", async () => {
+    vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
+      enabled: true,
+      provider: "hive",
+      default_model: "deepseek-ai/deepseek-v4.1-flash",
+      models: [
+        { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", code_ok: true },
+        { id: "ollama", label: "Ollama (local AI)" },
+      ],
+    });
+    const redraw = vi.spyOn(apiClient, "redrawIllustration").mockResolvedValue({ ...BUS, version: 3 });
+    renderPage();
+    fireEvent.click(await screen.findByTestId("edit-Bus"));
+    fireEvent.click(await screen.findByTestId("illustration-redraw-model"));
+    fireEvent.click(await screen.findByTestId("illustration-redraw-model-option-ollama"));
+    fireEvent.click(screen.getByTestId("illustration-redraw-button"));
+    await waitFor(() => expect(redraw).toHaveBeenCalledWith("b1", "", "ollama"));
+    expect(window.localStorage.getItem("conceptflow.libraryAiModel")).toBe("ollama");
   });
 
   it("exports the whole library as a dated ZIP download", async () => {

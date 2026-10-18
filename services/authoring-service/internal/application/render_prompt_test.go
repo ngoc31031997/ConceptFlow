@@ -77,6 +77,43 @@ func aProject() *domain.Project {
 	}
 }
 
+// stubBrief serves a fixed approved-brief section.
+type stubBrief struct{ section string }
+
+func (s stubBrief) ApprovedBriefSection(context.Context, string, *domain.Project) (string, error) {
+	return s.section, nil
+}
+
+func TestRender_StoryPromptCarriesTheApprovedBrief(t *testing.T) {
+	ctxData := &fakeRenderContext{project: aProject(), topic: "sung"}
+	r := newRenderer("BRIEF={{creative_brief}}", ctxData).WithBrief(stubBrief{section: "Câu hỏi trung tâm: Q"})
+	got, err := r.Execute(context.Background(), "p1", domain.RoleStoryArchitect)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Prompt != "BRIEF=Câu hỏi trung tâm: Q" {
+		t.Errorf("the story prompt must carry the approved brief, got %q", got.Prompt)
+	}
+	draft, err := r.Render(context.Background(), application.RenderInput{Role: domain.RoleStoryArchitect, ProjectID: "p1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if draft.Prompt != "BRIEF=Câu hỏi trung tâm: Q" {
+		t.Errorf("the copy-prompt render for a project must carry its brief too, got %q", draft.Prompt)
+	}
+}
+
+func TestRender_StoryPromptWithoutAProjectSaysThereIsNoBrief(t *testing.T) {
+	ctxData := &fakeRenderContext{project: aProject(), topic: "sung"}
+	got, err := newRenderer("BRIEF={{creative_brief}}", ctxData).Render(context.Background(), application.RenderInput{Role: domain.RoleStoryArchitect})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(got.Prompt, "{{creative_brief}}") || !strings.Contains(got.Prompt, "chưa có brief") {
+		t.Errorf("a render with no project fills the no-brief placeholder, got %q", got.Prompt)
+	}
+}
+
 // TestRoleFor_MapsEachStepToItsManualRole — the manual (Copy) flow's role of
 // each pipeline step; the removed review step and unknown names are errors.
 func TestRoleFor_MapsEachStepToItsManualRole(t *testing.T) {

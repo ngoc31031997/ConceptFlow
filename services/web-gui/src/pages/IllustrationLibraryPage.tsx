@@ -1,3 +1,5 @@
+import { AiModelField } from "../components/AiModelField";
+import { useLibraryAiModel } from "../hooks/useLibraryAiModel";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { AppShell } from "../components/AppShell";
 import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "../components/ui";
@@ -57,6 +59,7 @@ export function IllustrationLibraryPage() {
   const [draft, setDraft] = useState<Partial<IllustrationInput> | undefined>(undefined);
   const [drawOpen, setDrawOpen] = useState(false);
   const [drawText, setDrawText] = useState("");
+  const [aiModel, setAiModel] = useLibraryAiModel();
   const [drawFolder, setDrawFolder] = useState("");
   const [drawing, setDrawing] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -117,7 +120,7 @@ export function IllustrationLibraryPage() {
     setDrawing(true);
     setStatus(null);
     try {
-      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget });
+      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget, model: aiModel || undefined });
       setItems((list) => [...list, made]);
       setDrawText("");
       setDrawOpen(false);
@@ -363,6 +366,7 @@ export function IllustrationLibraryPage() {
                     data-testid="illustration-draw-folder"
                   />
                 </FormField>
+                <AiModelField label="Model AI vẽ hình" value={aiModel} onChange={setAiModel} disabled={drawing} testId="illustration-draw-model" />
                 <CtaRow helperText={drawing ? "AI đang vẽ và tự kiểm tra — thường mất 1–3 phút." : undefined}>
                   <Button onClick={draw} disabled={drawing || drawText.trim() === ""} data-testid="illustration-draw-button">
                     {drawing ? "Đang vẽ…" : "Vẽ"}

@@ -155,7 +155,7 @@ describe("CodeStepPage", () => {
 
     fireEvent.click(screen.getByTestId("pipeline-settings-toggle"));
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 6 — Code");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Code");
     expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
   });
 
