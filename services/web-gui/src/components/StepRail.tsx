@@ -1,8 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
-import { AUTO_STEPS, FLOW_LABELS, FLOW_PHASES, phaseOf, type StepStatus } from "../utils/flow";
-import { useProjectFlow } from "../context/ProjectFlowContext";
-import { usePresence } from "../hooks/usePresence";
-import glass from "../styles/glass.module.css";
+import { AUTO_STEPS, FLOW_VIEW, FLOW_VIEW_PHASES, viewStepOf, type FlowViewStep, type StepStatus } from "../utils/flow";
 import { useStepNav } from "../hooks/useStepNav";
 import styles from "./StepRail.module.css";
 
@@ -34,6 +30,13 @@ const STATUS_TEXT: Record<StepStatus, string> = {
   pending: "Chưa tới",
 };
 
+const TONE_CLASS = {
+  info: styles.toneInfo,
+  accent: styles.toneAccent,
+  run: styles.toneRun,
+  accent2: styles.toneAccent2,
+} as const;
+
 function Mark({ status, n }: { status: StepStatus; n: number }) {
   if (status === "done") return <span aria-hidden="true">✓</span>;
   if (status === "running") return <span className={styles.dot} aria-hidden="true" />;
@@ -53,53 +56,32 @@ interface StepRailProps {
   preview?: boolean;
 }
 
-/** A phase's step list, sliding open and closed with the shared reveal classes. */
-function PhaseSteps({ open, children }: { open: boolean; children: ReactNode }) {
-  const { mounted, closing } = usePresence(open);
-  if (!mounted) return null;
-  return <ol className={`${styles.list} ${closing ? glass.revealOut : glass.reveal}`}>{children}</ol>;
-}
-
-/** Index in FLOW_PHASES of the phase holding `step`; 0 for a step outside the flow. */
-function phaseIndex(step: number): number {
-  return Math.max(0, phaseOf(step)?.index ?? 0);
+/**
+ * The state of a step of the 21-step view from the running steps it shows:
+ * done when all are done, otherwise the state of the first one not done.
+ */
+function viewStatus(view: FlowViewStep, status: (step: number) => StepStatus): StepStatus {
+  const states = view.server.map(status);
+  if (states.length === 0) return "pending";
+  return states.find((s) => s !== "done") ?? "done";
 }
 
 /**
- * Menu dọc thứ hai — lớp nằm cạnh menu chính (Tạo video / Danh sách / Nhật ký),
- * xếp chồng lên nó thay vì trộn vào cùng một danh sách. Menu chính nói "đang ở
- * đâu trong ứng dụng"; lớp này nói "video này đang ở đâu trong 13 bước", từ
- * bước 1 (trước khi có project) tới lúc đăng.
+ * Menu dọc thứ hai, cạnh menu chính: "video này đang ở đâu trong luồng", 21
+ * bước của luồng mục tiêu (ADR-0042), từ bước 1 (trước khi có project) tới lúc
+ * đăng.
  *
- * Đầu menu là tên video, giai đoạn và bước hiện tại, số bước đã xong và thanh
- * tiến độ. Bên dưới là 5 giai đoạn thu gọn được: giai đoạn chứa bước đang xem
- * tự mở, Creator mở/đóng các giai đoạn khác. Mỗi giai đoạn ghi số bước đã xong
- * trên số bước dùng tới (bước "Không dùng" không tính). Bước máy tự chạy mang
- * nhãn "Tự động". Mọi bước đều bấm được: bước đã tới mở màn thật, bước khác mở
- * màn xem trước (useStepNav).
+ * Đầu menu là tên video và số bước đã xong. Bên dưới là bốn nhóm, mỗi nhóm có
+ * ô màu riêng và số bước xong trên tổng; mọi bước luôn hiện. Bước đang xem tô
+ * vàng, bước đã xong có dấu ✓, bước Creator duyệt mang dấu ◆. Bước app đã có
+ * bấm được (bước đã tới mở màn thật, bước khác mở màn xem trước, xem
+ * useStepNav); bước chưa làm mang nhãn "sắp có" và không bấm được.
  */
 export function StepRail({ currentStep, title, collapsed, onToggle, preview }: StepRailProps) {
   const nav = useStepNav(currentStep, { preview });
-  const flow = useProjectFlow();
-  const viewingPhase = phaseIndex(currentStep);
-  const [open, setOpen] = useState<Set<number>>(() => new Set([viewingPhase]));
-  // Moving to a step of another phase opens that phase too.
-  useEffect(() => {
-    setOpen((prev) => (prev.has(viewingPhase) ? prev : new Set(prev).add(viewingPhase)));
-  }, [viewingPhase]);
-
-  const togglePhase = (index: number) =>
-    setOpen((prev) => {
-      const next = new Set(prev);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
-      return next;
-    });
-
-  const counted = FLOW_PHASES.flatMap((phase) => phase.steps);
-  const doneCount = counted.filter((step) => nav.status(step) === "done").length;
-  const atStep = flow.flowStep || 1;
-  const atPhase = phaseOf(atStep);
+  const viewing = viewStepOf(currentStep)?.n;
+  const built = FLOW_VIEW.filter((v) => v.server.length > 0);
+  const doneCount = built.filter((v) => viewStatus(v, nav.status) === "done").length;
 
   return (
     <nav
@@ -111,15 +93,9 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
       <div className={styles.head}>
         {!collapsed && (
           <div className={styles.title} title={title}>
-            <span className={styles.titleLabel}>Video đang làm</span>
             <span className={styles.titleName}>{title}</span>
             <span className={styles.meta} data-testid="step-rail-meta">
-              {nav.hasProject && atPhase
-                ? `${atPhase.name} · ${FLOW_LABELS[atStep - 1]} · ${doneCount}/${counted.length} bước`
-                : "Nhập ý tưởng để bắt đầu"}
-            </span>
-            <span className={styles.progress} aria-hidden="true">
-              <span style={{ width: `${counted.length ? Math.round((doneCount / counted.length) * 100) : 0}%` }} />
+              {nav.hasProject ? `${doneCount}/${FLOW_VIEW.length} bước xong` : "Nhập ý tưởng để bắt đầu"}
             </span>
           </div>
         )}
@@ -136,85 +112,67 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
       </div>
 
       <div className={styles.scroll}>
-        {FLOW_PHASES.map((phase, index) => {
-          const done = phase.steps.filter((step) => nav.status(step) === "done").length;
-          const phaseDone = phase.steps.length > 0 && done === phase.steps.length;
-          // The narrow rail has no phase headers to open, so it lists every step.
-          const expanded = collapsed || open.has(index);
+        {FLOW_VIEW_PHASES.map((phase, index) => {
+          const steps = FLOW_VIEW.filter((v) => v.phase === index);
+          const done = steps.filter((v) => viewStatus(v, nav.status) === "done").length;
           return (
-            <section
-              key={phase.name}
-              className={`${styles.phase} ${index === viewingPhase ? styles.phaseViewing : ""}`}
-              data-testid={`rail-phase-${index + 1}`}
-              data-open={expanded}
-            >
+            <section key={phase.name} className={styles.phase} data-testid={`rail-phase-${index + 1}`}>
               {!collapsed && (
-                <button
-                  type="button"
-                  className={`${styles.phaseHead} ${phaseDone ? styles.phaseDone : ""}`}
-                  onClick={() => togglePhase(index)}
-                  aria-expanded={expanded}
-                  data-testid={`rail-phase-toggle-${index + 1}`}
-                >
-                  <span className={styles.phaseNo} aria-hidden="true">
-                    {phaseDone ? "✓" : index + 1}
+                <div className={styles.phaseHead}>
+                  <span className={styles.phaseName}>
+                    <i className={`${styles.swatch} ${TONE_CLASS[phase.tone]}`} aria-hidden="true" />
+                    {phase.name}
                   </span>
-                  <span className={styles.phaseName}>{phase.name}</span>
                   <span className={styles.phaseCount} data-testid={`rail-phase-count-${index + 1}`}>
-                    {done}/{phase.steps.length}
+                    {done}/{steps.length}
                   </span>
-                  <span className={styles.chevron} aria-hidden="true">
-                    ›
-                  </span>
-                </button>
+                </div>
               )}
-              <PhaseSteps open={expanded}>
-                  {phase.steps.map((step) => {
-                    const status = nav.status(step);
-                    const label = FLOW_LABELS[step - 1];
-                    const viewing = step === currentStep;
-                    const auto = AUTO_STEPS.has(step);
-                    return (
-                      <li key={step}>
-                        <button
-                          type="button"
-                          className={[
-                            styles.item,
-                            styles[`s_${status}`],
-                            viewing ? styles.viewing : "",
-                            auto ? styles.auto : "",
-                          ]
-                            .filter(Boolean)
-                            .join(" ")}
-                          disabled={!nav.isClickable(step)}
-                          onClick={() => nav.go(step)}
-                          aria-current={viewing ? "step" : undefined}
-                          title={collapsed ? `${step}. ${label}${auto ? " (tự động)" : ""} · ${STATUS_TEXT[status]}` : undefined}
-                          data-testid={`rail-step-${step}`}
-                          data-status={status}
-                          data-reached={nav.isReached(step)}
-                        >
-                          <span className={styles.mark}>
-                            <Mark status={status} n={step} />
+              <ol className={styles.list}>
+                {steps.map((view) => {
+                  const coming = view.server.length === 0;
+                  const status = viewStatus(view, nav.status);
+                  const isViewing = view.n === viewing;
+                  const target = view.server[0];
+                  const auto = view.server.every((step) => AUTO_STEPS.has(step)) && !coming;
+                  const hint = coming
+                    ? `${view.n}. ${view.label} · sắp có`
+                    : `${view.n}. ${view.label} · ${STATUS_TEXT[status]}${auto ? " · tự động" : ""}${view.gate ? " · bạn duyệt ở bước này" : ""}`;
+                  return (
+                    <li key={view.n}>
+                      <button
+                        type="button"
+                        className={[
+                          styles.item,
+                          styles[`s_${status}`],
+                          isViewing ? styles.viewing : "",
+                          coming ? styles.coming : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        disabled={coming || !nav.isClickable(target)}
+                        onClick={() => nav.go(target)}
+                        aria-current={isViewing ? "step" : undefined}
+                        title={hint}
+                        data-testid={`rail-step-${view.n}`}
+                        data-status={coming ? "coming" : status}
+                        data-reached={!coming && nav.isReached(target)}
+                      >
+                        <span className={styles.mark}>
+                          <Mark status={status} n={view.n} />
+                        </span>
+                        {!collapsed && <span className={styles.label}>{view.label}</span>}
+                        {!collapsed && coming && <span className={styles.comingTag}>sắp có</span>}
+                        {!collapsed && !coming && view.gate && (
+                          <span className={styles.gate} data-testid={`rail-gate-${view.n}`}>
+                            ◆
                           </span>
-                          {!collapsed && (
-                            <span className={styles.text}>
-                              <span className={styles.label}>
-                                {label}
-                                {auto && (
-                                  <span className={styles.autoTag} data-testid={`rail-auto-${step}`}>
-                                    Tự động
-                                  </span>
-                                )}
-                              </span>
-                              <span className={styles.state}>{STATUS_TEXT[status]}</span>
-                            </span>
-                          )}
-                        </button>
-                      </li>
-                    );
-                  })}
-              </PhaseSteps>
+                        )}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ol>
             </section>
           );
         })}

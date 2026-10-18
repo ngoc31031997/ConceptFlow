@@ -15,7 +15,7 @@ import { CodeChunkShotsField, CodeSegmentsPanel } from "../components/CodeSegmen
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
-import { FLOW_CODE, flowTitle } from "../utils/flow";
+import { FLOW_CODE, flowStepName } from "../utils/flow";
 
 
 /**
@@ -175,7 +175,7 @@ export function CodeStepPage() {
     <div data-testid="code-step-page">
       <AppShell
         currentStep={6}
-        title={flowTitle(FLOW_CODE)}
+        title={flowStepName(FLOW_CODE)}
         subtitle="Tạo code Remotion từ storyboard."
         wide
       >

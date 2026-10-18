@@ -30,6 +30,11 @@ const (
 	// from (figures and backdrops), and what the illustration library shows as
 	// its rules. Not a prompt to copy to an external AI, so it is never rendered.
 	RoleIllustrationStyle PromptRole = "illustration_style"
+
+	// The idea step's writer: turns a topic into the creative brief. Filled by
+	// the brief use case with the brief's own values (the Creator's note, the
+	// fields the Creator wrote), so it is not rendered by the generic renderer.
+	RoleCreativeBrief PromptRole = "creative_brief"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -37,7 +42,8 @@ func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
-		RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle:
+		RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle,
+		RoleCreativeBrief:
 		return true
 	default:
 		return false
@@ -46,9 +52,10 @@ func ValidPromptRole(role string) bool {
 
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
-// the illustration style rules, which are read as they are.
+// the illustration style rules, which are read as they are, and the brief
+// writer, whose values come from the brief use case.
 func IsRenderablePromptRole(role string) bool {
-	return ValidPromptRole(role) && PromptRole(role) != RoleIllustrationStyle
+	return ValidPromptRole(role) && PromptRole(role) != RoleIllustrationStyle && PromptRole(role) != RoleCreativeBrief
 }
 
 // PromptTemplate is one role/language's editable prompt text.

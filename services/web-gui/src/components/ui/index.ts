@@ -1,5 +1,6 @@
 export { Card } from "./Card";
-export { Button } from "./Button";
+export { Button, type ButtonVariant } from "./Button";
+export { Dialog, type DialogProps } from "./Dialog";
 export { FormField } from "./FormField";
 export { Select } from "./Select";
 export { TextArea } from "./TextArea";

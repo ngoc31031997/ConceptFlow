@@ -1,0 +1,101 @@
+.map {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+
+.card {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  background: var(--card);
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.phaseName {
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--ink);
+}
+.swatch {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  margin-right: 8px;
+  border: 1.5px solid var(--border-color);
+}
+.toneInfo {
+  background: var(--info);
+}
+.toneAccent {
+  background: var(--accent);
+}
+.toneRun {
+  background: var(--run);
+}
+.toneAccent2 {
+  background: var(--accent2);
+}
+
+.step {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1.5px solid var(--muted);
+  color: var(--ink);
+  font-size: 13px;
+  text-decoration: none;
+}
+.step:last-child {
+  border-bottom: 0;
+}
+.step:hover b {
+  text-decoration: underline;
+}
+.step:focus-visible {
+  outline: 2px solid var(--run);
+  outline-offset: 2px;
+}
+.step b {
+  font-family: var(--font-display);
+}
+.n {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+}
+.note {
+  display: block;
+  color: var(--ink-soft);
+}
+.gate {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--warn);
+}
+.auto {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+
+/* A step of the 21-step flow the app does not have yet. */
+.stepComing {
+  color: var(--ink-faint);
+}
+.coming {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+}

@@ -1,3 +1,5 @@
+import { AiModelField } from "./AiModelField";
+import { useLibraryAiModel } from "../hooks/useLibraryAiModel";
 import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
@@ -89,6 +91,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const [tagsText, setTagsText] = useState(form.tags.join(", "));
   const [busy, setBusy] = useState<"" | "try" | "save" | "delete" | "redraw">("");
   const [note, setNote] = useState("");
+  const [aiModel, setAiModel] = useLibraryAiModel();
   const [diagnostics, setDiagnostics] = useState<CodeDiagnostic[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [tried, setTried] = useState<IllustrationTry | null>(null);
@@ -149,7 +152,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
   const handleRedraw = () =>
     run("redraw", async () => {
       if (!illustration) return;
-      const saved = await redrawIllustration(illustration.id, note);
+      const saved = await redrawIllustration(illustration.id, note, aiModel || undefined);
       setNote("");
       onSaved(saved);
       setMessage("AI đã vẽ lại — phiên bản mới đang chờ duyệt.");
@@ -271,6 +274,7 @@ export function IllustrationEditor({ illustration, draft, folders, defaultFolder
             onChange={(e) => setNote(e.target.value)}
             data-testid="illustration-redraw-note"
           />
+          <AiModelField label="Model AI vẽ lại" value={aiModel} onChange={setAiModel} disabled={busy !== ""} testId="illustration-redraw-model" />
           <Button variant="ghost" onClick={handleRedraw} disabled={busy !== ""} data-testid="illustration-redraw-button">
             {busy === "redraw" ? "AI đang vẽ lại… (1–3 phút)" : "Vẽ lại bằng AI"}
           </Button>

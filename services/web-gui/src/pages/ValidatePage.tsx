@@ -12,7 +12,7 @@ import { useOutlineReview } from "../hooks/useOutlineReview";
 import { retryProject, ApiError } from "../api/client";
 import { ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { statusToStep, projectPhase, projectPath, VALIDATE_STEPS, VALIDATE_SUBSTEP_NUMBERS } from "../utils/pipelineLabels";
-import { FLOW_CODE, FLOW_REVIEW, FLOW_VALIDATE, flowTitle } from "../utils/flow";
+import { FLOW_CODE, FLOW_REVIEW, FLOW_VALIDATE, flowStepName } from "../utils/flow";
 import type { Project } from "../types";
 import styles from "./ValidatePage.module.css";
 
@@ -22,18 +22,18 @@ import styles from "./ValidatePage.module.css";
 // nothing renders the actions until isAwaitingReview && project are true.
 const EMPTY_PROJECT: Project = { project_id: "", status: "draft", voice_language: "vi", scenes: [] };
 
-/** Phần của màn Duyệt nội dung đang mở (?part=settings là phần 2). */
+/** Phần của màn Review đang mở (?part=settings là phần 2). */
 type ReviewPart = "review" | "settings";
 
 /**
- * Bước 7 — "Kiểm tra tự động" (và 8 — "Duyệt nội dung", cùng màn): phần rẻ của
+ * Bước 7 — "Validate" (và 8 — "Review", cùng màn): phần rẻ của
  * saga, và điểm dừng trước phần đắt.
  *
  * Bước 8 chia hai phần, mỗi phần một việc, cùng URL (`?part=settings`) để nút
  * Back của trình duyệt và tải lại trang giữ đúng phần đang xem: phần 1 duyệt
  * lời thoại, phần 2 chọn cài đặt xuất video (chất lượng, font, phụ đề, nhạc
- * nền) ngay trước nút "Duyệt và bắt đầu tạo video", vì bước Dựng hình và Ghép
- * video đọc chúng và là phần bắt đầu tốn tiền.
+ * nền) ngay trước nút "Duyệt và bắt đầu tạo video", vì bước Render và Merge + QC
+ * đọc chúng và là phần bắt đầu tốn tiền.
  *
  * Màn này dừng ở đúng ranh giới mà saga vốn đã có: chạy
  * thử kịch bản (parse_script → validate_script, vài giây, không tốn gì) rồi
@@ -134,7 +134,7 @@ export function ValidatePage() {
         wide={(isAwaitingReview && part === "review") || (reviewingPast && viewStep === FLOW_REVIEW)}
         // The title names the step as the rail does; what is happening
         // at it moves to the subtitle.
-        title={flowTitle(shownStep)}
+        title={flowStepName(shownStep)}
         subtitle={
           isCancelled
             ? "Đã hủy kiểm tra. Bạn đã dừng bước này. Bấm Chạy tiếp ở thanh trạng thái phía trên."
@@ -154,7 +154,7 @@ export function ValidatePage() {
             key={project.project_id}
             project={project}
             stages={["render", "merge"]}
-            hint="Dùng ở bước Dựng hình và Ghép video. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
+            hint="Dùng ở bước Render và Merge + QC. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
           />
         ) : (isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
           /*

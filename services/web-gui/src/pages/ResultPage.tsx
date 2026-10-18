@@ -15,7 +15,7 @@ import type { RenderQuality } from "../context/ProjectDraftContext";
 import { Button, Card } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./ResultPage.module.css";
-import { FLOW_RESULT, flowTitle } from "../utils/flow";
+import { FLOW_RESULT, flowStepName } from "../utils/flow";
 
 /**
  * Bước 13 — "Kết quả": trang này CHỈ xem lại
@@ -103,7 +103,7 @@ export function ResultPage() {
       <AppShell
         currentStep={FLOW_RESULT}
         wide
-        title={flowTitle(FLOW_RESULT)}
+        title={flowStepName(FLOW_RESULT)}
         subtitle="Xem lại video hoặc dựng lại. Đăng video ở bước tiếp theo."
       >
         {error && (

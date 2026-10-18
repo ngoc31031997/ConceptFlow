@@ -3,16 +3,16 @@ import styles from "./TopicSummary.module.css";
 
 interface TopicSummaryProps {
   topic: string;
-  /** Mở lại bước 1, chỗ duy nhất sửa chủ đề. */
-  onEdit: () => void;
+  /** Mở lại bước 1 (Ý tưởng), nơi có đề tài và creative brief. */
+  onOpen: () => void;
 }
 
 /**
  * Chủ đề của video dạng chỉ đọc, ở đầu các màn sau bước 1: nhắc Creator đang
- * làm video về cái gì, và đưa về bước 1 nếu muốn sửa. Chủ đề chỉ sửa ở một
- * chỗ để không có hai ô cùng giữ một giá trị.
+ * làm video về cái gì, và mở lại bước Ý tưởng để xem đề tài cùng brief. Đề
+ * tài chốt lúc tạo project; muốn đổi hướng thì làm lại brief kèm ghi chú.
  */
-export function TopicSummary({ topic, onEdit }: TopicSummaryProps) {
+export function TopicSummary({ topic, onOpen }: TopicSummaryProps) {
   const text = topic.trim();
   return (
     <div className={styles.summary} data-testid="topic-summary">
@@ -20,8 +20,8 @@ export function TopicSummary({ topic, onEdit }: TopicSummaryProps) {
       <span className={styles.topic} title={text}>
         {text || "Chưa có chủ đề"}
       </span>
-      <Button variant="ghost" onClick={onEdit} data-testid="topic-summary-edit">
-        Sửa
+      <Button variant="view" onClick={onOpen} data-testid="topic-summary-open">
+        Xem ở Ý tưởng
       </Button>
     </div>
   );

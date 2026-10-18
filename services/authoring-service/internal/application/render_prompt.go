@@ -50,6 +50,19 @@ type RenderPromptUseCase struct {
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
 	archetypes  ArchetypeListPort // optional; nil renders {{video_archetypes}} empty
+	brief       BriefSectionPort  // optional; nil renders {{creative_brief}} as the no-brief placeholder
+}
+
+// BriefSectionPort renders the project's approved creative brief for the
+// story prompt.
+type BriefSectionPort interface {
+	ApprovedBriefSection(ctx context.Context, projectID string, project *domain.Project) (string, error)
+}
+
+// WithBrief lets the renderer fill {{creative_brief}} from the idea step.
+func (uc *RenderPromptUseCase) WithBrief(p BriefSectionPort) *RenderPromptUseCase {
+	uc.brief = p
+	return uc
 }
 
 // ArchetypeListPort is the one read the renderer needs from the archetype table.
@@ -206,6 +219,14 @@ func (uc *RenderPromptUseCase) variablesFor(
 	// nothing reads.
 	if role == domain.RoleStoryArchitect {
 		vars["video_archetypes"] = uc.archetypeSection(ctx)
+		vars["creative_brief"] = creativeBriefPlaceholder
+		if uc.brief != nil {
+			section, err := uc.brief.ApprovedBriefSection(ctx, projectID, project)
+			if err != nil {
+				return nil, fmt.Errorf("load creative brief: %w", err)
+			}
+			vars["creative_brief"] = section
+		}
 	}
 	if role == domain.RoleStoryArchitect && project.VideoFormatID != "" {
 		format, err := uc.formats.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)

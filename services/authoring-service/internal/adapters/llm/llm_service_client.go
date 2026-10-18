@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
@@ -34,6 +35,36 @@ type Client struct {
 	mu          sync.Mutex
 	readyAt     time.Time
 	readyResult bool
+
+	defaults DefaultModelSource
+}
+
+// DefaultModelSource says which model a call runs on when it names none.
+type DefaultModelSource interface {
+	GetDefaultModel(ctx context.Context) (string, error)
+}
+
+// WithDefaultModel makes calls that name no model run on the default set in
+// the app's settings; without it (or with none set) llm-service's own default
+// applies.
+func (c *Client) WithDefaultModel(src DefaultModelSource) *Client {
+	c.defaults = src
+	return c
+}
+
+// modelOrDefault is model, or the settings default when model is empty. An
+// unreadable setting falls back to llm-service's default rather than failing a
+// call that did not ask for it.
+func (c *Client) modelOrDefault(ctx context.Context, model string) string {
+	if model != "" || c.defaults == nil {
+		return model
+	}
+	def, err := c.defaults.GetDefaultModel(ctx)
+	if err != nil {
+		slog.Warn("could not read the default model", "error", err.Error())
+		return ""
+	}
+	return def
 }
 
 func NewClient(baseURL string, timeout time.Duration) *Client {
@@ -308,7 +339,7 @@ func (c *Client) post(ctx context.Context, path string, body, out any) error {
 
 func (c *Client) Chat(ctx context.Context, req application.ChatRequest) (application.ChatResult, error) {
 	body := map[string]any{
-		"provider": "hive", "system": req.System, "user": req.User, "model": req.Model,
+		"provider": "hive", "system": req.System, "user": req.User, "model": c.modelOrDefault(ctx, req.Model),
 		"max_tokens": req.MaxTokens, "temperature": req.Temperature,
 	}
 	raw, err := c.stream(ctx, "/v1/chat", body, func(kind string, ev json.RawMessage) {
@@ -369,7 +400,7 @@ func (c *Client) suggestCall(ctx context.Context, path string, body map[string]a
 }
 
 func (c *Client) Suggest(
-	ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage,
+	ctx context.Context, scriptContent, categoryHint string, language domain.ContentLanguage, model string,
 ) (string, string, []string, error) {
 	var out struct {
 		Title       string   `json:"title"`
@@ -378,6 +409,7 @@ func (c *Client) Suggest(
 	}
 	err := c.suggestCall(ctx, "/v1/suggest-metadata", map[string]any{
 		"script_content": scriptContent, "category_hint": categoryHint, "language": string(language),
+		"model": c.modelOrDefault(ctx, model),
 	}, &out)
 	if err != nil {
 		return "", "", nil, err
@@ -400,7 +432,7 @@ func (c *Client) FinalizeStoryboard(
 		Usage      wireUsage `json:"usage"`
 	}
 	if err := c.post(ctx, "/v1/storyboard/finalize", map[string]any{
-		"content": content, "model": model, "max_tokens": maxTokens, "frame": frameBody(frame),
+		"content": content, "model": c.modelOrDefault(ctx, model), "max_tokens": maxTokens, "frame": frameBody(frame),
 	}, &out); err != nil {
 		return application.FinalizedStoryboard{}, err
 	}
@@ -421,10 +453,10 @@ func frameBody(f domain.Frame) map[string]int {
 }
 
 // codeBody is the /v2/code/* request (docs/contracts/authoring-llm-code-v2.md).
-func codeBody(req application.CodeGenRequest) map[string]any {
+func (c *Client) codeBody(ctx context.Context, req application.CodeGenRequest) map[string]any {
 	body := map[string]any{
 		"engine": req.Engine, "topic": req.Topic, "storyboard": req.Storyboard, "system": req.System,
-		"model": req.Model, "max_tokens": req.MaxTokens, "chunk_shots": req.ChunkShots,
+		"model": c.modelOrDefault(ctx, req.Model), "max_tokens": req.MaxTokens, "chunk_shots": req.ChunkShots,
 		"frame": frameBody(req.Frame),
 	}
 	if len(req.Illustrations) > 0 {
@@ -544,7 +576,7 @@ func (c *Client) GenerateCode(
 	ctx context.Context, req application.CodeGenRequest, onEvent func(application.CodeEvent),
 ) (application.CodeGenResult, error) {
 	var badEvent error
-	raw, err := c.stream(ctx, "/v2/code/generate", codeBody(req), func(kind string, ev json.RawMessage) {
+	raw, err := c.stream(ctx, "/v2/code/generate", c.codeBody(ctx, req), func(kind string, ev json.RawMessage) {
 		e, err := codeEvent(kind, ev)
 		if err != nil {
 			if badEvent == nil {
@@ -651,14 +683,14 @@ func (c *Client) PlanSegments(ctx context.Context, req application.CodeGenReques
 	var out struct {
 		Segments []wirePlanned `json:"segments"`
 	}
-	if err := c.segmentCall(ctx, "/v2/code/plan", codeBody(req), &out); err != nil {
+	if err := c.segmentCall(ctx, "/v2/code/plan", c.codeBody(ctx, req), &out); err != nil {
 		return nil, err
 	}
 	return planFrom(out.Segments), nil
 }
 
 func (c *Client) SegmentPrompt(ctx context.Context, req application.CodeGenRequest, key string) (string, string, error) {
-	body := codeBody(req)
+	body := c.codeBody(ctx, req)
 	body["key"] = key
 	var out struct {
 		System string `json:"system"`
@@ -671,7 +703,7 @@ func (c *Client) SegmentPrompt(ctx context.Context, req application.CodeGenReque
 }
 
 func (c *Client) ParseSegment(ctx context.Context, req application.CodeGenRequest, key, reply string) (string, json.RawMessage, error) {
-	body := codeBody(req)
+	body := c.codeBody(ctx, req)
 	body["key"], body["reply"] = key, reply
 	var out struct {
 		Fingerprint string          `json:"fingerprint"`

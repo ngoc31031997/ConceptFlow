@@ -1,7 +1,7 @@
 /*
-  Lớp menu thứ hai: đứng ngay cạnh sidebar chính (208px) và xếp lên trên nó một
-  chút — đổ bóng về phía nội dung, mép trái chồng vào sidebar 8px — để đọc ra là
-  "một tầng khác" chứ không phải thêm mục vào cùng danh sách.
+  Lớp menu thứ hai: đứng ngay cạnh sidebar chính (208px), mép trái chồng vào
+  sidebar 8px, đổ bóng về phía nội dung, để đọc ra là "một tầng khác" chứ
+  không phải thêm mục vào cùng danh sách.
 */
 .rail {
   position: fixed;
@@ -13,8 +13,8 @@
   z-index: 3;
   display: flex;
   flex-direction: column;
-  background: var(--accent-soft);
-  border-right: var(--border-w) solid var(--surface-border);
+  background: var(--card);
+  border-right: var(--border-w) solid var(--border-color);
   box-shadow: var(--shadow);
   transition: width 0.18s ease;
 }
@@ -22,42 +22,43 @@
   width: 64px;
 }
 
+/* Head: the video's name and how far it is, above a rule. */
 .head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
-  padding: 22px 10px 10px 22px;
+  margin: 16px 12px 0;
+  padding-bottom: 12px;
+  border-bottom: var(--border-w) solid var(--border-color);
 }
 .railCollapsed .head {
   justify-content: center;
-  padding-inline: 8px;
+  margin-inline: 8px;
 }
 .title {
   min-width: 0;
   display: grid;
-  gap: 2px;
-}
-.titleLabel {
-  font-size: 11px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--ink-faint);
+  gap: 4px;
 }
 .titleName {
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
   color: var(--ink);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+}
+.meta {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-faint);
 }
 .toggle {
   flex-shrink: 0;
   width: 28px;
   height: 28px;
   border-radius: var(--radius);
-  border: var(--border-w) solid var(--surface-border);
+  border: var(--border-w) solid var(--border-color);
   background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
@@ -66,14 +67,14 @@
 }
 .toggle:focus-visible,
 .item:focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--run);
   outline-offset: 2px;
 }
 
 .scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 10px 24px 22px;
+  padding: 14px 12px 24px;
   display: grid;
   gap: 14px;
   align-content: start;
@@ -82,42 +83,80 @@
   padding-inline: 8px;
   gap: 8px;
 }
+
+/* A phase: its colour, name and count, then its steps. */
 .phase {
   display: grid;
-  gap: 4px;
+  gap: 3px;
 }
-.phaseName {
-  margin: 0 0 2px;
+.phaseHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  padding: 2px 6px 4px;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
+.phaseName {
+  min-width: 0;
+}
+.phaseCount {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.swatch {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border: 1.5px solid var(--border-color);
+  vertical-align: -1px;
+}
+.toneInfo {
+  background: var(--info);
+}
+.toneAccent {
+  background: var(--accent);
+}
+.toneRun {
+  background: var(--run);
+}
+.toneAccent2 {
+  background: var(--accent2);
+}
+
 .list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
-  gap: 2px;
+  gap: 3px;
 }
 
+/* A step: its number in a circle, its name, ◆ when the Creator approves it. */
 .item {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 7px 8px;
+  gap: 8px;
+  padding: 5px 6px;
   border-radius: var(--radius);
   border: var(--border-w) solid transparent;
-  box-shadow: none;
   background: transparent;
-  color: var(--ink-faint);
+  color: var(--ink);
   text-align: left;
   font: inherit;
+  font-size: 13px;
   cursor: pointer;
 }
 .railCollapsed .item {
+  grid-template-columns: 24px;
   justify-content: center;
   padding-inline: 0;
 }
@@ -125,10 +164,7 @@
   cursor: default;
 }
 .item:not(:disabled):hover {
-  background: var(--card);
   border-color: var(--border-color);
-  transform: none;
-  box-shadow: none;
 }
 .viewing,
 .item.viewing:not(:disabled):hover {
@@ -136,64 +172,69 @@
   border-color: var(--border-color);
   box-shadow: var(--shadow-sm);
   color: var(--accent-ink);
-}
-.viewing .state {
-  color: var(--accent-ink);
+  font-weight: 700;
 }
 
 .mark {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: var(--border-w) solid currentColor;
+  border: 1.5px solid var(--border-color);
+  background: var(--card);
+  color: var(--ink);
   display: grid;
   place-items: center;
+  font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-.text {
-  display: grid;
-  min-width: 0;
+  font-weight: 700;
 }
 .label {
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.25;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.state {
-  font-size: 11px;
+.gate {
+  font-size: 10px;
+  color: var(--warn);
+}
+/* A step of the 21-step flow the app does not have yet. */
+.coming {
   color: var(--ink-faint);
+}
+.coming .mark {
+  border-style: dashed;
+  background: transparent;
+  color: var(--ink-faint);
+}
+.comingTag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  padding: 0 3px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  white-space: nowrap;
+}
+.viewing .gate {
+  color: var(--accent-ink);
 }
 
-.s_done {
-  color: var(--ink-soft);
-}
 .s_done .mark {
-  background: var(--ok, #1f9d6b);
-  border-color: var(--ok, #1f9d6b);
-  color: var(--accent-ink);
+  background: var(--ok-soft);
 }
-.s_waiting {
-  color: var(--ink);
-}
-.s_running {
-  color: var(--run, #7a5cd6);
-}
-.s_failed {
-  color: var(--danger, #d93b45);
+.s_running .mark {
+  color: var(--run);
 }
 .s_failed .mark {
-  background: var(--danger, #d93b45);
-  border-color: var(--danger, #d93b45);
-  color: var(--accent-ink);
+  background: var(--danger);
+  color: var(--danger-ink);
 }
-.s_cancelled {
-  color: var(--warn, #c7811a);
+.s_cancelled .mark {
+  color: var(--warn);
 }
-.s_pending {
+.s_pending:not(.viewing) {
   color: var(--ink-faint);
-  opacity: 0.7;
 }
 
 .dot {
@@ -212,6 +253,9 @@
   .dot {
     animation: none;
   }
+  .rail {
+    transition: none;
+  }
 }
 
 /* Điện thoại: sidebar chính thành thanh ngang, rail bước xếp thành khối tĩnh
@@ -225,129 +269,5 @@
     border-right: 0;
     border-bottom: var(--border-w) solid var(--border-color);
     box-shadow: none;
-  }
-}
-
-/* Steps a worker runs on its own: lighter text and a small tag. */
-.auto .label {
-  font-weight: 400;
-}
-.autoTag {
-  display: inline-block;
-  margin-left: 6px;
-  padding: 0 5px;
-  border: 1px solid currentColor;
-  border-radius: var(--radius);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: 1px;
-  opacity: 0.8;
-}
-
-/* Head: where the video stands, in words and as a bar. */
-.meta {
-  font-size: 12px;
-  color: var(--ink-soft);
-  line-height: 1.3;
-}
-.progress {
-  display: block;
-  height: 6px;
-  margin-top: 4px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 2px;
-  background: var(--card);
-  overflow: hidden;
-}
-.progress > span {
-  display: block;
-  height: 100%;
-  background: var(--success);
-}
-
-/* A phase header opens and closes its steps. */
-.phaseHead {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
-  border: var(--border-w) solid transparent;
-  border-radius: var(--radius);
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  box-shadow: none;
-}
-.phaseHead:hover {
-  background: var(--card);
-  border-color: var(--border-color);
-  transform: none;
-  box-shadow: none;
-}
-.phaseHead:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.phaseNo {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: var(--border-w) solid currentColor;
-  display: grid;
-  place-items: center;
-  font-size: 10.5px;
-  font-weight: 700;
-}
-.phaseDone .phaseNo {
-  background: var(--success);
-  border-color: var(--border-color);
-  color: var(--accent-ink);
-}
-.phaseName {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-.phaseViewing .phaseName {
-  text-decoration: underline;
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-.phaseCount {
-  font-size: 11.5px;
-  color: var(--ink-faint);
-  font-variant-numeric: tabular-nums;
-}
-.chevron {
-  font-size: 14px;
-  color: var(--ink-faint);
-  transition: transform 0.18s ease;
-}
-.phase[data-open="true"] .chevron {
-  transform: rotate(90deg);
-}
-.phase[data-open="true"] > .list {
-  margin-left: 17px;
-  padding-left: 8px;
-  border-left: var(--border-w) solid var(--border-color);
-}
-.railCollapsed .phase[data-open="true"] > .list {
-  margin-left: 0;
-  padding-left: 0;
-  border-left: 0;
-}
-@media (prefers-reduced-motion: reduce) {
-  .chevron {
-    transition: none;
   }
 }

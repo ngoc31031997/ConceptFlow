@@ -43,14 +43,14 @@ describe("the rail highlights the step the title names on the output screens", (
 
   it("Kết quả is step 12", async () => {
     renderAt("/projects/p1/result", "ready_to_publish", 12);
-    expect(await screen.findByTestId("rail-step-12")).toHaveAttribute("aria-current", "step");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 12 — Kết quả");
+    expect(await screen.findByTestId("rail-step-20")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Kết quả");
   });
 
   it("Đăng video is step 13", async () => {
     renderAt("/projects/p1/publish", "published", 13);
-    expect(await screen.findByTestId("rail-step-13")).toHaveAttribute("aria-current", "step");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 13 — Đăng video");
-    expect(screen.queryByTestId("rail-step-14")).toBeNull();
+    expect(await screen.findByTestId("rail-step-21")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Publish");
+    expect(screen.queryByTestId("rail-step-22")).toBeNull();
   });
 });

@@ -109,7 +109,7 @@ func TestSuggestMetadata(t *testing.T) {
 		_ = json.NewDecoder(r.Body).Decode(&body)
 		switch r.URL.Path {
 		case "/v1/suggest-metadata":
-			if body["language"] != "vi" || body["script_content"] != "S" || body["category_hint"] != "C" {
+			if body["language"] != "vi" || body["script_content"] != "S" || body["category_hint"] != "C" || body["model"] != "ollama" {
 				t.Errorf("metadata body = %v", body)
 			}
 			_, _ = w.Write([]byte(`{"title":"T","description":"D","tags":null,"usage":{}}`))
@@ -117,7 +117,7 @@ func TestSuggestMetadata(t *testing.T) {
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
 	})
-	title, desc, tags, err := c.Suggest(context.Background(), "S", "C", domain.LanguageVietnamese)
+	title, desc, tags, err := c.Suggest(context.Background(), "S", "C", domain.LanguageVietnamese, "ollama")
 	if err != nil || title != "T" || desc != "D" {
 		t.Fatalf("Suggest: %q %q %v", title, desc, err)
 	}
@@ -131,7 +131,7 @@ func TestANon200AnswerCarriesTheServicesErrorKind(t *testing.T) {
 		w.WriteHeader(http.StatusBadGateway)
 		_, _ = w.Write([]byte(`{"error":{"kind":"balance","provider":"ollama","message":"no credit","usage":{}}}`))
 	})
-	_, _, _, err := c.Suggest(context.Background(), "S", "C", domain.LanguageVietnamese)
+	_, _, _, err := c.Suggest(context.Background(), "S", "C", domain.LanguageVietnamese, "ollama")
 	if application.LLMErrorKindOf(err) != application.ErrKindBalance {
 		t.Fatalf("err = %v, want balance", err)
 	}
@@ -140,7 +140,7 @@ func TestANon200AnswerCarriesTheServicesErrorKind(t *testing.T) {
 		w.WriteHeader(http.StatusInternalServerError)
 		_, _ = w.Write([]byte(`<html>boom</html>`))
 	})
-	if _, _, _, err := bad.Suggest(context.Background(), "S", "C", domain.LanguageEnglish); application.LLMErrorKindOf(err) != application.ErrKindServer {
+	if _, _, _, err := bad.Suggest(context.Background(), "S", "C", domain.LanguageEnglish, ""); application.LLMErrorKindOf(err) != application.ErrKindServer {
 		t.Fatalf("err = %v, want server", err)
 	}
 }
@@ -455,3 +455,27 @@ func TestReadyReflectsTheServicesHiveKeyAndIsCached(t *testing.T) {
 }
 
 func asLLMError(err error, target **application.LLMError) bool { return errors.As(err, target) }
+
+type fixedDefault struct {
+	model string
+	err   error
+}
+
+func (f fixedDefault) GetDefaultModel(context.Context) (string, error) { return f.model, f.err }
+
+func TestModelOrDefaultUsesTheSettingOnlyWhenNoModelWasNamed(t *testing.T) {
+	c := NewClient("http://x", 0).WithDefaultModel(fixedDefault{model: "zai-org/glm-5.3-flash"})
+	if got := c.modelOrDefault(context.Background(), ""); got != "zai-org/glm-5.3-flash" {
+		t.Errorf("an unnamed model must take the setting, got %q", got)
+	}
+	if got := c.modelOrDefault(context.Background(), "ollama"); got != "ollama" {
+		t.Errorf("a named model must stay, got %q", got)
+	}
+	broken := NewClient("http://x", 0).WithDefaultModel(fixedDefault{err: errors.New("db down")})
+	if got := broken.modelOrDefault(context.Background(), ""); got != "" {
+		t.Errorf("an unreadable setting must fall back to llm-service's default, got %q", got)
+	}
+	if got := NewClient("http://x", 0).modelOrDefault(context.Background(), ""); got != "" {
+		t.Errorf("without a setting source the model stays empty, got %q", got)
+	}
+}

@@ -23,6 +23,7 @@ import (
 	"authoring/internal/adapters/rendering"
 	"authoring/internal/application"
 	"authoring/internal/config"
+	"authoring/internal/domain"
 )
 
 func main() {
@@ -66,7 +67,9 @@ func main() {
 	llmUsageRepo := postgres.NewLLMUsageRepository(pool)
 	llmUsageRecorder := application.NewLLMUsageRecorder(llmUsageRepo, logger)
 
-	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient)
+	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient).WithModels(authoringRepo)
+	defaultModel := application.NewDefaultModelUseCase(authoringRepo)
+	llmClient.WithDefaultModel(authoringRepo)
 
 	if err := authoringRepo.SeedVideoArchetypes(ctx); err != nil {
 		logger.Warn("could not seed system video archetypes", "error", err)
@@ -100,9 +103,19 @@ func main() {
 	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(authoringRepo)
 	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo)
 
+	// The idea step's creative brief, the first kind of review unit; every
+	// review unit is read, edited, redone and approved through reviewUnits.
+	creativeBrief := application.NewCreativeBriefUseCase(
+		authoringRepo, authoringRepo, projects, projects, authoringRepo,
+		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
+		Register(domain.UnitKindBrief, creativeBrief)
+
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
 	// ONE renderer, shared by the Copy button and the generate endpoint.
-	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).WithArchetypes(authoringRepo)
+	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).
+		WithArchetypes(authoringRepo).
+		WithBrief(creativeBrief)
 	generateAuthoring := application.NewGenerateAuthoringUseCase(
 		renderPrompt, llmProvider, llmUsageRecorder,
 		renderContext,
@@ -138,8 +151,11 @@ func main() {
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
 		WithDefaultModel(cfg.HiveModel).
+		WithDefaultModelSetting(defaultModel).
 		WithUsageStats(llmUsageRepo).
-		WithGenerateAuthoring(generateAuthoring)
+		WithGenerateAuthoring(generateAuthoring).
+		WithReviewUnits(reviewUnits).
+		WithCreativeBrief(creativeBrief)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

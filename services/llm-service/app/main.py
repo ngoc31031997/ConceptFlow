@@ -56,6 +56,7 @@ class MetadataBody(BaseModel):
     script_content: str
     category_hint: str = ""
     language: str = "en"
+    model: str = ""  # "" = the light provider's default; "ollama" / "ollama/<m>" / a Hive id
     stream: bool = False  # emit `progress` events like /v1/chat
 
 
@@ -272,9 +273,11 @@ def create_app(
     @app.post("/v1/suggest-metadata")
     async def suggest_metadata(body: MetadataBody):
         async def run(on_progress=None):
+            # A named model picks its own provider; none keeps the light task's.
+            provider, model = providers.for_model(providers.hive, body.model) if body.model else (providers.light, "")
             out = await tasks.suggest_metadata(
-                providers.light, body.script_content, body.category_hint, body.language, on_progress)
-            return {**out.value, "usage": out.usage.to_dict(), "provider": providers.light.name}
+                provider, body.script_content, body.category_hint, body.language, on_progress, model)
+            return {**out.value, "usage": out.usage.to_dict(), "provider": provider.name}
 
         return await _suggestion(body.stream, run)
 
