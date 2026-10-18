@@ -127,7 +127,7 @@ class LayoutChecker:
 
     # -- đo --------------------------------------------------------------------
 
-    def measure(self, script: str, font: str = "") -> dict:
+    def measure(self, script: str, kit_key: str, font: str = "") -> dict:
         """Số đo của mọi shot (JSON của layout probe, version 1)."""
         with self._lock:
             deadline = time.monotonic() + self._timeout
@@ -135,7 +135,7 @@ class LayoutChecker:
                 self._start(deadline)
             assert self._proc is not None and self._proc.stdin is not None
             rid = uuid.uuid4().hex
-            msg: dict = {"id": rid, "code": _sanitize_script(script)}
+            msg: dict = {"id": rid, "code": _sanitize_script(script), "kit": kit_key}
             if font:
                 msg["font"] = font
             try:

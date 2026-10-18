@@ -87,6 +87,8 @@ class Shot(BaseModel):
     visual: str
     narration: str = ""
     lines: list[Line] = []
+    # A fast camera move (a hard pan, a rush in): the shot is drawn with motion blur.
+    motion_blur: bool = False
 
     @field_validator("id")
     @classmethod
@@ -122,6 +124,57 @@ class Shot(BaseModel):
         return [line.say.strip() for line in self.lines] if self.lines else [self.narration]
 
 
+FOCUS_LAYERS = ("sky", "far", "mid", "near", "figures")
+
+
+class Grade(BaseModel):
+    """Colour grade of a scene: each value in -1..1, 0 = none."""
+
+    model_config = ConfigDict(extra="ignore")
+    warmth: float = 0
+    contrast: float = 0
+    saturation: float = 0
+
+    @field_validator("warmth", "contrast", "saturation")
+    @classmethod
+    def _unit(cls, v: float) -> float:
+        if not -1 <= v <= 1:
+            raise ValueError("must be between -1 and 1")
+        return v
+
+
+class Light(BaseModel):
+    """The light of one scene: where the main source is, and the colours the
+    kit lights every form with. `color`, `ambient` and `atmosphere` are roles
+    of the storyboard's palette; the kit never picks a colour of its own."""
+
+    model_config = ConfigDict(extra="ignore")
+    source: str = ""
+    x: float
+    y: float
+    color: str
+    intensity: float
+    ambient: str
+    atmosphere: str
+    haze: float
+    focus: str = "figures"
+    grade: Grade = Grade()
+
+    @field_validator("x", "y", "intensity", "haze")
+    @classmethod
+    def _unit_range(cls, v: float) -> float:
+        if not 0 <= v <= 1:
+            raise ValueError("must be between 0 and 1")
+        return v
+
+    @field_validator("focus")
+    @classmethod
+    def _focus(cls, v: str) -> str:
+        if v not in FOCUS_LAYERS:
+            raise ValueError(f"focus must be one of {', '.join(FOCUS_LAYERS)}")
+        return v
+
+
 class Scene(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str
@@ -133,6 +186,8 @@ class Scene(BaseModel):
     # Empty for a storyboard written before the director was asked for it.
     setting: str = ""
     end_frame: str = ""
+    # Required: the scene's light, from which the code step builds the shots' looks.
+    light: Light
     shots: list[Shot]
 
 
@@ -194,6 +249,10 @@ def parse(content: str, frame: Frame = LANDSCAPE) -> Storyboard:
     for sc in sb.scenes:
         if not sc.shots:
             problems.append(f"scene {sc.id!r} has no shots")
+        for field_name in ("color", "ambient", "atmosphere"):
+            role = getattr(sc.light, field_name)
+            if role not in roles:
+                problems.append(f"scene {sc.id!r}: light.{field_name} {role!r} is not a role of the palette")
         for sh in sc.shots:
             if sh.id in seen:
                 problems.append(f"duplicate shot id {sh.id}")
@@ -241,6 +300,8 @@ def dumps(sb: Storyboard) -> str:
         for shot in scene["shots"]:
             if not shot.get("lines"):
                 shot.pop("lines", None)  # and for shots written before narration lines
+            if not shot.get("motion_blur"):
+                shot.pop("motion_blur", None)  # and for shots that never asked for motion blur
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
@@ -267,6 +328,10 @@ def to_prose(sb: Storyboard, frame: Frame = LANDSCAPE) -> str:
             lines.append(f"Không khí: {sc.mood}")
         if sc.setting:
             lines.append(f"Bối cảnh: {sc.setting}")
+        li = sc.light
+        lines.append(
+            f"Ánh sáng: {li.source or 'nguồn sáng chính'} ở ({li.x}, {li.y}), màu {li.color}, "
+            f"cường độ {li.intensity}; sáng phụ {li.ambient}; không khí {li.atmosphere} (mù {li.haze}); nét ở {li.focus}")
         lines.append("Các shot:")
         for sh in sc.shots:
             spoken = " / ".join(f'"{said}"' for said in sh.spoken_lines())

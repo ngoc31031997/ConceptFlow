@@ -3,16 +3,17 @@ import json
 import pytest
 
 from app import storyboard as sbm
+from tests.lights import light
 
 GOOD = {
     "hero": "Hình vuông",
     "palette": [{"role": "accent", "hex": "#f5b841", "meaning": "đang chú ý"}],
     "scenes": [
-        {"id": "beat-1", "title": "Mở", "invariant": "x", "transition_in": None, "mood": "tò mò",
+        {"id": "beat-1", "light": light("accent"), "title": "Mở", "invariant": "x", "transition_in": None, "mood": "tò mò",
          "end_frame": "hình vuông", "shots": [
              {"id": "1.1", "camera": "trung cảnh", "visual": "mọc lên", "narration": "Câu một."},
              {"id": "1.2", "camera": "đẩy vào", "visual": "đổi màu", "narration": "Câu hai."}]},
-        {"id": "beat-2", "shots": [{"id": "2.1", "visual": "v", "narration": "n"}]},
+        {"id": "beat-2", "light": light("accent"), "shots": [{"id": "2.1", "visual": "v", "narration": "n"}]},
     ],
 }
 

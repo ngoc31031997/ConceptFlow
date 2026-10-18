@@ -138,3 +138,20 @@
   background: var(--muted);
   border-radius: var(--radius);
 }
+
+.detailBar {
+  display: grid;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.detailChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.detailChips button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink, inherit);
+}

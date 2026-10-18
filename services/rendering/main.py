@@ -42,6 +42,8 @@ from adapters.rendering.typescript_checker import TypeScriptChecker
 from adapters.storage.artifact_paths import purge_project_artifacts
 from application.check_script import CheckScriptUseCase
 from application.preview_illustration import PreviewIllustrationUseCase
+from application.stills import StillsUseCase
+from domain.kits import load_kits, load_skeletons
 from application.render_script import RenderScriptUseCase
 from application.validate_script import ValidateScriptUseCase
 from domain import lottie_catalog
@@ -155,10 +157,14 @@ async def run() -> None:
         Path(__file__).parent / "remotion_project",
         timeout_seconds=int(os.environ.get("ILLUSTRATION_PREVIEW_TIMEOUT_SECONDS", "180")),
     )
+    remotion_dir = Path(__file__).parent / "remotion_project"
+    kits = load_kits(remotion_dir)
+    stills = StillsUseCase(previewer, kits, os.environ.get("STILLS_DIR", "/shared/stills"))
     check_server = uvicorn.Server(uvicorn.Config(
         create_check_app(
             check_use_case, concurrency=int(os.environ.get("CHECK_CONCURRENCY", "2")), metrics=check_metrics,
-            illustrations=PreviewIllustrationUseCase(typescript, previewer),
+            illustrations=PreviewIllustrationUseCase(typescript, previewer, kits, load_skeletons(remotion_dir)),
+            stills=stills, kits=kits,
         ),
         host="0.0.0.0", port=int(os.environ.get("CHECK_HTTP_PORT", "8000")), log_level="warning",
     ))

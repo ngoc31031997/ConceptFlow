@@ -15,8 +15,8 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // manual templates; a deliberate wording change updates the hash here.
 var goldenManualPrompts = map[PromptRole]string{
 	RoleStoryArchitect:   "e028974c32f756d5e356431cbe7fa77187d1306896dd31e1ccc4dfa5a9763bfa",
-	RoleVisualDirector:   "54cda71ec1f61c8c7a4edf5024999bbf1bb7fd941ca2f1c7c38e653226c7eb39",
-	RoleRemotionEngineer: "f3a2fa10f958f3729585b066e914b70be014489397d1128c00586d95b854affe",
+	RoleVisualDirector:   "b31b943ee977765e08067fab8ad2da5a5b93d23ef41a1f487bf956658dfcd675",
+	RoleRemotionEngineer: "e3e7ea34f3911a76a0d674ed97710a0e9aab4276a6d44140967033ac1e9fe785",
 }
 
 // Every scene declares its own background colour, bright unless the setting
@@ -63,6 +63,7 @@ func TestAIPromptsUseOnlyPlaceholdersTheRendererFills(t *testing.T) {
 	known := map[string]bool{
 		"topic": true, "previous_output": true, "narration_language_rule": true,
 		"channel_identity": true, "format_beats": true, "subtitle_zone": true, "video_archetypes": true,
+		"visual_language": true, "scene_rules": true,
 		"frame": true, "frame_width": true, "frame_height": true, "safe_area": true, "frame_rules": true,
 	}
 	for _, role := range []PromptRole{RoleVisualDirectorAI, RoleRemotionEngineerAI} {

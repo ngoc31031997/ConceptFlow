@@ -13,6 +13,7 @@ from adapters.rendering.illustration_previewer import IllustrationPreviewer
 from adapters.rendering.typescript_checker import TypeScriptChecker
 from domain.illustration_asset import validate_asset_code
 from domain.illustration_style import check_style
+from domain.kits import require_kit
 
 
 @dataclass
@@ -26,19 +27,29 @@ class IllustrationPreview:
 
 
 class PreviewIllustrationUseCase:
-    def __init__(self, typescript: TypeScriptChecker, previewer: IllustrationPreviewer) -> None:
+    def __init__(
+        self, typescript: TypeScriptChecker, previewer: IllustrationPreviewer, kits: dict[str, int],
+        skeletons: dict[str, dict[str, str | None]],
+    ) -> None:
         self._ts = typescript
         self._preview = previewer
+        self._kits = kits
+        self._skeletons = skeletons
 
     def run(
-        self, name: str, code: str = "", props: dict | None = None, gif: bool = True, kind: str = "figure",
+        self, kit_key: str, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        kind: str = "figure", tier: str = "support",
     ) -> IllustrationPreview:
-        """Kiểm tra rồi dựng một hình (`kind` "figure") hay một nền ("backdrop")."""
+        """Kiểm tra rồi dựng một hình (`kind` "figure") hay một nền ("backdrop") theo kit đã ghim.
+
+        `tier` là hạng của hình trong video này; luật số hình con và gradient theo hạng.
+        Thiếu hoặc sai `kit_key` thì ném UnknownKitError."""
+        require_kit(self._kits, kit_key)
         if code:
             issues = validate_asset_code(name, code)
             if issues:
                 return IllustrationPreview(False, [{"message": i.message, "line": i.line} for i in issues])
-            style_errors, style_warnings = check_style(code, kind)
+            style_errors, style_warnings = check_style(code, kind, tier, self._skeletons)
             warnings = [{"message": f.text(), "line": f.line} for f in style_warnings]
             if style_errors:
                 found = [{"message": f.text(), "line": f.line} for f in style_errors]
@@ -49,7 +60,7 @@ class PreviewIllustrationUseCase:
                 return IllustrationPreview(False, found)
         else:
             warnings = []  # hình có sẵn của bộ minh hoạ: đã duyệt tay
-        out = self._preview.preview(name, code, props, gif, kind)
+        out = self._preview.preview(kit_key, name, code, props, gif, kind)
         if not out.ok:
             return IllustrationPreview(False, [{"message": out.error, "line": None}], warnings=warnings)
         return IllustrationPreview(True, png=out.png, gif=out.gif, warnings=warnings)

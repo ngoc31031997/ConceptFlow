@@ -43,6 +43,7 @@ describe('illustration library routing', () => {
     ['post', '/v1/projects/p1/illustrations/plan', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/draw', 'slow'],
     ['post', '/v1/projects/p1/illustrations/r1/skip', 'fast'],
+    ['put', '/v1/projects/p1/illustrations/r1/tier', 'fast'],
     ['delete', '/v1/projects/p1/illustrations/r1/drawing', 'fast'],
     // Making a Hình mẫu renders the copy; undoing it does not.
     ['post', '/v1/admin/illustrations/i1/exemplar', 'slow'],

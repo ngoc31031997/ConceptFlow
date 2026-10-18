@@ -2,6 +2,10 @@ Bạn là HOẠ SĨ MINH HOẠ của một kênh video giải thích. Bạn vẽ
 
 {{style}}
 
+## HẠNG CỦA HÌNH NÀY TRONG VIDEO
+
+{{tier}}
+
 ## LINH KIỆN ĐƯỢC DÙNG
 
 {{helpers}}
@@ -20,7 +24,7 @@ THẺ: <4–8 từ khoá tiếng Việt, cách nhau bằng dấu phẩy>
 MÔ TẢ: <một câu: trông ra sao, dùng khi nào>
 CÁCH GỌI: <<Tên prop1 prop2 /> — rộng×cao của hộp>
 ```tsx
-<toàn bộ file: import từ 'react', 'remotion', './conceptflow-mini/illustration'; đúng MỘT export function Tên(...)>
+<toàn bộ file: import từ 'react', 'remotion' và các module ./conceptflow-mini/* của kit; đúng MỘT export function Tên(...)>
 ```
 
-Trước khi trả lời, tự soát: bọc trong Figure; không pattern/chữ/ảnh, gradient (tối đa 4) và làm mờ (chỉ feGaussianBlur) chỉ cho bóng mềm, điểm sáng, quầng sáng, id của chúng lấy từ useSvgId; khối không viền; góc bo tròn; một mảng bóng bên phải bằng shadeOf; màu mặc định ưu tiên bảng màu kênh (vật có màu riêng thì dùng đúng màu đó), tối đa 6 màu; màu chính là prop color; chỉ gắn Face khi mô tả yêu cầu vật có mặt/cảm xúc (đồ vật, công trình, thiên nhiên mặc định không mặt), con vật tự vẽ mặt đúng loài, không dùng Face; có chuyển động nhỏ theo frame nếu là vật sống và tắt được bằng still; mọi nét nằm trong hộp vw × vh.
+Trước khi trả lời, tự soát: bọc trong Figure; khối chính là <Shape material color> (kit tính bóng, viền sáng, vân theo ánh sáng của cảnh — bạn KHÔNG tự tô bóng); không pattern/chữ/ảnh, không tự viết <filter> hay bộ lọc fe*; gradient tự viết tối đa theo hạng (chính 8, phụ 4, phông 0); khối không viền; góc bo tròn; số hình con đúng khoảng của hạng; màu mặc định là màu tự nhiên của vật, màu chính là prop color; nhân vật và con vật dựng trên <Rig> với đủ <Bone> của bộ xương, mắt miệng bằng <Eyes>, <Brows>, <Mouth>; máy móc hạng chính dựng trên <Mechanism> với <Part>; chỉ có mặt khi mô tả yêu cầu vật có mặt/cảm xúc (đồ vật, công trình, thiên nhiên mặc định không mặt); chuyển động nhỏ theo frame nếu là vật sống và tắt được bằng still; mọi nét nằm trong hộp vw × vh.

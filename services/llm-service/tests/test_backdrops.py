@@ -6,6 +6,7 @@ import json
 from app import storyboard as sbm
 from app.pipeline import merger
 from app.pipeline.run import library_section
+from tests.lights import light
 
 LIBRARY = [
     {"name": "SchoolBus", "usage": "<SchoolBus color /> — 320×200", "description": "xe buýt", "code": "x"},
@@ -41,7 +42,7 @@ def test_no_backdrop_section_without_backdrops():
 
 def test_a_library_backdrop_used_by_a_scene_is_pasted_into_the_script():
     sb = sbm.parse(json.dumps({"hero": "h", "palette": [{"role": "a", "hex": "#000000"}],
-                               "scenes": [{"id": "s", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}]}))
+                               "scenes": [{"id": "s", "light": light("a"), "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}]}))
     shot = {"1.1": "function Shot1_1({duration}: ShotProps) {\n"
                    "  return <Scene duration={duration} backdrop={OrchardBackdrop} />;\n}"}
     library = {"OrchardBackdrop": "import React from 'react';\nexport function OrchardBackdrop() {\n  return null;\n}\n",
@@ -58,7 +59,7 @@ def _import_lines(code: str) -> list[str]:
 
 def test_a_pasted_drawing_brings_the_imports_the_frame_lacks_without_duplicates():
     sb = sbm.parse(json.dumps({"hero": "h", "palette": [{"role": "a", "hex": "#000000"}],
-                               "scenes": [{"id": "s", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}]}))
+                               "scenes": [{"id": "s", "light": light("a"), "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}]}))
     shot = {"1.1": "function Shot1_1({duration}: ShotProps) {\n"
                    "  return <Scene duration={duration} backdrop={StarBackdrop} />;\n}"}
     library = {"StarBackdrop": "import React from 'react';\n"

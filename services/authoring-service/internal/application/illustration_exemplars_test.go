@@ -30,7 +30,7 @@ func (f fakeProjectStatus) GetStatus(_ context.Context, id string) (domain.Proje
 
 func approvedBus(repo *fakeIllustrationRepo) domain.Illustration {
 	bus := domain.Illustration{ID: "bus", Name: "Bus", Title: "Xe buýt", FolderID: "phuong-tien", Code: busCode,
-		Usage: "<Bus color /> — 320×210", Status: domain.IllustrationApproved, Version: 3}
+		Usage: "<Bus color /> — 320×210", KitKey: domain.PhatsangKitKey, Status: domain.IllustrationApproved, Version: 3}
 	repo.rows[bus.ID] = bus
 	return bus
 }
@@ -42,7 +42,7 @@ func TestDeleteIsRefusedWhileAProjectBeforeTheResultUsesTheDrawing(t *testing.T)
 	repo.linked["bus"] = []string{"p-render", "p-done"}
 	projects := fakeProjectStatus{status: map[string]domain.ProjectStatus{
 		"p-render": domain.StatusRendering, "p-done": domain.StatusPublished}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(projects)
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(projects)
 
 	err := uc.Delete(context.Background(), "bus")
 	var inUse *IllustrationInUseError
@@ -63,7 +63,7 @@ func TestDeleteGoesThroughWhenEveryUserIsDoneOrGone(t *testing.T) {
 	repo.users["bus"] = []IllustrationUser{{ProjectID: "p-done"}, {ProjectID: "p-gone"}}
 	repo.linked["bus"] = []string{"p-done", "p-gone"}
 	projects := fakeProjectStatus{status: map[string]domain.ProjectStatus{"p-done": domain.StatusReadyToPublish}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(projects)
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(projects)
 	if err := uc.Delete(context.Background(), "bus"); err != nil {
 		t.Fatal(err)
 	}
@@ -77,8 +77,8 @@ func TestDeleteRefusesWhenTheUsageCannotBeChecked(t *testing.T) {
 	approvedBus(repo)
 	repo.users["bus"] = []IllustrationUser{{ProjectID: "p1"}}
 	for name, uc := range map[string]*IllustrationsUseCase{
-		"orchestrator down": NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(fakeProjectStatus{fail: true}),
-		"not wired":         NewIllustrationsUseCase(repo, &fakeRenderer{}),
+		"orchestrator down": NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(fakeProjectStatus{fail: true}),
+		"not wired":         NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()),
 	} {
 		if err := uc.Delete(context.Background(), "bus"); !errors.Is(err, ErrIllustrationUsageUnknown) {
 			t.Errorf("%s: want usage-unknown, got %v", name, err)
@@ -93,7 +93,7 @@ func TestDeleteRefusesAProjectThatLinkedTheDrawingAfterTheCheck(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	approvedBus(repo)
 	repo.linked["bus"] = []string{"p-new"} // linked, but not found by the usage query the first time round
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(fakeProjectStatus{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(fakeProjectStatus{})
 	if err := uc.Delete(context.Background(), "bus"); !errors.Is(err, ErrIllustrationUsageUnknown) {
 		t.Fatalf("want a refusal, got %v", err)
 	}
@@ -106,7 +106,7 @@ func TestKitAndExemplarsCannotBeDeletedEditedOrReReviewed(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	repo.rows["ex"] = domain.Illustration{ID: "ex", Name: "Cat", FolderID: domain.ExemplarFolderID, Exemplar: true,
 		HomeFolderID: "dong-vat", Code: "export function Cat() {}", Status: domain.IllustrationApproved}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(fakeProjectStatus{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(fakeProjectStatus{})
 	ctx := context.Background()
 	for _, id := range []string{"builtin-Tooth", "ex"} {
 		if err := uc.Delete(ctx, id); !errors.Is(err, ErrIllustrationReadOnly) {
@@ -124,7 +124,7 @@ func TestKitAndExemplarsCannotBeDeletedEditedOrReReviewed(t *testing.T) {
 func TestNothingIsSavedIntoTheExemplarFolderByHand(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	bus := approvedBus(repo)
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	if _, err := uc.Create(ctx, domain.Illustration{Name: "Van", FolderID: domain.ExemplarFolderID, Code: busCode}); !errors.Is(err, ErrExemplarFolder) {
 		t.Fatalf("create: %v", err)
@@ -137,7 +137,7 @@ func TestNothingIsSavedIntoTheExemplarFolderByHand(t *testing.T) {
 func TestMakeExemplarCopiesUnderANewNameAndRendersIt(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
 	bus := approvedBus(repo)
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	cp, err := uc.MakeExemplar(context.Background(), bus.ID)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestMakeExemplarCopiesUnderANewNameAndRendersIt(t *testing.T) {
 
 func TestMakeExemplarRefusesDraftsKitAndAFullFolder(t *testing.T) {
 	repo := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	repo.rows["draft"] = domain.Illustration{ID: "draft", Name: "Van", FolderID: "phuong-tien", Code: busCode, Status: domain.IllustrationDraft}
 	for _, id := range []string{"draft", "builtin-Tooth"} {
@@ -192,7 +192,7 @@ func TestUnmakeDeletesACopyAndFilesAnOriginalBack(t *testing.T) {
 	bus := approvedBus(repo)
 	repo.rows["cat"] = domain.Illustration{ID: "cat", Name: "Cat", FolderID: domain.ExemplarFolderID, Exemplar: true,
 		HomeFolderID: "dong-vat", Code: "export function Cat() {}", Status: domain.IllustrationApproved}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithProjectStatus(fakeProjectStatus{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithProjectStatus(fakeProjectStatus{})
 	ctx := context.Background()
 	cp, err := uc.MakeExemplar(ctx, bus.ID)
 	if err != nil {
@@ -219,9 +219,9 @@ func TestUnmakeDeletesACopyAndFilesAnOriginalBack(t *testing.T) {
 func TestUnmakeACopyAVideoStillUsesIsRefused(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	repo.rows["cp"] = domain.Illustration{ID: "cp", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true,
-		SourceID: "bus", Code: busCode, Status: domain.IllustrationApproved}
+		SourceID: "bus", Code: busCode, KitKey: domain.PhatsangKitKey, Status: domain.IllustrationApproved}
 	repo.users["cp"] = []IllustrationUser{{ProjectID: "p1", Topic: "Xe"}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).
 		WithProjectStatus(fakeProjectStatus{status: map[string]domain.ProjectStatus{"p1": domain.StatusDraft}})
 	if _, err := uc.UnmakeExemplar(context.Background(), "cp"); !errors.Is(err, ErrIllustrationInUse) {
 		t.Fatalf("want in-use, got %v", err)

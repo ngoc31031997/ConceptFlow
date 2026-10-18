@@ -19,6 +19,7 @@ Mount tại `/shared` (`/shared:ro` với publisher).
 | `/shared/{project_id}/music/` | api-gateway | upload của Creator |
 | `/shared/channel-assets/{kind}/{quality}/normalized.mp4`, `with_music_v{n}.mp4` | video-assembly | không thuộc project nào |
 | `/shared/channel-assets/{kind}/…` (file upload gốc) | api-gateway | không thuộc project nào |
+| `/shared/stills/{hash}.png` | rendering | ảnh mẫu của ngôn ngữ hình, tên theo hash nội dung; `POST /v1/stills/prune` dọn ảnh không còn ai trỏ tới; api-gateway phát qua `/v1/stills/{file}` |
 
 Publisher chỉ đọc.
 

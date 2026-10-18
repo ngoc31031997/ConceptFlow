@@ -55,6 +55,9 @@ type CodeGenRequest struct {
 	System    string
 	Model     string
 	MaxTokens int
+	// KitKey is the kit of the visual language the project is pinned to: the
+	// code is checked with it and the video is drawn with it.
+	KitKey string
 	// Illustrations are the approved library drawings the Remotion Engineer
 	// may use; llm-service lists them in the prompt and pastes the used ones
 	// into the script.

@@ -1,17 +1,20 @@
 import json
 import re
 
+import pytest
+
 from app import storyboard as sbm
 from app.pipeline import merger
+from tests.lights import light
 
 SB = sbm.parse(json.dumps({
     "hero": "h",
     "palette": [{"role": "màu nhấn", "hex": "#F5B841", "meaning": "chú ý"},
                 {"role": "Đã xong", "hex": "#4A5670", "meaning": "chìm"}],
     "scenes": [
-        {"id": "hook", "shots": [{"id": "1.1", "visual": "v", "narration": 'Câu "một".'},
+        {"id": "hook", "light": light("màu nhấn"), "shots": [{"id": "1.1", "visual": "v", "narration": 'Câu "một".'},
                                   {"id": "1.2", "visual": "v", "narration": "Câu hai."}]},
-        {"id": "recap", "shots": [{"id": "2.1", "visual": "v", "narration": "Câu ba."}]},
+        {"id": "recap", "light": light("màu nhấn"), "shots": [{"id": "2.1", "visual": "v", "narration": "Câu ba."}]},
     ],
 }))
 TSX = {i: f"// Shot {i}\nfunction {merger.remotion_fn(i)}({{duration}}: ShotProps) {{\n  return null;\n}}" for i in ("1.1", "1.2", "2.1")}
@@ -28,7 +31,7 @@ def test_palette_keys_keep_the_camel_case_a_role_already_has():
         "hero": "h",
         "palette": [{"role": r, "hex": "#000000", "meaning": "m"}
                     for r in ("conNguoi", "NenPanel", "RED", "vàng khao khát", "3d glow", "màu NHẤN")],
-        "scenes": [{"id": "s", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}],
+        "scenes": [{"id": "s", "light": light("conNguoi"), "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}],
     }))
     assert list(merger.palette_keys(sb).values()) == [
         "conNguoi", "nenPanel", "red", "vangKhaoKhat", "c3dGlow", "mauNhan"]
@@ -111,3 +114,35 @@ def test_frame_names_cover_every_import_of_the_head():
     assert imported <= names, f"the head imports names frame_names() lacks: {sorted(imported - names)}"
     assert {"useCurrentFrame", "PALETTE", "LAYOUT", "clamp"} <= names
     assert "useCurrentFrameSafe" not in names
+
+
+def test_looks_are_built_from_the_scene_light_and_only_use_palette_entries():
+    text = merger.looks_text(SB)
+    assert text.startswith("const LOOKS: Record<string, Look> = {")
+    assert "scene1: {light: {x: 0.7, y: 0.2, color: PALETTE.mauNhan, intensity: 0.8}" in text
+    assert "scene2:" in text  # shot 2.1 belongs to the second scene
+    assert "ambient: PALETTE.mauNhan" in text and "atmosphere: {color: PALETTE.mauNhan, density: 0.3}" in text
+    assert "grade: {warmth: 0.1, contrast: 0, saturation: 0}" in text
+
+
+def test_the_merged_script_declares_the_looks_after_the_layout():
+    shots = {
+        sh.id: f"function {merger.remotion_fn(sh.id)}({{duration}}: ShotProps) {{ return null; }}"
+        for _, sh in SB.all_shots()
+    }
+    merged = merger.merge_remotion(SB, "const LAYOUT = {};", shots)
+    assert merged.code.index("const LAYOUT") < merged.code.index("const LOOKS")
+
+
+def test_a_light_that_names_a_role_outside_the_palette_is_refused():
+    doc = json.loads(sbm.dumps(SB))
+    doc["scenes"][0]["light"]["color"] = "ghost"
+    with pytest.raises(sbm.StoryboardError, match="light.color 'ghost'"):
+        sbm.parse(json.dumps(doc))
+
+
+def test_a_scene_without_light_is_refused():
+    doc = json.loads(sbm.dumps(SB))
+    del doc["scenes"][0]["light"]
+    with pytest.raises(sbm.StoryboardError, match="light"):
+        sbm.parse(json.dumps(doc))

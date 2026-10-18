@@ -93,7 +93,8 @@ func main() {
 	handleStepEvent := application.NewHandleStepEventUseCase(projectRepo, outboxRepo, realPublisher, channelAssetPointers, logger).
 		WithQCReports(qcReportRepo).
 		WithErrorLog(projectRepo).
-		WithAuthoringCleanup(authoringClient)
+		WithAuthoringCleanup(authoringClient).
+		WithKitKeys(authoringClient)
 	retryStep := application.NewRetryStepUseCase(projectRepo, outboxRepo)
 	// Cancel goes straight to the broker (a fanout to every worker), not through
 	// the outbox: it must reach a worker that is busy right now, and there is no

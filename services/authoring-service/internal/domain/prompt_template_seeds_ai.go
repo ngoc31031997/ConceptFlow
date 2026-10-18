@@ -36,11 +36,21 @@ Cấu trúc:
       "transition_in": "<hình nào của cảnh trước trở thành gì ở cảnh này, bằng kiểu chuyển cảnh nào>",
       "mood": "<cảm xúc và nhịp của cảnh>",
       "setting": "<bối cảnh kín khung: nơi chốn; lớp xa / lớp giữa / lớp gần mờ; nguồn sáng; tông màu chủ đạo theo vai trò trong palette>",
+      "light": {
+        "source": "<nguồn sáng chính là gì: nắng chiều qua tán lá, đèn bàn, lõi phát quang của tế bào>",
+        "x": <0 đến 1, vị trí ngang trong khung>, "y": <0 đến 1, vị trí dọc>,
+        "color": "<tên vai trò trong palette: màu của nguồn sáng>", "intensity": <0 đến 1>,
+        "ambient": "<tên vai trò trong palette: màu ánh sáng phụ, cũng là màu của bóng>",
+        "atmosphere": "<tên vai trò trong palette: màu không khí>", "haze": <0 đến 1, độ dày không khí>,
+        "focus": "<sky | far | mid | near | figures: lớp được lấy nét>",
+        "grade": {"warmth": <-0.3 đến 0.3>, "contrast": <-0.3 đến 0.3>, "saturation": <-0.3 đến 0.3>}
+      },
       "end_frame": "<hình còn lại trên màn hình khi cảnh kết thúc — cũng là điểm khởi đầu của cảnh sau>",
       "shots": [
         {
           "id": "<n.m>",
           "camera": "<cỡ cảnh + chuyển động máy>",
+          "motion_blur": <true chỉ khi máy chạy rất nhanh (lia mạnh, lao vào); nếu không thì bỏ trường này>,
           "visual": "<nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp>",
           "lines": [
             {"say": "<một câu hoặc một vế thoại, tối đa 20 từ>", "show": "<thay đổi NHÌN THẤY ĐƯỢC trong lúc câu này được đọc>"}
@@ -56,7 +66,8 @@ Cấu trúc:
 
 Quy tắc của cấu trúc:
 - Đúng một trong hai: điền "hero" (và "world": null) HOẶC điền "world" (và "hero": null) khi chủ đề không có vật biến đổi tự nhiên.
-- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Mỗi cảnh có đúng một vai trò màu nền (sáng, bão hoà, trừ khi bối cảnh ghi lý do phải tối); không có nền mặc định.
+- "palette": mỗi vai trò một mục, tên vai trò không trùng nhau, "hex" đúng dạng #RRGGBB (6 chữ số hex). Mỗi cảnh có đúng một vai trò màu nền (màu theo thực tế của nơi chốn và chủ đề, sáng hay tối do nơi chốn quyết định); không có nền mặc định.
+- "light" là BẮT BUỘC ở mọi cảnh; "color", "ambient", "atmosphere" phải là tên vai trò có trong "palette".
 - Trong "visual" gọi màu bằng TÊN VAI TRÒ đã khai báo trong "palette", không phát minh màu mới giữa chừng.
 - "id" của shot có dạng "<số cảnh>.<số thứ tự shot>" (ví dụ "1.1", "1.2", "2.1"), duy nhất trong toàn phim, đánh số theo thứ tự xuất hiện. Số shot do lượng thay đổi hình quyết định, không thêm cho đủ số.
 - "lines": lời thoại của shot, chia theo CÂU ĐỌC — 1 đến 4 câu mỗi shot, mỗi "say" là một câu hoặc một vế (tối đa 20 từ, đọc không quá khoảng 4 giây), nối các "say" lại là đúng lời thoại của shot. Mỗi câu được đọc thành một đoạn tiếng riêng và hình biết chính xác lúc câu bắt đầu, nên "show" của câu là MỘT thay đổi cụ thể bắt đầu đúng lúc câu đó được đọc: vật vào/ra, biến hình, tách đôi, nhân lên, đếm, xếp lại, đổi màu theo nghĩa, bàn tay cầm/rút/chỉ/đếm ngón, nhân vật đổi dáng, máy đẩy vào một chi tiết. Không "show" nào chỉ là "vẫn hiển thị", "giữ nguyên". Ưu tiên ẩn dụ bằng đồ vật đời thường, con số và bàn tay người cận cảnh thay cho sơ đồ.
@@ -82,7 +93,7 @@ const visualDirectorTailAIVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi
 12. Mỗi câu (tối đa khoảng 4 giây) có một thay đổi hình có nghĩa chưa (trừ khoảnh khắc aha)? Ý trừu tượng đã được kể bằng đồ vật, con số hay bàn tay cụ thể chưa? Hook có frame đầu đang chuyển động (không phải thẻ tiêu đề) không? Cảnh cuối có quay lại hình cảnh 1 với nghĩa mới không? Có hình nào nằm ngoài vật liệu dựng tốt (3D, hạt/khói, ảnh chụp, cử động phức tạp) không?
 13. Tắt tiếng và chỉ nhìn "visual" và các "show" từng shot: có shot nào mà lời thoại nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng "visual" lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 14. Mỗi vật cụ thể lần đầu xuất hiện trong "visual" đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
-14b. Mỗi cảnh đã có "setting" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) chưa? Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động, vật chính ≥ 40% chiều khung (trừ toàn cảnh) chưa? (luật 20)
+14b. Mỗi cảnh đã có "setting" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) và "light" chưa? Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động, vật chính ≥ 40% chiều khung (trừ toàn cảnh) chưa? (luật 20)
 15. Mọi vật xuất hiện ở từ hai shot trở lên đã có mục trong "layout" chưa, và cả vật có nằm trong vùng an toàn, ngoài vùng phụ đề không?
 16. JSON có hợp lệ 100% không: đủ ngoặc, không dấu phẩy thừa cuối danh sách, không bị cắt cụt, không có chữ nào ngoài đối tượng JSON, id shot không trùng?
 
@@ -114,7 +125,7 @@ const remoAAIVI = `## A. BÁM KỊCH BẢN — DỊCH TỪNG SHOT, KHÔNG SÁNG 
 2. **"visual" dựng đúng như chữ:** đúng vật được nêu, vị trí tương đối, thứ tự xuất hiện, kiểu chuyển động (mọc lên, trượt vào từ hướng nào, tách đôi, gộp lại...), nhịp. KHÔNG thêm vật trang trí, hiệu ứng, icon, nền hoạ tiết kịch bản không nói tới; KHÔNG bỏ vật nào kịch bản có.
 2b. **"lines":** mỗi câu thoại có một "show" — thay đổi đó bắt đầu đúng lúc câu được đọc, tức trong 12 frame đầu kể từ ¤lines[i]¤ (mục D), và xong trước câu sau. Không câu nào trôi qua mà hình đứng nguyên.
 3. **"camera":** toàn/trung/cận cảnh và đẩy vào/kéo ra/lia máy → prop ¤camera¤ của ¤<Scene>¤ (hoặc ¤<Camera>¤ khi không có Scene) — luật L8. "Máy đứng yên" vẫn cho máy trôi rất chậm (zoom 1 → 1.04), trừ khi kịch bản nói rõ khung phải đứng im.
-3b. **"scene_setting":** bối cảnh của cảnh (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) → các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤, ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤; mọi shot của cùng một cảnh dựng cùng một bối cảnh.
+3b. **"scene_setting":** bối cảnh của cảnh (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) → các lớp ¤sky¤/¤far¤/¤mid¤/¤near¤ của ¤<Scene>¤, ánh sáng bằng ¤<Glow>¤/¤<LightRays>¤; mọi shot của cùng một cảnh dựng cùng một bối cảnh. Mọi shot bọc TOÀN BỘ hình trong ¤<Shot look={LOOKS.sceneN}>¤ (N là số đứng trước dấu chấm của id shot; ¤LOOKS¤ đã có sẵn, dựng từ "light" của cảnh) và gọi hình qua kit — màu ánh sáng, bóng và viền sáng do kit tính, không tự vẽ; shot có "motion_blur": true thì thêm ¤motionBlur¤ vào ¤<Shot>¤.
 4. **"scene_transition_in":** biến hình / đi xuyên qua / kéo ra → frame 0 của shot đầu cảnh PHẢI vẽ lại y hệt hình cuối của shot trước (cùng toạ độ, kích thước, màu — từ cùng mục ¤LAYOUT¤), rồi nội suy sang hình mới. Chỉ "cắt thẳng" mới được bắt đầu từ khung trống. Tin nhắn của người dùng cho biết shot ngay trước lô bạn viết — dùng nó để nối.
 5. **"scene_end_frame":** hình ghi ở đó phải còn trên màn hình ở frame cuối của shot cuối cảnh.
 6. **"scene_invariant":** chi tiết không dựng được chính xác bằng JSX/SVG/CSS thì chọn cách gần nhất vẫn giữ nguyên ý nghĩa bất biến của cảnh.

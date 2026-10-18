@@ -29,6 +29,12 @@ import * as Lottie from '../conceptflow-mini/lottie';
 import * as SceneKit from '../conceptflow-mini/scene';
 import * as Backdrops from '../conceptflow-mini/backdrops';
 import * as Rig from '../conceptflow-mini/rig';
+import * as Kits from '../conceptflow-mini/kits';
+import * as Film from '../conceptflow-mini/film';
+import * as Material from '../conceptflow-mini/material';
+import * as Procedural from '../conceptflow-mini/procedural';
+import * as ShaderKit from '../conceptflow-mini/shader';
+import * as Skeleton from '../conceptflow-mini/skeleton';
 
 type Rect = {x: number; y: number; w: number; h: number};
 
@@ -71,11 +77,14 @@ type Sample = {
 
 // Kit parts that render inside an <svg> (a <g>, an <ellipse>): wrapping them in
 // a <div> would break the drawing, so they stay unlabelled.
-const SVG_PARTS = new Set(['Face', 'GroundShadow']);
+const SVG_PARTS = new Set([
+  'GroundShadow', 'Shape', 'Rig', 'Bone', 'Mechanism', 'Part', 'Eyes', 'Brows', 'Mouth', 'FigureFrameProvider',
+  'Ridges', 'Hills', 'Dunes', 'Canopy', 'Grass', 'Clouds', 'Stars', 'Rocks', 'Coral', 'Waves', 'Cells', 'Particles',
+]);
 // Frame-wide parts: the camera, the depth layers and the light. They are the
 // stage the figures stand on, not a figure, so they get no box of their own;
 // what they draw carries `data-cf-layer` and is skipped when measuring.
-const STAGE_PARTS = new Set(['Scene', 'Camera', 'Glow', 'LightRays', 'Vignette']);
+const STAGE_PARTS = new Set(['Scene', 'Camera', 'Glow', 'LightRays', 'Vignette', 'Shot', 'LookProvider', 'ShaderLayer']);
 // Regions of the frame: a backdrop and a split-screen panel. Their colour
 // carries `data-cf-layer`; what a panel holds is measured on its own.
 const REGION_PARTS = new Set(['Backdrop', 'Panel']);
@@ -128,6 +137,12 @@ const MODULES: Record<string, unknown> = {
   './conceptflow-mini/scene': esm(tagModule(SceneKit as unknown as Record<string, unknown>)),
   './conceptflow-mini/backdrops': esm(tagModule(Backdrops as unknown as Record<string, unknown>)),
   './conceptflow-mini/rig': esm(tagModule(Rig as unknown as Record<string, unknown>)),
+  './conceptflow-mini/kits': esm(Kits),
+  './conceptflow-mini/film': esm(tagModule(Film as unknown as Record<string, unknown>)),
+  './conceptflow-mini/material': esm(tagModule(Material as unknown as Record<string, unknown>)),
+  './conceptflow-mini/procedural': esm(tagModule(Procedural as unknown as Record<string, unknown>)),
+  './conceptflow-mini/shader': esm(tagModule(ShaderKit as unknown as Record<string, unknown>)),
+  './conceptflow-mini/skeleton': esm(tagModule(Skeleton as unknown as Record<string, unknown>)),
 };
 
 type Loaded = {

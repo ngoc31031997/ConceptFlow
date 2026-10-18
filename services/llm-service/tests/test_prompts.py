@@ -5,12 +5,13 @@ import json
 
 from app import storyboard as sbm
 from app.pipeline import merger, prompts
+from tests.lights import light
 
 
 def _sb(**top):
     doc = {
         "palette": [{"role": "accent", "hex": "#F5B841", "meaning": "đang chú ý"}],
-        "scenes": [{"id": "hook", "shots": [
+        "scenes": [{"id": "hook", "light": light("accent"), "shots": [
             {"id": "1.1", "visual": "v1", "narration": "Câu một."},
             {"id": "1.2", "visual": "v2", "narration": "Câu hai."},
             {"id": "1.3", "visual": "v3", "narration": "Câu ba."},
@@ -43,7 +44,7 @@ def test_chunk_turn_lists_the_palette_key_the_storyboard_uses():
     sb = sbm.parse(json.dumps({
         "hero": "Khối mô hình",
         "palette": [{"role": "conNguoi", "hex": "#F5B841", "meaning": "con người"}],
-        "scenes": [{"id": "hook", "shots": [
+        "scenes": [{"id": "hook", "light": light("conNguoi"), "shots": [
             {"id": "1.1", "visual": "thẻ màu conNguoi", "narration": "Câu một."}]}],
     }))
     turn = prompts.remotion_chunk(sb, "const LAYOUT = {};", ["1.1"], None, None)
@@ -65,7 +66,11 @@ def test_chunk_turn_lists_every_name_the_frame_imports():
     for line in merger._REMOTION_HEAD.splitlines():
         if line.startswith("import {"):
             head_names.update(n.strip() for n in line[len("import {"):line.index("}")].split(","))
-    shot_names = head_names - set(merger.ILLUSTRATION_HELPERS) - set(merger.SCENE_HELPERS) \
+    helpers = (
+        merger.ILLUSTRATION_HELPERS + merger.SCENE_HELPERS + merger.FILM_HELPERS + merger.MATERIAL_HELPERS
+        + merger.PROCEDURAL_HELPERS + merger.SHADER_HELPERS + merger.SKELETON_HELPERS
+    )
+    shot_names = head_names - set(helpers) \
         - {"registerRoot", "Composition", "calculateMetadataFromSegments", "Segments"}
     for name in sorted(shot_names):
         assert f" {name}" in listed, f"{name} is imported by the frame but not listed in the chunk turn"

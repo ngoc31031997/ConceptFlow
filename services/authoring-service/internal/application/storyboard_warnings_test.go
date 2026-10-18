@@ -37,7 +37,7 @@ func storyboardWarningsFixture(t *testing.T, engine domain.RenderEngine, formats
 		newRenderer("Chủ đề: {{topic}}", renderCtx),
 		&stubProvider{content: "raw"}, nil, renderCtx, nil,
 		&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
-	)
+	).WithLanguages(testLanguagePort())
 	uc.WithPipeline(&stubFinalizer{out: warnedStoryboard}, &stubCodegen{})
 	if formats != nil {
 		// An uncalibrated voice: the 140 wpm Vietnamese default applies.

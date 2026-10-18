@@ -9,6 +9,7 @@ import { IllustrationEditor } from "../components/IllustrationEditor";
 import { IllustrationBackupCard } from "../components/IllustrationBackupCard";
 import {
   createIllustrationFolder,
+  DETAIL_LABEL,
   deleteIllustration,
   deleteIllustrationFolder,
   drawIllustration,
@@ -20,6 +21,7 @@ import {
   rerenderIllustration,
   setIllustrationStatus,
   unmakeExemplar,
+  type DetailLevel,
   type Illustration,
   type IllustrationFolder,
   type IllustrationInput,
@@ -29,6 +31,8 @@ import glass from "../styles/glass.module.css";
 import styles from "./IllustrationLibraryPage.module.css";
 
 const ALL = "";
+
+const DETAIL_LEVELS: DetailLevel[] = ["rich", "medium", "silhouette"];
 const NEW = "new";
 
 /**
@@ -62,6 +66,9 @@ export function IllustrationLibraryPage() {
   const [aiModel, setAiModel] = useLibraryAiModel();
   const [drawFolder, setDrawFolder] = useState("");
   const [drawing, setDrawing] = useState(false);
+  // How much detail the AI draws with, and which detail level the grid shows.
+  const [drawDetail, setDrawDetail] = useState<DetailLevel>("medium");
+  const [detailFilter, setDetailFilter] = useState<DetailLevel | typeof ALL>(ALL);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const reload = useCallback(async () => {
@@ -120,7 +127,7 @@ export function IllustrationLibraryPage() {
     setDrawing(true);
     setStatus(null);
     try {
-      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget, model: aiModel || undefined });
+      const made = await drawIllustration({ description: drawText.trim(), folder_id: drawTarget, model: aiModel || undefined, detail_level: drawDetail });
       setItems((list) => [...list, made]);
       setDrawText("");
       setDrawOpen(false);
@@ -151,9 +158,11 @@ export function IllustrationLibraryPage() {
   const visible = items.filter(
     (i) =>
       (folder === ALL || i.folder_id === folder) &&
+      (detailFilter === ALL || i.detail_level === detailFilter) &&
       (q === "" || [i.name, i.title, i.description, ...i.tags].some((s) => s.toLowerCase().includes(q))),
   );
   const pending = items.filter((i) => !i.builtin && i.status === "draft").length;
+  const detailCount = (level: DetailLevel) => items.filter((i) => i.detail_level === level).length;
   const opened = openId === NEW ? null : items.find((i) => i.id === openId) ?? null;
 
   const replace = (saved: Illustration) =>
@@ -366,6 +375,18 @@ export function IllustrationLibraryPage() {
                     data-testid="illustration-draw-folder"
                   />
                 </FormField>
+                <FormField label="Mức chi tiết" className={glass.mtSm}>
+                  <Dropdown
+                    value={drawDetail}
+                    options={[
+                      { value: "rich", label: "Kỹ", hint: "Như vật chính: 80–400 hình con, chia bộ phận. Dùng được cho mọi hạng." },
+                      { value: "medium", label: "Vừa", hint: "Như vật phụ: 20–80 hình con. Dùng được cho hạng phụ và phông." },
+                      { value: "silhouette", label: "Bóng", hint: "Như phông: một khối rõ dáng. Chỉ dùng làm phông." },
+                    ]}
+                    onChange={(v) => setDrawDetail(v as DetailLevel)}
+                    data-testid="illustration-draw-detail"
+                  />
+                </FormField>
                 <AiModelField label="Model AI vẽ hình" value={aiModel} onChange={setAiModel} disabled={drawing} testId="illustration-draw-model" />
                 <CtaRow helperText={drawing ? "AI đang vẽ và tự kiểm tra — thường mất 1–3 phút." : undefined}>
                   <Button onClick={draw} disabled={drawing || drawText.trim() === ""} data-testid="illustration-draw-button">
@@ -400,6 +421,28 @@ export function IllustrationLibraryPage() {
                 />
               </div>
             )}
+            <div className={styles.detailBar} data-testid="illustration-detail-filter">
+              <p className={glass.cardHint}>
+                Mỗi hình ghi mức chi tiết nó được vẽ: Kỹ, Vừa hoặc Bóng. Hình Kỹ dùng được cho mọi hạng, hình Vừa cho hạng Phụ và
+                Phông, hình Bóng chỉ cho Phông; video cần nó làm vai chính thì AI vẽ bản kỹ hơn.
+              </p>
+              <span className={styles.detailChips} role="group" aria-label="Lọc theo mức chi tiết">
+                <Button variant="ghost" aria-pressed={detailFilter === ALL} onClick={() => setDetailFilter(ALL)} data-testid="detail-filter-all">
+                  Tất cả · {items.length}
+                </Button>
+                {DETAIL_LEVELS.map((level) => (
+                  <Button
+                    key={level}
+                    variant="ghost"
+                    aria-pressed={detailFilter === level}
+                    onClick={() => setDetailFilter(level)}
+                    data-testid={`detail-filter-${level}`}
+                  >
+                    {DETAIL_LABEL[level]} · {detailCount(level)}
+                  </Button>
+                ))}
+              </span>
+            </div>
             <ul className={`${styles.grid} ${glass.mtSm}`} data-testid="illustration-grid">
               {visible.map((ill) => (
                 <IllustrationTile

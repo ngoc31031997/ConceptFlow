@@ -3538,3 +3538,6 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Impact Assessment**: build lại web-gui, api-gateway, authoring-service, orchestrator, llm-service. Bảng `project_authoring` thêm `brief_model`, `publish_model`; bảng mới `app_settings`.
 **Context**: CONSTRUCTION — CR-072-U3a, Creator yêu cầu đưa lên main.
 ---
+
+## CR-072-U1 — Code xong, chờ duyệt (2026-10-18)
+Đã làm nhóm A–I: kit `phatsang`, store ngôn ngữ hình, hạng/mức chi tiết, trang Cài đặt, hợp đồng/ADR. Dịch vụ đã rebuild và healthy. Chưa kiểm: WebGL trong container, chạy AI thật, duyệt chất lượng hình (B7), `purge-legacy-data.sh --legacy-kit` (script chưa có trên main). Test hợp đồng shared-artifacts đỏ từ CR-071 (`clip_output_path`).

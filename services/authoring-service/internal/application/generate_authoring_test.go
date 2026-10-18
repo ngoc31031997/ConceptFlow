@@ -88,7 +88,7 @@ func newGenerateFixture(t *testing.T, provider *stubProvider, story *recordingSa
 		provider, nil, renderCtx, nil,
 		story, storyboard, &contentSaver{},
 		maxInputChars, 16000,
-	)
+	).WithLanguages(testLanguagePort())
 	return uc, storyboard
 }
 
@@ -215,7 +215,7 @@ func TestGenerateAuthoringSecondConcurrentCallIsBusy(t *testing.T) {
 }
 
 func TestGenerateAuthoringWithoutProviderIsNotConfigured(t *testing.T) {
-	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, nil, 0, 0)
+	uc := application.NewGenerateAuthoringUseCase(nil, nil, nil, nil, nil, nil, nil, nil, 0, 0).WithLanguages(testLanguagePort())
 	if uc.Available() {
 		t.Error("Available() = true with no provider")
 	}

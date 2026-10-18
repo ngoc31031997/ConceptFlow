@@ -236,6 +236,69 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS target_duration TEXT NOT 
 -- outline written from an older brief (or before any brief) is known to be
 -- stale. '' = no approved brief at the time.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_brief_sha TEXT NOT NULL DEFAULT '';
+-- The visual languages of the channel: the kit that paints the forms
+-- (kit_key) and the rule texts, versioned. Exactly one language is active; a
+-- project pins one (id, version) when its authoring row is created.
+CREATE TABLE IF NOT EXISTS visual_languages (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    note        TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    kit_key     TEXT NOT NULL,
+    is_system   BOOLEAN NOT NULL DEFAULT false,
+    is_active   BOOLEAN NOT NULL DEFAULT false,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS visual_languages_one_active ON visual_languages ((true)) WHERE is_active;
+CREATE UNIQUE INDEX IF NOT EXISTS visual_languages_name_key ON visual_languages (lower(name));
+-- Append-only: editing a language's rules adds a version, never rewrites one.
+CREATE TABLE IF NOT EXISTS visual_language_versions (
+    language_id        TEXT NOT NULL REFERENCES visual_languages(id) ON DELETE CASCADE,
+    version            INTEGER NOT NULL,
+    illustration_rules TEXT NOT NULL,
+    backdrop_rules     TEXT NOT NULL,
+    scene_rules        TEXT NOT NULL,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (language_id, version)
+);
+-- Sample scenes of a kit, rendered by the rendering service into its shared
+-- stills directory; kit_version says which version of the kit drew them.
+CREATE TABLE IF NOT EXISTS visual_language_samples (
+    kit_key     TEXT NOT NULL,
+    scene       TEXT NOT NULL,
+    frame       TEXT NOT NULL,
+    kit_version INTEGER NOT NULL,
+    file        TEXT NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (kit_key, scene, frame)
+);
+-- The language version a project is pinned to (NULL = not pinned: its drawing,
+-- check and render steps refuse to run).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS visual_language_id TEXT REFERENCES visual_languages(id);
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS visual_language_version INTEGER;
+-- Pins the active language the moment a project's authoring row is created, on
+-- whichever path creates it.
+CREATE OR REPLACE FUNCTION pin_visual_language() RETURNS trigger AS $$
+BEGIN
+    IF NEW.visual_language_id IS NULL THEN
+        SELECT l.id, (SELECT max(version) FROM visual_language_versions WHERE language_id = l.id)
+          INTO NEW.visual_language_id, NEW.visual_language_version
+          FROM visual_languages l WHERE l.is_active;
+    END IF;
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS project_authoring_pin_language ON project_authoring;
+CREATE TRIGGER project_authoring_pin_language BEFORE INSERT ON project_authoring
+    FOR EACH ROW EXECUTE FUNCTION pin_visual_language();
+-- The kit a library drawing was drawn for, and how much detail it has
+-- (rich / medium / silhouette: the tier it was first drawn as).
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS kit_key TEXT NOT NULL DEFAULT '';
+ALTER TABLE illustrations ADD COLUMN IF NOT EXISTS detail_level TEXT NOT NULL DEFAULT 'medium';
+-- The role of a drawing in this video (hero / support / background) and the
+-- AI's one-line reason for it.
+ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier TEXT NOT NULL DEFAULT 'support';
+ALTER TABLE project_illustrations ADD COLUMN IF NOT EXISTS tier_reason TEXT NOT NULL DEFAULT '';
 -- Colours outside the channel palette (S9) are not a warning; drop any such
 -- stored warnings so no drawing shows them.
 UPDATE illustrations SET warnings = COALESCE((

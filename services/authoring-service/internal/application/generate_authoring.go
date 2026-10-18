@@ -48,6 +48,9 @@ type GenerateAuthoringUseCase struct {
 	codegen   CodePipelinePort
 	// segments stores the code step segment by segment (see ADR-0030).
 	segments CodeSegmentPort
+	// languages supplies the visual language a project is pinned to, whose kit
+	// the code step draws and checks with.
+	languages LanguagePort
 	// formats/calibration feed the post-1b narration length check;
 	// see WithStoryboardChecks. Nil formats = no length check.
 	formats     FormatLookupPort

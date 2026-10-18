@@ -48,6 +48,9 @@ class ScriptRenderRequest:
     # `videoFont` input prop (conceptflow-mini's useVideoFont). None leaves
     # conceptflow-mini on its own default.
     video_font: str | None = None
+    # Visual language (kit) the project is pinned to, handed to the composition as
+    # the `kitKey` input prop. Required: a render without it is refused.
+    kit_key: str | None = None
 
     def __post_init__(self) -> None:
         # A browser clipboard on macOS hands out Vietnamese diacritics

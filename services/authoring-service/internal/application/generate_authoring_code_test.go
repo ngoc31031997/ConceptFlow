@@ -115,7 +115,7 @@ func codeFixture(t *testing.T, engine domain.RenderEngine, storyboard string) (
 		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 		application.NewLLMUsageRecorder(usage, nil), renderCtx, nil,
 		&recordingSaver{}, sb, code, 0, 16000,
-	).WithSegments(newFakeSegments())
+	).WithLanguages(testLanguagePort()).WithSegments(newFakeSegments())
 	return uc, sb, code, usage
 }
 
@@ -128,7 +128,7 @@ func TestStoryboardStepSavesTheCanonicalJSONAndBillsTheRepairTurn(t *testing.T) 
 		provider, application.NewLLMUsageRecorder(usage, nil), &fakeRenderContext{project: &domain.Project{
 			ProjectID: "p1", RenderEngine: domain.RenderEngineRemotion}}, nil,
 		&recordingSaver{}, sb, &contentSaver{}, 0, 16000,
-	).WithPipeline(&stubFinalizer{out: "{canonical}", repaired: true,
+	).WithLanguages(testLanguagePort()).WithPipeline(&stubFinalizer{out: "{canonical}", repaired: true,
 		usage: application.TokenUsage{Model: "m", PromptTokens: 7, CompletionTokens: 3}}, &stubCodegen{})
 
 	got, err := uc.Execute(context.Background(), "p1", "storyboard")
@@ -236,7 +236,7 @@ func TestCodeStepHandsTheSubtitleBandAndFontToTheLayoutCheck(t *testing.T) {
 			newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 			application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, nil,
 			&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
-		).WithPipeline(&stubFinalizer{}, gen).WithSegments(newFakeSegments())
+		).WithLanguages(testLanguagePort()).WithPipeline(&stubFinalizer{}, gen).WithSegments(newFakeSegments())
 		if _, err := uc.Execute(context.Background(), p.ProjectID, "code"); err != nil {
 			t.Fatalf("Execute: %v", err)
 		}
@@ -542,7 +542,7 @@ func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
 		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 		application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, fixedModels{Code: "ollama"},
 		&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
-	).WithPipeline(&stubFinalizer{}, gen)
+	).WithLanguages(testLanguagePort()).WithPipeline(&stubFinalizer{}, gen)
 	_, err := uc.Execute(context.Background(), "p1", "code")
 	var notForCode *application.ErrModelNotForCode
 	if !errors.As(err, &notForCode) || gen.calls != 0 {

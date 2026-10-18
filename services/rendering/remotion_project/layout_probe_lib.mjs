@@ -173,7 +173,7 @@ export async function launchBrowser(explicit) {
     throw new ProbeError('browser', `browser not found at ${executablePath}`);
   }
   try {
-    return await chromium.launch({executablePath, headless: true, args: ['--disable-dev-shm-usage']});
+    return await chromium.launch({executablePath, headless: true, args: ['--disable-dev-shm-usage', '--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader']});
   } catch (err) {
     throw new ProbeError('browser', `could not start Chromium: ${String(err?.message ?? err).split('\n')[0]}`);
   }
@@ -223,7 +223,7 @@ const firstLine = (err) => String(err?.message ?? err).split('\n')[0].slice(0, 1
  * each script a fresh page so nothing a script leaves on `window` reaches the
  * next one). Returns the probe JSON (version 1, see the T6a findings, §7).
  *
- * opts: {duration, pcts, font}
+ * opts: {duration, pcts, font, kit}
  */
 export async function probe(page, logs, source, opts) {
   const t = {};
@@ -233,7 +233,8 @@ export async function probe(page, logs, source, opts) {
   const table = shotTable(source);
 
   t0 = performance.now();
-  const inputProps = opts.font ? {videoFont: opts.font} : {};
+  if (!opts.kit) throw new ProbeError('load', 'thiếu kitKey: project chưa ghim ngôn ngữ hình');
+  const inputProps = {kitKey: opts.kit, ...(opts.font ? {videoFont: opts.font} : {})};
   let info;
   try {
     info = await page.evaluate(([code, props]) => window.cfProbe.load(code, props), [js, inputProps]);

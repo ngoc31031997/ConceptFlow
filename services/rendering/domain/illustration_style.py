@@ -1,17 +1,14 @@
 """Bộ kiểm tra style cho hình của thư viện minh hoạ.
 
-Luật đầy đủ là vai trò `illustration_style` trong thư viện prompt của
-authoring-service (bản hệ thống là authoring-service/.../prompts/illustration_style_vi.txt);
-mã [S..] ở đây là mã luật trong văn bản đó. Vi phạm làm hỏng style của cả kênh
-(gradient, filter, ảnh, chữ, ngẫu nhiên theo đồng hồ) là LỖI và chặn lưu; phần
-còn lại là CẢNH BÁO — Creator quyết định. Màu ngoài bảng
-màu kênh (S9) không bị kiểm tra.
+Luật đầy đủ là văn bản luật vẽ hình của ngôn ngữ hình đang ghim (authoring-service);
+mã [S..], [B..], [R..], [M..], [T..] ở đây là mã luật trong văn bản đó. Vi phạm làm
+hỏng lối vẽ chung (chữ, ảnh, bộ lọc tự viết, ngẫu nhiên theo đồng hồ, thiếu xương
+của rig) là LỖI và chặn lưu; phần còn lại là CẢNH BÁO — Creator quyết định. Màu
+không bị kiểm tra: màu đến từ bảng màu của video.
 
-Gradient (`linearGradient`, `radialGradient`) và làm mờ (`feGaussianBlur` trong
-`<filter>`) được dùng cho bóng mềm, điểm sáng và quầng sáng; mọi bộ lọc `fe*`
-khác vẫn là lỗi. Id của gradient/filter phải sinh bằng `useSvgId()` (S25): một
-id viết cứng bị trùng khi cùng một hình xuất hiện hai lần trên một khung, và
-hình thứ hai tô theo gradient của hình thứ nhất.
+Bộ lọc `fe*` và `<filter>` do kit lo (vật liệu, bóng, hạt, quầng sáng), hình không
+tự viết. Số hình con và số gradient tự viết giới hạn theo HẠNG của hình trong video
+này: chính (`hero`), phụ (`support`), phông (`background`).
 
 Kiểm tra trên mã nguồn TSX, không trên ảnh: rẻ, tất định, và chỉ được đúng dòng.
 """
@@ -22,15 +19,21 @@ import re
 from dataclasses import dataclass
 
 ERROR_TAGS = {"pattern": "S1", "image": "S1", "text": "S1", "foreignObject": "S1"}
-# The one filter primitive a drawing may use: a soft blur for a glow.
-ALLOWED_FILTER_PRIMITIVES = {"feGaussianBlur"}
 GRADIENT_TAGS = {"linearGradient", "radialGradient"}
-ID_TAGS = GRADIENT_TAGS | {"filter", "clipPath", "mask"}
-MAX_GRADIENTS = 4
+ID_TAGS = GRADIENT_TAGS | {"clipPath", "mask"}
 FORBIDDEN_CALLS = {"Math.random(": "S22", "Date.now(": "S22", "setTimeout(": "S22", "setInterval(": "S22"}
 
 TAG_RE = re.compile(r"<([A-Za-z][\w.]*)\b([^<>]*?)/?>", re.S)
-SHAPES = {"rect", "circle", "ellipse", "path", "polygon"}
+RAW_SHAPES = {"rect", "circle", "ellipse", "path", "polygon"}
+
+HERO, SUPPORT, BACKGROUND = "hero", "support", "background"
+TIERS = (HERO, SUPPORT, BACKGROUND)
+#: Hạng -> (số hình con tối thiểu, tối đa) trước khi cảnh báo S4.
+SHAPE_RANGE = {HERO: (80, 400), SUPPORT: (20, 80), BACKGROUND: (3, 15)}
+#: Hạng -> số gradient tự viết tối đa trước khi báo lỗi.
+MAX_GRADIENTS = {HERO: 8, SUPPORT: 4, BACKGROUND: 0}
+#: Từ số khối thô này trở lên mà không có <Shape> nào thì cảnh báo M1.
+RAW_SHAPES_WITHOUT_MATERIAL = 3
 
 
 @dataclass(frozen=True)
@@ -55,15 +58,22 @@ def _attr(attrs: str, name: str) -> str | None:
 BACKDROP = "backdrop"
 
 
-def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], list[StyleFinding]]:
+def check_style(
+    code: str, kind: str = "figure", tier: str = SUPPORT, skeletons: dict[str, dict[str, str | None]] | None = None,
+) -> tuple[list[StyleFinding], list[StyleFinding]]:
     """(lỗi, cảnh báo) của một hình (`kind` "figure") hay một nền ("backdrop").
+
+    `tier` là hạng của hình trong video này. `skeletons` là bảng bộ xương của kit
+    (domain.kits.load_skeletons); có thì kiểm rig thiếu xương (R1).
 
     Nền theo luật B..: vẽ kín khung theo `useLayerBox()`/`useVideoConfig()`
     thay vì bọc trong Figure, nhận prop `layer`, không có mặt người."""
+    if tier not in TIERS:
+        raise ValueError(f"hạng {tier!r} không hợp lệ ({', '.join(TIERS)})")
     errors: list[StyleFinding] = []
     warnings: list[StyleFinding] = []
 
-    shapes = 0
+    raw_shapes = 0
     gradients = 0
     for m in TAG_RE.finditer(code):
         tag, attrs = m.group(1), m.group(2)
@@ -72,8 +82,8 @@ def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], li
             msg = f"không dùng <{tag}> — hình không có hoạ tiết, chữ hay ảnh"
             errors.append(StyleFinding(ERROR_TAGS[tag], msg, line))
             continue
-        if tag.startswith("fe") and tag not in ALLOWED_FILTER_PRIMITIVES:
-            msg = f"không dùng <{tag}> — bộ lọc duy nhất được dùng là feGaussianBlur (quầng sáng)"
+        if tag == "filter" or (tag.startswith("fe") and tag[2:3].isupper()):
+            msg = f"không tự viết <{tag}> — bóng, hạt, quầng sáng do kit tính qua <Shape material>"
             errors.append(StyleFinding("S1", msg, line))
             continue
         if tag in GRADIENT_TAGS:
@@ -81,9 +91,9 @@ def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], li
         if tag in ID_TAGS and re.search(r"\bid\s*=\s*['\"]", attrs):
             msg = f"<{tag}> có id viết cứng — dùng id={{useSvgId('...')}} để hai bản của hình không trùng id"
             warnings.append(StyleFinding("S25", msg, line))
-        if tag not in SHAPES:
+        if tag not in RAW_SHAPES:
             continue
-        shapes += 1
+        raw_shapes += 1
         fill, stroke = _attr(attrs, "fill"), _attr(attrs, "stroke")
         if stroke and fill and fill != "none":
             warnings.append(StyleFinding("S2", f"<{tag}> vừa tô màu vừa có viền — khối không có viền", line))
@@ -107,25 +117,64 @@ def check_style(code: str, kind: str = "figure") -> tuple[list[StyleFinding], li
         errors.append(StyleFinding("S16",
             "hình phải bọc trong <Figure {...fig} size vw vh> để đặt theo x, y, size"))
 
-    if gradients > MAX_GRADIENTS:
-        warnings.append(StyleFinding(
-            "S1", f"{gradients} gradient — tối đa {MAX_GRADIENTS}, phần còn lại tô màu phẳng"))
-    if shapes > 60:
-        warnings.append(StyleFinding("S4", f"{shapes} hình con — quá chi tiết (nên 5–25)"))
+    limit = MAX_GRADIENTS[tier]
+    if gradients > limit:
+        errors.append(StyleFinding(
+            "S1", f"{gradients} gradient tự viết — hạng {tier} tối đa {limit}; ánh sáng do kit tính, tô màu phẳng"))
 
-    # Bảng màu kênh (S9) và số màu gốc (S10) chỉ là gợi ý cho AI vẽ, không kiểm tra:
-    # hình minh hoạ được dùng màu của chính vật.
+    shapes = raw_shapes + len(re.findall(r"<Shape\b", code))
+    low, high = SHAPE_RANGE[tier]
+    if kind != BACKDROP and not low <= shapes <= high:
+        warnings.append(StyleFinding(
+            "S4", f"{shapes} hình con — hạng {tier} nên có {low}–{high}"))
+
     black_fill = re.search(r"fill\s*=\s*['\"{]*['\"]#0{6}['\"]", code)
     if black_fill and not re.search(r"#000000['\"][^>]*opacity", code):
-        warnings.append(StyleFinding("S11", "đen thuần làm mảng màu — dùng INK hoặc bóng opacity thấp"))
+        warnings.append(StyleFinding("S11", "đen thuần làm mảng màu — dùng màu tối của vật hoặc bóng opacity thấp"))
 
     if kind != BACKDROP and "color" not in re.split(r"\)\s*\{", code, maxsplit=1)[0]:
         warnings.append(StyleFinding("S12", "màu chính không đổi được qua prop color"))
-    if "<Face" in code and "useCurrentFrame" not in code:
-        warnings.append(StyleFinding("S19", "hình có mặt nhưng không có chuyển động tự thân nào"))
     if "useCurrentFrame" in code and "still" not in code:
         warnings.append(StyleFinding("S20", "chuyển động không tắt được bằng prop still"))
+
+    if kind != BACKDROP:
+        warnings += _material_warnings(code, raw_shapes)
+        if tier == HERO and not re.search(r"<(Part|Bone|Rig|Mechanism)\b", code):
+            warnings.append(StyleFinding(
+                "T1", "hình hạng chính nên chia bộ phận: <Part> trong <Mechanism>, hoặc <Bone> trong <Rig>"))
+        if skeletons is not None:
+            errors += _rig_errors(code, skeletons)
     return errors, warnings
+
+
+def _material_warnings(code: str, raw_shapes: int) -> list[StyleFinding]:
+    if raw_shapes >= RAW_SHAPES_WITHOUT_MATERIAL and "<Shape" not in code:
+        return [StyleFinding("M1", "khối lớn nên là <Shape material=...> để kit tính ánh sáng, bóng và viền sáng")]
+    return []
+
+
+RIG_RE = re.compile(r"<Rig\b([^<>]*?)>", re.S)
+BONE_RE = re.compile(r"<Bone\b[^<>]*?\bname\s*=\s*(?:\"([^\"]+)\"|'([^']+)'|\{\s*['\"]([^'\"]+)['\"]\s*\})", re.S)
+
+
+def _rig_errors(code: str, skeletons: dict[str, dict[str, str | None]]) -> list[StyleFinding]:
+    """R1: một <Rig> phải khai báo đủ xương của bộ xương nó chọn."""
+    errors: list[StyleFinding] = []
+    for m in RIG_RE.finditer(code):
+        skeleton = _attr(m.group(1), "skeleton")
+        line = _line(code, m.start())
+        if skeleton is None:
+            errors.append(StyleFinding("R1", "<Rig> thiếu prop skeleton", line))
+            continue
+        if skeleton not in skeletons:
+            errors.append(StyleFinding(
+                "R1", f"bộ xương {skeleton!r} không có (có: {', '.join(sorted(skeletons))})", line))
+            continue
+        declared = {a or b or c for a, b, c in BONE_RE.findall(code)}
+        missing = [bone for bone in skeletons[skeleton] if bone not in declared]
+        if missing:
+            errors.append(StyleFinding("R1", f"rig {skeleton} thiếu xương: {', '.join(missing)}", line))
+    return errors
 
 
 def _backdrop_errors(code: str) -> list[StyleFinding]:
@@ -139,7 +188,9 @@ def _backdrop_errors(code: str) -> list[StyleFinding]:
         errors.append(StyleFinding(
             "B2",
             "nền phải vẽ kín khung theo useLayerBox() hoặc useVideoConfig(), không theo kích thước cố định"))
-    idx = code.find("<Face")
-    if idx >= 0:
-        errors.append(StyleFinding("B5", "nền là nơi chốn, không có mặt người", _line(code, idx)))
+    for face in ("<Eyes", "<Mouth", "<Brows"):
+        idx = code.find(face)
+        if idx >= 0:
+            errors.append(StyleFinding("B5", "nền là nơi chốn, không có mặt người", _line(code, idx)))
+            break
     return errors

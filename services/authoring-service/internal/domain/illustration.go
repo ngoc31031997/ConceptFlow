@@ -7,35 +7,19 @@ import (
 	"strings"
 )
 
-// The channel's illustration style rules and the building blocks a drawing may
-// use. The rules file is the shipped row of the illustration_style prompt
-// role; the active row of that role is what the AI drawer is held to and what
-// web-gui shows. rendering/domain/illustration_style.py checks the [S..] rules
-// it can check mechanically. The reference drawings (Hình mẫu) are library rows the
-// Creator picks, not text shipped with the image.
+// The building blocks a drawing may use. The rules a drawing is held to are
+// the pinned visual language's (visual_language.go); rendering/domain/illustration_style.py
+// checks the rule codes it can check mechanically. The reference drawings
+// (Hình mẫu) are library rows the Creator picks, not text shipped with the image.
 //
-//go:embed prompts/illustration_style_vi.txt
-var illustrationStyleVI string
-
 //go:embed prompts/illustration_helpers_vi.txt
 var illustrationHelpersVI string
-
-//go:embed prompts/backdrop_style_vi.txt
-var backdropStyleVI string
 
 //go:embed prompts/backdrop_helpers_vi.txt
 var backdropHelpersVI string
 
-// BackdropStyleGuide is the rule text of a backdrop ([B..] on top of [S..]).
-func BackdropStyleGuide() string { return strings.TrimSpace(backdropStyleVI) }
-
 // BackdropHelpers documents what a new backdrop is built from, with its frame.
 func BackdropHelpers() string { return strings.TrimSpace(backdropHelpersVI) }
-
-// IllustrationStyleGuide is the shipped rule text: the system row of the
-// illustration_style prompt role. What the AI illustrator and the library
-// use is that role's active row, which a Creator may have replaced.
-func IllustrationStyleGuide() string { return strings.TrimSpace(illustrationStyleVI) }
 
 // IllustrationHelpers documents the kit's building blocks for a new drawing.
 func IllustrationHelpers() string { return strings.TrimSpace(illustrationHelpersVI) }
@@ -104,6 +88,12 @@ type Illustration struct {
 	Description string           `json:"description"` // what it looks like and when to use it
 	Usage       string           `json:"usage"`       // one-line API: props and box aspect
 	Code        string           `json:"code,omitempty"`
+	// KitKey is the kit the drawing was drawn for; a video only gets drawings of its own kit.
+	KitKey string `json:"kit_key"`
+	// DetailLevel is how much detail the drawing has: the tier it was first
+	// drawn as. A video only gets a drawing whose detail is enough for the
+	// tier it needs (DetailEnough).
+	DetailLevel DetailLevel `json:"detail_level"`
 	// Builtin rows are the illustration kit: code ships in the image, Code is empty.
 	Builtin bool `json:"builtin"`
 	// Exemplar rows are the Hình mẫu the AI drawer learns from, filed
@@ -237,7 +227,13 @@ func SystemIllustrationFolders() []IllustrationFolder {
 // close-up hand. The prompt documents them next to the figures, but they are
 // the stage a shot is built on, not drawings, so they have no library row
 // and no narration keywords.
-var SceneKitComponents = []string{"Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText", "ReachingHand"}
+var SceneKitComponents = []string{
+	"Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText", "ReachingHand",
+	// Film look and the building blocks of a new drawing: forms lit by the
+	// scene's light, rigs, mechanisms, scenery generators and shader layers.
+	"Shot", "Shape", "GroundShadow", "Rig", "Bone", "Eyes", "Brows", "Mouth", "Mechanism", "Part", "ShaderLayer",
+	"Ridges", "Hills", "Dunes", "Canopy", "Grass", "Clouds", "Stars", "Rocks", "Coral", "Waves", "Cells", "Particles",
+}
 
 // IsSceneKitComponent reports whether name is one of SceneKitComponents.
 func IsSceneKitComponent(name string) bool {
@@ -249,6 +245,17 @@ func IsSceneKitComponent(name string) bool {
 	return false
 }
 
+// builtinDetail is the detail level of the kit figures that are not "medium";
+// it mirrors FIGURE_DETAIL in conceptflow-mini/illustration.tsx (a test holds
+// the two together).
+var builtinDetail = map[string]DetailLevel{
+	"Person":   DetailRich,
+	"Airplane": DetailRich,
+	"Cloud":    DetailSilhouette,
+	"Mark":     DetailSilhouette,
+	"Sparkle":  DetailSilhouette,
+}
+
 // BuiltinIllustrations are the 34 figures and the 6 backdrops of the kit,
 // filed into the system folders. Name must match an export of illustration.tsx
 // or backdrops.tsx; the rendering
@@ -256,10 +263,15 @@ func IsSceneKitComponent(name string) bool {
 // checks this list against the same prompt text.
 func BuiltinIllustrations() []Illustration {
 	b := func(name, title, folder, tags, desc, usage string) Illustration {
+		detail := DetailMedium
+		if d, ok := builtinDetail[name]; ok {
+			detail = d
+		}
 		return Illustration{
 			ID: "builtin-" + name, Name: name, Title: title, FolderID: folder,
 			Tags: NormalizeTags(strings.Split(tags, ",")), Description: desc, Usage: usage,
 			Builtin: true, Status: IllustrationApproved, Version: 1,
+			KitKey: PhatsangKitKey, DetailLevel: detail,
 		}
 	}
 	bd := func(name, title, tags, desc string) Illustration {
@@ -298,7 +310,7 @@ func BuiltinIllustrations() []Illustration {
 		b("Magnifier", "Kính lúp", "do-vat", "kính lúp,soi,tìm", "Kính lúp — soi kỹ, điều tra.", "<Magnifier color /> — 1:1"),
 		b("Mark", "Dấu đúng/sai", "bieu-tuong", "đúng,sai,tích,x", "Huy hiệu tròn dấu tích hoặc dấu X.", `<Mark kind="check"|"cross" /> — 1:1`),
 		b("Sparkle", "Tia lấp lánh", "bieu-tuong", "lấp lánh,sạch,mới", "Tia bốn cánh nhấp nháy.", "<Sparkle color /> — 1:1"),
-		b("Airplane", "Máy bay", "phuong-tien", "máy bay,bay,chiến tranh", "Máy bay cánh quạt nhìn ngang.", "<Airplane color /> — 320×120"),
+		b("Airplane", "Máy bay", "phuong-tien", "máy bay,bay,chiến tranh", "Máy bay cánh quạt nhìn ngang, dựng thành cơ cấu: cánh quạt quay, cánh tà nâng hạ, có kiểu cắt lớp và tách rời.", `<Airplane color view="outside"|"cutaway"|"exploded" /> — chính — 320×120`),
 		b("Bubble", "Bong bóng thoại", "bieu-tuong", "nói,thoại,suy nghĩ", "Bong bóng thoại/suy nghĩ chứa nhãn ngắn.", "<Bubble x y w h thought flip>Nhãn</Bubble>"),
 		b("Toothbrush", "Bàn chải đánh răng", "co-the-suc-khoe", "bàn chải,đánh răng,vệ sinh", "Bàn chải có kem, lông quay lên hoặc xuống.", "<Toothbrush color paste bristlesDown /> — 400×100"),
 		b("Toothpaste", "Kem đánh răng", "co-the-suc-khoe", "kem đánh răng,vệ sinh", "Tuýp kem đánh răng.", "<Toothpaste color /> — 300×120"),

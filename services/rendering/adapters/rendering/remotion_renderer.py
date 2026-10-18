@@ -225,7 +225,9 @@ class RemotionScriptRenderer(ScriptRendererPort):
             with open(entry_path, "w", encoding="utf-8") as f:
                 f.write(_sanitize_script(request.script_content))
             with open(props_path, "w", encoding="utf-8") as f:
-                props: dict = {"segments": segments}
+                if not request.kit_key:
+                    raise AnimationEngineError("project chưa ghim ngôn ngữ hình: render_scenes thiếu kit_key")
+                props: dict = {"segments": segments, "kitKey": request.kit_key}
                 if request.video_font:
                     props["videoFont"] = request.video_font
                 json.dump(props, f)

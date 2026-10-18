@@ -127,8 +127,15 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		}
 	}
 
+	languageName, sceneRules, err := uc.languageSections(ctx, in.ProjectID, effective.TemplateText)
+	if err != nil {
+		return RenderedPrompt{}, err
+	}
+
 	frame := domain.FrameFor(domain.VideoOutputMode(in.VideoOutputMode))
 	pairs := []string{
+		"{{visual_language}}", languageName,
+		"{{scene_rules}}", sceneRules,
 		"{{topic}}", topic,
 		"{{script}}", script,
 		"{{previous_output}}", previous,

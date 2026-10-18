@@ -97,14 +97,15 @@ class IllustrationPreviewer:
                 return reply
 
     def preview(
-        self, name: str, code: str = "", props: dict | None = None, gif: bool = True, kind: str = "figure",
+        self, kit_key: str, name: str, code: str = "", props: dict | None = None, gif: bool = True,
+        kind: str = "figure",
     ) -> PreviewResult:
         with self._lock:
             if self._proc is None or self._proc.poll() is not None:
                 self._start()
             assert self._proc is not None and self._proc.stdin is not None
             rid = uuid.uuid4().hex
-            msg = {"id": rid, "name": name, "props": props or {}, "gif": gif, "kind": kind}
+            msg = {"id": rid, "kit_key": kit_key, "name": name, "props": props or {}, "gif": gif, "kind": kind}
             if code:
                 msg["code"] = code
             try:
@@ -117,3 +118,24 @@ class IllustrationPreviewer:
         if reply.get("ok"):
             return PreviewResult(True, png=reply.get("png", ""), gif=reply.get("gif", ""))
         return PreviewResult(False, error=str(reply.get("error", "lỗi không rõ")))
+
+    def still(self, kit_key: str, composition: str, output: str, frame: int = 10, props: dict | None = None) -> None:
+        """Dựng một khung của composition mẫu `composition` ra file `output` (PNG)."""
+        with self._lock:
+            if self._proc is None or self._proc.poll() is not None:
+                self._start()
+            assert self._proc is not None and self._proc.stdin is not None
+            rid = uuid.uuid4().hex
+            msg = {
+                "id": rid, "op": "still", "kit_key": kit_key, "composition": composition,
+                "frame": frame, "props": props or {}, "output": output,
+            }
+            try:
+                self._proc.stdin.write(json.dumps(msg) + "\n")
+                self._proc.stdin.flush()
+            except OSError as exc:
+                self._stop()
+                raise IllustrationPreviewError(f"bộ dựng xem trước không nhận input: {exc}") from exc
+            reply = self._await(lambda r: r.get("id") == rid)
+        if not reply.get("ok"):
+            raise IllustrationPreviewError(str(reply.get("error", "lỗi không rõ")))

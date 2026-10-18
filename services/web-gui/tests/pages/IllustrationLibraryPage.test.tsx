@@ -150,7 +150,7 @@ describe("IllustrationLibraryPage", () => {
     expect(screen.getByTestId("illustration-draw-button")).toBeDisabled();
     fireEvent.change(screen.getByTestId("illustration-draw-text"), { target: { value: "xe máy đỏ" } });
     fireEvent.click(screen.getByTestId("illustration-draw-button"));
-    await waitFor(() => expect(draw).toHaveBeenCalledWith({ description: "xe máy đỏ", folder_id: "co-the-suc-khoe" }));
+    await waitFor(() => expect(draw).toHaveBeenCalledWith({ description: "xe máy đỏ", folder_id: "co-the-suc-khoe", detail_level: "medium" }));
     expect(await screen.findByTestId("illustration-tile-Motorbike")).toBeInTheDocument();
     expect(screen.getByTestId("illustration-editor")).toHaveTextContent("Sửa: Xe máy");
   });

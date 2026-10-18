@@ -163,7 +163,7 @@ func segmentFixture(t *testing.T, engine domain.RenderEngine, storyboard string)
 		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 		application.NewLLMUsageRecorder(usage, nil), renderCtx, nil,
 		&recordingSaver{}, &contentSaver{}, code, 0, 16000,
-	).WithSegments(store)
+	).WithLanguages(testLanguagePort()).WithSegments(store)
 	return uc, store, usage, code
 }
 

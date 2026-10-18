@@ -174,13 +174,39 @@ func (uc *ProjectIllustrationsUseCase) setProgress(rowID string, p domain.DrawPr
 	}
 }
 
+// plannedReuse is one library drawing the planner wants for the video, at the
+// tier it plays there. The planner may write a bare name; the tier is then
+// the supporting one.
+type plannedReuse struct {
+	Name   string `json:"name"`
+	Tier   string `json:"tier"`
+	Reason string `json:"reason"`
+}
+
+func (r *plannedReuse) UnmarshalJSON(b []byte) error {
+	var name string
+	if err := json.Unmarshal(b, &name); err == nil {
+		*r = plannedReuse{Name: name}
+		return nil
+	}
+	type plain plannedReuse
+	var p plain
+	if err := json.Unmarshal(b, &p); err != nil {
+		return err
+	}
+	*r = plannedReuse(p)
+	return nil
+}
+
 type plannedReply struct {
-	Reuse []string `json:"reuse"`
+	Reuse []plannedReuse `json:"reuse"`
 	Draw  []struct {
 		Name        string   `json:"name"`
 		Description string   `json:"description"`
 		FolderID    string   `json:"folder_id"`
 		Shots       []string `json:"shots"`
+		Tier        string   `json:"tier"`
+		Reason      string   `json:"reason"`
 	} `json:"draw"`
 	// Backdrops is one place per scene: a library backdrop to reuse, or a
 	// new one to draw.
@@ -258,6 +284,41 @@ func backdropRows(plan plannedReply, storyboard string, library map[string]domai
 	return rows
 }
 
+var tierSuffixes = []string{"Hero", "Support", "Background"}
+
+// nameForTier is the component name of the version of a drawing made for
+// tier: the base name with the tier appended (Bee -> BeeHero), replacing a
+// tier it already ends with.
+func nameForTier(name string, tier domain.Tier) string {
+	for _, s := range tierSuffixes {
+		if strings.HasSuffix(name, s) && len(name) > len(s) {
+			name = strings.TrimSuffix(name, s)
+			break
+		}
+	}
+	return name + strings.ToUpper(string(tier[:1])) + string(tier[1:])
+}
+
+// reuseAtTier is the row for a library drawing the video needs at `tier`: the
+// drawing itself when its detail level is enough for that tier, else a
+// planned row for a new, more detailed version (the library name with the
+// tier appended) that the drawer makes from the same description. It reports
+// false when the more detailed name is already taken.
+func reuseAtTier(existing domain.Illustration, tier domain.Tier, reason string, shots []string, byName map[string]domain.Illustration) (domain.ProjectIllustration, bool) {
+	kind := domain.KindOrFigure(existing.Kind)
+	if kind == domain.IllustrationBackdrop || domain.DetailEnough(existing.DetailLevel, tier) {
+		return domain.ProjectIllustration{Name: existing.Name, Description: existing.Description, FolderID: existing.FolderID,
+			Shots: shots, State: domain.PIReused, IllustrationID: existing.ID, Kind: kind, Tier: tier, TierReason: reason}, true
+	}
+	name := nameForTier(existing.Name, tier)
+	if _, taken := byName[name]; taken || domain.ValidateIllustrationName(name) != nil {
+		return domain.ProjectIllustration{}, false
+	}
+	return domain.ProjectIllustration{Name: name,
+		Description: existing.Description + " (vẽ kỹ hơn bản " + string(existing.DetailLevel) + " có sẵn, cho hạng " + string(tier) + ")",
+		FolderID:    existing.FolderID, Shots: shots, State: domain.PIPlanned, Kind: kind, Tier: tier, TierReason: reason}, true
+}
+
 // Plan reads the storyboard against the library and replaces the video's list.
 func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error) {
 	if uc.llm == nil {
@@ -272,6 +333,10 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	}
 	if strings.TrimSpace(storyboard) == "" {
 		return nil, fmt.Errorf("chưa có storyboard — hãy chạy Bước 4 — Visual trước")
+	}
+	lang, err := uc.library.rulesFor(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("ngôn ngữ hình của project: %w", err)
 	}
 	all, err := uc.library.List(ctx, IllustrationFilter{})
 	if err != nil {
@@ -290,12 +355,16 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 		if i.IsExemplarCopy() {
 			continue // a Hình mẫu copy; its source is in the catalog
 		}
+		if i.KitKey != lang.KitKey {
+			continue // drawn for another kit: it cannot be drawn in this video
+		}
 		byName[i.Name] = i
 		mark := ""
 		if i.Kind == domain.IllustrationBackdrop {
 			mark = " — NỀN"
 		}
-		fmt.Fprintf(&catalog, "- %s — %s — %s — %s%s\n", i.Name, i.Title, i.FolderID, strings.Join(i.Tags, ", "), mark)
+		fmt.Fprintf(&catalog, "- %s — %s — %s — %s — chi tiết: %s%s\n", i.Name, i.Title, i.FolderID,
+			strings.Join(i.Tags, ", "), i.DetailLevel, mark)
 	}
 	folderIDs := map[string]bool{}
 	for _, f := range folders {
@@ -356,10 +425,13 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	}
 	for _, d := range plan.Draw {
 		name := strings.TrimSpace(d.Name)
+		tier := domain.TierOrSupport(domain.Tier(d.Tier))
+		reason := strings.TrimSpace(d.Reason)
 		if existing, ok := byName[name]; ok {
 			// The model proposed drawing something the library already has.
-			add(domain.ProjectIllustration{Name: name, Description: existing.Description, FolderID: existing.FolderID,
-				Shots: d.Shots, State: domain.PIReused, IllustrationID: existing.ID, Kind: domain.KindOrFigure(existing.Kind)})
+			if row, ok := reuseAtTier(existing, tier, reason, d.Shots, byName); ok {
+				add(row)
+			}
 			continue
 		}
 		folder := d.FolderID
@@ -370,13 +442,14 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 			continue
 		}
 		add(domain.ProjectIllustration{Name: name, Description: strings.TrimSpace(d.Description), FolderID: folder,
-			Shots: d.Shots, State: domain.PIPlanned})
+			Shots: d.Shots, State: domain.PIPlanned, Tier: tier, TierReason: reason})
 	}
-	for _, name := range plan.Reuse {
-		if existing, ok := byName[strings.TrimSpace(name)]; ok {
-			add(domain.ProjectIllustration{Name: existing.Name, Description: existing.Description,
-				FolderID: existing.FolderID, State: domain.PIReused, IllustrationID: existing.ID,
-				Kind: domain.KindOrFigure(existing.Kind)})
+	for _, re := range plan.Reuse {
+		if existing, ok := byName[strings.TrimSpace(re.Name)]; ok {
+			tier := domain.TierOrSupport(domain.Tier(re.Tier))
+			if row, ok := reuseAtTier(existing, tier, strings.TrimSpace(re.Reason), nil, byName); ok {
+				add(row)
+			}
 		}
 	}
 	for _, r := range backdropRows(plan, storyboard, byName) {
@@ -432,7 +505,7 @@ func (uc *ProjectIllustrationsUseCase) Draw(ctx context.Context, projectID, rowI
 		return r, err
 	}
 	made, drawErr := uc.library.Draw(ctx, DrawRequest{Description: r.Description, FolderID: r.FolderID, Name: r.Name, Model: model,
-		Kind:       r.Kind,
+		Kind: r.Kind, ProjectID: projectID, Tier: r.Tier,
 		OnProgress: func(p domain.DrawProgress) { uc.setProgress(rowID, p) }})
 	if drawErr != nil {
 		r.State, r.Error = domain.PIFailed, drawErr.Error()
@@ -660,6 +733,10 @@ func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID st
 	if err != nil {
 		return nil, err
 	}
+	lang, err := uc.library.rulesFor(ctx, projectID)
+	if err != nil {
+		return nil, fmt.Errorf("ngôn ngữ hình của project: %w", err)
+	}
 	all, err := uc.library.List(ctx, IllustrationFilter{})
 	if err != nil {
 		return nil, err
@@ -697,9 +774,39 @@ func (uc *ProjectIllustrationsUseCase) ForCode(ctx context.Context, projectID st
 		take(*r.Illustration, true)
 	}
 	for _, i := range all {
-		if i.Kind != domain.IllustrationBackdrop {
+		if i.Kind != domain.IllustrationBackdrop && i.KitKey == lang.KitKey {
 			take(i, false)
 		}
 	}
 	return out, nil
+}
+
+// SetTier changes the role of a row's drawing in this video. A drawing that
+// was made with less detail than the new tier needs goes back to "planned"
+// (it must be drawn again); one that is detailed enough stays as it is.
+func (uc *ProjectIllustrationsUseCase) SetTier(ctx context.Context, projectID, rowID string, tier domain.Tier) (domain.ProjectIllustration, error) {
+	if !domain.ValidTier(tier) {
+		return domain.ProjectIllustration{}, fmt.Errorf("hạng %q không hợp lệ (hero, support hoặc background)", tier)
+	}
+	r, err := uc.row(ctx, projectID, rowID)
+	if err != nil {
+		return r, err
+	}
+	if r.Kind == domain.IllustrationBackdrop {
+		return r, fmt.Errorf("nền không có hạng")
+	}
+	if r.State == domain.PIDrawing {
+		return r, fmt.Errorf("hình %s đang được vẽ", r.Name)
+	}
+	r.Tier = tier
+	if r.Illustration != nil && !domain.DetailEnough(r.Illustration.DetailLevel, tier) {
+		// The drawing stays in the library; this video draws a new, more detailed
+		// one under its own name.
+		r.State, r.IllustrationID, r.Error = domain.PIPlanned, "", ""
+		r.Name = nameForTier(r.Name, tier)
+	}
+	if err := uc.repo.UpdateProjectIllustration(ctx, r); err != nil {
+		return r, err
+	}
+	return uc.row(ctx, projectID, rowID)
 }

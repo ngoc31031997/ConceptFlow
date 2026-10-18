@@ -71,6 +71,7 @@ type state struct {
 	StoryModel      string `json:"story_model"`
 	StoryboardModel string `json:"storyboard_model"`
 	CodeModel       string `json:"code_model"`
+	KitKey          string `json:"kit_key"`
 }
 
 func (c *Client) state(ctx context.Context, projectID string) (state, error) {
@@ -95,6 +96,13 @@ func (c *Client) GetAuthoringStoryboard(ctx context.Context, id string) (string,
 	s, err := c.state(ctx, id)
 	return s.Storyboard, err
 }
+
+// KitKey is the kit of the visual language the project is pinned to ("" when it has no pin).
+func (c *Client) KitKey(ctx context.Context, id string) (string, error) {
+	s, err := c.state(ctx, id)
+	return s.KitKey, err
+}
+
 func (c *Client) GetAuthoringModels(ctx context.Context, id string) (domain.AuthoringStepModels, error) {
 	s, err := c.state(ctx, id)
 	return domain.AuthoringStepModels{Story: s.StoryModel, Storyboard: s.StoryboardModel, Code: s.CodeModel}, err

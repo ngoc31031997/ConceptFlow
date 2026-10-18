@@ -34,6 +34,8 @@ def _shot_json(scene: Scene, shot: Shot) -> dict:
         "visual": shot.visual,
         "narration": shot.narration,
     } | ({"scene_setting": scene.setting} if scene.setting else {}) | (
+        {"motion_blur": True} if shot.motion_blur else {}
+    ) | (
         {"lines": [{"say": line.say, "show": line.show} for line in shot.lines]} if shot.lines else {}
     )
 
@@ -49,6 +51,16 @@ def _world(sb: Storyboard) -> str:
 def _palette_table(sb: Storyboard) -> str:
     keys = merger.palette_keys(sb)
     return "\n".join(f"- PALETTE.{keys[p.role]} = {p.hex} — {p.role}: {p.meaning}" for p in sb.palette)
+
+
+def _looks_block(sb: Storyboard) -> str:
+    """The LOOKS constant the frame declares, and how a shot uses it."""
+    return (
+        merger.looks_text(sb)
+        + "\nMỗi shot bọc TOÀN BỘ hình của nó trong `<Shot look={LOOKS.sceneN}>` (N là số đứng trước dấu chấm của "
+        "mã shot, shot 2.3 dùng `LOOKS.scene2`). Không tự viết look, không tự chọn màu ánh sáng: màu ánh sáng, "
+        "bóng và không khí do LOOKS và kit tính."
+    )
 
 
 def _retry_note(problem: str | None) -> str:
@@ -110,6 +122,8 @@ Bạn chỉ viết {len(shot_ids)} hàm shot. Hệ thống tự ghép mọi th�
 {_palette_table(sb)}
 - LAYOUT (dùng đúng các khoá này cho vật xuất hiện ở nhiều shot):
 {layout.strip()}
+- LOOKS (ánh sáng của từng cảnh, đã có sẵn):
+{_looks_block(sb)}
 
 Các shot bạn phải viết (theo đúng thứ tự):
 {_dump(mine)}
@@ -191,6 +205,9 @@ Bảng màu hợp lệ (chỉ dùng PALETTE.<khoá> dưới đây):
 LAYOUT hiện có:
 {layout.strip()}
 
+LOOKS hiện có:
+{_looks_block(sb)}
+
 Sửa CHỈ lỗi đã nêu, giữ nguyên hình và chuyển động đã dựng. Trả về ĐÚNG các hàm {names} đã sửa (mỗi hàm kèm comment `// Shot n.m — ...` phía trên) trong MỘT khối ```tsx, không gì khác."""
 
 
@@ -231,5 +248,8 @@ Bảng màu hợp lệ (chỉ dùng PALETTE.<khoá> dưới đây):
 
 LAYOUT hiện có:
 {layout.strip()}
+
+LOOKS hiện có:
+{_looks_block(sb)}
 
 Sửa CHỈ lỗi trên, giữ nguyên hình và chuyển động đã dựng. Trả về ĐÚNG một hàm `{merger.remotion_fn(key)}` đã sửa (kèm comment `// Shot {key} — ...` phía trên) trong một khối ```tsx, không gì khác."""

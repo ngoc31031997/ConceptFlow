@@ -388,7 +388,15 @@ func (uc *IllustrationsUseCase) importIllustration(
 		return item, err
 	}
 
-	preview, err := uc.render(ctx, ill.Name, ill.Code, ill.Kind)
+	if !domain.ValidDetail(ill.DetailLevel) {
+		ill.DetailLevel = domain.DetailMedium
+	}
+	kit, kerr := uc.kitOf(ctx, ill.KitKey)
+	if kerr != nil {
+		return item, kerr
+	}
+	ill.KitKey = kit
+	preview, err := uc.render(ctx, kit, ill.Name, ill.Code, ill.Kind, tierForDetail(ill.DetailLevel))
 	var invalid *InvalidIllustrationError
 	if errors.As(err, &invalid) {
 		item.Diagnostics = invalid.Diagnostics

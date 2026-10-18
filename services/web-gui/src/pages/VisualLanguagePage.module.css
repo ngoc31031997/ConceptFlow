@@ -1,0 +1,85 @@
+.activeStrip {
+  margin: 0 0 var(--space-md);
+  padding: 10px 14px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+  font-size: 13.5px;
+}
+
+.activeStrip strong {
+  margin-right: 8px;
+}
+
+/* Two scenes, each a wide (16:9) and a tall (9:16) picture side by side. */
+.samples {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-sm);
+}
+
+.sampleSet {
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.samplePair {
+  display: grid;
+  grid-template-columns: minmax(0, 3.16fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.wide,
+.tall {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+}
+
+.wide {
+  aspect-ratio: 16 / 9;
+}
+
+.tall {
+  aspect-ratio: 9 / 16;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.readOnly {
+  margin: var(--space-sm) 0 0;
+  padding: 10px 14px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+  font-size: 13px;
+}
+
+.readOnly strong {
+  margin-right: 8px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+@media (max-width: 760px) {
+  .samples {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -11,13 +11,14 @@ from app import storyboard as sbm
 from app.frame import LANDSCAPE, PORTRAIT, frame_of
 from app.pipeline import merger, prompts
 from app.pipeline.run import CodeRequest, make_plan
+from tests.lights import light
 
 PRIMITIVES = (Path(__file__).resolve().parents[2] / "rendering" / "remotion_project" / "src"
               / "conceptflow-mini" / "primitives.tsx")
 
 
 def _storyboard(layout=None, setting=""):
-    scene = {"id": "hook", "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}
+    scene = {"id": "hook", "light": light("nhấn"), "shots": [{"id": "1.1", "visual": "v", "narration": "n"}]}
     if setting:
         scene["setting"] = setting
     doc = {"hero": "h", "palette": [{"role": "nhấn", "hex": "#F5B841"}], "scenes": [scene]}

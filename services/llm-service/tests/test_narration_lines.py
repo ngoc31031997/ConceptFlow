@@ -6,12 +6,13 @@ import pytest
 
 from app import storyboard as sbm
 from app.pipeline import merger, prompts
+from tests.lights import light
 
 BASE = {
     "hero": "h",
     "palette": [{"role": "accent", "hex": "#F5B841", "meaning": "chú ý"}],
     "scenes": [
-        {"id": "hook", "shots": [
+        {"id": "hook", "light": light("accent"), "shots": [
             {"id": "1.1", "visual": "v", "lines": [
                 {"say": "Mười hai chia hết cho hai.", "show": "12 tách thành 2 nhóm"},
                 {"say": "Cho ba, cho bốn.", "show": "nhóm lại thành 3 rồi 4"},

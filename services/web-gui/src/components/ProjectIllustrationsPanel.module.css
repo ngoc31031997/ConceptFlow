@@ -52,3 +52,37 @@
   color: var(--danger);
   font-size: 13px;
 }
+
+.tier {
+  display: grid;
+  gap: 4px;
+  margin-bottom: var(--space-xs);
+}
+
+.tierLabel {
+  font: 700 11px var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.tierWhy {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.tierGuide {
+  margin-top: var(--space-sm);
+  padding: 12px 14px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+
+.tierGuideList {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}

@@ -63,8 +63,8 @@ ILLUSTRATION_KIT = (
 SCENE_KIT = ("Scene", "Camera", "Glow", "LightRays", "Vignette", "KeywordText")
 # The building blocks a library drawing (pasted into the script) uses.
 ILLUSTRATION_HELPERS = (
-    "Figure", "Face", "GroundShadow", "HeldAt", "figurePoint", "useBlink", "phaseOf", "shadeOf", "useSvgId",
-    "INK", "SHADE", "BLUSH", "WHITE",
+    "Figure", "HeldAt", "figurePoint", "useBlink", "phaseOf", "shadeOf", "useSvgId",
+    "INK", "SHADE", "BLUSH", "WHITE", "FIGURE_DETAIL",
 )
 # Every backdrop of conceptflow-mini/backdrops.tsx: whole-frame places a Scene
 # draws in its depth layers. Held to the file by the same test.
@@ -88,6 +88,30 @@ SEGMENT_API = ("calculateMetadataFromSegments", "Segments", "evenLines", "lineSp
 # Every component of conceptflow-mini/rig.tsx: close-up body parts that act.
 # Held to the file by the same test as the other kits.
 RIG_KIT = ("ReachingHand",)
+# conceptflow-mini/film.tsx: the film look every shot is wrapped in.
+FILM_KIT = ("Shot",)
+FILM_HELPERS = ("LookProvider", "useLook", "parseHex", "darken", "mix", "withAlpha")
+# conceptflow-mini/material.tsx: forms lit by the scene's light.
+MATERIAL_KIT = ("Shape", "GroundShadow")
+MATERIAL_HELPERS = ("FigureFrameProvider", "lightDirection", "capsulePath")
+# conceptflow-mini/procedural.tsx: noise-driven scenery generators.
+PROCEDURAL_KIT = (
+    "Ridges", "Hills", "Dunes", "Canopy", "Grass", "Clouds", "Stars", "Rocks", "Coral", "Waves", "Cells",
+    "Particles",
+)
+PROCEDURAL_HELPERS = ("noise1", "ridgeLine", "voronoiCells")
+# conceptflow-mini/shader.tsx: WebGL shader layers.
+SHADER_KIT = ("ShaderLayer",)
+SHADER_HELPERS = ("shaderSource", "SHADER_NAMES")
+# conceptflow-mini/skeleton.tsx: bones, poses and machines.
+SKELETON_KIT = ("Rig", "Bone", "Eyes", "Brows", "Mouth", "Mechanism", "Part")
+SKELETON_HELPERS = (
+    "SKELETONS", "boneDepth", "HUMANOID_POSES", "POSES", "restPoseName", "cycleAngles", "ikTwoBone",
+    "rotateAbout", "elbowPosition", "wrap180", "easeAction", "poseAt", "solveRig", "lookAngle", "isBlinking",
+    "partTransform",
+)
+# conceptflow-mini/kits.ts
+KITS_HELPERS = ("KITS", "KIT_VERSIONS", "kitKeys", "useKit")
 
 
 def _named_import(names: tuple[str, ...], module: str) -> str:
@@ -105,6 +129,12 @@ _REMOTION_HEAD = (
     + _named_import(SCENE_KIT + SCENE_HELPERS, "./conceptflow-mini/scene")
     + _named_import(BACKDROP_KIT, "./conceptflow-mini/backdrops")
     + _named_import(RIG_KIT, "./conceptflow-mini/rig")
+    + _named_import(FILM_KIT + FILM_HELPERS, "./conceptflow-mini/film")
+    + _named_import(MATERIAL_KIT + MATERIAL_HELPERS, "./conceptflow-mini/material")
+    + _named_import(PROCEDURAL_KIT + PROCEDURAL_HELPERS, "./conceptflow-mini/procedural")
+    + _named_import(SHADER_KIT + SHADER_HELPERS, "./conceptflow-mini/shader")
+    + _named_import(SKELETON_KIT + SKELETON_HELPERS, "./conceptflow-mini/skeleton")
+    + "import type {Look, MaterialName} from './conceptflow-mini/kits';\n"
 )
 
 
@@ -122,6 +152,11 @@ def available_names_text() -> str:
         "./conceptflow-mini/scene: " + ", ".join(SCENE_KIT),
         "./conceptflow-mini/backdrops: " + ", ".join(BACKDROP_KIT),
         "./conceptflow-mini/rig: " + ", ".join(RIG_KIT),
+        "./conceptflow-mini/film: " + ", ".join(FILM_KIT),
+        "./conceptflow-mini/material: " + ", ".join(MATERIAL_KIT),
+        "./conceptflow-mini/procedural: " + ", ".join(PROCEDURAL_KIT),
+        "./conceptflow-mini/shader: " + ", ".join(SHADER_KIT),
+        "./conceptflow-mini/skeleton: " + ", ".join(SKELETON_KIT),
     ])
 
 
@@ -133,7 +168,9 @@ def frame_names() -> frozenset[str]:
         "React", *REMOTION_API, *SEGMENT_API, *PRIMITIVES, "LottieClip",
         *ILLUSTRATION_KIT, *ILLUSTRATION_HELPERS, "FigureProps", "Mood", "PersonPose",
         *SCENE_KIT, *SCENE_HELPERS, *BACKDROP_KIT, *RIG_KIT,
-        "PALETTE", "LAYOUT", "clamp", "ShotProps",
+        *FILM_KIT, *FILM_HELPERS, *MATERIAL_KIT, *MATERIAL_HELPERS, *PROCEDURAL_KIT, *PROCEDURAL_HELPERS,
+        *SHADER_KIT, *SHADER_HELPERS, *SKELETON_KIT, *SKELETON_HELPERS, "Look", "MaterialName",
+        "PALETTE", "LAYOUT", "LOOKS", "clamp", "ShotProps",
     ))
 
 _REMOTION_TAIL = """
@@ -171,7 +208,32 @@ def remotion_frame_text(sb: Storyboard) -> dict[str, str]:
     palette = "const PALETTE = {\n" + "".join(
         f"  {keys[p.role]}: '{p.hex}', // {p.meaning or p.role}\n" for p in sb.palette
     ) + "};"
-    return {"palette": palette, "head": _REMOTION_HEAD.strip()}
+    return {"palette": palette, "looks": looks_text(sb), "head": _REMOTION_HEAD.strip()}
+
+
+def looks_text(sb: Storyboard) -> str:
+    """`const LOOKS = {...};`: the light of every scene as a `Look` for `<Shot look=...>`.
+
+    A key is `scene<n>`, `n` being the first part of the ids of the scene's shots
+    (shot 2.3 belongs to `LOOKS.scene2`). Every colour is a PALETTE entry, so a
+    scene's colours are the video's palette and nothing else."""
+    keys = palette_keys(sb)
+    rows: list[str] = []
+    for sc in sb.scenes:
+        li = sc.light
+        g = li.grade
+        n = _layout_number
+        body = (
+            f"light: {{x: {n(li.x)}, y: {n(li.y)}, color: PALETTE.{keys[li.color]}, intensity: {n(li.intensity)}}}, "
+            f"ambient: PALETTE.{keys[li.ambient]}, "
+            f"atmosphere: {{color: PALETTE.{keys[li.atmosphere]}, density: {n(li.haze)}}}, "
+            f"focus: '{li.focus}', "
+            f"grade: {{warmth: {n(g.warmth)}, contrast: {n(g.contrast)}, saturation: {n(g.saturation)}}}"
+        )
+        for prefix in dict.fromkeys(sh.id.split(".")[0] for sh in sc.shots):
+            note = " ".join(f"{sc.title or sc.id}: {li.source}".split()).rstrip(": ")
+            rows.append(f"  scene{prefix}: {{{body}}}, // {note}")
+    return "const LOOKS: Record<string, Look> = {\n" + "\n".join(rows) + "\n};"
 
 
 def _layout_number(v: int | float) -> str:
@@ -304,7 +366,7 @@ def merge_remotion(
     layout = layout.strip()
     palette = remotion_frame_text(sb)["palette"]
     head = head_with_library_imports(_REMOTION_HEAD, library or {}, shots)
-    parts: list[str] = [head, palette, "", layout, ""]
+    parts: list[str] = [head, palette, "", layout, "", looks_text(sb), ""]
     # Derive the layout's line range from the text actually emitted, not from
     # arithmetic on the pieces.
     first = "\n".join(parts[:3]).count("\n") + 2

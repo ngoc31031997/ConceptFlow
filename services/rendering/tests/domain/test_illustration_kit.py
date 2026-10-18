@@ -30,8 +30,30 @@ NOT_KIT_TAGS = {"AbsoluteFill"}
 
 
 # Linh kiện để vẽ hình mới, không phải hình để đặt lên khung.
-HELPERS = {"Figure", "Face", "GroundShadow", "HeldAt"}
+HELPERS = {"Figure", "HeldAt"}
 RIG = KIT.with_name("rig.tsx")
+
+
+MODULES = {
+    "film": ("FILM_KIT", "FILM_HELPERS"),
+    "material": ("MATERIAL_KIT", "MATERIAL_HELPERS"),
+    "procedural": ("PROCEDURAL_KIT", "PROCEDURAL_HELPERS"),
+    "shader": ("SHADER_KIT", "SHADER_HELPERS"),
+    "skeleton": ("SKELETON_KIT", "SKELETON_HELPERS"),
+}
+
+
+def module_exports(name: str) -> tuple[set[str], set[str]]:
+    """(components, other exports) of a conceptflow-mini module: a capitalised
+    function is a component, anything else (hooks, tables, maths) is a helper."""
+    text = KIT.with_name(f"{name}.tsx").read_text(encoding="utf-8")
+    names = set(re.findall(r"^export (?:function|const) (\w+)", text, re.M))
+    components = {n for n in names if n[0].isupper() and not n.isupper() and not n.endswith("Provider")}
+    return components, names - components
+
+
+def kit_module_components() -> set[str]:
+    return set().union(*(module_exports(m)[0] for m in MODULES))
 
 
 def rig_exports() -> set[str]:
@@ -66,7 +88,7 @@ def test_bo_minh_hoa_co_du_cac_hinh_toi_thieu():
 def test_moi_component_deu_duoc_mo_ta_trong_prompt_va_nguoc_lai():
     doc = DOC.read_text(encoding="utf-8")
     exports = kit_exports()
-    exports |= scene_exports()[0] | backdrop_exports() | rig_exports()
+    exports |= scene_exports()[0] | backdrop_exports() | rig_exports() | kit_module_components()
     documented = set(re.findall(r"<([A-Z]\w*)", doc)) - NOT_KIT_TAGS
     assert exports - documented == set(), "component chưa có trong illustration_kit_vi.txt"
     assert documented - exports == set(), "prompt nhắc tới component không tồn tại"
@@ -93,6 +115,15 @@ def test_khung_code_cua_merger_import_dung_bo_minh_hoa():
     assert scene_helpers and set(re.findall(r'"(\w+)"', scene_helpers.group(1))) == hooks
     backdrops = re.search(r"BACKDROP_KIT = \((.*?)\)", text, re.S)
     assert backdrops and set(re.findall(r'"(\w+)"', backdrops.group(1))) == backdrop_exports()
+    for module, (kit_name, helpers_name) in MODULES.items():
+        components, others = module_exports(module)
+        listed = {}
+        for tuple_name in (kit_name, helpers_name):
+            m = re.search(rf"{tuple_name} = \((.*?)\)", text, re.S)
+            assert m, f"merger.py không còn {tuple_name}"
+            listed[tuple_name] = set(re.findall(r'"(\w+)"', m.group(1)))
+        assert listed[kit_name] == components, module
+        assert listed[helpers_name] == others, module
 
 
 REAL = RENDERING / "remotion_project"

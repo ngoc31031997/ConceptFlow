@@ -13,6 +13,8 @@ import (
 // save/read use cases — a bare in-memory map is enough since these use
 // cases do nothing but validate and delegate.
 type fakeAuthoringStore struct {
+	// pinned is the visual language each project is pinned to; a project not in it has none.
+	pinned     map[string]domain.PinnedLanguage
 	topic      map[string]string
 	story      map[string]string
 	storyboard map[string]string
@@ -334,4 +336,11 @@ func TestSaveAuthoringModelsRefusesOllamaForCode(t *testing.T) {
 	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama", Code: "zai-org/glm-5.3-flash"}); err != nil {
 		t.Fatalf("ollama for the story step refused: %v", err)
 	}
+}
+
+func (f *fakeAuthoringStore) PinnedLanguage(_ context.Context, projectID string) (domain.PinnedLanguage, error) {
+	if p, ok := f.pinned[projectID]; ok {
+		return p, nil
+	}
+	return domain.PinnedLanguage{}, domain.ErrProjectNotPinned
 }

@@ -12,6 +12,7 @@ import { useAuthoringModels } from "../hooks/useAuthoringModels";
 import { NarrationPanel } from "../components/NarrationPanel";
 import { VideoFormatPicker } from "../components/VideoFormatPicker";
 import { useVideoFormats } from "../hooks/useVideoFormats";
+import { PinnedLanguageCard } from "../components/PinnedLanguageCard";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext, saveLastUsedSettings } from "../context/ProjectDraftContext";
 import { createProjectDraft, patchWizardSettings, type WizardSettingsPatch } from "../api/client";
@@ -161,7 +162,15 @@ export function ScriptAuthoringSettingsStepPage() {
         </StepSection>
 
         <StepSection
-          title="3. Cách soạn"
+          title="3. Ngôn ngữ hình"
+          hint="Cách vẽ video này, ghim lúc tạo project. Đổi ở Cài đặt chỉ áp cho video mới."
+          testId="settings-section-language"
+        >
+          <PinnedLanguageCard projectId={draft.projectId} />
+        </StepSection>
+
+        <StepSection
+          title="4. Cách soạn"
           hint="AI làm giúp hay bạn tự làm với ChatGPT, Claude…"
           testId="settings-section-authoring"
         >

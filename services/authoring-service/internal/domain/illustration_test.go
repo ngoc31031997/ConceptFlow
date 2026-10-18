@@ -44,11 +44,25 @@ func TestBuiltinIllustrationsMatchTheKitAndLiveInSystemFolders(t *testing.T) {
 	}
 }
 
-func TestStyleGuideKeepsItsRules(t *testing.T) {
-	for _, rule := range []string{"[S1]", "[S9]", "[S13]", "[S19]", "[S24]"} {
-		if !regexp.MustCompile(regexp.QuoteMeta(rule)).MatchString(IllustrationStyleGuide()) {
-			t.Errorf("style guide lost rule %s", rule)
+func TestShippedLanguageKeepsItsRules(t *testing.T) {
+	rules := PhatsangRules()
+	for _, rule := range []string{"[T1]", "[S1]", "[M1]", "[S13]", "[R1]", "[S19]", "[S24]"} {
+		if !regexp.MustCompile(regexp.QuoteMeta(rule)).MatchString(rules.Illustration) {
+			t.Errorf("illustration rules lost rule %s", rule)
 		}
+	}
+	for _, rule := range []string{"[B1]", "[B2]", "[B4]", "[G1]", "[G2]"} {
+		if !regexp.MustCompile(regexp.QuoteMeta(rule)).MatchString(rules.Backdrop) {
+			t.Errorf("backdrop rules lost rule %s", rule)
+		}
+	}
+	for _, rule := range []string{"[C1]", "[C2]", "[C3]", "[C10]"} {
+		if !regexp.MustCompile(regexp.QuoteMeta(rule)).MatchString(rules.Scene) {
+			t.Errorf("scene rules lost rule %s", rule)
+		}
+	}
+	if err := rules.Validate(); err != nil {
+		t.Fatalf("the shipped rules are not valid: %v", err)
 	}
 }
 

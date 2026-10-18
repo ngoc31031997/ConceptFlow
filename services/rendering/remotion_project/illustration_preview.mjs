@@ -5,8 +5,10 @@
  * Bundles src/illustration-preview/host.tsx and opens the browser once, then
  * answers one JSON request per stdin line with one JSON reply per stdout line:
  *
- *   -> {"id", "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool, "kind"?: "figure" or "backdrop"}
+ *   -> {"id", "kit_key", "code"?: TSX source, "name": component, "props"?: {...}, "gif"?: bool, "kind"?: "figure" or "backdrop"}
  *   <- {"id", "ok": true, "png": base64, "gif"?: base64}
+ *   -> {"id", "op": "still", "kit_key", "composition": id of a sample composition, "frame"?: n, "output": path}
+ *   <- {"id", "ok": true, "path": output}
  *   <- {"id", "ok": false, "error": "..."}
  *
  * `code` absent means a built-in kit component. The TSX is compiled here with
@@ -26,11 +28,22 @@ import {fileURLToPath} from 'node:url';
 const browserExecutable = process.env.REMOTION_BROWSER || null;
 const entry = fileURLToPath(new URL('./src/illustration-preview/host.tsx', import.meta.url));
 const serveUrl = await bundle({entryPoint: entry});
-const browser = await openBrowser('chrome', {browserExecutable, chromiumOptions: {enableMultiProcessOnLinux: true}});
+const browser = await openBrowser('chrome', {browserExecutable, chromiumOptions: {enableMultiProcessOnLinux: true, gl: 'swangle'}});
 const out = (msg) => process.stdout.write(JSON.stringify(msg) + '\n');
 out({ready: true});
 
+/** One frame of a sample composition (the visual language's sample scenes), written to `req.output`. */
+async function handleStill(req) {
+  if (!req.kit_key) throw new Error('thiếu kit_key: project chưa ghim ngôn ngữ hình');
+  const inputProps = {kitKey: req.kit_key, ...(req.props ?? {})};
+  const composition = await selectComposition({serveUrl, id: req.composition, inputProps, puppeteerInstance: browser});
+  await renderStill({composition, serveUrl, inputProps, frame: req.frame ?? 10, output: req.output, puppeteerInstance: browser});
+  return {id: req.id, ok: true, path: req.output};
+}
+
 async function handle(req) {
+  if (req.op === 'still') return handleStill(req);
+  if (!req.kit_key) throw new Error('thiếu kit_key: project chưa ghim ngôn ngữ hình');
   let js = '';
   if (req.code) {
     try {
@@ -40,7 +53,7 @@ async function handle(req) {
       throw new Error(`syntax error: ${msgs.join('; ') || err.message}`);
     }
   }
-  const inputProps = {js, name: req.name, props: req.props ?? {}, background: req.background, kind: req.kind ?? 'figure'};
+  const inputProps = {kitKey: req.kit_key, js, name: req.name, props: req.props ?? {}, background: req.background, kind: req.kind ?? 'figure'};
   const composition = await selectComposition({serveUrl, id: 'asset', inputProps, puppeteerInstance: browser});
   const dir = mkdtempSync(join(tmpdir(), 'asset-'));
   try {

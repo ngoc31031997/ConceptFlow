@@ -49,6 +49,13 @@ beforeEach(() => {
   vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue(FORMATS);
   vi.spyOn(apiClient, "listVoices").mockResolvedValue([]);
   vi.spyOn(apiClient, "listVideoArchetypes").mockResolvedValue(ARCHETYPES);
+  vi.spyOn(apiClient, "getProjectVisualLanguage").mockResolvedValue({
+    visual_language_id: "phatsang",
+    visual_language_version: 1,
+    kit_key: "phatsang",
+    name: "Khoa học phát sáng",
+    rules: { illustration_rules: "a", backdrop_rules: "b", scene_rules: "c" },
+  });
   createDraft = vi
     .spyOn(apiClient, "createProjectDraft")
     .mockResolvedValue({ similarProjects: [] });
@@ -79,18 +86,20 @@ function renderPage() {
 }
 
 describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
-  it("chia ba nhóm có đánh số, theo đúng thứ tự quyết định", async () => {
+  it("chia bốn nhóm có đánh số, theo đúng thứ tự quyết định", async () => {
     renderPage();
     await waitFor(() => expect(screen.getByTestId("settings-section-content")).toBeInTheDocument());
 
     const sections = [
       "settings-section-content",
       "settings-section-voice",
+      "settings-section-language",
       "settings-section-authoring",
     ].map((id) => screen.getByTestId(id));
     expect(sections[0]).toHaveTextContent("1. Nội dung video");
     expect(sections[1]).toHaveTextContent("2. Giọng đọc");
-    expect(sections[2]).toHaveTextContent("3. Cách soạn");
+    expect(sections[2]).toHaveTextContent("3. Ngôn ngữ hình");
+    expect(sections[3]).toHaveTextContent("4. Cách soạn");
     for (let i = 0; i < sections.length - 1; i += 1) {
       expect(
         sections[i].compareDocumentPosition(sections[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,

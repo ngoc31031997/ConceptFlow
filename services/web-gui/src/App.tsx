@@ -20,6 +20,7 @@ import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
 import { CodeStepPage } from "./pages/CodeStepPage";
 import { IllustrationsStepPage } from "./pages/IllustrationsStepPage";
 import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
+import { VisualLanguagePage } from "./pages/VisualLanguagePage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
 import { PromptSettingsPage } from "./pages/PromptSettingsPage";
 import { JournalPage } from "./pages/JournalPage";
@@ -77,6 +78,7 @@ export function App() {
             <Route path="/settings/prompts" element={<PromptSettingsPage />} />
             <Route path="/settings/ai-model" element={<AiModelSettingsPage />} />
             <Route path="/settings/video-archetypes" element={<VideoArchetypeSettingsPage />} />
+            <Route path="/settings/visual-languages" element={<VisualLanguagePage />} />
             {/* The illustration library, folders of reviewed drawings. */}
             <Route path="/settings/illustrations" element={<IllustrationLibraryPage />} />
 

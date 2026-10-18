@@ -13,7 +13,12 @@ import re
 from dataclasses import dataclass
 
 NAME_RE = re.compile(r"^[A-Z][A-Za-z0-9]{1,40}$")
-ALLOWED_MODULES = {"react", "remotion", "./conceptflow-mini/illustration", "./conceptflow-mini/scene"}
+ALLOWED_MODULES = {
+    "react", "remotion",
+    "./conceptflow-mini/illustration", "./conceptflow-mini/scene", "./conceptflow-mini/material",
+    "./conceptflow-mini/skeleton", "./conceptflow-mini/procedural", "./conceptflow-mini/shader",
+    "./conceptflow-mini/film", "./conceptflow-mini/kits", "./conceptflow-mini/backdrops",
+}
 IMPORT_RE = re.compile(r"^\s*import\b[^;]*?\bfrom\s*['\"]([^'\"]+)['\"]", re.M | re.S)
 BARE_IMPORT_RE = re.compile(r"^\s*import\s*['\"]([^'\"]+)['\"]", re.M)
 TOP_DECL_RE = re.compile(
@@ -48,7 +53,7 @@ def validate_asset_code(name: str, code: str) -> list[AssetIssue]:
         if m.group(1) not in ALLOWED_MODULES:
             issues.append(AssetIssue(
                 f"import '{m.group(1)}' không được phép — "
-                "chỉ react, remotion, ./conceptflow-mini/illustration, ./conceptflow-mini/scene",
+                "chỉ react, remotion và các module ./conceptflow-mini/* của kit",
                 _line_of(code, m.start())))
     if not re.search(rf"^export\s+function\s+{re.escape(name)}\s*\(", code, re.M):
         issues.append(AssetIssue(f"thiếu 'export function {name}(' ở đầu dòng"))

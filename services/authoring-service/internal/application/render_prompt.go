@@ -51,6 +51,39 @@ type RenderPromptUseCase struct {
 	calibration VoiceCalibrationPort
 	archetypes  ArchetypeListPort // optional; nil renders {{video_archetypes}} empty
 	brief       BriefSectionPort  // optional; nil renders {{creative_brief}} as the no-brief placeholder
+	languages   LanguagePort      // optional; nil refuses a template that needs the visual language
+}
+
+// WithLanguages lets the renderer fill {{visual_language}} and {{scene_rules}}
+// from the project's pinned language (the active one when no project is given).
+func (uc *RenderPromptUseCase) WithLanguages(l LanguagePort) *RenderPromptUseCase {
+	uc.languages = l
+	return uc
+}
+
+// languageSections are {{visual_language}} (what the look is) and
+// {{scene_rules}} (how light is used in a scene) of the language the prompt is
+// rendered for. A template that uses neither costs nothing; one that does fails
+// loudly when the language cannot be read, instead of rendering without it.
+func (uc *RenderPromptUseCase) languageSections(ctx context.Context, projectID, template string) (name, rules string, err error) {
+	if !strings.Contains(template, "{{visual_language}}") && !strings.Contains(template, "{{scene_rules}}") {
+		return "", "", nil
+	}
+	if uc.languages == nil {
+		return "", "", fmt.Errorf("visual language: not configured")
+	}
+	if projectID != "" {
+		p, err := uc.languages.Pinned(ctx, projectID)
+		if err != nil {
+			return "", "", fmt.Errorf("ngôn ngữ hình của project: %w", err)
+		}
+		return p.Name, strings.TrimSpace(p.Rules.Scene), nil
+	}
+	l, err := uc.languages.Active(ctx)
+	if err != nil {
+		return "", "", fmt.Errorf("ngôn ngữ hình đang bật: %w", err)
+	}
+	return l.Name + " — " + l.Description, strings.TrimSpace(l.Rules.Scene), nil
 }
 
 // BriefSectionPort renders the project's approved creative brief for the

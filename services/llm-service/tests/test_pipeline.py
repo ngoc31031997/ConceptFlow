@@ -19,12 +19,13 @@ from app.pipeline.run import (
     segment_prompt,
 )
 from app.provider import ChatRequest, ChatResult
+from tests.lights import light
 
 
 def storyboard(n_shots: int) -> str:
     shots = [{"id": f"1.{i}", "visual": f"v{i}", "narration": f"Câu {i}."} for i in range(1, n_shots + 1)]
     return json.dumps({"hero": "h", "palette": [{"role": "accent", "hex": "#F5B841"}],
-                       "scenes": [{"id": "hook", "shots": shots}]})
+                       "scenes": [{"id": "hook", "light": light("accent"), "shots": shots}]})
 
 
 def tsx(i, body="return null;"):
@@ -592,7 +593,7 @@ def storyboard_3_scenes() -> str:
     """Shots 3.3, 3.4, 3.5 as one chunk of three, like the scene that failed."""
     shots = [{"id": f"3.{i}", "visual": f"v{i}", "narration": f"Câu {i}."} for i in (3, 4, 5)]
     return json.dumps({"hero": "h", "palette": [{"role": "accent", "hex": "#F5B841"}],
-                       "scenes": [{"id": "s3", "shots": shots}],
+                       "scenes": [{"id": "s3", "light": light("accent"), "shots": shots}],
                        "layout": {"hero": {"x": 960, "y": 480, "size": 320}}})
 
 
@@ -1036,11 +1037,11 @@ async def test_an_engine_other_than_remotion_fails_the_run_before_any_call():
 
 
 def test_segment_fingerprints_of_a_remotion_plan_are_stable():
-    # Stored segments are reused when their fingerprint matches: these values
-    # were computed before the pipeline lost its second engine, and must not move.
+    # Stored segments are reused when their fingerprint matches: a change to the
+    # frame (the scene looks, the kit imports) must move them, and nothing else may.
     plan = make_plan(req(storyboard(4)), 2)
     assert [(s.key, s.fingerprint) for s in plan.segments] == [
-        ("frame", "a732826bd8c0a7124702bf30f342f2a21d83e6e92309dc4d3bf71c32c3b7ea7a"),
-        ("1.1-1.2", "af18aa0f38146c97befb5637b2f5059cdd2f34692675dad3c78ab43849afeee5"),
-        ("1.3-1.4", "10dff42525117caf9094cffd1d8cc94b1908b5c985cb7bb5a20ba56d646e1c90"),
+        ("frame", "c4d6d79479c1f550084b592edcd0d0822793e8d5d97ca7110c1a65155a9ef4bf"),
+        ("1.1-1.2", "9c34ea9acedbf555557dd7fa68332066e79c932531c4fc6431377efbc3c62cf3"),
+        ("1.3-1.4", "bbe5edb1b42ed0948ddd690e937b069affb94abd7c37fd5e4f029d19129a3194"),
     ]

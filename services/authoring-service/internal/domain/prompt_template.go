@@ -26,11 +26,6 @@ const (
 	RoleRemotionAdjust  PromptRole = "remotion_adjust"  // fix an existing Remotion component
 	RoleThumbnailDesign PromptRole = "thumbnail_design" // write an image-generation prompt for the thumbnail
 
-	// The illustration style rules the AI illustrator's system prompt is built
-	// from (figures and backdrops), and what the illustration library shows as
-	// its rules. Not a prompt to copy to an external AI, so it is never rendered.
-	RoleIllustrationStyle PromptRole = "illustration_style"
-
 	// The idea step's writer: turns a topic into the creative brief. Filled by
 	// the brief use case with the brief's own values (the Creator's note, the
 	// fields the Creator wrote), so it is not rendered by the generic renderer.
@@ -42,7 +37,7 @@ func ValidPromptRole(role string) bool {
 	switch PromptRole(role) {
 	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
-		RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle,
+		RoleRemotionAdjust, RoleThumbnailDesign,
 		RoleCreativeBrief:
 		return true
 	default:
@@ -52,10 +47,9 @@ func ValidPromptRole(role string) bool {
 
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
-// the illustration style rules, which are read as they are, and the brief
-// writer, whose values come from the brief use case.
+// the brief writer, whose values come from the brief use case.
 func IsRenderablePromptRole(role string) bool {
-	return ValidPromptRole(role) && PromptRole(role) != RoleIllustrationStyle && PromptRole(role) != RoleCreativeBrief
+	return ValidPromptRole(role) && PromptRole(role) != RoleCreativeBrief
 }
 
 // PromptTemplate is one role/language's editable prompt text.

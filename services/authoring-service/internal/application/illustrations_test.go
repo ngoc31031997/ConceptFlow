@@ -159,12 +159,16 @@ type fakeRenderer struct {
 	mu    sync.Mutex
 	calls []string
 	fail  bool
+	// lastKit and lastTier are what the newest preview was asked for.
+	lastKit  string
+	lastTier domain.Tier
 }
 
-func (f *fakeRenderer) PreviewIllustration(_ context.Context, name, code string, _ map[string]any, _ bool, _ domain.IllustrationKind) (IllustrationPreview, error) {
+func (f *fakeRenderer) PreviewIllustration(_ context.Context, kitKey, name, code string, _ map[string]any, _ bool, _ domain.IllustrationKind, tier domain.Tier) (IllustrationPreview, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls = append(f.calls, name+"|"+code)
+	f.lastKit, f.lastTier = kitKey, tier
 	if f.fail || strings.Contains(code, "BROKEN") {
 		line := 3
 		return IllustrationPreview{OK: false, Diagnostics: []PreviewDiagnostic{{Message: "TS2304: Cannot find name", Line: &line}}}, nil
@@ -176,7 +180,7 @@ const busCode = "export function Bus() { return null; }"
 
 func TestCreateRendersFirstAndStoresADraftWithItsPreview(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	out, err := uc.Create(context.Background(), domain.Illustration{Name: "Bus", FolderID: "phuong-tien", Code: busCode, Tags: []string{" Xe ", "xe"}})
 	if err != nil {
 		t.Fatal(err)
@@ -194,7 +198,7 @@ func TestCreateRendersFirstAndStoresADraftWithItsPreview(t *testing.T) {
 
 func TestCreateRefusesCodeTheRendererRejectsWithLineNumbers(t *testing.T) {
 	repo := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	_, err := uc.Create(context.Background(), domain.Illustration{Name: "Bus", FolderID: "phuong-tien", Code: "BROKEN"})
 	var invalid *InvalidIllustrationError
 	if !errors.As(err, &invalid) || *invalid.Diagnostics[0].Line != 3 || !strings.Contains(err.Error(), "dòng 3") {
@@ -213,7 +217,7 @@ func TestCreateRefusesCodeTheRendererRejectsWithLineNumbers(t *testing.T) {
 
 func TestEditingCodeSendsAnApprovedDrawingBackToDraftWithANewVersion(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	made, _ := uc.Create(ctx, domain.Illustration{Name: "Bus", FolderID: "phuong-tien", Code: busCode})
 	if _, err := uc.SetStatus(ctx, made.ID, domain.IllustrationApproved); err != nil {
@@ -236,7 +240,7 @@ func TestEditingCodeSendsAnApprovedDrawingBackToDraftWithANewVersion(t *testing.
 
 func TestBuiltinsAreReadOnlyAndRenderedLazilyWithoutCode(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	if _, err := uc.Update(ctx, "builtin-Tooth", domain.Illustration{Code: busCode}); !errors.Is(err, ErrIllustrationReadOnly) {
 		t.Fatalf("built-in edited: %v", err)
@@ -256,7 +260,7 @@ func TestBuiltinsAreReadOnlyAndRenderedLazilyWithoutCode(t *testing.T) {
 
 func TestSystemFoldersCannotBeDeletedAndFullFoldersStay(t *testing.T) {
 	repo := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	if err := uc.DeleteFolder(ctx, "con-nguoi"); !errors.Is(err, ErrFolderReadOnly) {
 		t.Fatalf("system folder: %v", err)

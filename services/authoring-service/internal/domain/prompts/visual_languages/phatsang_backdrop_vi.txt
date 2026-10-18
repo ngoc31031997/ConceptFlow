@@ -1,0 +1,28 @@
+# LUẬT VẼ NỀN — KHOA HỌC PHÁT SÁNG
+
+Một NỀN là một NƠI CHỐN kín khung (lòng quả sung, rừng nhiệt đới, đồng cỏ, đáy biển, vũ trụ, mạch máu, căn bếp) mà nhân vật đứng bên trong. Nền vẽ cùng lối với hình (Shape có vật liệu, không viền, không chữ, không ảnh, chuyển động theo frame) và MÀU THEO THỰC TẾ CỦA NƠI CHỐN: đồng cỏ châu Phi buổi trưa vàng sáng, rừng nhiệt đới nhiều tầng xanh lá đậm nhạt, lòng quả sung hồng sáng, vũ trụ tối sâu. Ánh sáng, sương và độ mờ theo lớp do kit áp theo look của cảnh.
+
+## 1. Cấu trúc
+- [B1] BỐN LỚP: prop layer ('sky' | 'far' | 'mid' | 'near'), chỉ vẽ lớp đó, lớp trống trả null. → LỖI khi thiếu layer.
+  sky: lớp xa nhất phủ kín (trời, vòm, nước sâu, khoảng không); far: dáng xa ít chi tiết (núi, rặng cây, tầng tế bào); mid: khối phía sau nhân vật, dồn về hai mép và mặt đất; near: 2–4 khối lớn sát ống kính ở góc khung (kit làm mờ).
+- [B2] KÍN KHUNG, CO THEO KHUNG: useVideoConfig() và useLayerBox(), vẽ theo tỉ lệ, đẹp ở 1920×1080 và 1080×1920 (khung dọc: dồn khối mid xuống đáy, mở khoảng trời). Không Figure, không toạ độ cố định. → LỖI.
+- [B3] CHỪA GIỮA KHUNG: 25%–75% bề ngang phía trên mặt đất để trống cho nhân vật; ở đó nền trơn nhất.
+
+## 2. Màu và ánh sáng
+- [B4] MÀU BẮT BUỘC TỪ PROPS: color (sắc chủ đạo của nơi chốn), ground (đất, sàn, đáy), light (màu nguồn sáng chính), không có mặc định — Kỹ sư truyền từ PALETTE. Mọi màu khác dẫn xuất bằng shadeOf từ ba màu này. Một sắc chủ đạo theo nơi chốn; sáng hay tối theo thực tế của nơi chốn.
+- [B4b] NGUỒN SÁNG ĐÚNG CHỖ: nếu nguồn sáng của cảnh nằm trong khung (mặt trời, đèn, lõi phát quang, khe sáng), vẽ nó ở vị trí useLook().light (x, y là tỉ lệ 0–1 của khung), bằng Shape material="emissive"; kit lo quầng.
+- [B4c] LỚP XA ÍT CHI TIẾT, LỚP GẦN ĐẬM: lớp far ít chi tiết và độ tương phản thấp, lớp mid rõ hơn, lớp near tối và tương phản; kit phủ màu không khí lên lớp xa theo look — đừng tự phủ.
+- [B5] KHÔNG MẶT: nơi chốn không có mặt, không <Eyes>, <Mouth>, <Brows>. → LỖI.
+- [B6] Prop still tắt chuyển động tự thân.
+
+## 3. Dựng bằng bộ sinh của kit
+- [G1] Địa hình và thiên nhiên dùng bộ sinh có seed cố định: <Ridges>, <Hills>, <Dunes>, <Canopy>, <Grass>, <Clouds>, <Rocks>, <Coral>, <Waves>, <Cells>, <Stars>; mỗi lớp có thể chồng 2–3 bộ sinh khác seed và khác độ sáng để có chiều sâu. Vật riêng của nơi chốn (thớ quả sung, cây baobab, rễ cây đa) tự vẽ bằng Shape có vật liệu.
+- [G2] Lớp sky hoặc far có thể là <ShaderLayer shader="sky|nebula|water|caustics|fog|godrays|tissue|aurora" …màu từ props />: bầu trời chuyển màu, tinh vân, mặt nước, vân sáng đáy nước, sương, tia sáng xuyên sương, mô sinh học, cực quang. Chọn shader hợp nơi chốn; không tự viết shader.
+- [G3] KHÔNG KHÍ: <Particles color size> ở lớp sky hoặc far theo nơi chốn (bụi đồng cỏ, phấn hoa rừng, bọt nước, bào tử, bụi sáng, sao).
+
+## 4. Sự sống của nền
+- [B8] CHUYỂN ĐỘNG CHẬM: cỏ, lá, rong, mây, sóng, tế bào trôi — biên độ nhỏ, chu kỳ ≥ 3 giây, lệch pha theo vị trí; không gì nhanh hơn nhân vật.
+- [B9] Nguồn sáng và đốm phát quang thở chậm, lệch pha nhau.
+
+## 5. Tên
+- [B7] Tên tiếng Anh PascalCase kết thúc bằng Backdrop (FigInteriorBackdrop, RainforestBackdrop, SavannaBackdrop).

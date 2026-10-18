@@ -6,6 +6,13 @@ import React from 'react';
 import {registerRoot, Composition, AbsoluteFill} from 'remotion';
 import {Stage} from '../conceptflow-mini/primitives';
 import * as K from '../conceptflow-mini/illustration';
+import {LookProvider} from '../conceptflow-mini/film';
+import {useKit} from '../conceptflow-mini/kits';
+
+/** Contact sheets are lit with the kit's neutral preview look. */
+function Lit({children}: {children: React.ReactNode}) {
+  return <LookProvider look={useKit().previewLook}>{children}</LookProvider>;
+}
 
 function Label({x, y, children}: {x: number; y: number; children: React.ReactNode}) {
   return <div style={{position: 'absolute', left: x - 150, top: y, width: 300, textAlign: 'center', fontSize: 26, color: '#3A1F4B', fontWeight: 700}}>{children}</div>;
@@ -14,7 +21,7 @@ function Label({x, y, children}: {x: number; y: number; children: React.ReactNod
 function People() {
   const poses: K.PersonPose[] = ['stand', 'sit', 'wave', 'point', 'think', 'cheer', 'ouch', 'shrug', 'walk'];
   return (
-    <Stage>
+    <Lit><Stage>
       <K.Backdrop color="#FFC857" floor="#FFB347" floorY={900} />
       {poses.map((p, i) => (
         <React.Fragment key={p}>
@@ -27,7 +34,7 @@ function People() {
           <K.Person x={180 + i * 260} y={860} size={300} mood={m} talking={false} still />
         </React.Fragment>
       ))}
-    </Stage>
+    </Stage></Lit>
   );
 }
 
@@ -71,7 +78,7 @@ function Things() {
   ];
   const cols = 8;
   return (
-    <Stage>
+    <Lit><Stage>
       <K.Backdrop color="#FFE3A3" />
       {items.map(([name, el], i) => {
         const cx = 120 + (i % cols) * 240;
@@ -84,7 +91,7 @@ function Things() {
         );
       })}
       <K.Bubble x={1700} y={960} w={300} h={100} flip>Đường!</K.Bubble>
-    </Stage>
+    </Stage></Lit>
   );
 }
 

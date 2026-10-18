@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -36,6 +37,7 @@ type Router struct {
 	suggestPublishMetadata  suggestPublishMetadataUseCase
 	prompts                 promptsUseCase
 	archetypes              archetypesUseCase
+	visualLanguages         visualLanguagesUseCase
 	illustrations           illustrationsUseCase
 	projectIllustrations    projectIllustrationsUseCase
 	renderPrompt            renderPromptUseCase
@@ -70,6 +72,7 @@ func (rt *Router) Handler() http.Handler {
 	// Prompt wording lives in the DB. Public read (the wizard fetches the
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
 	r.Get("/v1/video-archetypes", rt.handleListArchetypes)
+	rt.visualLanguageRoutes(r)
 	rt.illustrationRoutes(r)
 	rt.projectIllustrationRoutes(r)
 	// The idea step's brief and the review units of every step. See ADR-0035.
@@ -787,6 +790,10 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"story_model":      state.Models.Story,
 		"storyboard_model": state.Models.Storyboard,
 		"code_model":       state.Models.Code,
+		// The visual language the project is pinned to; "" for a project with no pin.
+		"visual_language_id":      state.Language.ID,
+		"visual_language_version": strconv.Itoa(state.Language.Version),
+		"kit_key":                 state.Language.KitKey,
 	})
 }
 

@@ -3,11 +3,12 @@ import json
 from app import storyboard as sbm
 from app.pipeline import autofix, merger
 from app.pipeline.checker import Diagnostic
+from tests.lights import light
 
 SB = sbm.parse(json.dumps({
     "hero": "h",
     "palette": [{"role": "accent", "hex": "#F5B841"}],
-    "scenes": [{"id": "hook", "shots": [{"id": "1.1", "visual": "v", "narration": "Câu một."},
+    "scenes": [{"id": "hook", "light": light("accent"), "shots": [{"id": "1.1", "visual": "v", "narration": "Câu một."},
                                          {"id": "1.2", "visual": "v", "narration": "Câu hai."}]}],
 }))
 

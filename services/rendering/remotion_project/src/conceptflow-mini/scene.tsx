@@ -4,8 +4,9 @@
  *
  *   - `Scene` stacks a shot in depth layers (sky, far, mid, the shot's own
  *     figures, near) that fill the whole frame and a little beyond it, drifts
- *     each layer at its own speed when the camera moves (parallax), blurs the
- *     near layer like a shallow depth of field, and darkens the corners;
+ *     each layer at its own speed when the camera moves (parallax), blurs each
+ *     layer by its distance from the focus layer, lays distance haze over the
+ *     far and mid layers and a bloom around the scene's light source;
  *   - `Camera` is the same camera move for a shot that has no Scene;
  *   - `Glow`, `LightRays` and `Vignette` are the light: a halo behind what
  *     matters, rays from a source, darker corners;
@@ -22,6 +23,8 @@
  */
 import React from 'react';
 import {AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {withAlpha, useLook} from './film';
+import {useKit} from './kits';
 
 /** Where the camera looks: the frame point shown at the centre, and the zoom. */
 export type CameraPoint = {x: number; y: number; zoom?: number};
@@ -118,6 +121,9 @@ export function Camera({
   );
 }
 
+/** What a backdrop drawing takes: its depth layer and the three palette colours of the place. */
+export type BackdropInput = {layer: 'sky' | 'far' | 'mid' | 'near'; color: string; ground: string; light: string; still?: boolean};
+
 /** The box a depth layer is drawn in: the frame plus its overscan, in frame px. */
 export type LayerBox = {left: number; top: number; width: number; height: number};
 
@@ -174,13 +180,12 @@ function Layer({
  * - `sky`: the farthest layer, never moves (a Backdrop, a backdrop drawing's
  *   sky layer).
  * - `far`, `mid`: scenery behind the figures (hills, walls, shelves).
- * - `near`: scenery in front of the figures, blurred by `blurNear` px (leaves,
- *   a table edge, a cell wall seen up close). Keep it at the frame edges.
+ * - `near`: scenery in front of the figures (leaves, a table edge, a cell
+ *   wall seen up close). Keep it at the frame edges.
  * - `backdrop`: a backdrop drawing (MeadowBackdrop, a library backdrop...);
  *   it fills every layer not given explicitly, with `backdropProps`.
  * - `camera`: the move, in frame coordinates; zoom ≥ 1. A pan at zoom 1 stays
  *   within about 10% of the frame, or the overscan runs out.
- * - `vignette`: how dark the corners get, 0 to 0.6.
  * - `duration`: the shot's own length in frames.
  */
 export function Scene({
@@ -192,38 +197,67 @@ export function Scene({
   mid,
   near,
   camera,
-  vignette = 0.35,
-  blurNear = 10,
   children,
 }: {
   duration: number;
-  backdrop?: React.ComponentType<{layer: 'sky' | 'far' | 'mid' | 'near'} & Record<string, unknown>>;
-  backdropProps?: Record<string, unknown>;
+  backdrop?: React.ComponentType<BackdropInput>;
+  backdropProps?: Omit<BackdropInput, 'layer'>;
   sky?: React.ReactNode;
   far?: React.ReactNode;
   mid?: React.ReactNode;
   near?: React.ReactNode;
   camera?: CameraMove;
-  vignette?: number;
-  blurNear?: number;
   children?: React.ReactNode;
 }) {
   const cam = useCamera(camera, duration);
+  const look = useLook();
+  const kit = useKit();
+  const blurOf = (layer: 'sky' | 'far' | 'mid' | 'near') => (look.focus === layer ? 0 : kit.dof[layer]);
+  const haze = (density: number) => (
+    <AbsoluteFill
+      data-cf-layer={LIGHT}
+      style={{pointerEvents: 'none', backgroundColor: withAlpha(look.atmosphere.color, density * look.atmosphere.density)}}
+    />
+  );
+  if (Backdrop && !backdropProps) throw new Error('Scene có backdrop thì phải có backdropProps {color, ground, light} lấy từ PALETTE');
   const fromBackdrop = (layer: 'sky' | 'far' | 'mid' | 'near') =>
-    Backdrop ? <Backdrop layer={layer} {...backdropProps} /> : null;
+    Backdrop && backdropProps ? <Backdrop layer={layer} {...backdropProps} /> : null;
   sky = sky ?? fromBackdrop('sky');
   far = far ?? fromBackdrop('far');
   mid = mid ?? fromBackdrop('mid');
   near = near ?? fromBackdrop('near');
   return (
     <AbsoluteFill style={{overflow: 'hidden'}}>
-      {sky ? <Layer depth={DEPTH.sky} cam={cam} overscan>{sky}</Layer> : null}
-      {far ? <Layer depth={DEPTH.far} cam={cam} overscan>{far}</Layer> : null}
-      {mid ? <Layer depth={DEPTH.mid} cam={cam} overscan>{mid}</Layer> : null}
+      {sky ? <Layer depth={DEPTH.sky} cam={cam} blur={blurOf('sky')} overscan>{sky}</Layer> : null}
+      {far ? <Layer depth={DEPTH.far} cam={cam} blur={blurOf('far')} overscan>{far}</Layer> : null}
+      {far ? haze(kit.haze.far) : null}
+      {mid ? <Layer depth={DEPTH.mid} cam={cam} blur={blurOf('mid')} overscan>{mid}</Layer> : null}
+      {mid ? haze(kit.haze.mid) : null}
       <Layer depth={1} cam={cam} overscan={false}>{children}</Layer>
-      {near ? <Layer depth={DEPTH.near} cam={cam} blur={blurNear} overscan>{near}</Layer> : null}
-      {vignette > 0 ? <Vignette strength={vignette} /> : null}
+      {near ? <Layer depth={DEPTH.near} cam={cam} blur={blurOf('near')} overscan>{near}</Layer> : null}
+      <LightBloom />
     </AbsoluteFill>
+  );
+}
+
+/**
+ * The halo around the scene's main light source, drawn over everything with
+ * the `screen` blend so bright things bloom without darkening what is behind.
+ */
+function LightBloom() {
+  const look = useLook();
+  const kit = useKit();
+  const {x, y, color, intensity} = look.light;
+  return (
+    <AbsoluteFill
+      data-cf-layer={LIGHT}
+      style={{
+        pointerEvents: 'none',
+        mixBlendMode: 'screen',
+        opacity: kit.bloom * intensity,
+        backgroundImage: `radial-gradient(circle at ${x * 100}% ${y * 100}%, ${withAlpha(color, 0.9)} 0%, ${withAlpha(color, 0.35)} ${kit.glowBlur * 250}%, ${withAlpha(color, 0)} ${kit.glowBlur * 700}%)`,
+      }}
+    />
   );
 }
 

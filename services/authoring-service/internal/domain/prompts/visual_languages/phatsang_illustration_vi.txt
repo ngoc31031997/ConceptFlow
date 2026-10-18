@@ -1,0 +1,64 @@
+# LUẬT VẼ HÌNH — KHOA HỌC PHÁT SÁNG
+
+Phim khoa học vẽ bằng tranh vector 2D: khối hình học bo tròn, không viền, và ÁNH SÁNG KỂ CHUYỆN — mọi khối được nguồn sáng của cảnh chiếu vào: mép hướng về nguồn có viền sáng, phía kia chìm vào bóng, vật phát sáng toả quầng. Màu theo thực tế của vật và theo bảng màu của video: cảnh có thể sáng rực hay tối sâu, lối vẽ vẫn là một. Bạn DỰNG HÌNH KHỐI và CHỌN VẬT LIỆU; ánh sáng, bóng, viền sáng, vân bề mặt do kit tính theo nguồn sáng của cảnh. Hình phải đọc được trong nửa giây khi nhỏ, và giàu chi tiết khi phóng to nếu nó là vật chính.
+
+## 0. Tinh thần
+- HÌNH HỌC TRƯỚC, CHI TIẾT SAU: dựng vật từ khối cơ bản (tròn, bầu dục, viên thuốc, chữ nhật bo góc, tam giác bo đỉnh); khối nào không giúp nhận ra vật thì bỏ.
+- ĐỌC BẰNG SILHOUETTE: tô kín bằng một màu vẫn đoán ra vật gì.
+- MỘT ĐIỂM NHẤN: mỗi hình một chỗ thu hút mắt nhất (mắt, lõi phát sáng, bộ phận đang được giải thích).
+- DÁNG CÓ HƯỚNG: vật sống nghiêng, vươn, cúi theo ý của nó; vật vô tri đặt chéo 3–8° hoặc có một chi tiết đang xảy ra.
+- PHÓNG ĐẠI CÓ CHỦ Ý: thứ quan trọng cho câu chuyện to và rõ hơn thật, thứ phụ nhỏ và đơn giản hơn.
+
+## 1. Hạng của hình (ghi kèm mô tả: vai của hình trong video này)
+- [T1] CHÍNH (hero) — vật hay nhân vật mà phim hoặc cảnh nói về nó. 80–400 hình con. Chia bộ phận bằng <Part name> (máy móc) hoặc <Bone name> (nhân vật, con vật). Đủ mọi chi tiết nhận dạng và chi tiết kỹ thuật mà lời thoại có thể nhắc (máy bay: thân, cánh, cánh tà, đuôi đứng, đuôi ngang, động cơ, cánh quạt hoặc tua-bin, càng, cửa sổ buồng lái). Máy móc mà phim giải thích cấu tạo có prop view: 'outside' | 'cutaway' (bổ đôi, thấy bên trong) | 'exploded' (bộ phận tách ra theo trục). Chất liệu khác nhau cho từng phần.
+- [T2] PHỤ (support) — có mặt, có vai nhỏ. 20–80 hình con. Đủ để nhận ra ngay, vài bộ phận chuyển động; không cắt lớp.
+- [T3] PHÔNG (background) — đám đông, vật xa, vật trang trí. 3–15 hình con. Một khối silhouette rõ dáng, một vật liệu, không mặt, không chi tiết bên trong.
+→ cảnh báo khi số hình con ngoài khoảng của hạng.
+
+## 2. Hình khối và vật liệu
+- [S1] KHỐI CHÍNH LÀ <Shape> CỦA KIT: <Shape d="…" | ellipse | rect | capsule material="…" color={…} depth={0..1} />. Tự vẽ <path>/<circle> tô phẳng chỉ cho chi tiết nhỏ (mắt, vạch, chấm, khe). KHÔNG pattern, <image>, <text>, foreignObject, KHÔNG tự viết <filter> (kit lo mờ, vân, quầng). Gradient tự viết chỉ khi vật thật sự có dải màu (cầu vồng, quang phổ): tối đa 8 (chính), 4 (phụ), 0 (phông). → LỖI.
+- [S2] KHÔNG VIỀN: khối có fill không có stroke. Stroke chỉ cho chi tiết mảnh (miệng, râu, dây, tia), màu ink của kit hoặc một màu sáng. → cảnh báo.
+- [S3] BO TRÒN: góc rx ≥ 6, khối lớn bo theo token radius; strokeLinecap/strokeLinejoin="round". Vật nhọn thật (gai, răng, tinh thể) bo nhẹ đỉnh 2–4 px.
+- [S5] GÓC NHÌN PHẲNG: thẳng hoặc ngang, không phối cảnh 3D. Muốn có khối thì thêm MỘT mặt bên hoặc mặt trên mỏng (Shape riêng, depth thấp).
+- [S5b] KHỐI LỒNG LỚP: vật phức tạp (tế bào, cỗ máy, cơ quan) là các lớp từ ngoài vào trong, lớp trong nhỏ và sáng hơn.
+- [M1] MỖI KHỐI MỘT VẬT LIỆU, chọn theo vật thật:
+  matte — nhựa mờ, gốm, giấy, sơn · glossy — nhựa bóng, vỏ cứng, quả chín, vỏ bọ · metal — kim loại (dải phản chiếu) · glass — kính, giọt nước, màng trong (thấy lớp sau, viền sáng mạnh) · skin — da người · fur — lông thú · fabric — vải · wood — gỗ · stone — đá, đất · organic — thịt quả, mô, nội tạng (trong mờ, sáng xuyên mép) · leaf — lá, cánh hoa (gân, xuyên sáng) · liquid — chất lỏng · emissive — vật phát sáng.
+  Hai khối cạnh nhau khác vật liệu hoặc khác độ sáng rõ. → cảnh báo khi khối lớn không phải Shape có vật liệu.
+- [M2] depth: 0 là mảnh phẳng (lá, tờ giấy), 1 là khối tròn đầy (quả, đầu); kit đặt độ cong của sáng tối theo nó.
+
+## 3. Ánh sáng (kit tính — bạn KHÔNG tự vẽ)
+- [L1] Không tự vẽ bóng, viền sáng, điểm bóng cho khối đã có vật liệu: kit tính theo nguồn sáng của cảnh và vị trí của hình. Bạn chỉ quyết thứ tự vẽ (khối trước đè khối sau) để kit đặt bóng tiếp xúc đúng chỗ.
+- [L2] Vật phát sáng: material="emissive" và prop glow (0–1); kit tạo lõi, quầng, loang sáng và chiếu nhẹ lên khối gần. Tối đa hai chỗ phát sáng một hình.
+- [L3] Vật đứng trên sàn có <GroundShadow cx cy rx />; kit kéo bóng theo hướng sáng, đổi thành vệt sáng dưới vật phát sáng.
+
+## 4. Màu
+- [S9] MÀU THEO THỰC TẾ CỦA VẬT: mặc định của prop color là màu tự nhiên dễ nhận ra (lá xanh lục, máu đỏ, ruột quả sung hồng, vỏ sung chín tím, cát vàng); Kỹ sư đổi theo PALETTE của video.
+- [S10] TỐI ĐA 5 MÀU GỐC một hình (không tính màu kit dẫn xuất). Một màu chủ đạo (~60% diện tích), một–hai màu phụ cùng nhóm, một màu nhấn tương phản (~10%).
+- [S10b] HÌNH PHẢI NỔI TRÊN NỀN CỦA CẢNH, dù nền sáng hay tối: giữ màu chính đổi được để Kỹ sư đẩy độ sáng khác hẳn nền.
+- [S11] KHÔNG ĐEN THUẦN: nét và mắt dùng ink của kit, không #000000. → cảnh báo.
+- [S12] Màu chính đổi qua prop color (và prop màu phụ nếu cần); không viết cứng màu bên trong ngoài chi tiết nhỏ. → cảnh báo.
+
+## 5. Nhân vật, con vật, máy móc
+- [S13] MẶC ĐỊNH KHÔNG CÓ MẶT. Đồ vật, công trình, nơi chốn, thiên nhiên không gắn mặt. Chỉ nhân vật được nhân hoá (mô tả ghi rõ, hoặc phải biểu lộ cảm xúc) mới có mặt; không chắc thì không vẽ mặt.
+- [R1] NHÂN VẬT VÀ CON VẬT hạng chính và phụ dựng trên <Rig skeleton="humanoid|quadruped|bird|fish|insect|worm">: vẽ da cho từng <Bone name pivot={[x, y]}> theo bảng xương của kit (pivot là chỗ khớp quay, đặt ở mép chồng giữa hai bộ phận để khi xoay không hở). Thiếu xương bắt buộc → LỖI. Dáng, hành động, chu kỳ, biểu cảm KHÔNG tự viết: nhận props pose, actions, cycle, reach, lookAt, mood và chuyển nguyên cho Rig.
+- [R2] MẮT VÀ MIỆNG dùng <Eyes>, <Brows>, <Mouth> của kit (mắt chấm ink có chấm sáng, lòng trắng tròn cho nhân vật nhân hoá); không tự vẽ kiểu mắt khác.
+- [R3] MÁY MÓC hạng chính dựng trên <Mechanism view={view}> với <Part name pivot motion="rotate|hinge|slide|none">: cánh quạt quay theo speed, cánh tà và cửa theo angle, piston theo offset. Bộ phận nào xuất hiện ở kiểu cutaway/exploded thì khai báo ở Part đó.
+- [S14] NGƯỜI: dùng <Person> (đã dựng trên rig). Chỉ vẽ người mới khi cần trang phục, dáng người mà Person không có — khi đó dựng Rig humanoid với da mới.
+- [S15] CON VẬT ĐÚNG LOÀI: đặc điểm nhận dạng (tai, mõm, mỏ, sừng, vây, đuôi) bằng khối hình học; không lông từng sợi (vật liệu fur lo vân lông).
+- [S15b] VI MÔ (tế bào, vi khuẩn, virus, phân tử): khối tròn hoặc viên thuốc vật liệu organic hoặc glass, màng ngoài là một Shape riêng, 2–5 bào quan bên trong; gai, roi, thụ thể là Part nhỏ phân bố đều; nhân tế bào là điểm nhấn.
+
+## 6. Khung và toạ độ
+- [S16] MỘT component export function TênPascalCase(props) bọc trong <Figure {...fig} size={fig.size ?? <cỡ>} vw={..} vh={..}>; vật lấp gần kín hộp, chừa lề 5% và chỗ cho quầng sáng, biên độ chuyển động. → LỖI khi thiếu Figure.
+- [S17] Nhận FigureProps (x, y, size, rotate, flip, scale, opacity, still) và truyền nguyên cho Figure.
+- [S18] Vật nhìn ngang quay đầu sang PHẢI (flip để quay trái).
+- [S25] Id của gradient, clipPath, mask sinh bằng useSvgId('ten'). → cảnh báo.
+
+## 7. Chuyển động
+- [S19] Hình có Rig hoặc Mechanism: chuyển động do kit (thở, chớp mắt, quán tính, quay). Hình không có rig mà là vật sống hoặc có năng lượng: chuyển động tự thân nhỏ theo frame (nhún sin(frame/14), bập bềnh sin(frame/22)), phần mềm đung đưa trễ pha, cộng phaseOf(x, y). → cảnh báo khi hình có mặt mà không chuyển động.
+- [S20] Chuyển động nhỏ, đều, lặp liền mạch, nhịp mềm; tắt được bằng still. → cảnh báo.
+- [S21] Trạng thái mang nghĩa là PROP (mood, open, on, level, glow, view…), khác nhau rõ khi nhìn từ xa.
+- [S22] Chỉ useCurrentFrame, interpolate, spring, Easing; KHÔNG Math.random, Date.now, CSS animation, setTimeout; vị trí "ngẫu nhiên" tính từ chỉ số. → LỖI.
+
+## 8. Tên và mô tả
+- [S23] Tên tiếng Anh PascalCase, danh từ của vật (Airplane, RedBloodCell), không mang màu hay trạng thái.
+- [S24] Tên hiển thị tiếng Việt ngắn; thẻ là từ người ta sẽ tìm; dòng "Cách gọi" liệt kê mọi prop, hạng và tỉ lệ hộp: <Airplane color view /> — chính — 480×200.

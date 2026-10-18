@@ -37,6 +37,12 @@ type DrawRequest struct {
 	Model       string // optional model override
 	// Kind is a figure (default) or a backdrop: it picks the drawer's rules.
 	Kind domain.IllustrationKind
+	// ProjectID, when set, draws for that project: its pinned language's rules
+	// and kit, and the tier below. Empty = a library drawing under the active language.
+	ProjectID string
+	// Tier is the role the drawing plays in the video (hero, support, background);
+	// a library drawing takes it from its detail level.
+	Tier domain.Tier
 	// OnProgress, when set, hears each attempt's phase as it happens.
 	OnProgress func(domain.DrawProgress)
 }
@@ -139,7 +145,7 @@ func (uc *IllustrationsUseCase) references(ctx context.Context, folderID, skipID
 // drawerSystem is the drawer's system prompt for a figure or a backdrop.
 // Without a drawer there is nothing to prompt, which is reported as such
 // before the style rules are read.
-func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string, kind domain.IllustrationKind) (string, error) {
+func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skipID string, kind domain.IllustrationKind, lr languageRules, tier domain.Tier) (string, error) {
 	if uc.drawer == nil {
 		return "", ErrDrawerDisabled
 	}
@@ -150,13 +156,10 @@ func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skip
 	if refs == "" {
 		refs = "(Chưa có hình tham chiếu — dựng đúng theo luật style và linh kiện ở trên.)"
 	}
-	style, err := uc.StyleRules(ctx)
-	if err != nil {
-		return "", fmt.Errorf("load illustration style: %w", err)
-	}
+	style := strings.TrimSpace(lr.Rules.Illustration)
 	if kind == domain.IllustrationBackdrop {
 		return strings.NewReplacer(
-			"{{style}}", domain.BackdropStyleGuide(),
+			"{{style}}", strings.TrimSpace(lr.Rules.Backdrop),
 			"{{figure_style}}", style,
 			"{{helpers}}", domain.BackdropHelpers(),
 			"{{references}}", refs,
@@ -164,15 +167,28 @@ func (uc *IllustrationsUseCase) drawerSystem(ctx context.Context, folderID, skip
 	}
 	return strings.NewReplacer(
 		"{{style}}", style,
+		"{{tier}}", tierInstruction(tier),
 		"{{helpers}}", domain.IllustrationHelpers(),
 		"{{references}}", refs,
 	).Replace(drawerPromptVI), nil
 }
 
+// tierInstruction tells the drawer which role the drawing plays in this video.
+func tierInstruction(t domain.Tier) string {
+	switch domain.TierOrSupport(t) {
+	case domain.TierHero:
+		return "HẠNG CHÍNH (hero): hình này là vật hoặc nhân vật mà video nói về — vẽ kỹ, 80–400 hình con, chia bộ phận (<Part>, <Bone>)."
+	case domain.TierBackground:
+		return "HẠNG PHÔNG (background): hình này chỉ là vật xa hoặc trang trí — 3–15 hình con, một khối rõ dáng, một vật liệu, không mặt."
+	}
+	return "HẠNG PHỤ (support): hình này có vai nhỏ — 20–80 hình con, đủ để nhận ra ngay, vài bộ phận chuyển động."
+}
+
 // draw runs the model until the renderer accepts the drawing. user is the
 // first turn; each failed attempt adds the code it produced and the errors.
 func (uc *IllustrationsUseCase) draw(
-	ctx context.Context, system, user, model string, kind domain.IllustrationKind, onProgress func(domain.DrawProgress),
+	ctx context.Context, system, user, model string, kind domain.IllustrationKind, lr languageRules, tier domain.Tier,
+	onProgress func(domain.DrawProgress),
 ) (drawnReply, IllustrationPreview, error) {
 	if uc.drawer == nil {
 		return drawnReply{}, IllustrationPreview{}, ErrDrawerDisabled
@@ -222,7 +238,7 @@ func (uc *IllustrationsUseCase) draw(
 			continue
 		}
 		report(domain.DrawProgress{Attempt: attempt, Phase: "checking", ContentChars: len(res.Content)})
-		preview, rerr := uc.render(ctx, reply.Name, reply.Code, kind)
+		preview, rerr := uc.render(ctx, lr.KitKey, reply.Name, reply.Code, kind, tier)
 		if rerr == nil {
 			return reply, preview, nil
 		}
@@ -247,17 +263,23 @@ func (uc *IllustrationsUseCase) Draw(ctx context.Context, req DrawRequest) (doma
 		user += "\nTên component bắt buộc: " + n
 	}
 	kind := domain.KindOrFigure(req.Kind)
-	system, err := uc.drawerSystem(ctx, req.FolderID, "", kind)
+	lr, err := uc.rulesFor(ctx, req.ProjectID)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
-	reply, preview, err := uc.draw(ctx, system, user, req.Model, kind, req.OnProgress)
+	tier := domain.TierOrSupport(req.Tier)
+	system, err := uc.drawerSystem(ctx, req.FolderID, "", kind, lr, tier)
+	if err != nil {
+		return domain.Illustration{}, err
+	}
+	reply, preview, err := uc.draw(ctx, system, user, req.Model, kind, lr, tier, req.OnProgress)
 	if err != nil {
 		return domain.Illustration{}, err
 	}
 	i := domain.Illustration{
 		Name: reply.Name, Title: reply.Title, FolderID: req.FolderID, Tags: strings.Split(reply.Tags, ","),
 		Description: reply.Description, Usage: reply.Usage, Code: reply.Code, Kind: kind,
+		KitKey: lr.KitKey, DetailLevel: domain.DetailFor(tier),
 	}
 	if i, err = normalizeIllustration(i); err != nil {
 		return i, err
@@ -291,11 +313,19 @@ func (uc *IllustrationsUseCase) Redraw(ctx context.Context, id, note, model stri
 	} else {
 		user += "\nCreator chưa ưng hình này: vẽ một phiên bản khác, đúng luật style hơn."
 	}
-	system, err := uc.drawerSystem(ctx, existing.FolderID, existing.ID, existing.Kind)
+	lr, err := uc.rulesFor(ctx, "")
 	if err != nil {
 		return existing, err
 	}
-	reply, preview, err := uc.draw(ctx, system, user, model, existing.Kind, nil)
+	if existing.KitKey != "" {
+		lr.KitKey = existing.KitKey
+	}
+	tier := tierForDetail(existing.DetailLevel)
+	system, err := uc.drawerSystem(ctx, existing.FolderID, existing.ID, existing.Kind, lr, tier)
+	if err != nil {
+		return existing, err
+	}
+	reply, preview, err := uc.draw(ctx, system, user, model, existing.Kind, lr, tier, nil)
 	if err != nil {
 		return existing, err
 	}

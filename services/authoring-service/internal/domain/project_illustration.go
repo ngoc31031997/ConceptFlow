@@ -23,7 +23,12 @@ type ProjectIllustration struct {
 	Description string `json:"description"`
 	FolderID    string `json:"folder_id"`
 	// Kind is a figure of some shots or the backdrop of a whole scene.
-	Kind           IllustrationKind         `json:"kind"`
+	Kind IllustrationKind `json:"kind"`
+	// Tier is the role of the drawing in this video (hero, support,
+	// background), proposed by the AI with TierReason and changed by the Creator
+	// before the drawing is made.
+	Tier           Tier                     `json:"tier"`
+	TierReason     string                   `json:"tier_reason"`
 	Shots          []string                 `json:"shots"`
 	State          ProjectIllustrationState `json:"state"`
 	Error          string                   `json:"error,omitempty"`

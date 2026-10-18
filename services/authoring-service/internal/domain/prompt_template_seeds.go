@@ -19,14 +19,13 @@ func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleStoryArchitect, Language: "vi", Version: 12, TemplateText: bt(storyArchitectVI)},
 		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
-		{Role: RoleVisualDirector, Language: "vi", Version: 12, TemplateText: bt(visualDirectorVI)},
-		{Role: RoleRemotionEngineer, Language: "vi", Version: 8, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
-		{Role: RoleVisualDirectorAI, Language: "vi", Version: 6, TemplateText: bt(visualDirectorAIVI)},
-		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 6, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
+		{Role: RoleVisualDirector, Language: "vi", Version: 13, TemplateText: bt(visualDirectorVI)},
+		{Role: RoleRemotionEngineer, Language: "vi", Version: 9, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
+		{Role: RoleVisualDirectorAI, Language: "vi", Version: 7, TemplateText: bt(visualDirectorAIVI)},
+		{Role: RoleRemotionEngineerAI, Language: "vi", Version: 7, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerAIVI)))},
 		// Bodies embedded from the exact text of the shipped TypeScript prompts.
 		{Role: RoleRemotionAdjust, Language: "vi", Version: 1, TemplateText: remotionAdjustTemplate},
 		{Role: RoleThumbnailDesign, Language: "vi", Version: 1, TemplateText: thumbnailDesignTemplate},
-		{Role: RoleIllustrationStyle, Language: "vi", Version: 1, TemplateText: IllustrationStyleGuide()},
 	}
 }
 
@@ -336,7 +335,7 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
   - kéo ra — cảnh cũ thu nhỏ lại, trở thành một phần của cảnh mới lớn hơn.
   - cắt thẳng sang cảnh trống — chỉ khi muốn tạo cú ngắt có chủ đích (đổi hẳn góc nhìn, một câu hỏi mới).
 - **Màu và ánh sáng:** nói theo VAI TRÒ và CẢM XÚC — "màu nhấn cho thứ đang được chú ý", "phần còn lại chìm về tông mờ", "màu cảnh báo khi hiểu lầm lộ ra", "màu thứ hai cho phe đối lập" — VÀ ghi luôn MÃ MÀU HEX cụ thể cho từng vai trò (ví dụ ¤#F5B841¤). Bạn là người duy nhất quyết định màu: bước dựng chỉ chép đúng mã bạn ghi, không tự chọn thêm màu nào.
-- **Bối cảnh và nền:** mỗi cảnh diễn ra ở MỘT NƠI CHỐN phủ kín khung hình, không phải vài vật lơ lửng trên nền trống. Ghi BỐI CẢNH của cảnh gồm: nơi chốn cụ thể (căn bếp buổi tối, khu vườn sau nhà, lòng một quả sung, bên trong mạch máu); các lớp sâu — lớp xa (trời, tường, đồi), lớp giữa (đồ đạc, cây cối phía sau nhân vật), lớp gần (thứ sát ống kính, mờ đi như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào); nguồn sáng (nắng chiều từ cửa sổ, quầng sáng trong lòng quả, tia sáng xuyên lá); và TÔNG MÀU CHỦ ĐẠO của cảnh — mỗi cảnh một tông bão hoà (cam đỏ ấm, tím hồng, xanh lá tươi), đổi tông khi đổi nơi chốn. Ý tự nó trừu tượng (một con số, một đồ thị, một phép so sánh) được dùng MỘT MÀU NỀN SÁNG, BÃO HOÀ phủ kín khung — gợi ý vàng ¤#FFD84D¤, xanh cyan ¤#2EC4F0¤, hồng ¤#FF9EC4¤, tím ¤#B48CFF¤, xanh lá ¤#8BD86B¤, cam ¤#FFB25B¤ — đổi màu nền khi đổi ý, và có thể chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, nửa phải là thế giới vi mô). MỖI CẢNH BẮT BUỘC có một vai trò màu nền trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"); không có nền mặc định. Phim tông tối chỉ khi chủ đề đòi (đêm, hang động, vũ trụ, đáy biển) và BỐI CẢNH phải ghi lý do; còn lại nền sáng, tươi. Mỗi màu tông cũng là một vai trò trong BẢNG MÀU. Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 12 màu cho cả phim (tính cả màu nền).
+- **Bối cảnh và nền:** mỗi cảnh diễn ra ở MỘT NƠI CHỐN phủ kín khung hình, không phải vài vật lơ lửng trên nền trống. Ghi BỐI CẢNH của cảnh gồm: nơi chốn cụ thể (căn bếp buổi tối, khu vườn sau nhà, lòng một quả sung, bên trong mạch máu); các lớp sâu — lớp xa (trời, tường, đồi), lớp giữa (đồ đạc, cây cối phía sau nhân vật), lớp gần (thứ sát ống kính, mờ đi như máy ảnh lấy nét sâu: tán lá, mép bàn, vách tế bào); nguồn sáng (nắng chiều từ cửa sổ, quầng sáng trong lòng quả, tia sáng xuyên lá); và TÔNG MÀU của cảnh THEO THỰC TẾ CỦA NƠI CHỐN VÀ CHỦ ĐỀ, lấy từ BẢNG MÀU — sáng hay tối là do nơi chốn quyết định (vũ trụ tối, lòng quả sung hồng sáng, rừng nhiệt đới nhiều tầng xanh lá, đồng cỏ châu Phi vàng), đổi tông khi đổi nơi chốn. Ý tự nó trừu tượng (một con số, một đồ thị, một phép so sánh) đặt trong không gian của thế giới hiện tại, cùng nguồn sáng của cảnh, có thể chia khung thành nhiều MẢNG MÀU (ví dụ nửa trái là căn phòng, nửa phải là thế giới vi mô). MỖI CẢNH BẮT BUỘC có một vai trò màu nền trong BẢNG MÀU (ví dụ "nền phòng — #FFC857 — đời thường"); không có nền mặc định. Mỗi màu tông cũng là một vai trò trong BẢNG MÀU. Mỗi cảnh còn ghi ÁNH SÁNG của nó theo luật cảnh dưới đây. Mọi vật và chữ phải nổi rõ trên nền của mảng nó nằm trên: chữ/nhãn tương phản với nền tối thiểu 4.5:1, màu "chìm về nền" vẫn phải còn nhìn thấy. Không dùng quá 12 màu cho cả phim (tính cả màu nền).
 - **Ánh sáng:** quầng sáng mềm quanh thứ quan trọng, tia sáng toả từ một nguồn, góc khung tối dần để kéo mắt vào giữa — dùng ánh sáng để chỉ chỗ cần nhìn.
 - **Font chữ và phụ đề:** do bước cấu hình chọn — đừng mô tả font, cỡ font hay phụ đề.
 - **Nhịp:** nhanh, bình thường hay chậm — ghi rõ khi nhịp mang nghĩa.
@@ -379,7 +378,8 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 
 17. **HOOK KHÔNG PHẢI THẺ TIÊU ĐỀ.** Frame đầu tiên đã phải có thứ đang chuyển động; không mở bằng một trang chữ đứng yên.
 
-18. **CHỈ VIẾT NHỮNG GÌ DỰNG ĐƯỢC — NHƯNG ĐỪNG TỰ HẠ CẤP THÀNH HÌNH TRỪU TƯỢNG.** Phim được vẽ theo lối TRANH PHẲNG KỂ CHUYỆN: hình vector phẳng, không viền, mảng màu tươi, dáng tròn, mắt chấm — như một cuốn truyện tranh thiếu nhi được làm động. Vật liệu dựng tốt:
+18. **CHỈ VIẾT NHỮNG GÌ DỰNG ĐƯỢC — NHƯNG ĐỪNG TỰ HẠ CẤP THÀNH HÌNH TRỪU TƯỢNG.** Lối vẽ của kênh: {{visual_language}}
+Vật liệu dựng tốt:
     - NGƯỜI (trẻ em, người lớn, người già; áo sơ mi, áo blouse bác sĩ, váy) với dáng đứng, ngồi, vẫy tay, chỉ tay, chống cằm, giơ tay mừng, ôm má, nhún vai, đi bộ, và nét mặt vui / buồn / lo / ngạc nhiên / đau / giận / bình thường; nói chuyện được (miệng mấp máy).
     - CƠ THỂ VÀ SỨC KHOẺ: chiếc răng có mặt (từ khoẻ trắng → đốm nâu → lỗ sâu → vỡ, đổi dần được), vi khuẩn có mặt (ác, vui, buồn), miệng há thấy hai hàm răng (chỉ định răng nào bị sâu), giọt nước/axit, khiên bảo vệ, trái tim đập.
     - ĐỒ ĂN: kẹo, kẹo mút, ly nước ngọt, bánh donut, quả táo.
@@ -390,6 +390,9 @@ Mô tả bằng lời tự nhiên, cụ thể như đang dặn một người qu
 19. **MINH HOẠ ĐÚNG CÁI ĐANG NÓI.** Đây là luật quan trọng nhất về nội dung hình. Khi THOẠI nhắc tới một người, một vật, một bộ phận cơ thể, một món ăn, một nơi chốn hay một việc đang xảy ra, HÌNH phải cho thấy CHÍNH thứ đó — hoặc một hình ảnh mà người xem nhận ra ngay là nó — chứ không phải một hình tròn hay mũi tên tượng trưng. Nói về sâu răng thì thấy chiếc răng, vi khuẩn, viên kẹo, bàn chải; nói về một ông cụ ngồi chờ thì thấy ông cụ ngồi bên bàn và chiếc đồng hồ. Phép thử: tắt tiếng, chỉ nhìn hình — người xem có đoán được câu thoại đang nói về cái gì không? Nếu không, vẽ lại shot đó. Hình trừu tượng chỉ dành cho ý tự nó trừu tượng, và ngay cả khi đó, gắn nó vào vật cụ thể đã có trên màn hình (con số hiện cạnh chiếc răng, không trôi giữa khung trống).
 
 20. **CẢNH KÍN KHUNG, CÓ CHIỀU SÂU VÀ ÁNH SÁNG.** Không shot nào là một vật nhỏ lọt thỏm giữa nền một màu. Nhân vật đứng TRONG bối cảnh của cảnh (lớp xa, lớp giữa phía sau, lớp gần mờ phía trước), máy di chuyển qua các lớp đó, ánh sáng chỉ vào thứ quan trọng. Chuyển cảnh mạnh nhất cho phim kiểu này là đi xuyên qua: máy đẩy thẳng vào một chi tiết (quả sung, tế bào, ô cửa) và chi tiết đó mở ra thành bối cảnh của cảnh sau.
+
+LUẬT CẢNH CỦA NGÔN NGỮ HÌNH:
+{{scene_rules}}
 
 {{frame_rules}}`
 
@@ -407,6 +410,7 @@ CẢNH <n> — <tên beat, giữ đúng id beat của Story Architect>
 Chuyển cảnh vào: <hình nào của cảnh trước trở thành gì ở cảnh này, bằng kiểu chuyển cảnh nào> (bỏ qua ở cảnh 1)
 Không khí: <cảm xúc và nhịp của cảnh — tò mò, căng dần, vỡ lẽ, lắng lại...>
 Bối cảnh: <nơi chốn kín khung; lớp xa / lớp giữa / lớp gần mờ; nguồn sáng; tông màu chủ đạo theo vai trò trong BẢNG MÀU>
+Ánh sáng: <nguồn sáng chính là gì, ở đâu trong khung (x, y từ 0 đến 1), vai trò màu của nó và cường độ 0–1; vai trò màu của ánh sáng phụ; vai trò màu và độ dày không khí (0–1); lớp được lấy nét (sky|far|mid|near|figures); chỉnh màu warmth/contrast/saturation nếu cần>
 Các shot:
   <n>.1 | MÁY: <cỡ cảnh + chuyển động máy> | HÌNH: <nền của cảnh; ai/cái gì xuất hiện / biến đổi / di chuyển, nét mặt và dáng, nằm đâu so với vật khác, màu theo vai trò, nhịp> | THOẠI: "<câu thoại>"
   <n>.2 | MÁY: ... | HÌNH: ... | THOẠI: "..."
@@ -433,7 +437,7 @@ const visualDirectorTailVI = `## TỰ KIỂM TRA TRƯỚC KHI TRẢ LỜI (soi t
 14. Có hình nào nằm ngoài "vật liệu dựng tốt" (3D phối cảnh, ảnh chụp, cử động phức tạp) không? Diễn đạt lại bằng tranh phẳng đơn giản.
 15. Tắt tiếng và chỉ nhìn HÌNH từng shot: có shot nào mà THOẠI nói về một người, vật, bộ phận cơ thể, món ăn hay nơi chốn cụ thể, nhưng HÌNH lại là hình tròn, hình vuông, mũi tên hay chữ không cho thấy thứ đó? Vẽ lại bằng chính thứ đó (luật 19).
 16. Mỗi vật cụ thể lần đầu xuất hiện đã được tả đủ để vẽ chưa (loại cụ thể, dáng, đặc điểm nhận dạng, màu thật)? Có vật nào bị gắn mặt người mà không phải nhân vật biểu lộ cảm xúc — con vật, đồ vật, công trình, thiên nhiên — không? Bỏ mặt đó đi (luật 14).
-17. Mỗi cảnh đã có "Bối cảnh" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) chưa? Có shot nào là vật nhỏ lọt thỏm giữa nền trống, hay vật chính nhỏ hơn 40% chiều khung ngoài toàn cảnh không? (luật 20)
+17. Mỗi cảnh đã có "Bối cảnh" kín khung (nơi chốn, lớp xa/giữa/gần, nguồn sáng, tông màu) và "Ánh sáng" chưa? Có shot nào là vật nhỏ lọt thỏm giữa nền trống, hay vật chính nhỏ hơn 40% chiều khung ngoài toàn cảnh không? (luật 20)
 18. Mỗi shot đã có máy chuyển động hoặc nhân vật đang hành động chưa? Có shot nào khung đứng yên hoàn toàn quá 2 giây không?
 
 Đây là bước 2/3 — bước sau sẽ dựng kịch bản này thành video, nên hãy viết đủ cụ thể để người dựng không phải đoán ý đạo diễn, nhưng tuyệt đối không viết code.`
@@ -524,9 +528,11 @@ Cách dùng (chỉ khi danh sách trên có clip):
 // actually exports.
 const remoC3VI = `## C3. BỘ MINH HOẠ PHẲNG — NGƯỜI, VẬT, BỐI CẢNH VẼ SẴN (DÙNG TRƯỚC TIÊN)
 
-Video của kênh được vẽ theo lối tranh phẳng kể chuyện. Mọi người, bộ phận cơ thể, món ăn, đồ vật và bối cảnh mà kịch bản nói tới được dựng bằng bộ hình vẽ sẵn dưới đây — đã được thiết kế cùng một nét vẽ, có nét mặt và dáng, tự chớp mắt/thở — thay vì vẽ lại từ ¤<path>¤. Clip Lottie (mục C2) chỉ là phần thêm; bộ này là mặc định.
+Video của kênh được vẽ theo MỘT lối vẽ: ánh sáng kể chuyện — hình khối bo tròn không viền, ánh sáng, bóng và viền sáng do kit tính theo ánh sáng của từng cảnh. Mọi người, bộ phận cơ thể, món ăn, đồ vật và bối cảnh mà kịch bản nói tới được dựng bằng bộ hình vẽ sẵn dưới đây — đã được thiết kế cùng một nét vẽ, có nét mặt và dáng, tự chớp mắt/thở — thay vì vẽ lại từ ¤<path>¤. Clip Lottie (mục C2) chỉ là phần thêm; bộ này là mặc định.
 
 {{illustration_kit}}
+
+Bản viết tay (không qua hệ thống ghép tự động): khai báo hằng ¤const LOOKS: Record<string, Look> = {scene1: {light: {x, y, color: PALETTE.xxx, intensity}, ambient: PALETTE.xxx, atmosphere: {color: PALETTE.xxx, density}, focus: 'figures', grade: {warmth: 0, contrast: 0, saturation: 0}}, ...}¤ từ dòng "Ánh sáng" của từng cảnh trong kịch bản phân cảnh (¤Look¤ import từ ¤./conceptflow-mini/kits¤), rồi bọc mỗi shot trong ¤<Shot look={LOOKS.sceneN}>¤.
 
 `
 

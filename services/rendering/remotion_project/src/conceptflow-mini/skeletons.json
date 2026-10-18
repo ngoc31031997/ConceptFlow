@@ -1,0 +1,70 @@
+{
+  "humanoid": {
+    "hips": null,
+    "spine": "hips",
+    "head": "spine",
+    "armL": "spine",
+    "foreArmL": "armL",
+    "armR": "spine",
+    "foreArmR": "armR",
+    "thighL": "hips",
+    "shinL": "thighL",
+    "thighR": "hips",
+    "shinR": "thighR"
+  },
+  "quadruped": {
+    "body": null,
+    "neck": "body",
+    "head": "neck",
+    "tail": "body",
+    "foreUpperL": "body",
+    "foreLowerL": "foreUpperL",
+    "foreUpperR": "body",
+    "foreLowerR": "foreUpperR",
+    "hindUpperL": "body",
+    "hindLowerL": "hindUpperL",
+    "hindUpperR": "body",
+    "hindLowerR": "hindUpperR"
+  },
+  "bird": {
+    "body": null,
+    "neck": "body",
+    "head": "neck",
+    "tail": "body",
+    "wingL": "body",
+    "wingR": "body",
+    "legL": "body",
+    "legR": "body"
+  },
+  "fish": {
+    "body": null,
+    "head": "body",
+    "tail": "body",
+    "finTop": "body",
+    "finL": "body",
+    "finR": "body"
+  },
+  "insect": {
+    "thorax": null,
+    "head": "thorax",
+    "abdomen": "thorax",
+    "wingL": "thorax",
+    "wingR": "thorax",
+    "legL1": "thorax",
+    "legL2": "thorax",
+    "legL3": "thorax",
+    "legR1": "thorax",
+    "legR2": "thorax",
+    "legR3": "thorax",
+    "antennaL": "head",
+    "antennaR": "head"
+  },
+  "worm": {
+    "seg1": null,
+    "seg2": "seg1",
+    "seg3": "seg2",
+    "seg4": "seg3",
+    "seg5": "seg4",
+    "seg6": "seg5"
+  }
+}

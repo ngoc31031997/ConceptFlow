@@ -32,3 +32,6 @@ Rig là code chạy trong mọi khung hình của video; lỗi ở đây làm h�
 ## Consequences
 - **Positive**: đổi ngôn ngữ không làm hỏng video đang dở; so được bốn ngôn ngữ trên cùng hai cảnh thử.
 - **Negative / Accepted Trade-offs**: bốn kit phải bảo trì song song; thư viện hình mới phải đọc rõ theo ngôn ngữ đang bật.
+
+## Implementation note (U1)
+U1 giao một ngôn ngữ hệ thống (Khoa học phát sáng, kit `phatsang`); ba ngôn ngữ còn lại chưa có kit. Màu vào qua `Scene.light`, ảnh mẫu qua `StillRenderService` (`/shared/stills`), hạng hình (chính/phụ/phông) và mức chi tiết (Kỹ/Vừa/Bóng) lưu theo project và thư viện.

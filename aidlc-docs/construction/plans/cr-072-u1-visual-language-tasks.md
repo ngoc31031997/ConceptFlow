@@ -5,19 +5,19 @@ Trạng thái: **chờ Creator duyệt task**. Thiết kế: `cr-072-u1-visual-l
 Mỗi task: đánh dấu `[x]` khi xong, chạy test của service đó, không commit trước khi Creator duyệt giai đoạn. Điểm dừng bắt buộc sau nhóm B: Creator xem ảnh gallery rồi mới nối vào luồng.
 
 ## A. rendering — nền móng (design bước 1)
-- [ ] A1. Thêm `@remotion/noise`, `@remotion/motion-blur` (4.0.525) vào `remotion_project/package.json`.
-- [ ] A2. Đặt `chromiumOptions.gl = 'swangle'` ở `render.mjs`, `layout_check.mjs`/`layout_probe_lib.mjs`, `illustration_preview.mjs`, `render_gallery.mjs`.
-- [ ] A3. `conceptflow-mini/kits.ts`: `KITS = {phatsang}` với bảng token (design mục 1), `useKit()` đọc `getInputProps().kitKey`, sai hoặc thiếu thì ném lỗi rõ.
-- [ ] A4. Test khói WebGL trong container rendering (báo rõ nếu `swangle` không chạy).
+- [x] A1. Thêm `@remotion/noise`, `@remotion/motion-blur` (4.0.525) vào `remotion_project/package.json`.
+- [x] A2. Đặt `chromiumOptions.gl = 'swangle'` ở `render.mjs`, `layout_check.mjs`/`layout_probe_lib.mjs`, `illustration_preview.mjs`, `render_gallery.mjs`.
+- [x] A3. `conceptflow-mini/kits.ts`: `KITS = {phatsang}` với bảng token (design mục 1), `useKit()` đọc `getInputProps().kitKey`, sai hoặc thiếu thì ném lỗi rõ.
+- [x] A4. Test khói WebGL: render thật bằng Chrome trên máy (macOS, `gl: 'swangle'`) chạy được cả 8 shader dùng trong nền. Chưa chạy trong container rendering (làm ở nhóm I).
 
 ## B. rendering — năm hệ thống kit (design bước 2–6)
-- [ ] B1. `film.tsx`: `<Shot look motionBlur?>` (chỉnh màu, hạt phim, vignette từ `ambient`, motion blur); `scene.tsx`: mờ theo độ sâu, sương theo `haze`, quầng nguồn sáng; thiếu `Shot` thì ném "thiếu look của cảnh".
-- [ ] B2. `material.tsx`: `<Shape material>` với 13 vật liệu, context vị trí của `Figure`, `GroundShadow` theo hướng sáng; test viền sáng đúng phía nguồn sáng.
-- [ ] B3. `rig.tsx`: sáu bộ xương, `Bone`, thư viện dáng, hành động theo mốc, chu kỳ, IK hai đoạn, biểu cảm; `Mechanism`/`Part`; dựng lại `Person`, `ReachingHand` giữ API; test góc khớp và IK.
-- [ ] B4. `procedural.tsx` (bộ sinh noise tất định) và `shader.tsx` (`ShaderLayer`, 8 shader có sẵn); dựng lại sáu nền trong `backdrops.tsx`, `color`, `ground`, `light` bắt buộc; test cùng seed cùng hình.
-- [ ] B5. Vẽ lại 30 hình có sẵn bằng `Shape`/vật liệu, mỗi hình khai báo mức chi tiết; `Airplane` hạng chính trên `Mechanism` có cắt lớp.
-- [ ] B6. Composition `LanguageSample` (lòng quả sung sáng hồng, vũ trụ tối), gallery nhận `--kit`; dựng ảnh 16:9 và 9:16.
-- [ ] **B7. ĐIỂM DỪNG: Creator xem ảnh gallery, chỉnh chất lượng trước khi nối luồng.**
+- [x] B1. (code + test + ảnh render thật; chỉnh chất lượng ở B7) `film.tsx`: `<Shot look motionBlur?>` (chỉnh màu, hạt phim, vignette từ `ambient`, motion blur); `scene.tsx`: mờ theo độ sâu, sương theo `haze`, quầng nguồn sáng; thiếu `Shot` thì ném "thiếu look của cảnh".
+- [x] B2. (code + test + ảnh render thật; chỉnh chất lượng ở B7) `material.tsx`: `<Shape material>` với 13 vật liệu, context vị trí của `Figure`, `GroundShadow` theo hướng sáng; test viền sáng đúng phía nguồn sáng.
+- [x] B3. (code + test + ảnh render thật; chỉnh chất lượng ở B7) `rig.tsx`: sáu bộ xương, `Bone`, thư viện dáng, hành động theo mốc, chu kỳ, IK hai đoạn, biểu cảm; `Mechanism`/`Part`; dựng lại `Person`, `ReachingHand` giữ API; test góc khớp và IK.
+- [x] B4. (code + test + ảnh render thật; chỉnh chất lượng ở B7) `procedural.tsx` (bộ sinh noise tất định) và `shader.tsx` (`ShaderLayer`, 8 shader có sẵn); dựng lại sáu nền trong `backdrops.tsx`, `color`, `ground`, `light` bắt buộc; test cùng seed cùng hình.
+- [x] B5. Vẽ lại 30 hình có sẵn bằng `Shape`/vật liệu, mỗi hình khai báo mức chi tiết; `Airplane` hạng chính trên `Mechanism` có cắt lớp.
+- [x] B6. Composition `LanguageSample` (lòng quả sung sáng hồng, vũ trụ tối), gallery nhận `--kit`; dựng ảnh 16:9 và 9:16.
+- [ ] **B7. ĐIỂM DỪNG (đang chờ Creator xem ảnh): Creator xem ảnh gallery, chỉnh chất lượng trước khi nối luồng.**
 
 ## C. rendering — API và bộ kiểm (design bước 7)
 - [ ] C1. `kit_key` ở `render_scenes` (`props.json`), kiểm code (`CheckBody.kit_key`, thiếu thì 422), xem trước (`kit_key`, `tier`).

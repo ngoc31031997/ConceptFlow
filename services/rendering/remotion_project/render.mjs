@@ -79,7 +79,7 @@ async function main() {
     // Recommended by Remotion's own Docker guide
     // (https://www.remotion.dev/docs/docker) for containers without a full
     // desktop compositor.
-    chromiumOptions: {enableMultiProcessOnLinux: true},
+    chromiumOptions: {enableMultiProcessOnLinux: true, gl: 'swangle'},
   });
 }
 

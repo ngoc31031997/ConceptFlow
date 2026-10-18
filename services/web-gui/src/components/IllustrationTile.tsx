@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { illustrationPreviewUrl, type Illustration } from "../api/client";
+import { DETAIL_LABEL, illustrationPreviewUrl, type Illustration } from "../api/client";
 import { illustrationStatusLabel } from "../utils/illustrationLabels";
 import { StyleWarnings } from "./StyleWarnings";
 import glass from "../styles/glass.module.css";
@@ -68,6 +68,16 @@ export function IllustrationTile({ illustration: ill, folderName, busy, bust = 0
         {ill.kind === "backdrop" && (
           <span className={`${glass.badge} ${glass.badgeNeutral}`} data-testid={`illustration-kind-${ill.name}`}>
             Nền
+          </span>
+        )}
+        {/* How much detail the picture was drawn with; the tier it plays is decided per video. */}
+        {ill.kind !== "backdrop" && ill.detail_level && (
+          <span
+            className={`${glass.badge} ${glass.badgeNeutral}`}
+            title="Mức chi tiết của bản vẽ. Hạng chính, phụ, phông là vai của hình trong từng video."
+            data-testid={`illustration-detail-${ill.name}`}
+          >
+            {DETAIL_LABEL[ill.detail_level]}
           </span>
         )}
         {ill.warnings?.length > 0 && (

@@ -22,18 +22,37 @@ from adapters.rendering.illustration_previewer import IllustrationPreviewError
 from adapters.rendering.typescript_checker import TypeScriptCheckError
 from application.check_script import CheckScriptUseCase, LayoutContext
 from application.preview_illustration import PreviewIllustrationUseCase
+from application.stills import StillsUseCase
+from domain.kits import UnknownKitError
 from domain.layout_rules import SubtitleBand
 
 logger = logging.getLogger(__name__)
 
 
 class IllustrationBody(BaseModel):
+    kit_key: str  # the visual language the project is pinned to; required
+    # Role of the drawing in this video: "hero", "support" or "background".
+    tier: Literal["hero", "support", "background"] = "support"
     name: str
     code: str = ""  # trống = hình dựng sẵn của bộ minh hoạ
     props: dict = {}
     gif: bool = True
     # "figure" (a figure of a shot) or "backdrop" (a whole-frame place).
     kind: Literal["figure", "backdrop"] = "figure"
+
+
+class StillBody(BaseModel):
+    """One frame of a sample composition of a kit."""
+    composition: str
+    kit_key: str
+    props: dict = {}
+    frame: int = 10
+
+
+class PruneBody(BaseModel):
+    """Stills not in `keep` and older than `min_age_hours` are deleted."""
+    keep: list[str] = []
+    min_age_hours: float = 24
 
 
 class SubtitleBandBody(BaseModel):
@@ -44,6 +63,7 @@ class SubtitleBandBody(BaseModel):
 
 class CheckBody(BaseModel):
     code: str
+    kit_key: str  # the visual language the project is pinned to; required
     scene_class_name: str = ""
     # For the layout check (Remotion only). No band = nothing is
     # burned into the frame; no font = the Stage's default.
@@ -54,6 +74,8 @@ class CheckBody(BaseModel):
 def create_check_app(
     use_case: CheckScriptUseCase, concurrency: int = 2, metrics: CheckMetrics | None = None,
     illustrations: PreviewIllustrationUseCase | None = None,
+    stills: StillsUseCase | None = None,
+    kits: dict[str, int] | None = None,
 ) -> FastAPI:
     metrics = metrics or CheckMetrics()
     app = FastAPI(title="rendering-check")
@@ -83,6 +105,7 @@ def create_check_app(
                     layout = LayoutContext(
                         subtitle_band=SubtitleBand(band.edge, band.px) if band else None,
                         video_font=body.video_font,
+                        kit_key=body.kit_key,
                     )
                     out = await asyncio.to_thread(
                         use_case.check, engine, body.code, body.scene_class_name, layout)
@@ -131,7 +154,10 @@ def create_check_app(
         async with preview_gate:
             try:
                 out = await asyncio.to_thread(
-                    illustrations.run, body.name, body.code, body.props, body.gif, body.kind)
+                    illustrations.run, body.kit_key, body.name, body.code, body.props, body.gif, body.kind,
+                    body.tier)
+            except UnknownKitError as exc:
+                return JSONResponse({"error": str(exc)}, status_code=400)
             except (IllustrationPreviewError, TypeScriptCheckError) as exc:
                 logger.error("illustration preview could not run: %s", exc)
                 return JSONResponse({"error": str(exc)}, status_code=503)
@@ -139,5 +165,35 @@ def create_check_app(
             "ok": out.ok, "diagnostics": out.diagnostics, "warnings": out.warnings,
             "png": out.png, "gif": out.gif,
         }
+
+    @app.get("/v1/kits")
+    async def list_kits():
+        return {"kits": [{"key": k, "version": v} for k, v in sorted((kits or {}).items())]}
+
+    still_gate = asyncio.Semaphore(1)
+
+    @app.post("/v1/stills")
+    async def make_still(body: StillBody):
+        if stills is None:
+            return JSONResponse({"error": "stills are not enabled"}, status_code=404)
+        async with still_gate:
+            try:
+                out = await asyncio.to_thread(stills.render, body.composition, body.kit_key, body.props, body.frame)
+            except UnknownKitError as exc:
+                return JSONResponse({"error": str(exc)}, status_code=400)
+            except IllustrationPreviewError as exc:
+                logger.error("still could not be rendered: %s", exc)
+                return JSONResponse({"error": str(exc)}, status_code=503)
+        return {"file": out.file, "cache_hit": out.cache_hit}
+
+    @app.post("/v1/stills/prune")
+    async def prune_stills(body: PruneBody):
+        if stills is None:
+            return JSONResponse({"error": "stills are not enabled"}, status_code=404)
+        try:
+            removed = await asyncio.to_thread(stills.prune, body.keep, body.min_age_hours)
+        except ValueError as exc:
+            return JSONResponse({"error": str(exc)}, status_code=400)
+        return {"removed": removed}
 
     return app

@@ -16,6 +16,7 @@ type projectIllustrationsUseCase interface {
 	Plan(ctx context.Context, projectID, model string) ([]domain.ProjectIllustration, error)
 	Draw(ctx context.Context, projectID, rowID, model string) (domain.ProjectIllustration, error)
 	SetSkipped(ctx context.Context, projectID, rowID string, skipped bool) (domain.ProjectIllustration, error)
+	SetTier(ctx context.Context, projectID, rowID string, tier domain.Tier) (domain.ProjectIllustration, error)
 	DeleteDrawing(ctx context.Context, projectID, rowID string) (domain.ProjectIllustration, error)
 	Stale(ctx context.Context, projectID string) (bool, error)
 }
@@ -31,6 +32,7 @@ func (rt *Router) projectIllustrationRoutes(r chi.Router) {
 	r.Post("/v1/projects/{project_id}/illustrations/plan", rt.handlePlanProjectIllustrations)
 	r.Post("/v1/projects/{project_id}/illustrations/{row_id}/draw", rt.handleDrawProjectIllustration)
 	r.Post("/v1/projects/{project_id}/illustrations/{row_id}/skip", rt.handleSkipProjectIllustration)
+	r.Put("/v1/projects/{project_id}/illustrations/{row_id}/tier", rt.handleSetProjectIllustrationTier)
 	r.Delete("/v1/projects/{project_id}/illustrations/{row_id}/drawing", rt.handleDeleteProjectIllustrationDrawing)
 }
 
@@ -130,6 +132,26 @@ func (rt *Router) handleDeleteProjectIllustrationDrawing(w http.ResponseWriter, 
 		return
 	}
 	row, err := rt.projectIllustrations.DeleteDrawing(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "row_id"))
+	if err != nil {
+		illustrationError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, row)
+}
+
+// handleSetProjectIllustrationTier changes the role of a drawing in this video.
+func (rt *Router) handleSetProjectIllustrationTier(w http.ResponseWriter, r *http.Request) {
+	if !rt.projectIllustrationsEnabled(w) {
+		return
+	}
+	var b struct {
+		Tier domain.Tier `json:"tier"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON body")
+		return
+	}
+	row, err := rt.projectIllustrations.SetTier(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "row_id"), b.Tier)
 	if err != nil {
 		illustrationError(w, err)
 		return

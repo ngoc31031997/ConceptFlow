@@ -15,6 +15,7 @@
  *                     check's own list, DEFAULT_PCTS in layout_probe_lib.mjs;
  *                     1 = the shot's last frame, duration - 1)
  *   --font NAME       videoFont input prop (default: the Stage's own default)
+ *   --kit KEY         kitKey input prop (default: phatsang)
  *   --out-dir DIR     write <name>.layout.json per script there (else stdout)
  *   --browser PATH    Chromium executable; else $LAYOUT_PROBE_BROWSER, else
  *                     Playwright's own headless shell
@@ -24,13 +25,14 @@ import {basename, join} from 'node:path';
 import {DEFAULT_DURATION, DEFAULT_PCTS, bundleHarness, launchBrowser, openPage, probe} from './layout_probe_lib.mjs';
 
 function parseArgs(argv) {
-  const opts = {duration: DEFAULT_DURATION, pcts: DEFAULT_PCTS, font: null, outDir: null, browser: null, scripts: []};
+  const opts = {duration: DEFAULT_DURATION, pcts: DEFAULT_PCTS, font: null, kit: 'phatsang', outDir: null, browser: null, scripts: []};
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     const next = () => argv[++i];
     if (a === '--duration') opts.duration = Number(next());
     else if (a === '--frames') opts.pcts = next().split(',').map(Number);
     else if (a === '--font') opts.font = next();
+    else if (a === '--kit') opts.kit = next();
     else if (a === '--out-dir') opts.outDir = next();
     else if (a === '--browser') opts.browser = next();
     else if (a.startsWith('--')) throw new Error(`unknown option ${a}`);

@@ -76,17 +76,26 @@ func main() {
 	}
 	archetypes := application.NewVideoArchetypesUseCase(authoringRepo)
 
+	// The visual languages: how the channel's videos are drawn. Seeded before
+	// anything can create a project, so every authoring row pins a language.
+	if err := authoringRepo.SeedVisualLanguages(ctx); err != nil {
+		logger.Error("could not seed the visual languages", "error", err)
+		os.Exit(1)
+	}
+	renderingClient := rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)
+	visualLanguages := application.NewVisualLanguagesUseCase(authoringRepo, renderingClient)
+	go keepLanguageSamples(ctx, logger, visualLanguages)
+
 	// The illustration library, previews rendered by the rendering service.
 	if err := authoringRepo.SeedIllustrations(ctx); err != nil {
 		logger.Warn("could not seed the illustration library", "error", err)
 	}
-	illustrations := application.NewIllustrationsUseCase(
-		authoringRepo, rendering.NewClient(cfg.RenderingURL, cfg.RenderingTimeout)).
+	illustrations := application.NewIllustrationsUseCase(authoringRepo, renderingClient).
 		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
 		// A drawing a video still working uses cannot be deleted.
 		WithProjectStatus(projects).
-		// The style rules the illustrator is held to are the active illustration_style prompt.
-		WithStylePrompts(authoringRepo)
+		// The rules and the kit a drawing is made under are its language's.
+		WithLanguages(visualLanguages)
 	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
@@ -115,7 +124,8 @@ func main() {
 	// ONE renderer, shared by the Copy button and the generate endpoint.
 	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).
 		WithArchetypes(authoringRepo).
-		WithBrief(creativeBrief)
+		WithBrief(creativeBrief).
+		WithLanguages(visualLanguages)
 	generateAuthoring := application.NewGenerateAuthoringUseCase(
 		renderPrompt, llmProvider, llmUsageRecorder,
 		renderContext,
@@ -124,6 +134,7 @@ func main() {
 		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
 	).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
 		WithIllustrations(projectIllustrations).
+		WithLanguages(visualLanguages).
 		// The post-1b length check reads the same format and voice
 		// calibration the outline prompt's beat sheet is built from.
 		WithStoryboardChecks(projects, projects).
@@ -141,6 +152,7 @@ func main() {
 		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
 		WithArchetypes(archetypes).
+		WithVisualLanguages(visualLanguages).
 		WithIllustrations(illustrations).
 		WithProjectIllustrations(projectIllustrations).
 		WithRenderPrompt(renderPrompt).
@@ -176,5 +188,48 @@ func main() {
 	defer cancel()
 	if err := server.Shutdown(shutdownCtx); err != nil {
 		logger.Error("http server shutdown error", "error", err)
+	}
+}
+
+const (
+	// languageSampleRetryDelay is how long to wait before trying to render the
+	// language samples again after rendering was not reachable.
+	languageSampleRetryDelay = 30 * time.Second
+	// stillPruneInterval and stillMinAge: stills no language page shows are
+	// deleted daily once they are a day old.
+	stillPruneInterval = 24 * time.Hour
+	stillMinAge        = 24 * time.Hour
+)
+
+// keepLanguageSamples renders the sample scenes of every language that has
+// none (or whose kit changed), retrying while rendering is not up, then prunes
+// the shared stills once a day.
+func keepLanguageSamples(ctx context.Context, logger *slog.Logger, languages *application.VisualLanguagesUseCase) {
+	for {
+		err := languages.EnsureSamples(ctx)
+		if err == nil {
+			break
+		}
+		logger.Warn("could not render the visual language samples yet", "error", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(languageSampleRetryDelay):
+		}
+	}
+	ticker := time.NewTicker(stillPruneInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			removed, err := languages.PruneStills(ctx, stillMinAge)
+			if err != nil {
+				logger.Warn("could not prune the shared stills", "error", err)
+				continue
+			}
+			logger.Info("pruned the shared stills", "removed", len(removed))
+		}
 	}
 }

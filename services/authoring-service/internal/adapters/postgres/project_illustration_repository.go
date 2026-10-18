@@ -14,7 +14,7 @@ import (
 
 func (r *PromptTemplateRepository) ListProjectIllustrations(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, project_id, position, name, description, folder_id, shots, state, error, COALESCE(illustration_id, ''), kind
+		SELECT id, project_id, position, name, description, folder_id, shots, state, error, COALESCE(illustration_id, ''), kind, tier, tier_reason
 		FROM project_illustrations WHERE project_id = $1 ORDER BY position
 	`, projectID)
 	if err != nil {
@@ -23,14 +23,15 @@ func (r *PromptTemplateRepository) ListProjectIllustrations(ctx context.Context,
 	var out []domain.ProjectIllustration
 	for rows.Next() {
 		var p domain.ProjectIllustration
-		var state, kind string
+		var state, kind, tier string
 		if err := rows.Scan(&p.ID, &p.ProjectID, &p.Position, &p.Name, &p.Description, &p.FolderID, &p.Shots,
-			&state, &p.Error, &p.IllustrationID, &kind); err != nil {
+			&state, &p.Error, &p.IllustrationID, &kind, &tier, &p.TierReason); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		p.State = domain.ProjectIllustrationState(state)
 		p.Kind = domain.KindOrFigure(domain.IllustrationKind(kind))
+		p.Tier = domain.TierOrSupport(domain.Tier(tier))
 		if p.Shots == nil {
 			p.Shots = []string{}
 		}
@@ -70,10 +71,10 @@ func (r *PromptTemplateRepository) ReplaceProjectIllustrations(ctx context.Conte
 				shots = []string{}
 			}
 			if _, err := tx.Exec(ctx, `
-				INSERT INTO project_illustrations (project_id, position, name, description, folder_id, shots, state, error, illustration_id, kind)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+				INSERT INTO project_illustrations (project_id, position, name, description, folder_id, shots, state, error, illustration_id, kind, tier, tier_reason)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 			`, projectID, p.Position, p.Name, p.Description, p.FolderID, shots, string(p.State), p.Error, ill,
-				string(domain.KindOrFigure(p.Kind))); err != nil {
+				string(domain.KindOrFigure(p.Kind)), string(domain.TierOrSupport(p.Tier)), p.TierReason); err != nil {
 				return err
 			}
 		}
@@ -87,9 +88,9 @@ func (r *PromptTemplateRepository) UpdateProjectIllustration(ctx context.Context
 		ill = p.IllustrationID
 	}
 	_, err := r.pool.Exec(ctx, `
-		UPDATE project_illustrations SET name = $3, state = $4, error = $5, illustration_id = $6
+		UPDATE project_illustrations SET name = $3, state = $4, error = $5, illustration_id = $6, tier = $7
 		WHERE id = $1 AND project_id = $2
-	`, p.ID, p.ProjectID, p.Name, string(p.State), p.Error, ill)
+	`, p.ID, p.ProjectID, p.Name, string(p.State), p.Error, ill, string(domain.TierOrSupport(p.Tier)))
 	return err
 }
 

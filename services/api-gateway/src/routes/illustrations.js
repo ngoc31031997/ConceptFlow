@@ -55,6 +55,8 @@ function illustrationsRouter(authoringClient, authoringSlowClient) {
   router.post('/v1/projects/:id/illustrations/plan', slow);
   router.post('/v1/projects/:id/illustrations/:rowId/draw', slow);
   router.post('/v1/projects/:id/illustrations/:rowId/skip', fast);
+  // The role of a drawing in this video (hero, support, background).
+  router.put('/v1/projects/:id/illustrations/:rowId/tier', fast);
   // Delete the row's unapproved AI drawing from the library.
   router.delete('/v1/projects/:id/illustrations/:rowId/drawing', fast);
   return router;

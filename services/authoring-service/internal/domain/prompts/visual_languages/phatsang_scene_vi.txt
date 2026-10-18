@@ -1,0 +1,13 @@
+LUẬT CẢNH — KHOA HỌC PHÁT SÁNG (ÁNH SÁNG KỂ CHUYỆN)
+
+- [C1] MÀU THEO THỰC TẾ: màu nền và tông của cảnh theo thực tế của nơi chốn và chủ đề (vũ trụ tối, lòng quả sung hồng sáng, rừng nhiệt đới xanh lá nhiều tầng, đồng cỏ châu Phi vàng). Sáng hay tối là do nơi chốn quyết định, không do phong cách. Mọi màu là một vai trò trong BẢNG MÀU.
+- [C2] MỖI CẢNH MỘT NGUỒN SÁNG CHÍNH: ghi trong "light" của cảnh — nguồn là gì (nắng chiều qua tán lá, đèn bàn, lõi phát quang của tế bào, ngôi sao), vị trí trong khung (x, y từ 0 đến 1), vai trò màu của nó, cường độ. Đặt nguồn lệch về một phía để có hướng sáng; đặt sau lưng nhân vật chỉ khi muốn bóng ngược có chủ ý.
+- [C3] ÁNH SÁNG PHỤ VÀ KHÔNG KHÍ: ghi "ambient" (vai trò màu của ánh sáng trời hoặc ánh sáng hắt — màu của bóng) và "atmosphere" + "haze" (màu và độ dày của không khí: sương rừng dày, bụi đồng cỏ vừa, nước biển dày, vũ trụ gần 0).
+- [C4] VIỀN SÁNG HƯỚNG VỀ NGUỒN: mọi nhân vật và vật có viền sáng ở phía nguồn sáng (kit tự làm theo vị trí). Đặt nhân vật để phía viền sáng quay về phía người xem nhìn vào.
+- [C5] LỚP XA NHẠT DẦN: bốn lớp chiều sâu; lớp càng xa càng ngả về màu không khí và càng mờ; chọn "focus" — lớp được lấy nét (thường là figures).
+- [C6] ÁNH SÁNG CHỈ CHỖ CẦN NHÌN: thứ đang được nói tới nằm ở vùng sáng nhất hoặc tự phát sáng; thứ đã xong vai lùi vào bóng hay vào không khí. Ghi khoảnh khắc ánh sáng đổi trong cảnh (đèn bật, mây che, lõi sáng lên).
+- [C7] ĐỔI NƠI CHỐN THÌ ĐỔI ÁNH SÁNG: mỗi nơi chốn một nguồn sáng và một không khí riêng; đi xuyên vào bên trong (quả → lòng quả → tế bào) thì nguồn sáng của lớp ngoài thành ánh sáng lọt vào lớp trong.
+- [C8] Ý TRỪU TƯỢNG (số, đồ thị, so sánh) đặt trong không gian của thế giới hiện tại, cùng nguồn sáng của cảnh; màu nền lấy từ bảng màu của thế giới.
+- [C9] CHỈNH MÀU NHẸ: "grade" của cảnh (warmth, contrast, saturation từ -0.3 đến 0.3) chỉ để nhấn cảm xúc; mặc định 0.
+- [C10] MÁY CHẠY NHANH (lia mạnh, lao vào): ghi "motion_blur": true ở shot đó.
+- [C11] CHỮ VÀ NHÃN tương phản tối thiểu 4.5:1 với vùng nó nằm trên; không đặt chữ đè quầng sáng.

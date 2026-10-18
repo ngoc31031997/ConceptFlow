@@ -12,7 +12,76 @@ func newTestUseCase() (*HandleStepEventUseCase, *fakeRepo, *fakePublisher, *fake
 	repo := newFakeRepo()
 	pub := &fakePublisher{}
 	prog := &fakeProgress{}
-	return NewHandleStepEventUseCase(repo, pub, prog, nil, nil), repo, pub, prog
+	return NewHandleStepEventUseCase(repo, pub, prog, nil, nil).WithKitKeys(fakeKits{kit: "phatsang"}), repo, pub, prog
+}
+
+// fakeKits answers the same kit for every project.
+type fakeKits struct {
+	kit string
+	err error
+}
+
+func (f fakeKits) KitKey(context.Context, string) (string, error) { return f.kit, f.err }
+
+// renderScenesProject is a narration-free project about to be rendered.
+func renderScenesProject(repo *fakeRepo) {
+	repo.projects["proj-1"] = &domain.Project{
+		ProjectID: "proj-1", Status: domain.StatusValidatingScript,
+		ContentLanguage: domain.LanguageEnglish, TTSEnabled: false,
+	}
+	repo.steps[stepKey("saga-1", domain.StepValidateScript)] = &domain.SagaStep{SagaID: "saga-1", StepName: domain.StepValidateScript, Status: domain.SagaStepInProgress}
+}
+
+func scriptValidated() StepEvent {
+	return StepEvent{
+		SagaID: "saga-1", ProjectID: "proj-1", EventType: "script_validated",
+		Payload: map[string]interface{}{
+			"scene_class_name": "DemoScene",
+			"scenes":           []interface{}{map[string]interface{}{"scene_index": float64(0), "narration_text": "a line"}},
+		},
+	}
+}
+
+// The render command carries the kit of the visual language the project is pinned to.
+func TestRenderScenesCarriesTheProjectsKit(t *testing.T) {
+	uc, repo, pub, _ := newTestUseCase()
+	renderScenesProject(repo)
+	if err := uc.Execute(context.Background(), scriptValidated()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	last := pub.last()
+	if last == nil || last.routingKey != "rendering" {
+		t.Fatalf("expected render_scenes dispatched to rendering, got %+v", last)
+	}
+	if got := last.envelope.Payload["kit_key"]; got != "phatsang" {
+		t.Fatalf("render_scenes kit_key = %v, want phatsang", got)
+	}
+}
+
+// A project with no pinned language is not rendered: the step fails and says why.
+func TestRenderScenesFailsClearlyWhenTheProjectHasNoPinnedLanguage(t *testing.T) {
+	uc, repo, pub, prog := newTestUseCase()
+	uc = uc.WithKitKeys(fakeKits{kit: ""})
+	renderScenesProject(repo)
+	if err := uc.Execute(context.Background(), scriptValidated()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, cmd := range pub.published {
+		if cmd.routingKey == "rendering" {
+			t.Fatalf("a project with no pinned language must not be rendered, got %+v", cmd)
+		}
+	}
+	project, _ := repo.Get(context.Background(), "proj-1")
+	if project.Status != domain.StatusFailedRenderScenes {
+		t.Fatalf("status = %s, want %s", project.Status, domain.StatusFailedRenderScenes)
+	}
+	step, _ := repo.GetStep(context.Background(), "saga-1", domain.StepRenderScenes)
+	if step.ErrorMessage == nil || *step.ErrorMessage != errNoPinnedLanguage {
+		t.Fatalf("step error = %v, want %q", step.ErrorMessage, errNoPinnedLanguage)
+	}
+	if len(prog.messages) == 0 {
+		t.Fatal("the failure was not reported as progress")
+	}
 }
 
 // TestHandleStepEventUseCase_ScriptParsed_SkipsClassifyAndDispatchesSynthesizeSpeech

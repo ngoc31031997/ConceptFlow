@@ -159,7 +159,16 @@ func (uc *GenerateAuthoringUseCase) codeRequest(
 		}
 	}
 
+	if uc.languages == nil {
+		return CodeGenRequest{}, errors.New("visual language: not configured")
+	}
+	pinned, err := uc.languages.Pinned(ctx, projectID)
+	if err != nil {
+		return CodeGenRequest{}, fmt.Errorf("ngôn ngữ hình của project: %w", err)
+	}
+
 	req := CodeGenRequest{
+		KitKey: pinned.KitKey,
 		Engine: string(domain.RenderEngineRemotion), Topic: topic, Storyboard: storyboard,
 		System: system, Model: model, MaxTokens: uc.maxOutputTokens, Illustrations: drawings,
 		Frame: domain.FrameFor(project.VideoOutputMode),
@@ -395,6 +404,13 @@ type IllustrationStagePort interface {
 // WithIllustrations turns on the drawing stage for Remotion projects.
 func (uc *GenerateAuthoringUseCase) WithIllustrations(stage IllustrationStagePort) *GenerateAuthoringUseCase {
 	uc.illustrations = stage
+	return uc
+}
+
+// WithLanguages gives the code step the language store, so a run knows the
+// kit its project is pinned to.
+func (uc *GenerateAuthoringUseCase) WithLanguages(l LanguagePort) *GenerateAuthoringUseCase {
+	uc.languages = l
 	return uc
 }
 

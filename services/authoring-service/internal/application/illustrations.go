@@ -118,7 +118,7 @@ type IllustrationPreview struct {
 // IllustrationRendererPort renders a drawing (rendering's /v1/illustrations/preview).
 // code "" renders a built-in kit component by name.
 type IllustrationRendererPort interface {
-	PreviewIllustration(ctx context.Context, name, code string, props map[string]any, gif bool, kind domain.IllustrationKind) (IllustrationPreview, error)
+	PreviewIllustration(ctx context.Context, kitKey, name, code string, props map[string]any, gif bool, kind domain.IllustrationKind, tier domain.Tier) (IllustrationPreview, error)
 }
 
 // InvalidIllustrationError carries the renderer's diagnostics.
@@ -138,19 +138,21 @@ func (e *InvalidIllustrationError) Error() string {
 
 func (e *InvalidIllustrationError) Unwrap() error { return ErrIllustrationInvalid }
 
-// IllustrationsUseCase manages the library.
-// StylePromptPort reads the active row of a prompt role: here, the
-// illustration style rules the Creator may have rewritten in the prompt library.
-type StylePromptPort interface {
-	GetActive(ctx context.Context, role domain.PromptRole) (domain.Prompt, error)
+// LanguagePort reads the visual languages: the active one (what the library
+// draws for) and the one a project pinned (what that project draws and renders with).
+type LanguagePort interface {
+	Active(ctx context.Context) (domain.VisualLanguage, error)
+	Pinned(ctx context.Context, projectID string) (domain.PinnedLanguage, error)
 }
+
+// IllustrationsUseCase manages the library.
 
 type IllustrationsUseCase struct {
 	repo     IllustrationRepoPort
 	renderer IllustrationRendererPort
 	drawer   *illustrationDrawer // nil = AI drawing disabled
 	projects ProjectStatusPort   // nil = a drawing any project uses cannot be deleted
-	styles   StylePromptPort     // nil = the style rules cannot be read
+	langs    LanguagePort        // nil = the style rules and the kit cannot be read
 }
 
 func NewIllustrationsUseCase(repo IllustrationRepoPort, renderer IllustrationRendererPort) *IllustrationsUseCase {
@@ -163,26 +165,65 @@ func (uc *IllustrationsUseCase) WithProjectStatus(p ProjectStatusPort) *Illustra
 	return uc
 }
 
-// WithStylePrompts gives the use case the prompt library the style rules are read from.
-func (uc *IllustrationsUseCase) WithStylePrompts(p StylePromptPort) *IllustrationsUseCase {
-	uc.styles = p
+// WithLanguages gives the use case the visual languages the rules and the kit are read from.
+func (uc *IllustrationsUseCase) WithLanguages(l LanguagePort) *IllustrationsUseCase {
+	uc.langs = l
 	return uc
 }
 
-// StyleRules is the illustration style text in force: the active row of the
-// illustration_style prompt role. It is what the AI illustrator is held to
-// and what the library shows; reading it failing is an error, never a quiet
-// fall back to other text.
-func (uc *IllustrationsUseCase) StyleRules(ctx context.Context) (string, error) {
-	if uc.styles == nil {
-		return "", errors.New("illustration style rules: no prompt library configured")
+// languageRules are the rules and the kit a drawing is made for.
+type languageRules struct {
+	KitKey string
+	Rules  domain.VisualLanguageRules
+}
+
+// rulesFor is the language a drawing is made under: the project's pinned
+// version when projectID is given, else the active language (a library
+// drawing belongs to no project). Failing to read it is an error, never a
+// quiet fall back to other text.
+func (uc *IllustrationsUseCase) rulesFor(ctx context.Context, projectID string) (languageRules, error) {
+	if uc.langs == nil {
+		return languageRules{}, errors.New("visual language: not configured")
 	}
-	p, err := uc.styles.GetActive(ctx, domain.RoleIllustrationStyle)
+	if projectID != "" {
+		p, err := uc.langs.Pinned(ctx, projectID)
+		if err != nil {
+			return languageRules{}, err
+		}
+		return languageRules{KitKey: p.KitKey, Rules: p.Rules}, nil
+	}
+	l, err := uc.langs.Active(ctx)
+	if err != nil {
+		return languageRules{}, err
+	}
+	return languageRules{KitKey: l.KitKey, Rules: l.Rules}, nil
+}
+
+// StyleRules is the illustration rule text of the active language, what the
+// library shows next to its drawings.
+func (uc *IllustrationsUseCase) StyleRules(ctx context.Context) (string, error) {
+	lr, err := uc.rulesFor(ctx, "")
 	if err != nil {
 		return "", fmt.Errorf("illustration style rules: %w", err)
 	}
-	return strings.TrimSpace(p.TemplateText), nil
+	return strings.TrimSpace(lr.Rules.Illustration), nil
 }
+
+// kitOf is the kit a drawing is rendered with: its own, or the active
+// language's for a drawing that has none yet.
+func (uc *IllustrationsUseCase) kitOf(ctx context.Context, own string) (string, error) {
+	if own != "" {
+		return own, nil
+	}
+	lr, err := uc.rulesFor(ctx, "")
+	if err != nil {
+		return "", err
+	}
+	return lr.KitKey, nil
+}
+
+// tierForDetail is the tier whose limits a drawing of that detail level is checked against.
+func tierForDetail(d domain.DetailLevel) domain.Tier { return domain.TierForDetail(d) }
 
 func (uc *IllustrationsUseCase) Folders(ctx context.Context) ([]domain.IllustrationFolder, error) {
 	return uc.repo.ListIllustrationFolders(ctx)
@@ -277,8 +318,8 @@ func normalizeIllustration(i domain.Illustration) (domain.Illustration, error) {
 // render checks and previews code as a figure or a backdrop (kind); a
 // refused drawing is an InvalidIllustrationError, a renderer that cannot run
 // is a plain error.
-func (uc *IllustrationsUseCase) render(ctx context.Context, name, code string, kind domain.IllustrationKind) (IllustrationPreview, error) {
-	out, err := uc.renderer.PreviewIllustration(ctx, name, code, nil, true, domain.KindOrFigure(kind))
+func (uc *IllustrationsUseCase) render(ctx context.Context, kitKey, name, code string, kind domain.IllustrationKind, tier domain.Tier) (IllustrationPreview, error) {
+	out, err := uc.renderer.PreviewIllustration(ctx, kitKey, name, code, nil, true, domain.KindOrFigure(kind), domain.TierOrSupport(tier))
 	if err != nil {
 		return out, fmt.Errorf("dựng xem trước: %w", err)
 	}
@@ -289,11 +330,15 @@ func (uc *IllustrationsUseCase) render(ctx context.Context, name, code string, k
 }
 
 // Try renders code without saving anything — the editor's "Xem trước" button.
-func (uc *IllustrationsUseCase) Try(ctx context.Context, name, code string, kind domain.IllustrationKind) (IllustrationPreview, error) {
+func (uc *IllustrationsUseCase) Try(ctx context.Context, name, code string, kind domain.IllustrationKind, detail domain.DetailLevel) (IllustrationPreview, error) {
 	if err := domain.ValidateIllustrationName(strings.TrimSpace(name)); err != nil {
 		return IllustrationPreview{}, err
 	}
-	return uc.render(ctx, strings.TrimSpace(name), code, kind)
+	lr, err := uc.rulesFor(ctx, "")
+	if err != nil {
+		return IllustrationPreview{}, err
+	}
+	return uc.render(ctx, lr.KitKey, strings.TrimSpace(name), code, kind, tierForDetail(detail))
 }
 
 // Create stores a new library drawing as a draft. The code must pass the
@@ -306,7 +351,15 @@ func (uc *IllustrationsUseCase) Create(ctx context.Context, i domain.Illustratio
 	if err := uc.writableFolder(ctx, i.FolderID); err != nil {
 		return i, err
 	}
-	preview, err := uc.render(ctx, i.Name, i.Code, i.Kind)
+	if !domain.ValidDetail(i.DetailLevel) {
+		i.DetailLevel = domain.DetailMedium
+	}
+	lr, err := uc.rulesFor(ctx, "")
+	if err != nil {
+		return i, err
+	}
+	i.KitKey = lr.KitKey
+	preview, err := uc.render(ctx, i.KitKey, i.Name, i.Code, i.Kind, tierForDetail(i.DetailLevel))
 	if err != nil {
 		return i, err
 	}
@@ -350,11 +403,22 @@ func (uc *IllustrationsUseCase) Update(ctx context.Context, id string, i domain.
 		return i, err
 	}
 	i.ID, i.Builtin, i.Exemplar = id, false, false
+	// The kit and the detail a drawing was made for are fixed by its first draw.
+	i.KitKey, i.DetailLevel = existing.KitKey, existing.DetailLevel
 	i.Status, i.Version, i.Warnings = existing.Status, existing.Version, existing.Warnings
 	codeChanged := i.Code != existing.Code || i.Name != existing.Name
 	var preview IllustrationPreview
 	if codeChanged {
-		if preview, err = uc.render(ctx, i.Name, i.Code, i.Kind); err != nil {
+		kit := existing.KitKey
+		if kit == "" {
+			lr, lerr := uc.rulesFor(ctx, "")
+			if lerr != nil {
+				return i, lerr
+			}
+			kit = lr.KitKey
+			i.KitKey = kit
+		}
+		if preview, err = uc.render(ctx, kit, i.Name, i.Code, i.Kind, tierForDetail(i.DetailLevel)); err != nil {
 			return i, err
 		}
 		i.Status, i.Version, i.Warnings = domain.IllustrationDraft, existing.Version+1, preview.Warnings
@@ -516,13 +580,18 @@ func (uc *IllustrationsUseCase) MakeExemplar(ctx context.Context, id string) (do
 	if err != nil {
 		return src, err
 	}
-	preview, err := uc.render(ctx, name, code, src.Kind)
+	kit, err := uc.kitOf(ctx, src.KitKey)
+	if err != nil {
+		return src, err
+	}
+	preview, err := uc.render(ctx, kit, name, code, src.Kind, tierForDetail(src.DetailLevel))
 	if err != nil {
 		return src, err
 	}
 	saved, err := uc.repo.CreateExemplar(ctx, domain.Illustration{
 		Name: name, Title: src.Title, FolderID: domain.ExemplarFolderID, Tags: src.Tags,
 		Description: src.Description, Usage: usage, Code: code, Exemplar: true, SourceID: src.ID, Kind: src.Kind,
+		KitKey: kit, DetailLevel: src.DetailLevel,
 		Status: domain.IllustrationApproved, Version: 1, Warnings: preview.Warnings,
 	}, domain.MaxExemplars)
 	if err != nil {
@@ -577,7 +646,11 @@ func (uc *IllustrationsUseCase) Rerender(ctx context.Context, id string) (png, g
 		return nil, nil, err
 	}
 	// Kit built-ins have no code (it ships in the image); exemplars carry theirs.
-	out, err := uc.render(ctx, existing.Name, existing.Code, existing.Kind)
+	kit, err := uc.kitOf(ctx, existing.KitKey)
+	if err != nil {
+		return nil, nil, err
+	}
+	out, err := uc.render(ctx, kit, existing.Name, existing.Code, existing.Kind, tierForDetail(existing.DetailLevel))
 	if err != nil {
 		return nil, nil, err
 	}

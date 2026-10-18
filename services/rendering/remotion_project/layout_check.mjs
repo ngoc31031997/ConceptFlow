@@ -10,7 +10,7 @@
  * Protocol: one JSON object per line on stdin, one per line on stdout.
  *   at start:  {"ready": true, "browser": {"version"}}
  *          or: {"fatal": "..."}                         (then it exits 1)
- *   in:        {"id": "...", "code": "<tsx>", "font": "Be Vietnam Pro"}
+ *   in:        {"id": "...", "code": "<tsx>", "font": "Be Vietnam Pro", "kit": "phatsang"}
  *   out:       {"id": "...", "result": {...probe JSON, version 1...}}
  *          or: {"id": "...", "error": "...", "stage": "compile|load|measure|browser"}
  * A request whose browser has died is answered with stage "browser" and the
@@ -50,6 +50,7 @@ async function handle(req) {
       duration: DEFAULT_DURATION,
       pcts: DEFAULT_PCTS,
       font: req.font || null,
+      kit: req.kit || null,
     });
     result.browser = {version: browser.version()};
     result.timing_ms.total = Math.round(performance.now() - t0);

@@ -457,7 +457,7 @@ func (c *Client) codeBody(ctx context.Context, req application.CodeGenRequest) m
 	body := map[string]any{
 		"engine": req.Engine, "topic": req.Topic, "storyboard": req.Storyboard, "system": req.System,
 		"model": c.modelOrDefault(ctx, req.Model), "max_tokens": req.MaxTokens, "chunk_shots": req.ChunkShots,
-		"frame": frameBody(req.Frame),
+		"frame": frameBody(req.Frame), "kit_key": req.KitKey,
 	}
 	if len(req.Illustrations) > 0 {
 		ills := make([]map[string]any, 0, len(req.Illustrations))

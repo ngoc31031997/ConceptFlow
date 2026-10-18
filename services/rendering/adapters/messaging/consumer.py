@@ -96,6 +96,7 @@ class RenderScriptCommandHandler:
                 render_quality=payload.get("render_quality"),
                 engine=payload.get("engine", "remotion"),
                 video_font=payload.get("video_font"),
+                kit_key=payload.get("kit_key"),
             )
             # The renderer's heartbeat fires on the render thread, but aio-pika
             # is only safe to touch from the event loop — hence the hop back.

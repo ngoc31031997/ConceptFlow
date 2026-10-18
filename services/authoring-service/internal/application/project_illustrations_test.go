@@ -97,7 +97,7 @@ const planJSON = `Đây là danh sách:
 
 func stage(llm *scriptedLLM) (*ProjectIllustrationsUseCase, *fakeProjectRows, *fakeIllustrationRepo) {
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	// One at a time: the scripted model answers in order.
 	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(`{"scenes":[]}`), llm, nil, 1000).WithDrawConcurrency(1)
@@ -408,7 +408,7 @@ func (m *mutableStoryboard) GetAuthoringStoryboard(context.Context, string) (str
 // The list remembers which storyboard it was planned from.
 func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(&scriptedLLM{}, nil, 1000).WithStylePrompts(systemStyle{})
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
 	llm := &scriptedLLM{replies: []string{planJSON}}
@@ -481,7 +481,7 @@ func TestReplanKeepsDrawingsAndSkipsByName(t *testing.T) {
 func TestPrepareReplansOnlyAStaleList(t *testing.T) {
 	lib := newFakeIllustrationRepo()
 	llm := &scriptedLLM{replies: []string{`{"reuse": ["Tooth"], "draw": []}`, `{"reuse": ["Germ"], "draw": []}`}}
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
 	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000).WithDrawConcurrency(1)
@@ -511,11 +511,11 @@ func TestPrepareReplansOnlyAStaleList(t *testing.T) {
 func TestExemplarCopiesAreNeitherPlannedNorHandedToTheCode(t *testing.T) {
 	llm := &scriptedLLM{replies: []string{`{"reuse": [], "draw": []}`}}
 	uc, _, lib := stage(llm)
-	lib.rows["bus"] = domain.Illustration{ID: "bus", Name: "Bus", FolderID: "phuong-tien", Code: busCode, Status: domain.IllustrationApproved}
+	lib.rows["bus"] = domain.Illustration{ID: "bus", Name: "Bus", FolderID: "phuong-tien", Code: busCode, KitKey: domain.PhatsangKitKey, Status: domain.IllustrationApproved}
 	lib.rows["cp"] = domain.Illustration{ID: "cp", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true, SourceID: "bus",
-		Code: "export function BusMau() {}", Status: domain.IllustrationApproved}
+		Code: "export function BusMau() {}", KitKey: domain.PhatsangKitKey, Status: domain.IllustrationApproved}
 	lib.rows["cat"] = domain.Illustration{ID: "cat", Name: "Cat", FolderID: domain.ExemplarFolderID, Exemplar: true, HomeFolderID: "dong-vat",
-		Code: "export function Cat() {}", Status: domain.IllustrationApproved}
+		Code: "export function Cat() {}", KitKey: domain.PhatsangKitKey, Status: domain.IllustrationApproved}
 	ctx := context.Background()
 	if _, err := uc.Plan(ctx, "p1", ""); err != nil {
 		t.Fatal(err)
@@ -577,7 +577,7 @@ const backdropPlanJSON = `{"reuse": [], "draw": [], "backdrops": [
 func TestPlanGivesEachPlaceOneBackdropRowCoveringItsScenes(t *testing.T) {
 	llm := &scriptedLLM{replies: []string{backdropPlanJSON}}
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(backdropStoryboard), llm, nil, 1000)
 
@@ -624,7 +624,7 @@ func TestABackdropIsDrawnWithTheBackdropRules(t *testing.T) {
 	reply := "TÊN: OrchardBackdrop\nTÊN HIỂN THỊ: Vườn sung\nTHẺ: vườn\nMÔ TẢ: vườn sung\nCÁCH GỌI: <Scene backdrop={OrchardBackdrop} />\n" +
 		"```tsx\nexport function OrchardBackdrop({layer}: {layer: string}) { return null; }\n```"
 	llm := &scriptedLLM{replies: []string{reply}}
-	library := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	library := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
 	made, err := library.Draw(context.Background(), DrawRequest{Description: "vườn sung", FolderID: "boi-canh", Kind: domain.IllustrationBackdrop})
 	if err != nil {
 		t.Fatal(err)

@@ -21,7 +21,7 @@ var backupNow = time.Date(2026, 9, 27, 8, 30, 0, 0, time.UTC)
 func libraryWithDrawings(t *testing.T) (*IllustrationsUseCase, *fakeIllustrationRepo) {
 	t.Helper()
 	repo := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	if _, err := uc.CreateFolder(ctx, domain.IllustrationFolder{ID: "do-choi", Name: "Đồ chơi", Description: "bóng, búp bê"}); err != nil {
 		t.Fatal(err)
@@ -116,7 +116,7 @@ func TestImportRestoresALostLibraryIntoTheSameFolders(t *testing.T) {
 
 	// A fresh database: only the seeded folders and built-ins.
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	report, err := uc.Import(context.Background(), backup.Zip, ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
@@ -191,7 +191,7 @@ func TestImportNeverOverwritesABuiltinAndReportsBrokenDrawings(t *testing.T) {
 	file := makeZip(t, map[string]string{"manifest.json": manifest,
 		"a.tsx": "export function Tooth() {}", "b.tsx": "BROKEN", "c.tsx": "export function Lost() {}", "d.tsx": "export function Kite() {}"})
 	repo := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	report, err := uc.Import(context.Background(), file, ImportOptions{Replace: true})
 	if err != nil {
 		t.Fatal(err)
@@ -216,7 +216,7 @@ func TestImportNeverOverwritesABuiltinAndReportsBrokenDrawings(t *testing.T) {
 
 type unreachableRenderer struct{ calls int }
 
-func (u *unreachableRenderer) PreviewIllustration(context.Context, string, string, map[string]any, bool, domain.IllustrationKind) (IllustrationPreview, error) {
+func (u *unreachableRenderer) PreviewIllustration(context.Context, string, string, string, map[string]any, bool, domain.IllustrationKind, domain.Tier) (IllustrationPreview, error) {
 	u.calls++
 	return IllustrationPreview{}, errors.New("rendering unreachable")
 }
@@ -225,7 +225,7 @@ func TestImportStopsWhenTheRendererIsDownAndSaysWhatWasLeft(t *testing.T) {
 	src, _ := libraryWithDrawings(t)
 	backup, _ := src.Export(context.Background(), backupNow)
 	repo, rend := newFakeIllustrationRepo(), &unreachableRenderer{}
-	report, err := NewIllustrationsUseCase(repo, rend).Import(context.Background(), backup.Zip, ImportOptions{})
+	report, err := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).Import(context.Background(), backup.Zip, ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestImportStopsWhenTheRendererIsDownAndSaysWhatWasLeft(t *testing.T) {
 }
 
 func TestImportRefusesFilesThatAreNotALibraryBackup(t *testing.T) {
-	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{})
+	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	cases := map[string][]byte{
 		"not a zip":       []byte("hello"),
 		"no manifest":     makeZip(t, map[string]string{"x.txt": "x"}),
@@ -281,7 +281,7 @@ func TestBackupKeepsTheExemplarsAndRestoresThemAsExemplars(t *testing.T) {
 	}
 
 	fresh := newFakeIllustrationRepo()
-	uc := NewIllustrationsUseCase(fresh, &fakeRenderer{})
+	uc := NewIllustrationsUseCase(fresh, &fakeRenderer{}).WithLanguages(newFakeLanguages())
 	report, err := uc.Import(ctx, backup.Zip, ImportOptions{})
 	if err != nil || report.Aborted != "" {
 		t.Fatalf("import: %+v %v", report, err)
@@ -317,7 +317,7 @@ func TestImportIntoAFullExemplarFolderKeepsOriginalsAsDrawingsAndSkipsCopies(t *
 		id := string(rune('a' + n))
 		full.rows[id] = domain.Illustration{ID: id, Name: "Full" + id, FolderID: domain.ExemplarFolderID, Exemplar: true}
 	}
-	report, err := NewIllustrationsUseCase(full, &fakeRenderer{}).Import(ctx, backup.Zip, ImportOptions{})
+	report, err := NewIllustrationsUseCase(full, &fakeRenderer{}).WithLanguages(newFakeLanguages()).Import(ctx, backup.Zip, ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestImportRefusesAnExemplarWhoseHomeIsTheExemplarFolder(t *testing.T) {
 		 "exemplar":true,"home_folder_id":"hinh-mau"}]}`
 	file := makeZip(t, map[string]string{"manifest.json": manifest, "hinh/hinh-mau/Loop.tsx": "export function Loop() {}"})
 	repo := newFakeIllustrationRepo()
-	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).Import(context.Background(), file, ImportOptions{})
+	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).Import(context.Background(), file, ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestImportRefusesAnOrdinaryDrawingFiledInTheExemplarFolder(t *testing.T) {
 		{"name":"Sneaky","title":"x","folder_id":"hinh-mau","status":"approved","version":1,"code_file":"hinh/hinh-mau/Sneaky.tsx"}]}`
 	file := makeZip(t, map[string]string{"manifest.json": manifest, "hinh/hinh-mau/Sneaky.tsx": "export function Sneaky() {}"})
 	repo := newFakeIllustrationRepo()
-	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).Import(context.Background(), file, ImportOptions{})
+	report, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).Import(context.Background(), file, ImportOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -60,6 +60,7 @@ class LayoutContext:
 
     subtitle_band: SubtitleBand | None = None  # None = nothing burned into the frame
     video_font: str = ""  # "" = the Stage's default (Be Vietnam Pro)
+    kit_key: str = ""  # the visual language the project is pinned to; "" is refused
 
 
 class CheckScriptUseCase:
@@ -85,6 +86,8 @@ class CheckScriptUseCase:
             raise ValueError(f"unknown engine {engine!r}")
         if not code.strip():
             raise ValueError("code is empty")
+        if not (layout and layout.kit_key):
+            raise ValueError("thiếu kit_key: project chưa ghim ngôn ngữ hình")
         diags: list[CheckDiagnostic] = []
         try:
             self._validate.validate(self._request(engine, code, scene_class_name))
@@ -102,7 +105,7 @@ class CheckScriptUseCase:
         ]
         if not diags:
             # Only a script that compiles is worth drawing.
-            layout_diags, warnings = self._check_layout(code, layout or LayoutContext())
+            layout_diags, warnings = self._check_layout(code, layout)
             diags += layout_diags
         return CheckOutcome(ok=not diags, diagnostics=diags, warnings=warnings)
 
@@ -111,7 +114,7 @@ class CheckScriptUseCase:
             return [], [LAYOUT_DISABLED_WARNING]
         began = time.monotonic()
         try:
-            probe = self._layout.measure(code, ctx.video_font)
+            probe = self._layout.measure(code, ctx.kit_key, ctx.video_font)
         except LayoutCheckError as exc:
             logger.warning("layout check could not run: %s", exc)
             return [], [f"Bố cục: KHÔNG kiểm tra được — {exc}. Kết quả biên dịch vẫn giữ nguyên."]

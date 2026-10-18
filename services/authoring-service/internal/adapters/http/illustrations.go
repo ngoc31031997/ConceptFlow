@@ -25,7 +25,7 @@ type illustrationsUseCase interface {
 	DeleteFolder(ctx context.Context, id string) error
 	List(ctx context.Context, f application.IllustrationFilter) ([]domain.Illustration, error)
 	Get(ctx context.Context, id string) (domain.Illustration, error)
-	Try(ctx context.Context, name, code string, kind domain.IllustrationKind) (application.IllustrationPreview, error)
+	Try(ctx context.Context, name, code string, kind domain.IllustrationKind, detail domain.DetailLevel) (application.IllustrationPreview, error)
 	Create(ctx context.Context, i domain.Illustration) (domain.Illustration, error)
 	Update(ctx context.Context, id string, i domain.Illustration) (domain.Illustration, error)
 	SetStatus(ctx context.Context, id string, status domain.IllustrationStatus) (domain.Illustration, error)
@@ -128,6 +128,9 @@ type illustrationBody struct {
 	Description string   `json:"description"`
 	Usage       string   `json:"usage"`
 	Code        string   `json:"code"`
+	// DetailLevel is the detail a new drawing is made with (rich, medium, silhouette).
+	DetailLevel domain.DetailLevel      `json:"detail_level"`
+	Kind        domain.IllustrationKind `json:"kind"`
 }
 
 func decodeIllustration(w http.ResponseWriter, r *http.Request) (domain.Illustration, bool) {
@@ -137,7 +140,7 @@ func decodeIllustration(w http.ResponseWriter, r *http.Request) (domain.Illustra
 		return domain.Illustration{}, false
 	}
 	return domain.Illustration{Name: b.Name, Title: b.Title, FolderID: b.FolderID, Tags: b.Tags,
-		Description: b.Description, Usage: b.Usage, Code: b.Code}, true
+		Description: b.Description, Usage: b.Usage, Code: b.Code, DetailLevel: b.DetailLevel, Kind: b.Kind}, true
 }
 
 func (rt *Router) handleListIllustrationFolders(w http.ResponseWriter, r *http.Request) {
@@ -247,15 +250,16 @@ func (rt *Router) handleTryIllustration(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	var b struct {
-		Name string                  `json:"name"`
-		Code string                  `json:"code"`
-		Kind domain.IllustrationKind `json:"kind"`
+		Name   string                  `json:"name"`
+		Code   string                  `json:"code"`
+		Kind   domain.IllustrationKind `json:"kind"`
+		Detail domain.DetailLevel      `json:"detail_level"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
 		return
 	}
-	out, err := rt.illustrations.Try(r.Context(), b.Name, b.Code, b.Kind)
+	out, err := rt.illustrations.Try(r.Context(), b.Name, b.Code, b.Kind, b.Detail)
 	if err != nil {
 		illustrationError(w, err)
 		return
@@ -405,6 +409,8 @@ func (rt *Router) handleDrawIllustration(w http.ResponseWriter, r *http.Request)
 		Name        string                  `json:"name"`
 		Model       string                  `json:"model"`
 		Kind        domain.IllustrationKind `json:"kind"`
+		// DetailLevel is how much detail the drawing gets: rich (a hero), medium, silhouette (scenery).
+		DetailLevel domain.DetailLevel `json:"detail_level"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&b); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid JSON body")
@@ -412,6 +418,7 @@ func (rt *Router) handleDrawIllustration(w http.ResponseWriter, r *http.Request)
 	}
 	out, err := rt.illustrations.Draw(r.Context(), application.DrawRequest{
 		Description: b.Description, FolderID: b.FolderID, Name: b.Name, Model: b.Model, Kind: b.Kind,
+		Tier: domain.TierForDetail(b.DetailLevel),
 	})
 	if err != nil {
 		illustrationError(w, err)

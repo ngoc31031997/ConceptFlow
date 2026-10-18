@@ -33,7 +33,7 @@ const motoCode = "export function Motorbike({color = '#E8453C', ...fig}) { retur
 func TestDrawRetriesWithTheRenderersLineNumberedErrorsThenStoresADraft(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", "BROKEN"), reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, rend).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	out, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy màu đỏ", FolderID: "phuong-tien"})
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestDrawPromptCarriesRulesHelpersExemplarsAndTheCreatorsApprovedDrawings(t 
 			CreatedAt: "2026-09-2" + string(rune('1'+n)) + "T00:00:00Z"}
 	}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestDrawPromptWithoutExemplarsSaysSoAndKeepsAtMostTwoOwnDrawings(t *testing
 			Code: "export function " + name + "() {}", Status: domain.IllustrationApproved}
 	}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestDrawPromptWithoutExemplarsSaysSoAndKeepsAtMostTwoOwnDrawings(t *testing
 
 	empty := newFakeIllustrationRepo()
 	llm = &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc = NewIllustrationsUseCase(empty, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc = NewIllustrationsUseCase(empty, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestDrawAndRedrawRefuseTheExemplarFolderAndExemplars(t *testing.T) {
 	repo.rows["ex"] = domain.Illustration{ID: "ex", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true,
 		Code: busCode, Status: domain.IllustrationApproved}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe", FolderID: domain.ExemplarFolderID}); !errors.Is(err, ErrExemplarFolder) {
 		t.Fatalf("draw into Hình mẫu: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestDrawAndRedrawRefuseTheExemplarFolderAndExemplars(t *testing.T) {
 func TestDrawGivesUpAfterThreeAttemptsAndSavesNothing(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", "BROKEN")}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	_, err := uc.Draw(context.Background(), DrawRequest{Description: "xe", FolderID: "phuong-tien"})
 	if err == nil || len(llm.calls) != maxDrawAttempts || !errors.Is(err, ErrIllustrationInvalid) {
 		t.Fatalf("want failure after %d calls, got %d, %v", maxDrawAttempts, len(llm.calls), err)
@@ -138,20 +138,20 @@ func TestDrawGivesUpAfterThreeAttemptsAndSavesNothing(t *testing.T) {
 			t.Fatal("a drawing that never passed was saved")
 		}
 	}
-	if _, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).Draw(context.Background(), DrawRequest{Description: "x", FolderID: "phuong-tien"}); !errors.Is(err, ErrDrawerDisabled) {
+	if _, err := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).Draw(context.Background(), DrawRequest{Description: "x", FolderID: "phuong-tien"}); !errors.Is(err, ErrDrawerDisabled) {
 		t.Fatalf("no drawer configured: %v", err)
 	}
 }
 
 func TestRedrawKeepsTheNameAndMakesANewDraftVersion(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
-	uc := NewIllustrationsUseCase(repo, rend)
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages())
 	ctx := context.Background()
 	made, _ := uc.Create(ctx, domain.Illustration{Name: "Motorbike", FolderID: "phuong-tien", Code: motoCode})
 	uc.SetStatus(ctx, made.ID, domain.IllustrationApproved)
 
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode+"\n// bánh to hơn")}}
-	uc.WithDrawer(llm, nil, 1000).WithStylePrompts(systemStyle{})
+	uc.WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
 	out, err := uc.Redraw(ctx, made.ID, "bánh to hơn", "")
 	if err != nil {
 		t.Fatal(err)
@@ -168,53 +168,85 @@ func TestRedrawKeepsTheNameAndMakesANewDraftVersion(t *testing.T) {
 	}
 }
 
-// systemStyle is a prompt library whose active illustration_style row is the shipped one.
-type systemStyle struct{}
-
-func (systemStyle) GetActive(_ context.Context, role domain.PromptRole) (domain.Prompt, error) {
-	return domain.Prompt{Role: role, TemplateText: domain.IllustrationStyleGuide()}, nil
-}
-
-// creatorStyle is a prompt library where the Creator activated their own rules, or one that cannot be read.
-type creatorStyle struct {
-	text string
-	err  error
-}
-
-func (c creatorStyle) GetActive(_ context.Context, role domain.PromptRole) (domain.Prompt, error) {
-	if role != domain.RoleIllustrationStyle {
-		return domain.Prompt{}, errors.New("asked for the wrong role " + string(role))
-	}
-	return domain.Prompt{Role: role, TemplateText: c.text}, c.err
-}
-
-func TestTheIllustratorIsHeldToTheActiveStyleRowForFiguresAndBackdrops(t *testing.T) {
+func TestTheIllustratorIsHeldToTheLanguagesRulesForFiguresAndBackdrops(t *testing.T) {
 	ctx := context.Background()
-	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithDrawer(&scriptedLLM{}, nil, 1000).
-		WithStylePrompts(creatorStyle{text: "  - [S1] LUẬT CỦA CREATOR: chỉ khối tròn  "})
+	langs := newFakeLanguages()
+	langs.active.Rules = domain.VisualLanguageRules{
+		Illustration: "  - [S1] LUẬT VẼ HÌNH CỦA NGÔN NGỮ: chỉ khối tròn  ",
+		Backdrop:     "- [B1] LUẬT NỀN CỦA NGÔN NGỮ",
+		Scene:        "- [C1] luật cảnh",
+	}
+	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000).WithLanguages(langs)
 	for _, kind := range []domain.IllustrationKind{domain.IllustrationFigure, domain.IllustrationBackdrop} {
-		system, err := uc.drawerSystem(ctx, "phuong-tien", "", kind)
+		lr, err := uc.rulesFor(ctx, "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		system, err := uc.drawerSystem(ctx, "phuong-tien", "", kind, lr, domain.TierSupport)
 		if err != nil {
 			t.Fatalf("%s: %v", kind, err)
 		}
-		if !strings.Contains(system, "- [S1] LUẬT CỦA CREATOR: chỉ khối tròn") {
-			t.Errorf("%s system prompt does not carry the active style row", kind)
+		if !strings.Contains(system, "- [S1] LUẬT VẼ HÌNH CỦA NGÔN NGỮ: chỉ khối tròn") {
+			t.Errorf("%s system prompt does not carry the language's illustration rules", kind)
 		}
-		if strings.Contains(system, domain.IllustrationStyleGuide()) {
-			t.Errorf("%s system prompt still carries the shipped rules over the Creator's", kind)
-		}
+	}
+	lr, _ := uc.rulesFor(ctx, "")
+	backdrop, _ := uc.drawerSystem(ctx, "boi-canh", "", domain.IllustrationBackdrop, lr, domain.TierSupport)
+	if !strings.Contains(backdrop, "- [B1] LUẬT NỀN CỦA NGÔN NGỮ") {
+		t.Error("a backdrop's system prompt does not carry the language's backdrop rules")
 	}
 }
 
-func TestDrawingStopsWhenTheStyleRulesCannotBeRead(t *testing.T) {
+func TestADrawingForAProjectUsesThePinnedLanguageNotTheActiveOne(t *testing.T) {
 	ctx := context.Background()
-	failing := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithDrawer(&scriptedLLM{}, nil, 1000).
-		WithStylePrompts(creatorStyle{err: errors.New("db down")})
-	if _, err := failing.drawerSystem(ctx, "phuong-tien", "", domain.IllustrationFigure); err == nil || !strings.Contains(err.Error(), "db down") {
+	langs := newFakeLanguages()
+	langs.pinned["p1"] = domain.PinnedLanguage{ID: "old", Version: 1, KitKey: "oldkit", Rules: domain.VisualLanguageRules{
+		Illustration: "LUẬT BẢN GHIM", Backdrop: "b", Scene: "s",
+	}}
+	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(langs)
+	pinned, err := uc.rulesFor(ctx, "p1")
+	if err != nil || pinned.KitKey != "oldkit" || pinned.Rules.Illustration != "LUẬT BẢN GHIM" {
+		t.Fatalf("pinned: %+v, %v", pinned, err)
+	}
+	active, err := uc.rulesFor(ctx, "")
+	if err != nil || active.KitKey != domain.PhatsangKitKey {
+		t.Fatalf("active: %+v, %v", active, err)
+	}
+	langs.unpinned["unpinned"] = true
+	if _, err := uc.rulesFor(ctx, "unpinned"); !errors.Is(err, domain.ErrProjectNotPinned) {
+		t.Fatalf("a project with no pin must be an error, got %v", err)
+	}
+}
+
+func TestDrawingStopsWhenTheLanguageCannotBeRead(t *testing.T) {
+	ctx := context.Background()
+	langs := newFakeLanguages()
+	langs.err = errors.New("db down")
+	failing := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000).WithLanguages(langs)
+	if _, err := failing.Draw(ctx, DrawRequest{Description: "xe", FolderID: "phuong-tien"}); err == nil || !strings.Contains(err.Error(), "db down") {
 		t.Fatalf("want the read error, got %v", err)
 	}
 	unwired := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{})
 	if _, err := unwired.StyleRules(ctx); err == nil {
-		t.Fatal("no prompt library must be an error, not the shipped text")
+		t.Fatal("no language store must be an error, not shipped text")
+	}
+}
+
+func TestADrawnFigureRemembersItsKitAndTheDetailOfItsTier(t *testing.T) {
+	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
+	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	out, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien", Tier: domain.TierHero})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.KitKey != domain.PhatsangKitKey || out.DetailLevel != domain.DetailRich {
+		t.Fatalf("kit %q, detail %q", out.KitKey, out.DetailLevel)
+	}
+	if rend.lastKit != domain.PhatsangKitKey || rend.lastTier != domain.TierHero {
+		t.Fatalf("the renderer was asked for kit %q tier %q", rend.lastKit, rend.lastTier)
+	}
+	if !strings.Contains(llm.calls[0].System, "HẠNG CHÍNH (hero)") {
+		t.Fatal("the drawer was not told the drawing is a hero")
 	}
 }

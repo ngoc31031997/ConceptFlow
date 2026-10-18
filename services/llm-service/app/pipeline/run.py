@@ -121,6 +121,8 @@ class CodeRequest:
     #: none) and the video's font ("" = the default).
     subtitle_band: dict | None = None
     video_font: str = ""
+    #: The visual language (kit) the project is pinned to; the run is refused without it.
+    kit_key: str = ""
     #: Shots per chunk for this project; 0 = the service default.
     chunk_shots: int = 0
     #: The segments the caller already stored, by key.
@@ -131,7 +133,7 @@ class CodeRequest:
     canvas: Frame = LANDSCAPE
 
     def layout(self) -> LayoutContext:
-        return LayoutContext(subtitle_band=self.subtitle_band, video_font=self.video_font)
+        return LayoutContext(subtitle_band=self.subtitle_band, video_font=self.video_font, kit_key=self.kit_key)
 
 
 def _is_backdrop(i: dict) -> bool:

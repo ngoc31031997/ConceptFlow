@@ -77,9 +77,9 @@ def project(tmp_path: Path, kind: str, timeout: int = 2) -> LayoutChecker:
 def test_one_process_answers_many_checks_and_passes_the_font(tmp_path):
     lc = project(tmp_path, "echo")
     try:
-        assert lc.measure("const a = 1;", "Montserrat")["font"]["family"] == "Montserrat"
+        assert lc.measure("const a = 1;", "phatsang", "Montserrat")["font"]["family"] == "Montserrat"
         pid = lc._proc.pid
-        assert lc.measure("const b = 2;")["version"] == 1
+        assert lc.measure("const b = 2;", "phatsang")["version"] == 1
         assert lc._proc.pid == pid and lc.browser_version == "141"
     finally:
         lc.close()
@@ -89,27 +89,27 @@ def test_a_script_that_does_not_load_is_its_own_error(tmp_path):
     lc = project(tmp_path, "echo")
     try:
         with pytest.raises(LayoutScriptError, match="registerRoot"):
-            lc.measure("LOADFAIL")
+            lc.measure("LOADFAIL", "phatsang")
         with pytest.raises(LayoutCheckError, match=r"thất bại \(measure\)"):
-            lc.measure("MEASUREFAIL")
+            lc.measure("MEASUREFAIL", "phatsang")
         with pytest.raises(LayoutCheckError, match="không đúng dạng"):
-            lc.measure("GARBAGE")
+            lc.measure("GARBAGE", "phatsang")
     finally:
         lc.close()
 
 
 def test_a_browser_that_cannot_start_is_an_error_never_a_pass(tmp_path):
     with pytest.raises(LayoutCheckError, match="không mở được trình duyệt.*Executable doesn't exist"):
-        project(tmp_path, "fatal").measure("const a = 1;")
+        project(tmp_path, "fatal").measure("const a = 1;", "phatsang")
 
 
 def test_a_crashed_checker_is_an_error_and_is_restarted(tmp_path):
     lc = project(tmp_path, "crash")
     try:
         with pytest.raises(LayoutCheckError, match="page crashed"):
-            lc.measure("const a = 1;")
+            lc.measure("const a = 1;", "phatsang")
         (tmp_path / "layout_check.mjs").write_text(textwrap.dedent(STAND_IN["echo"]))
-        assert lc.measure("const a = 1;")["version"] == 1
+        assert lc.measure("const a = 1;", "phatsang")["version"] == 1
     finally:
         lc.close()
 
@@ -119,7 +119,7 @@ def test_a_hung_checker_times_out_and_is_killed(tmp_path, kind):
     lc = project(tmp_path, kind, timeout=1)
     began = time.monotonic()
     with pytest.raises(LayoutCheckError, match="quá 1s"):
-        lc.measure("const a = 1;")
+        lc.measure("const a = 1;", "phatsang")
     assert time.monotonic() - began < 10
     assert lc._proc is None
 
@@ -129,13 +129,13 @@ def test_warm_swallows_a_start_failure_that_the_first_check_then_reports(tmp_pat
     lc.warm()
     assert lc._proc is None
     with pytest.raises(LayoutCheckError):
-        lc.measure("const a = 1;")
+        lc.measure("const a = 1;", "phatsang")
 
 
 def test_missing_packages_are_reported(tmp_path):
     (tmp_path / "layout_check.mjs").write_text("")
     with pytest.raises(LayoutCheckError, match="thiếu gói"):
-        LayoutChecker(tmp_path, node=sys.executable).measure("const a = 1;")
+        LayoutChecker(tmp_path, node=sys.executable).measure("const a = 1;", "phatsang")
 
 
 # --- the real checker, end to end through the compile check ---------------------------
@@ -230,7 +230,7 @@ def test_real_overshoot_is_caught(real_checker):
 def test_real_thirty_shot_video_is_measured_well_under_the_timeout(real_checker):
     code = (SAMPLES / "timing30.tsx").read_text(encoding="utf-8")
     began = time.monotonic()
-    probe = real_checker.measure(code)
+    probe = real_checker.measure(code, "phatsang")
     took = time.monotonic() - began
     assert len(probe["shots"]) == 30 and all(len(s["samples"]) == 12 for s in probe["shots"])
     assert probe["font"]["available"] is True
@@ -246,7 +246,7 @@ def test_real_one_chunk_check_skips_the_mergers_stubs(real_checker):
     lines = json.loads((SAMPLES / "problems.lines.json").read_text(encoding="utf-8"))
     a, b = lines["1.3"]
     stubbed = code[: a - 1] + ["function Shot1_3({duration}: ShotProps) {", "  return null;", "}"] + code[b:]
-    probe = real_checker.measure("\n".join(stubbed))
+    probe = real_checker.measure("\n".join(stubbed), "phatsang")
     by_id = {s["id"]: s for s in probe["shots"]}
     assert by_id["1.3"].get("skipped") == "stub" and by_id["1.3"]["samples"] == []
     assert all(len(s["samples"]) == 12 for sid, s in by_id.items() if sid != "1.3")

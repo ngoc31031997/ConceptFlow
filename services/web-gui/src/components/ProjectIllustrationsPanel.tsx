@@ -5,13 +5,19 @@ import {
   listIllustrationFolders,
   listProjectIllustrations,
   planProjectIllustrations,
+  detailEnough,
   setIllustrationStatus,
+  setProjectIllustrationTier,
   skipProjectIllustration,
   startAuthoringChain,
+  DETAIL_LABEL,
+  TIER_LABEL,
   type IllustrationFolder,
+  type IllustrationTier,
   type ProjectIllustration,
 } from "../api/client";
-import { Button, Card } from "./ui";
+import { Button, Card, Select } from "./ui";
+import { ConfirmModal } from "./ConfirmModal";
 import { IllustrationTile } from "./IllustrationTile";
 import { IllustrationEditor } from "./IllustrationEditor";
 import { OperationProgressCard } from "./OperationProgressCard";
@@ -20,6 +26,14 @@ import { drawProgressText, isProjectIllustrationReady as isReady } from "../util
 import glass from "../styles/glass.module.css";
 import tileStyles from "./IllustrationTile.module.css";
 import styles from "./ProjectIllustrationsPanel.module.css";
+
+const TIERS: IllustrationTier[] = ["hero", "support", "background"];
+
+const TIER_EXPLAIN: Record<IllustrationTier, string> = {
+  hero: "Vật hay nhân vật mà phim hoặc cảnh nói về nó. Vẽ kỹ, có bộ phận chuyển động; máy móc xem được kiểu cắt lớp.",
+  support: "Có mặt, có vai nhỏ. Đủ để nhận ra ngay, vài bộ phận chuyển động.",
+  background: "Đám đông, vật xa, vật trang trí. Một khối bóng rõ dáng, không chi tiết bên trong.",
+};
 
 const STATE_LABEL: Record<ProjectIllustration["state"], string> = {
   planned: "Chưa vẽ",
@@ -59,6 +73,8 @@ export function ProjectIllustrationsPanel({
   const [fixNote, setFixNote] = useState<{ id: string; text: string; n: number } | null>(null);
   const [bust, setBust] = useState<Record<string, number>>({});
   const [message, setMessage] = useState<string | null>(null);
+  // A tier change that makes a drawn picture be drawn again waits for confirmation.
+  const [tierChange, setTierChange] = useState<{ row: ProjectIllustration; tier: IllustrationTier } | null>(null);
   // The list was planned from an older storyboard.
   const [stale, setStale] = useState(false);
   // A chain (this step, or the whole pipeline) runs on the server and fills this list.
@@ -148,6 +164,44 @@ export function ProjectIllustrationsPanel({
     void act(r.id, () => deleteProjectIllustrationDrawing(projectId, r.id));
   }
 
+  /** Changing the tier of a row whose drawing is not detailed enough sends it back to drawing: confirm first. */
+  function changeTier(r: ProjectIllustration, tier: IllustrationTier) {
+    if (tier === r.tier) return;
+    if (r.illustration && !detailEnough(r.illustration.detail_level, tier)) {
+      setTierChange({ row: r, tier });
+      return;
+    }
+    void act(r.id, () => setProjectIllustrationTier(projectId, r.id, tier));
+  }
+
+  /** The tier of a figure: the AI's proposal with its reason, changed by the Creator before drawing. */
+  function tierControl(r: ProjectIllustration) {
+    if (r.kind === "backdrop") return null;
+    const tier = r.tier ?? "support";
+    return (
+      <div className={styles.tier} data-testid={`pi-tier-${r.name}`}>
+        <label className={styles.tierLabel} htmlFor={`pi-tier-select-${r.id}`}>
+          Hạng
+        </label>
+        <Select
+          id={`pi-tier-select-${r.id}`}
+          value={tier}
+          disabled={busy[r.id] || r.state === "drawing" || chainDrawing}
+          onChange={(e) => changeTier(r, e.target.value as IllustrationTier)}
+          aria-label={`Hạng của ${r.name}`}
+          data-testid={`pi-tier-select-${r.name}`}
+        >
+          {TIERS.map((t) => (
+            <option key={t} value={t}>
+              {TIER_LABEL[t]}
+            </option>
+          ))}
+        </Select>
+        {r.tier_reason && <span className={styles.tierWhy}>AI: {r.tier_reason}</span>}
+      </div>
+    );
+  }
+
   if (rows === null) return null;
   const ready = rows.filter(isReady).length;
   const missing = rows.filter((r) => r.state === "planned" || r.state === "failed").length;
@@ -181,6 +235,7 @@ export function ProjectIllustrationsPanel({
                 }}
                 actions={
                   <>
+                    {tierControl(r)}
                     {!ill.builtin && !ill.exemplar && ill.status === "draft" && (
                       <Button onClick={() => act(r.id, () => setIllustrationStatus(ill.id, "approved"))} disabled={busy[r.id]} data-testid={`pi-approve-${r.name}`}>
                         Duyệt
@@ -227,6 +282,7 @@ export function ProjectIllustrationsPanel({
                 {r.error && <span className={styles.error}>{r.error}</span>}
               </div>
               <div className={tileStyles.actions}>
+                {tierControl(r)}
                 {(r.state === "planned" || r.state === "failed") && (
                   <Button onClick={() => act(r.id, () => drawProjectIllustration(projectId, r.id))} disabled={busy[r.id] || chainDrawing} data-testid={`pi-draw-${r.name}`}>
                     {r.state === "failed" ? "Vẽ lại" : "Vẽ"}
@@ -274,6 +330,22 @@ export function ProjectIllustrationsPanel({
         </p>
       )}
       {message && <p className={styles.error} role="status">{message}</p>}
+      {figureRows.length > 0 && (
+        <div className={styles.tierGuide} data-testid="pi-tier-guide">
+          <h3 className={glass.cardTitle}>Hạng của hình trong video này</h3>
+          <p className={glass.cardHint}>
+            Hạng là vai của hình trong chuyện này, không phải của bản thân vật. AI đề xuất theo kịch bản và storyboard; bạn đổi
+            trước khi vẽ. Hạng quyết định AI vẽ kỹ tới đâu.
+          </p>
+          <ul className={styles.tierGuideList}>
+            {TIERS.map((t) => (
+              <li key={t}>
+                <strong>{TIER_LABEL[t]}</strong> {TIER_EXPLAIN[t]}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {openId && (
         <div className={glass.mtSm}>
           <IllustrationEditor
@@ -306,6 +378,27 @@ export function ProjectIllustrationsPanel({
       <ul className={`${styles.grid} ${glass.mtSm}`} data-testid="pi-grid">
         {figureRows.map(renderRow)}
       </ul>
+      <ConfirmModal
+        isOpen={tierChange !== null}
+        onClose={() => setTierChange(null)}
+        onConfirm={() => {
+          if (!tierChange) return;
+          const { row, tier } = tierChange;
+          void act(row.id, () => setProjectIllustrationTier(projectId, row.id, tier));
+        }}
+        title={tierChange ? `Đổi hạng của ${tierChange.row.name}?` : "Đổi hạng?"}
+        message={
+          tierChange ? (
+            <>
+              Sang hạng {TIER_LABEL[tierChange.tier]}. Hình đã vẽ ở mức chi tiết{" "}
+              {DETAIL_LABEL[tierChange.row.illustration?.detail_level ?? "medium"]} chưa đủ cho hạng này, nên hình này quay về
+              “Chưa vẽ” và AI vẽ một bản mới. Hình cũ vẫn ở thư viện cho các video khác. Code của shot dùng hình này phải chạy lại,
+              ở những bước đã chạy. Đổi lại hạng cũ thì AI vẽ lại lần nữa.
+            </>
+          ) : null
+        }
+        confirmLabel="Đổi hạng"
+      />
     </Card>
   );
 }

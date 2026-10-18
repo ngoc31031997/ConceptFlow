@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -193,6 +194,9 @@ type AuthoringStateReaderPort interface {
 	// ("" for every step, meaning "server default") for a project saved
 	// before this picker existed.
 	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
+	// PinnedLanguage is the visual language version the project is pinned to
+	// (domain.ErrProjectNotPinned when it has none).
+	PinnedLanguage(ctx context.Context, projectID string) (domain.PinnedLanguage, error)
 }
 
 // AuthoringState is what GET /v1/projects/{id}/authoring returns — every
@@ -209,6 +213,10 @@ type AuthoringState struct {
 	// "ai" — each field either "" (server default) or one of
 	// domain.AuthoringModelCatalog's ids.
 	Models domain.AuthoringStepModels
+	// Language is the visual language version the project is pinned to; its
+	// ID is empty for a project with no pin, which the steps that draw or
+	// render refuse to run.
+	Language domain.PinnedLanguage
 }
 
 // GetAuthoringStateUseCase backs the read side of the authoring pipeline.
@@ -245,9 +253,14 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
+	pinned, err := uc.authoring.PinnedLanguage(ctx, projectID)
+	if err != nil && !errors.Is(err, domain.ErrProjectNotPinned) {
+		return AuthoringState{}, err
+	}
 	return AuthoringState{
 		Mode: domain.NormalizeAuthoringMode(mode), Topic: topic,
 		Story: story, Storyboard: storyboard, Code: code, Models: models,
+		Language: pinned,
 	}, nil
 }
 

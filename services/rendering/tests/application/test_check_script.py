@@ -42,13 +42,13 @@ def make(validate=None, ts=None):
 
 def test_remotion_pass_runs_both_the_gate_and_tsc():
     validate, ts = FakeValidate(), FakeTs()
-    out = make(validate, ts).check("remotion", "export const narrations = ['a'];", "creator")
+    out = make(validate, ts).check("remotion", "export const narrations = ['a'];", "creator", KIT)
     assert out.ok and out.diagnostics == []
     assert validate.requests[0].engine == "remotion" and ts.seen == ["export const narrations = ['a'];"]
 
 
 def test_remotion_reports_tsc_diagnostics_with_lines():
-    out = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")])).check("remotion", "code", "creator")
+    out = make(ts=FakeTs([Diag(12, "TS2304", "Cannot find name 'x'.")])).check("remotion", "code", "creator", KIT)
     assert not out.ok and out.diagnostics[0].line == 12 and "TS2304" in out.diagnostics[0].message
     assert out.diagnostics[0].rule == "TS2304"
 
@@ -57,7 +57,7 @@ def test_gate_and_tsc_failures_are_both_reported():
     validate = FakeValidate(
         ScriptValidationError("bad lottie", [LintIssue(line=7, message="unknown lottie id")])
     )
-    out = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")])).check("remotion", "code", "creator")
+    out = make(validate, FakeTs([Diag(3, "TS1005", "';' expected.")])).check("remotion", "code", "creator", KIT)
     assert [d.line for d in out.diagnostics] == [7, 3]
     assert [d.rule for d in out.diagnostics] == ["", "TS1005"]  # lint issues carry no rule code
 
@@ -65,19 +65,19 @@ def test_gate_and_tsc_failures_are_both_reported():
 def test_a_dry_pass_that_dies_is_a_diagnostic_and_tsc_still_runs():
     ts = FakeTs()
     validate = FakeValidate(AnimationEngineError("narrations missing"))
-    out = make(validate, ts).check("remotion", "code", "creator")
+    out = make(validate, ts).check("remotion", "code", "creator", KIT)
     assert not out.ok and out.diagnostics[0].message == "narrations missing" and ts.seen == ["code"]
 
 
 def test_a_checker_that_cannot_run_raises_instead_of_passing():
     with pytest.raises(TypeScriptCheckError):
-        make(ts=FakeTs(error=TypeScriptCheckError("tsc not found"))).check("remotion", "code", "creator")
+        make(ts=FakeTs(error=TypeScriptCheckError("tsc not found"))).check("remotion", "code", "creator", KIT)
 
 
 @pytest.mark.parametrize("engine,code", [("python", "x"), ("manim", "x"), ("remotion", "  ")])
 def test_bad_input_is_a_value_error(engine, code):
     with pytest.raises(ValueError):
-        make().check(engine, code, "s")
+        make().check(engine, code, "s", KIT)
 
 
 # --- the layout check after tsc -------------------------------------------------------
@@ -98,12 +98,15 @@ TOOTH_OUT = {"kind": "kit", "component": "Tooth", "line": 12, "rect": box(1460, 
 SMALL_APPLE = {"kind": "kit", "component": "Apple", "line": 13, "rect": box(800, 400, 200, 200), "opacity": 1}
 
 
+KIT = LayoutContext(kit_key="phatsang")
+
+
 class FakeLayout:
     def __init__(self, result=None, error=None):
         self.result, self.error, self.seen = result, error, []
 
-    def measure(self, code, font=""):
-        self.seen.append((code, font))
+    def measure(self, code, kit_key, font=""):
+        self.seen.append((code, font, kit_key))
         if self.error:
             raise self.error
         return self.result
@@ -111,7 +114,7 @@ class FakeLayout:
 
 def test_blocking_layout_violations_become_line_numbered_layout_diagnostics():
     layout = FakeLayout(probe([TOOTH_OUT]))
-    out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("remotion", "code", "creator")
+    out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("remotion", "code", "creator", KIT)
     assert not out.ok and out.warnings == []
     [d] = out.diagnostics
     assert d.kind == "layout" and d.line == 12 and d.rule == "safe_area"
@@ -120,7 +123,7 @@ def test_blocking_layout_violations_become_line_numbered_layout_diagnostics():
 
 def test_non_blocking_findings_are_warnings_and_the_check_passes():
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(probe([SMALL_APPLE]))).check(
-        "remotion", "code", "creator")
+        "remotion", "code", "creator", KIT)
     assert out.ok and out.diagnostics == []
     assert out.warnings == ["Bố cục: Shot 1.1: vật lớn nhất (hình Apple) chỉ chiếm 19% chiều khung (< 40%) — "
                             "khung dễ thành nền trống với vật nhỏ lọt thỏm (dòng 13)"]
@@ -128,9 +131,9 @@ def test_non_blocking_findings_are_warnings_and_the_check_passes():
 
 def test_the_subtitle_band_and_font_reach_the_layout_check():
     layout = FakeLayout(probe([{**TOOTH_OUT, "rect": box(700, 600, 420, 300)}]))
-    ctx = LayoutContext(subtitle_band=SubtitleBand("bottom", 240), video_font="Montserrat")
+    ctx = LayoutContext(subtitle_band=SubtitleBand("bottom", 240), video_font="Montserrat", kit_key="phatsang")
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), layout).check("remotion", "code", "creator", ctx)
-    assert layout.seen == [("code", "Montserrat")]
+    assert layout.seen == [("code", "Montserrat", "phatsang")]
     assert [d.message.split(": ", 1)[1] for d in out.diagnostics] == [
         "hình Tooth lấn vùng phụ đề ở mép dưới khung (mép dưới y=900 > 840)"]
 
@@ -142,7 +145,7 @@ def test_the_subtitle_band_and_font_reach_the_layout_check():
 ])
 def test_a_layout_check_that_cannot_run_is_an_explicit_warning_and_tsc_stands(error):
     use_case = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(error=error))
-    out = use_case.check("remotion", "code", "creator")
+    out = use_case.check("remotion", "code", "creator", KIT)
     assert out.ok and out.diagnostics == []
     [w] = out.warnings
     assert w.startswith("Bố cục: KHÔNG kiểm tra được — ") and str(error) in w
@@ -151,14 +154,14 @@ def test_a_layout_check_that_cannot_run_is_an_explicit_warning_and_tsc_stands(er
 def test_measurements_the_rules_cannot_read_are_not_a_pass():
     broken = probe([{"kind": "kit", "component": "Tooth", "line": 12, "opacity": 1}])  # no rect
     use_case = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(broken))
-    out = use_case.check("remotion", "code", "creator")
+    out = use_case.check("remotion", "code", "creator", KIT)
     assert out.ok and out.diagnostics == []
     assert "KHÔNG kiểm tra được — số đo không đọc được" in out.warnings[0]
 
 
 def test_a_missing_font_means_not_checked_rather_than_numbers_in_the_wrong_font():
     out = CheckScriptUseCase(FakeValidate(), FakeTs(), FakeLayout(probe([TOOTH_OUT], font_ok=False))).check(
-        "remotion", "code", "creator")
+        "remotion", "code", "creator", KIT)
     assert out.ok and out.diagnostics == []
     assert "font 'Be Vietnam Pro' không có trong trình duyệt đo" in out.warnings[0]
 
@@ -166,10 +169,10 @@ def test_a_missing_font_means_not_checked_rather_than_numbers_in_the_wrong_font(
 def test_layout_is_not_measured_when_tsc_fails():
     layout = FakeLayout(probe([TOOTH_OUT]))
     out = CheckScriptUseCase(FakeValidate(), FakeTs([Diag(3, "TS1005", "';' expected.")]), layout).check(
-        "remotion", "code", "creator")
+        "remotion", "code", "creator", KIT)
     assert [d.kind for d in out.diagnostics] == ["compile"] and layout.seen == []
 
 
 def test_a_disabled_layout_check_says_so():
-    out = make().check("remotion", "code", "creator")
+    out = make().check("remotion", "code", "creator", KIT)
     assert out.ok and out.warnings == [LAYOUT_DISABLED_WARNING]
