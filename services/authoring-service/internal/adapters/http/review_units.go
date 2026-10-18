@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
@@ -304,13 +305,27 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, domain.ErrInvalidWizardInput):
-		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
+		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty):
+		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput))
 	case errors.Is(err, domain.ErrInvalidStatus):
-		writeError(w, http.StatusConflict, err.Error())
+		writeError(w, http.StatusConflict, reasonOf(err, domain.ErrInvalidStatus))
 	default:
 		writeError(w, http.StatusInternalServerError, "internal error")
 	}
+}
+
+// reasonOf is the text of err the Creator reads: when err wraps one of the
+// sentinels with a reason of its own ("sentinel: reason"), just the reason, so
+// the English name of the sentinel does not lead a Vietnamese message.
+func reasonOf(err error, sentinels ...error) string {
+	msg := err.Error()
+	for _, s := range sentinels {
+		if rest, ok := strings.CutPrefix(msg, s.Error()+": "); ok {
+			return rest
+		}
+	}
+	return msg
 }
 
 // writeUnitRunError maps the error of an AI write or redo: the unit API's own

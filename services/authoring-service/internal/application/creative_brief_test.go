@@ -2,16 +2,22 @@ package application
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
+	"sync"
 	"testing"
 
 	"authoring/internal/domain"
 )
 
-// briefUnits is an in-memory ReviewUnitPort.
+// briefUnits is an in-memory ReviewUnitPort, safe for the background source
+// checks that write to it while a test reads.
 type briefUnits struct {
+	mu    sync.Mutex
 	units map[string]domain.ReviewUnit
 	saves int
 }
@@ -19,14 +25,67 @@ type briefUnits struct {
 func newBriefUnits() *briefUnits { return &briefUnits{units: map[string]domain.ReviewUnit{}} }
 
 func (b *briefUnits) GetUnit(_ context.Context, projectID, kind, key string) (domain.ReviewUnit, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.get(projectID, kind, key)
+}
+
+// get reads a unit; the caller holds the lock.
+func (b *briefUnits) get(projectID, kind, key string) (domain.ReviewUnit, error) {
 	u, ok := b.units[projectID+"|"+kind+"|"+key]
 	if !ok {
 		return domain.ReviewUnit{}, domain.ErrUnitNotFound
 	}
+	u.Stale = u.InputRef != "" && u.InputSHA != b.sha(projectID, u.InputRef)
 	return u, nil
 }
 
+// sha hashes the content of the unit named "kind:key", as the store does.
+func (b *briefUnits) sha(projectID, ref string) string {
+	u, ok := b.units[projectID+"|"+strings.Replace(ref, ":", "|", 1)]
+	if !ok {
+		return ""
+	}
+	sum := md5.Sum(u.Content)
+	return hex.EncodeToString(sum[:])
+}
+
+func (b *briefUnits) UnitSHA(_ context.Context, projectID, kind, key string) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.sha(projectID, kind+":"+key), nil
+}
+
+func (b *briefUnits) ListUnits(_ context.Context, projectID, kind string) ([]domain.ReviewUnit, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	var out []domain.ReviewUnit
+	for k := range b.units {
+		parts := strings.SplitN(k, "|", 3)
+		if parts[0] == projectID && parts[1] == kind {
+			u, _ := b.get(projectID, kind, parts[2])
+			out = append(out, u)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if len(out[i].Key) != len(out[j].Key) {
+			return len(out[i].Key) < len(out[j].Key)
+		}
+		return out[i].Key < out[j].Key
+	})
+	return out, nil
+}
+
+func (b *briefUnits) DeleteUnit(_ context.Context, projectID, kind, key string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	delete(b.units, projectID+"|"+kind+"|"+key)
+	return nil
+}
+
 func (b *briefUnits) SaveUnit(_ context.Context, u domain.ReviewUnit) (domain.ReviewUnit, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
 	b.saves++
 	if u.CreatorFields == nil {
 		u.CreatorFields = []string{}

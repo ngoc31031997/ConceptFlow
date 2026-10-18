@@ -104,7 +104,7 @@ export function ScriptAuthoringSettingsStepPage() {
       if (await send({ confirm: true })) {
         // Cấu hình này thành mặc định cho project kế tiếp.
         saveLastUsedSettings(draft);
-        navigate("/create/script/outline");
+        navigate(`/projects/${draft.projectId}/research`);
       }
     } finally {
       setSaving(false);
@@ -199,7 +199,7 @@ export function ScriptAuthoringSettingsStepPage() {
         }
         onBack={() => navigate("/")}
         onNext={handleContinue}
-        nextLabel={saving ? "Đang lưu..." : "Sang Kịch bản"}
+        nextLabel={saving ? "Đang lưu..." : "Sang Nghiên cứu"}
         nextTestId="script-authoring-settings-next"
       />
     </div>

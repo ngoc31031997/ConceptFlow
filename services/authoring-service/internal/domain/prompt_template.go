@@ -35,6 +35,16 @@ const (
 	// the brief use case with the brief's own values (the Creator's note, the
 	// fields the Creator wrote), so it is not rendered by the generic renderer.
 	RoleCreativeBrief PromptRole = "creative_brief"
+
+	// The research step's question writer: turns the approved brief into the
+	// questions to research. Filled by the research use case, so it is not
+	// rendered by the generic renderer.
+	RoleResearchQuestions PromptRole = "research_questions"
+
+	// The text the Creator copies into an outside research tool. Filled by the
+	// research use case with the brief and the questions, so it is not rendered
+	// by the generic renderer.
+	RoleResearchPrompt PromptRole = "research_prompt"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -43,7 +53,7 @@ func ValidPromptRole(role string) bool {
 	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign, RoleIllustrationStyle,
-		RoleCreativeBrief:
+		RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt:
 		return true
 	default:
 		return false
@@ -53,9 +63,14 @@ func ValidPromptRole(role string) bool {
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
 // the illustration style rules, which are read as they are, and the brief
-// writer, whose values come from the brief use case.
+// writer and the two research roles, whose values come from their own use
+// cases.
 func IsRenderablePromptRole(role string) bool {
-	return ValidPromptRole(role) && PromptRole(role) != RoleIllustrationStyle && PromptRole(role) != RoleCreativeBrief
+	switch PromptRole(role) {
+	case RoleIllustrationStyle, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt:
+		return false
+	}
+	return ValidPromptRole(role)
 }
 
 // PromptTemplate is one role/language's editable prompt text.

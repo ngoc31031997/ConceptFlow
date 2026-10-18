@@ -1,4 +1,14 @@
-import { AUTO_STEPS, FLOW_VIEW, FLOW_VIEW_PHASES, viewStepOf, type FlowViewStep, type StepStatus } from "../utils/flow";
+import {
+  AUTO_STEPS,
+  FLOW_VIEW,
+  FLOW_VIEW_PHASES,
+  isBuilt,
+  screenStatus,
+  viewStepOf,
+  type FlowViewStep,
+  type StepStatus,
+} from "../utils/flow";
+import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useStepNav } from "../hooks/useStepNav";
 import styles from "./StepRail.module.css";
 
@@ -46,7 +56,10 @@ function Mark({ status, n }: { status: StepStatus; n: number }) {
 }
 
 interface StepRailProps {
-  currentStep: number;
+  /** Bước chạy mà màn đang mở hiển thị; trống ở màn của một bước không có bước chạy (xem `viewStep`). */
+  currentStep?: number;
+  /** Số của bước trong 21 bước mà màn đang mở hiển thị, khi nó không có bước chạy phía sau. */
+  viewStep?: number;
   /** Tên video hiển thị ở đầu menu ("Video mới" khi chưa có chủ đề). */
   title: string;
   /** Thu gọn / mở rộng do AppShell giữ, vì bề rộng của nó quyết định lề nội dung. */
@@ -75,13 +88,17 @@ function viewStatus(view: FlowViewStep, status: (step: number) => StepStatus): S
  * ô màu riêng và số bước xong trên tổng; mọi bước luôn hiện. Bước đang xem tô
  * vàng, bước đã xong có dấu ✓, bước Creator duyệt mang dấu ◆. Bước app đã có
  * bấm được (bước đã tới mở màn thật, bước khác mở màn xem trước, xem
- * useStepNav); bước chưa làm mang nhãn "sắp có" và không bấm được.
+ * useStepNav); bước chưa làm mang nhãn "sắp có" và mở màn "chưa phát triển".
+ * Bước có màn riêng (Nghiên cứu) không có bước chạy: trạng thái của nó suy từ
+ * vị trí của project.
  */
-export function StepRail({ currentStep, title, collapsed, onToggle, preview }: StepRailProps) {
-  const nav = useStepNav(currentStep, { preview });
-  const viewing = viewStepOf(currentStep)?.n;
-  const built = FLOW_VIEW.filter((v) => v.server.length > 0);
-  const doneCount = built.filter((v) => viewStatus(v, nav.status) === "done").length;
+export function StepRail({ currentStep, viewStep, title, collapsed, onToggle, preview }: StepRailProps) {
+  const nav = useStepNav(currentStep, { preview, webScreen: !currentStep && !!viewStep });
+  const flow = useProjectFlow();
+  const viewing = viewStep ?? (currentStep ? viewStepOf(currentStep)?.n : undefined);
+  const statusOf = (view: FlowViewStep): StepStatus =>
+    view.screen ? (nav.hasProject ? screenStatus(flow.flowStep) : "pending") : viewStatus(view, nav.status);
+  const doneCount = FLOW_VIEW.filter((v) => isBuilt(v) && statusOf(v) === "done").length;
 
   return (
     <nav
@@ -114,7 +131,7 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
       <div className={styles.scroll}>
         {FLOW_VIEW_PHASES.map((phase, index) => {
           const steps = FLOW_VIEW.filter((v) => v.phase === index);
-          const done = steps.filter((v) => viewStatus(v, nav.status) === "done").length;
+          const done = steps.filter((v) => statusOf(v) === "done").length;
           return (
             <section key={phase.name} className={styles.phase} data-testid={`rail-phase-${index + 1}`}>
               {!collapsed && (
@@ -130,14 +147,19 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
               )}
               <ol className={styles.list}>
                 {steps.map((view) => {
-                  const coming = view.server.length === 0;
-                  const status = viewStatus(view, nav.status);
+                  const coming = !isBuilt(view);
+                  const ownScreen = !!view.screen;
+                  const status = statusOf(view);
                   const isViewing = view.n === viewing;
                   const target = view.server[0];
-                  const auto = view.server.every((step) => AUTO_STEPS.has(step)) && !coming;
+                  const auto = !ownScreen && !coming && view.server.every((step) => AUTO_STEPS.has(step));
                   const hint = coming
-                    ? `${view.n}. ${view.label} · sắp có`
-                    : `${view.n}. ${view.label} · ${STATUS_TEXT[status]}${auto ? " · tự động" : ""}${view.gate ? " · bạn duyệt ở bước này" : ""}`;
+                    ? `${view.n}. ${view.label} · sắp có, chưa phát triển`
+                    : `${view.n}. ${view.label} · ${STATUS_TEXT[status]}${auto ? " · tự động" : ""}${view.optional ? " · tuỳ chọn" : ""}${view.gate ? " · bạn duyệt ở bước này" : ""}`;
+                  // A step with a screen of its own, and one not developed yet, open
+                  // without a running step behind them; the first needs a project.
+                  const disabled = coming || ownScreen ? isViewing || (ownScreen && !nav.hasProject) : !nav.isClickable(target);
+                  const open = () => (coming || ownScreen ? nav.openView(view) : nav.go(target));
                   return (
                     <li key={view.n}>
                       <button
@@ -150,19 +172,20 @@ export function StepRail({ currentStep, title, collapsed, onToggle, preview }: S
                         ]
                           .filter(Boolean)
                           .join(" ")}
-                        disabled={coming || !nav.isClickable(target)}
-                        onClick={() => nav.go(target)}
+                        disabled={disabled}
+                        onClick={open}
                         aria-current={isViewing ? "step" : undefined}
                         title={hint}
                         data-testid={`rail-step-${view.n}`}
                         data-status={coming ? "coming" : status}
-                        data-reached={!coming && nav.isReached(target)}
+                        data-reached={ownScreen ? nav.hasProject : !coming && nav.isReached(target)}
                       >
                         <span className={styles.mark}>
                           <Mark status={status} n={view.n} />
                         </span>
                         {!collapsed && <span className={styles.label}>{view.label}</span>}
                         {!collapsed && coming && <span className={styles.comingTag}>sắp có</span>}
+                        {!collapsed && view.optional && !coming && <span className={styles.comingTag}>tuỳ chọn</span>}
                         {!collapsed && !coming && view.gate && (
                           <span className={styles.gate} data-testid={`rail-gate-${view.n}`}>
                             ◆

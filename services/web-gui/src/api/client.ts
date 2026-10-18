@@ -420,6 +420,9 @@ export async function completeYoutubeAuthCallback(
 export type PromptRole =
   // Ý tưởng: viết creative brief từ đề tài (AI chạy ở server, không chép ra ngoài).
   | "creative_brief"
+  // Nghiên cứu: AI đặt câu hỏi từ brief, và prompt chép sang công cụ nghiên cứu bên ngoài.
+  | "research_questions"
+  | "research_prompt"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -1186,6 +1189,7 @@ export interface AuthoringState {
   /** Model-per-step picker's đã lưu cho project này — "" nghĩa là mặc định. */
   brief_model?: string;
   publish_model?: string;
+  research_model?: string;
   story_model?: string;
   storyboard_model?: string;
   code_model?: string;
@@ -1216,6 +1220,8 @@ export interface AuthoringStepModels {
   brief?: string;
   /** Model that suggests the publish title, description and tags. */
   publish?: string;
+  /** Model that writes the research questions; missing or "" reads as the default. */
+  research?: string;
   story: string;
   storyboard: string;
   code: string;
@@ -1656,4 +1662,321 @@ export async function generateBrief(projectId: string, operationId?: string): Pr
     body: JSON.stringify({}),
   });
   return fromWireUnit(wire, parseCreativeBrief);
+}
+
+/** What a fact is worth: settled, still argued, not known, or a common mistaken belief. */
+export type FactType = "fact" | "hypothesis" | "unknown" | "misconception";
+export const FACT_TYPES: readonly FactType[] = ["fact", "hypothesis", "unknown", "misconception"];
+
+/** How the check of a fact's source link stands: found, not found, unreadable, no link, or running. */
+export type LinkState = "ok" | "bad" | "na" | "none" | "run";
+
+/** One research question; `mine` is a question the Creator wrote (a regeneration keeps it). */
+export interface ResearchQuestion {
+  id: string;
+  text: string;
+  mine: boolean;
+  /** Written by the AI from a brief that has changed since. */
+  stale: boolean;
+}
+
+export interface FactLinkCheck {
+  state: LinkState;
+  why: string;
+  /** The page sentence closest to a quote that was not found. */
+  nearest: string;
+  checkedAt: string;
+}
+
+/** One fact of the table with its source. `mine` lists the fields the Creator wrote. */
+export interface ResearchFact {
+  id: string;
+  question: string;
+  claimVi: string;
+  type: FactType;
+  sourceTitle: string;
+  publisher: string;
+  year: string;
+  url: string;
+  quote: string;
+  confidence: string;
+  note: string;
+  must: boolean;
+  keep: boolean;
+  link: FactLinkCheck;
+  mine: string[];
+}
+
+/** One answer the Creator pasted: what was read from it and what was left out. */
+export interface PasteLog {
+  n: number;
+  at: string;
+  added: string[];
+  updated: string[];
+  rejected: { row: number; reason: string }[];
+}
+
+export interface QuestionCoverage {
+  question: string;
+  sources: number;
+  badFacts: string[];
+  /** Needs another round: under two independent sources, or a fact whose quote was not found. */
+  weak: boolean;
+}
+
+export interface ResearchGate {
+  status: UnitStatus;
+  skipped: boolean;
+  /** The step no longer holds the flow back: the table is approved or the step skipped. */
+  resolved: boolean;
+}
+
+/** The whole research screen as the server holds it. */
+export interface ResearchState {
+  gate: ResearchGate;
+  questions: ResearchQuestion[];
+  facts: ResearchFact[];
+  pastes: PasteLog[];
+  coverage: QuestionCoverage[];
+  briefApproved: boolean;
+  questionsStale: boolean;
+}
+
+interface researchFactWire {
+  id: string;
+  question: string;
+  claim_vi: string;
+  type: FactType;
+  source_title: string;
+  publisher: string;
+  year: string;
+  url: string;
+  quote: string;
+  confidence: string;
+  note: string;
+  must: boolean;
+  keep: boolean;
+  link: { state: LinkState; why?: string; nearest?: string; checked_at?: string };
+  mine: string[] | null;
+}
+
+interface pasteLogWire {
+  n: number;
+  at: string;
+  added: string[] | null;
+  updated: string[] | null;
+  rejected: { row: number; reason: string }[] | null;
+}
+
+interface researchStateWire {
+  gate: ResearchGate;
+  questions: ResearchQuestion[] | null;
+  facts: researchFactWire[] | null;
+  pastes: pasteLogWire[] | null;
+  coverage: { question: string; sources: number; bad_facts: string[] | null; weak: boolean }[] | null;
+  brief_approved: boolean;
+  questions_stale: boolean;
+}
+
+function fromWireFact(w: researchFactWire): ResearchFact {
+  return {
+    id: w.id,
+    question: w.question,
+    claimVi: w.claim_vi,
+    type: w.type,
+    sourceTitle: w.source_title,
+    publisher: w.publisher,
+    year: w.year,
+    url: w.url,
+    quote: w.quote,
+    confidence: w.confidence,
+    note: w.note,
+    must: w.must,
+    keep: w.keep,
+    link: { state: w.link.state, why: w.link.why ?? "", nearest: w.link.nearest ?? "", checkedAt: w.link.checked_at ?? "" },
+    mine: w.mine ?? [],
+  };
+}
+
+function fromWirePaste(w: pasteLogWire): PasteLog {
+  return { n: w.n, at: w.at, added: w.added ?? [], updated: w.updated ?? [], rejected: w.rejected ?? [] };
+}
+
+/** Reads the research step: questions, facts with their link checks, paste log, coverage. */
+export async function getResearch(projectId: string): Promise<ResearchState> {
+  const w = await apiFetch<researchStateWire>(`/v1/projects/${projectId}/research`);
+  return {
+    gate: w.gate,
+    questions: w.questions ?? [],
+    facts: (w.facts ?? []).map(fromWireFact),
+    pastes: (w.pastes ?? []).map(fromWirePaste),
+    coverage: (w.coverage ?? []).map((c) => ({ question: c.question, sources: c.sources, badFacts: c.bad_facts ?? [], weak: c.weak })),
+    briefApproved: w.brief_approved,
+    questionsStale: w.questions_stale,
+  };
+}
+
+/**
+ * Has the AI write the research questions from the approved brief (a model
+ * call: pass an operation id to follow it). The Creator's own questions stay
+ * unless `replaceEdited`. 409 without a brief, 503 without a language model.
+ */
+export async function generateResearchQuestions(
+  projectId: string,
+  options: { replaceEdited: boolean; note?: string },
+  operationId?: string,
+): Promise<ResearchQuestion[]> {
+  const res = await apiFetch<{ questions: ResearchQuestion[] | null }>(`/v1/projects/${projectId}/research/questions/generate`, {
+    method: "POST",
+    headers: { ...JSON_HEADERS, ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}) },
+    body: JSON.stringify({ replace_edited: options.replaceEdited, note: options.note ?? "" }),
+  });
+  return res.questions ?? [];
+}
+
+/** Adds a question the Creator wrote. */
+export async function addResearchQuestion(projectId: string, text: string): Promise<ResearchQuestion> {
+  return apiFetch<ResearchQuestion>(`/v1/projects/${projectId}/research/questions`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ text }),
+  });
+}
+
+/** Removes a question; the facts that answered it stay. */
+export async function deleteResearchQuestion(projectId: string, id: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/research/questions/${encodeURIComponent(id)}`, { method: "DELETE" });
+}
+
+/** The unit a research question is saved through. */
+function researchQuestionUnit(id: string): UnitRef<unknown> {
+  return { kind: "research_question", key: id, parse: (c) => c };
+}
+
+/** Saves the Creator's wording of a question; the question becomes theirs. */
+export async function editResearchQuestion(projectId: string, id: string, text: string): Promise<void> {
+  await editUnit(projectId, researchQuestionUnit(id), { text });
+}
+
+/** The prompt to copy into an outside research tool. */
+export async function getResearchPrompt(projectId: string): Promise<string> {
+  return (await apiFetch<{ prompt: string }>(`/v1/projects/${projectId}/research/prompt`)).prompt;
+}
+
+/** The prompt for another round: only the questions still short of sources. 409 when none is. */
+export async function getFollowUpPrompt(projectId: string): Promise<string> {
+  return (await apiFetch<{ prompt: string }>(`/v1/projects/${projectId}/research/follow-up-prompt`)).prompt;
+}
+
+/** What reading a pasted answer did. 400 when the answer holds no research JSON block. */
+export interface PasteResult {
+  added: string[];
+  updated: string[];
+  rejected: { row: number; reason: string }[];
+  log: PasteLog;
+}
+
+export async function pasteResearch(projectId: string, raw: string): Promise<PasteResult> {
+  const w = await apiFetch<{
+    added: string[] | null;
+    updated: string[] | null;
+    rejected: { row: number; reason: string }[] | null;
+    log: pasteLogWire;
+  }>(`/v1/projects/${projectId}/research/paste`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ raw }),
+  });
+  return { added: w.added ?? [], updated: w.updated ?? [], rejected: w.rejected ?? [], log: fromWirePaste(w.log) };
+}
+
+/** A fact the Creator adds by hand. */
+export interface FactInput {
+  question: string;
+  claimVi: string;
+  type: FactType;
+  sourceTitle?: string;
+  publisher?: string;
+  year?: string;
+  url?: string;
+  quote?: string;
+}
+
+export async function addFact(projectId: string, input: FactInput): Promise<ResearchFact> {
+  const w = await apiFetch<researchFactWire>(`/v1/projects/${projectId}/research/facts`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      question: input.question,
+      claim_vi: input.claimVi,
+      type: input.type,
+      source_title: input.sourceTitle ?? "",
+      publisher: input.publisher ?? "",
+      year: input.year ?? "",
+      url: input.url ?? "",
+      quote: input.quote ?? "",
+    }),
+  });
+  return fromWireFact(w);
+}
+
+/** Changes a fact's type, must-say mark or kept/dropped state straight in the table. */
+export async function setFactFlags(
+  projectId: string,
+  id: string,
+  flags: { type?: FactType; must?: boolean; keep?: boolean },
+): Promise<ResearchFact> {
+  const w = await apiFetch<researchFactWire>(`/v1/projects/${projectId}/research/facts/${encodeURIComponent(id)}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify(flags),
+  });
+  return fromWireFact(w);
+}
+
+/** The text fields of a fact the Creator can edit, by the names the server uses. */
+export type FactTextField = "claim_vi" | "source_title" | "publisher" | "year" | "url" | "quote" | "note" | "question";
+
+function factUnit(id: string): UnitRef<unknown> {
+  return { kind: "fact", key: id, parse: (c) => c };
+}
+
+/** Saves the Creator's changes to a fact's text; a new link or quote is checked again. */
+export async function editFact(projectId: string, id: string, fields: Partial<Record<FactTextField, string>>): Promise<void> {
+  await editUnit(projectId, factUnit(id), fields as Record<string, string>);
+}
+
+/** What changing or dropping a fact sends back in later steps. Empty while no later step uses it. */
+export async function getFactImpact(projectId: string, id: string): Promise<string[]> {
+  return getUnitImpact(projectId, factUnit(id));
+}
+
+/** Checks the links of the given facts again (every kept fact with a link when none is named). */
+export async function verifyFacts(projectId: string, factIds: string[]): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/research/verify`, {
+    method: "POST",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ fact_ids: factIds }),
+  });
+}
+
+/** Skips the research step, or comes back to do it. */
+export async function setResearchSkipped(projectId: string, skipped: boolean): Promise<ResearchGate> {
+  return apiFetch<ResearchGate>(`/v1/projects/${projectId}/research/skip`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ skipped }),
+  });
+}
+
+const RESEARCH_GATE_UNIT: UnitRef<unknown> = { kind: "research", key: "main", parse: (c) => c };
+
+/** Approves the fact table. 400 when it holds no kept fact. */
+export async function approveResearch(projectId: string): Promise<void> {
+  await approveUnit(projectId, RESEARCH_GATE_UNIT);
+}
+
+/** Takes the approval of the fact table back. */
+export async function unapproveResearch(projectId: string): Promise<void> {
+  await unapproveUnit(projectId, RESEARCH_GATE_UNIT);
 }

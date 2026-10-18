@@ -80,13 +80,15 @@ describe("AppShell — the 21-step flow", () => {
     expect(screen.getByTestId("rail-step-16")).toHaveAttribute("data-reached", "true");
     expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-reached", "false");
     expect(screen.getByTestId("rail-step-21")).not.toBeDisabled();
-    // A step the app does not have yet cannot be opened.
-    expect(screen.getByTestId("rail-step-18")).toBeDisabled();
+    // A step the app does not have yet opens a page that says it is not developed.
+    expect(screen.getByTestId("rail-step-18")).not.toBeDisabled();
 
     fireEvent.click(screen.getByTestId("rail-step-21"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/preview\/13$/);
     fireEvent.click(screen.getByTestId("rail-step-17"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/render$/);
+    fireEvent.click(screen.getByTestId("rail-step-18"));
+    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/coming\/18$/);
   });
 
   it("shows the phase and step above the title", async () => {
