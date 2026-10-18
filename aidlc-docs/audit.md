@@ -3484,3 +3484,19 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **AI Response**: Nút mở bước 4 Câu chuyện; màn đó hiện "Bước này chưa phát triển" tới U3c. Ghi vào thiết kế.
 **Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit.
 **Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt thiết kế.
+
+---
+## CR-072-U3b — Duyệt thiết kế; bổ sung khi chia task
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "ok làm đi"
+**AI Response**: Commit thiết kế (`69ae395`) và push. Đọc code web-gui ở mức dòng để chia task thì thấy thiết kế thiếu hai điều: (1) menu bước đánh khoá theo số bước server nên màn web-only cần trường `screen` và prop `viewStep`; (2) nếu Cấu hình mở Nghiên cứu và nút sang Câu chuyện chỉ hiện "chưa phát triển" thì video mới không còn đường tới bước Kịch bản hiện có. Ghi mục "Bổ sung sau khi đọc code web-gui" vào thiết kế, đề xuất nút phụ "Tiếp tục bằng bước Viết kịch bản hiện có" ở màn Câu chuyện chưa phát triển; chưa viết task, chờ Creator duyệt lại.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`; chưa commit phần bổ sung.
+**Context**: CONSTRUCTION — CR-072-U3b, chờ duyệt lại thiết kế.
+
+---
+## CR-072-U3b — Chọn (c): màn chưa có hiện "chưa phát triển"
+**Timestamp**: 2026-10-18T00:00:00Z
+**User Input**: "chọn C màn nào chưa có hiện chưa phát triển"
+**AI Response**: Ghi vào thiết kế: không thêm đường nối sang Kịch bản hiện có; mọi màn của luồng 21 bước chưa có mở ra màn "Bước này chưa phát triển". Commit phần bổ sung rồi chia task.
+**Artifacts Affected**: `cr-072-u3b-research-design.md`, `audit.md`.
+**Context**: CONSTRUCTION — CR-072-U3b.
