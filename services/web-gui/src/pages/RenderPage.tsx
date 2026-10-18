@@ -8,7 +8,7 @@ import { useSSE } from "../hooks/useSSE";
 import { useProject } from "../hooks/useProject";
 import { retryProject, ApiError } from "../api/client";
 import { statusToStep, projectPhase, projectPath, PROCESS_STEPS } from "../utils/pipelineLabels";
-import { FLOW_LABELS, FLOW_TTS, flowTitle } from "../utils/flow";
+import { FLOW_LABELS, FLOW_TTS, flowStepName } from "../utils/flow";
 
 /**
  * Settings that may still change after a stop at this saga step: the ones read
@@ -30,7 +30,7 @@ const SAGA_FLOW_STEP: Record<string, number> = {
 };
 
 /**
- * Bước 9–11 (Giọng đọc, Dựng hình, Ghép video): giai đoạn Sản xuất,
+ * Bước 9–11 (Giọng đọc, Render, Merge + QC): giai đoạn Sản xuất,
  * phần đắt, chạy sau khi Creator duyệt ở bước 8.
  *
  * Không có nhánh nào dừng chờ người: mọi thứ từ lúc này tới `ready_to_publish`
@@ -97,7 +97,7 @@ export function RenderPage() {
   const activeFlowStep = SAGA_FLOW_STEP[displayStep ?? ""] ?? FLOW_TTS;
   const shownFlowStep = viewOnly ? viewStep : activeFlowStep;
   // The whole phase in one tracker.
-  // QC runs inside "Ghép video" and has no row of its own.
+  // QC runs inside "Merge + QC" and has no row of its own.
   const trackerState =
     displayProgressState.currentStep === "qc_video"
       ? { ...displayProgressState, currentStep: "assemble_video" }
@@ -123,7 +123,7 @@ export function RenderPage() {
     <div data-testid="render-page">
       <AppShell
         currentStep={shownFlowStep}
-        title={flowTitle(shownFlowStep)}
+        title={flowStepName(shownFlowStep)}
         subtitle={
           reviewingPast
             ? "Giai đoạn sản xuất đã chạy xong."

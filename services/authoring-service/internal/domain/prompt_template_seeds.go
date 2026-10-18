@@ -17,7 +17,8 @@ func bt(s string) string { return strings.ReplaceAll(s, "¤", "`") }
 // split across the pipeline roles.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
-		{Role: RoleStoryArchitect, Language: "vi", Version: 11, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleStoryArchitect, Language: "vi", Version: 12, TemplateText: bt(storyArchitectVI)},
+		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
 		{Role: RoleVisualDirector, Language: "vi", Version: 12, TemplateText: bt(visualDirectorVI)},
 		{Role: RoleRemotionEngineer, Language: "vi", Version: 8, TemplateText: bt(withIllustrationKit(withLottieCatalog(remotionEngineerVI)))},
 		{Role: RoleVisualDirectorAI, Language: "vi", Version: 6, TemplateText: bt(visualDirectorAIVI)},
@@ -90,6 +91,12 @@ const storyArchitectVI = `Bạn là BIÊN KỊCH của một kênh video phổ b
 ======================================================
 CHỦ ĐỀ VIDEO: {{topic}}
 ======================================================
+
+## CREATIVE BRIEF
+
+{{creative_brief}}
+
+Brief là điểm tựa của dàn ý: câu hỏi trung tâm là câu video phải trả lời trước khi kết; khán giả và giọng điệu quyết định cách nói; điều người xem sẽ biết, hiểu, cảm thấy là đích mà các beat dẫn tới; phần ngoài phạm vi thì không nói tới. Dàn ý và lời thoại vừa thời lượng mục tiêu.
 
 NGUYÊN TẮC GỐC: DÀN Ý ĐI THEO CHỦ ĐỀ, KHÔNG ĐI THEO KHUÔN. Mỗi chủ đề có một con đường dễ hiểu nhất của riêng nó — một phép toán cần xây từng tầng, một quy trình cần đi theo dấu vết, một thiên kiến cần một nghịch lý, một phát minh cần kể như câu chuyện. Việc của bạn là TÌM con đường đó cho chủ đề này, rồi mới rót vào các beat. Một dàn ý mà thay chủ đề khác vào vẫn dùng được là dàn ý hỏng.
 

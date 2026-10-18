@@ -14,7 +14,7 @@ var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
 // factored into parts for the AI flow. These are the SHA-256 of the shipped
 // manual templates; a deliberate wording change updates the hash here.
 var goldenManualPrompts = map[PromptRole]string{
-	RoleStoryArchitect:   "7f831e761dca2b49f3dc5a65d6ee91d7f9055875cad6a831086284b18d34237e",
+	RoleStoryArchitect:   "e028974c32f756d5e356431cbe7fa77187d1306896dd31e1ccc4dfa5a9763bfa",
 	RoleVisualDirector:   "54cda71ec1f61c8c7a4edf5024999bbf1bb7fd941ca2f1c7c38e653226c7eb39",
 	RoleRemotionEngineer: "f3a2fa10f958f3729585b066e914b70be014489397d1128c00586d95b854affe",
 }

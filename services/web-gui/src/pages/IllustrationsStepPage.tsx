@@ -10,7 +10,7 @@ import { getAuthoringState } from "../api/client";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import styles from "./WizardSteps.module.css";
-import { FLOW_ILLUSTRATIONS, flowTitle } from "../utils/flow";
+import { FLOW_ILLUSTRATIONS, flowStepName } from "../utils/flow";
 
 /**
  * Bước Hình minh hoạ, giữa Hình ảnh và Code. Chạy
@@ -59,7 +59,7 @@ export function IllustrationsStepPage() {
     <div data-testid="illustrations-step-page">
       <AppShell
         currentStep={5}
-        title={flowTitle(FLOW_ILLUSTRATIONS)}
+        title={flowStepName(FLOW_ILLUSTRATIONS)}
         subtitle="Hình minh hoạ của video: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt trước khi viết code."
         wide
       >

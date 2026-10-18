@@ -129,6 +129,16 @@
   font-weight: 600;
 }
 
+/* A hint about the inputs of the step on screen; it never blocks the step. */
+.noticeBanner {
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  background: var(--info-soft);
+  border: var(--border-w) solid var(--border-color);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 @media (max-width: 900px) {
   .scriptLayout {
     grid-template-columns: minmax(0, 1fr);

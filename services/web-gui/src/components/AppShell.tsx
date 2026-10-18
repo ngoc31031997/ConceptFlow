@@ -8,10 +8,11 @@ import { useRecentProject } from "../hooks/useRecentProject";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
 import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
-import { FLOW_LABELS, phaseOf, readOnlyReason } from "../utils/flow";
+import { FLOW_STEP_PURPOSE, FLOW_VIEW, phaseOf, readOnlyReason, viewStepOf } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
 import { AccentPicker } from "./AccentPicker";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
+import { StepStrip, type StepStripProps } from "./StepStrip";
 import styles from "./AppShell.module.css";
 
 /*
@@ -30,13 +31,30 @@ interface AppShellProps {
   headerAction?: ReactNode;
   /** This screen previews `currentStep`, a step the video has not reached. */
   preview?: boolean;
+  /** What the step is for ("Bước này: …"), above the subtitle; the step's own purpose by default. */
+  role?: ReactNode;
+  /** Where the step stands and what comes next, under the subtitle. */
+  strip?: StepStripProps;
   children: ReactNode;
+}
+
+/**
+ * A settings page of the target flow that the app does not have yet: listed
+ * so the menu reads as the mockup does, but not a link.
+ */
+function ComingLink({ label }: { label: string }) {
+  return (
+    <span className={`${styles.sideLink} ${styles.sideComing}`} aria-disabled="true" title="Sắp có">
+      {label}
+      <span className={styles.sideComingTag}>sắp có</span>
+    </span>
+  );
 }
 
 const navCls = ({ isActive }: { isActive: boolean }) =>
   [styles.sideLink, isActive ? styles.sideLinkActive : ""].filter(Boolean).join(" ");
 
-export function AppShell({ currentStep, title, subtitle, wide, headerAction, preview, children }: AppShellProps) {
+export function AppShell({ currentStep, title, subtitle, wide, headerAction, preview, role, strip, children }: AppShellProps) {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   // Reset ngay khi bấm, không chỉ dựa vào router state: bấm khi đang ở "/" thì
@@ -53,10 +71,10 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
   const flow = useProjectFlow();
   const recent = useRecentProject(routeProjectId || draft.projectId);
   const recentName = recent ? recent.topic?.trim() || recent.project_id.slice(0, 8) : "";
-  // "Soạn nội dung · Hình ảnh": the phase and the step, not a bare "4/14".
+  // "Tiền kỳ · Nội dung · Ý tưởng": the phase and the step, not a bare "9/21".
   const recentStep = recent?.flow_step ?? 0;
   const recentPhase = phaseOf(recentStep);
-  const recentWhere = recentPhase ? ` · ${recentPhase.name} · ${FLOW_LABELS[recentStep - 1]}` : "";
+  const recentWhere = recentPhase ? `${recentPhase.name} · ${viewStepOf(recentStep)?.label ?? ""}` : "";
   const nav = useStepNav(currentStep, { preview });
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
@@ -65,6 +83,11 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
   // Menu bước hiện trên mọi màn của luồng, kể cả bước 1 trước khi có project,
   // để Creator thấy trước cả chặng đường.
   const showRail = !!currentStep;
+  const roleText = role ?? (currentStep ? FLOW_STEP_PURPOSE[currentStep - 1] : undefined);
+  // The menu marks where the Creator is: a step of the project they are on
+  // ("Tiếp tục"), or a new video that has no project yet ("Tạo video mới").
+  const onRecentProject = !!currentStep && !!recent && recent.project_id === (routeProjectId || draft.projectId);
+  const onNewVideo = !!currentStep && currentStep === 1 && !nav.hasProject;
   const currentPhase = currentStep ? phaseOf(currentStep) : null;
 
   const toggleRail = () => {
@@ -95,29 +118,43 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
         </Link>
 
         <nav className={styles.sideNav}>
-          <NavLink to="/" end state={NEW_VIDEO_STATE} onClick={startNewVideo} className={navCls}>Tạo video mới</NavLink>
+          <NavLink
+            to="/"
+            end
+            state={NEW_VIDEO_STATE}
+            onClick={startNewVideo}
+            className={() => navCls({ isActive: onNewVideo })}
+          >
+            Tạo video mới
+          </NavLink>
           {recent && (
             <NavLink
               to={`/projects/${recent.project_id}/resume`}
-              className={styles.sideLink}
+              className={() => navCls({ isActive: onRecentProject })}
               title={recentName}
               data-testid="resume-recent-project"
             >
-              <span className={styles.resumeLabel}>
-                ▶ Tiếp tục{recent.run_state === "running" ? " · đang chạy" : ""}
-                {recentWhere}
-              </span>
-              <span className={styles.resumeName}>{recentName}</span>
+              ▶ Tiếp tục{recent.run_state === "running" ? " · đang chạy" : ""}
+              <small className={styles.sideSub}>{recentWhere || recentName}</small>
             </NavLink>
           )}
           <NavLink to="/videos" className={navCls}>Danh sách video</NavLink>
           <NavLink to="/journal" className={navCls}>Nhật ký</NavLink>
+          <NavLink to="/flow" className={navCls} data-testid="nav-flow-map">
+            Bản đồ luồng
+            <small className={styles.sideSub}>xem cả {FLOW_VIEW.length} bước</small>
+          </NavLink>
+          <div className={styles.sideGroup}>Cài đặt</div>
           {/* Admin entry to edit the authoring pipeline's prompt wording. */}
           <NavLink to="/settings/prompts" className={navCls}>Cài đặt prompt</NavLink>
+          <NavLink to="/settings/ai-model" className={navCls}>Model AI mặc định</NavLink>
           {/* The table of video kinds the Story Architect chooses from. */}
           <NavLink to="/settings/video-archetypes" className={navCls}>Kiểu video</NavLink>
+          <ComingLink label="Ngôn ngữ hình" />
           {/* The illustration library the Remotion Engineer draws from. */}
           <NavLink to="/settings/illustrations" className={navCls}>Thư viện hình</NavLink>
+          <ComingLink label="Thư viện nhân vật" />
+          <ComingLink label="Từ điển phát âm" />
         </nav>
       </aside>
 
@@ -154,7 +191,7 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
               </div>
               {currentPhase && (
                 <span className={styles.phaseLine} data-testid="phase-line">
-                  {currentPhase.name} · Bước {currentStep}/{FLOW_LABELS.length}
+                  {currentPhase.name} · Bước {viewStepOf(currentStep ?? 0)?.n}/{FLOW_VIEW.length}
                 </span>
               )}
               <h1>{title}</h1>
@@ -168,8 +205,14 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
 
         <div className={`${styles.mainCol} ${wide ? styles.mainColWide : ""}`}>
           <div className={styles.heading}>
+            {roleText && (
+              <p className={styles.roleLine} data-testid="step-role">
+                <b>Bước này:</b> {roleText}
+              </p>
+            )}
             <p>{subtitle}</p>
           </div>
+          {strip && <StepStrip {...strip} />}
           {showRail && currentStep && nav.hasProject && <StatusStrip currentStep={currentStep} />}
           {readOnly && flow.status && (
             <p className={styles.readOnlyBanner} role="status" data-testid="read-only-banner">

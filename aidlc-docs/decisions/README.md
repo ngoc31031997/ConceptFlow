@@ -35,7 +35,7 @@
 | [ADR-0031](ADR-0031-frame-orientation-by-output-mode.md) | Khung hình theo chế độ đầu ra; short dựng dọc riêng từ đầu | Accepted | Application Design (CR-060) | 2026-10-01 |
 | [ADR-0032](ADR-0032-narration-lines-time-remotion-shots.md) | Câu thoại là đơn vị thời gian của shot Remotion | Accepted | Application Design (CR-067) | 2026-10-03 |
 | [ADR-0033](ADR-0033-remotion-only-render-engine.md) | Remotion là engine dựng video duy nhất | Accepted | Application Design (CR-071) | 2026-10-13 |
-| [ADR-0034](ADR-0034-three-phase-flow-and-art-bible.md) | Luồng ba giai đoạn và bộ thiết kế mỹ thuật hai lượt | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0034](ADR-0034-three-phase-flow-and-art-bible.md) | Luồng ba giai đoạn và bộ thiết kế mỹ thuật hai lượt | Superseded by ADR-0042 | Application Design (CR-072) | 2026-10-13 |
 | [ADR-0035](ADR-0035-per-unit-review-and-input-fingerprints.md) | Khung sửa theo đơn vị và dấu đầu vào để chỉ làm lại phần bị ảnh hưởng | Accepted | Application Design (CR-072) | 2026-10-13 |
 | [ADR-0036](ADR-0036-channel-visual-languages.md) | Ngôn ngữ hình của kênh: luật ở DB có phiên bản, rig là kit Remotion, một ngôn ngữ bật | Accepted | Application Design (CR-072) | 2026-10-13 |
 | [ADR-0037](ADR-0037-topic-driven-worlds.md) | Phong cách theo thế giới của chủ đề, thay nền sáng bão hoà mặc định của CR-067 | Accepted | Application Design (CR-072) | 2026-10-13 |
@@ -43,3 +43,6 @@
 | [ADR-0039](ADR-0039-shared-still-api-and-browser-animatic.md) | Một API ảnh tĩnh chung ở rendering; animatic phát trong trình duyệt | Accepted | Application Design (CR-072) | 2026-10-13 |
 | [ADR-0040](ADR-0040-draft-voice-over-rabbitmq-and-dictionary.md) | Giọng sơ bộ qua RabbitMQ ngoài saga render; từ điển phát âm ở authoring-service | Accepted | Application Design (CR-072) | 2026-10-13 |
 | [ADR-0041](ADR-0041-shared-volume-as-file-store.md) | `/shared` là kho file; dữ liệu và lệnh chỉ giữ đường dẫn | Accepted | Application Design (CR-072) | 2026-10-13 |
+| [ADR-0042](ADR-0042-21-step-flow-with-content-pre-production.md) | Luồng 21 bước, Tiền kỳ chia Nội dung và Hình ảnh (thay ADR-0034 phần luồng) | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
+| [ADR-0043](ADR-0043-pasted-research-with-source-verification.md) | Nghiên cứu có nguồn bằng prompt chép ra công cụ ngoài; backend kiểm đoạn trích và chặn địa chỉ nội bộ | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
+| [ADR-0044](ADR-0044-locked-script-versions-and-handoff.md) | Chốt phiên bản kịch bản; bước sau chỉ đọc bản đã chốt và bộ bàn giao trong DB | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |

@@ -12,7 +12,7 @@ import { useAuthoringMode } from "../hooks/useAuthoringMode";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { authoringHint } from "../utils/authoringHint";
 import styles from "./WizardSteps.module.css";
-import { FLOW_VISUAL, flowTitle } from "../utils/flow";
+import { FLOW_VISUAL, flowStepName } from "../utils/flow";
 
 /**
  * Bước 4 — Hình ảnh (Visual Director), the second authoring step: the server
@@ -128,7 +128,7 @@ export function VisualDirectorStepPage() {
     <div data-testid="visual-director-step-page">
       <AppShell
         currentStep={4}
-        title={flowTitle(FLOW_VISUAL)}
+        title={flowStepName(FLOW_VISUAL)}
         subtitle="Dựng storyboard hình ảnh từ dàn ý."
         wide
       >
@@ -141,7 +141,7 @@ export function VisualDirectorStepPage() {
             steps={["storyboard"]}
             what="storyboard"
             runDisabled={draft.authoringStory.trim().length === 0}
-            runDisabledReason="Cần hoàn thành bước Kịch bản trước."
+            runDisabledReason="Cần hoàn thành bước Viết kịch bản trước."
             onGenerated={(step, content) => {
               if (step === "storyboard") dispatch({ type: "SET_AUTHORING_STORYBOARD", payload: content });
             }}

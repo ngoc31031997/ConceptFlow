@@ -35,6 +35,10 @@ type RenderInput struct {
 	// VideoOutputMode picks the frame the frame variables describe: "short"
 	// is the portrait frame, anything else the landscape one.
 	VideoOutputMode string
+
+	// ProjectID, when set, fills {{creative_brief}} (story_architect only)
+	// with that project's approved brief.
+	ProjectID string
 }
 
 const (
@@ -109,8 +113,18 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 	}
 
 	archetypes := ""
+	brief := creativeBriefPlaceholder
 	if in.Role == domain.RoleStoryArchitect {
 		archetypes = uc.archetypeSection(ctx)
+		if in.ProjectID != "" && uc.brief != nil {
+			project, err := uc.projects.Get(ctx, in.ProjectID)
+			if err != nil {
+				return RenderedPrompt{}, fmt.Errorf("load project: %w", err)
+			}
+			if brief, err = uc.brief.ApprovedBriefSection(ctx, in.ProjectID, project); err != nil {
+				return RenderedPrompt{}, fmt.Errorf("load creative brief: %w", err)
+			}
+		}
 	}
 
 	frame := domain.FrameFor(domain.VideoOutputMode(in.VideoOutputMode))
@@ -123,6 +137,7 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		"{{thumbnail_audience}}", domain.ThumbnailAudience(language),
 		"{{format_beats}}", beats,
 		"{{video_archetypes}}", archetypes,
+		"{{creative_brief}}", brief,
 		"{{subtitle_zone}}", domain.SubtitleZoneIn(domain.SubtitleMode(in.SubtitleMode), style, frame, language),
 	}
 	for name, value := range domain.FramePromptVars(frame, language) {

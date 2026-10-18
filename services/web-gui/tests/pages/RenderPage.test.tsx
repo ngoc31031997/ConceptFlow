@@ -63,12 +63,12 @@ describe("RenderPage (bước 5 — sản xuất)", () => {
     await waitFor(() => expect(screen.getByTestId("progress-tracker-steps").querySelectorAll("li")).toHaveLength(3));
     const items = Array.from(screen.getByTestId("progress-tracker-steps").querySelectorAll("li"));
     expect(items[0]).toHaveTextContent("Tạo giọng đọc");
-    expect(items[1]).toHaveTextContent("Dựng hình");
+    expect(items[1]).toHaveTextContent("Render");
     expect(items[2]).toHaveTextContent("Ghép video hoàn chỉnh");
     expect(screen.getByTestId("progress-tracker-steps")).not.toHaveTextContent("Cắt clip dọc");
     expect(screen.getByTestId("progress-tracker-steps")).not.toHaveTextContent("Phân tích kịch bản");
     // The rail and the title follow the step that is running.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 10 — Dựng hình");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Render");
   });
 
   it("short dọc có cùng ba việc sản xuất như video dài", async () => {

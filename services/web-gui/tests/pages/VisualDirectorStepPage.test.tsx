@@ -86,7 +86,7 @@ describe("VisualDirectorStepPage", () => {
 
     expect(screen.queryByTestId("script-tab-storyboard")).not.toBeInTheDocument();
     // Screen titles name the step as the rail does.
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 4 — Hình ảnh");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Storyboard");
   });
 
   describe("lời nhắc theo cách làm", () => {

@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { suggestPublishMetadata, ApiError } from "../api/client";
 import { useOperationRun } from "../hooks/useOperationRun";
+import { AiModelSelect } from "./AiModelSelect";
 import { AiOperationCard } from "./AiOperationCard";
 import type { PublishMetadata } from "../types";
 import glass from "../styles/glass.module.css";
@@ -108,6 +109,7 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
 
   return (
     <form onSubmit={handleSubmit} className={`${glass.card} ${styles.form}`}>
+      <AiModelSelect projectId={projectId} step="publish" label="Model AI gợi ý" testId="publish-model" />
       <div className={styles.ctaRow}>
         <button
           type="button"

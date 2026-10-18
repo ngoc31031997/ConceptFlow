@@ -237,6 +237,7 @@ type saveAuthoringModeRequest struct {
 // /v1/projects/{id}/authoring/models — the model-per-step picker's choice
 // for each of the three tabs, "" meaning "server default".
 type saveAuthoringModelsRequest struct {
+	Brief      string `json:"brief"`
 	Story      string `json:"story"`
 	Storyboard string `json:"storyboard"`
 	Code       string `json:"code"`

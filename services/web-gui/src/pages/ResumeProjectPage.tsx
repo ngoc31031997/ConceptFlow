@@ -43,6 +43,8 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
     authoringModels: {
       story: state.story_model ?? "",
       storyboard: state.storyboard_model ?? "",
+      brief: state.brief_model ?? "",
+      publish: state.publish_model ?? "",
       code: state.code_model ?? "",
     },
     authoringTopic: state.topic,

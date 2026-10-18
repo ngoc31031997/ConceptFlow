@@ -84,7 +84,7 @@ describe("eventStepLabel", () => {
     ({ id: 1, project_id: "p", at: "t", flow_step, step_label, run_state: "done", source: "saga" }) as ProjectEvent;
 
   it("names a step as the step rail does, not with the server's older label", () => {
-    expect(eventStepLabel(event(10, "Render"))).toBe("Dựng hình");
+    expect(eventStepLabel(event(10, "Render"))).toBe("Render từng cảnh");
     expect(eventStepLabel(event(9, "TTS"))).toBe("Giọng đọc");
   });
 

@@ -9,6 +9,69 @@ describe("api/client", () => {
     vi.restoreAllMocks();
   });
 
+  describe("creative brief and review units", () => {
+    const unitWire = {
+      project_id: "p1",
+      kind: "brief",
+      key: "main",
+      status: "pending",
+      content: { question: "Q", tone: "T" },
+      creator_fields: null,
+      redo_count: 2,
+      updated_at: "2026-10-18T00:00:00Z",
+    };
+    const ok = (body: unknown) =>
+      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body }) as unknown as typeof fetch;
+
+    it("reads the brief state, filling the fields and length the server left out", async () => {
+      global.fetch = ok({ unit: unitWire, target_duration: "", story_stale: true, story_prompt_reads_brief: false });
+
+      const state = await client.getBriefState("p1");
+
+      expect(state.targetDuration).toBe(client.DEFAULT_TARGET_DURATION);
+      expect(state.storyStale).toBe(true);
+      expect(state.storyPromptReadsBrief).toBe(false);
+      expect(state.unit?.content).toEqual({
+        question: "Q",
+        audience: "",
+        know: "",
+        understand: "",
+        feel: "",
+        tone: "T",
+        out_of_scope: "",
+      });
+      expect(state.unit?.creatorFields).toEqual([]);
+      expect(state.unit?.redoCount).toBe(2);
+    });
+
+    it("sends the operation id with the AI runs, so the screen can follow them", async () => {
+      global.fetch = ok(unitWire);
+
+      await client.generateBrief("p1", "op-1");
+      await client.redoUnit("p1", client.BRIEF_UNIT, "ngắn hơn", "op-2");
+
+      const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls;
+      expect(calls[0][0]).toMatch(/\/v1\/projects\/p1\/brief\/generate$/);
+      expect((calls[0][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-1");
+      expect(calls[1][0]).toMatch(/\/v1\/projects\/p1\/units\/brief\/main\/redo$/);
+      expect((calls[1][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-2");
+      expect(JSON.parse(calls[1][1].body as string)).toEqual({ note: "ngắn hơn" });
+    });
+
+    it("sends a hand edit as the changed fields and reads the impact list", async () => {
+      global.fetch = ok(unitWire);
+      await client.editUnit("p1", client.BRIEF_UNIT, { tone: "ấm" });
+      const edit = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0];
+      expect(edit[1].method).toBe("PUT");
+      expect(JSON.parse(edit[1].body as string)).toEqual({ fields: { tone: "ấm" } });
+
+      global.fetch = ok({ items: ["Dàn ý"] });
+      expect(await client.getUnitImpact("p1", client.BRIEF_UNIT)).toEqual(["Dàn ý"]);
+      global.fetch = ok({ items: null });
+      expect(await client.getUnitImpact("p1", client.BRIEF_UNIT)).toEqual([]);
+    });
+  });
+
   it("throws generic message on network error", async () => {
     global.fetch = vi.fn().mockRejectedValue(new TypeError("network down"));
 

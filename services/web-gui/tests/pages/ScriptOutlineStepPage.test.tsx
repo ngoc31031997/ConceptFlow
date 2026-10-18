@@ -78,6 +78,58 @@ describe("ScriptOutlineStepPage", () => {
     window.localStorage.clear();
   });
 
+  describe("creative brief", () => {
+    const approved: apiClient.ReviewUnit<apiClient.CreativeBrief> = {
+      projectId: "p",
+      kind: "brief",
+      key: "main",
+      status: "approved",
+      content: apiClient.parseCreativeBrief({}),
+      creatorFields: [],
+      redoCount: 0,
+      updatedAt: "",
+    };
+    const state = (over: Partial<apiClient.BriefState>): apiClient.BriefState => ({
+      unit: approved,
+      targetDuration: "4-5",
+      storyStale: false,
+      storyPromptReadsBrief: true,
+      ...over,
+    });
+
+    it("renders the story prompt for this project, so the server fills in its approved brief", async () => {
+      vi.spyOn(apiClient, "getBriefState").mockResolvedValue(state({}));
+      seedTopic("Ong sung");
+      renderPage();
+
+      await waitFor(() =>
+        expect(apiClient.renderPrompt).toHaveBeenCalledWith(
+          expect.objectContaining({ role: "story_architect", project_id: expect.any(String) }),
+        ),
+      );
+      expect(screen.queryByTestId("story-brief-stale")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("story-brief-missing")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("story-prompt-no-brief")).not.toBeInTheDocument();
+    });
+
+    it("says the outline was written from an older brief", async () => {
+      vi.spyOn(apiClient, "getBriefState").mockResolvedValue(state({ storyStale: true }));
+      vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "Ong sung", story: "BEAT 1", storyboard: "", code: "" });
+      renderPage();
+
+      expect(await screen.findByTestId("story-brief-stale")).toHaveTextContent("brief cũ");
+    });
+
+    it("says when no brief is approved, and when the active story prompt does not read the brief", async () => {
+      vi.spyOn(apiClient, "getBriefState").mockResolvedValue(state({ unit: null, storyPromptReadsBrief: false }));
+      seedTopic("Ong sung");
+      renderPage();
+
+      expect(await screen.findByTestId("story-brief-missing")).toHaveTextContent("Chưa có creative brief đã duyệt");
+      expect(screen.getByTestId("story-prompt-no-brief")).toHaveTextContent("{{creative_brief}}");
+    });
+  });
+
   it("copies the server-rendered prompt for the project's topic", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.assign(navigator, { clipboard: { writeText } });
@@ -247,7 +299,7 @@ describe("ScriptOutlineStepPage", () => {
       expect(screen.getByTestId("script-outline-prompt")).toBeInTheDocument();
       // The mode applies to all of steps 3–6, not "bước 3".
       expect(screen.getByRole("radiogroup", { name: "Cách làm các bước 3–6" })).toBeInTheDocument();
-      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bước 3 — Kịch bản");
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Viết kịch bản");
       expect(screen.getByTestId("script-outline-copy")).toBeInTheDocument();
       expect(screen.queryByTestId("run-with-ai-story")).not.toBeInTheDocument();
     });
@@ -469,7 +521,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     renderPage();
 
     await waitFor(() => expect(screen.getByTestId("run-with-ai-running")).toBeInTheDocument());
-    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Đang chạy Bước 3 — Kịch bản");
+    expect(screen.getByTestId("run-with-ai-running")).toHaveTextContent("Đang chạy Bước 6 — Viết kịch bản");
     expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
     expect(screen.getByTestId("run-with-ai-cancel")).toBeInTheDocument();
   });
@@ -486,8 +538,8 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     expect(screen.getByTestId("run-with-ai-story")).toHaveTextContent("Chạy bằng AI các bước 3–6");
     expect(screen.getByTestId("run-with-ai-story")).toBeDisabled();
     // The step menu says which step the AI is on.
-    await waitFor(() => expect(screen.getByTestId("rail-step-4")).toHaveAttribute("data-status", "running"));
-    expect(screen.getByTestId("rail-step-3")).not.toHaveAttribute("data-status", "running");
+    await waitFor(() => expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-status", "running"));
+    expect(screen.getByTestId("rail-step-6")).not.toHaveAttribute("data-status", "running");
   });
 
   // Each screen shows only its own step's progress: once the outline is done
@@ -497,10 +549,10 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     renderPage();
 
     const elsewhere = await screen.findByTestId("authoring-run-elsewhere");
-    expect(elsewhere).toHaveTextContent("Bước 3 — Kịch bản đã xong. AI đang chạy Bước 4 — Hình ảnh.");
+    expect(elsewhere).toHaveTextContent("Bước 6 — Viết kịch bản đã xong. AI đang chạy Bước 9 — Storyboard.");
     expect(screen.queryByTestId(/^authoring-run-panel-/)).not.toBeInTheDocument();
     expect(screen.queryByTestId("authoring-live-progress")).not.toBeInTheDocument();
-    expect(screen.getByTestId("authoring-run-open-current")).toHaveTextContent("Mở Bước 4 — Hình ảnh");
+    expect(screen.getByTestId("authoring-run-open-current")).toHaveTextContent("Mở Bước 9 — Storyboard");
   });
 
   it("khi AI đang chạy chính bước này, hiện thẻ tiến độ của nó", async () => {
@@ -524,9 +576,9 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     renderPage();
 
     const row = await screen.findByTestId("run-with-ai-error-elsewhere");
-    expect(row).toHaveTextContent("Chuỗi AI dừng vì lỗi ở Bước 4 — Hình ảnh");
+    expect(row).toHaveTextContent("Chuỗi AI dừng vì lỗi ở Bước 9 — Storyboard");
     expect(screen.queryByTestId("run-with-ai-error")).not.toBeInTheDocument();
-    expect(screen.getByTestId("run-with-ai-open-error")).toHaveTextContent("Mở Bước 4 — Hình ảnh");
+    expect(screen.getByTestId("run-with-ai-open-error")).toHaveTextContent("Mở Bước 9 — Storyboard");
 
     fireEvent.click(screen.getByTestId("run-with-ai-dismiss"));
     await waitFor(() => expect(screen.queryByTestId("run-with-ai-error-elsewhere")).not.toBeInTheDocument());
@@ -546,7 +598,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
 
     const err = await screen.findByTestId("run-with-ai-error");
     expect(err).toHaveTextContent("hết số dư");
-    expect(err).toHaveTextContent("dừng ở Bước 3 — Kịch bản");
+    expect(err).toHaveTextContent("dừng ở Bước 6 — Viết kịch bản");
   });
 
   it("không hiện cảnh báo của storyboard ở bước Kịch bản", async () => {
@@ -574,7 +626,7 @@ describe("chuỗi AI chạy ở server (mở lại trang giữa/sau lượt ch�
     renderPage();
 
     const story = await screen.findByTestId("last-run-story");
-    expect(story).toHaveTextContent("Kịch bản");
+    expect(story).toHaveTextContent("Viết kịch bản");
     expect(story).toHaveTextContent("1m 12s");
     expect(story).toHaveTextContent("10,2k ký tự");
     expect(story).toHaveTextContent("4.000 token");

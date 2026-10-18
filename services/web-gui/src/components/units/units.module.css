@@ -1,0 +1,73 @@
+/* Review units: the status chip, the review bar, the "Bạn viết" tag and the
+   impact list shown inside an edit or redo dialog. */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.chipPending {
+  background: var(--warn-soft);
+}
+.chipApproved {
+  background: var(--ok-soft);
+}
+.chipRunning {
+  background: var(--run-soft);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.mine {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--info);
+  white-space: nowrap;
+}
+
+.impact {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--info-soft);
+  font-size: 13px;
+  color: var(--ink);
+}
+.impact b {
+  font-family: var(--font-display);
+}
+.impact ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+}
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--danger);
+}

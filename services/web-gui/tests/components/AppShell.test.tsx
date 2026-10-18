@@ -9,7 +9,7 @@ import { ProjectFlowProvider } from "../../src/context/ProjectFlowContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { Project, ProjectSummary } from "../../src/types";
-import { openAllPhases } from "../helpers/stepRail";
+import { waitForStepRail } from "../helpers/stepRail";
 
 /** Where the router is, for the navigation assertions. */
 function Where() {
@@ -58,37 +58,40 @@ function renderShell(p: Project | null, currentStep: number, recent: ProjectSumm
   );
 }
 
-describe("AppShell — 13-step flow", () => {
+describe("AppShell — the 21-step flow", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     window.localStorage.clear();
   });
 
-  it("shows all 13 steps, with the current one marked", async () => {
+  it("shows all 21 steps, with the current one marked", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await openAllPhases();
-    for (let i = 1; i <= 13; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
-    expect(screen.queryByTestId("rail-step-14")).not.toBeInTheDocument();
-    expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step");
+    await waitForStepRail();
+    for (let i = 1; i <= 21; i += 1) expect(screen.getByTestId(`rail-step-${i}`)).toBeInTheDocument();
+    expect(screen.queryByTestId("rail-step-22")).not.toBeInTheDocument();
+    // Running step 3 (the script) is step 6 of the 21.
+    expect(screen.getByTestId("rail-step-6")).toHaveAttribute("aria-current", "step");
   });
 
   it("opens a step the project has reached, and only a preview of one it has not", async () => {
     renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 5);
-    await openAllPhases();
-    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-reached", "true"));
-    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-reached", "true");
-    expect(screen.getByTestId("rail-step-11")).toHaveAttribute("data-reached", "false");
-    expect(screen.getByTestId("rail-step-13")).not.toBeDisabled();
+    await waitForStepRail();
+    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
+    expect(screen.getByTestId("rail-step-16")).toHaveAttribute("data-reached", "true");
+    expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-reached", "false");
+    expect(screen.getByTestId("rail-step-21")).not.toBeDisabled();
+    // A step the app does not have yet cannot be opened.
+    expect(screen.getByTestId("rail-step-18")).toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("rail-step-13"));
+    fireEvent.click(screen.getByTestId("rail-step-21"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/preview\/13$/);
-    fireEvent.click(screen.getByTestId("rail-step-10"));
+    fireEvent.click(screen.getByTestId("rail-step-17"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/render$/);
   });
 
   it("shows the phase and step above the title", async () => {
     renderShell(project({ status: "draft", flow_step: 4, run_state: "idle" }), 4);
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Soạn nội dung · Bước 4/13");
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Hình ảnh · Bước 9/21");
   });
 
   it("shows the step menu on step 1, before the server has a project", async () => {
@@ -98,8 +101,8 @@ describe("AppShell — 13-step flow", () => {
     expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("Nhập ý tưởng để bắt đầu");
     // Nothing runs yet, so there is no status strip.
     expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
-    await openAllPhases();
-    fireEvent.click(screen.getByTestId("rail-step-4"));
+    await waitForStepRail();
+    fireEvent.click(screen.getByTestId("rail-step-9"));
     expect(screen.getByTestId("where")).toHaveTextContent("/create/preview/4");
   });
 
@@ -109,8 +112,9 @@ describe("AppShell — 13-step flow", () => {
     ]);
 
     const link = await screen.findByTestId("resume-recent-project");
-    expect(link).toHaveTextContent("Tiếp tục · đang chạy · Sản xuất · Dựng hình");
-    expect(link).not.toHaveTextContent("/13");
+    expect(link).toHaveTextContent("Tiếp tục · đang chạy");
+    expect(link).toHaveTextContent("Hậu kỳ · Render");
+    expect(link).not.toHaveTextContent("/21");
   });
 
   it("locks the authoring screens read-only while the project is rendering, and says why", async () => {
@@ -122,7 +126,7 @@ describe("AppShell — 13-step flow", () => {
     // The bar that would save or start a render is locked too.
     expect(screen.getByTestId("next")).toBeDisabled();
     // Navigation stays usable: looking around is the point.
-    await openAllPhases();
+    await waitForStepRail();
     expect(screen.getByTestId("rail-step-2")).not.toBeDisabled();
   });
 
@@ -142,7 +146,7 @@ describe("AppShell — 13-step flow", () => {
 
   it("keeps real inputs for a draft", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await openAllPhases();
+    await waitForStepRail();
     await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-reached", "true"));
     expect(screen.getByTestId("story").tagName).toBe("TEXTAREA");
     expect(screen.getByTestId("lang").tagName).toBe("SELECT");
@@ -150,7 +154,7 @@ describe("AppShell — 13-step flow", () => {
 
   it("leaves a draft fully editable", async () => {
     renderShell(project({ status: "draft", flow_step: 3, run_state: "idle" }), 3);
-    await openAllPhases();
+    await waitForStepRail();
     await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-reached", "true"));
     expect(screen.queryByTestId("read-only-banner")).not.toBeInTheDocument();
     expect(screen.getByTestId("an-input")).not.toBeDisabled();
@@ -159,8 +163,8 @@ describe("AppShell — 13-step flow", () => {
 
   it("keeps a project that failed at render editable, so the Creator can go fix an earlier step", async () => {
     renderShell(project({ status: "failed_at_render_scenes", flow_step: 10, run_state: "failed" }), 5);
-    await openAllPhases();
-    await waitFor(() => expect(screen.getByTestId("rail-step-10")).toHaveAttribute("data-reached", "true"));
+    await waitForStepRail();
+    await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
     expect(screen.queryByTestId("read-only-banner")).not.toBeInTheDocument();
     expect(screen.getByTestId("an-input")).not.toBeDisabled();
   });
@@ -168,10 +172,10 @@ describe("AppShell — 13-step flow", () => {
   it("opens a past step of a locked project through resume (no API write on the way)", async () => {
     const put = vi.spyOn(globalThis, "fetch");
     renderShell(project({ status: "ready_to_publish", flow_step: 12, run_state: "idle" }), 12);
-    await openAllPhases();
-    await waitFor(() => expect(screen.getByTestId("rail-step-3")).toHaveAttribute("data-reached", "true"));
+    await waitForStepRail();
+    await waitFor(() => expect(screen.getByTestId("rail-step-6")).toHaveAttribute("data-reached", "true"));
     put.mockClear();
-    fireEvent.click(screen.getByTestId("rail-step-3"));
+    fireEvent.click(screen.getByTestId("rail-step-6"));
     // Navigating is a client-side route change; nothing is sent to the server.
     expect(put).not.toHaveBeenCalled();
   });
