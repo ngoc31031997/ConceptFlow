@@ -2,7 +2,7 @@
 name: code
 description: Implement an approved Change Request - work through the approved tasks in aidlc-docs/construction/plans/cr-NNN-*-tasks.md on its feature branch in the CR's own worktree, run the tests, rebuild the changed Docker services, and report. Invoked by the /cr skill after the Creator approves the tasks, or by the Creator with /code CR-NNN.
 argument-hint: "CR-<NNN>"
-model: sonnet
+model: claude-sonnet-5-5
 effort: medium
 ---
 

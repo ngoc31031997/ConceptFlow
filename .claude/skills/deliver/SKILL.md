@@ -2,7 +2,7 @@
 name: deliver
 description: After the Creator approves the code, commit the current branch, push it, merge it into main, pull main, refresh the graphify code graph for the new main and rebuild the changed Docker services. Run only when the Creator types /deliver.
 disable-model-invocation: true
-model: sonnet
+model: claude-sonnet-5-5
 effort: low
 argument-hint: "[optional commit message hint]"
 allowed-tools: Bash(git status*), Bash(git diff*), Bash(git log*), Bash(git branch*), Bash(git rev-parse*), Bash(git add*), Bash(git commit*), Bash(.claude/skills/deliver/deliver.sh*), Bash(scripts/worktree.sh prune*), ExitWorktree
