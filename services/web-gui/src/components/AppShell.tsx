@@ -8,7 +8,7 @@ import { useRecentProject } from "../hooks/useRecentProject";
 import { StepRail, readRailCollapsed, writeRailCollapsed } from "./StepRail";
 import { StatusStrip } from "./StatusStrip";
 import { ReadOnlyContext } from "../context/ReadOnlyContext";
-import { FLOW_STEP_PURPOSE, FLOW_VIEW, phaseOf, readOnlyReason, viewStepOf } from "../utils/flow";
+import { FLOW_STEP_PURPOSE, FLOW_VIEW, phaseOf, phaseOfView, readOnlyReason, viewStepOf } from "../utils/flow";
 import { ThemeToggle } from "./ThemeToggle";
 import { AccentPicker } from "./AccentPicker";
 import { ProjectErrorBadge } from "./ProjectErrorBadge";
@@ -24,6 +24,11 @@ import styles from "./AppShell.module.css";
 interface AppShellProps {
   /** Bước trong flow 13 bước mà màn này đang hiển thị (1-13). */
   currentStep?: number;
+  /**
+   * Số, trong 21 bước, của bước mà màn này hiển thị khi nó không có bước chạy
+   * phía sau (Nghiên cứu, hay màn "chưa phát triển"). Dùng thay `currentStep`.
+   */
+  viewStep?: number;
   title: string;
   subtitle: string;
   wide?: boolean;
@@ -54,7 +59,7 @@ function ComingLink({ label }: { label: string }) {
 const navCls = ({ isActive }: { isActive: boolean }) =>
   [styles.sideLink, isActive ? styles.sideLinkActive : ""].filter(Boolean).join(" ");
 
-export function AppShell({ currentStep, title, subtitle, wide, headerAction, preview, role, strip, children }: AppShellProps) {
+export function AppShell({ currentStep, viewStep, title, subtitle, wide, headerAction, preview, role, strip, children }: AppShellProps) {
   const draft = useContext(ProjectDraftContext);
   const dispatch = useContext(ProjectDraftDispatchContext);
   // Reset ngay khi bấm, không chỉ dựa vào router state: bấm khi đang ở "/" thì
@@ -63,8 +68,9 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
   const routeProjectId = useParams().id;
   // Tên project (chủ đề) từ bước 2 trở đi, để biết đang theo dõi project nào.
   // Trên màn có :id thì chỉ hiện khi bản nháp đang nạp đúng project đó.
+  const inProject = (currentStep ?? 0) >= 2 || !!viewStep;
   const projectName =
-    currentStep && currentStep >= 2 && draft.projectId && (!routeProjectId || routeProjectId === draft.projectId)
+    inProject && draft.projectId && (!routeProjectId || routeProjectId === draft.projectId)
       ? draft.authoringTopic.trim()
       : "";
 
@@ -75,20 +81,21 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
   const recentStep = recent?.flow_step ?? 0;
   const recentPhase = phaseOf(recentStep);
   const recentWhere = recentPhase ? `${recentPhase.name} · ${viewStepOf(recentStep)?.label ?? ""}` : "";
-  const nav = useStepNav(currentStep, { preview });
+  const nav = useStepNav(currentStep, { preview, webScreen: !currentStep && !!viewStep });
   const [railCollapsed, setRailCollapsed] = useState<boolean>(readRailCollapsed);
   // Chỉ xem: server sẽ từ chối sửa, nên báo trước thay vì để gõ xong mới lỗi.
   // Áp cho các màn soạn (1-6); màn 7-14 tự quản lý hành động của chúng.
   const readOnly = !!currentStep && currentStep <= 6 && nav.hasProject && !flow.editable;
   // Menu bước hiện trên mọi màn của luồng, kể cả bước 1 trước khi có project,
   // để Creator thấy trước cả chặng đường.
-  const showRail = !!currentStep;
+  const showRail = !!currentStep || !!viewStep;
   const roleText = role ?? (currentStep ? FLOW_STEP_PURPOSE[currentStep - 1] : undefined);
   // The menu marks where the Creator is: a step of the project they are on
   // ("Tiếp tục"), or a new video that has no project yet ("Tạo video mới").
   const onRecentProject = !!currentStep && !!recent && recent.project_id === (routeProjectId || draft.projectId);
   const onNewVideo = !!currentStep && currentStep === 1 && !nav.hasProject;
-  const currentPhase = currentStep ? phaseOf(currentStep) : null;
+  const shownView = viewStep ?? (currentStep ? viewStepOf(currentStep)?.n : undefined);
+  const currentPhase = viewStep ? phaseOfView(viewStep) : currentStep ? phaseOf(currentStep) : null;
 
   const toggleRail = () => {
     setRailCollapsed((c) => {
@@ -158,9 +165,10 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
         </nav>
       </aside>
 
-      {showRail && currentStep && (
+      {showRail && (
         <StepRail
           currentStep={currentStep}
+          viewStep={viewStep}
           title={projectName || (nav.hasProject ? flow.projectId.slice(0, 8) : "Video mới")}
           preview={preview}
           collapsed={railCollapsed}
@@ -185,13 +193,13 @@ export function AppShell({ currentStep, title, subtitle, wide, headerAction, pre
                     <span className={styles.projectChipName}>{projectName}</span>
                   </div>
                 )}
-                {currentStep && currentStep >= 2 && (routeProjectId || draft.projectId) && (
+                {inProject && (routeProjectId || draft.projectId) && (
                   <ProjectErrorBadge projectId={routeProjectId || draft.projectId} />
                 )}
               </div>
               {currentPhase && (
                 <span className={styles.phaseLine} data-testid="phase-line">
-                  {currentPhase.name} · Bước {viewStepOf(currentStep ?? 0)?.n}/{FLOW_VIEW.length}
+                  {currentPhase.name} · Bước {shownView}/{FLOW_VIEW.length}
                 </span>
               )}
               <h1>{title}</h1>

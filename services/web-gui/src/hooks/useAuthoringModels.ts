@@ -36,6 +36,7 @@ export function useAuthoringModels(projectId: string): {
           payload: {
             brief: state.brief_model ?? "",
             publish: state.publish_model ?? "",
+            research: state.research_model ?? "",
             story: state.story_model ?? "",
             storyboard: state.storyboard_model ?? "",
             code: state.code_model ?? "",

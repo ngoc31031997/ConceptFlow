@@ -16,6 +16,8 @@ import styles from "./PromptSettingsPage.module.css";
 
 const ROLES: { value: PromptRole; label: string }[] = [
   { value: "creative_brief", label: "0. Creative brief — viết brief từ đề tài (bước Ý tưởng)" },
+  { value: "research_questions", label: "0b. Câu hỏi nghiên cứu — AI đặt câu hỏi từ brief (bước Nghiên cứu)" },
+  { value: "research_prompt", label: "0c. Prompt nghiên cứu — chép sang công cụ nghiên cứu bên ngoài (bước Nghiên cứu)" },
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
@@ -55,6 +57,14 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   current_brief: "(brief hiện có, khi làm lại, sẽ hiện ở đây)",
   kept_fields: "(các ô Creator đã tự viết, AI giữ nguyên, sẽ hiện ở đây)",
   redo_note: "(ghi chú của Creator khi làm lại sẽ hiện ở đây)",
+  brief: "(creative brief đã duyệt, kèm thời lượng mục tiêu, sẽ hiện ở đây)",
+  kept_questions: "(các câu hỏi Creator đã tự viết, AI giữ nguyên, sẽ hiện ở đây)",
+  central_question: "(câu hỏi trung tâm của brief sẽ hiện ở đây)",
+  audience: "(khán giả của brief sẽ hiện ở đây)",
+  questions_heading: "CÂU HỎI CẦN TRA",
+  questions: "(danh sách câu hỏi Q1, Q2... sẽ hiện ở đây)",
+  extra: "(dữ kiện cần nguồn khác, chỉ có ở prompt bổ sung, sẽ hiện ở đây)",
+  answer_note: "(lời nhắc đánh mã tiếp, chỉ có ở prompt bổ sung, sẽ hiện ở đây)",
 };
 
 function renderPreview(templateText: string): string {

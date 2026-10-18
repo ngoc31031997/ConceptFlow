@@ -40,6 +40,15 @@ type ReviewUnit struct {
 	CreatorFields []string        `json:"creator_fields"`
 	RedoCount     int             `json:"redo_count"`
 	UpdatedAt     time.Time       `json:"updated_at"`
+	// InputRef names the unit this one was built from (kind:key), or "" when it
+	// was not built from another unit.
+	InputRef string `json:"input_ref"`
+	// InputSHA is the hash of the InputRef unit's content when this unit was
+	// built; Stale compares it with the hash now.
+	InputSHA string `json:"-"`
+	// Stale is true when the unit it was built from has changed since. Set by
+	// the store when reading; never written.
+	Stale bool `json:"stale"`
 }
 
 // HasCreatorField reports whether the Creator wrote field.

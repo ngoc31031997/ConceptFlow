@@ -21,6 +21,7 @@ import (
 	"authoring/internal/adapters/orchestrator"
 	"authoring/internal/adapters/postgres"
 	"authoring/internal/adapters/rendering"
+	"authoring/internal/adapters/sourcefetch"
 	"authoring/internal/application"
 	"authoring/internal/config"
 	"authoring/internal/domain"
@@ -108,8 +109,25 @@ func main() {
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	// The research step: its questions, facts and gate are review units too.
+	// The pages facts cite are checked in the background, by a fetcher that
+	// reaches only public hosts.
+	research := application.NewResearchDeskUseCase(
+		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	sourceVerifier := application.NewSourceVerifier(authoringRepo, sourcefetch.New())
+	sourceVerifier.Start(ctx)
+	research.WithVerifier(sourceVerifier)
+	// No check survives a restart: a fact still marked as being checked is a leftover.
+	if n, err := authoringRepo.ResetRunningFactLinks(ctx); err != nil {
+		logger.Warn("could not reset interrupted source checks", "error", err)
+	} else if n > 0 {
+		logger.Warn("marked interrupted source checks as unreachable", "count", n)
+	}
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
-		Register(domain.UnitKindBrief, creativeBrief)
+		Register(domain.UnitKindBrief, creativeBrief).
+		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
+		Register(domain.UnitKindFact, research.FactUnitKind()).
+		Register(domain.UnitKindResearch, research.GateUnitKind())
 
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
 	// ONE renderer, shared by the Copy button and the generate endpoint.
@@ -155,7 +173,8 @@ func main() {
 		WithUsageStats(llmUsageRepo).
 		WithGenerateAuthoring(generateAuthoring).
 		WithReviewUnits(reviewUnits).
-		WithCreativeBrief(creativeBrief)
+		WithCreativeBrief(creativeBrief).
+		WithResearch(research)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

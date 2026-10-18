@@ -69,7 +69,7 @@ function renderPage() {
             <Routes>
               <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
               <Route path="/" element={<div data-testid="step-1-stub" />} />
-              <Route path="/create/script/outline" element={<div data-testid="step-3-stub" />} />
+              <Route path="/projects/:id/research" element={<div data-testid="research-stub" />} />
             </Routes>
           </AuthoringRunProvider>
         </ProjectDraftProvider>
@@ -138,6 +138,17 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
         expect.objectContaining({ videoFormatId: "essay" }),
       ),
     );
+  });
+
+  it("nút tiếp theo lưu cấu hình rồi sang bước Nghiên cứu", async () => {
+    renderPage();
+    await waitFor(() => screen.getByTestId("script-authoring-settings-next"));
+    expect(screen.getByTestId("script-authoring-settings-next")).toHaveTextContent("Sang Nghiên cứu");
+
+    fireEvent.click(screen.getByTestId("script-authoring-settings-next"));
+
+    expect(await screen.findByTestId("research-stub")).toBeInTheDocument();
+    expect(patchSettings).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ confirm: true }));
   });
 
   it("báo ở thanh dưới khi không lưu được kiểu video", async () => {

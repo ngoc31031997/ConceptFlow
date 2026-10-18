@@ -7,7 +7,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 ---
 
 ### T1 — Domain nghiên cứu: kiểu dữ liệu, đọc khối JSON, độ phủ
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. Mới: `internal/domain/research.go`, `internal/domain/research_test.go`.
 - **Thay đổi**:
   - Hằng: `UnitKindResearch = "research"`, `ResearchUnitKey = "main"`, `UnitKindResearchQuestion = "research_question"`, `UnitKindFact = "fact"`, `ResearchSchema = "conceptflow.research.v1"`.
@@ -25,7 +25,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: —
 
 ### T2 — So khớp đoạn trích với trang
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. Mới: `internal/domain/source_match.go`, `internal/domain/source_match_test.go`.
 - **Thay đổi**:
   - `StripHTML(html string) string`: bỏ khối `<script>`, `<style>`, `<noscript>` (cả nội dung), bỏ thẻ còn lại thay bằng khoảng trắng, `html.UnescapeString`.
@@ -37,7 +37,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: —
 
 ### T3 — Bộ tải trang an toàn (SourceFetcher) và cổng
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. Mới: `internal/application/source_fetcher.go` (cổng), `internal/adapters/sourcefetch/guard.go`, `fetcher.go`, `guard_test.go`, `fetcher_test.go`.
 - **Thay đổi**:
   - Cổng (`application`): `type SourcePage struct{ Text string }`; `type FetchError struct{ Reason string }` (có `Error()` trả `Reason`); `type SourceFetcher interface{ Fetch(ctx context.Context, rawURL string) (SourcePage, error) }` — lỗi trả về luôn là `*FetchError` cho mọi lý do "không tải được" (reason tiếng Việt, ví dụ "địa chỉ nội bộ không được phép", "trang trả phí hoặc cần đăng nhập (HTTP 403)", "quá thời gian", "trang quá lớn (hơn 5 MB)", "loại tệp chưa đọc được (application/pdf)", "chuyển hướng quá 5 lần"); lỗi khác (ctx huỷ) trả nguyên. `type ResearchSource interface{ Name() string }` và `type PasteSource struct{}` với `Name() = "paste"`.
@@ -48,7 +48,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T2 (dùng `StripHTML`).
 
 ### T4 — Lưu trữ: cột, bảng nhật ký dán, cập nhật có điều kiện
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. `internal/adapters/postgres/db.go` (sau dòng 238), `internal/adapters/postgres/review_unit_repository.go`, `internal/domain/review_unit.go`, `internal/application/review_units.go` (cổng), mới `internal/adapters/postgres/research_repository.go`; test `review_unit_repository_test.go` (mở rộng), mới `research_repository_test.go`.
 - **Thay đổi**:
   - `db.go` thêm: `ALTER TABLE review_units ADD COLUMN IF NOT EXISTS input_ref TEXT NOT NULL DEFAULT '';`, `… input_sha TEXT NOT NULL DEFAULT '';`, `ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS research_model TEXT NOT NULL DEFAULT '';` và `CREATE TABLE IF NOT EXISTS research_pastes (project_id TEXT NOT NULL, n INTEGER NOT NULL, at TIMESTAMPTZ NOT NULL DEFAULT now(), added TEXT[] NOT NULL DEFAULT '{}', updated TEXT[] NOT NULL DEFAULT '{}', rejected JSONB NOT NULL DEFAULT '[]', PRIMARY KEY (project_id, n));` kèm comment SQL nói bảng/cột dùng để làm gì (đầu vào lúc dựng để biết đơn vị cũ; nhật ký dán không lưu nguyên văn).
@@ -63,7 +63,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T1.
 
 ### T5 — Vai prompt, model của bước và seed
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. `internal/domain/prompt_template.go` (dòng 30–60), `internal/domain/prompt_template_seeds.go` (dòng 18–31), mới `internal/domain/prompt_seed_research.go`, `internal/domain/project.go:559-587`, `internal/adapters/postgres/prompt_template_repository.go:246-275`, `internal/adapters/http/router.go` (`handleSaveAuthoringModels`, `saveAuthoringModelsRequest`, state response ~dòng 786), test `prompt_template_test.go` hiện có (mở rộng) và `application/prompt_templates_test.go` nếu liệt kê vai.
 - **Thay đổi**:
   - Hai vai: `RoleResearchQuestions PromptRole = "research_questions"`, `RoleResearchPrompt PromptRole = "research_prompt"`; thêm vào `ValidPromptRole`; `IsRenderablePromptRole` loại cả hai (giá trị do `ResearchDeskUseCase` điền, như `RoleCreativeBrief`).
@@ -74,7 +74,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: —
 
 ### T6 — ResearchDesk (1): câu hỏi, prompt, trạng thái, khung đơn vị mở rộng
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. `internal/application/review_units.go` (`UnitKind`), `internal/application/creative_brief.go` (`CheckApprovable`, `Impact`), mới `internal/application/research_ports.go`, `internal/application/research_desk.go`, `internal/application/research_questions.go`, test mới `research_desk_test.go`; sửa `creative_brief_test.go` cho chữ ký mới.
 - **Thay đổi**:
   - `UnitKind.CheckApprovable` đổi thành `CheckApprovable(ctx context.Context, unit domain.ReviewUnit) error` (loại `research` cần đếm dữ kiện của project); cập nhật `ReviewUnitsUseCase.setStatus` và `CreativeBriefUseCase.CheckApprovable`.
@@ -92,7 +92,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T1, T4, T5.
 
 ### T7 — ResearchDesk (2): dán kết quả, dữ kiện, kiểm link nền, bỏ qua, duyệt
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service. Mới `internal/application/research_facts.go`, `internal/application/source_verifier.go`, `internal/application/research_gate.go`; test mới `research_facts_test.go`, `source_verifier_test.go`.
 - **Thay đổi**:
   - `SourceVerifier` (`source_verifier.go`): `NewSourceVerifier(units SourceVerifierStore, fetcher SourceFetcher) *SourceVerifier` với `SourceVerifierStore{ GetUnit; SaveFactLink }`; hàng đợi 4 luồng (`chan` có đệm + 4 goroutine khởi động bằng `Start(ctx context.Context)`, `ctx` của tiến trình, không phải của request). `Enqueue(projectID, key, url, quote string)` ghi trước `link.state=run` (qua `SaveUnit` của fact, giữ nguyên các trường khác), rồi đẩy việc. Việc chạy: `url==""` → `none`; `Fetch` lỗi `*FetchError` → `na` + `Why=Reason`; thành công → `domain.MatchQuote`: `Found` → `ok`; `TooShort` → `bad` + `Why="đoạn trích quá ngắn để kiểm (dưới 20 ký tự)"`; còn lại `bad` + `Why="trang tải được nhưng không có đoạn trích này"` + `Nearest`; lưu bằng `SaveFactLink(pid,key,url,quote,link)` (trả false = fact đã đổi, bỏ kết quả). Lỗi ghi DB được log (`slog.Error`) kèm project/mã, không nuốt.
@@ -109,7 +109,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T1, T2, T3, T4, T6.
 
 ### T8 — HTTP authoring-service, nối dây, quét khi khởi động, gateway
-- [ ] Xong
+- [x] Xong
 - **Service / File**: authoring-service `internal/adapters/http/research.go` (mới), `internal/adapters/http/router.go` (struct `Router` ~dòng 55, `reviewUnitRoutes`), `internal/adapters/http/review_units.go` (`writeUnitError`, `writeUnitRunError`), `cmd/authoring/main.go` (dòng 106–118, 157–158); api-gateway `src/routes/projects.js` (sau dòng 138), `tests/routes/authoringRouting.test.js`; test mới `internal/adapters/http/research_test.go`.
 - **Thay đổi**:
   - `research.go`: interface `researchUseCase` (State, GenerateQuestions, AddQuestion, DeleteQuestion, ResearchPrompt, FollowUpPrompt, IngestPaste, AddFact, SetFactFlags, Verify, SetSkipped) và `WithResearch(uc researchUseCase) *Router`. Route (cộng vào `reviewUnitRoutes`, mỗi handler trả 404 "research is not enabled" khi `rt.research == nil`):
@@ -125,7 +125,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T5, T6, T7.
 
 ### T9 — web-gui: client API và kiểu dữ liệu
-- [ ] Xong
+- [x] Xong
 - **Service / File**: web-gui. `src/api/client.ts` (thêm sau `generateBrief`, dòng ~1660; `AuthoringStepModels` ~dòng 1215; `saveAuthoringModels` dòng 1228; state ~1187), `src/hooks/useAuthoringModels.ts`, `src/context/ProjectDraftContext.tsx` (payload `SET_AUTHORING_MODELS`), test `tests/api/research.test.ts` (mới), cập nhật test models hiện có.
 - **Thay đổi**: kiểu và hàm (đều qua `apiFetch`, snake_case ↔ camelCase như `getBriefState`): `FactType = "fact"|"hypothesis"|"unknown"|"misconception"`, `LinkState = "ok"|"bad"|"na"|"none"|"run"`, `ResearchQuestion{id,text,mine,stale}`, `ResearchFact{id,question,claimVi,type,sourceTitle,publisher,year,url,quote,confidence,note,must,keep,link:{state,why,nearest,checkedAt},mine:string[]}`, `PasteLog`, `QuestionCoverage{question,sources,badFacts,weak}`, `ResearchState{gate:{status,skipped,resolved},questions,facts,pastes,coverage,briefApproved,questionsStale}`; `getResearch(pid)`, `generateResearchQuestions(pid, {replaceEdited, note}, operationId?)`, `addResearchQuestion(pid,text)`, `deleteResearchQuestion(pid,id)`, `editResearchQuestion(pid,id,text)` (qua `editUnit` với `UnitRef` `{kind:"research_question",key:id}`), `getResearchPrompt(pid)`, `getFollowUpPrompt(pid)`, `pasteResearch(pid,raw)` → `{added,updated,rejected,log}`, `addFact(pid,input)`, `setFactFlags(pid,id,{type?,must?,keep?})`, `editFact(pid,id,fields)` (qua `editUnit`, kind `fact`), `getFactImpact(pid,id)` (qua `getUnitImpact`), `verifyFacts(pid,ids)`, `setResearchSkipped(pid,skipped)`, `approveResearch(pid)`/`unapproveResearch(pid)` (qua `approveUnit`/`unapproveUnit` với `{kind:"research",key:"main"}`). `AuthoringStepModels` thêm `research`; `saveAuthoringModels` gửi `research`; đọc `research_model` ở `useAuthoringModels` và reducer.
 - **Test** (`vitest`, mock `fetch` như test client hiện có): mỗi hàm gọi đúng method/URL/body và map trường đúng; 400/502/503 thành `ApiError` với thông điệp server; `saveAuthoringModels` có `research`. Chạy: `npx vitest run tests/api`.
@@ -133,7 +133,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T8 (hợp đồng API).
 
 ### T10 — web-gui: bước chỉ có trên web, màn "chưa phát triển", điều hướng
-- [ ] Xong
+- [x] Xong
 - **Service / File**: web-gui. `src/utils/flow.ts` (`FlowViewStep` ~dòng 89, `FLOW_VIEW` dòng 106, `viewStepOf` 128), `src/components/AppShell.tsx` (props dòng 24–39; dòng 82–91, 161–169, 188–196, 216), `src/components/StepRail.tsx` (dòng 63–67, 83, 132–171), `src/pages/FlowMapPage.tsx` (dòng 14–55), `src/hooks/useStepNav.ts`, `src/App.tsx` (routes dòng 63–95), `src/pages/ScriptAuthoringSettingsStepPage.tsx:107`, mới `src/pages/ComingStepPage.tsx` (+ `.module.css`), test mới `tests/pages/ComingStepPage.test.tsx` và cập nhật `tests/components/StepRail.test.tsx`, `tests/utils/flow.test.ts`, `tests/pages/FlowMapPage.test.tsx`, `tests/pages/ScriptAuthoringSettingsStepPage.test.tsx`.
 - **Thay đổi**:
   - `flow.ts`: `FlowViewStep` thêm `screen?: "research"`; bước 3 đặt `screen: "research"` (giữ `server: []`). Hàm mới `viewStepByN(n)`, `isBuilt(view) = view.server.length > 0 || !!view.screen`, `viewRoute(view, projectId)`: `screen==="research"` → `/projects/${projectId}/research`; bước chưa có → `comingRoute(n, projectId)` = `/projects/${projectId}/coming/${n}` (hoặc `/create/coming/${n}` khi chưa có project). Trạng thái bước web-only: `screenStatus(view, flowStep, runState)`: `flowStep < FLOW_CONFIG` → `pending`; `flowStep === FLOW_CONFIG` → `waiting`; `flowStep > FLOW_CONFIG` → `done`.
@@ -148,7 +148,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: —
 
 ### T11 — web-gui: hook useResearch
-- [ ] Xong
+- [x] Xong
 - **Service / File**: web-gui. Mới `src/hooks/useResearch.ts`, test mới `tests/hooks/useResearch.test.tsx`.
 - **Thay đổi**: theo mẫu `useCreativeBrief.ts`. `useResearch(projectId, enabled)` trả `{ state, loadError, busy, actionError, running (AI đang sinh câu hỏi), run: OperationRun, pasteMsg, generateQuestions(replaceEdited, note), addQuestion(text), saveQuestion(id,text), deleteQuestion(id), pasteResults(raw), addFact(input), saveFact(id, fields), setFlags(id, flags), recheck(ids), skip(skipped), approve(), unapprove(), reload }`. Tải bằng `getResearch`; chỉ lượt tải mới nhất được áp (bộ đếm như `loadSeq`). Khi `state.facts` còn fact `link.state === "run"`, đặt `setInterval` 2000 ms gọi `reload` (xoá khi hết `run` hoặc unmount). Hành động thành công thì `reload`; lỗi thì `actionError` bằng thông điệp server (`messageOf` như hook brief). `edit*` ném `Error(message)` để modal hiện lỗi. `pasteResults` đặt `pasteMsg`: `["ok", "Đã đọc N dữ kiện…"]`, hoặc `["w", lý do]` khi 400.
 - **Test**: tải lần đầu; poll chạy khi có `run` và dừng khi hết (fake timers); lượt tải cũ không đè lượt mới; lỗi 400 của dán thành `pasteMsg` cảnh báo; `generateQuestions` bật `running` và gọi với operation id. Chạy: `npx vitest run tests/hooks/useResearch.test.tsx`.
@@ -156,7 +156,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T9.
 
 ### T12 — web-gui: màn Nghiên cứu và kiểm chứng
-- [ ] Xong
+- [x] Xong
 - **Service / File**: web-gui. Mới `src/pages/ResearchStepPage.tsx` (+ `ResearchStepPage.module.css`), `src/components/research/QuestionsCard.tsx`, `PromptCard.tsx`, `PasteCard.tsx`, `FactsCard.tsx`, `CoverageCard.tsx`, `FactEditModal.tsx`, `FactAddModal.tsx`, `PromptModal.tsx`, `research.module.css`; `src/App.tsx` (route `/projects/:id/research` và `/create/script/research` → trang, chuyển về `/` nếu không có project); test mới `tests/pages/ResearchStepPage.test.tsx`, `tests/components/research/*.test.tsx`.
 - **Thay đổi**: trang dùng `AppShell viewStep={3}` với `title="Nghiên cứu và kiểm chứng"`, `subtitle` = câu mockup ("Sinh câu hỏi cần tra, chép prompt ra công cụ nghiên cứu bên ngoài, rồi dán kết quả lại. Hệ thống tải từng link và kiểm đoạn trích có thật trong trang không."), `role` = mô tả bước ở mockup, `strip` theo mockup (đã duyệt: `st-ok` "Bảng dữ kiện đã duyệt" + "Tiếp theo: xây dựng câu chuyện từ các dữ kiện này."; chưa duyệt: "Chờ bạn duyệt · N dữ kiện" kèm đếm khớp / không khớp / không tải được / không có nguồn / đang kiểm; đã bỏ qua: "Đã bỏ qua"). Project id = `useParams().id ?? draft.projectId`. Màn theo mockup bản 9, luật giao diện 1, 4–6 và `components/ui` (`Card`, `Button` biến thể `primary|ghost|danger|impact|run|view`, `Dialog`, `ConfirmModal`, `UnitEditModal` không dùng — fact có modal riêng):
   - **Dải đầu**: nhãn "Tuỳ chọn" + "Bỏ qua thì dữ kiện mang nhãn “chưa có nguồn”; bước Rà soát hiện cảnh báo nhưng không chặn." + nút `impact` "Bỏ qua bước này" → `ConfirmModal`-kiểu (dùng `Dialog` với danh sách ảnh hưởng của mockup: 4 dòng, hoàn tác bằng "Làm nghiên cứu") → `skip(true)`. Khi `gate.skipped`: màn "Khi bỏ qua bước này" (4 gạch đầu dòng của mockup) + nút "Làm nghiên cứu" (`skip(false)`) + nút "Sang xây dựng câu chuyện →".
@@ -173,7 +173,7 @@ Quy ước chung: chuẩn code `docs/code-standards-rules.md` (comment nói code
 - **Phụ thuộc**: T9, T10, T11.
 
 ### T13 — Hợp đồng và tài liệu
-- [ ] Xong
+- [x] Xong
 - **Service / File**: tài liệu. Mới `docs/contracts/research-v1.md`; `docs/contracts/README.md` (thêm hàng mục HTTP/ra Internet); `aidlc-docs/aidlc-state.md` (trạng thái U3b; backlog: thanh bước hiện "bỏ qua" cho bước 3; kiểm chứng lại sau khi chốt; API tìm kiếm qua `ResearchSource`).
 - **Thay đổi**: `research-v1.md` ghi: mẫu JSON `conceptflow.research.v1` (từng trường, kiểu, ý nghĩa, `type` bốn giá trị, `confidence`), luật tìm khối, giới hạn 1 MB / 300 dòng, luật gộp theo mã, các lý do bỏ dòng; route `/v1/projects/{id}/research…` của T8; đường ra Internet của authoring-service và luật SSRF với số liệu (bảng của thiết kế mục 4); mã `link.state`. `README.md`: một hàng trỏ tới file mới.
 - **Test**: không có; soát bằng mắt khớp code T1/T3/T8.

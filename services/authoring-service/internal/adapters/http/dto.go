@@ -238,6 +238,8 @@ type saveAuthoringModeRequest struct {
 // for each of the three tabs, "" meaning "server default".
 type saveAuthoringModelsRequest struct {
 	Brief      string `json:"brief"`
+	Publish    string `json:"publish"`
+	Research   string `json:"research"`
 	Story      string `json:"story"`
 	Storyboard string `json:"storyboard"`
 	Code       string `json:"code"`
