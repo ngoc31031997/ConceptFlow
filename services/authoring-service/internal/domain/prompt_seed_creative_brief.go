@@ -37,8 +37,8 @@ NGÔN NGỮ CỦA BRIEF: {{brief_language}}
 
 Viết bằng {{brief_language}}. Mỗi ô một đến ba câu ngắn, cụ thể cho chính đề tài này: thay đề tài khác vào mà vẫn đúng là ô viết hỏng. Brief phải vừa với thời lượng mục tiêu: đừng hứa nhiều điều hơn số phút cho phép. Không bịa con số, tên người hay sự kiện; chỗ nào cần dữ kiện thì để bước Nghiên cứu tìm.
 
-Nếu có ghi chú của Creator, làm đúng ghi chú đó. Ô Creator đã viết thì chép lại nguyên văn.
+Nếu có ghi chú của Creator, ghi chú đó ƯU TIÊN HƠN brief hiện có: brief hiện có chỉ là bản nháp cũ để sửa, không phải mẫu phải giữ. Làm theo ba bước: (1) đọc ghi chú và xác định nó đòi đổi ô nào (ví dụ ghi chú về người xem thì đổi audience); (2) viết lại ô đó theo đúng ghi chú, không giữ ý cũ trái với ghi chú; (3) viết lại mọi ô khác bị ảnh hưởng (khán giả đổi thì giọng điệu, điều người xem biết và hiểu cũng phải khớp). Brief mới phải khác brief cũ ở đúng những chỗ ghi chú đòi; đừng chép lại nguyên văn ô bị ghi chú đụng tới. Nếu ghi chú đọc được theo hai nghĩa, chọn cách hiểu làm brief đổi rõ ràng theo hướng ghi chú; không được bỏ qua ghi chú. Ô Creator đã viết (mục "Ô CREATOR ĐÃ VIẾT") thì vẫn chép lại nguyên văn.
 
 ## ĐẦU RA
-Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu dưới, không thêm chữ nào khác:
+Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu dưới, không thêm chữ nào khác. Trong nội dung các ô KHÔNG dùng dấu nháy kép thẳng ("): khi cần trích một từ hay một câu, dùng dấu « » hoặc dấu nháy đơn, và không xuống dòng giữa một ô, để khối JSON luôn đọc được:
 {"question":"...","audience":"...","know":"...","understand":"...","feel":"...","tone":"...","out_of_scope":"..."}`

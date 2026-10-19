@@ -34,6 +34,27 @@ func TestParseBriefReplyRefusesAReplyWithoutJSON(t *testing.T) {
 	}
 }
 
+func TestParseBriefReplyRefusesAnUnescapedQuoteInsideAField(t *testing.T) {
+	reply := "```json\n" + `{"question":"Vì sao gọi là "tự do" khi không ai chọn?","audience":"a","know":"b","understand":"c","feel":"d","tone":"e","out_of_scope":"f"}` + "\n```"
+	if _, err := ParseBriefReply(reply); !errors.Is(err, ErrBriefReplyUnusable) {
+		t.Fatalf("an unescaped quote inside a field must be unusable, got %v", err)
+	}
+}
+
+func TestBriefPromptForbidsStraightQuotesInsideFields(t *testing.T) {
+	if !strings.Contains(creativeBriefVI, `KHÔNG dùng dấu nháy kép thẳng`) {
+		t.Fatal("the brief prompt must tell the model not to put straight double quotes inside field text")
+	}
+}
+
+func TestBriefPromptRanksTheCreatorsNoteAboveTheCurrentBrief(t *testing.T) {
+	for _, want := range []string{"ƯU TIÊN HƠN brief hiện có", "mọi ô khác bị ảnh hưởng", "không được bỏ qua ghi chú"} {
+		if !strings.Contains(creativeBriefVI, want) {
+			t.Fatalf("the brief prompt must tell the model that the note outranks the current brief: missing %q", want)
+		}
+	}
+}
+
 func TestKeepCreatorFieldsKeepsOnlyTheCreatorsFields(t *testing.T) {
 	written := CreativeBrief{Question: "AI Q", Audience: "AI A", Tone: "AI T"}
 	current := CreativeBrief{Question: "Creator Q", Audience: "old A", Tone: "Creator T"}
