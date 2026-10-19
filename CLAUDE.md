@@ -23,6 +23,11 @@ When implementing:
 - Whenever code is changed to fix a bug or implement/patch a Change Request, rebuild the Docker image(s) for every affected service and restart the container(s) via `scripts/worktree.sh rebuild <service>...` from the branch's worktree (it builds from the worktree's code and restarts in the primary checkout; never `docker compose up` inside a worktree), then confirm it reports healthy — do this immediately, without waiting to be asked, so the Creator can check the change live at any time.
 - Only rebuild the services whose code actually changed (check `git status`/diff to scope it) — no need to rebuild the whole stack for a one-service fix.
 
+## Test data cleanup
+- After running any test (unit, integration, smoke, e2e, or a manual check against the running stack), remove the data it created: DB rows, RabbitMQ queues/messages, generated files/media, uploaded assets, temp files and containers/volumes started for the test. Leave the local stack in the state it was in before the test.
+- Do the cleanup in the same turn, before reporting. Delete only what the test created (identify it by the test's own ids/markers), never wipe a table or volume that also holds Creator data. If you cannot tell whether a row or file is test data, STOP and ask.
+- State in the report what was cleaned up; if cleanup was not possible or was skipped, say so explicitly.
+
 ## Git branching policy
 - Every Change Request (CR) gets its own feature branch (`feature/cr-<NNN>-<slug>`) — never implement a new CR directly on `main`/`master` or on another CR's still-open branch. See `.ai-dlc/aws-aidlc-rule-details/construction/git-branching.md` for the full rule. This matters because multiple agents may work in this repo concurrently.
 - Every CR and fix branch lives in its own git worktree (`scripts/worktree.sh add <branch>` under `.claude/worktrees/`, entered with `EnterWorktree`), so CRs can run in parallel. The primary checkout stays on a clean `main`: never work, check out or commit there.
