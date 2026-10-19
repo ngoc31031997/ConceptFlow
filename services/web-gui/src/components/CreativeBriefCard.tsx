@@ -201,6 +201,7 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
         impact={editImpact}
         onSave={brief.edit}
         note={editNote}
+        size="xl"
         testId="brief-edit"
       />
       <UnitRedoModal

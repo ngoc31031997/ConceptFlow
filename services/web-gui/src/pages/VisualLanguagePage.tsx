@@ -288,7 +288,7 @@ export function VisualLanguagePage() {
         open={editing !== null}
         onClose={() => setEditing(null)}
         hasInput
-        size="lg"
+        size="xl"
         title={selected ? `Sửa ${selected.name}` : "Sửa ngôn ngữ hình"}
         testId="language-edit-dialog"
         footer={

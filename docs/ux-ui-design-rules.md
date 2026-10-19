@@ -46,6 +46,13 @@ Open a modal for:
 - Reviewing an AI proposal before it is applied (a pacing proposal, an edit plan, notes the AI will apply).
 - Picking from a list or uploading a file to replace an item ("Thay từ thư viện", "Tải SVG lên").
 - A generated text the user copies into another tool (a prompt to paste into an outside research or image tool).
+
+Size of a modal follows how much it holds, set with the dialog's `size`:
+
+- `sm` (480px): a confirmation, one or two lines of text.
+- `md` (640px): a form of one to four short fields (the default).
+- `lg` (900px): one long block of text, or a form of five to eight fields.
+- `xl` (1200px): a form of many long text fields ("Sửa tay · Creative brief", "Sửa ngôn ngữ hình").
 - Previewing one item's media (a 480p shot preview).
 - Every confirmation required by rule 5.
 
