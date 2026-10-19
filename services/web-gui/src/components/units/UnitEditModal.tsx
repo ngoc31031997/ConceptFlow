@@ -23,6 +23,8 @@ interface UnitEditModalProps {
   onSave: (changed: Record<string, string>) => Promise<void>;
   /** A line under the fields saying what a hand edit does to the unit. */
   note?: ReactNode;
+  /** Dialog width; the caller picks it by how much text the fields hold. */
+  size?: "md" | "lg" | "xl";
   testId: string;
 }
 
@@ -37,7 +39,7 @@ function valuesOf(fields: UnitEditField[]): Record<string, string> {
  * unit, yellow when nothing does yet. What the Creator typed lives in the
  * dialog, so a refresh of the page behind it does not reset it.
  */
-export function UnitEditModal({ open, onClose, title, fields, impact, onSave, note, testId }: UnitEditModalProps) {
+export function UnitEditModal({ open, onClose, title, fields, impact, onSave, note, size = "md", testId }: UnitEditModalProps) {
   const [values, setValues] = useState<Record<string, string>>(() => valuesOf(fields));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +83,7 @@ export function UnitEditModal({ open, onClose, title, fields, impact, onSave, no
       onClose={onClose}
       title={title}
       hasInput
-      size={fields.length > 4 ? "lg" : "md"}
+      size={size}
       testId={testId}
       footer={
         <>

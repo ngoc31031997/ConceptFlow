@@ -38,6 +38,15 @@ function Harness({ hasInput = false, onClose }: { hasInput?: boolean; onClose?: 
 }
 
 describe("Dialog", () => {
+  it("applies the width class of the requested size", () => {
+    render(
+      <Dialog open onClose={() => {}} title="Sửa tay · Creative brief" size="xl" testId="dlg-xl" footer={<Button>Lưu</Button>}>
+        <p>nhiều dữ liệu</p>
+      </Dialog>,
+    );
+    expect(screen.getByTestId("dlg-xl").className).toMatch(/xl/);
+  });
+
   it("moves focus to the first field, and back to the opener when closed", async () => {
     render(<Harness hasInput />);
     const opener = screen.getByTestId("opener");
