@@ -103,12 +103,14 @@ Write `aidlc-docs/construction/plans/cr-<NNN>-<slug>-tasks.md` in Vietnamese. It
 - End with a **Sau cùng** section: the services to rebuild and the design's live checks (**Kiểm tra**).
 - If the line-level reading shows the approved design is wrong or incomplete, do not patch it silently in the tasks: revise the design doc, tell the Creator what changed and why, and wait for the design to be re-approved before writing the tasks.
 
+Also write `aidlc-docs/construction/plans/cr-<NNN>-<slug>-tasks.html` from [tasks-template.html](tasks-template.html), so the Creator can see the tasks and their progress in a browser. It is a view of the `.md` (same tasks, same order): one `<article class="task" id="T<n>" data-status="todo">` per task with Service, Phân công, Phụ thuộc, Yêu cầu, and the sections **Hiện trạng**, **Thay đổi**, **Cần làm**, **Cách làm**, **Test**, **Xong khi**, plus one row per task in the overview table. Keep the template's styles and script. Status values: `todo`, `doing`, `done`, `blocked`.
+
 Add the task breakdown to the CR's audit entry. Report to the Creator: the task list (number, title, service, files, one line each), anything the breakdown revealed, the doc path, and that you wait for approval of the tasks. Commit nothing.
 
 ## After the Creator approves the tasks
 
 1. Apply any changes they asked for to the tasks doc and the audit (User Input verbatim). If a change alters the solution, update the design doc too.
-2. Commit the tasks doc (and any design change) with the audit on the CR branch: `CR-<NNN>: tasks approved — <n> tasks`, and push it.
+2. Keep the HTML in step with the tasks doc, then commit both (and any design change) with the audit on the CR branch: `CR-<NNN>: tasks approved — <n> tasks`, and push it.
 3. Invoke the `code` skill with `CR-<NNN>`.
 
 If they ask for changes instead, revise the tasks, report again, and wait.

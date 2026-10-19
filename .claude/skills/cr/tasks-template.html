@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CR-NNN — Danh sách task</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #e2e2dc;
+    --todo: #8a8a84; --doing: #b86e00; --done: #1a7f45; --blocked: #c0362c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --card: #1e1e1c; --text: #ececE8; --muted: #9a9a94; --line: #34342f;
+      --todo: #a3a39d; --doing: #e0a040; --done: #4cc57e; --blocked: #ee6b60; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 64px; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 16px; }
+  .progress { background: var(--line); border-radius: 6px; height: 10px; overflow: hidden; margin: 8px 0 4px; }
+  .progress > i { display: block; height: 100%; width: 0; background: var(--done); }
+  .counts { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  table.overview { width: 100%; border-collapse: collapse; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; overflow: hidden; margin-bottom: 28px; font-size: 14px; }
+  table.overview th, table.overview td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  table.overview th { background: var(--bg); font-weight: 600; }
+  table.overview tr:last-child td { border-bottom: 0; }
+  .task { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--todo);
+    border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
+  .task[data-status="doing"] { border-left-color: var(--doing); }
+  .task[data-status="done"] { border-left-color: var(--done); }
+  .task[data-status="blocked"] { border-left-color: var(--blocked); }
+  .task h2 { font-size: 17px; margin: 0 0 8px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; color: #fff; background: var(--todo); }
+  [data-status="doing"] > h2 .badge, .badge[data-status="doing"] { background: var(--doing); }
+  [data-status="done"] > h2 .badge, .badge[data-status="done"] { background: var(--done); }
+  [data-status="blocked"] > h2 .badge, .badge[data-status="blocked"] { background: var(--blocked); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+  .task h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+  .task p, .task ul, .task ol { margin: 0 0 4px; }
+  .task ul, .task ol { padding-left: 20px; }
+  code, pre { font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+  code { background: var(--bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; overflow-x: auto; margin: 4px 0; }
+  .note { font-size: 13px; color: var(--blocked); }
+</style>
+</head>
+<body>
+<main>
+  <h1>CR-NNN — tiêu đề CR</h1>
+  <p class="sub">Nhánh <code>feature/cr-NNN-slug</code> · thiết kế: <code>aidlc-docs/construction/plans/cr-NNN-slug-design.md</code></p>
+  <div class="progress"><i id="bar"></i></div>
+  <div class="counts" id="counts"></div>
+
+  <!-- Bảng tổng quan: một dòng mỗi task; trạng thái được script điền từ data-status của task tương ứng. -->
+  <table class="overview">
+    <thead><tr><th>#</th><th>Task</th><th>Service</th><th>Phân công</th><th>Trạng thái</th></tr></thead>
+    <tbody>
+      <tr><td>T1</td><td><a href="#T1">Tiêu đề task</a></td><td>service</td><td>Sonnet (/code)</td><td><span class="badge" data-for="T1"></span></td></tr>
+    </tbody>
+  </table>
+
+  <!--
+    Một <article> mỗi task. Trạng thái chỉ nằm ở data-status: todo | doing | done | blocked.
+    /code đổi data-status khi tick checkbox của task tương ứng trong file -tasks.md (file .md là nguồn, file này là bản xem).
+  -->
+  <article class="task" id="T1" data-status="todo">
+    <h2>T1 — Tiêu đề task <span class="badge"></span></h2>
+    <div class="meta">
+      <span><b>Service:</b> service</span>
+      <span><b>Phân công:</b> Sonnet (/code)</span>
+      <span><b>Phụ thuộc:</b> —</span>
+      <span><b>Yêu cầu:</b> FR-1</span>
+    </div>
+
+    <h3>Hiện trạng</h3>
+    <p>Code đang làm gì, kèm <code>file:line</code>.</p>
+
+    <h3>Thay đổi</h3>
+    <p>Sau task, hành vi/cấu trúc khác thế nào.</p>
+
+    <h3>Cần làm</h3>
+    <ol>
+      <li>Việc 1 tại <code>file</code> (hàm/kiểu), chữ ký, hằng số, nội dung prompt/message.</li>
+    </ol>
+
+    <h3>Cách làm</h3>
+    <p>Cách tiếp cận, vì sao, ràng buộc cần tuân theo.</p>
+    <pre>// đoạn phác thảo khi thay đổi không hiển nhiên</pre>
+
+    <h3>Test</h3>
+    <ul><li><code>file</code>: tên case, assert gì. Lệnh chạy: <code>…</code></li></ul>
+
+    <h3>Xong khi</h3>
+    <p>Điều kiện nghiệm thu quan sát được.</p>
+
+    <p class="note" data-note hidden></p>
+  </article>
+</main>
+<script>
+  // Nhãn và tiến độ được tính từ data-status, nên đổi trạng thái chỉ cần sửa thuộc tính này.
+  const LABEL = { todo: "Chưa làm", doing: "Đang làm", done: "Xong", blocked: "Bị chặn" };
+  const tasks = [...document.querySelectorAll(".task")];
+  const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
+  for (const t of tasks) {
+    const s = t.dataset.status in LABEL ? t.dataset.status : "todo";
+    counts[s]++;
+    const badge = t.querySelector("h2 .badge");
+    badge.textContent = LABEL[s];
+    const row = document.querySelector('.badge[data-for="' + t.id + '"]');
+    if (row) { row.textContent = LABEL[s]; row.dataset.status = s; }
+    const note = t.querySelector("[data-note]");
+    if (note && note.textContent.trim()) note.hidden = false;
+  }
+  document.getElementById("bar").style.width = (tasks.length ? counts.done / tasks.length * 100 : 0) + "%";
+  document.getElementById("counts").textContent =
+    counts.done + "/" + tasks.length + " xong · " + counts.doing + " đang làm · " +
+    counts.blocked + " bị chặn · " + counts.todo + " chưa làm";
+</script>
+</body>
+</html>

@@ -24,7 +24,7 @@ Work through the tasks in order, skipping tasks already ticked `- [x] Xong` (a r
 
 - Match the surrounding code's style and naming. Every code change follows `docs/code-standards-rules.md` (documentation comments only, no CR numbers or change history; basic code standards). UI: `docs/ux-ui-design-rules.md`.
 - No stubs, fake outputs, `TODO: implement`, swallowed errors (CLAUDE.md "No fake code").
-- Add or update the tests the task names and run them. When they pass and the task's **Xong khi** holds, tick its checkbox (`- [x] Xong`) in the tasks doc before starting the next task.
+- Add or update the tests the task names and run them. When they pass and the task's **Xong khi** holds, tick its checkbox (`- [x] Xong`) in the tasks doc before starting the next task. If `cr-<NNN>-*-tasks.html` exists, set that task's `data-status` to `done` there too (`doing` while working on it, `blocked` with a reason in its `data-note` paragraph if you stop).
 - If a task turns out wrong or impossible, or the code contradicts it (a line, signature or caller that is not as described), STOP and ask. Do not redesign on your own and do not skip the task.
 
 ## 3. Verify
