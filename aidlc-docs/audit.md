@@ -3611,3 +3611,24 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: FIX — chờ Creator duyệt rồi chạy /deliver.
 
 **Bổ sung (cùng nhánh)**: Creator báo redo có chạy nhưng output không đổi (ghi chú: "làm cho người xem có kinh nghiệm quang học"; ô Khán giả vẫn "không có kinh nghiệm"). Trả lời: "gộp luôn sửa prompt vào nhánh này". Đã dò UI → API → usecase → prompt: ghi chú tới được prompt (`redo_note`), nên nguyên nhân nhiều khả năng ở prompt (neo vào brief cũ, không nói ghi chú ưu tiên) và ghi chú mơ hồ; chưa chạy model thật nên chưa kiểm chứng. Sửa prompt hệ thống: ghi chú ưu tiên hơn brief hiện có, buộc đổi ô được nhắc tới và mọi ô bị ảnh hưởng, không bỏ qua ghi chú. Thêm 1 test; `go test ./...` authoring-service pass; rebuild authoring-service (healthy); prompt active trong DB đã có đoạn mới. Chưa chạy thử với Ollama thật.
+
+---
+## CR-072-U3c — Câu chuyện (thiết kế)
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "implement giao diện bước 4 câu chuyện theo file mockup đi https://claude.ai/artifact/HibBJUisUocqKXDZD57cTH"; chọn phạm vi: "Cả bước: backend + giao diện (Recommended)"; "khoan, đây là CR lớn nên ngoài giao diện đã chốt tôi cần làm theo DLC"; "dừng tối làm tiếp nhé"; "tiếp tục nào"
+**AI Response**: Mở nhánh `feature/cr-072-u3c-story` (worktree riêng, từ main `a06abaf`). Đã viết nhầm một phần code (domain, prompt) trước khi có thiết kế được duyệt; dời ra ngoài repo, nhánh về sạch. Viết `cr-072-u3c-story-design.md` (phụ thuộc, thiết kế chức năng, thiết kế mức thấp) và `cr-072-u3c-story-design-questions.md` (5 câu).
+**Impact Assessment**: chỉ tài liệu. Khi code: build lại authoring-service, api-gateway, web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3c-story-design.md`, `cr-072-u3c-story-design-questions.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, chờ Creator trả lời câu hỏi và duyệt thiết kế.
+
+---
+
+---
+## CR-072-U3c — Duyệt thiết kế
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "1 u3b là cái gì tôi đã bảo xoá hết rồi mà. làm theo như giao diện chỗ nào chưa hiểu thì hỏi tôi 2 lưu thành 6 đơn vị riêng 3 viết riêng ô đó 4 sửa 1 ô câu chuyền về chờ duyệt 5 quy ước kỹ thuật là gì nói"; "đường dẫn api có đánh version thêm quy tắc này vào thiết kế hệ thống ok thiết kế này ổn đó"
+**AI Response**: Ghi câu trả lời 1–5 vào `cr-072-u3c-story-design-questions.md`. Thêm mục "API Versioning Rule" vào `inception/high-level-design/integration-boundaries.md` (theo ADR-0008, vốn đã quyết định `/v1` toàn hệ thống). Thiết kế được duyệt; commit giai đoạn thiết kế. Bước kế: chia task.
+**Artifacts Affected**: `cr-072-u3c-story-design.md`, `cr-072-u3c-story-design-questions.md`, `integration-boundaries.md`, `audit.md`.
+**Context**: CONSTRUCTION — CR-072-U3c, thiết kế đã duyệt.
+
+---
