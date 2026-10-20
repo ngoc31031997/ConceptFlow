@@ -7,6 +7,10 @@ import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 import type { Project } from "../../src/types";
 
+function researchState(resolved: boolean) {
+  vi.spyOn(apiClient, "getResearch").mockResolvedValue({ gate: { resolved } } as unknown as apiClient.ResearchState);
+}
+
 function renderResume(flowStep: number) {
   const project = {
     project_id: "p1", status: "draft", voice_language: "vi", scenes: [], render_engine: "remotion", flow_step: flowStep,
@@ -19,6 +23,9 @@ function renderResume(flowStep: number) {
         <ProjectDraftProvider>
           <Routes>
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />
+            <Route path="/" element={<p>màn ý tưởng</p>} />
+            <Route path="/projects/:id/research" element={<p>màn nghiên cứu</p>} />
+            <Route path="/create/script/outline" element={<p>màn kịch bản</p>} />
             <Route path="/create/script/storyboard" element={<p>màn visual</p>} />
             <Route path="/create/script/illustrations" element={<p>màn hình minh hoạ</p>} />
             <Route path="/create/script/code" element={<p>màn code</p>} />
@@ -46,5 +53,22 @@ describe("ResumeProjectPage mở lại đúng bước server báo", () => {
   it("dự án ở bước 4 mở màn Visual", async () => {
     renderResume(4);
     expect(await screen.findByText("màn visual")).toBeInTheDocument();
+  });
+
+  it("dự án ở bước 1 (brief chưa duyệt) mở lại màn Ý tưởng", async () => {
+    renderResume(1);
+    expect(await screen.findByText("màn ý tưởng")).toBeInTheDocument();
+  });
+
+  it("dự án ở bước 3 mà nghiên cứu chưa duyệt/bỏ qua mở màn Nghiên cứu", async () => {
+    researchState(false);
+    renderResume(3);
+    expect(await screen.findByText("màn nghiên cứu")).toBeInTheDocument();
+  });
+
+  it("dự án ở bước 3 với nghiên cứu đã xong mở màn kịch bản", async () => {
+    researchState(true);
+    renderResume(3);
+    expect(await screen.findByText("màn kịch bản")).toBeInTheDocument();
   });
 });

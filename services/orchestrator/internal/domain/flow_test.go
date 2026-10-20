@@ -11,6 +11,8 @@ func TestFlowStateFor(t *testing.T) {
 		want    FlowState
 	}{
 		{"fresh draft row is already past init", StatusDraft, 1, AuthoredContent{}, FlowState{FlowConfig, RunIdle}},
+		{"brief not approved keeps the draft at the idea step", StatusDraft, 1, AuthoredContent{BriefOpen: true}, FlowState{FlowInit, RunIdle}},
+		{"brief approved moves the draft to config", StatusDraft, 1, AuthoredContent{}, FlowState{FlowConfig, RunIdle}},
 		{"config", StatusDraft, 2, AuthoredContent{}, FlowState{FlowConfig, RunIdle}},
 		{"script, nothing yet", StatusDraft, 3, AuthoredContent{}, FlowState{FlowStory, RunIdle}},
 		{"story done → visual is next", StatusDraft, 3, AuthoredContent{Story: true}, FlowState{FlowVisual, RunIdle}},

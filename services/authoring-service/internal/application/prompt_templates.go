@@ -363,4 +363,7 @@ type AuthoringSummary struct {
 	// approved or skipped — what the code step's gate asks. Engine-agnostic; the
 	// orchestrator only reads it for a Remotion project.
 	IllustrationsReady bool `json:"illustrations_ready"`
+	// BriefApproved: the creative brief is written and approved; it is what
+	// lets a project leave the idea step.
+	BriefApproved bool `json:"brief_approved"`
 }

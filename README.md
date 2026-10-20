@@ -50,7 +50,6 @@ Cổng mở ra host: Web GUI http://localhost:3000, API Gateway http://localhost
 | `orchestrator` | Go (ADR-0018) | Saga coordinator và chủ sở hữu project: tạo/fork/xoá project, huỷ/retry bước, channel asset | REST nội bộ; RabbitMQ command/event (Outbox cho command, ADR-0019) | `orchestrator-db` |
 | `authoring-service` | Go (ADR-0029) | Thư viện prompt, chuỗi soạn kịch bản (câu chuyện → storyboard → code), wizard, gợi ý metadata/short, thư viện hình minh hoạ, nhật ký dùng LLM | REST nội bộ; gọi orchestrator, llm-service, rendering | `authoring-service-db` |
 | `llm-service` | Python (CR-039) | Nơi duy nhất gọi mô hình ngôn ngữ (Hive qua OpenAI SDK, hoặc Ollama); pipeline sinh code chia đoạn | REST nội bộ; gọi rendering để kiểm biên dịch | — |
-| `ollama` | image `ollama/ollama` | Mô hình local cho llm-service khi chọn provider `ollama` (`ollama-pull` tải model một lần) | HTTP nội bộ | — |
 | `rendering` | Python + Node (Remotion) | Bước `validate_script` và `render_scenes`; HTTP nội bộ `/v1/check/*`, `/v1/illustrations/preview` | RabbitMQ `rendering.commands` + HTTP nội bộ | `rendering-db` |
 | `tts` | Python (Edge, Azure — ADR-0024, ADR-0025) | Bước `synthesize_speech` | RabbitMQ `tts.commands` (ADR-0014) | `tts-db` |
 | `video-assembly` | Python (ffmpeg) | Bước `assemble_video`, `qc_video`, chuẩn hoá channel asset | RabbitMQ `video_assembly.commands` | `video-assembly-db` |

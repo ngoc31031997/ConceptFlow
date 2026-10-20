@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { getAuthoringState, getProject } from "../api/client";
+import { getAuthoringState, getProject, getResearch } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
 import type { ProjectDraft } from "../context/ProjectDraftContext";
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_CODE, FLOW_CONFIG, authoringRoute } from "../utils/flow";
+import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute } from "../utils/flow";
 import type { Project } from "../types";
 import type { AuthoringState } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -54,6 +54,16 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
   };
 }
 
+/** True when the research step is approved or skipped, or its state cannot be read. */
+async function researchResolved(projectId: string): Promise<boolean> {
+  try {
+    return (await getResearch(projectId)).gate.resolved;
+  } catch {
+    // The story screen is always a valid place to land; do not block opening.
+    return true;
+  }
+}
+
 /**
  * Mở lại một project đang dở ở máy/trình duyệt bất kỳ: nạp bước 1-3 đã lưu trên
  * server vào bản nháp, rồi đưa Creator tới đúng bước `wizard_step`. Project đã
@@ -92,6 +102,14 @@ export function ResumeProjectPage() {
         // định bước (sửa sau lỗi), mở màn Code — nơi có nội dung xa nhất.
         const flowStep = project.flow_step ?? FLOW_CONFIG;
         const step = stepParam || Math.min(flowStep, FLOW_CODE);
+        // Research (optional) sits between Config and the story but is not one
+        // of the server's steps: a project that reached the story with the
+        // research neither approved nor skipped is still at the research screen.
+        if (!stepParam && step === FLOW_STORY && !(await researchResolved(id))) {
+          if (cancelled) return;
+          navigate(`/projects/${id}/research`, { replace: true });
+          return;
+        }
         navigate(authoringRoute(step), { replace: true });
       } catch {
         if (!cancelled) setError("Không mở lại được dự án. Dự án có thể đã bị xóa hoặc kết nối bị gián đoạn.");
