@@ -141,7 +141,12 @@ export function ResearchStepPage() {
           onFlags={research.setFlags}
           onRecheck={(id) => research.recheck([id])}
         />
-        <CoverageCard projectId={projectId} questions={s.questions} coverage={s.coverage} />
+        <CoverageCard
+          projectId={projectId}
+          questions={s.questions}
+          coverage={s.coverage}
+          checking={new Set(s.facts.filter((f) => f.link.state === "run").map((f) => f.question))}
+        />
         <Card data-testid="research-approve-card">
           <div className={styles.body}>
             <div className={styles.head}>

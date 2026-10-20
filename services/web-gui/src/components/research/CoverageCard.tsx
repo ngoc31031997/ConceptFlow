@@ -10,6 +10,8 @@ interface CoverageCardProps {
   projectId: string;
   questions: ResearchQuestion[];
   coverage: QuestionCoverage[];
+  /** Ids of the questions that have a fact whose link is still being checked. */
+  checking: ReadonlySet<string>;
 }
 
 /**
@@ -18,7 +20,7 @@ interface CoverageCardProps {
  * that do not, or that hold a fact whose quote was not found, go into a
  * follow-up prompt for another round.
  */
-export function CoverageCard({ projectId, questions, coverage }: CoverageCardProps) {
+export function CoverageCard({ projectId, questions, coverage, checking }: CoverageCardProps) {
   const [open, setOpen] = useState(false);
   const [prompt, setPrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -55,8 +57,8 @@ export function CoverageCard({ projectId, questions, coverage }: CoverageCardPro
                       <td className={styles.code}>{q.id}</td>
                       <td>{q.text}</td>
                       <td>
-                        <CoverageChip coverage={c} testId={`coverage-chip-${q.id}`} />
-                        {c && c.badFacts.length > 0 && (
+                        <CoverageChip coverage={c} checking={checking.has(q.id)} testId={`coverage-chip-${q.id}`} />
+                        {c && !checking.has(q.id) && c.badFacts.length > 0 && (
                           <span className={`${styles.warn} ${styles.sub}`} data-testid={`coverage-bad-${q.id}`}>
                             {c.badFacts.join(", ")} không khớp
                           </span>
@@ -69,7 +71,13 @@ export function CoverageCard({ projectId, questions, coverage }: CoverageCardPro
             </table>
           </div>
         )}
+        {questions.length > 0 && checking.size > 0 && (
+          <p className={styles.hint} role="status" data-testid="coverage-checking">
+            Đang chờ kiểm link nên độ phủ chưa chốt.
+          </p>
+        )}
         {questions.length > 0 &&
+          checking.size === 0 &&
           (weak.length > 0 ? (
             <div className={styles.actions}>
               <Button variant="view" className={styles.sm} onClick={() => void showFollowUp()} data-testid="coverage-follow-up">

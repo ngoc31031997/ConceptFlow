@@ -397,8 +397,24 @@ describe("ResearchStepPage", () => {
     it("cannot check again a link that is being checked", async () => {
       state = baseState({ facts: [fact("F01", { link: { state: "run", why: "", nearest: "", checkedAt: "" } })] });
       await ready();
-      expect(screen.getByTestId("fact-link-F01")).toHaveTextContent("● đang kiểm");
+      expect(screen.getByTestId("fact-link-F01")).toHaveTextContent("đang kiểm");
       expect(screen.getByTestId("fact-recheck-F01")).toBeDisabled();
+    });
+
+    it("shows that links are being checked in the fact table and holds the coverage count back", async () => {
+      state = baseState({ facts: [fact("F01", { link: { state: "run", why: "", nearest: "", checkedAt: "" } }), fact("F02")] });
+      await ready();
+      expect(screen.getByTestId("facts-checking")).toHaveTextContent("Đang tải và kiểm 1 link");
+      expect(screen.getByTestId("coverage-chip-Q1")).toHaveTextContent("đang tính…");
+      expect(screen.getByTestId("coverage-chip-Q2")).toHaveTextContent("1 nguồn khớp · cần thêm 1");
+      expect(screen.getByTestId("coverage-checking")).toBeInTheDocument();
+      expect(screen.queryByTestId("coverage-follow-up")).not.toBeInTheDocument();
+    });
+
+    it("shows no checking notice when every link is checked", async () => {
+      await ready();
+      expect(screen.queryByTestId("facts-checking")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("coverage-checking")).not.toBeInTheDocument();
     });
 
     it("edits a fact in a dialog and sends only what changed", async () => {

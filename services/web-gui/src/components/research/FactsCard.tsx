@@ -32,7 +32,7 @@ const LINK_CHIPS: Record<LinkState, { label: string; className: string }> = {
   bad: { label: "✗ không khớp", className: styles.chipWait },
   na: { label: "? không tải được", className: styles.chipTodo },
   none: { label: "– không có nguồn", className: styles.chipTodo },
-  run: { label: "● đang kiểm", className: styles.chipRun },
+  run: { label: "đang kiểm", className: styles.chipRun },
 };
 
 function LinkCell({ fact }: { fact: ResearchFact }) {
@@ -40,6 +40,7 @@ function LinkCell({ fact }: { fact: ResearchFact }) {
   return (
     <>
       <span className={`${styles.chip} ${chip.className}`} data-testid={`fact-link-${fact.id}`} data-state={fact.link.state}>
+        {fact.link.state === "run" && <span className={styles.spinner} aria-hidden="true" />}
         {chip.label}
       </span>
       {fact.link.state !== "run" && fact.link.why && <span className={styles.sub}>{fact.link.why}</span>}
@@ -100,6 +101,7 @@ export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, on
   const [filter, setFilter] = useState<Filter>("all");
   const [pending, setPending] = useState<PendingChange | null>(null);
   const shown = facts.filter((f) => matches(f, filter));
+  const checking = facts.filter((f) => f.link.state === "run").length;
 
   // Runs the change at once when nothing uses the fact; otherwise asks first.
   async function guarded(fact: ResearchFact, title: string, label: string, run: () => void) {
@@ -128,6 +130,12 @@ export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, on
         <span className={styles.hint}>
           Mã, câu hỏi, loại, nguồn và đoạn trích. Loại và “bắt buộc nói” sửa ngay trong bảng; chữ, link và đoạn trích sửa ở nút Sửa.
         </span>
+        {checking > 0 && (
+          <p className={styles.checking} role="status" data-testid="facts-checking">
+            <span className={styles.spinner} aria-hidden="true" />
+            Đang tải và kiểm {checking} link…
+          </p>
+        )}
         <div className={styles.filters}>
           {FILTERS.map((f) => (
             <button
