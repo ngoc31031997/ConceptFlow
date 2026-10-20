@@ -3632,3 +3632,13 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3c, thiết kế đã duyệt.
 
 ---
+
+---
+## CR-072-U3c — Kế hoạch code
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: (không có; sau khi Creator duyệt thiết kế)
+**AI Response**: Viết `cr-072-u3c-story-code-generation-plan.md`: 16 task (backend T1–T6, gateway T7, hợp đồng T8, web-gui T9–T13, kiểm/rebuild/báo cáo T14–T16). Chờ Creator duyệt kế hoạch trước khi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3c-story-code-generation-plan.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 1 (planning), chờ duyệt.
+
+---
