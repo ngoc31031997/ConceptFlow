@@ -121,7 +121,7 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
     expect(patchSettings).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ confirm: true }));
   });
 
-  it("báo ở thanh dưới và ở lại bước khi không lưu được", async () => {
+  it("báo lỗi cuối trang và ở lại bước khi không lưu được", async () => {
     patchSettings.mockRejectedValue(new Error("offline"));
     renderPage();
     await waitFor(() => screen.getByTestId("script-authoring-settings-next"));

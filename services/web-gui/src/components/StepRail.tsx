@@ -97,7 +97,7 @@ export function StepRail({ currentStep, viewStep, title, collapsed, onToggle, pr
   const flow = useProjectFlow();
   const viewing = viewStep ?? (currentStep ? viewStepOf(currentStep)?.n : undefined);
   const statusOf = (view: FlowViewStep): StepStatus =>
-    view.screen ? (nav.hasProject ? screenStatus(flow.flowStep) : "pending") : viewStatus(view, nav.status);
+    view.screen ? (nav.hasProject ? screenStatus(view, flow.flowStep, flow.researchResolved) : "pending") : viewStatus(view, nav.status);
   const doneCount = FLOW_VIEW.filter((v) => isBuilt(v) && statusOf(v) === "done").length;
 
   return (
@@ -156,9 +156,14 @@ export function StepRail({ currentStep, viewStep, title, collapsed, onToggle, pr
                   const hint = coming
                     ? `${view.n}. ${view.label} · sắp có, chưa phát triển`
                     : `${view.n}. ${view.label} · ${STATUS_TEXT[status]}${auto ? " · tự động" : ""}${view.optional ? " · tuỳ chọn" : ""}${view.gate ? " · bạn duyệt ở bước này" : ""}`;
-                  // A step with a screen of its own, and one not developed yet, open
-                  // without a running step behind them; the first needs a project.
-                  const disabled = coming || ownScreen ? isViewing || (ownScreen && !nav.hasProject) : !nav.isClickable(target);
+                  // A step opens only once the one before it is done or skipped. A step
+                  // with a screen of its own, and one not developed yet, open without a
+                  // running step behind them; the first needs a project that got that far.
+                  const disabled = coming
+                    ? isViewing
+                    : ownScreen
+                      ? isViewing || !nav.hasProject || status === "pending"
+                      : !nav.isClickable(target) || !nav.isReached(target);
                   const open = () => (coming || ownScreen ? nav.openView(view) : nav.go(target));
                   return (
                     <li key={view.n}>

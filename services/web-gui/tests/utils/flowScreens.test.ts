@@ -43,12 +43,20 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(5, "")).toBe("/create/coming/5");
   });
 
-  it("puts the research step open from the config step on and passed once the script is reached", () => {
-    expect(screenStatus(0)).toBe("pending");
-    expect(screenStatus(1)).toBe("pending");
-    expect(screenStatus(2)).toBe("waiting");
-    expect(screenStatus(3)).toBe("done");
-    expect(screenStatus(13)).toBe("done");
+  it("opens the research step once the config is confirmed and passes it with approval or the script", () => {
+    expect(screenStatus(research, 0, false)).toBe("pending");
+    expect(screenStatus(research, 2, false)).toBe("pending");
+    expect(screenStatus(research, 3, false)).toBe("waiting");
+    expect(screenStatus(research, 3, true)).toBe("done");
+    expect(screenStatus(research, 4, false)).toBe("done");
+  });
+
+  it("opens the story step only once research is approved or skipped", () => {
+    const story = FLOW_VIEW[VIEW_STORY - 1];
+    expect(screenStatus(story, 2, true)).toBe("pending");
+    expect(screenStatus(story, 3, false)).toBe("pending");
+    expect(screenStatus(story, 3, true)).toBe("waiting");
+    expect(screenStatus(story, 4, false)).toBe("done");
   });
 
   it("finds the phase of a step by its place in the 21 steps", () => {

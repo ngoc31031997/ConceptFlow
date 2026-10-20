@@ -97,8 +97,8 @@ describe("StepRail — second-layer vertical menu", () => {
   });
 
   it("opens the research screen from the step menu and shows where the project stands on it", async () => {
-    renderRailWithRoutes({ ...rendering, status: "draft", flow_step: 2, run_state: "idle" } as Project);
-    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-status", "waiting"));
+    renderRailWithRoutes({ ...rendering, status: "draft", flow_step: 3, run_state: "idle" } as Project);
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-status", "done"));
     const research = screen.getByTestId("rail-step-3");
     expect(research).toHaveAttribute("data-status", "waiting");
     expect(research).toHaveAttribute("data-reached", "true");
@@ -138,8 +138,8 @@ describe("StepRail — second-layer vertical menu", () => {
     );
     await waitFor(() => expect(screen.getByTestId("rail-step-3")).toHaveAttribute("aria-current", "step"));
     expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 3/21");
-    // Every other step can be opened from here.
-    expect(screen.getByTestId("rail-step-2")).not.toBeDisabled();
+    // A step the project has already passed can be opened from here.
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).not.toBeDisabled());
     expect(screen.getByTestId("rail-step-3")).toBeDisabled();
   });
 
@@ -161,7 +161,7 @@ describe("StepRail — second-layer vertical menu", () => {
     }
   });
 
-  it("opens every built step: the real screen of a reached one, a preview of the rest", async () => {
+  it("opens a built step only once the project has reached it", async () => {
     renderRail(rendering);
     await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
     for (const step of [2, 16, 17]) {
@@ -169,8 +169,36 @@ describe("StepRail — second-layer vertical menu", () => {
     }
     for (const step of [19, 20, 21]) {
       expect(screen.getByTestId(`rail-step-${step}`)).toHaveAttribute("data-reached", "false");
-      expect(screen.getByTestId(`rail-step-${step}`)).not.toBeDisabled();
+      expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
     }
+  });
+
+  it("keeps the config step closed while the project is still at the idea step", async () => {
+    renderRail({ ...rendering, status: "draft", flow_step: 1, run_state: "idle" } as Project, 1);
+    await waitFor(() => expect(screen.getByTestId("rail-step-1")).toHaveAttribute("aria-current", "step"));
+    for (const step of [2, 3, 4, 6]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
+  });
+
+  it("keeps the research step closed until the config is confirmed", async () => {
+    renderRail({ ...rendering, status: "draft", flow_step: 2, run_state: "idle" } as Project, 2);
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("aria-current", "step"));
+    expect(screen.getByTestId("rail-step-3")).toBeDisabled();
+    expect(screen.getByTestId("rail-step-4")).toBeDisabled();
+  });
+
+  it("keeps the story step closed until research is approved or skipped", async () => {
+    const atConfig = { ...rendering, status: "draft", flow_step: 3, run_state: "idle" } as Project;
+    const research = vi.spyOn(apiClient, "getResearch");
+    research.mockResolvedValue({ gate: { status: "idle", skipped: false, resolved: false } } as unknown as apiClient.ResearchState);
+    const { unmount } = renderRail(atConfig, 2);
+    await waitFor(() => expect(screen.getByTestId("rail-step-2")).toHaveAttribute("data-status", "done"));
+    expect(screen.getByTestId("rail-step-3")).not.toBeDisabled();
+    expect(screen.getByTestId("rail-step-4")).toBeDisabled();
+    unmount();
+
+    research.mockResolvedValue({ gate: { status: "idle", skipped: true, resolved: true } } as unknown as apiClient.ResearchState);
+    renderRail(atConfig, 2);
+    await waitFor(() => expect(screen.getByTestId("rail-step-4")).not.toBeDisabled());
   });
 
   it("marks a cancelled and a failed step differently", async () => {

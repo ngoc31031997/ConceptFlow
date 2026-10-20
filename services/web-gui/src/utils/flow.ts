@@ -163,13 +163,17 @@ export function storyRoute(projectId: string): string {
 }
 
 /**
- * Where a step of a screen of its own stands for a project at running step
- * `flowStep`. The research and story steps are open to the Creator from the
- * config step on and count as passed once the project has moved on to the script.
+ * Where a step with a screen of its own stands for a project at running step
+ * `flowStep`. Confirming the config step moves the project to the story step
+ * (3), which opens research; the story screen opens once research is approved
+ * or skipped. Both count as passed once the project has moved on to the script.
+ * A "pending" step is closed in the step menu.
  */
-export function screenStatus(flowStep: number): StepStatus {
-  if (flowStep < FLOW_CONFIG) return "pending";
-  return flowStep === FLOW_CONFIG ? "waiting" : "done";
+export function screenStatus(view: FlowViewStep, flowStep: number, researchResolved: boolean): StepStatus {
+  if (flowStep <= FLOW_CONFIG) return "pending";
+  if (flowStep > FLOW_STORY) return "done";
+  if (view.screen === "story") return researchResolved ? "waiting" : "pending";
+  return researchResolved ? "done" : "waiting";
 }
 
 /** The phase that holds step `n` of the 21-step flow, or null for a number outside it. */

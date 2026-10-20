@@ -21,6 +21,7 @@ import {
   type FactType,
   type ResearchState,
 } from "../api/client";
+import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useOperationRun, type OperationRun } from "./useOperationRun";
 
 /** The operation kind the server records for the AI run that writes the questions. */
@@ -81,6 +82,7 @@ function messageOf(err: unknown): string {
  * RESEARCH_POLL_MS, so the checks fill in by themselves.
  */
 export function useResearch(projectId: string, enabled: boolean): ResearchControls {
+  const { refetch: refetchFlow } = useProjectFlow();
   const [state, setState] = useState<ResearchState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
@@ -144,6 +146,8 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
       try {
         await change();
         await load();
+        // The step menu opens the story step from the skip / approval just made.
+        refetchFlow();
         return true;
       } catch (err) {
         setActionError(messageOf(err));
@@ -152,7 +156,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
         setBusy(false);
       }
     },
-    [load],
+    [load, refetchFlow],
   );
 
   // Like act, but a failure is thrown for the dialog that asked.

@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { StoryState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
 import { AppShell } from "../components/AppShell";
+import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
 import { ApproachCard } from "../components/story/ApproachCard";
 import { FactsUseCard } from "../components/story/FactsUseCard";
@@ -118,16 +119,6 @@ export function StoryStepPage() {
             </div>
           </div>
         </Card>
-        <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-          <Button
-            variant="primary"
-            onClick={() => navigate(comingRoute(VIEW_STORY + 1, projectId))}
-            disabled={s.status !== "approved"}
-            data-testid="story-next"
-          >
-            Sang beat sheet →
-          </Button>
-        </div>
       </>
     );
   }
@@ -166,6 +157,20 @@ export function StoryStepPage() {
         )}
         {state && <div className={researchStyles.body}>{content(state)}</div>}
       </AppShell>
+
+      <WizardNav
+        allowWhenLocked
+        hint={
+          state?.status === "approved"
+            ? "Câu chuyện đã duyệt. Sang bước Beat sheet."
+            : "Duyệt câu chuyện để sang bước Beat sheet."
+        }
+        onBack={() => navigate(`/projects/${projectId}/research`)}
+        onNext={() => navigate(comingRoute(VIEW_STORY + 1, projectId))}
+        nextDisabled={state?.status !== "approved"}
+        nextLabel="Lưu và sang beat sheet"
+        nextTestId="story-next"
+      />
 
       <UnitRedoModal
         open={redoOpen}

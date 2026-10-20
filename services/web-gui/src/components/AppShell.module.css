@@ -394,9 +394,10 @@
   justify-content: center;
   margin-bottom: 0;
 }
+/* right: leaves the corner to the keyboard-shortcuts button, which is fixed there. */
 .topbar .headerActions {
   position: absolute;
-  right: 16px;
+  right: 68px;
   top: 30px;
 }
 @media (max-width: 640px) {
