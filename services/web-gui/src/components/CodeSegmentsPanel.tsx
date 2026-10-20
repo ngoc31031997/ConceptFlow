@@ -9,7 +9,7 @@ import {
   type CodeSegment,
   type CodeSegmentsView,
 } from "../api/client";
-import { Button, Card, TextArea, TextInput } from "./ui";
+import { Button, Card, CopyBox, TextArea, TextInput } from "./ui";
 import { useAuthoringRun, useAuthoringRunDispatch } from "../context/AuthoringRunContext";
 import { usePresence } from "../hooks/usePresence";
 import glass from "../styles/glass.module.css";
@@ -399,9 +399,11 @@ export function CodeSegmentsPanel({
                 )}
               </Reveal>
               <Reveal open={openKey === s.key && hasCode && !isEditing}>
-                <pre className={styles.code} data-testid={`code-segment-${s.key}-code`}>
-                  {segmentText(s)}
-                </pre>
+                <CopyBox text={segmentText(s)} what="code của đoạn này" copyTestId={`code-segment-${s.key}-quick-copy`}>
+                  <pre className={styles.code} data-testid={`code-segment-${s.key}-code`}>
+                    {segmentText(s)}
+                  </pre>
+                </CopyBox>
               </Reveal>
             </li>
           );

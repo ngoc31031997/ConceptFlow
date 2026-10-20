@@ -2,7 +2,7 @@ import { AiModelField } from "../components/AiModelField";
 import { useLibraryAiModel } from "../hooks/useLibraryAiModel";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { AppShell } from "../components/AppShell";
-import { Button, Card, CtaRow, Dropdown, FormField, TextArea, TextInput } from "../components/ui";
+import { Button, Card, CopyBox, CtaRow, Dropdown, FormField, TextArea, TextInput } from "../components/ui";
 import { Disclosure } from "../components/Disclosure";
 import { IllustrationTile } from "../components/IllustrationTile";
 import { IllustrationEditor } from "../components/IllustrationEditor";
@@ -348,7 +348,9 @@ export function IllustrationLibraryPage() {
                     />
                   ))}
                 </ul>
-                <pre className={styles.rules} data-testid="illustration-style-rules">{rules}</pre>
+                <CopyBox text={rules} what="luật style" copyTestId="illustration-style-rules-copy">
+                  <pre className={styles.rules} data-testid="illustration-style-rules">{rules}</pre>
+                </CopyBox>
               </Disclosure>
             </div>
             {drawOpen && (

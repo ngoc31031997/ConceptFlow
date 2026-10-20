@@ -93,13 +93,3 @@
   font: 12px ui-monospace, Menlo, monospace;
   color: var(--ink-faint);
 }
-.copyBtn {
-  margin: 0 0 14px;
-  padding: 5px 10px;
-  border-radius: var(--radius);
-  border: var(--border-w) solid var(--surface-border);
-  background: transparent;
-  color: var(--ink-soft);
-  font-size: 12px;
-  cursor: pointer;
-}

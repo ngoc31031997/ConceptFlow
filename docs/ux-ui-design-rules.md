@@ -115,3 +115,14 @@ The step pages of the flow (Ý tưởng, Cấu hình, Nghiên cứu, and every s
 - Do not set a smaller `max-width` on a step's own body to get a narrower column; cards fill the `wide` main column.
 - A new step page is checked against the previous step side by side at the same window size before it is done.
 - The only pages that stay narrow are standalone forms and callbacks outside the flow (sign-in, OAuth callback, "Đang mở dự án"). A page that is part of the flow is never one of them.
+
+## 8. Quick copy on every block of text worth pasting elsewhere
+
+A block of text the Creator may paste into another tool or a ticket (a prompt, a script, code, an error trace, a style rule, a playbook) carries a small quick-copy button inside its box, at the top-left, so copying never needs a click to open a full view first.
+
+- Use `<CopyBox text=… what=…>` from `components/ui` around the `<pre>` or `<TextArea>`. It draws the one outline of the box, a thin bar inside it with the button at the left, and the text flush below (the text element's own border and fill are dropped). Use `<CopyButton>` alone only when the block already has its own header bar; do not write a one-off copy button or call `navigator.clipboard` in a screen. `hooks/useCopy.ts` owns the clipboard call.
+- The button is small and neutral (rule 6, "copy" is a neutral action): a copy icon and "Sao chép", no confirmation (rule 5). After a click it shows a check and "Đã chép" for two seconds; when the browser refuses it shows "Không chép được", never a false success.
+- `what` names the content ("prompt nghiên cứu", "chi tiết lỗi") so the accessible name and tooltip say what is copied.
+- It copies the text exactly as the block shows it, and is disabled while that text is empty or still being built or out of date.
+- Applies to read-only blocks and to long text fields alike, in cards and in modals. A modal that exists to copy a generated text (rule 4) keeps its footer "Sao chép" button as well.
+- A new screen with such a block is checked for this button before it is done.

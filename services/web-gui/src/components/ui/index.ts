@@ -8,3 +8,5 @@ export { TextInput } from "./TextInput";
 export { CtaRow } from "./CtaRow";
 export { Dropdown, type DropdownOption } from "./Dropdown";
 export { Pagination } from "./Pagination";
+export { CopyButton } from "./CopyButton";
+export { CopyBox } from "./CopyBox";

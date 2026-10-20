@@ -1,0 +1,30 @@
+.box {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--muted);
+  overflow: hidden;
+}
+.bar {
+  display: flex;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom: 1px dashed var(--surface-border, var(--border-color));
+}
+.body {
+  min-width: 0;
+}
+/* The content sits flush inside the box: the box draws the outline and the fill. */
+.box .body > pre,
+.box .body > textarea,
+.box .body > div {
+  margin: 0;
+  width: 100%;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}

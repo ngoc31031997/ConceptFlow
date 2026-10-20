@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Card, Button, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
+import { Card, Button, CopyBox, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
 import {
   listPrompts,
   createPrompt,
@@ -368,26 +368,30 @@ export function PromptSettingsPage() {
                 />
               </FormField>
               <FormField label="Nội dung" className={glass.mtSm}>
-                <TextArea
-                  data-testid="prompt-template-textarea"
-                  value={draftText}
-                  onChange={(e) => setDraftText(e.target.value)}
-                  readOnly={readOnly}
-                  disabled={loading || (!creating && selected === null)}
-                  rows={22}
-                />
+                <CopyBox text={draftText} what="nội dung prompt" copyTestId="prompt-template-quick-copy">
+                  <TextArea
+                    data-testid="prompt-template-textarea"
+                    value={draftText}
+                    onChange={(e) => setDraftText(e.target.value)}
+                    readOnly={readOnly}
+                    disabled={loading || (!creating && selected === null)}
+                    rows={22}
+                  />
+                </CopyBox>
               </FormField>
             </Card>
 
             {showPreview && (
               <div className={styles.previewBlock}>
                 <Card title="Xem trước" hint="Dữ liệu mẫu">
-                  <TextArea
-                    data-testid="prompt-preview-textarea"
-                    value={renderPreview(draftText)}
-                    readOnly
-                    rows={18}
-                  />
+                  <CopyBox text={renderPreview(draftText)} what="bản xem trước" copyTestId="prompt-preview-quick-copy">
+                    <TextArea
+                      data-testid="prompt-preview-textarea"
+                      value={renderPreview(draftText)}
+                      readOnly
+                      rows={18}
+                    />
+                  </CopyBox>
                 </Card>
               </div>
             )}

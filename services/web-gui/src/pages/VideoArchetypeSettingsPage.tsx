@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { AppShell } from "../components/AppShell";
-import { Card, Button, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
+import { Card, Button, CopyBox, Dropdown, FormField, TextArea, TextInput, CtaRow } from "../components/ui";
 import {
   listVideoArchetypes,
   createVideoArchetype,
@@ -256,14 +256,16 @@ export function VideoArchetypeSettingsPage() {
               />
             </FormField>
             <FormField label="Playbook — cách gán vào các beat của format" className={glass.mtSm}>
-              <TextArea
-                data-testid="archetype-playbook-input"
-                value={playbook}
-                onChange={(e) => setPlaybook(e.target.value)}
-                readOnly={readOnly}
-                disabled={editorDisabled}
-                rows={14}
-              />
+              <CopyBox text={playbook} what="playbook" copyTestId="archetype-playbook-quick-copy">
+                <TextArea
+                  data-testid="archetype-playbook-input"
+                  value={playbook}
+                  onChange={(e) => setPlaybook(e.target.value)}
+                  readOnly={readOnly}
+                  disabled={editorDisabled}
+                  rows={14}
+                />
+              </CopyBox>
             </FormField>
           </Card>
         </div>
