@@ -35,16 +35,16 @@ const LINK_CHIPS: Record<LinkState, { label: string; className: string }> = {
   run: { label: "đang kiểm", className: styles.chipRun },
 };
 
-function LinkCell({ fact }: { fact: ResearchFact }) {
-  const chip = LINK_CHIPS[fact.link.state];
+function LinkCell({ fact, checking }: { fact: ResearchFact; checking: boolean }) {
+  const chip = checking ? LINK_CHIPS.run : LINK_CHIPS[fact.link.state];
   return (
     <>
       <span className={`${styles.chip} ${chip.className}`} data-testid={`fact-link-${fact.id}`} data-state={fact.link.state}>
-        {fact.link.state === "run" && <span className={styles.spinner} aria-hidden="true" />}
+        {checking && <span className={styles.spinner} aria-hidden="true" />}
         {chip.label}
       </span>
-      {fact.link.state !== "run" && fact.link.why && <span className={styles.sub}>{fact.link.why}</span>}
-      {fact.link.state === "bad" && fact.link.nearest && (
+      {!checking && fact.link.why && <span className={styles.sub}>{fact.link.why}</span>}
+      {!checking && fact.link.state === "bad" && fact.link.nearest && (
         <span className={styles.sub} data-testid={`fact-nearest-${fact.id}`}>
           Câu gần giống trong trang: “{fact.link.nearest}”
         </span>
@@ -84,6 +84,8 @@ interface PendingChange {
 interface FactsCardProps {
   projectId: string;
   facts: ResearchFact[];
+  /** Codes of the facts whose link is being checked, including ones just sent. */
+  checking: ReadonlySet<string>;
   locked: boolean;
   onAdd: () => void;
   onEdit: (fact: ResearchFact) => void;
@@ -97,11 +99,10 @@ interface FactsCardProps {
  * later work already uses asks first and lists what it sends back
  * (docs/ux-ui-design-rules.md, rule 5), taking the list from the server.
  */
-export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, onRecheck }: FactsCardProps) {
+export function FactsCard({ projectId, facts, checking, locked, onAdd, onEdit, onFlags, onRecheck }: FactsCardProps) {
   const [filter, setFilter] = useState<Filter>("all");
   const [pending, setPending] = useState<PendingChange | null>(null);
   const shown = facts.filter((f) => matches(f, filter));
-  const checking = facts.filter((f) => f.link.state === "run").length;
 
   // Runs the change at once when nothing uses the fact; otherwise asks first.
   async function guarded(fact: ResearchFact, title: string, label: string, run: () => void) {
@@ -130,10 +131,10 @@ export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, on
         <span className={styles.hint}>
           Mã, câu hỏi, loại, nguồn và đoạn trích. Loại và “bắt buộc nói” sửa ngay trong bảng; chữ, link và đoạn trích sửa ở nút Sửa.
         </span>
-        {checking > 0 && (
+        {checking.size > 0 && (
           <p className={styles.checking} role="status" data-testid="facts-checking">
             <span className={styles.spinner} aria-hidden="true" />
-            Đang tải và kiểm {checking} link…
+            Đang tải và kiểm {checking.size} link…
           </p>
         )}
         <div className={styles.filters}>
@@ -203,7 +204,7 @@ export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, on
                     <SourceCell fact={fact} />
                   </td>
                   <td>
-                    <LinkCell fact={fact} />
+                    <LinkCell fact={fact} checking={checking.has(fact.id)} />
                   </td>
                   <td className={styles.center}>
                     <input
@@ -228,7 +229,7 @@ export function FactsCard({ projectId, facts, locked, onAdd, onEdit, onFlags, on
                           variant="primary"
                           className={styles.sm}
                           onClick={() => void onRecheck(fact.id)}
-                          disabled={locked || fact.link.state === "run"}
+                          disabled={locked || checking.has(fact.id)}
                           data-testid={`fact-recheck-${fact.id}`}
                         >
                           Kiểm lại

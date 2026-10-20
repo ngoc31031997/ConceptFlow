@@ -29,6 +29,9 @@ const QUESTION_RUN_KIND = "research_question";
 /** How often the screen asks again while some link is still being checked. */
 export const RESEARCH_POLL_MS = 2000;
 
+/** How long a fact sent for checking keeps showing as being checked, so a check that ends at once is still seen. */
+export const CHECK_HOLD_MS = 1500;
+
 /** What reading a pasted answer said, for the line under the paste box. */
 export interface PasteMessage {
   tone: "ok" | "warn";
@@ -48,6 +51,8 @@ export interface ResearchControls {
   /** Why the last action failed, in the server's words. */
   actionError: string | null;
   pasteMessage: PasteMessage | null;
+  /** Codes of the facts just sent for checking, shown as being checked for CHECK_HOLD_MS even if the answer is already in. */
+  holding: ReadonlySet<string>;
   generateQuestions: (replaceEdited: boolean, note?: string) => Promise<boolean>;
   addQuestion: (text: string) => Promise<boolean>;
   saveQuestion: (id: string, text: string) => Promise<boolean>;
@@ -82,6 +87,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pasteMessage, setPasteMessage] = useState<PasteMessage | null>(null);
+  const [holding, setHolding] = useState<ReadonlySet<string>>(new Set());
   // Only the newest load may land: an older answer must not overwrite a newer one.
   const loadSeq = useRef(0);
 
@@ -116,6 +122,19 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
     const timer = setInterval(() => void load(), RESEARCH_POLL_MS);
     return () => clearInterval(timer);
   }, [checking, load]);
+
+  // Keeps the given facts shown as being checked for CHECK_HOLD_MS.
+  const hold = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setHolding((prev) => new Set([...prev, ...ids]));
+    setTimeout(() => {
+      setHolding((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+    }, CHECK_HOLD_MS);
+  }, []);
 
   // Runs a change, then reloads; reports whether it worked.
   const act = useCallback(
@@ -185,6 +204,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
           text: `Đã đọc ${read} dữ kiện${left ? `, bỏ ${left} dòng (lý do ở nhật ký)` : ""}. Đang tải từng link để kiểm đoạn trích.`,
         });
         await load();
+        hold([...result.added, ...result.updated]);
         return true;
       } catch (err) {
         setPasteMessage({ tone: "warn", text: messageOf(err) });
@@ -193,7 +213,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
         setBusy(false);
       }
     },
-    [projectId, load],
+    [projectId, load, hold],
   );
 
   return {
@@ -204,6 +224,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
     busy,
     actionError,
     pasteMessage,
+    holding,
     generateQuestions,
     addQuestion: (text) => act(() => addResearchQuestion(projectId, text)),
     saveQuestion: (id, text) => act(() => editResearchQuestion(projectId, id, text)),
@@ -212,7 +233,11 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
     addFact: (input) => actOrThrow(() => apiAddFact(projectId, input)),
     saveFact: (id, fields) => actOrThrow(() => editFact(projectId, id, fields)),
     setFlags: (id, flags) => act(() => setFactFlags(projectId, id, flags)),
-    recheck: (ids) => act(() => verifyFacts(projectId, ids)),
+    recheck: async (ids) => {
+      const ok = await act(() => verifyFacts(projectId, ids));
+      if (ok) hold(ids);
+      return ok;
+    },
     skip: (skipped) => act(() => setResearchSkipped(projectId, skipped)),
     approve: () => act(() => approveResearch(projectId)),
     unapprove: () => act(() => unapproveResearch(projectId)),

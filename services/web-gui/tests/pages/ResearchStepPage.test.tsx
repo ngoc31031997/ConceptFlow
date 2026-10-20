@@ -411,6 +411,17 @@ describe("ResearchStepPage", () => {
       expect(screen.queryByTestId("coverage-follow-up")).not.toBeInTheDocument();
     });
 
+    it("keeps a fact sent for checking shown as being checked even when the answer is already in", async () => {
+      vi.spyOn(apiClient, "verifyFacts").mockResolvedValue(undefined);
+      await ready();
+      fireEvent.click(screen.getByTestId("fact-recheck-F08"));
+      await waitFor(() => expect(screen.getByTestId("fact-link-F08")).toHaveTextContent("đang kiểm"));
+      expect(screen.getByTestId("facts-checking")).toBeInTheDocument();
+      expect(screen.getByTestId("coverage-chip-Q1")).toHaveTextContent("đang tính…");
+      await waitFor(() => expect(screen.queryByTestId("facts-checking")).not.toBeInTheDocument(), { timeout: 3000 });
+      expect(screen.getByTestId("coverage-chip-Q1")).toHaveTextContent("✓ 2 nguồn khớp");
+    });
+
     it("shows no checking notice when every link is checked", async () => {
       await ready();
       expect(screen.queryByTestId("facts-checking")).not.toBeInTheDocument();

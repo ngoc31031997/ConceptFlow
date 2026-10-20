@@ -84,6 +84,8 @@ export function ResearchStepPage() {
   const aiAvailable = llm?.enabled === true;
 
   function content(s: ResearchState) {
+    const checking = new Set(s.facts.filter((f) => f.link.state === "run" || research.holding.has(f.id)).map((f) => f.id));
+    const checkingQuestions = new Set(s.facts.filter((f) => checking.has(f.id)).map((f) => f.question));
     if (s.gate.skipped) {
       return (
         <>
@@ -135,6 +137,7 @@ export function ResearchStepPage() {
         <FactsCard
           projectId={projectId}
           facts={s.facts}
+          checking={checking}
           locked={locked}
           onAdd={() => setAdding(true)}
           onEdit={setEditing}
@@ -145,7 +148,7 @@ export function ResearchStepPage() {
           projectId={projectId}
           questions={s.questions}
           coverage={s.coverage}
-          checking={new Set(s.facts.filter((f) => f.link.state === "run").map((f) => f.question))}
+          checking={checkingQuestions}
         />
         <Card data-testid="research-approve-card">
           <div className={styles.body}>
