@@ -12,8 +12,8 @@ Mỗi file là một quy trình đầy đủ, đọc là làm được, không c
 
 - **Giọng đọc Edge** — engine giọng mặc định (ADR-0024). Không tài khoản, không key,
   không cấu hình. Đây là lý do hệ thống chạy được ngay khi chưa có credential nào.
-- **LLM (Ollama)** — chạy local trong container `ollama`, mô hình đặt bằng
-  `OLLAMA_MODEL` trong `.env` (mặc định `llama3.2`). Không gọi API bên ngoài,
+- **LLM (Ollama)** — chạy local bằng Ollama cài trên máy (`brew install ollama`, `ollama pull qwen2.5:7b`), mô hình đặt bằng
+  `OLLAMA_MODEL` trong `.env` (mặc định `qwen2.5:7b`). Không gọi API bên ngoài,
   không API key.
 - **RabbitMQ / PostgreSQL / Grafana** — user/password do bạn tự đặt trong `.env`,
   không phải đi xin ở đâu.
@@ -36,4 +36,4 @@ Mỗi file là một quy trình đầy đủ, đọc là làm được, không c
 | `AZURE_SPEECH_KEY`, `AZURE_SPEECH_REGION` | [azure-speech-key.md](azure-speech-key.md) |
 | `GOOGLE_TTS_CREDENTIALS_FILE` | [google-cloud-tts-key.md](google-cloud-tts-key.md) |
 | `RABBITMQ_USER/PASS`, `POSTGRES_USER/PASS`, `GRAFANA_USER/PASS` | tự đặt, xem `.env.example` |
-| `OLLAMA_MODEL` | tuỳ chọn, mặc định `llama3.2` |
+| `OLLAMA_MODEL` | tuỳ chọn, mặc định `qwen2.5:7b` |
