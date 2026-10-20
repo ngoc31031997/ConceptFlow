@@ -18,6 +18,9 @@ type AuthoringSummary struct {
 	// approved or skipped. nil means the authoring-service did not send
 	// it — read as ready.
 	IllustrationsReady *bool `json:"illustrations_ready"`
+	// BriefApproved: the idea step's creative brief is approved. nil means
+	// the authoring-service did not send it — read as approved.
+	BriefApproved *bool `json:"brief_approved"`
 }
 
 // Content is the summary as FlowStateFor reads it.
@@ -25,6 +28,7 @@ func (s AuthoringSummary) Content() domain.AuthoredContent {
 	return domain.AuthoredContent{
 		Story: s.Story, Storyboard: s.Storyboard, Code: s.Code,
 		Illustrations: s.IllustrationsReady == nil || *s.IllustrationsReady,
+		BriefOpen:     s.BriefApproved != nil && !*s.BriefApproved,
 	}
 }
 

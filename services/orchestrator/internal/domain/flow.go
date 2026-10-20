@@ -56,9 +56,14 @@ func RunStateOf(status ProjectStatus, errorMessage *string) RunState {
 // Illustrations says the drawing list of the illustrations step (5) is planned
 // and every drawing approved or skipped — the same rule that gates the code
 // step.
+//
+// BriefOpen says the creative brief exists in authoring-service but is not
+// approved (or was never written): the idea step is not finished, so the
+// project still stands at step 1.
 type AuthoredContent struct {
 	Story, Storyboard, Code bool
 	Illustrations           bool
+	BriefOpen               bool
 }
 
 // FlowState is where a project stands in the 13-step flow.
@@ -81,9 +86,12 @@ func FlowStateFor(status ProjectStatus, storedWizardStep int, content AuthoredCo
 	case StatusDraft:
 		switch {
 		case storedWizardStep <= WizardStepConfig:
-			// A server-side draft exists only once the Creator got past step 1
-			// (the row is created by "Tiếp tục"), so the earliest place it can
-			// be is Config. FlowInit is a client-only state before the row.
+			// The row is created with "Tạo project", before the brief exists,
+			// so the project is at Ý tưởng until the brief is approved and at
+			// Config from then on.
+			if content.BriefOpen {
+				return FlowState{FlowInit, RunIdle}
+			}
 			return FlowState{FlowConfig, RunIdle}
 		case content.Code:
 			// Code exists: the draft waits for the Creator to start validation.

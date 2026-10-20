@@ -297,7 +297,10 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 		           WHERE pi.project_id = pa.project_id
 		             AND NOT (pi.state = 'skipped'
 		                      OR (pi.state IN ('reused', 'drawn') AND i.id IS NOT NULL
-		                          AND (i.builtin OR i.status = 'approved'))))
+		                          AND (i.builtin OR i.status = 'approved')))),
+		       EXISTS (SELECT 1 FROM review_units ru
+		               WHERE ru.project_id = pa.project_id AND ru.kind = 'brief' AND ru.unit_key = 'main'
+		                 AND ru.status = 'approved')
 		FROM project_authoring pa WHERE pa.project_id = ANY($1)`, projectIDs)
 	if err != nil {
 		return nil, err
@@ -306,7 +309,7 @@ func (r *PromptTemplateRepository) Summaries(ctx context.Context, projectIDs []s
 	for rows.Next() {
 		var id string
 		var s application.AuthoringSummary
-		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code, &s.IllustrationsReady); err != nil {
+		if err := rows.Scan(&id, &s.Topic, &s.Story, &s.Storyboard, &s.Code, &s.IllustrationsReady, &s.BriefApproved); err != nil {
 			return nil, err
 		}
 		out[id] = s
