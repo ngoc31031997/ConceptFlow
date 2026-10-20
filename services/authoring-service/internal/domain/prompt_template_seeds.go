@@ -9,6 +9,8 @@ func DefaultPromptTemplates() []PromptTemplate {
 		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
 		{Role: RoleResearchQuestions, Language: "vi", Version: 1, TemplateText: researchQuestionsVI},
 		{Role: RoleResearchPrompt, Language: "vi", Version: 1, TemplateText: researchPromptVI},
+		{Role: RoleStoryApproaches, Language: "vi", Version: 1, TemplateText: storyApproachesVI},
+		{Role: RoleStoryFrame, Language: "vi", Version: 1, TemplateText: storyFrameVI},
 	}
 }
 

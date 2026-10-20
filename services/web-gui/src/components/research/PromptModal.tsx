@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Dialog } from "../ui";
+import { Button, CopyBox, Dialog } from "../ui";
 import styles from "./research.module.css";
 
 interface PromptModalProps {
@@ -70,9 +70,11 @@ export function PromptModal({ open, onClose, title, text, error, testId }: Promp
         </p>
       )}
       {text !== null && (
-        <pre className={`${styles.promptBox} ${styles.promptFull}`} data-testid={`${testId}-text`}>
-          {text}
-        </pre>
+        <CopyBox text={text} what="prompt" copyTestId={`${testId}-quick-copy`}>
+          <pre className={`${styles.promptBox} ${styles.promptFull}`} data-testid={`${testId}-text`}>
+            {text}
+          </pre>
+        </CopyBox>
       )}
       {copyFailed && (
         <p className={styles.warn} role="alert">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getResearchPrompt, type ResearchQuestion } from "../../api/client";
-import { Button, Card } from "../ui";
+import { Button, Card, CopyBox } from "../ui";
 import { errorText } from "./errorText";
 import { PromptModal } from "./PromptModal";
 import styles from "./research.module.css";
@@ -64,9 +64,11 @@ export function PromptCard({ projectId, questions }: PromptCardProps) {
         )}
         {prompt !== null && (
           <>
-            <pre className={styles.promptBox} data-testid="research-prompt-preview">
-              {prompt}
-            </pre>
+            <CopyBox text={prompt} what="prompt nghiên cứu" copyTestId="research-prompt-quick-copy">
+              <pre className={styles.promptBox} data-testid="research-prompt-preview">
+                {prompt}
+              </pre>
+            </CopyBox>
             <div className={styles.actions}>
               <Button variant="view" onClick={() => setOpen(true)} data-testid="research-prompt-open">
                 Xem toàn bộ và sao chép

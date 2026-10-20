@@ -30,6 +30,15 @@
 - **Gateway ↔ Orchestrator**: đồng bộ REST chỉ để khởi tạo Saga (nhận `saga_id`/`project_id` ngay lập tức); tiến trình sau đó được theo dõi qua event.
 - **Orchestrator ↔ Service nghiệp vụ**: **bất đồng bộ qua Message Queue** cho MỌI service nghiệp vụ, kể cả TTS Service (ADR-0014) — quyết định thay đổi so với thiết kế ban đầu (ADR-0005, đã bị supersede), nhằm: (1) không chặn Orchestrator khi 1 bước xử lý lâu, (2) đảm bảo command không mất khi 1 service tạm thời down, (3) hỗ trợ retry tự nhiên qua cơ chế requeue/dead-letter của RabbitMQ, (4) mỗi bước là 1 sự kiện độc lập, quan sát/lưu trữ được (hỗ trợ mục tiêu Orchestrator persist kết quả từng bước).
 
+## API Versioning Rule (toàn hệ thống)
+
+Mọi endpoint REST của mọi service (qua API Gateway và giữa các service) có tiền tố phiên bản trong đường dẫn: `/v1/...` (ADR-0008).
+
+- Endpoint mới luôn nằm dưới `/v1/`, kể cả khi chỉ có client nội bộ.
+- Thay đổi tương thích (chỉ thêm trường) giữ nguyên `/v1/`; bên nhận bỏ qua trường lạ. Không đổi tên, không xoá, không đổi nghĩa trường đang có.
+- Thay đổi phá vỡ thì mở `/v2/...` song song; bản cũ được giữ tối thiểu một chu kỳ phát triển, thông báo qua changelog trong `aidlc-docs/`.
+- Hợp đồng từng endpoint ghi trong `docs/contracts/`; chỉ mục ở `docs/contracts/README.md`.
+
 ## Orchestration Pattern: Saga (Orchestration-based)
 Xem ADR-0007 cho phân tích đầy đủ. Tóm tắt:
 - **Orchestrator Service** là Saga coordinator duy nhất — biết toàn bộ định nghĩa các bước và thứ tự.

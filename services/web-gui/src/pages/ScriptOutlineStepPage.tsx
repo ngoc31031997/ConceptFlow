@@ -13,7 +13,7 @@ import { stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { authoringHint } from "../utils/authoringHint";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { useVideoFormats } from "../hooks/useVideoFormats";
-import { Card, Button, TextArea } from "../components/ui";
+import { Card, Button, CopyBox, TextArea } from "../components/ui";
 import glass from "../styles/glass.module.css";
 import styles from "./WizardSteps.module.css";
 import { FLOW_STORY, flowStepName } from "../utils/flow";
@@ -209,13 +209,15 @@ export function ScriptOutlineStepPage() {
               title="1. Sao chép prompt"
               hint="Sao chép prompt rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
-              <TextArea
-                readOnly
-                value={prompt}
-                rows={16}
-                className={styles.promptTextarea}
-                data-testid="script-outline-prompt"
-              />
+              <CopyBox text={prompt} what="prompt" disabled={rendered.prompt === null || rendered.stale} copyTestId="script-outline-prompt-quick-copy">
+                <TextArea
+                  readOnly
+                  value={prompt}
+                  rows={16}
+                  className={styles.promptTextarea}
+                  data-testid="script-outline-prompt"
+                />
+              </CopyBox>
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="script-outline-copy">
                 {copied ? "Đã sao chép" : "Sao chép prompt"}
               </Button>

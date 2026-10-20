@@ -3611,3 +3611,45 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: FIX — chờ Creator duyệt rồi chạy /deliver.
 
 **Bổ sung (cùng nhánh)**: Creator báo redo có chạy nhưng output không đổi (ghi chú: "làm cho người xem có kinh nghiệm quang học"; ô Khán giả vẫn "không có kinh nghiệm"). Trả lời: "gộp luôn sửa prompt vào nhánh này". Đã dò UI → API → usecase → prompt: ghi chú tới được prompt (`redo_note`), nên nguyên nhân nhiều khả năng ở prompt (neo vào brief cũ, không nói ghi chú ưu tiên) và ghi chú mơ hồ; chưa chạy model thật nên chưa kiểm chứng. Sửa prompt hệ thống: ghi chú ưu tiên hơn brief hiện có, buộc đổi ô được nhắc tới và mọi ô bị ảnh hưởng, không bỏ qua ghi chú. Thêm 1 test; `go test ./...` authoring-service pass; rebuild authoring-service (healthy); prompt active trong DB đã có đoạn mới. Chưa chạy thử với Ollama thật.
+
+---
+## CR-072-U3c — Câu chuyện (thiết kế)
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "implement giao diện bước 4 câu chuyện theo file mockup đi https://claude.ai/artifact/HibBJUisUocqKXDZD57cTH"; chọn phạm vi: "Cả bước: backend + giao diện (Recommended)"; "khoan, đây là CR lớn nên ngoài giao diện đã chốt tôi cần làm theo DLC"; "dừng tối làm tiếp nhé"; "tiếp tục nào"
+**AI Response**: Mở nhánh `feature/cr-072-u3c-story` (worktree riêng, từ main `a06abaf`). Đã viết nhầm một phần code (domain, prompt) trước khi có thiết kế được duyệt; dời ra ngoài repo, nhánh về sạch. Viết `cr-072-u3c-story-design.md` (phụ thuộc, thiết kế chức năng, thiết kế mức thấp) và `cr-072-u3c-story-design-questions.md` (5 câu).
+**Impact Assessment**: chỉ tài liệu. Khi code: build lại authoring-service, api-gateway, web-gui.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3c-story-design.md`, `cr-072-u3c-story-design-questions.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, chờ Creator trả lời câu hỏi và duyệt thiết kế.
+
+---
+
+---
+## CR-072-U3c — Duyệt thiết kế
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "1 u3b là cái gì tôi đã bảo xoá hết rồi mà. làm theo như giao diện chỗ nào chưa hiểu thì hỏi tôi 2 lưu thành 6 đơn vị riêng 3 viết riêng ô đó 4 sửa 1 ô câu chuyền về chờ duyệt 5 quy ước kỹ thuật là gì nói"; "đường dẫn api có đánh version thêm quy tắc này vào thiết kế hệ thống ok thiết kế này ổn đó"
+**AI Response**: Ghi câu trả lời 1–5 vào `cr-072-u3c-story-design-questions.md`. Thêm mục "API Versioning Rule" vào `inception/high-level-design/integration-boundaries.md` (theo ADR-0008, vốn đã quyết định `/v1` toàn hệ thống). Thiết kế được duyệt; commit giai đoạn thiết kế. Bước kế: chia task.
+**Artifacts Affected**: `cr-072-u3c-story-design.md`, `cr-072-u3c-story-design-questions.md`, `integration-boundaries.md`, `audit.md`.
+**Context**: CONSTRUCTION — CR-072-U3c, thiết kế đã duyệt.
+
+---
+
+---
+## CR-072-U3c — Kế hoạch code
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: (không có; sau khi Creator duyệt thiết kế)
+**AI Response**: Viết `cr-072-u3c-story-code-generation-plan.md`: 16 task (backend T1–T6, gateway T7, hợp đồng T8, web-gui T9–T13, kiểm/rebuild/báo cáo T14–T16). Chờ Creator duyệt kế hoạch trước khi code.
+**Artifacts Affected**: `aidlc-docs/construction/plans/cr-072-u3c-story-code-generation-plan.md`, `audit.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 1 (planning), chờ duyệt.
+
+---
+
+---
+## CR-072-U3c — Code xong, chờ duyệt
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "bắt dầu code đi chỗ nào cần test gọi api local ollama tôi cài trên máy rồi"; chọn "Thêm ô chọn model riêng (Recommended)"
+**AI Response**: Làm 16 task của `cr-072-u3c-story-code-generation-plan.md`. authoring-service: đơn vị `story` (cổng), `story_field` (sáu ô), `story_approach`; đọc câu trả lời AI chặt (mã dữ kiện lạ, thiếu ô, JSON hỏng thì không lưu); dạng gõ tay `câu [F01, F02]`; gợi ý góc, chọn góc, lưu kiểu mới vào bảng Kiểu video, viết khung, làm lại riêng từng ô, bật/tắt dữ kiện dùng, bỏ qua Nghiên cứu thì AI tự liệt kê dữ kiện `link=none`; hai vai prompt `story_approaches`, `story_frame`; khoá model riêng `story_frame` (cột `story_frame_model`); 6 route `/v1/projects/{id}/story…`; `Impact` của brief nêu khung câu chuyện. api-gateway: 6 route. web-gui: bước 4 thành màn riêng `/projects/:id/story` (thẻ góc tiếp cận, sáu ô, dữ kiện dùng, duyệt), hook `useStory`, ô chọn model, hai vai prompt trong Cài đặt prompt; nút Nghiên cứu mở Câu chuyện; nút "Sang beat sheet" mở trang "chưa phát triển". Hợp đồng `docs/contracts/story-v1.md`.
+**Impact Assessment**: build lại và khởi động lại authoring-service, api-gateway, web-gui (healthy; code từ `feature/cr-072-u3c-story`). Test: Go `go test -race ./...` xanh; api-gateway `npm test` 157 xanh; web-gui `vitest` 628 xanh, `tsc -b` sạch, `eslint` 0 lỗi. Chạy thật với Ollama (qwen2.5:7b, model `ollama`) trên một project thử: gợi ý góc và viết khung thành công, bỏ qua Nghiên cứu nên AI liệt kê 4 dữ kiện `link=none`; lúc đầu model trích mã dữ kiện không có nên bị từ chối, đã sửa prompt (ví dụ đầu ra theo chế độ có/không có dữ kiện). Chưa kiểm thật qua API: sửa tay, làm lại một ô, duyệt (project thử bị xoá bởi tiến trình khác giữa chừng); các luồng này chỉ có test tự động. Dọn: project thử đã bị xoá cùng dữ liệu authoring; xoá thêm 5 dòng `llm_usage` của project đó.
+**Artifacts Affected**: `services/authoring-service/`, `services/api-gateway/`, `services/web-gui/`, `docs/contracts/story-v1.md`, `docs/contracts/README.md`, `aidlc-docs/construction/plans/cr-072-u3c-story-*.md`, `integration-boundaries.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 2 xong, chờ Creator duyệt.
+
+---

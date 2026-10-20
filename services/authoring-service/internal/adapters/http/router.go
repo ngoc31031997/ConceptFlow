@@ -57,6 +57,7 @@ type Router struct {
 	reviewUnits             reviewUnitsUseCase
 	creativeBrief           creativeBriefUseCase
 	research                researchUseCase
+	story                   storyUseCase
 }
 
 // NewRouter constructs the router; every capability is attached with a With* method.
@@ -82,6 +83,8 @@ func (rt *Router) Handler() http.Handler {
 	rt.reviewUnitRoutes(r)
 	// The research step: questions, the prompt for an outside tool, pasted answers, facts.
 	rt.researchRoutes(r)
+	// The story step: approaches, the six fields of the frame, the facts it uses.
+	rt.storyRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
@@ -819,12 +822,13 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"code":       state.Code,
 		// Model-per-step picker's saved choice for each tab, "" meaning
 		// "server default" — same rehydrate-on-reload reasoning as mode.
-		"brief_model":      state.Models.Brief,
-		"publish_model":    state.Models.Publish,
-		"research_model":   state.Models.Research,
-		"story_model":      state.Models.Story,
-		"storyboard_model": state.Models.Storyboard,
-		"code_model":       state.Models.Code,
+		"brief_model":       state.Models.Brief,
+		"publish_model":     state.Models.Publish,
+		"research_model":    state.Models.Research,
+		"story_frame_model": state.Models.StoryFrame,
+		"story_model":       state.Models.Story,
+		"storyboard_model":  state.Models.Storyboard,
+		"code_model":        state.Models.Code,
 		// The visual language the project is pinned to; "" for a project with no pin.
 		"visual_language_id":      state.Language.ID,
 		"visual_language_version": strconv.Itoa(state.Language.Version),
@@ -851,7 +855,7 @@ func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	models := domain.AuthoringStepModels{
-		Brief: req.Brief, Publish: req.Publish, Research: req.Research,
+		Brief: req.Brief, Publish: req.Publish, Research: req.Research, StoryFrame: req.StoryFrame,
 		Story: req.Story, Storyboard: req.Storyboard, Code: req.Code,
 	}
 	if err := rt.saveAuthoringModels.Execute(r.Context(), projectID, models); err != nil {

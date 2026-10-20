@@ -18,7 +18,7 @@ import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useResearch } from "../hooks/useResearch";
-import { VIEW_RESEARCH, comingRoute, readOnlyReason } from "../utils/flow";
+import { VIEW_RESEARCH, readOnlyReason, storyRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Sinh câu hỏi cần tra, chép prompt ra công cụ nghiên cứu bên ngoài, rồi dán kết quả lại. Hệ thống tải từng link và kiểm đoạn trích có thật trong trang không.";
@@ -180,7 +180,7 @@ export function ResearchStepPage() {
       <div className={`${styles.actions} ${styles.actionsEnd}`}>
         <Button
           variant="primary"
-          onClick={() => navigate(comingRoute(VIEW_RESEARCH + 1, projectId))}
+          onClick={() => navigate(storyRoute(projectId))}
           disabled={!state?.gate.resolved}
           data-testid="research-next"
         >

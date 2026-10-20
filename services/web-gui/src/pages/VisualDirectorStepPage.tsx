@@ -5,7 +5,7 @@ import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { getAuthoringState, saveAuthoringStoryboard } from "../api/client";
-import { Card, Button, TextArea } from "../components/ui";
+import { Card, Button, CopyBox, TextArea } from "../components/ui";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useAuthoringMode } from "../hooks/useAuthoringMode";
@@ -157,13 +157,15 @@ export function VisualDirectorStepPage() {
               title="1. Sao chép prompt"
               hint="Xem lại nội dung, sao chép rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
-              <TextArea
-                readOnly
-                value={prompt}
-                rows={18}
-                className={styles.promptTextarea}
-                data-testid="visual-director-prompt"
-              />
+              <CopyBox text={prompt} what="prompt" disabled={rendered.prompt === null || rendered.stale} copyTestId="visual-director-prompt-quick-copy">
+                <TextArea
+                  readOnly
+                  value={prompt}
+                  rows={18}
+                  className={styles.promptTextarea}
+                  data-testid="visual-director-prompt"
+                />
+              </CopyBox>
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="visual-director-copy">
                 {copied ? "Đã sao chép" : "Sao chép prompt"}
               </Button>

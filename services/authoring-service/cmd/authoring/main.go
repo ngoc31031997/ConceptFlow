@@ -132,7 +132,14 @@ func main() {
 	} else if n > 0 {
 		logger.Warn("marked interrupted source checks as unreachable", "count", n)
 	}
+	// The story step: the six fields of the frame and its gate are review
+	// units; the research step asks it which work rests on a fact.
+	story := application.NewStoryDeskUseCase(
+		authoringRepo, projects, projects, authoringRepo, archetypes, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	research.RegisterFactDependents(story.FactDependents())
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
+		Register(domain.UnitKindStory, story.GateUnitKind()).
+		Register(domain.UnitKindStoryField, story.FieldUnitKind()).
 		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
@@ -186,7 +193,8 @@ func main() {
 		WithGenerateAuthoring(generateAuthoring).
 		WithReviewUnits(reviewUnits).
 		WithCreativeBrief(creativeBrief).
-		WithResearch(research)
+		WithResearch(research).
+		WithStory(story)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

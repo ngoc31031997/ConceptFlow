@@ -150,6 +150,15 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/research/facts/:fid', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/research/verify', proxyHandler(authoring, 'authoring-service'));
   router.put('/v1/projects/:id/research/skip', proxyHandler(authoring, 'authoring-service'));
+  // Câu chuyện: góc tiếp cận, sáu ô của khung và dữ kiện dùng. Sửa/làm lại/duyệt
+  // từng ô đi qua /units/story_field/* và /units/story/main; chỉ hai lượt AI dưới
+  // đây gọi model nên dùng client timeout dài.
+  router.get('/v1/projects/:id/story', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/story/approaches/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.put('/v1/projects/:id/story/approach', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/story/approaches/:key/archetype', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/story/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.put('/v1/projects/:id/story/facts/:fid', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));

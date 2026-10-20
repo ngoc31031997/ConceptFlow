@@ -1,0 +1,31 @@
+.copyBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.copyBtn:hover:not(:disabled) {
+  background: var(--muted);
+}
+.copyBtn:focus-visible {
+  outline: 2px solid var(--border-color);
+  outline-offset: 2px;
+}
+.copyBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.done {
+  background: color-mix(in srgb, var(--success) 25%, var(--card));
+}
+.failed {
+  background: var(--danger-soft);
+}

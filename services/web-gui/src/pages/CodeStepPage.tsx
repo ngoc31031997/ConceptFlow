@@ -9,7 +9,7 @@ import { getAuthoringState, saveAuthoringCode, startRenderSaga, ApiError } from 
 import { validateRemotionScript, stripMarkdownCodeFence } from "../utils/scriptValidation";
 import { useRenderedPrompt } from "../hooks/useRenderedPrompt";
 import { authoringHint } from "../utils/authoringHint";
-import { Card, Button, TextArea } from "../components/ui";
+import { Card, Button, CopyBox, TextArea } from "../components/ui";
 import { PipelineSettingsBar } from "../components/PipelineSettingsBar";
 import { CodeChunkShotsField, CodeSegmentsPanel } from "../components/CodeSegmentsPanel";
 import { useLlmStatus } from "../hooks/useLlmStatus";
@@ -223,13 +223,15 @@ export function CodeStepPage() {
               title="1. Sao chép prompt"
               hint="Xem lại nội dung, sao chép rồi dán vào ChatGPT, Claude hoặc Gemini."
             >
-              <TextArea
-                readOnly
-                value={prompt}
-                rows={18}
-                className={styles.promptTextarea}
-                data-testid="code-step-prompt"
-              />
+              <CopyBox text={prompt} what="prompt" disabled={rendered.prompt === null || rendered.stale} copyTestId="code-step-prompt-quick-copy">
+                <TextArea
+                  readOnly
+                  value={prompt}
+                  rows={18}
+                  className={styles.promptTextarea}
+                  data-testid="code-step-prompt"
+                />
+              </CopyBox>
               <Button onClick={handleCopy} disabled={rendered.prompt === null || rendered.stale} className={styles.copyButton} data-testid="code-step-copy">
                 {copied ? "Đã sao chép" : "Sao chép prompt"}
               </Button>

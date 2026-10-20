@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { listProjectErrors, type ProjectErrorEntry } from "../api/client";
 import { stepLabel } from "../utils/pipelineLabels";
 import glass from "../styles/glass.module.css";
+import { CopyBox } from "./ui";
 import styles from "./ErrorBanner.module.css";
 
 interface ErrorBannerProps {
@@ -50,7 +51,6 @@ export function shortError(message: string, max = 140): string {
 export function ErrorBanner({ errorMessage, onRetry, isRetrying, projectId, step }: ErrorBannerProps) {
   const [open, setOpen] = useState(false);
   const [trace, setTrace] = useState<ProjectErrorEntry | null>(null);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (!open || !projectId) return;
@@ -79,15 +79,6 @@ export function ErrorBanner({ errorMessage, onRetry, isRetrying, projectId, step
     trace?.elapsed_seconds ? `đã chạy: ${trace.elapsed_seconds}s` : "",
     trace?.kind ? `loại: ${trace.kind}` : "",
   ].filter(Boolean);
-
-  async function copy() {
-    try {
-      await navigator.clipboard.writeText(fullText);
-      setCopied(true);
-    } catch {
-      /* clipboard refused (some app views): the text is selectable in the box */
-    }
-  }
 
   return (
     <div className={glass.card} role="alert">
@@ -119,12 +110,11 @@ export function ErrorBanner({ errorMessage, onRetry, isRetrying, projectId, step
                   ))}
                 </p>
               )}
-              <pre className={styles.detail} data-testid="error-banner-detail">
-                {fullText}
-              </pre>
-              <button type="button" className={styles.copyBtn} onClick={copy} data-testid="error-banner-copy">
-                {copied ? "Đã sao chép" : "Sao chép chi tiết"}
-              </button>
+              <CopyBox text={fullText} what="chi tiết lỗi" copyTestId="error-banner-copy">
+                <pre className={styles.detail} data-testid="error-banner-detail">
+                  {fullText}
+                </pre>
+              </CopyBox>
             </>
           )}
           <div className={styles.actions}>

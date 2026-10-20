@@ -330,7 +330,7 @@ func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID str
 	if projectID == "" {
 		return fmt.Errorf("project_id is required")
 	}
-	for _, id := range []string{models.Brief, models.Publish, models.Research, models.Story, models.Storyboard, models.Code} {
+	for _, id := range []string{models.Brief, models.Publish, models.Research, models.StoryFrame, models.Story, models.Storyboard, models.Code} {
 		if !domain.ValidAuthoringModel(id) {
 			return fmt.Errorf("unknown model %q", id)
 		}

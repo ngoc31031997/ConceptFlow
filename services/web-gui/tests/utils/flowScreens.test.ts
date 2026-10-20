@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   FLOW_VIEW,
   VIEW_RESEARCH,
+  VIEW_STORY,
   comingRoute,
   isBuilt,
   phaseOf,
   phaseOfView,
   screenRoute,
   screenStatus,
+  storyRoute,
 } from "../../src/utils/flow";
 
 describe("steps with a screen of their own", () => {
@@ -21,15 +23,24 @@ describe("steps with a screen of their own", () => {
     expect(isBuilt(research)).toBe(true);
   });
 
+  it("treats the story step as built with a screen under its video", () => {
+    const story = FLOW_VIEW[VIEW_STORY - 1];
+    expect(story.label).toBe("Câu chuyện");
+    expect(story.screen).toBe("story");
+    expect(isBuilt(story)).toBe(true);
+    expect(screenRoute(story, "p1")).toBe("/projects/p1/story");
+    expect(storyRoute("p1")).toBe("/projects/p1/story");
+  });
+
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([4, 5, 7, 8, 10, 11, 12, 18]);
+    expect(notBuilt).toEqual([5, 7, 8, 10, 11, 12, 18]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
     expect(screenRoute(research, "p1")).toBe("/projects/p1/research");
-    expect(comingRoute(4, "p1")).toBe("/projects/p1/coming/4");
-    expect(comingRoute(4, "")).toBe("/create/coming/4");
+    expect(comingRoute(5, "p1")).toBe("/projects/p1/coming/5");
+    expect(comingRoute(5, "")).toBe("/create/coming/5");
   });
 
   it("puts the research step open from the config step on and passed once the script is reached", () => {
