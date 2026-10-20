@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
+import { WizardNav } from "../components/WizardNav";
 import { AiModelSelect } from "../components/AiModelSelect";
 import { CreativeBriefCard } from "../components/CreativeBriefCard";
 import { SelectableOption } from "../components/SelectableOption";
@@ -311,17 +312,20 @@ export function ScriptStepPage() {
         </Card>
 
         <CreativeBriefCard projectId={draft.projectId} created={created} brief={brief} aiAvailable={aiAvailable} />
-
-        <div className={styles.actions}>
-          <Button
-            onClick={() => navigate("/create/script/settings")}
-            disabled={unit?.status !== "approved"}
-            data-testid="script-step-next"
-          >
-            Sang cấu hình →
-          </Button>
-        </div>
       </AppShell>
+
+      <WizardNav
+        allowWhenLocked
+        hint={
+          unit?.status === "approved"
+            ? "Brief đã duyệt. Sang bước Cấu hình."
+            : "Duyệt brief để sang bước Cấu hình."
+        }
+        onNext={() => navigate("/create/script/settings")}
+        nextDisabled={unit?.status !== "approved"}
+        nextLabel="Lưu và sang cấu hình"
+        nextTestId="script-step-next"
+      />
     </div>
   );
 }

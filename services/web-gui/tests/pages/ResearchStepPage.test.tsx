@@ -473,7 +473,7 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("step-strip")).toHaveTextContent("Bảng dữ kiện đã duyệt");
       expect(screen.getByTestId("research-unapprove")).toBeInTheDocument();
       expect(screen.getByTestId("research-next")).not.toBeDisabled();
-      expect(screen.getByTestId("research-next")).toHaveTextContent("Sang xây dựng câu chuyện →");
+      expect(screen.getByTestId("research-next")).toHaveTextContent("Lưu và sang câu chuyện");
 
       fireEvent.click(screen.getByTestId("research-next"));
       expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/story");

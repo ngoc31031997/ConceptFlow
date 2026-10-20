@@ -73,18 +73,16 @@ describe("AppShell — the 21-step flow", () => {
     expect(screen.getByTestId("rail-step-6")).toHaveAttribute("aria-current", "step");
   });
 
-  it("opens a step the project has reached, and only a preview of one it has not", async () => {
+  it("opens a step the project has reached, and keeps the ones after it closed", async () => {
     renderShell(project({ status: "rendering", flow_step: 10, run_state: "running" }), 5);
     await waitForStepRail();
     await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-reached", "true"));
     expect(screen.getByTestId("rail-step-16")).toHaveAttribute("data-reached", "true");
     expect(screen.getByTestId("rail-step-19")).toHaveAttribute("data-reached", "false");
-    expect(screen.getByTestId("rail-step-21")).not.toBeDisabled();
+    expect(screen.getByTestId("rail-step-21")).toBeDisabled();
     // A step the app does not have yet opens a page that says it is not developed.
     expect(screen.getByTestId("rail-step-18")).not.toBeDisabled();
 
-    fireEvent.click(screen.getByTestId("rail-step-21"));
-    expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/preview\/13$/);
     fireEvent.click(screen.getByTestId("rail-step-17"));
     expect(screen.getByTestId("where").textContent).toMatch(/^\/projects\/[^/]+\/render$/);
     fireEvent.click(screen.getByTestId("rail-step-18"));
@@ -104,8 +102,7 @@ describe("AppShell — the 21-step flow", () => {
     // Nothing runs yet, so there is no status strip.
     expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
     await waitForStepRail();
-    fireEvent.click(screen.getByTestId("rail-step-9"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/create/preview/4");
+    for (const step of [2, 3, 4, 9]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
   });
 
   it("names the phase and the step on the sidebar's resume link, not a bare step count", async () => {

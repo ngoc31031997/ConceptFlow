@@ -2,6 +2,7 @@ import { useContext, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
 import type { ResearchFact, ResearchState } from "../api/client";
 import { AppShell } from "../components/AppShell";
+import { WizardNav } from "../components/WizardNav";
 import type { StepStripProps } from "../components/StepStrip";
 import { Button, Card } from "../components/ui";
 import { CoverageCard } from "../components/research/CoverageCard";
@@ -103,7 +104,6 @@ export function ResearchStepPage() {
               </div>
             </div>
           </Card>
-          {next()}
         </>
       );
     }
@@ -165,23 +165,7 @@ export function ResearchStepPage() {
             </div>
           </div>
         </Card>
-        {next()}
       </>
-    );
-  }
-
-  function next() {
-    return (
-      <div className={`${styles.actions} ${styles.actionsEnd}`}>
-        <Button
-          variant="primary"
-          onClick={() => navigate(storyRoute(projectId))}
-          disabled={!state?.gate.resolved}
-          data-testid="research-next"
-        >
-          Sang xây dựng câu chuyện →
-        </Button>
-      </div>
     );
   }
 
@@ -224,6 +208,21 @@ export function ResearchStepPage() {
         )}
         {state && <div className={styles.body}>{content(state)}</div>}
       </AppShell>
+
+      <WizardNav
+        allowWhenLocked
+        isBlocked={false}
+        hint={
+          state?.gate.resolved
+            ? "Nghiên cứu đã xong hoặc đã bỏ qua. Sang bước Câu chuyện."
+            : "Duyệt bảng dữ kiện hoặc bỏ qua nghiên cứu để sang bước Câu chuyện."
+        }
+        onBack={() => navigate("/create/script/settings")}
+        onNext={() => navigate(storyRoute(projectId))}
+        nextDisabled={!state?.gate.resolved}
+        nextLabel="Lưu và sang câu chuyện"
+        nextTestId="research-next"
+      />
 
       <ImpactConfirm
         open={skipping}
