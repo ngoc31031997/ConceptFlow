@@ -44,6 +44,11 @@ func (r *PromptTemplateRepository) PurgeLegacyPrompts(ctx context.Context) (int,
 		return deleted, err
 	}
 	deleted += int(retired.RowsAffected())
+	unshipped, err := r.pool.Exec(ctx, `DELETE FROM prompts WHERE is_system AND role = ANY($1)`, unshippedPromptRoles)
+	if err != nil {
+		return deleted, err
+	}
+	deleted += int(unshipped.RowsAffected())
 	for _, t := range []string{"prompt_overrides_legacy", "prompt_templates_legacy", "prompt_overrides", "prompt_templates"} {
 		if _, err := r.pool.Exec(ctx, `DROP TABLE IF EXISTS `+t); err != nil {
 			return deleted, err
@@ -57,6 +62,15 @@ func (r *PromptTemplateRepository) PurgeLegacyPrompts(ctx context.Context) (int,
 // video, and the three Manim roles wrote and fixed scripts for a render engine
 // the pipeline no longer has (see ADR-0033).
 var retiredPromptRoles = []string{"short_script", "manim_engineer", "manim_engineer_ai", "manim_adjust"}
+
+// unshippedPromptRoles are roles that still exist but no longer ship a system
+// wording: a database seeded earlier keeps their system rows until the purge
+// removes them. A Creator's own rows of these roles are kept.
+var unshippedPromptRoles = []string{
+	string(domain.RoleStoryArchitect), string(domain.RoleVisualDirector), string(domain.RoleRemotionEngineer),
+	string(domain.RoleVisualDirectorAI), string(domain.RoleRemotionEngineerAI),
+	string(domain.RoleRemotionAdjust), string(domain.RoleThumbnailDesign),
+}
 
 // SeedPrompts writes the system prompts, overwriting their wording on every
 // start so a rebuilt binary is the whole deploy.

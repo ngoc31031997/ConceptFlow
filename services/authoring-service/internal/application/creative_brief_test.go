@@ -131,16 +131,20 @@ func (p *briefProject) GetStatus(context.Context, string) (domain.ProjectStatus,
 	return p.status, nil
 }
 
-// briefPrompts serves the shipped prompts.
-type briefPrompts struct{}
+// briefPrompts serves the shipped prompts, plus a story prompt written by the
+// Creator when story is set (no story prompt ships).
+type briefPrompts struct{ story string }
 
-func (briefPrompts) GetActive(_ context.Context, role domain.PromptRole) (domain.Prompt, error) {
+func (b briefPrompts) GetActive(_ context.Context, role domain.PromptRole) (domain.Prompt, error) {
+	if role == domain.RoleStoryArchitect && b.story != "" {
+		return domain.Prompt{Role: role, TemplateText: b.story}, nil
+	}
 	for _, p := range domain.SystemPrompts() {
 		if p.Role == role {
 			return p, nil
 		}
 	}
-	return domain.Prompt{}, errors.New("no prompt")
+	return domain.Prompt{}, ErrPromptNotFound
 }
 
 // briefLLM replies with a fixed text and keeps the prompts it was sent.
@@ -409,8 +413,20 @@ func TestStateReportsAStoryWrittenFromAnotherBrief(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if state.Unit != nil || !state.StoryStale || !state.StoryPromptReadsBrief {
-		t.Errorf("want no unit, a stale story and the shipped story prompt reading the brief, got %+v", state)
+	if state.Unit != nil || !state.StoryStale || state.StoryPromptReadsBrief {
+		t.Errorf("want no unit, a stale story and no story prompt reading the brief, got %+v", state)
+	}
+}
+
+func TestStateReportsACreatorStoryPromptThatReadsTheBrief(t *testing.T) {
+	f := newBriefFixture()
+	f.uc.prompts = briefPrompts{story: "Viết chuyện từ " + briefVariable}
+	state, err := f.uc.State(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !state.StoryPromptReadsBrief {
+		t.Errorf("a story prompt holding %s reads the brief, got %+v", briefVariable, state)
 	}
 }
 

@@ -100,7 +100,7 @@ func TestSystemPrompts_OnePerRoleAndVietnameseOnly(t *testing.T) {
 			t.Errorf("%s: not a usable system row: %+v", p.Role, p)
 		}
 	}
-	for _, role := range []domain.PromptRole{domain.RoleStoryArchitect, domain.RoleVisualDirector, domain.RoleRemotionEngineer} {
+	for _, role := range []domain.PromptRole{domain.RoleCreativeBrief, domain.RoleResearchQuestions, domain.RoleResearchPrompt} {
 		if seen[role] != 1 {
 			t.Errorf("role %s has %d system rows, want 1", role, seen[role])
 		}
@@ -109,7 +109,7 @@ func TestSystemPrompts_OnePerRoleAndVietnameseOnly(t *testing.T) {
 
 func TestSystemPromptCannotBeEditedOrDeleted(t *testing.T) {
 	uc := application.NewPromptsUseCase(newFakePromptLibrary())
-	id := domain.SystemPromptID(domain.RoleStoryArchitect)
+	id := domain.SystemPromptID(domain.RoleCreativeBrief)
 
 	if _, err := uc.Update(context.Background(), id, "x", "y"); !errors.Is(err, application.ErrPromptReadOnly) {
 		t.Errorf("Update err = %v, want ErrPromptReadOnly", err)
@@ -123,20 +123,20 @@ func TestCopyOfSystemPromptIsEditableInactiveAndUserOwned(t *testing.T) {
 	store := newFakePromptLibrary()
 	uc := application.NewPromptsUseCase(store)
 
-	copied, err := uc.Copy(context.Background(), domain.SystemPromptID(domain.RoleVisualDirector))
+	copied, err := uc.Copy(context.Background(), domain.SystemPromptID(domain.RoleResearchQuestions))
 	if err != nil {
 		t.Fatalf("Copy: %v", err)
 	}
 	if copied.IsSystem || copied.IsActive {
 		t.Errorf("copy must be user-owned and inactive, got %+v", copied)
 	}
-	if copied.Role != domain.RoleVisualDirector || copied.TemplateText == "" {
+	if copied.Role != domain.RoleResearchQuestions || copied.TemplateText == "" {
 		t.Errorf("copy lost role/text: %+v", copied)
 	}
 	if _, err := uc.Update(context.Background(), copied.ID, "tên mới", "chữ mới"); err != nil {
 		t.Errorf("a copy must be editable: %v", err)
 	}
-	active, _ := uc.Active(context.Background(), domain.RoleVisualDirector)
+	active, _ := uc.Active(context.Background(), domain.RoleResearchQuestions)
 	if !active.IsSystem {
 		t.Error("copying must not change which prompt is active")
 	}
@@ -146,11 +146,11 @@ func TestActivateLeavesExactlyOneActivePerRole(t *testing.T) {
 	uc := application.NewPromptsUseCase(newFakePromptLibrary())
 	ctx := context.Background()
 
-	mine, _ := uc.Create(ctx, domain.RoleStoryArchitect, "của tôi", "nội dung")
+	mine, _ := uc.Create(ctx, domain.RoleCreativeBrief, "của tôi", "nội dung")
 	if _, err := uc.Activate(ctx, mine.ID); err != nil {
 		t.Fatalf("Activate: %v", err)
 	}
-	rows, _ := uc.List(ctx, domain.RoleStoryArchitect)
+	rows, _ := uc.List(ctx, domain.RoleCreativeBrief)
 	active := 0
 	for _, r := range rows {
 		if r.IsActive {
@@ -160,7 +160,7 @@ func TestActivateLeavesExactlyOneActivePerRole(t *testing.T) {
 	if active != 1 {
 		t.Fatalf("%d active rows for the role, want exactly 1", active)
 	}
-	got, _ := uc.Active(ctx, domain.RoleStoryArchitect)
+	got, _ := uc.Active(ctx, domain.RoleCreativeBrief)
 	if got.ID != mine.ID {
 		t.Errorf("active = %s, want %s", got.ID, mine.ID)
 	}
@@ -170,12 +170,12 @@ func TestDeletingTheActivePromptHandsTheRoleBackToTheSystemOne(t *testing.T) {
 	uc := application.NewPromptsUseCase(newFakePromptLibrary())
 	ctx := context.Background()
 
-	mine, _ := uc.Create(ctx, domain.RoleRemotionEngineer, "của tôi", "nội dung")
+	mine, _ := uc.Create(ctx, domain.RoleResearchPrompt, "của tôi", "nội dung")
 	_, _ = uc.Activate(ctx, mine.ID)
 	if err := uc.Delete(ctx, mine.ID); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
-	got, err := uc.Active(ctx, domain.RoleRemotionEngineer)
+	got, err := uc.Active(ctx, domain.RoleResearchPrompt)
 	if err != nil || !got.IsSystem {
 		t.Errorf("active after delete = %+v, %v; want the system prompt", got, err)
 	}
@@ -187,10 +187,10 @@ func TestCreateValidatesRoleNameAndText(t *testing.T) {
 	if _, err := uc.Create(ctx, "nonsense", "a", "b"); err == nil {
 		t.Error("expected an error for an unknown role")
 	}
-	if _, err := uc.Create(ctx, domain.RoleStoryArchitect, "  ", "b"); err == nil {
+	if _, err := uc.Create(ctx, domain.RoleCreativeBrief, "  ", "b"); err == nil {
 		t.Error("expected an error for a blank name")
 	}
-	if _, err := uc.Create(ctx, domain.RoleStoryArchitect, "a", " "); err == nil {
+	if _, err := uc.Create(ctx, domain.RoleCreativeBrief, "a", " "); err == nil {
 		t.Error("expected an error for blank text")
 	}
 }

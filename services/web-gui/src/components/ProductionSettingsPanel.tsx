@@ -16,10 +16,11 @@ import { VideoFontPicker } from "./VideoFontPicker";
 import glass from "../styles/glass.module.css";
 
 /**
- * Which saga step's settings to show: "render" = render_scenes (quality, video
- * font), "merge" = assemble_video (subtitles, background music).
+ * Which settings to show: "render" = render_scenes (quality, video font),
+ * "merge" = assemble_video (subtitles, background music), "subtitles" = the
+ * subtitles alone.
  */
-export type ProductionStage = "render" | "merge";
+export type ProductionStage = "render" | "merge" | "subtitles";
 
 interface ProductionSettingsPanelProps {
   project: Project;
@@ -77,9 +78,10 @@ function subtitleModeOf(project: Project): SubtitleMode {
 
 /**
  * Settings read only by the production steps, shown next to the step that
- * reads them rather than in step 2: at the review gate (before anything costly
- * runs) and on the failure of the step that reads them, so a bad choice can be
- * fixed and retried in place. The server enforces the same boundary
+ * reads them: the subtitles at the review gate (before anything costly runs),
+ * and every setting of a step on that step's failure, so a bad choice can be
+ * fixed and retried in place. Quality, video font and background music are
+ * chosen in step 2. The server enforces the same boundary
  * (domain.WizardPatchAllowed): render settings stay editable until
  * render_scenes has run, merge settings until assemble_video has run.
  *
@@ -184,6 +186,7 @@ export function ProductionSettingsPanel({ project, stages, hint, onSaved }: Prod
 
   const showRender = stages.includes("render");
   const showMerge = stages.includes("merge");
+  const showSubtitles = showMerge || stages.includes("subtitles");
 
   return (
     <section data-testid="production-settings" aria-label="Cấu hình dựng và ghép">
@@ -215,7 +218,7 @@ export function ProductionSettingsPanel({ project, stages, hint, onSaved }: Prod
         </>
       )}
 
-      {showMerge && (
+      {showSubtitles && (
         <>
           <div className={glass.mtSm}>
             <Disclosure
@@ -232,6 +235,11 @@ export function ProductionSettingsPanel({ project, stages, hint, onSaved }: Prod
               />
             </Disclosure>
           </div>
+        </>
+      )}
+
+      {showMerge && (
+        <>
           <div className={glass.mtSm}>
             <Disclosure
               title="Nhạc nền"

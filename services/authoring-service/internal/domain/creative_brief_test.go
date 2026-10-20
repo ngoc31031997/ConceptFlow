@@ -2,9 +2,24 @@ package domain
 
 import (
 	"errors"
+	"regexp"
 	"strings"
 	"testing"
 )
+
+var placeholderRe = regexp.MustCompile(`\{\{([a-z_]+)\}\}`)
+
+// aiTemplate returns the shipped wording of role.
+func aiTemplate(t *testing.T, role PromptRole) string {
+	t.Helper()
+	for _, tpl := range DefaultPromptTemplates() {
+		if tpl.Role == role {
+			return tpl.TemplateText
+		}
+	}
+	t.Fatalf("no shipped template for %s", role)
+	return ""
+}
 
 const fullBriefJSON = `{"question":"Vì sao ong chết trong quả sung?","audience":"Người xem phổ thông","know":"Sung là chùm hoa kín","understand":"Vòng đời ong gắn với quả","feel":"Ngạc nhiên","tone":"Tò mò, ấm","out_of_scope":"Không tư vấn ăn uống"}`
 
@@ -115,11 +130,5 @@ func TestCreativeBriefPromptUsesOnlyTheVariablesTheUseCaseFills(t *testing.T) {
 		if !strings.Contains(text, `"`+field+`"`) {
 			t.Errorf("the creative_brief prompt does not ask for the %q key", field)
 		}
-	}
-}
-
-func TestStoryArchitectPromptReadsTheBrief(t *testing.T) {
-	if !strings.Contains(aiTemplate(t, RoleStoryArchitect), "{{creative_brief}}") {
-		t.Error("the shipped story_architect prompt must read {{creative_brief}}")
 	}
 }

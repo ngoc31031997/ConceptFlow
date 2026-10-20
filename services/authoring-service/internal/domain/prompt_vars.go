@@ -24,14 +24,6 @@ var channelIdentityVI string
 //go:embed prompts/channel_identity_en.txt
 var channelIdentityEN string
 
-// lottie_catalog_vi.txt is GENERATED from the approved clips in
-// rendering/remotion_project/lottie/manifest.json by
-// rendering/tools/lottie_catalog.py prompt — never edit it by hand.
-// It is Vietnamese only, like the seeded prompts that carry it.
-//
-//go:embed prompts/lottie_catalog_vi.txt
-var lottieCatalogVI string
-
 // illustration_kit_vi.txt is the API of remotion_project/src/conceptflow-mini/
 // illustration.tsx as the Remotion Engineer reads it. It is written by
 // hand, and rendering/tests/domain/test_illustration_kit.py fails when a
@@ -58,16 +50,6 @@ var narrationRuleRemotionVI string
 //go:embed prompts/narration_rule_remotion_en.txt
 var narrationRuleRemotionEN string
 
-// Bodies of the "copy to an external AI" prompts.
-// Generated from the shipping TypeScript (see testdata/prompt_golden.json) and
-// held to it byte for byte by prompt_golden_test.go.
-//
-//go:embed prompts/remotion_adjust.txt
-var remotionAdjustTemplate string
-
-//go:embed prompts/thumbnail_design.txt
-var thumbnailDesignTemplate string
-
 //go:embed prompts/thumbnail_audience_vi.txt
 var thumbnailAudienceVI string
 
@@ -92,20 +74,6 @@ func ChannelIdentity(language string) string {
 		return channelIdentityVI
 	}
 	return channelIdentityEN
-}
-
-// withLottieCatalog expands {{lottie_catalog}} at seed time. It is baked in
-// rather than substituted per request because the copy-the-prompt-by-hand flow
-// in web-gui reads the stored template as-is and would otherwise show the
-// literal placeholder.
-func withLottieCatalog(text string) string {
-	return strings.ReplaceAll(text, "{{lottie_catalog}}", strings.TrimSpace(lottieCatalogVI))
-}
-
-// withIllustrationKit expands {{illustration_kit}} at seed time, for the same
-// reason as withLottieCatalog.
-func withIllustrationKit(text string) string {
-	return strings.ReplaceAll(text, "{{illustration_kit}}", strings.TrimSpace(illustrationKitVI))
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language

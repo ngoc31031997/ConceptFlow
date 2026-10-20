@@ -19,7 +19,7 @@ func TestPurgeLegacyPromptsDeletesEveryRowOfARetiredRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	if _, err := pool.Exec(ctx, `DELETE FROM prompts WHERE role IN ('short_script', 'manim_engineer', 'thumbnail_design')`); err != nil {
+	if _, err := pool.Exec(ctx, `DELETE FROM prompts WHERE role IN ('short_script', 'manim_engineer', 'thumbnail_design', 'creative_brief')`); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `
@@ -27,7 +27,9 @@ func TestPurgeLegacyPromptsDeletesEveryRowOfARetiredRole(t *testing.T) {
 		    ('retired-system', 'short_script', 'Mặc định', 'x', true, true),
 		    ('retired-creator', 'short_script', 'Của tôi', 'y', false, false),
 		    ('retired-manim', 'manim_engineer', 'Mặc định', 'm', true, true),
-		    ('kept-system', 'thumbnail_design', 'Mặc định', 'z', true, true)`); err != nil {
+		    ('unshipped-system', 'thumbnail_design', 'Mặc định', 'z', true, true),
+		    ('kept-creator', 'thumbnail_design', 'Của tôi', 'w', false, false),
+		    ('kept-system', 'creative_brief', 'Mặc định', 'v', true, true)`); err != nil {
 		t.Fatal(err)
 	}
 
@@ -43,13 +45,20 @@ func TestPurgeLegacyPromptsDeletesEveryRowOfARetiredRole(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT count(*) FROM prompts WHERE role IN ('short_script', 'manim_engineer')`).Scan(&retired); err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM prompts WHERE id = 'kept-system'`).Scan(&kept); err != nil {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM prompts WHERE id IN ('kept-system', 'kept-creator')`).Scan(&kept); err != nil {
 		t.Fatal(err)
 	}
 	if retired != 0 {
 		t.Errorf("%d rows of retired roles left after purge, want 0", retired)
 	}
-	if kept != 1 {
-		t.Errorf("a prompt of a live role was deleted by the purge")
+	if kept != 2 {
+		t.Errorf("%d of the 2 rows that must survive are left: a Creator's prompt or a shipped role's system prompt was purged", kept)
+	}
+	var unshipped int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM prompts WHERE id = 'unshipped-system'`).Scan(&unshipped); err != nil {
+		t.Fatal(err)
+	}
+	if unshipped != 0 {
+		t.Errorf("the system row of a role that ships no wording is left after purge")
 	}
 }

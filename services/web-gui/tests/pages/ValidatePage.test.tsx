@@ -125,8 +125,10 @@ describe("ValidatePage (bước 7 — chạy thử, bước 8 — duyệt)", () 
     fireEvent.click(screen.getByTestId("review-next"));
 
     await waitFor(() => expect(screen.getByTestId("production-settings")).toBeInTheDocument());
-    expect(screen.getByTestId("production-render-quality")).toBeInTheDocument();
     expect(screen.getByTestId("production-subtitles")).toBeInTheDocument();
+    // Quality, video font and background music are chosen in step 2.
+    expect(screen.queryByTestId("production-render-quality")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("production-background-music")).not.toBeInTheDocument();
     expect(screen.queryByTestId("outline-review")).not.toBeInTheDocument();
     const settings = screen.getByTestId("production-settings");
     const approve = screen.getByTestId("outline-approve");

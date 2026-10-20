@@ -153,8 +153,8 @@ export function ValidatePage() {
           <ProductionSettingsPanel
             key={project.project_id}
             project={project}
-            stages={["render", "merge"]}
-            hint="Dùng ở bước Render và Merge + QC. Nếu một trong hai bước lỗi, bạn sửa được ngay tại đó rồi thử lại."
+            stages={["subtitles"]}
+            hint="Dùng ở bước Merge + QC. Chất lượng, font chữ và nhạc nền chọn ở bước Cấu hình; nếu Render hay Merge lỗi, bạn sửa được ngay tại đó rồi thử lại."
           />
         ) : (isAwaitingReview || (reviewingPast && viewStep === FLOW_REVIEW)) && project ? (
           /*

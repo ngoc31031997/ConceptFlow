@@ -103,11 +103,12 @@ func (uc *CreativeBriefUseCase) State(ctx context.Context, projectID string) (Br
 		return BriefState{}, err
 	}
 	state.StoryStale = link.HasStory && !link.FromCurrentBrief
+	// A library with no story prompt has nothing that could read the brief.
 	story, err := uc.prompts.GetActive(ctx, domain.RoleStoryArchitect)
-	if err != nil {
+	if err != nil && !errors.Is(err, ErrPromptNotFound) {
 		return BriefState{}, fmt.Errorf("load story prompt: %w", err)
 	}
-	state.StoryPromptReadsBrief = strings.Contains(story.TemplateText, briefVariable)
+	state.StoryPromptReadsBrief = err == nil && strings.Contains(story.TemplateText, briefVariable)
 	return state, nil
 }
 

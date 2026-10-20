@@ -6,49 +6,11 @@ import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { AuthoringRunProvider } from "../../src/context/AuthoringRunContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
-import type { VideoFormat } from "../../src/types";
 
-const ARCHETYPES: apiClient.VideoArchetype[] = [
-  {
-    id: "system-A",
-    code: "A",
-    name: "Nghịch lý",
-    when_to_use: "lỗi tư duy",
-    playbook: "",
-    recommended_format_id: "essay",
-    is_system: true,
-  },
-];
-const FORMATS = [
-  { id: "essay", name: "Chuỗi ví dụ", version: 1, min_seconds: 300, max_seconds: 600, beats: [] },
-  {
-    id: "quick",
-    name: "Giải thích nhanh",
-    version: 1,
-    min_seconds: 60,
-    max_seconds: 120,
-    beats: [],
-  },
-] as VideoFormat[];
-
-let createDraft: MockInstance<typeof apiClient.createProjectDraft>;
 let patchSettings: MockInstance<typeof apiClient.patchWizardSettings>;
 
 beforeEach(() => {
-  vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
-    enabled: false,
-    provider: "",
-    reason: "Chưa cấu hình",
-  });
-  vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({
-    topic: "",
-    story: "",
-    storyboard: "",
-    code: "",
-  });
-  vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue(FORMATS);
   vi.spyOn(apiClient, "listVoices").mockResolvedValue([]);
-  vi.spyOn(apiClient, "listVideoArchetypes").mockResolvedValue(ARCHETYPES);
   vi.spyOn(apiClient, "getProjectVisualLanguage").mockResolvedValue({
     visual_language_id: "phatsang",
     visual_language_version: 1,
@@ -56,9 +18,7 @@ beforeEach(() => {
     name: "Khoa học phát sáng",
     rules: { illustration_rules: "a", backdrop_rules: "b", scene_rules: "c" },
   });
-  createDraft = vi
-    .spyOn(apiClient, "createProjectDraft")
-    .mockResolvedValue({ similarProjects: [] });
+  vi.spyOn(apiClient, "getMusicInfo").mockResolvedValue({ exists: false, background_music_path: null });
   patchSettings = vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
 });
 
@@ -86,31 +46,45 @@ function renderPage() {
 }
 
 describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
-  it("chia bốn nhóm có đánh số, theo đúng thứ tự quyết định", async () => {
+  it("có năm mục đánh số theo thứ tự mockup, rồi các chỗ sẽ duyệt", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("settings-section-content")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("settings-section-voice")).toBeInTheDocument());
 
     const sections = [
-      "settings-section-content",
       "settings-section-voice",
+      "settings-section-font",
+      "settings-section-music",
+      "settings-section-quality",
       "settings-section-language",
-      "settings-section-authoring",
+      "settings-section-gates",
     ].map((id) => screen.getByTestId(id));
-    expect(sections[0]).toHaveTextContent("1. Nội dung video");
-    expect(sections[1]).toHaveTextContent("2. Giọng đọc");
-    expect(sections[2]).toHaveTextContent("3. Ngôn ngữ hình");
-    expect(sections[3]).toHaveTextContent("4. Cách soạn");
+    expect(sections[0]).toHaveTextContent("1. Giọng kể");
+    expect(sections[1]).toHaveTextContent("2. Chữ trên video");
+    expect(sections[2]).toHaveTextContent("3. Nhạc nền");
+    expect(sections[3]).toHaveTextContent("4. Chất lượng render");
+    expect(sections[4]).toHaveTextContent("5. Ngôn ngữ hình");
     for (let i = 0; i < sections.length - 1; i += 1) {
       expect(
         sections[i].compareDocumentPosition(sections[i + 1]) & Node.DOCUMENT_POSITION_FOLLOWING,
       ).toBeTruthy();
     }
-    // Kiểu video nằm cùng nhóm với format nó gợi ý; không có bộ chọn engine.
-    await waitFor(() =>
-      expect(sections[0]).toContainElement(screen.getByTestId("video-archetype-picker")),
-    );
-    expect(sections[0]).toContainElement(screen.getByTestId("video-format-picker"));
-    expect(screen.queryByTestId("render-engine-picker")).not.toBeInTheDocument();
+  });
+
+  it("không còn chọn kiểu video, format và cách soạn ở bước này", async () => {
+    renderPage();
+    await waitFor(() => expect(screen.getByTestId("settings-section-voice")).toBeInTheDocument());
+    expect(screen.queryByTestId("video-archetype-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("video-format-picker")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("settings-section-authoring")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("content-language-picker")).not.toBeInTheDocument();
+  });
+
+  it("liệt kê các bước có chỗ duyệt, đánh dấu bước tuỳ chọn", async () => {
+    renderPage();
+    const gates = await screen.findByTestId("settings-gates");
+    expect(gates).toHaveTextContent("1. Ý tưởng · creative brief");
+    expect(gates).toHaveTextContent("3. Nghiên cứu và kiểm chứng · tuỳ chọn");
+    expect(gates).toHaveTextContent("16. Review");
   });
 
   it("hiện chủ đề chỉ đọc, “Xem ở Ý tưởng” đưa về bước 1", async () => {
@@ -121,38 +95,25 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
     expect(screen.getByTestId("step-1-stub")).toBeInTheDocument();
   });
 
-  it("không còn chọn ngôn ngữ nội dung và dạng video: hai thứ đó chốt ở bước Ý tưởng", async () => {
+  it("đổi font, chất lượng rồi lưu từng mục lên project", async () => {
     renderPage();
-    await waitFor(() => expect(screen.getByTestId("settings-section-content")).toBeInTheDocument());
-    expect(screen.queryByTestId("content-language-picker")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("video-output-mode-picker")).not.toBeInTheDocument();
-  });
+    await waitFor(() => screen.getByTestId("video-font-Montserrat"));
 
-  it("chọn kiểu video là lưu lại chủ đề có “kiểu: X”; dùng format gợi ý là lưu format", async () => {
-    renderPage();
-    await waitFor(() => screen.getByTestId("video-archetype-select"));
-
-    fireEvent.click(screen.getByTestId("video-archetype-select"));
-    fireEvent.click(screen.getByTestId("video-archetype-select-option-A"));
-
+    fireEvent.click(screen.getByTestId("video-font-Montserrat"));
     await waitFor(() =>
-      expect(createDraft).toHaveBeenCalledWith(expect.any(String), "kiểu: A", "vi"),
+      expect(patchSettings).toHaveBeenCalledWith(expect.any(String), { videoFont: "Montserrat" }),
     );
-    expect(screen.getByTestId("topic-summary")).toHaveTextContent("kiểu: A");
 
-    fireEvent.click(await screen.findByTestId("video-archetype-use-format"));
+    fireEvent.click(screen.getByTestId("render-quality-720p30"));
     await waitFor(() =>
-      expect(patchSettings).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ videoFormatId: "essay" }),
-      ),
+      expect(patchSettings).toHaveBeenCalledWith(expect.any(String), { renderQuality: "720p30" }),
     );
   });
 
-  it("nút tiếp theo lưu cấu hình rồi sang bước Nghiên cứu", async () => {
+  it("nút lưu chốt bước rồi sang bước Nghiên cứu", async () => {
     renderPage();
     await waitFor(() => screen.getByTestId("script-authoring-settings-next"));
-    expect(screen.getByTestId("script-authoring-settings-next")).toHaveTextContent("Sang Nghiên cứu");
+    expect(screen.getByTestId("script-authoring-settings-next")).toHaveTextContent("Lưu và sang nghiên cứu");
 
     fireEvent.click(screen.getByTestId("script-authoring-settings-next"));
 
@@ -160,14 +121,14 @@ describe("ScriptAuthoringSettingsStepPage (Bước 2 — Cấu hình)", () => {
     expect(patchSettings).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ confirm: true }));
   });
 
-  it("báo ở thanh dưới khi không lưu được kiểu video", async () => {
-    createDraft.mockRejectedValue(new Error("offline"));
+  it("báo ở thanh dưới và ở lại bước khi không lưu được", async () => {
+    patchSettings.mockRejectedValue(new Error("offline"));
     renderPage();
-    await waitFor(() => screen.getByTestId("video-archetype-select"));
+    await waitFor(() => screen.getByTestId("script-authoring-settings-next"));
 
-    fireEvent.click(screen.getByTestId("video-archetype-select"));
-    fireEvent.click(screen.getByTestId("video-archetype-select-option-A"));
+    fireEvent.click(screen.getByTestId("script-authoring-settings-next"));
 
-    expect(await screen.findByText(/Không lưu được kiểu video/)).toBeInTheDocument();
+    expect(await screen.findByText(/Không lưu được cấu hình/)).toBeInTheDocument();
+    expect(screen.queryByTestId("research-stub")).not.toBeInTheDocument();
   });
 });

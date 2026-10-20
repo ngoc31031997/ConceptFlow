@@ -6,15 +6,18 @@ import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useStepNav } from "../hooks/useStepNav";
 import {
   AUTO_STEPS,
+  FLOW_CONFIG,
   FLOW_LABELS,
   FLOW_STEP_PURPOSE,
   flowStepName,
 } from "../utils/flow";
+import { ScriptAuthoringSettingsStepPage } from "./ScriptAuthoringSettingsStepPage";
 import styles from "./StepPreviewPage.module.css";
 
 /**
  * Xem trước một bước video chưa tới: tên bước, bước
- * đó làm gì, và vì sao chưa mở được. Màn chỉ để đọc — không có ô nhập hay nút
+ * đó làm gì, và vì sao chưa mở được. Bước Cấu hình có màn thật nên được hiện
+ * nguyên màn đó ở chế độ chỉ đọc. Màn chỉ để đọc — không có ô nhập hay nút
  * hành động — nên không thể làm một bước khi các bước trước nó chưa xong.
  *
  * Mở từ menu bước (useStepNav). Khi project đã tới bước này (ví dụ mở lại một
@@ -40,6 +43,18 @@ export function StepPreviewPage() {
   const backToCurrent = () =>
     nav.hasProject && flow.flowStep ? nav.open(flow.flowStep) : navigate("/");
 
+  const backLabel =
+    nav.hasProject && flow.flowStep
+      ? `Về bước đang làm: ${FLOW_LABELS[flow.flowStep - 1]}`
+      : "Về bước Ý tưởng";
+
+  // The config step has a real screen: show it read-only instead of the placeholder.
+  if (step === FLOW_CONFIG) {
+    return (
+      <ScriptAuthoringSettingsStepPage readOnly backLabel={backLabel} onBack={backToCurrent} />
+    );
+  }
+
   return (
     <div data-testid="step-preview-page">
       <AppShell
@@ -61,9 +76,7 @@ export function StepPreviewPage() {
         </Card>
         <div className={styles.actions}>
           <Button variant="ghost" onClick={backToCurrent} data-testid="step-preview-back">
-            {nav.hasProject && flow.flowStep
-              ? `Về bước đang làm: ${FLOW_LABELS[flow.flowStep - 1]}`
-              : "Về bước Ý tưởng"}
+            {backLabel}
           </Button>
         </div>
       </AppShell>
