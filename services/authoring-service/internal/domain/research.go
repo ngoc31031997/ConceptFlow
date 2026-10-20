@@ -274,7 +274,7 @@ func ParseResearchPaste(raw string, validQuestion func(id string) bool) (PastePa
 	if len(raw) > MaxPasteBytes {
 		return PasteParse{}, ErrPasteTooLarge
 	}
-	blocks := researchBlocks(raw)
+	blocks := researchBlocks(stripMarkdownEscapes(raw))
 	if len(blocks) == 0 {
 		return PasteParse{}, ErrNoResearchJSON
 	}
@@ -310,6 +310,42 @@ func ParseResearchPaste(raw string, validQuestion func(id string) bool) (PastePa
 		}
 	}
 	return out, nil
+}
+
+// stripMarkdownEscapes removes the backslash a chat page puts before a
+// punctuation mark when it renders markdown (`https\://`, `research\.v1`), which
+// copying the rendered text carries along. A backslash that starts a JSON
+// escape (`\"`, `\\`, `\/`, `\b`, `\f`, `\n`, `\r`, `\t`, `\u`) is kept with the
+// character it escapes, so valid JSON is returned unchanged.
+func stripMarkdownEscapes(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c != '\\' || i+1 == len(s) {
+			b.WriteByte(c)
+			continue
+		}
+		next := s[i+1]
+		if strings.IndexByte(`"\/bfnrtu`, next) >= 0 {
+			b.WriteByte(c)
+			b.WriteByte(next)
+			i++
+			continue
+		}
+		if next > ' ' && next < 0x7f && !isASCIIAlnum(next) {
+			continue
+		}
+		b.WriteByte(c)
+	}
+	return b.String()
+}
+
+func isASCIIAlnum(c byte) bool {
+	return c >= '0' && c <= '9' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z'
 }
 
 // readClaim reads one row; the second result is why it was left out ("" when read).

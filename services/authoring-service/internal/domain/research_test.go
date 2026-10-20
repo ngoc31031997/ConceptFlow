@@ -194,3 +194,28 @@ func TestCoverageCountsIndependentSources(t *testing.T) {
 		t.Errorf("two independent sources must not be weak: %+v", clean[0])
 	}
 }
+
+func TestParseResearchPasteReadsTextCopiedWithMarkdownEscapes(t *testing.T) {
+	pasted := `{"schema": "conceptflow\.research.v1", "claims": [{"id": "F01", "question": "Q1", "claim_vi": "Một ý.", "type": "fact", "source_title": "Why", "publisher": "NASA", "year": null, "url": "https\://www\.nature.com/articles/064138a0?a=1\&b=\~2", "quote": "Dòng một\nDòng \"hai\" và \\ cuối.", "confidence": "high", "note": ""}]}`
+	got, err := ParseResearchPaste(pasted, anyQuestion)
+	if err != nil {
+		t.Fatalf("a paste with markdown escapes should be read: %v", err)
+	}
+	if len(got.Claims) != 1 || len(got.Rejected) != 0 {
+		t.Fatalf("claims = %d, rejected = %v, want 1 claim and none rejected", len(got.Claims), got.Rejected)
+	}
+	f := got.Claims[0].Fact
+	if f.URL != "https://www.nature.com/articles/064138a0?a=1&b=~2" {
+		t.Errorf("url = %q, want the link without backslashes", f.URL)
+	}
+	if f.Quote != "Dòng một\nDòng \"hai\" và \\ cuối." {
+		t.Errorf("quote = %q, want JSON escapes kept", f.Quote)
+	}
+}
+
+func TestStripMarkdownEscapesLeavesValidJSONUnchanged(t *testing.T) {
+	in := `{"a":"x\"y\\z\/w\n\t\u00e9","b":"C:\Users"}`
+	if got := stripMarkdownEscapes(in); got != in {
+		t.Errorf("valid escapes changed: %q", got)
+	}
+}
