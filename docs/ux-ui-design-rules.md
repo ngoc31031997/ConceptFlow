@@ -106,3 +106,12 @@ A button's fill tells how much the action changes before the user reads its labe
 - Colour never carries the meaning alone: the label names the action, and every red or orange action goes through rule 5 (or shows its impact in its own modal).
 - Text on a filled button keeps a 4.5:1 contrast in both themes. The dark theme puts dark text on the orange, red and purple fills (`--impact-ink`, `--danger-ink`, `--run-ink`).
 - `components/ui/Button.tsx` has the `primary`, `ghost`, `danger` and `dangerGhost` variants today. The `impact`, `run` and `view` variants, and the `--impact`, `--impact-ink`, `--danger-ink` and `--run-ink` tokens in `theme.css`, are added under these names by the first change that needs them.
+
+## 7. Every flow step page has the same width
+
+The step pages of the flow (Ý tưởng, Cấu hình, Nghiên cứu, and every step after them) must look equally wide, so moving between steps does not make the content jump from full width to a narrow column.
+
+- A step page passes `wide` to `<AppShell>`, as every existing step page does. Without it the content sits in a narrow centred column with empty space on both sides.
+- Do not set a smaller `max-width` on a step's own body to get a narrower column; cards fill the `wide` main column.
+- A new step page is checked against the previous step side by side at the same window size before it is done.
+- The only pages that stay narrow are standalone forms and callbacks outside the flow (sign-in, OAuth callback, "Đang mở dự án"). A page that is part of the flow is never one of them.

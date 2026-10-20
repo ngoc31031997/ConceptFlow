@@ -189,6 +189,7 @@ export function ResearchStepPage() {
     <div data-testid="research-step-page">
       <AppShell
         viewStep={VIEW_RESEARCH}
+        wide
         title="Nghiên cứu và kiểm chứng"
         subtitle={SUBTITLE}
         role={ROLE}
