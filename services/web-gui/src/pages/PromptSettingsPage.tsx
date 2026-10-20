@@ -18,6 +18,8 @@ const ROLES: { value: PromptRole; label: string }[] = [
   { value: "creative_brief", label: "0. Creative brief — viết brief từ đề tài (bước Ý tưởng)" },
   { value: "research_questions", label: "0b. Câu hỏi nghiên cứu — AI đặt câu hỏi từ brief (bước Nghiên cứu)" },
   { value: "research_prompt", label: "0c. Prompt nghiên cứu — chép sang công cụ nghiên cứu bên ngoài (bước Nghiên cứu)" },
+  { value: "story_approaches", label: "0d. Góc tiếp cận — AI gợi ý cách kể từ brief và dữ kiện (bước Câu chuyện)" },
+  { value: "story_frame", label: "0e. Khung câu chuyện — AI viết câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff (bước Câu chuyện)" },
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },
@@ -65,6 +67,12 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   questions: "(danh sách câu hỏi Q1, Q2... sẽ hiện ở đây)",
   extra: "(dữ kiện cần nguồn khác, chỉ có ở prompt bổ sung, sẽ hiện ở đây)",
   answer_note: "(lời nhắc đánh mã tiếp, chỉ có ở prompt bổ sung, sẽ hiện ở đây)",
+  facts: "(bảng dữ kiện: mã, loại, nội dung, sẽ hiện ở đây)",
+  facts_rule: "(luật về dữ kiện: dùng bảng có sẵn hoặc tự liệt kê, sẽ hiện ở đây)",
+  archetypes: "(các kiểu video có trong bảng Kiểu video sẽ hiện ở đây)",
+  approach: "(góc tiếp cận Creator đã chọn, kèm cách kể của kiểu đó, sẽ hiện ở đây)",
+  current_frame: "(các ô của khung câu chuyện hiện có sẽ hiện ở đây)",
+  fields_to_write: "(các ô AI cần viết lần này sẽ hiện ở đây)",
 };
 
 function renderPreview(templateText: string): string {

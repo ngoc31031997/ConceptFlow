@@ -46,6 +46,7 @@ function draftFromServer(project: Project, state: AuthoringState): Partial<Proje
       brief: state.brief_model ?? "",
       publish: state.publish_model ?? "",
       research: state.research_model ?? "",
+      story_frame: state.story_frame_model ?? "",
       code: state.code_model ?? "",
     },
     authoringTopic: state.topic,

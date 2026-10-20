@@ -40,6 +40,12 @@ const (
 	// research use case with the brief and the questions, so it is not rendered
 	// by the generic renderer.
 	RoleResearchPrompt PromptRole = "research_prompt"
+
+	// The story step's proposer of approaches and writer of the story frame.
+	// Filled by the story use case with the brief, the facts and the Creator's
+	// choices, so they are not rendered by the generic renderer.
+	RoleStoryApproaches PromptRole = "story_approaches"
+	RoleStoryFrame      PromptRole = "story_frame"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -48,7 +54,8 @@ func ValidPromptRole(role string) bool {
 	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign,
-		RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt:
+		RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
+		RoleStoryApproaches, RoleStoryFrame:
 		return true
 	default:
 		return false
@@ -57,11 +64,11 @@ func ValidPromptRole(role string) bool {
 
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
-// the brief writer and the two research roles, whose values come from their
-// own use cases.
+// the brief writer, the research roles and the story roles, whose values come
+// from their own use cases.
 func IsRenderablePromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt:
+	case RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame:
 		return false
 	}
 	return ValidPromptRole(role)

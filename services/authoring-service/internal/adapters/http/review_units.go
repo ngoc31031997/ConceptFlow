@@ -306,7 +306,8 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
-		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty):
+		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty),
+		errors.Is(err, application.ErrStoryIncomplete), errors.Is(err, application.ErrStoryNothingToWrite):
 		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput))
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, reasonOf(err, domain.ErrInvalidStatus))

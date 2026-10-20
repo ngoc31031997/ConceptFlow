@@ -449,6 +449,9 @@ export type PromptRole =
   // Nghiên cứu: AI đặt câu hỏi từ brief, và prompt chép sang công cụ nghiên cứu bên ngoài.
   | "research_questions"
   | "research_prompt"
+  // Câu chuyện: AI gợi ý góc tiếp cận và viết khung câu chuyện.
+  | "story_approaches"
+  | "story_frame"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -1262,6 +1265,7 @@ export interface AuthoringState {
   brief_model?: string;
   publish_model?: string;
   research_model?: string;
+  story_frame_model?: string;
   story_model?: string;
   storyboard_model?: string;
   code_model?: string;
@@ -1294,6 +1298,8 @@ export interface AuthoringStepModels {
   publish?: string;
   /** Model that writes the research questions; missing or "" reads as the default. */
   research?: string;
+  /** Model that proposes the story approaches and writes the story frame; missing or "" reads as the default. */
+  story_frame?: string;
   story: string;
   storyboard: string;
   code: string;
@@ -2157,4 +2163,190 @@ export async function approveResearch(projectId: string): Promise<void> {
 /** Takes the approval of the fact table back. */
 export async function unapproveResearch(projectId: string): Promise<void> {
   await unapproveUnit(projectId, RESEARCH_GATE_UNIT);
+}
+
+/** The six fields of the story frame, in the order the screen shows them. */
+export const STORY_FIELD_KEYS = ["question", "promise", "chain", "payoff", "logline", "summary"] as const;
+export type StoryFieldKey = (typeof STORY_FIELD_KEYS)[number];
+
+/** The story step's gate: approving it approves the whole story. */
+export const STORY_UNIT: UnitRef<unknown> = { kind: "story", key: "main", parse: (c) => c };
+
+/** The unit one story field is saved and redone through. */
+export function storyFieldUnit(key: StoryFieldKey): UnitRef<unknown> {
+  return { kind: "story_field", key, parse: (c) => c };
+}
+
+/** One field of the story frame. `text` is what the Creator edits; a chain step or the payoff ends in "[F01, F02]" for the facts it rests on. */
+export interface StoryField {
+  key: StoryFieldKey;
+  label: string;
+  text: string;
+  facts: string[];
+  /** The Creator wrote or edited it; an AI run keeps it. */
+  mine: boolean;
+  /** Written by the AI from a brief that has changed since. */
+  stale: boolean;
+}
+
+/** One way of telling the story the AI proposed. */
+export interface StoryApproach {
+  key: string;
+  code: string;
+  name: string;
+  angle: string;
+  why: string;
+  refs: string[];
+  open: string;
+  /** A kind of video that is not in the Kiểu video table yet. */
+  isNew: boolean;
+  /** The row of the Kiểu video table a new kind was saved as; "" until saved. */
+  archetypeId: string;
+  selected: boolean;
+}
+
+/** One kept fact as the story step lists it. */
+export interface StoryFact {
+  id: string;
+  claimVi: string;
+  type: FactType;
+  /** The script has to state it, so the story always uses it. */
+  must: boolean;
+  used: boolean;
+  /** The chain or the payoff rests on it. */
+  cited: boolean;
+  link: LinkState;
+}
+
+/** Everything the story screen shows. */
+export interface StoryState {
+  status: UnitStatus;
+  /** The approach the story follows; "" lets the AI choose. */
+  approachKey: string;
+  fields: StoryField[];
+  approaches: StoryApproach[];
+  facts: StoryFact[];
+  briefApproved: boolean;
+  researchResolved: boolean;
+  researchSkipped: boolean;
+}
+
+interface storyStateWire {
+  status: UnitStatus;
+  approach_key: string;
+  fields: { key: StoryFieldKey; label: string; text: string; facts: string[] | null; mine: boolean; stale: boolean }[] | null;
+  approaches: storyApproachWire[] | null;
+  facts: { id: string; claim_vi: string; type: FactType; must: boolean; used: boolean; cited: boolean; link: LinkState }[] | null;
+  brief_approved: boolean;
+  research_resolved: boolean;
+  research_skipped: boolean;
+}
+
+interface storyApproachWire {
+  key: string;
+  code: string;
+  name: string;
+  angle: string;
+  why: string;
+  refs: string[] | null;
+  open: string;
+  is_new: boolean;
+  archetype_id: string;
+  selected: boolean;
+}
+
+function fromWireApproach(w: storyApproachWire): StoryApproach {
+  return {
+    key: w.key,
+    code: w.code,
+    name: w.name,
+    angle: w.angle,
+    why: w.why,
+    refs: w.refs ?? [],
+    open: w.open,
+    isNew: w.is_new,
+    archetypeId: w.archetype_id,
+    selected: w.selected,
+  };
+}
+
+function fromWireStory(w: storyStateWire): StoryState {
+  return {
+    status: w.status,
+    approachKey: w.approach_key,
+    fields: (w.fields ?? []).map((f) => ({ ...f, facts: f.facts ?? [] })),
+    approaches: (w.approaches ?? []).map(fromWireApproach),
+    facts: (w.facts ?? []).map((f) => ({
+      id: f.id,
+      claimVi: f.claim_vi,
+      type: f.type,
+      must: f.must,
+      used: f.used,
+      cited: f.cited,
+      link: f.link,
+    })),
+    briefApproved: w.brief_approved,
+    researchResolved: w.research_resolved,
+    researchSkipped: w.research_skipped,
+  };
+}
+
+/** Reads the story step: the six fields, the proposed approaches, the kept facts and what the step waits for. */
+export async function getStory(projectId: string): Promise<StoryState> {
+  return fromWireStory(await apiFetch<storyStateWire>(`/v1/projects/${projectId}/story`));
+}
+
+/**
+ * Has the AI propose approaches to tell the story (a model call: pass an
+ * operation id to follow it). The approach the Creator chose stays. 409 while
+ * the brief or the research step is not done, 503 without a language model.
+ */
+export async function generateStoryApproaches(projectId: string, note: string, operation?: OperationCall): Promise<StoryApproach[]> {
+  const res = await apiFetch<{ approaches: storyApproachWire[] | null }>(`/v1/projects/${projectId}/story/approaches/generate`, {
+    method: "POST",
+    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: JSON.stringify({ note }),
+  });
+  return (res.approaches ?? []).map(fromWireApproach);
+}
+
+/** Chooses the approach the story follows; "" lets the AI choose. */
+export async function selectStoryApproach(projectId: string, key: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/story/approach`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ key }),
+  });
+}
+
+/** Saves a new kind of video the AI proposed into the Kiểu video table. */
+export async function saveApproachAsArchetype(projectId: string, key: string): Promise<StoryApproach> {
+  return fromWireApproach(
+    await apiFetch<storyApproachWire>(`/v1/projects/${projectId}/story/approaches/${encodeURIComponent(key)}/archetype`, { method: "POST" }),
+  );
+}
+
+/**
+ * Has the AI write the fields of the story the Creator has not written (a
+ * model call: pass an operation id to follow it). The story goes to review.
+ */
+export async function generateStory(projectId: string, note: string, operation?: OperationCall): Promise<StoryState> {
+  return fromWireStory(
+    await apiFetch<storyStateWire>(`/v1/projects/${projectId}/story/generate`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+      signal: operationInit(operation).signal,
+      body: JSON.stringify({ note }),
+    }),
+  );
+}
+
+/** Turns the use of one fact in the story on or off; 400 for a fact the script must state. */
+export async function setStoryFactUse(projectId: string, factId: string, use: boolean): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/story/facts/${encodeURIComponent(factId)}`, {
+    method: "PUT",
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ use }),
+  });
 }

@@ -29,6 +29,7 @@ import { AiModelSettingsPage } from "./pages/AiModelSettingsPage";
 import { StepPreviewPage } from "./pages/StepPreviewPage";
 import { ComingStepPage } from "./pages/ComingStepPage";
 import { ResearchStepPage } from "./pages/ResearchStepPage";
+import { StoryStepPage } from "./pages/StoryStepPage";
 
 /**
  * The wizard draft lives only in memory (see ProjectDraftContext), so a page
@@ -89,6 +90,7 @@ export function App() {
                 thái project không thuộc về nó (projectPath). */}
             <Route path="/projects/:id/preview/:step" element={<StepPreviewPage />} />
             <Route path="/projects/:id/research" element={<ResearchStepPage />} />
+            <Route path="/projects/:id/story" element={<StoryStepPage />} />
             <Route path="/projects/:id/coming/:n" element={<ComingStepPage />} />
             <Route path="/create/coming/:n" element={<ComingStepPage />} />
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />

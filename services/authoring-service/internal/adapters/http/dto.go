@@ -240,6 +240,7 @@ type saveAuthoringModelsRequest struct {
 	Brief      string `json:"brief"`
 	Publish    string `json:"publish"`
 	Research   string `json:"research"`
+	StoryFrame string `json:"story_frame"`
 	Story      string `json:"story"`
 	Storyboard string `json:"storyboard"`
 	Code       string `json:"code"`

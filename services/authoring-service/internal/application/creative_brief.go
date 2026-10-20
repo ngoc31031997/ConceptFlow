@@ -289,7 +289,8 @@ func (uc *CreativeBriefUseCase) Redo(ctx context.Context, projectID, key, note s
 }
 
 // Impact lists what a change to the brief sends back: the story outline, when
-// one was written, and the research questions the AI wrote from the brief.
+// one was written, the story frame, and the research questions the AI wrote
+// from the brief.
 func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key string) ([]string, error) {
 	if key != domain.BriefUnitKey {
 		return nil, domain.ErrUnitNotFound
@@ -301,6 +302,13 @@ func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key strin
 	items := []string{}
 	if link.HasStory {
 		items = append(items, "Dàn ý và lời thoại đã viết ở bước Viết kịch bản: cần viết lại theo brief mới")
+	}
+	stories, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
+	if err != nil {
+		return nil, err
+	}
+	if len(stories) > 0 {
+		items = append(items, "Khung câu chuyện: cần xem lại theo brief mới")
 	}
 	questions, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
 	if err != nil {

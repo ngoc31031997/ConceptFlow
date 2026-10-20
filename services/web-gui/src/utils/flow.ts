@@ -102,7 +102,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research";
+  screen?: "research" | "story";
   /** What the step holds, in a few words, for the flow map. */
   note: string;
 }
@@ -111,7 +111,7 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 1, phase: 0, label: "Ý tưởng", title: "Ý tưởng · creative brief", gate: true, server: [1], note: "Đề tài, câu hỏi trung tâm, khán giả, điều người xem mang về" },
   { n: 2, phase: 0, label: "Cấu hình", server: [2], note: "Kiểu video, format, giọng đọc, cách soạn" },
   { n: 3, phase: 0, label: "Nghiên cứu", title: "Nghiên cứu và kiểm chứng", gate: true, optional: true, server: [], screen: "research", note: "Câu hỏi cần tra, prompt chép ra ngoài, dán kết quả, kiểm link và đoạn trích" },
-  { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
+  { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], note: "Dàn ý và lời thoại theo beat" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
@@ -139,6 +139,9 @@ export function viewStepOf(step: number): FlowViewStep | undefined {
 /** The number, in the 21-step flow, of the research step. */
 export const VIEW_RESEARCH = 3;
 
+/** The number, in the 21-step flow, of the story step. */
+export const VIEW_STORY = 4;
+
 /** Whether the app has a screen for the step: a running step behind it, or a screen of its own. */
 export function isBuilt(view: FlowViewStep): boolean {
   return view.server.length > 0 || !!view.screen;
@@ -154,10 +157,15 @@ export function screenRoute(view: FlowViewStep, projectId: string): string {
   return `/projects/${projectId}/${view.screen}`;
 }
 
+/** The screen of the story step. */
+export function storyRoute(projectId: string): string {
+  return `/projects/${projectId}/story`;
+}
+
 /**
  * Where a step of a screen of its own stands for a project at running step
- * `flowStep`. The research step is open to the Creator from the config step on
- * and counts as passed once the project has moved on to the script.
+ * `flowStep`. The research and story steps are open to the Creator from the
+ * config step on and count as passed once the project has moved on to the script.
  */
 export function screenStatus(flowStep: number): StepStatus {
   if (flowStep < FLOW_CONFIG) return "pending";

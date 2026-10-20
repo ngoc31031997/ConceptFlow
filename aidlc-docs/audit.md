@@ -3642,3 +3642,14 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 1 (planning), chờ duyệt.
 
 ---
+
+---
+## CR-072-U3c — Code xong, chờ duyệt
+**Timestamp**: 2026-10-20T00:00:00Z
+**User Input**: "bắt dầu code đi chỗ nào cần test gọi api local ollama tôi cài trên máy rồi"; chọn "Thêm ô chọn model riêng (Recommended)"
+**AI Response**: Làm 16 task của `cr-072-u3c-story-code-generation-plan.md`. authoring-service: đơn vị `story` (cổng), `story_field` (sáu ô), `story_approach`; đọc câu trả lời AI chặt (mã dữ kiện lạ, thiếu ô, JSON hỏng thì không lưu); dạng gõ tay `câu [F01, F02]`; gợi ý góc, chọn góc, lưu kiểu mới vào bảng Kiểu video, viết khung, làm lại riêng từng ô, bật/tắt dữ kiện dùng, bỏ qua Nghiên cứu thì AI tự liệt kê dữ kiện `link=none`; hai vai prompt `story_approaches`, `story_frame`; khoá model riêng `story_frame` (cột `story_frame_model`); 6 route `/v1/projects/{id}/story…`; `Impact` của brief nêu khung câu chuyện. api-gateway: 6 route. web-gui: bước 4 thành màn riêng `/projects/:id/story` (thẻ góc tiếp cận, sáu ô, dữ kiện dùng, duyệt), hook `useStory`, ô chọn model, hai vai prompt trong Cài đặt prompt; nút Nghiên cứu mở Câu chuyện; nút "Sang beat sheet" mở trang "chưa phát triển". Hợp đồng `docs/contracts/story-v1.md`.
+**Impact Assessment**: build lại và khởi động lại authoring-service, api-gateway, web-gui (healthy; code từ `feature/cr-072-u3c-story`). Test: Go `go test -race ./...` xanh; api-gateway `npm test` 157 xanh; web-gui `vitest` 628 xanh, `tsc -b` sạch, `eslint` 0 lỗi. Chạy thật với Ollama (qwen2.5:7b, model `ollama`) trên một project thử: gợi ý góc và viết khung thành công, bỏ qua Nghiên cứu nên AI liệt kê 4 dữ kiện `link=none`; lúc đầu model trích mã dữ kiện không có nên bị từ chối, đã sửa prompt (ví dụ đầu ra theo chế độ có/không có dữ kiện). Chưa kiểm thật qua API: sửa tay, làm lại một ô, duyệt (project thử bị xoá bởi tiến trình khác giữa chừng); các luồng này chỉ có test tự động. Dọn: project thử đã bị xoá cùng dữ liệu authoring; xoá thêm 5 dòng `llm_usage` của project đó.
+**Artifacts Affected**: `services/authoring-service/`, `services/api-gateway/`, `services/web-gui/`, `docs/contracts/story-v1.md`, `docs/contracts/README.md`, `aidlc-docs/construction/plans/cr-072-u3c-story-*.md`, `integration-boundaries.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 2 xong, chờ Creator duyệt.
+
+---

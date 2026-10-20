@@ -562,14 +562,17 @@ type AuthoringStepModels struct {
 	// Publish is the model that suggests the title, description and tags.
 	Publish string
 	// Research is the model the research step writes its questions with.
-	Research   string
+	Research string
+	// StoryFrame is the model the story step proposes approaches and writes the
+	// story frame with.
+	StoryFrame string
 	Story      string
 	Storyboard string
 	Code       string
 }
 
 // ModelFor returns the chosen model for one authoring step ("brief", "research",
-// "story", "storyboard", "code" or "publish"), or "" for an unrecognised step —
+// "story_frame", "story", "storyboard", "code" or "publish"), or "" for an unrecognised step —
 // callers already validate the step elsewhere (RoleFor), so this never has to
 // reject one.
 func (m AuthoringStepModels) ModelFor(step string) string {
@@ -578,6 +581,8 @@ func (m AuthoringStepModels) ModelFor(step string) string {
 		return m.Brief
 	case "research":
 		return m.Research
+	case "story_frame":
+		return m.StoryFrame
 	case "publish":
 		return m.Publish
 	case "story":

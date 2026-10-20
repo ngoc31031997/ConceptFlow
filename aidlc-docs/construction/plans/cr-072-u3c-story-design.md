@@ -88,6 +88,10 @@ Phiên bản: tiền tố `/v1`, chỉ thêm trường (không đổi tên). Tru
 
 Go: đọc câu trả lời AI (đúng, thiếu ô, mã lạ, hỏng JSON), dạng gõ tay, use case với AI giả (theo quy ước dự án), kho lưu với Postgres tạm, HTTP. Gateway: route. Web-gui: vitest cho màn, hook, các hộp thoại. Dọn dữ liệu test sau khi chạy.
 
+## Bổ sung trong lúc code: model AI của bước
+
+Bước Câu chuyện có ô chọn model riêng (khoá `story_frame`, cột `story_frame_model`, như bước Nghiên cứu) để Creator chạy bằng Ollama trên máy; Creator đã chọn hướng này. Khoá tách khỏi `story` của bước Kịch bản.
+
 ## Chưa làm (nói rõ)
 
 - Beat sheet và các bước sau: nút "Sang beat sheet" mở trang "chưa phát triển".

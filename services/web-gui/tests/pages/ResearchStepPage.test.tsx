@@ -476,7 +476,7 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("research-next")).toHaveTextContent("Sang xây dựng câu chuyện →");
 
       fireEvent.click(screen.getByTestId("research-next"));
-      expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/4");
+      expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/story");
     });
 
     it("takes an approval back", async () => {
@@ -527,7 +527,7 @@ describe("ResearchStepPage", () => {
       renderPage();
       await screen.findByTestId("research-skipped-card");
       fireEvent.click(screen.getByTestId("research-next"));
-      expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/4");
+      expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/story");
     });
   });
 
