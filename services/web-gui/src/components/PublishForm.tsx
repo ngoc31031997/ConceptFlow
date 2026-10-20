@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { suggestPublishMetadata, ApiError } from "../api/client";
+import { suggestPublishMetadata, isRequestCancelled, ApiError } from "../api/client";
 import { useOperationRun } from "../hooks/useOperationRun";
 import { AiModelSelect } from "./AiModelSelect";
 import { AiOperationCard } from "./AiOperationCard";
@@ -63,7 +63,8 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
     if (suggestError) setSuggestError(null);
   };
 
-  const suggestRun = useOperationRun();
+  // The suggestion is only returned to this form, so leaving the page drops the call instead of paying for an answer nobody reads.
+  const suggestRun = useOperationRun({ abortOnUnmount: true });
 
   async function handleSuggestAI() {
     setSuggestError(null); // Clear previous error
@@ -78,6 +79,7 @@ export function PublishForm({ projectId, onSubmit, isSubmitting }: PublishFormPr
       setDescription(suggestion.description ?? "");
       setTags(Array.isArray(suggestion.tags) ? suggestion.tags.join(", ") : "");
     } catch (err) {
+      if (isRequestCancelled(err)) return;
       setSuggestError(err instanceof ApiError ? err.message : String(err));
     } finally {
       setIsSuggesting(false);

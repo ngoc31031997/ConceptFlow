@@ -9,6 +9,7 @@ import {
   editFact,
   editResearchQuestion,
   generateResearchQuestions,
+  isRequestCancelled,
   getResearch,
   pasteResearch,
   setFactFlags,
@@ -21,6 +22,9 @@ import {
   type ResearchState,
 } from "../api/client";
 import { useOperationRun, type OperationRun } from "./useOperationRun";
+
+/** The operation kind the server records for the AI run that writes the questions. */
+const QUESTION_RUN_KIND = "research_question";
 
 /** How often the screen asks again while some link is still being checked. */
 export const RESEARCH_POLL_MS = 2000;
@@ -78,7 +82,6 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pasteMessage, setPasteMessage] = useState<PasteMessage | null>(null);
-  const run = useOperationRun();
   // Only the newest load may land: an older answer must not overwrite a newer one.
   const loadSeq = useRef(0);
 
@@ -95,6 +98,9 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
       setLoadError(messageOf(err));
     }
   }, [projectId]);
+
+  // A run that outlived the page is followed from here; the questions it stored are loaded when it ends.
+  const run = useOperationRun({ projectId: enabled ? projectId : undefined, kinds: [QUESTION_RUN_KIND], onSettled: () => void load() });
 
   useEffect(() => {
     setState(null);
@@ -154,6 +160,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
         await load();
         return true;
       } catch (err) {
+        if (isRequestCancelled(err)) return false;
         // The card stays with the failure and the time already spent.
         setActionError(messageOf(err));
         return false;
@@ -192,7 +199,7 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
   return {
     state,
     loadError,
-    running,
+    running: running || run.resumed,
     run,
     busy,
     actionError,

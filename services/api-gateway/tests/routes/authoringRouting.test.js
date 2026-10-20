@@ -70,6 +70,8 @@ describe('routing between orchestrator and authoring-service', () => {
     ['put', '/v1/settings/ai-model', 'authoring'],
     ['get', '/v1/operations/op-1', 'authoring'],
     ['get', '/v1/operations/delete:p1', 'orchestrator'],
+    ['post', '/v1/operations/op-1/cancel', 'authoring'],
+    ['get', '/v1/projects/p1/operations', 'authoring'],
     ['get', '/v1/projects/p1', 'orchestrator'],
     ['post', '/v1/projects', 'orchestrator'],
     ['patch', '/v1/projects/p1/settings', 'orchestrator'],

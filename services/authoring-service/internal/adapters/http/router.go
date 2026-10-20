@@ -69,6 +69,8 @@ func (rt *Router) Handler() http.Handler {
 	r := chi.NewRouter()
 	r.Get("/health", rt.handleHealth)
 	r.Get("/v1/operations/{operation_id}", rt.handleGetOperation)
+	r.Post("/v1/operations/{operation_id}/cancel", rt.handleCancelOperation)
+	r.Get("/v1/projects/{project_id}/operations", rt.handleListProjectOperations)
 	r.Post("/v1/projects/{project_id}/suggest-metadata", rt.handleSuggestMetadata)
 	// Prompt wording lives in the DB. Public read (the wizard fetches the
 	// current template at runtime); admin list/update (the PromptSettingsPage editor).
@@ -490,9 +492,37 @@ func (rt *Router) trackOperation(r *http.Request, kind string) (context.Context,
 	if rt.operations == nil || id == "" {
 		return r.Context(), func(error) {}
 	}
-	rt.operations.Start(id, kind)
-	ctx := application.WithProgress(r.Context(), func(p application.ChatProgress) { rt.operations.Progress(id, p) })
-	return ctx, func(err error) { rt.operations.Finish(id, err) }
+	ctx, cancel := context.WithCancel(r.Context())
+	rt.operations.Start(id, kind, chi.URLParam(r, "project_id"), cancel)
+	ctx = application.WithProgress(ctx, func(p application.ChatProgress) { rt.operations.Progress(id, p) })
+	return ctx, func(err error) {
+		rt.operations.Finish(id, err)
+		cancel()
+	}
+}
+
+// handleCancelOperation stops a running long call by its id, from any page: the
+// cancellation token the GUI holds only in the page that started the call.
+func (rt *Router) handleCancelOperation(w http.ResponseWriter, r *http.Request) {
+	if rt.operations == nil {
+		writeError(w, http.StatusNotFound, "operations are not available")
+		return
+	}
+	if !rt.operations.Cancel(chi.URLParam(r, "operation_id")) {
+		writeError(w, http.StatusNotFound, "operation not running")
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// handleListProjectOperations lists the long calls still running for a project,
+// so a page opened again can pick up the progress of a call it did not start.
+func (rt *Router) handleListProjectOperations(w http.ResponseWriter, r *http.Request) {
+	running := []application.RunningOperation{}
+	if rt.operations != nil {
+		running = append(running, rt.operations.Running(chi.URLParam(r, "project_id"))...)
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"operations": running})
 }
 
 func (rt *Router) handleGetOperation(w http.ResponseWriter, r *http.Request) {

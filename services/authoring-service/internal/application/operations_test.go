@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -11,7 +12,7 @@ func TestOperations_TracksProgressAndKeepsCountersOnFailure(t *testing.T) {
 	clock := time.Unix(1000, 0)
 	ops.now = func() time.Time { return clock }
 
-	ops.Start("op1", "suggest_metadata")
+	ops.Start("op1", "suggest_metadata", "p1", nil)
 	if op, _ := ops.Get("op1"); op.Phase != "waiting" || op.Status != "running" || op.Total != nil {
 		t.Fatalf("fresh operation should wait with unknown total, got %+v", op)
 	}
@@ -35,11 +36,51 @@ func TestOperations_TracksProgressAndKeepsCountersOnFailure(t *testing.T) {
 
 func TestOperations_UnknownAndEmptyID(t *testing.T) {
 	ops := NewOperations()
-	ops.Start("", "x")
+	ops.Start("", "x", "p1", nil)
 	if _, ok := ops.Get(""); ok {
 		t.Fatal("an empty id must not be registered")
 	}
 	if _, ok := ops.Get("nope"); ok {
 		t.Fatal("unknown id must be absent")
+	}
+}
+
+func TestOperations_CancelStopsTheCallAndMarksItCancelled(t *testing.T) {
+	ops := NewOperations()
+	ctx, cancel := context.WithCancel(context.Background())
+	ops.Start("op1", "research_question", "p1", cancel)
+
+	if !ops.Cancel("op1") {
+		t.Fatal("a running operation must be cancellable")
+	}
+	if ctx.Err() == nil {
+		t.Fatal("cancelling must cancel the call's context")
+	}
+	ops.Finish("op1", ctx.Err())
+	if op, _ := ops.Get("op1"); op.Status != OperationCancelled || op.Error != "" {
+		t.Fatalf("a stopped call is cancelled, not failed, got %+v", op)
+	}
+	if ops.Cancel("op1") {
+		t.Fatal("an ended operation cannot be cancelled again")
+	}
+	if ops.Cancel("nope") {
+		t.Fatal("an unknown id cannot be cancelled")
+	}
+}
+
+func TestOperations_RunningListsOnlyOpenCallsOfTheProject(t *testing.T) {
+	ops := NewOperations()
+	clock := time.Unix(1000, 0)
+	ops.now = func() time.Time { return clock }
+	ops.Start("old", "brief", "p1", nil)
+	clock = clock.Add(3 * time.Second)
+	ops.Start("new", "research_question", "p1", nil)
+	ops.Start("other-project", "brief", "p2", nil)
+	ops.Start("done", "brief", "p1", nil)
+	ops.Finish("done", nil)
+
+	got := ops.Running("p1")
+	if len(got) != 2 || got[0].ID != "old" || got[1].ID != "new" {
+		t.Fatalf("want the two open calls of p1, longest-running first, got %+v", got)
 	}
 }

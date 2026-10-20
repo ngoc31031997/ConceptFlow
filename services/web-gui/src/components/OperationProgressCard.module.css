@@ -47,6 +47,11 @@
   background: var(--run);
 }
 
+.cancel {
+  align-self: flex-start;
+  margin-top: 2px;
+}
+
 .error {
   margin: 0;
   font-size: 12.5px;

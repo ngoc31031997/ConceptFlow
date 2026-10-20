@@ -3,6 +3,7 @@ package application
 import (
 	"context"
 	"errors"
+	"sort"
 	"sync"
 	"time"
 )
@@ -18,11 +19,29 @@ type Operation struct {
 	Done           *int   `json:"done"`
 	Total          *int   `json:"total"`
 	ElapsedMs      int64  `json:"elapsed_ms"`
-	Status         string `json:"status"` // "running" | "succeeded" | "failed"
+	Status         string `json:"status"` // "running" | "succeeded" | "failed" | "cancelled"
 	Error          string `json:"error,omitempty"`
 
-	started  time.Time
-	finished time.Time
+	projectID string
+	cancel    context.CancelFunc
+	cancelled bool
+	started   time.Time
+	finished  time.Time
+}
+
+// Operation statuses.
+const (
+	OperationRunning   = "running"
+	OperationSucceeded = "succeeded"
+	OperationFailed    = "failed"
+	OperationCancelled = "cancelled"
+)
+
+// RunningOperation is a call still in flight for a project, with the id the
+// GUI polls and cancels it by.
+type RunningOperation struct {
+	ID string `json:"id"`
+	Operation
 }
 
 // operationRetention is how long a finished operation stays readable, so the
@@ -41,16 +60,49 @@ func NewOperations() *Operations {
 	return &Operations{ops: map[string]*Operation{}, now: time.Now}
 }
 
-// Start registers id as running. The caller picks the id (the GUI sends one
-// with the request), so it can poll before the call has returned.
-func (o *Operations) Start(id, kind string) {
+// Start registers id as running for projectID. The caller picks the id (the GUI
+// sends one with the request), so it can poll before the call has returned.
+// cancel stops the call's context when Cancel is asked for id.
+func (o *Operations) Start(id, kind, projectID string, cancel context.CancelFunc) {
 	if id == "" {
 		return
 	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	o.gcLocked()
-	o.ops[id] = &Operation{Kind: kind, Phase: "waiting", Status: "running", started: o.now()}
+	o.ops[id] = &Operation{Kind: kind, Phase: "waiting", Status: OperationRunning, projectID: projectID, cancel: cancel, started: o.now()}
+}
+
+// Cancel stops the running operation id by cancelling its context. It reports
+// false when the id is unknown or the call already ended.
+func (o *Operations) Cancel(id string) bool {
+	o.mu.Lock()
+	op := o.ops[id]
+	if op == nil || op.Status != OperationRunning {
+		o.mu.Unlock()
+		return false
+	}
+	op.cancelled = true
+	cancel := op.cancel
+	o.mu.Unlock()
+	if cancel != nil {
+		cancel()
+	}
+	return true
+}
+
+// Running lists the calls still in flight for projectID, oldest first.
+func (o *Operations) Running(projectID string) []RunningOperation {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var out []RunningOperation
+	for id := range o.ops {
+		if o.ops[id].projectID == projectID && o.ops[id].Status == OperationRunning {
+			out = append(out, RunningOperation{ID: id, Operation: o.snapshotLocked(o.ops[id])})
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ElapsedMs > out[j].ElapsedMs })
+	return out
 }
 
 // Progress records the streamed size of the reply.
@@ -58,7 +110,7 @@ func (o *Operations) Progress(id string, p ChatProgress) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	op := o.ops[id]
-	if op == nil || op.Status != "running" {
+	if op == nil || op.Status != OperationRunning {
 		return
 	}
 	op.ReasoningChars, op.ContentChars = p.ReasoningChars, p.ContentChars
@@ -69,8 +121,9 @@ func (o *Operations) Progress(id string, p ChatProgress) {
 	}
 }
 
-// Finish closes the operation; a non-nil err marks it failed and keeps the
-// counters and elapsed time already reached.
+// Finish closes the operation; a non-nil err marks it failed (cancelled when
+// the Creator asked to stop it) and keeps the counters and elapsed time already
+// reached.
 func (o *Operations) Finish(id string, err error) {
 	o.mu.Lock()
 	defer o.mu.Unlock()
@@ -79,11 +132,14 @@ func (o *Operations) Finish(id string, err error) {
 		return
 	}
 	op.finished = o.now()
-	if err != nil {
-		op.Status, op.Error = "failed", operationErrorKind(err)
-		return
+	switch {
+	case err != nil && op.cancelled:
+		op.Status = OperationCancelled
+	case err != nil:
+		op.Status, op.Error = OperationFailed, operationErrorKind(err)
+	default:
+		op.Status = OperationSucceeded
 	}
-	op.Status = "succeeded"
 }
 
 // Get returns a snapshot of the operation, or false when it is unknown.
@@ -94,13 +150,17 @@ func (o *Operations) Get(id string) (Operation, bool) {
 	if op == nil {
 		return Operation{}, false
 	}
+	return o.snapshotLocked(op), true
+}
+
+func (o *Operations) snapshotLocked(op *Operation) Operation {
 	out := *op
 	end := o.now()
 	if !op.finished.IsZero() {
 		end = op.finished
 	}
 	out.ElapsedMs = end.Sub(op.started).Milliseconds()
-	return out, true
+	return out
 }
 
 func (o *Operations) gcLocked() {

@@ -160,7 +160,22 @@ describe("useResearch", () => {
       ok = await result.current.generateQuestions(true, "cơ chế");
     });
     expect(ok).toBe(true);
-    expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: true, note: "cơ chế" }, expect.any(String));
+    expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: true, note: "cơ chế" }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) }));
+    expect(result.current.running).toBe(false);
+  });
+
+  it("treats a cancelled AI run as no failure: no error on the page, the questions as they were", async () => {
+    vi.spyOn(client, "getResearch").mockResolvedValue(stateWith([]));
+    vi.spyOn(client, "generateResearchQuestions").mockRejectedValue(new client.RequestCancelledError());
+    const { result } = renderHook(() => useResearch("p1", true));
+    await waitFor(() => expect(result.current.state).not.toBeNull());
+
+    let ok = true;
+    await act(async () => {
+      ok = await result.current.generateQuestions(false);
+    });
+    expect(ok).toBe(false);
+    expect(result.current.actionError).toBeNull();
     expect(result.current.running).toBe(false);
   });
 

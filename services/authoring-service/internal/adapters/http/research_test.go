@@ -326,3 +326,66 @@ func TestGenerateQuestionsIsTrackedAsAnOperation(t *testing.T) {
 		t.Errorf("operation kind = %q, want %q", op.Kind, domain.UnitKindResearchQuestion)
 	}
 }
+
+// waitingResearch holds GenerateQuestions open until its context ends, like a
+// model call that has not answered yet.
+type waitingResearch struct {
+	fakeResearch
+	started chan struct{}
+}
+
+func (w *waitingResearch) GenerateQuestions(ctx context.Context, _ string, _ bool, _ string) ([]application.QuestionView, error) {
+	close(w.started)
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func TestRunningGenerationCanBeFoundAndCancelledFromAnotherPage(t *testing.T) {
+	ops := application.NewOperations()
+	research := &waitingResearch{started: make(chan struct{})}
+	h := NewRouter(&fakeSuggestMetadata{}, nil).WithResearch(research).WithOperations(ops).Handler()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		req := httptest.NewRequest(http.MethodPost, "/v1/projects/p1/research/questions/generate", nil)
+		req.Header.Set("X-Operation-Id", "op-questions")
+		h.ServeHTTP(httptest.NewRecorder(), req)
+	}()
+	<-research.started
+
+	list := httptest.NewRecorder()
+	h.ServeHTTP(list, httptest.NewRequest(http.MethodGet, "/v1/projects/p1/operations", nil))
+	var body struct {
+		Operations []struct {
+			ID, Kind, Status string
+		} `json:"operations"`
+	}
+	if err := json.Unmarshal(list.Body.Bytes(), &body); err != nil {
+		t.Fatalf("list body: %v", err)
+	}
+	if len(body.Operations) != 1 || body.Operations[0].ID != "op-questions" || body.Operations[0].Kind != domain.UnitKindResearchQuestion {
+		t.Fatalf("the open generation must be listed for its project, got %s", list.Body.String())
+	}
+	other := httptest.NewRecorder()
+	h.ServeHTTP(other, httptest.NewRequest(http.MethodGet, "/v1/projects/p2/operations", nil))
+	if !strings.Contains(other.Body.String(), `"operations":[]`) {
+		t.Fatalf("another project must list nothing, got %s", other.Body.String())
+	}
+
+	cancel := httptest.NewRecorder()
+	h.ServeHTTP(cancel, httptest.NewRequest(http.MethodPost, "/v1/operations/op-questions/cancel", nil))
+	if cancel.Code != http.StatusAccepted {
+		t.Fatalf("cancel status = %d, want 202", cancel.Code)
+	}
+	<-done
+	if op, _ := ops.Get("op-questions"); op.Status != application.OperationCancelled {
+		t.Fatalf("status = %q, want cancelled", op.Status)
+	}
+
+	again := httptest.NewRecorder()
+	h.ServeHTTP(again, httptest.NewRequest(http.MethodPost, "/v1/operations/op-questions/cancel", nil))
+	if again.Code != http.StatusNotFound {
+		t.Fatalf("cancelling an ended call = %d, want 404", again.Code)
+	}
+}

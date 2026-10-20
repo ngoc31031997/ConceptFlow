@@ -1,3 +1,4 @@
+import { Button } from "./ui";
 import styles from "./OperationProgressCard.module.css";
 
 interface OperationProgressCardProps {
@@ -12,6 +13,8 @@ interface OperationProgressCardProps {
   /** "step": kiểu thẻ bước trong stepper. */
   variant?: "default" | "step";
   testId?: string;
+  /** Có thì thẻ hiện nút huỷ lượt chạy đang mở. */
+  onCancel?: () => void;
 }
 
 export function OperationProgressCard({
@@ -22,6 +25,7 @@ export function OperationProgressCard({
   error,
   variant = "default",
   testId,
+  onCancel,
 }: OperationProgressCardProps) {
   const determinate = typeof total === "number" && total > 0;
   const pct = determinate ? Math.min(100, Math.max(0, Math.round(((done ?? 0) / total!) * 100))) : null;
@@ -44,6 +48,11 @@ export function OperationProgressCard({
         />
       </div>
       {error && <p className={styles.error} role="alert">{error}</p>}
+      {onCancel && !error && (
+        <Button variant="ghost" className={styles.cancel} onClick={onCancel} data-testid={testId ? `${testId}-cancel` : undefined}>
+          Huỷ lượt chạy
+        </Button>
+      )}
     </div>
   );
 }

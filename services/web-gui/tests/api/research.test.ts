@@ -85,9 +85,19 @@ describe("research api", () => {
     expect(state.facts[0].link).toEqual({ state: "run", why: "", nearest: "", checkedAt: "" });
   });
 
+  it("reports a request the Creator aborted as a cancellation, not a connection failure", async () => {
+    const controller = new AbortController();
+    global.fetch = vi.fn().mockImplementation(() => {
+      controller.abort();
+      return Promise.reject(new DOMException("aborted", "AbortError"));
+    }) as unknown as typeof fetch;
+    const err = await client.generateResearchQuestions("p1", { replaceEdited: false }, { id: "op-1", signal: controller.signal }).catch((e: unknown) => e);
+    expect(client.isRequestCancelled(err)).toBe(true);
+  });
+
   it("generates questions with the replace flag, the note and the operation id", async () => {
     const fn = mockFetch(200, { questions: [{ id: "Q7", text: "Mới?", mine: false, stale: false }] });
-    const questions = await client.generateResearchQuestions("p1", { replaceEdited: true, note: "cơ chế" }, "op-9");
+    const questions = await client.generateResearchQuestions("p1", { replaceEdited: true, note: "cơ chế" }, { id: "op-9", signal: new AbortController().signal });
     expect(questions).toHaveLength(1);
     const call = lastCall(fn);
     expect(call.path).toBe("research/questions/generate");

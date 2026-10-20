@@ -164,6 +164,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.get('/v1/operations/:operationId', (req, res, next) =>
     (req.params.operationId.startsWith('delete:') ? toOrchestrator : toAuthoring)(req, res, next),
   );
+  // Stopping a model call, and finding the ones a project still has running,
+  // are authoring-service's too.
+  router.post('/v1/operations/:operationId/cancel', toAuthoring);
+  router.get('/v1/projects/:id/operations', toAuthoring);
   router.delete('/v1/projects/:id', deleteProjectHandler(orchestratorClient, sharedDir));
   return router;
 }

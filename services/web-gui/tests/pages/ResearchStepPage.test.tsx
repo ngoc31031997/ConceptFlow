@@ -278,7 +278,7 @@ describe("ResearchStepPage", () => {
       await ready();
       expect(screen.getByTestId("question-generate")).toHaveTextContent("Sinh lại từ brief");
       fireEvent.click(screen.getByTestId("question-generate"));
-      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: false, note: undefined }, expect.any(String)));
+      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: false, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
       expect(screen.queryByTestId("question-generate-dialog")).not.toBeInTheDocument();
     });
 
@@ -292,11 +292,11 @@ describe("ResearchStepPage", () => {
       expect(generate).not.toHaveBeenCalled();
 
       fireEvent.click(screen.getByTestId("question-generate-replace"));
-      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: true, note: undefined }, expect.any(String)));
+      await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", { replaceEdited: true, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
 
       fireEvent.click(screen.getByTestId("question-generate"));
       fireEvent.click(await screen.findByTestId("question-generate-keep"));
-      await waitFor(() => expect(generate).toHaveBeenLastCalledWith("p1", { replaceEdited: false, note: undefined }, expect.any(String)));
+      await waitFor(() => expect(generate).toHaveBeenLastCalledWith("p1", { replaceEdited: false, note: undefined }, expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })));
     });
 
     it("offers to generate when there are no questions, and has no prompt to show yet", async () => {

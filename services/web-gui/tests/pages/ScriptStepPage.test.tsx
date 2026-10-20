@@ -299,7 +299,7 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     fireEvent.click(screen.getByTestId("brief-redo-send"));
 
     await waitFor(() =>
-      expect(redo).toHaveBeenCalledWith(expect.any(String), apiClient.BRIEF_UNIT, "nói về ong đực nhiều hơn", expect.any(String)),
+      expect(redo).toHaveBeenCalledWith(expect.any(String), apiClient.BRIEF_UNIT, "nói về ong đực nhiều hơn", expect.objectContaining({ id: expect.any(String), signal: expect.any(AbortSignal) })),
     );
   });
 

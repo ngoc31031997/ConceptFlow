@@ -182,9 +182,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(`${GATEWAY_URL}${path}`, init);
   } catch {
+    if (init?.signal?.aborted) throw new RequestCancelledError();
     throw new ApiError(GENERIC_CONNECTION_ERROR);
   }
   if (!response.ok) {
+    if (init?.signal?.aborted) throw new RequestCancelledError();
     const { message, code, diagnostics } = await parseError(response);
     throw new ApiError(message, code, diagnostics, response.status);
   }
@@ -353,10 +355,34 @@ export function newOperationId(): string {
 
 const OPERATION_ID_HEADER = "X-Operation-Id";
 
-export function suggestPublishMetadata(id: string, operationId?: string): Promise<SuggestedMetadata> {
+/** A long call as the GUI follows and can stop it: the id to poll and the signal that cancels the request. */
+export interface OperationCall {
+  id: string;
+  signal: AbortSignal;
+}
+
+/** The Creator stopped the request; the server drops the model call when the connection closes. */
+export class RequestCancelledError extends Error {
+  constructor() {
+    super("Request cancelled");
+    this.name = "RequestCancelledError";
+  }
+}
+
+/** True when `err` is the Creator cancelling a call, which is not a failure to report. */
+export function isRequestCancelled(err: unknown): boolean {
+  return err instanceof RequestCancelledError;
+}
+
+/** Headers and signal of a request that carries an operation id; empty when it is not a followed call. */
+function operationInit(operation?: OperationCall): { headers: Record<string, string>; signal?: AbortSignal } {
+  return operation ? { headers: { [OPERATION_ID_HEADER]: operation.id }, signal: operation.signal } : { headers: {} };
+}
+
+export function suggestPublishMetadata(id: string, operation?: OperationCall): Promise<SuggestedMetadata> {
   return apiFetch<SuggestedMetadata>(`/v1/projects/${id}/suggest-metadata`, {
     method: "POST",
-    ...(operationId ? { headers: { [OPERATION_ID_HEADER]: operationId } } : {}),
+    ...operationInit(operation),
   });
 }
 
@@ -1508,8 +1534,24 @@ export interface OperationProgress {
   done: number | null;
   total: number | null;
   elapsed_ms: number;
-  status: "pending" | "running" | "succeeded" | "failed";
+  status: "pending" | "running" | "succeeded" | "failed" | "cancelled";
   error: string | null;
+}
+
+/** A call still running for a project, with the id it is polled and cancelled by. */
+export interface RunningOperation extends OperationProgress {
+  id: string;
+}
+
+/** The calls a project still has running, so a page opened again can pick up a call it did not start. */
+export async function listRunningOperations(projectId: string): Promise<RunningOperation[]> {
+  const res = await apiFetch<{ operations: RunningOperation[] | null }>(`/v1/projects/${projectId}/operations`);
+  return res.operations ?? [];
+}
+
+/** Stops a running call by its id; 404 when it already ended. */
+export function cancelOperation(operationId: string): Promise<void> {
+  return apiFetch<void>(`/v1/operations/${operationId}/cancel`, { method: "POST" });
 }
 
 export function getOperation(operationId: string): Promise<OperationProgress> {
@@ -1592,14 +1634,12 @@ export async function redoUnit<C>(
   projectId: string,
   ref: UnitRef<C>,
   note: string,
-  operationId?: string,
+  operation?: OperationCall,
 ): Promise<ReviewUnit<C>> {
   const wire = await apiFetch<reviewUnitWire>(`${unitPath(projectId, ref)}/redo`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}),
-    },
+    headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
     body: JSON.stringify({ note }),
   });
   return fromWireUnit(wire, ref.parse);
@@ -1698,13 +1738,11 @@ export async function setTargetDuration(projectId: string, targetDuration: Targe
  * operation id to follow it). 503 when no language model is configured, 502
  * when the reply could not be read.
  */
-export async function generateBrief(projectId: string, operationId?: string): Promise<ReviewUnit<CreativeBrief>> {
+export async function generateBrief(projectId: string, operation?: OperationCall): Promise<ReviewUnit<CreativeBrief>> {
   const wire = await apiFetch<reviewUnitWire>(`/v1/projects/${projectId}/brief/generate`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}),
-    },
+    headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
     body: JSON.stringify({}),
   });
   return fromWireUnit(wire, parseCreativeBrief);
@@ -1963,11 +2001,12 @@ export async function getResearch(projectId: string): Promise<ResearchState> {
 export async function generateResearchQuestions(
   projectId: string,
   options: { replaceEdited: boolean; note?: string },
-  operationId?: string,
+  operation?: OperationCall,
 ): Promise<ResearchQuestion[]> {
   const res = await apiFetch<{ questions: ResearchQuestion[] | null }>(`/v1/projects/${projectId}/research/questions/generate`, {
     method: "POST",
-    headers: { ...JSON_HEADERS, ...(operationId ? { [OPERATION_ID_HEADER]: operationId } : {}) },
+    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
     body: JSON.stringify({ replace_edited: options.replaceEdited, note: options.note ?? "" }),
   });
   return res.questions ?? [];

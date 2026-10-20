@@ -47,8 +47,8 @@ describe("api/client", () => {
     it("sends the operation id with the AI runs, so the screen can follow them", async () => {
       global.fetch = ok(unitWire);
 
-      await client.generateBrief("p1", "op-1");
-      await client.redoUnit("p1", client.BRIEF_UNIT, "ngắn hơn", "op-2");
+      await client.generateBrief("p1", { id: "op-1", signal: new AbortController().signal });
+      await client.redoUnit("p1", client.BRIEF_UNIT, "ngắn hơn", { id: "op-2", signal: new AbortController().signal });
 
       const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls;
       expect(calls[0][0]).toMatch(/\/v1\/projects\/p1\/brief\/generate$/);

@@ -7,13 +7,18 @@ import {
   editUnit,
   generateBrief,
   getBriefState,
+  isRequestCancelled,
   redoUnit,
   unapproveUnit,
   type BriefState,
   type CreativeBrief,
+  type OperationCall,
   type ReviewUnit,
 } from "../api/client";
 import { useOperationRun, type OperationRun } from "./useOperationRun";
+
+/** The operation kind the server records for the AI runs that write the brief. */
+const BRIEF_RUN_KIND = "brief";
 
 /** The idea step's brief as the screen works with it. */
 export interface CreativeBriefControls {
@@ -56,7 +61,6 @@ export function useCreativeBrief(projectId: string, enabled: boolean): CreativeB
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [failedNote, setFailedNote] = useState("");
-  const run = useOperationRun();
   // Only the newest load may land: a slow first load must not overwrite the
   // brief a run that finished after it has just returned.
   const loadSeq = useRef(0);
@@ -78,6 +82,9 @@ export function useCreativeBrief(projectId: string, enabled: boolean): CreativeB
       });
   }, [projectId]);
 
+  // A run that outlived the page is followed from here; the brief it stored is loaded when it ends.
+  const run = useOperationRun({ projectId: enabled ? projectId : undefined, kinds: [BRIEF_RUN_KIND], onSettled: reload });
+
   useEffect(() => {
     setState(null);
     setLoadError(null);
@@ -94,7 +101,7 @@ export function useCreativeBrief(projectId: string, enabled: boolean): CreativeB
   );
 
   const runAI = useCallback(
-    async (call: (operationId: string) => Promise<ReviewUnit<CreativeBrief>>, note: string) => {
+    async (call: (operation: OperationCall) => Promise<ReviewUnit<CreativeBrief>>, note: string) => {
       setRunning(true);
       setActionError(null);
       try {
@@ -103,6 +110,7 @@ export function useCreativeBrief(projectId: string, enabled: boolean): CreativeB
         run.end();
         return true;
       } catch (err) {
+        if (isRequestCancelled(err)) return false;
         setActionError(messageOf(err));
         setFailedNote(note);
         // The card stays with the failure and the time already spent.
@@ -152,5 +160,5 @@ export function useCreativeBrief(projectId: string, enabled: boolean): CreativeB
     [changeApproval, projectId],
   );
 
-  return { state, loadError, running, run, actionError, busy, failedNote, generate, redo, edit, approve, unapprove, reload };
+  return { state, loadError, running: running || run.resumed, run, actionError, busy, failedNote, generate, redo, edit, approve, unapprove, reload };
 }
