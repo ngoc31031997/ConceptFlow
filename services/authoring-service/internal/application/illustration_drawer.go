@@ -193,8 +193,8 @@ func (uc *IllustrationsUseCase) draw(
 	if uc.drawer == nil {
 		return drawnReply{}, IllustrationPreview{}, ErrDrawerDisabled
 	}
-	if err := checkCodeModel(StepIllustrations, model); err != nil {
-		return drawnReply{}, IllustrationPreview{}, err
+	if model == "" {
+		model = stepDefaultModel(ctx, uc.stepDefaults, StepIllustrations)
 	}
 	turn := user
 	var lastErr error

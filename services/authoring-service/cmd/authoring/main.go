@@ -70,7 +70,6 @@ func main() {
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient).WithModels(authoringRepo)
 	defaultModel := application.NewDefaultModelUseCase(authoringRepo)
-	llmClient.WithDefaultModel(authoringRepo)
 
 	if err := authoringRepo.SeedVideoArchetypes(ctx); err != nil {
 		logger.Warn("could not seed system video archetypes", "error", err)
@@ -96,7 +95,9 @@ func main() {
 		// A drawing a video still working uses cannot be deleted.
 		WithProjectStatus(projects).
 		// The rules and the kit a drawing is made under are its language's.
-		WithLanguages(visualLanguages)
+		WithLanguages(visualLanguages).
+		// A drawing that names no model runs on the model saved for the drawings.
+		WithStepDefaults(authoringRepo)
 	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
 		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
@@ -187,7 +188,6 @@ func main() {
 		WithAuthoringState(getAuthoringState).
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
-		WithDefaultModel(cfg.HiveModel).
 		WithDefaultModelSetting(defaultModel).
 		WithUsageStats(llmUsageRepo).
 		WithGenerateAuthoring(generateAuthoring).

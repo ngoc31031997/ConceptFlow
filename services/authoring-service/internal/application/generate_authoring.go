@@ -445,9 +445,6 @@ func (uc *GenerateAuthoringUseCase) runInner(
 		}
 		model = stepModels.ModelFor(step)
 	}
-	if err := checkCodeModel(step, model); err != nil {
-		return GeneratedStep{}, err
-	}
 
 	started := time.Now()
 	uc.beginProgress(projectID, step, started)

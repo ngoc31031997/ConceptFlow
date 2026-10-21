@@ -1,5 +1,5 @@
 import { useAuthoringModels } from "../hooks/useAuthoringModels";
-import { useLlmStatus } from "../hooks/useLlmStatus";
+import { defaultModelFor, useLlmStatus } from "../hooks/useLlmStatus";
 import { Dropdown } from "./ui";
 import styles from "./AiModelSelect.module.css";
 
@@ -17,8 +17,7 @@ interface AiModelSelectProps {
  * The model an AI call runs on, chosen at the button that starts it. The
  * choice is the project's own (saved on the server the moment it changes, so
  * the run reads it back from there). Until the Creator picks one it shows, and
- * the run uses, the default set in Cài đặt. Draws nothing when no model is
- * configured.
+ * the run uses, the default set in Cài đặt for this step. Draws nothing when no model is configured.
  */
 export function AiModelSelect({ projectId, step, label, testId = "ai-model-select" }: AiModelSelectProps) {
   const llm = useLlmStatus();
@@ -26,9 +25,8 @@ export function AiModelSelect({ projectId, step, label, testId = "ai-model-selec
   const options = llm?.models ?? [];
   if (options.length === 0) return null;
 
-  const defaultModel = llm?.default_model ?? "";
-  const listed = options.some((o) => o.id === defaultModel) || !defaultModel ? options : [...options, { id: defaultModel, label: defaultModel }];
-  const value = models[step] || defaultModel || listed[0].id;
+  const defaultModel = defaultModelFor(llm, step) || options[0].id;
+  const value = models[step] || defaultModel;
 
   return (
     <div className={styles.field} data-testid={`${testId}-field`}>
@@ -38,7 +36,7 @@ export function AiModelSelect({ projectId, step, label, testId = "ai-model-selec
         value={value}
         onChange={(next) => setModels({ ...models, [step]: next })}
         data-testid={testId}
-        options={listed.map((o) => ({
+        options={options.map((o) => ({
           value: o.id,
           label: o.label,
           badge: o.id === defaultModel ? "Mặc định" : undefined,

@@ -375,22 +375,6 @@ func (r *codeRun) onEvent(ev CodeEvent) {
 	}
 }
 
-// ErrModelNotForCode refuses a model the code step cannot use.
-type ErrModelNotForCode struct{ Model string }
-
-func (e *ErrModelNotForCode) Error() string {
-	return fmt.Sprintf("model %q không dùng được cho bước Code và Hình minh hoạ (model local không viết nổi code cảnh; "+
-		"mọi lượt đã đo đều hết giờ) — chọn DeepSeek hoặc GLM ở ô Model AI", e.Model)
-}
-
-// checkCodeModel applies domain.ModelAllowedForStep to a code-writing step.
-func checkCodeModel(step, model string) error {
-	if !domain.ModelAllowedForStep(step, model) {
-		return &ErrModelNotForCode{Model: model}
-	}
-	return nil
-}
-
 // IllustrationStagePort is the per-video drawing list as the illustrations and
 // code steps need it.
 type IllustrationStagePort interface {
@@ -503,9 +487,6 @@ func (uc *GenerateAuthoringUseCase) runIllustrations(ctx context.Context, projec
 			return GeneratedStep{}, fmt.Errorf("load authoring models: %w", err)
 		}
 		model = stepModels.ModelFor("code")
-	}
-	if err := checkCodeModel(step, model); err != nil {
-		return GeneratedStep{}, err
 	}
 
 	uc.beginProgress(projectID, step, time.Now())

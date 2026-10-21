@@ -39,10 +39,9 @@ beforeEach(() => {
     enabled: llmEnabled,
     provider: llmEnabled ? "hive" : "",
     reason: llmEnabled ? "" : "Chưa cấu hình",
-    default_model: "deepseek-ai/deepseek-v4.1-flash",
     models: llmEnabled
       ? [
-          { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", code_ok: true },
+          { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash" },
           { id: "ollama", label: "Ollama (local AI)" },
         ]
       : [],

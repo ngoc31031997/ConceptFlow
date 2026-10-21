@@ -262,10 +262,39 @@ func (r *PromptTemplateRepository) SaveAuthoringModels(ctx context.Context, proj
 	return err
 }
 
-// GetAuthoringModels returns the saved per-step model choice, or the zero
-// value (every step "" — the server default) when this project has no
-// authoring row yet or predates this column.
+// GetAuthoringModels returns the model each step of the project runs on: the
+// project's own choice, else the default saved for that step, else "" (the
+// app-wide default applies downstream).
 func (r *PromptTemplateRepository) GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error) {
+	chosen, err := r.GetChosenAuthoringModels(ctx, projectID)
+	if err != nil {
+		return domain.AuthoringStepModels{}, err
+	}
+	defaults, err := r.GetStepDefaultModels(ctx)
+	if err != nil {
+		return domain.AuthoringStepModels{}, err
+	}
+	fill := func(chosen, step string) string {
+		if chosen != "" {
+			return chosen
+		}
+		return defaults[step]
+	}
+	return domain.AuthoringStepModels{
+		Brief:      fill(chosen.Brief, "brief"),
+		Publish:    fill(chosen.Publish, "publish"),
+		Research:   fill(chosen.Research, "research"),
+		StoryFrame: fill(chosen.StoryFrame, "story_frame"),
+		Story:      fill(chosen.Story, "story"),
+		Storyboard: fill(chosen.Storyboard, "storyboard"),
+		Code:       fill(chosen.Code, "code"),
+	}, nil
+}
+
+// GetChosenAuthoringModels returns only what the Creator picked for the
+// project: the saved per-step choice, or the zero value (every step "") when
+// this project has no authoring row yet or predates this column.
+func (r *PromptTemplateRepository) GetChosenAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error) {
 	var models domain.AuthoringStepModels
 	err := r.pool.QueryRow(ctx, `
 		SELECT brief_model, publish_model, research_model, story_frame_model, story_model, storyboard_model, code_model FROM project_authoring WHERE project_id = $1

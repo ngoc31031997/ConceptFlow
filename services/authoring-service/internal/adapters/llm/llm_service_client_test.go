@@ -455,27 +455,3 @@ func TestReadyReflectsTheServicesHiveKeyAndIsCached(t *testing.T) {
 }
 
 func asLLMError(err error, target **application.LLMError) bool { return errors.As(err, target) }
-
-type fixedDefault struct {
-	model string
-	err   error
-}
-
-func (f fixedDefault) GetDefaultModel(context.Context) (string, error) { return f.model, f.err }
-
-func TestModelOrDefaultUsesTheSettingOnlyWhenNoModelWasNamed(t *testing.T) {
-	c := NewClient("http://x", 0).WithDefaultModel(fixedDefault{model: "zai-org/glm-5.3-flash"})
-	if got := c.modelOrDefault(context.Background(), ""); got != "zai-org/glm-5.3-flash" {
-		t.Errorf("an unnamed model must take the setting, got %q", got)
-	}
-	if got := c.modelOrDefault(context.Background(), "ollama"); got != "ollama" {
-		t.Errorf("a named model must stay, got %q", got)
-	}
-	broken := NewClient("http://x", 0).WithDefaultModel(fixedDefault{err: errors.New("db down")})
-	if got := broken.modelOrDefault(context.Background(), ""); got != "" {
-		t.Errorf("an unreadable setting must fall back to llm-service's default, got %q", got)
-	}
-	if got := NewClient("http://x", 0).modelOrDefault(context.Background(), ""); got != "" {
-		t.Errorf("without a setting source the model stays empty, got %q", got)
-	}
-}

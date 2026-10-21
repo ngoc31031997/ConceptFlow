@@ -504,9 +504,9 @@ func NormalizeAuthoringMode(s string) string {
 type AuthoringModelOption struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
-	// CodeOK is false for a model the code step (and the drawings, which are
-	// code too) refuses — see ModelAllowedForStep.
-	CodeOK bool `json:"code_ok"`
+	// Local is true for a model served on this machine rather than by Hive; the
+	// GUI warns that it can time out on the code step and the drawings.
+	Local bool `json:"local"`
 }
 
 // AuthoringModelCatalog is the fixed list the picker offers. "" is not listed
@@ -515,12 +515,13 @@ type AuthoringModelOption struct {
 // default" (HIVE_MODEL), which is what an empty/legacy project_authoring row
 // still means today.
 var AuthoringModelCatalog = []AuthoringModelOption{
-	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash", CodeOK: true},
-	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash", CodeOK: true},
 	// Local model served by the `ollama` container. llm-service routes any id
 	// "ollama" or "ollama/<model>" to Ollama instead of Hive; bare "ollama"
-	// means whatever OLLAMA_MODEL is set to.
-	{ID: "ollama", Label: "Ollama (local AI)"},
+	// means whatever OLLAMA_MODEL is set to. It is listed first because the
+	// first model is the default of every step with none saved.
+	{ID: "ollama", Label: "Ollama (local AI)", Local: true},
+	{ID: "deepseek-ai/deepseek-v4.1-flash", Label: "DeepSeek V4.1 Flash"},
+	{ID: "zai-org/glm-5.3-flash", Label: "GLM-5.3-Flash"},
 }
 
 // ValidAuthoringModel reports whether id is "" (server default) or one of
@@ -540,16 +541,35 @@ func ValidAuthoringModel(id string) bool {
 	return false
 }
 
-// ModelAllowedForStep reports whether model id may serve an authoring step.
-// The code step — and the illustrations step, whose drawings
-// are Remotion code written with the code step's model — refuses the local
-// Ollama model: every code chunk sent to it timed out (5/5 measured), and a
-// local model is not strong enough to write a Remotion scene.
-func ModelAllowedForStep(step, id string) bool {
-	if step != "code" && step != "illustrations" {
-		return true
+// ConfigurableModelSteps are the steps that call an AI and can carry a default
+// model: the seven of AuthoringStepModels and the drawings of the illustration
+// library, which belong to no project.
+var ConfigurableModelSteps = []string{
+	"brief", "research", "story_frame", "story", "storyboard", "code", "publish", "illustrations",
+}
+
+// WithStepModelFallback returns the default model of every configurable step:
+// the one saved for it, else the first model of AuthoringModelCatalog.
+func WithStepModelFallback(saved map[string]string) map[string]string {
+	out := make(map[string]string, len(ConfigurableModelSteps))
+	for _, step := range ConfigurableModelSteps {
+		if model := saved[step]; model != "" {
+			out[step] = model
+		} else {
+			out[step] = AuthoringModelCatalog[0].ID
+		}
 	}
-	return id != "ollama" && !strings.HasPrefix(id, "ollama/")
+	return out
+}
+
+// ValidModelStep reports whether step is one of ConfigurableModelSteps.
+func ValidModelStep(step string) bool {
+	for _, s := range ConfigurableModelSteps {
+		if s == step {
+			return true
+		}
+	}
+	return false
 }
 
 // AuthoringStepModels is the per-step model choice for one project — one Hive
