@@ -16,7 +16,7 @@ import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useStory, type StoryControls } from "../hooks/useStory";
-import { VIEW_STORY, comingRoute, readOnlyReason } from "../utils/flow";
+import { VIEW_STORY, beatsRoute, readOnlyReason } from "../utils/flow";
 
 const SUBTITLE =
   "Chọn góc kể từ bảng dữ kiện, rồi chốt câu hỏi mở đầu, lời hứa, chuỗi nhân quả và payoff. Sửa từng ô, hoặc cho AI làm lại kèm ghi chú.";
@@ -166,7 +166,7 @@ export function StoryStepPage() {
             : "Duyệt câu chuyện để sang bước Beat sheet."
         }
         onBack={() => navigate(`/projects/${projectId}/research`)}
-        onNext={() => navigate(comingRoute(VIEW_STORY + 1, projectId))}
+        onNext={() => navigate(beatsRoute(projectId))}
         nextDisabled={state?.status !== "approved"}
         nextLabel="Lưu và sang beat sheet"
         nextTestId="story-next"

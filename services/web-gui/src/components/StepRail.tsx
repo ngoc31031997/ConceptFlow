@@ -97,7 +97,7 @@ export function StepRail({ currentStep, viewStep, title, collapsed, onToggle, pr
   const flow = useProjectFlow();
   const viewing = viewStep ?? (currentStep ? viewStepOf(currentStep)?.n : undefined);
   const statusOf = (view: FlowViewStep): StepStatus =>
-    view.screen ? (nav.hasProject ? screenStatus(view, flow.flowStep, flow.researchResolved) : "pending") : viewStatus(view, nav.status);
+    view.screen ? (nav.hasProject ? screenStatus(view, flow.flowStep, flow) : "pending") : viewStatus(view, nav.status);
   const doneCount = FLOW_VIEW.filter((v) => isBuilt(v) && statusOf(v) === "done").length;
 
   return (

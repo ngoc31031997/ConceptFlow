@@ -159,7 +159,7 @@ const initialDraft: ProjectDraft = {
   backgroundMusicVolume: 0.2,
   videoOutputMode: "long",
   authoringMode: "manual",
-  authoringModels: { brief: "", publish: "", research: "", story_frame: "", story: "", storyboard: "", code: "" },
+  authoringModels: { brief: "", publish: "", research: "", story_frame: "", beat_sheet: "", story: "", storyboard: "", code: "" },
   authoringTopic: "",
   authoringStory: "",
   authoringStoryboard: "",

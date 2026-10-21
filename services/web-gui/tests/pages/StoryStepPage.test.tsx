@@ -304,7 +304,7 @@ describe("StoryStepPage", () => {
     await waitFor(() => expect(screen.getByTestId("story-unapprove")).toBeInTheDocument());
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Câu chuyện đã duyệt");
     fireEvent.click(screen.getByTestId("story-next"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/5");
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/beats");
   });
 
   it("cannot approve a story with an empty field and says which", async () => {

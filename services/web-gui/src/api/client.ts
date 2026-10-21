@@ -452,6 +452,7 @@ export type PromptRole =
   // Câu chuyện: AI gợi ý góc tiếp cận và viết khung câu chuyện.
   | "story_approaches"
   | "story_frame"
+  | "beat_sheet"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -1266,6 +1267,7 @@ export interface AuthoringState {
   publish_model?: string;
   research_model?: string;
   story_frame_model?: string;
+  beat_sheet_model?: string;
   story_model?: string;
   storyboard_model?: string;
   code_model?: string;
@@ -1300,6 +1302,8 @@ export interface AuthoringStepModels {
   research?: string;
   /** Model that proposes the story approaches and writes the story frame; missing or "" reads as the default. */
   story_frame?: string;
+  /** Model that writes the beat sheet; missing or "" reads as the default. */
+  beat_sheet?: string;
   story: string;
   storyboard: string;
   code: string;
@@ -2350,4 +2354,164 @@ export async function setStoryFactUse(projectId: string, factId: string, use: bo
     headers: JSON_HEADERS,
     body: JSON.stringify({ use }),
   });
+}
+
+/** The functions a beat can have, in the order a video usually runs them. */
+export const BEAT_FNS = ["Hook", "Đặt vấn đề", "Giải thích cơ chế", "Cao trào", "Mở rộng hệ quả", "Payoff"] as const;
+export type BeatFn = (typeof BEAT_FNS)[number];
+
+/** How far the duration buttons move a beat, in seconds. */
+export const BEAT_DURATION_STEP = 5;
+
+/** The shortest a beat may be, in seconds. */
+export const BEAT_MIN_SECONDS = 5;
+
+/** The fields of a beat the Creator edits as text in the dialog. */
+export type BeatTextField = "title" | "goal" | "content" | "next";
+
+/** The unit one beat is saved, redone and approved through. */
+export function beatUnit(key: string): UnitRef<unknown> {
+  return { kind: "beat", key, parse: (c) => c };
+}
+
+/** One beat of the sheet. `mine` names the fields the Creator wrote; an AI run keeps them. */
+export interface Beat {
+  key: string;
+  fn: BeatFn;
+  title: string;
+  goal: string;
+  content: string;
+  facts: string[];
+  /** Target length in seconds. */
+  dur: number;
+  /** How the beat joins the one after it; "" for the last beat. */
+  next: string;
+  status: UnitStatus;
+  mine: string[];
+  stale: boolean;
+  /** Facts the script must state that no other beat holds, so deleting this beat drops them. */
+  onlyMust: string[];
+}
+
+/** One kept fact the beats can use. */
+export interface BeatFact {
+  id: string;
+  claimVi: string;
+  type: FactType;
+  must: boolean;
+  link: LinkState;
+}
+
+/** One line of the structure check. */
+export interface BeatCheck {
+  ok: boolean;
+  text: string;
+}
+
+/** Everything the beat sheet screen shows. */
+export interface BeatState {
+  /** Approved when the sheet has beats and every one is approved. */
+  status: UnitStatus;
+  storyApproved: boolean;
+  beats: Beat[];
+  facts: BeatFact[];
+  checks: BeatCheck[];
+  totalSeconds: number;
+  targetLabel: string;
+}
+
+interface beatStateWire {
+  status: UnitStatus;
+  story_approved: boolean;
+  beats:
+    | {
+        key: string;
+        fn: BeatFn;
+        title: string;
+        goal: string;
+        content: string;
+        facts: string[] | null;
+        dur: number;
+        next: string;
+        status: UnitStatus;
+        mine: string[] | null;
+        stale: boolean;
+        only_must: string[] | null;
+      }[]
+    | null;
+  facts: { id: string; claim_vi: string; type: FactType; must: boolean; link: LinkState }[] | null;
+  checks: BeatCheck[] | null;
+  total_seconds: number;
+  target_label: string;
+}
+
+function fromWireBeats(w: beatStateWire): BeatState {
+  return {
+    status: w.status,
+    storyApproved: w.story_approved,
+    beats: (w.beats ?? []).map((b) => ({ ...b, facts: b.facts ?? [], mine: b.mine ?? [], onlyMust: b.only_must ?? [] })),
+    facts: (w.facts ?? []).map((f) => ({ id: f.id, claimVi: f.claim_vi, type: f.type, must: f.must, link: f.link })),
+    checks: w.checks ?? [],
+    totalSeconds: w.total_seconds,
+    targetLabel: w.target_label,
+  };
+}
+
+/** Reads the beat sheet step: the beats in order, the kept facts, the structure checks and whether the story is approved. */
+export async function getBeats(projectId: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats`));
+}
+
+/**
+ * Has the AI write the whole sheet from the approved story (a model call: pass
+ * an operation id to follow it). Beats the Creator wrote any part of keep that
+ * part; the others are replaced and every beat goes to review.
+ */
+export async function generateBeats(projectId: string, note: string, operation?: OperationCall): Promise<BeatState> {
+  return fromWireBeats(
+    await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/generate`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+      signal: operationInit(operation).signal,
+      body: JSON.stringify({ note }),
+    }),
+  );
+}
+
+/**
+ * Adds a beat after the beat `after` ("" on an empty sheet). With `blank` the
+ * server adds an empty beat for the Creator to fill in, which works without a
+ * language model; otherwise the AI writes it (a model call).
+ */
+export async function addBeat(
+  projectId: string,
+  after: string,
+  blank: boolean,
+  note: string,
+  operation?: OperationCall,
+): Promise<BeatState> {
+  return fromWireBeats(
+    await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+      signal: operationInit(operation).signal,
+      body: JSON.stringify({ after, blank, note }),
+    }),
+  );
+}
+
+/** Sets the order of the beats; `order` names every beat once. */
+export async function reorderBeats(projectId: string, order: string[]): Promise<BeatState> {
+  return fromWireBeats(
+    await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/order`, {
+      method: "PUT",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ order }),
+    }),
+  );
+}
+
+/** Removes a beat from the sheet. */
+export async function deleteBeat(projectId: string, key: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/${encodeURIComponent(key)}`, { method: "DELETE" }));
 }
