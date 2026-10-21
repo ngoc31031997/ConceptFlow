@@ -11,6 +11,10 @@ function researchState(resolved: boolean) {
   vi.spyOn(apiClient, "getResearch").mockResolvedValue({ gate: { resolved } } as unknown as apiClient.ResearchState);
 }
 
+function storyState(status: string) {
+  vi.spyOn(apiClient, "getStory").mockResolvedValue({ status } as unknown as apiClient.StoryState);
+}
+
 function renderResume(flowStep: number) {
   const project = {
     project_id: "p1", status: "draft", voice_language: "vi", scenes: [], render_engine: "remotion", flow_step: flowStep,
@@ -25,6 +29,7 @@ function renderResume(flowStep: number) {
             <Route path="/projects/:id/resume" element={<ResumeProjectPage />} />
             <Route path="/" element={<p>màn ý tưởng</p>} />
             <Route path="/projects/:id/research" element={<p>màn nghiên cứu</p>} />
+            <Route path="/projects/:id/story" element={<p>màn câu chuyện</p>} />
             <Route path="/create/script/outline" element={<p>màn kịch bản</p>} />
             <Route path="/create/script/storyboard" element={<p>màn visual</p>} />
             <Route path="/create/script/illustrations" element={<p>màn hình minh hoạ</p>} />
@@ -66,8 +71,16 @@ describe("ResumeProjectPage mở lại đúng bước server báo", () => {
     expect(await screen.findByText("màn nghiên cứu")).toBeInTheDocument();
   });
 
-  it("dự án ở bước 3 với nghiên cứu đã xong mở màn kịch bản", async () => {
+  it("dự án ở bước 3 với nghiên cứu đã xong mà câu chuyện chưa duyệt mở màn Câu chuyện", async () => {
     researchState(true);
+    storyState("pending");
+    renderResume(3);
+    expect(await screen.findByText("màn câu chuyện")).toBeInTheDocument();
+  });
+
+  it("dự án ở bước 3 với câu chuyện đã duyệt mở màn kịch bản", async () => {
+    researchState(true);
+    storyState("approved");
     renderResume(3);
     expect(await screen.findByText("màn kịch bản")).toBeInTheDocument();
   });

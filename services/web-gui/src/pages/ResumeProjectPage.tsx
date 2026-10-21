@@ -1,7 +1,7 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { getAuthoringState, getProject, getResearch } from "../api/client";
+import { getAuthoringState, getProject, getResearch, getStory } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
 import type { ProjectDraft } from "../context/ProjectDraftContext";
 import { projectPath } from "../utils/pipelineLabels";
@@ -65,6 +65,15 @@ async function researchResolved(projectId: string): Promise<boolean> {
   }
 }
 
+/** True when the story is approved; an unreadable story counts as not approved so the Creator lands on it. */
+async function storyApproved(projectId: string): Promise<boolean> {
+  try {
+    return (await getStory(projectId)).status === "approved";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Mở lại một project đang dở ở máy/trình duyệt bất kỳ: nạp bước 1-3 đã lưu trên
  * server vào bản nháp, rồi đưa Creator tới đúng bước `wizard_step`. Project đã
@@ -109,6 +118,13 @@ export function ResumeProjectPage() {
         if (!stepParam && step === FLOW_STORY && !(await researchResolved(id))) {
           if (cancelled) return;
           navigate(`/projects/${id}/research`, { replace: true });
+          return;
+        }
+        // The story is a step of its own that the server does not track: until
+        // it is approved the project is still on it, not on the script.
+        if (!stepParam && step === FLOW_STORY && !(await storyApproved(id))) {
+          if (cancelled) return;
+          navigate(`/projects/${id}/story`, { replace: true });
           return;
         }
         navigate(authoringRoute(step), { replace: true });
