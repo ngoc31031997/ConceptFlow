@@ -153,6 +153,15 @@ type IllustrationsUseCase struct {
 	drawer   *illustrationDrawer // nil = AI drawing disabled
 	projects ProjectStatusPort   // nil = a drawing any project uses cannot be deleted
 	langs    LanguagePort        // nil = the style rules and the kit cannot be read
+
+	stepDefaults StepDefaultModelsPort // nil = a drawing naming no model follows the app-wide default
+}
+
+// WithStepDefaults lets a drawing that names no model run on the model saved
+// for the drawings.
+func (uc *IllustrationsUseCase) WithStepDefaults(src StepDefaultModelsPort) *IllustrationsUseCase {
+	uc.stepDefaults = src
+	return uc
 }
 
 func NewIllustrationsUseCase(repo IllustrationRepoPort, renderer IllustrationRendererPort) *IllustrationsUseCase {

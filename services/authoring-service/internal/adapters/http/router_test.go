@@ -301,8 +301,8 @@ func TestHandleLLMStatusCodeStats(t *testing.T) {
 		t.Fatalf("status = %+v (queried %s/%s)", got, stats.step, stats.phase)
 	}
 	for _, m := range got.Models {
-		if m.ID == "ollama" && m.CodeOK {
-			t.Error("ollama offered for the code step")
+		if m.ID == "ollama" && !m.Local {
+			t.Error("ollama must be flagged local so the GUI can warn about it")
 		}
 	}
 
@@ -313,12 +313,5 @@ func TestHandleLLMStatusCodeStats(t *testing.T) {
 	_ = json.Unmarshal(rec.Body.Bytes(), &got)
 	if rec.Code != 200 || got.CodeStats != nil || got.CodeStatsError == "" {
 		t.Fatalf("failed read: code=%d stats=%v err=%q, want 200 with the error stated", rec.Code, got.CodeStats, got.CodeStatsError)
-	}
-}
-
-func TestDescribeGenerateErrorModelNotForCode(t *testing.T) {
-	status, msg := DescribeGenerateError(&application.ErrModelNotForCode{Model: "ollama"})
-	if status != 400 || !strings.Contains(msg, "ollama") {
-		t.Fatalf("got %d %q, want 400 naming the model", status, msg)
 	}
 }

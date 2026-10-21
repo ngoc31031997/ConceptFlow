@@ -190,10 +190,10 @@ type AuthoringStateReaderPort interface {
 	GetAuthoringStory(ctx context.Context, projectID string) (string, error)
 	GetAuthoringStoryboard(ctx context.Context, projectID string) (string, error)
 	GetAuthoringCode(ctx context.Context, projectID string) (string, error)
-	// GetAuthoringModels returns the per-step Hive model choice, zero value
-	// ("" for every step, meaning "server default") for a project saved
-	// before this picker existed.
-	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
+	// GetChosenAuthoringModels returns only the models the Creator picked for
+	// the project: the zero value ("" for every step) when none was picked.
+	// A step left empty is shown on the default saved for it.
+	GetChosenAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
 	// PinnedLanguage is the visual language version the project is pinned to
 	// (domain.ErrProjectNotPinned when it has none).
 	PinnedLanguage(ctx context.Context, projectID string) (domain.PinnedLanguage, error)
@@ -249,7 +249,7 @@ func (uc *GetAuthoringStateUseCase) Execute(ctx context.Context, projectID strin
 	if err != nil {
 		return AuthoringState{}, err
 	}
-	models, err := uc.authoring.GetAuthoringModels(ctx, projectID)
+	models, err := uc.authoring.GetChosenAuthoringModels(ctx, projectID)
 	if err != nil {
 		return AuthoringState{}, err
 	}
@@ -334,9 +334,6 @@ func (uc *SaveAuthoringModelsUseCase) Execute(ctx context.Context, projectID str
 		if !domain.ValidAuthoringModel(id) {
 			return fmt.Errorf("unknown model %q", id)
 		}
-	}
-	if err := checkCodeModel("code", models.Code); err != nil {
-		return err
 	}
 	return uc.authoring.SaveAuthoringModels(ctx, projectID, models)
 }

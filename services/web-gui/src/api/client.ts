@@ -976,8 +976,8 @@ export function skipProjectIllustration(projectId: string, rowId: string, skippe
 export type AuthoringModelOption = {
   id: string;
   label: string;
-  /** False = bước Code (và Hình minh hoạ) không dùng được model này. */
-  code_ok?: boolean;
+  /** True = model chạy trên máy này (Ollama); bước Code và Hình minh hoạ có thể hết giờ. */
+  local?: boolean;
 };
 
 /** Chi phí đã đo của một model ở các đoạn code (30 ngày). */
@@ -996,8 +996,8 @@ export type LlmStatus = {
   reason?: string;
   /** Danh mục model cho picker ở bước 1 — rỗng khi chế độ AI chưa khả dụng. */
   models?: AuthoringModelOption[];
-  /** Model cụ thể mà lựa chọn rỗng ("") được máy chủ quy về. */
-  default_model?: string;
+  /** Model mặc định của từng bước, được chọn sẵn ở chỗ chọn model của bước đó. */
+  step_defaults?: Record<string, string>;
   /** Số liệu đo của từng model ở bước Code, theo id model. */
   code_stats?: Record<string, ModelUsageStats>;
   /** Có khi không đọc được số liệu (khác với "chưa có số liệu"). */
@@ -1318,26 +1318,27 @@ export async function saveAuthoringModels(projectId: string, models: AuthoringSt
 }
 
 /**
- * The model every AI call runs on when the project and the button name none,
- * as the Creator set it in Cài đặt ("" when they set none), and the model the
- * server falls back to.
+ * The default model of every step, as set in Cài đặt: the model a step is
+ * pre-selected on and runs on until the Creator picks another.
  */
 export interface AiModelSetting {
-  defaultModel: string;
-  serverModel: string;
+  /** Model mặc định của từng bước (bước chưa đặt là model đầu danh mục). */
+  stepModels: Record<string, string>;
+  /** Các bước cấu hình được model, theo thứ tự hiển thị. */
+  steps: string[];
 }
 
 export async function getAiModelSetting(): Promise<AiModelSetting> {
-  const wire = await apiFetch<{ default_model: string; server_model: string }>("/v1/settings/ai-model");
-  return { defaultModel: wire.default_model, serverModel: wire.server_model };
+  const wire = await apiFetch<{ step_models: Record<string, string>; steps: string[] }>("/v1/settings/ai-model");
+  return { stepModels: wire.step_models ?? {}, steps: wire.steps ?? [] };
 }
 
-/** Sets the default model; "" clears it so the server's applies. 400 for a model that cannot serve every step. */
-export async function setAiModelDefault(model: string): Promise<void> {
-  await apiFetch<undefined>("/v1/settings/ai-model", {
+/** Sets the default model of one step. 400 for an unknown step or a model that is not listed. */
+export async function setAiModelStepDefault(step: string, model: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/settings/ai-model/steps/${encodeURIComponent(step)}`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ default_model: model }),
+    body: JSON.stringify({ model }),
   });
 }
 

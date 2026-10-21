@@ -43,7 +43,6 @@ type Router struct {
 	renderPrompt            renderPromptUseCase
 	generateAuthoring       generateAuthoringUseCase
 	authoringChain          authoringChainUseCase
-	defaultModel            string
 	defaultModelSetting     defaultModelUseCase
 	usageStats              application.LLMUsageStatsPort
 	saveAuthoringMode       saveAuthoringModeUseCase
@@ -342,20 +341,8 @@ func (rt *Router) WithAuthoringModels(saveAuthoringModels saveAuthoringModelsUse
 	return rt
 }
 
-// WithGenerateAuthoring enables the run-a-step-with-AI endpoint.
-// Left unwired (no API key), the route answers 404 and GET /v1/llm/status
-// reports disabled, so the GUI hides the button and says why instead of
-// offering one that fails on the first press.
-// WithDefaultModel tells GET /v1/llm/status which concrete model an empty
-// ("server default") choice resolves to, so the GUI can name it.
-func (rt *Router) WithDefaultModel(id string) *Router {
-	rt.defaultModel = id
-	return rt
-}
-
-// WithDefaultModelSetting enables the app setting that names the model every
-// AI call runs on when nothing more specific was chosen, and makes
-// GET /v1/llm/status report it.
+// WithDefaultModelSetting enables the app setting that names the default model
+// of each step, and makes GET /v1/llm/status report them.
 func (rt *Router) WithDefaultModelSetting(uc defaultModelUseCase) *Router {
 	rt.defaultModelSetting = uc
 	return rt
@@ -437,6 +424,10 @@ func (rt *Router) handleCancelAuthoringChain(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// WithGenerateAuthoring enables the run-a-step-with-AI endpoint.
+// Left unwired (no API key), the route answers 404 and GET /v1/llm/status
+// reports disabled, so the GUI hides the button and says why instead of
+// offering one that fails on the first press.
 func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
 	rt.generateAuthoring = generateAuthoring
 	return rt
@@ -1008,8 +999,9 @@ type llmStatusResponse struct {
 	// (SaveAuthoringModelsUseCase) can never drift apart. Empty when the AI
 	// path itself is unavailable — nothing to pick a model for.
 	Models []domain.AuthoringModelOption `json:"models,omitempty"`
-	// DefaultModel is the concrete model id an empty choice resolves to.
-	DefaultModel string `json:"default_model,omitempty"`
+	// StepDefaults is the default model of every step; the GUI pre-selects it
+	// where a step's model is chosen.
+	StepDefaults map[string]string `json:"step_defaults,omitempty"`
 	// CodeStats is what each model's code chunks cost over the last 30 days,
 	// keyed by model id. CodeStatsError says why they are
 	// missing when the read failed — never shown as "no data".
@@ -1027,7 +1019,7 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := llmStatusResponse{
 		Enabled: true, Provider: rt.generateAuthoring.Provider(),
-		Models: domain.AuthoringModelCatalog, DefaultModel: rt.effectiveDefaultModel(r.Context()),
+		Models: domain.AuthoringModelCatalog, StepDefaults: rt.effectiveStepDefaults(r.Context()),
 	}
 	if rt.usageStats != nil {
 		stats, err := rt.usageStats.ModelUsageStats(r.Context(), "code", "chunk", time.Now().Add(-codeStatsWindow))
@@ -1142,12 +1134,6 @@ func DescribeGenerateError(err error) (int, string) {
 	if errors.As(err, &incomplete) {
 		return http.StatusUnprocessableEntity, incomplete.Error()
 	}
-	// The Creator's model choice, not the provider, is the problem.
-	var notForCode *application.ErrModelNotForCode
-	if errors.As(err, &notForCode) {
-		return http.StatusBadRequest, notForCode.Error()
-	}
-
 	status := http.StatusBadGateway
 	var message string
 	switch application.LLMErrorKindOf(err) {

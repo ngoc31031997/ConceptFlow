@@ -2,7 +2,6 @@ package application_test
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"authoring/internal/application"
@@ -54,10 +53,14 @@ func (f *fakeAuthoringStore) GetAuthoringMode(_ context.Context, projectID strin
 	return f.mode[projectID], nil
 }
 
-// SaveAuthoringModels/GetAuthoringModels back the model-per-step picker.
+// SaveAuthoringModels/GetChosenAuthoringModels back the model-per-step picker.
 func (f *fakeAuthoringStore) SaveAuthoringModels(_ context.Context, projectID string, models domain.AuthoringStepModels) error {
 	f.models[projectID] = models
 	return nil
+}
+
+func (f *fakeAuthoringStore) GetChosenAuthoringModels(_ context.Context, projectID string) (domain.AuthoringStepModels, error) {
+	return f.models[projectID], nil
 }
 
 func (f *fakeAuthoringStore) GetAuthoringModels(_ context.Context, projectID string) (domain.AuthoringStepModels, error) {
@@ -320,21 +323,15 @@ func TestSaveAuthoringModeRejectsUnknownMode(t *testing.T) {
 	}
 }
 
-// The code step's model cannot be the local Ollama model; the
-// other steps may still use it.
-func TestSaveAuthoringModelsRefusesOllamaForCode(t *testing.T) {
+// Every step, the code step included, may be set to the local Ollama model.
+func TestSaveAuthoringModelsAcceptsOllamaForAnyStep(t *testing.T) {
 	store := newFakeAuthoringStore()
 	uc := application.NewSaveAuthoringModelsUseCase(store)
-	err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Code: "ollama"})
-	var notForCode *application.ErrModelNotForCode
-	if !errors.As(err, &notForCode) {
-		t.Fatalf("err = %v, want ErrModelNotForCode", err)
+	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama", Code: "ollama"}); err != nil {
+		t.Fatalf("ollama refused: %v", err)
 	}
-	if _, saved := store.models["p1"]; saved {
-		t.Fatal("refused choice was saved")
-	}
-	if err := uc.Execute(context.Background(), "p1", domain.AuthoringStepModels{Story: "ollama", Code: "zai-org/glm-5.3-flash"}); err != nil {
-		t.Fatalf("ollama for the story step refused: %v", err)
+	if store.models["p1"].Code != "ollama" {
+		t.Fatalf("saved code model = %q, want ollama", store.models["p1"].Code)
 	}
 }
 

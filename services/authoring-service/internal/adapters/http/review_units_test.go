@@ -141,45 +141,50 @@ func TestBriefRoutes(t *testing.T) {
 	}
 }
 
-// fakeDefaultModel keeps the default model in memory.
+// fakeDefaultModel keeps the default model of each step in memory.
 type fakeDefaultModel struct {
-	model string
+	steps map[string]string
 	err   error
 }
 
-func (f *fakeDefaultModel) Get(context.Context) (string, error) { return f.model, nil }
-func (f *fakeDefaultModel) Set(_ context.Context, model string) error {
+func (f *fakeDefaultModel) StepModels(context.Context) (map[string]string, error) {
+	return domain.WithStepModelFallback(f.steps), nil
+}
+
+func (f *fakeDefaultModel) SetStep(_ context.Context, step, model string) error {
 	if f.err != nil {
 		return f.err
 	}
-	f.model = model
+	if f.steps == nil {
+		f.steps = map[string]string{}
+	}
+	f.steps[step] = model
 	return nil
 }
 
-func TestDefaultModelSettingRoundTripsAndFeedsTheLLMStatus(t *testing.T) {
+func TestStepDefaultModelSettingRoundTripsAndFeedsTheLLMStatus(t *testing.T) {
 	setting := &fakeDefaultModel{}
-	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithDefaultModel("server-model").WithDefaultModelSetting(setting)
-	do := func(method, body string) *httptest.ResponseRecorder {
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithDefaultModelSetting(setting)
+	do := func(method, path, body string) *httptest.ResponseRecorder {
 		rec := httptest.NewRecorder()
-		rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, "/v1/settings/ai-model", strings.NewReader(body)))
+		rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
 		return rec
 	}
-	if rec := do("PUT", `{"default_model":"zai-org/glm-5.3-flash"}`); rec.Code != http.StatusNoContent {
+	var got aiModelSettingResponse
+	if err := json.Unmarshal(do("GET", "/v1/settings/ai-model", "").Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.StepModels["brief"] != "ollama" || len(got.StepModels) != len(domain.ConfigurableModelSteps) || len(got.Steps) != len(domain.ConfigurableModelSteps) {
+		t.Fatalf("with nothing saved every step is on the first catalog model, got %+v", got)
+	}
+	if rec := do("PUT", "/v1/settings/ai-model/steps/brief", `{"model":"zai-org/glm-5.3-flash"}`); rec.Code != http.StatusNoContent {
 		t.Fatalf("put: status %d %s", rec.Code, rec.Body.String())
 	}
-	var got aiModelSettingResponse
-	if err := json.Unmarshal(do("GET", "").Body.Bytes(), &got); err != nil || got.DefaultModel != "zai-org/glm-5.3-flash" || got.ServerModel != "server-model" {
-		t.Fatalf("get: %+v, %v", got, err)
+	if steps := rt.effectiveStepDefaults(context.Background()); steps["brief"] != "zai-org/glm-5.3-flash" || steps["code"] != "ollama" {
+		t.Errorf("the status must report the saved default and leave other steps alone, got %v", steps)
 	}
-	if model := rt.effectiveDefaultModel(context.Background()); model != "zai-org/glm-5.3-flash" {
-		t.Errorf("the status must report the setting, got %q", model)
-	}
-	setting.model = ""
-	if model := rt.effectiveDefaultModel(context.Background()); model != "server-model" {
-		t.Errorf("with no setting the server's model applies, got %q", model)
-	}
-	setting.err = fmt.Errorf("unknown model")
-	if rec := do("PUT", `{"default_model":"x"}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("a refused model must be a 400, got %d", rec.Code)
+	setting.err = fmt.Errorf("%w: step", domain.ErrInvalidWizardInput)
+	if rec := do("PUT", "/v1/settings/ai-model/steps/render", `{"model":"ollama"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("a refused step must be a 400, got %d", rec.Code)
 	}
 }

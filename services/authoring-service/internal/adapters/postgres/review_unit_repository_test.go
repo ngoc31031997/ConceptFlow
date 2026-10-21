@@ -57,7 +57,7 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 	if err := r.SaveAuthoringModels(ctx, pid, models); err != nil {
 		t.Fatal(err)
 	}
-	if got, err := r.GetAuthoringModels(ctx, pid); err != nil || got != models {
+	if got, err := r.GetChosenAuthoringModels(ctx, pid); err != nil || got != models {
 		t.Fatalf("the brief's model must round-trip with the others, got %+v, %v", got, err)
 	}
 
@@ -91,32 +91,5 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 	}
 	if _, err := r.GetUnit(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey); !errors.Is(err, domain.ErrUnitNotFound) {
 		t.Fatalf("deleting the project must delete its units, got %v", err)
-	}
-}
-
-// The app-wide default model round-trips and clears.
-func TestDefaultModelSettingAgainstPostgres(t *testing.T) {
-	url := os.Getenv("TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("TEST_DATABASE_URL not set")
-	}
-	ctx := context.Background()
-	pool, err := NewPool(ctx, url, 4)
-	if err != nil {
-		t.Fatal(err)
-	}
-	r := NewPromptTemplateRepository(pool)
-	t.Cleanup(func() { _ = r.SaveDefaultModel(ctx, "") })
-	if err := r.SaveDefaultModel(ctx, "zai-org/glm-5.3-flash"); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := r.GetDefaultModel(ctx); err != nil || got != "zai-org/glm-5.3-flash" {
-		t.Fatalf("default model read back %q, %v", got, err)
-	}
-	if err := r.SaveDefaultModel(ctx, ""); err != nil {
-		t.Fatal(err)
-	}
-	if got, err := r.GetDefaultModel(ctx); err != nil || got != "" {
-		t.Fatalf("a cleared default must read as empty, got %q, %v", got, err)
 	}
 }

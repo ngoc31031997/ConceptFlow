@@ -324,9 +324,6 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	if uc.llm == nil {
 		return nil, ErrDrawerDisabled
 	}
-	if err := checkCodeModel(StepIllustrations, model); err != nil {
-		return nil, err
-	}
 	storyboard, err := uc.storyboards.GetAuthoringStoryboard(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("load storyboard: %w", err)

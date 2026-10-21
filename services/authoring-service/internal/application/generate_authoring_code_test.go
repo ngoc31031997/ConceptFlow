@@ -530,9 +530,8 @@ func (m fixedModels) GetAuthoringModels(context.Context, string) (domain.Authori
 	return domain.AuthoringStepModels(m), nil
 }
 
-// A project that saved Ollama for code before the rule existed
-// is stopped before any model call, with the reason.
-func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
+// A project whose code step is set to the local Ollama model runs on it.
+func TestCodeStepRunsOnASavedOllamaChoice(t *testing.T) {
 	renderCtx := &fakeRenderContext{
 		project: &domain.Project{ProjectID: "p1", ContentLanguage: domain.LanguageVietnamese, RenderEngine: domain.RenderEngineRemotion},
 		topic:   "t", storyboard: `{"scenes":[]}`,
@@ -542,10 +541,9 @@ func TestCodeStepRefusesASavedOllamaChoiceBeforeAnyCall(t *testing.T) {
 		newRenderer("SYSTEM {{topic}}", renderCtx), &stubProvider{content: "x"},
 		application.NewLLMUsageRecorder(&usagePort{}, nil), renderCtx, fixedModels{Code: "ollama"},
 		&recordingSaver{}, &contentSaver{}, &contentSaver{}, 0, 16000,
-	).WithLanguages(testLanguagePort()).WithPipeline(&stubFinalizer{}, gen)
+	).WithLanguages(testLanguagePort()).WithPipeline(&stubFinalizer{}, gen).WithSegments(newFakeSegments())
 	_, err := uc.Execute(context.Background(), "p1", "code")
-	var notForCode *application.ErrModelNotForCode
-	if !errors.As(err, &notForCode) || gen.calls != 0 {
-		t.Fatalf("err=%v codegen=%d, want ErrModelNotForCode before any call", err, gen.calls)
+	if err != nil || gen.calls != 1 || gen.req.Model != "ollama" {
+		t.Fatalf("err=%v codegen=%d model=%q, want one code run on ollama", err, gen.calls, gen.req.Model)
 	}
 }

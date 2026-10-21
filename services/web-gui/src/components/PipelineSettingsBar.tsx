@@ -81,7 +81,7 @@ export function PipelineSettingsBar({
               models={models}
               onChange={setModels}
               options={llm?.models ?? []}
-              defaultModel={llm?.default_model ?? ""}
+              stepDefaults={llm?.step_defaults}
               disabled={running}
               codeStats={llm?.code_stats}
               codeStatsError={llm?.code_stats_error}

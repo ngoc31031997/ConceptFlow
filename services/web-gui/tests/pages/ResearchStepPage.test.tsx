@@ -77,8 +77,7 @@ beforeEach(() => {
     enabled: true,
     provider: "hive",
     reason: "",
-    default_model: "m1",
-    models: [{ id: "m1", label: "Model 1", code_ok: true }],
+    models: [{ id: "m1", label: "Model 1" }],
   });
   vi.spyOn(apiClient, "getProject").mockImplementation(async () => project);
   vi.spyOn(apiClient, "listProjectErrors").mockResolvedValue([]);

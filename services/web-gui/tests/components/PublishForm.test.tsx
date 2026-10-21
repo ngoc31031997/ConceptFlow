@@ -35,10 +35,9 @@ describe("PublishForm model choice", () => {
     vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({
       enabled: true,
       provider: "hive",
-      default_model: "deepseek-ai/deepseek-v4.1-flash",
       models: [
-        { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", code_ok: true },
-        { id: "ollama", label: "Ollama (local AI)", code_ok: false },
+        { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash" },
+        { id: "ollama", label: "Ollama (local AI)", local: true },
       ],
     });
     vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });

@@ -2,34 +2,42 @@ package postgres
 
 import (
 	"context"
-	"errors"
+	"strings"
 
-	"github.com/jackc/pgx/v5"
+	"authoring/internal/domain"
 )
 
-const defaultModelKey = "default_model"
+// stepModelKeyPrefix starts the app_settings key of a step's default model;
+// the step name follows it.
+const stepModelKeyPrefix = "default_model."
 
-// GetDefaultModel returns the model every AI call runs on when nothing more
-// specific was chosen, or "" when none was set (the server's own default then
-// applies).
-func (r *PromptTemplateRepository) GetDefaultModel(ctx context.Context) (string, error) {
-	var value string
-	err := r.pool.QueryRow(ctx, `SELECT value FROM app_settings WHERE key = $1`, defaultModelKey).Scan(&value)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
+// GetStepDefaultModels returns the default model of every configurable step:
+// the one saved for it, else the first model of the catalog.
+func (r *PromptTemplateRepository) GetStepDefaultModels(ctx context.Context) (map[string]string, error) {
+	rows, err := r.pool.Query(ctx, `SELECT key, value FROM app_settings WHERE key LIKE $1`, stepModelKeyPrefix+"%")
+	if err != nil {
+		return nil, err
 	}
-	return value, err
+	defer rows.Close()
+	saved := map[string]string{}
+	for rows.Next() {
+		var key, value string
+		if err := rows.Scan(&key, &value); err != nil {
+			return nil, err
+		}
+		saved[strings.TrimPrefix(key, stepModelKeyPrefix)] = value
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return domain.WithStepModelFallback(saved), nil
 }
 
-// SaveDefaultModel stores the default model; "" clears it.
-func (r *PromptTemplateRepository) SaveDefaultModel(ctx context.Context, model string) error {
-	if model == "" {
-		_, err := r.pool.Exec(ctx, `DELETE FROM app_settings WHERE key = $1`, defaultModelKey)
-		return err
-	}
+// SaveStepDefaultModel stores the default model of one step.
+func (r *PromptTemplateRepository) SaveStepDefaultModel(ctx context.Context, step, model string) error {
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO app_settings (key, value) VALUES ($1, $2)
 		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value
-	`, defaultModelKey, model)
+	`, stepModelKeyPrefix+step, model)
 	return err
 }

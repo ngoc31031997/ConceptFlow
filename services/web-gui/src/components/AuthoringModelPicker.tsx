@@ -1,5 +1,6 @@
 import type { AuthoringModelOption, AuthoringStepModels, ModelUsageStats } from "../api/client";
 import { Dropdown } from "./ui";
+import { LOCAL_CODE_MODEL_WARNING } from "./localModelWarning";
 import glass from "../styles/glass.module.css";
 import styles from "./AuthoringModelPicker.module.css";
 
@@ -14,8 +15,8 @@ interface AuthoringModelPickerProps {
   onChange: (models: AuthoringStepModels) => void;
   /** Danh mục model server cho phép chọn (từ GET /v1/llm/status). */
   options: AuthoringModelOption[];
-  /** Model cụ thể mà giá trị rỗng ("") được máy chủ quy về. */
-  defaultModel?: string;
+  /** Model mặc định của từng bước ở Cài đặt; bước thiếu dùng model đầu danh mục. */
+  stepDefaults?: Record<string, string>;
   disabled?: boolean;
   /** Chi phí đã đo của từng model ở bước Code (GET /v1/llm/status). */
   codeStats?: Record<string, ModelUsageStats>;
@@ -65,16 +66,15 @@ export function codeStatsLine(stats: ModelUsageStats | undefined): { text: strin
  * vừa chọn, và lượt chạy AI tiếp theo dùng đúng nó.
  */
 export function AuthoringModelPicker({
-  models, onChange, options, defaultModel = "", disabled, codeStats, codeStatsError,
+  models, onChange, options, stepDefaults = {}, disabled, codeStats, codeStatsError,
 }: AuthoringModelPickerProps) {
   if (options.length === 0) return null;
 
-  // "" nghĩa là "mặc định máy chủ" — luôn hiện tên model thật thay vì nhãn mơ hồ.
-  const shown = options.some((o) => o.id === defaultModel) || !defaultModel
-    ? options
-    : [...options, { id: defaultModel, label: defaultModel }];
+  // Bước chưa chọn hiện mặc định của bước (Cài đặt), trước khi có thì model đầu danh mục.
+  const shown = options;
+  const defaultFor = (step: string) => stepDefaults[step] || options[0].id;
 
-  const codeModel = models.code || defaultModel;
+  const codeModel = models.code || defaultFor("code");
   const stats = codeStatsError ? { text: codeStatsError, warn: true } : codeStatsLine(codeStats?.[codeModel]);
 
   return (
@@ -87,12 +87,9 @@ export function AuthoringModelPicker({
       </div>
       <div className={styles.selects}>
         {STEP_ORDER.map(({ key, label }) => {
-          const value = models[key] || defaultModel || shown[0].id;
-          // Bước Code chỉ liệt kê model viết được code. Lựa chọn
-          // cũ không hợp lệ vẫn hiện (kèm nhãn) để Creator thấy mà đổi.
-          const listed = key === "code"
-            ? shown.filter((o) => o.code_ok !== false || o.id === value)
-            : shown;
+          const stepDefault = defaultFor(key);
+          const value = models[key] || stepDefault || shown[0].id;
+          const localCode = key === "code" && shown.find((o) => o.id === value)?.local === true;
           return (
             <div key={key} className={styles.field}>
               <span className={styles.fieldLabel}>{label}</span>
@@ -102,14 +99,17 @@ export function AuthoringModelPicker({
                 onChange={(v) => onChange({ ...models, [key]: v })}
                 disabled={disabled}
                 data-testid={`authoring-model-${key}`}
-                options={listed.map((option) => ({
+                options={shown.map((option) => ({
                   value: option.id,
                   label: option.label,
-                  badge: key === "code" && option.code_ok === false
-                    ? "Không dùng cho Code"
-                    : option.id === defaultModel ? "Mặc định" : undefined,
+                  badge: option.id === stepDefault ? "Mặc định" : undefined,
                 }))}
               />
+              {localCode && (
+                <span className={styles.statsWarn} data-testid="authoring-model-code-local-warning">
+                  {LOCAL_CODE_MODEL_WARNING}
+                </span>
+              )}
               {key === "code" && (
                 <span className={stats.warn ? styles.statsWarn : styles.stats} data-testid="authoring-model-code-stats">
                   {stats.text}

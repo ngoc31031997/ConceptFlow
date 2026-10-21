@@ -32,28 +32,31 @@ type creativeBriefUseCase interface {
 	Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error)
 }
 
-// defaultModelUseCase is the app setting for the default AI model.
+// defaultModelUseCase is the app setting for the default AI model of each step.
 type defaultModelUseCase interface {
-	Get(ctx context.Context) (string, error)
-	Set(ctx context.Context, model string) error
+	StepModels(ctx context.Context) (map[string]string, error)
+	SetStep(ctx context.Context, step, model string) error
 }
 
-// effectiveDefaultModel is the model an AI call runs on when nothing more
-// specific was chosen: the one set in the app's settings, else the server's.
-func (rt *Router) effectiveDefaultModel(ctx context.Context) string {
-	if rt.defaultModelSetting != nil {
-		if model, err := rt.defaultModelSetting.Get(ctx); err == nil && model != "" {
-			return model
-		}
+// effectiveStepDefaults is the default model of every configurable step. An
+// unreadable setting is logged and read as none, so the GUI still opens.
+func (rt *Router) effectiveStepDefaults(ctx context.Context) map[string]string {
+	if rt.defaultModelSetting == nil {
+		return map[string]string{}
 	}
-	return rt.defaultModel
+	steps, err := rt.defaultModelSetting.StepModels(ctx)
+	if err != nil {
+		slog.Warn("could not read the step default models", "error", err.Error())
+		return map[string]string{}
+	}
+	return steps
 }
 
-// aiModelSettingResponse is GET /v1/settings/ai-model: the model the Creator
-// set ("" when none) and the one the server falls back to.
+// aiModelSettingResponse is GET /v1/settings/ai-model: the default model of
+// every step, and the steps that can carry one.
 type aiModelSettingResponse struct {
-	DefaultModel string `json:"default_model"`
-	ServerModel  string `json:"server_model"`
+	StepModels map[string]string `json:"step_models"`
+	Steps      []string          `json:"steps"`
 }
 
 func (rt *Router) handleGetAIModelSetting(w http.ResponseWriter, r *http.Request) {
@@ -61,29 +64,34 @@ func (rt *Router) handleGetAIModelSetting(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusNotFound, "default model setting is not enabled")
 		return
 	}
-	model, err := rt.defaultModelSetting.Get(r.Context())
+	steps, err := rt.defaultModelSetting.StepModels(r.Context())
 	if err != nil {
-		slog.Error("read default model failed", "error", err.Error())
+		slog.Error("read step default models failed", "error", err.Error())
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	writeJSON(w, http.StatusOK, aiModelSettingResponse{DefaultModel: model, ServerModel: rt.defaultModel})
+	writeJSON(w, http.StatusOK, aiModelSettingResponse{StepModels: steps, Steps: domain.ConfigurableModelSteps})
 }
 
-func (rt *Router) handlePutAIModelSetting(w http.ResponseWriter, r *http.Request) {
+func (rt *Router) handlePutAIModelStep(w http.ResponseWriter, r *http.Request) {
 	if rt.defaultModelSetting == nil {
 		writeError(w, http.StatusNotFound, "default model setting is not enabled")
 		return
 	}
 	var body struct {
-		DefaultModel string `json:"default_model"`
+		Model string `json:"model"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := rt.defaultModelSetting.Set(r.Context(), body.DefaultModel); err != nil {
-		writeError(w, http.StatusBadRequest, err.Error())
+	if err := rt.defaultModelSetting.SetStep(r.Context(), chi.URLParam(r, "step"), body.Model); err != nil {
+		if errors.Is(err, domain.ErrInvalidWizardInput) {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		slog.Error("save step default model failed", "error", err.Error())
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -103,7 +111,7 @@ func (rt *Router) WithCreativeBrief(uc creativeBriefUseCase) *Router {
 
 func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Get("/v1/settings/ai-model", rt.handleGetAIModelSetting)
-	r.Put("/v1/settings/ai-model", rt.handlePutAIModelSetting)
+	r.Put("/v1/settings/ai-model/steps/{step}", rt.handlePutAIModelStep)
 	r.Get("/v1/projects/{project_id}/brief", rt.handleGetBrief)
 	r.Put("/v1/projects/{project_id}/brief/target-duration", rt.handleSetTargetDuration)
 	r.Post("/v1/projects/{project_id}/brief/generate", rt.handleGenerateBrief)

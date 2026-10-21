@@ -4,9 +4,9 @@ import { AuthoringModelPicker, codeStatsLine } from "../../src/components/Author
 import type { AuthoringModelOption, ModelUsageStats } from "../../src/api/client";
 
 const OPTIONS: AuthoringModelOption[] = [
-  { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash", code_ok: true },
-  { id: "zai-org/glm-5.3-flash", label: "GLM-5.3-Flash", code_ok: true },
-  { id: "ollama", label: "Ollama (local AI)", code_ok: false },
+  { id: "ollama", label: "Ollama (local AI)", local: true },
+  { id: "deepseek-ai/deepseek-v4.1-flash", label: "DeepSeek V4.1 Flash" },
+  { id: "zai-org/glm-5.3-flash", label: "GLM-5.3-Flash" },
 ];
 const DEEPSEEK: ModelUsageStats = {
   model: "deepseek-ai/deepseek-v4.1-flash", calls: 169, ok: 107, failures: { empty: 45, server: 17 },
@@ -23,28 +23,38 @@ function openOptions(testId: string): string[] {
 }
 
 describe("AuthoringModelPicker", () => {
-  it("does not offer Ollama for the code step", () => {
+  it("offers Ollama for every step, the code step included", () => {
     render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" />);
-    expect(openOptions("authoring-model-code").some((t) => t.includes("Ollama"))).toBe(false);
+      options={OPTIONS} />);
+    expect(openOptions("authoring-model-code").some((t) => t.includes("Ollama"))).toBe(true);
   });
 
-  it("still offers Ollama for the story step", () => {
-    render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" />);
-    expect(openOptions("authoring-model-story").some((t) => t.includes("Ollama"))).toBe(true);
+  it("warns on the code step when the chosen model is the local one", () => {
+    const { rerender } = render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: GLM.model }} onChange={vi.fn()}
+      options={OPTIONS} />);
+    expect(screen.queryByTestId("authoring-model-code-local-warning")).not.toBeInTheDocument();
+
+    rerender(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "ollama" }} onChange={vi.fn()}
+      options={OPTIONS} />);
+    expect(screen.getByTestId("authoring-model-code-local-warning")).toHaveTextContent("hết giờ");
+
+    rerender(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
+      options={OPTIONS} stepDefaults={{ code: "ollama" }} />);
+    expect(screen.getByTestId("authoring-model-code-local-warning")).toBeInTheDocument();
   });
 
-  it("keeps an old Ollama choice visible for code, marked as unusable", () => {
-    render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "ollama" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" />);
-    const texts = openOptions("authoring-model-code");
-    expect(texts.find((t) => t.includes("Ollama"))).toContain("Không dùng cho Code");
+  it("pre-selects the default saved for each step, and the first model when a step has none", () => {
+    render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
+      options={OPTIONS}
+      stepDefaults={{ story: "deepseek-ai/deepseek-v4.1-flash", code: "zai-org/glm-5.3-flash" }} />);
+    expect(screen.getByTestId("authoring-model-story")).toHaveTextContent("DeepSeek V4.1 Flash");
+    expect(screen.getByTestId("authoring-model-storyboard")).toHaveTextContent("Ollama");
+    expect(screen.getByTestId("authoring-model-code")).toHaveTextContent("GLM-5.3-Flash");
   });
 
   it("shows the measured cost of the chosen code model, as a warning when it ran out of budget", () => {
-    const { rerender } = render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash"
+    const { rerender } = render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: DEEPSEEK.model }} onChange={vi.fn()}
+      options={OPTIONS}
       codeStats={{ [DEEPSEEK.model]: DEEPSEEK, [GLM.model]: GLM }} />);
     const line = screen.getByTestId("authoring-model-code-stats");
     expect(line).toHaveTextContent("107/169 đoạn code đạt");
@@ -52,7 +62,7 @@ describe("AuthoringModelPicker", () => {
     expect(line).toHaveTextContent("trả về rỗng 45");
 
     rerender(<AuthoringModelPicker models={{ story: "", storyboard: "", code: GLM.model }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash"
+      options={OPTIONS}
       codeStats={{ [DEEPSEEK.model]: DEEPSEEK, [GLM.model]: GLM }} />);
     expect(screen.getByTestId("authoring-model-code-stats")).toHaveTextContent("TB 98k token, 8,8 phút mỗi đoạn");
     expect(codeStatsLine(GLM).warn).toBe(true);
@@ -61,11 +71,11 @@ describe("AuthoringModelPicker", () => {
 
   it("says when there is no data, and says so differently when the numbers could not be read", () => {
     const { rerender } = render(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" codeStats={{}} />);
+      options={OPTIONS} codeStats={{}} />);
     expect(screen.getByTestId("authoring-model-code-stats")).toHaveTextContent("Chưa có số liệu");
 
     rerender(<AuthoringModelPicker models={{ story: "", storyboard: "", code: "" }} onChange={vi.fn()}
-      options={OPTIONS} defaultModel="deepseek-ai/deepseek-v4.1-flash" codeStatsError="không đọc được số liệu đã đo" />);
+      options={OPTIONS} codeStatsError="không đọc được số liệu đã đo" />);
     expect(screen.getByTestId("authoring-model-code-stats")).toHaveTextContent("không đọc được số liệu đã đo");
   });
 });

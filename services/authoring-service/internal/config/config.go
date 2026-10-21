@@ -25,8 +25,8 @@ type Config struct {
 	LLMServiceURL string
 	// 0 = wait as long as llm-service does (Hive can take minutes on a reasoning model).
 	LLMServiceTimeout time.Duration
-	// HiveModel is the default the model picker shows; llm-service applies its
-	// own HIVE_MODEL when a call names none.
+	// HiveModel is the model llm-service applies when a call names none; it is
+	// logged at start-up.
 	HiveModel           string
 	HiveMaxInputChars   int
 	HiveMaxOutputTokens int

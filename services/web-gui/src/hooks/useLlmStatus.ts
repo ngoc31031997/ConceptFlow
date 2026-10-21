@@ -14,6 +14,14 @@ import { getLlmStatus, type LlmStatus } from "../api/client";
 let cachedStatus: LlmStatus | null = null;
 
 /**
+ * The model a step is pre-selected on when nothing was chosen for it: the
+ * default of the step set in Cài đặt, else "" while the status is unknown.
+ */
+export function defaultModelFor(llm: LlmStatus | null, step: string): string {
+  return llm?.step_defaults?.[step] ?? "";
+}
+
+/**
  * Whether the "Gọi API trực tiếp" mode exists on this
  * deployment at all.
  *
