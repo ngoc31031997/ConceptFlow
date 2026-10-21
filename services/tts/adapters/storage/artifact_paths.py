@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import wave
 
@@ -32,6 +33,32 @@ def compute_audio_path(project_id: str, scene_index: int, voice_id: str, text: s
     digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:12]
     return os.path.join(
         SHARED_VOLUME_ROOT, project_id, "audio", f"{scene_index}_{voice_id}_{digest}.wav"
+    )
+
+
+LINE_ID_PATTERN = re.compile(r"^b[1-9][0-9]*\.[1-9][0-9]*$")
+
+
+def is_valid_line_id(line_id: str) -> bool:
+    """A script line id (b1.2): the only shape allowed into a file name."""
+    return bool(LINE_ID_PATTERN.match(line_id))
+
+
+def compute_line_cache_key(voice_id: str, text: str) -> str:
+    """Names the reading of one line: the same wording in the same voice always
+    gives the same key, and different wording or voice never does."""
+    return hashlib.sha256(f"{voice_id}\n{text}".encode()).hexdigest()[:12]
+
+
+def compute_line_audio_path(project_id: str, line_id: str, cache_key: str) -> str:
+    """Conventional path:
+    /shared/{project_id}/audio/{line}_{cache_key}.wav, where the line id has its
+    dot written as a dash (b1.2 -> b1-2) so the name has one dot only."""
+    return os.path.join(
+        SHARED_VOLUME_ROOT,
+        _safe_project_id(project_id),
+        "audio",
+        f"{line_id.replace('.', '-')}_{cache_key}.wav",
     )
 
 

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -594,5 +595,30 @@ func TestHandleGetProject_PlacesTheIllustrationsStep(t *testing.T) {
 		if got.FlowStep != c.want {
 			t.Errorf("%s: flow_step %d, want %d", c.name, got.FlowStep, c.want)
 		}
+	}
+}
+
+type fakeDraftVoice struct {
+	project string
+	err     error
+}
+
+func (f *fakeDraftVoice) Dispatch(_ context.Context, projectID string) error {
+	f.project = projectID
+	return f.err
+}
+
+func TestInternalDraftVoiceDispatchesTheProjectsLines(t *testing.T) {
+	f := &fakeDraftVoice{}
+	rt := (&Router{}).WithDraftVoice(f)
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/internal/v1/projects/p1/draft-voice", nil))
+	if rec.Code != http.StatusAccepted || f.project != "p1" {
+		t.Errorf("status %d project %q", rec.Code, f.project)
+	}
+	rec = httptest.NewRecorder()
+	(&Router{}).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/internal/v1/projects/p1/draft-voice", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("not wired: status %d, want 404", rec.Code)
 	}
 }

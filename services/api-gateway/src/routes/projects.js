@@ -4,6 +4,8 @@ const express = require('express');
 const multer = require('multer');
 const { proxyHandler } = require('../handlers/proxyHandler');
 const { videoHandler } = require('../handlers/videoHandler');
+const { sharedFileHandler } = require('../handlers/sharedFileHandler');
+const path = require('path');
 const { deleteProjectHandler } = require('../handlers/deleteProjectHandler');
 const {
   thumbnailUploadHandler,
@@ -167,6 +169,26 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/beats', proxyHandler(authoringAi, 'authoring-service'));
   router.put('/v1/projects/:id/beats/order', proxyHandler(authoring, 'authoring-service'));
   router.delete('/v1/projects/:id/beats/:key', proxyHandler(authoring, 'authoring-service'));
+  // Bước Viết kịch bản: lời thoại từng beat đi qua /units/script_beat/*; ở đây là
+  // cả màn, các lượt AI (viết, gợi ý) và đưa câu đi đọc. Đọc giọng chạy nền qua
+  // orchestrator và tts nên lời gọi chỉ xếp câu vào hàng chờ.
+  router.get('/v1/projects/:id/script', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/script/suggest', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/script/speak', proxyHandler(authoring, 'authoring-service'));
+  // File giọng của từng câu, do tts ghi vào /shared/{project}/audio. Tên file gồm
+  // mã câu và khoá nội dung nên không bao giờ đổi; chỉ tên đúng mẫu mới được phát.
+  router.get('/v1/projects/:id/audio/:file', (req, res, next) => {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(req.params.id)) {
+      res.status(404).json({ error: 'file_not_found' });
+      return;
+    }
+    sharedFileHandler(path.join(sharedDir, req.params.id, 'audio'), {
+      param: 'file',
+      namePattern: /^b[1-9][0-9]*-[1-9][0-9]*_[0-9a-f]{12}\.wav$/,
+      contentType: 'audio/wav',
+    })(req, res, next);
+  });
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));

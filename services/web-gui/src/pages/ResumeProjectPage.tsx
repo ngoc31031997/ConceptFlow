@@ -1,11 +1,11 @@
 import { useContext, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { getAuthoringState, getProject, getResearch, getStory } from "../api/client";
+import { getAuthoringState, getBeats, getProject, getResearch, getStory } from "../api/client";
 import { ProjectDraftDispatchContext, defaultSubtitleStyle } from "../context/ProjectDraftContext";
 import type { ProjectDraft } from "../context/ProjectDraftContext";
 import { projectPath } from "../utils/pipelineLabels";
-import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute } from "../utils/flow";
+import { FLOW_CODE, FLOW_CONFIG, FLOW_STORY, authoringRoute, beatsRoute, scriptRoute } from "../utils/flow";
 import type { Project } from "../types";
 import type { AuthoringState } from "../api/client";
 import glass from "../styles/glass.module.css";
@@ -75,6 +75,15 @@ async function storyApproved(projectId: string): Promise<boolean> {
   }
 }
 
+/** True when every beat is approved; an unreadable beat sheet counts as not approved so the Creator lands on it. */
+async function beatsApproved(projectId: string): Promise<boolean> {
+  try {
+    return (await getBeats(projectId)).status === "approved";
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Mở lại một project đang dở ở máy/trình duyệt bất kỳ: nạp bước 1-3 đã lưu trên
  * server vào bản nháp, rồi đưa Creator tới đúng bước `wizard_step`. Project đã
@@ -126,6 +135,14 @@ export function ResumeProjectPage() {
         if (!stepParam && step === FLOW_STORY && !(await storyApproved(id))) {
           if (cancelled) return;
           navigate(`/projects/${id}/story`, { replace: true });
+          return;
+        }
+        // Script writing has a screen of its own; the beat sheet comes first
+        // until its beats are approved.
+        if (step === FLOW_STORY) {
+          const target = !stepParam && !(await beatsApproved(id)) ? beatsRoute(id) : scriptRoute(id);
+          if (cancelled) return;
+          navigate(target, { replace: true });
           return;
         }
         navigate(authoringRoute(step), { replace: true });

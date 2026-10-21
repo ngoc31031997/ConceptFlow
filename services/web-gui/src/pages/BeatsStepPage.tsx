@@ -16,7 +16,7 @@ import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useBeats, type BeatsControls } from "../hooks/useBeats";
 import { useLlmStatus } from "../hooks/useLlmStatus";
-import { VIEW_BEATS, comingRoute, readOnlyReason, storyRoute } from "../utils/flow";
+import { VIEW_BEATS, readOnlyReason, scriptRoute, storyRoute } from "../utils/flow";
 
 const SUBTITLE =
   "Bước 1: duyệt bộ khung (chức năng và dữ kiện của từng beat, dựng từ câu chuyện). Bước 2: AI viết nội dung từng beat, rồi bạn duyệt.";
@@ -214,7 +214,7 @@ export function BeatsStepPage() {
               : "Duyệt mọi beat để sang bước Viết kịch bản."
         }
         onBack={() => navigate(storyRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_BEATS + 1, projectId))}
+        onNext={() => navigate(scriptRoute(projectId))}
         nextDisabled={state?.status !== "approved"}
         nextLabel="Lưu và sang viết kịch bản"
         nextTestId="beats-next"

@@ -106,7 +106,10 @@ func main() {
 	// (ADR-0022) — a broker reconnect implicitly drops all consumers, and
 	// Consumer.Start is safe to call again (its old delivery loops already
 	// exited on their own when the previous channel closed).
-	consumer := amqp.NewConsumer(connMgr, inboxRepo, handleStepEvent, projectRepo, logger)
+	// Reading script lines aloud runs outside any saga: authoring-service lists
+	// the waiting lines, tts reads them, and the answer goes back to it.
+	draftVoice := application.NewDraftVoiceUseCase(authoringClient, outboxRepo)
+	consumer := amqp.NewConsumer(connMgr, inboxRepo, handleStepEvent, projectRepo, logger).WithDraftVoice(draftVoice)
 	if err := consumer.Start(ctx); err != nil {
 		logger.Error("failed to start amqp consumer", "error", err)
 		os.Exit(1)
@@ -143,6 +146,7 @@ func main() {
 	projectStore := projectStoreWithAuthoring{ProjectRepository: projectRepo, authoring: authoringClient}
 	router := httpadapter.NewRouter(startRenderSaga, startPublishSaga, retryStep, projectStore, reviewOutline, channelAssets).
 		WithDeleteProject(deleteProject).
+		WithDraftVoice(draftVoice).
 		WithQCReports(qcReportRepo).
 		WithProjectErrors(projectRepo).
 		WithProjectEvents(projectRepo).

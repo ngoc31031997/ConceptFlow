@@ -309,6 +309,24 @@ ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS research_model TEXT NOT N
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_frame_model TEXT NOT NULL DEFAULT '';
 -- Model the beat sheet step writes the beats with ('' = server default).
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS beat_sheet_model TEXT NOT NULL DEFAULT '';
+-- The reading of each script line by a voice: which wording and voice, and the
+-- file the voice service wrote (a path under /shared, never the audio).
+CREATE TABLE IF NOT EXISTS voice_lines (
+    project_id   TEXT NOT NULL,
+    line_id      TEXT NOT NULL,
+    text         TEXT NOT NULL,
+    text_sha     TEXT NOT NULL,
+    voice_id     TEXT NOT NULL DEFAULT '',
+    language     TEXT NOT NULL DEFAULT 'vi',
+    status       TEXT NOT NULL DEFAULT 'pending',
+    audio_path   TEXT NOT NULL DEFAULT '',
+    duration_s   DOUBLE PRECISION NOT NULL DEFAULT 0,
+    cache_key    TEXT NOT NULL DEFAULT '',
+    cache_hit    BOOLEAN NOT NULL DEFAULT false,
+    error        TEXT NOT NULL DEFAULT '',
+    requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, line_id)
+);
 -- One row per answer the Creator pasted into the research step, numbered per
 -- project. Holds what was read from it, never the pasted text itself.
 CREATE TABLE IF NOT EXISTS research_pastes (

@@ -2,7 +2,7 @@ aio-pika==9.4.*
 asyncpg==0.30.*
 # ADR-0024 — Edge Read Aloud voices are the default engine. No account or key,
 # but it does need the network.
-edge-tts==7.2.*
+edge-tts==7.3.*
 # ADR-0023 — Google Cloud TTS. Dormant, no free tier; only used when
 # GOOGLE_APPLICATION_CREDENTIALS is set.
 google-cloud-texttospeech==2.*

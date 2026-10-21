@@ -18,6 +18,7 @@ def _load(service: str):
 def test_paths_match_the_contract():
     tts, rendering, va = _load("tts"), _load("rendering"), _load("video-assembly")
     assert tts.compute_audio_path("P", 3, "v", "x").startswith("/shared/P/audio/")
+    assert tts.compute_line_audio_path("P", "b1.2", "0123456789ab") == "/shared/P/audio/b1-2_0123456789ab.wav"
     assert rendering.compute_video_path("P") == "/shared/P/video/rendered.mp4"
     assert rendering.compute_timing_path("P") == "/shared/P/video/timing.json"
     assert va.video_output_path("P") == "/shared/P/video/final.mp4"

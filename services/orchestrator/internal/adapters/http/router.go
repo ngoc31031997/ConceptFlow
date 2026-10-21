@@ -105,6 +105,17 @@ type deleteProjectUseCase interface {
 	Execute(ctx context.Context, projectID string) error
 }
 
+type draftVoiceUseCase interface {
+	Dispatch(ctx context.Context, projectID string) error
+}
+
+// WithDraftVoice enables POST /internal/v1/projects/{id}/draft-voice, the call
+// authoring-service makes when script lines wait to be read.
+func (rt *Router) WithDraftVoice(d draftVoiceUseCase) *Router {
+	rt.draftVoice = d
+	return rt
+}
+
 // WithDeleteProject switches DELETE /v1/projects/{id} to the delete saga.
 func (rt *Router) WithDeleteProject(d deleteProjectUseCase) *Router {
 	rt.deleteProject = d
@@ -117,6 +128,7 @@ type Router struct {
 	startPublishSaga   startPublishSagaUseCase
 	retryStep          retryStepUseCase
 	deleteProject      deleteProjectUseCase
+	draftVoice         draftVoiceUseCase
 	reviewOutline      reviewOutlineUseCase
 	projects           projectStore
 	channelAssets      channelAssetsUseCase
@@ -296,6 +308,7 @@ func (rt *Router) Handler() http.Handler {
 	r.Get("/internal/v1/projects/{project_id}/status", rt.handleInternalProjectStatus)
 	r.Get("/internal/v1/formats/{format_id}", rt.handleInternalGetFormat)
 	r.Get("/internal/v1/voices/{voice_id}/calibration", rt.handleInternalVoiceCalibration)
+	r.Post("/internal/v1/projects/{project_id}/draft-voice", rt.handleInternalDraftVoice)
 	r.Post("/internal/v1/projects/{project_id}/errors", rt.handleInternalAppendError)
 	r.Post("/internal/v1/projects/{project_id}/events", rt.handleInternalAppendEvent)
 	r.Post("/v1/sagas/render", rt.handleStartRenderSaga)
@@ -1041,6 +1054,18 @@ func (rt *Router) handleInternalAppendError(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (rt *Router) handleInternalDraftVoice(w http.ResponseWriter, r *http.Request) {
+	if rt.draftVoice == nil {
+		writeError(w, http.StatusNotFound, "draft voice is not enabled")
+		return
+	}
+	if err := rt.draftVoice.Dispatch(r.Context(), chi.URLParam(r, "project_id")); err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
 }
 
 func (rt *Router) handleInternalAppendEvent(w http.ResponseWriter, r *http.Request) {

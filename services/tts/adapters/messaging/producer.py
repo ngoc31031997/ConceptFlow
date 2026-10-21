@@ -11,6 +11,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 
+from application.synthesize_lines import LineSpeechResult
 from application.synthesize_speech_batch import SceneSpeechResult
 
 EVENTS_EXCHANGE = "events.direct"
@@ -50,4 +51,34 @@ def success_envelope(saga_id: str, project_id: str, results: list[SceneSpeechRes
 def failure_envelope(saga_id: str, project_id: str, error_message: str) -> dict:
     return build_envelope(
         saga_id, project_id, {"event_type": "synthesis_failed", "error_message": error_message}
+    )
+
+
+def lines_envelope(saga_id: str, project_id: str, results: list[LineSpeechResult]) -> dict:
+    """The answer to a synthesize_lines command: one entry per line, a file or
+    the reason the line could not be read."""
+    return build_envelope(
+        saga_id,
+        project_id,
+        {
+            "event_type": "lines_synthesized",
+            "lines": [
+                {
+                    "line_id": r.line_id,
+                    "ref": r.ref,
+                    "audio_path": r.audio_path,
+                    "duration_seconds": r.duration_seconds,
+                    "cache_key": r.cache_key,
+                    "cache_hit": r.cache_hit,
+                    "error": r.error,
+                }
+                for r in results
+            ],
+        },
+    )
+
+
+def lines_failure_envelope(saga_id: str, project_id: str, error_message: str) -> dict:
+    return build_envelope(
+        saga_id, project_id, {"event_type": "lines_synthesis_failed", "error_message": error_message}
     )

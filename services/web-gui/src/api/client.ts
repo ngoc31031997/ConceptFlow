@@ -453,6 +453,8 @@ export type PromptRole =
   | "story_approaches"
   | "story_frame"
   | "beat_sheet"
+  // Viết kịch bản: AI viết lời thoại từng beat và gợi ý sửa câu.
+  | "script_writer"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -2430,6 +2432,8 @@ export interface BeatState {
   unwritten: number;
   /** Beats the last content run resized so the total fits the target. */
   rebalanced: number;
+  /** How many beats have approved dialogue; moving a beat changes how it joins its neighbours. */
+  scriptApproved: number;
 }
 
 interface beatStateWire {
@@ -2460,6 +2464,7 @@ interface beatStateWire {
   phase: BeatPhase;
   unwritten: number;
   rebalanced: number;
+  script_approved: number;
 }
 
 function fromWireBeats(w: beatStateWire): BeatState {
@@ -2474,6 +2479,7 @@ function fromWireBeats(w: beatStateWire): BeatState {
     phase: w.phase,
     unwritten: w.unwritten,
     rebalanced: w.rebalanced,
+    scriptApproved: w.script_approved ?? 0,
   };
 }
 
@@ -2549,4 +2555,216 @@ export async function reorderBeats(projectId: string, order: string[]): Promise<
 /** Removes a beat from the sheet. */
 export async function deleteBeat(projectId: string, key: string): Promise<BeatState> {
   return fromWireBeats(await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/${encodeURIComponent(key)}`, { method: "DELETE" }));
+}
+
+/** The unit the dialogue of one beat is saved, redone and approved through; the key is the beat's key. */
+export function scriptBeatUnit(key: string): UnitRef<unknown> {
+  return { kind: "script_beat", key, parse: (c) => c };
+}
+
+/** The reading of one line: none (never asked, or the wording changed since), pending, running, ready or failed. */
+export type ScriptAudioState = "none" | "pending" | "running" | "ready" | "failed";
+
+export interface ScriptAudio {
+  state: ScriptAudioState;
+  /** Name of the voice file under /v1/projects/{id}/audio/; set when ready. */
+  file?: string;
+  error?: string;
+}
+
+/** A flag over one line: too long to say in one breath, or hard for a voice to read. */
+export interface ScriptLineFlag {
+  kind: "Câu dài" | "Khó nghe";
+  msg: string;
+}
+
+export interface ScriptLine {
+  /** `<beat key>.<n>`, never reused inside its beat. */
+  id: string;
+  text: string;
+  facts: string[];
+  /** Length in seconds: the voice file's when there is one for the current wording, else an estimate. */
+  seconds: number;
+  estimated: boolean;
+  flag: ScriptLineFlag | null;
+  audio: ScriptAudio;
+}
+
+export interface ScriptJoin {
+  ok: boolean;
+  msg: string;
+}
+
+/** The dialogue of one beat as the script screen shows it. */
+export interface ScriptBeat {
+  key: string;
+  /** Position in the sheet from 1. */
+  number: number;
+  fn: BeatFn;
+  title: string;
+  goal: string;
+  /** The length the beat sheet gave the beat. */
+  targetSeconds: number;
+  /** The beat has dialogue. */
+  written: boolean;
+  status: UnitStatus;
+  mine: string[];
+  /** The beat changed since its dialogue was written. */
+  stale: boolean;
+  lines: ScriptLine[];
+  seconds: number;
+  /** How the beat joins the one before it; null for the first beat and when there is nothing to join. */
+  join: ScriptJoin | null;
+}
+
+export interface ScriptCheck {
+  ok: boolean;
+  text: string;
+}
+
+export interface ScriptStats {
+  lines: number;
+  beats: number;
+  written: number;
+  /** Lines with no voice file for their current wording. */
+  estimated: number;
+  totalSeconds: number;
+  openFlags: number;
+  openJoins: number;
+}
+
+/** Everything the script screen shows. */
+export interface ScriptState {
+  /** Approved when every beat has dialogue and every beat is approved. */
+  status: UnitStatus;
+  beatsApproved: boolean;
+  beats: ScriptBeat[];
+  checks: ScriptCheck[];
+  stats: ScriptStats;
+  targetLabel: string;
+  inRange: boolean;
+  /** The voice the lines are read with; "" is the default voice. */
+  voiceId: string;
+}
+
+interface scriptStateWire {
+  status: UnitStatus;
+  beats_approved: boolean;
+  beats:
+    | {
+        key: string;
+        number: number;
+        fn: BeatFn;
+        title: string;
+        goal: string;
+        target_seconds: number;
+        written: boolean;
+        status: UnitStatus;
+        mine: string[] | null;
+        stale: boolean;
+        lines: { id: string; text: string; facts: string[] | null; seconds: number; estimated: boolean; flag: ScriptLineFlag | null; audio: ScriptAudio }[] | null;
+        seconds: number;
+        join: ScriptJoin | null;
+      }[]
+    | null;
+  checks: ScriptCheck[] | null;
+  stats: {
+    lines: number;
+    beats: number;
+    written: number;
+    estimated: number;
+    total_seconds: number;
+    open_flags: number;
+    open_joins: number;
+  };
+  target_label: string;
+  in_range: boolean;
+  voice_id: string;
+}
+
+function fromWireScript(w: scriptStateWire): ScriptState {
+  return {
+    status: w.status,
+    beatsApproved: w.beats_approved,
+    beats: (w.beats ?? []).map((b) => ({
+      key: b.key,
+      number: b.number,
+      fn: b.fn,
+      title: b.title,
+      goal: b.goal,
+      targetSeconds: b.target_seconds,
+      written: b.written,
+      status: b.status,
+      mine: b.mine ?? [],
+      stale: b.stale,
+      lines: (b.lines ?? []).map((l) => ({ ...l, facts: l.facts ?? [] })),
+      seconds: b.seconds,
+      join: b.join,
+    })),
+    checks: w.checks ?? [],
+    stats: {
+      lines: w.stats.lines,
+      beats: w.stats.beats,
+      written: w.stats.written,
+      estimated: w.stats.estimated,
+      totalSeconds: w.stats.total_seconds,
+      openFlags: w.stats.open_flags,
+      openJoins: w.stats.open_joins,
+    },
+    targetLabel: w.target_label,
+    inRange: w.in_range,
+    voiceId: w.voice_id,
+  };
+}
+
+/** Reads the script step: the dialogue of every beat, its flags, the checks and the reading of each line. */
+export async function getScript(projectId: string): Promise<ScriptState> {
+  return fromWireScript(await apiFetch<scriptStateWire>(`/v1/projects/${projectId}/script`));
+}
+
+/**
+ * Has the AI write the dialogue of the beats that have none, one beat after
+ * another (a model call: pass an operation id to follow it). With `beat` only
+ * that beat, which must have no dialogue yet.
+ */
+export async function generateScript(projectId: string, beat: string, note: string, operation?: OperationCall): Promise<ScriptState> {
+  return fromWireScript(
+    await apiFetch<scriptStateWire>(`/v1/projects/${projectId}/script/generate`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+      signal: operationInit(operation).signal,
+      body: JSON.stringify({ beat, note }),
+    }),
+  );
+}
+
+/**
+ * Asks the AI for one replacement sentence for a flagged line (`line`) or for
+ * the first line of a beat that joins badly with the one before it (`join`).
+ * Nothing is stored: the Creator applies the text with an edit of the line.
+ */
+export async function suggestScriptLine(projectId: string, kind: "line" | "join", lineId: string, operation?: OperationCall): Promise<string> {
+  const reply = await apiFetch<{ text: string }>(`/v1/projects/${projectId}/script/suggest`, {
+    method: "POST",
+    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: JSON.stringify({ kind, line_id: lineId }),
+  });
+  return reply.text;
+}
+
+/** Puts the lines in the queue to be read in the project's voice; lines that already have a current file are left alone. */
+export async function speakScriptLines(projectId: string, lineIds: string[]): Promise<ScriptState> {
+  return fromWireScript(
+    await apiFetch<scriptStateWire>(`/v1/projects/${projectId}/script/speak`, {
+      method: "POST",
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ line_ids: lineIds }),
+    }),
+  );
+}
+
+/** Where the browser plays a line's voice file from. */
+export function scriptAudioUrl(projectId: string, file: string): string {
+  return `${GATEWAY_URL}/v1/projects/${projectId}/audio/${encodeURIComponent(file)}`;
 }

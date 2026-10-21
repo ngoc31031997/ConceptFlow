@@ -11,6 +11,7 @@ Mount tại `/shared` (`/shared:ro` với publisher).
 | Đường dẫn | Chủ ghi | Ghi chú |
 |---|---|---|
 | `/shared/{project_id}/audio/{scene}_{voice}_{hash}.wav` | tts | |
+| `/shared/{project_id}/audio/{line}_{cache_key}.wav` | tts | giọng từng câu của kịch bản (`b1-2` là câu `b1.2`, dấu chấm đổi thành gạch ngang); `cache_key` là 12 ký tự đầu của sha256 (giọng, chữ), nên cùng chữ và giọng thì dùng lại file; api-gateway phát qua `/v1/projects/{id}/audio/{file}` |
 | `/shared/{project_id}/video/rendered.mp4` | rendering | video câm |
 | `/shared/{project_id}/video/timing.json` | rendering | sidecar thời gian |
 | `/shared/{project_id}/video/final.mp4` | video-assembly | |

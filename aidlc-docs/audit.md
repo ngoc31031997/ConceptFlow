@@ -3664,3 +3664,14 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3d, Code Generation xong, chờ Creator duyệt.
 
 ---
+
+---
+## CR-072-U3e — Code xong, chờ duyệt
+**Timestamp**: 2026-10-21T00:00:00Z
+**User Input**: "implement bước 6 trong https://claude.ai/artifact/HibBJUisUocqKXDZD57cTH"; trả lời bốn câu: "1 ok / 2 ai viết từng beat một / 3 làm đủ đường / 4 để máy cờ bằng bảng luật cố định (AI chỉ viết gợi ý khi bạn mở)"
+**AI Response**: Thiết kế và kế hoạch (`cr-072-u3e-script-writing-design.md`, `-code-generation-plan.md`), rồi code 19 task. authoring-service: đơn vị `script_beat` (khoá theo beat, câu có mã `b1.2` không dùng lại), AI viết từng beat đọc beat liền trước/sau, sửa tay/làm lại/duyệt, cờ câu dài và khó nghe bằng bảng luật cố định, kiểm câu mở/kết/chỗ nối, gợi ý AI chỉ khi hỏi, bảng `voice_lines` và route nội bộ cho đọc giọng; orchestrator: `DraftVoiceUseCase`, định tuyến `lines_synthesized` và lệnh `synthesize_lines` bị dead-letter ra ngoài saga; tts: `SynthesizeLinesUseCase` (cache theo giọng và chữ), consumer và producer; api-gateway: proxy `/script` và phát `/audio/{file}` từ `/shared`; web-gui: màn Viết kịch bản, nghe thử từng câu/beat/cả kịch bản, hộp xác nhận đổi thứ tự beat khi lời thoại đã duyệt. Khác thiết kế lúc duyệt: model AI dùng khoá `story` có sẵn; lấy câu chờ đọc bằng POST `claim`; nút viết lời thoại chạy thẳng không có hộp ghi chú.
+**Impact Assessment**: Go `gofmt`, `go vet`, `go test -race ./...` xanh (authoring chạy cả test kho Postgres trên Postgres tạm, đã xoá); tts pytest 119 xanh + ruff; api-gateway jest 177 xanh; web-gui `tsc`, `eslint` 0 lỗi, `vitest` 662 xanh (trừ `durationEstimate.test.ts`, chỉ lỗi khi chạy trong container vì đọc fixture ngoài thư mục web-gui). Chưa chạy AI thật và chưa nghe giọng thật trên stack. `tests/contracts` còn hai test đỏ có sẵn, không do CR này. Bước Kịch bản cũ không còn đường vào từ menu; video mới chưa đi tiếp được sau bước 6 tới khi U3f.
+**Artifacts Affected**: `services/authoring-service/`, `services/orchestrator/`, `services/tts/`, `services/api-gateway/`, `services/web-gui/`, `docs/contracts/script-v1.md`, `docs/contracts/shared-artifacts.md`, `docs/contracts/README.md`, `aidlc-docs/construction/plans/cr-072-u3e-script-writing-*.md`; chưa commit. Đã rebuild authoring-service, orchestrator, tts, api-gateway, web-gui, tất cả healthy.
+**Context**: CONSTRUCTION — CR-072-U3e, Code Generation xong, chờ Creator duyệt.
+
+---

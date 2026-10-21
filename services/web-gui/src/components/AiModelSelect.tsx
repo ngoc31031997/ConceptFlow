@@ -7,7 +7,7 @@ interface AiModelSelectProps {
   /** The project the choice belongs to. */
   projectId: string;
   /** Which model of the project this chooses. */
-  step: "brief" | "publish" | "research" | "story_frame" | "beat_sheet";
+  step: "brief" | "publish" | "research" | "story_frame" | "beat_sheet" | "story";
   /** What the AI does here ("Model viết brief"). */
   label: string;
   testId?: string;

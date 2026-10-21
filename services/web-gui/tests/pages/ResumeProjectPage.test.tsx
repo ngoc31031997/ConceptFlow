@@ -30,7 +30,8 @@ function renderResume(flowStep: number) {
             <Route path="/" element={<p>màn ý tưởng</p>} />
             <Route path="/projects/:id/research" element={<p>màn nghiên cứu</p>} />
             <Route path="/projects/:id/story" element={<p>màn câu chuyện</p>} />
-            <Route path="/create/script/outline" element={<p>màn kịch bản</p>} />
+            <Route path="/projects/:id/beats" element={<p>màn beat sheet</p>} />
+            <Route path="/projects/:id/script" element={<p>màn kịch bản</p>} />
             <Route path="/create/script/storyboard" element={<p>màn visual</p>} />
             <Route path="/create/script/illustrations" element={<p>màn hình minh hoạ</p>} />
             <Route path="/create/script/code" element={<p>màn code</p>} />
@@ -78,9 +79,18 @@ describe("ResumeProjectPage mở lại đúng bước server báo", () => {
     expect(await screen.findByText("màn câu chuyện")).toBeInTheDocument();
   });
 
-  it("dự án ở bước 3 với câu chuyện đã duyệt mở màn kịch bản", async () => {
+  it("dự án ở bước 3 với câu chuyện đã duyệt mà beat chưa duyệt mở màn Beat sheet", async () => {
     researchState(true);
     storyState("approved");
+    vi.spyOn(apiClient, "getBeats").mockResolvedValue({ status: "pending" } as never);
+    renderResume(3);
+    expect(await screen.findByText("màn beat sheet")).toBeInTheDocument();
+  });
+
+  it("dự án ở bước 3 với beat đã duyệt mở màn Viết kịch bản mới", async () => {
+    researchState(true);
+    storyState("approved");
+    vi.spyOn(apiClient, "getBeats").mockResolvedValue({ status: "approved" } as never);
     renderResume(3);
     expect(await screen.findByText("màn kịch bản")).toBeInTheDocument();
   });

@@ -102,7 +102,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research" | "story" | "beats";
+  screen?: "research" | "story" | "beats" | "script";
   /** What the step holds, in a few words, for the flow map. */
   note: string;
 }
@@ -113,7 +113,7 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 3, phase: 0, label: "Nghiên cứu", title: "Nghiên cứu và kiểm chứng", gate: true, optional: true, server: [], screen: "research", note: "Câu hỏi cần tra, prompt chép ra ngoài, dán kết quả, kiểm link và đoạn trích" },
   { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
-  { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], note: "Dàn ý và lời thoại theo beat" },
+  { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], screen: "script", note: "Lời thoại theo beat, chuyển tiếp, nghe thử" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
   { n: 8, phase: 1, label: "Mỹ thuật · lượt 1", title: "Thiết kế mỹ thuật · lượt 1", gate: true, server: [], note: "Diễn viên và phim trường dùng chung cả video" },
   { n: 9, phase: 1, label: "Storyboard", gate: true, server: [4], note: "Cảnh, shot, lời đọc, hình trên màn" },
@@ -171,6 +171,7 @@ export interface ScreenStanding {
   researchResolved: boolean;
   storyApproved: boolean;
   beatsApproved: boolean;
+  scriptApproved: boolean;
 }
 
 /**
@@ -189,10 +190,21 @@ export function screenStatus(view: FlowViewStep, flowStep: number, standing: Scr
     case "story":
       if (!standing.researchResolved) return "pending";
       return standing.storyApproved ? "done" : "waiting";
-    default:
+    case "beats":
       if (!standing.storyApproved) return "pending";
       return standing.beatsApproved ? "done" : "waiting";
+    default:
+      if (!standing.beatsApproved) return "pending";
+      return standing.scriptApproved ? "done" : "waiting";
   }
+}
+
+/** The number, in the 21-step flow, of the script step. */
+export const VIEW_SCRIPT = 6;
+
+/** The screen of the script step. */
+export function scriptRoute(projectId: string): string {
+  return `/projects/${projectId}/script`;
 }
 
 /** The screen of the beat sheet step. */

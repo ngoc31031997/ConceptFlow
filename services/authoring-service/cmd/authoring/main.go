@@ -142,10 +142,18 @@ func main() {
 	beats := application.NewBeatDeskUseCase(
 		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
+	// The script step: each beat's dialogue is a review unit; the voice lines
+	// hold the reading of each line, which the orchestrator gets read.
+	script := application.NewScriptDeskUseCase(
+		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats).
+		WithVoices(authoringRepo, projects)
+	voiceLines := application.NewVoiceLinesUseCase(authoringRepo)
+	research.RegisterFactDependents(script.FactDependents())
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindStory, story.GateUnitKind()).
 		Register(domain.UnitKindStoryField, story.FieldUnitKind()).
 		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
+		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
@@ -200,7 +208,8 @@ func main() {
 		WithCreativeBrief(creativeBrief).
 		WithResearch(research).
 		WithStory(story).
-		WithBeats(beats)
+		WithBeats(beats).
+		WithScript(script, voiceLines)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

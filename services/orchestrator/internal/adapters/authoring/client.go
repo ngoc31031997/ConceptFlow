@@ -153,3 +153,25 @@ func (c *Client) Summaries(ctx context.Context, projectIDs []string) (map[string
 func (c *Client) DeleteAuthoring(ctx context.Context, projectID string) error {
 	return c.do(ctx, http.MethodDelete, "/internal/v1/authoring/"+url.PathEscape(projectID), nil, nil)
 }
+
+// ClaimVoiceLines asks authoring-service for the script lines waiting to be
+// read; they are marked as sent.
+func (c *Client) ClaimVoiceLines(ctx context.Context, projectID string) ([]application.VoiceLine, error) {
+	var out struct {
+		Lines []application.VoiceLine `json:"lines"`
+	}
+	err := c.do(ctx, http.MethodPost, "/internal/v1/authoring/"+url.PathEscape(projectID)+"/voice-lines/claim", nil, &out)
+	return out.Lines, err
+}
+
+// SaveVoiceResults hands tts's answer for script lines to authoring-service.
+func (c *Client) SaveVoiceResults(ctx context.Context, projectID string, results []application.VoiceLineResult) error {
+	return c.do(ctx, http.MethodPost, "/internal/v1/authoring/"+url.PathEscape(projectID)+"/voice-lines/results",
+		map[string]any{"lines": results}, nil)
+}
+
+// FailVoiceLines marks the script lines sent to tts and still unanswered as failed.
+func (c *Client) FailVoiceLines(ctx context.Context, projectID, reason string) error {
+	return c.do(ctx, http.MethodPost, "/internal/v1/authoring/"+url.PathEscape(projectID)+"/voice-lines/fail",
+		map[string]any{"reason": reason}, nil)
+}

@@ -111,11 +111,27 @@ type inboxPort interface {
 // dead AMQP channel, so Start is safe to call again with no explicit
 // teardown (ADR-0022).
 type Consumer struct {
-	chans   *ConnectionManager
-	inbox   inboxPort
-	handler eventHandler
-	repo    domain.ProjectRepositoryPort
-	logger  *slog.Logger
+	chans      *ConnectionManager
+	inbox      inboxPort
+	handler    eventHandler
+	repo       domain.ProjectRepositoryPort
+	logger     *slog.Logger
+	draftVoice draftVoiceHandler
+}
+
+// draftVoiceHandler is the capability the consumer needs from
+// application.DraftVoiceUseCase: the answers to synthesize_lines commands,
+// which belong to no saga step.
+type draftVoiceHandler interface {
+	HandleEvent(ctx context.Context, projectID, eventType string, payload map[string]interface{}) error
+	FailUndelivered(ctx context.Context, projectID, reason string) error
+}
+
+// WithDraftVoice routes the answers to synthesize_lines commands, and such a
+// command when it is dead-lettered, to h instead of the saga.
+func (c *Consumer) WithDraftVoice(h draftVoiceHandler) *Consumer {
+	c.draftVoice = h
+	return c
 }
 
 // NewConsumer constructs the Consumer.
@@ -226,6 +242,11 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 
 	eventType := resolveEventType(envelope)
 
+	if c.draftVoice != nil && application.IsDraftVoiceEvent(eventType) {
+		c.handleDraftVoiceDelivery(ctx, d, envelope, eventType)
+		return
+	}
+
 	err = c.handler.Execute(ctx, application.StepEvent{
 		MessageID: envelope.MessageID,
 		SagaID:    envelope.SagaID,
@@ -257,6 +278,37 @@ func (c *Consumer) handleEventDelivery(ctx context.Context, d amqp.Delivery) {
 	_ = d.Ack(false)
 }
 
+// handleDraftVoiceDelivery passes tts's answer for script lines on. It retries
+// like any event: a failure nacks the message back, up to maxEventAttempts,
+// after which the lines are marked failed so the Creator sees it.
+func (c *Consumer) handleDraftVoiceDelivery(ctx context.Context, d amqp.Delivery, envelope domain.Envelope, eventType string) {
+	if err := c.draftVoice.HandleEvent(ctx, envelope.ProjectID, eventType, envelope.Payload); err != nil {
+		attempt := bumpEventAttempt(envelope.MessageID)
+		if attempt >= maxEventAttempts {
+			c.logger.ErrorContext(ctx, "draft voice event failed, giving up", "error", err, "event_type", eventType, "project_id", envelope.ProjectID)
+			reason := fmt.Sprintf("không ghi nhận được kết quả đọc giọng sau %d lần: %v", attempt, err)
+			if failErr := c.draftVoice.FailUndelivered(ctx, envelope.ProjectID, reason); failErr != nil {
+				nackWithBackoff(ctx, d)
+				return
+			}
+			clearEventAttempts(envelope.MessageID)
+			if markErr := c.inbox.MarkProcessed(ctx, envelope.MessageID); markErr != nil {
+				c.logger.ErrorContext(ctx, "failed to mark message processed", "error", markErr, "message_id", envelope.MessageID)
+			}
+			_ = d.Ack(false)
+			return
+		}
+		c.logger.ErrorContext(ctx, "draft voice event failed, nacking for redelivery", "error", err, "event_type", eventType, "attempt", attempt)
+		nackWithBackoff(ctx, d)
+		return
+	}
+	clearEventAttempts(envelope.MessageID)
+	if err := c.inbox.MarkProcessed(ctx, envelope.MessageID); err != nil {
+		c.logger.ErrorContext(ctx, "failed to mark message processed", "error", err, "message_id", envelope.MessageID)
+	}
+	_ = d.Ack(false)
+}
+
 // handleDLQDelivery handles a dead-lettered command: the envelope's
 // EventType is the step name it was originally dispatched for (commands are
 // published with EventType = step name, see application's dispatch
@@ -265,6 +317,17 @@ func (c *Consumer) handleDLQDelivery(ctx context.Context, d amqp.Delivery) {
 	envelope, err := DecodeEnvelope(d.Body)
 	if err != nil {
 		c.logger.ErrorContext(ctx, "failed to decode DLQ envelope, dropping", "error", err)
+		_ = d.Ack(false)
+		return
+	}
+
+	if c.draftVoice != nil && envelope.EventType == application.CommandSynthesizeLines {
+		// A draft voice command belongs to no saga step: only its lines fail.
+		if err := c.draftVoice.FailUndelivered(ctx, envelope.ProjectID, deadLetterMessage(d)); err != nil {
+			c.logger.ErrorContext(ctx, "failed to fail draft voice lines for DLQ delivery", "error", err)
+			nackWithBackoff(ctx, d)
+			return
+		}
 		_ = d.Ack(false)
 		return
 	}

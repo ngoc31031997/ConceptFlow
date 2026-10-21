@@ -103,6 +103,12 @@ func (c *Client) GetVoiceCalibration(ctx context.Context, voiceID string) (domai
 	return v, err
 }
 
+// DispatchDraftVoice asks the orchestrator to have the script lines that wait
+// to be read sent to the voice service.
+func (c *Client) DispatchDraftVoice(ctx context.Context, projectID string) error {
+	return c.do(ctx, http.MethodPost, "/internal/v1/projects/"+url.PathEscape(projectID)+"/draft-voice", nil, nil)
+}
+
 // AppendProjectError appends to the project's error log.
 func (c *Client) AppendProjectError(ctx context.Context, projectID string, e application.ProjectError) error {
 	return c.do(ctx, http.MethodPost, "/internal/v1/projects/"+url.PathEscape(projectID)+"/errors", e, nil)

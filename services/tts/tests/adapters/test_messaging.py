@@ -149,3 +149,72 @@ async def test_drops_a_command_the_creator_already_cancelled(shared_volume_root)
         assert not pool.store.outbox_events
     finally:
         REGISTRY._cancelled_at.pop(envelope["project_id"], None)
+
+
+def _lines_envelope(message_id: str = "lines-1", lines: list | None = None) -> bytes:
+    lines = lines or [
+        {"line_id": "b1.1", "text": "Câu một.", "language": "vi", "voice_id": "", "ref": "sha-1"},
+        {"line_id": "b1.2", "text": "Câu hai.", "language": "vi", "voice_id": "", "ref": "sha-2"},
+    ]
+    return json.dumps(
+        {
+            "message_id": message_id,
+            "saga_id": "saga-lines",
+            "project_id": "project-1",
+            "event_type": "synthesize_lines",
+            "timestamp": "2026-10-21T00:00:00Z",
+            "payload": {"event_type": "synthesize_lines", "lines": lines},
+        }
+    ).encode("utf-8")
+
+
+def _build_dispatcher(engine: TTSEnginePort):
+    from adapters.messaging.consumer import SynthesizeLinesCommandHandler, TtsCommandDispatcher
+    from application.synthesize_lines import SynthesizeLinesUseCase
+
+    pool = FakePool()
+    inbox, outbox = InboxRepository(pool), OutboxRepository()
+    speech = SynthesizeSpeechCommandHandler(
+        SynthesizeSpeechBatchUseCase(SynthesizeSpeechUseCase(engine)), pool, inbox, outbox
+    )
+    lines = SynthesizeLinesCommandHandler(SynthesizeLinesUseCase(engine), pool, inbox, outbox)
+    return TtsCommandDispatcher(speech, lines=lines), pool
+
+
+@pytest.mark.asyncio
+async def test_synthesize_lines_command_is_answered_with_one_entry_per_line(shared_volume_root) -> None:
+    dispatcher, pool = _build_dispatcher(FakeTTSEngine())
+    message = FakeMessage(_lines_envelope())
+
+    await dispatcher.handle(message)
+
+    assert message.acked is True
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "lines_synthesized"
+    answers = event["payload"]["payload"]["lines"]
+    assert [a["line_id"] for a in answers] == ["b1.1", "b1.2"]
+    assert [a["ref"] for a in answers] == ["sha-1", "sha-2"]
+    assert all(a["duration_seconds"] == 2.0 and a["error"] == "" for a in answers)
+    assert "lines-1" in pool.store.processed_message_ids
+
+
+@pytest.mark.asyncio
+async def test_a_synthesize_speech_command_still_goes_to_the_scene_handler(shared_volume_root) -> None:
+    dispatcher, pool = _build_dispatcher(FakeTTSEngine())
+
+    await dispatcher.handle(FakeMessage(make_envelope()))
+
+    event = next(iter(pool.store.outbox_events.values()))
+    assert event["event_type"] == "speech_synthesized"
+
+
+@pytest.mark.asyncio
+async def test_a_duplicate_synthesize_lines_message_is_not_read_again(shared_volume_root) -> None:
+    dispatcher, pool = _build_dispatcher(FakeTTSEngine())
+    pool.store.processed_message_ids.add("lines-1")
+    message = FakeMessage(_lines_envelope())
+
+    await dispatcher.handle(message)
+
+    assert message.acked is True
+    assert len(pool.store.outbox_events) == 0

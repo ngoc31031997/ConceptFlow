@@ -18,7 +18,11 @@ import signal
 import aio_pika
 
 from adapters.messaging.cancellation import CancelAwareOutbox, listen_for_cancels
-from adapters.messaging.consumer import SynthesizeSpeechCommandHandler, TtsCommandDispatcher
+from adapters.messaging.consumer import (
+    SynthesizeLinesCommandHandler,
+    SynthesizeSpeechCommandHandler,
+    TtsCommandDispatcher,
+)
 from adapters.messaging.producer import EVENTS_EXCHANGE, EVENTS_ROUTING_KEY
 from adapters.messaging.progress import PROGRESS_EXCHANGE, ProgressPublisher
 from adapters.messaging.purge import PurgeProjectArtifactsCommandHandler
@@ -32,6 +36,7 @@ from adapters.tts_engines.edge_adapter import EdgeTTSAdapter
 from adapters.tts_engines.routing_engine import RoutingTTSEngine
 from adapters.tts_engines.voice_registry import ENGINE_AZURE, ENGINE_GOOGLE
 from adapters.tts_engines.voice_samples import generate_missing_samples
+from application.synthesize_lines import SynthesizeLinesUseCase
 from application.synthesize_speech import SynthesizeSpeechUseCase
 from application.synthesize_speech_batch import SynthesizeSpeechBatchUseCase
 from domain.ports import TTSEnginePort
@@ -105,6 +110,8 @@ async def run() -> None:
         command_handler,
         # Dọn thư mục audio của project bị xoá.
         PurgeProjectArtifactsCommandHandler(purge_project_artifacts, pool, inbox, outbox),
+        # Đọc từng câu của kịch bản ngoài saga render (ADR-0040).
+        SynthesizeLinesCommandHandler(SynthesizeLinesUseCase(engine), pool, inbox, outbox),
     )
     relay = OutboxRelay(pool, exchange, make_persistent_message, EVENTS_ROUTING_KEY)
     relay.start()

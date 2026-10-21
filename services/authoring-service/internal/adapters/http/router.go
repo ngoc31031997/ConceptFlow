@@ -58,6 +58,8 @@ type Router struct {
 	research                researchUseCase
 	story                   storyUseCase
 	beats                   beatUseCase
+	script                  scriptUseCase
+	voiceLines              voiceLinesUseCase
 }
 
 // NewRouter constructs the router; every capability is attached with a With* method.
@@ -87,6 +89,8 @@ func (rt *Router) Handler() http.Handler {
 	rt.storyRoutes(r)
 	// The beat sheet step: the beats, their order and the AI runs that write them.
 	rt.beatRoutes(r)
+	// The script step: the dialogue of each beat, its checks and the reading of each line.
+	rt.scriptRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
@@ -127,6 +131,9 @@ func (rt *Router) Handler() http.Handler {
 	// Internal — called by the orchestrator only (never routed by the gateway).
 	r.Get("/internal/v1/authoring/summaries", rt.handleInternalSummaries)
 	r.Get("/internal/v1/authoring/similar", rt.handleInternalSimilar)
+	r.Post("/internal/v1/authoring/{project_id}/voice-lines/claim", rt.handleClaimVoiceLines)
+	r.Post("/internal/v1/authoring/{project_id}/voice-lines/results", rt.handleVoiceLineResults)
+	r.Post("/internal/v1/authoring/{project_id}/voice-lines/fail", rt.handleFailVoiceLines)
 	r.Get("/internal/v1/authoring/{project_id}", rt.handleGetAuthoringState)
 	r.Put("/internal/v1/authoring/{project_id}", rt.handleInternalPut)
 	r.Delete("/internal/v1/authoring/{project_id}", rt.handleInternalDelete)

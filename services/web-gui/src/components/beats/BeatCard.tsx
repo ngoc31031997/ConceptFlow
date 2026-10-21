@@ -62,6 +62,8 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const [editing, setEditing] = useState(false);
   const [redoing, setRedoing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Moving a beat changes how it joins its neighbours, so it asks first once dialogue is approved.
+  const [moving, setMoving] = useState<-1 | 1 | null>(null);
   const unit = beatUnit(beat.key);
   const editImpact = useUnitImpact(projectId, unit, editing);
   const redoImpact = useUnitImpact(projectId, unit, redoing);
@@ -217,10 +219,10 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         )}
 
         <div className={styles.moves}>
-          <Button variant="ghost" className={researchStyles.sm} onClick={() => void beats.move(beat.key, -1)} disabled={busy || index === 0} data-testid={`beat-up-${beat.key}`}>
+          <Button variant="ghost" className={researchStyles.sm} onClick={() => (state.scriptApproved > 0 ? setMoving(-1) : void beats.move(beat.key, -1))} disabled={busy || index === 0} data-testid={`beat-up-${beat.key}`}>
             ↑ Lên
           </Button>
-          <Button variant="ghost" className={researchStyles.sm} onClick={() => void beats.move(beat.key, 1)} disabled={busy || last} data-testid={`beat-down-${beat.key}`}>
+          <Button variant="ghost" className={researchStyles.sm} onClick={() => (state.scriptApproved > 0 ? setMoving(1) : void beats.move(beat.key, 1))} disabled={busy || last} data-testid={`beat-down-${beat.key}`}>
             ↓ Xuống
           </Button>
           {!skeleton && aiAvailable && !beat.goal.trim() && !beat.content.trim() && (
@@ -263,6 +265,28 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         modelSelect={aiAvailable ? <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId={`beat-redo-model-${beat.key}`} /> : undefined}
         onSend={(note) => void beats.redo(beat.key, note)}
         testId={`beat-redo-${beat.key}`}
+      />
+      <ImpactConfirm
+        open={moving !== null}
+        onClose={() => setMoving(null)}
+        title={`Đổi thứ tự beat B${no}?`}
+        lead={`“${beat.title}” đi ${moving === -1 ? "lên trước" : "xuống sau"} một beat`}
+        list={[
+          `${state.scriptApproved} beat đã có lời thoại được duyệt. Lời thoại giữ nguyên và vẫn đã duyệt.`,
+          "Chỗ nối giữa các beat đổi chỗ được kiểm lại ở bước Viết kịch bản; câu đầu beat có thể cần viết lại cho nối mượt.",
+        ]}
+        undo="Đổi lại thứ tự để quay về như cũ."
+        choices={[
+          {
+            label: "Đổi thứ tự",
+            variant: "impact",
+            onChoose: () => {
+              if (moving !== null) void beats.move(beat.key, moving);
+            },
+            testId: `beat-move-confirm-${beat.key}`,
+          },
+        ]}
+        testId={`beat-move-dialog-${beat.key}`}
       />
       <ImpactConfirm
         open={deleting}

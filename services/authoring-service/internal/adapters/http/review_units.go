@@ -316,7 +316,8 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty),
 		errors.Is(err, application.ErrStoryIncomplete), errors.Is(err, application.ErrStoryNothingToWrite),
-		errors.Is(err, application.ErrBeatNoGoal), errors.Is(err, application.ErrBeatSheetFull):
+		errors.Is(err, application.ErrBeatNoGoal), errors.Is(err, application.ErrBeatSheetFull),
+		errors.Is(err, application.ErrScriptBeatEmpty), errors.Is(err, application.ErrScriptBeatHasLines), errors.Is(err, application.ErrScriptLineNotFlagged):
 		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput))
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, reasonOf(err, domain.ErrInvalidStatus))
@@ -347,7 +348,7 @@ func writeUnitRunError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrInvalidStatus):
 		writeUnitError(w, err)
-	case errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable):
+	case errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable):
 		writeError(w, http.StatusBadGateway, err.Error()+". Thử làm lại, hoặc tự điền các ô.")
 	case errors.Is(err, application.ErrLLMNotConfigured):
 		writeError(w, http.StatusServiceUnavailable,

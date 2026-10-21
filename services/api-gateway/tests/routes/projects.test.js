@@ -132,3 +132,48 @@ describe('routes/projects', () => {
     });
   });
 });
+
+describe('GET /v1/projects/:id/audio/:file', () => {
+  const WAV = Buffer.from('RIFF0000WAVEfmt ', 'ascii');
+  const NAME = 'b1-2_0123456789ab.wav';
+  let dir;
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gateway-audio-'));
+    fs.mkdirSync(path.join(dir, 'p1', 'audio'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'p1', 'audio', NAME), WAV);
+    fs.writeFileSync(path.join(dir, 'p1', 'audio', '0_vi-VN-HoaiMyNeural_0123456789ab.wav'), WAV);
+    fs.mkdirSync(path.join(dir, 'p2', 'audio'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'p2', 'audio', 'b9-9_0123456789ab.wav'), WAV);
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  test('serves a line file of the project as audio/wav', async () => {
+    const res = await request(buildApp({ request: jest.fn() }, dir)).get(`/v1/projects/p1/audio/${NAME}`);
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/audio\/wav/);
+    expect(res.headers['accept-ranges']).toBe('bytes');
+  });
+
+  test('supports a Range request so the player can seek', async () => {
+    const res = await request(buildApp({ request: jest.fn() }, dir))
+      .get(`/v1/projects/p1/audio/${NAME}`)
+      .set('Range', 'bytes=0-3');
+    expect(res.status).toBe(206);
+    expect(res.headers['content-range']).toBe(`bytes 0-3/${WAV.length}`);
+  });
+
+  test.each([
+    ['a scene file that is not a line file', '0_vi-VN-HoaiMyNeural_0123456789ab.wav'],
+    ['a name that tries to leave the folder', '..%2F..%2Fsecret.wav'],
+    ['a line file of another project', 'b9-9_0123456789ab.wav'],
+    ['a file that does not exist', 'b7-7_0123456789ab.wav'],
+  ])('404 for %s', async (_label, file) => {
+    const res = await request(buildApp({ request: jest.fn() }, dir)).get(`/v1/projects/p1/audio/${file}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('404 for a project id that could point outside the shared folder', async () => {
+    const res = await request(buildApp({ request: jest.fn() }, dir)).get(`/v1/projects/..%2Fp2/audio/b9-9_0123456789ab.wav`);
+    expect(res.status).toBe(404);
+  });
+});

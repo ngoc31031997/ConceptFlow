@@ -176,8 +176,29 @@ func (k beatKind) Redo(ctx context.Context, projectID, key, note string) (domain
 	return uc.units.GetUnit(ctx, projectID, domain.UnitKindBeat, key)
 }
 
-// Impact is empty: nothing is built on the beats yet.
-func (beatKind) Impact(context.Context, string, string) ([]string, error) { return []string{}, nil }
+// Impact lists the dialogue written for the beat: editing the beat marks it
+// as out of date for the Creator to review again.
+func (k beatKind) Impact(ctx context.Context, projectID, key string) ([]string, error) {
+	items := []string{}
+	if err := requireBeatKey(key); err != nil {
+		return items, err
+	}
+	unit, err := k.desk.units.GetUnit(ctx, projectID, domain.UnitKindScriptBeat, key)
+	if errors.Is(err, domain.ErrUnitNotFound) {
+		return items, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	script, err := readScriptBeat(unit)
+	if err != nil {
+		return nil, err
+	}
+	if len(script.Lines) > 0 {
+		items = append(items, fmt.Sprintf("Viết kịch bản: lời thoại của beat này (%d câu) cần xem lại", len(script.Lines)))
+	}
+	return items, nil
+}
 
 // CheckApprovable refuses a beat without a goal.
 func (beatKind) CheckApprovable(_ context.Context, unit domain.ReviewUnit) error {

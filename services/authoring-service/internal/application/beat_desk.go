@@ -73,6 +73,9 @@ type BeatState struct {
 	Rebalanced int `json:"rebalanced"`
 	// TargetLabel is the length the video aims for, as the screen says it.
 	TargetLabel string `json:"target_label"`
+	// ScriptApproved counts the beats whose dialogue is approved; moving a
+	// beat changes how it joins its neighbours, so the screen asks first.
+	ScriptApproved int `json:"script_approved"`
 }
 
 // BeatDeskUseCase backs the beat sheet step: the beats the AI writes from the
@@ -247,6 +250,15 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 			approved++
 		}
 	}
+	scriptUnits, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindScriptBeat)
+	if err != nil {
+		return BeatState{}, err
+	}
+	for _, u := range scriptUnits {
+		if u.Status == domain.UnitApproved && indexOfBeat(stored, u.Key) >= 0 {
+			state.ScriptApproved++
+		}
+	}
 	mustSet := toSet(must)
 	for _, b := range stored {
 		view := BeatView{Key: b.unit.Key, Beat: b.Beat, Status: b.unit.Status, Mine: append([]string{}, b.unit.CreatorFields...), Stale: b.unit.Stale, OnlyMust: []string{}, NoFact: b.Fn != domain.BeatFns[0] && len(b.Facts) == 0}
@@ -323,6 +335,9 @@ func (uc *BeatDeskUseCase) Delete(ctx context.Context, projectID, key string) er
 	if err := uc.saveSheet(ctx, sheetUnit, gate); err != nil {
 		return err
 	}
+	if err := uc.units.DeleteUnit(ctx, projectID, domain.UnitKindScriptBeat, key); err != nil {
+		return err
+	}
 	return uc.units.DeleteUnit(ctx, projectID, domain.UnitKindBeat, key)
 }
 
@@ -346,6 +361,15 @@ func (uc *BeatDeskUseCase) Reorder(ctx context.Context, projectID string, order 
 	}
 	gate.Order = append([]string{}, order...)
 	return uc.saveSheet(ctx, sheetUnit, gate)
+}
+
+func indexOfBeat(beats []storedBeat, key string) int {
+	for i, b := range beats {
+		if b.unit.Key == key {
+			return i
+		}
+	}
+	return -1
 }
 
 func indexOf(list []string, key string) int {

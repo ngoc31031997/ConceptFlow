@@ -3,6 +3,7 @@ import {
   FLOW_VIEW,
   VIEW_BEATS,
   VIEW_RESEARCH,
+  VIEW_SCRIPT,
   VIEW_STORY,
   beatsRoute,
   comingRoute,
@@ -11,6 +12,7 @@ import {
   phaseOfView,
   screenRoute,
   screenStatus,
+  scriptRoute,
   storyRoute,
 } from "../../src/utils/flow";
 
@@ -45,7 +47,7 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
 
-  const none = { researchResolved: false, storyApproved: false, beatsApproved: false };
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false };
   const researched = { ...none, researchResolved: true };
   const storied = { ...researched, storyApproved: true };
   const beaten = { ...storied, beatsApproved: true };
@@ -75,6 +77,17 @@ describe("steps with a screen of their own", () => {
     expect(screenStatus(beats, 3, beaten)).toBe("done");
     expect(beatsRoute("p1")).toBe("/projects/p1/beats");
     expect(screenRoute(beats, "p1")).toBe("/projects/p1/beats");
+  });
+
+  it("opens the script only once every beat is approved, and passes it with approval", () => {
+    const script = FLOW_VIEW[VIEW_SCRIPT - 1];
+    expect(script.screen).toBe("script");
+    expect(screenStatus(script, 3, storied)).toBe("pending");
+    expect(screenStatus(script, 3, beaten)).toBe("waiting");
+    expect(screenStatus(script, 3, { ...beaten, scriptApproved: true })).toBe("done");
+    expect(screenStatus(script, 4, none)).toBe("done");
+    expect(scriptRoute("p1")).toBe("/projects/p1/script");
+    expect(screenRoute(script, "p1")).toBe("/projects/p1/script");
   });
 
   it("finds the phase of a step by its place in the 21 steps", () => {

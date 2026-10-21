@@ -5,12 +5,14 @@ import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useAuthoringRun } from "../context/AuthoringRunContext";
 import {
   AUTHORING_STEP_FLOW,
+  FLOW_STORY,
   authoringRoute,
   comingRoute,
   flowRoute,
   isBuilt,
   previewRoute,
   screenRoute,
+  scriptRoute,
   stepStatus,
   type FlowViewStep,
   type StepStatus,
@@ -95,6 +97,11 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
     }
     if (!hasProject) {
       navigate(DRAFT_ROUTES[step - 1]);
+      return;
+    }
+    // The script step has a screen of its own; the old script screen has no way in.
+    if (step === FLOW_STORY) {
+      navigate(scriptRoute(projectId));
       return;
     }
     // Bản nháp đang mở đúng project này và còn sửa được: đi thẳng, giữ những gì

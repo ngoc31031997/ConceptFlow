@@ -56,6 +56,7 @@ function baseState(over: Partial<BeatState> = {}): BeatState {
     phase: "content",
     unwritten: 0,
     rebalanced: 0,
+    scriptApproved: 0,
     ...over,
   };
 }
@@ -268,6 +269,17 @@ describe("BeatsStepPage", () => {
     await waitFor(() => expect(reorder).toHaveBeenCalledWith("p1", ["b2", "b1", "b3"]));
   });
 
+  it("asks before moving a beat once dialogue is approved, and says how many beats it touches", async () => {
+    state = baseState({ scriptApproved: 2 });
+    const reorder = vi.spyOn(apiClient, "reorderBeats").mockResolvedValue(baseState());
+    await ready();
+    fireEvent.click(screen.getByTestId("beat-down-b1"));
+    expect(screen.getByTestId("beat-move-dialog-b1")).toHaveTextContent("2 beat đã có lời thoại được duyệt");
+    expect(reorder).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("beat-move-confirm-b1"));
+    await waitFor(() => expect(reorder).toHaveBeenCalledWith("p1", ["b2", "b1", "b3"]));
+  });
+
   it("has the AI write a new beat after another", async () => {
     const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
     await ready();
@@ -324,7 +336,7 @@ describe("BeatsStepPage", () => {
     await waitFor(() => expect(screen.getByTestId("step-strip")).toHaveTextContent("Beat sheet đã duyệt"));
     expect(approve.mock.calls.map((c) => (c[1] as { key: string }).key)).toEqual(["b1", "b2", "b3"]);
     fireEvent.click(screen.getByTestId("beats-next"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/6");
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/script");
   });
 
   it("rewrites the whole sheet with a note after saying what it keeps", async () => {
