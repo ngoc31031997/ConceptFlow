@@ -122,17 +122,16 @@ func (uc *BeatDeskUseCase) run(ctx context.Context, projectID string, bc beatCon
 		return nil, fmt.Errorf("load beat sheet prompt: %w", err)
 	}
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"channel_identity": domain.ChannelIdentity(bc.language),
-		"topic":            bc.topic,
-		"brief_language":   briefLanguageName(bc.language),
-		"target":           bc.targetLabel,
-		"brief":            bc.brief,
-		"story":            bc.story,
-		"facts":            factsText(bc.facts),
-		"current_beats":    currentBeatsText(current),
-		"kept_beats":       keptBeatsText(current),
-		"redo_note":        noteText(note),
-		"task":             task,
+		"topic":          bc.topic,
+		"brief_language": briefLanguageName(bc.language),
+		"target":         bc.targetLabel,
+		"brief":          bc.brief,
+		"story":          bc.story,
+		"facts":          factsText(bc.facts),
+		"current_beats":  currentBeatsText(current),
+		"kept_beats":     keptBeatsText(current),
+		"redo_note":      noteText(note),
+		"task":           task,
 	})
 	content, err := uc.chat(ctx, projectID, bc.model, system)
 	if err != nil {

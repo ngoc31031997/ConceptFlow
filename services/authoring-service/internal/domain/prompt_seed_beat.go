@@ -11,8 +11,6 @@ import "fmt"
 // is read.
 const beatSheetVI = `Bạn là BIÊN KỊCH của một kênh video phổ biến kiến thức. Việc của bạn ở bước này là chia câu chuyện thành các BEAT: mỗi beat có một chức năng và đẩy người xem tiến một bước. Chưa viết lời thoại.
 
-{{channel_identity}}
-
 ======================================================
 ĐỀ TÀI: {{topic}}
 NGÔN NGỮ: {{brief_language}}

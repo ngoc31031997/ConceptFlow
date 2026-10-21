@@ -95,7 +95,7 @@ func TestBeatSheetRoleIsShippedAndTakesItsValues(t *testing.T) {
 		t.Fatal("beat_sheet must be a known role filled by its own use case")
 	}
 	out := RenderPromptTemplate(seededText(t, RoleBeatSheet), map[string]string{
-		"channel_identity": "KÊNH", "topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "target": "4–5 phút", "brief": "BRIEF",
+		"topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "target": "4–5 phút", "brief": "BRIEF",
 		"story": "STORY", "facts": "FACTS", "current_beats": "b1 (B1)", "kept_beats": "- b1: goal", "redo_note": "GHI-CHÚ",
 		"task": BeatTaskAdd("b1", "b2"),
 	})
