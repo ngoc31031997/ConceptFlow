@@ -27,6 +27,8 @@ function beat(key: string, over: Partial<Beat> = {}): Beat {
     mine: [],
     stale: false,
     onlyMust: [],
+    noFact: false,
+    step: `Bước ${key}`,
     ...over,
   };
 }
@@ -51,6 +53,9 @@ function baseState(over: Partial<BeatState> = {}): BeatState {
     ],
     totalSeconds: 108,
     targetLabel: "4–5 phút",
+    phase: "content",
+    unwritten: 0,
+    rebalanced: 0,
     ...over,
   };
 }
@@ -114,23 +119,101 @@ describe("BeatsStepPage", () => {
   });
 
   it("says what the step waits for while the story is not approved", async () => {
-    state = baseState({ storyApproved: false, beats: [], checks: [] });
+    state = baseState({ storyApproved: false, beats: [], checks: [], phase: "empty" });
     renderPage();
     expect(await screen.findByTestId("beats-not-open")).toHaveTextContent("Duyệt câu chuyện");
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chưa mở bước");
     expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
   });
 
-  it("has the AI write the sheet when there is none", async () => {
-    state = baseState({ beats: [], checks: [] });
-    const generate = vi.spyOn(apiClient, "generateBeats").mockResolvedValue(baseState());
+  it("builds the skeleton from the story when there is no sheet, without the AI", async () => {
+    state = baseState({ beats: [], checks: [], phase: "empty" });
+    const build = vi.spyOn(apiClient, "buildBeatSkeleton").mockResolvedValue(baseState({ phase: "skeleton" }));
     renderPage();
-    fireEvent.click(await screen.findByTestId("beats-generate"));
-    await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "", expect.anything()));
+    expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("beats-build-skeleton"));
+    await waitFor(() => expect(build).toHaveBeenCalledWith("p1"));
+  });
+
+  it("shows only the function, the story line and the facts while the skeleton is reviewed", async () => {
+    state = baseState({
+      phase: "skeleton",
+      unwritten: 3,
+      beats: [beat("b1", { fn: "Hook", goal: "", content: "" }), beat("b2", { goal: "", content: "", noFact: true }), beat("b3", { fn: "Payoff", goal: "", content: "", next: "" })],
+    });
+    await ready();
+    expect(screen.getByTestId("beat-step-b2")).toHaveTextContent("Bước b2");
+    expect(screen.getByTestId("beat-fn-b2")).toBeInTheDocument();
+    expect(screen.getByTestId("beat-nofact-mark-b2")).toBeInTheDocument();
+    expect(screen.queryByTestId("beat-dur-b2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("beat-goal-b2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("beat-review-b2")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("beats-timeline")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
+    expect(screen.getByTestId("step-strip")).toHaveTextContent("Chờ bạn duyệt bộ khung");
+    expect(screen.getByTestId("beat-add-b1")).toHaveTextContent("+ Thêm beat trống sau");
+  });
+
+  it("approves the skeleton, and asks first before building it again", async () => {
+    state = baseState({ phase: "skeleton", unwritten: 3 });
+    const approve = vi.spyOn(apiClient, "approveBeatSkeleton").mockResolvedValue(baseState());
+    const build = vi.spyOn(apiClient, "buildBeatSkeleton").mockResolvedValue(baseState({ phase: "skeleton" }));
+    await ready();
+    fireEvent.click(screen.getByTestId("beats-rebuild-skeleton"));
+    expect(build).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByTestId("beats-rebuild-confirm"));
+    await waitFor(() => expect(build).toHaveBeenCalledWith("p1"));
+    fireEvent.click(screen.getByTestId("beats-approve-skeleton"));
+    await waitFor(() => expect(approve).toHaveBeenCalledWith("p1"));
+  });
+
+  it("puts every action that runs after the beats, and writes only the beats without content from the bottom button", async () => {
+    state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
+    const generate = vi.spyOn(apiClient, "generateBeats").mockResolvedValue(baseState());
+    await ready();
+    const run = screen.getByTestId("beats-generate");
+    expect(run).toHaveTextContent("AI viết nội dung các beat chưa có (1)");
+    expect(screen.getByTestId("beat-b3").compareDocumentPosition(run) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getByTestId("beat-b3").compareDocumentPosition(screen.getByTestId("beats-rewrite")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    fireEvent.click(run);
+    await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "", expect.anything(), true));
+  });
+
+  it("offers the bottom run only while some beat has no content", async () => {
+    await ready();
+    expect(screen.queryByTestId("beats-generate")).not.toBeInTheDocument();
+    expect(screen.getByTestId("beats-rewrite")).toBeInTheDocument();
+  });
+
+  it("gives a beat without content its own run, and a written beat none", async () => {
+    state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
+    const redo = vi.spyOn(apiClient, "redoUnit").mockResolvedValue(undefined as never);
+    await ready();
+    expect(screen.queryByTestId("beat-write-b1")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("beat-write-b2"));
+    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", expect.anything(), "", expect.anything()));
+  });
+
+  it("says how many beats were resized to fit the target", async () => {
+    state = baseState({ rebalanced: 2 });
+    await ready();
+    expect(screen.getByTestId("beats-rebalanced")).toHaveTextContent("Đã cân lại thời lượng của 2 beat");
+  });
+
+  it("marks a beat that cites no fact with a warning and leaves the others plain", async () => {
+    state = baseState({
+      beats: [beat("b1", { fn: "Hook", facts: [] }), beat("b2", { facts: ["F02"] }), beat("b3", { facts: [], noFact: true, fn: "Payoff", next: "" })],
+    });
+    await ready();
+    expect(screen.getByTestId("beat-nofact-mark-b3")).toHaveAccessibleName("Beat chưa có dữ kiện");
+    expect(screen.getByTestId("beat-nofact-b3")).toHaveTextContent("Chưa gắn dữ kiện");
+    expect(screen.queryByTestId("beat-nofact-mark-b1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("beat-nofact-mark-b2")).not.toBeInTheDocument();
+    expect(screen.getByTestId("beat-facts-b1")).toHaveTextContent("chưa gắn dữ kiện");
   });
 
   it("adds an empty beat by hand to an empty sheet", async () => {
-    state = baseState({ beats: [], checks: [] });
+    state = baseState({ beats: [], checks: [], phase: "empty" });
     const add = vi.spyOn(apiClient, "addBeat").mockResolvedValue(baseState());
     renderPage();
     fireEvent.click(await screen.findByTestId("beats-add-first"));
@@ -251,7 +334,7 @@ describe("BeatsStepPage", () => {
     fireEvent.change(await screen.findByTestId("beats-rewrite-dialog-note"), { target: { value: "gọn hơn" } });
     await waitFor(() => expect(screen.getByTestId("beats-rewrite-dialog-send")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("beats-rewrite-dialog-send"));
-    await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "gọn hơn", expect.anything()));
+    await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "gọn hơn", expect.anything(), false));
   });
 
   it("shows why a change failed", async () => {

@@ -4,7 +4,9 @@ import {
   BEAT_DURATION_STEP,
   GENERIC_CONNECTION_ERROR,
   addBeat,
+  approveBeatSkeleton,
   approveUnit,
+  buildBeatSkeleton,
   beatUnit,
   deleteBeat,
   editUnit,
@@ -41,7 +43,15 @@ export interface BeatsControls {
   actionError: string | null;
   /** The note of the AI run that failed, so its dialog starts from it. */
   failedNote: string;
-  generate: (note: string) => Promise<boolean>;
+  /** Builds the skeleton from the approved story (no AI). */
+  buildSkeleton: () => Promise<boolean>;
+  /** Approves the skeleton, so the AI may write the content. */
+  approveSkeleton: () => Promise<boolean>;
+  /**
+   * The AI writes the content of the beats of the approved skeleton, one beat at a time:
+   * only those without content with `onlyUnwritten`, every beat otherwise.
+   */
+  generate: (note: string, onlyUnwritten?: boolean) => Promise<boolean>;
   /** Adds a beat after `after` ("" on an empty sheet): the AI writes it, or with `blank` an empty one is added. */
   add: (after: string, blank: boolean, note: string) => Promise<boolean>;
   redo: (key: string, note: string) => Promise<boolean>;
@@ -172,7 +182,9 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
     busy,
     actionError,
     failedNote,
-    generate: (note) => runAI("sheet", note, (op) => generateBeats(projectId, note, op)),
+    buildSkeleton: () => act(() => buildBeatSkeleton(projectId)),
+    approveSkeleton: () => act(() => approveBeatSkeleton(projectId)),
+    generate: (note, onlyUnwritten = false) => runAI("sheet", note, (op) => generateBeats(projectId, note, op, onlyUnwritten)),
     add: (after, blank, note) => (blank ? act(() => addBeat(projectId, after, true, "")) : runAI("add", note, (op) => addBeat(projectId, after, false, note, op))),
     redo: (key, note) => runAI({ beat: key }, note, (op) => redoUnit(projectId, beatUnit(key), note, op)),
     edit,

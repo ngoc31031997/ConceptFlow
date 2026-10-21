@@ -115,8 +115,12 @@ func (k beatKind) Edit(ctx context.Context, projectID, key string, fields map[st
 }
 
 // Redo has the AI write this one beat again with the Creator's note, reading
-// the other beats as context. The Creator asked for it by name, so the beat
-// stops being the Creator's.
+// the other beats as context and the time budget they leave. It serves a beat
+// of the skeleton that has no content yet as well as one already written.
+// Function and facts stay as they are; the Creator asked for this beat by
+// name, so the wording that was the Creator's is released while a length the
+// Creator set is kept. When this beat was the last one without content the
+// lengths of the sheet are brought inside the target.
 func (k beatKind) Redo(ctx context.Context, projectID, key, note string) (domain.ReviewUnit, error) {
 	if err := requireBeatKey(key); err != nil {
 		return domain.ReviewUnit{}, err
@@ -132,34 +136,44 @@ func (k beatKind) Redo(ctx context.Context, projectID, key, note string) (domain
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}
-	current, _, _, err := uc.beats(ctx, projectID)
+	work, gate, sheetUnit, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}
-	var old *storedBeat
-	for i := range current {
-		if current[i].unit.Key == key {
-			old = &current[i]
+	if !gate.SkeletonApproved {
+		return domain.ReviewUnit{}, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonNeeded)
+	}
+	at := -1
+	written := make([]bool, len(work))
+	for i, b := range work {
+		written[i] = b.Written()
+		if b.unit.Key == key {
+			at = i
 		}
 	}
-	if old == nil {
+	if at < 0 {
 		return domain.ReviewUnit{}, domain.ErrUnitNotFound
 	}
-	drafts, err := uc.run(ctx, projectID, bc, current, domain.BeatTaskRedo(key), note)
+	written[at] = false
+	kept := []string{}
+	for _, field := range work[at].unit.CreatorFields {
+		if field == domain.BeatFieldFn || field == domain.BeatFieldFacts || field == domain.BeatFieldDur {
+			kept = append(kept, field)
+		}
+	}
+	work[at].unit.CreatorFields = kept
+	work[at].unit.RedoCount++
+	beat, err := uc.writeOne(ctx, projectID, bc, work, written, at, note)
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}
-	if len(drafts) != 1 || (drafts[0].Key != "" && drafts[0].Key != key) {
-		return domain.ReviewUnit{}, fmt.Errorf("%w: cần đúng một beat %s", domain.ErrBeatReplyUnusable, key)
-	}
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
-	if err != nil {
+	work[at].Beat = beat
+	rewritten := make([]bool, len(work))
+	rewritten[at] = true
+	if err := uc.saveContent(ctx, projectID, bc, work, rewritten, gate, sheetUnit); err != nil {
 		return domain.ReviewUnit{}, err
 	}
-	unit := old.unit
-	unit.Status, unit.CreatorFields, unit.RedoCount = domain.UnitPending, []string{}, unit.RedoCount+1
-	unit.InputRef, unit.InputSHA = beatStoryRef, sha
-	return uc.saveBeat(ctx, projectID, key, drafts[0].Beat, unit)
+	return uc.units.GetUnit(ctx, projectID, domain.UnitKindBeat, key)
 }
 
 // Impact is empty: nothing is built on the beats yet.

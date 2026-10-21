@@ -9,6 +9,7 @@ import { StructureCard } from "../components/beats/StructureCard";
 import researchStyles from "../components/research/research.module.css";
 import type { StepStripProps } from "../components/StepStrip";
 import { Button, Card } from "../components/ui";
+import { ImpactConfirm } from "../components/research/ImpactConfirm";
 import { UnitRedoModal } from "../components/units/UnitRedoModal";
 import { WizardNav } from "../components/WizardNav";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
@@ -18,13 +19,19 @@ import { useLlmStatus } from "../hooks/useLlmStatus";
 import { VIEW_BEATS, comingRoute, readOnlyReason, storyRoute } from "../utils/flow";
 
 const SUBTITLE =
-  "Mỗi beat có một chức năng, một mục tiêu và các dữ kiện nó dùng. Thêm, xoá, đổi thứ tự beat; duyệt từng beat.";
+  "Bước 1: duyệt bộ khung (chức năng và dữ kiện của từng beat, dựng từ câu chuyện). Bước 2: AI viết nội dung từng beat, rồi bạn duyệt.";
 
 const ROLE = "Chia câu chuyện thành các beat, mỗi beat một chức năng và một bước tiến. Chưa viết lời thoại.";
 
+/** What building the skeleton again does, for the dialog that asks first. */
+const REBUILD_IMPACT = [
+  "Mọi beat của bộ khung hiện tại bị xoá, kể cả chức năng và dữ kiện bạn đã sửa.",
+  "Bộ khung mới được dựng lại từ câu chuyện đã duyệt, không gọi AI.",
+];
+
 /** What a rewrite of the whole sheet does, for the dialog that asks first. */
 const REWRITE_IMPACT = [
-  "Beat bạn đã viết (mục tiêu, tên, nội dung…) giữ nguyên; các beat khác được AI viết lại hoặc bỏ.",
+  "AI viết lại nội dung của mọi beat theo bộ khung đã duyệt; chức năng, dữ kiện và phần bạn đã viết giữ nguyên.",
   "Mọi beat về chờ duyệt.",
 ];
 
@@ -34,8 +41,14 @@ function stripOf(state: BeatState, running: BeatsControls["running"]): StepStrip
     return { tone: "todo", label: "Chưa mở bước", message: "Duyệt câu chuyện ở bước Câu chuyện trước." };
   }
   if (running !== null) return { tone: "run", label: "AI đang viết", message: "Phần bạn tự viết giữ nguyên." };
-  if (state.beats.length === 0) {
-    return { tone: "todo", label: "Chưa có beat sheet", message: "AI chia câu chuyện thành các beat, hoặc bạn tự thêm từng beat." };
+  if (state.phase === "empty") {
+    return { tone: "todo", label: "Chưa có bộ khung", message: "Dựng bộ khung từ câu chuyện, hoặc bạn tự thêm từng beat." };
+  }
+  if (state.phase === "skeleton") {
+    return { tone: "wait", label: "Chờ bạn duyệt bộ khung", message: "Kiểm chức năng và dữ kiện của từng beat, rồi duyệt để AI viết nội dung." };
+  }
+  if (state.unwritten > 0) {
+    return { tone: "todo", label: `Chưa viết nội dung · ${state.unwritten}/${state.beats.length} beat`, message: "AI viết lần lượt từng beat theo bộ khung đã duyệt." };
   }
   const done = state.beats.filter((b) => b.status === "approved").length;
   if (state.status === "approved") {
@@ -49,10 +62,12 @@ function stripOf(state: BeatState, running: BeatsControls["running"]): StepStrip
 }
 
 /**
- * Step 5 of the 21-step flow: the beat sheet. The AI splits the approved story
- * into beats, each with a function, a goal, the facts it uses and a target
- * length; the Creator edits, reorders, adds and deletes beats and approves
- * each one. The structure card checks the whole sheet and only warns.
+ * Step 5 of the 21-step flow: the beat sheet, in two phases. First a skeleton
+ * built from the approved story with no AI (one beat per step of the chain,
+ * each with a function and its facts) which the Creator reviews and approves;
+ * then the AI writes the content and length of each beat, one at a time, and
+ * the Creator edits, reorders, adds and deletes beats and approves each one.
+ * The structure card checks the whole sheet and only warns.
  */
 export function BeatsStepPage() {
   const params = useParams<{ id?: string }>();
@@ -63,6 +78,7 @@ export function BeatsStepPage() {
   const projectId = params.id ?? draft.projectId;
   const beats = useBeats(projectId, !!projectId);
   const [rewriteOpen, setRewriteOpen] = useState(false);
+  const [rebuildOpen, setRebuildOpen] = useState(false);
 
   if (!projectId) return <Navigate to="/" replace />;
 
@@ -75,6 +91,7 @@ export function BeatsStepPage() {
     const pendingWithGoal = s.beats.filter((b) => b.status === "pending" && b.goal.trim() !== "").length;
     const writingSheet = beats.running === "sheet";
     const writingAdd = beats.running === "add";
+    const skeleton = s.phase === "skeleton";
     return (
       <>
         {!s.storyApproved && (
@@ -82,21 +99,16 @@ export function BeatsStepPage() {
             Duyệt câu chuyện ở bước Câu chuyện trước.
           </p>
         )}
-        {s.storyApproved && s.beats.length === 0 && (
+        {s.storyApproved && s.phase === "empty" && (
           <Card data-testid="beats-empty-card">
             <div className={researchStyles.body}>
               <p className={researchStyles.hint}>
-                {aiAvailable
-                  ? "Chưa có beat sheet. AI chia câu chuyện đã duyệt thành các beat, hoặc bạn tự thêm từng beat."
-                  : "Chưa có beat sheet. Chưa cấu hình AI nên bạn tự thêm từng beat rồi duyệt."}
+                Chưa có beat sheet. Bộ khung được dựng từ câu chuyện đã duyệt: một beat mở đầu, mỗi bước của chuỗi nhân quả một beat, một beat kết. Không cần AI.
               </p>
-              {aiAvailable && <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId="beats-model" />}
               <div className={researchStyles.actions} style={{ justifyContent: "flex-start" }}>
-                {aiAvailable && (
-                  <Button variant="run" onClick={() => void beats.generate("")} disabled={busy} data-testid="beats-generate">
-                    AI viết beat sheet
-                  </Button>
-                )}
+                <Button onClick={() => void beats.buildSkeleton()} disabled={busy} data-testid="beats-build-skeleton">
+                  Dựng bộ khung từ câu chuyện
+                </Button>
                 <Button variant="ghost" onClick={() => void beats.add("", true, "")} disabled={busy} data-testid="beats-add-first">
                   + Thêm beat trống
                 </Button>
@@ -104,34 +116,48 @@ export function BeatsStepPage() {
             </div>
           </Card>
         )}
-        <AiOperationCard
-          run={beats.run}
-          active={writingSheet || writingAdd}
-          testId="beats-progress"
-          title={writingAdd ? "AI đang viết beat mới" : "AI đang viết beat sheet"}
-        />
         {s.beats.length > 0 && (
           <>
             <StructureCard state={s} />
-            <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-              {aiAvailable && (
-                <Button variant="ghost" className={researchStyles.sm} onClick={() => setRewriteOpen(true)} disabled={busy} data-testid="beats-rewrite">
-                  Viết lại cả bảng
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                className={researchStyles.sm}
-                onClick={() => void beats.approveAll()}
-                disabled={busy || pendingWithGoal === 0}
-                data-testid="beats-approve-all"
-              >
-                Duyệt tất cả beat còn lại
-              </Button>
-            </div>
             {s.beats.map((beat, index) => (
               <BeatCard key={beat.key} projectId={projectId} beat={beat} index={index} state={s} beats={beats} aiAvailable={aiAvailable} locked={locked} />
             ))}
+            <AiOperationCard
+              run={beats.run}
+              active={writingSheet || writingAdd}
+              testId="beats-progress"
+              title={writingAdd ? "AI đang viết beat mới" : "AI đang viết nội dung các beat"}
+            />
+            {skeleton && (
+              <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
+                <Button variant="ghost" onClick={() => setRebuildOpen(true)} disabled={busy} data-testid="beats-rebuild-skeleton">
+                  Dựng lại bộ khung
+                </Button>
+                <Button onClick={() => void beats.approveSkeleton()} disabled={busy} data-testid="beats-approve-skeleton">
+                  Duyệt bộ khung
+                </Button>
+              </div>
+            )}
+            {!skeleton && (
+              <>
+                {aiAvailable && <AiModelSelect projectId={projectId} step="beat_sheet" label="Model AI cho bước Beat sheet" testId="beats-model" />}
+                <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
+                  {aiAvailable && (
+                    <Button variant="ghost" onClick={() => setRewriteOpen(true)} disabled={busy} data-testid="beats-rewrite">
+                      Viết lại cả bảng
+                    </Button>
+                  )}
+                  {aiAvailable && s.unwritten > 0 && (
+                    <Button variant="run" onClick={() => void beats.generate("", true)} disabled={busy} data-testid="beats-generate">
+                      AI viết nội dung các beat chưa có ({s.unwritten})
+                    </Button>
+                  )}
+                  <Button onClick={() => void beats.approveAll()} disabled={busy || pendingWithGoal === 0} data-testid="beats-approve-all">
+                    Duyệt tất cả beat còn lại
+                  </Button>
+                </div>
+              </>
+            )}
           </>
         )}
         {beats.actionError && (
@@ -183,13 +209,26 @@ export function BeatsStepPage() {
         hint={
           state?.status === "approved"
             ? "Beat sheet đã duyệt. Sang bước Viết kịch bản."
-            : "Duyệt mọi beat để sang bước Viết kịch bản."
+            : state?.phase === "skeleton"
+              ? "Duyệt bộ khung, để AI viết nội dung, rồi duyệt mọi beat."
+              : "Duyệt mọi beat để sang bước Viết kịch bản."
         }
         onBack={() => navigate(storyRoute(projectId))}
         onNext={() => navigate(comingRoute(VIEW_BEATS + 1, projectId))}
         nextDisabled={state?.status !== "approved"}
         nextLabel="Lưu và sang viết kịch bản"
         nextTestId="beats-next"
+      />
+
+      <ImpactConfirm
+        open={rebuildOpen}
+        onClose={() => setRebuildOpen(false)}
+        title="Dựng lại bộ khung?"
+        lead="Bộ khung hiện tại của beat sheet"
+        list={REBUILD_IMPACT}
+        undo="Không hoàn tác được."
+        choices={[{ label: "Dựng lại bộ khung", variant: "danger", onChoose: () => void beats.buildSkeleton(), testId: "beats-rebuild-confirm" }]}
+        testId="beats-rebuild-dialog"
       />
 
       <UnitRedoModal

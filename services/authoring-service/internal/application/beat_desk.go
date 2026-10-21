@@ -40,7 +40,20 @@ type BeatView struct {
 	// OnlyMust lists the facts the script must state that no other beat holds,
 	// so deleting this beat leaves them out of the video.
 	OnlyMust []string `json:"only_must"`
+	// NoFact is true for a beat other than the hook that cites no fact, so
+	// nothing backs what it says.
+	NoFact bool `json:"no_fact"`
 }
+
+// The phases of the step, in the order the Creator goes through them.
+const (
+	// BeatPhaseEmpty is a sheet with no beat yet.
+	BeatPhaseEmpty = "empty"
+	// BeatPhaseSkeleton is a sheet whose functions and facts the Creator is still reviewing.
+	BeatPhaseSkeleton = "skeleton"
+	// BeatPhaseContent is a sheet whose skeleton is approved, so its content is written and reviewed.
+	BeatPhaseContent = "content"
+)
 
 // BeatState is everything the beat sheet screen shows.
 type BeatState struct {
@@ -51,6 +64,13 @@ type BeatState struct {
 	Facts         []BeatFactView     `json:"facts"`
 	Checks        []domain.BeatCheck `json:"checks"`
 	TotalSeconds  int                `json:"total_seconds"`
+	// Phase is one of the BeatPhase constants.
+	Phase string `json:"phase"`
+	// Unwritten counts the beats whose content is not written yet.
+	Unwritten int `json:"unwritten"`
+	// Rebalanced is how many beats the last content run had to resize so the
+	// total fits the target.
+	Rebalanced int `json:"rebalanced"`
 	// TargetLabel is the length the video aims for, as the screen says it.
 	TargetLabel string `json:"target_label"`
 }
@@ -191,9 +211,18 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	if state.StoryApproved, err = uc.storyApproved(ctx, projectID); err != nil {
 		return BeatState{}, err
 	}
-	stored, _, _, err := uc.beats(ctx, projectID)
+	stored, gate, _, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return BeatState{}, err
+	}
+	state.Rebalanced = gate.Rebalanced
+	switch {
+	case len(stored) == 0:
+		state.Phase = BeatPhaseEmpty
+	case !gate.SkeletonApproved:
+		state.Phase = BeatPhaseSkeleton
+	default:
+		state.Phase = BeatPhaseContent
 	}
 	facts, err := loadKeptFacts(ctx, uc.units, projectID)
 	if err != nil {
@@ -220,7 +249,7 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	}
 	mustSet := toSet(must)
 	for _, b := range stored {
-		view := BeatView{Key: b.unit.Key, Beat: b.Beat, Status: b.unit.Status, Mine: append([]string{}, b.unit.CreatorFields...), Stale: b.unit.Stale, OnlyMust: []string{}}
+		view := BeatView{Key: b.unit.Key, Beat: b.Beat, Status: b.unit.Status, Mine: append([]string{}, b.unit.CreatorFields...), Stale: b.unit.Stale, OnlyMust: []string{}, NoFact: b.Fn != domain.BeatFns[0] && len(b.Facts) == 0}
 		for _, id := range b.Facts {
 			if mustSet[id] && holders[id] == 1 {
 				view.OnlyMust = append(view.OnlyMust, id)
@@ -228,8 +257,11 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 		}
 		state.Beats = append(state.Beats, view)
 		state.TotalSeconds += b.Dur
+		if !b.Written() {
+			state.Unwritten++
+		}
 	}
-	if len(stored) > 0 && approved == len(stored) {
+	if state.Phase == BeatPhaseContent && approved == len(stored) {
 		state.Status = domain.UnitApproved
 	}
 	project, err := uc.projects.Get(ctx, projectID)
@@ -242,7 +274,11 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	}
 	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
 	state.TargetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, "vi")
-	state.Checks = domain.CheckBeatSheet(beats, must, lo, hi, state.TargetLabel)
+	if state.Phase == BeatPhaseContent {
+		state.Checks = domain.CheckBeatSheet(beats, must, lo, hi, state.TargetLabel)
+	} else {
+		state.Checks = domain.CheckSkeleton(beats, must)
+	}
 	return state, nil
 }
 
@@ -281,6 +317,9 @@ func (uc *BeatDeskUseCase) Delete(ctx context.Context, projectID, key string) er
 		return domain.ErrUnitNotFound
 	}
 	gate.Order = append(append([]string{}, gate.Order[:at]...), gate.Order[at+1:]...)
+	if len(gate.Order) == 0 {
+		gate.SkeletonApproved, gate.Rebalanced = false, 0
+	}
 	if err := uc.saveSheet(ctx, sheetUnit, gate); err != nil {
 		return err
 	}

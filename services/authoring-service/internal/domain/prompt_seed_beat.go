@@ -1,6 +1,9 @@
 package domain
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 // --- Beat sheet --------------------------------------------------------------
 // The beat sheet step's writer. One prompt serves three jobs, told apart by
@@ -61,14 +64,31 @@ Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu dưới, không 
 
 // Tasks of the beat sheet prompt, the values of {{task}}.
 const (
-	beatTaskWriteAllVI = "Viết cả beat sheet từ khung câu chuyện: trả về TOÀN BỘ danh sách beat theo thứ tự. Beat hiện có mà Creator đã viết phần nào thì giữ khoá và chép lại phần đó nguyên văn; các beat khác bạn viết lại hoặc bỏ."
-	beatTaskRedoVI     = "Viết lại ĐÚNG MỘT beat có khoá %s, đọc các beat khác để khớp. Trả về một danh sách có đúng một beat, mang khoá %s."
-	beatTaskAddVI      = "Viết MỘT beat mới đặt giữa beat %s và beat %s, để mạch chuyện liền. Trả về một danh sách có đúng một beat với key \"\"."
-	beatTaskAddLastVI  = "Viết MỘT beat mới đặt cuối sau beat %s. Trả về một danh sách có đúng một beat với key \"\"."
+	beatTaskWriteVI = "Viết nội dung của ĐÚNG MỘT beat có khoá %s (beat thứ %d trong %d beat). Chức năng và dữ kiện của beat đã được chốt, giữ nguyên: chức năng %s; %s. Bước câu chuyện beat này kể: %s\n" +
+		"Viết \"title\", \"goal\", \"content\", \"next\" và ước lượng \"dur\" (số giây) theo lượng nội dung beat cần, đọc các beat khác để mạch chuyện liền và không lặp ý. " +
+		"Ngân sách thời lượng cả video: từ %s đến %s; các beat đã viết dùng %s; còn %d beat chưa viết, kể cả beat này. " +
+		"Trả về một danh sách có đúng một beat, mang khoá %s, với \"fn\" và \"facts\" đúng như đã chốt."
+	beatTaskRedoVI    = "Viết lại ĐÚNG MỘT beat có khoá %s, đọc các beat khác để khớp. Trả về một danh sách có đúng một beat, mang khoá %s."
+	beatTaskAddVI     = "Viết MỘT beat mới đặt giữa beat %s và beat %s, để mạch chuyện liền. Trả về một danh sách có đúng một beat với key \"\"."
+	beatTaskAddLastVI = "Viết MỘT beat mới đặt cuối sau beat %s. Trả về một danh sách có đúng một beat với key \"\"."
 )
 
-// BeatTaskWriteAll is {{task}} when the whole sheet is written.
-func BeatTaskWriteAll() string { return beatTaskWriteAllVI }
+// BeatTaskWrite is {{task}} when the content of the beat with key is written
+// from the approved skeleton: b is the beat as the skeleton fixed it, no and
+// total place it in the sheet, lo and hi bound the whole video in seconds, used
+// is the length of the beats already written and remaining counts the beats
+// still to write, this one included.
+func BeatTaskWrite(key string, no, total int, b Beat, lo, hi, used, remaining int) string {
+	facts := "chưa có dữ kiện: để facts rỗng, đừng bịa"
+	if len(b.Facts) > 0 {
+		facts = "dữ kiện " + strings.Join(b.Facts, ", ")
+	}
+	step := b.Step
+	if strings.TrimSpace(step) == "" {
+		step = "(beat do Creator thêm: tự viết từ khung câu chuyện)"
+	}
+	return fmt.Sprintf(beatTaskWriteVI, key, no, total, b.Fn, facts, step, FormatSeconds(lo), FormatSeconds(hi), FormatSeconds(used), remaining, key)
+}
 
 // BeatTaskRedo is {{task}} when the beat with key is written again.
 func BeatTaskRedo(key string) string { return fmt.Sprintf(beatTaskRedoVI, key, key) }

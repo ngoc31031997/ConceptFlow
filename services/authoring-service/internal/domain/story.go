@@ -47,6 +47,13 @@ const TextFieldName = "text"
 // MaxStoryApproaches is the most approaches one proposal may hold.
 const MaxStoryApproaches = 6
 
+// Keys of the story fields the beat sheet is built from.
+const (
+	StoryFieldQuestion = "question"
+	StoryFieldChain    = storyFieldChain
+	StoryFieldPayoff   = storyFieldPayoff
+)
+
 // MaxStoryChain is the most steps the chain of cause and effect may hold.
 const MaxStoryChain = 12
 

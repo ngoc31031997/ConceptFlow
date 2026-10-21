@@ -2391,6 +2391,10 @@ export interface Beat {
   stale: boolean;
   /** Facts the script must state that no other beat holds, so deleting this beat drops them. */
   onlyMust: string[];
+  /** The beat is not the hook and cites no fact, so nothing backs what it says. */
+  noFact: boolean;
+  /** The story line the beat was built from; "" for a beat the Creator added. */
+  step: string;
 }
 
 /** One kept fact the beats can use. */
@@ -2408,6 +2412,9 @@ export interface BeatCheck {
   text: string;
 }
 
+/** Where the step stands: no beat yet, reviewing the skeleton, or writing and reviewing the content. */
+export type BeatPhase = "empty" | "skeleton" | "content";
+
 /** Everything the beat sheet screen shows. */
 export interface BeatState {
   /** Approved when the sheet has beats and every one is approved. */
@@ -2418,6 +2425,11 @@ export interface BeatState {
   checks: BeatCheck[];
   totalSeconds: number;
   targetLabel: string;
+  phase: BeatPhase;
+  /** Beats whose goal and content are not written yet. */
+  unwritten: number;
+  /** Beats the last content run resized so the total fits the target. */
+  rebalanced: number;
 }
 
 interface beatStateWire {
@@ -2437,23 +2449,31 @@ interface beatStateWire {
         mine: string[] | null;
         stale: boolean;
         only_must: string[] | null;
+        no_fact: boolean | null;
+        step: string | null;
       }[]
     | null;
   facts: { id: string; claim_vi: string; type: FactType; must: boolean; link: LinkState }[] | null;
   checks: BeatCheck[] | null;
   total_seconds: number;
   target_label: string;
+  phase: BeatPhase;
+  unwritten: number;
+  rebalanced: number;
 }
 
 function fromWireBeats(w: beatStateWire): BeatState {
   return {
     status: w.status,
     storyApproved: w.story_approved,
-    beats: (w.beats ?? []).map((b) => ({ ...b, facts: b.facts ?? [], mine: b.mine ?? [], onlyMust: b.only_must ?? [] })),
+    beats: (w.beats ?? []).map((b) => ({ ...b, facts: b.facts ?? [], mine: b.mine ?? [], onlyMust: b.only_must ?? [], noFact: b.no_fact ?? false, step: b.step ?? "" })),
     facts: (w.facts ?? []).map((f) => ({ id: f.id, claimVi: f.claim_vi, type: f.type, must: f.must, link: f.link })),
     checks: w.checks ?? [],
     totalSeconds: w.total_seconds,
     targetLabel: w.target_label,
+    phase: w.phase,
+    unwritten: w.unwritten,
+    rebalanced: w.rebalanced,
   };
 }
 
@@ -2467,13 +2487,13 @@ export async function getBeats(projectId: string): Promise<BeatState> {
  * an operation id to follow it). Beats the Creator wrote any part of keep that
  * part; the others are replaced and every beat goes to review.
  */
-export async function generateBeats(projectId: string, note: string, operation?: OperationCall): Promise<BeatState> {
+export async function generateBeats(projectId: string, note: string, operation?: OperationCall, onlyUnwritten = false): Promise<BeatState> {
   return fromWireBeats(
     await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/generate`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
-      body: JSON.stringify({ note }),
+      body: JSON.stringify({ note, only_unwritten: onlyUnwritten }),
     }),
   );
 }
@@ -2498,6 +2518,21 @@ export async function addBeat(
       body: JSON.stringify({ after, blank, note }),
     }),
   );
+}
+
+/**
+ * Builds the skeleton of the sheet from the approved story, with no model: a
+ * hook, one beat per step of the chain of cause and effect, and a payoff. It
+ * replaces the beats now on the sheet; the server refuses once the skeleton is
+ * approved.
+ */
+export async function buildBeatSkeleton(projectId: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/skeleton`, { method: "POST" }));
+}
+
+/** Approves the functions and facts of the beats, so the AI may write their content. */
+export async function approveBeatSkeleton(projectId: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`/v1/projects/${projectId}/beats/skeleton/approve`, { method: "POST" }));
 }
 
 /** Sets the order of the beats; `order` names every beat once. */

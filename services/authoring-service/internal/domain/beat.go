@@ -82,6 +82,15 @@ type Beat struct {
 	Dur int `json:"dur"`
 	// Next says how the beat joins the one after it; empty for the last beat.
 	Next string `json:"next"`
+	// Step is the story line the beat was built from; empty for a beat the
+	// Creator added by hand.
+	Step string `json:"step"`
+}
+
+// Written reports whether the AI or the Creator has written the beat's goal
+// and content; a beat of the skeleton is not written yet.
+func (b Beat) Written() bool {
+	return strings.TrimSpace(b.Goal) != "" && strings.TrimSpace(b.Content) != ""
 }
 
 // BeatSheetGate is the content of the gate unit.
@@ -90,6 +99,12 @@ type BeatSheetGate struct {
 	Order []string `json:"order"`
 	// NextSeq is the number the next beat key takes; keys are never reused.
 	NextSeq int `json:"next_seq"`
+	// SkeletonApproved is true once the Creator approved the functions and facts
+	// of the beats; only then does the AI write their content.
+	SkeletonApproved bool `json:"skeleton_approved"`
+	// Rebalanced is how many beats had their length changed by the last run to
+	// bring the total inside the target.
+	Rebalanced int `json:"rebalanced"`
 }
 
 // BeatKey is the key of the beat with sequence number n.

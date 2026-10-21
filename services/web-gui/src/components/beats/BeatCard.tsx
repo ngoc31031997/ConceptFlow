@@ -36,6 +36,9 @@ const TEXT_FIELDS = [
   { name: "next", label: "Chuyển sang beat sau", rows: 3 },
 ] as const;
 
+/** What the warning on a beat without a fact says. */
+const NO_FACT_TIP = "Chưa gắn dữ kiện: điều beat này nói chưa có gì làm chứng. Gắn dữ kiện, hoặc bỏ ý này.";
+
 function Block({ label, text, testId }: { label: string; text: string; testId: string }) {
   return (
     <div className={styles.control} data-testid={testId}>
@@ -51,7 +54,9 @@ function Block({ label, text, testId }: { label: string; text: string; testId: s
  * sheet (up, down, add after, delete). Text edits go through the "Sửa tay"
  * dialog (docs/ux-ui-design-rules.md, rule 4); the function, length and facts
  * change in place. Deleting asks first and names the facts the script must
- * state that no other beat holds.
+ * state that no other beat holds. While the skeleton is reviewed only the
+ * function, the story line and the facts show, since the length and the text
+ * are not written yet.
  */
 export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, locked }: BeatCardProps) {
   const [editing, setEditing] = useState(false);
@@ -68,6 +73,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const unusedFacts = state.facts.filter((f) => !beat.facts.includes(f.id));
   const isMine = (field: string) => beat.mine.includes(field);
   const canShorten = beat.dur - BEAT_DURATION_STEP >= BEAT_MIN_SECONDS;
+  const skeleton = state.phase === "skeleton";
 
   const deleteList = [
     "Beat này bị xoá khỏi bảng; các beat còn lại giữ nguyên.",
@@ -83,9 +89,14 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
         <div className={researchStyles.head}>
           <h3>
             B{no} · {beat.title}
+            {beat.noFact && (
+              <span className={styles.noFactMark} role="img" aria-label="Beat chưa có dữ kiện" title={NO_FACT_TIP} data-testid={`beat-nofact-mark-${beat.key}`}>
+                !
+              </span>
+            )}
           </h3>
           <span className={styles.moves}>
-            {writing ? <UnitStatusChip state="running" testId={`beat-status-${beat.key}`} /> : <UnitStatusChip state={beat.status} testId={`beat-status-${beat.key}`} />}
+            {!skeleton && (writing ? <UnitStatusChip state="running" testId={`beat-status-${beat.key}`} /> : <UnitStatusChip state={beat.status} testId={`beat-status-${beat.key}`} />)}
             {beat.mine.length > 0 && (
               <span className={unitStyles.mine} title="AI giữ nguyên phần này khi viết lại" data-testid={`beat-mine-${beat.key}`}>
                 ✎ Bạn viết
@@ -108,35 +119,48 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               data-testid={`beat-fn-${beat.key}`}
             />
           </div>
-          <div className={styles.control}>
-            <span className={styles.controlLabel}>Thời lượng mục tiêu{isMine("dur") ? " ✎" : ""}</span>
-            <div className={styles.stepper}>
-              <Button
-                variant="ghost"
-                className={researchStyles.sm}
-                onClick={() => void beats.shiftDuration(beat, -1)}
-                disabled={busy || !canShorten}
-                data-testid={`beat-dur-down-${beat.key}`}
-              >
-                − {BEAT_DURATION_STEP} s
-              </Button>
-              <span className={styles.seconds} data-testid={`beat-dur-${beat.key}`}>
-                {beat.dur} s
-              </span>
-              <Button variant="ghost" className={researchStyles.sm} onClick={() => void beats.shiftDuration(beat, 1)} disabled={busy} data-testid={`beat-dur-up-${beat.key}`}>
-                + {BEAT_DURATION_STEP} s
-              </Button>
+          {!skeleton && (
+            <div className={styles.control}>
+              <span className={styles.controlLabel}>Thời lượng mục tiêu{isMine("dur") ? " ✎" : ""}</span>
+              <div className={styles.stepper}>
+                <Button
+                  variant="ghost"
+                  className={researchStyles.sm}
+                  onClick={() => void beats.shiftDuration(beat, -1)}
+                  disabled={busy || !canShorten}
+                  data-testid={`beat-dur-down-${beat.key}`}
+                >
+                  − {BEAT_DURATION_STEP} s
+                </Button>
+                <span className={styles.seconds} data-testid={`beat-dur-${beat.key}`}>
+                  {beat.dur} s
+                </span>
+                <Button variant="ghost" className={researchStyles.sm} onClick={() => void beats.shiftDuration(beat, 1)} disabled={busy} data-testid={`beat-dur-up-${beat.key}`}>
+                  + {BEAT_DURATION_STEP} s
+                </Button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <Block label="Mục tiêu · bước tiến của beat" text={beat.goal} testId={`beat-goal-${beat.key}`} />
-        <Block label="Nội dung chính" text={beat.content} testId={`beat-content-${beat.key}`} />
+        {skeleton ? (
+          <Block label="Bước câu chuyện" text={beat.step || "(beat bạn thêm, không có bước câu chuyện)"} testId={`beat-step-${beat.key}`} />
+        ) : (
+          <>
+            <Block label="Mục tiêu · bước tiến của beat" text={beat.goal} testId={`beat-goal-${beat.key}`} />
+            <Block label="Nội dung chính" text={beat.content} testId={`beat-content-${beat.key}`} />
+          </>
+        )}
 
         <div className={styles.control}>
           <span className={styles.controlLabel}>Dữ kiện dùng{isMine("facts") ? " ✎" : ""}</span>
           <div className={styles.factRow} data-testid={`beat-facts-${beat.key}`}>
-            {beat.facts.length === 0 && <span className={researchStyles.hint}>chưa gắn dữ kiện</span>}
+            {beat.noFact && (
+              <span className={styles.noFactNote} data-testid={`beat-nofact-${beat.key}`}>
+                ! {NO_FACT_TIP}
+              </span>
+            )}
+            {beat.facts.length === 0 && !beat.noFact && <span className={researchStyles.hint}>chưa gắn dữ kiện</span>}
             {beat.facts.map((id) => (
               <span key={id} className={styles.factTag}>
                 <FactTags ids={[id]} />
@@ -170,22 +194,26 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
           )}
         </div>
 
-        {!last && <Block label="Chuyển sang beat sau" text={beat.next} testId={`beat-next-${beat.key}`} />}
+        {!skeleton && !last && <Block label="Chuyển sang beat sau" text={beat.next} testId={`beat-next-${beat.key}`} />}
 
-        <UnitReviewBar
-          status={beat.status}
-          approveLabel="Duyệt beat"
-          approveDisabled={beat.goal.trim() === ""}
-          busy={busy}
-          canRedo={aiAvailable}
-          onEdit={() => setEditing(true)}
-          onRedo={() => setRedoing(true)}
-          onApprove={() => void beats.approve(beat.key)}
-          onUnapprove={() => void beats.unapprove(beat.key)}
-          testId={`beat-review-${beat.key}`}
-        />
-        {beat.goal.trim() === "" && beat.status === "pending" && (
-          <p className={researchStyles.hint}>Viết mục tiêu của beat rồi mới duyệt được.</p>
+        {!skeleton && (
+          <>
+            <UnitReviewBar
+              status={beat.status}
+              approveLabel="Duyệt beat"
+              approveDisabled={beat.goal.trim() === ""}
+              busy={busy}
+              canRedo={aiAvailable}
+              onEdit={() => setEditing(true)}
+              onRedo={() => setRedoing(true)}
+              onApprove={() => void beats.approve(beat.key)}
+              onUnapprove={() => void beats.unapprove(beat.key)}
+              testId={`beat-review-${beat.key}`}
+            />
+            {beat.goal.trim() === "" && beat.status === "pending" && (
+              <p className={researchStyles.hint}>Viết mục tiêu của beat rồi mới duyệt được.</p>
+            )}
+          </>
         )}
 
         <div className={styles.moves}>
@@ -195,14 +223,19 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
           <Button variant="ghost" className={researchStyles.sm} onClick={() => void beats.move(beat.key, 1)} disabled={busy || last} data-testid={`beat-down-${beat.key}`}>
             ↓ Xuống
           </Button>
+          {!skeleton && aiAvailable && !beat.goal.trim() && !beat.content.trim() && (
+            <Button variant="run" className={researchStyles.sm} onClick={() => void beats.redo(beat.key, "")} disabled={busy} data-testid={`beat-write-${beat.key}`}>
+              AI viết beat này
+            </Button>
+          )}
           <Button
             variant="run"
             className={researchStyles.sm}
-            onClick={() => void beats.add(beat.key, !aiAvailable, "")}
+            onClick={() => void beats.add(beat.key, skeleton || !aiAvailable, "")}
             disabled={busy}
             data-testid={`beat-add-${beat.key}`}
           >
-            {aiAvailable ? "+ Thêm beat sau" : "+ Thêm beat trống sau"}
+            {aiAvailable && !skeleton ? "+ Thêm beat sau" : "+ Thêm beat trống sau"}
           </Button>
           <Button variant="danger" className={researchStyles.sm} onClick={() => setDeleting(true)} disabled={busy} data-testid={`beat-delete-${beat.key}`}>
             Xoá beat

@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -16,6 +17,8 @@ type beatContext struct {
 	story       string
 	facts       []storyFact
 	targetLabel string
+	// loSeconds and hiSeconds bound the total length of the sheet.
+	loSeconds, hiSeconds int
 	// model is the model the project chose for this step; "" is the server default.
 	model string
 }
@@ -48,13 +51,16 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	}
 	bc.language = briefLanguage(project.ContentLanguage)
 	bc.targetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, bc.language)
+	bc.loSeconds, bc.hiSeconds = domain.TargetSeconds(project.VideoOutputMode, duration)
 	bc.brief = domain.BriefSection(brief, bc.targetLabel)
 	if bc.facts, err = loadKeptFacts(ctx, uc.units, projectID); err != nil {
 		return bc, err
 	}
-	if bc.story, err = uc.storyText(ctx, projectID); err != nil {
+	fields, err := uc.storyFields(ctx, projectID)
+	if err != nil {
 		return bc, err
 	}
+	bc.story = storyFieldsText(fields)
 	models, err := uc.units.GetAuthoringModels(ctx, projectID)
 	if err != nil {
 		return bc, fmt.Errorf("load authoring models: %w", err)
@@ -63,29 +69,34 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	return bc, nil
 }
 
-// storyText shows the approved story frame to the model, one labelled block per field.
-func (uc *BeatDeskUseCase) storyText(ctx context.Context, projectID string) (string, error) {
+// storyFields reads the approved story frame, one field per key.
+func (uc *BeatDeskUseCase) storyFields(ctx context.Context, projectID string) (map[string]domain.StoryField, error) {
 	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	byKey := make(map[string]domain.ReviewUnit, len(units))
+	out := make(map[string]domain.StoryField, len(units))
 	for _, u := range units {
-		byKey[u.Key] = u
+		f, err := readStoryField(u)
+		if err != nil {
+			return nil, err
+		}
+		out[u.Key] = f
 	}
+	return out, nil
+}
+
+// storyFieldsText shows the story frame to the model, one labelled block per field.
+func storyFieldsText(fields map[string]domain.StoryField) string {
 	var sb strings.Builder
 	for _, key := range domain.StoryFieldKeys {
-		u, ok := byKey[key]
+		f, ok := fields[key]
 		if !ok {
 			continue
 		}
-		f, err := readStoryField(u)
-		if err != nil {
-			return "", err
-		}
 		sb.WriteString(key + " (" + domain.StoryFieldLabel(key) + "):\n" + f.Text + "\n")
 	}
-	return strings.TrimRight(sb.String(), "\n"), nil
+	return strings.TrimRight(sb.String(), "\n")
 }
 
 // currentBeatsText lists the stored beats for a prompt, in order, with their keys.
@@ -95,6 +106,10 @@ func currentBeatsText(beats []storedBeat) string {
 	}
 	lines := make([]string, 0, len(beats))
 	for i, b := range beats {
+		if !b.Written() {
+			lines = append(lines, fmt.Sprintf("%s (B%d) · %s · dữ kiện %s · CHƯA VIẾT\n  bước câu chuyện: %s", b.unit.Key, i+1, b.Fn, strings.Join(b.Facts, ", "), b.Step))
+			continue
+		}
 		lines = append(lines, fmt.Sprintf("%s (B%d) · %s · %s · %d s · dữ kiện %s\n  mục tiêu: %s\n  nội dung: %s\n  nối sang beat sau: %s",
 			b.unit.Key, i+1, b.Fn, b.Title, b.Dur, strings.Join(b.Facts, ", "), b.Goal, b.Content, b.Next))
 	}
@@ -162,12 +177,221 @@ func creatorFieldsOf(dst *domain.Beat, src domain.Beat, fields []string) {
 	}
 }
 
-// Generate has the AI write the whole sheet from the approved story; note is
-// the Creator's instruction for this run. A beat the Creator wrote any part of
-// keeps its key and that part, and the reply must keep every such beat. The
-// other beats are replaced. A reply that cannot be read stores nothing. Every
-// beat goes to review.
-func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string) error {
+// ErrBeatSkeletonNeeded is returned when the content is asked for before the
+// Creator approved the skeleton.
+var ErrBeatSkeletonNeeded = errors.New("duyệt bộ khung của beat sheet trước khi AI viết nội dung")
+
+// ErrBeatSkeletonLocked is returned when the skeleton is built again after it
+// was approved.
+var ErrBeatSkeletonLocked = errors.New("bộ khung đã duyệt, không dựng lại được")
+
+// beatWriteAttempts is how many times one beat is asked for before the run
+// gives up.
+const beatWriteAttempts = 2
+
+// BuildSkeleton builds the skeleton of the sheet from the approved story, with
+// no model: a Hook, one beat per step of the chain and a Payoff, each with the
+// facts its line cites. It replaces the beats now on the sheet, so it is the
+// Creator's call to rebuild; once the skeleton is approved and the sheet has
+// beats it is refused. The skeleton it builds is not approved.
+func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) error {
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	approved, err := uc.storyApproved(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if !approved {
+		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
+	}
+	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if gate.SkeletonApproved && len(current) > 0 {
+		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonLocked)
+	}
+	fields, err := uc.storyFields(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	project, err := uc.projects.Get(ctx, projectID)
+	if err != nil {
+		return fmt.Errorf("load project: %w", err)
+	}
+	duration, err := uc.units.GetTargetDuration(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
+	outline, err := domain.NewBeatOutline(fields[domain.StoryFieldChain].Text, lo, hi)
+	if err != nil {
+		return fmt.Errorf("read story chain: %w", err)
+	}
+	payoffText, payoffFacts, err := domain.ParseRefLine(fields[domain.StoryFieldPayoff].Text, nil)
+	if err != nil {
+		return fmt.Errorf("read story payoff: %w", err)
+	}
+	beats, err := outline.Skeleton(domain.ChainStep{Text: strings.TrimSpace(fields[domain.StoryFieldQuestion].Text)}, domain.ChainStep{Text: payoffText, Facts: payoffFacts})
+	if err != nil {
+		return fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
+	}
+	facts, err := loadKeptFacts(ctx, uc.units, projectID)
+	if err != nil {
+		return err
+	}
+	known := factKnownTo(facts)
+	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
+	if err != nil {
+		return err
+	}
+	order := make([]string, 0, len(beats))
+	for _, b := range beats {
+		kept := b.Facts[:0:0]
+		for _, id := range b.Facts {
+			if known(id) {
+				kept = append(kept, id)
+			}
+		}
+		b.Facts = kept
+		key := domain.BeatKey(gate.NextSeq)
+		gate.NextSeq++
+		unit := domain.ReviewUnit{Status: domain.UnitPending, InputRef: beatStoryRef, InputSHA: sha}
+		if _, err := uc.saveBeat(ctx, projectID, key, b, unit); err != nil {
+			return err
+		}
+		order = append(order, key)
+	}
+	gate.Order, gate.Rebalanced, gate.SkeletonApproved = order, 0, false
+	if err := uc.saveSheet(ctx, sheetUnit, gate); err != nil {
+		return err
+	}
+	for _, old := range current {
+		if err := uc.units.DeleteUnit(ctx, projectID, domain.UnitKindBeat, old.unit.Key); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ApproveSkeleton records that the Creator accepted the functions and facts of
+// the beats; the AI may write their content from then on.
+func (uc *BeatDeskUseCase) ApproveSkeleton(ctx context.Context, projectID string) error {
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	if len(current) == 0 {
+		return fmt.Errorf("%w: chưa có beat nào để duyệt bộ khung", domain.ErrInvalidUnitEdit)
+	}
+	gate.SkeletonApproved = true
+	return uc.saveSheet(ctx, sheetUnit, gate)
+}
+
+// writeOne has the AI write the content of the beat at index at of work, whose
+// earlier beats are already written. A reply that cannot be read is asked for
+// once more with what was wrong in the note. The function and facts stay as
+// the skeleton fixed them and the parts the Creator wrote keep their value.
+func (uc *BeatDeskUseCase) writeOne(ctx context.Context, projectID string, bc beatContext, work []storedBeat, written []bool, at int, note string) (domain.Beat, error) {
+	old := work[at]
+	used, remaining := 0, 0
+	for i, b := range work {
+		if written[i] {
+			used += b.Dur
+		} else {
+			remaining++
+		}
+	}
+	task := domain.BeatTaskWrite(old.unit.Key, at+1, len(work), old.Beat, bc.loSeconds, bc.hiSeconds, used, remaining)
+	runNote := note
+	for attempt := 1; ; attempt++ {
+		drafts, err := uc.run(ctx, projectID, bc, work, task, runNote)
+		if err == nil && (len(drafts) != 1 || (drafts[0].Key != "" && drafts[0].Key != old.unit.Key)) {
+			err = fmt.Errorf("%w: cần đúng một beat %s", domain.ErrBeatReplyUnusable, old.unit.Key)
+		}
+		if err == nil {
+			beat := drafts[0].Beat
+			beat.Fn, beat.Facts, beat.Step = old.Fn, old.Facts, old.Step
+			creatorFieldsOf(&beat, old.Beat, old.unit.CreatorFields)
+			if verr := beat.Validate(factKnownTo(bc.facts)); verr != nil {
+				err = fmt.Errorf("%w: %v", domain.ErrBeatReplyUnusable, verr)
+			} else {
+				return beat, nil
+			}
+		}
+		if !errors.Is(err, domain.ErrBeatReplyUnusable) {
+			return domain.Beat{}, err
+		}
+		if attempt == beatWriteAttempts {
+			return domain.Beat{}, fmt.Errorf("beat %s (B%d) viết %d lần vẫn sai: %w", old.unit.Key, at+1, attempt, err)
+		}
+		runNote = strings.TrimSpace(note + "\nLẦN VIẾT TRƯỚC SAI: " + err.Error() + ". Viết lại beat này và sửa điểm trên.")
+	}
+}
+
+// saveContent stores the beats a content run wrote and, when the run leaves no
+// beat unwritten, brings the total length inside the target first: the lengths
+// the Creator set and the beats already approved stay as they are and every
+// other beat is resized together. rewritten marks the beats the run wrote; the
+// others are stored again only when their length was resized. It fails, and
+// stores nothing, when no lengths fit.
+func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc beatContext, work []storedBeat, rewritten []bool, gate domain.BeatSheetGate, sheetUnit domain.ReviewUnit) error {
+	durs := make([]int, len(work))
+	unwritten := false
+	for i, b := range work {
+		durs[i] = b.Dur
+		unwritten = unwritten || !b.Written()
+	}
+	if !unwritten {
+		beats := make([]domain.Beat, len(work))
+		fixed := make([]bool, len(work))
+		for i, b := range work {
+			beats[i] = b.Beat
+			fixed[i] = b.unit.HasCreatorField(domain.BeatFieldDur) || (!rewritten[i] && b.unit.Status == domain.UnitApproved)
+		}
+		var err error
+		if durs, err = domain.BalanceSeconds(beats, fixed, bc.loSeconds, bc.hiSeconds); err != nil {
+			return fmt.Errorf("%w: %v", domain.ErrBeatReplyUnusable, err)
+		}
+	}
+	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
+	if err != nil {
+		return err
+	}
+	gate.Rebalanced = 0
+	for i, b := range work {
+		resized := durs[i] != b.Dur
+		if resized {
+			gate.Rebalanced++
+		}
+		if !rewritten[i] && !resized {
+			continue
+		}
+		b.Dur = durs[i]
+		unit := b.unit
+		if rewritten[i] {
+			unit.Status, unit.InputRef, unit.InputSHA = domain.UnitPending, beatStoryRef, sha
+		}
+		if _, err := uc.saveBeat(ctx, projectID, unit.Key, b.Beat, unit); err != nil {
+			return err
+		}
+	}
+	return uc.saveSheet(ctx, sheetUnit, gate)
+}
+
+// Generate has the AI write the content of the beats of the approved
+// skeleton, one beat at a time in order; each call sees the beats written so
+// far and the time budget left. With onlyUnwritten the beats that already have
+// content are left alone; otherwise every beat is written again. Function and
+// facts are not changed and the parts the Creator wrote keep their value. When
+// the run leaves no beat unwritten their lengths are brought inside the
+// target. Nothing is stored unless all of it succeeds. Every beat written goes
+// to review.
+func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string, onlyUnwritten bool) error {
 	if err := uc.requireAI(); err != nil {
 		return err
 	}
@@ -182,61 +406,35 @@ func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string)
 	if err != nil {
 		return err
 	}
-	drafts, err := uc.run(ctx, projectID, bc, current, domain.BeatTaskWriteAll(), note)
-	if err != nil {
-		return err
+	if !gate.SkeletonApproved || len(current) == 0 {
+		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonNeeded)
 	}
-	storedByKey := make(map[string]storedBeat, len(current))
-	for _, b := range current {
-		storedByKey[b.unit.Key] = b
-	}
-	kept := map[string]bool{}
-	for _, d := range drafts {
-		if d.Key == "" {
+	// work shows the model the sheet as the run builds it: a beat not yet
+	// written in this run appears as it stands in the skeleton.
+	work := make([]storedBeat, len(current))
+	written := make([]bool, len(current))
+	rewritten := make([]bool, len(current))
+	for i, b := range current {
+		work[i] = b
+		if onlyUnwritten && b.Written() {
+			written[i] = true
 			continue
 		}
-		if _, ok := storedByKey[d.Key]; !ok {
-			return fmt.Errorf("%w: khoá %s không phải beat hiện có", domain.ErrBeatReplyUnusable, d.Key)
-		}
-		kept[d.Key] = true
+		rewritten[i] = true
+		work[i].Title, work[i].Goal, work[i].Content, work[i].Next = "", "", "", ""
+		creatorFieldsOf(&work[i].Beat, b.Beat, b.unit.CreatorFields)
 	}
-	for _, b := range current {
-		if len(b.unit.CreatorFields) > 0 && !kept[b.unit.Key] {
-			return fmt.Errorf("%w: bỏ mất beat %s mà bạn đã viết", domain.ErrBeatReplyUnusable, b.unit.Key)
+	for i := range current {
+		if written[i] {
+			continue
 		}
-	}
-
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
-	if err != nil {
-		return err
-	}
-	order := make([]string, 0, len(drafts))
-	for _, d := range drafts {
-		key, beat, unit := d.Key, d.Beat, domain.ReviewUnit{Status: domain.UnitPending, InputRef: beatStoryRef, InputSHA: sha}
-		if old, ok := storedByKey[key]; ok {
-			unit.CreatorFields, unit.RedoCount = old.unit.CreatorFields, old.unit.RedoCount
-			creatorFieldsOf(&beat, old.Beat, old.unit.CreatorFields)
-			if err := beat.Validate(factKnownTo(bc.facts)); err != nil {
-				return fmt.Errorf("%w: beat %s: %v", domain.ErrBeatReplyUnusable, key, err)
-			}
-		} else {
-			key = domain.BeatKey(gate.NextSeq)
-			gate.NextSeq++
-		}
-		if _, err := uc.saveBeat(ctx, projectID, key, beat, unit); err != nil {
+		beat, err := uc.writeOne(ctx, projectID, bc, work, written, i, note)
+		if err != nil {
 			return err
 		}
-		order = append(order, key)
+		work[i].Beat, written[i] = beat, true
 	}
-	for _, old := range current {
-		if !kept[old.unit.Key] {
-			if err := uc.units.DeleteUnit(ctx, projectID, domain.UnitKindBeat, old.unit.Key); err != nil {
-				return err
-			}
-		}
-	}
-	gate.Order = order
-	return uc.saveSheet(ctx, sheetUnit, gate)
+	return uc.saveContent(ctx, projectID, bc, work, rewritten, gate, sheetUnit)
 }
 
 // Add puts a new beat after the beat with key after (the first place of an
@@ -270,6 +468,9 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 	} else {
 		if err := uc.requireAI(); err != nil {
 			return "", err
+		}
+		if !gate.SkeletonApproved {
+			return "", fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonNeeded)
 		}
 		bc, err := uc.context(ctx, projectID)
 		if err != nil {

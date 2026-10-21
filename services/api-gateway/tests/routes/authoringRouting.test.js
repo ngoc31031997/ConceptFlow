@@ -67,6 +67,8 @@ describe('routing between orchestrator and authoring-service', () => {
     ['post', '/v1/projects/p1/story/generate', 'authoringAi'],
     ['put', '/v1/projects/p1/story/facts/F02', 'authoring'],
     ['get', '/v1/projects/p1/beats', 'authoring'],
+    ['post', '/v1/projects/p1/beats/skeleton', 'authoring'],
+    ['post', '/v1/projects/p1/beats/skeleton/approve', 'authoring'],
     ['post', '/v1/projects/p1/beats/generate', 'authoringAi'],
     ['post', '/v1/projects/p1/beats', 'authoringAi'],
     ['put', '/v1/projects/p1/beats/order', 'authoring'],
