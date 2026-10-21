@@ -79,12 +79,11 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 
 	language := briefLanguage(project.ContentLanguage)
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"channel_identity": domain.ChannelIdentity(language),
-		"topic":            topic,
-		"brief":            domain.BriefSection(brief, label),
-		"brief_language":   briefLanguageName(language),
-		"kept_questions":   keptQuestionsText(existing, replaceEdited),
-		"redo_note":        noteText(note),
+		"topic":          topic,
+		"brief":          domain.BriefSection(brief, label),
+		"brief_language": briefLanguageName(language),
+		"kept_questions": keptQuestionsText(existing, replaceEdited),
+		"redo_note":      noteText(note),
 	})
 	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{

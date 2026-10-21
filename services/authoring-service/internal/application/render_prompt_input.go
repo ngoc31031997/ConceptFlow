@@ -49,20 +49,6 @@ const (
 	engineerEmptyPrevious       = "(chưa có dàn ý/storyboard đã lưu ở các bước trước)"
 )
 
-// isCodeRole reports whether role writes or repairs Remotion code, whose
-// narration rule also names where the lines live in the code.
-func isCodeRole(role domain.PromptRole) bool {
-	return role == domain.RoleRemotionEngineer || role == domain.RoleRemotionEngineerAI || role == domain.RoleRemotionAdjust
-}
-
-// narrationRuleFor is {{narration_language_rule}} for role in language.
-func narrationRuleFor(role domain.PromptRole, language string) string {
-	if isCodeRole(role) {
-		return domain.CodeNarrationLanguageRule(language)
-	}
-	return domain.NarrationLanguageRule(language)
-}
-
 // Render fills the role's active library prompt with the input.
 //
 // Substitution is a single pass (strings.Replacer), so text the Creator pasted
@@ -139,9 +125,7 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 		"{{topic}}", topic,
 		"{{script}}", script,
 		"{{previous_output}}", previous,
-		"{{channel_identity}}", domain.ChannelIdentity(language),
-		"{{narration_language_rule}}", narrationRuleFor(in.Role, language),
-		"{{thumbnail_audience}}", domain.ThumbnailAudience(language),
+		"{{narration_language_rule}}", domain.NarrationLanguageRule(language),
 		"{{format_beats}}", beats,
 		"{{video_archetypes}}", archetypes,
 		"{{creative_brief}}", brief,

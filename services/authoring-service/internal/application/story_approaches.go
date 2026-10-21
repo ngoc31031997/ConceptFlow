@@ -79,15 +79,14 @@ func (uc *StoryDeskUseCase) GenerateApproaches(ctx context.Context, projectID, n
 		return nil, fmt.Errorf("load video archetypes: %w", err)
 	}
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"channel_identity": domain.ChannelIdentity(sc.language),
-		"topic":            sc.topic,
-		"brief_language":   briefLanguageName(sc.language),
-		"brief":            sc.brief,
-		"facts":            factsText(sc.facts),
-		"archetypes":       archetypesText(table),
-		"refs_rule":        domain.StoryRefsRule(len(sc.facts) > 0),
-		"refs_example":     domain.StoryRefsExample(len(sc.facts) > 0),
-		"redo_note":        noteText(note),
+		"topic":          sc.topic,
+		"brief_language": briefLanguageName(sc.language),
+		"brief":          sc.brief,
+		"facts":          factsText(sc.facts),
+		"archetypes":     archetypesText(table),
+		"refs_rule":      domain.StoryRefsRule(len(sc.facts) > 0),
+		"refs_example":   domain.StoryRefsExample(len(sc.facts) > 0),
+		"redo_note":      noteText(note),
 	})
 	reply, err := uc.chat(ctx, domain.RoleStoryApproaches, domain.UnitKindStoryApproach, projectID, sc.model, system)
 	if err != nil {

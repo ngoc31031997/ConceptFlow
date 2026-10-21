@@ -236,8 +236,7 @@ func (uc *RenderPromptUseCase) variablesFor(
 
 	vars := map[string]string{
 		"topic":                   topic,
-		"channel_identity":        domain.ChannelIdentity(language),
-		"narration_language_rule": narrationRuleFor(role, language),
+		"narration_language_rule": domain.NarrationLanguageRule(language),
 		"previous_output":         previous,
 		"format_beats":            "",
 		"video_archetypes":        "",

@@ -170,7 +170,7 @@ func TestStoryRolesAreShippedAndFillTheirOwnValues(t *testing.T) {
 		}
 	}
 	out := RenderPromptTemplate(seededText(t, RoleStoryFrame), map[string]string{
-		"channel_identity": "KÊNH", "topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "brief": "BRIEF", "facts": "F01: x",
+		"topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "brief": "BRIEF", "facts": "F01: x",
 		"facts_rule": storyFactsGivenVI, "facts_example": StoryFactsExample(false), "approach": "GÓC", "current_frame": "KHUNG", "kept_fields": "GIỮ", "redo_note": "GHI-CHÚ",
 		"fields_to_write": "logline",
 	})
@@ -178,7 +178,7 @@ func TestStoryRolesAreShippedAndFillTheirOwnValues(t *testing.T) {
 		t.Errorf("an unfilled placeholder is left in the frame prompt: %q", out[strings.Index(out, "{{"):])
 	}
 	out = RenderPromptTemplate(seededText(t, RoleStoryApproaches), map[string]string{
-		"channel_identity": "KÊNH", "topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "brief": "BRIEF", "facts": "F01: x",
+		"topic": "ĐỀ-TÀI", "brief_language": "tiếng Việt", "brief": "BRIEF", "facts": "F01: x",
 		"archetypes": "A: x", "redo_note": "GHI-CHÚ", "refs_rule": StoryRefsRule(true), "refs_example": StoryRefsExample(true),
 	})
 	if strings.Contains(out, "{{") {

@@ -18,12 +18,6 @@ import (
 // of thing that loses a character in translation, and embedding removes that
 // risk by construction instead of asking a test to catch it afterwards.
 
-//go:embed prompts/channel_identity_vi.txt
-var channelIdentityVI string
-
-//go:embed prompts/channel_identity_en.txt
-var channelIdentityEN string
-
 // illustration_kit_vi.txt is the API of remotion_project/src/conceptflow-mini/
 // illustration.tsx as the Remotion Engineer reads it. It is written by
 // hand, and rendering/tests/domain/test_illustration_kit.py fails when a
@@ -41,39 +35,11 @@ var narrationRuleVI string
 //go:embed prompts/narration_rule_en.txt
 var narrationRuleEN string
 
-// The code roles' rule also names where the lines live in the code: the
-// composition's `narrations` array.
-//
-//go:embed prompts/narration_rule_remotion_vi.txt
-var narrationRuleRemotionVI string
-
-//go:embed prompts/narration_rule_remotion_en.txt
-var narrationRuleRemotionEN string
-
-//go:embed prompts/thumbnail_audience_vi.txt
-var thumbnailAudienceVI string
-
-//go:embed prompts/thumbnail_audience_en.txt
-var thumbnailAudienceEN string
-
 // wordsPerMinute is the fallback speaking rate per content language, used
 // when the project's voice has no measured calibration of its own.
 var wordsPerMinute = map[string]float64{
 	"vi": 140,
 	"en": 150,
-}
-
-// ChannelIdentity returns the block {{channel_identity}} expands to: what
-// THIS channel is, in place of the older "make it like 3Blue1Brown".
-//
-// Falls back to English for an unknown language rather than returning an
-// empty section — a prompt missing its identity block still looks valid and
-// produces a generic video, which is the worst way to fail here.
-func ChannelIdentity(language string) string {
-	if language == "vi" {
-		return channelIdentityVI
-	}
-	return channelIdentityEN
 }
 
 // NarrationLanguageRule returns {{narration_language_rule}} — which language
@@ -83,24 +49,6 @@ func NarrationLanguageRule(language string) string {
 		return narrationRuleVI
 	}
 	return narrationRuleEN
-}
-
-// CodeNarrationLanguageRule is {{narration_language_rule}} for the roles that
-// write or fix Remotion code: the same language rule, naming the `narrations`
-// array the lines live in.
-func CodeNarrationLanguageRule(language string) string {
-	if language == "vi" {
-		return narrationRuleRemotionVI
-	}
-	return narrationRuleRemotionEN
-}
-
-// ThumbnailAudience is {{thumbnail_audience}}: who the thumbnail is for.
-func ThumbnailAudience(language string) string {
-	if language == "vi" {
-		return thumbnailAudienceVI
-	}
-	return thumbnailAudienceEN
 }
 
 // BeatSheetWordsPerMinute is the speaking rate the beat budgets are converted

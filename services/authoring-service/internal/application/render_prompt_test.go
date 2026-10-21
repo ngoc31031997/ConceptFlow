@@ -135,7 +135,7 @@ func TestRoleFor_MapsEachStepToItsManualRole(t *testing.T) {
 
 func TestRender_SubstitutesEveryVariable(t *testing.T) {
 	uc := newRenderer(
-		"CHỦ ĐỀ: {{topic}}\n{{channel_identity}}\n{{format_beats}}\n{{narration_language_rule}}",
+		"CHỦ ĐỀ: {{topic}}\n{{format_beats}}\n{{narration_language_rule}}",
 		&fakeRenderContext{project: aProject(), topic: "Vì sao bầu trời có màu xanh"},
 	)
 
@@ -149,8 +149,8 @@ func TestRender_SubstitutesEveryVariable(t *testing.T) {
 	if !strings.Contains(out.Prompt, "Vì sao bầu trời có màu xanh") {
 		t.Fatal("the topic did not reach the prompt")
 	}
-	if !strings.Contains(out.Prompt, "BẢN SẮC KÊNH") {
-		t.Fatal("the channel identity block did not reach the prompt")
+	if !strings.Contains(out.Prompt, "TIẾNG VIỆT") {
+		t.Fatal("the narration language rule did not reach the prompt")
 	}
 	if !strings.Contains(out.Prompt, "CẤU TRÚC BẮT BUỘC") {
 		t.Fatal("the beat sheet did not reach the prompt")

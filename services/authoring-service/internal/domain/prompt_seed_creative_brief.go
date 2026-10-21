@@ -8,8 +8,6 @@ package domain
 // prompt asks the model to build the other boxes around them.
 const creativeBriefVI = `Bạn là BIÊN TẬP NỘI DUNG của một kênh video phổ biến kiến thức. Việc của bạn ở bước này là biến một ý tưởng ban đầu thành một CREATIVE BRIEF: một đề tài đủ cụ thể để nghiên cứu và kể. Chưa viết chuyện, chưa chia beat, chưa viết lời thoại.
 
-{{channel_identity}}
-
 ======================================================
 ĐỀ TÀI: {{topic}}
 DẠNG VIDEO: {{video_kind}}

@@ -117,7 +117,7 @@ func TestBriefSectionListsEveryFieldWithItsLabel(t *testing.T) {
 
 func TestCreativeBriefPromptUsesOnlyTheVariablesTheUseCaseFills(t *testing.T) {
 	known := map[string]bool{
-		"channel_identity": true, "topic": true, "video_kind": true, "target_duration": true,
+		"topic": true, "video_kind": true, "target_duration": true,
 		"brief_language": true, "current_brief": true, "kept_fields": true, "redo_note": true,
 	}
 	text := aiTemplate(t, RoleCreativeBrief)

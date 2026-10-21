@@ -174,14 +174,13 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 	}
 	language := briefLanguage(project.ContentLanguage)
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"channel_identity": domain.ChannelIdentity(language),
-		"topic":            topic,
-		"video_kind":       videoKindLabel(project.VideoOutputMode),
-		"target_duration":  domain.TargetDurationLabel(project.VideoOutputMode, duration, language),
-		"brief_language":   briefLanguageName(language),
-		"current_brief":    currentBriefText(current, exists),
-		"kept_fields":      keptFieldsText(current, unit.CreatorFields),
-		"redo_note":        noteText(note),
+		"topic":           topic,
+		"video_kind":      videoKindLabel(project.VideoOutputMode),
+		"target_duration": domain.TargetDurationLabel(project.VideoOutputMode, duration, language),
+		"brief_language":  briefLanguageName(language),
+		"current_brief":   currentBriefText(current, exists),
+		"kept_fields":     keptFieldsText(current, unit.CreatorFields),
+		"redo_note":       noteText(note),
 	})
 
 	started := uc.now()

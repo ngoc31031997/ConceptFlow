@@ -33,7 +33,7 @@ func TestResearchRolesAreShippedAndNotGenericallyRendered(t *testing.T) {
 
 func TestResearchQuestionsPromptTakesItsValues(t *testing.T) {
 	out := RenderPromptTemplate(seededText(t, RoleResearchQuestions), map[string]string{
-		"channel_identity": "KÊNH", "topic": "ĐỀ-TÀI", "brief": "BRIEF-NỘI-DUNG", "brief_language": "tiếng Việt",
+		"topic": "ĐỀ-TÀI", "brief": "BRIEF-NỘI-DUNG", "brief_language": "tiếng Việt",
 		"kept_questions": "- Q1: câu của Creator", "redo_note": "GHI-CHÚ",
 	})
 	if strings.Contains(out, "{{") {

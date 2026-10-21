@@ -94,30 +94,10 @@ func TestBuildStoryBeatSheetSection_MatchesTheTypeScriptCharacterForCharacter(t 
 	}
 }
 
-// TestChannelIdentity_IsTheShippedBlock — embedded, so this guards the
-// wiring (right language, no stray trimming) rather than the text.
-func TestChannelIdentity_IsTheShippedBlock(t *testing.T) {
-	vi := ChannelIdentity("vi")
-	en := ChannelIdentity("en")
-
-	if !strings.Contains(vi, "BẢN SẮC KÊNH") {
-		t.Fatalf("Vietnamese identity block looks wrong: %.60q", vi)
-	}
-	if !strings.Contains(en, "CHANNEL IDENTITY") {
-		t.Fatalf("English identity block looks wrong: %.60q", en)
-	}
-	if vi == en {
-		t.Fatal("the two languages must not return the same block")
-	}
-}
-
-// TestChannelIdentity_UnknownLanguageStillReturnsABlock — an empty identity
-// section still renders as a valid-looking prompt and quietly produces a
-// generic video, which is the worst way for this to fail.
-func TestChannelIdentity_UnknownLanguageStillReturnsABlock(t *testing.T) {
-	if got := ChannelIdentity("fr"); got == "" {
-		t.Fatal("an unknown language must fall back, not return nothing")
-	}
+// TestNarrationLanguageRule_UnknownLanguageStillReturnsARule — an empty rule
+// still renders as a valid-looking prompt and leaves the narration language
+// to chance.
+func TestNarrationLanguageRule_UnknownLanguageStillReturnsARule(t *testing.T) {
 	if got := NarrationLanguageRule("fr"); got == "" {
 		t.Fatal("an unknown language must fall back, not return nothing")
 	}

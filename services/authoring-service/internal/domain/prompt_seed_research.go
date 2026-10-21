@@ -7,8 +7,6 @@ package domain
 // around them instead of repeating them.
 const researchQuestionsVI = `Bạn là BIÊN TẬP NỘI DUNG của một kênh video phổ biến kiến thức. Việc của bạn ở bước này là đọc creative brief và đặt ra các CÂU HỎI CẦN TRA: những điều phải có nguồn đáng tin trước khi viết kịch bản. Chưa viết chuyện, chưa trả lời câu hỏi.
 
-{{channel_identity}}
-
 ======================================================
 ĐỀ TÀI: {{topic}}
 NGÔN NGỮ CỦA CÂU HỎI: {{brief_language}}

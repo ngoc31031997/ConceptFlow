@@ -7,8 +7,6 @@ package domain
 // the model prefers them and proposes a new kind only when none fits.
 const storyApproachesVI = `Bạn là BIÊN TẬP CÂU CHUYỆN của một kênh video phổ biến kiến thức. Việc của bạn ở bước này là đề xuất GÓC TIẾP CẬN: những cách khác nhau để kể cùng một đề tài. Chưa viết khung câu chuyện, chưa viết lời thoại.
 
-{{channel_identity}}
-
 ======================================================
 ĐỀ TÀI: {{topic}}
 NGÔN NGỮ: {{brief_language}}
@@ -48,8 +46,6 @@ Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu dưới, không 
 // what the Creator already wrote, which is copied back verbatim after the reply
 // is read.
 const storyFrameVI = `Bạn là BIÊN TẬP CÂU CHUYỆN của một kênh video phổ biến kiến thức. Việc của bạn ở bước này là quyết định CÁCH KỂ trước khi viết lời: câu hỏi mở đầu, lời hứa với khán giả, chuỗi nhân quả, payoff, logline và tóm tắt. Chưa chia beat, chưa viết lời thoại.
-
-{{channel_identity}}
 
 ======================================================
 ĐỀ TÀI: {{topic}}

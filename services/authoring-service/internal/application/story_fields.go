@@ -113,18 +113,17 @@ func (uc *StoryDeskUseCase) writeFields(ctx context.Context, projectID string, w
 		return err
 	}
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"channel_identity": domain.ChannelIdentity(sc.language),
-		"topic":            sc.topic,
-		"brief_language":   briefLanguageName(sc.language),
-		"brief":            sc.brief,
-		"facts":            factsText(sc.facts),
-		"facts_rule":       domain.StoryFactsRule(listMode),
-		"facts_example":    domain.StoryFactsExample(listMode),
-		"approach":         approach,
-		"current_frame":    current,
-		"kept_fields":      kept,
-		"fields_to_write":  strings.Join(want, ", "),
-		"redo_note":        noteText(note),
+		"topic":           sc.topic,
+		"brief_language":  briefLanguageName(sc.language),
+		"brief":           sc.brief,
+		"facts":           factsText(sc.facts),
+		"facts_rule":      domain.StoryFactsRule(listMode),
+		"facts_example":   domain.StoryFactsExample(listMode),
+		"approach":        approach,
+		"current_frame":   current,
+		"kept_fields":     kept,
+		"fields_to_write": strings.Join(want, ", "),
+		"redo_note":       noteText(note),
 	})
 	content, err := uc.chat(ctx, domain.RoleStoryFrame, domain.UnitKindStoryField, projectID, sc.model, system)
 	if err != nil {

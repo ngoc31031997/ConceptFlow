@@ -38,7 +38,6 @@ const NEW_ROW = "new";
 /** Dữ liệu mẫu chỉ để xem trước định dạng — không gửi lên server. */
 const PREVIEW_SAMPLE: Record<string, string> = {
   topic: "Vì sao bầu trời có màu xanh",
-  channel_identity: "(khối bản sắc kênh — do server dựng theo ngôn ngữ — sẽ hiện ở đây)",
   video_archetypes: "(danh sách kiểu video và playbook từng kiểu — lấy từ mục Kiểu video — sẽ hiện ở đây)",
   format_beats: "(danh sách beat của format đã chọn sẽ hiện ở đây)",
   narration_language_rule: "Toàn bộ lời thoại phải viết bằng TIẾNG VIỆT.",
@@ -51,7 +50,6 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   safe_area: "(96, 96) đến (1824, 984)",
   frame_rules: "(luật khung dọc — chỉ có khi video là short dọc — sẽ hiện ở đây)",
   narrate_example: "Nội dung lời thoại cho đoạn này",
-  thumbnail_audience: "(khán giả theo ngôn ngữ video sẽ hiện ở đây)",
   creative_brief: "(creative brief đã duyệt ở bước Ý tưởng, kèm thời lượng mục tiêu, sẽ hiện ở đây)",
   video_kind: "Video dài 16:9",
   target_duration: "4–5 phút",
