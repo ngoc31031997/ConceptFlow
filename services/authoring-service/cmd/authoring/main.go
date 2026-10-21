@@ -138,9 +138,14 @@ func main() {
 	story := application.NewStoryDeskUseCase(
 		authoringRepo, projects, projects, authoringRepo, archetypes, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
+	// The beat sheet step: each beat is a review unit; the gate only holds their order.
+	beats := application.NewBeatDeskUseCase(
+		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	research.RegisterFactDependents(beats.FactDependents())
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindStory, story.GateUnitKind()).
 		Register(domain.UnitKindStoryField, story.FieldUnitKind()).
+		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
 		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
@@ -194,7 +199,8 @@ func main() {
 		WithReviewUnits(reviewUnits).
 		WithCreativeBrief(creativeBrief).
 		WithResearch(research).
-		WithStory(story)
+		WithStory(story).
+		WithBeats(beats)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

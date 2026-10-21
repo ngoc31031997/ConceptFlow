@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useMatch } from "react-router-dom";
-import { getProject, getResearch } from "../api/client";
+import { getBeats, getProject, getResearch, getStory } from "../api/client";
 import { ProjectDraftContext } from "./ProjectDraftContext";
 import type { Project } from "../types";
 import { FLOW_STORY, isAuthoringEditable } from "../utils/flow";
@@ -31,6 +31,10 @@ export interface ProjectFlow {
    * is false before that and moot after.
    */
   researchResolved: boolean;
+  /** The story is approved. Only read once research is resolved; false before that. */
+  storyApproved: boolean;
+  /** Every beat is approved. Only read once the story is approved; false before that. */
+  beatsApproved: boolean;
   /**
    * The server has answered for this project at least once, so a null
    * `project` means "not on the server yet" rather than "still asking".
@@ -40,7 +44,7 @@ export interface ProjectFlow {
 }
 
 const noFlow: ProjectFlow = {
-  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, loaded: true,
+  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, storyApproved: false, beatsApproved: false, loaded: true,
   refetch: () => {},
 };
 
@@ -52,18 +56,25 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
   const projectId = routeId ?? draft.projectId;
   const [project, setProject] = useState<Project | null>(null);
   const [researchResolved, setResearchResolved] = useState(false);
+  const [storyApproved, setStoryApproved] = useState(false);
+  const [beatsApproved, setBeatsApproved] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
     if (!projectId) return;
     getProject(projectId)
       .then(async (p) => {
-        // Research only gates the story step while the project waits at the story step.
-        // A research read that fails leaves the story step closed.
+        // Each step opens the next only while the project waits at the story step,
+        // and each read is made only when the one before it passed. A read that
+        // fails leaves the step it gates closed.
         const resolved =
           p.flow_step === FLOW_STORY ? await getResearch(projectId).then((r) => r.gate.resolved, () => false) : false;
+        const storyDone = resolved ? await getStory(projectId).then((s) => s.status === "approved", () => false) : false;
+        const beatsDone = storyDone ? await getBeats(projectId).then((b) => b.status === "approved", () => false) : false;
         setProject(p);
         setResearchResolved(resolved);
+        setStoryApproved(storyDone);
+        setBeatsApproved(beatsDone);
       })
       .catch(() => setProject(null)) // no such project on the server yet
       .finally(() => setLoaded(true));
@@ -72,6 +83,8 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     setProject(null);
     setResearchResolved(false);
+    setStoryApproved(false);
+    setBeatsApproved(false);
     setLoaded(!projectId);
     load();
     if (!projectId) return;
@@ -87,6 +100,8 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     runState: project?.run_state,
     editable: isAuthoringEditable(project?.status),
     researchResolved,
+    storyApproved,
+    beatsApproved,
     loaded,
     refetch: load,
   };

@@ -122,12 +122,17 @@ type storyFact struct {
 
 // keptFacts loads the facts the Creator has not dropped, in code order.
 func (uc *StoryDeskUseCase) keptFacts(ctx context.Context, projectID string) ([]storyFact, error) {
-	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindFact)
+	return loadKeptFacts(ctx, uc.units, projectID)
+}
+
+// loadKeptFacts loads the facts of a project the Creator has not dropped, in code order.
+func loadKeptFacts(ctx context.Context, units ReviewUnitPort, projectID string) ([]storyFact, error) {
+	stored, err := units.ListUnits(ctx, projectID, domain.UnitKindFact)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]storyFact, 0, len(units))
-	for _, u := range units {
+	out := make([]storyFact, 0, len(stored))
+	for _, u := range stored {
 		var f domain.Fact
 		if err := json.Unmarshal(u.Content, &f); err != nil {
 			return nil, fmt.Errorf("read stored fact %s: %w", u.Key, err)
@@ -248,7 +253,12 @@ func (uc *StoryDeskUseCase) researchStanding(ctx context.Context, projectID stri
 
 // approvedBrief returns the brief when it is approved, and reports whether it is.
 func (uc *StoryDeskUseCase) approvedBrief(ctx context.Context, projectID string) (domain.CreativeBrief, bool, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
+	return loadApprovedBrief(ctx, uc.units, projectID)
+}
+
+// loadApprovedBrief returns the brief of a project when it is approved, and reports whether it is.
+func loadApprovedBrief(ctx context.Context, units ReviewUnitPort, projectID string) (domain.CreativeBrief, bool, error) {
+	unit, err := units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
 	if errors.Is(err, domain.ErrUnitNotFound) {
 		return domain.CreativeBrief{}, false, nil
 	}

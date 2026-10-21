@@ -40,21 +40,18 @@ describe("ComingStepPage", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("says the step is not developed, what it is for, and where it sits in the flow", async () => {
-    renderAt("/projects/p1/coming/5", draft);
+    renderAt("/projects/p1/coming/7", draft);
     expect(await screen.findByTestId("coming-step-page")).toBeInTheDocument();
     expect(screen.getByTestId("coming-step-notice")).toHaveTextContent("Bước này chưa phát triển");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Dàn ý · beat sheet");
-    expect(screen.getByTestId("step-role")).toHaveTextContent(/Beat, chức năng, mục tiêu/);
-    await waitFor(() => expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 5/21"));
-    expect(screen.getByTestId("rail-step-5")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rà soát và chốt kịch bản");
+    expect(screen.getByTestId("step-role")).toHaveTextContent(/Rà soát, ghi chú bàn giao, chốt phiên bản/);
+    await waitFor(() => expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 7/21"));
+    expect(screen.getByTestId("rail-step-7")).toHaveAttribute("aria-current", "step");
   });
 
-  it("offers the step before it, which here has a screen of its own", async () => {
-    renderAt("/projects/p1/coming/5", draft);
-    const back = await screen.findByTestId("coming-step-back");
-    expect(back).toHaveTextContent("Bước trước: Câu chuyện");
-    fireEvent.click(back);
-    await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/story"));
+  it("names the step before it", async () => {
+    renderAt("/projects/p1/coming/7", draft);
+    expect(await screen.findByTestId("coming-step-back")).toHaveTextContent("Bước trước: Viết kịch bản");
   });
 
   it("offers another not-developed step as the step before, when that is what precedes it", async () => {

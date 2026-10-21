@@ -6,7 +6,7 @@ import { ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
 
-const STEPS = ["brief", "research", "story_frame", "story", "storyboard", "code", "publish", "illustrations"];
+const STEPS = ["brief", "research", "story_frame", "beat_sheet", "story", "storyboard", "code", "publish", "illustrations"];
 
 /** Every step on the first catalog model, as the server reports an unconfigured one. */
 function setting(over: Record<string, string> = {}): apiClient.AiModelSetting {

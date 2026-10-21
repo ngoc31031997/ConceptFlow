@@ -307,6 +307,8 @@ ALTER TABLE review_units ADD COLUMN IF NOT EXISTS input_sha TEXT NOT NULL DEFAUL
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS research_model TEXT NOT NULL DEFAULT '';
 -- Model the story step proposes approaches and writes the frame with ('' = server default).
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS story_frame_model TEXT NOT NULL DEFAULT '';
+-- Model the beat sheet step writes the beats with ('' = server default).
+ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS beat_sheet_model TEXT NOT NULL DEFAULT '';
 -- One row per answer the Creator pasted into the research step, numbered per
 -- project. Holds what was read from it, never the pasted text itself.
 CREATE TABLE IF NOT EXISTS research_pastes (

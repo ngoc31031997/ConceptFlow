@@ -3653,3 +3653,14 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3c, Code Generation Part 2 xong, chờ Creator duyệt.
 
 ---
+
+---
+## CR-072-U3d — Code xong, chờ duyệt
+**Timestamp**: 2026-10-21T00:00:00Z
+**User Input**: "https://claude.ai/artifact/HibBJUisUocqKXDZD57cTH implement giao diện bước 5"; chọn "Cả bước 5 như bước 4"; "Có sửa orchestrator flow.go không? ... => ok; 2 như đề xuất dùng key bền b1 b2"
+**AI Response**: Thiết kế và kế hoạch (`cr-072-u3d-beats-design.md`, `-code-generation-plan.md`), rồi code 16 task. authoring-service: đơn vị `beat` (khoá bền b1…) và cổng `beat_sheet` giữ thứ tự; đọc câu trả lời AI chặt (chức năng, thời lượng, mã dữ kiện, khoá; bỏ mất beat Creator viết thì từ chối); AI viết cả bảng (giữ beat Creator viết), thêm beat (AI hoặc trống), làm lại một beat; sửa chức năng, thời lượng, dữ kiện, chữ qua API đơn vị chung; đổi thứ tự, xoá; kiểm cấu trúc năm dòng; vai prompt `beat_sheet`; khoá model riêng `beat_sheet` (cột `beat_sheet_model`); `Impact` của câu chuyện nêu beat; người tìm dữ kiện nêu beat dùng dữ kiện. api-gateway: 5 route. web-gui: bước 5 thành màn `/projects/:id/beats` (thẻ Cấu trúc, thẻ từng beat, sửa tay/làm lại/duyệt/xoá có xác nhận), hook `useBeats`, menu bước đọc trạng thái duyệt thật của Câu chuyện và Beat sheet. Hợp đồng `docs/contracts/beats-v1.md`.
+**Impact Assessment**: Go `go vet`, `go test ./...` xanh, nhưng các test kho Postgres bị bỏ qua vì không đặt `TEST_DATABASE_URL` (câu SQL thêm cột `beat_sheet_model` chỉ kiểm bằng cách khởi động lại dịch vụ trên stack thật); api-gateway jest route xanh; web-gui `tsc`, `eslint` 0 lỗi, `vitest` 662 xanh. Chưa chạy AI thật. Test cũ giả định bước 5 là bước chưa làm đầu tiên nên được chuyển sang bước 7.
+**Artifacts Affected**: `services/authoring-service/`, `services/api-gateway/`, `services/web-gui/`, `docs/contracts/beats-v1.md`, `docs/contracts/README.md`, `aidlc-docs/construction/plans/cr-072-u3d-beats-*.md`; chưa commit.
+**Context**: CONSTRUCTION — CR-072-U3d, Code Generation xong, chờ Creator duyệt.
+
+---

@@ -1,0 +1,116 @@
+/* The beat sheet step: the structure strip and one card per beat. Tokens come from theme.css. */
+
+.timeline {
+  display: flex;
+  height: 40px;
+  min-width: 560px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.segment {
+  padding: 3px 5px;
+  border-right: 1.5px solid var(--border-color);
+  background: var(--info-soft);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.segment:nth-child(even) {
+  background: var(--accent-soft);
+}
+.segment:last-child {
+  border-right: 0;
+}
+.scroll {
+  overflow-x: auto;
+}
+
+.checks {
+  display: grid;
+  gap: 2px;
+}
+.check {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ok);
+}
+.checkWarn {
+  color: var(--warn);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+@media (max-width: 760px) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.control {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.controlLabel {
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 700;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.seconds {
+  min-width: 48px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.factRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.factTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.factDrop {
+  padding: 0 5px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 3px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 11px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.factDrop:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.addFact {
+  max-width: 320px;
+}
+
+.moves {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.keep {
+  font-size: 12px;
+  color: var(--ink-faint);
+}

@@ -241,6 +241,7 @@ type saveAuthoringModelsRequest struct {
 	Publish    string `json:"publish"`
 	Research   string `json:"research"`
 	StoryFrame string `json:"story_frame"`
+	BeatSheet  string `json:"beat_sheet"`
 	Story      string `json:"story"`
 	Storyboard string `json:"storyboard"`
 	Code       string `json:"code"`
