@@ -57,6 +57,7 @@ type Router struct {
 	creativeBrief           creativeBriefUseCase
 	research                researchUseCase
 	story                   storyUseCase
+	beats                   beatUseCase
 }
 
 // NewRouter constructs the router; every capability is attached with a With* method.
@@ -84,6 +85,8 @@ func (rt *Router) Handler() http.Handler {
 	rt.researchRoutes(r)
 	// The story step: approaches, the six fields of the frame, the facts it uses.
 	rt.storyRoutes(r)
+	// The beat sheet step: the beats, their order and the AI runs that write them.
+	rt.beatRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)
@@ -817,6 +820,7 @@ func (rt *Router) handleGetAuthoringState(w http.ResponseWriter, r *http.Request
 		"publish_model":     state.Models.Publish,
 		"research_model":    state.Models.Research,
 		"story_frame_model": state.Models.StoryFrame,
+		"beat_sheet_model":  state.Models.BeatSheet,
 		"story_model":       state.Models.Story,
 		"storyboard_model":  state.Models.Storyboard,
 		"code_model":        state.Models.Code,
@@ -846,7 +850,7 @@ func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	models := domain.AuthoringStepModels{
-		Brief: req.Brief, Publish: req.Publish, Research: req.Research, StoryFrame: req.StoryFrame,
+		Brief: req.Brief, Publish: req.Publish, Research: req.Research, StoryFrame: req.StoryFrame, BeatSheet: req.BeatSheet,
 		Story: req.Story, Storyboard: req.Storyboard, Code: req.Code,
 	}
 	if err := rt.saveAuthoringModels.Execute(r.Context(), projectID, models); err != nil {

@@ -301,8 +301,10 @@ func (k fieldKind) Redo(ctx context.Context, projectID, key, note string) (domai
 	return k.desk.units.GetUnit(ctx, projectID, domain.UnitKindStoryField, key)
 }
 
-// Impact is empty: nothing is built on the story yet.
-func (fieldKind) Impact(context.Context, string, string) ([]string, error) { return []string{}, nil }
+// Impact names the beat sheet when beats were written from the story.
+func (k fieldKind) Impact(ctx context.Context, projectID, _ string) ([]string, error) {
+	return k.desk.beatImpact(ctx, projectID)
+}
 
 // CheckApprovable accepts any field; the story as a whole is what gets approved.
 func (fieldKind) CheckApprovable(context.Context, domain.ReviewUnit) error { return nil }
@@ -336,9 +338,9 @@ func (storyGateKind) Redo(context.Context, string, string, string) (domain.Revie
 	return domain.ReviewUnit{}, fmt.Errorf("%w: làm lại từng ô của câu chuyện, không làm lại cổng duyệt", domain.ErrInvalidUnitEdit)
 }
 
-// Impact is empty: nothing is built on the story yet.
-func (storyGateKind) Impact(context.Context, string, string) ([]string, error) {
-	return []string{}, nil
+// Impact names the beat sheet when beats were written from the story.
+func (k storyGateKind) Impact(ctx context.Context, projectID, _ string) ([]string, error) {
+	return k.desk.beatImpact(ctx, projectID)
 }
 
 // CheckApprovable refuses a story with an empty field.
@@ -366,4 +368,17 @@ func (k storyGateKind) CheckApprovable(ctx context.Context, unit domain.ReviewUn
 		return fmt.Errorf("%w: %s", ErrStoryIncomplete, strings.Join(missing, "; "))
 	}
 	return nil
+}
+
+// beatImpact lists what changing the story sends back in the beat sheet; empty
+// until beats were written.
+func (uc *StoryDeskUseCase) beatImpact(ctx context.Context, projectID string) ([]string, error) {
+	beats, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindBeat)
+	if err != nil {
+		return nil, err
+	}
+	if len(beats) == 0 {
+		return []string{}, nil
+	}
+	return []string{fmt.Sprintf("Beat sheet: %d beat viết từ câu chuyện này cần xem lại", len(beats))}, nil
 }

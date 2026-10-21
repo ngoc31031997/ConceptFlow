@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   FLOW_VIEW,
+  VIEW_BEATS,
   VIEW_RESEARCH,
   VIEW_STORY,
+  beatsRoute,
   comingRoute,
   isBuilt,
   phaseOf,
@@ -34,29 +36,45 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([5, 7, 8, 10, 11, 12, 18]);
+    expect(notBuilt).toEqual([7, 8, 10, 11, 12, 18]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
     expect(screenRoute(research, "p1")).toBe("/projects/p1/research");
-    expect(comingRoute(5, "p1")).toBe("/projects/p1/coming/5");
-    expect(comingRoute(5, "")).toBe("/create/coming/5");
+    expect(comingRoute(7, "p1")).toBe("/projects/p1/coming/7");
+    expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
+
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false };
+  const researched = { ...none, researchResolved: true };
+  const storied = { ...researched, storyApproved: true };
+  const beaten = { ...storied, beatsApproved: true };
 
   it("opens the research step once the config is confirmed and passes it with approval or the script", () => {
-    expect(screenStatus(research, 0, false)).toBe("pending");
-    expect(screenStatus(research, 2, false)).toBe("pending");
-    expect(screenStatus(research, 3, false)).toBe("waiting");
-    expect(screenStatus(research, 3, true)).toBe("done");
-    expect(screenStatus(research, 4, false)).toBe("done");
+    expect(screenStatus(research, 0, none)).toBe("pending");
+    expect(screenStatus(research, 2, none)).toBe("pending");
+    expect(screenStatus(research, 3, none)).toBe("waiting");
+    expect(screenStatus(research, 3, researched)).toBe("done");
+    expect(screenStatus(research, 4, none)).toBe("done");
   });
 
-  it("opens the story step only once research is approved or skipped", () => {
+  it("opens the story step only once research is approved or skipped, and passes it with approval", () => {
     const story = FLOW_VIEW[VIEW_STORY - 1];
-    expect(screenStatus(story, 2, true)).toBe("pending");
-    expect(screenStatus(story, 3, false)).toBe("pending");
-    expect(screenStatus(story, 3, true)).toBe("waiting");
-    expect(screenStatus(story, 4, false)).toBe("done");
+    expect(screenStatus(story, 2, researched)).toBe("pending");
+    expect(screenStatus(story, 3, none)).toBe("pending");
+    expect(screenStatus(story, 3, researched)).toBe("waiting");
+    expect(screenStatus(story, 3, storied)).toBe("done");
+    expect(screenStatus(story, 4, none)).toBe("done");
+  });
+
+  it("opens the beat sheet only once the story is approved, and passes it with approval", () => {
+    const beats = FLOW_VIEW[VIEW_BEATS - 1];
+    expect(beats.screen).toBe("beats");
+    expect(screenStatus(beats, 3, researched)).toBe("pending");
+    expect(screenStatus(beats, 3, storied)).toBe("waiting");
+    expect(screenStatus(beats, 3, beaten)).toBe("done");
+    expect(beatsRoute("p1")).toBe("/projects/p1/beats");
+    expect(screenRoute(beats, "p1")).toBe("/projects/p1/beats");
   });
 
   it("finds the phase of a step by its place in the 21 steps", () => {

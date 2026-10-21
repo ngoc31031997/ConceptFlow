@@ -102,7 +102,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research" | "story";
+  screen?: "research" | "story" | "beats";
   /** What the step holds, in a few words, for the flow map. */
   note: string;
 }
@@ -112,7 +112,7 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 2, phase: 0, label: "Cấu hình", server: [2], note: "Kiểu video, format, giọng đọc, cách soạn" },
   { n: 3, phase: 0, label: "Nghiên cứu", title: "Nghiên cứu và kiểm chứng", gate: true, optional: true, server: [], screen: "research", note: "Câu hỏi cần tra, prompt chép ra ngoài, dán kết quả, kiểm link và đoạn trích" },
   { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
-  { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
+  { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], note: "Dàn ý và lời thoại theo beat" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
   { n: 8, phase: 1, label: "Mỹ thuật · lượt 1", title: "Thiết kế mỹ thuật · lượt 1", gate: true, server: [], note: "Diễn viên và phim trường dùng chung cả video" },
@@ -142,6 +142,9 @@ export const VIEW_RESEARCH = 3;
 /** The number, in the 21-step flow, of the story step. */
 export const VIEW_STORY = 4;
 
+/** The number, in the 21-step flow, of the beat sheet step. */
+export const VIEW_BEATS = 5;
+
 /** Whether the app has a screen for the step: a running step behind it, or a screen of its own. */
 export function isBuilt(view: FlowViewStep): boolean {
   return view.server.length > 0 || !!view.screen;
@@ -162,18 +165,39 @@ export function storyRoute(projectId: string): string {
   return `/projects/${projectId}/story`;
 }
 
+/** What the steps before a step with a screen of its own have finished. */
+export interface ScreenStanding {
+  /** The research table is approved or the step was skipped. */
+  researchResolved: boolean;
+  storyApproved: boolean;
+  beatsApproved: boolean;
+}
+
 /**
  * Where a step with a screen of its own stands for a project at running step
  * `flowStep`. Confirming the config step moves the project to the story step
- * (3), which opens research; the story screen opens once research is approved
- * or skipped. Both count as passed once the project has moved on to the script.
- * A "pending" step is closed in the step menu.
+ * (3), which opens research; each later screen opens once the one before it is
+ * approved (research: or skipped). All count as passed once the project has
+ * moved on to the script. A "pending" step is closed in the step menu.
  */
-export function screenStatus(view: FlowViewStep, flowStep: number, researchResolved: boolean): StepStatus {
+export function screenStatus(view: FlowViewStep, flowStep: number, standing: ScreenStanding): StepStatus {
   if (flowStep <= FLOW_CONFIG) return "pending";
   if (flowStep > FLOW_STORY) return "done";
-  if (view.screen === "story") return researchResolved ? "waiting" : "pending";
-  return researchResolved ? "done" : "waiting";
+  switch (view.screen) {
+    case "research":
+      return standing.researchResolved ? "done" : "waiting";
+    case "story":
+      if (!standing.researchResolved) return "pending";
+      return standing.storyApproved ? "done" : "waiting";
+    default:
+      if (!standing.storyApproved) return "pending";
+      return standing.beatsApproved ? "done" : "waiting";
+  }
+}
+
+/** The screen of the beat sheet step. */
+export function beatsRoute(projectId: string): string {
+  return `/projects/${projectId}/beats`;
 }
 
 /** The phase that holds step `n` of the 21-step flow, or null for a number outside it. */

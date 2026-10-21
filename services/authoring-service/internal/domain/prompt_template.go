@@ -46,6 +46,10 @@ const (
 	// choices, so they are not rendered by the generic renderer.
 	RoleStoryApproaches PromptRole = "story_approaches"
 	RoleStoryFrame      PromptRole = "story_frame"
+
+	// The beat sheet step's writer of the beats; filled by the beat use case
+	// with the story, the facts and the Creator's choices.
+	RoleBeatSheet PromptRole = "beat_sheet"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -55,7 +59,7 @@ func ValidPromptRole(role string) bool {
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign,
 		RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
-		RoleStoryApproaches, RoleStoryFrame:
+		RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet:
 		return true
 	default:
 		return false
@@ -64,11 +68,11 @@ func ValidPromptRole(role string) bool {
 
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
-// the brief writer, the research roles and the story roles, whose values come
+// the brief writer, the research roles, the story roles and the beat writer, whose values come
 // from their own use cases.
 func IsRenderablePromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame:
+	case RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet:
 		return false
 	}
 	return ValidPromptRole(role)

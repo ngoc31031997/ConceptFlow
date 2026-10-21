@@ -545,7 +545,7 @@ func ValidAuthoringModel(id string) bool {
 // model: the seven of AuthoringStepModels and the drawings of the illustration
 // library, which belong to no project.
 var ConfigurableModelSteps = []string{
-	"brief", "research", "story_frame", "story", "storyboard", "code", "publish", "illustrations",
+	"brief", "research", "story_frame", "beat_sheet", "story", "storyboard", "code", "publish", "illustrations",
 }
 
 // WithStepModelFallback returns the default model of every configurable step:
@@ -586,13 +586,15 @@ type AuthoringStepModels struct {
 	// StoryFrame is the model the story step proposes approaches and writes the
 	// story frame with.
 	StoryFrame string
+	// BeatSheet is the model the beat sheet step writes the beats with.
+	BeatSheet  string
 	Story      string
 	Storyboard string
 	Code       string
 }
 
 // ModelFor returns the chosen model for one authoring step ("brief", "research",
-// "story_frame", "story", "storyboard", "code" or "publish"), or "" for an unrecognised step —
+// "story_frame", "beat_sheet", "story", "storyboard", "code" or "publish"), or "" for an unrecognised step —
 // callers already validate the step elsewhere (RoleFor), so this never has to
 // reject one.
 func (m AuthoringStepModels) ModelFor(step string) string {
@@ -603,6 +605,8 @@ func (m AuthoringStepModels) ModelFor(step string) string {
 		return m.Research
 	case "story_frame":
 		return m.StoryFrame
+	case "beat_sheet":
+		return m.BeatSheet
 	case "publish":
 		return m.Publish
 	case "story":

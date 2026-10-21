@@ -159,6 +159,12 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/story/approaches/:key/archetype', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/story/generate', proxyHandler(authoringAi, 'authoring-service'));
   router.put('/v1/projects/:id/story/facts/:fid', proxyHandler(authoring, 'authoring-service'));
+  // Bước Beat sheet: từng beat đi qua /units/beat/*; ở đây là cả bảng, thứ tự và các lượt AI.
+  router.get('/v1/projects/:id/beats', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/beats/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/beats', proxyHandler(authoringAi, 'authoring-service'));
+  router.put('/v1/projects/:id/beats/order', proxyHandler(authoring, 'authoring-service'));
+  router.delete('/v1/projects/:id/beats/:key', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/thumbnail', upload.single('thumbnail'), thumbnailUploadHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail/info', thumbnailInfoHandler(sharedDir));
   router.get('/v1/projects/:id/thumbnail', thumbnailServeHandler(sharedDir));

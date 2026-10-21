@@ -80,7 +80,7 @@ describe("StepRail — second-layer vertical menu", () => {
   it("shows the steps the app does not have yet as “sắp có”, and opens a page saying so", async () => {
     renderRail(rendering);
     await waitForStepRail();
-    for (const step of [5, 7, 8, 10, 11, 12, 18]) {
+    for (const step of [7, 8, 10, 11, 12, 18]) {
       const item = screen.getByTestId(`rail-step-${step}`);
       expect(item).toHaveAttribute("data-status", "coming");
       expect(item).toHaveTextContent("sắp có");
@@ -92,8 +92,8 @@ describe("StepRail — second-layer vertical menu", () => {
     renderRailWithRoutes(rendering);
     await waitFor(() => expect(screen.getByTestId("rail-step-17")).toHaveAttribute("data-status", "running"));
 
-    fireEvent.click(screen.getByTestId("rail-step-5"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/5");
+    fireEvent.click(screen.getByTestId("rail-step-7"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/7");
   });
 
   it("opens the research screen from the step menu and shows where the project stands on it", async () => {
@@ -146,16 +146,16 @@ describe("StepRail — second-layer vertical menu", () => {
   it("counts the finished steps of each phase and of the video", async () => {
     renderRail(rendering, 10);
     await waitFor(() => expect(screen.getByTestId("rail-phase-count-3")).toHaveTextContent("4/4"));
-    expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("5/7");
+    expect(screen.getByTestId("rail-phase-count-1")).toHaveTextContent("6/7");
     expect(screen.getByTestId("rail-phase-count-2")).toHaveTextContent("1/5");
     expect(screen.getByTestId("rail-phase-count-4")).toHaveTextContent("0/5");
-    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("10/21 bước xong");
+    expect(screen.getByTestId("step-rail-meta")).toHaveTextContent("11/21 bước xong");
   });
 
   it("marks the built steps where the Creator approves with ◆", async () => {
     renderRail(rendering);
     await waitForStepRail();
-    for (const step of [1, 3, 4, 6, 9, 16]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
+    for (const step of [1, 3, 4, 5, 6, 9, 16]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
     for (const step of [2, 13, 14, 15, 17, 19, 20, 21]) {
       expect(screen.queryByTestId(`rail-gate-${step}`)).not.toBeInTheDocument();
     }

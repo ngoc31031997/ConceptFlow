@@ -11,6 +11,7 @@ const STEP_LABELS: Record<string, string> = {
   brief: "Viết brief (Ý tưởng)",
   research: "Sinh câu hỏi (Nghiên cứu)",
   story_frame: "Câu chuyện (hướng tiếp cận, khung)",
+  beat_sheet: "Beat sheet (dàn ý theo beat)",
   story: "Kịch bản",
   storyboard: "Visual (storyboard)",
   code: "Viết code",
