@@ -6,6 +6,7 @@ package domain
 // narration language is chosen per project.
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
+		{Role: RoleIdea, Language: "vi", Version: 1, TemplateText: ideaVI},
 		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
 		{Role: RoleResearchQuestions, Language: "vi", Version: 1, TemplateText: researchQuestionsVI},
 		{Role: RoleResearchPrompt, Language: "vi", Version: 1, TemplateText: researchPromptVI},

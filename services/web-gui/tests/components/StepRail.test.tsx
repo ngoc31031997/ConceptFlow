@@ -155,8 +155,8 @@ describe("StepRail — second-layer vertical menu", () => {
   it("marks the built steps where the Creator approves with ◆", async () => {
     renderRail(rendering);
     await waitForStepRail();
-    for (const step of [1, 3, 4, 5, 6, 7, 9, 16]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
-    for (const step of [2, 13, 14, 15, 17, 19, 20, 21]) {
+    for (const step of [1, 2, 3, 4, 5, 6, 7, 9, 16]) expect(screen.getByTestId(`rail-gate-${step}`)).toHaveTextContent("◆");
+    for (const step of [13, 14, 15, 17, 19, 20, 21]) {
       expect(screen.queryByTestId(`rail-gate-${step}`)).not.toBeInTheDocument();
     }
   });

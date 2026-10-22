@@ -8,7 +8,7 @@ import { NavigationLoader } from "./components/NavigationLoader";
 import { KeyboardShortcutsHelp } from "./components/KeyboardShortcutsHelp";
 import { ScriptStepPage } from "./pages/ScriptStepPage";
 import { ResumeProjectPage } from "./pages/ResumeProjectPage";
-import { ScriptAuthoringSettingsStepPage } from "./pages/ScriptAuthoringSettingsStepPage";
+import { CreativeBriefStepPage } from "./pages/CreativeBriefStepPage";
 import { ValidatePage } from "./pages/ValidatePage";
 import { RenderPage } from "./pages/RenderPage";
 import { ResultPage } from "./pages/ResultPage";
@@ -61,14 +61,14 @@ export function App() {
           <NavigationLoader />
           <KeyboardShortcutsHelp />
           <Routes>
-            {/* "/" (Bước 1) chỉ còn tình huống "chỉ có ý tưởng" — chọn xong
-                là tạo project ngay. "/create/script/settings" (Bước 2) chọn
-                ngôn ngữ, cách làm rồi mới vào chuỗi 3 tab bên dưới
-                (xem ScriptPipelineTabs). Mỗi tab một URL riêng để Back/
-                reload/bookmark đều chạy, và tab nào cũng bấm sang được bất
-                kể tiến độ. */}
+            {/* "/" (Bước 1) viết ý tưởng từ đề tài và tạo project.
+                "/create/script/brief" (Bước 2) chọn dạng video, ngôn ngữ,
+                thời lượng rồi viết brief từ ý tưởng đã duyệt. Mỗi bước một
+                URL riêng để Back/reload/bookmark đều chạy, và bước nào cũng
+                bấm sang được bất kể tiến độ. */}
             <Route path="/" element={<ScriptStepPage />} />
-            <Route path="/create/script/settings" element={<ScriptAuthoringSettingsStepPage />} />
+            <Route path="/create/script/brief" element={<CreativeBriefStepPage />} />
+            <Route path="/create/script/settings" element={<Navigate to="/create/script/brief" replace />} />
             <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
             <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
             {/* The video's drawings, between Visual and Code. */}
@@ -76,8 +76,8 @@ export function App() {
             <Route path="/create/script/code" element={<CodeStepPage />} />
             {/* Read-only preview of a step not reached yet. */}
             <Route path="/create/preview/:step" element={<StepPreviewPage />} />
-            <Route path="/create/settings" element={<Navigate to="/create/script/settings" replace />} />
-            <Route path="/create/review" element={<Navigate to="/create/script/settings" replace />} />
+            <Route path="/create/settings" element={<Navigate to="/create/script/brief" replace />} />
+            <Route path="/create/review" element={<Navigate to="/create/script/brief" replace />} />
 
             {/* Admin screen to edit pipeline prompt wording, outside
                 the Creator wizard flow. */}

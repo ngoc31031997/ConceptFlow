@@ -15,7 +15,8 @@ import glass from "../styles/glass.module.css";
 import styles from "./PromptSettingsPage.module.css";
 
 const ROLES: { value: PromptRole; label: string }[] = [
-  { value: "creative_brief", label: "0. Creative brief — viết brief từ đề tài (bước Ý tưởng)" },
+  { value: "idea", label: "0. Ý tưởng — viết câu hỏi trung tâm, vì sao thú vị, đã biết và chưa biết từ đề tài (bước Ý tưởng)" },
+  { value: "creative_brief", label: "0a. Creative brief — viết định hướng sáng tạo từ ý tưởng đã duyệt (bước Creative brief)" },
   { value: "research_questions", label: "0b. Câu hỏi nghiên cứu — AI đặt câu hỏi từ brief (bước Nghiên cứu)" },
   { value: "research_prompt", label: "0c. Prompt nghiên cứu — chép sang công cụ nghiên cứu bên ngoài (bước Nghiên cứu)" },
   { value: "story_approaches", label: "0d. Góc tiếp cận — AI gợi ý cách kể từ brief và dữ kiện (bước Câu chuyện)" },
@@ -54,7 +55,11 @@ const PREVIEW_SAMPLE: Record<string, string> = {
   safe_area: "(96, 96) đến (1824, 984)",
   frame_rules: "(luật khung dọc — chỉ có khi video là short dọc — sẽ hiện ở đây)",
   narrate_example: "Nội dung lời thoại cho đoạn này",
-  creative_brief: "(creative brief đã duyệt ở bước Ý tưởng, kèm thời lượng mục tiêu, sẽ hiện ở đây)",
+  creative_brief: "(ý tưởng và creative brief đã duyệt, kèm thời lượng mục tiêu, sẽ hiện ở đây)",
+  idea: "(ý tưởng đã duyệt ở bước Ý tưởng sẽ hiện ở đây)",
+  idea_language: "tiếng Việt",
+  current_idea: "(ý tưởng hiện có, khi làm lại, sẽ hiện ở đây)",
+  platform: "YouTube",
   video_kind: "Video dài 16:9",
   target_duration: "4–5 phút",
   brief_language: "tiếng Việt",

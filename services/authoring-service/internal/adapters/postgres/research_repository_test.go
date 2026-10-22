@@ -56,7 +56,7 @@ func TestUnitStaleAgainstItsSourceInPostgres(t *testing.T) {
 	const pid = "research-stale-test"
 	r, ctx := researchRepo(t, pid)
 
-	brief, _ := json.Marshal(domain.CreativeBrief{Question: "Q", Tone: "T"})
+	brief, _ := json.Marshal(domain.CreativeBrief{Audience: "Q", Tone: "T"})
 	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
 		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: domain.UnitApproved, Content: brief,
 	}); err != nil {
@@ -87,7 +87,7 @@ func TestUnitStaleAgainstItsSourceInPostgres(t *testing.T) {
 		t.Fatalf("a unit built from nothing is never stale: %+v, %v", handWritten, err)
 	}
 
-	changed, _ := json.Marshal(domain.CreativeBrief{Question: "Q2", Tone: "T"})
+	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Q2", Tone: "T"})
 	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
 		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: domain.UnitApproved, Content: changed,
 	}); err != nil {

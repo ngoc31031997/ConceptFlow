@@ -87,8 +87,14 @@ func newResearchFixture() *researchFixture {
 
 func (f *researchFixture) seedBrief(t *testing.T, status domain.UnitStatus) {
 	t.Helper()
+	ideaRaw, _ := json.Marshal(domain.Idea{Question: "Vì sao ong chết trong quả sung?", Why: "w", Known: "k", Unknown: "u"})
+	if _, err := f.units.SaveUnit(context.Background(), domain.ReviewUnit{
+		ProjectID: "p1", Kind: domain.UnitKindIdea, Key: domain.IdeaUnitKey, Status: status, Content: ideaRaw,
+	}); err != nil {
+		t.Fatal(err)
+	}
 	raw, _ := json.Marshal(domain.CreativeBrief{
-		Question: "Vì sao ong chết trong quả sung?", Audience: "Người xem phổ thông", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o",
+		Audience: "Người xem phổ thông", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o",
 	})
 	if _, err := f.units.SaveUnit(context.Background(), domain.ReviewUnit{
 		ProjectID: "p1", Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: status, Content: raw,
@@ -234,7 +240,7 @@ func TestQuestionsGoStaleWhenTheBriefChanges(t *testing.T) {
 		t.Fatal("nothing changed yet")
 	}
 
-	changed, _ := json.Marshal(domain.CreativeBrief{Question: "Câu hỏi trung tâm mới"})
+	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Khán giả mới"})
 	brief, _ := f.units.GetUnit(ctx, "p1", domain.UnitKindBrief, domain.BriefUnitKey)
 	brief.Content = changed
 	if _, err := f.units.SaveUnit(ctx, brief); err != nil {

@@ -66,8 +66,9 @@ func (f *storyFixture) save(t *testing.T, kind, key string, status domain.UnitSt
 // open approves the brief and the research step and seeds three facts.
 func (f *storyFixture) open(t *testing.T) {
 	t.Helper()
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
 	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{
-		Question: "Vì sao ong chết?", Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o",
+		Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o",
 	})
 	f.save(t, domain.UnitKindResearch, domain.ResearchUnitKey, domain.UnitApproved, domain.ResearchGate{})
 	f.save(t, domain.UnitKindFact, "F01", domain.UnitPending, domain.Fact{ClaimVI: "Sung là chùm hoa kín.", Type: domain.FactTypeFact, Keep: true, Must: true, Link: domain.FactLink{State: domain.LinkOK}})
@@ -154,7 +155,8 @@ func TestGenerateFrameRefusesWhenTheStepIsNotOpen(t *testing.T) {
 	if err := f.uc.GenerateFrame(context.Background(), "p1", ""); !errors.Is(err, ErrStoryNeedsBrief) {
 		t.Errorf("err = %v, want the brief to be required first", err)
 	}
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Question: "q"})
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
+	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "q"})
 	if err := f.uc.GenerateFrame(context.Background(), "p1", ""); !errors.Is(err, ErrStoryNeedsResearch) {
 		t.Errorf("err = %v, want the research step to be required next", err)
 	}
@@ -178,7 +180,8 @@ func TestGenerateFrameStoresNothingFromAnUnusableReply(t *testing.T) {
 
 func TestGenerateFrameListsFactsWhenResearchWasSkipped(t *testing.T) {
 	f := newStoryFixture()
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Question: "q"})
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
+	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "q"})
 	f.save(t, domain.UnitKindResearch, domain.ResearchUnitKey, domain.UnitPending, domain.ResearchGate{Skipped: true})
 	f.llm.reply = `{"question":"q","promise":"p","chain":[{"text":"s","facts":["F01"]}],"payoff":"x","payoff_facts":["F01"],"logline":"l","summary":"u","used_facts":[],"facts":[{"id":"F01","claim_vi":"Sung là chùm hoa","type":"fact","note":""}]}`
 	if err := f.uc.GenerateFrame(context.Background(), "p1", ""); err != nil {
@@ -195,7 +198,8 @@ func TestGenerateFrameListsFactsWhenResearchWasSkipped(t *testing.T) {
 
 func TestGenerateFrameDoesNotOverwriteAFactTheCreatorHas(t *testing.T) {
 	f := newStoryFixture()
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Question: "q"})
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
+	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "q"})
 	f.save(t, domain.UnitKindResearch, domain.ResearchUnitKey, domain.UnitPending, domain.ResearchGate{Skipped: true})
 	f.save(t, domain.UnitKindFact, "F01", domain.UnitPending, domain.Fact{ClaimVI: "Đã bỏ", Type: domain.FactTypeFact, Keep: false})
 	f.llm.reply = `{"question":"q","promise":"p","chain":[{"text":"s","facts":["F01"]}],"payoff":"x","payoff_facts":[],"logline":"l","summary":"u","used_facts":[],"facts":[{"id":"F01","claim_vi":"Khác","type":"fact","note":""}]}`
@@ -491,7 +495,8 @@ func TestStoryAIRunsUseTheModelChosenForTheStep(t *testing.T) {
 
 func TestApproachesPromptTellsTheModelNotToCiteFactsWhenThereAreNone(t *testing.T) {
 	f := newStoryFixture()
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Question: "q"})
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
+	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "q"})
 	f.save(t, domain.UnitKindResearch, domain.ResearchUnitKey, domain.UnitPending, domain.ResearchGate{Skipped: true})
 	f.llm.reply = `{"approaches":[{"code":"HÀNH-TRÌNH","name":"Hành trình","angle":"đi vào quả","why":"không có dữ kiện","refs":[],"open":"Quả sung..."}]}`
 	if _, err := f.uc.GenerateApproaches(context.Background(), "p1", ""); err != nil {

@@ -94,19 +94,15 @@ describe("StepPreviewPage — xem trước bước chưa tới", () => {
     );
   });
 
-  it("bước Cấu hình chưa tới hiện màn thật ở chế độ chỉ đọc", async () => {
-    vi.spyOn(apiClient, "listVoices").mockResolvedValue([]);
-    vi.spyOn(apiClient, "getMusicInfo").mockResolvedValue({ exists: false, background_music_path: null });
-    vi.spyOn(apiClient, "getProjectVisualLanguage").mockRejectedValue(new apiClient.ApiError("not found"));
+  it("bước Creative brief chưa tới hiện màn thật ở chế độ chỉ đọc", async () => {
     renderPreview("/create/preview/2", null);
 
-    expect(await screen.findByTestId("settings-read-only-notice")).toHaveTextContent("Chưa tới bước này");
-    expect(screen.getByTestId("settings-section-font")).toBeInTheDocument();
-    expect(screen.getByTestId("settings-section-quality")).toBeInTheDocument();
+    expect(await screen.findByTestId("brief-read-only-notice")).toHaveTextContent("Chưa tới bước này");
+    expect(screen.getByTestId("brief-form-card")).toBeInTheDocument();
     // Every control sits inside the inert body, and there is no way forward.
-    expect(screen.getByTestId("settings-section-font").closest("[inert]")).not.toBeNull();
-    expect(screen.queryByTestId("script-authoring-settings-next")).not.toBeInTheDocument();
-    expect(screen.getByTestId("settings-read-only-back")).toHaveTextContent("Về bước Ý tưởng");
+    expect(screen.getByTestId("brief-form-card").closest("[inert]")).not.toBeNull();
+    expect(screen.queryByTestId("creative-brief-next")).not.toBeInTheDocument();
+    expect(screen.getByTestId("brief-read-only-back")).toHaveTextContent("Về bước Ý tưởng");
   });
 
   it("đưa về bước 1 khi số bước không hợp lệ", () => {

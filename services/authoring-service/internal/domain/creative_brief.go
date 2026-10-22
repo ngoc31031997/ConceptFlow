@@ -13,11 +13,12 @@ const (
 	BriefUnitKey  = "main"
 )
 
-// CreativeBrief turns a topic into something specific enough to research and
-// tell: the question the video answers, who it is for, what the viewer will
-// know, understand and feel afterwards, the tone, and what it leaves out.
+// CreativeBrief turns an approved idea into something specific enough to
+// research and tell: who the video is for, what the viewer will know,
+// understand and feel afterwards, the tone, and what it leaves out. The
+// length, the form, the language and the platform are chosen before the brief
+// is written and belong to the project.
 type CreativeBrief struct {
-	Question   string `json:"question"`
 	Audience   string `json:"audience"`
 	Know       string `json:"know"`
 	Understand string `json:"understand"`
@@ -26,13 +27,53 @@ type CreativeBrief struct {
 	OutOfScope string `json:"out_of_scope"`
 }
 
+// The brief step's platform choice is stored as a unit of its own, since it
+// is picked before any brief exists: brief_platform:main.
+const (
+	UnitKindBriefPlatform = "brief_platform"
+	BriefPlatformKey      = "main"
+)
+
+// BriefPlatform is the stored platform choice.
+type BriefPlatform struct {
+	Platform string `json:"platform"`
+}
+
+// The platforms a video can be published to.
+const (
+	PlatformYouTube       = "YouTube"
+	PlatformYouTubeShorts = "YouTube Shorts"
+	PlatformWebsite       = "Website, khoá học"
+)
+
+// Platforms lists the choices in the order the screen shows them.
+var Platforms = []string{PlatformYouTube, PlatformYouTubeShorts, PlatformWebsite}
+
+// DefaultPlatform is the platform a project has until the Creator picks one:
+// a short goes to YouTube Shorts, a long video to YouTube.
+func DefaultPlatform(mode VideoOutputMode) string {
+	if mode == ModeShortOnly {
+		return PlatformYouTubeShorts
+	}
+	return PlatformYouTube
+}
+
+// ValidPlatform reports whether p is one of Platforms.
+func ValidPlatform(p string) bool {
+	for _, known := range Platforms {
+		if known == p {
+			return true
+		}
+	}
+	return false
+}
+
 // BriefFields are the brief's field names in the order the screen and the
 // prompts show them.
-var BriefFields = []string{"question", "audience", "know", "understand", "feel", "tone", "out_of_scope"}
+var BriefFields = []string{"audience", "know", "understand", "feel", "tone", "out_of_scope"}
 
 // briefFieldLabels names each field in the text the story step reads.
 var briefFieldLabels = map[string]string{
-	"question":     "Câu hỏi trung tâm cần trả lời",
 	"audience":     "Khán giả",
 	"know":         "Sau video, người xem sẽ biết",
 	"understand":   "Sau video, người xem sẽ hiểu",
@@ -50,8 +91,6 @@ func IsBriefField(name string) bool {
 // Field returns the value of the named field ("" for an unknown name).
 func (b CreativeBrief) Field(name string) string {
 	switch name {
-	case "question":
-		return b.Question
 	case "audience":
 		return b.Audience
 	case "know":
@@ -72,8 +111,6 @@ func (b CreativeBrief) Field(name string) string {
 // leaves b as it is.
 func (b CreativeBrief) WithField(name, value string) CreativeBrief {
 	switch name {
-	case "question":
-		b.Question = value
 	case "audience":
 		b.Audience = value
 	case "know":
@@ -126,17 +163,11 @@ var ErrBriefReplyUnusable = errors.New("câu trả lời của AI không dùng �
 
 // ParseBriefReply reads the brief out of a model reply: the first JSON object
 // in it, with or without a ```json fence around it. Every field must be there
-// and non-empty; a reply missing one is an error naming the fields, so a
-// half-written brief is never stored.
+// and non-empty; a reply missing one is an error naming the fields, so a half-written brief is never stored.
 func ParseBriefReply(reply string) (CreativeBrief, error) {
-	start := strings.Index(reply, "{")
-	end := strings.LastIndex(reply, "}")
-	if start < 0 || end <= start {
-		return CreativeBrief{}, fmt.Errorf("%w: không có khối JSON", ErrBriefReplyUnusable)
-	}
-	var raw map[string]any
-	if err := json.Unmarshal([]byte(reply[start:end+1]), &raw); err != nil {
-		return CreativeBrief{}, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrBriefReplyUnusable, err)
+	raw, err := replyObject(reply)
+	if err != nil {
+		return CreativeBrief{}, fmt.Errorf("%w: %v", ErrBriefReplyUnusable, err)
 	}
 	var brief CreativeBrief
 	for _, f := range BriefFields {
@@ -148,6 +179,21 @@ func ParseBriefReply(reply string) (CreativeBrief, error) {
 		return CreativeBrief{}, fmt.Errorf("%w: thiếu ô %s", ErrBriefReplyUnusable, brief.MissingFieldLabels())
 	}
 	return brief, nil
+}
+
+// replyObject reads the first JSON object out of a model reply, with or
+// without a ```json fence around it.
+func replyObject(reply string) (map[string]any, error) {
+	start := strings.Index(reply, "{")
+	end := strings.LastIndex(reply, "}")
+	if start < 0 || end <= start {
+		return nil, errors.New("không có khối JSON")
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(reply[start:end+1]), &raw); err != nil {
+		return nil, fmt.Errorf("khối JSON không đọc được (%v)", err)
+	}
+	return raw, nil
 }
 
 // TargetDuration is the length a long video aims for, in minutes. A short has
@@ -198,11 +244,13 @@ func TargetDurationLabel(mode VideoOutputMode, d TargetDuration, language string
 	return span + " phút"
 }
 
-// BriefSection is the approved brief as the story step reads it, one labelled
-// line per field, plus the target length.
-func BriefSection(b CreativeBrief, durationLabel string) string {
+// BriefSection is the approved idea and brief as the later steps read them,
+// one labelled line per field, plus the target length and the platform.
+func BriefSection(i Idea, b CreativeBrief, durationLabel, platform string) string {
 	var sb strings.Builder
-	sb.WriteString("Thời lượng mục tiêu: " + durationLabel)
+	sb.WriteString(IdeaSection(i))
+	sb.WriteString("\nThời lượng mục tiêu: " + durationLabel)
+	sb.WriteString("\nNền tảng phát hành: " + platform)
 	for _, f := range BriefFields {
 		sb.WriteString("\n" + briefFieldLabels[f] + ": " + b.Field(f))
 	}

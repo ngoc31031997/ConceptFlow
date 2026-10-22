@@ -73,7 +73,8 @@ func (f *beatFixture) save(t *testing.T, kind, key string, status domain.UnitSta
 // three beats.
 func (f *beatFixture) open(t *testing.T) {
 	t.Helper()
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Question: "Vì sao ong chết?", Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o"})
+	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
+	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o"})
 	f.save(t, domain.UnitKindStory, domain.StoryUnitKey, domain.UnitApproved, domain.StoryGate{UsedFacts: []string{}})
 	f.save(t, domain.UnitKindStoryField, "question", domain.UnitPending, domain.StoryField{Text: "Vì sao ong chết trong quả sung?", Facts: []string{}})
 	f.save(t, domain.UnitKindStoryField, "chain", domain.UnitPending, domain.StoryField{Text: "Ong chui qua cửa hẹp. [F02]", Facts: []string{"F02"}})

@@ -54,6 +54,9 @@ func (f *fakeBrief) State(context.Context, string) (application.BriefState, erro
 func (f *fakeBrief) SetTargetDuration(context.Context, string, domain.TargetDuration) error {
 	return f.err
 }
+func (f *fakeBrief) SetPlatform(context.Context, string, string) error {
+	return f.err
+}
 func (f *fakeBrief) Generate(context.Context, string, string) (domain.ReviewUnit, error) {
 	return domain.ReviewUnit{Kind: domain.UnitKindBrief}, f.err
 }
@@ -134,7 +137,13 @@ func TestBriefRoutes(t *testing.T) {
 		t.Errorf("target duration: status %d", rec.Code)
 	}
 	if rec := serveUnits(&fakeUnits{}, &fakeBrief{err: domain.ErrInvalidStatus}, "PUT", "/v1/projects/p1/brief/target-duration", `{"target_duration":"5-7"}`); rec.Code != http.StatusConflict {
-		t.Errorf("target duration after the brief: status %d, want 409", rec.Code)
+		t.Errorf("target duration of a project that is no longer a draft: status %d, want 409", rec.Code)
+	}
+	if rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "PUT", "/v1/projects/p1/brief/platform", `{"platform":"YouTube"}`); rec.Code != http.StatusNoContent {
+		t.Errorf("platform: status %d", rec.Code)
+	}
+	if rec := serveUnits(&fakeUnits{}, &fakeBrief{err: domain.ErrInvalidWizardInput}, "PUT", "/v1/projects/p1/brief/platform", `{"platform":"TikTok"}`); rec.Code != http.StatusBadRequest {
+		t.Errorf("platform outside the list: status %d, want 400", rec.Code)
 	}
 	if rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "POST", "/v1/projects/p1/brief/generate", ""); rec.Code != http.StatusOK {
 		t.Errorf("generate: status %d", rec.Code)
@@ -186,5 +195,47 @@ func TestStepDefaultModelSettingRoundTripsAndFeedsTheLLMStatus(t *testing.T) {
 	setting.err = fmt.Errorf("%w: step", domain.ErrInvalidWizardInput)
 	if rec := do("PUT", "/v1/settings/ai-model/steps/render", `{"model":"ollama"}`); rec.Code != http.StatusBadRequest {
 		t.Errorf("a refused step must be a 400, got %d", rec.Code)
+	}
+}
+
+// fakeIdea is the idea step's use case with a fixed answer.
+type fakeIdea struct {
+	state application.IdeaState
+	err   error
+}
+
+func (f *fakeIdea) State(context.Context, string) (application.IdeaState, error) {
+	return f.state, f.err
+}
+func (f *fakeIdea) Generate(context.Context, string, string) (domain.ReviewUnit, error) {
+	return domain.ReviewUnit{Kind: domain.UnitKindIdea}, f.err
+}
+
+func serveIdea(idea *fakeIdea, method, path string) *httptest.ResponseRecorder {
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithIdea(idea)
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+	return rec
+}
+
+func TestIdeaRoutes(t *testing.T) {
+	unit := domain.ReviewUnit{Kind: domain.UnitKindIdea, Key: domain.IdeaUnitKey, Status: domain.UnitApproved}
+	rec := serveIdea(&fakeIdea{state: application.IdeaState{Unit: &unit}}, "GET", "/v1/projects/p1/idea")
+	var body ideaStateResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK || body.Unit == nil || body.Unit.Status != domain.UnitApproved {
+		t.Errorf("idea state: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveIdea(&fakeIdea{}, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusOK {
+		t.Errorf("generate: status %d", rec.Code)
+	}
+	unusable := &fakeIdea{err: fmt.Errorf("%w: thiếu ô", domain.ErrIdeaReplyUnusable)}
+	if rec := serveIdea(unusable, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusBadGateway {
+		t.Errorf("an unusable reply: status %d, want 502", rec.Code)
+	}
+	if rec := serveIdea(&fakeIdea{err: application.ErrLLMNotConfigured}, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("no model: status %d, want 503", rec.Code)
 	}
 }

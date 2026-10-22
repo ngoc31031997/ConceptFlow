@@ -11,7 +11,7 @@ import {
   FLOW_STEP_PURPOSE,
   flowStepName,
 } from "../utils/flow";
-import { ScriptAuthoringSettingsStepPage } from "./ScriptAuthoringSettingsStepPage";
+import { CreativeBriefStepPage } from "./CreativeBriefStepPage";
 import styles from "./StepPreviewPage.module.css";
 
 /**
@@ -48,11 +48,9 @@ export function StepPreviewPage() {
       ? `Về bước đang làm: ${FLOW_LABELS[flow.flowStep - 1]}`
       : "Về bước Ý tưởng";
 
-  // The config step has a real screen: show it read-only instead of the placeholder.
+  // The brief step has a real screen: show it read-only instead of the placeholder.
   if (step === FLOW_CONFIG) {
-    return (
-      <ScriptAuthoringSettingsStepPage readOnly backLabel={backLabel} onBack={backToCurrent} />
-    );
+    return <CreativeBriefStepPage readOnly backLabel={backLabel} onBack={backToCurrent} />;
   }
 
   return (

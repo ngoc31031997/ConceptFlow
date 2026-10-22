@@ -59,6 +59,10 @@ const (
 	// handoff note; filled by the script lock use case.
 	RoleScriptReview  PromptRole = "script_review"
 	RoleScriptHandoff PromptRole = "script_handoff"
+
+	// The idea step's writer of the central question, why it is interesting
+	// and what is and is not known; filled by the idea use case.
+	RoleIdea PromptRole = "idea"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -67,7 +71,7 @@ func ValidPromptRole(role string) bool {
 	case RoleStoryArchitect, RoleVisualDirector, RoleRemotionEngineer,
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign,
-		RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
+		RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
 		RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff:
 		return true
 	default:
@@ -77,11 +81,11 @@ func ValidPromptRole(role string) bool {
 
 // IsRenderablePromptRole reports whether role is a known role whose prompt
 // can be rendered with a project's or the Creator's values: every role but
-// the brief writer, the research roles, the story roles, the beat writer and the script writer, whose values come
+// the idea and brief writers, the research roles, the story roles, the beat writer and the script writer, whose values come
 // from their own use cases.
 func IsRenderablePromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff:
+	case RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff:
 		return false
 	}
 	return ValidPromptRole(role)

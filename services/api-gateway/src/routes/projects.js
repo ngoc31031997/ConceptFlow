@@ -125,10 +125,13 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(authoringAi, 'authoring-service'),
   );
-  // Ý tưởng · creative brief: state, the target length, and the AI writing the
-  // brief (a model call, so the long-timeout client).
+  // Idea and creative brief steps: each one's state and the AI writing it
+  // (a model call, so the long-timeout client), plus the brief's target length and platform.
+  router.get('/v1/projects/:id/idea', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/idea/generate', proxyHandler(authoringAi, 'authoring-service'));
   router.get('/v1/projects/:id/brief', proxyHandler(authoring, 'authoring-service'));
   router.put('/v1/projects/:id/brief/target-duration', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/brief/platform', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/brief/generate', proxyHandler(authoringAi, 'authoring-service'));
   // Review units of every step (read, hand edit, redo with a note, approve,
   // impact). A redo calls the model, so it takes the long-timeout client.

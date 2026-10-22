@@ -21,20 +21,20 @@ func aiTemplate(t *testing.T, role PromptRole) string {
 	return ""
 }
 
-const fullBriefJSON = `{"question":"Vì sao ong chết trong quả sung?","audience":"Người xem phổ thông","know":"Sung là chùm hoa kín","understand":"Vòng đời ong gắn với quả","feel":"Ngạc nhiên","tone":"Tò mò, ấm","out_of_scope":"Không tư vấn ăn uống"}`
+const fullBriefJSON = `{"audience":"Người xem phổ thông","know":"Sung là chùm hoa kín","understand":"Vòng đời ong gắn với quả","feel":"Ngạc nhiên","tone":"Tò mò, ấm","out_of_scope":"Không tư vấn ăn uống"}`
 
 func TestParseBriefReplyReadsAFencedJSONBlock(t *testing.T) {
 	brief, err := ParseBriefReply("Đây là brief:\n```json\n" + fullBriefJSON + "\n```\n")
 	if err != nil {
 		t.Fatalf("a fenced reply with every field should parse: %v", err)
 	}
-	if brief.Question != "Vì sao ong chết trong quả sung?" || brief.OutOfScope != "Không tư vấn ăn uống" {
+	if brief.Audience != "Người xem phổ thông" || brief.OutOfScope != "Không tư vấn ăn uống" {
 		t.Errorf("fields read wrong: %+v", brief)
 	}
 }
 
 func TestParseBriefReplyRefusesAReplyMissingAField(t *testing.T) {
-	_, err := ParseBriefReply(`{"question":"Q","audience":"A","know":"K","understand":"U","feel":"","tone":"T"}`)
+	_, err := ParseBriefReply(`{"audience":"A","know":"K","understand":"U","feel":"","tone":"T"}`)
 	if !errors.Is(err, ErrBriefReplyUnusable) {
 		t.Fatalf("a reply with an empty and a missing field must be unusable, got %v", err)
 	}
@@ -50,7 +50,7 @@ func TestParseBriefReplyRefusesAReplyWithoutJSON(t *testing.T) {
 }
 
 func TestParseBriefReplyRefusesAnUnescapedQuoteInsideAField(t *testing.T) {
-	reply := "```json\n" + `{"question":"Vì sao gọi là "tự do" khi không ai chọn?","audience":"a","know":"b","understand":"c","feel":"d","tone":"e","out_of_scope":"f"}` + "\n```"
+	reply := "```json\n" + `{"audience":"Người "xem" phổ thông","know":"b","understand":"c","feel":"d","tone":"e","out_of_scope":"f"}` + "\n```"
 	if _, err := ParseBriefReply(reply); !errors.Is(err, ErrBriefReplyUnusable) {
 		t.Fatalf("an unescaped quote inside a field must be unusable, got %v", err)
 	}
@@ -71,10 +71,10 @@ func TestBriefPromptRanksTheCreatorsNoteAboveTheCurrentBrief(t *testing.T) {
 }
 
 func TestKeepCreatorFieldsKeepsOnlyTheCreatorsFields(t *testing.T) {
-	written := CreativeBrief{Question: "AI Q", Audience: "AI A", Tone: "AI T"}
-	current := CreativeBrief{Question: "Creator Q", Audience: "old A", Tone: "Creator T"}
-	got := KeepCreatorFields(written, current, []string{"question", "tone"})
-	if got.Question != "Creator Q" || got.Tone != "Creator T" {
+	written := CreativeBrief{Know: "AI K", Audience: "AI A", Tone: "AI T"}
+	current := CreativeBrief{Know: "Creator K", Audience: "old A", Tone: "Creator T"}
+	got := KeepCreatorFields(written, current, []string{"know", "tone"})
+	if got.Know != "Creator K" || got.Tone != "Creator T" {
 		t.Errorf("the Creator's fields must survive the redo, got %+v", got)
 	}
 	if got.Audience != "AI A" {
@@ -107,8 +107,12 @@ func TestBriefSectionListsEveryFieldWithItsLabel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	section := BriefSection(brief, "4–5 phút")
-	for _, want := range []string{"Thời lượng mục tiêu: 4–5 phút", "Câu hỏi trung tâm cần trả lời: Vì sao ong chết trong quả sung?", "Ngoài phạm vi (video không nói tới): Không tư vấn ăn uống"} {
+	idea := Idea{Question: "Vì sao ong chết trong quả sung?", Why: "w", Known: "k", Unknown: "u"}
+	section := BriefSection(idea, brief, "4–5 phút", "YouTube")
+	for _, want := range []string{
+		"Câu hỏi trung tâm cần trả lời: Vì sao ong chết trong quả sung?", "Thời lượng mục tiêu: 4–5 phút",
+		"Ngoài phạm vi (video không nói tới): Không tư vấn ăn uống", "Nền tảng phát hành: YouTube",
+	} {
 		if !strings.Contains(section, want) {
 			t.Errorf("the brief section lacks %q:\n%s", want, section)
 		}
@@ -117,7 +121,7 @@ func TestBriefSectionListsEveryFieldWithItsLabel(t *testing.T) {
 
 func TestCreativeBriefPromptUsesOnlyTheVariablesTheUseCaseFills(t *testing.T) {
 	known := map[string]bool{
-		"topic": true, "video_kind": true, "target_duration": true,
+		"topic": true, "idea": true, "video_kind": true, "target_duration": true, "platform": true,
 		"brief_language": true, "current_brief": true, "kept_fields": true, "redo_note": true,
 	}
 	text := aiTemplate(t, RoleCreativeBrief)
@@ -130,5 +134,17 @@ func TestCreativeBriefPromptUsesOnlyTheVariablesTheUseCaseFills(t *testing.T) {
 		if !strings.Contains(text, `"`+field+`"`) {
 			t.Errorf("the creative_brief prompt does not ask for the %q key", field)
 		}
+	}
+}
+
+func TestDefaultPlatformFollowsTheVideoForm(t *testing.T) {
+	if got := DefaultPlatform(ModeShortOnly); got != PlatformYouTubeShorts {
+		t.Errorf("a short defaults to YouTube Shorts, got %q", got)
+	}
+	if got := DefaultPlatform(ModeLongOnly); got != PlatformYouTube {
+		t.Errorf("a long video defaults to YouTube, got %q", got)
+	}
+	if ValidPlatform("TikTok") || !ValidPlatform(PlatformWebsite) {
+		t.Error("only the listed platforms are valid")
 	}
 }

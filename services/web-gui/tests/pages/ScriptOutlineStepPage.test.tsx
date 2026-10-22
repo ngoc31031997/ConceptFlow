@@ -88,10 +88,12 @@ describe("ScriptOutlineStepPage", () => {
       creatorFields: [],
       redoCount: 0,
       updatedAt: "",
+      stale: false,
     };
     const state = (over: Partial<apiClient.BriefState>): apiClient.BriefState => ({
       unit: approved,
       targetDuration: "4-5",
+      platform: "YouTube",
       storyStale: false,
       storyPromptReadsBrief: true,
       ...over,

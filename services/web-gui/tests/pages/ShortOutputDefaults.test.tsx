@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { useContext } from "react";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
-import { ScriptStepPage } from "../../src/pages/ScriptStepPage";
+import { CreativeBriefStepPage } from "../../src/pages/CreativeBriefStepPage";
 import { ProjectDraftContext, ProjectDraftProvider } from "../../src/context/ProjectDraftContext";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 import * as apiClient from "../../src/api/client";
@@ -27,6 +27,15 @@ beforeEach(() => {
     reason: "Chưa cấu hình",
   });
   vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue(FORMATS);
+  vi.spyOn(apiClient, "getIdeaState").mockResolvedValue({ unit: null });
+  vi.spyOn(apiClient, "getBriefState").mockResolvedValue({
+    unit: null,
+    targetDuration: "4-5",
+    platform: "YouTube",
+    storyStale: false,
+    storyPromptReadsBrief: true,
+  });
+  vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -34,7 +43,7 @@ afterEach(() => {
   window.localStorage.clear();
 });
 
-/** Shows the draft's format and subtitle settings, which step 1 itself does not display. */
+/** Shows the draft's format and subtitle settings, which the brief step itself does not display. */
 function SubtitleProbe() {
   const draft = useContext(ProjectDraftContext);
   return (
@@ -49,14 +58,16 @@ describe("chọn Short dọc", () => {
         <MemoryRouter initialEntries={["/"]}>
           <ProjectDraftProvider>
             <Routes>
-              <Route path="/" element={<ScriptStepPage />} />
+              <Route path="/" element={<CreativeBriefStepPage />} />
             </Routes>
             <SubtitleProbe />
           </ProjectDraftProvider>
         </MemoryRouter>
       </ThemeProvider>,
     );
-    fireEvent.click(await screen.findByTestId("video-output-mode-short"));
+    const short = await screen.findByTestId("video-output-mode-short");
+    await waitFor(() => expect(short).not.toBeDisabled());
+    fireEvent.click(short);
     await waitFor(() =>
       expect(screen.getByTestId("subtitle-probe")).toHaveTextContent("vertical_short_60s/burn_in/top"),
     );

@@ -9,7 +9,7 @@ package domain
 // awaiting_review and nothing runs until the Creator presses "start render".
 const (
 	FlowInit          = 1  // Khởi tạo — topic, project row
-	FlowConfig        = 2  // Cấu hình
+	FlowConfig        = 2  // Creative brief
 	FlowStory         = 3  // Kịch bản
 	FlowVisual        = 4  // Visual
 	FlowIllustrations = 5  // Hình minh hoạ: runs before Code, which reads its output
@@ -151,7 +151,7 @@ func FlowStepForAuthoring(step string) int {
 
 // FlowStepLabel is the Creator-facing name of a flow step.
 var FlowStepLabel = map[int]string{
-	FlowInit: "Ý tưởng", FlowConfig: "Cấu hình", FlowStory: "Viết kịch bản", FlowVisual: "Storyboard",
+	FlowInit: "Ý tưởng", FlowConfig: "Creative brief", FlowStory: "Viết kịch bản", FlowVisual: "Storyboard",
 	FlowCode: "Code", FlowIllustrations: "Hình minh hoạ", FlowValidate: "Validate", FlowReview: "Review", FlowTTS: "Giọng đọc",
 	FlowRender: "Render từng cảnh", FlowMerge: "Merge + QC",
 	FlowResult: "Kết quả", FlowPublish: "Publish",

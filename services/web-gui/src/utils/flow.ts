@@ -14,7 +14,7 @@ import type { AuthoringStep } from "../api/client";
  */
 export const FLOW_LABELS = [
   "Ý tưởng",
-  "Cấu hình",
+  "Creative brief",
   "Viết kịch bản",
   "Storyboard",
   "Hình minh hoạ",
@@ -33,8 +33,8 @@ export const FLOW_LABELS = [
  * title, and the preview of a step not reached yet.
  */
 export const FLOW_STEP_PURPOSE = [
-  "Biến ý tưởng ban đầu thành một đề tài đủ cụ thể để phát triển: câu hỏi trung tâm, khán giả, điều người xem mang về. Chưa viết chuyện.",
-  "Chọn kiểu video, format, giọng đọc và cách soạn (AI làm giúp hay tự làm) cho video này.",
+  "Viết ý tưởng ban đầu thành một câu hỏi rõ: vì sao đáng xem, điều đã biết và chưa biết. Chưa cần lời giải và chưa chọn cách kể.",
+  "Thống nhất video làm cho ai, để người xem hiểu và nhớ điều gì, dài bao lâu, đăng ở đâu, giọng điệu nào và điều gì không nói tới.",
   "Dựng dàn ý và lời thoại theo các beat của format, bám theo brief đã duyệt.",
   "Chia chuyện thành cảnh và shot: mỗi cảnh có lời đọc và những gì xuất hiện trên màn hình.",
   "Chuẩn bị hình cho từng shot: dùng lại hình trong thư viện, AI vẽ hình còn thiếu, bạn duyệt.",
@@ -89,7 +89,7 @@ export const FLOW_VIEW_PHASES = [
 export interface FlowViewStep {
   n: number;
   label: string;
-  /** Screen title when it differs from the label ("Ý tưởng · creative brief"). */
+  /** Screen title when it differs from the label ("Định hướng sáng tạo"). */
   title?: string;
   /** Index in FLOW_VIEW_PHASES. */
   phase: 0 | 1 | 2 | 3;
@@ -108,8 +108,8 @@ export interface FlowViewStep {
 }
 
 export const FLOW_VIEW: readonly FlowViewStep[] = [
-  { n: 1, phase: 0, label: "Ý tưởng", title: "Ý tưởng · creative brief", gate: true, server: [1], note: "Đề tài, câu hỏi trung tâm, khán giả, điều người xem mang về" },
-  { n: 2, phase: 0, label: "Cấu hình", server: [2], note: "Kiểu video, format, giọng đọc, cách soạn" },
+  { n: 1, phase: 0, label: "Ý tưởng", title: "Ý tưởng ban đầu", gate: true, server: [1], note: "Đề tài, câu hỏi trung tâm, vì sao thú vị, đã biết và chưa biết" },
+  { n: 2, phase: 0, label: "Creative brief", title: "Định hướng sáng tạo", gate: true, server: [2], note: "Khán giả, điều người xem mang về, thời lượng, nền tảng, giọng điệu, ngoài phạm vi" },
   { n: 3, phase: 0, label: "Nghiên cứu", title: "Nghiên cứu và kiểm chứng", gate: true, optional: true, server: [], screen: "research", note: "Câu hỏi cần tra, prompt chép ra ngoài, dán kết quả, kiểm link và đoạn trích" },
   { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
@@ -278,7 +278,7 @@ export function flowRoute(step: number, projectId: string, opts: { view?: boolea
 /** Wizard route for authoring steps 1-6 (the screens that hold a draft). */
 export function authoringRoute(step: number): string {
   if (step <= 1) return "/";
-  if (step === 2) return "/create/script/settings";
+  if (step === 2) return "/create/script/brief";
   if (step === 3) return "/create/script/outline";
   if (step === 4) return "/create/script/storyboard";
   if (step === 5) return "/create/script/illustrations";

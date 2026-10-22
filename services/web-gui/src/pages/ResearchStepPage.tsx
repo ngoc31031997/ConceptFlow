@@ -225,7 +225,7 @@ export function ResearchStepPage() {
             ? "Nghiên cứu đã xong hoặc đã bỏ qua. Sang bước Câu chuyện."
             : "Duyệt bảng dữ kiện hoặc bỏ qua nghiên cứu để sang bước Câu chuyện."
         }
-        onBack={() => navigate("/create/script/settings")}
+        onBack={() => navigate("/create/script/brief")}
         onNext={() => navigate(storyRoute(projectId))}
         nextDisabled={!state?.gate.resolved}
         nextLabel="Lưu và sang câu chuyện"

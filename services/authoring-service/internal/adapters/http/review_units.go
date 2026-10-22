@@ -29,6 +29,13 @@ type reviewUnitsUseCase interface {
 type creativeBriefUseCase interface {
 	State(ctx context.Context, projectID string) (application.BriefState, error)
 	SetTargetDuration(ctx context.Context, projectID string, d domain.TargetDuration) error
+	SetPlatform(ctx context.Context, projectID, platform string) error
+	Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error)
+}
+
+// ideaUseCase is the idea step: the unit the AI writes from the topic.
+type ideaUseCase interface {
+	State(ctx context.Context, projectID string) (application.IdeaState, error)
 	Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error)
 }
 
@@ -103,6 +110,12 @@ func (rt *Router) WithReviewUnits(uc reviewUnitsUseCase) *Router {
 	return rt
 }
 
+// WithIdea enables the /idea routes.
+func (rt *Router) WithIdea(uc ideaUseCase) *Router {
+	rt.idea = uc
+	return rt
+}
+
 // WithCreativeBrief enables the /brief routes.
 func (rt *Router) WithCreativeBrief(uc creativeBriefUseCase) *Router {
 	rt.creativeBrief = uc
@@ -112,8 +125,11 @@ func (rt *Router) WithCreativeBrief(uc creativeBriefUseCase) *Router {
 func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Get("/v1/settings/ai-model", rt.handleGetAIModelSetting)
 	r.Put("/v1/settings/ai-model/steps/{step}", rt.handlePutAIModelStep)
+	r.Get("/v1/projects/{project_id}/idea", rt.handleGetIdea)
+	r.Post("/v1/projects/{project_id}/idea/generate", rt.handleGenerateIdea)
 	r.Get("/v1/projects/{project_id}/brief", rt.handleGetBrief)
 	r.Put("/v1/projects/{project_id}/brief/target-duration", rt.handleSetTargetDuration)
+	r.Put("/v1/projects/{project_id}/brief/platform", rt.handleSetPlatform)
 	r.Post("/v1/projects/{project_id}/brief/generate", rt.handleGenerateBrief)
 	r.Get("/v1/projects/{project_id}/units/{kind}/{key}", rt.handleGetUnit)
 	r.Put("/v1/projects/{project_id}/units/{kind}/{key}", rt.handleEditUnit)
@@ -123,10 +139,49 @@ func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Get("/v1/projects/{project_id}/units/{kind}/{key}/impact", rt.handleUnitImpact)
 }
 
+// ideaStateResponse is GET /v1/projects/{id}/idea.
+type ideaStateResponse struct {
+	Unit *domain.ReviewUnit `json:"unit"`
+}
+
+func (rt *Router) handleGetIdea(w http.ResponseWriter, r *http.Request) {
+	if rt.idea == nil {
+		writeError(w, http.StatusNotFound, "idea is not enabled")
+		return
+	}
+	state, err := rt.idea.State(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, ideaStateResponse{Unit: state.Unit})
+}
+
+func (rt *Router) handleGenerateIdea(w http.ResponseWriter, r *http.Request) {
+	if rt.idea == nil {
+		writeError(w, http.StatusNotFound, "idea is not enabled")
+		return
+	}
+	note, err := readNote(r)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	ctx, finish := rt.trackOperation(r, domain.UnitKindIdea)
+	unit, err := rt.idea.Generate(ctx, chi.URLParam(r, "project_id"), note)
+	finish(err)
+	if err != nil {
+		writeUnitRunError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, unit)
+}
+
 // briefStateResponse is GET /v1/projects/{id}/brief.
 type briefStateResponse struct {
 	Unit                  *domain.ReviewUnit `json:"unit"`
 	TargetDuration        string             `json:"target_duration"`
+	Platform              string             `json:"platform"`
 	StoryStale            bool               `json:"story_stale"`
 	StoryPromptReadsBrief bool               `json:"story_prompt_reads_brief"`
 }
@@ -142,7 +197,7 @@ func (rt *Router) handleGetBrief(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, briefStateResponse{
-		Unit: state.Unit, TargetDuration: string(state.TargetDuration),
+		Unit: state.Unit, TargetDuration: string(state.TargetDuration), Platform: state.Platform,
 		StoryStale: state.StoryStale, StoryPromptReadsBrief: state.StoryPromptReadsBrief,
 	})
 }
@@ -160,6 +215,25 @@ func (rt *Router) handleSetTargetDuration(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := rt.creativeBrief.SetTargetDuration(r.Context(), chi.URLParam(r, "project_id"), domain.TargetDuration(body.TargetDuration)); err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (rt *Router) handleSetPlatform(w http.ResponseWriter, r *http.Request) {
+	if rt.creativeBrief == nil {
+		writeError(w, http.StatusNotFound, "creative brief is not enabled")
+		return
+	}
+	var body struct {
+		Platform string `json:"platform"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if err := rt.creativeBrief.SetPlatform(r.Context(), chi.URLParam(r, "project_id"), body.Platform); err != nil {
 		writeUnitError(w, err)
 		return
 	}
@@ -314,7 +388,7 @@ func writeUnitError(w http.ResponseWriter, err error) {
 	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound),
 		errors.Is(err, application.ErrFindingNotFound), errors.Is(err, domain.ErrNoLockedVersion):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
+	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, application.ErrIdeaIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty),
 		errors.Is(err, application.ErrStoryIncomplete), errors.Is(err, application.ErrStoryNothingToWrite),
 		errors.Is(err, application.ErrBeatNoGoal), errors.Is(err, application.ErrBeatSheetFull),
@@ -350,7 +424,7 @@ func writeUnitRunError(w http.ResponseWriter, err error) {
 		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrInvalidStatus):
 		writeUnitError(w, err)
-	case errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
+	case errors.Is(err, domain.ErrIdeaReplyUnusable), errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
 		errors.Is(err, domain.ErrReviewReplyUnusable), errors.Is(err, domain.ErrHandoffReplyUnusable):
 		writeError(w, http.StatusBadGateway, err.Error()+". Thử làm lại, hoặc tự điền các ô.")
 	case errors.Is(err, application.ErrLLMNotConfigured):

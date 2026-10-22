@@ -393,7 +393,7 @@ func (uc *ScriptLockDeskUseCase) currentParts(ctx context.Context, projectID str
 		parts = append(parts, p)
 		return nil
 	}
-	brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+	_, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -595,7 +595,7 @@ func (uc *ScriptLockDeskUseCase) fillPackage(ctx context.Context, projectID stri
 	if err != nil {
 		return fmt.Errorf("load topic: %w", err)
 	}
-	brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+	_, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
 	if err != nil {
 		return err
 	}

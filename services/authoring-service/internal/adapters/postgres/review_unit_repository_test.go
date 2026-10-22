@@ -32,7 +32,7 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 	if _, err := r.GetUnit(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey); !errors.Is(err, domain.ErrUnitNotFound) {
 		t.Fatalf("no unit yet must be ErrUnitNotFound, got %v", err)
 	}
-	content, _ := json.Marshal(domain.CreativeBrief{Question: "Q", Tone: "T"})
+	content, _ := json.Marshal(domain.CreativeBrief{Audience: "Q", Tone: "T"})
 	saved, err := r.SaveUnit(ctx, domain.ReviewUnit{
 		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey,
 		Status: domain.UnitPending, Content: content, RedoCount: 2,
@@ -77,7 +77,7 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 	if link, err := r.StoryBriefLink(ctx, pid); err != nil || !link.HasStory || !link.FromCurrentBrief {
 		t.Fatalf("a story saved under the approved brief is current, got %+v, %v", link, err)
 	}
-	changed, _ := json.Marshal(domain.CreativeBrief{Question: "Q2", Tone: "T"})
+	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Q2", Tone: "T"})
 	got.Content = changed
 	if _, err := r.SaveUnit(ctx, got); err != nil {
 		t.Fatal(err)

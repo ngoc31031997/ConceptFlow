@@ -19,7 +19,7 @@ import {
 } from "../utils/flow";
 
 /** Bước bản nháp (chưa có project trên server) quay lại được, theo route. */
-const DRAFT_ROUTES = ["/", "/create/script/settings", "/create/script/outline"];
+const DRAFT_ROUTES = ["/", "/create/script/brief", "/create/script/outline"];
 
 export interface StepNav {
   /** Có project trên server để đọc vị trí hay không. */

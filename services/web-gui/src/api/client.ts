@@ -444,7 +444,9 @@ export async function completeYoutubeAuthCallback(
 }
 
 export type PromptRole =
-  // Ý tưởng: viết creative brief từ đề tài (AI chạy ở server, không chép ra ngoài).
+  // Ý tưởng: viết câu hỏi trung tâm, vì sao thú vị, đã biết và chưa biết từ đề tài.
+  | "idea"
+  // Creative brief: viết định hướng sáng tạo từ ý tưởng đã duyệt (AI chạy ở server, không chép ra ngoài).
   | "creative_brief"
   // Nghiên cứu: AI đặt câu hỏi từ brief, và prompt chép sang công cụ nghiên cứu bên ngoài.
   | "research_questions"
@@ -1591,6 +1593,8 @@ export interface ReviewUnit<C> {
   creatorFields: string[];
   redoCount: number;
   updatedAt: string;
+  /** Written from a unit that has changed since (the brief after its idea). */
+  stale: boolean;
 }
 
 /** Names one unit and reads its content from the wire. */
@@ -1609,6 +1613,7 @@ interface reviewUnitWire {
   creator_fields: string[] | null;
   redo_count: number;
   updated_at: string;
+  stale?: boolean;
 }
 
 function fromWireUnit<C>(wire: reviewUnitWire, parse: (content: unknown) => C): ReviewUnit<C> {
@@ -1621,6 +1626,7 @@ function fromWireUnit<C>(wire: reviewUnitWire, parse: (content: unknown) => C): 
     creatorFields: wire.creator_fields ?? [],
     redoCount: wire.redo_count,
     updatedAt: wire.updated_at,
+    stale: wire.stale === true,
   };
 }
 
@@ -1682,23 +1688,44 @@ export async function getUnitImpact(projectId: string, ref: UnitAddress): Promis
   return res.items ?? [];
 }
 
-/** The creative brief's fields, in the order the screen and the prompts show them. */
-export const BRIEF_FIELDS = ["question", "audience", "know", "understand", "feel", "tone", "out_of_scope"] as const;
-export type BriefField = (typeof BRIEF_FIELDS)[number];
-export type CreativeBrief = Record<BriefField, string>;
+/** The idea's fields, in the order the screen and the prompts show them. */
+export const IDEA_FIELDS = ["question", "why", "known", "unknown"] as const;
+export type IdeaField = (typeof IDEA_FIELDS)[number];
+export type Idea = Record<IdeaField, string>;
 
-/** Reads a stored brief; a field the server did not send reads as empty. */
-export function parseCreativeBrief(content: unknown): CreativeBrief {
+/** Reads the fields named in `fields` out of a stored unit; one the server did not send reads as empty. */
+function parseFields<F extends string>(fields: readonly F[], content: unknown): Record<F, string> {
   const source = (content && typeof content === "object" ? content : {}) as Record<string, unknown>;
-  const brief = {} as CreativeBrief;
-  for (const field of BRIEF_FIELDS) {
+  const out = {} as Record<F, string>;
+  for (const field of fields) {
     const value = source[field];
-    brief[field] = typeof value === "string" ? value : "";
+    out[field] = typeof value === "string" ? value : "";
   }
-  return brief;
+  return out;
+}
+
+/** Reads a stored idea. */
+export function parseIdea(content: unknown): Idea {
+  return parseFields(IDEA_FIELDS, content);
 }
 
 /** The idea step's one unit. */
+export const IDEA_UNIT: UnitRef<Idea> = { kind: "idea", key: "main", parse: parseIdea };
+
+/** The creative brief's fields, in the order the screen and the prompts show them. */
+export const BRIEF_FIELDS = ["audience", "know", "understand", "feel", "tone", "out_of_scope"] as const;
+export type BriefField = (typeof BRIEF_FIELDS)[number];
+export type CreativeBrief = Record<BriefField, string>;
+
+/** The platforms a video can be published to, picked before the brief is written. */
+export const PLATFORMS = ["YouTube", "YouTube Shorts", "Website, khoá học"] as const;
+
+/** Reads a stored brief. */
+export function parseCreativeBrief(content: unknown): CreativeBrief {
+  return parseFields(BRIEF_FIELDS, content);
+}
+
+/** The brief step's one unit. */
 export const BRIEF_UNIT: UnitRef<CreativeBrief> = { kind: "brief", key: "main", parse: parseCreativeBrief };
 
 /** Target length of a long video, in minutes; a short is always under 60 seconds. */
@@ -1706,8 +1733,33 @@ export type TargetDuration = "3-4" | "4-5" | "5-7" | "7-10";
 export const TARGET_DURATIONS: readonly TargetDuration[] = ["3-4", "4-5", "5-7", "7-10"];
 export const DEFAULT_TARGET_DURATION: TargetDuration = "4-5";
 
+/** The idea step as the server holds it. */
+export interface IdeaState {
+  unit: ReviewUnit<Idea> | null;
+}
+
+export async function getIdeaState(projectId: string): Promise<IdeaState> {
+  const wire = await apiFetch<{ unit: reviewUnitWire | null }>(`/v1/projects/${projectId}/idea`);
+  return { unit: wire.unit ? fromWireUnit(wire.unit, parseIdea) : null };
+}
+
 /**
- * The idea step as the server holds it. `storyStale`: the outline on the
+ * Has the AI write the idea from the project's topic (a model call: pass an
+ * operation id to follow it). 503 when no language model is configured, 502
+ * when the reply could not be read.
+ */
+export async function generateIdea(projectId: string, operation?: OperationCall): Promise<ReviewUnit<Idea>> {
+  const wire = await apiFetch<reviewUnitWire>(`/v1/projects/${projectId}/idea/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: JSON.stringify({}),
+  });
+  return fromWireUnit(wire, parseIdea);
+}
+
+/**
+ * The brief step as the server holds it. `storyStale`: the outline on the
  * story step was written from another brief than the approved one.
  * `storyPromptReadsBrief`: the active story prompt has `{{creative_brief}}`
  * (a prompt the Creator wrote may not, and then the brief never reaches it).
@@ -1715,6 +1767,8 @@ export const DEFAULT_TARGET_DURATION: TargetDuration = "4-5";
 export interface BriefState {
   unit: ReviewUnit<CreativeBrief> | null;
   targetDuration: TargetDuration;
+  /** One of PLATFORMS: the one picked, or the default for the video form. */
+  platform: string;
   storyStale: boolean;
   storyPromptReadsBrief: boolean;
 }
@@ -1722,6 +1776,7 @@ export interface BriefState {
 interface briefStateWire {
   unit: reviewUnitWire | null;
   target_duration: string;
+  platform: string;
   story_stale: boolean;
   story_prompt_reads_brief: boolean;
 }
@@ -1735,6 +1790,7 @@ export async function getBriefState(projectId: string): Promise<BriefState> {
   return {
     unit: wire.unit ? fromWireUnit(wire.unit, parseCreativeBrief) : null,
     targetDuration: asTargetDuration(wire.target_duration),
+    platform: wire.platform,
     storyStale: wire.story_stale,
     storyPromptReadsBrief: wire.story_prompt_reads_brief,
   };
@@ -1749,8 +1805,17 @@ export async function setTargetDuration(projectId: string, targetDuration: Targe
   });
 }
 
+/** Picks the platform. 409 once a brief exists: the brief was written for the old one. */
+export async function setPlatform(projectId: string, platform: string): Promise<void> {
+  await apiFetch<undefined>(`/v1/projects/${projectId}/brief/platform`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ platform }),
+  });
+}
+
 /**
- * Has the AI write the brief from the project's topic (a model call: pass an
+ * Has the AI write the brief from the project's approved idea (a model call: pass an
  * operation id to follow it). 503 when no language model is configured, 502
  * when the reply could not be read.
  */

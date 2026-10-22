@@ -248,7 +248,7 @@ export function ScriptOutlineStepPage() {
       <WizardNav
         hint={hint}
         isBlocked={!!saveError}
-        onBack={() => navigate("/create/script/settings")}
+        onBack={() => navigate("/create/script/brief")}
         backLabel="Quay lại cấu hình"
         onNext={handleContinue}
         nextLabel={saving ? "Đang lưu..." : "Tiếp tục"}

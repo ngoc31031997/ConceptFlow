@@ -162,7 +162,7 @@ func (l *briefLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error) 
 	return ChatResult{Content: l.reply}, l.err
 }
 
-const briefReplyJSON = `{"question":"AI câu hỏi","audience":"AI khán giả","know":"AI biết","understand":"AI hiểu","feel":"AI cảm thấy","tone":"AI giọng","out_of_scope":"AI ngoài phạm vi"}`
+const briefReplyJSON = `{"audience":"AI khán giả","know":"AI biết","understand":"AI hiểu","feel":"AI cảm thấy","tone":"AI giọng","out_of_scope":"AI ngoài phạm vi"}`
 
 type briefFixture struct {
 	units   *briefUnits
@@ -183,7 +183,16 @@ func newBriefFixture() *briefFixture {
 		llm: &briefLLM{reply: "```json\n" + briefReplyJSON + "\n```"},
 	}
 	f.uc = NewCreativeBriefUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.saveIdea(domain.UnitApproved)
 	return f
+}
+
+// saveIdea stores the idea the brief is written from, with the given status.
+func (f *briefFixture) saveIdea(status domain.UnitStatus) {
+	raw, _ := json.Marshal(domain.Idea{Question: "Ý câu hỏi", Why: "Ý vì sao", Known: "Ý đã biết", Unknown: "Ý chưa biết"})
+	f.units.units["p1|"+domain.UnitKindIdea+"|"+domain.IdeaUnitKey] = domain.ReviewUnit{
+		ProjectID: "p1", Kind: domain.UnitKindIdea, Key: domain.IdeaUnitKey, Status: status, Content: raw, CreatorFields: []string{},
+	}
 }
 
 func briefOf(t *testing.T, u domain.ReviewUnit) domain.CreativeBrief {
@@ -204,11 +213,11 @@ func TestGenerateWritesTheBriefForReview(t *testing.T) {
 	if unit.Status != domain.UnitPending || unit.RedoCount != 0 {
 		t.Errorf("a first brief waits for review with no redo counted, got status %q redo %d", unit.Status, unit.RedoCount)
 	}
-	if b := briefOf(t, unit); b.Question != "AI câu hỏi" || b.OutOfScope != "AI ngoài phạm vi" {
+	if b := briefOf(t, unit); b.Audience != "AI khán giả" || b.OutOfScope != "AI ngoài phạm vi" {
 		t.Errorf("brief stored wrong: %+v", b)
 	}
 	system := f.llm.systems[0]
-	for _, want := range []string{"Vì sao trong quả sung có xác ong?", "5–7 phút", "Video dài 16:9", "tiếng Việt"} {
+	for _, want := range []string{"Vì sao trong quả sung có xác ong?", "5–7 phút", "Video dài 16:9", "tiếng Việt", "Ý câu hỏi"} {
 		if !strings.Contains(system, want) {
 			t.Errorf("the brief prompt lacks %q", want)
 		}
@@ -239,7 +248,7 @@ func TestRedoKeepsTheCreatorsFieldsAndCountsTheRedo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("redo: %v", err)
 	}
-	if b := briefOf(t, unit); b.Tone != "Creator giọng" || b.Question != "AI câu hỏi" {
+	if b := briefOf(t, unit); b.Tone != "Creator giọng" || b.Audience != "AI khán giả" {
 		t.Errorf("redo must keep the Creator's tone and take the AI's other fields, got %+v", b)
 	}
 	if unit.RedoCount != 1 {
@@ -272,14 +281,14 @@ func TestGenerateWithoutAModelSaysSo(t *testing.T) {
 
 func TestEditBeforeAnyBriefCreatesOneTheCreatorWrote(t *testing.T) {
 	f := newBriefFixture()
-	unit, err := f.uc.Edit(context.Background(), "p1", domain.BriefUnitKey, map[string]string{"question": "  Câu của tôi  "})
+	unit, err := f.uc.Edit(context.Background(), "p1", domain.BriefUnitKey, map[string]string{"audience": "  Khán giả của tôi  "})
 	if err != nil {
 		t.Fatalf("edit: %v", err)
 	}
-	if b := briefOf(t, unit); b.Question != "Câu của tôi" {
-		t.Errorf("edited field stored wrong: %q", b.Question)
+	if b := briefOf(t, unit); b.Audience != "Khán giả của tôi" {
+		t.Errorf("edited field stored wrong: %q", b.Audience)
 	}
-	if !unit.HasCreatorField("question") || len(unit.CreatorFields) != 1 {
+	if !unit.HasCreatorField("audience") || len(unit.CreatorFields) != 1 {
 		t.Errorf("only the edited field becomes the Creator's, got %v", unit.CreatorFields)
 	}
 }
@@ -354,7 +363,7 @@ func TestUnitsRejectAnUnregisteredKind(t *testing.T) {
 	}
 }
 
-func TestTargetDurationIsChosenBeforeTheBrief(t *testing.T) {
+func TestTargetDurationCanChangeAfterTheBrief(t *testing.T) {
 	f := newBriefFixture()
 	ctx := context.Background()
 	if err := f.uc.SetTargetDuration(ctx, "p1", "9-12"); !errors.Is(err, domain.ErrInvalidWizardInput) {
@@ -366,8 +375,8 @@ func TestTargetDurationIsChosenBeforeTheBrief(t *testing.T) {
 	if _, err := f.uc.Generate(ctx, "p1", ""); err != nil {
 		t.Fatal(err)
 	}
-	if err := f.uc.SetTargetDuration(ctx, "p1", domain.Duration3to4); !errors.Is(err, domain.ErrInvalidStatus) {
-		t.Fatalf("the length cannot change once a brief exists, got %v", err)
+	if err := f.uc.SetTargetDuration(ctx, "p1", domain.Duration3to4); err != nil || f.store.duration != domain.Duration3to4 {
+		t.Fatalf("the length can still change once a brief exists, got %v", err)
 	}
 }
 
@@ -401,7 +410,7 @@ func TestApprovedBriefSectionIsOnlyTheApprovedBrief(t *testing.T) {
 		t.Fatal(err)
 	}
 	section, err = f.uc.ApprovedBriefSection(ctx, "p1", project)
-	if err != nil || !strings.Contains(section, "AI câu hỏi") || !strings.Contains(section, "5–7 phút") {
+	if err != nil || !strings.Contains(section, "Ý câu hỏi") || !strings.Contains(section, "AI khán giả") || !strings.Contains(section, "5–7 phút") {
 		t.Fatalf("the approved brief and its length reach the story prompt, got %q, %v", section, err)
 	}
 }
@@ -439,5 +448,83 @@ func TestStateGivesTheDefaultLengthWhenNoneWasPicked(t *testing.T) {
 	}
 	if state.TargetDuration != domain.DefaultTargetDuration {
 		t.Errorf("an unpicked length must read as the default %q, got %q", domain.DefaultTargetDuration, state.TargetDuration)
+	}
+}
+
+func TestGenerateNeedsAnApprovedIdea(t *testing.T) {
+	f := newBriefFixture()
+	f.saveIdea(domain.UnitPending)
+	if _, err := f.uc.Generate(context.Background(), "p1", ""); !errors.Is(err, ErrBriefNeedsIdea) {
+		t.Fatalf("a brief cannot be written from an idea waiting for review, got %v", err)
+	}
+	if f.units.saves != 0 {
+		t.Error("a refused brief must not be stored")
+	}
+}
+
+func TestBriefGoesStaleWhenItsIdeaChanges(t *testing.T) {
+	f := newBriefFixture()
+	ctx := context.Background()
+	unit, err := f.uc.Generate(ctx, "p1", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if unit.InputRef != "idea:main" {
+		t.Fatalf("a brief records the idea it was written from, got %q", unit.InputRef)
+	}
+	if got, _ := f.units.GetUnit(ctx, "p1", domain.UnitKindBrief, domain.BriefUnitKey); got.Stale {
+		t.Fatal("a brief just written from the idea is not stale")
+	}
+	idea := f.units.units["p1|idea|main"]
+	idea.Content = []byte(`{"question":"Ý mới","why":"w","known":"k","unknown":"u"}`)
+	f.units.units["p1|idea|main"] = idea
+	if got, _ := f.units.GetUnit(ctx, "p1", domain.UnitKindBrief, domain.BriefUnitKey); !got.Stale {
+		t.Fatal("a brief written from an idea that changed since must read as stale")
+	}
+}
+
+func TestPlatformIsChosenBeforeTheBriefAndReachesItsPrompt(t *testing.T) {
+	f := newBriefFixture()
+	ctx := context.Background()
+	state, err := f.uc.State(ctx, "p1")
+	if err != nil || state.Platform != domain.PlatformYouTube {
+		t.Fatalf("a long video that picked nothing reads as YouTube, got %q, %v", state.Platform, err)
+	}
+	if err := f.uc.SetPlatform(ctx, "p1", "TikTok"); !errors.Is(err, domain.ErrInvalidWizardInput) {
+		t.Fatalf("a platform outside the list must be refused, got %v", err)
+	}
+	if err := f.uc.SetPlatform(ctx, "p1", domain.PlatformWebsite); err != nil {
+		t.Fatalf("a listed platform must be accepted: %v", err)
+	}
+	if _, err := f.uc.Generate(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(f.llm.systems[0], domain.PlatformWebsite) {
+		t.Error("the brief prompt must carry the platform the Creator picked")
+	}
+	if state, _ = f.uc.State(ctx, "p1"); state.Platform != domain.PlatformWebsite {
+		t.Errorf("the picked platform must be read back, got %q", state.Platform)
+	}
+	if err := f.uc.SetPlatform(ctx, "p1", domain.PlatformYouTube); err != nil {
+		t.Fatalf("the platform can still change once a brief exists, got %v", err)
+	}
+	if state, _ = f.uc.State(ctx, "p1"); state.Platform != domain.PlatformYouTube {
+		t.Errorf("the new platform must be read back, got %q", state.Platform)
+	}
+}
+
+func TestApprovedBriefSectionNamesThePlatform(t *testing.T) {
+	f := newBriefFixture()
+	ctx := context.Background()
+	if _, err := f.uc.Generate(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	units := NewReviewUnitsUseCase(f.units, f.project).Register(domain.UnitKindBrief, f.uc)
+	if _, err := units.Approve(ctx, "p1", domain.UnitKindBrief, domain.BriefUnitKey); err != nil {
+		t.Fatal(err)
+	}
+	section, err := f.uc.ApprovedBriefSection(ctx, "p1", &f.project.project)
+	if err != nil || !strings.Contains(section, "Nền tảng phát hành: YouTube") {
+		t.Fatalf("the approved brief names the platform, got %q, %v", section, err)
 	}
 }

@@ -135,11 +135,7 @@ func (uc *ResearchDeskUseCase) State(ctx context.Context, projectID string) (Res
 		return ResearchState{}, err
 	}
 	state.Coverage = coverageOf(state.Questions, state.Facts)
-	brief, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
-	switch {
-	case err == nil:
-		state.BriefApproved = brief.Status == domain.UnitApproved
-	case !errors.Is(err, domain.ErrUnitNotFound):
+	if _, _, state.BriefApproved, err = loadApprovedBrief(ctx, uc.units, projectID); err != nil {
 		return ResearchState{}, err
 	}
 	return state, nil
@@ -218,18 +214,17 @@ func (uc *ResearchDeskUseCase) durationLabel(ctx context.Context, projectID stri
 	return domain.TargetDurationLabel(project.VideoOutputMode, duration, briefLanguage(project.ContentLanguage)), nil
 }
 
-// brief loads the idea step's brief; a project without one cannot be researched.
-func (uc *ResearchDeskUseCase) brief(ctx context.Context, projectID string) (domain.ReviewUnit, domain.CreativeBrief, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
-	if errors.Is(err, domain.ErrUnitNotFound) {
-		return domain.ReviewUnit{}, domain.CreativeBrief{}, fmt.Errorf("%w: chưa có brief, viết brief ở bước Ý tưởng trước", domain.ErrInvalidStatus)
-	}
+// brief loads the idea and the brief; a project without a brief cannot be
+// researched.
+func (uc *ResearchDeskUseCase) brief(ctx context.Context, projectID string) (domain.Idea, domain.CreativeBrief, error) {
+	idea, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
 	if err != nil {
-		return domain.ReviewUnit{}, domain.CreativeBrief{}, err
+		return domain.Idea{}, domain.CreativeBrief{}, err
 	}
-	var brief domain.CreativeBrief
-	if err := json.Unmarshal(unit.Content, &brief); err != nil {
-		return domain.ReviewUnit{}, domain.CreativeBrief{}, fmt.Errorf("read stored brief: %w", err)
+	if _, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey); errors.Is(err, domain.ErrUnitNotFound) {
+		return domain.Idea{}, domain.CreativeBrief{}, fmt.Errorf("%w: chưa có brief, viết brief ở bước Creative brief trước", domain.ErrInvalidStatus)
+	} else if err != nil {
+		return domain.Idea{}, domain.CreativeBrief{}, err
 	}
-	return unit, brief, nil
+	return idea, brief, nil
 }

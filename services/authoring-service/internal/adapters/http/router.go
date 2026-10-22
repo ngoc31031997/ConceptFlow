@@ -54,6 +54,7 @@ type Router struct {
 	internal                InternalAuthoring
 	operations              *application.Operations
 	reviewUnits             reviewUnitsUseCase
+	idea                    ideaUseCase
 	creativeBrief           creativeBriefUseCase
 	research                researchUseCase
 	story                   storyUseCase

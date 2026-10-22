@@ -42,7 +42,8 @@ describe("FlowMapPage", () => {
     for (let step = 1; step <= 21; step += 1) expect(screen.getByTestId(`flow-map-step-${step}`)).toBeInTheDocument();
     expect(screen.getByTestId("flow-map-step-9")).toHaveTextContent("◆ bạn duyệt");
     expect(screen.getByTestId("flow-map-step-17")).toHaveTextContent("tự chạy");
-    expect(screen.getByTestId("flow-map-step-2")).not.toHaveTextContent("◆");
+    expect(screen.getByTestId("flow-map-step-2")).toHaveTextContent("◆ bạn duyệt");
+    expect(screen.getByTestId("flow-map-step-13")).not.toHaveTextContent("◆");
     expect(screen.getByTestId("flow-map-step-8")).toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-6")).not.toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-7")).not.toHaveTextContent("sắp có");

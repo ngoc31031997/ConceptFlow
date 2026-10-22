@@ -21,7 +21,8 @@ describe("flowTitle", () => {
 
   it("gives a screen title the bare name, since the line above it carries the number", () => {
     expect(flowStepName(4)).toBe("Storyboard");
-    expect(flowStepName(1)).toBe("Ý tưởng · creative brief");
+    expect(flowStepName(1)).toBe("Ý tưởng ban đầu");
+    expect(flowStepName(2)).toBe("Định hướng sáng tạo");
     expect(flowStepName(99)).toBe("Bước 99");
   });
 
@@ -67,7 +68,7 @@ describe("phases of the flow", () => {
   });
 
   it("marks the steps the Creator approves", () => {
-    expect(FLOW_VIEW.filter((v) => v.gate).map((v) => v.n)).toEqual([1, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16]);
+    expect(FLOW_VIEW.filter((v) => v.gate).map((v) => v.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 16]);
   });
 });
 

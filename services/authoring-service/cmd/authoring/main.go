@@ -114,8 +114,12 @@ func main() {
 	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(authoringRepo)
 	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo)
 
-	// The idea step's creative brief, the first kind of review unit; every
-	// review unit is read, edited, redone and approved through reviewUnits.
+	// The idea step's idea and the brief step's creative brief, the first kinds
+	// of review unit; every review unit is read, edited, redone and approved
+	// through reviewUnits.
+	idea := application.NewIdeaUseCase(
+		authoringRepo, authoringRepo, projects, projects, authoringRepo,
+		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
@@ -159,6 +163,7 @@ func main() {
 		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
+		Register(domain.UnitKindIdea, idea).
 		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
@@ -210,6 +215,7 @@ func main() {
 		WithUsageStats(llmUsageRepo).
 		WithGenerateAuthoring(generateAuthoring).
 		WithReviewUnits(reviewUnits).
+		WithIdea(idea).
 		WithCreativeBrief(creativeBrief).
 		WithResearch(research).
 		WithStory(story).

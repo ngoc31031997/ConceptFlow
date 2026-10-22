@@ -48,7 +48,7 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return nil, err
 	}
-	_, brief, err := uc.brief(ctx, projectID)
+	idea, brief, err := uc.brief(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -77,10 +77,14 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 		return nil, err
 	}
 
+	briefText, err := briefSectionFor(ctx, uc.units, projectID, project.VideoOutputMode, idea, brief, label)
+	if err != nil {
+		return nil, err
+	}
 	language := briefLanguage(project.ContentLanguage)
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
 		"topic":          topic,
-		"brief":          domain.BriefSection(brief, label),
+		"brief":          briefText,
 		"brief_language": briefLanguageName(language),
 		"kept_questions": keptQuestionsText(existing, replaceEdited),
 		"redo_note":      noteText(note),

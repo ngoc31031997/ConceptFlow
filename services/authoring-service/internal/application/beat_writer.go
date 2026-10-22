@@ -34,7 +34,7 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	if !approved {
 		return bc, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
 	}
-	brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+	idea, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
 	if err != nil {
 		return bc, err
 	}
@@ -52,7 +52,9 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	bc.language = briefLanguage(project.ContentLanguage)
 	bc.targetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, bc.language)
 	bc.loSeconds, bc.hiSeconds = domain.TargetSeconds(project.VideoOutputMode, duration)
-	bc.brief = domain.BriefSection(brief, bc.targetLabel)
+	if bc.brief, err = briefSectionFor(ctx, uc.units, projectID, project.VideoOutputMode, idea, brief, bc.targetLabel); err != nil {
+		return bc, err
+	}
 	if bc.facts, err = loadKeptFacts(ctx, uc.units, projectID); err != nil {
 		return bc, err
 	}

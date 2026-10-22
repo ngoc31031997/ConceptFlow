@@ -251,25 +251,32 @@ func (uc *StoryDeskUseCase) researchStanding(ctx context.Context, projectID stri
 	return unit.Status == domain.UnitApproved || gate.Skipped, gate.Skipped, nil
 }
 
-// approvedBrief returns the brief when it is approved, and reports whether it is.
-func (uc *StoryDeskUseCase) approvedBrief(ctx context.Context, projectID string) (domain.CreativeBrief, bool, error) {
+// approvedBrief returns the idea and the brief when both are approved, and
+// reports whether they are.
+func (uc *StoryDeskUseCase) approvedBrief(ctx context.Context, projectID string) (domain.Idea, domain.CreativeBrief, bool, error) {
 	return loadApprovedBrief(ctx, uc.units, projectID)
 }
 
-// loadApprovedBrief returns the brief of a project when it is approved, and reports whether it is.
-func loadApprovedBrief(ctx context.Context, units ReviewUnitPort, projectID string) (domain.CreativeBrief, bool, error) {
+// loadApprovedBrief returns the idea and the brief of a project, and reports
+// whether both are approved.
+func loadApprovedBrief(ctx context.Context, units ReviewUnitPort, projectID string) (domain.Idea, domain.CreativeBrief, bool, error) {
+	ideaUnit, idea, ideaExists, err := loadIdea(ctx, units, projectID)
+	if err != nil {
+		return domain.Idea{}, domain.CreativeBrief{}, false, err
+	}
 	unit, err := units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
 	if errors.Is(err, domain.ErrUnitNotFound) {
-		return domain.CreativeBrief{}, false, nil
+		return idea, domain.CreativeBrief{}, false, nil
 	}
 	if err != nil {
-		return domain.CreativeBrief{}, false, err
+		return domain.Idea{}, domain.CreativeBrief{}, false, err
 	}
 	var brief domain.CreativeBrief
 	if err := json.Unmarshal(unit.Content, &brief); err != nil {
-		return domain.CreativeBrief{}, false, fmt.Errorf("read stored brief: %w", err)
+		return domain.Idea{}, domain.CreativeBrief{}, false, fmt.Errorf("read stored brief: %w", err)
 	}
-	return brief, unit.Status == domain.UnitApproved, nil
+	approved := ideaExists && ideaUnit.Status == domain.UnitApproved && unit.Status == domain.UnitApproved
+	return idea, brief, approved, nil
 }
 
 // State returns the whole story screen.
@@ -280,7 +287,7 @@ func (uc *StoryDeskUseCase) State(ctx context.Context, projectID string) (StoryS
 		return StoryState{}, err
 	}
 	state.Status, state.ApproachKey = gateUnit.Status, gate.ApproachKey
-	if _, state.BriefApproved, err = uc.approvedBrief(ctx, projectID); err != nil {
+	if _, _, state.BriefApproved, err = uc.approvedBrief(ctx, projectID); err != nil {
 		return StoryState{}, err
 	}
 	if state.ResearchResolved, state.ResearchSkipped, err = uc.researchStanding(ctx, projectID); err != nil {
@@ -442,7 +449,7 @@ type storyContext struct {
 // open yet: the brief must be approved and the research step approved or skipped.
 func (uc *StoryDeskUseCase) context(ctx context.Context, projectID string) (storyContext, error) {
 	var sc storyContext
-	brief, approved, err := uc.approvedBrief(ctx, projectID)
+	idea, brief, approved, err := uc.approvedBrief(ctx, projectID)
 	if err != nil {
 		return sc, err
 	}
@@ -467,7 +474,9 @@ func (uc *StoryDeskUseCase) context(ctx context.Context, projectID string) (stor
 		return sc, err
 	}
 	sc.language = briefLanguage(sc.project.ContentLanguage)
-	sc.brief = domain.BriefSection(brief, domain.TargetDurationLabel(sc.project.VideoOutputMode, duration, sc.language))
+	if sc.brief, err = briefSectionFor(ctx, uc.units, projectID, sc.project.VideoOutputMode, idea, brief, domain.TargetDurationLabel(sc.project.VideoOutputMode, duration, sc.language)); err != nil {
+		return sc, err
+	}
 	if sc.facts, err = uc.keptFacts(ctx, projectID); err != nil {
 		return sc, err
 	}

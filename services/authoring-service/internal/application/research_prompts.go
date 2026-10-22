@@ -71,13 +71,14 @@ func (uc *ResearchDeskUseCase) FollowUpPrompt(ctx context.Context, projectID str
 // promptInputs is what both prompts are built from.
 type promptInputs struct {
 	topic     string
+	idea      domain.Idea
 	brief     domain.CreativeBrief
 	duration  string
 	questions []QuestionView
 }
 
 func (uc *ResearchDeskUseCase) promptInputs(ctx context.Context, projectID string) (promptInputs, error) {
-	_, brief, err := uc.brief(ctx, projectID)
+	idea, brief, err := uc.brief(ctx, projectID)
 	if err != nil {
 		return promptInputs{}, err
 	}
@@ -100,7 +101,7 @@ func (uc *ResearchDeskUseCase) promptInputs(ctx context.Context, projectID strin
 	if len(questions) == 0 {
 		return promptInputs{}, fmt.Errorf("%w: chưa có câu hỏi nào để tra", domain.ErrInvalidStatus)
 	}
-	return promptInputs{topic: topic, brief: brief, duration: duration, questions: questions}, nil
+	return promptInputs{topic: topic, idea: idea, brief: brief, duration: duration, questions: questions}, nil
 }
 
 func (uc *ResearchDeskUseCase) renderResearchPrompt(ctx context.Context, in promptInputs, heading string, questions []QuestionView, extra, answerNote string) (string, error) {
@@ -114,7 +115,7 @@ func (uc *ResearchDeskUseCase) renderResearchPrompt(ctx context.Context, in prom
 	}
 	return domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
 		"topic":             in.topic,
-		"central_question":  in.brief.Question,
+		"central_question":  in.idea.Question,
 		"audience":          in.brief.Audience,
 		"target_duration":   in.duration,
 		"questions_heading": heading,

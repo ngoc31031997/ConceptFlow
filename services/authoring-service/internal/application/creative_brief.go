@@ -11,15 +11,45 @@ import (
 	"authoring/internal/domain"
 )
 
-// BriefStorePort is what the idea step reads and writes beside the brief unit:
-// the topic, the target length, the model picked for the brief, and whether the
-// saved story outline was written from the brief that is approved now.
+// BriefStorePort is what the idea and brief steps read and write beside their
+// units: the topic, the target length, the model picked for them, and whether
+// the saved story outline was written from the brief that is approved now.
 type BriefStorePort interface {
 	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
 	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
 	GetTargetDuration(ctx context.Context, projectID string) (domain.TargetDuration, error)
 	SaveTargetDuration(ctx context.Context, projectID string, d domain.TargetDuration) error
 	StoryBriefLink(ctx context.Context, projectID string) (StoryBriefLink, error)
+}
+
+// loadPlatform returns the platform the Creator picked for the project, or
+// the default for its video form when none was picked.
+func loadPlatform(ctx context.Context, units ReviewUnitPort, projectID string, mode domain.VideoOutputMode) (string, error) {
+	unit, err := units.GetUnit(ctx, projectID, domain.UnitKindBriefPlatform, domain.BriefPlatformKey)
+	if errors.Is(err, domain.ErrUnitNotFound) {
+		return domain.DefaultPlatform(mode), nil
+	}
+	if err != nil {
+		return "", err
+	}
+	var stored domain.BriefPlatform
+	if err := json.Unmarshal(unit.Content, &stored); err != nil {
+		return "", fmt.Errorf("read stored platform: %w", err)
+	}
+	if !domain.ValidPlatform(stored.Platform) {
+		return domain.DefaultPlatform(mode), nil
+	}
+	return stored.Platform, nil
+}
+
+// briefSectionFor renders the approved idea and brief with the project's
+// target length and platform, as the later steps' prompts read them.
+func briefSectionFor(ctx context.Context, units ReviewUnitPort, projectID string, mode domain.VideoOutputMode, idea domain.Idea, brief domain.CreativeBrief, durationLabel string) (string, error) {
+	platform, err := loadPlatform(ctx, units, projectID, mode)
+	if err != nil {
+		return "", err
+	}
+	return domain.BriefSection(idea, brief, durationLabel, platform), nil
 }
 
 // StoryBriefLink ties the story step's saved outline to the brief.
@@ -31,11 +61,13 @@ type StoryBriefLink struct {
 	FromCurrentBrief bool
 }
 
-// BriefState is everything the idea screen shows.
+// BriefState is everything the brief screen shows.
 type BriefState struct {
 	// Unit is nil until a brief was written or typed.
 	Unit           *domain.ReviewUnit
 	TargetDuration domain.TargetDuration
+	// Platform is the one picked for the video, or the default for its form.
+	Platform string
 	// StoryStale is true when a story outline exists that was not written from
 	// the brief approved now.
 	StoryStale bool
@@ -45,9 +77,9 @@ type BriefState struct {
 	StoryPromptReadsBrief bool
 }
 
-// CreativeBriefUseCase backs the idea step: the target length, the AI writing
-// the brief from the topic, and the brief as a review unit (UnitKind for
-// domain.UnitKindBrief).
+// CreativeBriefUseCase backs the brief step: the target length, the AI writing
+// the brief from the approved idea, and the brief as a review unit (UnitKind
+// for domain.UnitKindBrief).
 type CreativeBriefUseCase struct {
 	units           ReviewUnitPort
 	store           BriefStorePort
@@ -72,6 +104,9 @@ func NewCreativeBriefUseCase(
 	}
 }
 
+// briefIdeaRef names the unit a brief is built from.
+const briefIdeaRef = domain.UnitKindIdea + ":" + domain.IdeaUnitKey
+
 // ErrBriefIncomplete is returned when a brief with empty fields is approved.
 var ErrBriefIncomplete = errors.New("brief còn ô trống")
 
@@ -81,7 +116,7 @@ const creativeBriefPlaceholder = "(chưa có brief đã duyệt: dựng dàn ý 
 // briefVariable is the story_architect placeholder the approved brief fills.
 const briefVariable = "{{creative_brief}}"
 
-// State returns the idea screen's data.
+// State returns the brief screen's data.
 func (uc *CreativeBriefUseCase) State(ctx context.Context, projectID string) (BriefState, error) {
 	var state BriefState
 	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
@@ -98,6 +133,13 @@ func (uc *CreativeBriefUseCase) State(ctx context.Context, projectID string) (Br
 	if !domain.ValidTargetDuration(state.TargetDuration) {
 		state.TargetDuration = domain.DefaultTargetDuration
 	}
+	project, err := uc.projects.Get(ctx, projectID)
+	if err != nil {
+		return BriefState{}, fmt.Errorf("load project: %w", err)
+	}
+	if state.Platform, err = loadPlatform(ctx, uc.units, projectID, project.VideoOutputMode); err != nil {
+		return BriefState{}, err
+	}
 	link, err := uc.store.StoryBriefLink(ctx, projectID)
 	if err != nil {
 		return BriefState{}, err
@@ -112,9 +154,9 @@ func (uc *CreativeBriefUseCase) State(ctx context.Context, projectID string) (Br
 	return state, nil
 }
 
-// SetTargetDuration saves the long video's target length. It is chosen before
-// the brief is written; once a brief exists the length is part of what the
-// brief was written for, and changing it is refused.
+// SetTargetDuration saves the long video's target length. A brief already
+// written keeps the length it was written for until the Creator has the AI
+// write it again.
 func (uc *CreativeBriefUseCase) SetTargetDuration(ctx context.Context, projectID string, d domain.TargetDuration) error {
 	if !domain.ValidTargetDuration(d) {
 		return fmt.Errorf("%w: thời lượng mục tiêu %q không có trong danh sách", domain.ErrInvalidWizardInput, d)
@@ -122,18 +164,34 @@ func (uc *CreativeBriefUseCase) SetTargetDuration(ctx context.Context, projectID
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
-	if _, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey); err == nil {
-		return fmt.Errorf("%w: thời lượng mục tiêu chỉ chọn được trước khi viết brief", domain.ErrInvalidStatus)
-	} else if !errors.Is(err, domain.ErrUnitNotFound) {
-		return err
-	}
 	return uc.store.SaveTargetDuration(ctx, projectID, d)
 }
 
-// Generate has the AI write the brief from the topic, keeping every field the
-// Creator wrote; note is the Creator's instruction for this run ("" for the
-// first run). The brief goes to review. A reply that cannot be read, or that
-// misses a field, is an error and nothing is stored.
+// SetPlatform saves the platform the video is published to. A brief already
+// written keeps the platform it was written for until the Creator has the AI
+// write it again.
+func (uc *CreativeBriefUseCase) SetPlatform(ctx context.Context, projectID, platform string) error {
+	if !domain.ValidPlatform(platform) {
+		return fmt.Errorf("%w: nền tảng %q không có trong danh sách", domain.ErrInvalidWizardInput, platform)
+	}
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
+	raw, err := json.Marshal(domain.BriefPlatform{Platform: platform})
+	if err != nil {
+		return err
+	}
+	_, err = uc.units.SaveUnit(ctx, domain.ReviewUnit{
+		ProjectID: projectID, Kind: domain.UnitKindBriefPlatform, Key: domain.BriefPlatformKey,
+		Status: domain.UnitApproved, Content: raw,
+	})
+	return err
+}
+
+// Generate has the AI write the brief from the approved idea, keeping every
+// field the Creator wrote; note is the Creator's instruction for this run ("" for
+// the first run). The brief goes to review. A reply that cannot be read, or
+// that misses a field, is an error and nothing is stored.
 func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error) {
 	if uc.provider == nil {
 		return domain.ReviewUnit{}, ErrLLMNotConfigured
@@ -155,6 +213,17 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 	if strings.TrimSpace(topic) == "" {
 		return domain.ReviewUnit{}, fmt.Errorf("%w: project chưa có đề tài", domain.ErrInvalidWizardInput)
 	}
+	ideaUnit, idea, ideaExists, err := loadIdea(ctx, uc.units, projectID)
+	if err != nil {
+		return domain.ReviewUnit{}, err
+	}
+	if !ideaExists || ideaUnit.Status != domain.UnitApproved {
+		return domain.ReviewUnit{}, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBriefNeedsIdea)
+	}
+	ideaSHA, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindIdea, domain.IdeaUnitKey)
+	if err != nil {
+		return domain.ReviewUnit{}, err
+	}
 	duration, err := uc.store.GetTargetDuration(ctx, projectID)
 	if err != nil {
 		return domain.ReviewUnit{}, err
@@ -173,12 +242,18 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 		return domain.ReviewUnit{}, fmt.Errorf("load brief prompt: %w", err)
 	}
 	language := briefLanguage(project.ContentLanguage)
+	platform, err := loadPlatform(ctx, uc.units, projectID, project.VideoOutputMode)
+	if err != nil {
+		return domain.ReviewUnit{}, err
+	}
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
 		"topic":           topic,
+		"idea":            domain.IdeaSection(idea),
 		"video_kind":      videoKindLabel(project.VideoOutputMode),
 		"target_duration": domain.TargetDurationLabel(project.VideoOutputMode, duration, language),
 		"brief_language":  briefLanguageName(language),
-		"current_brief":   currentBriefText(current, exists),
+		"platform":        platform,
+		"current_brief":   currentJSONText(current, exists),
 		"kept_fields":     keptFieldsText(current, unit.CreatorFields),
 		"redo_note":       noteText(note),
 	})
@@ -208,6 +283,7 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 		unit.RedoCount++
 	}
 	unit.Status = domain.UnitPending
+	unit.InputRef, unit.InputSHA = briefIdeaRef, ideaSHA
 	if unit.Content, err = json.Marshal(written); err != nil {
 		return domain.ReviewUnit{}, err
 	}
@@ -287,14 +363,19 @@ func (uc *CreativeBriefUseCase) Redo(ctx context.Context, projectID, key, note s
 	return uc.Generate(ctx, projectID, note)
 }
 
-// Impact lists what a change to the brief sends back: the story outline, when
-// one was written, the story frame, and the research questions the AI wrote
-// from the brief.
+// Impact lists what a change to the brief sends back.
 func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key string) ([]string, error) {
 	if key != domain.BriefUnitKey {
 		return nil, domain.ErrUnitNotFound
 	}
-	link, err := uc.store.StoryBriefLink(ctx, projectID)
+	return briefDownstream(ctx, uc.units, uc.store, projectID)
+}
+
+// briefDownstream lists what a change to the brief sends back: the story
+// outline, when one was written, the story frame, and the research questions
+// the AI wrote from the brief.
+func briefDownstream(ctx context.Context, units ReviewUnitPort, store BriefStorePort, projectID string) ([]string, error) {
+	link, err := store.StoryBriefLink(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -302,14 +383,14 @@ func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key strin
 	if link.HasStory {
 		items = append(items, "Dàn ý và lời thoại đã viết ở bước Viết kịch bản: cần viết lại theo brief mới")
 	}
-	stories, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
+	stories, err := units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
 	if err != nil {
 		return nil, err
 	}
 	if len(stories) > 0 {
 		items = append(items, "Khung câu chuyện: cần xem lại theo brief mới")
 	}
-	questions, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
+	questions, err := units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
 	if err != nil {
 		return nil, err
 	}
@@ -335,29 +416,22 @@ func (uc *CreativeBriefUseCase) CheckApprovable(_ context.Context, unit domain.R
 }
 
 // ApprovedBriefSection is what {{creative_brief}} renders to in the story
-// prompt: the approved brief with its target length, or a placeholder telling
-// the model there is none.
+// prompt: the approved idea and brief with the target length, or a placeholder
+// telling the model there is none.
 func (uc *CreativeBriefUseCase) ApprovedBriefSection(ctx context.Context, projectID string, project *domain.Project) (string, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
-	if errors.Is(err, domain.ErrUnitNotFound) {
-		return creativeBriefPlaceholder, nil
-	}
+	idea, brief, approved, err := loadApprovedBrief(ctx, uc.units, projectID)
 	if err != nil {
 		return "", err
 	}
-	if unit.Status != domain.UnitApproved {
+	if !approved {
 		return creativeBriefPlaceholder, nil
-	}
-	var brief domain.CreativeBrief
-	if err := json.Unmarshal(unit.Content, &brief); err != nil {
-		return "", fmt.Errorf("read stored brief: %w", err)
 	}
 	duration, err := uc.store.GetTargetDuration(ctx, projectID)
 	if err != nil {
 		return "", err
 	}
 	label := domain.TargetDurationLabel(project.VideoOutputMode, duration, briefLanguage(project.ContentLanguage))
-	return domain.BriefSection(brief, label), nil
+	return briefSectionFor(ctx, uc.units, projectID, project.VideoOutputMode, idea, brief, label)
 }
 
 func briefLanguage(lang domain.ContentLanguage) string {
@@ -379,15 +453,6 @@ func videoKindLabel(mode domain.VideoOutputMode) string {
 		return "Shorts 9:16"
 	}
 	return "Video dài 16:9"
-}
-
-func currentBriefText(brief domain.CreativeBrief, exists bool) string {
-	if !exists {
-		return "(chưa có)"
-	}
-	// Marshalling a struct of strings cannot fail.
-	raw, _ := json.Marshal(brief)
-	return string(raw)
 }
 
 func keptFieldsText(brief domain.CreativeBrief, creatorFields []string) string {

@@ -14,13 +14,12 @@ import styles from "./CreativeBriefCard.module.css";
 
 /** Each field's label on the card (short, under its group) and in the edit dialog (whole). */
 const FIELD_LABELS: Record<BriefField, { card: string; full: string; rows: number }> = {
-  question: { card: "Câu hỏi trung tâm cần trả lời", full: "Câu hỏi trung tâm cần trả lời", rows: 2 },
-  audience: { card: "Khán giả", full: "Khán giả", rows: 2 },
+  audience: { card: "Khán giả và kiến thức nền", full: "Khán giả và kiến thức nền", rows: 2 },
   know: { card: "biết", full: "Sau video, người xem sẽ biết", rows: 3 },
   understand: { card: "hiểu", full: "Sau video, người xem sẽ hiểu", rows: 3 },
   feel: { card: "cảm thấy", full: "Sau video, người xem sẽ cảm thấy", rows: 3 },
-  tone: { card: "Giọng điệu", full: "Giọng điệu", rows: 2 },
-  out_of_scope: { card: "Ngoài phạm vi · video không nói tới", full: "Ngoài phạm vi (video không nói tới)", rows: 2 },
+  tone: { card: "Giọng điệu và phong cách nội dung", full: "Giọng điệu và phong cách nội dung", rows: 2 },
+  out_of_scope: { card: "Giới hạn · ngoài phạm vi", full: "Giới hạn: ngoài phạm vi (video không nói tới, nội dung cần tránh)", rows: 2 },
 };
 
 const EMPTY_BRIEF = Object.fromEntries(BRIEF_FIELDS.map((f) => [f, ""])) as CreativeBrief;
@@ -32,15 +31,18 @@ interface CreativeBriefCardProps {
   brief: CreativeBriefControls;
   /** A language model is configured, so the AI can write and redo the brief. */
   aiAvailable: boolean;
+  /** The idea the brief is written from is approved; the AI writes nothing before. */
+  ideaApproved: boolean;
 }
 
 /**
- * Section 2 of the idea step: the creative brief as one review unit. The
+ * The brief step's creative brief as one review unit, written from the
+ * approved idea. The
  * fields read as text; "Sửa tay" and "Làm lại kèm ghi chú" open their dialogs
  * (docs/ux-ui-design-rules.md, rule 4), each with the later work it sends back.
  * Without a language model the Creator writes the brief and approves it.
  */
-export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: CreativeBriefCardProps) {
+export function CreativeBriefCard({ projectId, created, brief, aiAvailable, ideaApproved }: CreativeBriefCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [redoOpen, setRedoOpen] = useState(false);
   const editImpact = useUnitImpact(projectId, BRIEF_UNIT, editOpen);
@@ -84,8 +86,8 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
       return (
         <p className={styles.hint}>
           {aiAvailable
-            ? "Chưa có brief. Bấm “Tạo project và viết brief”: AI viết brief từ đề tài, bạn sửa rồi duyệt."
-            : "Chưa có brief. Bấm “Tạo project”, rồi tự viết brief và duyệt."}
+            ? "Chưa có brief. Duyệt ý tưởng ở bước 1: AI viết brief từ ý tưởng, bạn sửa rồi duyệt."
+            : "Chưa có brief. Duyệt ý tưởng ở bước 1, rồi tự viết brief và duyệt."}
         </p>
       );
     }
@@ -115,9 +117,11 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
       return (
         <>
           <p className={styles.hint}>
-            {aiAvailable
-              ? "Chưa có brief. AI viết từ đề tài, hoặc bạn tự viết."
-              : "Chưa có brief. Chưa cấu hình AI nên bạn tự viết brief rồi duyệt."}
+            {!ideaApproved
+              ? "Chưa có brief. Duyệt ý tưởng ở bước 1 trước: brief được viết từ ý tưởng đã duyệt."
+              : aiAvailable
+                ? "Chưa có brief. AI viết từ ý tưởng, hoặc bạn tự viết."
+                : "Chưa có brief. Chưa cấu hình AI nên bạn tự viết brief rồi duyệt."}
           </p>
           {aiAvailable && <AiModelSelect projectId={projectId} step="brief" label="Model AI viết brief" testId="brief-model" />}
           <div className={styles.actions}>
@@ -125,7 +129,7 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
               Tự viết brief
             </Button>
             {aiAvailable && (
-              <Button variant="run" onClick={() => void brief.generate()} data-testid="brief-generate">
+              <Button variant="run" onClick={() => void brief.generate()} disabled={!ideaApproved} data-testid="brief-generate">
                 AI viết brief
               </Button>
             )}
@@ -136,9 +140,13 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
     return (
       <>
         <p className={styles.hint}>
-          AI viết từ đề tài. Ô nào cũng sửa được bằng “Sửa tay”; ô bạn đã sửa thì AI giữ nguyên khi làm lại.
+          AI viết từ ý tưởng đã duyệt. Ô nào cũng sửa được bằng “Sửa tay”; ô bạn đã sửa thì AI giữ nguyên khi làm lại.
         </p>
-        {field("question")}
+        {unit.stale && (
+          <p className={styles.hint} role="status" data-testid="brief-stale">
+            Ý tưởng đã đổi sau khi brief được viết: xem lại brief, hoặc nhờ AI làm lại.
+          </p>
+        )}
         {field("audience")}
         <div className={styles.group}>
           <span className={styles.label}>Sau video, người xem sẽ…</span>
@@ -181,7 +189,7 @@ export function CreativeBriefCard({ projectId, created, brief, aiAvailable }: Cr
     <Card data-testid="brief-card">
       <div className={styles.body}>
         <div className={styles.head}>
-          <h3>② Creative brief</h3>
+          <h3>Định hướng sáng tạo</h3>
           {chip}
         </div>
         {body()}
