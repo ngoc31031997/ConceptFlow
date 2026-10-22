@@ -269,13 +269,13 @@ func (uc *ScriptDeskUseCase) State(ctx context.Context, projectID string) (Scrip
 		}
 		secs := make([]float64, 0, len(sc.Lines))
 		for _, l := range sc.Lines {
-			lv := ScriptLineView{ScriptLine: l, Flag: domain.FlagLine(l.Text)}
+			lv := ScriptLineView{ScriptLine: l, Flag: domain.FlagLine(l.SpokenText())}
 			row, ok := voiceRows[l.ID]
-			lv.Audio = audioOf(row, ok, l.Text, voiceID)
+			lv.Audio = audioOf(row, ok, l.SpokenText(), voiceID)
 			if lv.Audio.State == "ready" {
 				lv.Seconds = row.DurationSeconds
 			} else {
-				lv.Seconds, lv.Estimated = domain.EstimateNarrationDuration(l.Text, lang), true
+				lv.Seconds, lv.Estimated = domain.EstimateNarrationDuration(l.SpokenText(), lang), true
 				state.Stats.Estimated++
 			}
 			if lv.Flag != nil {
@@ -287,7 +287,7 @@ func (uc *ScriptDeskUseCase) State(ctx context.Context, projectID string) (Scrip
 		}
 		if view.Written {
 			if i > 0 && prevLast != "" {
-				if j := domain.FlagJoin(prevLast, sc.Lines[0].Text); j != nil {
+				if j := domain.FlagJoin(prevLast, sc.Lines[0].SpokenText()); j != nil {
 					view.Join = &ScriptJoinView{Msg: j.Msg}
 					state.Stats.OpenJoins++
 				} else {
@@ -295,7 +295,7 @@ func (uc *ScriptDeskUseCase) State(ctx context.Context, projectID string) (Scrip
 				}
 			}
 			last := sc.Lines[len(sc.Lines)-1]
-			prevLast = last.Text
+			prevLast = last.SpokenText()
 			lastLine = &sc.Lines[len(sc.Lines)-1]
 			if firstBeatLines == nil {
 				firstBeatLines, firstSecs = sc.Lines, secs

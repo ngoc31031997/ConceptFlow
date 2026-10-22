@@ -2650,6 +2650,8 @@ export interface ScriptLine {
   /** `<beat key>.<n>`, never reused inside its beat. */
   id: string;
   text: string;
+  /** What the voice reads when it differs from `text` (a formula said in words); absent when the text is read as written. */
+  spoken?: string;
   facts: string[];
   /** Length in seconds: the voice file's when there is one for the current wording, else an estimate. */
   seconds: number;

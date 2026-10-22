@@ -437,3 +437,41 @@ func TestSpeakWithoutVoicesIsRefused(t *testing.T) {
 		t.Errorf("err = %v, want ErrVoiceNotConfigured", err)
 	}
 }
+
+func TestSpokenWordingIsWhatTheVoiceReadsAndKeepsTheShownText(t *testing.T) {
+	f := newScriptFixture(t)
+	ctx, kind := context.Background(), f.uc.ScriptUnitKind()
+	if _, err := kind.Edit(ctx, "p1", "b1", map[string]string{ScriptFieldAddStart: "D = (1 - m) / p"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.uc.Speak(ctx, "p1", []string{"b1.1"}); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.voices.rows["b1.1"]; r.Text != "D = (1 - m) / p" {
+		t.Fatalf("with no spoken wording the voice reads the text, got %q", r.Text)
+	}
+	f.voices.rows["b1.1"] = domain.VoiceLine{LineID: "b1.1", TextSHA: domain.LineTextSHA("D = (1 - m) / p"), VoiceID: "vi-HoaiMy", Status: domain.VoiceLineReady, AudioPath: "/shared/p1/audio/x.wav", DurationSeconds: 4}
+
+	const spoken = "Đê bằng một trừ mờ, rồi tất cả chia cho bê."
+	if _, err := kind.Edit(ctx, "p1", "b1", map[string]string{"spoken:b1.1": spoken}); err != nil {
+		t.Fatal(err)
+	}
+	state, _ := f.uc.State(ctx, "p1")
+	l := state.Beats[0].Lines[0]
+	if l.Text != "D = (1 - m) / p" || l.Spoken != spoken || l.Audio.State != "none" {
+		t.Errorf("line = %+v: the shown text stays, and the file read from the old wording is no longer current", l)
+	}
+	if err := f.uc.Speak(ctx, "p1", []string{"b1.1"}); err != nil {
+		t.Fatal(err)
+	}
+	if r := f.voices.rows["b1.1"]; r.Status != domain.VoiceLinePending || r.Text != spoken || r.TextSHA != domain.LineTextSHA(spoken) {
+		t.Errorf("row = %+v, want the line asked again with the spoken wording", r)
+	}
+
+	if _, err := kind.Edit(ctx, "p1", "b1", map[string]string{"spoken:b1.1": ""}); err != nil {
+		t.Fatal(err)
+	}
+	if got := f.script(t, "b1").Lines[0]; got.Spoken != "" || got.SpokenText() != "D = (1 - m) / p" {
+		t.Errorf("line = %+v, want an empty spoken wording to read the text again", got)
+	}
+}

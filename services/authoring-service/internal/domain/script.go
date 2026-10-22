@@ -34,10 +34,22 @@ var ErrScriptReplyUnusable = errors.New("câu trả lời của AI không dùng 
 
 // ScriptLine is one spoken sentence. ID is "<beat key>.<n>", never reused
 // inside its beat, so a voice file and a suggestion can keep pointing at it.
+// Text is what the screen shows (subtitles, review); Spoken, when set, is what
+// the voice reads instead, for a line the voice would misread as written, such
+// as a formula.
 type ScriptLine struct {
-	ID    string   `json:"id"`
-	Text  string   `json:"text"`
-	Facts []string `json:"facts"`
+	ID     string   `json:"id"`
+	Text   string   `json:"text"`
+	Spoken string   `json:"spoken,omitempty"`
+	Facts  []string `json:"facts"`
+}
+
+// SpokenText is the wording the voice reads: Spoken when the line has one, else Text.
+func (l ScriptLine) SpokenText() string {
+	if s := strings.TrimSpace(l.Spoken); s != "" {
+		return s
+	}
+	return strings.TrimSpace(l.Text)
 }
 
 // ScriptBeat is the content of a script_beat unit.
@@ -68,6 +80,14 @@ func LineTextSHA(text string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+// ValidateSpokenText checks the reading of one line; empty means the line is read as written.
+func ValidateSpokenText(spoken string) error {
+	if n := len([]rune(strings.TrimSpace(spoken))); n > MaxLineRunes {
+		return fmt.Errorf("chữ để đọc dài %d ký tự, tối đa %d", n, MaxLineRunes)
+	}
+	return nil
+}
+
 // ValidateLineText checks the wording of one line.
 func ValidateLineText(text string) error {
 	t := strings.TrimSpace(text)
@@ -95,6 +115,9 @@ func (s ScriptBeat) Validate(known func(id string) bool) error {
 		if err := ValidateLineText(l.Text); err != nil {
 			return fmt.Errorf("câu %s: %v", l.ID, err)
 		}
+		if err := ValidateSpokenText(l.Spoken); err != nil {
+			return fmt.Errorf("câu %s: %v", l.ID, err)
+		}
 		for _, id := range l.Facts {
 			if known != nil && !known(id) {
 				return fmt.Errorf("câu %s trích dữ kiện %s không có trong bảng dữ kiện", l.ID, id)
@@ -106,8 +129,9 @@ func (s ScriptBeat) Validate(known func(id string) bool) error {
 
 // ScriptLineDraft is a line as the AI wrote it, before it has an id.
 type ScriptLineDraft struct {
-	Text  string
-	Facts []string
+	Text   string
+	Spoken string
+	Facts  []string
 }
 
 // ParseScriptReply reads the lines out of a model reply {"lines":[...]}. Every
@@ -120,8 +144,9 @@ func ParseScriptReply(reply string, known func(id string) bool) ([]ScriptLineDra
 	}
 	var wire struct {
 		Lines []struct {
-			Text  string   `json:"text"`
-			Facts []string `json:"facts"`
+			Text   string   `json:"text"`
+			Spoken string   `json:"spoken"`
+			Facts  []string `json:"facts"`
 		} `json:"lines"`
 	}
 	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
@@ -135,8 +160,11 @@ func ParseScriptReply(reply string, known func(id string) bool) ([]ScriptLineDra
 	}
 	out := make([]ScriptLineDraft, 0, len(wire.Lines))
 	for i, w := range wire.Lines {
-		d := ScriptLineDraft{Text: strings.TrimSpace(w.Text), Facts: []string{}}
+		d := ScriptLineDraft{Text: strings.TrimSpace(w.Text), Spoken: strings.TrimSpace(w.Spoken), Facts: []string{}}
 		if err := ValidateLineText(d.Text); err != nil {
+			return nil, fmt.Errorf("%w: câu thứ %d: %v", ErrScriptReplyUnusable, i+1, err)
+		}
+		if err := ValidateSpokenText(d.Spoken); err != nil {
 			return nil, fmt.Errorf("%w: câu thứ %d: %v", ErrScriptReplyUnusable, i+1, err)
 		}
 		for _, raw := range w.Facts {
@@ -265,7 +293,7 @@ func CheckClosing(last *ScriptLine) ScriptCheck {
 	if last == nil {
 		return ScriptCheck{Text: "Chưa có câu kết"}
 	}
-	t := strings.TrimSpace(last.Text)
+	t := strings.TrimSpace(last.SpokenText())
 	ended := t != "" && strings.ContainsRune(".!?…", []rune(t)[len([]rune(t))-1])
 	flag := FlagLine(t)
 	if ended && (flag == nil || flag.Kind != LineFlagLong) {

@@ -186,7 +186,7 @@ func ScriptSHA(beats [][]ScriptLine) string {
 	h := sha256.New()
 	for _, lines := range beats {
 		for _, l := range lines {
-			h.Write([]byte(l.ID + "\x00" + strings.TrimSpace(l.Text) + "\x00" + strings.Join(l.Facts, ",") + "\n"))
+			h.Write([]byte(l.ID + "\x00" + strings.TrimSpace(l.Text) + "\x00" + strings.TrimSpace(l.Spoken) + "\x00" + strings.Join(l.Facts, ",") + "\n"))
 		}
 		h.Write([]byte("|"))
 	}
@@ -324,7 +324,7 @@ func MachineFindings(in ReviewInput) []ReviewFinding {
 	prevLast := ""
 	for i, b := range in.Beats {
 		for _, l := range b.Lines {
-			flag := FlagLine(l.Text)
+			flag := FlagLine(l.SpokenText())
 			if flag == nil {
 				continue
 			}
@@ -343,7 +343,7 @@ func MachineFindings(in ReviewInput) []ReviewFinding {
 			continue
 		}
 		if i > 0 && prevLast != "" {
-			if j := FlagJoin(prevLast, b.Lines[0].Text); j != nil {
+			if j := FlagJoin(prevLast, b.Lines[0].SpokenText()); j != nil {
 				out = append(out, ReviewFinding{
 					ID: "m-join:" + b.Key, Source: FindingByMachine, Group: ReviewGroupLogic, Line: b.Lines[0].ID,
 					Title:  fmt.Sprintf("Chỗ nối từ beat B%d sang beat B%d", in.Beats[i-1].Number, b.Number),
@@ -351,7 +351,7 @@ func MachineFindings(in ReviewInput) []ReviewFinding {
 				})
 			}
 		}
-		prevLast = b.Lines[len(b.Lines)-1].Text
+		prevLast = b.Lines[len(b.Lines)-1].SpokenText()
 	}
 	return out
 }
