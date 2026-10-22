@@ -126,3 +126,13 @@ A block of text the Creator may paste into another tool or a ticket (a prompt, a
 - It copies the text exactly as the block shows it, and is disabled while that text is empty or still being built or out of date.
 - Applies to read-only blocks and to long text fields alike, in cards and in modals. A modal that exists to copy a generated text (rule 4) keeps its footer "Sao chép" button as well.
 - A new screen with such a block is checked for this button before it is done.
+
+## 9. A dropdown never hides the text the Creator chooses by
+
+When options are long sentences (a fact, a claim, a title), the Creator must be able to read each one in full before choosing it.
+
+- Never cut an option's label in code (`slice`, a character limit plus "…"). Pass the whole text as `label`; the list wraps it over as many lines as it needs and stays scrollable.
+- A short `label` with the long part in `hint` is fine, as long as the hint is also shown in full (the list never truncates either).
+- The trigger shows the chosen option on one line with an ellipsis, so `<Dropdown>` puts the full label and hint in the trigger's `title` tooltip. Where the chosen text is the thing the Creator must re-read later, show it in full next to the trigger instead (as the fact tags beside "+ Gắn dữ kiện…" do).
+- Give a dropdown with long options room: a trigger of at least 480px (or the full column) so lines stay short.
+- A new dropdown is checked with its longest real option before it is done.

@@ -186,7 +186,7 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
               placeholder="+ Gắn dữ kiện…"
               options={unusedFacts.map((f) => ({
                 value: f.id,
-                label: `${f.id} · ${f.claimVi.length > 52 ? `${f.claimVi.slice(0, 52)}…` : f.claimVi}`,
+                label: `${f.id} · ${f.claimVi}`,
               }))}
               onChange={(id) => id && void beats.setFacts(beat, [...beat.facts, id])}
               disabled={busy}

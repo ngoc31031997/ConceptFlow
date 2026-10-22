@@ -128,6 +128,7 @@ export function Dropdown({
         aria-controls={open ? listId : undefined}
         aria-activedescendant={open ? `${listId}-${active}` : undefined}
         aria-label={rest["aria-label"]}
+        title={selected ? [selected.label, selected.hint].filter(Boolean).join(" — ") : undefined}
         data-testid={testId}
       >
         <span className={styles.triggerText}>
