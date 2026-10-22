@@ -166,7 +166,9 @@
 .item:not(:disabled):hover {
   border-color: var(--border-color);
 }
-.viewing,
+/* The step being viewed is a disabled button, so the selector is as specific as
+   the global `button:disabled` rule to keep its own colour. */
+.item.viewing,
 .item.viewing:not(:disabled):hover {
   background: var(--accent);
   border-color: var(--border-color);
