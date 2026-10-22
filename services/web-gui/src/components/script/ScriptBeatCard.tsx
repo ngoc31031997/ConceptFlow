@@ -176,6 +176,11 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
                       </span>
                       <span className={styles.lineBody}>
                         <span data-testid={`script-line-text-${line.id}`}>{line.text}</span>
+                        {line.spoken && (
+                          <span className={styles.spoken} data-testid={`script-line-spoken-${line.id}`}>
+                            <b>Đọc:</b> {line.spoken}
+                          </span>
+                        )}
                         <span className={styles.tags}>
                           <FactTags ids={line.facts} />
                           {line.flag && (
@@ -244,12 +249,15 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         onClose={() => setEditing(false)}
         title={`Sửa tay · B${beat.number} ${beat.title}`}
         fields={[
-          ...beat.lines.map((l) => ({ name: `line:${l.id}`, label: `Câu ${l.id.slice(1)}`, value: l.text, rows: 2 })),
+          ...beat.lines.flatMap((l) => [
+            { name: `line:${l.id}`, label: `Câu ${l.id.slice(1)}`, value: l.text, rows: 2 },
+            { name: `spoken:${l.id}`, label: `Chữ để đọc câu ${l.id.slice(1)} (để trống thì đọc đúng như chữ trên)`, value: l.spoken ?? "", rows: 2 },
+          ]),
           { name: `add:${lastId}`, label: beat.lines.length === 0 ? "Câu đầu tiên" : "Thêm một câu mới ở cuối", value: "", rows: 2 },
         ]}
         impact={editImpact}
         onSave={(changed) => script.edit(beat.key, changed)}
-        note="Xoá trắng một câu để bỏ câu đó. Sửa xong beat về chờ duyệt; câu đã sửa phải nghe thử lại."
+        note="Xoá trắng một câu để bỏ câu đó. Công thức hay ký hiệu giọng đọc sai thì ghi cách đọc vào ô “Chữ để đọc” (ví dụ: Đê bằng một trừ mờ, rồi chia cho bê); phụ đề vẫn hiện chữ ở ô trên. Sửa xong beat về chờ duyệt; câu đã sửa phải nghe thử lại."
         size="lg"
         testId={`script-edit-${beat.key}`}
       />

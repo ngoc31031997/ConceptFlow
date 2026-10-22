@@ -49,7 +49,7 @@ export interface ScriptControls {
   edit: (beat: string, fields: Record<string, string>) => Promise<void>;
   /** Asks the AI for a replacement sentence; the text is returned, nothing is stored. */
   suggest: (kind: "line" | "join", lineId: string) => Promise<string | null>;
-  /** Replaces the text of one line. */
+  /** Replaces the text of one line with a new sentence; the old spoken wording no longer fits it and is cleared. */
   setLine: (beat: string, lineId: string, text: string) => Promise<boolean>;
   approve: (beat: string) => Promise<boolean>;
   unapprove: (beat: string) => Promise<boolean>;
@@ -215,7 +215,7 @@ export function useScript(projectId: string, enabled: boolean): ScriptControls {
     redo: (beat, note) => runAI({ beat }, note, (op) => redoUnit(projectId, scriptBeatUnit(beat), note, op)),
     edit,
     suggest,
-    setLine: (beat, lineId, text) => act(() => editFields(beat, { [`line:${lineId}`]: text })),
+    setLine: (beat, lineId, text) => act(() => editFields(beat, { [`line:${lineId}`]: text, [`spoken:${lineId}`]: "" })),
     approve: (beat) => act(() => approveUnit(projectId, scriptBeatUnit(beat))),
     unapprove: (beat) => act(() => unapproveUnit(projectId, scriptBeatUnit(beat))),
     approveAll: () =>

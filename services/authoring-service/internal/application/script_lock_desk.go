@@ -677,7 +677,7 @@ func (uc *ScriptLockDeskUseCase) ApplyFix(ctx context.Context, projectID, id str
 	if !ok {
 		return ErrFindingNotApplicable
 	}
-	if _, err := uc.script.ScriptUnitKind().Edit(ctx, projectID, beatKey, map[string]string{scriptFieldLine + f.Line: f.Fix}); err != nil {
+	if _, err := uc.script.ScriptUnitKind().Edit(ctx, projectID, beatKey, map[string]string{scriptFieldLine + f.Line: f.Fix, scriptFieldSpoken + f.Line: ""}); err != nil {
 		return err
 	}
 	in.review.Decide(f, domain.FindingFixed, "")

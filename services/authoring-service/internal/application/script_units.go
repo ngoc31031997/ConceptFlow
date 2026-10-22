@@ -14,12 +14,14 @@ var ErrScriptBeatEmpty = errors.New("beat chưa có lời thoại")
 
 // Fields of a script_beat unit a hand edit sets. A field is the prefix
 // followed by a line id: "line:b1.2" is the text of line b1.2 (empty deletes
-// the line), "facts:b1.2" its fact codes ("F01, F02"), and "add:b1.2" a new
+// the line), "spoken:b1.2" the wording the voice reads instead (empty reads the
+// text as written), "facts:b1.2" its fact codes ("F01, F02"), and "add:b1.2" a new
 // line after b1.2 ("add:start" puts one first).
 const (
-	scriptFieldLine  = "line:"
-	scriptFieldFacts = "facts:"
-	scriptFieldAdd   = "add:"
+	scriptFieldLine   = "line:"
+	scriptFieldFacts  = "facts:"
+	scriptFieldSpoken = "spoken:"
+	scriptFieldAdd    = "add:"
 	// ScriptFieldAddStart adds a line before every other line of the beat.
 	ScriptFieldAddStart = scriptFieldAdd + "start"
 	// scriptCreatorField is the name under which a hand edit is remembered.
@@ -83,6 +85,12 @@ func (k scriptKind) Edit(ctx context.Context, projectID, key string, fields map[
 			} else {
 				script.Lines[at].Text = value
 			}
+		case strings.HasPrefix(field, scriptFieldSpoken):
+			at := lineIndex(script.Lines, strings.TrimPrefix(field, scriptFieldSpoken))
+			if at < 0 {
+				return domain.ReviewUnit{}, fmt.Errorf("%w: không có câu %s", domain.ErrInvalidUnitEdit, strings.TrimPrefix(field, scriptFieldSpoken))
+			}
+			script.Lines[at].Spoken = value
 		case strings.HasPrefix(field, scriptFieldFacts):
 			at := lineIndex(script.Lines, strings.TrimPrefix(field, scriptFieldFacts))
 			if at < 0 {

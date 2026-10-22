@@ -46,6 +46,7 @@ THỜI LƯỢNG MỤC TIÊU CẢ VIDEO: {{target}}
 
 ## LUẬT VIẾT LỜI ĐỂ ĐỌC
 - Viết để NGHE, không phải để đọc: câu ngắn, mỗi câu một ý, không quá 28 từ, không dùng ngoặc, ký hiệu (%, /, &), chữ viết tắt hay số dài; viết số bằng chữ khi có thể.
+- Công thức và ký hiệu giọng đọc sẽ đọc sai (ví dụ D = (1 - m) / p): giữ nguyên ở "text" để hiện trên màn hình, và điền "spoken" là cách NÓI câu đó thành lời, đọc tên từng chữ cái theo tiếng Việt (D là «đê», m là «mờ», p là «bê») và nói rõ phép tính: «Đê bằng một trừ mờ, rồi tất cả chia cho bê.» Câu không có gì giọng đọc sai thì bỏ "spoken" (hoặc để rỗng).
 - Chuyển tiếp tự nhiên: câu đầu của beat nối được với câu cuối của beat liền trước, không lặp lại cùng một cách mở câu.
 - Đúng nhịp: độ dài lời thoại của beat vừa với thời lượng mục tiêu của beat (đọc khoảng 2,3 từ mỗi giây).
 - Đủ rõ mà không dài dòng. Chỉ nói điều thuộc mục tiêu và nội dung của beat.
@@ -56,8 +57,8 @@ Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu của việc c�
 
 // Tasks of the script writer prompt, the values of {{task}}.
 const (
-	scriptTaskWriteVI = "Viết lời thoại cho beat trên. Trả về {\"lines\":[{\"text\":\"...\",\"facts\":[\"F01\"]}]}: các câu theo thứ tự đọc; \"facts\" là mã dữ kiện câu đó nói, chỉ dùng mã có trong bảng dữ kiện, để [] nếu câu không dùng dữ kiện."
-	scriptTaskRedoVI  = "Viết lại TOÀN BỘ lời thoại của beat trên theo ghi chú của Creator. Trả về {\"lines\":[{\"text\":\"...\",\"facts\":[\"F01\"]}]} như khi viết mới; \"facts\" chỉ dùng mã có trong bảng dữ kiện."
+	scriptTaskWriteVI = "Viết lời thoại cho beat trên. Trả về {\"lines\":[{\"text\":\"...\",\"spoken\":\"\",\"facts\":[\"F01\"]}]}: các câu theo thứ tự đọc; \"spoken\" chỉ điền khi câu có công thức hoặc ký hiệu giọng đọc sẽ đọc sai (theo luật viết lời để đọc), còn lại để \"\"; \"facts\" là mã dữ kiện câu đó nói, chỉ dùng mã có trong bảng dữ kiện, để [] nếu câu không dùng dữ kiện."
+	scriptTaskRedoVI  = "Viết lại TOÀN BỘ lời thoại của beat trên theo ghi chú của Creator. Trả về {\"lines\":[{\"text\":\"...\",\"spoken\":\"\",\"facts\":[\"F01\"]}]} như khi viết mới (\"spoken\" chỉ điền khi câu có công thức hoặc ký hiệu giọng đọc sẽ đọc sai); \"facts\" chỉ dùng mã có trong bảng dữ kiện."
 	scriptTaskLineVI  = "Gợi ý câu thay cho câu %s (xem lời thoại hiện có) vì câu đó bị cờ: %s. Giữ ý và các dữ kiện của câu. Trả về {\"text\":\"...\"} với đúng một câu thay thế."
 	scriptTaskJoinVI  = "Gợi ý câu thay cho CÂU ĐẦU (%s) của beat này để nó nối mượt với câu cuối của beat liền trước, vì: %s. Giữ ý và các dữ kiện của câu. Trả về {\"text\":\"...\"} với đúng một câu thay thế."
 )

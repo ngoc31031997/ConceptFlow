@@ -132,7 +132,7 @@ func (uc *ScriptDeskUseCase) run(ctx context.Context, projectID string, sc scrip
 func writeLines(beatKey string, drafts []domain.ScriptLineDraft, next int) domain.ScriptBeat {
 	out := domain.ScriptBeat{Lines: make([]domain.ScriptLine, 0, len(drafts)), NextSeq: next}
 	for _, d := range drafts {
-		out.Lines = append(out.Lines, domain.ScriptLine{ID: domain.ScriptLineID(beatKey, out.NextSeq), Text: d.Text, Facts: d.Facts})
+		out.Lines = append(out.Lines, domain.ScriptLine{ID: domain.ScriptLineID(beatKey, out.NextSeq), Text: d.Text, Spoken: d.Spoken, Facts: d.Facts})
 		out.NextSeq++
 	}
 	return out
@@ -237,7 +237,7 @@ func (uc *ScriptDeskUseCase) Suggest(ctx context.Context, projectID, kind, lineI
 	var task string
 	switch kind {
 	case "line":
-		flag := domain.FlagLine(script.Lines[li].Text)
+		flag := domain.FlagLine(script.Lines[li].SpokenText())
 		if flag == nil {
 			return "", ErrScriptLineNotFlagged
 		}
@@ -250,7 +250,7 @@ func (uc *ScriptDeskUseCase) Suggest(ctx context.Context, projectID, kind, lineI
 		if len(prev.Lines) == 0 {
 			return "", ErrScriptLineNotFlagged
 		}
-		j := domain.FlagJoin(prev.Lines[len(prev.Lines)-1].Text, script.Lines[0].Text)
+		j := domain.FlagJoin(prev.Lines[len(prev.Lines)-1].SpokenText(), script.Lines[0].SpokenText())
 		if j == nil {
 			return "", ErrScriptLineNotFlagged
 		}
@@ -283,7 +283,7 @@ func (uc *ScriptDeskUseCase) Speak(ctx context.Context, projectID string, lineID
 	text := map[string]string{}
 	for _, s := range scripts {
 		for _, l := range s.Lines {
-			text[l.ID] = l.Text
+			text[l.ID] = l.SpokenText()
 		}
 	}
 	voiceID, lang, err := uc.voiceOf(ctx, projectID)

@@ -148,3 +148,39 @@ func TestFlagJoin(t *testing.T) {
 		t.Error("nothing to join, nothing to flag")
 	}
 }
+
+func TestParseScriptReplyReadsTheSpokenWording(t *testing.T) {
+	got, err := ParseScriptReply(`{"lines":[{"text":"D = (1 - m) / p","spoken":" Đê bằng một trừ mờ, rồi chia cho bê. ","facts":[]},{"text":"Câu hai.","facts":[]}]}`, knownF01)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[0].Spoken != "Đê bằng một trừ mờ, rồi chia cho bê." || got[1].Spoken != "" {
+		t.Errorf("got %+v, want the trimmed spoken wording only where the AI gave one", got)
+	}
+	long := `{"lines":[{"text":"Câu.","spoken":"` + strings.Repeat("a", MaxLineRunes+1) + `","facts":[]}]}`
+	if _, err := ParseScriptReply(long, knownF01); !errors.Is(err, ErrScriptReplyUnusable) {
+		t.Errorf("err = %v, want a too-long spoken wording refused", err)
+	}
+}
+
+func TestSpokenTextFallsBackToTheWrittenText(t *testing.T) {
+	l := ScriptLine{Text: "D = (1 - m) / p"}
+	if l.SpokenText() != l.Text {
+		t.Errorf("SpokenText = %q, want the text when Spoken is empty", l.SpokenText())
+	}
+	l.Spoken = " Đê bằng một trừ mờ, rồi chia cho bê. "
+	if want := "Đê bằng một trừ mờ, rồi chia cho bê."; l.SpokenText() != want {
+		t.Errorf("SpokenText = %q, want %q", l.SpokenText(), want)
+	}
+	if FlagLine(l.SpokenText()) != nil {
+		t.Error("a line read from words must not be flagged for the symbols it shows")
+	}
+}
+
+func TestScriptSHAChangesWhenOnlyTheSpokenWordingChanges(t *testing.T) {
+	a := ScriptSHA([][]ScriptLine{{{ID: "b1.1", Text: "D = 1"}}})
+	b := ScriptSHA([][]ScriptLine{{{ID: "b1.1", Text: "D = 1", Spoken: "Đê bằng một"}}})
+	if a == b {
+		t.Error("the reading is part of the script a review judged")
+	}
+}

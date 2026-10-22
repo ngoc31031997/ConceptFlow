@@ -184,7 +184,24 @@ describe("ScriptWriteStepPage", () => {
     expect(suggest).toHaveBeenCalledWith("p1", "line", "b1.1", expect.anything());
     expect(edit).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("script-suggestion-apply-b1.1"));
-    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b1" }), { "line:b1.1": "Chất các-bon đi-ô-xít rất nhiều." }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b1" }), { "line:b1.1": "Chất các-bon đi-ô-xít rất nhiều.", "spoken:b1.1": "" }));
+  });
+
+  it("shows what the voice reads when it differs from the text and lets the Creator edit it", async () => {
+    state = baseState({
+      beats: [beat("b1", 1, { lines: [line("b1.1", "D = (1 - m) / p", { spoken: "Đê bằng một trừ mờ, rồi chia cho bê." })] })],
+    });
+    const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
+    renderPage();
+    expect(await screen.findByTestId("script-line-text-b1.1")).toHaveTextContent("D = (1 - m) / p");
+    expect(screen.getByTestId("script-line-spoken-b1.1")).toHaveTextContent("Đê bằng một trừ mờ, rồi chia cho bê.");
+    fireEvent.click(screen.getByTestId("script-review-b1-edit"));
+    const field = await screen.findByTestId("script-edit-b1-field-spoken:b1.1");
+    fireEvent.change(field, { target: { value: "Đê bằng một trừ mờ, rồi tất cả chia cho bê." } });
+    fireEvent.click(screen.getByTestId("script-edit-b1-save"));
+    await waitFor(() =>
+      expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "script_beat", key: "b1" }), { "spoken:b1.1": "Đê bằng một trừ mờ, rồi tất cả chia cho bê." }),
+    );
   });
 
   it("offers a suggestion for a join that does not read well", async () => {
