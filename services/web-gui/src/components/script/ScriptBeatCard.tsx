@@ -127,7 +127,7 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
         </div>
         <p className={researchStyles.hint}>Mục tiêu: {beat.goal || "(chưa có)"}</p>
 
-        <AiOperationCard run={script.run} active={writing || (writingAll && !beat.written)} testId={`script-progress-${beat.key}`} title="AI đang viết lời thoại beat này" />
+        <AiOperationCard run={script.run} active={writing || (writingAll && !beat.written)} showFailure={script.runBeat === null || script.runBeat === beat.key} testId={`script-progress-${beat.key}`} title="AI đang viết lời thoại beat này" />
 
         {beat.join && (
           <>

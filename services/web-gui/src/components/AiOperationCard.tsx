@@ -10,6 +10,8 @@ interface AiOperationCardProps {
   active: boolean;
   testId: string;
   title?: string;
+  /** False when a failure belongs to another card on the same screen; true by default. */
+  showFailure?: boolean;
 }
 
 /**
@@ -19,9 +21,9 @@ interface AiOperationCardProps {
  * Creator can cancel it, after a confirmation: the request is aborted, the
  * server drops the model call and nothing is stored.
  */
-export function AiOperationCard({ run, active, testId, title }: AiOperationCardProps) {
+export function AiOperationCard({ run, active, testId, title, showFailure = true }: AiOperationCardProps) {
   const [confirming, setConfirming] = useState(false);
-  const failed = run.progress?.status === "failed";
+  const failed = showFailure && run.progress?.status === "failed";
   if (!active && !failed) return null;
   return (
     <>

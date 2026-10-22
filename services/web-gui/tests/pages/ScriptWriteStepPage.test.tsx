@@ -145,6 +145,18 @@ describe("ScriptWriteStepPage", () => {
     await waitFor(() => expect(generate).toHaveBeenCalledWith("p1", "", "", expect.anything()));
   });
 
+  it("shows the loading card only on the beat being written, not on the other empty beats", async () => {
+    state = baseState({
+      beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 }), beat("b2", 2, { written: false, lines: [], seconds: 0 })],
+      stats: { ...baseState().stats, written: 0, lines: 0 },
+    });
+    vi.spyOn(apiClient, "generateScript").mockReturnValue(new Promise(() => {}));
+    renderPage();
+    fireEvent.click(await screen.findByTestId("script-write-b1"));
+    expect(await screen.findByTestId("script-progress-b1")).toBeInTheDocument();
+    expect(screen.queryByTestId("script-progress-b2")).not.toBeInTheDocument();
+  });
+
   it("lets the Creator write a beat by hand when no model is configured", async () => {
     vi.spyOn(apiClient, "getLlmStatus").mockResolvedValue({ enabled: false, provider: "hive", reason: "", models: [] });
     state = baseState({ beats: [beat("b1", 1, { written: false, lines: [], seconds: 0 })], stats: { ...baseState().stats, written: 0, lines: 0 } });

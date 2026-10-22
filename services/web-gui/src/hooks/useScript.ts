@@ -39,6 +39,8 @@ export interface ScriptControls {
   actionError: string | null;
   /** The note of the AI run that failed, so its dialog starts from it. */
   failedNote: string;
+  /** The beat the last AI run was for; null when it was for every beat. */
+  runBeat: string | null;
   player: LinePlayer;
   /** Writes the dialogue of every beat that has none, or of `beat` when given. */
   generate: (beat: string, note: string) => Promise<boolean>;
@@ -73,6 +75,7 @@ export function useScript(projectId: string, enabled: boolean): ScriptControls {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [failedNote, setFailedNote] = useState("");
+  const [runBeat, setRunBeat] = useState<string | null>(null);
   // Only the newest load may land: an older answer must not overwrite a newer one.
   const loadSeq = useRef(0);
 
@@ -129,6 +132,7 @@ export function useScript(projectId: string, enabled: boolean): ScriptControls {
   const runAI = useCallback(
     async (what: Exclude<ScriptRunning, null>, note: string, call: (operation: OperationCall) => Promise<unknown>) => {
       setRunning(what);
+      setRunBeat(typeof what === "object" && "beat" in what ? what.beat : null);
       setActionError(null);
       try {
         await call(run.begin());
@@ -205,8 +209,9 @@ export function useScript(projectId: string, enabled: boolean): ScriptControls {
     busy,
     actionError,
     failedNote,
+    runBeat,
     player,
-    generate: (beat, note) => runAI("write", note, (op) => generateScript(projectId, beat, note, op)),
+    generate: (beat, note) => runAI(beat ? { beat } : "write", note, (op) => generateScript(projectId, beat, note, op)),
     redo: (beat, note) => runAI({ beat }, note, (op) => redoUnit(projectId, scriptBeatUnit(beat), note, op)),
     edit,
     suggest,
