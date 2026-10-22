@@ -102,7 +102,7 @@ export interface FlowViewStep {
    * The step has a screen of its own that no running step stands behind (it
    * is not one of the 13 steps the server derives a project's position from).
    */
-  screen?: "research" | "story" | "beats" | "script";
+  screen?: "research" | "story" | "beats" | "script" | "lock";
   /** What the step holds, in a few words, for the flow map. */
   note: string;
 }
@@ -114,7 +114,7 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], screen: "script", note: "Lời thoại theo beat, chuyển tiếp, nghe thử" },
-  { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
+  { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], screen: "lock", note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
   { n: 8, phase: 1, label: "Mỹ thuật · lượt 1", title: "Thiết kế mỹ thuật · lượt 1", gate: true, server: [], note: "Diễn viên và phim trường dùng chung cả video" },
   { n: 9, phase: 1, label: "Storyboard", gate: true, server: [4], note: "Cảnh, shot, lời đọc, hình trên màn" },
   { n: 10, phase: 1, label: "Mỹ thuật · lượt 2", title: "Thiết kế mỹ thuật · lượt 2", gate: true, server: [], note: "Màu và ánh sáng từng phần của chuyện; khung mẫu" },
@@ -172,6 +172,8 @@ export interface ScreenStanding {
   storyApproved: boolean;
   beatsApproved: boolean;
   scriptApproved: boolean;
+  /** A version of the script is locked. */
+  scriptLocked: boolean;
 }
 
 /**
@@ -193,6 +195,9 @@ export function screenStatus(view: FlowViewStep, flowStep: number, standing: Scr
     case "beats":
       if (!standing.storyApproved) return "pending";
       return standing.beatsApproved ? "done" : "waiting";
+    case "lock":
+      if (!standing.scriptApproved) return "pending";
+      return standing.scriptLocked ? "done" : "waiting";
     default:
       if (!standing.beatsApproved) return "pending";
       return standing.scriptApproved ? "done" : "waiting";
@@ -201,6 +206,14 @@ export function screenStatus(view: FlowViewStep, flowStep: number, standing: Scr
 
 /** The number, in the 21-step flow, of the script step. */
 export const VIEW_SCRIPT = 6;
+
+/** The number, in the 21-step flow, of the lock step. */
+export const VIEW_LOCK = 7;
+
+/** The screen of the lock step. */
+export function lockRoute(projectId: string): string {
+  return `/projects/${projectId}/lock`;
+}
 
 /** The screen of the script step. */
 export function scriptRoute(projectId: string): string {

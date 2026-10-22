@@ -22,6 +22,8 @@ const ROLES: { value: PromptRole; label: string }[] = [
   { value: "story_frame", label: "0e. Khung câu chuyện — AI viết câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff (bước Câu chuyện)" },
   { value: "beat_sheet", label: "0f. Beat sheet — AI chia câu chuyện thành các beat (bước Beat sheet)" },
   { value: "script_writer", label: "0g. Viết kịch bản — AI viết lời thoại từng beat và gợi ý sửa câu (bước Viết kịch bản)" },
+  { value: "script_review", label: "0h. Rà soát kịch bản — AI đọc cả kịch bản và nêu các mục cần xử lý (bước Rà soát và chốt)" },
+  { value: "script_handoff", label: "0i. Ghi chú bàn giao — AI viết năm mục bàn giao của một beat (bước Rà soát và chốt)" },
   { value: "story_architect", label: "1. Story Architect — dựng dàn ý" },
   { value: "visual_director", label: "2. Visual Director — dựng storyboard" },
   { value: "remotion_engineer", label: "3. Remotion Engineer — viết code Remotion" },

@@ -59,6 +59,7 @@ type Router struct {
 	story                   storyUseCase
 	beats                   beatUseCase
 	script                  scriptUseCase
+	scriptLock              scriptLockUseCase
 	voiceLines              voiceLinesUseCase
 }
 
@@ -91,6 +92,8 @@ func (rt *Router) Handler() http.Handler {
 	rt.beatRoutes(r)
 	// The script step: the dialogue of each beat, its checks and the reading of each line.
 	rt.scriptRoutes(r)
+	// The lock step: the review of the whole script, the handoff notes and the locked versions.
+	rt.scriptLockRoutes(r)
 	r.Post("/v1/admin/video-archetypes", rt.handleCreateArchetype)
 	r.Post("/v1/admin/video-archetypes/{id}/copy", rt.handleCopyArchetype)
 	r.Put("/v1/admin/video-archetypes/{id}", rt.handleUpdateArchetype)

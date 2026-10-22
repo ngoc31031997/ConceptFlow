@@ -2,12 +2,14 @@ import { describe, it, expect } from "vitest";
 import {
   FLOW_VIEW,
   VIEW_BEATS,
+  VIEW_LOCK,
   VIEW_RESEARCH,
   VIEW_SCRIPT,
   VIEW_STORY,
   beatsRoute,
   comingRoute,
   isBuilt,
+  lockRoute,
   phaseOf,
   phaseOfView,
   screenRoute,
@@ -38,7 +40,7 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([7, 8, 10, 11, 12, 18]);
+    expect(notBuilt).toEqual([8, 10, 11, 12, 18]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {
@@ -47,7 +49,7 @@ describe("steps with a screen of their own", () => {
     expect(comingRoute(7, "")).toBe("/create/coming/7");
   });
 
-  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false };
+  const none = { researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false };
   const researched = { ...none, researchResolved: true };
   const storied = { ...researched, storyApproved: true };
   const beaten = { ...storied, beatsApproved: true };
@@ -88,6 +90,18 @@ describe("steps with a screen of their own", () => {
     expect(screenStatus(script, 4, none)).toBe("done");
     expect(scriptRoute("p1")).toBe("/projects/p1/script");
     expect(screenRoute(script, "p1")).toBe("/projects/p1/script");
+  });
+
+  it("opens the lock step once the script is approved, and passes it once a version is locked", () => {
+    const lock = FLOW_VIEW[VIEW_LOCK - 1];
+    const scripted = { ...beaten, scriptApproved: true };
+    expect(lock.screen).toBe("lock");
+    expect(isBuilt(lock)).toBe(true);
+    expect(screenStatus(lock, 3, beaten)).toBe("pending");
+    expect(screenStatus(lock, 3, scripted)).toBe("waiting");
+    expect(screenStatus(lock, 3, { ...scripted, scriptLocked: true })).toBe("done");
+    expect(lockRoute("p1")).toBe("/projects/p1/lock");
+    expect(screenRoute(lock, "p1")).toBe("/projects/p1/lock");
   });
 
   it("finds the phase of a step by its place in the 21 steps", () => {

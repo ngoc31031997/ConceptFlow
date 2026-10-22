@@ -3675,3 +3675,14 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3e, Code Generation xong, chờ Creator duyệt.
 
 ---
+
+---
+## CR-072-U3f — Code xong, chờ duyệt
+**Timestamp**: 2026-10-22T00:00:00Z
+**User Input**: "làm bước 7 theo mockup nào https://claude.ai/artifact/HibBJUisUocqKXDZD57cTH"; trả lời: không đụng `flow.go`; AI rà soát theo sáu vòng của Creator (fact-check, logic, audience, timing, production feasibility, final consistency) và viết ghi chú bàn giao; rà soát cả kịch bản một lượt, bàn giao từng beat; vòng 6 là nút "Rà soát lại" ở tab Rà soát.
+**AI Response**: Thiết kế (`cr-072-u3f-review-lock-design.md`) rồi code. authoring-service: đơn vị `handoff_beat`, đơn vị `script_review` và `glossary` ngoài API đơn vị chung, máy kiểm (dữ kiện bắt buộc, link không khớp, con số chưa gắn dữ kiện, thời lượng, cờ câu và chỗ nối của bước 6, AI chưa rà soát), AI rà soát một lượt và rà soát lại, AI viết ghi chú bàn giao từng beat, bảng `script_versions` chỉ thêm, `HandoffFor(role)` và route nội bộ `/internal/v1/authoring/{id}/handoff`; hai vai prompt mới `script_review`, `script_handoff`. api-gateway: proxy `/script-lock…`. web-gui: trang `/projects/:id/lock` ba tab, bước 6 mở sang bước 7 và mở được tại một câu (`?line=`), bước 7 vào menu bước. Không sửa `flow.go`.
+**Impact Assessment**: Go `gofmt`, `go vet`, `go test ./...` xanh (kho `script_versions` chạy trên Postgres tạm, đã xoá); api-gateway jest `tests/routes` xanh; web-gui `tsc`, `vitest` 704 xanh.
+**Artifacts Affected**: `services/authoring-service/`, `services/api-gateway/`, `services/web-gui/`, `docs/contracts/script-lock-v1.md`, `docs/contracts/README.md`, `aidlc-docs/construction/plans/cr-072-u3f-review-lock-design.md`.
+**Context**: CONSTRUCTION — CR-072-U3f, Code Generation xong, chờ Creator duyệt. Chưa chạy AI thật (không có HIVE_API_KEY).
+
+---

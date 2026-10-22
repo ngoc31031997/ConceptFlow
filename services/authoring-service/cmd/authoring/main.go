@@ -149,11 +149,16 @@ func main() {
 		WithVoices(authoringRepo, projects)
 	voiceLines := application.NewVoiceLinesUseCase(authoringRepo)
 	research.RegisterFactDependents(script.FactDependents())
+	// The lock step: the handoff note of each beat is a review unit; the review
+	// and the glossary are units of their own; locking writes a version.
+	scriptLock := application.NewScriptLockDeskUseCase(
+		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindStory, story.GateUnitKind()).
 		Register(domain.UnitKindStoryField, story.FieldUnitKind()).
 		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
+		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
 		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
@@ -209,7 +214,8 @@ func main() {
 		WithResearch(research).
 		WithStory(story).
 		WithBeats(beats).
-		WithScript(script, voiceLines)
+		WithScript(script, voiceLines).
+		WithScriptLock(scriptLock)
 	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
 		_, msg := httpadapter.DescribeGenerateError(err)
 		return msg

@@ -43,8 +43,9 @@ describe("FlowMapPage", () => {
     expect(screen.getByTestId("flow-map-step-9")).toHaveTextContent("◆ bạn duyệt");
     expect(screen.getByTestId("flow-map-step-17")).toHaveTextContent("tự chạy");
     expect(screen.getByTestId("flow-map-step-2")).not.toHaveTextContent("◆");
-    expect(screen.getByTestId("flow-map-step-7")).toHaveTextContent("sắp có");
+    expect(screen.getByTestId("flow-map-step-8")).toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-6")).not.toHaveTextContent("sắp có");
+    expect(screen.getByTestId("flow-map-step-7")).not.toHaveTextContent("sắp có");
     // The research step has a screen of its own, so it is not “sắp có”; it is optional.
     expect(screen.getByTestId("flow-map-step-3")).not.toHaveTextContent("sắp có");
     expect(screen.getByTestId("flow-map-step-3")).toHaveTextContent("tuỳ chọn");
@@ -52,8 +53,8 @@ describe("FlowMapPage", () => {
 
   it("opens the not-developed page of a step that is not built", () => {
     renderMap();
-    fireEvent.click(screen.getByTestId("flow-map-step-7"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/create/coming/7");
+    fireEvent.click(screen.getByTestId("flow-map-step-8"));
+    expect(screen.getByTestId("where")).toHaveTextContent("/create/coming/8");
   });
 
   it("opens the research screen of the video last worked on, and only when there is one", async () => {

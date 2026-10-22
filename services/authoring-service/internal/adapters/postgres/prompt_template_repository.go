@@ -367,6 +367,10 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	if _, err := r.pool.Exec(ctx, `DELETE FROM voice_lines WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
+	// And its locked script versions.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM script_versions WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
 	// And the log of its pasted research answers.
 	if _, err := r.pool.Exec(ctx, `DELETE FROM research_pastes WHERE project_id = $1`, projectID); err != nil {
 		return err

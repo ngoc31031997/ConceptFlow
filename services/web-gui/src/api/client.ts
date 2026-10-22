@@ -455,6 +455,9 @@ export type PromptRole =
   | "beat_sheet"
   // Viết kịch bản: AI viết lời thoại từng beat và gợi ý sửa câu.
   | "script_writer"
+  // Rà soát và chốt: rà soát cả kịch bản, viết ghi chú bàn giao một beat.
+  | "script_review"
+  | "script_handoff"
   | "story_architect"
   | "visual_director"
   | "remotion_engineer"
@@ -2767,4 +2770,306 @@ export async function speakScriptLines(projectId: string, lineIds: string[]): Pr
 /** Where the browser plays a line's voice file from. */
 export function scriptAudioUrl(projectId: string, file: string): string {
   return `${GATEWAY_URL}/v1/projects/${projectId}/audio/${encodeURIComponent(file)}`;
+}
+
+/** The unit the handoff note of one beat is saved, redone and approved through; the key is the beat's key. */
+export function handoffBeatUnit(key: string): UnitRef<unknown> {
+  return { kind: "handoff_beat", key, parse: (c) => c };
+}
+
+/** Where a review finding stands: still to deal with, a passed check, information, dealt with, or accepted with a reason. */
+export type FindingState = "open" | "ok" | "info" | "fixed" | "accepted";
+
+/** One line of the review of the whole script. */
+export interface ReviewFinding {
+  id: string;
+  source: "machine" | "ai";
+  group: string;
+  groupLabel: string;
+  state: FindingState;
+  title: string;
+  detail: string;
+  /** The line the finding is about, if any. */
+  line: string;
+  /** A replacement for `line` the Creator can apply. */
+  fix: string;
+  /** A line to add to the handoff note of a beat. */
+  handoff: { beat: string; section: string; text: string } | null;
+  /** The finding is dealt with at the research step. */
+  research: boolean;
+  why: string;
+}
+
+export interface HandoffSection {
+  key: string;
+  label: string;
+  /** The roles that read this section, by key. */
+  roles: string[];
+}
+
+export interface HandoffNote {
+  must: string[];
+  terms: string[];
+  exact: string[];
+  free: string[];
+  unsure: string[];
+}
+
+export interface LockBeat {
+  key: string;
+  number: number;
+  fn: string;
+  title: string;
+  goal: string;
+  written: boolean;
+  status: UnitStatus;
+  mine: string[];
+  /** The dialogue the note was written from has changed since. */
+  stale: boolean;
+  note: HandoffNote;
+  lines: number;
+}
+
+export interface GlossaryTerm {
+  term: string;
+  say: string;
+  draw: string;
+  avoid: string;
+  mine: boolean;
+}
+
+export interface LockCondition {
+  ok: boolean;
+  text: string;
+}
+
+export interface LockFact {
+  id: string;
+  type: string;
+  link: string;
+}
+
+export interface LockPackage {
+  topic: string;
+  audience: string;
+  targetLabel: string;
+  totalSeconds: number;
+  lines: number;
+  beats: number;
+  chain: { fn: string; title: string; next: string }[];
+  facts: LockFact[];
+  hypotheses: number;
+  unmatched: number;
+  noSource: boolean;
+}
+
+export interface LockVersion {
+  version: number;
+  lockedAt: string;
+  note: string;
+}
+
+/** Everything the lock screen shows. */
+export interface ScriptLockState {
+  scriptReady: boolean;
+  /** The AI has reviewed the script at least once. */
+  reviewed: boolean;
+  findings: ReviewFinding[];
+  openCount: number;
+  aiNotes: string[];
+  myNotes: string[];
+  glossary: GlossaryTerm[];
+  beats: LockBeat[];
+  conditions: LockCondition[];
+  canLock: boolean;
+  package: LockPackage;
+  handoff: { beats: number; sections: Record<string, number>; glossary: number };
+  sections: HandoffSection[];
+  versions: LockVersion[];
+  lockedVersion: number;
+  nextVersion: number;
+  /** What changed since the latest locked version. */
+  draft: string[];
+  skippedResearch: boolean;
+}
+
+interface lockStateWire {
+  script_ready: boolean;
+  reviewed: boolean;
+  findings:
+    | {
+        id: string;
+        source: "machine" | "ai";
+        group: string;
+        group_label: string;
+        state: FindingState;
+        title: string;
+        detail: string;
+        line?: string;
+        fix?: string;
+        handoff?: { beat: string; section: string; text: string } | null;
+        research?: boolean;
+        why?: string;
+      }[]
+    | null;
+  open_count: number;
+  ai_notes: string[] | null;
+  my_notes: string[] | null;
+  glossary: GlossaryTerm[] | null;
+  beats:
+    | {
+        key: string;
+        number: number;
+        fn: string;
+        title: string;
+        goal: string;
+        written: boolean;
+        status: UnitStatus;
+        mine: string[] | null;
+        stale: boolean;
+        note: Partial<HandoffNote> | null;
+        lines: number;
+      }[]
+    | null;
+  conditions: LockCondition[] | null;
+  can_lock: boolean;
+  package: {
+    topic: string;
+    audience: string;
+    target_label: string;
+    total_seconds: number;
+    lines: number;
+    beats: number;
+    chain: { fn: string; title: string; next: string }[] | null;
+    facts: LockFact[] | null;
+    hypotheses: number;
+    unmatched: number;
+    no_source: boolean;
+  } | null;
+  handoff: { beats: number; sections: Record<string, number> | null; glossary: number } | null;
+  sections: HandoffSection[] | null;
+  versions: { version: number; locked_at: string; note: string }[] | null;
+  locked_version: number;
+  next_version: number;
+  draft: string[] | null;
+  skipped_research: boolean;
+}
+
+function fromWireLock(w: lockStateWire): ScriptLockState {
+  const p = w.package;
+  return {
+    scriptReady: w.script_ready,
+    reviewed: w.reviewed ?? false,
+    findings: (w.findings ?? []).map((f) => ({
+      id: f.id,
+      source: f.source,
+      group: f.group,
+      groupLabel: f.group_label,
+      state: f.state,
+      title: f.title,
+      detail: f.detail,
+      line: f.line ?? "",
+      fix: f.fix ?? "",
+      handoff: f.handoff ?? null,
+      research: f.research ?? false,
+      why: f.why ?? "",
+    })),
+    openCount: w.open_count,
+    aiNotes: w.ai_notes ?? [],
+    myNotes: w.my_notes ?? [],
+    glossary: w.glossary ?? [],
+    beats: (w.beats ?? []).map((b) => ({
+      ...b,
+      mine: b.mine ?? [],
+      note: {
+        must: b.note?.must ?? [],
+        terms: b.note?.terms ?? [],
+        exact: b.note?.exact ?? [],
+        free: b.note?.free ?? [],
+        unsure: b.note?.unsure ?? [],
+      },
+    })),
+    conditions: w.conditions ?? [],
+    canLock: w.can_lock,
+    package: {
+      topic: p?.topic ?? "",
+      audience: p?.audience ?? "",
+      targetLabel: p?.target_label ?? "",
+      totalSeconds: p?.total_seconds ?? 0,
+      lines: p?.lines ?? 0,
+      beats: p?.beats ?? 0,
+      chain: p?.chain ?? [],
+      facts: p?.facts ?? [],
+      hypotheses: p?.hypotheses ?? 0,
+      unmatched: p?.unmatched ?? 0,
+      noSource: p?.no_source ?? false,
+    },
+    handoff: { beats: w.handoff?.beats ?? 0, sections: w.handoff?.sections ?? {}, glossary: w.handoff?.glossary ?? 0 },
+    sections: w.sections ?? [],
+    versions: (w.versions ?? []).map((v) => ({ version: v.version, lockedAt: v.locked_at, note: v.note })),
+    lockedVersion: w.locked_version,
+    nextVersion: w.next_version,
+    draft: w.draft ?? [],
+    skippedResearch: w.skipped_research,
+  };
+}
+
+async function lockCall(projectId: string, path: string, body?: unknown, operation?: OperationCall): Promise<ScriptLockState> {
+  const init = operationInit(operation);
+  return fromWireLock(
+    await apiFetch<lockStateWire>(`/v1/projects/${projectId}/script-lock${path}`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...init.headers },
+      signal: init.signal,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
+  );
+}
+
+/** Reads the lock step: the review, the handoff notes, the glossary and the locked versions. */
+export async function getScriptLock(projectId: string): Promise<ScriptLockState> {
+  return fromWireLock(await apiFetch<lockStateWire>(`/v1/projects/${projectId}/script-lock`));
+}
+
+/** Has the AI read the whole script and report what to deal with (a model call: pass an operation to follow it). */
+export function reviewScript(projectId: string, operation?: OperationCall): Promise<ScriptLockState> {
+  return lockCall(projectId, "/review", undefined, operation);
+}
+
+/** Replaces the finding's line with the fix it carries; the beat goes back to review. */
+export function applyFinding(projectId: string, findingId: string): Promise<ScriptLockState> {
+  return lockCall(projectId, `/findings/${encodeURIComponent(findingId)}/apply`);
+}
+
+/** Adds the line a finding proposes to its beat's handoff note. */
+export function addFindingToHandoff(projectId: string, findingId: string): Promise<ScriptLockState> {
+  return lockCall(projectId, `/findings/${encodeURIComponent(findingId)}/handoff`);
+}
+
+/** Accepts a finding as it stands, with the reason. */
+export function acceptFinding(projectId: string, findingId: string, why: string): Promise<ScriptLockState> {
+  return lockCall(projectId, `/findings/${encodeURIComponent(findingId)}/accept`, { why });
+}
+
+export function addReviewNote(projectId: string, text: string): Promise<ScriptLockState> {
+  return lockCall(projectId, "/notes", { text });
+}
+
+export function addGlossaryTerm(projectId: string, term: { term: string; say: string; draw: string; avoid: string }): Promise<ScriptLockState> {
+  return lockCall(projectId, "/glossary", term);
+}
+
+/** Has the AI write the handoff note of every beat that has none, or only of `beat` (a model call). */
+export function generateHandoff(projectId: string, beat: string, operation?: OperationCall): Promise<ScriptLockState> {
+  return lockCall(projectId, "/handoff/generate", { beat }, operation);
+}
+
+/** Keeps a note as it is after the dialogue it was written from changed, and approves it. */
+export function confirmHandoff(projectId: string, beat: string): Promise<ScriptLockState> {
+  return lockCall(projectId, `/handoff/${encodeURIComponent(beat)}/confirm`);
+}
+
+/** Freezes the script and its handoff as the next version. */
+export function lockScript(projectId: string, note: string): Promise<ScriptLockState> {
+  return lockCall(projectId, "/lock", { note });
 }

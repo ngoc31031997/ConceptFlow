@@ -254,7 +254,7 @@ describe("ScriptWriteStepPage", () => {
     await waitFor(() => expect(screen.getByTestId("step-strip")).toHaveTextContent("Kịch bản đã duyệt"));
     expect(approve.mock.calls.map((c) => (c[1] as { key: string }).key)).toEqual(["b1", "b2", "b3"]);
     fireEvent.click(screen.getByTestId("script-next"));
-    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/coming/7");
+    expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/lock");
   });
 
   it("redoes one beat's dialogue with a note", async () => {

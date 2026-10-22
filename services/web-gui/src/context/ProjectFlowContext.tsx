@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { useMatch } from "react-router-dom";
-import { getBeats, getProject, getResearch, getScript, getStory } from "../api/client";
+import { getBeats, getProject, getResearch, getScript, getScriptLock, getStory } from "../api/client";
 import { ProjectDraftContext } from "./ProjectDraftContext";
 import type { Project } from "../types";
 import { FLOW_STORY, isAuthoringEditable } from "../utils/flow";
@@ -37,6 +37,8 @@ export interface ProjectFlow {
   beatsApproved: boolean;
   /** The dialogue of every beat is approved. Only read once the beats are approved; false before that. */
   scriptApproved: boolean;
+  /** A version of the script is locked. Only read once the script is approved; false before that. */
+  scriptLocked: boolean;
   /**
    * The server has answered for this project at least once, so a null
    * `project` means "not on the server yet" rather than "still asking".
@@ -46,7 +48,7 @@ export interface ProjectFlow {
 }
 
 const noFlow: ProjectFlow = {
-  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, loaded: true,
+  project: null, projectId: "", status: undefined, flowStep: 0, runState: undefined, editable: true, researchResolved: false, storyApproved: false, beatsApproved: false, scriptApproved: false, scriptLocked: false, loaded: true,
   refetch: () => {},
 };
 
@@ -61,6 +63,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
   const [storyApproved, setStoryApproved] = useState(false);
   const [beatsApproved, setBeatsApproved] = useState(false);
   const [scriptApproved, setScriptApproved] = useState(false);
+  const [scriptLocked, setScriptLocked] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
@@ -75,11 +78,13 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
         const storyDone = resolved ? await getStory(projectId).then((s) => s.status === "approved", () => false) : false;
         const beatsDone = storyDone ? await getBeats(projectId).then((b) => b.status === "approved", () => false) : false;
         const scriptDone = beatsDone ? await getScript(projectId).then((c) => c.status === "approved", () => false) : false;
+        const lockedDone = scriptDone ? await getScriptLock(projectId).then((l) => l.lockedVersion > 0, () => false) : false;
         setProject(p);
         setResearchResolved(resolved);
         setStoryApproved(storyDone);
         setBeatsApproved(beatsDone);
         setScriptApproved(scriptDone);
+        setScriptLocked(lockedDone);
       })
       .catch(() => setProject(null)) // no such project on the server yet
       .finally(() => setLoaded(true));
@@ -91,6 +96,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     setStoryApproved(false);
     setBeatsApproved(false);
     setScriptApproved(false);
+    setScriptLocked(false);
     setLoaded(!projectId);
     load();
     if (!projectId) return;
@@ -109,6 +115,7 @@ export function ProjectFlowProvider({ children }: { children: ReactNode }) {
     storyApproved,
     beatsApproved,
     scriptApproved,
+    scriptLocked,
     loaded,
     refetch: load,
   };

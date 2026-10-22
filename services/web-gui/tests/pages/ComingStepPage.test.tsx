@@ -40,26 +40,26 @@ describe("ComingStepPage", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("says the step is not developed, what it is for, and where it sits in the flow", async () => {
-    renderAt("/projects/p1/coming/7", draft);
+    renderAt("/projects/p1/coming/8", draft);
     expect(await screen.findByTestId("coming-step-page")).toBeInTheDocument();
     expect(screen.getByTestId("coming-step-notice")).toHaveTextContent("Bước này chưa phát triển");
-    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rà soát và chốt kịch bản");
-    expect(screen.getByTestId("step-role")).toHaveTextContent(/Rà soát, ghi chú bàn giao, chốt phiên bản/);
-    await waitFor(() => expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Nội dung · Bước 7/21"));
-    expect(screen.getByTestId("rail-step-7")).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Thiết kế mỹ thuật · lượt 1");
+    expect(screen.getByTestId("step-role")).toHaveTextContent(/Diễn viên và phim trường dùng chung cả video/);
+    await waitFor(() => expect(screen.getByTestId("phase-line")).toHaveTextContent("Tiền kỳ · Hình ảnh · Bước 8/21"));
+    expect(screen.getByTestId("rail-step-8")).toHaveAttribute("aria-current", "step");
   });
 
   it("names the step before it", async () => {
-    renderAt("/projects/p1/coming/7", draft);
-    expect(await screen.findByTestId("coming-step-back")).toHaveTextContent("Bước trước: Viết kịch bản");
+    renderAt("/projects/p1/coming/8", draft);
+    expect(await screen.findByTestId("coming-step-back")).toHaveTextContent("Bước trước: Rà soát và chốt");
   });
 
   it("offers another not-developed step as the step before, when that is what precedes it", async () => {
-    renderAt("/projects/p1/coming/8", draft);
-    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Thiết kế mỹ thuật · lượt 1");
+    renderAt("/projects/p1/coming/11", draft);
+    expect(await screen.findByRole("heading", { level: 1 })).toHaveTextContent("Giọng sơ bộ");
     fireEvent.click(screen.getByTestId("coming-step-back"));
-    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rà soát và chốt kịch bản"));
-    expect(screen.getByTestId("phase-line")).toHaveTextContent("Bước 7/21");
+    await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Thiết kế mỹ thuật · lượt 2"));
+    expect(screen.getByTestId("phase-line")).toHaveTextContent("Bước 10/21");
   });
 
   it("works before a video exists", async () => {
@@ -77,6 +77,8 @@ describe("ComingStepPage", () => {
   it("opens the real screen of a step the app has", async () => {
     renderAt("/projects/p1/coming/3", draft);
     await waitFor(() => expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/research"));
+    renderAt("/projects/p1/coming/7", draft);
+    await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/lock")).toBe(true));
     renderAt("/projects/p1/coming/4", draft);
     await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/story")).toBe(true));
     renderAt("/projects/p1/coming/9", draft);

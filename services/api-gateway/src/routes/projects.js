@@ -176,6 +176,18 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/script/generate', proxyHandler(authoringAi, 'authoring-service'));
   router.post('/v1/projects/:id/script/suggest', proxyHandler(authoringAi, 'authoring-service'));
   router.post('/v1/projects/:id/script/speak', proxyHandler(authoring, 'authoring-service'));
+  // Bước Rà soát và chốt: ghi chú bàn giao từng beat đi qua /units/handoff_beat/*; ở đây
+  // là cả màn, lượt AI rà soát và viết ghi chú bàn giao, xử lý từng mục, thuật ngữ và chốt.
+  router.get('/v1/projects/:id/script-lock', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/review', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/findings/:finding/apply', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/findings/:finding/handoff', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/findings/:finding/accept', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/notes', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/glossary', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/handoff/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/handoff/:key/confirm', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/script-lock/lock', proxyHandler(authoring, 'authoring-service'));
   // File giọng của từng câu, do tts ghi vào /shared/{project}/audio. Tên file gồm
   // mã câu và khoá nội dung nên không bao giờ đổi; chỉ tên đúng mẫu mới được phát.
   router.get('/v1/projects/:id/audio/:file', (req, res, next) => {

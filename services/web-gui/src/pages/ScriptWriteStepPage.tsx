@@ -1,5 +1,5 @@
-import { useContext } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
+import { useContext, useEffect } from "react";
+import { Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type { ScriptState } from "../api/client";
 import { AiModelSelect } from "../components/AiModelSelect";
 import { AppShell } from "../components/AppShell";
@@ -13,7 +13,7 @@ import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useScript, type ScriptControls } from "../hooks/useScript";
-import { VIEW_SCRIPT, beatsRoute, comingRoute, readOnlyReason } from "../utils/flow";
+import { VIEW_SCRIPT, beatsRoute, lockRoute, readOnlyReason } from "../utils/flow";
 
 const SUBTITLE =
   "Lời thoại chia theo beat. Nghe thử từng câu bằng giọng đã chọn; máy chỉ ra câu dài, câu khó nghe và chỗ nối chưa mượt.";
@@ -54,6 +54,12 @@ export function ScriptWriteStepPage() {
   const llm = useLlmStatus();
   const projectId = params.id ?? draft.projectId;
   const script = useScript(projectId, !!projectId);
+  // A line opened from another screen (the lock step's "Mở câu đó") is marked and brought into view.
+  const highlight = useSearchParams()[0].get("line");
+  const loaded = script.state !== null;
+  useEffect(() => {
+    if (highlight && loaded) document.getElementById(`ln-${highlight}`)?.scrollIntoView({ block: "center" });
+  }, [highlight, loaded]);
 
   if (!projectId) return <Navigate to="/" replace />;
 
@@ -109,7 +115,7 @@ export function ScriptWriteStepPage() {
           </>
         )}
         {s.beatsApproved &&
-          s.beats.map((beat) => <ScriptBeatCard key={beat.key} projectId={projectId} beat={beat} script={script} aiAvailable={aiAvailable} locked={locked} />)}
+          s.beats.map((beat) => <ScriptBeatCard key={beat.key} projectId={projectId} beat={beat} script={script} aiAvailable={aiAvailable} locked={locked} highlight={highlight} />)}
         {script.actionError && (
           <p className={researchStyles.error} role="alert" data-testid="script-error">
             {script.actionError}
@@ -151,7 +157,7 @@ export function ScriptWriteStepPage() {
         allowWhenLocked
         hint={state?.status === "approved" ? "Kịch bản đã duyệt. Sang bước Rà soát và chốt." : "Duyệt lời thoại của mọi beat để sang bước Rà soát và chốt."}
         onBack={() => navigate(beatsRoute(projectId))}
-        onNext={() => navigate(comingRoute(VIEW_SCRIPT + 1, projectId))}
+        onNext={() => navigate(lockRoute(projectId))}
         nextDisabled={state?.status !== "approved"}
         nextLabel="Lưu và sang rà soát và chốt"
         nextTestId="script-next"

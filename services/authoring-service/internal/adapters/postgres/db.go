@@ -327,6 +327,16 @@ CREATE TABLE IF NOT EXISTS voice_lines (
     requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (project_id, line_id)
 );
+-- A locked version of the script: an immutable snapshot of the parts the steps
+-- after the script read, each with its hash.
+CREATE TABLE IF NOT EXISTS script_versions (
+    project_id TEXT NOT NULL,
+    version    INTEGER NOT NULL,
+    note       TEXT NOT NULL DEFAULT '',
+    locked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    parts      JSONB NOT NULL,
+    PRIMARY KEY (project_id, version)
+);
 -- One row per answer the Creator pasted into the research step, numbered per
 -- project. Holds what was read from it, never the pasted text itself.
 CREATE TABLE IF NOT EXISTS research_pastes (

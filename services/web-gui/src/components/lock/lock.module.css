@@ -1,0 +1,235 @@
+/* The lock step: tabs, findings, handoff sections and the package. Tokens come from theme.css. */
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tab {
+  font: 600 13.5px var(--font-display, inherit);
+  padding: 7px 13px;
+  border: var(--bw, 2px) solid var(--line);
+  border-radius: var(--radius, 4px);
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+.tab[aria-selected="true"] {
+  background: var(--accent);
+  color: var(--accent-ink, var(--ink));
+}
+.tabCount {
+  margin-left: 6px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+
+.findings {
+  display: grid;
+  gap: 0;
+}
+.finding {
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 6px 14px;
+  padding: 10px 0;
+  border-bottom: 1.5px solid var(--muted);
+}
+.finding:last-child {
+  border-bottom: 0;
+}
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.findingTitle {
+  font-weight: 700;
+}
+.detail {
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+.quote {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  border-left: 3px solid var(--line);
+  padding-left: 8px;
+}
+.findingActions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+@media (max-width: 760px) {
+  .finding {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .findingActions {
+    grid-column: 1;
+  }
+}
+
+.chipOk,
+.chipOpen,
+.chipInfo {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border: 1.5px solid var(--line);
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.chipOk {
+  background: var(--ok-soft);
+}
+.chipOpen {
+  background: var(--warn-soft);
+}
+.chipInfo {
+  background: var(--muted);
+  color: var(--ink-faint);
+}
+
+.notes {
+  display: grid;
+  gap: 6px;
+}
+.noteLine {
+  padding: 8px 10px;
+  background: var(--muted);
+  border-radius: var(--radius, 4px);
+  font-size: 13.5px;
+}
+
+.sections {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+@media (max-width: 760px) {
+  .sections {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.section {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+}
+.section ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+}
+.roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+.role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background: var(--card);
+  color: var(--ink-soft);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 7px 8px;
+  border-bottom: 1.5px solid var(--muted);
+  vertical-align: top;
+}
+.table th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+  border-bottom: var(--bw, 2px) solid var(--line);
+}
+.scroll {
+  overflow-x: auto;
+}
+
+.chain {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  font-size: 13.5px;
+}
+.chainNext {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+.cond {
+  display: grid;
+  gap: 4px;
+}
+.condOk,
+.condWarn {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+}
+.condOk {
+  color: var(--ok);
+}
+.condWarn {
+  color: var(--warn);
+}
+.draft {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: var(--bw, 2px) solid var(--line);
+  border-radius: var(--radius, 4px);
+  background: var(--info-soft);
+  font-size: 13px;
+}
+.draft ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.grid2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+@media (max-width: 760px) {
+  .grid2 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
