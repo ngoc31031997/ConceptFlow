@@ -59,6 +59,8 @@ func (f *fakeChannelAssets) Preview(_ context.Context) ([]domain.ChannelAssetPoi
 }
 
 type fakeProjectReader struct {
+	ideaSubject  string
+	ideaLanguage domain.ContentLanguage
 	project      *domain.Project
 	err          error
 	listOut      []domain.ProjectSummary
@@ -528,6 +530,13 @@ func (f *fakeProjectReader) GetStatus(_ context.Context, _ string) (domain.Proje
 	return "", domain.ErrProjectNotFound
 }
 
+func (f *fakeProjectReader) GetIdeaInput(_ context.Context, _ string) (string, domain.ContentLanguage, error) {
+	if f.project == nil {
+		return "", "", domain.ErrProjectNotFound
+	}
+	return f.ideaSubject, f.ideaLanguage, nil
+}
+
 func (f *fakeProjectReader) GetVideoFormat(_ context.Context, id string, _ int) (domain.VideoFormat, error) {
 	return domain.VideoFormat{ID: id}, nil
 }
@@ -620,5 +629,31 @@ func TestInternalDraftVoiceDispatchesTheProjectsLines(t *testing.T) {
 	(&Router{}).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/internal/v1/projects/p1/draft-voice", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("not wired: status %d, want 404", rec.Code)
+	}
+}
+
+func TestInternalIdeaInput_ReturnsSubjectAndLanguage(t *testing.T) {
+	reader := &fakeProjectReader{project: &domain.Project{ProjectID: "p1"}, ideaSubject: "Rơi vào hố đen thì sao?", ideaLanguage: domain.LanguageVietnamese}
+	router := NewRouter(nil, nil, nil, reader, nil, nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/internal/v1/projects/p1/idea-input", nil))
+	if rec.Code != 200 {
+		t.Fatalf("status = %d, want 200: %s", rec.Code, rec.Body.String())
+	}
+	var got map[string]string
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatal(err)
+	}
+	if got["subject"] != "Rơi vào hố đen thì sao?" || got["language"] != "vi" {
+		t.Fatalf("body = %v", got)
+	}
+}
+
+func TestInternalIdeaInput_UnknownProjectIs404(t *testing.T) {
+	router := NewRouter(nil, nil, nil, &fakeProjectReader{}, nil, nil)
+	rec := httptest.NewRecorder()
+	router.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/internal/v1/projects/nope/idea-input", nil))
+	if rec.Code != 404 {
+		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }

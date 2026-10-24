@@ -15,13 +15,15 @@ import (
 type fakeDraftRepo struct {
 	saved   map[string]*domain.Project
 	topics  map[string]string
+	subject map[string]string
 	saveErr error
 }
 
 func newFakeDraftRepo() *fakeDraftRepo {
 	return &fakeDraftRepo{
-		saved:  map[string]*domain.Project{},
-		topics: map[string]string{},
+		saved:   map[string]*domain.Project{},
+		topics:  map[string]string{},
+		subject: map[string]string{},
 	}
 }
 
@@ -52,6 +54,11 @@ func (f *fakeDraftRepo) GetStatusAndLanguage(_ context.Context, projectID string
 
 func (f *fakeDraftRepo) SaveAuthoringTopic(_ context.Context, projectID, topic string, _ domain.ContentLanguage) error {
 	f.topics[projectID] = topic
+	return nil
+}
+
+func (f *fakeDraftRepo) SaveIdeaInput(_ context.Context, projectID, subject string, _ domain.ContentLanguage) error {
+	f.subject[projectID] = subject
 	return nil
 }
 
@@ -117,5 +124,19 @@ func TestCreateProjectDraft_AShortOfAnUnknownVideoIsRefused(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("a short of a project that does not exist must be refused")
+	}
+}
+
+func TestCreateProjectDraft_KeepsTheTextAndLanguageOnTheProject(t *testing.T) {
+	repo := newFakeDraftRepo()
+	uc := application.NewCreateProjectDraftUseCase(repo)
+	out, err := uc.Execute(context.Background(), application.CreateProjectDraftInput{
+		Topic: "  Chuyện gì xảy ra nếu ta rơi vào hố đen?  ", ContentLanguage: domain.LanguageVietnamese,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := repo.subject[out.ProjectID]; got != "Chuyện gì xảy ra nếu ta rơi vào hố đen?" {
+		t.Fatalf("subject = %q", got)
 	}
 }

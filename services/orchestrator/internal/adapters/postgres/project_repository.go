@@ -811,6 +811,34 @@ func (r *ProjectRepository) GetStatusAndLanguage(ctx context.Context, projectID 
 	return domain.ProjectStatus(status), domain.ContentLanguage(language), nil
 }
 
+// SaveIdeaInput stores what the Creator typed on the idea step and the content
+// language of the video.
+func (r *ProjectRepository) SaveIdeaInput(ctx context.Context, projectID, subject string, language domain.ContentLanguage) error {
+	tag, err := r.pool.Exec(ctx, `UPDATE projects SET subject = $2, language = $3, updated_at = now() WHERE project_id = $1`,
+		projectID, subject, string(language))
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return domain.ErrProjectNotFound
+	}
+	return nil
+}
+
+// GetIdeaInput returns what SaveIdeaInput stored; both are empty for a project
+// that never had an idea typed.
+func (r *ProjectRepository) GetIdeaInput(ctx context.Context, projectID string) (string, domain.ContentLanguage, error) {
+	var subject, language string
+	err := r.pool.QueryRow(ctx, `SELECT subject, language FROM projects WHERE project_id = $1`, projectID).Scan(&subject, &language)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", "", domain.ErrProjectNotFound
+	}
+	if err != nil {
+		return "", "", err
+	}
+	return subject, domain.ContentLanguage(language), nil
+}
+
 // GetStatuses returns the current status of each project id that exists, so the
 // topic-collision list can show them (authoring-service does not know statuses).
 func (r *ProjectRepository) GetStatuses(ctx context.Context, projectIDs []string) (map[string]domain.ProjectStatus, error) {

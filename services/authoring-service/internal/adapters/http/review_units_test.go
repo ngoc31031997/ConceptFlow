@@ -198,44 +198,102 @@ func TestStepDefaultModelSettingRoundTripsAndFeedsTheLLMStatus(t *testing.T) {
 	}
 }
 
-// fakeIdea is the idea step's use case with a fixed answer.
+// fakeIdea is the first step's use case with a fixed answer.
 type fakeIdea struct {
-	state application.IdeaState
-	err   error
+	state   application.ProjectIdeaState
+	idea    domain.StoredIdea
+	review  domain.IdeaReview
+	err     error
+	patched application.IdeaPatch
 }
 
-func (f *fakeIdea) State(context.Context, string) (application.IdeaState, error) {
+func (f *fakeIdea) State(context.Context, string) (application.ProjectIdeaState, error) {
 	return f.state, f.err
 }
-func (f *fakeIdea) Generate(context.Context, string, string) (domain.ReviewUnit, error) {
-	return domain.ReviewUnit{Kind: domain.UnitKindIdea}, f.err
+func (f *fakeIdea) Generate(context.Context, string, string) (domain.StoredIdea, error) {
+	return f.idea, f.err
+}
+func (f *fakeIdea) Edit(_ context.Context, _ string, p application.IdeaPatch) (domain.StoredIdea, error) {
+	f.patched = p
+	return f.idea, f.err
+}
+func (f *fakeIdea) Approve(context.Context, string) (domain.StoredIdea, error) { return f.idea, f.err }
+func (f *fakeIdea) Unapprove(context.Context, string) (domain.StoredIdea, error) {
+	return f.idea, f.err
+}
+func (f *fakeIdea) Review(context.Context, string) (domain.IdeaReview, error) {
+	return f.review, f.err
 }
 
-func serveIdea(idea *fakeIdea, method, path string) *httptest.ResponseRecorder {
+func serveIdea(idea *fakeIdea, method, path, body string) *httptest.ResponseRecorder {
 	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithIdea(idea)
 	rec := httptest.NewRecorder()
-	rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
 	return rec
 }
 
 func TestIdeaRoutes(t *testing.T) {
-	unit := domain.ReviewUnit{Kind: domain.UnitKindIdea, Key: domain.IdeaUnitKey, Status: domain.UnitApproved}
-	rec := serveIdea(&fakeIdea{state: application.IdeaState{Unit: &unit}}, "GET", "/v1/projects/p1/idea")
+	stored := domain.StoredIdea{
+		Idea:   domain.ProjectIdea{CentralQuestion: "Rơi vào thì sao?", CuriosityPoints: []string{"a"}, Scope: "s"},
+		Status: domain.IdeaApproved,
+	}
+	state := application.ProjectIdeaState{Idea: &stored, Subject: "Rơi vào hố đen?", Language: domain.LanguageVietnamese, InputChanged: true}
+	rec := serveIdea(&fakeIdea{state: state}, "GET", "/v1/projects/p1/idea", "")
 	var body ideaStateResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if rec.Code != http.StatusOK || body.Unit == nil || body.Unit.Status != domain.UnitApproved {
+	if rec.Code != http.StatusOK || body.Idea == nil || body.Idea.Status != "approved" || body.Idea.CuriosityPoints[0] != "a" ||
+		body.Subject != "Rơi vào hố đen?" || body.Language != "vi" || !body.InputChanged || body.Review != nil {
 		t.Errorf("idea state: status %d body %s", rec.Code, rec.Body.String())
 	}
-	if rec := serveIdea(&fakeIdea{}, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusOK {
+	if rec := serveIdea(&fakeIdea{}, "GET", "/v1/projects/p1/idea", ""); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"idea":null`) {
+		t.Errorf("no idea yet: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveIdea(&fakeIdea{idea: stored}, "POST", "/v1/projects/p1/idea/generate", ""); rec.Code != http.StatusOK {
 		t.Errorf("generate: status %d", rec.Code)
 	}
-	unusable := &fakeIdea{err: fmt.Errorf("%w: thiếu ô", domain.ErrIdeaReplyUnusable)}
-	if rec := serveIdea(unusable, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusBadGateway {
+	unusable := &fakeIdea{err: fmt.Errorf("%w: thiếu ô", domain.ErrProjectIdeaReplyUnusable)}
+	if rec := serveIdea(unusable, "POST", "/v1/projects/p1/idea/generate", ""); rec.Code != http.StatusBadGateway {
 		t.Errorf("an unusable reply: status %d, want 502", rec.Code)
 	}
-	if rec := serveIdea(&fakeIdea{err: application.ErrLLMNotConfigured}, "POST", "/v1/projects/p1/idea/generate"); rec.Code != http.StatusServiceUnavailable {
+	if rec := serveIdea(&fakeIdea{err: application.ErrLLMNotConfigured}, "POST", "/v1/projects/p1/idea/generate", ""); rec.Code != http.StatusServiceUnavailable {
 		t.Errorf("no model: status %d, want 503", rec.Code)
+	}
+	if rec := serveIdea(&fakeIdea{err: domain.ErrInvalidStatus}, "POST", "/v1/projects/p1/idea/generate", ""); rec.Code != http.StatusConflict {
+		t.Errorf("a locked project: status %d, want 409", rec.Code)
+	}
+}
+
+func TestIdeaEditApproveReviewRoutes(t *testing.T) {
+	stored := domain.StoredIdea{Idea: domain.ProjectIdea{CentralQuestion: "q?"}, Status: domain.IdeaPending}
+	f := &fakeIdea{idea: stored}
+	rec := serveIdea(f, "PUT", "/v1/projects/p1/idea", `{"scope":"Phạm vi mới","curiosity_points":["a","b"]}`)
+	if rec.Code != http.StatusOK || f.patched.Scope == nil || *f.patched.Scope != "Phạm vi mới" ||
+		f.patched.CuriosityPoints == nil || len(*f.patched.CuriosityPoints) != 2 || f.patched.CentralQuestion != nil {
+		t.Errorf("edit: status %d patch %+v", rec.Code, f.patched)
+	}
+	if rec := serveIdea(f, "PUT", "/v1/projects/p1/idea", `{bad`); rec.Code != http.StatusBadRequest {
+		t.Errorf("a bad body: status %d, want 400", rec.Code)
+	}
+	if rec := serveIdea(f, "POST", "/v1/projects/p1/idea/approve", ""); rec.Code != http.StatusOK {
+		t.Errorf("approve: status %d", rec.Code)
+	}
+	if rec := serveIdea(f, "POST", "/v1/projects/p1/idea/unapprove", ""); rec.Code != http.StatusOK {
+		t.Errorf("unapprove: status %d", rec.Code)
+	}
+	if rec := serveIdea(&fakeIdea{err: domain.ErrIdeaNotFound}, "POST", "/v1/projects/p1/idea/approve", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("approving nothing: status %d, want 404", rec.Code)
+	}
+	if rec := serveIdea(&fakeIdea{err: fmt.Errorf("%w: Phạm vi", domain.ErrProjectIdeaInvalid)}, "POST", "/v1/projects/p1/idea/approve", ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("approving an incomplete idea: status %d, want 400", rec.Code)
+	}
+	review := domain.IdeaReview{Clarity: domain.IdeaAspect{Rating: domain.RatingGood, Comment: "Rõ."}}
+	rec = serveIdea(&fakeIdea{review: review}, "POST", "/v1/projects/p1/idea/review", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"clarity"`) {
+		t.Errorf("review: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveIdea(&fakeIdea{err: fmt.Errorf("%w: x", domain.ErrIdeaReviewReplyUnusable)}, "POST", "/v1/projects/p1/idea/review", ""); rec.Code != http.StatusBadGateway {
+		t.Errorf("an unusable review: status %d, want 502", rec.Code)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -33,10 +34,15 @@ type creativeBriefUseCase interface {
 	Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error)
 }
 
-// ideaUseCase is the idea step: the unit the AI writes from the topic.
+// ideaUseCase is the first step: the idea the AI writes from the Creator's text,
+// the Creator's edits and approval, and the AI's review of it.
 type ideaUseCase interface {
-	State(ctx context.Context, projectID string) (application.IdeaState, error)
-	Generate(ctx context.Context, projectID, note string) (domain.ReviewUnit, error)
+	State(ctx context.Context, projectID string) (application.ProjectIdeaState, error)
+	Generate(ctx context.Context, projectID, note string) (domain.StoredIdea, error)
+	Edit(ctx context.Context, projectID string, patch application.IdeaPatch) (domain.StoredIdea, error)
+	Approve(ctx context.Context, projectID string) (domain.StoredIdea, error)
+	Unapprove(ctx context.Context, projectID string) (domain.StoredIdea, error)
+	Review(ctx context.Context, projectID string) (domain.IdeaReview, error)
 }
 
 // defaultModelUseCase is the app setting for the default AI model of each step.
@@ -127,6 +133,10 @@ func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Put("/v1/settings/ai-model/steps/{step}", rt.handlePutAIModelStep)
 	r.Get("/v1/projects/{project_id}/idea", rt.handleGetIdea)
 	r.Post("/v1/projects/{project_id}/idea/generate", rt.handleGenerateIdea)
+	r.Put("/v1/projects/{project_id}/idea", rt.handleEditIdea)
+	r.Post("/v1/projects/{project_id}/idea/approve", rt.handleApproveIdea)
+	r.Post("/v1/projects/{project_id}/idea/unapprove", rt.handleUnapproveIdea)
+	r.Post("/v1/projects/{project_id}/idea/review", rt.handleReviewIdea)
 	r.Get("/v1/projects/{project_id}/brief", rt.handleGetBrief)
 	r.Put("/v1/projects/{project_id}/brief/target-duration", rt.handleSetTargetDuration)
 	r.Put("/v1/projects/{project_id}/brief/platform", rt.handleSetPlatform)
@@ -139,9 +149,40 @@ func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Get("/v1/projects/{project_id}/units/{kind}/{key}/impact", rt.handleUnitImpact)
 }
 
-// ideaStateResponse is GET /v1/projects/{id}/idea.
+// ideaDTO is an idea as the screen reads it.
+type ideaDTO struct {
+	CentralQuestion string     `json:"central_question"`
+	CuriosityPoints []string   `json:"curiosity_points"`
+	Scope           string     `json:"scope"`
+	CreatorFields   []string   `json:"creator_fields"`
+	Status          string     `json:"status"`
+	RedoCount       int        `json:"redo_count"`
+	ApprovedAt      *time.Time `json:"approved_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
+}
+
+func toIdeaDTO(s domain.StoredIdea) ideaDTO {
+	idea := s.Idea.Normalized()
+	creator := s.CreatorFields
+	if creator == nil {
+		creator = []string{}
+	}
+	return ideaDTO{
+		CentralQuestion: idea.CentralQuestion, CuriosityPoints: idea.CuriosityPoints,
+		Scope: idea.Scope, CreatorFields: creator, Status: string(s.Status), RedoCount: s.RedoCount,
+		ApprovedAt: s.ApprovedAt, UpdatedAt: s.UpdatedAt,
+	}
+}
+
+// ideaStateResponse is GET /v1/projects/{id}/idea. A review exists only after
+// the AI read the idea; review_stale says the idea changed after that.
 type ideaStateResponse struct {
-	Unit *domain.ReviewUnit `json:"unit"`
+	Idea         *ideaDTO           `json:"idea"`
+	Subject      string             `json:"subject"`
+	Language     string             `json:"language"`
+	InputChanged bool               `json:"input_changed"`
+	Review       *domain.IdeaReview `json:"review"`
+	ReviewStale  bool               `json:"review_stale"`
 }
 
 func (rt *Router) handleGetIdea(w http.ResponseWriter, r *http.Request) {
@@ -154,7 +195,15 @@ func (rt *Router) handleGetIdea(w http.ResponseWriter, r *http.Request) {
 		writeUnitError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, ideaStateResponse{Unit: state.Unit})
+	resp := ideaStateResponse{
+		Subject: state.Subject, Language: string(state.Language), InputChanged: state.InputChanged,
+		Review: state.Review, ReviewStale: state.ReviewStale,
+	}
+	if state.Idea != nil {
+		dto := toIdeaDTO(*state.Idea)
+		resp.Idea = &dto
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (rt *Router) handleGenerateIdea(w http.ResponseWriter, r *http.Request) {
@@ -167,14 +216,82 @@ func (rt *Router) handleGenerateIdea(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	ctx, finish := rt.trackOperation(r, domain.UnitKindIdea)
-	unit, err := rt.idea.Generate(ctx, chi.URLParam(r, "project_id"), note)
+	ctx, finish := rt.trackOperation(r, "idea")
+	idea, err := rt.idea.Generate(ctx, chi.URLParam(r, "project_id"), note)
 	finish(err)
 	if err != nil {
 		writeUnitRunError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, unit)
+	writeJSON(w, http.StatusOK, toIdeaDTO(idea))
+}
+
+// editIdeaRequest is PUT /v1/projects/{id}/idea; an absent field is left alone.
+type editIdeaRequest struct {
+	CentralQuestion *string   `json:"central_question"`
+	CuriosityPoints *[]string `json:"curiosity_points"`
+	Scope           *string   `json:"scope"`
+}
+
+func (rt *Router) handleEditIdea(w http.ResponseWriter, r *http.Request) {
+	if rt.idea == nil {
+		writeError(w, http.StatusNotFound, "idea is not enabled")
+		return
+	}
+	var req editIdeaRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	idea, err := rt.idea.Edit(r.Context(), chi.URLParam(r, "project_id"), application.IdeaPatch{
+		CentralQuestion: req.CentralQuestion,
+		CuriosityPoints: req.CuriosityPoints, Scope: req.Scope,
+	})
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toIdeaDTO(idea))
+}
+
+func (rt *Router) handleApproveIdea(w http.ResponseWriter, r *http.Request) {
+	rt.ideaStatusChange(w, r, func(ctx context.Context, id string) (domain.StoredIdea, error) {
+		return rt.idea.Approve(ctx, id)
+	})
+}
+
+func (rt *Router) handleUnapproveIdea(w http.ResponseWriter, r *http.Request) {
+	rt.ideaStatusChange(w, r, func(ctx context.Context, id string) (domain.StoredIdea, error) {
+		return rt.idea.Unapprove(ctx, id)
+	})
+}
+
+func (rt *Router) ideaStatusChange(w http.ResponseWriter, r *http.Request, change func(context.Context, string) (domain.StoredIdea, error)) {
+	if rt.idea == nil {
+		writeError(w, http.StatusNotFound, "idea is not enabled")
+		return
+	}
+	idea, err := change(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toIdeaDTO(idea))
+}
+
+func (rt *Router) handleReviewIdea(w http.ResponseWriter, r *http.Request) {
+	if rt.idea == nil {
+		writeError(w, http.StatusNotFound, "idea is not enabled")
+		return
+	}
+	ctx, finish := rt.trackOperation(r, "idea_review")
+	review, err := rt.idea.Review(ctx, chi.URLParam(r, "project_id"))
+	finish(err)
+	if err != nil {
+		writeUnitRunError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, review)
 }
 
 // briefStateResponse is GET /v1/projects/{id}/brief.
@@ -385,16 +502,16 @@ func (rt *Router) handleUnitImpact(w http.ResponseWriter, r *http.Request) {
 // the error's own text, which names what was wrong.
 func writeUnitError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound),
+	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound), errors.Is(err, domain.ErrIdeaNotFound),
 		errors.Is(err, application.ErrFindingNotFound), errors.Is(err, domain.ErrNoLockedVersion):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, application.ErrIdeaIncomplete), errors.Is(err, domain.ErrInvalidWizardInput),
+	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, application.ErrIdeaIncomplete), errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty),
 		errors.Is(err, application.ErrStoryIncomplete), errors.Is(err, application.ErrStoryNothingToWrite),
 		errors.Is(err, application.ErrBeatNoGoal), errors.Is(err, application.ErrBeatSheetFull),
 		errors.Is(err, application.ErrScriptBeatEmpty), errors.Is(err, application.ErrScriptBeatHasLines), errors.Is(err, application.ErrScriptLineNotFlagged),
 		errors.Is(err, domain.ErrHandoffEmpty), errors.Is(err, application.ErrHandoffExists), errors.Is(err, application.ErrFindingNotApplicable):
-		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput))
+		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput, domain.ErrProjectIdeaInvalid))
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, reasonOf(err, domain.ErrInvalidStatus))
 	default:
@@ -421,10 +538,10 @@ func reasonOf(err error, sentinels ...error) string {
 func writeUnitRunError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind),
-		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput),
-		errors.Is(err, domain.ErrInvalidStatus):
+		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput), errors.Is(err, domain.ErrIdeaNotFound),
+		errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrInvalidStatus):
 		writeUnitError(w, err)
-	case errors.Is(err, domain.ErrIdeaReplyUnusable), errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
+	case errors.Is(err, domain.ErrIdeaReplyUnusable), errors.Is(err, domain.ErrProjectIdeaReplyUnusable), errors.Is(err, domain.ErrIdeaReviewReplyUnusable), errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
 		errors.Is(err, domain.ErrReviewReplyUnusable), errors.Is(err, domain.ErrHandoffReplyUnusable):
 		writeError(w, http.StatusBadGateway, err.Error()+". Thử làm lại, hoặc tự điền các ô.")
 	case errors.Is(err, application.ErrLLMNotConfigured):

@@ -120,6 +120,11 @@ func main() {
 	idea := application.NewIdeaUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	// The first step's idea: written from the text the Creator typed, which the
+	// orchestrator keeps with the project.
+	projectIdea := application.NewProjectIdeaUseCase(
+		authoringRepo, projects, authoringRepo, projects, authoringRepo,
+		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
@@ -215,7 +220,7 @@ func main() {
 		WithUsageStats(llmUsageRepo).
 		WithGenerateAuthoring(generateAuthoring).
 		WithReviewUnits(reviewUnits).
-		WithIdea(idea).
+		WithIdea(projectIdea).
 		WithCreativeBrief(creativeBrief).
 		WithResearch(research).
 		WithStory(story).
