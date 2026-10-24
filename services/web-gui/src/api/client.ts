@@ -452,7 +452,6 @@ export type PromptRole =
   | "research_questions"
   | "research_prompt"
   // Câu chuyện: AI gợi ý góc tiếp cận và viết khung câu chuyện.
-  | "story_approaches"
   | "story_frame"
   | "beat_sheet"
   // Viết kịch bản: AI viết lời thoại từng beat và gợi ý sửa câu.
@@ -2652,175 +2651,143 @@ export async function unapproveResearch(projectId: string): Promise<void> {
   await unapproveUnit(projectId, RESEARCH_GATE_UNIT);
 }
 
-/** The six fields of the story frame, in the order the screen shows them. */
-export const STORY_FIELD_KEYS = ["question", "promise", "chain", "payoff", "logline", "summary"] as const;
+/** The fields of the story, in the order the screen shows them. */
+export const STORY_FIELD_KEYS = ["central_question", "core_answer", "narrative_arc"] as const;
 export type StoryFieldKey = (typeof STORY_FIELD_KEYS)[number];
 
-/** The story step's gate: approving it approves the whole story. */
-export const STORY_UNIT: UnitRef<unknown> = { kind: "story", key: "main", parse: (c) => c };
+/** The most beats the narrative arc may hold, and the fewest. */
+export const MAX_ARC_BEATS = 12;
+export const MIN_ARC_BEATS = 3;
 
-/** The unit one story field is saved and redone through. */
-export function storyFieldUnit(key: StoryFieldKey): UnitRef<unknown> {
-  return { kind: "story_field", key, parse: (c) => c };
-}
-
-/** One field of the story frame. `text` is what the Creator edits; a chain step or the payoff ends in "[F01, F02]" for the facts it rests on. */
-export interface StoryField {
-  key: StoryFieldKey;
-  label: string;
+/** One beat of the narrative arc: its role in the telling, what it says, and the research facts it rests on. */
+export interface ArcBeat {
+  beat: string;
   text: string;
   facts: string[];
-  /** The Creator wrote or edited it; an AI run keeps it. */
-  mine: boolean;
-  /** Written by the AI from a brief that has changed since. */
-  stale: boolean;
 }
 
-/** One way of telling the story the AI proposed. */
-export interface StoryApproach {
-  key: string;
-  code: string;
-  name: string;
-  angle: string;
-  why: string;
-  refs: string[];
-  open: string;
-  /** A kind of video that is not in the Kiểu video table yet. */
-  isNew: boolean;
-  /** The row of the Kiểu video table a new kind was saved as; "" until saved. */
-  archetypeId: string;
-  selected: boolean;
+/** The story the AI or the Creator wrote. */
+export interface Story {
+  centralQuestion: string;
+  coreAnswer: string;
+  narrativeArc: ArcBeat[];
+  /** The fields the Creator wrote or edited; an AI run keeps them. */
+  creatorFields: StoryFieldKey[];
+  status: UnitStatus;
+  updatedAt: string;
 }
 
-/** One kept fact as the story step lists it. */
+/** One kept research fact as the story step lists it. */
 export interface StoryFact {
   id: string;
   claimVi: string;
   type: FactType;
-  /** The script has to state it, so the story always uses it. */
+  /** The script has to state it. */
   must: boolean;
-  used: boolean;
-  /** The chain or the payoff rests on it. */
+  /** A beat of the arc rests on it. */
   cited: boolean;
   link: LinkState;
 }
 
 /** Everything the story screen shows. */
 export interface StoryState {
+  /** The story's status; "pending" while there is no story. */
   status: UnitStatus;
-  /** The approach the story follows; "" lets the AI choose. */
-  approachKey: string;
-  fields: StoryField[];
-  approaches: StoryApproach[];
+  /** null until the AI or the Creator wrote one. */
+  story: Story | null;
+  /** The kept research facts the AI reads. */
   facts: StoryFact[];
+  /** The approved brief the AI reads; null while the brief step is not approved. */
+  brief: ResearchBrief | null;
   briefApproved: boolean;
   researchResolved: boolean;
   researchSkipped: boolean;
+  /** The approved brief or the kept facts differ from the ones the story was written from. */
+  briefStale: boolean;
+  researchStale: boolean;
+}
+
+interface storyWire {
+  central_question: string;
+  core_answer: string;
+  narrative_arc: { beat: string; text: string; facts: string[] | null }[] | null;
+  creator_fields: StoryFieldKey[] | null;
+  status: UnitStatus;
+  updated_at: string;
 }
 
 interface storyStateWire {
-  status: UnitStatus;
-  approach_key: string;
-  fields: { key: StoryFieldKey; label: string; text: string; facts: string[] | null; mine: boolean; stale: boolean }[] | null;
-  approaches: storyApproachWire[] | null;
-  facts: { id: string; claim_vi: string; type: FactType; must: boolean; used: boolean; cited: boolean; link: LinkState }[] | null;
+  story: storyWire | null;
+  facts: { id: string; claim_vi: string; type: FactType; must: boolean; cited: boolean; link: LinkState }[] | null;
+  brief: {
+    audience: string;
+    duration_seconds: number;
+    tone: string;
+    learning_objectives: string[] | null;
+    avoid: string[] | null;
+  } | null;
   brief_approved: boolean;
   research_resolved: boolean;
   research_skipped: boolean;
+  brief_stale: boolean;
+  research_stale: boolean;
 }
 
-interface storyApproachWire {
-  key: string;
-  code: string;
-  name: string;
-  angle: string;
-  why: string;
-  refs: string[] | null;
-  open: string;
-  is_new: boolean;
-  archetype_id: string;
-  selected: boolean;
-}
-
-function fromWireApproach(w: storyApproachWire): StoryApproach {
+function fromWireStoryBody(w: storyWire): Story {
   return {
-    key: w.key,
-    code: w.code,
-    name: w.name,
-    angle: w.angle,
-    why: w.why,
-    refs: w.refs ?? [],
-    open: w.open,
-    isNew: w.is_new,
-    archetypeId: w.archetype_id,
-    selected: w.selected,
+    centralQuestion: w.central_question,
+    coreAnswer: w.core_answer,
+    narrativeArc: (w.narrative_arc ?? []).map((b) => ({ beat: b.beat, text: b.text, facts: b.facts ?? [] })),
+    creatorFields: w.creator_fields ?? [],
+    status: w.status,
+    updatedAt: w.updated_at,
   };
 }
 
 function fromWireStory(w: storyStateWire): StoryState {
   return {
-    status: w.status,
-    approachKey: w.approach_key,
-    fields: (w.fields ?? []).map((f) => ({ ...f, facts: f.facts ?? [] })),
-    approaches: (w.approaches ?? []).map(fromWireApproach),
+    status: w.story?.status ?? "pending",
+    story: w.story ? fromWireStoryBody(w.story) : null,
     facts: (w.facts ?? []).map((f) => ({
       id: f.id,
       claimVi: f.claim_vi,
       type: f.type,
       must: f.must,
-      used: f.used,
       cited: f.cited,
       link: f.link,
     })),
+    brief: w.brief
+      ? {
+          audience: w.brief.audience,
+          durationSeconds: w.brief.duration_seconds,
+          tone: w.brief.tone,
+          learningObjectives: w.brief.learning_objectives ?? [],
+          avoid: w.brief.avoid ?? [],
+        }
+      : null,
     briefApproved: w.brief_approved,
     researchResolved: w.research_resolved,
     researchSkipped: w.research_skipped,
+    briefStale: w.brief_stale,
+    researchStale: w.research_stale,
   };
 }
 
-/** Reads the story step: the six fields, the proposed approaches, the kept facts and what the step waits for. */
+/** Reads the story step: the story, the kept facts and brief the AI reads, and what the step waits for. */
 export async function getStory(projectId: string): Promise<StoryState> {
   return fromWireStory(await apiFetch<storyStateWire>(`/v1/projects/${projectId}/story`));
 }
 
 /**
- * Has the AI propose approaches to tell the story (a model call: pass an
- * operation id to follow it). The approach the Creator chose stays. 409 while
- * the brief or the research step is not done, 503 without a language model.
+ * Has the AI write the story from the approved brief and the kept facts,
+ * keeping the fields the Creator wrote (a model call: pass an operation id to
+ * follow it). The story goes to review. 409 while the brief or the research
+ * step is not done, 503 without a language model, 502 when the reply could
+ * not be read.
  */
-export async function generateStoryApproaches(projectId: string, note: string, operation?: OperationCall): Promise<StoryApproach[]> {
-  const res = await apiFetch<{ approaches: storyApproachWire[] | null }>(`/v1/projects/${projectId}/story/approaches/generate`, {
-    method: "POST",
-    headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
-    signal: operationInit(operation).signal,
-    body: JSON.stringify({ note }),
-  });
-  return (res.approaches ?? []).map(fromWireApproach);
-}
-
-/** Chooses the approach the story follows; "" lets the AI choose. */
-export async function selectStoryApproach(projectId: string, key: string): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/story/approach`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ key }),
-  });
-}
-
-/** Saves a new kind of video the AI proposed into the Kiểu video table. */
-export async function saveApproachAsArchetype(projectId: string, key: string): Promise<StoryApproach> {
-  return fromWireApproach(
-    await apiFetch<storyApproachWire>(`/v1/projects/${projectId}/story/approaches/${encodeURIComponent(key)}/archetype`, { method: "POST" }),
-  );
-}
-
-/**
- * Has the AI write the fields of the story the Creator has not written (a
- * model call: pass an operation id to follow it). The story goes to review.
- */
-export async function generateStory(projectId: string, note: string, operation?: OperationCall): Promise<StoryState> {
-  return fromWireStory(
-    await apiFetch<storyStateWire>(`/v1/projects/${projectId}/story/generate`, {
+export async function generateStory(projectId: string, note: string, operation?: OperationCall): Promise<Story> {
+  return fromWireStoryBody(
+    await apiFetch<storyWire>(`/v1/projects/${projectId}/story/generate`, {
       method: "POST",
       headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
       signal: operationInit(operation).signal,
@@ -2829,13 +2796,36 @@ export async function generateStory(projectId: string, note: string, operation?:
   );
 }
 
-/** Turns the use of one fact in the story on or off; 400 for a fact the script must state. */
-export async function setStoryFactUse(projectId: string, factId: string, use: boolean): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/story/facts/${encodeURIComponent(factId)}`, {
-    method: "PUT",
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ use }),
-  });
+/** A hand edit: only the fields given change. */
+export interface StoryPatch {
+  centralQuestion?: string;
+  coreAnswer?: string;
+  narrativeArc?: ArcBeat[];
+}
+
+/** Saves a hand edit. 400 for a beat citing a fact the table does not hold, or more beats than allowed. */
+export async function editStory(projectId: string, patch: StoryPatch): Promise<Story> {
+  const body: Record<string, unknown> = {};
+  if (patch.centralQuestion !== undefined) body.central_question = patch.centralQuestion;
+  if (patch.coreAnswer !== undefined) body.core_answer = patch.coreAnswer;
+  if (patch.narrativeArc !== undefined) body.narrative_arc = patch.narrativeArc;
+  return fromWireStoryBody(
+    await apiFetch<storyWire>(`/v1/projects/${projectId}/story`, {
+      method: "PUT",
+      headers: JSON_HEADERS,
+      body: JSON.stringify(body),
+    }),
+  );
+}
+
+/** Approves the story; 400 while a field is empty or the arc has fewer than three beats. */
+export async function approveStory(projectId: string): Promise<Story> {
+  return fromWireStoryBody(await apiFetch<storyWire>(`/v1/projects/${projectId}/story/approve`, { method: "POST" }));
+}
+
+/** Takes the approval back. */
+export async function unapproveStory(projectId: string): Promise<Story> {
+  return fromWireStoryBody(await apiFetch<storyWire>(`/v1/projects/${projectId}/story/unapprove`, { method: "POST" }));
 }
 
 /** The functions a beat can have, in the order a video usually runs them. */

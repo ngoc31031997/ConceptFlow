@@ -101,7 +101,7 @@ type ScriptState struct {
 // line. The dialogue of a beat is a review unit (domain.UnitKindScriptBeat)
 // keyed by the beat's key.
 type ScriptDeskUseCase struct {
-	units           StoryStorePort
+	units           StepUnitStorePort
 	projects        ProjectReaderPort
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
@@ -118,7 +118,7 @@ type ScriptDeskUseCase struct {
 // language model is configured: the Creator then writes the lines by hand.
 // voices and dispatcher may be nil, which turns listening off.
 func NewScriptDeskUseCase(
-	units StoryStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units StepUnitStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int, beats *BeatDeskUseCase,
 ) *ScriptDeskUseCase {
 	return &ScriptDeskUseCase{

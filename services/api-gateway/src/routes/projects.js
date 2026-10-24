@@ -165,15 +165,13 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/research/facts/:fid', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/research/verify', proxyHandler(authoring, 'authoring-service'));
   router.put('/v1/projects/:id/research/skip', proxyHandler(authoring, 'authoring-service'));
-  // Câu chuyện: góc tiếp cận, sáu ô của khung và dữ kiện dùng. Sửa/làm lại/duyệt
-  // từng ô đi qua /units/story_field/* và /units/story/main; chỉ hai lượt AI dưới
-  // đây gọi model nên dùng client timeout dài.
+  // Câu chuyện: một dòng project_story (câu hỏi trung tâm, câu trả lời cốt lõi, mạch kể).
+  // Chỉ lượt AI viết gọi model nên dùng client timeout dài.
   router.get('/v1/projects/:id/story', proxyHandler(authoring, 'authoring-service'));
-  router.post('/v1/projects/:id/story/approaches/generate', proxyHandler(authoringAi, 'authoring-service'));
-  router.put('/v1/projects/:id/story/approach', proxyHandler(authoring, 'authoring-service'));
-  router.post('/v1/projects/:id/story/approaches/:key/archetype', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/story/generate', proxyHandler(authoringAi, 'authoring-service'));
-  router.put('/v1/projects/:id/story/facts/:fid', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/story', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/story/approve', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/story/unapprove', proxyHandler(authoring, 'authoring-service'));
   // Bước Beat sheet: từng beat đi qua /units/beat/*; ở đây là bộ khung, cả bảng, thứ tự và các lượt AI.
   router.get('/v1/projects/:id/beats', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/beats/skeleton', proxyHandler(authoring, 'authoring-service'));

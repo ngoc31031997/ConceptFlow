@@ -431,6 +431,22 @@ CREATE TABLE IF NOT EXISTS project_research (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
     PRIMARY KEY (project_id, fact_id)
 );
+-- The story step's structure, one row per project, which the later steps read.
+-- narrative_arc is the ordered list of beats; creator_fields lists the fields
+-- the Creator wrote, which a redo keeps; brief_hash and research_hash identify
+-- the approved brief and the kept facts the story was written from.
+CREATE TABLE IF NOT EXISTS project_story (
+    project_id       TEXT PRIMARY KEY,
+    central_question TEXT NOT NULL DEFAULT '',
+    core_answer      TEXT NOT NULL DEFAULT '',
+    narrative_arc    JSONB NOT NULL DEFAULT '[]',
+    creator_fields   JSONB NOT NULL DEFAULT '[]',
+    brief_hash       TEXT NOT NULL DEFAULT '',
+    research_hash    TEXT NOT NULL DEFAULT '',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

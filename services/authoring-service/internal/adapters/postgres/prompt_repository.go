@@ -60,8 +60,9 @@ func (r *PromptTemplateRepository) PurgeLegacyPrompts(ctx context.Context) (int,
 // retiredPromptRoles are roles the prompt library once had and no longer
 // knows: "short_script" drafted a script for a vertical clip cut from a long
 // video, and the three Manim roles wrote and fixed scripts for a render engine
-// the pipeline no longer has (see ADR-0033).
-var retiredPromptRoles = []string{"short_script", "manim_engineer", "manim_engineer_ai", "manim_adjust"}
+// the pipeline no longer has (see ADR-0033). "story_approaches" proposed ways to
+// tell the story, a step the story step no longer has.
+var retiredPromptRoles = []string{"short_script", "manim_engineer", "manim_engineer_ai", "manim_adjust", "story_approaches"}
 
 // unshippedPromptRoles are roles that still exist but no longer ship a system
 // wording: a database seeded earlier keeps their system rows until the purge

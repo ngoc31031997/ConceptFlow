@@ -147,14 +147,15 @@ func main() {
 	} else if n > 0 {
 		logger.Warn("marked interrupted source checks as unreachable", "count", n)
 	}
-	// The story step: the six fields of the frame and its gate are review
-	// units; the research step asks it which work rests on a fact.
+	// The story step: written from the approved brief and the kept research
+	// facts and stored in project_story; the research step asks it which work
+	// rests on a fact.
 	story := application.NewStoryDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, archetypes, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
 	// The beat sheet step: each beat is a review unit; the gate only holds their order.
 	beats := application.NewBeatDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, story, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
 	// The script step: each beat's dialogue is a review unit; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.
@@ -168,8 +169,6 @@ func main() {
 	scriptLock := application.NewScriptLockDeskUseCase(
 		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
-		Register(domain.UnitKindStory, story.GateUnitKind()).
-		Register(domain.UnitKindStoryField, story.FieldUnitKind()).
 		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).

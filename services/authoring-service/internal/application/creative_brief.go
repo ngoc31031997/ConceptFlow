@@ -372,8 +372,8 @@ func (uc *CreativeBriefUseCase) Impact(ctx context.Context, projectID, key strin
 }
 
 // briefDownstream lists what a change to the brief sends back: the story
-// outline, when one was written, the story frame, and the research questions
-// the AI wrote from the brief.
+// outline, when one was written, and the research questions the AI wrote from
+// the brief.
 func briefDownstream(ctx context.Context, units ReviewUnitPort, store BriefStorePort, projectID string) ([]string, error) {
 	link, err := store.StoryBriefLink(ctx, projectID)
 	if err != nil {
@@ -382,13 +382,6 @@ func briefDownstream(ctx context.Context, units ReviewUnitPort, store BriefStore
 	items := []string{}
 	if link.HasStory {
 		items = append(items, "Dàn ý và lời thoại đã viết ở bước Viết kịch bản: cần viết lại theo brief mới")
-	}
-	stories, err := units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
-	if err != nil {
-		return nil, err
-	}
-	if len(stories) > 0 {
-		items = append(items, "Khung câu chuyện: cần xem lại theo brief mới")
 	}
 	questions, err := units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
 	if err != nil {

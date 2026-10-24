@@ -182,6 +182,17 @@ func (uc *ResearchDeskUseCase) gate(ctx context.Context, projectID string) (doma
 	return unit, gate, nil
 }
 
+// ResearchStanding reports whether the research step is resolved, that is
+// approved or skipped, and whether it was skipped; the steps after it open only
+// once it is resolved.
+func (uc *ResearchDeskUseCase) ResearchStanding(ctx context.Context, projectID string) (resolved, skipped bool, err error) {
+	unit, gate, err := uc.gate(ctx, projectID)
+	if err != nil {
+		return false, false, err
+	}
+	return unit.Status == domain.UnitApproved || gate.Skipped, gate.Skipped, nil
+}
+
 // saveGate stores the gate unit with its content.
 func (uc *ResearchDeskUseCase) saveGate(ctx context.Context, unit domain.ReviewUnit, gate domain.ResearchGate) (domain.ReviewUnit, error) {
 	raw, err := json.Marshal(gate)

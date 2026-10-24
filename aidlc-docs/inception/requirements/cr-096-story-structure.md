@@ -36,7 +36,9 @@ Một dòng một dự án; khoá `project_id`.
 
 **Hoàn thành khi** (điều kiện duyệt): có đủ ba trường; arc có ít nhất 3 nhịp, nhịp đầu dẫn vào câu hỏi và nhịp cuối trả lời nó. Máy chỉ kiểm được số trường và số nhịp; Creator xác nhận câu chuyện có mạch, không chỉ là danh sách thông tin.
 
-## Prompt `story_architect` (viết lại)
+## Prompt `story_frame` (viết lại)
+
+Vai `story_frame` là vai prompt của bước này; vai `story_architect` là của luồng cũ và không đổi.
 
 - Input chỉ còn: `{{brief}}` (5 trường của bước 2: audience, duration, tone, learning objectives, avoid), `{{research}}` (các dòng giữ lại của `project_research`: mã, loại, dữ kiện, độ tin), `{{brief_language}}`, `{{current_story}}`, `{{kept_fields}}`, `{{redo_note}}`. Bỏ `{{topic}}`, `{{approach}}`, `{{facts_rule}}`, `{{facts_example}}`. Prompt không có `{{idea}}`: brief đã được viết từ ý tưởng đã duyệt (CR-094).
 - Việc của AI: chọn góc kể và xây mạch từ câu hỏi đến lời giải. Số nhịp tuỳ lượng dữ kiện; nhịp đầu là hook, nhịp cuối là payoff; dữ kiện `hypothesis` phải nói thận trọng, `misconception` chỉ nhắc để gỡ, số liệu chỉ lấy từ bảng.
@@ -52,14 +54,16 @@ Một dòng một dự án; khoá `project_id`.
 
 ## Bước 5 vẫn chạy được (lớp chuyển đổi)
 
-Bước 5 chưa có CR mới (CR-097), nên `beat_writer.go` đọc `project_story` đã duyệt qua một hàm chuyển đổi: `question` ← `central_question`, `chain` ← các nhịp của arc (kèm mã dữ kiện), `payoff` ← `core_answer`. Điều kiện "story đã duyệt" của bước 5 đọc `project_story.status`.
+Bước 5 chưa có CR mới (CR-097), nên `beat_writer.go` đọc `project_story` đã duyệt qua một hàm chuyển đổi: `question` ← `central_question`, `chain` ← các nhịp của arc (kèm mã dữ kiện), `payoff` ← `core_answer`. Điều kiện "story đã duyệt" của bước 5 đọc `project_story.status`. Beat ghi `story:main` vào `input_ref`; kho đơn vị tính băm tham chiếu này từ `project_story` để beat viết từ câu chuyện đã đổi vẫn hiện là cũ.
+
+Bước 5 vẫn đọc dữ kiện từ review unit `fact` (chưa chuyển sang `project_research`): với dự án mới, bước 5 chưa thấy dữ kiện cho tới CR-097.
 
 ## Việc cần làm (sau khi duyệt)
 
 1. Migration tạo `project_story`; repository và cổng lưu trữ.
 2. `StoryDeskUseCase`: đọc `project_brief` và `project_research`; viết, sửa, viết lại và duyệt trên `project_story`; bỏ phần góc tiếp cận, gate `used_facts` và chế độ AI tự liệt kê dữ kiện.
 3. Domain: kiểu `StoryStructure`, parse đầu ra của AI, kiểm mã dữ kiện.
-4. Prompt seed `story_architect` mới; bỏ `story_approaches`.
+4. Prompt seed `story_frame` mới; bỏ vai `story_approaches` (hàng prompt cũ bị xoá khi dịch vụ khởi động).
 5. Lớp chuyển đổi cho bước 5; xoá `project_story` khi xoá phần authoring của dự án.
 6. Web GUI: `StoryStepPage`, `FrameCard`, client API, hook, dialog xem đầu vào.
 7. `docs/contracts/story-structure-v1.md` và một dòng trong `docs/contracts/README.md`; test (AI giả).

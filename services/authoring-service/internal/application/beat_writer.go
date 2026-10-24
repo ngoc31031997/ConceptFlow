@@ -71,32 +71,32 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	return bc, nil
 }
 
-// storyFields reads the approved story frame, one field per key.
+// storyFields reads the approved story in the fields the beat sheet is built from.
 func (uc *BeatDeskUseCase) storyFields(ctx context.Context, projectID string) (map[string]domain.StoryField, error) {
-	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindStoryField)
+	story, _, ok, err := uc.stories.ApprovedStory(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	out := make(map[string]domain.StoryField, len(units))
-	for _, u := range units {
-		f, err := readStoryField(u)
-		if err != nil {
-			return nil, err
-		}
-		out[u.Key] = f
+	if !ok {
+		return nil, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
 	}
-	return out, nil
+	return story.BeatFields(), nil
 }
 
-// storyFieldsText shows the story frame to the model, one labelled block per field.
+// storyFieldsText shows the story to the model, one labelled block per field.
 func storyFieldsText(fields map[string]domain.StoryField) string {
+	labels := []struct{ key, name string }{
+		{domain.BeatFieldQuestion, "Câu hỏi trung tâm"},
+		{domain.BeatFieldChain, "Mạch kể, một nhịp một dòng"},
+		{domain.BeatFieldPayoff, "Câu trả lời cốt lõi"},
+	}
 	var sb strings.Builder
-	for _, key := range domain.StoryFieldKeys {
-		f, ok := fields[key]
+	for _, l := range labels {
+		f, ok := fields[l.key]
 		if !ok {
 			continue
 		}
-		sb.WriteString(key + " (" + domain.StoryFieldLabel(key) + "):\n" + f.Text + "\n")
+		sb.WriteString(l.key + " (" + l.name + "):\n" + f.Text + "\n")
 	}
 	return strings.TrimRight(sb.String(), "\n")
 }
@@ -227,15 +227,15 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 		return err
 	}
 	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
-	outline, err := domain.NewBeatOutline(fields[domain.StoryFieldChain].Text, lo, hi)
+	outline, err := domain.NewBeatOutline(fields[domain.BeatFieldChain].Text, lo, hi)
 	if err != nil {
 		return fmt.Errorf("read story chain: %w", err)
 	}
-	payoffText, payoffFacts, err := domain.ParseRefLine(fields[domain.StoryFieldPayoff].Text, nil)
+	payoffText, payoffFacts, err := domain.ParseRefLine(fields[domain.BeatFieldPayoff].Text, nil)
 	if err != nil {
 		return fmt.Errorf("read story payoff: %w", err)
 	}
-	beats, err := outline.Skeleton(domain.ChainStep{Text: strings.TrimSpace(fields[domain.StoryFieldQuestion].Text)}, domain.ChainStep{Text: payoffText, Facts: payoffFacts})
+	beats, err := outline.Skeleton(domain.ChainStep{Text: strings.TrimSpace(fields[domain.BeatFieldQuestion].Text)}, domain.ChainStep{Text: payoffText, Facts: payoffFacts})
 	if err != nil {
 		return fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
 	}
@@ -244,7 +244,7 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 		return err
 	}
 	known := factKnownTo(facts)
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
+	sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
 	if err != nil {
 		return err
 	}
@@ -360,7 +360,7 @@ func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc
 			return fmt.Errorf("%w: %v", domain.ErrBeatReplyUnusable, err)
 		}
 	}
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
+	sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
 	if err != nil {
 		return err
 	}
@@ -490,7 +490,7 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 			return "", fmt.Errorf("%w: cần đúng một beat mới", domain.ErrBeatReplyUnusable)
 		}
 		beat = drafts[0].Beat
-		sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
+		sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
 		if err != nil {
 			return "", err
 		}

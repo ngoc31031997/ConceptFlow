@@ -36,22 +36,34 @@ func (l *beatLLM) say(replies ...string) {
 	l.replies, l.systems = replies, nil
 }
 
+// fakeStories is the approved story the beat sheet reads; ok false is a story not approved.
+type fakeStories struct {
+	story domain.StoryStructure
+	ok    bool
+}
+
+func (s *fakeStories) ApprovedStory(context.Context, string) (domain.StoryStructure, string, bool, error) {
+	return s.story, s.story.Hash(), s.ok, nil
+}
+
 type beatFixture struct {
-	units *briefUnits
-	store *researchStore
-	llm   *beatLLM
-	uc    *BeatDeskUseCase
+	units   *briefUnits
+	store   *researchStore
+	stories *fakeStories
+	llm     *beatLLM
+	uc      *BeatDeskUseCase
 }
 
 func newBeatFixture() *beatFixture {
 	units := newBriefUnits()
 	project := &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly}, status: domain.StatusDraft}
 	f := &beatFixture{
-		units: units,
-		store: &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration4to5},
-		llm:   &beatLLM{replies: []string{beatReplyHook, beatReplyMiddle, beatReplyPayoff}},
+		units:   units,
+		store:   &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration4to5},
+		stories: &fakeStories{},
+		llm:     &beatLLM{replies: []string{beatReplyHook, beatReplyMiddle, beatReplyPayoff}},
 	}
-	f.uc = NewBeatDeskUseCase(f.store, project, project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewBeatDeskUseCase(f.store, f.stories, project, project, briefPrompts{}, f.llm, nil, 4000)
 	return f
 }
 
@@ -75,10 +87,11 @@ func (f *beatFixture) open(t *testing.T) {
 	t.Helper()
 	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
 	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o"})
-	f.save(t, domain.UnitKindStory, domain.StoryUnitKey, domain.UnitApproved, domain.StoryGate{UsedFacts: []string{}})
-	f.save(t, domain.UnitKindStoryField, "question", domain.UnitPending, domain.StoryField{Text: "Vì sao ong chết trong quả sung?", Facts: []string{}})
-	f.save(t, domain.UnitKindStoryField, "chain", domain.UnitPending, domain.StoryField{Text: "Ong chui qua cửa hẹp. [F02]", Facts: []string{"F02"}})
-	f.save(t, domain.UnitKindStoryField, "payoff", domain.UnitPending, domain.StoryField{Text: "Hai loài dựa nhau. [F03]", Facts: []string{"F03"}})
+	f.stories.story, f.stories.ok = domain.StoryStructure{
+		CentralQuestion: "Vì sao ong chết trong quả sung?",
+		CoreAnswer:      "Hai loài dựa nhau. [F03]",
+		NarrativeArc:    []domain.ArcBeat{{Beat: "Cơ chế", Text: "Ong chui qua cửa hẹp.", Facts: []string{"F02"}}},
+	}, true
 	f.save(t, domain.UnitKindFact, "F01", domain.UnitPending, domain.Fact{ClaimVI: "Sung là chùm hoa kín.", Type: domain.FactTypeFact, Keep: true, Must: true})
 	f.save(t, domain.UnitKindFact, "F02", domain.UnitPending, domain.Fact{ClaimVI: "Ong mẹ chết trong quả.", Type: domain.FactTypeFact, Keep: true})
 	f.save(t, domain.UnitKindFact, "F03", domain.UnitPending, domain.Fact{ClaimVI: "Ficin phân giải xác ong.", Type: domain.FactTypeHypothesis, Keep: true})
@@ -158,7 +171,10 @@ func TestBuildSkeletonHasAHookAStepBeatAndAPayoffWithTheirFacts(t *testing.T) {
 func TestBuildSkeletonFlagsAStepWithoutAFact(t *testing.T) {
 	f := newBeatFixture()
 	f.open(t)
-	f.save(t, domain.UnitKindStoryField, "chain", domain.UnitPending, domain.StoryField{Text: "Ong chui qua cửa hẹp. [F02]\nMắt người nhạy với màu xanh.", Facts: []string{"F02"}})
+	f.stories.story.NarrativeArc = []domain.ArcBeat{
+		{Beat: "Cơ chế", Text: "Ong chui qua cửa hẹp.", Facts: []string{"F02"}},
+		{Beat: "Rẽ ngang", Text: "Mắt người nhạy với màu xanh."},
+	}
 	if err := f.uc.BuildSkeleton(context.Background(), "p1"); err != nil {
 		t.Fatalf("BuildSkeleton: %v", err)
 	}
@@ -195,7 +211,10 @@ func TestBuildSkeletonRebuildsUntilItIsApproved(t *testing.T) {
 func TestBuildSkeletonRefusesWhenTheChainCannotFitTheTarget(t *testing.T) {
 	f := newBeatFixture()
 	f.open(t)
-	f.save(t, domain.UnitKindStoryField, "chain", domain.UnitPending, domain.StoryField{Text: strings.Repeat("Một bước. [F02]\n", 19), Facts: []string{"F02"}})
+	f.stories.story.NarrativeArc = nil
+	for i := 0; i < 19; i++ {
+		f.stories.story.NarrativeArc = append(f.stories.story.NarrativeArc, domain.ArcBeat{Beat: "Nhịp", Text: "Một bước.", Facts: []string{"F02"}})
+	}
 	if err := f.uc.BuildSkeleton(context.Background(), "p1"); !errors.Is(err, domain.ErrInvalidUnitEdit) {
 		t.Errorf("err = %v, want a chain of 19 steps refused", err)
 	}
@@ -268,7 +287,7 @@ func TestGenerateWritesOneBeatPerCallInOrderAndKeepsTheKeys(t *testing.T) {
 	if state.Phase != BeatPhaseContent || state.Status != domain.UnitPending || state.TotalSeconds != 268 || state.Rebalanced != 0 {
 		t.Errorf("phase=%s status=%s total=%d rebalanced=%d", state.Phase, state.Status, state.TotalSeconds, state.Rebalanced)
 	}
-	if !strings.Contains(f.llm.systems[0], "F01 [fact · bắt buộc nói]") || !strings.Contains(f.llm.systems[0], "question (Câu hỏi mở đầu)") {
+	if !strings.Contains(f.llm.systems[0], "F01 [fact · bắt buộc nói]") || !strings.Contains(f.llm.systems[0], "question (Câu hỏi trung tâm)") {
 		t.Errorf("the prompt must carry the facts and the story, got %q", f.llm.systems[0])
 	}
 	if !strings.Contains(f.llm.systems[1], "beat thứ 2 trong 3 beat") || !strings.Contains(f.llm.systems[1], "Ong chui qua cửa hẹp.") || !strings.Contains(f.llm.systems[1], "Quả sung") {
@@ -421,7 +440,7 @@ func TestRedoBeforeTheSkeletonIsApprovedIsRefused(t *testing.T) {
 func TestGenerateRefusesBeforeTheStoryIsApproved(t *testing.T) {
 	f := newBeatFixture()
 	f.open(t)
-	f.save(t, domain.UnitKindStory, domain.StoryUnitKey, domain.UnitPending, domain.StoryGate{})
+	f.stories.ok = false
 	if err := f.uc.Generate(context.Background(), "p1", "", false); !errors.Is(err, ErrBeatsNeedStory) {
 		t.Errorf("err = %v, want the story to be required first", err)
 	}

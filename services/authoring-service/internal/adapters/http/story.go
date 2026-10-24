@@ -3,8 +3,8 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,20 +12,16 @@ import (
 	"authoring/internal/domain"
 )
 
-// Operation kinds a story AI run is recorded under, so that any page can follow it.
-const (
-	operationStoryApproach = "story_approach"
-	operationStory         = "story"
-)
+// operationStory is the kind a story AI run is recorded under, so that any page can follow it.
+const operationStory = "story"
 
-// storyUseCase is the story step beyond the generic unit API.
+// storyUseCase is the story step.
 type storyUseCase interface {
 	State(ctx context.Context, projectID string) (application.StoryState, error)
-	GenerateApproaches(ctx context.Context, projectID, note string) ([]application.StoryApproachView, error)
-	SelectApproach(ctx context.Context, projectID, key string) error
-	SaveApproachAsArchetype(ctx context.Context, projectID, key string) (application.StoryApproachView, error)
-	GenerateFrame(ctx context.Context, projectID, note string) error
-	SetFactUse(ctx context.Context, projectID, factID string, use bool) error
+	Generate(ctx context.Context, projectID, note string) (domain.StoredStory, error)
+	Edit(ctx context.Context, projectID string, patch application.StoryPatch) (domain.StoredStory, error)
+	Approve(ctx context.Context, projectID string) (domain.StoredStory, error)
+	Unapprove(ctx context.Context, projectID string) (domain.StoredStory, error)
 }
 
 // WithStory enables the /story routes.
@@ -37,11 +33,10 @@ func (rt *Router) WithStory(uc storyUseCase) *Router {
 func (rt *Router) storyRoutes(r chi.Router) {
 	const base = "/v1/projects/{project_id}/story"
 	r.Get(base, rt.handleGetStory)
-	r.Post(base+"/approaches/generate", rt.handleGenerateApproaches)
-	r.Put(base+"/approach", rt.handleSelectApproach)
-	r.Post(base+"/approaches/{key}/archetype", rt.handleSaveApproachArchetype)
 	r.Post(base+"/generate", rt.handleGenerateStory)
-	r.Put(base+"/facts/{fact_id}", rt.handleSetStoryFactUse)
+	r.Put(base, rt.handleEditStory)
+	r.Post(base+"/approve", rt.handleApproveStory)
+	r.Post(base+"/unapprove", rt.handleUnapproveStory)
 }
 
 // storyEnabled answers 404 when the story step is not wired.
@@ -53,16 +48,25 @@ func (rt *Router) storyEnabled(w http.ResponseWriter) bool {
 	return true
 }
 
-// writeStoryRunError maps the errors of an AI run of the story step.
-func writeStoryRunError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, domain.ErrStoryReplyUnusable), errors.Is(err, domain.ErrApproachReplyUnusable):
-		writeError(w, http.StatusBadGateway, err.Error()+". Thử làm lại, hoặc tự viết các ô.")
-	case errors.Is(err, application.ErrLLMNotConfigured):
-		writeError(w, http.StatusServiceUnavailable,
-			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên AI không viết được. Bạn tự viết các ô rồi duyệt.")
-	default:
-		writeUnitRunError(w, err)
+// storyDTO is a story as the screen reads it.
+type storyDTO struct {
+	CentralQuestion string             `json:"central_question"`
+	CoreAnswer      string             `json:"core_answer"`
+	NarrativeArc    []domain.ArcBeat   `json:"narrative_arc"`
+	CreatorFields   []string           `json:"creator_fields"`
+	Status          domain.StoryStatus `json:"status"`
+	UpdatedAt       time.Time          `json:"updated_at"`
+}
+
+func toStoryDTO(s domain.StoredStory) storyDTO {
+	story := s.Story.Normalized()
+	creator := s.CreatorFields
+	if creator == nil {
+		creator = []string{}
+	}
+	return storyDTO{
+		CentralQuestion: story.CentralQuestion, CoreAnswer: story.CoreAnswer, NarrativeArc: story.NarrativeArc,
+		CreatorFields: creator, Status: s.Status, UpdatedAt: s.UpdatedAt,
 	}
 }
 
@@ -75,108 +79,92 @@ func (rt *Router) handleGetStory(w http.ResponseWriter, r *http.Request) {
 		writeUnitError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, state)
-}
-
-// noteBody reads the optional {"note": "..."} body of an AI run.
-func noteBody(w http.ResponseWriter, r *http.Request) (string, bool) {
-	var body struct {
-		Note string `json:"note"`
+	var story *storyDTO
+	if state.Story != nil {
+		dto := toStoryDTO(*state.Story)
+		story = &dto
 	}
-	if r.ContentLength != 0 {
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			writeError(w, http.StatusBadRequest, "invalid request body")
-			return "", false
-		}
+	facts := state.Facts
+	if facts == nil {
+		facts = []application.StoryFactView{}
 	}
-	return body.Note, true
-}
-
-func (rt *Router) handleGenerateApproaches(w http.ResponseWriter, r *http.Request) {
-	if !rt.storyEnabled(w) {
-		return
-	}
-	note, ok := noteBody(w, r)
-	if !ok {
-		return
-	}
-	ctx, finish := rt.trackOperation(r, operationStoryApproach)
-	approaches, err := rt.story.GenerateApproaches(ctx, chi.URLParam(r, "project_id"), note)
-	finish(err)
-	if err != nil {
-		writeStoryRunError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"approaches": approaches})
-}
-
-func (rt *Router) handleSelectApproach(w http.ResponseWriter, r *http.Request) {
-	if !rt.storyEnabled(w) {
-		return
-	}
-	var body struct {
-		Key string `json:"key"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := rt.story.SelectApproach(r.Context(), chi.URLParam(r, "project_id"), body.Key); err != nil {
-		writeUnitError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (rt *Router) handleSaveApproachArchetype(w http.ResponseWriter, r *http.Request) {
-	if !rt.storyEnabled(w) {
-		return
-	}
-	approach, err := rt.story.SaveApproachAsArchetype(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "key"))
-	if err != nil {
-		writeUnitError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, approach)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"story":             story,
+		"facts":             facts,
+		"brief":             briefWire(state.Brief),
+		"brief_approved":    state.Brief != nil,
+		"research_resolved": state.ResearchResolved,
+		"research_skipped":  state.ResearchSkipped,
+		"brief_stale":       state.BriefStale,
+		"research_stale":    state.ResearchStale,
+	})
 }
 
 func (rt *Router) handleGenerateStory(w http.ResponseWriter, r *http.Request) {
 	if !rt.storyEnabled(w) {
 		return
 	}
-	note, ok := noteBody(w, r)
-	if !ok {
-		return
-	}
-	ctx, finish := rt.trackOperation(r, operationStory)
-	err := rt.story.GenerateFrame(ctx, chi.URLParam(r, "project_id"), note)
-	finish(err)
+	note, err := readNote(r)
 	if err != nil {
-		writeStoryRunError(w, err)
-		return
-	}
-	state, err := rt.story.State(r.Context(), chi.URLParam(r, "project_id"))
-	if err != nil {
-		writeUnitError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, state)
-}
-
-func (rt *Router) handleSetStoryFactUse(w http.ResponseWriter, r *http.Request) {
-	if !rt.storyEnabled(w) {
-		return
-	}
-	var body struct {
-		Use *bool `json:"use"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Use == nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if err := rt.story.SetFactUse(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "fact_id"), *body.Use); err != nil {
+	ctx, finish := rt.trackOperation(r, operationStory)
+	story, err := rt.story.Generate(ctx, chi.URLParam(r, "project_id"), note)
+	finish(err)
+	if err != nil {
+		writeUnitRunError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toStoryDTO(story))
+}
+
+// editStoryRequest is PUT /v1/projects/{id}/story; an absent field is left alone.
+type editStoryRequest struct {
+	CentralQuestion *string           `json:"central_question"`
+	CoreAnswer      *string           `json:"core_answer"`
+	NarrativeArc    *[]domain.ArcBeat `json:"narrative_arc"`
+}
+
+func (rt *Router) handleEditStory(w http.ResponseWriter, r *http.Request) {
+	if !rt.storyEnabled(w) {
+		return
+	}
+	var req editStoryRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	story, err := rt.story.Edit(r.Context(), chi.URLParam(r, "project_id"), application.StoryPatch{
+		CentralQuestion: req.CentralQuestion, CoreAnswer: req.CoreAnswer, NarrativeArc: req.NarrativeArc,
+	})
+	if err != nil {
 		writeUnitError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, toStoryDTO(story))
+}
+
+func (rt *Router) handleApproveStory(w http.ResponseWriter, r *http.Request) {
+	rt.storyStatusChange(w, r, func(ctx context.Context, id string) (domain.StoredStory, error) {
+		return rt.story.Approve(ctx, id)
+	})
+}
+
+func (rt *Router) handleUnapproveStory(w http.ResponseWriter, r *http.Request) {
+	rt.storyStatusChange(w, r, func(ctx context.Context, id string) (domain.StoredStory, error) {
+		return rt.story.Unapprove(ctx, id)
+	})
+}
+
+func (rt *Router) storyStatusChange(w http.ResponseWriter, r *http.Request, change func(context.Context, string) (domain.StoredStory, error)) {
+	if !rt.storyEnabled(w) {
+		return
+	}
+	story, err := change(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeUnitError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toStoryDTO(story))
 }
