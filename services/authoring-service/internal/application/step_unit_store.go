@@ -10,6 +10,7 @@ import (
 // units, the project's topic and length, and the model choices.
 type StepUnitStorePort interface {
 	ReviewUnitPort
+	ResearchFactStorePort
 	GetAuthoringTopic(ctx context.Context, projectID string) (string, error)
 	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
 	GetTargetDuration(ctx context.Context, projectID string) (domain.TargetDuration, error)

@@ -47,6 +47,12 @@ function baseState(over: Partial<BeatState> = {}): BeatState {
       beat("b3", { fn: "Payoff", dur: 50, next: "" }),
     ],
     facts: [fact("F01", { must: true }), fact("F02"), fact("F03", { type: "hypothesis" })],
+    input: {
+      topic: "Vì sao trong quả sung có xác ong?",
+      brief: "Khán giả: Người tò mò\nGiọng điệu: Gần gũi",
+      briefApproved: true,
+      story: "question (Câu hỏi trung tâm):\nVì sao ong chết trong quả sung?",
+    },
     checks: [
       { ok: false, text: "Tổng 1:48 · mục tiêu 4–5 phút" },
       { ok: true, text: "Hook 18 s · nên ≤ 20 s" },
@@ -117,6 +123,29 @@ describe("BeatsStepPage", () => {
     expect(screen.getByTestId("beat-goal-b3")).toHaveTextContent("Mục tiêu b3");
     expect(screen.queryByTestId("beat-next-b3")).not.toBeInTheDocument();
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chờ bạn duyệt · 0/3 beat");
+  });
+
+  it("shows the input the AI reads, read again from the server, before any call", async () => {
+    await ready();
+    expect(screen.getByTestId("beats-input-summary")).toHaveTextContent("Brief đã duyệt · 3 dữ kiện đang giữ");
+    const loads = vi.mocked(apiClient.getBeats).mock.calls.length;
+    fireEvent.click(screen.getByTestId("beats-input-open"));
+    const dialog = await screen.findByTestId("beats-input-dialog");
+    await waitFor(() => expect(vi.mocked(apiClient.getBeats).mock.calls.length).toBe(loads + 1));
+    await waitFor(() => expect(screen.queryByTestId("beats-input-loading")).not.toBeInTheDocument());
+    expect(dialog).toHaveTextContent("Vì sao trong quả sung có xác ong?");
+    expect(screen.getByTestId("beats-input-brief")).toHaveTextContent("Khán giả: Người tò mò");
+    expect(screen.getByTestId("beats-input-facts")).toHaveTextContent("Dữ kiện F01 (bắt buộc nói)");
+    expect(screen.getByTestId("beats-input-story")).toHaveTextContent("Vì sao ong chết trong quả sung?");
+    fireEvent.click(screen.getByTestId("beats-input-close"));
+    await waitFor(() => expect(screen.queryByTestId("beats-input-dialog")).not.toBeInTheDocument());
+  });
+
+  it("says the brief is not approved when the input has none", async () => {
+    state = baseState({ input: { topic: "Đề tài", brief: "", briefApproved: false, story: "question (Câu hỏi trung tâm):\nQ" } });
+    await ready();
+    fireEvent.click(screen.getByTestId("beats-input-open"));
+    expect(await screen.findByTestId("beats-input-no-brief")).toBeInTheDocument();
   });
 
   it("says what the step waits for while the story is not approved", async () => {

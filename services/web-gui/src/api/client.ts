@@ -2878,6 +2878,16 @@ export interface BeatFact {
   link: LinkState;
 }
 
+/** What the AI reads besides the kept facts, as the prompt gets it. */
+export interface BeatInput {
+  topic: string;
+  /** The approved brief; "" while the brief step is not approved. */
+  brief: string;
+  briefApproved: boolean;
+  /** The approved story in the fields the beats are built from; "" while the story is not approved. */
+  story: string;
+}
+
 /** One line of the structure check. */
 export interface BeatCheck {
   ok: boolean;
@@ -2894,6 +2904,7 @@ export interface BeatState {
   storyApproved: boolean;
   beats: Beat[];
   facts: BeatFact[];
+  input: BeatInput;
   checks: BeatCheck[];
   totalSeconds: number;
   targetLabel: string;
@@ -2928,6 +2939,7 @@ interface beatStateWire {
       }[]
     | null;
   facts: { id: string; claim_vi: string; type: FactType; must: boolean; link: LinkState }[] | null;
+  input: { topic: string; brief: string; brief_approved: boolean; story: string } | null;
   checks: BeatCheck[] | null;
   total_seconds: number;
   target_label: string;
@@ -2943,6 +2955,7 @@ function fromWireBeats(w: beatStateWire): BeatState {
     storyApproved: w.story_approved,
     beats: (w.beats ?? []).map((b) => ({ ...b, facts: b.facts ?? [], mine: b.mine ?? [], onlyMust: b.only_must ?? [], noFact: b.no_fact ?? false, step: b.step ?? "" })),
     facts: (w.facts ?? []).map((f) => ({ id: f.id, claimVi: f.claim_vi, type: f.type, must: f.must, link: f.link })),
+    input: { topic: w.input?.topic ?? "", brief: w.input?.brief ?? "", briefApproved: w.input?.brief_approved ?? false, story: w.input?.story ?? "" },
     checks: w.checks ?? [],
     totalSeconds: w.total_seconds,
     targetLabel: w.target_label,

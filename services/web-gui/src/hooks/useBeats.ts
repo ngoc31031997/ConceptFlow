@@ -67,7 +67,8 @@ export interface BeatsControls {
   unapprove: (key: string) => Promise<boolean>;
   /** Approves every beat still waiting that has a goal. */
   approveAll: () => Promise<boolean>;
-  reload: () => void;
+  /** Reads the state again; resolves when it has landed. */
+  reload: () => Promise<void>;
 }
 
 function messageOf(err: unknown): string {
@@ -209,6 +210,6 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
           if (beat.status === "pending" && beat.goal.trim() !== "") await approveUnit(projectId, beatUnit(beat.key));
         }
       }),
-    reload: () => void load(),
+    reload: load,
   };
 }

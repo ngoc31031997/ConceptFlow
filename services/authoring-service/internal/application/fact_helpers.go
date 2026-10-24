@@ -16,20 +16,16 @@ type storyFact struct {
 	domain.Fact
 }
 
-// loadKeptFacts loads the facts of a project the Creator has not dropped, in code order.
-func loadKeptFacts(ctx context.Context, units ReviewUnitPort, projectID string) ([]storyFact, error) {
-	stored, err := units.ListUnits(ctx, projectID, domain.UnitKindFact)
+// loadKeptFacts loads the research facts of a project the Creator has not dropped, in code order.
+func loadKeptFacts(ctx context.Context, store ResearchFactStorePort, projectID string) ([]storyFact, error) {
+	stored, err := store.ListResearchFacts(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
 	out := make([]storyFact, 0, len(stored))
-	for _, u := range stored {
-		var f domain.Fact
-		if err := json.Unmarshal(u.Content, &f); err != nil {
-			return nil, fmt.Errorf("read stored fact %s: %w", u.Key, err)
-		}
-		if f.Keep {
-			out = append(out, storyFact{ID: u.Key, Fact: f})
+	for _, f := range stored {
+		if f.Fact.Keep {
+			out = append(out, storyFact{ID: f.ID, Fact: f.Fact})
 		}
 	}
 	return out, nil

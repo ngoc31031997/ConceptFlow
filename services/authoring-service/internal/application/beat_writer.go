@@ -34,10 +34,6 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	if !approved {
 		return bc, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
 	}
-	idea, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
-	if err != nil {
-		return bc, err
-	}
 	project, err := uc.projects.Get(ctx, projectID)
 	if err != nil {
 		return bc, fmt.Errorf("load project: %w", err)
@@ -52,9 +48,14 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	bc.language = briefLanguage(project.ContentLanguage)
 	bc.targetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, bc.language)
 	bc.loSeconds, bc.hiSeconds = domain.TargetSeconds(project.VideoOutputMode, duration)
-	if bc.brief, err = briefSectionFor(ctx, uc.units, projectID, project.VideoOutputMode, idea, brief, bc.targetLabel); err != nil {
+	brief, briefOK, err := uc.briefs.ApprovedBrief(ctx, projectID)
+	if err != nil {
 		return bc, err
 	}
+	if !briefOK {
+		return bc, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedBrief)
+	}
+	bc.brief = brief.Section()
 	if bc.facts, err = loadKeptFacts(ctx, uc.units, projectID); err != nil {
 		return bc, err
 	}
@@ -69,6 +70,28 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	}
 	bc.model = models.ModelFor("beat_sheet")
 	return bc, nil
+}
+
+// input reads what the AI is given besides the facts, as the prompt gets it.
+func (uc *BeatDeskUseCase) input(ctx context.Context, projectID string) (BeatInput, error) {
+	var in BeatInput
+	var err error
+	if in.Topic, err = uc.units.GetAuthoringTopic(ctx, projectID); err != nil {
+		return in, fmt.Errorf("load topic: %w", err)
+	}
+	brief, ok, err := uc.briefs.ApprovedBrief(ctx, projectID)
+	if err != nil {
+		return in, err
+	}
+	if ok {
+		in.Brief, in.BriefApproved = brief.Section(), true
+	}
+	fields, err := uc.storyFields(ctx, projectID)
+	if err != nil {
+		return in, err
+	}
+	in.Story = storyFieldsText(fields)
+	return in, nil
 }
 
 // storyFields reads the approved story in the fields the beat sheet is built from.

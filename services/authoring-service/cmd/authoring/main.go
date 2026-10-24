@@ -155,7 +155,7 @@ func main() {
 	research.RegisterFactDependents(story.FactDependents())
 	// The beat sheet step: each beat is a review unit; the gate only holds their order.
 	beats := application.NewBeatDeskUseCase(
-		authoringRepo, story, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
 	// The script step: each beat's dialogue is a review unit; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.

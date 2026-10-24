@@ -5,6 +5,7 @@ import { AiModelSelect } from "../components/AiModelSelect";
 import { AiOperationCard } from "../components/AiOperationCard";
 import { AppShell } from "../components/AppShell";
 import { BeatCard } from "../components/beats/BeatCard";
+import { BeatInputCard } from "../components/beats/BeatInputCard";
 import { StructureCard } from "../components/beats/StructureCard";
 import researchStyles from "../components/research/research.module.css";
 import type { StepStripProps } from "../components/StepStrip";
@@ -99,6 +100,7 @@ export function BeatsStepPage() {
             Duyệt câu chuyện ở bước Câu chuyện trước.
           </p>
         )}
+        {s.storyApproved && <BeatInputCard state={s} onReload={beats.reload} />}
         {s.storyApproved && s.phase === "empty" && (
           <Card data-testid="beats-empty-card">
             <div className={researchStyles.body}>

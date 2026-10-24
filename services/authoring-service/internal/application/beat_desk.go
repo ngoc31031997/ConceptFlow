@@ -15,6 +15,9 @@ import (
 // written from a story that has changed since reads as stale.
 const beatStoryRef = domain.StoryInputKind + ":" + domain.StoryInputKey
 
+// ErrBeatsNeedBrief is returned when the beat sheet is asked for before the brief is approved.
+var ErrBeatsNeedBrief = errors.New("duyệt brief ở bước Creative brief trước")
+
 // ErrBeatsNeedStory is returned when the beat sheet is asked for before the story is approved.
 var ErrBeatsNeedStory = errors.New("duyệt câu chuyện ở bước Câu chuyện trước")
 
@@ -57,6 +60,17 @@ const (
 	BeatPhaseContent = "content"
 )
 
+// BeatInput is what the AI reads besides the kept facts, as the prompt gets it,
+// so the Creator can see it before any call.
+type BeatInput struct {
+	Topic string `json:"topic"`
+	// Brief is the approved brief; empty while the brief step is not approved.
+	Brief         string `json:"brief"`
+	BriefApproved bool   `json:"brief_approved"`
+	// Story is the approved story in the fields the beats are built from.
+	Story string `json:"story"`
+}
+
 // BeatState is everything the beat sheet screen shows.
 type BeatState struct {
 	// Status is approved when the sheet has beats and every one is approved.
@@ -64,6 +78,7 @@ type BeatState struct {
 	StoryApproved bool               `json:"story_approved"`
 	Beats         []BeatView         `json:"beats"`
 	Facts         []BeatFactView     `json:"facts"`
+	Input         BeatInput          `json:"input"`
 	Checks        []domain.BeatCheck `json:"checks"`
 	TotalSeconds  int                `json:"total_seconds"`
 	// Phase is one of the BeatPhase constants.
@@ -87,6 +102,7 @@ type BeatState struct {
 type BeatDeskUseCase struct {
 	units           StepUnitStorePort
 	stories         ApprovedStoryPort
+	briefs          ApprovedBriefPort
 	projects        ProjectReaderPort
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
@@ -99,11 +115,11 @@ type BeatDeskUseCase struct {
 // NewBeatDeskUseCase wires the use case. provider may be nil when no language
 // model is configured: the Creator then adds and writes the beats by hand.
 func NewBeatDeskUseCase(
-	units StepUnitStorePort, stories ApprovedStoryPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units StepUnitStorePort, stories ApprovedStoryPort, briefs ApprovedBriefPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
 ) *BeatDeskUseCase {
 	return &BeatDeskUseCase{
-		units: units, stories: stories, projects: projects, locks: locks, prompts: prompts,
+		units: units, stories: stories, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
 		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
@@ -210,6 +226,11 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	var err error
 	if state.StoryApproved, err = uc.storyApproved(ctx, projectID); err != nil {
 		return BeatState{}, err
+	}
+	if state.StoryApproved {
+		if state.Input, err = uc.input(ctx, projectID); err != nil {
+			return BeatState{}, err
+		}
 	}
 	stored, gate, _, err := uc.beats(ctx, projectID)
 	if err != nil {

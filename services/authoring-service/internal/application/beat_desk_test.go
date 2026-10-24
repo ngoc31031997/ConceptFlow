@@ -50,6 +50,7 @@ type beatFixture struct {
 	units   *briefUnits
 	store   *researchStore
 	stories *fakeStories
+	briefs  *approvedSteps
 	llm     *beatLLM
 	uc      *BeatDeskUseCase
 }
@@ -61,9 +62,10 @@ func newBeatFixture() *beatFixture {
 		units:   units,
 		store:   &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration4to5},
 		stories: &fakeStories{},
+		briefs:  &approvedSteps{},
 		llm:     &beatLLM{replies: []string{beatReplyHook, beatReplyMiddle, beatReplyPayoff}},
 	}
-	f.uc = NewBeatDeskUseCase(f.store, f.stories, project, project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewBeatDeskUseCase(f.store, f.stories, f.briefs, project, project, briefPrompts{}, f.llm, nil, 4000)
 	return f
 }
 
@@ -85,17 +87,24 @@ func (f *beatFixture) save(t *testing.T, kind, key string, status domain.UnitSta
 // three beats.
 func (f *beatFixture) open(t *testing.T) {
 	t.Helper()
-	f.save(t, domain.UnitKindIdea, domain.IdeaUnitKey, domain.UnitApproved, domain.Idea{Question: "Vì sao ong chết?", Why: "w", Known: "k", Unknown: "u"})
-	f.save(t, domain.UnitKindBrief, domain.BriefUnitKey, domain.UnitApproved, domain.CreativeBrief{Audience: "a", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o"})
+	f.briefs.brief, f.briefs.briefOK = domain.ProjectBrief{Audience: "Người tò mò", DurationSeconds: 270, Tone: "Gần gũi", LearningObjectives: []string{"Hiểu vì sao"}, Avoid: []string{"Thuật ngữ"}}, true
 	f.stories.story, f.stories.ok = domain.StoryStructure{
 		CentralQuestion: "Vì sao ong chết trong quả sung?",
 		CoreAnswer:      "Hai loài dựa nhau. [F03]",
 		NarrativeArc:    []domain.ArcBeat{{Beat: "Cơ chế", Text: "Ong chui qua cửa hẹp.", Facts: []string{"F02"}}},
 	}, true
-	f.save(t, domain.UnitKindFact, "F01", domain.UnitPending, domain.Fact{ClaimVI: "Sung là chùm hoa kín.", Type: domain.FactTypeFact, Keep: true, Must: true})
-	f.save(t, domain.UnitKindFact, "F02", domain.UnitPending, domain.Fact{ClaimVI: "Ong mẹ chết trong quả.", Type: domain.FactTypeFact, Keep: true})
-	f.save(t, domain.UnitKindFact, "F03", domain.UnitPending, domain.Fact{ClaimVI: "Ficin phân giải xác ong.", Type: domain.FactTypeHypothesis, Keep: true})
-	f.save(t, domain.UnitKindFact, "F04", domain.UnitPending, domain.Fact{ClaimVI: "Đã bỏ.", Type: domain.FactTypeFact, Keep: false})
+	f.saveFact(t, "F01", domain.Fact{ClaimVI: "Sung là chùm hoa kín.", Type: domain.FactTypeFact, Keep: true, Must: true})
+	f.saveFact(t, "F02", domain.Fact{ClaimVI: "Ong mẹ chết trong quả.", Type: domain.FactTypeFact, Keep: true})
+	f.saveFact(t, "F03", domain.Fact{ClaimVI: "Ficin phân giải xác ong.", Type: domain.FactTypeHypothesis, Keep: true})
+	f.saveFact(t, "F04", domain.Fact{ClaimVI: "Đã bỏ.", Type: domain.FactTypeFact, Keep: false})
+}
+
+// saveFact puts a fact in the research table the beat sheet reads.
+func (f *beatFixture) saveFact(t *testing.T, id string, fact domain.Fact) {
+	t.Helper()
+	if err := f.store.SaveResearchFact(context.Background(), "p1", domain.StoredFact{ID: id, Fact: fact}); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func (f *beatFixture) beat(t *testing.T, key string) (domain.ReviewUnit, domain.Beat) {
