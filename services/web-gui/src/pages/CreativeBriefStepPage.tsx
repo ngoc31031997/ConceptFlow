@@ -19,8 +19,6 @@ import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { DEFAULT_LONG_FORMAT_ID, SHORT_FORMAT_ID, isShortFormat } from "../utils/outputMode";
 import { FLOW_CONFIG, flowStepName } from "../utils/flow";
-import cardStyles from "../components/CreativeBriefCard.module.css";
-import ideaStyles from "../components/idea/ProjectIdeaCard.module.css";
 import wizard from "./WizardSteps.module.css";
 import styles from "./ScriptStepPage.module.css";
 
@@ -53,8 +51,7 @@ interface CreativeBriefStepPageProps {
  *
  * ① Dạng video: dài hay ngắn. Mỗi lần đổi là một lần lưu lên project và quyết
  *   định khoảng thời lượng brief được đặt. Ngôn ngữ nội dung đã chốt ở bước 1.
- * ② Ý tưởng đã duyệt ở bước 1: chỉ đọc, là đầu vào của brief.
- * ③ Định hướng sáng tạo (ProjectBriefCard): AI viết khán giả, thời lượng, giọng
+ * ② Định hướng sáng tạo (ProjectBriefCard): AI viết khán giả, thời lượng, giọng
  *   điệu, mục tiêu học tập và điều cần tránh từ ý tưởng; Creator sửa tay hoặc
  *   nhờ làm lại, xem đánh giá của AI, rồi duyệt. Không có AI thì Creator tự viết.
  *
@@ -189,38 +186,6 @@ export function CreativeBriefStepPage({
             {saveError && (
               <p className={styles.error} role="alert" data-testid="brief-save-error">
                 {saveError}
-              </p>
-            )}
-          </Card>
-
-          <Card className={styles.card} data-testid="brief-idea-card">
-            <h3 className={styles.cardTitle}>② Ý tưởng đã duyệt</h3>
-            {approvedIdea ? (
-              <>
-                <div className={cardStyles.field}>
-                  <span className={cardStyles.label}>Câu hỏi trung tâm</span>
-                  <p className={cardStyles.value} data-testid="brief-idea-question">
-                    {approvedIdea.centralQuestion}
-                  </p>
-                </div>
-                <div className={cardStyles.field}>
-                  <span className={cardStyles.label}>Điểm gây tò mò</span>
-                  <ul className={ideaStyles.points}>
-                    {approvedIdea.curiosityPoints.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                </div>
-                <div className={cardStyles.field}>
-                  <span className={cardStyles.label}>Phạm vi</span>
-                  <p className={cardStyles.value}>{approvedIdea.scope}</p>
-                </div>
-              </>
-            ) : (
-              <p className={styles.hint} data-testid="brief-idea-missing">
-                {created && brief.screen
-                  ? "Ý tưởng ở bước 1 chưa được duyệt. Duyệt ý tưởng trước: brief được viết từ ý tưởng đã duyệt."
-                  : "Chưa có ý tưởng đã duyệt."}
               </p>
             )}
           </Card>

@@ -119,6 +119,8 @@ describe("CreativeBriefStepPage (Bước 2 — Creative brief)", () => {
     expect(await screen.findByTestId("brief-form-card")).toBeInTheDocument();
     expect(screen.queryByTestId("content-language-en")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Định hướng sáng tạo");
+    expect(screen.queryByTestId("brief-idea-card")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTestId("brief-input-open"));
     expect(await screen.findByTestId("brief-idea-question")).toHaveTextContent("Người rơi thấy gì?");
     expect(screen.getByTestId("brief-card")).toBeInTheDocument();
     expect(screen.queryByTestId("brief-duration")).not.toBeInTheDocument();
@@ -129,7 +131,8 @@ describe("CreativeBriefStepPage (Bước 2 — Creative brief)", () => {
     briefScreen = screenOf({ idea: null });
     renderPage();
     expect(await screen.findByTestId("brief-generate")).toBeDisabled();
-    expect(screen.getByTestId("brief-idea-missing")).toHaveTextContent("chưa được duyệt");
+    fireEvent.click(screen.getByTestId("brief-input-open"));
+    expect(await screen.findByTestId("brief-idea-missing")).toHaveTextContent("chưa được duyệt");
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Duyệt ý tưởng ở bước 1 trước");
   });
 

@@ -11,6 +11,7 @@ import unitStyles from "../units/units.module.css";
 import cardStyles from "../CreativeBriefCard.module.css";
 import styles from "../idea/ProjectIdeaCard.module.css";
 import { BriefEditModal } from "./BriefEditModal";
+import { BriefInputModal } from "./BriefInputModal";
 import { BriefRedoModal } from "./BriefRedoModal";
 
 const FIELD_LABELS: Record<ProjectBriefField, string> = {
@@ -74,6 +75,7 @@ export function ProjectBriefCard({
 }: ProjectBriefCardProps) {
   const [editOpen, setEditOpen] = useState(false);
   const [redoOpen, setRedoOpen] = useState(false);
+  const [inputOpen, setInputOpen] = useState(false);
 
   const screen = brief.screen;
   const stored = screen?.brief ?? null;
@@ -351,7 +353,18 @@ export function ProjectBriefCard({
     <Card data-testid="brief-card">
       <div className={cardStyles.body}>
         <div className={cardStyles.head}>
-          <h3>③ Định hướng sáng tạo</h3>
+          <div className={cardStyles.titleGroup}>
+            <h3>② Định hướng sáng tạo</h3>
+            <Button
+              variant="view"
+              className={cardStyles.sm}
+              onClick={() => setInputOpen(true)}
+              title="Xem ý tưởng đã duyệt ở bước 1 mà AI đọc để viết brief"
+              data-testid="brief-input-open"
+            >
+              Xem đầu vào của AI
+            </Button>
+          </div>
           {chip}
         </div>
         {body()}
@@ -376,6 +389,7 @@ export function ProjectBriefCard({
         maxDurationSeconds={maxSeconds}
         onSave={brief.edit}
       />
+      <BriefInputModal open={inputOpen} onClose={() => setInputOpen(false)} idea={brief.screen?.idea ?? null} />
       <BriefRedoModal
         open={redoOpen}
         onClose={() => setRedoOpen(false)}
