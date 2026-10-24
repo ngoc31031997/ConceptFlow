@@ -10,8 +10,10 @@ import (
 	"authoring/internal/domain"
 )
 
-// beatStoryRef names the story as the unit the beats are built from.
-const beatStoryRef = domain.UnitKindStory + ":" + domain.StoryUnitKey
+// beatStoryRef names the approved story as the input the beats are built from.
+// The review unit store resolves it from the project's story, so that a beat
+// written from a story that has changed since reads as stale.
+const beatStoryRef = domain.StoryInputKind + ":" + domain.StoryInputKey
 
 // ErrBeatsNeedStory is returned when the beat sheet is asked for before the story is approved.
 var ErrBeatsNeedStory = errors.New("duyệt câu chuyện ở bước Câu chuyện trước")
@@ -83,7 +85,8 @@ type BeatState struct {
 // the gate that holds their order are review units (UnitKind for
 // domain.UnitKindBeat and domain.UnitKindBeatSheet).
 type BeatDeskUseCase struct {
-	units           StoryStorePort
+	units           StepUnitStorePort
+	stories         ApprovedStoryPort
 	projects        ProjectReaderPort
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
@@ -96,11 +99,11 @@ type BeatDeskUseCase struct {
 // NewBeatDeskUseCase wires the use case. provider may be nil when no language
 // model is configured: the Creator then adds and writes the beats by hand.
 func NewBeatDeskUseCase(
-	units StoryStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units StepUnitStorePort, stories ApprovedStoryPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
 ) *BeatDeskUseCase {
 	return &BeatDeskUseCase{
-		units: units, projects: projects, locks: locks, prompts: prompts,
+		units: units, stories: stories, projects: projects, locks: locks, prompts: prompts,
 		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
@@ -195,16 +198,10 @@ func (uc *BeatDeskUseCase) saveBeat(ctx context.Context, projectID, key string, 
 	return uc.units.SaveUnit(ctx, base)
 }
 
-// storyApproved reports whether the story gate is approved.
+// storyApproved reports whether the story is approved.
 func (uc *BeatDeskUseCase) storyApproved(ctx context.Context, projectID string) (bool, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindStory, domain.StoryUnitKey)
-	if errors.Is(err, domain.ErrUnitNotFound) {
-		return false, nil
-	}
-	if err != nil {
-		return false, err
-	}
-	return unit.Status == domain.UnitApproved, nil
+	_, _, ok, err := uc.stories.ApprovedStory(ctx, projectID)
+	return ok, err
 }
 
 // State returns the whole beat sheet screen.

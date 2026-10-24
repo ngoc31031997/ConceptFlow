@@ -41,11 +41,10 @@ const (
 	// by the generic renderer.
 	RoleResearchPrompt PromptRole = "research_prompt"
 
-	// The story step's proposer of approaches and writer of the story frame.
-	// Filled by the story use case with the brief, the facts and the Creator's
-	// choices, so they are not rendered by the generic renderer.
-	RoleStoryApproaches PromptRole = "story_approaches"
-	RoleStoryFrame      PromptRole = "story_frame"
+	// The story step's writer of the story structure. Filled by the story use
+	// case with the brief and the facts, so it is not rendered by the generic
+	// renderer.
+	RoleStoryFrame PromptRole = "story_frame"
 
 	// The beat sheet step's writer of the beats; filled by the beat use case
 	// with the story, the facts and the Creator's choices.
@@ -82,7 +81,7 @@ func ValidPromptRole(role string) bool {
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign,
 		RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
-		RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
+		RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
 		RoleProjectIdea, RoleProjectIdeaReview, RoleProjectBrief, RoleProjectBriefReview:
 		return true
 	default:
@@ -96,7 +95,7 @@ func ValidPromptRole(role string) bool {
 // from their own use cases.
 func IsRenderablePromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
+	case RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
 		RoleProjectIdea, RoleProjectIdeaReview, RoleProjectBrief, RoleProjectBriefReview:
 		return false
 	}

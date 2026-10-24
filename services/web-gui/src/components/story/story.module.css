@@ -1,77 +1,4 @@
-/* The story step: approach cards, the six fields of the frame, the facts the story uses. Tokens come from theme.css. */
-
-.approaches {
-  display: grid;
-  gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.approach {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-  padding: 12px 14px;
-  border: var(--border-w) solid var(--border-color);
-  border-radius: var(--radius);
-  background: var(--card);
-  color: var(--ink);
-  text-align: left;
-  font-size: 13px;
-  cursor: pointer;
-}
-.approach:hover:not(:disabled) {
-  box-shadow: var(--shadow-sm);
-}
-.approach:disabled {
-  cursor: default;
-  opacity: 0.7;
-}
-.approach:focus-visible {
-  outline: 3px solid var(--run);
-  outline-offset: 2px;
-}
-.approachOn {
-  background: var(--accent-soft);
-  box-shadow: var(--shadow-sm);
-}
-.approachOn::after {
-  content: "✓ đã chọn";
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  font-weight: 700;
-  color: var(--ok);
-}
-.approachName {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 6px;
-  font-family: var(--font-display);
-  font-size: 14.5px;
-}
-.code {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--ink-faint);
-}
-.newTag {
-  padding: 0 6px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--accent2);
-  color: #0a0a0a;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-}
-.small {
-  color: var(--ink-soft);
-  font-size: 12.5px;
-}
-.open {
-  font-style: italic;
-}
+/* The story step: the input summary, the three fields of the story, the arc editor. Tokens come from theme.css. */
 
 .tags {
   display: flex;
@@ -120,18 +47,6 @@
   color: var(--ink-faint);
   font-style: italic;
 }
-.chain {
-  margin: 0;
-  padding-left: 20px;
-  display: grid;
-  gap: 6px;
-  font-size: 13.5px;
-}
-.chain .tags {
-  display: inline-flex;
-  vertical-align: middle;
-  margin-left: 6px;
-}
 .fieldActions {
   display: flex;
   flex-wrap: wrap;
@@ -148,25 +63,49 @@
   font-weight: 700;
 }
 
-.factText {
+.arc {
+  margin: 0;
+  padding-left: 22px;
   display: grid;
-  gap: 2px;
+  gap: 8px;
+  font-size: 13.5px;
 }
-.factNote {
-  font-size: 12px;
-  color: var(--ink-faint);
+.beatName {
+  font-family: var(--font-display);
+  font-weight: 700;
 }
-.factWarn {
+.arc .tags {
+  display: inline-flex;
+  vertical-align: middle;
+  margin-left: 6px;
+}
+
+.beatEdit {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: var(--border-w) solid var(--border-color);
+  border-radius: var(--radius);
+  background: var(--card);
+}
+.beatEditHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-family: var(--font-mono);
   font-size: 11.5px;
-  color: var(--warn);
-}
-.noSource {
-  padding: 0 5px;
-  border: 1.5px solid var(--border-color);
-  border-radius: 3px;
-  background: var(--info-soft);
-  font-family: var(--font-mono);
-  font-size: 10.5px;
   font-weight: 700;
+}
+.beatEditTools {
+  display: flex;
+  gap: 6px;
+}
+.inputSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13.5px;
 }

@@ -23,20 +23,27 @@ function lastCall(fn: ReturnType<typeof vi.fn>) {
   };
 }
 
-const stateWire = {
+const storyWire = {
+  central_question: "Vì sao?",
+  core_answer: "Vì thế.",
+  narrative_arc: [
+    { beat: "Hook", text: "Mở", facts: null },
+    { beat: "Payoff", text: "Kết", facts: ["F01"] },
+  ],
+  creator_fields: ["core_answer"],
   status: "pending",
-  approach_key: "A2",
-  fields: [
-    { key: "question", label: "Câu hỏi mở đầu", text: "Vì sao?", facts: null, mine: true, stale: false },
-    { key: "chain", label: "Chuỗi nhân quả", text: "Bước một [F01]", facts: ["F01"], mine: false, stale: true },
-  ],
-  approaches: [
-    { key: "A2", code: "VÒNG-ĐỜI", name: "Vòng đời", angle: "theo ong", why: "F04", refs: null, open: "Câu chuyện...", is_new: true, archetype_id: "", selected: true },
-  ],
-  facts: [{ id: "F01", claim_vi: "Sung là chùm hoa", type: "fact", must: true, used: true, cited: true, link: "none" }],
+  updated_at: "2026-10-24T10:00:00Z",
+};
+
+const stateWire = {
+  story: storyWire,
+  facts: [{ id: "F01", claim_vi: "Sung là chùm hoa", type: "fact", must: true, cited: true, link: "none" }],
+  brief: { audience: "Học sinh", duration_seconds: 300, tone: "Ấm", learning_objectives: null, avoid: ["Thuật ngữ"] },
   brief_approved: true,
   research_resolved: true,
-  research_skipped: true,
+  research_skipped: false,
+  brief_stale: true,
+  research_stale: false,
 };
 
 describe("story api", () => {
@@ -49,51 +56,55 @@ describe("story api", () => {
     const fn = mockFetch(200, stateWire);
     const state = await client.getStory("p1");
     expect(lastCall(fn)).toMatchObject({ path: "story", method: "GET" });
-    expect(state.approachKey).toBe("A2");
-    expect(state.fields[0]).toMatchObject({ key: "question", mine: true, facts: [] });
-    expect(state.fields[1]).toMatchObject({ stale: true, facts: ["F01"] });
-    expect(state.approaches[0]).toMatchObject({ isNew: true, archetypeId: "", refs: [], selected: true });
-    expect(state.facts[0]).toMatchObject({ claimVi: "Sung là chùm hoa", must: true, link: "none" });
-    expect(state.researchSkipped).toBe(true);
+    expect(state.status).toBe("pending");
+    expect(state.story).toMatchObject({ centralQuestion: "Vì sao?", coreAnswer: "Vì thế.", creatorFields: ["core_answer"] });
+    expect(state.story?.narrativeArc).toEqual([
+      { beat: "Hook", text: "Mở", facts: [] },
+      { beat: "Payoff", text: "Kết", facts: ["F01"] },
+    ]);
+    expect(state.facts[0]).toMatchObject({ claimVi: "Sung là chùm hoa", must: true, cited: true, link: "none" });
+    expect(state.brief).toMatchObject({ audience: "Học sinh", durationSeconds: 300, learningObjectives: [], avoid: ["Thuật ngữ"] });
+    expect(state.briefStale).toBe(true);
+    expect(state.researchStale).toBe(false);
   });
 
-  it("starts the AI runs with the note and the operation id", async () => {
-    const fn = mockFetch(200, { approaches: [stateWire.approaches[0]] });
-    const approaches = await client.generateStoryApproaches("p1", "thử cách khác", { id: "op-1", signal: new AbortController().signal });
-    expect(approaches[0].code).toBe("VÒNG-ĐỜI");
-    expect(lastCall(fn)).toMatchObject({ path: "story/approaches/generate", method: "POST", body: { note: "thử cách khác" } });
+  it("reads a project with no story and no approved brief", async () => {
+    mockFetch(200, { ...stateWire, story: null, facts: null, brief: null, brief_approved: false, research_resolved: false });
+    const state = await client.getStory("p1");
+    expect(state).toMatchObject({ story: null, facts: [], brief: null, status: "pending", briefApproved: false });
+  });
+
+  it("starts the AI run with the note and the operation id", async () => {
+    const fn = mockFetch(200, storyWire);
+    const story = await client.generateStory("p1", "ngắn hơn", { id: "op-1", signal: new AbortController().signal });
+    expect(story.narrativeArc).toHaveLength(2);
+    expect(lastCall(fn)).toMatchObject({ path: "story/generate", method: "POST", body: { note: "ngắn hơn" } });
     expect(lastCall(fn).headers?.["X-Operation-Id"]).toBe("op-1");
-
-    const gen = mockFetch(200, stateWire);
-    const state = await client.generateStory("p1", "", { id: "op-2", signal: new AbortController().signal });
-    expect(state.fields).toHaveLength(2);
-    expect(lastCall(gen)).toMatchObject({ path: "story/generate", method: "POST", body: { note: "" } });
-    expect(lastCall(gen).headers?.["X-Operation-Id"]).toBe("op-2");
   });
 
-  it("chooses an approach, saves a new kind and turns a fact on or off", async () => {
-    let fn = mockFetch(204);
-    await client.selectStoryApproach("p1", "A3");
-    expect(lastCall(fn)).toMatchObject({ path: "story/approach", method: "PUT", body: { key: "A3" } });
-
-    fn = mockFetch(200, { ...stateWire.approaches[0], archetype_id: "row-1" });
-    const saved = await client.saveApproachAsArchetype("p1", "A2");
-    expect(lastCall(fn)).toMatchObject({ path: "story/approaches/A2/archetype", method: "POST" });
-    expect(saved.archetypeId).toBe("row-1");
-
-    fn = mockFetch(204);
-    await client.setStoryFactUse("p1", "F02", false);
-    expect(lastCall(fn)).toMatchObject({ path: "story/facts/F02", method: "PUT", body: { use: false } });
+  it("sends only the fields of a hand edit", async () => {
+    const fn = mockFetch(200, storyWire);
+    await client.editStory("p1", { coreAnswer: "Đáp án" });
+    expect(lastCall(fn)).toMatchObject({ path: "story", method: "PUT", body: { core_answer: "Đáp án" } });
+    await client.editStory("p1", { narrativeArc: [{ beat: "A", text: "a", facts: ["F01"] }] });
+    expect(lastCall(fn).body).toEqual({ narrative_arc: [{ beat: "A", text: "a", facts: ["F01"] }] });
   });
 
-  it("addresses the story fields and the gate as review units", () => {
-    expect(client.STORY_UNIT).toMatchObject({ kind: "story", key: "main" });
-    expect(client.storyFieldUnit("payoff")).toMatchObject({ kind: "story_field", key: "payoff" });
-    expect(client.STORY_FIELD_KEYS).toEqual(["question", "promise", "chain", "payoff", "logline", "summary"]);
+  it("approves and takes the approval back", async () => {
+    let fn = mockFetch(200, { ...storyWire, status: "approved" });
+    expect((await client.approveStory("p1")).status).toBe("approved");
+    expect(lastCall(fn)).toMatchObject({ path: "story/approve", method: "POST" });
+    fn = mockFetch(200, storyWire);
+    expect((await client.unapproveStory("p1")).status).toBe("pending");
+    expect(lastCall(fn)).toMatchObject({ path: "story/unapprove", method: "POST" });
+  });
+
+  it("names the fields of the story", () => {
+    expect(client.STORY_FIELD_KEYS).toEqual(["central_question", "core_answer", "narrative_arc"]);
   });
 
   it("raises the server's words when the step is not open", async () => {
-    mockFetch(409, { error: "duyệt brief ở bước Ý tưởng trước" });
+    mockFetch(409, { error: "duyệt brief ở bước Creative brief trước" });
     await expect(client.generateStory("p1", "")).rejects.toThrow(/duyệt brief/);
   });
 });

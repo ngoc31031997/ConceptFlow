@@ -36,7 +36,7 @@ type ScriptVersionPort interface {
 // version. The handoff note of a beat is a review unit (domain.UnitKindHandoffBeat)
 // keyed by the beat's key; the review and the glossary are one unit each.
 type ScriptLockDeskUseCase struct {
-	units           StoryStorePort
+	units           StepUnitStorePort
 	projects        ProjectReaderPort
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
@@ -52,7 +52,7 @@ type ScriptLockDeskUseCase struct {
 // NewScriptLockDeskUseCase wires the use case. provider may be nil when no
 // language model is configured: the Creator then writes the notes by hand.
 func NewScriptLockDeskUseCase(
-	units StoryStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units StepUnitStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
 	beats *BeatDeskUseCase, script *ScriptDeskUseCase, versions ScriptVersionPort,
 ) *ScriptLockDeskUseCase {

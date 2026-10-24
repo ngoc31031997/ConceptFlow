@@ -18,14 +18,25 @@ const approvedBriefSHA = `COALESCE((
     WHERE ru.project_id = $1 AND ru.kind = 'brief' AND ru.unit_key = 'main' AND ru.status = 'approved'
 ), '')`
 
+// storyContentSHA hashes the content of the story of project $1: the same hash
+// a unit records as input_sha when it names the story as its input (see
+// domain.StoryInputKind), so that a unit written from a story that has changed
+// since reads as stale.
+const storyContentSHA = `(SELECT md5(ps.central_question || E'\n' || ps.core_answer || E'\n' || ps.narrative_arc::text)
+    FROM project_story ps WHERE ps.project_id = $1)`
+
 // reviewUnitColumns lists a unit's columns for a query that aliases the table
 // as ru. The last column is stale: the unit was built from another unit
 // (input_ref) whose content no longer hashes to what was recorded (input_sha).
+// An input_ref naming the story is hashed from the project's story.
 const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.content, ru.creator_fields, ru.redo_count, ru.updated_at,
     ru.input_ref, ru.input_sha,
     (ru.input_ref <> '' AND ru.input_sha <> COALESCE((
         SELECT md5(src.content::text) FROM review_units src
         WHERE src.project_id = ru.project_id AND src.kind || ':' || src.unit_key = ru.input_ref
+    ), (
+        SELECT md5(ps.central_question || E'\n' || ps.core_answer || E'\n' || ps.narrative_arc::text)
+        FROM project_story ps WHERE ps.project_id = ru.project_id AND ru.input_ref = '` + domain.StoryInputKind + `:` + domain.StoryInputKey + `'
     ), ''))`
 
 func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
@@ -84,14 +95,20 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 // UnitSHA returns the md5 of a unit's content, or "" when there is no such
 // unit. It is the same hash the stale column compares against.
 func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind, key string) (string, error) {
-	var sha string
-	err := r.pool.QueryRow(ctx,
-		`SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`,
-		projectID, kind, key).Scan(&sha)
-	if errors.Is(err, pgx.ErrNoRows) {
+	query := `SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`
+	args := []any{projectID, kind, key}
+	if kind == domain.StoryInputKind && key == domain.StoryInputKey {
+		query, args = `SELECT `+storyContentSHA, []any{projectID}
+	}
+	var sha *string
+	err := r.pool.QueryRow(ctx, query, args...).Scan(&sha)
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && sha == nil) {
 		return "", nil
 	}
-	return sha, err
+	if err != nil {
+		return "", err
+	}
+	return *sha, nil
 }
 
 // SaveUnit upserts a review unit and returns it as stored.
