@@ -77,6 +77,19 @@ func (c *Client) Get(ctx context.Context, projectID string) (*domain.Project, er
 	return &p, nil
 }
 
+// IdeaInput returns the text the Creator typed on the first step and the
+// content language, both kept with the project.
+func (c *Client) IdeaInput(ctx context.Context, projectID string) (application.IdeaInput, error) {
+	var out struct {
+		Subject  string `json:"subject"`
+		Language string `json:"language"`
+	}
+	if err := c.do(ctx, http.MethodGet, "/internal/v1/projects/"+url.PathEscape(projectID)+"/idea-input", nil, &out); err != nil {
+		return application.IdeaInput{}, err
+	}
+	return application.IdeaInput{Subject: out.Subject, Language: domain.ContentLanguage(out.Language)}, nil
+}
+
 // GetStatus is the narrow read the authoring lock needs.
 func (c *Client) GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error) {
 	var out struct {

@@ -415,6 +415,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS prompts_one_system_per_role ON prompts (role) 
 -- time the project spent in from_status.
 ALTER TABLE projects ADD COLUMN IF NOT EXISTS forked_from TEXT NOT NULL DEFAULT '';
 
+-- What the Creator typed on the idea step, and the language the video's
+-- content is written in. authoring-service reads both over the internal API
+-- to have the AI write the idea. Written by their own statement, never by the
+-- long positional upsert above.
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS subject TEXT NOT NULL DEFAULT '';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS language TEXT NOT NULL DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS project_events (
     id                BIGSERIAL PRIMARY KEY,
     project_id        TEXT NOT NULL,

@@ -3,9 +3,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
 import { WizardNav } from "../components/WizardNav";
 import { AiModelSelect } from "../components/AiModelSelect";
-import { IdeaCard } from "../components/IdeaCard";
+import { ContentLanguagePicker } from "../components/ContentLanguagePicker";
+import { ProjectIdeaCard } from "../components/idea/ProjectIdeaCard";
 import type { StepStripProps } from "../components/StepStrip";
-import { Button, Card, TextInput } from "../components/ui";
+import { Button, Card, TextArea } from "../components/ui";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import {
@@ -14,27 +15,28 @@ import {
   patchWizardSettings,
   saveAuthoringModels,
   setTargetDuration,
+  updateProjectTopic,
   type SimilarProject,
 } from "../api/client";
-import { useIdea } from "../hooks/useIdea";
+import { useProjectIdea } from "../hooks/useProjectIdea";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { FLOW_INIT, flowStepName } from "../utils/flow";
 import wizard from "./WizardSteps.module.css";
 import styles from "./ScriptStepPage.module.css";
 
 const SUBTITLE =
-  "Viết ý tưởng ban đầu thành một câu hỏi rõ: vì sao đáng xem, điều đã biết và chưa biết. Chưa cần lời giải và chưa chọn cách kể.";
+  "Gõ ý tưởng của bạn bằng lời thường. AI biến nó thành câu hỏi trung tâm, các điểm gây tò mò và phạm vi; bạn sửa rồi duyệt. Chưa cần lời giải và chưa chọn cách kể.";
 
 /**
- * Bước 1 — Ý tưởng ban đầu, trên xuống:
+ * Bước 1 — Ý tưởng, trên xuống:
  *
- * ① Đề tài: chủ đề hoặc câu hỏi ban đầu, rồi "Tạo project và viết ý tưởng".
- *   Dạng video, ngôn ngữ và thời lượng chọn ở bước Creative brief; project
- *   được tạo với giá trị đang chọn trong bản nháp.
- * ② Ý tưởng (IdeaCard): AI viết từ đề tài, Creator sửa tay hoặc nhờ làm lại,
- *   rồi duyệt. Không có AI thì Creator tự viết.
+ * ① Ý tưởng của bạn: một ô lớn để gõ ý tưởng, ngôn ngữ nội dung, rồi "Tạo
+ *   project và viết ý tưởng". Dạng video, thời lượng và nền tảng không chọn ở
+ *   đây; project nhận giá trị mặc định.
+ * ② Ý tưởng (ProjectIdeaCard): AI viết ba trường từ nội dung đã gõ, đánh giá,
+ *   Creator sửa tay hoặc nhờ làm lại, rồi duyệt. Không có AI thì Creator tự viết.
  *
- * "Sang Creative brief" chỉ mở khi ý tưởng đã duyệt: brief được viết từ ý tưởng.
+ * "Sang bước tiếp theo" chỉ mở khi ý tưởng đã duyệt.
  */
 export function ScriptStepPage() {
   const draft = useContext(ProjectDraftContext);
@@ -47,6 +49,7 @@ export function ScriptStepPage() {
 
   const [createdFor, setCreatedFor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [savingText, setSavingText] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [similarProjects, setSimilarProjects] = useState<SimilarProject[]>([]);
 
@@ -55,7 +58,7 @@ export function ScriptStepPage() {
   }, [draft.hasSubmitted, dispatch]);
 
   // "Tạo video mới" → projectId mới. Xoá cờ khỏi history để reload/Quay lại
-  // không reset thêm lần nữa và làm mất chủ đề vừa gõ.
+  // không reset thêm lần nữa và làm mất nội dung vừa gõ.
   useEffect(() => {
     const st = location.state as { newVideo?: boolean } | null;
     if (!st?.newVideo) return;
@@ -68,14 +71,17 @@ export function ScriptStepPage() {
   // answered, the form stays shut rather than offer to create it twice.
   const created = createdFor === draft.projectId || flow.project?.project_id === draft.projectId;
   const checking = !created && !flow.loaded;
-  const idea = useIdea(draft.projectId, created);
-  const unit = idea.state?.unit ?? null;
-  const topic = draft.authoringTopic;
-  const topicLocked = created || creating || checking;
-  const canCreate = topic.trim().length > 0 && !topicLocked;
+  const idea = useProjectIdea(draft.projectId, created);
+  const stored = idea.screen?.idea ?? null;
+  const text = draft.authoringTopic;
+  const textLocked = creating || checking || savingText;
+  const canCreate = text.trim().length > 0 && !created && !textLocked;
+  // The text the server keeps; once it differs from the box, "Lưu nội dung" is offered.
+  const savedText = idea.screen?.subject ?? "";
+  const textEdited = created && idea.screen !== null && text.trim() !== savedText.trim() && text.trim().length > 0;
 
   async function handleCreate() {
-    const trimmed = topic.trim();
+    const trimmed = text.trim();
     if (!trimmed) return;
     const projectId = draft.projectId;
     setCreateError(null);
@@ -85,6 +91,8 @@ export function ScriptStepPage() {
       // The idea and the brief run on the model picked for the story step: the
       // last one the Creator used, until the AI settings change it.
       await saveAuthoringModels(projectId, draft.authoringModels);
+      // Video form, length and platform are no longer picked on this step: the
+      // project starts with the defaults.
       if (draft.videoOutputMode === "short") {
         await patchWizardSettings(projectId, { videoOutputMode: "short" });
       } else {
@@ -102,19 +110,33 @@ export function ScriptStepPage() {
     if (aiAvailable) void idea.generate();
   }
 
+  async function handleSaveText() {
+    setCreateError(null);
+    setSavingText(true);
+    try {
+      const { similarProjects: similar } = await updateProjectTopic(draft.projectId, text.trim());
+      setSimilarProjects(similar);
+      idea.reload();
+    } catch {
+      setCreateError("Không lưu được nội dung. Vui lòng kiểm tra kết nối và thử lại.");
+    } finally {
+      setSavingText(false);
+    }
+  }
+
   function strip(): StepStripProps {
     if (!created) {
       return createError
         ? { tone: "todo", label: "Chưa tạo project", message: createError }
-        : { tone: "todo", label: "Chưa tạo project", message: "Nhập đề tài rồi bấm Tạo project và viết ý tưởng." };
+        : { tone: "todo", label: "Chưa tạo project", message: "Gõ ý tưởng rồi bấm Tạo project và viết ý tưởng." };
     }
-    if (idea.running) return { tone: "run", label: "AI đang viết ý tưởng", message: "Ô bạn đã sửa giữ nguyên." };
-    if (!unit) return { tone: "todo", label: "Chưa có ý tưởng", message: "AI viết ý tưởng từ đề tài, hoặc bạn tự viết; duyệt rồi sang Creative brief." };
-    if (unit.status === "approved") return { tone: "ok", label: "Ý tưởng đã duyệt", message: "Tiếp theo: Creative brief." };
+    if (idea.writing) return { tone: "run", label: "AI đang viết ý tưởng", message: "Ô bạn đã sửa giữ nguyên." };
+    if (!stored) return { tone: "todo", label: "Chưa có ý tưởng", message: "AI viết ý tưởng từ nội dung bạn gõ, hoặc bạn tự viết; duyệt rồi sang bước tiếp theo." };
+    if (stored.status === "approved") return { tone: "ok", label: "Ý tưởng đã duyệt", message: "Tiếp theo: Creative brief." };
     return {
       tone: "wait",
       label: "Chờ bạn duyệt ý tưởng",
-      message: "AI đã viết ý tưởng từ đề tài. Sửa ô nào cũng được; ô bạn viết thì AI giữ nguyên khi làm lại.",
+      message: "Xem đánh giá của AI rồi duyệt. Sửa ô nào cũng được; ô bạn viết thì AI giữ nguyên khi làm lại.",
     };
   }
 
@@ -122,28 +144,43 @@ export function ScriptStepPage() {
     <div data-testid="script-step-page">
       <AppShell currentStep={FLOW_INIT} wide title={flowStepName(FLOW_INIT)} subtitle={SUBTITLE} strip={strip()}>
         <Card className={styles.card} data-testid="idea-topic-card">
-          <h3 className={styles.cardTitle}>① Đề tài</h3>
+          <h3 className={styles.cardTitle}>① Ý tưởng của bạn</h3>
 
           <div className={styles.field}>
-            <label className={styles.label} htmlFor="idea-topic">
-              Chủ đề hoặc câu hỏi ban đầu <span className={styles.hint}>· tên tạm</span>
+            <label className={styles.label} htmlFor="idea-input">
+              Bạn muốn làm video về điều gì? <span className={styles.hint}>· viết tự nhiên, vài chữ hay vài câu đều được</span>
             </label>
-            <TextInput
-              id="idea-topic"
-              value={topic}
+            <TextArea
+              id="idea-input"
+              value={text}
               onChange={(e) => dispatch({ type: "SET_AUTHORING_TOPIC", payload: e.target.value })}
-              placeholder="Ý tưởng/chủ đề video của bạn là gì?"
-              disabled={topicLocked}
+              placeholder="Ví dụ: Chuyện gì xảy ra nếu ta rơi vào hố đen? Ta có bị kéo dài như sợi mì không? Người bên ngoài có thấy ta biến mất không?"
+              rows={8}
+              disabled={textLocked}
               data-testid="script-step-topic"
             />
           </div>
 
+          {!created && <ContentLanguagePicker value={draft.voiceLanguage} onChange={(language) => dispatch({ type: "SET_VOICE_LANGUAGE", payload: language })} />}
+          {created && (
+            <p className={styles.note} data-testid="idea-language-note">
+              Ngôn ngữ nội dung: {(idea.screen?.language || draft.voiceLanguage) === "en" ? "English" : "Tiếng Việt"}. Ý tưởng được viết bằng ngôn ngữ này.
+            </p>
+          )}
+
           {!created && aiAvailable && <AiModelSelect projectId={draft.projectId} step="brief" label="Model AI viết ý tưởng và brief" testId="idea-brief-model" />}
           <div className={styles.actions}>
             {created ? (
-              <p className={styles.note} data-testid="idea-created-note">
-                ✓ Đã tạo project. Đổi đề tài thì dùng “Làm lại kèm ghi chú” ở ý tưởng.
-              </p>
+              <>
+                <p className={styles.note} data-testid="idea-created-note">
+                  ✓ Đã tạo project. Sửa nội dung thì bấm “Lưu nội dung”, rồi dùng “Làm lại kèm ghi chú” ở ý tưởng nếu muốn AI viết lại.
+                </p>
+                {textEdited && (
+                  <Button variant="primary" onClick={() => void handleSaveText()} disabled={savingText} data-testid="script-step-save-text">
+                    {savingText ? "Đang lưu…" : "Lưu nội dung"}
+                  </Button>
+                )}
+              </>
             ) : (
               <>
                 {createError && (
@@ -162,6 +199,11 @@ export function ScriptStepPage() {
               </>
             )}
           </div>
+          {created && createError && (
+            <p className={styles.error} role="alert">
+              {createError}
+            </p>
+          )}
           {similarProjects.length > 0 && (
             <div className={wizard.topicCollisionBanner} data-testid="topic-collision-banner">
               Chủ đề này giống {similarProjects.length} dự án khác:{" "}
@@ -178,18 +220,18 @@ export function ScriptStepPage() {
           )}
         </Card>
 
-        <IdeaCard projectId={draft.projectId} created={created} idea={idea} aiAvailable={aiAvailable} />
+        <ProjectIdeaCard projectId={draft.projectId} created={created} idea={idea} aiAvailable={aiAvailable} />
       </AppShell>
 
       <WizardNav
         allowWhenLocked
         hint={
-          unit?.status === "approved"
+          stored?.status === "approved"
             ? "Ý tưởng đã duyệt. Sang bước Creative brief."
             : "Duyệt ý tưởng để sang bước Creative brief."
         }
         onNext={() => navigate("/create/script/brief")}
-        nextDisabled={unit?.status !== "approved"}
+        nextDisabled={stored?.status !== "approved"}
         nextLabel="Lưu và sang Creative brief"
         nextTestId="script-step-next"
       />

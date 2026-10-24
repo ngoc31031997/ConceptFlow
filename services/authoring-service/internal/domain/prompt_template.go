@@ -63,6 +63,11 @@ const (
 	// The idea step's writer of the central question, why it is interesting
 	// and what is and is not known; filled by the idea use case.
 	RoleIdea PromptRole = "idea"
+
+	// The first step's writer of the idea from the text the Creator typed, and
+	// the reviewer that reads the idea before the Creator approves it.
+	RoleProjectIdea       PromptRole = "project_idea"
+	RoleProjectIdeaReview PromptRole = "project_idea_review"
 )
 
 // ValidPromptRole reports whether role is one of the known pipeline roles.
@@ -72,7 +77,8 @@ func ValidPromptRole(role string) bool {
 		RoleVisualDirectorAI, RoleRemotionEngineerAI,
 		RoleRemotionAdjust, RoleThumbnailDesign,
 		RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt,
-		RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff:
+		RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
+		RoleProjectIdea, RoleProjectIdeaReview:
 		return true
 	default:
 		return false
@@ -85,7 +91,8 @@ func ValidPromptRole(role string) bool {
 // from their own use cases.
 func IsRenderablePromptRole(role string) bool {
 	switch PromptRole(role) {
-	case RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff:
+	case RoleIdea, RoleCreativeBrief, RoleResearchQuestions, RoleResearchPrompt, RoleStoryApproaches, RoleStoryFrame, RoleBeatSheet, RoleScriptWriter, RoleScriptReview, RoleScriptHandoff,
+		RoleProjectIdea, RoleProjectIdeaReview:
 		return false
 	}
 	return ValidPromptRole(role)

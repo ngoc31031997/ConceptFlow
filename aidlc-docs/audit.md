@@ -3686,3 +3686,51 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CONSTRUCTION — CR-072-U3f, Code Generation xong, chờ Creator duyệt. Chưa chạy AI thật (không có HIVE_API_KEY).
 
 ---
+
+## CR-093 · Requirements Analysis — bắt đầu
+**Timestamp**: 2026-10-24T00:00:00Z
+**User Input**: "tôi muốn đưa toàn bộ flow 1 đến 7 về đúng flow và input và output sau [luồng mẫu 'Ví dụ thực tế Input / Output xuyên suốt pipeline video animation', chủ đề 'Chuyện gì xảy ra nếu ta rơi vào hố đen?': 1 IDEA → idea.md; 2 CREATIVE BRIEF → creative-brief.md; 3 RESEARCH & FACT-CHECK → research/research-dossier.md, research/source-register.csv; 4 STORY DEVELOPMENT → story-structure.md; 5 OUTLINE / BEAT SHEET → beat-sheet.md; 6 SCRIPTWRITING → script-v1.md; 7 SCRIPT REVIEW & LOCK (input thêm review-rules.md; Critical/Major/Minor; không khoá khi còn Critical) → script-review-report.md, script-final.md, script-handoff-notes.md, script-version.json]". Câu hỏi phạm vi: "Đổi cả sản phẩm (CR mới)".
+**AI Response**: Mở nhánh feature/cr-093-content-flow-io (worktree). So luồng mẫu với luồng hiện tại (8 điểm khác D1–D8), ghi nhận nhánh fix/beat-sheet-from-story trùng phần beat/story. Tạo cr-093-requirement-questions.md (14 câu).
+**Context**: Inception · Requirements Analysis, chờ Creator trả lời câu hỏi.
+
+---
+
+## CR-093 · Requirements Analysis — chia mỗi bước một CR
+**Timestamp**: 2026-10-24T00:10:00Z
+**User Input**: "trước khi trả lời mỗi câu hỏi hãy chia mỗi bước thành 1 CR riêng với input và output là contract giữa các bước ta sẽ làm bước một IDEA trước nhé"
+**AI Response**: Chia bảy CR (CR-093 Idea … CR-099 Review & lock), hợp đồng giữa các bước ghi ở aidlc-docs/inception/plans/cr-093-099-content-flow-roadmap.md. Đổi tên nhánh thành feature/cr-093-idea-step; thay file câu hỏi bằng cr-093-idea-requirement-questions.md (8 câu, chỉ bước 1).
+**Context**: Inception · Requirements Analysis CR-093, chờ Creator trả lời.
+
+---
+
+## CR-093 · Requirements Analysis — Creator đã trả lời câu hỏi bước 1
+**Timestamp**: 2026-10-24T00:30:00Z
+**User Input**: "tôi trả lời rồi đó" (câu trả lời nằm trong cr-093-idea-requirement-questions.md: Q1 textbox lớn, AI trả topic/central_question/curiosity_points[]/scope, lưu theo project; Q2 A; Q3 chưa cần quan tâm; Q4 B kèm Definition of Done — IDEA (Machine Validation, Quality Review, Creator Approval); Q5 chưa cần quan tâm brief; Q6 bảng riêng project_idea; Q7 không cần quan tâm; Q8 thêm trường chọn ngôn ngữ để AI viết brief theo ngôn ngữ đã chọn)
+**AI Response**: Phát hiện 5 điểm mơ hồ (lưu hay không văn bản thô, vị trí màn Idea so với màn tạo project, phạm vi của ô ngôn ngữ, quan hệ giữa bảng project_idea và khung đơn vị, lưu kết quả AI review). Tạo cr-093-idea-clarification-questions.md. Chưa viết requirements.md.
+**Context**: Inception · Requirements Analysis CR-093, chờ trả lời câu hỏi làm rõ.
+
+---
+
+## CR-093 · Requirements Analysis — trả lời câu hỏi làm rõ, tạo requirements
+**Timestamp**: 2026-10-24T00:50:00Z
+**User Input**: "1 có lưu nhưng nó sẽ dc lưu vào table chính là table project, field ngôn ngữ cũng lưu ở table này / 2 thay thế màn hình bước 1 hiện tại / 3 có, 4 trường idea viết theo ngôn ngữ được chọn / 4 không idea có API riêng / 5 có nhưng lưu vào 1 table riêng ko ảnh hưởng đến hiện tại". Hỏi thêm (AskUserQuestion): nơi lưu → "dùng lại cột cũ để lưu chủ đề của project, ngôn ngữ dùng cột language để đánh dấu project làm bằng ngôn ngữ nào. authoring-serivce đọc qua API, không ghi chéo db"; các ô cũ → "chưa cần quân tâm đế các ô đó và bước brief".
+**AI Response**: Tạo cr-093-idea-step.md (FR-1..12, NFR-1..6). Ghi rõ ngoài phạm vi: các ô cũ và brief, project cũ, xuất file. Chưa bắt đầu Workflow Planning.
+**Context**: Inception · Requirements Analysis CR-093, chờ Creator duyệt.
+
+---
+
+## CR-093 · Vào code bước Idea
+**Timestamp**: 2026-10-24T11:00:00Z
+**User Input**: "vẫn giữ nguyên quyết định là lưu 2 cột đó vào table này bổ sung thêm cho nhé" / "nghe tôi này bạn không cần quan tâm đến trước đó như thế nào. giờ bạn cứ sửa lại theo ý tôi ok chứ còn bước brief tôi đã nói tạm thời không quan tâm, bạn chỉ quan tâm đến bước idea, brief chạy lỗi hay gì kệ nó HIỂU CHỨ" (cùng các chốt trước: cột `subject`, cột `language`, `topic` Creator nhập khác trường AI sửa lại nên đặt tên rõ nghĩa, vào coding luôn)
+**AI Response**: Bỏ qua các giai đoạn thiết kế theo yêu cầu của Creator. Orchestrator: thêm cột `projects.subject`, `projects.language`, `SaveIdeaInput`/`GetIdeaInput`, route nội bộ `idea-input`. Authoring-service: domain `ProjectIdea`/`IdeaReview`, use case `ProjectIdeaUseCase`, bảng `project_idea`, `project_idea_review`, prompt `project_idea`, `project_idea_review`, route `/idea` (generate, PUT, approve, unapprove, review). Gateway: thêm route. Web-gui: `ScriptStepPage` mới, `useProjectIdea`, `components/idea/*`, gỡ `IdeaCard`. Hợp đồng `docs/contracts/idea-v1.md`. Đính chính `cr-093-idea-step.md`: bước Ý tưởng đã tồn tại và `topic`/`language` nằm ở `project_authoring`. Chưa commit (chờ Creator duyệt).
+**Context**: Construction (rút gọn theo yêu cầu của Creator) CR-093.
+
+---
+
+## CR-093 · Thay prompt viết ý tưởng, bỏ refined_topic
+**Timestamp**: 2026-10-24T12:00:00Z
+**User Input**: "tôi muốn dùng system promt này [system prompt IDEA EDITOR, schema 3 key central_question/curiosity_points/scope] cho bước idea. bạn review rồi check giúp tôi, oke thì thay thế bản hiện tại nhé" / "promt viết lại là promt gốc + kết quả cũ + review của creator" / "B"
+**AI Response**: Review: prompt thiếu refined_topic (code bắt buộc) và dùng {{topic}} thay {{subject}}. Creator chọn B: bỏ refined_topic khỏi domain, bảng project_idea (DROP COLUMN), API, web-gui, hợp đồng. Thay seed project_idea bằng nguyên văn prompt của Creator; code điền {{topic}} bằng đoạn Creator gõ.
+**Context**: CR-093, chưa commit.
+
+---

@@ -99,6 +99,7 @@ type projectStore interface {
 	GetStatus(ctx context.Context, projectID string) (domain.ProjectStatus, error)
 	GetVideoFormat(ctx context.Context, formatID string, version int) (domain.VideoFormat, error)
 	GetVoiceCalibration(ctx context.Context, voiceID string) (domain.VoiceCalibration, error)
+	GetIdeaInput(ctx context.Context, projectID string) (string, domain.ContentLanguage, error)
 }
 
 type deleteProjectUseCase interface {
@@ -306,6 +307,7 @@ func (rt *Router) Handler() http.Handler {
 	// Internal — called by authoring-service only (never routed by the gateway).
 	r.Get("/internal/v1/projects/{project_id}", rt.handleInternalGetProject)
 	r.Get("/internal/v1/projects/{project_id}/status", rt.handleInternalProjectStatus)
+	r.Get("/internal/v1/projects/{project_id}/idea-input", rt.handleInternalIdeaInput)
 	r.Get("/internal/v1/formats/{format_id}", rt.handleInternalGetFormat)
 	r.Get("/internal/v1/voices/{voice_id}/calibration", rt.handleInternalVoiceCalibration)
 	r.Post("/internal/v1/projects/{project_id}/draft-voice", rt.handleInternalDraftVoice)
@@ -1018,6 +1020,18 @@ func (rt *Router) handleInternalProjectStatus(w http.ResponseWriter, r *http.Req
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": string(status)})
+}
+
+// handleInternalIdeaInput returns the text the Creator typed on the idea step
+// and the content language, which authoring-service has the AI write the idea
+// from.
+func (rt *Router) handleInternalIdeaInput(w http.ResponseWriter, r *http.Request) {
+	subject, language, err := rt.projects.GetIdeaInput(r.Context(), chi.URLParam(r, "project_id"))
+	if err != nil {
+		writeUseCaseError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"subject": subject, "language": string(language)})
 }
 
 func (rt *Router) handleInternalGetFormat(w http.ResponseWriter, r *http.Request) {

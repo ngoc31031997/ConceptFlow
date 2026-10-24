@@ -80,3 +80,23 @@ func TestClient_AppendsErrorsAndEvents(t *testing.T) {
 		t.Fatalf("error not posted: %v", got)
 	}
 }
+
+func TestClient_IdeaInputReadsTheTextAndLanguage(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/internal/v1/projects/p1/idea-input" {
+			http.NotFound(w, r)
+			return
+		}
+		_, _ = w.Write([]byte(`{"subject":"Rơi vào hố đen?","language":"vi"}`))
+	}))
+	defer srv.Close()
+	c := NewClient(srv.URL, time.Second)
+
+	in, err := c.IdeaInput(context.Background(), "p1")
+	if err != nil || in.Subject != "Rơi vào hố đen?" || in.Language != domain.LanguageVietnamese {
+		t.Fatalf("idea input = %+v err=%v", in, err)
+	}
+	if _, err := c.IdeaInput(context.Background(), "nope"); !errors.Is(err, domain.ErrProjectNotFound) {
+		t.Fatalf("a 404 must become ErrProjectNotFound, got %v", err)
+	}
+}

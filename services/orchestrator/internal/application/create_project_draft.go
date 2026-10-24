@@ -21,6 +21,9 @@ type ProjectDraftPort interface {
 	// scoped to "same language" — see NormalizeTopic's doc comment).
 	GetStatusAndLanguage(ctx context.Context, projectID string) (domain.ProjectStatus, domain.ContentLanguage, error)
 	SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error
+	// SaveIdeaInput keeps the Creator's text and the content language on the
+	// project itself, for authoring-service to read when it writes the idea.
+	SaveIdeaInput(ctx context.Context, projectID, subject string, language domain.ContentLanguage) error
 	FindSimilarTopics(ctx context.Context, language domain.ContentLanguage, normalizedTopic, excludeProjectID string) ([]SimilarProject, error)
 	// Get loads a whole project; used to link a new short to its long video.
 	Get(ctx context.Context, projectID string) (*domain.Project, error)
@@ -118,6 +121,9 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 		if err := uc.repo.SaveAuthoringTopic(ctx, projectID, topic, input.ContentLanguage); err != nil {
 			return nil, err
 		}
+		if err := uc.repo.SaveIdeaInput(ctx, projectID, topic, input.ContentLanguage); err != nil {
+			return nil, err
+		}
 		var err error
 		similar, err = uc.repo.FindSimilarTopics(ctx, input.ContentLanguage, domain.NormalizeTopic(topic), projectID)
 		if err != nil {
@@ -190,6 +196,9 @@ func (uc *UpdateProjectTopicUseCase) Execute(ctx context.Context, input UpdatePr
 	}
 
 	if err := uc.repo.SaveAuthoringTopic(ctx, input.ProjectID, topic, language); err != nil {
+		return nil, err
+	}
+	if err := uc.repo.SaveIdeaInput(ctx, input.ProjectID, topic, language); err != nil {
 		return nil, err
 	}
 	similar, err := uc.repo.FindSimilarTopics(ctx, language, domain.NormalizeTopic(topic), input.ProjectID)

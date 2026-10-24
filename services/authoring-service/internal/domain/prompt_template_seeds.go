@@ -7,6 +7,8 @@ package domain
 func DefaultPromptTemplates() []PromptTemplate {
 	return []PromptTemplate{
 		{Role: RoleIdea, Language: "vi", Version: 1, TemplateText: ideaVI},
+		{Role: RoleProjectIdea, Language: "vi", Version: 1, TemplateText: projectIdeaVI},
+		{Role: RoleProjectIdeaReview, Language: "vi", Version: 1, TemplateText: projectIdeaReviewVI},
 		{Role: RoleCreativeBrief, Language: "vi", Version: 1, TemplateText: creativeBriefVI},
 		{Role: RoleResearchQuestions, Language: "vi", Version: 1, TemplateText: researchQuestionsVI},
 		{Role: RoleResearchPrompt, Language: "vi", Version: 1, TemplateText: researchPromptVI},

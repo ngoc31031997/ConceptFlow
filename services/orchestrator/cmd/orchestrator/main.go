@@ -240,6 +240,10 @@ func (a projectDraftAdapter) GetStatusAndLanguage(ctx context.Context, projectID
 	return a.projects.GetStatusAndLanguage(ctx, projectID)
 }
 
+func (a projectDraftAdapter) SaveIdeaInput(ctx context.Context, projectID, subject string, language domain.ContentLanguage) error {
+	return a.projects.SaveIdeaInput(ctx, projectID, subject, language)
+}
+
 func (a projectDraftAdapter) SaveAuthoringTopic(ctx context.Context, projectID, topic string, language domain.ContentLanguage) error {
 	return a.authoring.SaveAuthoringTopic(ctx, projectID, topic, language)
 }

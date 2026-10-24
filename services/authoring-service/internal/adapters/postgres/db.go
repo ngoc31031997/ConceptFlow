@@ -350,6 +350,32 @@ CREATE TABLE IF NOT EXISTS research_pastes (
 );
 -- Colours outside the channel palette (S9) are not a warning; drop any such
 -- stored warnings so no drawing shows them.
+-- The first step's idea: what the AI made of the text the Creator typed. The
+-- text itself and the language live with the project in the orchestrator.
+-- creator_fields lists the fields the Creator wrote, which the AI keeps when it
+-- writes the idea again; input_hash and language say what it was written from.
+CREATE TABLE IF NOT EXISTS project_idea (
+    project_id       TEXT PRIMARY KEY,
+    central_question TEXT NOT NULL DEFAULT '',
+    curiosity_points JSONB NOT NULL DEFAULT '[]',
+    scope            TEXT NOT NULL DEFAULT '',
+    creator_fields   JSONB NOT NULL DEFAULT '[]',
+    status           TEXT NOT NULL DEFAULT 'pending',
+    redo_count       INTEGER NOT NULL DEFAULT 0,
+    language         TEXT NOT NULL DEFAULT '',
+    input_hash       TEXT NOT NULL DEFAULT '',
+    approved_at      TIMESTAMPTZ,
+    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE project_idea DROP COLUMN IF EXISTS refined_topic;
+-- The AI's latest review of the idea, kept apart from the idea so dropping it
+-- changes nothing about the idea. idea_hash is the hash of the idea it read.
+CREATE TABLE IF NOT EXISTS project_idea_review (
+    project_id TEXT PRIMARY KEY,
+    review     JSONB NOT NULL,
+    idea_hash  TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

@@ -1758,6 +1758,177 @@ export async function generateIdea(projectId: string, operation?: OperationCall)
   return fromWireUnit(wire, parseIdea);
 }
 
+/** Where an idea stands in review. */
+export type ProjectIdeaStatus = "pending" | "approved";
+
+/** The idea the AI made of the Creator's text, with what review needs around it. */
+export interface ProjectIdea {
+  centralQuestion: string;
+  curiosityPoints: string[];
+  scope: string;
+  /** Fields the Creator wrote or changed; the AI keeps them when it writes again. */
+  creatorFields: ProjectIdeaField[];
+  status: ProjectIdeaStatus;
+  redoCount: number;
+  approvedAt: string | null;
+  updatedAt: string;
+}
+
+/** The idea's fields, in the order the screen shows them. */
+export const PROJECT_IDEA_FIELDS = ["central_question", "curiosity_points", "scope"] as const;
+export type ProjectIdeaField = (typeof PROJECT_IDEA_FIELDS)[number];
+
+export type IdeaRating = "good" | "fair" | "weak";
+
+export interface IdeaAspect {
+  rating: IdeaRating;
+  comment: string;
+}
+
+/** The AI's reading of an idea before approval; advice only. */
+export interface IdeaReview {
+  clarity: IdeaAspect;
+  researchability: IdeaAspect;
+  scopeFit: IdeaAspect;
+  unclear: string[];
+  suggestions: string[];
+  createdAt: string;
+}
+
+/** Everything the idea screen shows. */
+export interface IdeaScreen {
+  idea: ProjectIdea | null;
+  /** The text the Creator typed, kept with the project. */
+  subject: string;
+  language: "vi" | "en" | "";
+  /** The text or language changed after the idea was written. */
+  inputChanged: boolean;
+  review: IdeaReview | null;
+  /** The idea changed after the review read it. */
+  reviewStale: boolean;
+}
+
+interface ideaWire {
+  central_question: string;
+  curiosity_points: string[] | null;
+  scope: string;
+  creator_fields: string[] | null;
+  status: ProjectIdeaStatus;
+  redo_count: number;
+  approved_at: string | null;
+  updated_at: string;
+}
+
+interface ideaReviewWire {
+  clarity: IdeaAspect;
+  researchability: IdeaAspect;
+  scope_fit: IdeaAspect;
+  unclear: string[] | null;
+  suggestions: string[] | null;
+  created_at: string;
+}
+
+function fromWireIdea(w: ideaWire): ProjectIdea {
+  return {
+    centralQuestion: w.central_question,
+    curiosityPoints: w.curiosity_points ?? [],
+    scope: w.scope,
+    creatorFields: (w.creator_fields ?? []).filter((f): f is ProjectIdeaField =>
+      (PROJECT_IDEA_FIELDS as readonly string[]).includes(f),
+    ),
+    status: w.status,
+    redoCount: w.redo_count,
+    approvedAt: w.approved_at,
+    updatedAt: w.updated_at,
+  };
+}
+
+function fromWireIdeaReview(w: ideaReviewWire): IdeaReview {
+  return {
+    clarity: w.clarity,
+    researchability: w.researchability,
+    scopeFit: w.scope_fit,
+    unclear: w.unclear ?? [],
+    suggestions: w.suggestions ?? [],
+    createdAt: w.created_at,
+  };
+}
+
+/** Reads the first step: the idea, the text it was written from and the AI's review. */
+export async function getIdeaScreen(projectId: string): Promise<IdeaScreen> {
+  const w = await apiFetch<{
+    idea: ideaWire | null;
+    subject: string;
+    language: string;
+    input_changed: boolean;
+    review: ideaReviewWire | null;
+    review_stale: boolean;
+  }>(`/v1/projects/${projectId}/idea`);
+  return {
+    idea: w.idea ? fromWireIdea(w.idea) : null,
+    subject: w.subject,
+    language: w.language === "vi" || w.language === "en" ? w.language : "",
+    inputChanged: w.input_changed,
+    review: w.review ? fromWireIdeaReview(w.review) : null,
+    reviewStale: w.review_stale,
+  };
+}
+
+/**
+ * Has the AI write the idea from the Creator's text, keeping the fields the
+ * Creator wrote (a model call: pass an operation id to follow it). 503 when no
+ * language model is configured, 502 when the reply could not be read.
+ */
+export async function generateProjectIdea(projectId: string, note: string, operation?: OperationCall): Promise<ProjectIdea> {
+  const wire = await apiFetch<ideaWire>(`/v1/projects/${projectId}/idea/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: JSON.stringify({ note }),
+  });
+  return fromWireIdea(wire);
+}
+
+/** A hand edit: only the fields given change. */
+export interface ProjectIdeaPatch {
+  centralQuestion?: string;
+  curiosityPoints?: string[];
+  scope?: string;
+}
+
+/** Saves a hand edit. 400 when the list holds more than the server allows. */
+export async function editProjectIdea(projectId: string, patch: ProjectIdeaPatch): Promise<ProjectIdea> {
+  const body: Record<string, unknown> = {};
+  if (patch.centralQuestion !== undefined) body.central_question = patch.centralQuestion;
+  if (patch.curiosityPoints !== undefined) body.curiosity_points = patch.curiosityPoints;
+  if (patch.scope !== undefined) body.scope = patch.scope;
+  const wire = await apiFetch<ideaWire>(`/v1/projects/${projectId}/idea`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return fromWireIdea(wire);
+}
+
+/** Approves the idea; 400 while a field is empty. */
+export async function approveProjectIdea(projectId: string): Promise<ProjectIdea> {
+  return fromWireIdea(await apiFetch<ideaWire>(`/v1/projects/${projectId}/idea/approve`, { method: "POST" }));
+}
+
+/** Takes the approval back. */
+export async function unapproveProjectIdea(projectId: string): Promise<ProjectIdea> {
+  return fromWireIdea(await apiFetch<ideaWire>(`/v1/projects/${projectId}/idea/unapprove`, { method: "POST" }));
+}
+
+/** Has the AI read the idea for clarity, researchability and scope (a model call). */
+export async function reviewProjectIdea(projectId: string, operation?: OperationCall): Promise<IdeaReview> {
+  const wire = await apiFetch<ideaReviewWire>(`/v1/projects/${projectId}/idea/review`, {
+    method: "POST",
+    ...operationInit(operation),
+  });
+  return fromWireIdeaReview(wire);
+}
+
 /**
  * The brief step as the server holds it. `storyStale`: the outline on the
  * story step was written from another brief than the approved one.
