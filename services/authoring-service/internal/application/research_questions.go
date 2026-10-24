@@ -12,9 +12,6 @@ import (
 // questionTextField is the one editable field of a research question.
 const questionTextField = "text"
 
-// briefRef names the brief as the unit AI-written questions are built from.
-const briefRef = domain.UnitKindBrief + ":" + domain.BriefUnitKey
-
 // questions loads every research question in code order.
 func (uc *ResearchDeskUseCase) questions(ctx context.Context, projectID string) ([]QuestionView, error) {
 	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindResearchQuestion)
@@ -27,7 +24,7 @@ func (uc *ResearchDeskUseCase) questions(ctx context.Context, projectID string) 
 		if err := json.Unmarshal(u.Content, &q); err != nil {
 			return nil, fmt.Errorf("read stored question %s: %w", u.Key, err)
 		}
-		out = append(out, QuestionView{ID: u.Key, Text: q.Text, Mine: u.HasCreatorField(questionTextField), Stale: u.Stale})
+		out = append(out, QuestionView{ID: u.Key, Text: q.Text, Mine: u.HasCreatorField(questionTextField), briefHash: q.BriefHash})
 	}
 	return out, nil
 }
@@ -56,14 +53,6 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 	if err != nil {
 		return nil, fmt.Errorf("load project: %w", err)
 	}
-	topic, err := uc.units.GetAuthoringTopic(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("load topic: %w", err)
-	}
-	label, err := uc.durationLabel(ctx, projectID, project)
-	if err != nil {
-		return nil, err
-	}
 	models, err := uc.units.GetAuthoringModels(ctx, projectID)
 	if err != nil {
 		return nil, fmt.Errorf("load authoring models: %w", err)
@@ -77,15 +66,10 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 		return nil, err
 	}
 
-	briefText, err := briefSectionFor(ctx, uc.units, projectID, project.VideoOutputMode, idea, brief, label)
-	if err != nil {
-		return nil, err
-	}
-	language := briefLanguage(project.ContentLanguage)
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"topic":          topic,
-		"brief":          briefText,
-		"brief_language": briefLanguageName(language),
+		"idea":           idea.Section(),
+		"brief":          brief.Section(),
+		"brief_language": briefLanguageName(briefLanguage(project.ContentLanguage)),
 		"kept_questions": keptQuestionsText(existing, replaceEdited),
 		"redo_note":      noteText(note),
 	})
@@ -116,18 +100,15 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 		return nil, err
 	}
 	next := nextQuestionNumber(gate, existing)
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
-	if err != nil {
-		return nil, err
-	}
+	briefHash := brief.Hash()
 	for _, text := range written {
-		raw, err := json.Marshal(domain.ResearchQuestion{Text: text})
+		raw, err := json.Marshal(domain.ResearchQuestion{Text: text, BriefHash: briefHash})
 		if err != nil {
 			return nil, err
 		}
 		if _, err := uc.units.SaveUnit(ctx, domain.ReviewUnit{
 			ProjectID: projectID, Kind: domain.UnitKindResearchQuestion, Key: domain.QuestionID(next),
-			Status: domain.UnitPending, Content: raw, InputRef: briefRef, InputSHA: sha,
+			Status: domain.UnitPending, Content: raw,
 		}); err != nil {
 			return nil, err
 		}

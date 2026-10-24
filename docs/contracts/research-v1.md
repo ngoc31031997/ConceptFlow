@@ -2,6 +2,13 @@
 
 Bước Nghiên cứu (authoring-service) đọc câu trả lời của một công cụ nghiên cứu bên ngoài mà Creator dán vào, rồi tải từng trang nguồn để kiểm đoạn trích. File này ghi hợp đồng của hai việc đó. Lý do chọn cách làm: [ADR-0043](../../aidlc-docs/decisions/ADR-0043-pasted-research-with-source-verification.md). Mã tương ứng: `services/authoring-service/internal/domain/research.go` (đọc khối JSON), `internal/domain/source_match.go` (so đoạn trích), `internal/adapters/sourcefetch/` (tải trang).
 
+## Nơi lưu và nguồn đầu vào
+
+- Dữ kiện lưu trong bảng `project_research` của authoring-service, một dòng một dữ kiện, khoá `(project_id, fact_id)`. Các bước sau đọc bảng này. Cột: `question_id`, `claim_vi`, `type`, `source_title`, `publisher`, `year`, `url`, `quote`, `confidence`, `note`, `must`, `keep`, `link_state`, `link_why`, `link_nearest`, `link_checked_at`, `creator_fields` (các ô Creator tự viết, lần dán sau không ghi đè), `created_at`, `updated_at`. Bước đọc dữ kiện đang giữ lọc `keep = true` và dùng `type`, `link_state` để biết dữ kiện đã được xác minh chưa.
+- Câu hỏi nghiên cứu và cổng duyệt/bỏ qua của bước vẫn là review unit (`research_question`, `research`).
+- Đầu vào của bước: idea đã duyệt đọc từ `project_idea` (`{{idea}}`) và brief đã duyệt đọc từ `project_brief` (`{{brief}}`). Chưa duyệt một trong hai thì sinh câu hỏi và lấy prompt trả `409`.
+- Duyệt bảng chỉ cần có một dữ kiện đang giữ; nguồn chưa xác minh không chặn duyệt. Bước vẫn có thể bỏ qua.
+
 ## Mẫu JSON
 
 Prompt nghiên cứu (vai `research_prompt`, sửa được ở Cài đặt prompt) yêu cầu công cụ trả duy nhất một khối ` ```json ` như sau:

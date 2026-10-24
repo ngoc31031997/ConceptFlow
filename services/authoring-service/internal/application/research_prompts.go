@@ -71,8 +71,8 @@ func (uc *ResearchDeskUseCase) FollowUpPrompt(ctx context.Context, projectID str
 // promptInputs is what both prompts are built from.
 type promptInputs struct {
 	topic     string
-	idea      domain.Idea
-	brief     domain.CreativeBrief
+	idea      domain.ProjectIdea
+	brief     domain.ProjectBrief
 	duration  string
 	questions []QuestionView
 }
@@ -82,17 +82,9 @@ func (uc *ResearchDeskUseCase) promptInputs(ctx context.Context, projectID strin
 	if err != nil {
 		return promptInputs{}, err
 	}
-	project, err := uc.projects.Get(ctx, projectID)
-	if err != nil {
-		return promptInputs{}, fmt.Errorf("load project: %w", err)
-	}
 	topic, err := uc.units.GetAuthoringTopic(ctx, projectID)
 	if err != nil {
 		return promptInputs{}, fmt.Errorf("load topic: %w", err)
-	}
-	duration, err := uc.durationLabel(ctx, projectID, project)
-	if err != nil {
-		return promptInputs{}, err
 	}
 	questions, err := uc.questions(ctx, projectID)
 	if err != nil {
@@ -101,7 +93,7 @@ func (uc *ResearchDeskUseCase) promptInputs(ctx context.Context, projectID strin
 	if len(questions) == 0 {
 		return promptInputs{}, fmt.Errorf("%w: chưa có câu hỏi nào để tra", domain.ErrInvalidStatus)
 	}
-	return promptInputs{topic: topic, idea: idea, brief: brief, duration: duration, questions: questions}, nil
+	return promptInputs{topic: topic, idea: idea, brief: brief, duration: durationLabel(brief), questions: questions}, nil
 }
 
 func (uc *ResearchDeskUseCase) renderResearchPrompt(ctx context.Context, in promptInputs, heading string, questions []QuestionView, extra, answerNote string) (string, error) {
@@ -115,7 +107,7 @@ func (uc *ResearchDeskUseCase) renderResearchPrompt(ctx context.Context, in prom
 	}
 	return domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
 		"topic":             in.topic,
-		"central_question":  in.idea.Question,
+		"central_question":  in.idea.CentralQuestion,
 		"audience":          in.brief.Audience,
 		"target_duration":   in.duration,
 		"questions_heading": heading,

@@ -119,9 +119,31 @@ type ResearchGate struct {
 	NextQuestion int `json:"next_question"`
 }
 
-// ResearchQuestion is the content of a question unit.
+// ResearchQuestion is the content of a question unit. BriefHash identifies the
+// approved brief an AI-written question was written from; it is empty for a
+// question the Creator wrote or edited.
 type ResearchQuestion struct {
-	Text string `json:"text"`
+	Text      string `json:"text"`
+	BriefHash string `json:"brief_hash,omitempty"`
+}
+
+// StoredFact is a fact as the project_research table holds it: the fact under
+// its code, with the names of the fields the Creator wrote by hand, which a
+// pasted answer does not overwrite.
+type StoredFact struct {
+	ID            string
+	Fact          Fact
+	CreatorFields []string
+}
+
+// HasCreatorField reports whether the Creator wrote or changed the named field.
+func (s StoredFact) HasCreatorField(name string) bool {
+	for _, f := range s.CreatorFields {
+		if f == name {
+			return true
+		}
+	}
+	return false
 }
 
 // ErrNoResearchJSON is returned when a pasted answer holds no research JSON block.

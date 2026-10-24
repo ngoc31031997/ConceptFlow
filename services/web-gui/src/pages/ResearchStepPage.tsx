@@ -127,6 +127,9 @@ export function ResearchStepPage() {
           running={research.running}
           run={research.run}
           locked={locked}
+          idea={s.idea}
+          brief={s.brief}
+          onReloadInput={research.reload}
           onGenerate={research.generateQuestions}
           onAdd={research.addQuestion}
           onSave={research.saveQuestion}

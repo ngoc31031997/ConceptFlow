@@ -565,3 +565,31 @@ func TestStateCoversEachQuestionByIndependentSources(t *testing.T) {
 		t.Errorf("gate JSON = %s", raw)
 	}
 }
+
+// The Creator may approve the table while a source is unchecked or its quote was
+// not found: approval needs one kept fact, not a verified link.
+func TestApproveAllowsFactsWithUnverifiedSources(t *testing.T) {
+	f := newFactsFixture(t)
+	ctx := context.Background()
+	f.seedFact(t, "F01", domain.Fact{
+		Question: "Q1", ClaimVI: "Dữ kiện chưa xác minh", Type: domain.FactTypeFact, URL: "https://example.org/1",
+		Quote: "không có trên trang", Keep: true, Link: domain.FactLink{State: domain.LinkBad, Why: "không thấy đoạn trích"},
+	})
+	if _, err := f.units.Approve(ctx, "p1", domain.UnitKindResearch, domain.ResearchUnitKey); err != nil {
+		t.Fatalf("a table with an unverified source must be approvable: %v", err)
+	}
+}
+
+// The facts live in project_research and the later steps read them there: a pasted
+// answer is saved as rows and survives a read back.
+func TestPastedFactsAreStoredForLaterSteps(t *testing.T) {
+	f := newFactsFixture(t)
+	ctx := context.Background()
+	if _, err := f.uc.IngestPaste(ctx, "p1", answer(claimRow("F01", 1), claimRow("F02", 2))); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := f.store.ListResearchFacts(ctx, "p1")
+	if err != nil || len(stored) != 2 || stored[0].ID != "F01" || stored[1].Fact.ClaimVI != "Dữ kiện số 2" || !stored[0].Fact.Keep {
+		t.Fatalf("stored facts = %+v, %v, want F01 and F02 kept", stored, err)
+	}
+}

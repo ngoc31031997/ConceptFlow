@@ -386,6 +386,9 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 		return err
 	}
 	// And the log of its pasted research answers.
+	if _, err := r.pool.Exec(ctx, `DELETE FROM project_research WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
 	if _, err := r.pool.Exec(ctx, `DELETE FROM research_pastes WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}

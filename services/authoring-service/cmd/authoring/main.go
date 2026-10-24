@@ -132,11 +132,12 @@ func main() {
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
-	// The research step: its questions, facts and gate are review units too.
+	// The research step: its questions and gate are review units, its facts rows
+	// of project_research, planned from the approved idea and brief.
 	// The pages facts cite are checked in the background, by a fetcher that
 	// reaches only public hosts.
 	research := application.NewResearchDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectIdea, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	sourceVerifier := application.NewSourceVerifier(authoringRepo, sourcefetch.New())
 	sourceVerifier.Start(ctx)
 	research.WithVerifier(sourceVerifier)

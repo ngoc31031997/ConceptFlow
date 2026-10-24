@@ -30,6 +30,8 @@ type QuestionView struct {
 	Mine bool `json:"mine"`
 	// Stale is true for a question the AI wrote from a brief that has changed since.
 	Stale bool `json:"stale"`
+	// briefHash identifies the brief the AI wrote the question from.
+	briefHash string
 }
 
 // FactView is one fact with its code and the fields the Creator wrote.
@@ -48,8 +50,12 @@ type ResearchState struct {
 	Facts     []FactView                `json:"facts"`
 	Pastes    []PasteLog                `json:"pastes"`
 	Coverage  []domain.QuestionCoverage `json:"coverage"`
-	// BriefApproved is true when the idea step's brief is approved.
+	// BriefApproved is true when the idea and the brief are both approved.
 	BriefApproved bool `json:"brief_approved"`
+	// Idea and Brief are the approved idea and brief the research is planned
+	// from, nil while not approved.
+	Idea  *domain.ProjectIdea  `json:"idea"`
+	Brief *domain.ProjectBrief `json:"brief"`
 	// QuestionsStale is true when some AI-written question was written from a
 	// brief that has changed.
 	QuestionsStale bool `json:"questions_stale"`
@@ -62,6 +68,8 @@ type ResearchState struct {
 // domain.UnitKindResearchQuestion, UnitKindFact and UnitKindResearch).
 type ResearchDeskUseCase struct {
 	units           ResearchStorePort
+	ideas           ApprovedIdeaPort
+	briefs          ApprovedBriefPort
 	projects        ProjectReaderPort
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
@@ -94,11 +102,12 @@ func (uc *ResearchDeskUseCase) RegisterFactDependents(f FactDependentsFinder) *R
 // NewResearchDeskUseCase wires the use case. provider may be nil when no
 // language model is configured: the Creator then writes the questions by hand.
 func NewResearchDeskUseCase(
-	units ResearchStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units ResearchStorePort, ideas ApprovedIdeaPort, briefs ApprovedBriefPort, projects ProjectReaderPort,
+	locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
 ) *ResearchDeskUseCase {
 	return &ResearchDeskUseCase{
-		units: units, projects: projects, locks: locks, prompts: prompts,
+		units: units, ideas: ideas, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
 		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
@@ -123,11 +132,6 @@ func (uc *ResearchDeskUseCase) State(ctx context.Context, projectID string) (Res
 	if state.Questions, err = uc.questions(ctx, projectID); err != nil {
 		return ResearchState{}, err
 	}
-	for _, q := range state.Questions {
-		if q.Stale {
-			state.QuestionsStale = true
-		}
-	}
 	if state.Facts, err = uc.facts(ctx, projectID); err != nil {
 		return ResearchState{}, err
 	}
@@ -135,8 +139,27 @@ func (uc *ResearchDeskUseCase) State(ctx context.Context, projectID string) (Res
 		return ResearchState{}, err
 	}
 	state.Coverage = coverageOf(state.Questions, state.Facts)
-	if _, _, state.BriefApproved, err = loadApprovedBrief(ctx, uc.units, projectID); err != nil {
+	brief, approved, err := uc.briefs.ApprovedBrief(ctx, projectID)
+	if err != nil {
 		return ResearchState{}, err
+	}
+	idea, ideaApproved, err := uc.ideas.ApprovedIdea(ctx, projectID)
+	if err != nil {
+		return ResearchState{}, err
+	}
+	state.BriefApproved = approved && ideaApproved
+	if ideaApproved {
+		state.Idea = &idea
+	}
+	if approved {
+		state.Brief = &brief
+		hash := brief.Hash()
+		for i, q := range state.Questions {
+			if q.briefHash != "" && q.briefHash != hash {
+				state.Questions[i].Stale = true
+				state.QuestionsStale = true
+			}
+		}
 	}
 	return state, nil
 }
@@ -171,21 +194,17 @@ func (uc *ResearchDeskUseCase) saveGate(ctx context.Context, unit domain.ReviewU
 
 // facts loads every fact of the project in code order.
 func (uc *ResearchDeskUseCase) facts(ctx context.Context, projectID string) ([]FactView, error) {
-	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindFact)
+	stored, err := uc.units.ListResearchFacts(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
-	out := make([]FactView, 0, len(units))
-	for _, u := range units {
-		var fact domain.Fact
-		if err := json.Unmarshal(u.Content, &fact); err != nil {
-			return nil, fmt.Errorf("read stored fact %s: %w", u.Key, err)
-		}
-		mine := u.CreatorFields
+	out := make([]FactView, 0, len(stored))
+	for _, f := range stored {
+		mine := f.CreatorFields
 		if mine == nil {
 			mine = []string{}
 		}
-		out = append(out, FactView{ID: u.Key, Fact: fact, Mine: mine})
+		out = append(out, FactView{ID: f.ID, Fact: f.Fact, Mine: mine})
 	}
 	return out, nil
 }
@@ -205,26 +224,27 @@ func coverageOf(questions []QuestionView, facts []FactView) []domain.QuestionCov
 	return domain.Coverage(ids, factIDs, byID)
 }
 
-// durationLabel is the project's target length as the prompts say it.
-func (uc *ResearchDeskUseCase) durationLabel(ctx context.Context, projectID string, project *domain.Project) (string, error) {
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
-	if err != nil {
-		return "", err
-	}
-	return domain.TargetDurationLabel(project.VideoOutputMode, duration, briefLanguage(project.ContentLanguage)), nil
+// durationLabel is the brief's target length as the prompts say it.
+func durationLabel(brief domain.ProjectBrief) string {
+	return fmt.Sprintf("%d giây (%s)", brief.DurationSeconds, domain.FormatDuration(brief.DurationSeconds))
 }
 
-// brief loads the idea and the brief; a project without a brief cannot be
-// researched.
-func (uc *ResearchDeskUseCase) brief(ctx context.Context, projectID string) (domain.Idea, domain.CreativeBrief, error) {
-	idea, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+// brief loads the approved idea and brief the research is planned from; the
+// research of a project whose first two steps are not approved cannot start.
+func (uc *ResearchDeskUseCase) brief(ctx context.Context, projectID string) (domain.ProjectIdea, domain.ProjectBrief, error) {
+	idea, ok, err := uc.ideas.ApprovedIdea(ctx, projectID)
 	if err != nil {
-		return domain.Idea{}, domain.CreativeBrief{}, err
+		return domain.ProjectIdea{}, domain.ProjectBrief{}, err
 	}
-	if _, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey); errors.Is(err, domain.ErrUnitNotFound) {
-		return domain.Idea{}, domain.CreativeBrief{}, fmt.Errorf("%w: chưa có brief, viết brief ở bước Creative brief trước", domain.ErrInvalidStatus)
-	} else if err != nil {
-		return domain.Idea{}, domain.CreativeBrief{}, err
+	if !ok {
+		return domain.ProjectIdea{}, domain.ProjectBrief{}, fmt.Errorf("%w: chưa duyệt Idea, duyệt bước 1 trước", domain.ErrInvalidStatus)
+	}
+	brief, ok, err := uc.briefs.ApprovedBrief(ctx, projectID)
+	if err != nil {
+		return domain.ProjectIdea{}, domain.ProjectBrief{}, err
+	}
+	if !ok {
+		return domain.ProjectIdea{}, domain.ProjectBrief{}, fmt.Errorf("%w: chưa duyệt brief, duyệt bước Creative brief trước", domain.ErrInvalidStatus)
 	}
 	return idea, brief, nil
 }

@@ -113,6 +113,8 @@ func (rt *Router) handleGetResearch(w http.ResponseWriter, r *http.Request) {
 		"pastes":          state.Pastes,
 		"coverage":        coverage,
 		"brief_approved":  state.BriefApproved,
+		"idea":            ideaWire(state.Idea),
+		"brief":           briefWire(state.Brief),
 		"questions_stale": state.QuestionsStale,
 	})
 }
@@ -304,4 +306,25 @@ func (rt *Router) handleSkipResearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, gate)
+}
+
+// ideaWire is the approved idea as the research screen shows it, null when there is none.
+func ideaWire(i *domain.ProjectIdea) any {
+	if i == nil {
+		return nil
+	}
+	n := i.Normalized()
+	return map[string]any{"central_question": n.CentralQuestion, "curiosity_points": n.CuriosityPoints, "scope": n.Scope}
+}
+
+// briefWire is the approved brief as the research screen shows it, null when there is none.
+func briefWire(b *domain.ProjectBrief) any {
+	if b == nil {
+		return nil
+	}
+	n := b.Normalized()
+	return map[string]any{
+		"audience": n.Audience, "duration_seconds": n.DurationSeconds, "tone": n.Tone,
+		"learning_objectives": n.LearningObjectives, "avoid": n.Avoid,
+	}
 }

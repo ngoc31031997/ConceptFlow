@@ -67,7 +67,8 @@ export interface ResearchControls {
   skip: (skipped: boolean) => Promise<boolean>;
   approve: () => Promise<boolean>;
   unapprove: () => Promise<boolean>;
-  reload: () => void;
+  /** Loads the whole state again; resolves when the answer has landed. */
+  reload: () => Promise<void>;
 }
 
 function messageOf(err: unknown): string {
@@ -245,6 +246,6 @@ export function useResearch(projectId: string, enabled: boolean): ResearchContro
     skip: (skipped) => act(() => setResearchSkipped(projectId, skipped)),
     approve: () => act(() => approveResearch(projectId)),
     unapprove: () => act(() => unapproveResearch(projectId)),
-    reload: () => void load(),
+    reload: load,
   };
 }

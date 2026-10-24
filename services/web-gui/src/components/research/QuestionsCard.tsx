@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { QuestionCoverage, ResearchQuestion } from "../../api/client";
+import type { QuestionCoverage, ResearchBrief, ResearchIdea, ResearchQuestion } from "../../api/client";
 import type { OperationRun } from "../../hooks/useOperationRun";
 import { AiModelSelect } from "../AiModelSelect";
 import { AiOperationCard } from "../AiOperationCard";
@@ -7,6 +7,7 @@ import { Button, Card, TextInput } from "../ui";
 import unitStyles from "../units/units.module.css";
 import { CoverageChip } from "./CoverageChip";
 import { ImpactConfirm } from "./ImpactConfirm";
+import { ResearchInputModal } from "./ResearchInputModal";
 import styles from "./research.module.css";
 
 interface QuestionRowProps {
@@ -87,6 +88,11 @@ interface QuestionsCardProps {
   run: OperationRun;
   /** The step cannot be changed now (the project is past editing). */
   locked: boolean;
+  /** The approved idea and brief the questions are written from. */
+  idea: ResearchIdea | null;
+  brief: ResearchBrief | null;
+  /** Reads the idea and brief again from the server. */
+  onReloadInput: () => Promise<void>;
   onGenerate: (replaceEdited: boolean) => Promise<boolean>;
   onAdd: (text: string) => Promise<boolean>;
   onSave: (id: string, text: string) => Promise<boolean>;
@@ -108,6 +114,9 @@ export function QuestionsCard({
   running,
   run,
   locked,
+  idea,
+  brief,
+  onReloadInput,
   onGenerate,
   onAdd,
   onSave,
@@ -117,6 +126,9 @@ export function QuestionsCard({
   const [draft, setDraft] = useState("");
   const [deleting, setDeleting] = useState<ResearchQuestion | null>(null);
   const [regenerating, setRegenerating] = useState(false);
+  // The dialog that shows what the AI reads.
+  const [inputOpen, setInputOpen] = useState(false);
+  const [inputLoading, setInputLoading] = useState(false);
   // The row for a new question takes focus as it appears.
   const newRow = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -133,6 +145,13 @@ export function QuestionsCard({
     if (text) await onAdd(text);
   }
 
+  // The input is read again each time the dialog opens, so it shows what the AI will get.
+  function openInput() {
+    setInputOpen(true);
+    setInputLoading(true);
+    void onReloadInput().finally(() => setInputLoading(false));
+  }
+
   function startGenerate() {
     if (mine.length > 0) setRegenerating(true);
     else void onGenerate(false);
@@ -144,7 +163,18 @@ export function QuestionsCard({
     <Card data-testid="research-questions-card">
       <div className={styles.body}>
         <div className={styles.head}>
-          <h3>① Câu hỏi cần tra</h3>
+          <div className={styles.titleGroup}>
+            <h3>① Câu hỏi cần tra</h3>
+            <Button
+              variant="view"
+              className={styles.sm}
+              onClick={openInput}
+              title="Xem ý tưởng và brief đã duyệt mà AI đọc để sinh câu hỏi"
+              data-testid="research-input-open"
+            >
+              Xem đầu vào của AI
+            </Button>
+          </div>
           <span className={styles.hint}>AI tự sinh từ brief · không cần duyệt · sửa, xoá, thêm tuỳ ý</span>
         </div>
         {stale && (
@@ -207,6 +237,13 @@ export function QuestionsCard({
         <AiOperationCard run={run} active={running} testId="research-progress" title="AI đang sinh câu hỏi" />
       </div>
 
+      <ResearchInputModal
+        open={inputOpen}
+        onClose={() => setInputOpen(false)}
+        loading={inputLoading}
+        idea={idea}
+        brief={brief}
+      />
       <ImpactConfirm
         open={deleting !== null}
         onClose={() => setDeleting(null)}

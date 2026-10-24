@@ -34,6 +34,8 @@ function stateWith(facts: ResearchFact[], over: Partial<ResearchState> = {}): Re
     coverage: [],
     briefApproved: true,
     questionsStale: false,
+    idea: null,
+    brief: null,
     ...over,
   };
 }
@@ -107,7 +109,9 @@ describe("useResearch", () => {
       .mockResolvedValue(stateWith([fact({ id: "F09" })]));
     const { result } = renderHook(() => useResearch("p1", true));
     await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
-    act(() => result.current.reload());
+    act(() => {
+      void result.current.reload();
+    });
     await waitFor(() => expect(result.current.state?.facts[0]?.id).toBe("F09"));
 
     await act(async () => {

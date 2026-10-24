@@ -33,13 +33,13 @@ func TestResearchRolesAreShippedAndNotGenericallyRendered(t *testing.T) {
 
 func TestResearchQuestionsPromptTakesItsValues(t *testing.T) {
 	out := RenderPromptTemplate(seededText(t, RoleResearchQuestions), map[string]string{
-		"topic": "ĐỀ-TÀI", "brief": "BRIEF-NỘI-DUNG", "brief_language": "tiếng Việt",
+		"idea": "IDEA-NỘI-DUNG", "brief": "BRIEF-NỘI-DUNG", "brief_language": "tiếng Việt",
 		"kept_questions": "- Q1: câu của Creator", "redo_note": "GHI-CHÚ",
 	})
 	if strings.Contains(out, "{{") {
 		t.Errorf("an unfilled placeholder is left in the questions prompt: %q", out[strings.Index(out, "{{"):])
 	}
-	for _, want := range []string{"ĐỀ-TÀI", "BRIEF-NỘI-DUNG", "câu của Creator", "GHI-CHÚ", `{"questions"`} {
+	for _, want := range []string{"IDEA-NỘI-DUNG", "BRIEF-NỘI-DUNG", "câu của Creator", "GHI-CHÚ", `"questions": [`} {
 		if !strings.Contains(out, want) {
 			t.Errorf("questions prompt lacks %q", want)
 		}

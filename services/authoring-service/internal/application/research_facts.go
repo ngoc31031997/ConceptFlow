@@ -116,49 +116,35 @@ type PasteResult struct {
 	Log      PasteLog
 }
 
-// loadFact reads one fact unit and its content.
-func (uc *ResearchDeskUseCase) loadFact(ctx context.Context, projectID, id string) (domain.ReviewUnit, domain.Fact, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindFact, id)
-	if err != nil {
-		return domain.ReviewUnit{}, domain.Fact{}, err
-	}
-	var fact domain.Fact
-	if err := json.Unmarshal(unit.Content, &fact); err != nil {
-		return domain.ReviewUnit{}, domain.Fact{}, fmt.Errorf("read stored fact %s: %w", id, err)
-	}
-	return unit, fact, nil
+// loadFact reads one stored fact.
+func (uc *ResearchDeskUseCase) loadFact(ctx context.Context, projectID, id string) (domain.StoredFact, error) {
+	return uc.units.GetResearchFact(ctx, projectID, id)
 }
 
-// saveFact stores a fact unit with the given content.
-func (uc *ResearchDeskUseCase) saveFact(ctx context.Context, unit domain.ReviewUnit, fact domain.Fact) (domain.ReviewUnit, error) {
-	raw, err := json.Marshal(fact)
-	if err != nil {
-		return domain.ReviewUnit{}, err
-	}
-	unit.Content = raw
-	return uc.units.SaveUnit(ctx, unit)
+// saveFact stores a fact.
+func (uc *ResearchDeskUseCase) saveFact(ctx context.Context, projectID string, fact domain.StoredFact) error {
+	return uc.units.SaveResearchFact(ctx, projectID, fact)
 }
 
 // saveAndCheck stores a fact whose link or quote is new, marking it as being
 // checked (or as having no source), and queues the check. Without a verifier a
 // fact with a link says honestly that it could not be checked.
-func (uc *ResearchDeskUseCase) saveAndCheck(ctx context.Context, unit domain.ReviewUnit, fact domain.Fact) (domain.ReviewUnit, error) {
+func (uc *ResearchDeskUseCase) saveAndCheck(ctx context.Context, projectID string, fact domain.StoredFact) error {
 	switch {
-	case fact.URL == "":
-		fact.Link = domain.FactLink{State: domain.LinkNone}
+	case fact.Fact.URL == "":
+		fact.Fact.Link = domain.FactLink{State: domain.LinkNone}
 	case uc.verifier == nil:
-		fact.Link = domain.FactLink{State: domain.LinkUnreachable, Why: "kiểm link chưa được bật trên máy chủ"}
+		fact.Fact.Link = domain.FactLink{State: domain.LinkUnreachable, Why: "kiểm link chưa được bật trên máy chủ"}
 	default:
-		fact.Link = domain.FactLink{State: domain.LinkRunning}
+		fact.Fact.Link = domain.FactLink{State: domain.LinkRunning}
 	}
-	saved, err := uc.saveFact(ctx, unit, fact)
-	if err != nil {
-		return domain.ReviewUnit{}, err
+	if err := uc.saveFact(ctx, projectID, fact); err != nil {
+		return err
 	}
-	if fact.Link.State == domain.LinkRunning {
-		uc.verifier.Enqueue(unit.ProjectID, unit.Key, fact.URL, fact.Quote)
+	if fact.Fact.Link.State == domain.LinkRunning {
+		uc.verifier.Enqueue(projectID, fact.ID, fact.Fact.URL, fact.Fact.Quote)
 	}
-	return saved, nil
+	return nil
 }
 
 // reopenGate sends an approved fact table back to review: the Creator approved
@@ -218,25 +204,27 @@ func (uc *ResearchDeskUseCase) IngestPaste(ctx context.Context, projectID, raw s
 		result.Rejected = []domain.PasteRejected{}
 	}
 	for _, claim := range parsed.Claims {
-		unit, stored, err := uc.loadFact(ctx, projectID, claim.ID)
+		stored, err := uc.loadFact(ctx, projectID, claim.ID)
 		switch {
 		case errors.Is(err, domain.ErrUnitNotFound):
-			unit = domain.ReviewUnit{ProjectID: projectID, Kind: domain.UnitKindFact, Key: claim.ID, Status: domain.UnitPending, CreatorFields: []string{}}
-			if _, err := uc.saveAndCheck(ctx, unit, claim.Fact); err != nil {
+			fresh := domain.StoredFact{ID: claim.ID, Fact: claim.Fact, CreatorFields: []string{}}
+			if err := uc.saveAndCheck(ctx, projectID, fresh); err != nil {
 				return PasteResult{}, err
 			}
 			result.Added = append(result.Added, claim.ID)
 		case err != nil:
 			return PasteResult{}, err
 		default:
-			merged := mergePasted(stored, unit.CreatorFields, claim.Fact)
-			sourceChanged := merged.URL != stored.URL || merged.Quote != stored.Quote
-			merged.Link = stored.Link
+			merged := stored
+			merged.Fact = mergePasted(stored.Fact, stored.CreatorFields, claim.Fact)
+			sourceChanged := merged.Fact.URL != stored.Fact.URL || merged.Fact.Quote != stored.Fact.Quote
+			merged.Fact.Link = stored.Fact.Link
 			if sourceChanged {
-				if _, err := uc.saveAndCheck(ctx, unit, merged); err != nil {
-					return PasteResult{}, err
-				}
-			} else if _, err := uc.saveFact(ctx, unit, merged); err != nil {
+				err = uc.saveAndCheck(ctx, projectID, merged)
+			} else {
+				err = uc.saveFact(ctx, projectID, merged)
+			}
+			if err != nil {
 				return PasteResult{}, err
 			}
 			result.Updated = append(result.Updated, claim.ID)
@@ -276,13 +264,13 @@ func (uc *ResearchDeskUseCase) AddFact(ctx context.Context, projectID string, in
 	if err := uc.requireQuestion(ctx, projectID, in.Question); err != nil {
 		return FactView{}, err
 	}
-	existing, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindFact)
+	existing, err := uc.units.ListResearchFacts(ctx, projectID)
 	if err != nil {
 		return FactView{}, err
 	}
 	ids := make([]string, 0, len(existing))
-	for _, u := range existing {
-		ids = append(ids, u.Key)
+	for _, f := range existing {
+		ids = append(ids, f.ID)
 	}
 	id := domain.NextFactID(ids)
 	fact := domain.Fact{
@@ -296,15 +284,13 @@ func (uc *ResearchDeskUseCase) AddFact(ctx context.Context, projectID string, in
 			mine = append(mine, name)
 		}
 	}
-	unit := domain.ReviewUnit{ProjectID: projectID, Kind: domain.UnitKindFact, Key: id, Status: domain.UnitPending, CreatorFields: mine}
-	saved, err := uc.saveAndCheck(ctx, unit, fact)
-	if err != nil {
+	if err := uc.saveAndCheck(ctx, projectID, domain.StoredFact{ID: id, Fact: fact, CreatorFields: mine}); err != nil {
 		return FactView{}, err
 	}
 	if err := uc.reopenGate(ctx, projectID); err != nil {
 		return FactView{}, err
 	}
-	return uc.factView(ctx, projectID, saved.Key)
+	return uc.factView(ctx, projectID, id)
 }
 
 // requireQuestion fails unless question names a research question that exists.
@@ -320,15 +306,15 @@ func (uc *ResearchDeskUseCase) requireQuestion(ctx context.Context, projectID, q
 
 // factView reads one fact as the screen shows it.
 func (uc *ResearchDeskUseCase) factView(ctx context.Context, projectID, id string) (FactView, error) {
-	unit, fact, err := uc.loadFact(ctx, projectID, id)
+	stored, err := uc.loadFact(ctx, projectID, id)
 	if err != nil {
 		return FactView{}, err
 	}
-	mine := unit.CreatorFields
+	mine := stored.CreatorFields
 	if mine == nil {
 		mine = []string{}
 	}
-	return FactView{ID: id, Fact: fact, Mine: mine}, nil
+	return FactView{ID: id, Fact: stored.Fact, Mine: mine}, nil
 }
 
 // SetFactFlags changes a fact's type, must-say mark or kept/dropped state in
@@ -341,15 +327,16 @@ func (uc *ResearchDeskUseCase) SetFactFlags(ctx context.Context, projectID, id s
 	if flags.Type != nil && !domain.ValidFactType(*flags.Type) {
 		return FactView{}, fmt.Errorf("%w: loại dữ kiện %q không có", domain.ErrInvalidUnitEdit, *flags.Type)
 	}
-	unit, fact, err := uc.loadFact(ctx, projectID, id)
+	stored, err := uc.loadFact(ctx, projectID, id)
 	if err != nil {
 		return FactView{}, err
 	}
+	fact := &stored.Fact
 	changed := false
 	if flags.Type != nil && *flags.Type != fact.Type {
 		fact.Type = *flags.Type
-		if !unit.HasCreatorField(factFieldType) {
-			unit.CreatorFields = append(unit.CreatorFields, factFieldType)
+		if !stored.HasCreatorField(factFieldType) {
+			stored.CreatorFields = append(stored.CreatorFields, factFieldType)
 		}
 		changed = true
 	}
@@ -364,7 +351,7 @@ func (uc *ResearchDeskUseCase) SetFactFlags(ctx context.Context, projectID, id s
 	if !changed {
 		return uc.factView(ctx, projectID, id)
 	}
-	if _, err := uc.saveFact(ctx, unit, fact); err != nil {
+	if err := uc.saveFact(ctx, projectID, stored); err != nil {
 		return FactView{}, err
 	}
 	if err := uc.reopenGate(ctx, projectID); err != nil {
@@ -392,11 +379,11 @@ func (uc *ResearchDeskUseCase) Verify(ctx context.Context, projectID string, ids
 	}
 	sort.Strings(ids)
 	for _, id := range ids {
-		unit, fact, err := uc.loadFact(ctx, projectID, id)
+		stored, err := uc.loadFact(ctx, projectID, id)
 		if err != nil {
 			return err
 		}
-		if _, err := uc.saveAndCheck(ctx, unit, fact); err != nil {
+		if err := uc.saveAndCheck(ctx, projectID, stored); err != nil {
 			return err
 		}
 	}
@@ -423,10 +410,11 @@ func (k factKind) Edit(ctx context.Context, projectID, key string, fields map[st
 			return domain.ReviewUnit{}, fmt.Errorf("%w: dữ kiện không sửa được ô %q ở đây", domain.ErrInvalidUnitEdit, name)
 		}
 	}
-	unit, fact, err := uc.loadFact(ctx, projectID, key)
+	stored, err := uc.loadFact(ctx, projectID, key)
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}
+	fact := stored.Fact
 	before := fact
 	for _, name := range factTextFields {
 		value, ok := fields[name]
@@ -448,18 +436,18 @@ func (k factKind) Edit(ctx context.Context, projectID, key string, fields map[st
 			continue
 		}
 		fact = withFactField(fact, name, value)
-		if !unit.HasCreatorField(name) {
-			unit.CreatorFields = append(unit.CreatorFields, name)
+		if !stored.HasCreatorField(name) {
+			stored.CreatorFields = append(stored.CreatorFields, name)
 		}
 	}
 	if fact == before {
-		return unit, nil
+		return factUnit(projectID, stored)
 	}
-	var saved domain.ReviewUnit
+	stored.Fact = fact
 	if fact.URL != before.URL || fact.Quote != before.Quote {
-		saved, err = uc.saveAndCheck(ctx, unit, fact)
+		err = uc.saveAndCheck(ctx, projectID, stored)
 	} else {
-		saved, err = uc.saveFact(ctx, unit, fact)
+		err = uc.saveFact(ctx, projectID, stored)
 	}
 	if err != nil {
 		return domain.ReviewUnit{}, err
@@ -467,7 +455,23 @@ func (k factKind) Edit(ctx context.Context, projectID, key string, fields map[st
 	if err := uc.reopenGate(ctx, projectID); err != nil {
 		return domain.ReviewUnit{}, err
 	}
-	return saved, nil
+	saved, err := uc.loadFact(ctx, projectID, key)
+	if err != nil {
+		return domain.ReviewUnit{}, err
+	}
+	return factUnit(projectID, saved)
+}
+
+// factUnit gives a stored fact the shape the generic unit API answers with.
+func factUnit(projectID string, stored domain.StoredFact) (domain.ReviewUnit, error) {
+	raw, err := json.Marshal(stored.Fact)
+	if err != nil {
+		return domain.ReviewUnit{}, err
+	}
+	return domain.ReviewUnit{
+		ProjectID: projectID, Kind: domain.UnitKindFact, Key: stored.ID, Status: domain.UnitPending,
+		Content: raw, CreatorFields: stored.CreatorFields,
+	}, nil
 }
 
 func isFactTextField(name string) bool {

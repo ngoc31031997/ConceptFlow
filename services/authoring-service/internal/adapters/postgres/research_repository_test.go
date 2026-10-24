@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"testing"
 
@@ -29,25 +30,56 @@ func researchRepo(t *testing.T, pid string) (*PromptTemplateRepository, context.
 
 func saveFact(t *testing.T, r *PromptTemplateRepository, ctx context.Context, pid, key string, f domain.Fact) {
 	t.Helper()
-	raw, _ := json.Marshal(f)
-	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindFact, Key: key, Status: domain.UnitPending, Content: raw,
-	}); err != nil {
+	if err := r.SaveResearchFact(ctx, pid, domain.StoredFact{ID: key, Fact: f}); err != nil {
 		t.Fatal(err)
 	}
 }
 
 func readFact(t *testing.T, r *PromptTemplateRepository, ctx context.Context, pid, key string) domain.Fact {
 	t.Helper()
-	u, err := r.GetUnit(ctx, pid, domain.UnitKindFact, key)
+	s, err := r.GetResearchFact(ctx, pid, key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var f domain.Fact
-	if err := json.Unmarshal(u.Content, &f); err != nil {
+	return s.Fact
+}
+
+// A fact survives a round trip through project_research, lists in code order
+// and replaces the row of the same code; a missing code is not found.
+func TestResearchFactRoundTripInPostgres(t *testing.T) {
+	const pid = "research-fact-test"
+	r, ctx := researchRepo(t, pid)
+	want := domain.Fact{
+		Question: "Q1", ClaimVI: "Dữ kiện", Type: domain.FactTypeHypothesis, SourceTitle: "Tựa", Publisher: "NXB", Year: "2020",
+		URL: "https://a.org/x", Quote: "đoạn trích", Confidence: "high", Note: "ghi chú", Must: true, Keep: true,
+		Link: domain.FactLink{State: domain.LinkBad, Why: "vì sao", Nearest: "câu gần nhất", CheckedAt: "2026-10-24T10:00:00Z"},
+	}
+	if err := r.SaveResearchFact(ctx, pid, domain.StoredFact{ID: "F10", Fact: want, CreatorFields: []string{"claim_vi"}}); err != nil {
 		t.Fatal(err)
 	}
-	return f
+	saveFact(t, r, ctx, pid, "F02", domain.Fact{ClaimVI: "hai", Type: domain.FactTypeFact, Keep: true, Link: domain.FactLink{State: domain.LinkNone}})
+
+	got, err := r.GetResearchFact(ctx, pid, "F10")
+	if err != nil || got.Fact != want || len(got.CreatorFields) != 1 || got.CreatorFields[0] != "claim_vi" {
+		t.Fatalf("round trip = %+v, %v, want %+v with the Creator's field", got, err, want)
+	}
+	list, err := r.ListResearchFacts(ctx, pid)
+	if err != nil || len(list) != 2 || list[0].ID != "F02" || list[1].ID != "F10" {
+		t.Fatalf("list = %+v, %v, want F02 before F10", list, err)
+	}
+	saveFact(t, r, ctx, pid, "F02", domain.Fact{ClaimVI: "hai, sửa", Type: domain.FactTypeFact, Keep: false, Link: domain.FactLink{State: domain.LinkNone}})
+	if again := readFact(t, r, ctx, pid, "F02"); again.ClaimVI != "hai, sửa" || again.Keep {
+		t.Fatalf("saving the same code must replace the row, got %+v", again)
+	}
+	if _, err := r.GetResearchFact(ctx, pid, "F99"); !errors.Is(err, domain.ErrUnitNotFound) {
+		t.Fatalf("a missing fact: err = %v, want ErrUnitNotFound", err)
+	}
+	if err := r.DeleteAuthoring(ctx, pid); err != nil {
+		t.Fatal(err)
+	}
+	if list, _ := r.ListResearchFacts(ctx, pid); len(list) != 0 {
+		t.Fatalf("deleting the project's authoring must remove its facts, left %+v", list)
+	}
 }
 
 // A unit built from the brief is stale once the brief's content changes, and a

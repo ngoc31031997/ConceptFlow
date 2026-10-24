@@ -2362,6 +2362,22 @@ export interface ResearchGate {
 }
 
 /** The whole research screen as the server holds it. */
+/** The approved idea (step 1) the research is planned from. */
+export interface ResearchIdea {
+  centralQuestion: string;
+  curiosityPoints: string[];
+  scope: string;
+}
+
+/** The approved brief (step 2) the research is planned from. */
+export interface ResearchBrief {
+  audience: string;
+  durationSeconds: number;
+  tone: string;
+  learningObjectives: string[];
+  avoid: string[];
+}
+
 export interface ResearchState {
   gate: ResearchGate;
   questions: ResearchQuestion[];
@@ -2370,6 +2386,10 @@ export interface ResearchState {
   coverage: QuestionCoverage[];
   briefApproved: boolean;
   questionsStale: boolean;
+  /** Null while the idea is not approved. */
+  idea: ResearchIdea | null;
+  /** Null while the brief is not approved. */
+  brief: ResearchBrief | null;
 }
 
 interface researchFactWire {
@@ -2406,6 +2426,14 @@ interface researchStateWire {
   coverage: { question: string; sources: number; bad_facts: string[] | null; weak: boolean }[] | null;
   brief_approved: boolean;
   questions_stale: boolean;
+  idea: { central_question: string; curiosity_points: string[] | null; scope: string } | null;
+  brief: {
+    audience: string;
+    duration_seconds: number;
+    tone: string;
+    learning_objectives: string[] | null;
+    avoid: string[] | null;
+  } | null;
 }
 
 function fromWireFact(w: researchFactWire): ResearchFact {
@@ -2443,6 +2471,18 @@ export async function getResearch(projectId: string): Promise<ResearchState> {
     coverage: (w.coverage ?? []).map((c) => ({ question: c.question, sources: c.sources, badFacts: c.bad_facts ?? [], weak: c.weak })),
     briefApproved: w.brief_approved,
     questionsStale: w.questions_stale,
+    idea: w.idea
+      ? { centralQuestion: w.idea.central_question, curiosityPoints: w.idea.curiosity_points ?? [], scope: w.idea.scope }
+      : null,
+    brief: w.brief
+      ? {
+          audience: w.brief.audience,
+          durationSeconds: w.brief.duration_seconds,
+          tone: w.brief.tone,
+          learningObjectives: w.brief.learning_objectives ?? [],
+          avoid: w.brief.avoid ?? [],
+        }
+      : null,
   };
 }
 

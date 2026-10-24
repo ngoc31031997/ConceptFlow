@@ -52,9 +52,13 @@ describe("research api", () => {
       coverage: [{ question: "Q1", sources: 1, bad_facts: null, weak: true }],
       brief_approved: true,
       questions_stale: true,
+      idea: { central_question: "Vì sao?", curiosity_points: null, scope: "Phạm vi" },
+      brief: { audience: "Khán giả", duration_seconds: 270, tone: "Tò mò", learning_objectives: ["Một"], avoid: null },
     });
 
     const state = await client.getResearch("p1");
+    expect(state.idea).toEqual({ centralQuestion: "Vì sao?", curiosityPoints: [], scope: "Phạm vi" });
+    expect(state.brief).toEqual({ audience: "Khán giả", durationSeconds: 270, tone: "Tò mò", learningObjectives: ["Một"], avoid: [] });
 
     expect(state.briefApproved).toBe(true);
     expect(state.questionsStale).toBe(true);
@@ -79,6 +83,8 @@ describe("research api", () => {
       coverage: null,
       brief_approved: false,
       questions_stale: false,
+      idea: null,
+      brief: null,
     });
     const state = await client.getResearch("p1");
     expect(state.questions).toEqual([]);

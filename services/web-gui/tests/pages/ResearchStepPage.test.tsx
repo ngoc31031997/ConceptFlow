@@ -61,6 +61,14 @@ function baseState(over: Partial<ResearchState> = {}): ResearchState {
     coverage: [coverageOf("Q1", 2, false), coverageOf("Q2", 1, true, ["F08"])],
     briefApproved: true,
     questionsStale: false,
+    idea: { centralQuestion: "Vì sao ong chết trong quả sung?", curiosityPoints: ["Ong vào quả bằng đường nào?"], scope: "Sung và ong thụ phấn" },
+    brief: {
+      audience: "Người xem phổ thông",
+      durationSeconds: 270,
+      tone: "Tò mò",
+      learningObjectives: ["Hiểu vì sao ong chết trong quả"],
+      avoid: ["Nói ong bị ăn thịt"],
+    },
     ...over,
   };
 }
@@ -330,6 +338,36 @@ describe("ResearchStepPage", () => {
       expect(screen.getByTestId("question-stale-Q1")).toBeInTheDocument();
       expect(screen.queryByTestId("question-stale-Q2")).not.toBeInTheDocument();
       expect(screen.getByTestId("question-mine-Q2")).toHaveTextContent("Bạn viết");
+    });
+
+    it("shows the approved idea and brief, read again from the server, behind the ! button", async () => {
+      await ready();
+      const reads = vi.mocked(apiClient.getResearch).mock.calls.length;
+      fireEvent.click(screen.getByTestId("research-input-open"));
+      const dialog = await screen.findByTestId("research-input-dialog");
+      await waitFor(() => expect(within(dialog).getByTestId("research-input-idea")).toBeInTheDocument());
+      expect(vi.mocked(apiClient.getResearch).mock.calls.length).toBeGreaterThan(reads);
+      expect(within(dialog).getByTestId("research-input-idea")).toHaveTextContent("Vì sao ong chết trong quả sung?");
+      expect(within(dialog).getByTestId("research-input-idea")).toHaveTextContent("Ong vào quả bằng đường nào?");
+      expect(within(dialog).getByTestId("research-input-brief")).toHaveTextContent("Người xem phổ thông");
+      expect(within(dialog).getByTestId("research-input-brief")).toHaveTextContent("4:30");
+      expect(within(dialog).getByTestId("research-input-brief")).toHaveTextContent("Nói ong bị ăn thịt");
+    });
+
+    it("calls the AI straight away, without asking again what it will read", async () => {
+      const gen = vi.spyOn(apiClient, "generateResearchQuestions").mockResolvedValue([]);
+      await ready();
+      fireEvent.click(screen.getByTestId("question-generate"));
+      await waitFor(() => expect(gen).toHaveBeenCalled());
+      expect(screen.queryByTestId("research-input-dialog")).not.toBeInTheDocument();
+    });
+
+    it("says which of the idea and the brief is not approved yet", async () => {
+      state = baseState({ idea: null, briefApproved: false });
+      await ready();
+      fireEvent.click(screen.getByTestId("research-input-open"));
+      expect(await screen.findByTestId("research-input-no-idea")).toHaveTextContent("chưa được duyệt");
+      expect(screen.getByTestId("research-input-brief")).toBeInTheDocument();
     });
 
     it("shows the failure of the AI and keeps the page usable", async () => {

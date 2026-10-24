@@ -403,6 +403,34 @@ CREATE TABLE IF NOT EXISTS project_brief_review (
     brief_hash TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- The research step's facts, one row per fact, which the later steps read.
+-- creator_fields lists the fields the Creator wrote, which a pasted answer
+-- does not overwrite; the link_* columns hold the result of checking the
+-- source link against the quote.
+CREATE TABLE IF NOT EXISTS project_research (
+    project_id      TEXT NOT NULL,
+    fact_id         TEXT NOT NULL,
+    question_id     TEXT NOT NULL DEFAULT '',
+    claim_vi        TEXT NOT NULL DEFAULT '',
+    type            TEXT NOT NULL DEFAULT 'fact',
+    source_title    TEXT NOT NULL DEFAULT '',
+    publisher       TEXT NOT NULL DEFAULT '',
+    year            TEXT NOT NULL DEFAULT '',
+    url             TEXT NOT NULL DEFAULT '',
+    quote           TEXT NOT NULL DEFAULT '',
+    confidence      TEXT NOT NULL DEFAULT '',
+    note            TEXT NOT NULL DEFAULT '',
+    must            BOOLEAN NOT NULL DEFAULT FALSE,
+    keep            BOOLEAN NOT NULL DEFAULT TRUE,
+    link_state      TEXT NOT NULL DEFAULT 'none',
+    link_why        TEXT NOT NULL DEFAULT '',
+    link_nearest    TEXT NOT NULL DEFAULT '',
+    link_checked_at TEXT NOT NULL DEFAULT '',
+    creator_fields  JSONB NOT NULL DEFAULT '[]',
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, fact_id)
+);
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

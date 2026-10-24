@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 
@@ -17,6 +18,7 @@ type researchStore struct {
 	duration domain.TargetDuration
 	models   domain.AuthoringStepModels
 	pastes   []PasteLog
+	facts    map[string]domain.StoredFact
 }
 
 func (s *researchStore) GetAuthoringTopic(context.Context, string) (string, error) {
@@ -37,35 +39,80 @@ func (s *researchStore) ListPastes(context.Context, string) ([]PasteLog, error) 
 	return append([]PasteLog{}, s.pastes...), nil
 }
 
+func (s *researchStore) factKey(projectID, id string) string { return projectID + "|" + id }
+
+func (s *researchStore) ListResearchFacts(_ context.Context, projectID string) ([]domain.StoredFact, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := []domain.StoredFact{}
+	for k, f := range s.facts {
+		if strings.HasPrefix(k, projectID+"|") {
+			out = append(out, f)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return len(out[i].ID) < len(out[j].ID) || len(out[i].ID) == len(out[j].ID) && out[i].ID < out[j].ID
+	})
+	return out, nil
+}
+
+func (s *researchStore) GetResearchFact(_ context.Context, projectID, id string) (domain.StoredFact, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	f, ok := s.facts[s.factKey(projectID, id)]
+	if !ok {
+		return domain.StoredFact{}, domain.ErrUnitNotFound
+	}
+	return f, nil
+}
+
+func (s *researchStore) SaveResearchFact(_ context.Context, projectID string, f domain.StoredFact) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.facts == nil {
+		s.facts = map[string]domain.StoredFact{}
+	}
+	s.facts[s.factKey(projectID, f.ID)] = f
+	return nil
+}
+
 // SaveFactLink stores a check result while the fact still has the url and quote
 // the check started from, as the real store does.
 func (s *researchStore) SaveFactLink(_ context.Context, projectID, key, url, quote string, link domain.FactLink) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	k := projectID + "|" + domain.UnitKindFact + "|" + key
-	unit, ok := s.units[k]
-	if !ok {
+	f, ok := s.facts[s.factKey(projectID, key)]
+	if !ok || f.Fact.URL != url || f.Fact.Quote != quote {
 		return false, nil
 	}
-	var fact domain.Fact
-	if err := json.Unmarshal(unit.Content, &fact); err != nil {
-		return false, err
-	}
-	if fact.URL != url || fact.Quote != quote {
-		return false, nil
-	}
-	fact.Link = link
-	unit.Content, _ = json.Marshal(fact)
-	s.units[k] = unit
+	f.Fact.Link = link
+	s.facts[s.factKey(projectID, key)] = f
 	return true, nil
 }
 
+// approvedSteps is the approved idea and brief of the first two steps.
+type approvedSteps struct {
+	idea    domain.ProjectIdea
+	ideaOK  bool
+	brief   domain.ProjectBrief
+	briefOK bool
+}
+
+func (a *approvedSteps) ApprovedIdea(context.Context, string) (domain.ProjectIdea, bool, error) {
+	return a.idea, a.ideaOK, nil
+}
+
+func (a *approvedSteps) ApprovedBrief(context.Context, string) (domain.ProjectBrief, bool, error) {
+	return a.brief, a.briefOK, nil
+}
+
 type researchFixture struct {
-	units   *briefUnits
-	store   *researchStore
-	project *briefProject
-	llm     *briefLLM
-	uc      *ResearchDeskUseCase
+	units    *briefUnits
+	store    *researchStore
+	approved *approvedSteps
+	project  *briefProject
+	llm      *briefLLM
+	uc       *ResearchDeskUseCase
 }
 
 const questionsReplyJSON = `{"questions":["Quả sung có phải là hoa không?","Ong nào thụ phấn cho sung?","Ong mẹ có chết trong quả không?"]}`
@@ -73,42 +120,37 @@ const questionsReplyJSON = `{"questions":["Quả sung có phải là hoa không?
 func newResearchFixture() *researchFixture {
 	units := newBriefUnits()
 	f := &researchFixture{
-		units: units,
-		store: &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration5to7},
+		units:    units,
+		store:    &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration5to7},
+		approved: &approvedSteps{},
 		project: &briefProject{
 			project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly},
 			status:  domain.StatusDraft,
 		},
 		llm: &briefLLM{reply: "```json\n" + questionsReplyJSON + "\n```"},
 	}
-	f.uc = NewResearchDeskUseCase(f.store, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewResearchDeskUseCase(f.store, f.approved, f.approved, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
 	return f
 }
 
+// seedBrief gives the project the idea and brief of the first two steps, both
+// approved when status is UnitApproved and both still pending otherwise.
 func (f *researchFixture) seedBrief(t *testing.T, status domain.UnitStatus) {
 	t.Helper()
-	ideaRaw, _ := json.Marshal(domain.Idea{Question: "Vì sao ong chết trong quả sung?", Why: "w", Known: "k", Unknown: "u"})
-	if _, err := f.units.SaveUnit(context.Background(), domain.ReviewUnit{
-		ProjectID: "p1", Kind: domain.UnitKindIdea, Key: domain.IdeaUnitKey, Status: status, Content: ideaRaw,
-	}); err != nil {
-		t.Fatal(err)
+	ok := status == domain.UnitApproved
+	f.approved.idea = domain.ProjectIdea{
+		CentralQuestion: "Vì sao ong chết trong quả sung?", CuriosityPoints: []string{"Ong vào quả bằng đường nào?"}, Scope: "Sung và ong thụ phấn",
 	}
-	raw, _ := json.Marshal(domain.CreativeBrief{
-		Audience: "Người xem phổ thông", Know: "k", Understand: "u", Feel: "f", Tone: "t", OutOfScope: "o",
-	})
-	if _, err := f.units.SaveUnit(context.Background(), domain.ReviewUnit{
-		ProjectID: "p1", Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: status, Content: raw,
-	}); err != nil {
-		t.Fatal(err)
+	f.approved.brief = domain.ProjectBrief{
+		Audience: "Người xem phổ thông", DurationSeconds: 270, Tone: "Tò mò",
+		LearningObjectives: []string{"Hiểu vì sao ong chết trong quả"}, Avoid: []string{"Nói ong bị ăn thịt"},
 	}
+	f.approved.ideaOK, f.approved.briefOK = ok, ok
 }
 
 func (f *researchFixture) seedFact(t *testing.T, id string, fact domain.Fact) {
 	t.Helper()
-	raw, _ := json.Marshal(fact)
-	if _, err := f.units.SaveUnit(context.Background(), domain.ReviewUnit{
-		ProjectID: "p1", Kind: domain.UnitKindFact, Key: id, Status: domain.UnitPending, Content: raw,
-	}); err != nil {
+	if err := f.store.SaveResearchFact(context.Background(), "p1", domain.StoredFact{ID: id, Fact: fact, CreatorFields: []string{}}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -141,11 +183,17 @@ func TestGenerateQuestionsWritesFromTheBriefOnTheResearchModel(t *testing.T) {
 	if len(f.llm.models) != 1 || f.llm.models[0] != "ollama" {
 		t.Errorf("model used = %v, want the research model", f.llm.models)
 	}
-	if !strings.Contains(f.llm.systems[0], "Vì sao ong chết trong quả sung?") || !strings.Contains(f.llm.systems[0], "Vì sao trong quả sung có xác ong?") {
-		t.Errorf("the prompt must carry the brief and the topic, got %q", f.llm.systems[0])
+	for _, want := range []string{"Vì sao ong chết trong quả sung?", "Ong vào quả bằng đường nào?", "Người xem phổ thông", "Hiểu vì sao ong chết trong quả"} {
+		if !strings.Contains(f.llm.systems[0], want) {
+			t.Errorf("the prompt must carry the approved idea and brief, lacks %q", want)
+		}
 	}
 	unit, _ := f.units.GetUnit(context.Background(), "p1", domain.UnitKindResearchQuestion, "Q1")
-	if unit.InputRef != "brief:main" || unit.InputSHA == "" || unit.Status != domain.UnitPending {
+	var stored domain.ResearchQuestion
+	if err := json.Unmarshal(unit.Content, &stored); err != nil {
+		t.Fatal(err)
+	}
+	if stored.BriefHash != f.approved.brief.Hash() || unit.Status != domain.UnitPending {
 		t.Errorf("a question must record the brief it was built from: %+v", unit)
 	}
 }
@@ -240,12 +288,7 @@ func TestQuestionsGoStaleWhenTheBriefChanges(t *testing.T) {
 		t.Fatal("nothing changed yet")
 	}
 
-	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Khán giả mới"})
-	brief, _ := f.units.GetUnit(ctx, "p1", domain.UnitKindBrief, domain.BriefUnitKey)
-	brief.Content = changed
-	if _, err := f.units.SaveUnit(ctx, brief); err != nil {
-		t.Fatal(err)
-	}
+	f.approved.brief.Audience = "Khán giả mới"
 	state, err := f.uc.State(ctx, "p1")
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +362,7 @@ func TestResearchPromptCarriesBriefQuestionsAndTemplate(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"Vì sao trong quả sung có xác ong?", "Vì sao ong chết trong quả sung?", "Người xem phổ thông", "5–7 phút",
+		"Vì sao trong quả sung có xác ong?", "Vì sao ong chết trong quả sung?", "Người xem phổ thông", "270 giây (4:30)",
 		"CÂU HỎI CẦN TRA\nQ1. Quả sung có phải là hoa không?\nQ2. Ong nào thụ phấn cho sung?", domain.ResearchSchema,
 	} {
 		if !strings.Contains(prompt, want) {
@@ -406,5 +449,25 @@ func TestBriefImpactMentionsAIQuestions(t *testing.T) {
 	items, _ = brief.Impact(ctx, "p1", domain.BriefUnitKey)
 	if len(items) != 1 || !strings.Contains(items[0], "Câu hỏi nghiên cứu") {
 		t.Fatalf("items = %v, want the research questions listed", items)
+	}
+}
+
+// The state carries the approved idea and brief the research is planned from, so
+// the screen can show them before the AI is called; none while they are not approved.
+func TestStateCarriesTheApprovedIdeaAndBrief(t *testing.T) {
+	f := newResearchFixture()
+	ctx := context.Background()
+	f.seedBrief(t, domain.UnitPending)
+	state, err := f.uc.State(ctx, "p1")
+	if err != nil || state.Idea != nil || state.Brief != nil || state.BriefApproved {
+		t.Fatalf("unapproved: idea %v, brief %v, approved %v, err %v, want none", state.Idea, state.Brief, state.BriefApproved, err)
+	}
+	f.seedBrief(t, domain.UnitApproved)
+	state, err = f.uc.State(ctx, "p1")
+	if err != nil || state.Idea == nil || state.Brief == nil || !state.BriefApproved {
+		t.Fatalf("approved: %+v, %v, want the idea and brief", state, err)
+	}
+	if state.Idea.CentralQuestion != "Vì sao ong chết trong quả sung?" || state.Brief.DurationSeconds != 270 {
+		t.Errorf("state carries %+v and %+v, want the seeded ones", state.Idea, state.Brief)
 	}
 }

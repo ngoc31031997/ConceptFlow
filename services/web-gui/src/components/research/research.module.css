@@ -362,3 +362,26 @@
     animation-duration: 2.4s;
   }
 }
+
+.inputBody {
+  display: grid;
+  gap: 14px;
+}
+
+.inputBody section {
+  display: grid;
+  gap: 10px;
+}
+
+.inputBody h4 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 15px;
+}
+
+.titleGroup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
