@@ -143,7 +143,11 @@ func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note stri
 	if err != nil {
 		return domain.StoredIdea{}, fmt.Errorf("load project input: %w", err)
 	}
-	if strings.TrimSpace(in.Subject) == "" {
+	// The orchestrator already cleaned what it keeps; text saved before that rule
+	// existed is cleaned here, so no straight quote reaches the prompt.
+	in.Subject = domain.SanitizeIdeaText(in.Subject)
+	note = domain.SanitizeIdeaText(note)
+	if in.Subject == "" {
 		return domain.StoredIdea{}, fmt.Errorf("%w: %w", domain.ErrInvalidWizardInput, domain.ErrIdeaNoInput)
 	}
 	models, err := uc.models.GetAuthoringModels(ctx, projectID)
@@ -160,7 +164,7 @@ func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note stri
 	}
 	language := briefLanguageName(briefLanguage(in.Language))
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
-		"topic":         strings.TrimSpace(in.Subject),
+		"topic":         in.Subject,
 		"idea_language": language,
 		"current_idea":  currentIdeaText(current, exists),
 		"kept_fields":   keptProjectIdeaFieldsText(current),
@@ -249,6 +253,9 @@ func (uc *ProjectIdeaUseCase) Edit(ctx context.Context, projectID string, patch 
 		stored.Language = string(in.Language)
 		stored.InputHash = domain.HashInput(in.Subject)
 	}
+	// What the Creator typed is cleaned the same way as the text the idea is
+	// written from, so the next redo does not hand a straight quote to the AI.
+	patch = cleanedPatch(patch)
 	before := stored.Idea.Hash()
 	idea := stored.Idea
 	setText := func(name string, value *string, dst *string) {
@@ -287,6 +294,27 @@ func (uc *ProjectIdeaUseCase) Edit(ctx context.Context, projectID string, patch 
 		return domain.StoredIdea{}, err
 	}
 	return stored, nil
+}
+
+// cleanedPatch returns the patch with every text run through
+// domain.SanitizeIdeaText; a nil field stays nil.
+func cleanedPatch(p IdeaPatch) IdeaPatch {
+	clean := func(s *string) *string {
+		if s == nil {
+			return nil
+		}
+		v := domain.SanitizeIdeaText(*s)
+		return &v
+	}
+	out := IdeaPatch{CentralQuestion: clean(p.CentralQuestion), Scope: clean(p.Scope)}
+	if p.CuriosityPoints != nil {
+		points := make([]string, len(*p.CuriosityPoints))
+		for i, pt := range *p.CuriosityPoints {
+			points[i] = domain.SanitizeIdeaText(pt)
+		}
+		out.CuriosityPoints = &points
+	}
+	return out
 }
 
 // markCreatorField adds name to fields when owned, removes it when not.

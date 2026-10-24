@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ProjectIdea, ProjectIdeaPatch } from "../../api/client";
+import { sanitizeIdeaText } from "../../utils/sanitizeIdeaText";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 import unitStyles from "../units/units.module.css";
 
@@ -100,13 +101,13 @@ export function IdeaEditModal({ open, onClose, idea, onSave }: IdeaEditModalProp
       }
     >
       <FormField label="Câu hỏi trung tâm">
-        <TextArea value={form.question} onChange={(e) => setForm({ ...form, question: e.target.value })} rows={2} data-testid="idea-edit-field-central_question" />
+        <TextArea value={form.question} onChange={(e) => setForm({ ...form, question: sanitizeIdeaText(e.target.value) })} rows={2} data-testid="idea-edit-field-central_question" />
       </FormField>
       <FormField label="Điểm gây tò mò (mỗi dòng một điểm)">
-        <TextArea value={form.points} onChange={(e) => setForm({ ...form, points: e.target.value })} rows={5} data-testid="idea-edit-field-curiosity_points" />
+        <TextArea value={form.points} onChange={(e) => setForm({ ...form, points: sanitizeIdeaText(e.target.value) })} rows={5} data-testid="idea-edit-field-curiosity_points" />
       </FormField>
       <FormField label="Phạm vi">
-        <TextArea value={form.scope} onChange={(e) => setForm({ ...form, scope: e.target.value })} rows={3} data-testid="idea-edit-field-scope" />
+        <TextArea value={form.scope} onChange={(e) => setForm({ ...form, scope: sanitizeIdeaText(e.target.value) })} rows={3} data-testid="idea-edit-field-scope" />
       </FormField>
       <p className={unitStyles.note}>
         {approved ? "Ý tưởng đang được duyệt: lưu bản sửa sẽ đưa nó về chờ duyệt, bạn duyệt lại sau. " : ""}

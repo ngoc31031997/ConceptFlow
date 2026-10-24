@@ -174,6 +174,25 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
     expect(screen.getByTestId("script-step-next")).toBeDisabled();
   });
 
+  it("làm sạch dấu nháy kép và gạch chéo ngược ngay khi gõ, để AI không chép chúng vào JSON", async () => {
+    renderPage();
+    await screen.findByText("Tạo project và viết ý tưởng →");
+    typeText('Vì sao người ta nói "ăn sung là ăn xác ong"? Đường dẫn C:\\tmp');
+    expect(screen.getByTestId("script-step-topic")).toHaveValue("Vì sao người ta nói “ăn sung là ăn xác ong”? Đường dẫn C:/tmp");
+
+    fireEvent.click(screen.getByTestId("script-step-create"));
+    await screen.findByTestId("idea-field-central_question");
+    expect(createDraft).toHaveBeenCalledWith(expect.any(String), "Vì sao người ta nói “ăn sung là ăn xác ong”? Đường dẫn C:/tmp", "vi");
+  });
+
+  it("ghi chú làm lại cũng được làm sạch dấu nháy kép", async () => {
+    renderPage();
+    await createWithAI();
+    fireEvent.click(screen.getByTestId("idea-actions-redo"));
+    fireEvent.change(await screen.findByTestId("idea-redo-note"), { target: { value: 'nhấn mạnh "ngộ nhận"' } });
+    expect(screen.getByTestId("idea-redo-note")).toHaveValue("nhấn mạnh “ngộ nhận”");
+  });
+
   it("ngôn ngữ đã chọn đi cùng lúc tạo project", async () => {
     renderPage();
     await screen.findByText("Tạo project và viết ý tưởng →");

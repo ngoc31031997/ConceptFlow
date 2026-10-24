@@ -21,6 +21,7 @@ import {
 import { useProjectIdea } from "../hooks/useProjectIdea";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { FLOW_INIT, flowStepName } from "../utils/flow";
+import { sanitizeIdeaText } from "../utils/sanitizeIdeaText";
 import wizard from "./WizardSteps.module.css";
 import styles from "./ScriptStepPage.module.css";
 
@@ -73,7 +74,8 @@ export function ScriptStepPage() {
   const checking = !created && !flow.loaded;
   const idea = useProjectIdea(draft.projectId, created);
   const stored = idea.screen?.idea ?? null;
-  const text = draft.authoringTopic;
+  // A draft reopened from storage may hold text typed before the cleaning existed.
+  const text = sanitizeIdeaText(draft.authoringTopic);
   const textLocked = creating || checking || savingText;
   const canCreate = text.trim().length > 0 && !created && !textLocked;
   // The text the server keeps; once it differs from the box, "Lưu nội dung" is offered.
@@ -153,7 +155,7 @@ export function ScriptStepPage() {
             <TextArea
               id="idea-input"
               value={text}
-              onChange={(e) => dispatch({ type: "SET_AUTHORING_TOPIC", payload: e.target.value })}
+              onChange={(e) => dispatch({ type: "SET_AUTHORING_TOPIC", payload: sanitizeIdeaText(e.target.value) })}
               placeholder="Ví dụ: Chuyện gì xảy ra nếu ta rơi vào hố đen? Ta có bị kéo dài như sợi mì không? Người bên ngoài có thấy ta biến mất không?"
               rows={8}
               disabled={textLocked}

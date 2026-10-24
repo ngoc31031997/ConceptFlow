@@ -181,9 +181,37 @@ func (s StoredIdea) HasCreatorField(name string) bool {
 	return false
 }
 
-// HashInput identifies the text the Creator typed, ignoring surrounding space.
+// SanitizeIdeaText cleans text the Creator typed before it is stored or handed
+// to the AI. The AI answers in JSON and tends to copy a straight double quote or
+// a backslash from its input into a JSON string, which then cannot be read. So a
+// straight double quote becomes a typographic one (“ at the start or after a
+// space, bracket or dash, ” anywhere else), a backslash becomes a slash, and
+// control characters other than a new line and a tab are dropped. Everything
+// else, Vietnamese letters and single quotes included, is kept. The result is
+// trimmed. The orchestrator applies the same rule to the text it keeps.
+func SanitizeIdeaText(text string) string {
+	var out []rune
+	for _, r := range strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n") {
+		switch {
+		case r == '"':
+			if len(out) == 0 || strings.ContainsRune(" \t\n([{“‘—–-", out[len(out)-1]) {
+				out = append(out, '“')
+			} else {
+				out = append(out, '”')
+			}
+		case r == '\\':
+			out = append(out, '/')
+		case r == '\n' || r == '\t' || r >= ' ' && r != 0x7f:
+			out = append(out, r)
+		}
+	}
+	return strings.TrimSpace(string(out))
+}
+
+// HashInput identifies the text the Creator typed once it is cleaned, so text
+// kept before the cleaning existed and the same text kept after it match.
 func HashInput(text string) string {
-	sum := sha256.Sum256([]byte(strings.TrimSpace(text)))
+	sum := sha256.Sum256([]byte(SanitizeIdeaText(text)))
 	return hex.EncodeToString(sum[:])
 }
 

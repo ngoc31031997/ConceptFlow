@@ -140,3 +140,33 @@ func TestCreateProjectDraft_KeepsTheTextAndLanguageOnTheProject(t *testing.T) {
 		t.Fatalf("subject = %q", got)
 	}
 }
+
+func TestCreateProjectDraft_CleansQuotesBeforeKeepingTheText(t *testing.T) {
+	repo := newFakeDraftRepo()
+	uc := application.NewCreateProjectDraftUseCase(repo)
+	out, err := uc.Execute(context.Background(), application.CreateProjectDraftInput{
+		Topic: `Vì sao nói "ăn sung là ăn xác ong"?`, ContentLanguage: domain.LanguageVietnamese,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "Vì sao nói “ăn sung là ăn xác ong”?"
+	if repo.subject[out.ProjectID] != want || repo.topics[out.ProjectID] != want {
+		t.Fatalf("subject = %q, topic = %q, want both %q", repo.subject[out.ProjectID], repo.topics[out.ProjectID], want)
+	}
+}
+
+func TestUpdateProjectTopic_CleansQuotesBeforeKeepingTheText(t *testing.T) {
+	repo := newFakeDraftRepo()
+	repo.saved["p1"] = &domain.Project{ProjectID: "p1", Status: domain.StatusDraft, ContentLanguage: domain.LanguageVietnamese}
+	uc := application.NewUpdateProjectTopicUseCase(repo)
+	if _, err := uc.Execute(context.Background(), application.UpdateProjectTopicInput{ProjectID: "p1", Topic: `nói "a" đi`}); err != nil {
+		t.Fatal(err)
+	}
+	if repo.subject["p1"] != "nói “a” đi" || repo.topics["p1"] != "nói “a” đi" {
+		t.Fatalf("subject = %q, topic = %q", repo.subject["p1"], repo.topics["p1"])
+	}
+	if _, err := uc.Execute(context.Background(), application.UpdateProjectTopicInput{ProjectID: "p1", Topic: " \u0007 "}); err == nil {
+		t.Fatal("a topic with nothing left after cleaning must be refused")
+	}
+}

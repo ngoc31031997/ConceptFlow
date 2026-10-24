@@ -24,6 +24,15 @@ Ba trường viết bằng ngôn ngữ nội dung của project. Bước sau ch�
 
 authoring-service không đọc bảng của orchestrator; nó gọi `GET /internal/v1/projects/{id}/idea-input` (orchestrator) và nhận `{"subject": "…", "language": "vi"|"en"}`, `404` khi project không có. Hai cột này nằm cạnh `projects.voice_language` và `project_authoring.topic/.language`, vốn vẫn được ghi như trước; không bộ nào đọc `project_authoring` thay cho chúng ở bước này.
 
+## Làm sạch chữ Creator gõ
+
+AI trả lời bằng JSON và hay chép dấu nháy kép thẳng hoặc dấu gạch chéo ngược từ đầu vào vào chuỗi JSON, làm câu trả lời không đọc được. Vì vậy mọi chữ Creator gõ ở bước này được làm sạch ở API (và cả ở web-gui khi gõ):
+
+- `"` thành nháy cong: `“` ở đầu chuỗi hoặc sau khoảng trắng, dấu mở, gạch ngang; `”` ở chỗ còn lại.
+- `\` thành `/`; ký tự điều khiển bỏ đi (giữ xuống dòng và tab); chuỗi được cắt khoảng trắng hai đầu.
+- orchestrator làm sạch `topic` của `POST /v1/projects` và `PATCH /v1/projects/{id}/topic` trước khi lưu vào `subject` (và `project_authoring`); `400` nếu chữ rỗng sau khi làm sạch.
+- authoring-service làm sạch các ô của `PUT /v1/projects/{id}/idea`, `note` của `generate`, và đoạn đọc từ orchestrator (dữ liệu lưu trước khi có luật này) trước khi đưa vào prompt. `input_changed` so sánh chữ đã làm sạch nên không báo sai.
+
 ## Đường dẫn
 
 | Phương thức | Đường dẫn | Việc |

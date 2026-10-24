@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { sanitizeIdeaText } from "../../utils/sanitizeIdeaText";
 import { Button, Dialog, FormField, TextArea } from "../ui";
 import unitStyles from "../units/units.module.css";
 
@@ -60,7 +61,7 @@ export function IdeaRedoModal({ open, onClose, approved, initialNote, modelSelec
       <FormField label="Ghi chú cho AI">
         <TextArea
           value={note}
-          onChange={(e) => setNote(e.target.value)}
+          onChange={(e) => setNote(sanitizeIdeaText(e.target.value))}
           rows={4}
           placeholder="Viết điều chưa ổn và muốn đổi thế nào"
           data-testid="idea-redo-note"

@@ -3,7 +3,6 @@ package application
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	"orchestrator/internal/domain"
 )
@@ -115,7 +114,7 @@ func (uc *CreateProjectDraftUseCase) Execute(ctx context.Context, input CreatePr
 		}
 	}
 
-	topic := strings.TrimSpace(input.Topic)
+	topic := domain.SanitizeIdeaText(input.Topic)
 	var similar []SimilarProject
 	if topic != "" {
 		if err := uc.repo.SaveAuthoringTopic(ctx, projectID, topic, input.ContentLanguage); err != nil {
@@ -182,7 +181,7 @@ func (uc *UpdateProjectTopicUseCase) Execute(ctx context.Context, input UpdatePr
 	if input.ProjectID == "" {
 		return nil, fmt.Errorf("project_id is required")
 	}
-	topic := strings.TrimSpace(input.Topic)
+	topic := domain.SanitizeIdeaText(input.Topic)
 	if topic == "" {
 		return nil, fmt.Errorf("topic is required")
 	}
