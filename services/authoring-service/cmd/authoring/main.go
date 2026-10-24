@@ -125,6 +125,10 @@ func main() {
 	projectIdea := application.NewProjectIdeaUseCase(
 		authoringRepo, projects, authoringRepo, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+	// The second step's brief: written from the approved idea.
+	projectBrief := application.NewProjectBriefUseCase(
+		authoringRepo, projectIdea, projects, projects, authoringRepo, projects, authoringRepo,
+		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
@@ -222,6 +226,7 @@ func main() {
 		WithReviewUnits(reviewUnits).
 		WithIdea(projectIdea).
 		WithCreativeBrief(creativeBrief).
+		WithProjectBrief(projectBrief).
 		WithResearch(research).
 		WithStory(story).
 		WithBeats(beats).

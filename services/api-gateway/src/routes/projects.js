@@ -133,6 +133,12 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/idea/approve', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/idea/unapprove', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/idea/review', proxyHandler(authoringAi, 'authoring-service'));
+  router.get('/v1/projects/:id/creative-brief', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/creative-brief/generate', proxyHandler(authoringAi, 'authoring-service'));
+  router.put('/v1/projects/:id/creative-brief', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/creative-brief/approve', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/creative-brief/unapprove', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/creative-brief/review', proxyHandler(authoringAi, 'authoring-service'));
   router.get('/v1/projects/:id/brief', proxyHandler(authoring, 'authoring-service'));
   router.put('/v1/projects/:id/brief/target-duration', proxyHandler(authoring, 'authoring-service'));
   router.put('/v1/projects/:id/brief/platform', proxyHandler(authoring, 'authoring-service'));

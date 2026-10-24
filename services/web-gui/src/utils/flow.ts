@@ -109,7 +109,7 @@ export interface FlowViewStep {
 
 export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 1, phase: 0, label: "Ý tưởng", title: "Ý tưởng ban đầu", gate: true, server: [1], note: "Đề tài, câu hỏi trung tâm, vì sao thú vị, đã biết và chưa biết" },
-  { n: 2, phase: 0, label: "Creative brief", title: "Định hướng sáng tạo", gate: true, server: [2], note: "Khán giả, điều người xem mang về, thời lượng, nền tảng, giọng điệu, ngoài phạm vi" },
+  { n: 2, phase: 0, label: "Creative brief", title: "Định hướng sáng tạo", gate: true, server: [2], note: "Khán giả, thời lượng, giọng điệu, mục tiêu học tập, điều cần tránh" },
   { n: 3, phase: 0, label: "Nghiên cứu", title: "Nghiên cứu và kiểm chứng", gate: true, optional: true, server: [], screen: "research", note: "Câu hỏi cần tra, prompt chép ra ngoài, dán kết quả, kiểm link và đoạn trích" },
   { n: 4, phase: 0, label: "Câu chuyện", title: "Xây dựng câu chuyện", gate: true, server: [], screen: "story", note: "Góc tiếp cận, câu hỏi mở đầu, lời hứa, chuỗi nhân quả, payoff, dữ kiện dùng" },
   { n: 5, phase: 0, label: "Beat sheet", title: "Dàn ý · beat sheet", gate: true, server: [], screen: "beats", note: "Beat, chức năng, mục tiêu, dữ kiện, thời lượng" },

@@ -1,57 +1,39 @@
 import { useContext, useState, type HTMLAttributes } from "react";
 import { useNavigate } from "react-router-dom";
 import { AppShell } from "../components/AppShell";
-import { CreativeBriefCard } from "../components/CreativeBriefCard";
+import { ProjectBriefCard } from "../components/brief/ProjectBriefCard";
 import { SelectableOption } from "../components/SelectableOption";
 import { TopicSummary } from "../components/TopicSummary";
 import type { StepStripProps } from "../components/StepStrip";
 import { WizardNav } from "../components/WizardNav";
-import { Button, Card, Select } from "../components/ui";
+import { Button, Card } from "../components/ui";
 import {
   ProjectDraftContext,
   ProjectDraftDispatchContext,
   saveLastUsedSettings,
   type VideoOutputMode,
 } from "../context/ProjectDraftContext";
-import {
-  ApiError,
-  DEFAULT_TARGET_DURATION,
-  GENERIC_CONNECTION_ERROR,
-  PLATFORMS,
-  TARGET_DURATIONS,
-  patchWizardSettings,
-  setPlatform,
-  setTargetDuration,
-  type TargetDuration,
-} from "../api/client";
-import { useCreativeBrief } from "../hooks/useCreativeBrief";
-import { useIdea } from "../hooks/useIdea";
+import { ApiError, GENERIC_CONNECTION_ERROR, patchWizardSettings } from "../api/client";
+import { useProjectBrief } from "../hooks/useProjectBrief";
 import { useLlmStatus } from "../hooks/useLlmStatus";
 import { useVideoFormats } from "../hooks/useVideoFormats";
 import { DEFAULT_LONG_FORMAT_ID, SHORT_FORMAT_ID, isShortFormat } from "../utils/outputMode";
 import { FLOW_CONFIG, flowStepName } from "../utils/flow";
+import cardStyles from "../components/CreativeBriefCard.module.css";
+import ideaStyles from "../components/idea/ProjectIdeaCard.module.css";
 import wizard from "./WizardSteps.module.css";
 import styles from "./ScriptStepPage.module.css";
 
 const SUBTITLE =
-  "Thống nhất video làm cho ai, nhằm đạt mục tiêu gì và có giới hạn nào. Brief là điểm tựa cho nghiên cứu, câu chuyện và kịch bản phía sau.";
+  "Thống nhất video làm cho ai, dài bao lâu, nói với giọng nào, người xem hiểu được gì và điều gì phải tránh. AI viết từ ý tưởng đã duyệt ở bước 1.";
 
 const OUTPUT_MODES: { value: VideoOutputMode; label: string; hint: string }[] = [
-  { value: "long", label: "Video dài 16:9", hint: "3–10 phút, có chương" },
-  { value: "short", label: "Shorts 9:16", hint: "dưới 60 giây" },
+  { value: "long", label: "Video dài 16:9", hint: "từ 2 đến 30 phút, có chương" },
+  { value: "short", label: "Shorts 9:16", hint: "1–2 phút" },
 ];
-const LANGUAGES: { value: "vi" | "en"; label: string; hint?: string }[] = [
-  { value: "vi", label: "Tiếng Việt", hint: "giọng, phụ đề, mô tả" },
-  { value: "en", label: "English" },
-];
-const SHORT_DURATION_LABEL = "dưới 60 giây";
 
 /** React 18's typings have no `inert`; the attribute still reaches the DOM. */
 const INERT = { inert: "" } as HTMLAttributes<HTMLDivElement>;
-
-function durationLabel(d: TargetDuration): string {
-  return `${d.replace("-", "–")} phút`;
-}
 
 /** Props of the step 2 screen. */
 interface CreativeBriefStepPageProps {
@@ -69,13 +51,14 @@ interface CreativeBriefStepPageProps {
 /**
  * Bước 2 — Creative brief (định hướng sáng tạo), trên xuống:
  *
- * ① Hình thức: dạng video, ngôn ngữ nội dung, thời lượng dự kiến, nền tảng
- *   phát hành. Mỗi lần đổi là một lần lưu lên project. Brief đã viết giữ
- *   nguyên cho tới khi Creator nhờ AI viết lại theo lựa chọn mới.
- * ② Định hướng sáng tạo (CreativeBriefCard): AI viết từ ý tưởng đã duyệt,
- *   Creator sửa tay hoặc nhờ làm lại, rồi duyệt. Không có AI thì Creator tự viết.
+ * ① Dạng video: dài hay ngắn. Mỗi lần đổi là một lần lưu lên project và quyết
+ *   định khoảng thời lượng brief được đặt. Ngôn ngữ nội dung đã chốt ở bước 1.
+ * ② Ý tưởng đã duyệt ở bước 1: chỉ đọc, là đầu vào của brief.
+ * ③ Định hướng sáng tạo (ProjectBriefCard): AI viết khán giả, thời lượng, giọng
+ *   điệu, mục tiêu học tập và điều cần tránh từ ý tưởng; Creator sửa tay hoặc
+ *   nhờ làm lại, xem đánh giá của AI, rồi duyệt. Không có AI thì Creator tự viết.
  *
- * "Lưu và sang nghiên cứu" chỉ mở khi brief đã duyệt: các bước sau dựng từ brief.
+ * "Lưu và sang nghiên cứu" chỉ mở khi brief đã duyệt.
  */
 export function CreativeBriefStepPage({
   readOnly = false,
@@ -91,18 +74,14 @@ export function CreativeBriefStepPage({
 
   // This step opens only after the idea step made the project.
   const created = !readOnly && !!draft.projectId;
-  const idea = useIdea(draft.projectId, created);
-  const brief = useCreativeBrief(draft.projectId, created);
-  const unit = brief.state?.unit ?? null;
-  const ideaApproved = idea.state?.unit?.status === "approved";
-  const isShort = draft.videoOutputMode === "short";
+  const brief = useProjectBrief(draft.projectId, created);
+  const stored = brief.screen?.brief ?? null;
+  const approvedIdea = brief.screen?.idea ?? null;
 
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const choicesLocked = readOnly || !created || brief.running || brief.state === null;
-  const shownDuration = brief.state?.targetDuration ?? DEFAULT_TARGET_DURATION;
-  const shownPlatform = brief.state?.platform ?? PLATFORMS[0];
+  const choicesLocked = readOnly || !created || brief.writing || brief.screen === null;
 
   async function save(action: () => Promise<void>) {
     setSaveError(null);
@@ -126,24 +105,9 @@ export function CreativeBriefStepPage({
       const current = formats.find((f) => f.id === draft.videoFormatId);
       if (current && isShortFormat(current)) dispatch({ type: "SET_VIDEO_FORMAT", payload: DEFAULT_LONG_FORMAT_ID });
     }
-    void save(() => patchWizardSettings(draft.projectId, { videoOutputMode: mode }));
-  }
-
-  function handleLanguageChange(language: "vi" | "en") {
-    dispatch({ type: "SET_VOICE_LANGUAGE", payload: language });
-    void save(() => patchWizardSettings(draft.projectId, { voiceLanguage: language }));
-  }
-
-  function handlePlatformChange(next: string) {
     void save(async () => {
-      await setPlatform(draft.projectId, next);
-      brief.reload();
-    });
-  }
-
-  function handleDurationChange(next: TargetDuration) {
-    void save(async () => {
-      await setTargetDuration(draft.projectId, next);
+      await patchWizardSettings(draft.projectId, { videoOutputMode: mode });
+      // The range of lengths a brief may set follows the video form.
       brief.reload();
     });
   }
@@ -166,12 +130,12 @@ export function CreativeBriefStepPage({
 
   function strip(): StepStripProps | undefined {
     if (readOnly) return undefined;
-    if (brief.running) return { tone: "run", label: "AI đang viết brief", message: "Ô bạn đã sửa giữ nguyên." };
-    if (!unit && !ideaApproved) {
+    if (brief.writing) return { tone: "run", label: "AI đang viết brief", message: "Ô bạn đã sửa giữ nguyên." };
+    if (!stored && !approvedIdea) {
       return { tone: "todo", label: "Chưa có brief", message: "Duyệt ý tưởng ở bước 1 trước: brief được viết từ ý tưởng đã duyệt." };
     }
-    if (!unit) return { tone: "todo", label: "Chưa có brief", message: "AI viết brief từ ý tưởng, hoặc bạn tự viết; duyệt rồi sang Nghiên cứu." };
-    if (unit.status === "approved") return { tone: "ok", label: "Brief đã duyệt", message: "Tiếp theo: Nghiên cứu (tuỳ chọn)." };
+    if (!stored) return { tone: "todo", label: "Chưa có brief", message: "AI viết brief từ ý tưởng, hoặc bạn tự viết; duyệt rồi sang Nghiên cứu." };
+    if (stored.status === "approved") return { tone: "ok", label: "Brief đã duyệt", message: "Tiếp theo: Nghiên cứu (tuỳ chọn)." };
     return {
       tone: "wait",
       label: "Chờ bạn duyệt brief",
@@ -197,7 +161,7 @@ export function CreativeBriefStepPage({
         <TopicSummary topic={draft.authoringTopic} onOpen={() => navigate("/")} />
         <div className={readOnly ? wizard.readOnlyBody : undefined} {...(readOnly ? INERT : {})}>
           <Card className={styles.card} data-testid="brief-form-card">
-            <h3 className={styles.cardTitle}>① Hình thức</h3>
+            <h3 className={styles.cardTitle}>① Dạng video</h3>
 
             <div className={styles.field}>
               <span className={styles.label} id="brief-output-mode">
@@ -217,73 +181,9 @@ export function CreativeBriefStepPage({
                 ))}
               </div>
             </div>
-
-            <div className={styles.grid3}>
-              <div className={styles.field}>
-                <span className={styles.label} id="brief-language">
-                  Ngôn ngữ nội dung
-                </span>
-                <div className={styles.options} role="radiogroup" aria-labelledby="brief-language">
-                  {LANGUAGES.map((o) => (
-                    <SelectableOption
-                      key={o.value}
-                      selected={draft.voiceLanguage === o.value}
-                      onSelect={() => handleLanguageChange(o.value)}
-                      label={o.label}
-                      hint={o.hint}
-                      disabled={choicesLocked}
-                      testId={`content-language-${o.value}`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="brief-duration">
-                  Thời lượng dự kiến
-                </label>
-                {isShort ? (
-                  <Select id="brief-duration" value="short" disabled data-testid="brief-duration">
-                    <option value="short">{SHORT_DURATION_LABEL}</option>
-                  </Select>
-                ) : (
-                  <Select
-                    id="brief-duration"
-                    value={shownDuration}
-                    onChange={(e) => handleDurationChange(e.target.value as TargetDuration)}
-                    disabled={choicesLocked}
-                    data-testid="brief-duration"
-                  >
-                    {TARGET_DURATIONS.map((d) => (
-                      <option key={d} value={d}>
-                        {durationLabel(d)}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-                <span className={styles.hint}>Beat sheet và kịch bản bám theo khung này.</span>
-              </div>
-              <div className={styles.field}>
-                <label className={styles.label} htmlFor="brief-platform">
-                  Nền tảng phát hành
-                </label>
-                <Select
-                  id="brief-platform"
-                  value={shownPlatform}
-                  onChange={(e) => handlePlatformChange(e.target.value)}
-                  disabled={choicesLocked}
-                  data-testid="brief-platform"
-                >
-                  {PLATFORMS.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
-            {unit && (
+            {stored && (
               <p className={styles.hint} data-testid="brief-form-note">
-                Brief đã viết theo lựa chọn lúc trước. Đổi ở đây xong, bấm “Làm lại kèm ghi chú” ở brief để AI viết theo lựa chọn mới.
+                Brief đã viết theo lựa chọn lúc trước. Đổi dạng video ở đây xong, bấm “Làm lại kèm ghi chú” ở brief để AI viết theo lựa chọn mới.
               </p>
             )}
             {saveError && (
@@ -293,13 +193,39 @@ export function CreativeBriefStepPage({
             )}
           </Card>
 
-          <CreativeBriefCard
-            projectId={draft.projectId}
-            created={created}
-            brief={brief}
-            aiAvailable={aiAvailable}
-            ideaApproved={ideaApproved}
-          />
+          <Card className={styles.card} data-testid="brief-idea-card">
+            <h3 className={styles.cardTitle}>② Ý tưởng đã duyệt</h3>
+            {approvedIdea ? (
+              <>
+                <div className={cardStyles.field}>
+                  <span className={cardStyles.label}>Câu hỏi trung tâm</span>
+                  <p className={cardStyles.value} data-testid="brief-idea-question">
+                    {approvedIdea.centralQuestion}
+                  </p>
+                </div>
+                <div className={cardStyles.field}>
+                  <span className={cardStyles.label}>Điểm gây tò mò</span>
+                  <ul className={ideaStyles.points}>
+                    {approvedIdea.curiosityPoints.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className={cardStyles.field}>
+                  <span className={cardStyles.label}>Phạm vi</span>
+                  <p className={cardStyles.value}>{approvedIdea.scope}</p>
+                </div>
+              </>
+            ) : (
+              <p className={styles.hint} data-testid="brief-idea-missing">
+                {created && brief.screen
+                  ? "Ý tưởng ở bước 1 chưa được duyệt. Duyệt ý tưởng trước: brief được viết từ ý tưởng đã duyệt."
+                  : "Chưa có ý tưởng đã duyệt."}
+              </p>
+            )}
+          </Card>
+
+          <ProjectBriefCard projectId={draft.projectId} created={created} brief={brief} aiAvailable={aiAvailable} />
         </div>
         {readOnly && (
           <Button variant="ghost" onClick={onBack} data-testid="brief-read-only-back">
@@ -311,10 +237,10 @@ export function CreativeBriefStepPage({
       {!readOnly && (
         <WizardNav
           isBlocked={!!saveError}
-          nextDisabled={saving || unit?.status !== "approved"}
+          nextDisabled={saving || stored?.status !== "approved"}
           hint={
             saveError ??
-            (unit?.status === "approved"
+            (stored?.status === "approved"
               ? "Brief đã duyệt. Sang bước Nghiên cứu (tuỳ chọn)."
               : "Duyệt brief để sang bước Nghiên cứu.")
           }

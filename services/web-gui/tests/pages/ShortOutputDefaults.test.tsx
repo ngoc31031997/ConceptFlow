@@ -27,13 +27,17 @@ beforeEach(() => {
     reason: "Chưa cấu hình",
   });
   vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue(FORMATS);
-  vi.spyOn(apiClient, "getIdeaState").mockResolvedValue({ unit: null });
-  vi.spyOn(apiClient, "getBriefState").mockResolvedValue({
-    unit: null,
-    targetDuration: "4-5",
-    platform: "YouTube",
-    storyStale: false,
-    storyPromptReadsBrief: true,
+  vi.spyOn(apiClient, "getBriefScreen").mockResolvedValue({
+    brief: null,
+    idea: null,
+    subject: "",
+    language: "vi",
+    videoMode: "long",
+    minDurationSeconds: 121,
+    maxDurationSeconds: 1800,
+    ideaChanged: false,
+    review: null,
+    reviewStale: false,
   });
   vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
 });

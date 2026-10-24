@@ -45,6 +45,17 @@ type ideaUseCase interface {
 	Review(ctx context.Context, projectID string) (domain.IdeaReview, error)
 }
 
+// projectBriefUseCase is the second step: the brief the AI writes from the
+// approved idea, the Creator's edits and approval, and the AI's review of it.
+type projectBriefUseCase interface {
+	State(ctx context.Context, projectID string) (application.ProjectBriefState, error)
+	Generate(ctx context.Context, projectID, note string) (domain.StoredBrief, error)
+	Edit(ctx context.Context, projectID string, patch application.BriefPatch) (domain.StoredBrief, error)
+	Approve(ctx context.Context, projectID string) (domain.StoredBrief, error)
+	Unapprove(ctx context.Context, projectID string) (domain.StoredBrief, error)
+	Review(ctx context.Context, projectID string) (domain.BriefReview, error)
+}
+
 // defaultModelUseCase is the app setting for the default AI model of each step.
 type defaultModelUseCase interface {
 	StepModels(ctx context.Context) (map[string]string, error)
@@ -131,6 +142,7 @@ func (rt *Router) WithCreativeBrief(uc creativeBriefUseCase) *Router {
 func (rt *Router) reviewUnitRoutes(r chi.Router) {
 	r.Get("/v1/settings/ai-model", rt.handleGetAIModelSetting)
 	r.Put("/v1/settings/ai-model/steps/{step}", rt.handlePutAIModelStep)
+	rt.projectBriefRoutes(r)
 	r.Get("/v1/projects/{project_id}/idea", rt.handleGetIdea)
 	r.Post("/v1/projects/{project_id}/idea/generate", rt.handleGenerateIdea)
 	r.Put("/v1/projects/{project_id}/idea", rt.handleEditIdea)
@@ -502,16 +514,16 @@ func (rt *Router) handleUnitImpact(w http.ResponseWriter, r *http.Request) {
 // the error's own text, which names what was wrong.
 func writeUnitError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound), errors.Is(err, domain.ErrIdeaNotFound),
+	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind), errors.Is(err, domain.ErrProjectNotFound), errors.Is(err, domain.ErrIdeaNotFound), errors.Is(err, domain.ErrBriefNotFound),
 		errors.Is(err, application.ErrFindingNotFound), errors.Is(err, domain.ErrNoLockedVersion):
 		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, application.ErrIdeaIncomplete), errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrInvalidWizardInput),
+	case errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, application.ErrBriefIncomplete), errors.Is(err, application.ErrIdeaIncomplete), errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrProjectBriefInvalid), errors.Is(err, domain.ErrInvalidWizardInput),
 		errors.Is(err, domain.ErrNoResearchJSON), errors.Is(err, domain.ErrPasteTooLarge), errors.Is(err, domain.ErrResearchEmpty),
 		errors.Is(err, application.ErrStoryIncomplete), errors.Is(err, application.ErrStoryNothingToWrite),
 		errors.Is(err, application.ErrBeatNoGoal), errors.Is(err, application.ErrBeatSheetFull),
 		errors.Is(err, application.ErrScriptBeatEmpty), errors.Is(err, application.ErrScriptBeatHasLines), errors.Is(err, application.ErrScriptLineNotFlagged),
 		errors.Is(err, domain.ErrHandoffEmpty), errors.Is(err, application.ErrHandoffExists), errors.Is(err, application.ErrFindingNotApplicable):
-		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput, domain.ErrProjectIdeaInvalid))
+		writeError(w, http.StatusBadRequest, reasonOf(err, domain.ErrInvalidUnitEdit, domain.ErrInvalidWizardInput, domain.ErrProjectIdeaInvalid, domain.ErrProjectBriefInvalid))
 	case errors.Is(err, domain.ErrInvalidStatus):
 		writeError(w, http.StatusConflict, reasonOf(err, domain.ErrInvalidStatus))
 	default:
@@ -538,10 +550,10 @@ func reasonOf(err error, sentinels ...error) string {
 func writeUnitRunError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, domain.ErrUnitNotFound), errors.Is(err, domain.ErrUnknownUnitKind),
-		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput), errors.Is(err, domain.ErrIdeaNotFound),
-		errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrInvalidStatus):
+		errors.Is(err, domain.ErrInvalidUnitEdit), errors.Is(err, domain.ErrInvalidWizardInput), errors.Is(err, domain.ErrIdeaNotFound), errors.Is(err, domain.ErrBriefNotFound),
+		errors.Is(err, domain.ErrProjectIdeaInvalid), errors.Is(err, domain.ErrProjectBriefInvalid), errors.Is(err, domain.ErrInvalidStatus):
 		writeUnitError(w, err)
-	case errors.Is(err, domain.ErrIdeaReplyUnusable), errors.Is(err, domain.ErrProjectIdeaReplyUnusable), errors.Is(err, domain.ErrIdeaReviewReplyUnusable), errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
+	case errors.Is(err, domain.ErrIdeaReplyUnusable), errors.Is(err, domain.ErrProjectIdeaReplyUnusable), errors.Is(err, domain.ErrIdeaReviewReplyUnusable), errors.Is(err, domain.ErrProjectBriefReplyUnusable), errors.Is(err, domain.ErrBriefReviewReplyUnusable), errors.Is(err, domain.ErrBriefReplyUnusable), errors.Is(err, domain.ErrBeatReplyUnusable), errors.Is(err, domain.ErrScriptReplyUnusable),
 		errors.Is(err, domain.ErrReviewReplyUnusable), errors.Is(err, domain.ErrHandoffReplyUnusable):
 		writeError(w, http.StatusBadGateway, err.Error()+". Thử làm lại, hoặc tự điền các ô.")
 	case errors.Is(err, application.ErrLLMNotConfigured):

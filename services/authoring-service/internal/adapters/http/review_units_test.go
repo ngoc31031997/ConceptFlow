@@ -297,3 +297,109 @@ func TestIdeaEditApproveReviewRoutes(t *testing.T) {
 		t.Errorf("an unusable review: status %d, want 502", rec.Code)
 	}
 }
+
+// fakeProjectBrief is the second step's use case with a fixed answer.
+type fakeProjectBrief struct {
+	state   application.ProjectBriefState
+	brief   domain.StoredBrief
+	review  domain.BriefReview
+	err     error
+	patched application.BriefPatch
+}
+
+func (f *fakeProjectBrief) State(context.Context, string) (application.ProjectBriefState, error) {
+	return f.state, f.err
+}
+func (f *fakeProjectBrief) Generate(context.Context, string, string) (domain.StoredBrief, error) {
+	return f.brief, f.err
+}
+func (f *fakeProjectBrief) Edit(_ context.Context, _ string, p application.BriefPatch) (domain.StoredBrief, error) {
+	f.patched = p
+	return f.brief, f.err
+}
+func (f *fakeProjectBrief) Approve(context.Context, string) (domain.StoredBrief, error) {
+	return f.brief, f.err
+}
+func (f *fakeProjectBrief) Unapprove(context.Context, string) (domain.StoredBrief, error) {
+	return f.brief, f.err
+}
+func (f *fakeProjectBrief) Review(context.Context, string) (domain.BriefReview, error) {
+	return f.review, f.err
+}
+
+func serveProjectBrief(brief *fakeProjectBrief, method, path, body string) *httptest.ResponseRecorder {
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(&fakeUnits{}).WithProjectBrief(brief)
+	rec := httptest.NewRecorder()
+	rt.Handler().ServeHTTP(rec, httptest.NewRequest(method, path, strings.NewReader(body)))
+	return rec
+}
+
+func TestProjectBriefRoutes(t *testing.T) {
+	stored := domain.StoredBrief{
+		Brief:  domain.ProjectBrief{Audience: "a", DurationSeconds: 270, Tone: "t", LearningObjectives: []string{"o"}, Avoid: []string{"v"}},
+		Status: domain.BriefApproved,
+	}
+	idea := domain.ProjectIdea{CentralQuestion: "q?", CuriosityPoints: []string{"c"}, Scope: "s"}
+	state := application.ProjectBriefState{
+		Brief: &stored, Idea: &idea, Subject: "Rơi vào hố đen?", Language: domain.LanguageVietnamese,
+		VideoMode: domain.ModeLongOnly, MinDurationSeconds: 121, MaxDurationSeconds: 1800, IdeaChanged: true,
+	}
+	rec := serveProjectBrief(&fakeProjectBrief{state: state}, "GET", "/v1/projects/p1/creative-brief", "")
+	var body projectBriefStateResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if rec.Code != http.StatusOK || body.Brief == nil || body.Brief.DurationSeconds != 270 || body.Idea == nil ||
+		body.Idea.Scope != "s" || body.MinDurationSeconds != 121 || body.MaxDurationSeconds != 1800 || !body.IdeaChanged || body.Review != nil {
+		t.Errorf("brief state: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{}, "GET", "/v1/projects/p1/creative-brief", ""); rec.Code != http.StatusOK ||
+		!strings.Contains(rec.Body.String(), `"brief":null`) || !strings.Contains(rec.Body.String(), `"idea":null`) {
+		t.Errorf("no brief or idea yet: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{brief: stored}, "POST", "/v1/projects/p1/creative-brief/generate", ""); rec.Code != http.StatusOK {
+		t.Errorf("generate: status %d", rec.Code)
+	}
+	unusable := &fakeProjectBrief{err: fmt.Errorf("%w: thiếu ô", domain.ErrProjectBriefReplyUnusable)}
+	if rec := serveProjectBrief(unusable, "POST", "/v1/projects/p1/creative-brief/generate", ""); rec.Code != http.StatusBadGateway {
+		t.Errorf("an unusable reply: status %d, want 502", rec.Code)
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{err: application.ErrLLMNotConfigured}, "POST", "/v1/projects/p1/creative-brief/generate", ""); rec.Code != http.StatusServiceUnavailable {
+		t.Errorf("no model: status %d, want 503", rec.Code)
+	}
+	needsIdea := &fakeProjectBrief{err: fmt.Errorf("%w: %w", domain.ErrInvalidStatus, domain.ErrBriefNeedsApprovedIdea)}
+	if rec := serveProjectBrief(needsIdea, "POST", "/v1/projects/p1/creative-brief/generate", ""); rec.Code != http.StatusConflict {
+		t.Errorf("idea not approved: status %d, want 409", rec.Code)
+	}
+}
+
+func TestProjectBriefEditApproveReviewRoutes(t *testing.T) {
+	f := &fakeProjectBrief{brief: domain.StoredBrief{Status: domain.BriefPending}}
+	rec := serveProjectBrief(f, "PUT", "/v1/projects/p1/creative-brief", `{"duration_seconds":300,"avoid":["a","b"]}`)
+	if rec.Code != http.StatusOK || f.patched.DurationSeconds == nil || *f.patched.DurationSeconds != 300 ||
+		f.patched.Avoid == nil || len(*f.patched.Avoid) != 2 || f.patched.Tone != nil {
+		t.Errorf("edit: status %d patch %+v", rec.Code, f.patched)
+	}
+	if rec := serveProjectBrief(f, "PUT", "/v1/projects/p1/creative-brief", `{bad`); rec.Code != http.StatusBadRequest {
+		t.Errorf("a bad body: status %d, want 400", rec.Code)
+	}
+	for _, path := range []string{"approve", "unapprove"} {
+		if rec := serveProjectBrief(f, "POST", "/v1/projects/p1/creative-brief/"+path, ""); rec.Code != http.StatusOK {
+			t.Errorf("%s: status %d", path, rec.Code)
+		}
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{err: domain.ErrBriefNotFound}, "POST", "/v1/projects/p1/creative-brief/approve", ""); rec.Code != http.StatusNotFound {
+		t.Errorf("approving nothing: status %d, want 404", rec.Code)
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{err: fmt.Errorf("%w: thời lượng", domain.ErrProjectBriefInvalid)}, "POST", "/v1/projects/p1/creative-brief/approve", ""); rec.Code != http.StatusBadRequest {
+		t.Errorf("approving an invalid brief: status %d, want 400", rec.Code)
+	}
+	review := domain.BriefReview{AudienceFit: domain.IdeaAspect{Rating: domain.RatingGood, Comment: "Rõ."}}
+	rec = serveProjectBrief(&fakeProjectBrief{review: review}, "POST", "/v1/projects/p1/creative-brief/review", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"audience_fit"`) {
+		t.Errorf("review: status %d body %s", rec.Code, rec.Body.String())
+	}
+	if rec := serveProjectBrief(&fakeProjectBrief{err: fmt.Errorf("%w: x", domain.ErrBriefReviewReplyUnusable)}, "POST", "/v1/projects/p1/creative-brief/review", ""); rec.Code != http.StatusBadGateway {
+		t.Errorf("an unusable review: status %d, want 502", rec.Code)
+	}
+}

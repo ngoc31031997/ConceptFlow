@@ -56,6 +56,7 @@ type Router struct {
 	reviewUnits             reviewUnitsUseCase
 	idea                    ideaUseCase
 	creativeBrief           creativeBriefUseCase
+	projectBrief            projectBriefUseCase
 	research                researchUseCase
 	story                   storyUseCase
 	beats                   beatUseCase

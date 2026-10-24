@@ -376,6 +376,33 @@ CREATE TABLE IF NOT EXISTS project_idea_review (
     idea_hash  TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- The second step's brief: what the AI made of the approved idea. creator_fields
+-- lists the fields the Creator wrote, which the AI keeps when it writes the brief
+-- again; idea_hash says which approved idea it was written from; duration_seconds
+-- is the target length, shown to the Creator as h:mm:ss.
+CREATE TABLE IF NOT EXISTS project_brief (
+    project_id          TEXT PRIMARY KEY,
+    audience            TEXT NOT NULL DEFAULT '',
+    duration_seconds    INTEGER NOT NULL DEFAULT 0,
+    tone                TEXT NOT NULL DEFAULT '',
+    learning_objectives JSONB NOT NULL DEFAULT '[]',
+    avoid               JSONB NOT NULL DEFAULT '[]',
+    creator_fields      JSONB NOT NULL DEFAULT '[]',
+    status              TEXT NOT NULL DEFAULT 'pending',
+    redo_count          INTEGER NOT NULL DEFAULT 0,
+    language            TEXT NOT NULL DEFAULT '',
+    idea_hash           TEXT NOT NULL DEFAULT '',
+    approved_at         TIMESTAMPTZ,
+    updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The AI's latest review of the brief, kept apart from the brief. brief_hash is
+-- the hash of the brief it read.
+CREATE TABLE IF NOT EXISTS project_brief_review (
+    project_id TEXT PRIMARY KEY,
+    review     JSONB NOT NULL,
+    brief_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

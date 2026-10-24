@@ -1929,6 +1929,207 @@ export async function reviewProjectIdea(projectId: string, operation?: Operation
   return fromWireIdeaReview(wire);
 }
 
+/** Where a brief stands in review. */
+export type ProjectBriefStatus = "pending" | "approved";
+
+/** The brief's fields, in the order the screen shows them. */
+export const PROJECT_BRIEF_FIELDS = ["audience", "duration_seconds", "tone", "learning_objectives", "avoid"] as const;
+export type ProjectBriefField = (typeof PROJECT_BRIEF_FIELDS)[number];
+
+/** The brief the AI made of the approved idea, with what review needs around it. */
+export interface ProjectBrief {
+  audience: string;
+  /** Target length in seconds; the screen shows it as h:mm:ss. */
+  durationSeconds: number;
+  tone: string;
+  learningObjectives: string[];
+  avoid: string[];
+  /** Fields the Creator wrote or changed; the AI keeps them when it writes again. */
+  creatorFields: ProjectBriefField[];
+  status: ProjectBriefStatus;
+  redoCount: number;
+  approvedAt: string | null;
+  updatedAt: string;
+}
+
+/** The AI's reading of a brief before approval; advice only. */
+export interface BriefReview {
+  audienceFit: IdeaAspect;
+  durationFit: IdeaAspect;
+  objectives: IdeaAspect;
+  avoidList: IdeaAspect;
+  unclear: string[];
+  suggestions: string[];
+  createdAt: string;
+}
+
+/** The approved idea a brief is written from. */
+export interface BriefIdea {
+  centralQuestion: string;
+  curiosityPoints: string[];
+  scope: string;
+}
+
+/** Everything the brief screen shows. */
+export interface BriefScreen {
+  brief: ProjectBrief | null;
+  /** The approved idea from step 1; null while it is not approved. */
+  idea: BriefIdea | null;
+  subject: string;
+  language: "vi" | "en" | "";
+  videoMode: "long" | "short";
+  /** The lengths, in seconds, a brief may set for this video form. */
+  minDurationSeconds: number;
+  maxDurationSeconds: number;
+  /** The approved idea is not the one the brief was written from. */
+  ideaChanged: boolean;
+  review: BriefReview | null;
+  /** The brief changed after the review read it. */
+  reviewStale: boolean;
+}
+
+interface projectBriefWire {
+  audience: string;
+  duration_seconds: number;
+  tone: string;
+  learning_objectives: string[] | null;
+  avoid: string[] | null;
+  creator_fields: string[] | null;
+  status: ProjectBriefStatus;
+  redo_count: number;
+  approved_at: string | null;
+  updated_at: string;
+}
+
+interface briefReviewWire {
+  audience_fit: IdeaAspect;
+  duration_fit: IdeaAspect;
+  objectives: IdeaAspect;
+  avoid_list: IdeaAspect;
+  unclear: string[] | null;
+  suggestions: string[] | null;
+  created_at: string;
+}
+
+function fromWireProjectBrief(w: projectBriefWire): ProjectBrief {
+  return {
+    audience: w.audience,
+    durationSeconds: w.duration_seconds,
+    tone: w.tone,
+    learningObjectives: w.learning_objectives ?? [],
+    avoid: w.avoid ?? [],
+    creatorFields: (w.creator_fields ?? []).filter((f): f is ProjectBriefField =>
+      (PROJECT_BRIEF_FIELDS as readonly string[]).includes(f),
+    ),
+    status: w.status,
+    redoCount: w.redo_count,
+    approvedAt: w.approved_at,
+    updatedAt: w.updated_at,
+  };
+}
+
+function fromWireBriefReview(w: briefReviewWire): BriefReview {
+  return {
+    audienceFit: w.audience_fit,
+    durationFit: w.duration_fit,
+    objectives: w.objectives,
+    avoidList: w.avoid_list,
+    unclear: w.unclear ?? [],
+    suggestions: w.suggestions ?? [],
+    createdAt: w.created_at,
+  };
+}
+
+/** Reads the second step: the brief, the approved idea it comes from and the AI's review. */
+export async function getBriefScreen(projectId: string): Promise<BriefScreen> {
+  const w = await apiFetch<{
+    brief: projectBriefWire | null;
+    idea: { central_question: string; curiosity_points: string[] | null; scope: string } | null;
+    subject: string;
+    language: string;
+    video_mode: string;
+    min_duration_seconds: number;
+    max_duration_seconds: number;
+    idea_changed: boolean;
+    review: briefReviewWire | null;
+    review_stale: boolean;
+  }>(`/v1/projects/${projectId}/creative-brief`);
+  return {
+    brief: w.brief ? fromWireProjectBrief(w.brief) : null,
+    idea: w.idea
+      ? { centralQuestion: w.idea.central_question, curiosityPoints: w.idea.curiosity_points ?? [], scope: w.idea.scope }
+      : null,
+    subject: w.subject,
+    language: w.language === "vi" || w.language === "en" ? w.language : "",
+    videoMode: w.video_mode === "short" ? "short" : "long",
+    minDurationSeconds: w.min_duration_seconds,
+    maxDurationSeconds: w.max_duration_seconds,
+    ideaChanged: w.idea_changed,
+    review: w.review ? fromWireBriefReview(w.review) : null,
+    reviewStale: w.review_stale,
+  };
+}
+
+/**
+ * Has the AI write the brief from the approved idea, keeping the fields the
+ * Creator wrote (a model call: pass an operation id to follow it). 409 while
+ * the idea is not approved, 503 when no language model is configured, 502 when
+ * the reply could not be read.
+ */
+export async function generateProjectBrief(projectId: string, note: string, operation?: OperationCall): Promise<ProjectBrief> {
+  const wire = await apiFetch<projectBriefWire>(`/v1/projects/${projectId}/creative-brief/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...operationInit(operation).headers },
+    signal: operationInit(operation).signal,
+    body: JSON.stringify({ note }),
+  });
+  return fromWireProjectBrief(wire);
+}
+
+/** A hand edit: only the fields given change. */
+export interface ProjectBriefPatch {
+  audience?: string;
+  durationSeconds?: number;
+  tone?: string;
+  learningObjectives?: string[];
+  avoid?: string[];
+}
+
+/** Saves a hand edit. 400 when a list holds more lines than the server allows. */
+export async function editProjectBrief(projectId: string, patch: ProjectBriefPatch): Promise<ProjectBrief> {
+  const body: Record<string, unknown> = {};
+  if (patch.audience !== undefined) body.audience = patch.audience;
+  if (patch.durationSeconds !== undefined) body.duration_seconds = patch.durationSeconds;
+  if (patch.tone !== undefined) body.tone = patch.tone;
+  if (patch.learningObjectives !== undefined) body.learning_objectives = patch.learningObjectives;
+  if (patch.avoid !== undefined) body.avoid = patch.avoid;
+  const wire = await apiFetch<projectBriefWire>(`/v1/projects/${projectId}/creative-brief`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  return fromWireProjectBrief(wire);
+}
+
+/** Approves the brief; 400 while a field is empty or the length is outside the video form's range. */
+export async function approveProjectBrief(projectId: string): Promise<ProjectBrief> {
+  return fromWireProjectBrief(await apiFetch<projectBriefWire>(`/v1/projects/${projectId}/creative-brief/approve`, { method: "POST" }));
+}
+
+/** Takes the approval back. */
+export async function unapproveProjectBrief(projectId: string): Promise<ProjectBrief> {
+  return fromWireProjectBrief(await apiFetch<projectBriefWire>(`/v1/projects/${projectId}/creative-brief/unapprove`, { method: "POST" }));
+}
+
+/** Has the AI read the brief for audience, length, objectives and the avoid list (a model call). */
+export async function reviewProjectBrief(projectId: string, operation?: OperationCall): Promise<BriefReview> {
+  const wire = await apiFetch<briefReviewWire>(`/v1/projects/${projectId}/creative-brief/review`, {
+    method: "POST",
+    ...operationInit(operation),
+  });
+  return fromWireBriefReview(wire);
+}
+
 /**
  * The brief step as the server holds it. `storyStale`: the outline on the
  * story step was written from another brief than the approved one.
