@@ -175,6 +175,8 @@ BRIEF CẦN ĐÁNH GIÁ (viết bằng {{brief_language}}):
 {{brief}}
 ======================================================
 
+Phạm vi của IDEA đã được đánh giá và Creator duyệt ở bước 1. Coi nó là dữ kiện đã chốt: không đánh giá phạm vi, không ghi vào "unclear" hay "suggestions" điều gì về việc làm rõ, mở rộng hay thu hẹp phạm vi của IDEA. Chỉ xét brief có nằm trong phạm vi đó không; nếu brief vượt ra ngoài, nêu chỗ brief cần sửa.
+
 ## ĐÁNH GIÁ BỐN MỤC
 1. audience_fit — KHÁN GIẢ: khán giả có cụ thể không; mức nền tảng kiến thức có hợp với độ khó của câu hỏi trung tâm không.
 2. duration_fit — THỜI LƯỢNG: số giây có hợp với số điểm gây tò mò và độ rộng phạm vi của IDEA không; quá ngắn để đi hết hay quá dài so với nội dung.

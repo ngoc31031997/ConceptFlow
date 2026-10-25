@@ -290,6 +290,9 @@ services:
   orchestrator-db:
     image: postgres:16-alpine
     container_name: orchestrator-db
+    # Opened on the host's loopback only, so a database client (DBeaver) can connect.
+    ports:
+      - "127.0.0.1:5434:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}

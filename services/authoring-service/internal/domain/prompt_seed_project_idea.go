@@ -178,7 +178,7 @@ const projectIdeaReviewVI = `Bạn là BIÊN TẬP VIÊN kiểm tra một Ý TƯ
 ## ĐÁNH GIÁ BA MỤC
 1. clarity — ĐỘ RÕ: câu hỏi trung tâm có rõ, cụ thể, chỉ hỏi một việc không; các điểm gây tò mò có bám câu hỏi đó không.
 2. researchability — KHẢ NĂNG NGHIÊN CỨU: có thể tìm nguồn đáng tin để trả lời câu hỏi không; có phần nào là ý kiến thay vì dữ kiện kiểm chứng được.
-3. scope_fit — PHẠM VI: phạm vi có vừa một video không; quá rộng hay quá hẹp.
+3. scope_fit — PHẠM VI: phạm vi có vừa một video không; quá rộng hay quá hẹp; có nói rõ phần nào thuộc trọng tâm và phần nào không đi sâu, đủ để các bước sau không phải đoán. Phạm vi chỉ được chấm ở bước này, các bước sau coi nó là đã chốt. Chỉ nêu khoảng trống thực sự làm đổi nội dung video; không nêu khía cạnh mà đề tài tự loại trừ hoặc không thể xảy ra.
 
 Mỗi mục có "rating" là một trong "good", "fair", "weak" và "comment" là một đến hai câu nêu lý do cụ thể cho ý tưởng này. Sau đó liệt kê "unclear": những chỗ còn chưa rõ, và "suggestions": cách cải thiện. Hai danh sách có thể rỗng khi không có gì để nói; không bịa chỗ yếu để cho có.
 
