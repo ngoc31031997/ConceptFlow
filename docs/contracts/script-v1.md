@@ -6,7 +6,7 @@ Bước Viết kịch bản (authoring-service) viết lời thoại cho từng 
 
 | Kind | Key | Nội dung (`content`) |
 |---|---|---|
-| `script_beat` | khoá của beat (`b1`, `b2`…) | `{lines:[{id,text,facts[]}], next_seq}`; `id` là `<khoá beat>.<n>`, không dùng lại trong beat; `facts` là mã dữ kiện của câu |
+| `script_beat` (bảng `project_script`: `lines` jsonb, `next_seq`, `status`, `creator_fields`, `redo_count`, `input_ref`, `input_sha`; khoá `project_id` + `beat_key`) | khoá của beat (`b1`, `b2`…) | `{lines:[{id,text,facts[]}], next_seq}`; `id` là `<khoá beat>.<n>`, không dùng lại trong beat; `facts` là mã dữ kiện của câu |
 
 Dựng từ `beat:{key}` (`input_ref`): beat đổi thì lời thoại của beat đó `stale`, beat khác giữ nguyên. Bước xong khi mọi beat có lời thoại và mọi `script_beat` đã duyệt (`status` của màn). Sửa, làm lại, duyệt qua API đơn vị chung: `PUT /v1/projects/{id}/units/script_beat/{key}` với `{"fields":{…}}`: `line:<id>` là chữ của câu (rỗng thì bỏ câu), `facts:<id>` là `"F01, F02"`, `add:<id>` thêm câu mới sau câu `<id>` (`add:start` thêm lên đầu; beat chưa có lời thoại có thể tự viết bằng đường này); `POST …/redo` (AI viết lại cả lời thoại của beat, đánh số câu tiếp tục); `POST …/approve` (cần có ít nhất một câu). Sửa xong beat về chờ duyệt và thành của Creator (`mine: ["lines"]`).
 

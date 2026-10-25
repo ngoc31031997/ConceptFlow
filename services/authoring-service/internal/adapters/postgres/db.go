@@ -447,18 +447,81 @@ CREATE TABLE IF NOT EXISTS project_story (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- The beat sheet step, one row per project, which the script step reads.
--- beats is the ordered list of beats, each with its content under "beat" and
--- its review state beside it; the other columns are the gate of the step.
+-- The beat sheet step, which the script step reads. project_beat_sheet holds
+-- what concerns the whole sheet (the gate of the step); project_beat holds the
+-- beats, one row each, position giving the order the video runs them.
 CREATE TABLE IF NOT EXISTS project_beat_sheet (
     project_id        TEXT PRIMARY KEY,
-    beats             JSONB NOT NULL DEFAULT '[]',
     next_seq          INTEGER NOT NULL DEFAULT 1,
     skeleton_approved BOOLEAN NOT NULL DEFAULT FALSE,
     rebalanced        INTEGER NOT NULL DEFAULT 0,
     updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
 );
--- Beats and their gate were review units once; they live in project_beat_sheet now.
+CREATE TABLE IF NOT EXISTS project_beat (
+    project_id     TEXT NOT NULL REFERENCES project_beat_sheet (project_id) ON DELETE CASCADE,
+    beat_key       TEXT NOT NULL,
+    position       INTEGER NOT NULL,
+    fn             TEXT NOT NULL,
+    title          TEXT NOT NULL DEFAULT '',
+    goal           TEXT NOT NULL DEFAULT '',
+    content        TEXT NOT NULL DEFAULT '',
+    facts          TEXT[] NOT NULL DEFAULT '{}',
+    dur            INTEGER NOT NULL,
+    next           TEXT NOT NULL DEFAULT '',
+    step           TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    story_hash     TEXT NOT NULL DEFAULT '',
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, beat_key),
+    UNIQUE (project_id, position)
+);
+-- The beats were a JSONB list on the sheet once; move them to project_beat.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_schema = current_schema() AND table_name = 'project_beat_sheet' AND column_name = 'beats') THEN
+        INSERT INTO project_beat (project_id, beat_key, position, fn, title, goal, content, facts, dur, next, step,
+                                  status, creator_fields, redo_count, story_hash, updated_at)
+        SELECT pbs.project_id, e.elem->>'key', e.ord::int,
+               e.elem->'beat'->>'fn', COALESCE(e.elem->'beat'->>'title', ''), COALESCE(e.elem->'beat'->>'goal', ''),
+               COALESCE(e.elem->'beat'->>'content', ''),
+               COALESCE(ARRAY(SELECT jsonb_array_elements_text(e.elem->'beat'->'facts')), '{}'),
+               (e.elem->'beat'->>'dur')::int, COALESCE(e.elem->'beat'->>'next', ''), COALESCE(e.elem->'beat'->>'step', ''),
+               COALESCE(e.elem->>'status', 'pending'),
+               COALESCE(ARRAY(SELECT jsonb_array_elements_text(e.elem->'creator_fields')), '{}'),
+               COALESCE((e.elem->>'redo_count')::int, 0), COALESCE(e.elem->>'story_hash', ''), pbs.updated_at
+        FROM project_beat_sheet pbs, jsonb_array_elements(pbs.beats) WITH ORDINALITY AS e(elem, ord)
+        ON CONFLICT DO NOTHING;
+        ALTER TABLE project_beat_sheet DROP COLUMN beats;
+    END IF;
+END $$;
+-- The dialogue of the script step, one row per beat (beat_key is the key of the
+-- beat in project_beat). lines is the ordered list of spoken lines; input_ref
+-- and input_sha name the beat the dialogue was written from and its content
+-- hash then, so a changed beat shows the dialogue as stale.
+CREATE TABLE IF NOT EXISTS project_script (
+    project_id     TEXT NOT NULL,
+    beat_key       TEXT NOT NULL,
+    lines          JSONB NOT NULL DEFAULT '[]',
+    next_seq       INTEGER NOT NULL DEFAULT 1,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    input_ref      TEXT NOT NULL DEFAULT '',
+    input_sha      TEXT NOT NULL DEFAULT '',
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, beat_key)
+);
+-- The dialogue was a review unit once; move it to project_script.
+INSERT INTO project_script (project_id, beat_key, lines, next_seq, status, creator_fields, redo_count, input_ref, input_sha, updated_at)
+SELECT project_id, unit_key, COALESCE(content->'lines', '[]'::jsonb), COALESCE((content->>'next_seq')::int, 1),
+       status, creator_fields, redo_count, input_ref, input_sha, updated_at
+FROM review_units WHERE kind = 'script_beat'
+ON CONFLICT DO NOTHING;
+DELETE FROM review_units WHERE kind = 'script_beat';
+-- Beats and their gate were review units once; they live in project_beat_sheet and project_beat now.
 DELETE FROM review_units WHERE kind IN ('beat', 'beat_sheet');
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'

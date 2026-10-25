@@ -28,9 +28,10 @@ const storyContentSHA = `(SELECT md5(ps.central_question || E'\n' || ps.core_ans
 // reviewUnitColumns lists a unit's columns for a query that aliases the table
 // as ru. The last column is stale: the unit was built from another unit
 // (input_ref) whose content no longer hashes to what was recorded (input_sha).
-// An input_ref naming the story is hashed from the project's story, and one
-// naming a beat from that beat in the project's beat sheet.
-const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.content, ru.creator_fields, ru.redo_count, ru.updated_at,
+// An input_ref naming the story is hashed from the project's story, one naming
+// a beat from that beat in project_beat, and one naming a beat's dialogue from
+// that row of project_script.
+var reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.content, ru.creator_fields, ru.redo_count, ru.updated_at,
     ru.input_ref, ru.input_sha,
     (ru.input_ref <> '' AND ru.input_sha <> COALESCE((
         SELECT md5(src.content::text) FROM review_units src
@@ -39,9 +40,11 @@ const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.co
         SELECT md5(ps.central_question || E'\n' || ps.core_answer || E'\n' || ps.narrative_arc::text)
         FROM project_story ps WHERE ps.project_id = ru.project_id AND ru.input_ref = '` + domain.StoryInputKind + `:` + domain.StoryInputKey + `'
     ), (
-        SELECT md5((elem->'beat')::text)
-        FROM project_beat_sheet pbs, jsonb_array_elements(pbs.beats) elem
-        WHERE pbs.project_id = ru.project_id AND ru.input_ref = '` + domain.UnitKindBeat + `:' || (elem->>'key')
+        SELECT md5(` + beatContentJSON("pb") + `) FROM project_beat pb
+        WHERE pb.project_id = ru.project_id AND ru.input_ref = '` + domain.UnitKindBeat + `:' || pb.beat_key
+    ), (
+        SELECT md5(` + scriptContentJSON("sc") + `::text) FROM project_script sc
+        WHERE sc.project_id = ru.project_id AND ru.input_ref = '` + domain.UnitKindScriptBeat + `:' || sc.beat_key
     ), ''))`
 
 func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
@@ -64,6 +67,9 @@ func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
 
 // GetUnit returns one review unit, or domain.ErrUnitNotFound.
 func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind, key string) (domain.ReviewUnit, error) {
+	if kind == domain.UnitKindScriptBeat {
+		return r.getScriptUnit(ctx, projectID, key)
+	}
 	return scanReviewUnit(r.pool.QueryRow(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2 AND ru.unit_key = $3`,
 		projectID, kind, key))
@@ -71,6 +77,9 @@ func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind,
 
 // ListUnits returns every unit of a kind, ordered so that Q2 comes before Q10.
 func (r *PromptTemplateRepository) ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error) {
+	if kind == domain.UnitKindScriptBeat {
+		return r.listScriptUnits(ctx, projectID)
+	}
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2
 		 ORDER BY length(ru.unit_key), ru.unit_key`,
@@ -92,6 +101,9 @@ func (r *PromptTemplateRepository) ListUnits(ctx context.Context, projectID, kin
 
 // DeleteUnit removes one unit; a unit that is not there is not an error.
 func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, kind, key string) error {
+	if kind == domain.UnitKindScriptBeat {
+		return r.deleteScriptUnit(ctx, projectID, key)
+	}
 	_, err := r.pool.Exec(ctx,
 		`DELETE FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`, projectID, kind, key)
 	return err
@@ -107,6 +119,8 @@ func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind,
 		query, args = `SELECT `+storyContentSHA, []any{projectID}
 	case kind == domain.UnitKindBeat:
 		query, args = `SELECT `+beatContentSHA, []any{projectID, key}
+	case kind == domain.UnitKindScriptBeat:
+		query, args = `SELECT `+scriptContentSHA, []any{projectID, key}
 	}
 	var sha *string
 	err := r.pool.QueryRow(ctx, query, args...).Scan(&sha)
@@ -121,6 +135,9 @@ func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind,
 
 // SaveUnit upserts a review unit and returns it as stored.
 func (r *PromptTemplateRepository) SaveUnit(ctx context.Context, unit domain.ReviewUnit) (domain.ReviewUnit, error) {
+	if unit.Kind == domain.UnitKindScriptBeat {
+		return r.saveScriptUnit(ctx, unit)
+	}
 	creatorFields := unit.CreatorFields
 	if creatorFields == nil {
 		creatorFields = []string{}

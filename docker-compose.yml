@@ -357,6 +357,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASS}
       POSTGRES_DB: authoring
+    # Opened on the host's loopback only, so a database client (DBeaver) can connect.
+    ports:
+      - "127.0.0.1:5433:5432"
     volumes:
       - authoring_db_data:/var/lib/postgresql/data
     deploy:

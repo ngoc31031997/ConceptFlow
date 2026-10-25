@@ -393,8 +393,11 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	if _, err := r.pool.Exec(ctx, `DELETE FROM project_story WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
-	// And its beat sheet.
+	// And its beat sheet (its beats go with it) and the dialogue written from them.
 	if _, err := r.pool.Exec(ctx, `DELETE FROM project_beat_sheet WHERE project_id = $1`, projectID); err != nil {
+		return err
+	}
+	if _, err := r.pool.Exec(ctx, `DELETE FROM project_script WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
 	if _, err := r.pool.Exec(ctx, `DELETE FROM research_pastes WHERE project_id = $1`, projectID); err != nil {

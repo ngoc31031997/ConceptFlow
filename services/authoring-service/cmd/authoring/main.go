@@ -153,11 +153,11 @@ func main() {
 	story := application.NewStoryDeskUseCase(
 		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
-	// The beat sheet step: the beats and their gate are one row of project_beat_sheet.
+	// The beat sheet step: the gate is a row of project_beat_sheet and each beat a row of project_beat.
 	beats := application.NewBeatDeskUseCase(
 		authoringRepo, authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
-	// The script step: each beat's dialogue is a review unit; the voice lines
+	// The script step: each beat's dialogue is a review unit stored in project_script; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.
 	script := application.NewScriptDeskUseCase(
 		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats).

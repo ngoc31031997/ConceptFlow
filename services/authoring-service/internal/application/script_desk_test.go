@@ -74,8 +74,8 @@ func (d *countingDispatcher) DispatchDraftVoice(context.Context, string) error {
 }
 
 const (
-	scriptWrite = "Viết lời thoại cho beat trên"
-	scriptRedo  = "Viết lại TOÀN BỘ lời thoại"
+	scriptWrite = "Viết lời dẫn cho beat trên"
+	scriptRedo  = "Viết lại TOÀN BỘ lời dẫn"
 	scriptLine  = "Gợi ý câu thay cho câu"
 	scriptJoin  = "Gợi ý câu thay cho CÂU ĐẦU"
 )

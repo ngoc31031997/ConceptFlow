@@ -84,8 +84,17 @@ func beatText(b storedBeat, number int, facts []storyFact) string {
 	if len(used) == 0 {
 		used = []string{"(không có)"}
 	}
-	return fmt.Sprintf("%s (B%d) · %s · %s · %d giây\nmục tiêu: %s\nnội dung: %s\ndữ kiện của beat:\n- %s",
-		b.unit.Key, number, b.Fn, b.Title, b.Dur, b.Goal, b.Content, strings.Join(used, "\n- "))
+	next := b.Next
+	if next == "" {
+		next = "(beat cuối của video)"
+	}
+	return fmt.Sprintf("%s (B%d) · %s · %s · %d giây (khoảng %d từ)\nmục tiêu: %s\nnội dung: %s\nnối sang beat sau: %s\ndữ kiện của beat:\n- %s",
+		b.unit.Key, number, b.Fn, b.Title, b.Dur, beatWords(b.Dur), b.Goal, b.Content, next, strings.Join(used, "\n- "))
+}
+
+// beatWords is how many spoken words fit a beat of dur seconds, at about 2.3 words a second.
+func beatWords(dur int) int {
+	return dur * 23 / 10
 }
 
 // neighbourText shows the dialogue of the beat next to the one being written.
@@ -118,6 +127,7 @@ func (uc *ScriptDeskUseCase) run(ctx context.Context, projectID string, sc scrip
 		"brief":          sc.brief,
 		"story":          sc.story,
 		"facts":          factsText(sc.facts),
+		"outline":        currentBeatsText(sc.beats),
 		"beat":           beatText(sc.beats[at], at+1, sc.facts),
 		"previous":       neighbourText(sc, at-1),
 		"following":      neighbourText(sc, at+1),

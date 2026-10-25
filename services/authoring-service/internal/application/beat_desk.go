@@ -96,7 +96,7 @@ type BeatState struct {
 
 // BeatDeskUseCase backs the beat sheet step: the beats the AI writes from the
 // approved story, their order, and the Creator's review of each. The beats and
-// the gate that holds their order are one row of project_beat_sheet.
+// the gate of the step are stored in project_beat (one row per beat) and project_beat_sheet.
 type BeatDeskUseCase struct {
 	units           StepUnitStorePort
 	sheets          BeatSheetStorePort

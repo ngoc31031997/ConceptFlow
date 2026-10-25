@@ -99,7 +99,7 @@ type ScriptState struct {
 // ScriptDeskUseCase backs the script step: the dialogue of each beat, written
 // by the AI from the approved beat sheet, its checks, and the reading of each
 // line. The dialogue of a beat is a review unit (domain.UnitKindScriptBeat)
-// keyed by the beat's key.
+// keyed by the beat's key and stored as a row of project_script.
 type ScriptDeskUseCase struct {
 	units           StepUnitStorePort
 	projects        ProjectReaderPort
