@@ -34,7 +34,9 @@ type ScriptVersionPort interface {
 // ScriptLockDeskUseCase backs the lock step: the review of the whole script,
 // the handoff note of each beat, the shared glossary, and the locking of a
 // version. The handoff note of a beat is a review unit (domain.UnitKindHandoffBeat)
-// keyed by the beat's key; the review and the glossary are one unit each.
+// keyed by the beat's key; the review and the glossary are one unit each. The
+// unit store keeps them in project_handoff, project_script_review and
+// project_glossary.
 type ScriptLockDeskUseCase struct {
 	units           StepUnitStorePort
 	projects        ProjectReaderPort

@@ -400,6 +400,12 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 	if _, err := r.pool.Exec(ctx, `DELETE FROM project_script WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}
+	// And the research gate, and the lock step's review, handoff notes and glossary.
+	for _, table := range []string{"project_research_gate", "project_script_review", "project_handoff", "project_glossary"} {
+		if _, err := r.pool.Exec(ctx, `DELETE FROM `+table+` WHERE project_id = $1`, projectID); err != nil {
+			return err
+		}
+	}
 	if _, err := r.pool.Exec(ctx, `DELETE FROM research_pastes WHERE project_id = $1`, projectID); err != nil {
 		return err
 	}

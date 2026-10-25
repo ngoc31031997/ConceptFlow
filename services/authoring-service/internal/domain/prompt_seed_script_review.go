@@ -2,7 +2,8 @@ package domain
 
 // --- Script review and handoff -----------------------------------------------
 // Two prompts of the step "Rà soát và chốt". script_review reads the whole
-// script in one call and reports findings in five groups; on a second review
+// script in one call and reports findings in six groups; {{outline}} is the
+// approved beat sheet (length, content and join of each beat); on a second review
 // {{previous_findings}} lists what was reported before so the model can say
 // which still stand. script_handoff writes the handoff note of one beat.
 
@@ -23,6 +24,9 @@ THỜI LƯỢNG MỤC TIÊU: {{target}}
 ## BẢNG DỮ KIỆN (mã, loại, nội dung)
 {{facts}}
 
+## DÀN BEAT ĐÃ DUYỆT (thời lượng, nội dung, chỗ nối sang beat sau)
+{{outline}}
+
 ## KỊCH BẢN THEO BEAT (mỗi câu có mã)
 {{script}}
 
@@ -32,7 +36,7 @@ THỜI LƯỢNG MỤC TIÊU: {{target}}
 ## NHÓM MỤC
 - accuracy: khẳng định chưa có bằng chứng trong bảng dữ kiện, giả thuyết bị nói như sự thật.
 - research: lời thoại lệch với dữ kiện trong bảng (nói khác nguồn, bỏ ghi chú thận trọng).
-- timing: đoạn giải thích quá dày, nhịp kể quá nhanh.
+- timing: đoạn giải thích quá dày so với thời lượng của beat trong dàn beat, nhịp kể quá nhanh.
 - logic: lỗ hổng lập luận, ý bị lặp, chuyển đoạn đột ngột, nguyên nhân – kết quả chưa rõ.
 - clarity: thuật ngữ khó, câu giải thích mơ hồ, kiến thức bị giả định là khán giả đã biết, chữ dễ hiểu sai.
 - production: nội dung khó diễn đạt bằng hình, quá nhiều khái niệm cùng lúc, cảnh cần bối cảnh chưa rõ.
@@ -43,7 +47,7 @@ THỜI LƯỢNG MỤC TIÊU: {{target}}
 - "line" là mã câu có trong kịch bản. "fix" là MỘT câu thay thế cho câu "line" (giữ ý, giữ dữ kiện), chỉ đưa khi sửa được bằng đổi một câu.
 - "handoff" dùng khi lời thoại giữ được nhưng các vai làm hình cần được dặn: {"beat":"b2","section":"terms","text":"..."}; section là một trong must, terms, exact, free, unsure.
 - Nếu một mục ở lần trước vẫn còn đúng với kịch bản hiện tại, đưa lại mục đó với "same_as" là mã của nó (dạng r1, r2…, KHÔNG phải mã câu). Lần rà soát đầu, hoặc mục mới: để "same_as" là "". Mục nào không còn đúng thì KHÔNG đưa lại.
-- Mỗi tiêu đề và mô tả không quá 300 ký tự, viết bằng tiếng Việt.
+- Mỗi tiêu đề và mô tả không quá 300 ký tự, viết bằng tiếng Việt. "fix" và "handoff.text" viết bằng ngôn ngữ của kịch bản ({{brief_language}}).
 
 ## ĐẦU RA
 Trả về DUY NHẤT một khối ` + "```json" + ` theo mẫu, không thêm chữ nào khác. Trong nội dung KHÔNG dùng dấu nháy kép thẳng ("): dùng dấu « » hoặc nháy đơn, và không xuống dòng giữa một ô.

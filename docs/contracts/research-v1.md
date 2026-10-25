@@ -4,6 +4,7 @@ Bước Nghiên cứu (authoring-service) đọc câu trả lời của một c�
 
 ## Nơi lưu và nguồn đầu vào
 
+- Cổng của bước (đơn vị `research`, khoá `main`) lưu trong bảng `project_research_gate`, một dòng một dự án: `skipped` (Creator bỏ qua bước), `next_question` (số mã câu hỏi kế tiếp), `status`, `creator_fields`, `redo_count`.
 - Dữ kiện lưu trong bảng `project_research` của authoring-service, một dòng một dữ kiện, khoá `(project_id, fact_id)`. Các bước sau đọc bảng này. Cột: `question_id`, `claim_vi`, `type`, `source_title`, `publisher`, `year`, `url`, `quote`, `confidence`, `note`, `must`, `keep`, `link_state`, `link_why`, `link_nearest`, `link_checked_at`, `creator_fields` (các ô Creator tự viết, lần dán sau không ghi đè), `created_at`, `updated_at`. Bước đọc dữ kiện đang giữ lọc `keep = true` và dùng `type`, `link_state` để biết dữ kiện đã được xác minh chưa.
 - Câu hỏi nghiên cứu và cổng duyệt/bỏ qua của bước vẫn là review unit (`research_question`, `research`).
 - Đầu vào của bước: idea đã duyệt đọc từ `project_idea` (`{{idea}}`) và brief đã duyệt đọc từ `project_brief` (`{{brief}}`). Chưa duyệt một trong hai thì sinh câu hỏi và lấy prompt trả `409`.

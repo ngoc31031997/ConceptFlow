@@ -157,7 +157,7 @@ func (uc *ScriptLockDeskUseCase) Review(ctx context.Context, projectID string) e
 	system := domain.RenderPromptTemplate(prompt.TemplateText, map[string]string{
 		"topic": lc.topic, "brief_language": briefLanguageName(lc.language), "target": lc.targetLabel,
 		"brief": lc.brief, "story": lc.story, "facts": factsText(lc.facts),
-		"script": lc.scriptText(), "previous_findings": previousFindingsText(prev),
+		"outline": currentBeatsText(lc.beats), "script": lc.scriptText(), "previous_findings": previousFindingsText(prev),
 	})
 	earlier := map[string]bool{}
 	for _, f := range prev.Findings {

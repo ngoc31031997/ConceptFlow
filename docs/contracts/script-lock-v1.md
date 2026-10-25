@@ -6,9 +6,9 @@ Bước Rà soát và chốt (authoring-service) rà soát cả kịch bản b�
 
 | Lưu ở | Kind / bảng | Key | Nội dung |
 |---|---|---|---|
-| `review_units` | `handoff_beat` (đơn vị duyệt, qua API đơn vị chung) | khoá beat (`b1`…) | `{must[], terms[], exact[], free[], unsure[]}`; dựng từ `script_beat:{key}` nên `stale` khi lời thoại đổi |
-| `review_units` | `script_review` (không qua API đơn vị chung) | `main` | các mục AI rà soát (`r1`, `r2`… không dùng lại), quyết định của Creator theo mã mục kèm dấu vân tay nội dung mục, ghi chú của AI và của Creator, hash lời thoại lúc AI rà soát gần nhất |
-| `review_units` | `glossary` (không qua API đơn vị chung) | `main` | `{terms:[{term,say,draw,avoid,mine}]}` |
+| `project_handoff` | `handoff_beat` (đơn vị duyệt, qua API đơn vị chung) | `(project_id, beat_key)` | cột `must`, `terms`, `exact`, `free`, `unsure` (jsonb, mảng câu), `status`, `creator_fields`, `redo_count`, `input_ref`, `input_sha`; dựng từ `script_beat:{key}` (`project_script`) nên `stale` khi lời thoại đổi |
+| `project_script_review` | `script_review` (không qua API đơn vị chung) | `project_id` | cột `findings`, `next_seq`, `decisions`, `ai_notes`, `my_notes`, `reviewed_sha`, `rounds`, `status`: các mục AI rà soát (`r1`, `r2`… không dùng lại), quyết định của Creator theo mã mục kèm dấu vân tay nội dung mục, ghi chú của AI và của Creator, hash lời thoại lúc AI rà soát gần nhất |
+| `project_glossary` | `glossary` (không qua API đơn vị chung) | `(project_id, position)` | một dòng một thuật ngữ: `term`, `say`, `draw`, `avoid`, `mine`; lưu là thay cả bảng của dự án trong một giao dịch |
 | `script_versions` | bảng riêng | `(project_id, version)` | ảnh chụp bất biến: `parts[]` gồm `brief`, `facts`, `story`, `order`, `beat:{k}`, `script:{k}`, `handoff:{k}`, `glossary`, `review` (mục đã chấp nhận kèm lý do, ghi chú rà soát), mỗi phần có `sha`; ghi chú phiên bản, lúc chốt. Chỉ thêm, không sửa; trùng số phiên bản thì 409 |
 
 Sửa ghi chú bàn giao qua `PUT /v1/projects/{id}/units/handoff_beat/{key}` với `{"fields":{…}}`: khoá là `must|terms|exact|free|unsure`, giá trị mỗi dòng một mục (rỗng thì bỏ trống mục); `POST …/redo` (AI viết lại cả ghi chú của beat, ghi chú thôi là của Creator); `POST …/approve` (cần có ít nhất một mục). Beat chưa có ghi chú tự viết được bằng đường sửa.
@@ -63,5 +63,7 @@ Trả `{version, locked_at, brief?, glossary?, beats:[{key, number, fn?, title?,
 | 409 | script chưa duyệt hết, chưa đủ điều kiện chốt, không có thay đổi để chốt, trùng số phiên bản |
 | 502 | câu trả lời AI không dùng được |
 | 503 | chưa cấu hình AI |
+
+Đầu vào của AI rà soát: brief đã duyệt (`project_brief`), dữ kiện đang giữ (`project_research`), khung câu chuyện (`project_story`), dàn beat đầy đủ (`project_beat`: thời lượng, nội dung, chỗ nối — `{{outline}}`) và lời thoại (`project_script`). Cờ bỏ qua bước Nghiên cứu đọc từ `project_research_gate`.
 
 Model AI của bước là model Creator chọn ở khoá `story` (như bước Viết kịch bản). Vai prompt: `script_review` (rà soát) và `script_handoff` (ghi chú bàn giao của một beat). Lượt AI ghi nhận dưới kind `script_review` và `handoff_beat`.

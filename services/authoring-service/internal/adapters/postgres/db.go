@@ -523,6 +523,91 @@ ON CONFLICT DO NOTHING;
 DELETE FROM review_units WHERE kind = 'script_beat';
 -- Beats and their gate were review units once; they live in project_beat_sheet and project_beat now.
 DELETE FROM review_units WHERE kind IN ('beat', 'beat_sheet');
+-- The gate of the research step: whether the Creator skipped the step, the
+-- number the next question code takes, and the approval of the fact table.
+CREATE TABLE IF NOT EXISTS project_research_gate (
+    project_id     TEXT PRIMARY KEY,
+    skipped        BOOLEAN NOT NULL DEFAULT FALSE,
+    next_question  INTEGER NOT NULL DEFAULT 0,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- The lock step. project_script_review holds the review of the whole script
+-- (the AI's findings, the Creator's decisions on them and the notes);
+-- project_handoff the handoff note of each beat, input_ref and input_sha naming
+-- the dialogue it was written from so a changed dialogue shows the note as
+-- stale; project_glossary the shared glossary, one row per term in order.
+CREATE TABLE IF NOT EXISTS project_script_review (
+    project_id     TEXT PRIMARY KEY,
+    findings       JSONB NOT NULL DEFAULT '[]',
+    next_seq       INTEGER NOT NULL DEFAULT 1,
+    decisions      JSONB NOT NULL DEFAULT '{}',
+    ai_notes       JSONB NOT NULL DEFAULT '[]',
+    my_notes       JSONB NOT NULL DEFAULT '[]',
+    reviewed_sha   TEXT NOT NULL DEFAULT '',
+    rounds         INTEGER NOT NULL DEFAULT 0,
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS project_handoff (
+    project_id     TEXT NOT NULL,
+    beat_key       TEXT NOT NULL,
+    must           JSONB NOT NULL DEFAULT '[]',
+    terms          JSONB NOT NULL DEFAULT '[]',
+    exact          JSONB NOT NULL DEFAULT '[]',
+    free           JSONB NOT NULL DEFAULT '[]',
+    unsure         JSONB NOT NULL DEFAULT '[]',
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    input_ref      TEXT NOT NULL DEFAULT '',
+    input_sha      TEXT NOT NULL DEFAULT '',
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, beat_key)
+);
+CREATE TABLE IF NOT EXISTS project_glossary (
+    project_id TEXT NOT NULL,
+    position   INTEGER NOT NULL,
+    term       TEXT NOT NULL,
+    say        TEXT NOT NULL DEFAULT '',
+    draw       TEXT NOT NULL DEFAULT '',
+    avoid      TEXT NOT NULL DEFAULT '',
+    mine       BOOLEAN NOT NULL DEFAULT FALSE,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, position)
+);
+-- The research gate and the lock step's data were review units once; move them.
+INSERT INTO project_research_gate (project_id, skipped, next_question, status, creator_fields, redo_count, updated_at)
+SELECT project_id, COALESCE((content->>'skipped')::boolean, FALSE), COALESCE((content->>'next_question')::int, 0),
+       status, creator_fields, redo_count, updated_at
+FROM review_units WHERE kind = 'research' AND unit_key = 'main'
+ON CONFLICT DO NOTHING;
+INSERT INTO project_script_review (project_id, findings, next_seq, decisions, ai_notes, my_notes, reviewed_sha, rounds,
+                                   status, creator_fields, redo_count, updated_at)
+SELECT project_id, COALESCE(content->'findings', '[]'), COALESCE((content->>'next_seq')::int, 1),
+       COALESCE(content->'decisions', '{}'), COALESCE(content->'ai_notes', '[]'), COALESCE(content->'my_notes', '[]'),
+       COALESCE(content->>'reviewed_sha', ''), COALESCE((content->>'rounds')::int, 0),
+       status, creator_fields, redo_count, updated_at
+FROM review_units WHERE kind = 'script_review' AND unit_key = 'main'
+ON CONFLICT DO NOTHING;
+INSERT INTO project_handoff (project_id, beat_key, must, terms, exact, free, unsure,
+                             status, creator_fields, redo_count, input_ref, input_sha, updated_at)
+SELECT project_id, unit_key, COALESCE(content->'must', '[]'), COALESCE(content->'terms', '[]'),
+       COALESCE(content->'exact', '[]'), COALESCE(content->'free', '[]'), COALESCE(content->'unsure', '[]'),
+       status, creator_fields, redo_count, input_ref, input_sha, updated_at
+FROM review_units WHERE kind = 'handoff_beat'
+ON CONFLICT DO NOTHING;
+INSERT INTO project_glossary (project_id, position, term, say, draw, avoid, mine, updated_at)
+SELECT ru.project_id, t.ord::int, COALESCE(t.elem->>'term', ''), COALESCE(t.elem->>'say', ''),
+       COALESCE(t.elem->>'draw', ''), COALESCE(t.elem->>'avoid', ''), COALESCE((t.elem->>'mine')::boolean, FALSE), ru.updated_at
+FROM review_units ru, jsonb_array_elements(COALESCE(ru.content->'terms', '[]')) WITH ORDINALITY AS t(elem, ord)
+WHERE ru.kind = 'glossary' AND ru.unit_key = 'main'
+ON CONFLICT DO NOTHING;
+DELETE FROM review_units WHERE kind IN ('research', 'script_review', 'handoff_beat', 'glossary');
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

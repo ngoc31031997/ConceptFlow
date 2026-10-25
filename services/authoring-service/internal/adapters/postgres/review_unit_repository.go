@@ -70,6 +70,12 @@ func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind,
 	if kind == domain.UnitKindScriptBeat {
 		return r.getScriptUnit(ctx, projectID, key)
 	}
+	if isLockKind(kind) {
+		return r.getLockUnit(ctx, projectID, kind, key)
+	}
+	if kind == domain.UnitKindResearch {
+		return r.getResearchGateUnit(ctx, projectID, key)
+	}
 	return scanReviewUnit(r.pool.QueryRow(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2 AND ru.unit_key = $3`,
 		projectID, kind, key))
@@ -79,6 +85,19 @@ func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind,
 func (r *PromptTemplateRepository) ListUnits(ctx context.Context, projectID, kind string) ([]domain.ReviewUnit, error) {
 	if kind == domain.UnitKindScriptBeat {
 		return r.listScriptUnits(ctx, projectID)
+	}
+	if isLockKind(kind) {
+		return r.listLockUnits(ctx, projectID, kind)
+	}
+	if kind == domain.UnitKindResearch {
+		u, err := r.getResearchGateUnit(ctx, projectID, domain.ResearchUnitKey)
+		if errors.Is(err, domain.ErrUnitNotFound) {
+			return []domain.ReviewUnit{}, nil
+		}
+		if err != nil {
+			return nil, err
+		}
+		return []domain.ReviewUnit{u}, nil
 	}
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2
@@ -104,6 +123,13 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 	if kind == domain.UnitKindScriptBeat {
 		return r.deleteScriptUnit(ctx, projectID, key)
 	}
+	if isLockKind(kind) {
+		return r.deleteLockUnit(ctx, projectID, kind, key)
+	}
+	if kind == domain.UnitKindResearch {
+		_, err := r.pool.Exec(ctx, `DELETE FROM project_research_gate WHERE project_id = $1`, projectID)
+		return err
+	}
 	_, err := r.pool.Exec(ctx,
 		`DELETE FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`, projectID, kind, key)
 	return err
@@ -112,6 +138,9 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 // UnitSHA returns the md5 of a unit's content, or "" when there is no such
 // unit. It is the same hash the stale column compares against.
 func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind, key string) (string, error) {
+	if isLockKind(kind) {
+		return r.lockUnitSHA(ctx, projectID, kind, key)
+	}
 	query := `SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`
 	args := []any{projectID, kind, key}
 	switch {
@@ -137,6 +166,12 @@ func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind,
 func (r *PromptTemplateRepository) SaveUnit(ctx context.Context, unit domain.ReviewUnit) (domain.ReviewUnit, error) {
 	if unit.Kind == domain.UnitKindScriptBeat {
 		return r.saveScriptUnit(ctx, unit)
+	}
+	if isLockKind(unit.Kind) {
+		return r.saveLockUnit(ctx, unit)
+	}
+	if unit.Kind == domain.UnitKindResearch {
+		return r.saveResearchGateUnit(ctx, unit)
 	}
 	creatorFields := unit.CreatorFields
 	if creatorFields == nil {
