@@ -121,26 +121,26 @@ func never(string) bool  { return false }
 func TestParseReviewReplyRejectsWhatItCannotTrust(t *testing.T) {
 	bad := map[string]string{
 		"no json":       "xin chào",
-		"unknown group": "```json\n{\"findings\":[{\"group\":\"zzz\",\"title\":\"x\"}]}\n```",
-		"no title":      "```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\" \"}]}\n```",
-		"fix no line":   "```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"fix\":\"Câu mới.\"}]}\n```",
-		"final group":   "```json\n{\"findings\":[{\"group\":\"final\",\"title\":\"x\"}]}\n```",
+		"unknown group": "{\"findings\":[{\"group\":\"zzz\",\"title\":\"x\"}]}",
+		"no title":      "{\"findings\":[{\"group\":\"logic\",\"title\":\" \"}]}",
+		"fix no line":   "{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"fix\":\"Câu mới.\"}]}",
+		"final group":   "{\"findings\":[{\"group\":\"final\",\"title\":\"x\"}]}",
 	}
 	for name, reply := range bad {
 		if _, err := ParseReviewReply(reply, always, always, always); err == nil {
 			t.Errorf("%s: want error, got none", name)
 		}
 	}
-	line := "```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"line\":\"b9.9\"}]}\n```"
+	line := "{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"line\":\"b9.9\"}]}"
 	if _, err := ParseReviewReply(line, never, always, always); err == nil {
 		t.Error("an unknown line must be rejected")
 	}
-	ho := "```json\n{\"findings\":[{\"group\":\"clarity\",\"title\":\"x\",\"handoff\":{\"beat\":\"b1\",\"section\":\"bogus\",\"text\":\"t\"}}]}\n```"
+	ho := "{\"findings\":[{\"group\":\"clarity\",\"title\":\"x\",\"handoff\":{\"beat\":\"b1\",\"section\":\"bogus\",\"text\":\"t\"}}]}"
 	if _, err := ParseReviewReply(ho, always, always, always); err == nil {
 		t.Error("an unknown handoff section must be rejected")
 	}
 	// A same_as that names no earlier finding makes a new finding, not an unusable review.
-	same := "```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"same_as\":\"b24.1\"}]}\n```"
+	same := "{\"findings\":[{\"group\":\"logic\",\"title\":\"x\",\"same_as\":\"b24.1\"}]}"
 	r, err := ParseReviewReply(same, always, always, never)
 	if err != nil || len(r.Findings) != 1 || r.Findings[0].SameAs != "" {
 		t.Errorf("unknown same_as: reply %+v err %v, want one new finding", r, err)
@@ -162,7 +162,7 @@ func parse(t *testing.T, reply string, earlier ...string) ReviewReply {
 
 func TestSecondReviewKeepsIdsFixesVanishedAndReopensRepeated(t *testing.T) {
 	first := ApplyReview(ScriptReview{}, parse(t,
-		"```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\"A\",\"line\":\"b1.1\"},{\"group\":\"clarity\",\"title\":\"B\"},{\"group\":\"timing\",\"title\":\"C\"}],\"notes\":[\"ổn\"]}\n```"), "sha1")
+		"{\"findings\":[{\"group\":\"logic\",\"title\":\"A\",\"line\":\"b1.1\"},{\"group\":\"clarity\",\"title\":\"B\"},{\"group\":\"timing\",\"title\":\"C\"}],\"notes\":[\"ổn\"]}"), "sha1")
 	if len(first.Findings) != 3 || first.Findings[0].ID != "r1" || first.NextSeq != 4 || first.Rounds != 1 {
 		t.Fatalf("first review = %+v", first)
 	}
@@ -171,7 +171,7 @@ func TestSecondReviewKeepsIdsFixesVanishedAndReopensRepeated(t *testing.T) {
 	first.Decide(first.Findings[1], FindingAccepted, "đã biết")
 
 	second := ApplyReview(first, parse(t,
-		"```json\n{\"findings\":[{\"group\":\"logic\",\"title\":\"A\",\"line\":\"b1.1\",\"same_as\":\"r1\"},{\"group\":\"production\",\"title\":\"D\"}]}\n```", "r1", "r2", "r3"), "sha2")
+		"{\"findings\":[{\"group\":\"logic\",\"title\":\"A\",\"line\":\"b1.1\",\"same_as\":\"r1\"},{\"group\":\"production\",\"title\":\"D\"}]}", "r1", "r2", "r3"), "sha2")
 	byID := map[string]ReviewFinding{}
 	for _, f := range second.Findings {
 		byID[f.ID] = f
@@ -192,7 +192,7 @@ func TestSecondReviewKeepsIdsFixesVanishedAndReopensRepeated(t *testing.T) {
 		t.Errorf("second = %+v", second)
 	}
 	// A third review drops what was already fixed.
-	third := ApplyReview(second, parse(t, "```json\n{\"findings\":[]}\n```"), "sha3")
+	third := ApplyReview(second, parse(t, "{\"findings\":[]}"), "sha3")
 	for _, f := range third.Findings {
 		if f.ID == "r3" {
 			t.Error("a finding already fixed before the review must be dropped")

@@ -74,7 +74,6 @@ type ResearchDeskUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	verifier        *SourceVerifier
 	dependents      []FactDependentsFinder
@@ -104,11 +103,11 @@ func (uc *ResearchDeskUseCase) RegisterFactDependents(f FactDependentsFinder) *R
 func NewResearchDeskUseCase(
 	units ResearchStorePort, ideas ApprovedIdeaPort, briefs ApprovedBriefPort, projects ProjectReaderPort,
 	locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	provider LLMProviderPort, maxOutputTokens int,
 ) *ResearchDeskUseCase {
 	return &ResearchDeskUseCase{
 		units: units, ideas: ideas, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 

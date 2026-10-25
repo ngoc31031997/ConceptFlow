@@ -2,9 +2,18 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 )
+
+// ErrLLMNotConfigured means no API key is set, so asking a model is not
+// possible for this deployment.
+var ErrLLMNotConfigured = errors.New("chưa cấu hình API key cho nhà cung cấp AI")
+
+// userTurnNudge is the one-line nudge that follows the system prompt. Some
+// providers answer an empty user turn with a question back.
+const userTurnNudge = "Hãy thực hiện nhiệm vụ trên và chỉ trả về kết quả theo đúng định dạng đã mô tả."
 
 // LLMProviderPort is the one way the application talks to a large language
 // model. One adapter implements it: the llm-service client,
@@ -16,7 +25,7 @@ import (
 // one carries a prompt and hands back text, because the authoring pipeline's
 // prompts already live in the database and the caller assembles them.
 type LLMProviderPort interface {
-	// Name identifies the provider in llm_usage rows and error messages.
+	// Name identifies the provider in error messages and the GUI status.
 	Name() string
 	Chat(ctx context.Context, req ChatRequest) (ChatResult, error)
 }
@@ -35,6 +44,16 @@ type ChatRequest struct {
 	// "" means "use the adapter's default", for every caller that does not set
 	// it and every project that never touched the picker.
 	Model string
+	// Where the call comes from, written to llm-service's call log: the
+	// project it serves, the role (the step's AI role) and, for a step that
+	// calls the model more than once, the step and phase.
+	ProjectID string
+	Role      string
+	Step      string
+	Phase     string
+	// ExpectJSON asks llm-service for the first JSON object of the reply
+	// (one repair turn if it cannot be read); it comes back as ChatResult.JSON.
+	ExpectJSON bool
 	// OnProgress, when set, is called as the reply streams in with running
 	// totals — a provider that cannot stream simply never calls it. It runs on
 	// the calling goroutine, so it must return quickly.
@@ -52,11 +71,14 @@ type ChatProgress struct {
 // ChatResult is what came back, plus what it cost.
 type ChatResult struct {
 	Content string
-	Usage   TokenUsage
+	// JSON is the reply's JSON object, set when the request had ExpectJSON.
+	JSON  json.RawMessage
+	Usage TokenUsage
+	// CallID is the llm-service call-log row of this call.
+	CallID string
 }
 
-// TokenUsage is the measured cost of one call, written to llm_usage so the
-// Creator can see spend in the web GUI instead of on a provider dashboard.
+// TokenUsage is the measured cost of one call, as llm-service reported it.
 //
 // ReasoningTokens is broken out rather than folded into CompletionTokens
 // because it is not free: glm-5.3-flash spent 66 of 122 completion tokens
@@ -112,9 +134,6 @@ const (
 	ErrKindMalformed LLMErrorKind = "malformed"
 	// ErrKindNotConfigured — no provider is available (no API key).
 	ErrKindNotConfigured LLMErrorKind = "not_configured"
-	// ErrKindCheckFailed — the code pipeline finished and saved the script, but
-	// it still fails the compile check after the last repair round.
-	ErrKindCheckFailed LLMErrorKind = "check_failed"
 )
 
 // LLMError carries the kind alongside the underlying cause.
@@ -122,7 +141,7 @@ type LLMError struct {
 	Kind     LLMErrorKind
 	Provider string
 	// Usage is filled in when the provider billed us despite the failure —
-	// a truncated answer still costs tokens, and llm_usage must record it.
+	// a truncated answer still costs tokens, and the cost is still reported.
 	Usage TokenUsage
 	// Partial is the text that did arrive before a ErrKindTruncated cut-off.
 	// Empty for every other kind.
@@ -131,39 +150,26 @@ type LLMError struct {
 	// request id, finish_reason, the response body — for the error log. Not
 	// shown to the Creator.
 	Diag string
-	Err  error
+	// CallID is the call-log row of the failed call ("" when none was logged).
+	CallID string
+	Err    error
 }
 
 func (e *LLMError) Error() string {
-	return fmt.Sprintf("%s: %s: %v", e.Provider, e.Kind, e.Err)
+	msg := fmt.Sprintf("%s: %s: %v", e.Provider, e.Kind, e.Err)
+	if e.CallID != "" {
+		msg += fmt.Sprintf(" (mã cuộc gọi %s)", e.CallID)
+	}
+	return msg
 }
 
 func (e *LLMError) Unwrap() error { return e.Err }
-
-// billedUsage returns the tokens a failed call was still charged for, or a
-// zero value when err carries none.
-func billedUsage(err error) TokenUsage {
-	var llmErr *LLMError
-	if errors.As(err, &llmErr) {
-		return llmErr.Usage
-	}
-	return TokenUsage{}
-}
 
 // LLMErrorKindOf reports the kind of err, or "" if err is not an LLMError.
 func LLMErrorKindOf(err error) LLMErrorKind {
 	var llmErr *LLMError
 	if errors.As(err, &llmErr) {
 		return llmErr.Kind
-	}
-	return ""
-}
-
-// partialOf returns the text a truncated call managed to write, or "".
-func partialOf(err error) string {
-	var llmErr *LLMError
-	if errors.As(err, &llmErr) {
-		return llmErr.Partial
 	}
 	return ""
 }

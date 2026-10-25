@@ -6,15 +6,15 @@ import (
 )
 
 func TestParseHandoffReply(t *testing.T) {
-	ok := "```json\n{\"must\":[\"A\"],\"terms\":[\"  \"],\"glossary\":[{\"term\":\"ficin\",\"say\":\"phi-xin\",\"draw\":\"quầng\",\"avoid\":\"\"}]}\n```"
+	ok := "{\"must\":[\"A\"],\"terms\":[\"  \"],\"glossary\":[{\"term\":\"ficin\",\"say\":\"phi-xin\",\"draw\":\"quầng\",\"avoid\":\"\"}]}"
 	r, err := ParseHandoffReply(ok)
 	if err != nil || len(r.Note.Must) != 1 || len(r.Note.Terms) != 0 || len(r.Terms) != 1 {
 		t.Fatalf("reply = %+v err=%v", r, err)
 	}
 	for name, bad := range map[string]string{
 		"no json":    "x",
-		"empty":      "```json\n{\"must\":[]}\n```",
-		"empty term": "```json\n{\"must\":[\"a\"],\"glossary\":[{\"term\":\" \"}]}\n```",
+		"empty":      "{\"must\":[]}",
+		"empty term": "{\"must\":[\"a\"],\"glossary\":[{\"term\":\" \"}]}",
 	} {
 		if _, err := ParseHandoffReply(bad); err == nil {
 			t.Errorf("%s: want error", name)

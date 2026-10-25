@@ -87,7 +87,6 @@ type CreativeBriefUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -96,11 +95,11 @@ type CreativeBriefUseCase struct {
 // language model is configured: the Creator then writes the brief by hand.
 func NewCreativeBriefUseCase(
 	units ReviewUnitPort, store BriefStorePort, projects ProjectReaderPort, locks AuthoringLockPort,
-	prompts PromptActivePort, provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	prompts PromptActivePort, provider LLMProviderPort, maxOutputTokens int,
 ) *CreativeBriefUseCase {
 	return &CreativeBriefUseCase{
 		units: units, store: store, projects: projects, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -258,7 +257,6 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 		"redo_note":       noteText(note),
 	})
 
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -266,14 +264,15 @@ func (uc *CreativeBriefUseCase) Generate(ctx context.Context, projectID, note st
 		Temperature: 0.7,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleCreativeBrief),
+		Step:        domain.UnitKindBrief,
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleCreativeBrief), domain.UnitKindBrief, projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.ReviewUnit{}, chatErr
 	}
-	written, err := domain.ParseBriefReply(result.Content)
+	written, err := domain.ParseBriefReply(string(result.JSON))
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}

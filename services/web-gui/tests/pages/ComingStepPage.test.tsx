@@ -81,7 +81,12 @@ describe("ComingStepPage", () => {
     await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/lock")).toBe(true));
     renderAt("/projects/p1/coming/4", draft);
     await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/story")).toBe(true));
-    renderAt("/projects/p1/coming/9", draft);
-    await waitFor(() => expect(screen.getAllByTestId("where").some((el) => el.textContent === "/projects/p1/preview/4")).toBe(true));
+  });
+
+  it("says a step whose screen was taken out is not developed, even though a running step stands behind it", async () => {
+    for (const n of [9, 13, 14]) {
+      renderAt(`/projects/p1/coming/${n}`, draft);
+      await waitFor(() => expect(screen.getAllByTestId("coming-step-notice").length).toBeGreaterThan(0));
+    }
   });
 });

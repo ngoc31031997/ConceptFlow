@@ -1,7 +1,6 @@
-import { useEffect } from "react";
+import { useContext, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { ProjectDraftProvider } from "./context/ProjectDraftContext";
-import { AuthoringRunProvider } from "./context/AuthoringRunContext";
+import { ProjectDraftContext, ProjectDraftProvider } from "./context/ProjectDraftContext";
 import { ProjectFlowProvider } from "./context/ProjectFlowContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import { NavigationLoader } from "./components/NavigationLoader";
@@ -15,10 +14,6 @@ import { ResultPage } from "./pages/ResultPage";
 import { PublishPage } from "./pages/PublishPage";
 import { OAuthCallbackPage } from "./pages/OAuthCallbackPage";
 import { VideoListPage } from "./pages/VideoListPage";
-import { ScriptOutlineStepPage } from "./pages/ScriptOutlineStepPage";
-import { VisualDirectorStepPage } from "./pages/VisualDirectorStepPage";
-import { CodeStepPage } from "./pages/CodeStepPage";
-import { IllustrationsStepPage } from "./pages/IllustrationsStepPage";
 import { VideoArchetypeSettingsPage } from "./pages/VideoArchetypeSettingsPage";
 import { VisualLanguagePage } from "./pages/VisualLanguagePage";
 import { IllustrationLibraryPage } from "./pages/IllustrationLibraryPage";
@@ -33,6 +28,13 @@ import { ScriptWriteStepPage } from "./pages/ScriptWriteStepPage";
 import { ResearchStepPage } from "./pages/ResearchStepPage";
 import { BeatsStepPage } from "./pages/BeatsStepPage";
 import { StoryStepPage } from "./pages/StoryStepPage";
+import { comingRoute } from "./utils/flow";
+
+/** A wizard address of a step the app does not have yet opens that step's "not developed" page. */
+function ComingWizardStep({ n }: { n: number }) {
+  const draft = useContext(ProjectDraftContext);
+  return <Navigate to={comingRoute(n, draft.projectId)} replace />;
+}
 
 /**
  * The wizard draft lives only in memory (see ProjectDraftContext), so a page
@@ -54,7 +56,6 @@ export function App() {
   return (
     <ThemeProvider>
       <ProjectDraftProvider>
-        <AuthoringRunProvider>
         <BrowserRouter>
           <ProjectFlowProvider>
           <RedirectStaleWizardLoad />
@@ -69,11 +70,12 @@ export function App() {
             <Route path="/" element={<ScriptStepPage />} />
             <Route path="/create/script/brief" element={<CreativeBriefStepPage />} />
             <Route path="/create/script/settings" element={<Navigate to="/create/script/brief" replace />} />
-            <Route path="/create/script/outline" element={<ScriptOutlineStepPage />} />
-            <Route path="/create/script/storyboard" element={<VisualDirectorStepPage />} />
-            {/* The video's drawings, between Visual and Code. */}
-            <Route path="/create/script/illustrations" element={<IllustrationsStepPage />} />
-            <Route path="/create/script/code" element={<CodeStepPage />} />
+            {/* The old wizard's script, storyboard, drawings and code screens are gone:
+                each address opens the page of the step that is not developed yet. */}
+            <Route path="/create/script/outline" element={<Navigate to="/create/script/brief" replace />} />
+            <Route path="/create/script/storyboard" element={<ComingWizardStep n={9} />} />
+            <Route path="/create/script/illustrations" element={<ComingWizardStep n={13} />} />
+            <Route path="/create/script/code" element={<ComingWizardStep n={14} />} />
             {/* Read-only preview of a step not reached yet. */}
             <Route path="/create/preview/:step" element={<StepPreviewPage />} />
             <Route path="/create/settings" element={<Navigate to="/create/script/brief" replace />} />
@@ -111,7 +113,6 @@ export function App() {
           </Routes>
           </ProjectFlowProvider>
         </BrowserRouter>
-        </AuthoringRunProvider>
       </ProjectDraftProvider>
     </ThemeProvider>
   );

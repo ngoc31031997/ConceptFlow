@@ -43,7 +43,6 @@ type ScriptLockDeskUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	beats           *BeatDeskUseCase
 	script          *ScriptDeskUseCase
@@ -55,11 +54,11 @@ type ScriptLockDeskUseCase struct {
 // language model is configured: the Creator then writes the notes by hand.
 func NewScriptLockDeskUseCase(
 	units StepUnitStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	provider LLMProviderPort, maxOutputTokens int,
 	beats *BeatDeskUseCase, script *ScriptDeskUseCase, versions ScriptVersionPort,
 ) *ScriptLockDeskUseCase {
 	return &ScriptLockDeskUseCase{
-		units: units, projects: projects, locks: locks, prompts: prompts, provider: provider, recorder: recorder,
+		units: units, projects: projects, locks: locks, prompts: prompts, provider: provider,
 		maxOutputTokens: maxOutputTokens, beats: beats, script: script, versions: versions, now: time.Now,
 	}
 }

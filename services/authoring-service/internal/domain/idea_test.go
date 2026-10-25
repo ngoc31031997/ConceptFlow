@@ -8,10 +8,10 @@ import (
 
 const fullIdeaJSON = `{"question":"Vì sao ong chết trong quả sung?","why":"Ai cũng nghe ăn sung là ăn xác ong","known":"Sung là chùm hoa kín","unknown":"Quả ngoài chợ có còn xác ong không"}`
 
-func TestParseIdeaReplyReadsAFencedJSONBlock(t *testing.T) {
-	idea, err := ParseIdeaReply("Đây là ý tưởng:\n```json\n" + fullIdeaJSON + "\n```\n")
+func TestParseIdeaReplyReadsTheJSONObject(t *testing.T) {
+	idea, err := ParseIdeaReply(fullIdeaJSON)
 	if err != nil {
-		t.Fatalf("a fenced reply with every field should parse: %v", err)
+		t.Fatalf("a reply with every field should parse: %v", err)
 	}
 	if idea.Question != "Vì sao ong chết trong quả sung?" || idea.Unknown != "Quả ngoài chợ có còn xác ong không" {
 		t.Errorf("fields read wrong: %+v", idea)

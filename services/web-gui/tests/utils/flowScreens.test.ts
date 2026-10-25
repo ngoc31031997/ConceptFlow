@@ -40,7 +40,7 @@ describe("steps with a screen of their own", () => {
 
   it("leaves the steps nobody has built as not built", () => {
     const notBuilt = FLOW_VIEW.filter((v) => !isBuilt(v)).map((v) => v.n);
-    expect(notBuilt).toEqual([8, 10, 11, 12, 18]);
+    expect(notBuilt).toEqual([8, 9, 10, 11, 12, 13, 14, 18]);
   });
 
   it("addresses the research screen under its video and a not-developed step under a video or alone", () => {

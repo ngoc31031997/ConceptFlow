@@ -9,7 +9,7 @@ import (
 func knownF01(id string) bool { return id == "F01" || id == "F02" }
 
 func TestParseScriptReplyReadsLinesAndNormalisesFactCodes(t *testing.T) {
-	got, err := ParseScriptReply("```json\n{\"lines\":[{\"text\":\" Câu một. \",\"facts\":[\"f01\",\"F01\"]},{\"text\":\"Câu hai.\",\"facts\":[]}]}\n```", knownF01)
+	got, err := ParseScriptReply("{\"lines\":[{\"text\":\" Câu một. \",\"facts\":[\"f01\",\"F01\"]},{\"text\":\"Câu hai.\",\"facts\":[]}]}", knownF01)
 	if err != nil {
 		t.Fatal(err)
 	}

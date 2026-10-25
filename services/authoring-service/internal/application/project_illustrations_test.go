@@ -97,10 +97,10 @@ const planJSON = `Đây là danh sách:
 
 func stage(llm *scriptedLLM) (*ProjectIllustrationsUseCase, *fakeProjectRows, *fakeIllustrationRepo) {
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	// One at a time: the scripted model answers in order.
-	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(`{"scenes":[]}`), llm, nil, 1000).WithDrawConcurrency(1)
+	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(`{"scenes":[]}`), llm, 1000).WithDrawConcurrency(1)
 	return uc, rows, lib
 }
 
@@ -408,11 +408,11 @@ func (m *mutableStoryboard) GetAuthoringStoryboard(context.Context, string) (str
 // The list remembers which storyboard it was planned from.
 func TestStaleFollowsTheStoryboardThePlanWasMadeFrom(t *testing.T) {
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000)
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
 	llm := &scriptedLLM{replies: []string{planJSON}}
-	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000)
+	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, 1000)
 	ctx := context.Background()
 
 	// A list with no recorded fingerprint: not stale.
@@ -481,10 +481,10 @@ func TestReplanKeepsDrawingsAndSkipsByName(t *testing.T) {
 func TestPrepareReplansOnlyAStaleList(t *testing.T) {
 	lib := newFakeIllustrationRepo()
 	llm := &scriptedLLM{replies: []string{`{"reuse": ["Tooth"], "draw": []}`, `{"reuse": ["Germ"], "draw": []}`}}
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
 	sb := &mutableStoryboard{text: `{"scenes":[1]}`}
-	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, nil, 1000).WithDrawConcurrency(1)
+	uc := NewProjectIllustrationsUseCase(rows, library, sb, llm, 1000).WithDrawConcurrency(1)
 	ctx := context.Background()
 
 	if _, err := uc.Prepare(ctx, "p1", "", nil); err != nil {
@@ -577,9 +577,9 @@ const backdropPlanJSON = `{"reuse": [], "draw": [], "backdrops": [
 func TestPlanGivesEachPlaceOneBackdropRowCoveringItsScenes(t *testing.T) {
 	llm := &scriptedLLM{replies: []string{backdropPlanJSON}}
 	lib := newFakeIllustrationRepo()
-	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
+	library := NewIllustrationsUseCase(lib, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000)
 	rows := &fakeProjectRows{lib: lib, rows: map[string][]domain.ProjectIllustration{}, planned: map[string]bool{}}
-	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(backdropStoryboard), llm, nil, 1000)
+	uc := NewProjectIllustrationsUseCase(rows, library, storyboardOf(backdropStoryboard), llm, 1000)
 
 	got, err := uc.Plan(context.Background(), "p1", "")
 	if err != nil {
@@ -624,7 +624,7 @@ func TestABackdropIsDrawnWithTheBackdropRules(t *testing.T) {
 	reply := "TÊN: OrchardBackdrop\nTÊN HIỂN THỊ: Vườn sung\nTHẺ: vườn\nMÔ TẢ: vườn sung\nCÁCH GỌI: <Scene backdrop={OrchardBackdrop} />\n" +
 		"```tsx\nexport function OrchardBackdrop({layer}: {layer: string}) { return null; }\n```"
 	llm := &scriptedLLM{replies: []string{reply}}
-	library := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000)
+	library := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000)
 	made, err := library.Draw(context.Background(), DrawRequest{Description: "vườn sung", FolderID: "boi-canh", Kind: domain.IllustrationBackdrop})
 	if err != nil {
 		t.Fatal(err)

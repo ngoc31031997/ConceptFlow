@@ -2,3 +2,4 @@ fastapi==0.141.*
 uvicorn[standard]==0.54.*
 openai==2.54.*
 httpx==0.28.*
+asyncpg==0.30.*

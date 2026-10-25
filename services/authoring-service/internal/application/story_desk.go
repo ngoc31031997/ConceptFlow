@@ -81,7 +81,6 @@ type StoryDeskUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -91,11 +90,11 @@ type StoryDeskUseCase struct {
 func NewStoryDeskUseCase(
 	store StoryStorePort, briefs ApprovedBriefPort, research ResearchStandingPort, projects ProjectReaderPort,
 	locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	provider LLMProviderPort, maxOutputTokens int,
 ) *StoryDeskUseCase {
 	return &StoryDeskUseCase{
 		store: store, briefs: briefs, research: research, projects: projects, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -349,7 +348,6 @@ func (uc *StoryDeskUseCase) Generate(ctx context.Context, projectID, note string
 		"redo_note":      noteText(note),
 	})
 
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -357,14 +355,15 @@ func (uc *StoryDeskUseCase) Generate(ctx context.Context, projectID, note string
 		Temperature: 0.7,
 		Model:       models.ModelFor("story_frame"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleStoryFrame),
+		Step:        "story",
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleStoryFrame), "story", projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.StoredStory{}, chatErr
 	}
-	written, err := domain.ParseStoryReply(result.Content, knownStoredFact(in.facts))
+	written, err := domain.ParseStoryReply(string(result.JSON), knownStoredFact(in.facts))
 	if err != nil {
 		return domain.StoredStory{}, err
 	}

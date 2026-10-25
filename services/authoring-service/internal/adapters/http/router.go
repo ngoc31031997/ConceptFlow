@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -41,10 +41,8 @@ type Router struct {
 	illustrations           illustrationsUseCase
 	projectIllustrations    projectIllustrationsUseCase
 	renderPrompt            renderPromptUseCase
-	generateAuthoring       generateAuthoringUseCase
-	authoringChain          authoringChainUseCase
+	llmStatus               llmStatusSource
 	defaultModelSetting     defaultModelUseCase
-	usageStats              application.LLMUsageStatsPort
 	saveAuthoringMode       saveAuthoringModeUseCase
 	saveAuthoringModels     saveAuthoringModelsUseCase
 	saveAuthoringStory      saveAuthoringStoryUseCase
@@ -119,19 +117,9 @@ func (rt *Router) Handler() http.Handler {
 	// Starter scripts and hook/end-screen snippets (static text).
 	// Run a step with the API, and tell the GUI whether that
 	// option exists at all before it draws the button.
-	r.Post("/v1/projects/{project_id}/authoring/{step}/generate", rt.handleGenerateAuthoring)
-	r.Post("/v1/projects/{project_id}/authoring/chain", rt.handleStartAuthoringChain)
-	r.Get("/v1/projects/{project_id}/authoring/chain", rt.handleGetAuthoringChain)
-	r.Delete("/v1/projects/{project_id}/authoring/chain", rt.handleCancelAuthoringChain)
 	r.Get("/v1/llm/status", rt.handleLLMStatus)
 	r.Put("/v1/projects/{project_id}/authoring/mode", rt.handleSaveAuthoringMode)
 	r.Put("/v1/projects/{project_id}/authoring/models", rt.handleSaveAuthoringModels)
-	r.Get("/v1/projects/{project_id}/authoring/{step}/progress", rt.handleAuthoringProgress)
-	// The code step's segments (ADR-0030).
-	r.Get("/v1/projects/{project_id}/authoring/code/segments", rt.handleCodeSegments)
-	r.Get("/v1/projects/{project_id}/authoring/code/segments/{key}/prompt", rt.handleCodeSegmentPrompt)
-	r.Put("/v1/projects/{project_id}/authoring/code/segments/{key}", rt.handlePasteCodeSegment)
-	r.Put("/v1/projects/{project_id}/authoring/code/chunk-shots", rt.handleSaveCodeChunkShots)
 
 	// Internal — called by the orchestrator only (never routed by the gateway).
 	r.Get("/internal/v1/authoring/summaries", rt.handleInternalSummaries)
@@ -203,10 +191,6 @@ func (rt *Router) handleInternalPut(w http.ResponseWriter, r *http.Request) {
 }
 
 func (rt *Router) handleInternalDelete(w http.ResponseWriter, r *http.Request) {
-	// A deleted project must not keep spending tokens on a chain nobody can see.
-	if rt.authoringChain != nil {
-		rt.authoringChain.Cancel(chi.URLParam(r, "project_id"))
-	}
 	if err := rt.internal.DeleteAuthoring(r.Context(), chi.URLParam(r, "project_id")); err != nil {
 		writeUseCaseError(w, err)
 		return
@@ -278,39 +262,11 @@ type saveAuthoringModelsUseCase interface {
 	Execute(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
 }
 
-// generateAuthoringUseCase backs POST
-// /v1/projects/{id}/authoring/{step}/generate — the second way to do a step,
-// beside the Copy-prompt round trip, which stays exactly as it was.
-type generateAuthoringUseCase interface {
-	Execute(ctx context.Context, projectID, step string) (application.GeneratedStep, error)
-	Available() bool
-	Provider() string
-}
-
-// authoringChainUseCase runs 1a/1b/1c in order on the server, so a run
-// survives the browser closing (see application.AuthoringChainRunner).
-type authoringChainUseCase interface {
-	// StartWith takes the code step's options (zero = none).
-	StartWith(projectID string, steps []string, opts application.CodeRunOptions) error
-	State(projectID string) (application.ChainState, bool)
-	// Cancel stops a running chain; false when none is running.
-	Cancel(projectID string) bool
-}
-
-// authoringProgressReader is the optional live-progress side of the generate
-// use case; a use case without it simply has no progress endpoint.
-type authoringProgressReader interface {
-	Progress(projectID, step string) application.AuthoringProgress
-}
-
-// codeSegmentsUseCase is the optional code-segment side of the generate use case:
-// the code step's segments and the per-run options.
-type codeSegmentsUseCase interface {
-	ExecuteCode(ctx context.Context, projectID string, opts application.CodeRunOptions) (application.GeneratedStep, error)
-	CodeSegments(ctx context.Context, projectID string) (application.CodeSegmentsView, error)
-	CodeSegmentPrompt(ctx context.Context, projectID, key string) (string, string, error)
-	PasteCodeSegment(ctx context.Context, projectID, key, reply, source string) (domain.CodeSegment, error)
-	SetCodeChunkShots(ctx context.Context, projectID string, n int) error
+// llmStatusSource says whether a model can be asked at all: llm-service is
+// reachable and holds a key.
+type llmStatusSource interface {
+	Ready() bool
+	Name() string
 }
 
 // saveAuthoringStoryUseCase backs step 1's POST
@@ -335,6 +291,12 @@ type saveAuthoringCodeUseCase interface {
 // wizard rehydrate saved story/storyboard/code on reload/back-navigation.
 type getAuthoringStateUseCase interface {
 	Execute(ctx context.Context, projectID string) (application.AuthoringState, error)
+}
+
+// WithLLMStatus enables GET /v1/llm/status: whether the AI path can be offered.
+func (rt *Router) WithLLMStatus(status llmStatusSource) *Router {
+	rt.llmStatus = status
+	return rt
 }
 
 // WithRenderPrompt enables server-side prompt rendering.
@@ -363,90 +325,8 @@ func (rt *Router) WithDefaultModelSetting(uc defaultModelUseCase) *Router {
 	return rt
 }
 
-// WithUsageStats lets GET /v1/llm/status report what each model has cost the
-// code step.
-func (rt *Router) WithUsageStats(port application.LLMUsageStatsPort) *Router {
-	rt.usageStats = port
-	return rt
-}
-
 // codeStatsWindow is how far back the code step's model numbers look.
 const codeStatsWindow = 30 * 24 * time.Hour
-
-// WithAuthoringChain enables POST/GET /v1/projects/{id}/authoring/chain.
-func (rt *Router) WithAuthoringChain(chain authoringChainUseCase) *Router {
-	rt.authoringChain = chain
-	return rt
-}
-
-// handleStartAuthoringChain starts the chain and returns 202 at once; the GUI
-// polls GET .../authoring/chain (and .../{step}/progress for the live phase).
-func (rt *Router) handleStartAuthoringChain(w http.ResponseWriter, r *http.Request) {
-	if rt.authoringChain == nil {
-		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
-		return
-	}
-	// {"steps": ["code"], "segment": key} re-runs one code
-	// segment, {"steps": ["code"], "fresh": true} writes every segment again.
-	var req struct {
-		Steps   []string `json:"steps"`
-		Segment string   `json:"segment"`
-		Fresh   bool     `json:"fresh"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	err := rt.authoringChain.StartWith(chi.URLParam(r, "project_id"), req.Steps,
-		application.CodeRunOptions{Segment: req.Segment, Fresh: req.Fresh})
-	switch {
-	case errors.Is(err, application.ErrChainBusy):
-		writeError(w, http.StatusConflict, "Một lượt chạy AI cho dự án này đang diễn ra, chờ nó xong đã.")
-	case errors.Is(err, application.ErrChainInvalid):
-		writeError(w, http.StatusBadRequest, err.Error())
-	case err != nil:
-		writeError(w, http.StatusInternalServerError, "không bắt đầu được lượt chạy")
-	default:
-		w.WriteHeader(http.StatusAccepted)
-	}
-}
-
-// handleGetAuthoringChain reports the running or last-finished chain. 200 with
-// finished=false/running=false and no steps when none ever ran.
-func (rt *Router) handleGetAuthoringChain(w http.ResponseWriter, r *http.Request) {
-	if rt.authoringChain == nil {
-		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
-		return
-	}
-	st, ok := rt.authoringChain.State(chi.URLParam(r, "project_id"))
-	if !ok {
-		st = application.ChainState{Steps: []string{}}
-	}
-	writeJSON(w, http.StatusOK, st)
-}
-
-// handleCancelAuthoringChain stops the project's running chain. 204 when it was
-// asked to stop, 404 when nothing was running.
-func (rt *Router) handleCancelAuthoringChain(w http.ResponseWriter, r *http.Request) {
-	if rt.authoringChain == nil {
-		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
-		return
-	}
-	if !rt.authoringChain.Cancel(chi.URLParam(r, "project_id")) {
-		writeError(w, http.StatusNotFound, "Không có lượt chạy AI nào đang diễn ra.")
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
-}
-
-// WithGenerateAuthoring enables the run-a-step-with-AI endpoint.
-// Left unwired (no API key), the route answers 404 and GET /v1/llm/status
-// reports disabled, so the GUI hides the button and says why instead of
-// offering one that fails on the first press.
-func (rt *Router) WithGenerateAuthoring(generateAuthoring generateAuthoringUseCase) *Router {
-	rt.generateAuthoring = generateAuthoring
-	return rt
-}
 
 // WithPrompts attaches the prompt library, enabling GET
 // /v1/prompts/{role} and the /v1/admin/prompts routes. Without it the routes
@@ -872,16 +752,6 @@ func (rt *Router) handleSaveAuthoringModels(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleAuthoringProgress reports how far a running generate call has got.
-func (rt *Router) handleAuthoringProgress(w http.ResponseWriter, r *http.Request) {
-	pr, ok := rt.generateAuthoring.(authoringProgressReader)
-	if !ok {
-		writeError(w, http.StatusNotFound, "progress is not available")
-		return
-	}
-	writeJSON(w, http.StatusOK, pr.Progress(chi.URLParam(r, "project_id"), chi.URLParam(r, "step")))
-}
-
 // handleSaveAuthoringMode stores how the Creator works step 1.
 //
 // PUT, not POST: it replaces one value, and sending it twice must mean the
@@ -1018,15 +888,10 @@ type llmStatusResponse struct {
 	// StepDefaults is the default model of every step; the GUI pre-selects it
 	// where a step's model is chosen.
 	StepDefaults map[string]string `json:"step_defaults,omitempty"`
-	// CodeStats is what each model's code chunks cost over the last 30 days,
-	// keyed by model id. CodeStatsError says why they are
-	// missing when the read failed — never shown as "no data".
-	CodeStats      map[string]application.ModelUsageStats `json:"code_stats,omitempty"`
-	CodeStatsError string                                 `json:"code_stats_error,omitempty"`
 }
 
 func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
-	if rt.generateAuthoring == nil || !rt.generateAuthoring.Available() {
+	if rt.llmStatus == nil || !rt.llmStatus.Ready() {
 		writeJSON(w, http.StatusOK, llmStatusResponse{
 			Enabled: false,
 			Reason:  "Chưa cấu hình HIVE_API_KEY cho llm-service (hoặc llm-service không chạy) — dùng nút Copy prompt như cũ.",
@@ -1034,74 +899,10 @@ func (rt *Router) handleLLMStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := llmStatusResponse{
-		Enabled: true, Provider: rt.generateAuthoring.Provider(),
+		Enabled: true, Provider: rt.llmStatus.Name(),
 		Models: domain.AuthoringModelCatalog, StepDefaults: rt.effectiveStepDefaults(r.Context()),
 	}
-	if rt.usageStats != nil {
-		stats, err := rt.usageStats.ModelUsageStats(r.Context(), "code", "chunk", time.Now().Add(-codeStatsWindow))
-		if err != nil {
-			slog.Warn("could not read code model stats", "error", err)
-			resp.CodeStatsError = "không đọc được số liệu đã đo"
-		} else {
-			resp.CodeStats = map[string]application.ModelUsageStats{}
-			for _, s := range stats {
-				resp.CodeStats[s.Model] = s
-			}
-		}
-	}
 	writeJSON(w, http.StatusOK, resp)
-}
-
-// handleGenerateAuthoring runs one authoring step through the configured
-// provider.
-//
-// It is an addition, not a replacement: GET .../prompts/{role} still serves
-// the same text for the Copy button, and every failure below names the
-// copy-out path as the way through.
-func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request) {
-	if rt.generateAuthoring == nil {
-		writeError(w, http.StatusNotFound, "chạy bằng AI chưa được bật trên máy chủ này")
-		return
-	}
-	projectID := chi.URLParam(r, "project_id")
-	step := chi.URLParam(r, "step")
-
-	// The code step takes an optional body — {"segment": key}
-	// re-runs one segment, {"fresh": true} writes every segment again. No
-	// body runs the missing segments.
-	var opts application.CodeRunOptions
-	if r.ContentLength != 0 {
-		var body struct {
-			Segment string `json:"segment"`
-			Fresh   bool   `json:"fresh"`
-		}
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil && !errors.Is(err, io.EOF) {
-			writeError(w, http.StatusBadRequest, "invalid request body")
-			return
-		}
-		opts = application.CodeRunOptions{Segment: body.Segment, Fresh: body.Fresh}
-	}
-	var result application.GeneratedStep
-	var err error
-	if opts != (application.CodeRunOptions{}) {
-		segs, ok := rt.generateAuthoring.(codeSegmentsUseCase)
-		if !ok || step != "code" {
-			writeError(w, http.StatusBadRequest, "segment and fresh apply to the code step only")
-			return
-		}
-		if opts.Segment != "" && opts.Fresh {
-			writeError(w, http.StatusBadRequest, "segment and fresh cannot be combined")
-			return
-		}
-		result, err = segs.ExecuteCode(r.Context(), projectID, opts)
-	} else {
-		result, err = rt.generateAuthoring.Execute(r.Context(), projectID, step)
-	}
-	if err != nil {
-		writeGenerateError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, result)
 }
 
 // errorCause is the underlying reason of an LLMError without its
@@ -1109,28 +910,20 @@ func (rt *Router) handleGenerateAuthoring(w http.ResponseWriter, r *http.Request
 func errorCause(err error) string {
 	var llmErr *application.LLMError
 	if errors.As(err, &llmErr) && llmErr.Err != nil {
+		if llmErr.CallID != "" {
+			return fmt.Sprintf("%s (mã cuộc gọi %s)", llmErr.Err.Error(), llmErr.CallID)
+		}
 		return llmErr.Err.Error()
 	}
 	return err.Error()
 }
 
-// writeGenerateError maps a failed run onto a status code and a Vietnamese
-// sentence that says what to do about it. "AI failed" would
-// send a Creator with an empty Hive balance to go rewrite their prompt.
-func writeGenerateError(w http.ResponseWriter, err error) {
-	status, message := DescribeGenerateError(err)
-	writeError(w, status, message)
-}
-
 // DescribeGenerateError is the status code and Creator-facing sentence for a
-// failed run. Exported because the server-side chain runner reports the same
-// sentence the HTTP path would have.
+// failed model call, shared by every handler that asks a model.
 func DescribeGenerateError(err error) (int, string) {
 	const fallback = " Hoặc dùng nút Copy prompt như cũ."
 
 	switch {
-	case errors.Is(err, application.ErrGenerateBusy):
-		return http.StatusConflict, "Một lượt chạy AI cho bước này đang diễn ra, chờ nó xong đã."
 	case errors.Is(err, application.ErrLLMNotConfigured):
 		return http.StatusServiceUnavailable,
 			"Chưa cấu hình HIVE_API_KEY trong .env (llm-service) nên không gọi được AI." + fallback
@@ -1144,11 +937,6 @@ func DescribeGenerateError(err error) (int, string) {
 	}
 	if errors.Is(err, application.ErrIllustrationsNotPlanned) || errors.Is(err, application.ErrIllustrationsStale) {
 		return http.StatusConflict, err.Error()
-	}
-	// The step kept what finished; the Creator re-runs the rest.
-	var incomplete *application.ErrSegmentsIncomplete
-	if errors.As(err, &incomplete) {
-		return http.StatusUnprocessableEntity, incomplete.Error()
 	}
 	status := http.StatusBadGateway
 	var message string
@@ -1187,113 +975,4 @@ func DescribeGenerateError(err error) (int, string) {
 		return http.StatusBadRequest, err.Error()
 	}
 	return status, message + fallback
-}
-
-// --- code segments -----------------------------------------------------------
-
-func (rt *Router) codeSegments(w http.ResponseWriter) (codeSegmentsUseCase, bool) {
-	segs, ok := rt.generateAuthoring.(codeSegmentsUseCase)
-	if !ok {
-		writeError(w, http.StatusNotFound, "code segments are not enabled")
-	}
-	return segs, ok
-}
-
-// writeSegmentError maps the one-segment calls' errors; anything else is
-// described like a failed run.
-func writeSegmentError(w http.ResponseWriter, err error) {
-	var notReady *application.ErrSegmentNotReady
-	var reply *application.ErrSegmentReply
-	var notCut *application.ErrStoryboardNotSegmentable
-	switch {
-	case errors.Is(err, application.ErrSegmentUnknown):
-		writeError(w, http.StatusNotFound, err.Error())
-	case errors.Is(err, application.ErrSegmentsUnsupported):
-		// An older llm-service (ADR-0030: the two deploy independently).
-		writeError(w, http.StatusNotImplemented, err.Error())
-	case errors.As(err, &notReady):
-		writeError(w, http.StatusConflict, "Chưa lấy được prompt của đoạn này: "+notReady.Message)
-	case errors.As(err, &reply):
-		writeError(w, http.StatusUnprocessableEntity, reply.Error())
-	case errors.As(err, &notCut):
-		writeError(w, http.StatusConflict, notCut.Error())
-	case errors.Is(err, domain.ErrInvalidChunkShots):
-		writeError(w, http.StatusBadRequest, err.Error())
-	default:
-		writeGenerateError(w, err)
-	}
-}
-
-// GET /v1/projects/{id}/authoring/code/segments
-func (rt *Router) handleCodeSegments(w http.ResponseWriter, r *http.Request) {
-	segs, ok := rt.codeSegments(w)
-	if !ok {
-		return
-	}
-	view, err := segs.CodeSegments(r.Context(), chi.URLParam(r, "project_id"))
-	if err != nil {
-		writeSegmentError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, view)
-}
-
-// GET /v1/projects/{id}/authoring/code/segments/{key}/prompt
-func (rt *Router) handleCodeSegmentPrompt(w http.ResponseWriter, r *http.Request) {
-	segs, ok := rt.codeSegments(w)
-	if !ok {
-		return
-	}
-	system, user, err := segs.CodeSegmentPrompt(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "key"))
-	if err != nil {
-		writeSegmentError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]string{"system": system, "user": user})
-}
-
-// PUT /v1/projects/{id}/authoring/code/segments/{key} {reply, source}
-func (rt *Router) handlePasteCodeSegment(w http.ResponseWriter, r *http.Request) {
-	segs, ok := rt.codeSegments(w)
-	if !ok {
-		return
-	}
-	var body struct {
-		Reply  string `json:"reply"`
-		Source string `json:"source"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if body.Source != domain.SegmentSourceExternal && body.Source != domain.SegmentSourceManual {
-		writeError(w, http.StatusBadRequest, `source must be "external" or "manual"`)
-		return
-	}
-	seg, err := segs.PasteCodeSegment(r.Context(), chi.URLParam(r, "project_id"), chi.URLParam(r, "key"), body.Reply, body.Source)
-	if err != nil {
-		writeSegmentError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, seg)
-}
-
-// PUT /v1/projects/{id}/authoring/code/chunk-shots {chunk_shots}
-func (rt *Router) handleSaveCodeChunkShots(w http.ResponseWriter, r *http.Request) {
-	segs, ok := rt.codeSegments(w)
-	if !ok {
-		return
-	}
-	var body struct {
-		ChunkShots int `json:"chunk_shots"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request body")
-		return
-	}
-	if err := segs.SetCodeChunkShots(r.Context(), chi.URLParam(r, "project_id"), body.ChunkShots); err != nil {
-		writeSegmentError(w, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }

@@ -159,7 +159,10 @@ func (l *briefLLM) Name() string { return "fake" }
 func (l *briefLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error) {
 	l.systems = append(l.systems, req.System)
 	l.models = append(l.models, req.Model)
-	return ChatResult{Content: l.reply}, l.err
+	if l.err != nil {
+		return ChatResult{}, l.err
+	}
+	return llmServiceReply(req, l.reply)
 }
 
 const briefReplyJSON = `{"audience":"AI khán giả","know":"AI biết","understand":"AI hiểu","feel":"AI cảm thấy","tone":"AI giọng","out_of_scope":"AI ngoài phạm vi"}`
@@ -182,7 +185,7 @@ func newBriefFixture() *briefFixture {
 		},
 		llm: &briefLLM{reply: "```json\n" + briefReplyJSON + "\n```"},
 	}
-	f.uc = NewCreativeBriefUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewCreativeBriefUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, f.llm, 4000)
 	f.saveIdea(domain.UnitApproved)
 	return f
 }
@@ -273,7 +276,7 @@ func TestGenerateStoresNothingWhenTheReplyMissesAField(t *testing.T) {
 
 func TestGenerateWithoutAModelSaysSo(t *testing.T) {
 	f := newBriefFixture()
-	uc := NewCreativeBriefUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, nil, nil, 4000)
+	uc := NewCreativeBriefUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, nil, 4000)
 	if _, err := uc.Generate(context.Background(), "p1", ""); !errors.Is(err, ErrLLMNotConfigured) {
 		t.Fatalf("no provider must be reported, got %v", err)
 	}

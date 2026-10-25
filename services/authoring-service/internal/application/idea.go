@@ -33,7 +33,6 @@ type IdeaUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -42,11 +41,11 @@ type IdeaUseCase struct {
 // model is configured: the Creator then writes the idea by hand.
 func NewIdeaUseCase(
 	units ReviewUnitPort, store BriefStorePort, projects ProjectReaderPort, locks AuthoringLockPort,
-	prompts PromptActivePort, provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	prompts PromptActivePort, provider LLMProviderPort, maxOutputTokens int,
 ) *IdeaUseCase {
 	return &IdeaUseCase{
 		units: units, store: store, projects: projects, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -109,7 +108,6 @@ func (uc *IdeaUseCase) Generate(ctx context.Context, projectID, note string) (do
 		"redo_note":     noteText(note),
 	})
 
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -117,14 +115,15 @@ func (uc *IdeaUseCase) Generate(ctx context.Context, projectID, note string) (do
 		Temperature: 0.7,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleIdea),
+		Step:        domain.UnitKindIdea,
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleIdea), domain.UnitKindIdea, projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.ReviewUnit{}, chatErr
 	}
-	written, err := domain.ParseIdeaReply(result.Content)
+	written, err := domain.ParseIdeaReply(string(result.JSON))
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}

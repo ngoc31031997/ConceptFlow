@@ -245,8 +245,8 @@ var (
 	ErrIdeaNoInput = errors.New("project chưa có nội dung ý tưởng")
 )
 
-// ParseProjectIdeaReply reads the idea out of a model reply: the first JSON
-// object in it, with or without a ```json fence around it. Every field must
+// ParseProjectIdeaReply reads the idea out of the JSON object llm-service
+// returned for the reply. Every field must
 // be there and hold something, so a half-written idea is never stored.
 func ParseProjectIdeaReply(reply string) (ProjectIdea, error) {
 	raw, err := replyObject(reply)

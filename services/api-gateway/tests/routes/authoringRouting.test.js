@@ -19,7 +19,7 @@ function buildApp(clients) {
   return app;
 }
 
-// Prompts and the 1a/1b/1c chain are authoring-service's; the
+// Prompts and the authoring steps are authoring-service's; the
 // project itself stays with the orchestrator.
 describe('routing between orchestrator and authoring-service', () => {
   let clients;
@@ -31,14 +31,6 @@ describe('routing between orchestrator and authoring-service', () => {
     ['get', '/v1/projects/p1/authoring', 'authoring'],
     ['post', '/v1/projects/p1/authoring/story', 'authoring'],
     ['put', '/v1/projects/p1/authoring/mode', 'authoring'],
-    ['get', '/v1/projects/p1/authoring/code/segments', 'authoring'],
-    ['get', '/v1/projects/p1/authoring/code/segments/1.1-1.3/prompt', 'authoring'],
-    ['put', '/v1/projects/p1/authoring/code/segments/1.1-1.3', 'authoring'],
-    ['put', '/v1/projects/p1/authoring/code/chunk-shots', 'authoring'],
-    ['get', '/v1/projects/p1/authoring/story/progress', 'authoring'],
-    ['post', '/v1/projects/p1/authoring/chain', 'authoring'],
-    ['delete', '/v1/projects/p1/authoring/chain', 'authoring'],
-    ['post', '/v1/projects/p1/authoring/story/generate', 'authoringAi'],
     ['post', '/v1/projects/p1/suggest-metadata', 'authoringAi'],
     ['get', '/v1/projects/p1/idea', 'authoring'],
     ['post', '/v1/projects/p1/idea/generate', 'authoringAi'],

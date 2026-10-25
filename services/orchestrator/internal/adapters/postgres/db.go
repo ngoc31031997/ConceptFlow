@@ -348,47 +348,8 @@ END $$;
 -- built on the one that changed.
 DROP TABLE IF EXISTS project_authoring_history;
 
--- One row per LLM call, so the Creator can see spend in the
--- web GUI instead of on a provider dashboard. This is the first paid service
--- in the pipeline: measure first, enforce later.
--- No spending cap here on purpose — a cap set before anyone knows the real
--- numbers is how a gate loses its credibility.
---
--- Prompts and answers are NOT stored: project_authoring already holds them,
--- and a second copy would double the data at risk for no new insight.
---
--- reasoning_tokens is its own column rather than folded into completion:
--- measured, glm-5.3-flash spent 66 of 122 completion tokens reasoning before
--- answering a one-sentence question. A screen that hides that cannot
--- explain why one model costs twice another for the same visible output.
---
--- project_id is nullable and carries NO foreign key: deleting a project must
--- not erase the record of what it cost.
-CREATE TABLE IF NOT EXISTS llm_usage (
-    id                BIGSERIAL PRIMARY KEY,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    provider          TEXT NOT NULL,
-    model             TEXT NOT NULL,
-    role              TEXT NOT NULL DEFAULT '',
-    step              TEXT NOT NULL DEFAULT '',
-    project_id        TEXT,
-    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
-    completion_tokens INTEGER NOT NULL DEFAULT 0,
-    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,
-    cached_tokens     INTEGER NOT NULL DEFAULT 0,
-    duration_ms       INTEGER NOT NULL DEFAULT 0,
-    ok                BOOLEAN NOT NULL,
-    error_kind        TEXT NOT NULL DEFAULT ''
-);
-
--- Every read of this table is "recent first" or "the last N days", so the
--- index matches the only access pattern there is.
-CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
-
--- The code step is now several calls (layout/cast, one per chunk,
--- repairs). phase says which, so a step's cost can be broken down; '' for every
--- call that is one call for its step.
-ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS phase TEXT NOT NULL DEFAULT '';
+-- Model calls are logged by llm-service in its own database.
+DROP TABLE IF EXISTS llm_usage;
 
 -- The prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active. A row with is_system ships in the binary

@@ -66,7 +66,8 @@ class TaskOutcome:
 
 
 async def suggest_metadata(
-    provider: Provider, script_content: str, category_hint: str, language: str, on_progress=None, model: str = ""
+    provider: Provider, script_content: str, category_hint: str, language: str, on_progress=None, model: str = "",
+    project_id: str = "",
 ) -> TaskOutcome:
     """A small local model asked only for "valid JSON" sometimes returns a
     well-formed object with an empty title. That parses fine, so it is checked
@@ -77,7 +78,9 @@ async def suggest_metadata(
     total = Usage()
     for _ in range(SUGGEST_MAX_ATTEMPTS):
         try:
-            res = await provider.chat(ChatRequest(user=prompt, json_mode=True, model=model), on_progress)
+            res = await provider.chat(ChatRequest(
+                user=prompt, json_mode=True, model=model,
+                project_id=project_id, role="suggest_metadata", step="publish"), on_progress)
         except LLMError as err:
             last = err
             total = total + err.usage

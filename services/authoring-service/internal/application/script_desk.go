@@ -106,7 +106,6 @@ type ScriptDeskUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	beats           *BeatDeskUseCase
 	voices          VoiceLinePort
@@ -119,11 +118,11 @@ type ScriptDeskUseCase struct {
 // voices and dispatcher may be nil, which turns listening off.
 func NewScriptDeskUseCase(
 	units StepUnitStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int, beats *BeatDeskUseCase,
+	provider LLMProviderPort, maxOutputTokens int, beats *BeatDeskUseCase,
 ) *ScriptDeskUseCase {
 	return &ScriptDeskUseCase{
 		units: units, projects: projects, locks: locks, prompts: prompts, provider: provider,
-		recorder: recorder, maxOutputTokens: maxOutputTokens, beats: beats, now: time.Now,
+		maxOutputTokens: maxOutputTokens, beats: beats, now: time.Now,
 	}
 }
 

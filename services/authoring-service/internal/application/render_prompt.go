@@ -160,22 +160,6 @@ func RoleFor(step string) (domain.PromptRole, error) {
 	}
 }
 
-// AIRoleFor is RoleFor for the AI flow: the story step is shared, the
-// storyboard step asks for JSON, and the code step asks for shot functions
-// only.
-func AIRoleFor(step string) (domain.PromptRole, error) {
-	switch step {
-	case "story":
-		return domain.RoleStoryArchitect, nil
-	case "storyboard":
-		return domain.RoleVisualDirectorAI, nil
-	case "code":
-		return domain.RoleRemotionEngineerAI, nil
-	default:
-		return "", fmt.Errorf("unknown step %q", step)
-	}
-}
-
 // Execute renders the prompt for one role of one project.
 //
 // Không còn tham số lintResults: {{lint_results}} chỉ tồn tại cho

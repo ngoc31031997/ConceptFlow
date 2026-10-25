@@ -28,7 +28,10 @@ func (l *beatLLM) Name() string { return "fake" }
 func (l *beatLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error) {
 	l.systems = append(l.systems, req.System)
 	i := min(len(l.systems)-1, len(l.replies)-1)
-	return ChatResult{Content: l.replies[i]}, l.err
+	if l.err != nil {
+		return ChatResult{}, l.err
+	}
+	return llmServiceReply(req, l.replies[i])
 }
 
 // say makes every later call answer with the given replies in turn.
@@ -67,7 +70,7 @@ func newBeatFixture() *beatFixture {
 		briefs:  &approvedSteps{},
 		llm:     &beatLLM{replies: []string{beatReplyHook, beatReplyMiddle, beatReplyPayoff}},
 	}
-	f.uc = NewBeatDeskUseCase(f.store, f.sheets, f.stories, f.briefs, project, project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewBeatDeskUseCase(f.store, f.sheets, f.stories, f.briefs, project, project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 
@@ -382,7 +385,7 @@ func TestGenerateAsksAgainOnceForABeatItCannotRead(t *testing.T) {
 	if err := f.uc.ApproveSkeleton(context.Background(), "p1"); err != nil {
 		t.Fatal(err)
 	}
-	f.llm.say("không phải JSON", beatReplyHook, beatReplyMiddle, beatReplyPayoff)
+	f.llm.say(`{"beats":[]}`, beatReplyHook, beatReplyMiddle, beatReplyPayoff)
 	if err := f.uc.Generate(context.Background(), "p1", "", false); err != nil {
 		t.Fatalf("Generate: %v", err)
 	}
@@ -397,7 +400,7 @@ func TestGenerateStoresNothingWhenABeatStaysUnreadable(t *testing.T) {
 	if err := f.uc.ApproveSkeleton(context.Background(), "p1"); err != nil {
 		t.Fatal(err)
 	}
-	f.llm.say(beatReplyHook, "không phải JSON")
+	f.llm.say(beatReplyHook, `{"beats":[]}`)
 	err := f.uc.Generate(context.Background(), "p1", "", false)
 	if !errors.Is(err, domain.ErrBeatReplyUnusable) || !strings.Contains(err.Error(), "b2") {
 		t.Fatalf("err = %v, want the unreadable beat b2 named", err)

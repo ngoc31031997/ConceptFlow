@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const beatsReply = "```json\n" + `{"beats":[{"key":"","fn":"Hook","title":"Quả sung","goal":"Gây tò mò","content":"Mở từ đĩa sung","facts":["f1"," F02 ","F1"],"dur":18,"next":"Zoom vào"},{"key":"b7","fn":"Payoff","title":"Ai nuôi ai","goal":"Trả lời","content":"Hai loài nương nhau","facts":[],"dur":30,"next":""}]}` + "\n```"
+const beatsReply = `{"beats":[{"key":"","fn":"Hook","title":"Quả sung","goal":"Gây tò mò","content":"Mở từ đĩa sung","facts":["f1"," F02 ","F1"],"dur":18,"next":"Zoom vào"},{"key":"b7","fn":"Payoff","title":"Ai nuôi ai","goal":"Trả lời","content":"Hai loài nương nhau","facts":[],"dur":30,"next":""}]}`
 
 func TestParseBeatsReplyReadsBeatsInOrder(t *testing.T) {
 	drafts, err := ParseBeatsReply(beatsReply, knownFacts("F01", "F02"))

@@ -27,18 +27,18 @@ func (uc *ScriptLockDeskUseCase) requireAI() error {
 
 // chat sends one system prompt and records the usage under role.
 func (uc *ScriptLockDeskUseCase) chat(ctx context.Context, role domain.PromptRole, unitKind, projectID, model, system string) (string, error) {
-	started := uc.now()
 	result, err := uc.provider.Chat(ctx, ChatRequest{
 		System: system, User: userTurnNudge, MaxTokens: uc.maxOutputTokens, Temperature: 0.4,
 		Model: model, OnProgress: ProgressFrom(ctx),
+		ProjectID:  projectID,
+		Role:       string(role),
+		Step:       unitKind,
+		ExpectJSON: true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(role), unitKind, projectID, result.Usage, started, err))
-	}
 	if err != nil {
 		return "", err
 	}
-	return result.Content, nil
+	return string(result.JSON), nil
 }
 
 // lockContext is what both AI calls of the step read.

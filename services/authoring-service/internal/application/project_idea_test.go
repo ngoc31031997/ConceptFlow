@@ -64,7 +64,7 @@ func newProjectIdeaFixture() *projectIdeaFixture {
 		project: &briefProject{status: domain.StatusDraft},
 		llm:     &briefLLM{reply: projectIdeaReply},
 	}
-	f.uc = NewProjectIdeaUseCase(f.store, f.input, f.models, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewProjectIdeaUseCase(f.store, f.input, f.models, f.project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 

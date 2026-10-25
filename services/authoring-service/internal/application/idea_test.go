@@ -30,7 +30,7 @@ func newIdeaFixture() *ideaFixture {
 		},
 		llm: &briefLLM{reply: "```json\n" + ideaReplyJSON + "\n```"},
 	}
-	f.uc = NewIdeaUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewIdeaUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 
@@ -110,7 +110,7 @@ func TestIdeaGenerateStoresNothingWhenTheReplyMissesAField(t *testing.T) {
 
 func TestIdeaGenerateWithoutAModelSaysSo(t *testing.T) {
 	f := newIdeaFixture()
-	uc := NewIdeaUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, nil, nil, 4000)
+	uc := NewIdeaUseCase(f.units, f.store, f.project, f.project, briefPrompts{}, nil, 4000)
 	if _, err := uc.Generate(context.Background(), "p1", ""); !errors.Is(err, ErrLLMNotConfigured) {
 		t.Fatalf("no provider must be reported, got %v", err)
 	}

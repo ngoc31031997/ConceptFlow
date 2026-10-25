@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-const briefReply = "```json\n" + `{"audience":" Khán giả phổ thông từ cấp 2 trở lên. ","duration_seconds":270,"tone":"Tò mò, dễ hiểu, chính xác.","learning_objectives":["Giải thích chân trời sự kiện ở mức khái niệm."," ","giải thích chân trời sự kiện ở mức khái niệm.","Hiểu lực thủy triều phụ thuộc vào điều kiện vật lý."],"avoid":["Mô tả chân trời sự kiện như một lớp vỏ cứng."]}` + "\n```"
+const briefReply = `{"audience":" Khán giả phổ thông từ cấp 2 trở lên. ","duration_seconds":270,"tone":"Tò mò, dễ hiểu, chính xác.","learning_objectives":["Giải thích chân trời sự kiện ở mức khái niệm."," ","giải thích chân trời sự kiện ở mức khái niệm.","Hiểu lực thủy triều phụ thuộc vào điều kiện vật lý."],"avoid":["Mô tả chân trời sự kiện như một lớp vỏ cứng."]}`
 
 func validBrief() ProjectBrief {
 	return ProjectBrief{

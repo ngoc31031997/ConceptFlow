@@ -46,3 +46,4 @@
 | [ADR-0042](ADR-0042-21-step-flow-with-content-pre-production.md) | Luồng 21 bước, Tiền kỳ chia Nội dung và Hình ảnh (thay ADR-0034 phần luồng) | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
 | [ADR-0043](ADR-0043-pasted-research-with-source-verification.md) | Nghiên cứu có nguồn bằng prompt chép ra công cụ ngoài; backend kiểm đoạn trích và chặn địa chỉ nội bộ | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
 | [ADR-0044](ADR-0044-locked-script-versions-and-handoff.md) | Chốt phiên bản kịch bản; bước sau chỉ đọc bản đã chốt và bộ bàn giao trong DB | Accepted | Application Design (CR-072, Tiền kỳ · Nội dung) | 2026-10-17 |
+| [ADR-0045](ADR-0045-llm-service-owns-call-log.md) | llm-service giữ DB riêng và là nơi duy nhất ghi và trả JSON của cuộc gọi AI | Proposed | Application Design (CR-100) | 2026-10-25 |

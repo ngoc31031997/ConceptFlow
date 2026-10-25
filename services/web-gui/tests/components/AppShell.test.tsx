@@ -102,7 +102,9 @@ describe("AppShell — the 21-step flow", () => {
     // Nothing runs yet, so there is no status strip.
     expect(screen.queryByTestId("status-strip")).not.toBeInTheDocument();
     await waitForStepRail();
-    for (const step of [2, 3, 4, 9]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
+    for (const step of [2, 3, 4]) expect(screen.getByTestId(`rail-step-${step}`)).toBeDisabled();
+    // The storyboard screen was taken out: it reads as a step that is coming, not as one that is locked.
+    expect(screen.getByTestId("rail-step-9")).toHaveAttribute("data-status", "coming");
   });
 
   it("names the phase and the step on the sidebar's resume link, not a bare step count", async () => {

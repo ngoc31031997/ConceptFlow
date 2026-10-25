@@ -161,8 +161,8 @@ func KeepCreatorFields(written, current CreativeBrief, creatorFields []string) C
 // ErrBriefReplyUnusable marks a model reply the brief cannot be read from.
 var ErrBriefReplyUnusable = errors.New("câu trả lời của AI không dùng được làm brief")
 
-// ParseBriefReply reads the brief out of a model reply: the first JSON object
-// in it, with or without a ```json fence around it. Every field must be there
+// ParseBriefReply reads the brief out of the JSON object llm-service returned
+// for the reply. Every field must be there
 // and non-empty; a reply missing one is an error naming the fields, so a half-written brief is never stored.
 func ParseBriefReply(reply string) (CreativeBrief, error) {
 	raw, err := replyObject(reply)
@@ -181,16 +181,10 @@ func ParseBriefReply(reply string) (CreativeBrief, error) {
 	return brief, nil
 }
 
-// replyObject reads the first JSON object out of a model reply, with or
-// without a ```json fence around it.
+// replyObject reads the JSON object llm-service returned for the reply.
 func replyObject(reply string) (map[string]any, error) {
-	start := strings.Index(reply, "{")
-	end := strings.LastIndex(reply, "}")
-	if start < 0 || end <= start {
-		return nil, errors.New("không có khối JSON")
-	}
 	var raw map[string]any
-	if err := json.Unmarshal([]byte(reply[start:end+1]), &raw); err != nil {
+	if err := json.Unmarshal([]byte(reply), &raw); err != nil {
 		return nil, fmt.Errorf("khối JSON không đọc được (%v)", err)
 	}
 	return raw, nil

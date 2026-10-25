@@ -19,6 +19,7 @@ import openai
 from openai import AsyncOpenAI
 
 from app import errors
+from app.calllog import CallLogPort, CallRecord, new_call_id
 from app.errors import LLMError, Usage
 from app.limiter import RateLimiter
 
@@ -40,12 +41,19 @@ class ChatRequest:
     # 0 = no limit. A reasoning model can otherwise think until max_tokens
     # (measured: 380k reasoning chars, 0 content, 13 minutes) and still fail.
     max_reasoning_chars: int = 0
+    # Where the call came from, written to its llm_calls row; none of it reaches the model.
+    project_id: str = ""
+    role: str = ""
+    step: str = ""
+    phase: str = ""
 
 
 @dataclass
 class ChatResult:
     content: str
     usage: Usage
+    #: The llm_calls row this call was logged under ("" when no log is attached).
+    call_id: str = ""
 
 
 def _usage_from(raw: dict | None, model: str) -> Usage:
@@ -101,8 +109,10 @@ class Provider:
         limiter: RateLimiter | None = None,
         extra_headers: dict[str, str] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        call_log: CallLogPort | None = None,
     ) -> None:
         self.name = name
+        self._call_log = call_log
         self.default_model = default_model
         self._api_key = api_key
         self._max_retries = max_retries
@@ -120,6 +130,43 @@ class Provider:
         return bool(self._api_key)
 
     async def chat(self, req: ChatRequest, on_progress: ProgressFn | None = None) -> ChatResult:
+        """One call, retries included, logged as one llm_calls row."""
+        if self._call_log is None:
+            return await self._chat_with_retries(req, on_progress)
+        call_id, started = new_call_id(), time.monotonic()
+        try:
+            res = await self._chat_with_retries(req, on_progress)
+        except LLMError as err:
+            err.call_id = call_id
+            await self._log(call_id, req, started, error=err)
+            raise
+        res.call_id = call_id
+        await self._log(call_id, req, started, result=res)
+        return res
+
+    async def _log(
+        self, call_id: str, req: ChatRequest, started: float,
+        result: ChatResult | None = None, error: LLMError | None = None,
+    ) -> None:
+        """A log that cannot be written is reported and dropped: the Creator's answer must not fail
+        because a bookkeeping row did not land."""
+        usage = result.usage if result else error.usage
+        rec = CallRecord(
+            call_id=call_id, provider=self.name, model=usage.model or req.model or self.default_model,
+            ok=result is not None, role=req.role, step=req.step, phase=req.phase, project_id=req.project_id,
+            response=result.content if result else error.partial,
+            error_kind=error.kind if error else "", error_message=error.message if error else "",
+            prompt_tokens=usage.prompt_tokens, completion_tokens=usage.completion_tokens,
+            reasoning_tokens=usage.reasoning_tokens, cached_tokens=usage.cached_tokens,
+            reasoning_chars=usage.reasoning_chars, usage_reported=usage.usage_reported,
+            duration_ms=int((time.monotonic() - started) * 1000),
+        )
+        try:
+            await self._call_log.record(rec)
+        except Exception:  # noqa: BLE001 - reported below, never allowed to fail the call
+            logger.exception("could not write llm call %s to the call log", call_id)
+
+    async def _chat_with_retries(self, req: ChatRequest, on_progress: ProgressFn | None) -> ChatResult:
         if not self.configured:
             raise LLMError(errors.NOT_CONFIGURED, self.name, f"{self.name.upper()}_API_KEY is not set")
         last: LLMError | None = None

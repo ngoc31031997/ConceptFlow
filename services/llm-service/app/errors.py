@@ -79,6 +79,8 @@ class LLMError(Exception):
     # False stops a RETRYABLE kind from being retried when another attempt is
     # known to fail the same way and would only double the wait.
     retryable: bool = True
+    #: The llm_calls row this failure was logged under ("" until logged).
+    call_id: str = ""
 
     def __str__(self) -> str:
         return f"{self.provider}: {self.kind}: {self.message}"
@@ -91,4 +93,5 @@ class LLMError(Exception):
             "usage": self.usage.to_dict(),
             "partial": self.partial,
             "diag": self.diag,
+            "call_id": self.call_id,
         }

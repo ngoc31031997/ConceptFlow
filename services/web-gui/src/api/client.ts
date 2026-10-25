@@ -987,16 +987,6 @@ export type AuthoringModelOption = {
   local?: boolean;
 };
 
-/** Chi phí đã đo của một model ở các đoạn code (30 ngày). */
-export type ModelUsageStats = {
-  model: string;
-  calls: number;
-  ok: number;
-  failures: Record<string, number>;
-  avg_completion_tokens: number;
-  avg_duration_ms: number;
-};
-
 export type LlmStatus = {
   enabled: boolean;
   provider: string;
@@ -1005,10 +995,6 @@ export type LlmStatus = {
   models?: AuthoringModelOption[];
   /** Model mặc định của từng bước, được chọn sẵn ở chỗ chọn model của bước đó. */
   step_defaults?: Record<string, string>;
-  /** Số liệu đo của từng model ở bước Code, theo id model. */
-  code_stats?: Record<string, ModelUsageStats>;
-  /** Có khi không đọc được số liệu (khác với "chưa có số liệu"). */
-  code_stats_error?: string;
 };
 
 export function getLlmStatus(): Promise<LlmStatus> {
@@ -1021,203 +1007,6 @@ export function getLlmStatus(): Promise<LlmStatus> {
  * kèm ý nghĩa nghiệp vụ.
  */
 export type AuthoringMode = "manual" | "ai";
-
-/**
- * Ba bước của pipeline soạn kịch bản, theo đúng tên server dùng.
- *
- * Bước "review" (Script Reviewer) đã bị bỏ hẳn khỏi sản phẩm; server
- * cũng không còn nhận nó nữa.
- *
- * "illustrations" (chỉ Remotion): lập danh sách hình từ storyboard và
- * vẽ hình còn thiếu, nằm giữa Visual và Code. Không sinh nội dung soạn thảo.
- */
-export type AuthoringStep = "story" | "storyboard" | "illustrations" | "code";
-
-/**
- * Kết quả một lượt chạy bằng AI. `save_error` có nghĩa là đã
- * sinh được nội dung nhưng chưa lưu được (ví dụ project đã khoá vì đang
- * render): nội dung vẫn trả về, vì token đã bị tính tiền rồi.
- */
-export type GeneratedStep = {
-  step: string;
-  role: string;
-  content: string;
-  provider: string;
-  usage: {
-    model: string;
-    PromptTokens?: number;
-    CompletionTokens?: number;
-  };
-  save_error?: string;
-  /**
-   * Chỉ bước 1c. `check_failed`: code đã được lưu nhưng vẫn không qua
-   * kiểm tra biên dịch sau `repair_rounds` vòng sửa; `diagnostics` là danh sách
-   * lỗi để Creator tự sửa. `model_calls` là số lượt gọi model của cả lượt chạy.
-   */
-  check_failed?: boolean;
-  diagnostics?: string[];
-  repair_rounds?: number;
-  warnings?: string[];
-  model_calls?: number;
-  /** Bước Hình minh hoạ đã vẽ xong nhưng còn hình chờ duyệt; `message` nói hình nào. */
-  awaiting_review?: boolean;
-  message?: string;
-};
-
-/**
- * Chạy một bước bằng API: server tự render prompt (cùng một
- * hàm với nút Copy), gọi provider, lưu kết quả, trả nội dung về.
- *
- * Đây là lựa chọn thứ hai, không phải bản thay thế: nút Sao chép prompt vẫn là
- * đường đi khi chưa có key, hết số dư, hoặc Creator muốn dùng AI khác.
- */
-export function generateAuthoringStep(projectId: string, step: AuthoringStep): Promise<GeneratedStep> {
-  return apiFetch<GeneratedStep>(`/v1/projects/${projectId}/authoring/${step}/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
-/**
- * Chuỗi các bước 1a/1b/1c chạy ở server, không phụ thuộc trình duyệt: POST
- * bắt đầu (trả về ngay), GET cho biết đang chạy hay kết cục lần chạy gần nhất.
- */
-export interface AuthoringChainState {
-  running: boolean;
-  steps: AuthoringStep[];
-  current_index: number;
-  finished: boolean;
-  /** Lý do dừng (đã dịch sẵn cho Creator) và bước dừng. */
-  error?: string;
-  error_step?: AuthoringStep;
-  /** Dừng nhưng không phải lỗi: code còn lỗi biên dịch, hoặc không lưu được. */
-  note?: string;
-  /** Creator bấm Dừng (hoặc dự án bị xoá): không phải lỗi, `error` để trống. */
-  cancelled?: boolean;
-  /** Dừng chờ Creator duyệt hình minh hoạ (không phải lỗi); `waiting_step` là bước dừng. */
-  waiting?: string;
-  waiting_step?: AuthoringStep;
-  /**
-   * Cảnh báo không chặn của từng bước đã xong, theo bước. Bước
-   * Visual (storyboard): cảnh nào lời thoại dài/ngắn so với ngân sách của
-   * format, shot nào lời thoại nhắc một vật mà HÌNH không có.
-   */
-  warnings?: Partial<Record<AuthoringStep, string[]>>;
-  started_at?: string;
-  finished_at?: string;
-}
-
-/**
- * Cách chạy bước Code: `segment` chạy lại đúng một đoạn,
- * `fresh` bỏ mọi đoạn rồi sinh lại toàn bộ. Không có gì = chạy các đoạn còn thiếu.
- */
-export type CodeRunOptions = { segment: string } | { fresh: true };
-
-export function startAuthoringChain(
-  projectId: string,
-  steps: AuthoringStep[],
-  codeOptions?: CodeRunOptions,
-): Promise<void> {
-  return apiFetch<void>(`/v1/projects/${projectId}/authoring/chain`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ steps, ...codeOptions }),
-  });
-}
-
-/** Một đoạn của bước Code: khung (LAYOUT/cast) hoặc một nhóm shot. */
-export interface CodeSegment {
-  key: string;
-  kind: "frame" | "shots";
-  position: number;
-  shots: string[];
-  status: "pending" | "running" | "done" | "failed";
-  /** "" khi chưa có nội dung. */
-  source: "" | "ai" | "external" | "manual" | "storyboard";
-  /** Khung: {code}; đoạn shot: {shots: {"1.1": "..."}}. */
-  content?: { code?: string; shots?: Record<string, string> };
-  error_kind: string;
-  error_message: string;
-  /** Shots a failed chunk could not write; `content` then holds the ones it did. */
-  failed_shots: string[];
-  duration_ms: number;
-  updated_at: string;
-}
-
-export interface CodeSegmentsView {
-  chunk_shots: number;
-  running: boolean;
-  segments: CodeSegment[];
-}
-
-export function getCodeSegments(projectId: string): Promise<CodeSegmentsView> {
-  return apiFetch<CodeSegmentsView>(`/v1/projects/${projectId}/authoring/code/segments`);
-}
-
-/** Đúng lượt hỏi của một đoạn, để chạy bằng AI ngoài. */
-export function getCodeSegmentPrompt(projectId: string, key: string): Promise<{ system: string; user: string }> {
-  return apiFetch(`/v1/projects/${projectId}/authoring/code/segments/${encodeURIComponent(key)}/prompt`);
-}
-
-/** Lưu kết quả dán từ AI ngoài, hoặc bản sửa tay, của một đoạn; server kiểm khuôn trước (422 nếu sai). */
-export function putCodeSegment(
-  projectId: string,
-  key: string,
-  reply: string,
-  source: "external" | "manual",
-): Promise<CodeSegment> {
-  return apiFetch<CodeSegment>(`/v1/projects/${projectId}/authoring/code/segments/${encodeURIComponent(key)}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ reply, source }),
-  });
-}
-
-/** Số shot mỗi đoạn của bước Code (1–10). */
-export async function putCodeChunkShots(projectId: string, chunkShots: number): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/code/chunk-shots`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chunk_shots: chunkShots }),
-  });
-}
-
-/**
- * Dừng chuỗi đang chạy: server huỷ lời gọi model đang dở nên nhà cung cấp
- * ngừng sinh (và tính) thêm token. 404 nếu không có chuỗi nào đang chạy.
- */
-export async function cancelAuthoringChain(projectId: string): Promise<void> {
-  await apiFetch<undefined>(`/v1/projects/${projectId}/authoring/chain`, { method: "DELETE" });
-}
-
-export function getAuthoringChain(projectId: string): Promise<AuthoringChainState> {
-  return apiFetch<AuthoringChainState>(`/v1/projects/${projectId}/authoring/chain`);
-}
-
-/** Tiến độ sống của một lượt chạy AI (phản hồi streaming từ Hive). */
-export interface AuthoringProgress {
-  running: boolean;
-  phase: "idle" | "waiting" | "reasoning" | "writing" | "layout" | "cast" | "chunks" | "merge" | "check" | "repair" | "plan" | "draw";
-  reasoning_chars: number;
-  content_chars: number;
-  elapsed_seconds: number;
-  // Tiến độ riêng của bước 1c: số lô đã xong / tổng, vòng sửa hiện tại / tối đa.
-  chunks_done?: number;
-  chunks_total?: number;
-  repair_round?: number;
-  repair_max?: number;
-  // Bước Hình minh hoạ: số hình cần vẽ ở lượt này, đã xong (kể cả lỗi),
-  // lỗi, dùng lại từ thư viện, và tổng số hình trong danh sách.
-  drawings_total?: number;
-  drawings_done?: number;
-  drawings_failed?: number;
-  drawings_reused?: number;
-  drawings_planned?: number;
-}
-
-export function getAuthoringProgress(projectId: string, step: AuthoringStep): Promise<AuthoringProgress> {
-  return apiFetch<AuthoringProgress>(`/v1/projects/${projectId}/authoring/${step}/progress`);
-}
 
 /** Bước 1 — lưu dàn ý câu chuyện (Story Architect) Creator dán vào. */
 export async function saveAuthoringStory(
@@ -1519,6 +1308,65 @@ export function listProjectEvents(id: string): Promise<ProjectEvent[]> {
 
 export function listRecentEvents(limit = 500): Promise<ProjectEvent[]> {
   return apiFetch<ProjectEvent[]>(`/v1/events?limit=${limit}`);
+}
+
+/** Một dòng nhật ký cuộc gọi AI của llm-service: phản hồi thô và chi phí, không có prompt. */
+export interface LlmCall {
+  call_id: string;
+  created_at: string;
+  provider: string;
+  model: string;
+  role: string;
+  step: string;
+  phase: string;
+  project_id: string;
+  response: string;
+  ok: boolean;
+  error_kind: string;
+  error_message: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  reasoning_tokens: number;
+  cached_tokens: number;
+  reasoning_chars: number;
+  usage_reported: boolean;
+  duration_ms: number;
+}
+
+export interface LlmCallsFilter {
+  project_id?: string;
+  role?: string;
+  ok?: boolean;
+  /** Chỉ lấy các dòng cũ hơn mốc này (`next_before` của trang trước). */
+  before?: string;
+  limit?: number;
+}
+
+export interface LlmCallsPage {
+  calls: LlmCall[];
+  /** Mốc của trang kế tiếp; null khi đã hết. */
+  next_before: string | null;
+}
+
+export function listLlmCalls(filter: LlmCallsFilter = {}): Promise<LlmCallsPage> {
+  const q = new URLSearchParams();
+  if (filter.project_id) q.set("project_id", filter.project_id);
+  if (filter.role) q.set("role", filter.role);
+  if (filter.ok !== undefined) q.set("ok", String(filter.ok));
+  if (filter.before) q.set("before", filter.before);
+  q.set("limit", String(filter.limit ?? 100));
+  return apiFetch<LlmCallsPage>(`/v1/llm/calls?${q.toString()}`);
+}
+
+/** Chọn đúng một cách: các dòng đã chọn, các dòng cũ hơn N ngày, hoặc tất cả. */
+export type LlmCallsDeletion = { ids: string[] } | { older_than_days: number } | { all: true };
+
+export function deleteLlmCalls(selection: LlmCallsDeletion): Promise<{ deleted: number }> {
+  return apiFetch<{ deleted: number }>("/v1/llm/calls/delete", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(selection),
+  });
 }
 
 /** Dừng bước đang chạy; dự án ở lại bước đó (đã hủy) để thử lại. */

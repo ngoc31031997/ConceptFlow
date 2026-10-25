@@ -114,7 +114,7 @@ func TestParseResearchPasteStopsAtClaimLimit(t *testing.T) {
 }
 
 func TestParseResearchQuestionsReply(t *testing.T) {
-	got, err := ParseResearchQuestionsReply("```json\n{\"questions\":[\" Một? \",\"hai?\",\"MỘT?\",\"\"]}\n```")
+	got, err := ParseResearchQuestionsReply("{\"questions\":[\" Một? \",\"hai?\",\"MỘT?\",\"\"]}")
 	if err != nil || len(got) != 2 || got[0] != "Một?" || got[1] != "hai?" {
 		t.Fatalf("got %v, %v, want the two distinct trimmed questions", got, err)
 	}

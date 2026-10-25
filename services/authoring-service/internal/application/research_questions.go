@@ -73,7 +73,6 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 		"kept_questions": keptQuestionsText(existing, replaceEdited),
 		"redo_note":      noteText(note),
 	})
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -81,14 +80,15 @@ func (uc *ResearchDeskUseCase) GenerateQuestions(ctx context.Context, projectID 
 		Temperature: 0.7,
 		Model:       models.ModelFor("research"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleResearchQuestions),
+		Step:        domain.UnitKindResearchQuestion,
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleResearchQuestions), domain.UnitKindResearchQuestion, projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return nil, chatErr
 	}
-	written, err := domain.ParseResearchQuestionsReply(result.Content)
+	written, err := domain.ParseResearchQuestionsReply(string(result.JSON))
 	if err != nil {
 		return nil, err
 	}

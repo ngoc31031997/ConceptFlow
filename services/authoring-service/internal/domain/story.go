@@ -54,14 +54,3 @@ func uniqueFacts(lists ...[]string) []string {
 	}
 	return out
 }
-
-// jsonObjectIn returns the text from the first "{" to the last "}" of a
-// reply, with or without a ```json fence around it.
-func jsonObjectIn(reply string) (string, bool) {
-	start := strings.Index(reply, "{")
-	end := strings.LastIndex(reply, "}")
-	if start < 0 || end <= start {
-		return "", false
-	}
-	return reply[start : end+1], true
-}

@@ -155,14 +155,10 @@ type beatWire struct {
 // range and only facts known() knows; a key, when given, must have the form
 // b1 and appear once. A reply that fails any of that stores nothing.
 func ParseBeatsReply(reply string, known func(id string) bool) ([]BeatDraft, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return nil, fmt.Errorf("%w: không có khối JSON", ErrBeatReplyUnusable)
-	}
 	var wire struct {
 		Beats []beatWire `json:"beats"`
 	}
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return nil, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrBeatReplyUnusable, err)
 	}
 	if len(wire.Beats) == 0 {

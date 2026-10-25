@@ -243,10 +243,6 @@ type HandoffReply struct {
 // "free":[..],"unsure":[..],"glossary":[{"term","say","draw","avoid"}]}. A
 // section may be empty; an item must have text. Anything unreadable stores nothing.
 func ParseHandoffReply(reply string) (HandoffReply, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return HandoffReply{}, fmt.Errorf("%w: không có khối JSON", ErrHandoffReplyUnusable)
-	}
 	var wire struct {
 		Must     []string `json:"must"`
 		Terms    []string `json:"terms"`
@@ -260,7 +256,7 @@ func ParseHandoffReply(reply string) (HandoffReply, error) {
 			Avoid string `json:"avoid"`
 		} `json:"glossary"`
 	}
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return HandoffReply{}, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrHandoffReplyUnusable, err)
 	}
 	clean := func(in []string) []string {

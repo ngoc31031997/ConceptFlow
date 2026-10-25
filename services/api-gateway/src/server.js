@@ -14,6 +14,7 @@ const { sagasRouter } = require('./routes/sagas');
 const { projectsRouter } = require('./routes/projects');
 const { channelAssetsRouter } = require('./routes/channelAssets');
 const { promptsRouter } = require('./routes/prompts');
+const { llmCallsRouter } = require('./routes/llmCalls');
 const { illustrationsRouter } = require('./routes/illustrations');
 const { visualLanguagesRouter } = require('./routes/visualLanguages');
 const { authRouter } = require('./routes/auth');
@@ -48,6 +49,8 @@ function main() {
   // Prompts and the authoring chain are served by authoring-service.
   const authoringClient = createHttpClient(config.authoringServiceUrl);
   const authoringAiClient = createHttpClient(config.authoringServiceUrl, { timeoutMs: 0 });
+  // The call log and its statistics are llm-service's own.
+  const llmClient = createHttpClient(config.llmServiceUrl);
   const publisherClient = createHttpClient(config.publisherUrl);
 
   // 3. Connect to RabbitMQ (amqpClient), declare exclusive queue bound to progress.fanout.
@@ -71,6 +74,7 @@ function main() {
   app.use(projectsRouter(orchestratorClient, config.sharedDir, orchestratorAiClient, authoringClient, authoringAiClient));
   app.use(channelAssetsRouter(orchestratorClient, config.sharedDir));
   app.use(promptsRouter(authoringClient));
+  app.use(llmCallsRouter(llmClient));
   app.use(illustrationsRouter(authoringClient, authoringAiClient));
   app.use(visualLanguagesRouter(authoringClient, authoringAiClient, config.sharedDir));
   app.use(authRouter(publisherClient));

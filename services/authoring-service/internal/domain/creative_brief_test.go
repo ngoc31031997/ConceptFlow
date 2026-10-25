@@ -23,10 +23,10 @@ func aiTemplate(t *testing.T, role PromptRole) string {
 
 const fullBriefJSON = `{"audience":"Người xem phổ thông","know":"Sung là chùm hoa kín","understand":"Vòng đời ong gắn với quả","feel":"Ngạc nhiên","tone":"Tò mò, ấm","out_of_scope":"Không tư vấn ăn uống"}`
 
-func TestParseBriefReplyReadsAFencedJSONBlock(t *testing.T) {
-	brief, err := ParseBriefReply("Đây là brief:\n```json\n" + fullBriefJSON + "\n```\n")
+func TestParseBriefReplyReadsTheJSONObject(t *testing.T) {
+	brief, err := ParseBriefReply(fullBriefJSON)
 	if err != nil {
-		t.Fatalf("a fenced reply with every field should parse: %v", err)
+		t.Fatalf("a reply with every field should parse: %v", err)
 	}
 	if brief.Audience != "Người xem phổ thông" || brief.OutOfScope != "Không tư vấn ăn uống" {
 		t.Errorf("fields read wrong: %+v", brief)
@@ -50,7 +50,7 @@ func TestParseBriefReplyRefusesAReplyWithoutJSON(t *testing.T) {
 }
 
 func TestParseBriefReplyRefusesAnUnescapedQuoteInsideAField(t *testing.T) {
-	reply := "```json\n" + `{"audience":"Người "xem" phổ thông","know":"b","understand":"c","feel":"d","tone":"e","out_of_scope":"f"}` + "\n```"
+	reply := `{"audience":"Người "xem" phổ thông","know":"b","understand":"c","feel":"d","tone":"e","out_of_scope":"f"}`
 	if _, err := ParseBriefReply(reply); !errors.Is(err, ErrBriefReplyUnusable) {
 		t.Fatalf("an unescaped quote inside a field must be unusable, got %v", err)
 	}

@@ -2,9 +2,7 @@ import { useContext } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ProjectDraftContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
-import { useAuthoringRun } from "../context/AuthoringRunContext";
 import {
-  AUTHORING_STEP_FLOW,
   FLOW_STORY,
   authoringRoute,
   comingRoute,
@@ -70,16 +68,7 @@ export function useStepNav(currentStep: number | undefined, options: StepNavOpti
   const projectId = routeProjectId || flow.projectId || draft.projectId;
   const hasProject = flow.project !== null;
   const reached = options.preview ? flow.flowStep : Math.max(currentStep ?? 0, flow.flowStep);
-  // The server's flow step says nothing about an AI run on an authoring step
-  // (the draft stays "idle"), so the step the AI works on right now comes
-  // from the run in progress.
-  const run = useAuthoringRun();
-  const aiStep = run.running ? run.steps[run.currentIndex] : undefined;
-  const aiFlowStep = aiStep ? AUTHORING_STEP_FLOW[aiStep] : 0;
-  const status = (step: number): StepStatus =>
-    step === aiFlowStep
-      ? "running"
-      : stepStatus(step, flow.flowStep, flow.runState);
+  const status = (step: number): StepStatus => stepStatus(step, flow.flowStep, flow.runState);
 
   const isReached = (step: number) => {
     if (hasProject) return step <= reached;

@@ -3734,3 +3734,11 @@ mà theo sơ đồ này tôi không biết ở bước mỹ thuật lượt 1 ha
 **Context**: CR-093, chưa commit.
 
 ---
+
+## CR-100 · Nhật ký cuộc gọi AI ở llm-service — thiết kế
+**Timestamp**: 2026-10-25
+**User Input**: "1 log tất cả các cuộc gọi và cho phép chọn all xoá multi hoặc xoá theo cơ chế 30 ngày … load data raw table lên giao diện / 2 thống kê chunk … gateway forward thẳng cho llm-service / 3 authoring service ko lưu bất cứ thứ gì liên quan đến llm nữa, xoá table llm_usage"
+**AI Response**: Đổi số CR-098 (đã dành cho Scriptwriting) sang CR-100. Viết cr-100-llm-call-log.md và ADR-0045 (Proposed). Chưa viết code; còn 5 câu hỏi mở.
+**Context**: Inception/Application Design CR-100, chờ Creator duyệt.
+
+---

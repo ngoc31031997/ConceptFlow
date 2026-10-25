@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "../components/AppShell";
 import { Card } from "../components/ui";
+import { LlmCallsPanel } from "../components/LlmCallsPanel";
 import { listRecentEvents, listProjects, ApiError, type ProjectEvent } from "../api/client";
 import { FLOW_LABELS, eventStepLabel } from "../utils/flow";
 import glass from "../styles/glass.module.css";
@@ -91,7 +92,7 @@ export function JournalPage() {
   const [events, setEvents] = useState<ProjectEvent[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [view, setView] = useState<"overview" | "project">("overview");
+  const [view, setView] = useState<"overview" | "project" | "calls">("overview");
   const [topics, setTopics] = useState<Record<string, string>>({});
 
   // Tên chủ đề để nhận ra dự án thay vì chỉ mã; lỗi thì vẫn hiện mã.
@@ -169,26 +170,29 @@ export function JournalPage() {
         title="Nhật ký sản xuất"
         subtitle="Theo dõi từng dự án qua các bước: thời gian, chi phí và lỗi phát sinh."
       >
-        {error && (
+        {view !== "calls" && error && (
           <p role="alert" className={glass.helperText}>
             {error}
           </p>
         )}
-        {events === null && !error && <p className={glass.helperText}>Đang tải nhật ký...</p>}
-        {events !== null && projects.length === 0 && (
+        {view !== "calls" && events === null && !error && <p className={glass.helperText}>Đang tải nhật ký...</p>}
+        {view !== "calls" && events !== null && projects.length === 0 && (
           <p className={glass.helperText}>Chưa có hoạt động nào được ghi lại.</p>
         )}
 
-        {projects.length > 0 && (
-          <div className={styles.tabs} role="tablist" aria-label="Kiểu xem nhật ký">
-            <button type="button" role="tab" aria-selected={view === "overview"} className={`${styles.tab} ${view === "overview" ? styles.tabOn : ""}`} onClick={() => setView("overview")} data-testid="journal-tab-overview">
-              Tổng quan theo bước
-            </button>
-            <button type="button" role="tab" aria-selected={view === "project"} className={`${styles.tab} ${view === "project" ? styles.tabOn : ""}`} onClick={() => setView("project")} data-testid="journal-tab-project">
-              Từng dự án
-            </button>
-          </div>
-        )}
+        <div className={styles.tabs} role="tablist" aria-label="Kiểu xem nhật ký">
+          <button type="button" role="tab" aria-selected={view === "overview"} className={`${styles.tab} ${view === "overview" ? styles.tabOn : ""}`} onClick={() => setView("overview")} data-testid="journal-tab-overview">
+            Tổng quan theo bước
+          </button>
+          <button type="button" role="tab" aria-selected={view === "project"} className={`${styles.tab} ${view === "project" ? styles.tabOn : ""}`} onClick={() => setView("project")} data-testid="journal-tab-project">
+            Từng dự án
+          </button>
+          <button type="button" role="tab" aria-selected={view === "calls"} className={`${styles.tab} ${view === "calls" ? styles.tabOn : ""}`} onClick={() => setView("calls")} data-testid="journal-tab-calls">
+            Cuộc gọi AI
+          </button>
+        </div>
+
+        {view === "calls" && <LlmCallsPanel />}
 
         {projects.length > 0 && view === "overview" && (
           <Card title="Bước nào chậm, tốn, hay lỗi nhất" hint={`Tính trên ${projects.length} dự án, ${events?.length ?? 0} sự kiện gần nhất. Thời gian chờ bạn thao tác không được tính.`}>

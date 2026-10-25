@@ -114,6 +114,8 @@ class CodeRequest:
     #: Applied to every call of the run (layout/chunk/repair);
     #: 0 = no limit. See ChatRequest.max_reasoning_chars.
     max_reasoning_chars: int = 0
+    #: The project the run serves, for the call log.
+    project_id: str = ""
     #: Approved library drawings: {name, usage, description, code}.
     illustrations: list[dict] = field(default_factory=list)
     #: For the layout check of a Remotion script: the strip
@@ -562,7 +564,8 @@ class CodePipeline:
                 res = await self._p.chat(ChatRequest(
                     system=req.system, user=build(problem), model=req.model,
                     max_tokens=req.max_tokens, temperature=req.temperature,
-                    max_reasoning_chars=req.max_reasoning_chars))
+                    max_reasoning_chars=req.max_reasoning_chars,
+                    project_id=req.project_id, role="remotion_engineer", step="code", phase=phase))
             except LLMError as err:
                 await record(Call(phase, label, False, err.usage, err.kind, str(err), _ms(began), segment))
                 raise PipelineFailure(f"{phase} {label}: {err}", [], error=err) from err

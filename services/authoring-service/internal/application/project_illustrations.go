@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -70,13 +69,6 @@ func pendingNames(rows []domain.ProjectIllustration) string {
 	return strings.Join(names, ", ")
 }
 
-// AwaitingReviewMessage is the Creator-facing sentence for an illustrations
-// step that finished drawing but still waits for the Creator's review.
-func AwaitingReviewMessage(rows []domain.ProjectIllustration) string {
-	return fmt.Sprintf("Đã vẽ xong. Còn %d hình chờ bạn duyệt hoặc bỏ qua (%s) — duyệt xong thì chạy bước Code.",
-		len(rows), pendingNames(rows))
-}
-
 // ProjectIllustrationRepoPort persists the per-video list.
 type ProjectIllustrationRepoPort interface {
 	ListProjectIllustrations(ctx context.Context, projectID string) ([]domain.ProjectIllustration, error)
@@ -109,7 +101,6 @@ type ProjectIllustrationsUseCase struct {
 	library     *IllustrationsUseCase
 	storyboards StoryboardReaderPort
 	llm         LLMProviderPort
-	recorder    *LLMUsageRecorder
 	maxTokens   int
 	concurrency int
 
@@ -127,10 +118,10 @@ type drawState struct {
 
 func NewProjectIllustrationsUseCase(
 	repo ProjectIllustrationRepoPort, library *IllustrationsUseCase, storyboards StoryboardReaderPort,
-	llm LLMProviderPort, recorder *LLMUsageRecorder, maxTokens int,
+	llm LLMProviderPort, maxTokens int,
 ) *ProjectIllustrationsUseCase {
 	return &ProjectIllustrationsUseCase{repo: repo, library: library, storyboards: storyboards, llm: llm,
-		recorder: recorder, maxTokens: maxTokens, concurrency: DefaultDrawConcurrency, drawing: map[string]*drawState{}}
+		maxTokens: maxTokens, concurrency: DefaultDrawConcurrency, drawing: map[string]*drawState{}}
 }
 
 // WithDrawConcurrency sets how many drawings are drawn at once (min 1).
@@ -221,15 +212,10 @@ type plannedReply struct {
 // backdropFolderID is where every backdrop is filed.
 const backdropFolderID = "boi-canh"
 
-var jsonObjectRe = regexp.MustCompile(`(?s)\{.*\}`)
-
+// parsePlan reads the plan out of the JSON object llm-service returned.
 func parsePlan(text string) (plannedReply, error) {
 	var p plannedReply
-	raw := jsonObjectRe.FindString(text)
-	if raw == "" {
-		return p, fmt.Errorf("câu trả lời không có JSON")
-	}
-	if err := json.Unmarshal([]byte(raw), &p); err != nil {
+	if err := json.Unmarshal([]byte(text), &p); err != nil {
 		return p, fmt.Errorf("JSON lập danh sách hình không đọc được: %w", err)
 	}
 	return p, nil
@@ -374,16 +360,13 @@ func (uc *ProjectIllustrationsUseCase) Plan(ctx context.Context, projectID, mode
 	system := strings.NewReplacer("{{catalog}}", strings.TrimSpace(catalog.String()),
 		"{{folders}}", strings.TrimSpace(folderText.String())).Replace(plannerPromptVI)
 
-	started := time.Now()
 	res, err := uc.llm.Chat(ctx, ChatRequest{System: system, User: "STORYBOARD:\n" + storyboard,
-		MaxTokens: uc.maxTokens, Temperature: 0.2, Model: model})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.llm.Name(), plannerRole, "illustration", projectID, res.Usage, started, err))
-	}
+		MaxTokens: uc.maxTokens, Temperature: 0.2, Model: model,
+		ProjectID: projectID, Role: plannerRole, Step: StepIllustrations, ExpectJSON: true})
 	if err != nil {
 		return nil, err
 	}
-	plan, err := parsePlan(res.Content)
+	plan, err := parsePlan(string(res.JSON))
 	if err != nil {
 		return nil, err
 	}

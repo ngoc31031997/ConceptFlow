@@ -36,30 +36,8 @@ CREATE TABLE IF NOT EXISTS project_authoring (
 );
 CREATE INDEX IF NOT EXISTS project_authoring_topic_lang ON project_authoring (language);
 
--- One row per LLM call. project_id is nullable and has no FK: deleting a
--- project must not erase the record of what it cost.
-CREATE TABLE IF NOT EXISTS llm_usage (
-    id                BIGSERIAL PRIMARY KEY,
-    created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
-    provider          TEXT NOT NULL,
-    model             TEXT NOT NULL,
-    role              TEXT NOT NULL DEFAULT '',
-    step              TEXT NOT NULL DEFAULT '',
-    project_id        TEXT,
-    prompt_tokens     INTEGER NOT NULL DEFAULT 0,
-    completion_tokens INTEGER NOT NULL DEFAULT 0,
-    reasoning_tokens  INTEGER NOT NULL DEFAULT 0,
-    cached_tokens     INTEGER NOT NULL DEFAULT 0,
-    duration_ms       INTEGER NOT NULL DEFAULT 0,
-    ok                BOOLEAN NOT NULL,
-    error_kind        TEXT NOT NULL DEFAULT '',
-    phase             TEXT NOT NULL DEFAULT ''
-);
-CREATE INDEX IF NOT EXISTS llm_usage_created_at_idx ON llm_usage (created_at DESC);
--- A call whose stream was cut (reasoning budget) or that failed comes
--- back with no usage record; its tokens are then unknown, not zero.
-ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS reasoning_chars INTEGER NOT NULL DEFAULT 0;
-ALTER TABLE llm_usage ADD COLUMN IF NOT EXISTS usage_reported BOOLEAN NOT NULL DEFAULT true;
+-- Model calls are logged by llm-service in its own database.
+DROP TABLE IF EXISTS llm_usage;
 
 -- The prompt library. Each pipeline role owns a list of prompts and
 -- exactly one of them is active; is_system rows ship in the binary.
@@ -187,7 +165,7 @@ ALTER TABLE authoring_segments ADD COLUMN IF NOT EXISTS failed_shots TEXT[] NOT 
 -- Shots per code segment, chosen by the Creator.
 ALTER TABLE project_authoring ADD COLUMN IF NOT EXISTS code_chunk_shots INTEGER NOT NULL DEFAULT 3;
 -- Every failed check of a code run, for statistics. Kept when
--- the project is deleted, like llm_usage.
+-- the project is deleted.
 CREATE TABLE IF NOT EXISTS code_check_diagnostics (
     id          BIGSERIAL PRIMARY KEY,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),

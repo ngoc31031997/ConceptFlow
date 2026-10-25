@@ -307,6 +307,13 @@ type AuthoringModelsPort interface {
 	SaveAuthoringModels(ctx context.Context, projectID string, models domain.AuthoringStepModels) error
 }
 
+// AuthoringModelsReaderPort is the read side of the model-per-step picker,
+// separate from AuthoringModelsPort (the write side) since a step that calls
+// a model only ever reads it, once per call, to know which model to ask.
+type AuthoringModelsReaderPort interface {
+	GetAuthoringModels(ctx context.Context, projectID string) (domain.AuthoringStepModels, error)
+}
+
 // SaveAuthoringModelsUseCase stores which Hive model each of the three
 // authoring tabs calls when the Creator runs step 1 by API. One picker at
 // step 1 sets all three at once (mirrors AuthoringMode: a Creator who has

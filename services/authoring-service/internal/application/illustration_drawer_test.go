@@ -21,7 +21,7 @@ func (s *scriptedLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, erro
 	if len(s.replies) > 1 {
 		s.replies = s.replies[1:]
 	}
-	return ChatResult{Content: r}, nil
+	return llmServiceReply(req, r)
 }
 
 func reply(name, code string) string {
@@ -33,7 +33,7 @@ const motoCode = "export function Motorbike({color = '#E8453C', ...fig}) { retur
 func TestDrawRetriesWithTheRenderersLineNumberedErrorsThenStoresADraft(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", "BROKEN"), reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	out, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy màu đỏ", FolderID: "phuong-tien"})
 	if err != nil {
 		t.Fatal(err)
@@ -63,7 +63,7 @@ func TestDrawPromptCarriesRulesHelpersExemplarsAndTheCreatorsApprovedDrawings(t 
 			CreatedAt: "2026-09-2" + string(rune('1'+n)) + "T00:00:00Z"}
 	}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestDrawPromptWithoutExemplarsSaysSoAndKeepsAtMostTwoOwnDrawings(t *testing
 			Code: "export function " + name + "() {}", Status: domain.IllustrationApproved}
 	}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -99,7 +99,7 @@ func TestDrawPromptWithoutExemplarsSaysSoAndKeepsAtMostTwoOwnDrawings(t *testing
 
 	empty := newFakeIllustrationRepo()
 	llm = &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc = NewIllustrationsUseCase(empty, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc = NewIllustrationsUseCase(empty, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien"}); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestDrawAndRedrawRefuseTheExemplarFolderAndExemplars(t *testing.T) {
 	repo.rows["ex"] = domain.Illustration{ID: "ex", Name: "BusMau", FolderID: domain.ExemplarFolderID, Exemplar: true,
 		Code: busCode, Status: domain.IllustrationApproved}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	if _, err := uc.Draw(context.Background(), DrawRequest{Description: "xe", FolderID: domain.ExemplarFolderID}); !errors.Is(err, ErrExemplarFolder) {
 		t.Fatalf("draw into Hình mẫu: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestDrawAndRedrawRefuseTheExemplarFolderAndExemplars(t *testing.T) {
 func TestDrawGivesUpAfterThreeAttemptsAndSavesNothing(t *testing.T) {
 	repo := newFakeIllustrationRepo()
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", "BROKEN")}}
-	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	_, err := uc.Draw(context.Background(), DrawRequest{Description: "xe", FolderID: "phuong-tien"})
 	if err == nil || len(llm.calls) != maxDrawAttempts || !errors.Is(err, ErrIllustrationInvalid) {
 		t.Fatalf("want failure after %d calls, got %d, %v", maxDrawAttempts, len(llm.calls), err)
@@ -151,7 +151,7 @@ func TestRedrawKeepsTheNameAndMakesANewDraftVersion(t *testing.T) {
 	uc.SetStatus(ctx, made.ID, domain.IllustrationApproved)
 
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode+"\n// bánh to hơn")}}
-	uc.WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc.WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	out, err := uc.Redraw(ctx, made.ID, "bánh to hơn", "")
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +176,7 @@ func TestTheIllustratorIsHeldToTheLanguagesRulesForFiguresAndBackdrops(t *testin
 		Backdrop:     "- [B1] LUẬT NỀN CỦA NGÔN NGỮ",
 		Scene:        "- [C1] luật cảnh",
 	}
-	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000).WithLanguages(langs)
+	uc := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, 1000).WithLanguages(langs)
 	for _, kind := range []domain.IllustrationKind{domain.IllustrationFigure, domain.IllustrationBackdrop} {
 		lr, err := uc.rulesFor(ctx, "")
 		if err != nil {
@@ -222,7 +222,7 @@ func TestDrawingStopsWhenTheLanguageCannotBeRead(t *testing.T) {
 	ctx := context.Background()
 	langs := newFakeLanguages()
 	langs.err = errors.New("db down")
-	failing := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, nil, 1000).WithLanguages(langs)
+	failing := NewIllustrationsUseCase(newFakeIllustrationRepo(), &fakeRenderer{}).WithLanguages(newFakeLanguages()).WithDrawer(&scriptedLLM{}, 1000).WithLanguages(langs)
 	if _, err := failing.Draw(ctx, DrawRequest{Description: "xe", FolderID: "phuong-tien"}); err == nil || !strings.Contains(err.Error(), "db down") {
 		t.Fatalf("want the read error, got %v", err)
 	}
@@ -235,7 +235,7 @@ func TestDrawingStopsWhenTheLanguageCannotBeRead(t *testing.T) {
 func TestADrawnFigureRemembersItsKitAndTheDetailOfItsTier(t *testing.T) {
 	repo, rend := newFakeIllustrationRepo(), &fakeRenderer{}
 	llm := &scriptedLLM{replies: []string{reply("Motorbike", motoCode)}}
-	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, nil, 1000).WithLanguages(newFakeLanguages())
+	uc := NewIllustrationsUseCase(repo, rend).WithLanguages(newFakeLanguages()).WithDrawer(llm, 1000).WithLanguages(newFakeLanguages())
 	out, err := uc.Draw(context.Background(), DrawRequest{Description: "xe máy", FolderID: "phuong-tien", Tier: domain.TierHero})
 	if err != nil {
 		t.Fatal(err)

@@ -1,5 +1,3 @@
-import type { AuthoringStep } from "../api/client";
-
 /**
  * The 13-step production flow, as the Creator sees it. The server decides where
  * a project stands (`flow_step` + `run_state` on GET /v1/projects/:id, derived
@@ -60,13 +58,6 @@ export const FLOW_REVIEW = 8;
 export const FLOW_TTS = 9;
 export const FLOW_RESULT = 12;
 
-/** The flow step of each authoring step the AI can run. */
-export const AUTHORING_STEP_FLOW: Record<AuthoringStep, number> = {
-  story: 3,
-  storyboard: 4,
-  illustrations: 5,
-  code: 6,
-};
 export const FLOW_PUBLISH = 13;
 
 /** The theme colour that marks a phase (a token in theme.css). */
@@ -103,6 +94,8 @@ export interface FlowViewStep {
    * is not one of the 13 steps the server derives a project's position from).
    */
   screen?: "research" | "story" | "beats" | "script" | "lock";
+  /** The step's screen was taken out and comes back in a later version: it shows the "not developed" page. */
+  comingSoon?: boolean;
   /** What the step holds, in a few words, for the flow map. */
   note: string;
 }
@@ -116,12 +109,12 @@ export const FLOW_VIEW: readonly FlowViewStep[] = [
   { n: 6, phase: 0, label: "Viết kịch bản", gate: true, server: [3], screen: "script", note: "Lời thoại theo beat, chuyển tiếp, nghe thử" },
   { n: 7, phase: 0, label: "Rà soát và chốt", title: "Rà soát và chốt kịch bản", gate: true, server: [], screen: "lock", note: "Rà soát, ghi chú bàn giao, chốt phiên bản" },
   { n: 8, phase: 1, label: "Mỹ thuật · lượt 1", title: "Thiết kế mỹ thuật · lượt 1", gate: true, server: [], note: "Diễn viên và phim trường dùng chung cả video" },
-  { n: 9, phase: 1, label: "Storyboard", gate: true, server: [4], note: "Cảnh, shot, lời đọc, hình trên màn" },
+  { n: 9, phase: 1, label: "Storyboard", gate: true, server: [4], comingSoon: true, note: "Cảnh, shot, lời đọc, hình trên màn" },
   { n: 10, phase: 1, label: "Mỹ thuật · lượt 2", title: "Thiết kế mỹ thuật · lượt 2", gate: true, server: [], note: "Màu và ánh sáng từng phần của chuyện; khung mẫu" },
   { n: 11, phase: 1, label: "Giọng sơ bộ", server: [], note: "Giọng chính thức từng câu, tự chạy" },
   { n: 12, phase: 1, label: "Animatic", gate: true, server: [], note: "Khung tĩnh và giọng, chốt nhịp" },
-  { n: 13, phase: 2, label: "Hình minh hoạ", server: [5], note: "Hình riêng của từng shot" },
-  { n: 14, phase: 2, label: "Code", server: [6], note: "Code Remotion theo cảnh, tự kiểm lỗi" },
+  { n: 13, phase: 2, label: "Hình minh hoạ", server: [5], comingSoon: true, note: "Hình riêng của từng shot" },
+  { n: 14, phase: 2, label: "Code", server: [6], comingSoon: true, note: "Code Remotion theo cảnh, tự kiểm lỗi" },
   { n: 15, phase: 2, label: "Validate", server: [7], note: "Kiểm code và luật" },
   { n: 16, phase: 2, label: "Review", gate: true, server: [8], note: "Nhìn lại, bắt đầu tạo video" },
   { n: 17, phase: 3, label: "Render từng cảnh", server: [9, 10], note: "Giọng đọc rồi render từng cảnh, tự chạy" },
@@ -147,7 +140,7 @@ export const VIEW_BEATS = 5;
 
 /** Whether the app has a screen for the step: a running step behind it, or a screen of its own. */
 export function isBuilt(view: FlowViewStep): boolean {
-  return view.server.length > 0 || !!view.screen;
+  return !view.comingSoon && (view.server.length > 0 || !!view.screen);
 }
 
 /** The screen that tells the Creator step `n` of the 21-step flow is not developed yet. */

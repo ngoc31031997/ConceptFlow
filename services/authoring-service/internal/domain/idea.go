@@ -105,8 +105,8 @@ func KeepIdeaCreatorFields(written, current Idea, creatorFields []string) Idea {
 // ErrIdeaReplyUnusable marks a model reply the idea cannot be read from.
 var ErrIdeaReplyUnusable = errors.New("câu trả lời của AI không dùng được làm ý tưởng")
 
-// ParseIdeaReply reads the idea out of a model reply: the first JSON object
-// in it, with or without a ```json fence around it. Every field must be there
+// ParseIdeaReply reads the idea out of the JSON object llm-service returned
+// for the reply. Every field must be there
 // and non-empty; a reply missing one is an error naming the fields, so a
 // half-written idea is never stored.
 func ParseIdeaReply(reply string) (Idea, error) {

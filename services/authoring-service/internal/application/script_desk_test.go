@@ -26,7 +26,7 @@ func (l *scriptLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error)
 	}
 	for marker, reply := range l.replies {
 		if strings.Contains(req.System, marker) {
-			return ChatResult{Content: reply}, nil
+			return llmServiceReply(req, reply)
 		}
 	}
 	return ChatResult{}, errors.New("no reply for this prompt")
@@ -103,7 +103,7 @@ func newScriptFixture(t *testing.T) *scriptFixture {
 		voices:     &memVoices{rows: map[string]domain.VoiceLine{}},
 		dispatcher: &countingDispatcher{},
 	}
-	f.uc = NewScriptDeskUseCase(b.store, project, project, briefPrompts{}, f.llm, nil, 4000, b.uc).WithVoices(f.voices, f.dispatcher)
+	f.uc = NewScriptDeskUseCase(b.store, project, project, briefPrompts{}, f.llm, 4000, b.uc).WithVoices(f.voices, f.dispatcher)
 	return f
 }
 

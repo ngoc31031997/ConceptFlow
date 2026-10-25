@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-const storyReply = "```json\n" + `{"central_question":"Điều gì xảy ra khi ta rơi vào hố đen?","core_answer":"Người rơi và người ở xa nhận thông tin khác nhau.","narrative_arc":[
+const storyReply = `{"central_question":"Điều gì xảy ra khi ta rơi vào hố đen?","core_answer":"Người rơi và người ở xa nhận thông tin khác nhau.","narrative_arc":[
 {"beat":"Hook","text":"Người ngoài có thấy ta vượt ranh giới không?","facts":[]},
 {"beat":"Hai góc nhìn","text":"Người rơi và người ở xa.","facts":["f1","F02"]},
-{"beat":"Payoff","text":"Tổng hợp điều mỗi góc nhìn biết.","facts":["F01"]}]}` + "\n```"
+{"beat":"Payoff","text":"Tổng hợp điều mỗi góc nhìn biết.","facts":["F01"]}]}`
 
 func TestParseStoryReplyReadsTheThreeFields(t *testing.T) {
 	story, err := ParseStoryReply(storyReply, knownFacts("F01", "F02"))

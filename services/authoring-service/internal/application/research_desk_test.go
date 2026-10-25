@@ -129,7 +129,7 @@ func newResearchFixture() *researchFixture {
 		},
 		llm: &briefLLM{reply: "```json\n" + questionsReplyJSON + "\n```"},
 	}
-	f.uc = NewResearchDeskUseCase(f.store, f.approved, f.approved, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewResearchDeskUseCase(f.store, f.approved, f.approved, f.project, f.project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 
@@ -242,7 +242,7 @@ func TestGenerateQuestionsFailsWithoutChangingTheList(t *testing.T) {
 	if _, err := f.uc.GenerateQuestions(ctx, "p1", false, ""); err != nil {
 		t.Fatal(err)
 	}
-	f.llm.reply = "xin lỗi, tôi không biết"
+	f.llm.reply = `{"questions":[]}`
 	if _, err := f.uc.GenerateQuestions(ctx, "p1", false, ""); !errors.Is(err, domain.ErrResearchReplyUnusable) {
 		t.Fatalf("err = %v, want ErrResearchReplyUnusable", err)
 	}
@@ -431,7 +431,7 @@ func TestStateStartsEmptyAndPending(t *testing.T) {
 func TestBriefImpactMentionsAIQuestions(t *testing.T) {
 	f := newResearchFixture()
 	f.seedBrief(t, domain.UnitApproved)
-	brief := NewCreativeBriefUseCase(f.units, &briefStore{}, f.project, f.project, briefPrompts{}, nil, nil, 4000)
+	brief := NewCreativeBriefUseCase(f.units, &briefStore{}, f.project, f.project, briefPrompts{}, nil, 4000)
 	ctx := context.Background()
 	items, err := brief.Impact(ctx, "p1", domain.BriefUnitKey)
 	if err != nil || len(items) != 0 {

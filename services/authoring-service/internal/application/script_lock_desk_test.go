@@ -66,7 +66,7 @@ func newLockFixture(t *testing.T) *lockFixture {
 	}
 	project := &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly, VoiceID: "v"}, status: domain.StatusDraft}
 	v := &memVersions{}
-	uc := NewScriptLockDeskUseCase(sf.beat.store, project, project, briefPrompts{}, sf.llm, nil, 4000, sf.beat.uc, sf.uc, v)
+	uc := NewScriptLockDeskUseCase(sf.beat.store, project, project, briefPrompts{}, sf.llm, 4000, sf.beat.uc, sf.uc, v)
 	return &lockFixture{scriptFixture: sf, versions: v, uc2: uc}
 }
 
@@ -473,15 +473,15 @@ type flakyLLM struct {
 }
 
 func (l *flakyLLM) Name() string { return "fake" }
-func (l *flakyLLM) Chat(context.Context, ChatRequest) (ChatResult, error) {
+func (l *flakyLLM) Chat(_ context.Context, req ChatRequest) (ChatResult, error) {
 	i := min(l.calls, len(l.replies)-1)
 	l.calls++
-	return ChatResult{Content: l.replies[i]}, nil
+	return llmServiceReply(req, l.replies[i])
 }
 
-func TestReviewAsksAgainWhenTheJSONIsBrokenAndGivesUpAfterThreeTries(t *testing.T) {
+func TestReviewAsksAgainWhenTheReplyIsUnusableAndGivesUpAfterThreeTries(t *testing.T) {
 	f := newLockFixture(t)
-	broken := `{"findings":[],"notes":["a,"b"]}}`
+	broken := `{"findings":[{"group":"zzz","title":"x"}]}`
 	good := f.reviewReply(`{"group":"logic","title":"T","line":"b1.1"}`)
 	llm := &flakyLLM{replies: []string{broken, good}}
 	f.uc2.provider = llm

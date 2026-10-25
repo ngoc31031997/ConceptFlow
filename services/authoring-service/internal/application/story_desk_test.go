@@ -57,7 +57,7 @@ func newStoryFixture() *storyFixture {
 		project:  &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly}, status: domain.StatusDraft},
 		llm:      &briefLLM{reply: storyReplyFull},
 	}
-	f.uc = NewStoryDeskUseCase(f.store, f.approved, f.standing, f.project, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewStoryDeskUseCase(f.store, f.approved, f.standing, f.project, f.project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 
@@ -191,7 +191,7 @@ func TestGenerateStoresNothingFromAnUnusableReply(t *testing.T) {
 	f := newStoryFixture()
 	f.open(t)
 	for name, reply := range map[string]string{
-		"not json":     "không có gì",
+		"no fields":    `{}`,
 		"unknown fact": `{"central_question":"Q","core_answer":"A","narrative_arc":[{"beat":"H","text":"1","facts":["F09"]},{"beat":"M","text":"2","facts":[]},{"beat":"P","text":"3","facts":[]}]}`,
 		"dropped fact": `{"central_question":"Q","core_answer":"A","narrative_arc":[{"beat":"H","text":"1","facts":["F04"]},{"beat":"M","text":"2","facts":[]},{"beat":"P","text":"3","facts":[]}]}`,
 		"two beats":    `{"central_question":"Q","core_answer":"A","narrative_arc":[{"beat":"H","text":"1","facts":[]},{"beat":"P","text":"3","facts":[]}]}`,

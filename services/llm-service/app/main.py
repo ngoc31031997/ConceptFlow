@@ -12,17 +12,21 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, model_validator
 
+from app import errors, tasks
 from app import storyboard as sbm
-from app import tasks
+from app.calllog import CallFilter, CallLogPort, PgCallLog
 from app.config import Config
 from app.errors import LLMError, Usage
 from app.frame import LANDSCAPE, MAX_HEIGHT, Frame, frame_of
+from app.jsonreply import first_json_object, repair_prompt
 from app.pipeline.checker import CheckerPort, RenderingChecker
 from app.pipeline.checker import CheckerUnavailable as _CheckerUnavailable
 from app.pipeline.extract import ExtractError
@@ -50,6 +54,14 @@ class ChatBody(BaseModel):
     max_tokens: int = Field(0, ge=0)
     temperature: float = 0.7
     json_mode: bool = False
+    # Read the first JSON object of the reply (one repair turn if it cannot be read)
+    # and return it as `json` next to `content`.
+    expect_json: bool = False
+    # Where the call comes from, written to the call log.
+    project_id: str = ""
+    role: str = ""
+    step: str = ""
+    phase: str = ""
 
 
 class MetadataBody(BaseModel):
@@ -58,6 +70,7 @@ class MetadataBody(BaseModel):
     language: str = "en"
     model: str = ""  # "" = the light provider's default; "ollama" / "ollama/<m>" / a Hive id
     stream: bool = False  # emit `progress` events like /v1/chat
+    project_id: str = ""
 
 
 class FrameIn(BaseModel):
@@ -80,6 +93,7 @@ def _canvas(frame: FrameIn | None) -> Frame:
 
 class StoryboardBody(BaseModel):
     content: str
+    project_id: str = ""
     model: str = ""
     max_tokens: int = Field(0, ge=0)
     # No frame = the landscape long-form frame.
@@ -111,6 +125,7 @@ class SegmentIn(BaseModel):
 
 
 class CodeBody(BaseModel):
+    project_id: str = ""
     illustrations: list[IllustrationIn] = []
     engine: str
     topic: str = ""
@@ -137,7 +152,7 @@ class CodeBody(BaseModel):
         return CodeRequest(
             engine=self.engine, topic=self.topic, storyboard=self.storyboard, system=self.system,
             model=model, max_tokens=self.max_tokens, temperature=self.temperature,
-            max_reasoning_chars=max_reasoning_chars,
+            max_reasoning_chars=max_reasoning_chars, project_id=self.project_id,
             illustrations=[i.model_dump() for i in self.illustrations],
             subtitle_band=self.subtitle_band.model_dump() if self.subtitle_band else None,
             video_font=self.video_font, kit_key=self.kit_key, chunk_shots=self.chunk_shots,
@@ -159,6 +174,21 @@ class SegmentPromptBody(CodeBody):
 class SegmentParseBody(CodeBody):
     key: str
     reply: str
+
+
+class DeleteCallsBody(BaseModel):
+    """Exactly one way to choose the rows to delete."""
+
+    ids: list[str] | None = None
+    older_than_days: int | None = Field(None, ge=0)
+    all: bool = False
+
+    @model_validator(mode="after")
+    def _one_way(self):
+        chosen = [self.ids is not None, self.older_than_days is not None, self.all]
+        if sum(chosen) != 1:
+            raise ValueError("give exactly one of ids, older_than_days, all")
+        return self
 
 
 def _line(obj: dict) -> bytes:
@@ -235,12 +265,25 @@ async def _suggestion(stream: bool, run):
 
 
 def create_app(
-    config: Config | None = None, providers: Providers | None = None, checker: CheckerPort | None = None
+    config: Config | None = None, providers: Providers | None = None, checker: CheckerPort | None = None,
+    call_log: CallLogPort | None = None,
 ) -> FastAPI:
     config = config or Config.from_env()
-    providers = providers or Providers(config)
+    owned_log = call_log is None
+    if call_log is None:
+        call_log = PgCallLog(config.database_url)
+    providers = providers or Providers(config, call_log)
     checker = checker or RenderingChecker(config.rendering_url, config.rendering_check_timeout)
-    app = FastAPI(title="llm-service")
+
+    @asynccontextmanager
+    async def lifespan(_: FastAPI):
+        if owned_log:
+            await call_log.start()
+        yield
+        if owned_log:
+            await call_log.stop()
+
+    app = FastAPI(title="llm-service", lifespan=lifespan)
 
     @app.get("/health")
     async def health() -> dict:
@@ -262,15 +305,67 @@ def create_app(
             async def progress(reasoning: int, content: int) -> None:
                 await emit({"type": "progress", "reasoning_chars": reasoning, "content_chars": content})
 
-            res = await provider.chat(
-                ChatRequest(user=body.user, system=body.system, model=model, max_tokens=body.max_tokens,
-                            temperature=body.temperature, json_mode=body.json_mode,
-                            max_reasoning_chars=config.chat_max_reasoning_chars),
-                on_progress=progress,
-            )
-            return {"content": res.content, "usage": res.usage.to_dict(), "provider": provider.name}
+            def request(user: str, system: str, temperature: float, phase: str) -> ChatRequest:
+                return ChatRequest(
+                    user=user, system=system, model=model, max_tokens=body.max_tokens,
+                    temperature=temperature, json_mode=body.json_mode,
+                    max_reasoning_chars=config.chat_max_reasoning_chars,
+                    project_id=body.project_id, role=body.role, step=body.step, phase=phase)
+
+            res = await provider.chat(request(body.user, body.system, body.temperature, body.phase), progress)
+            out = {"content": res.content, "usage": res.usage.to_dict(), "provider": provider.name,
+                   "call_id": res.call_id}
+            if not body.expect_json:
+                return out
+            obj, problem = first_json_object(res.content)
+            if obj is None:
+                try:
+                    fixed = await provider.chat(
+                        request(repair_prompt(res.content, problem), "", 0.0, "json_repair"), progress)
+                except LLMError as err:
+                    err.usage = res.usage + err.usage
+                    raise
+                out.update(content=fixed.content, usage=(res.usage + fixed.usage).to_dict(),
+                           call_id=fixed.call_id)
+                obj, problem = first_json_object(fixed.content)
+                if obj is None:
+                    raise LLMError(
+                        errors.MALFORMED, provider.name, f"khối JSON không đọc được ({problem})",
+                        res.usage + fixed.usage, fixed.content, call_id=fixed.call_id)
+            return {**out, "json": obj}
 
         return _stream(work)
+
+    @app.get("/v1/llm/stats")
+    async def llm_stats(step: str, phase: str, days: int = 30):
+        """Per model: calls, successes, failures by kind, average completion tokens and duration of the
+        successful calls of one step phase over the last `days`."""
+        since = datetime.now(UTC) - timedelta(days=days)
+        return {m.model: m.to_dict() for m in await call_log.stats(step, phase, since)}
+
+    @app.get("/v1/llm/calls")
+    async def llm_calls(
+        limit: int = 100, before: datetime | None = None, project_id: str = "", role: str = "",
+        ok: bool | None = None,
+    ):
+        """The raw rows, newest first; pass `next_before` as `before` for the next page."""
+        limit = max(1, min(limit, 500))
+        rows = await call_log.list(CallFilter(project_id, role, ok, before, limit))
+        return {
+            "calls": [r.to_dict() for r in rows],
+            "next_before": rows[-1].created_at.isoformat() if len(rows) == limit else None,
+        }
+
+    @app.post("/v1/llm/calls/delete")
+    async def llm_calls_delete(body: DeleteCallsBody):
+        if body.ids is not None:
+            deleted = await call_log.delete_ids(body.ids)
+        elif body.older_than_days is not None:
+            deleted = await call_log.delete_older_than(
+                datetime.now(UTC) - timedelta(days=body.older_than_days))
+        else:
+            deleted = await call_log.delete_all()
+        return {"deleted": deleted}
 
     @app.post("/v1/suggest-metadata")
     async def suggest_metadata(body: MetadataBody):
@@ -278,7 +373,8 @@ def create_app(
             # A named model picks its own provider; none keeps the light task's.
             provider, model = providers.for_model(providers.hive, body.model) if body.model else (providers.light, "")
             out = await tasks.suggest_metadata(
-                provider, body.script_content, body.category_hint, body.language, on_progress, model)
+                provider, body.script_content, body.category_hint, body.language, on_progress, model,
+                body.project_id)
             return {**out.value, "usage": out.usage.to_dict(), "provider": provider.name}
 
         return await _suggestion(body.stream, run)
@@ -301,7 +397,8 @@ def create_app(
                 try:
                     res = await provider.chat(ChatRequest(
                         user=sbm.fix_prompt(content, exc.problems), model=model,
-                        max_tokens=body.max_tokens, temperature=0.0))
+                        max_tokens=body.max_tokens, temperature=0.0,
+                        project_id=body.project_id, role="storyboard_repair", step="storyboard", phase="repair"))
                 except LLMError as err:
                     err.usage = total + err.usage
                     logger.warning("llm call failed: %s\n%s", err, err.diag)

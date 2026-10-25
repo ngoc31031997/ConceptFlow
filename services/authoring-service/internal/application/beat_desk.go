@@ -106,7 +106,6 @@ type BeatDeskUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -115,11 +114,11 @@ type BeatDeskUseCase struct {
 // model is configured: the Creator then adds and writes the beats by hand.
 func NewBeatDeskUseCase(
 	units StepUnitStorePort, sheets BeatSheetStorePort, stories ApprovedStoryPort, briefs ApprovedBriefPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	provider LLMProviderPort, maxOutputTokens int,
 ) *BeatDeskUseCase {
 	return &BeatDeskUseCase{
 		units: units, sheets: sheets, stories: stories, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -371,7 +370,6 @@ func (uc *BeatDeskUseCase) requireAI() error {
 
 // chat sends one system prompt and records the usage.
 func (uc *BeatDeskUseCase) chat(ctx context.Context, projectID, model, system string) (string, error) {
-	started := uc.now()
 	result, err := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -379,12 +377,13 @@ func (uc *BeatDeskUseCase) chat(ctx context.Context, projectID, model, system st
 		Temperature: 0.7,
 		Model:       model,
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleBeatSheet),
+		Step:        domain.UnitKindBeat,
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleBeatSheet), domain.UnitKindBeat, projectID, result.Usage, started, err))
-	}
 	if err != nil {
 		return "", err
 	}
-	return result.Content, nil
+	return string(result.JSON), nil
 }

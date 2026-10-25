@@ -58,7 +58,6 @@ type ProjectIdeaUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -67,11 +66,11 @@ type ProjectIdeaUseCase struct {
 // model is configured: the Creator then writes the idea by hand.
 func NewProjectIdeaUseCase(
 	store ProjectIdeaStorePort, input IdeaInputPort, models AuthoringModelsReaderPort, locks AuthoringLockPort,
-	prompts PromptActivePort, provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	prompts PromptActivePort, provider LLMProviderPort, maxOutputTokens int,
 ) *ProjectIdeaUseCase {
 	return &ProjectIdeaUseCase{
 		store: store, input: input, models: models, locks: locks, prompts: prompts,
-		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -171,7 +170,6 @@ func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note stri
 		"redo_note":     noteText(note),
 	})
 
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -179,14 +177,15 @@ func (uc *ProjectIdeaUseCase) Generate(ctx context.Context, projectID, note stri
 		Temperature: 0.7,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleProjectIdea),
+		Step:        "idea",
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleProjectIdea), "idea", projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.StoredIdea{}, chatErr
 	}
-	written, err := domain.ParseProjectIdeaReply(result.Content)
+	written, err := domain.ParseProjectIdeaReply(string(result.JSON))
 	if err != nil {
 		return domain.StoredIdea{}, err
 	}
@@ -407,7 +406,6 @@ func (uc *ProjectIdeaUseCase) Review(ctx context.Context, projectID string) (dom
 		"idea":          stored.Idea.Section(),
 		"idea_language": briefLanguageName(briefLanguage(in.Language)),
 	})
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -415,14 +413,15 @@ func (uc *ProjectIdeaUseCase) Review(ctx context.Context, projectID string) (dom
 		Temperature: 0.3,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleProjectIdeaReview),
+		Step:        "idea_review",
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleProjectIdeaReview), "idea_review", projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.IdeaReview{}, chatErr
 	}
-	review, err := domain.ParseIdeaReviewReply(result.Content)
+	review, err := domain.ParseIdeaReviewReply(string(result.JSON))
 	if err != nil {
 		return domain.IdeaReview{}, err
 	}

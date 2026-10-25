@@ -161,21 +161,15 @@ var ErrResearchReplyUnusable = errors.New("câu trả lời của AI không dùn
 // MaxGeneratedQuestions is the most questions one AI reply may hold.
 const MaxGeneratedQuestions = 12
 
-// ParseResearchQuestionsReply reads the questions out of a model reply: the
-// first JSON object in it, with a "questions" list of strings, with or without
-// a ```json fence. Blank and repeated questions are dropped; a reply with none
+// ParseResearchQuestionsReply reads the questions out of the JSON object llm-service
+// returned for the reply, a "questions" list of strings. Blank and repeated questions are dropped; a reply with none
 // left, or with more than MaxGeneratedQuestions, is an error so that a half
 // usable list is never stored.
 func ParseResearchQuestionsReply(reply string) ([]string, error) {
-	start := strings.Index(reply, "{")
-	end := strings.LastIndex(reply, "}")
-	if start < 0 || end <= start {
-		return nil, fmt.Errorf("%w: không có khối JSON", ErrResearchReplyUnusable)
-	}
 	var doc struct {
 		Questions []string `json:"questions"`
 	}
-	if err := json.Unmarshal([]byte(reply[start:end+1]), &doc); err != nil {
+	if err := json.Unmarshal([]byte(reply), &doc); err != nil {
 		return nil, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrResearchReplyUnusable, err)
 	}
 	seen := map[string]bool{}

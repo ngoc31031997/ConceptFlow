@@ -268,27 +268,6 @@ func TestRender_RequiresAProjectID(t *testing.T) {
 	}
 }
 
-// --- the AI flow's own roles -------------------------------------------------
-
-func TestAIRoleFor_UsesTheAIPromptsAndLeavesTheManualMappingAlone(t *testing.T) {
-	for step, want := range map[string]domain.PromptRole{
-		"story":      domain.RoleStoryArchitect,
-		"storyboard": domain.RoleVisualDirectorAI,
-		"code":       domain.RoleRemotionEngineerAI,
-	} {
-		if got, err := application.AIRoleFor(step); err != nil || got != want {
-			t.Errorf("AIRoleFor(%s) = %q, %v; want %q", step, got, err, want)
-		}
-	}
-	if _, err := application.AIRoleFor("review"); err == nil {
-		t.Error("an unknown step must be an error")
-	}
-	// The manual flow's mapping is unchanged.
-	if got, _ := application.RoleFor("storyboard"); got != domain.RoleVisualDirector {
-		t.Errorf("RoleFor(storyboard) = %q, want the manual visual_director", got)
-	}
-}
-
 func TestRender_AIEngineerPromptCarriesTheStoryButNotTheStoryboard(t *testing.T) {
 	ctx := &fakeRenderContext{project: aProject(), story: "STORY-TEXT", storyboard: `{"scenes":"STORYBOARD-JSON"}`}
 	r := newRenderer("PREV={{previous_output}}", ctx)

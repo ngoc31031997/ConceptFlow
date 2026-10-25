@@ -411,6 +411,32 @@ services:
     networks:
       - backend
 
+  # The call log of llm-service: one row per model call (what came back and
+  # what it cost, never the prompt). Opened on the host's loopback only, so a
+  # database client (DBeaver) can connect.
+  llm-db:
+    image: postgres:16-alpine
+    container_name: llm-db
+    ports:
+      - "127.0.0.1:5435:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASS}
+      POSTGRES_DB: llm
+    volumes:
+      - llm_db_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-256M}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d llm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
   # The only service that talks to a language model. Hive and Ollama
   # are both called through the OpenAI SDK (Ollama via its /v1 endpoint). It
   # also runs the chunked code pipeline: layout/cast, shots in parallel, merge,
@@ -437,6 +463,7 @@ services:
       CHAT_MAX_REASONING_CHARS: ${CHAT_MAX_REASONING_CHARS:-0} # /v1/chat (bước 1a/1b suy nghĩ dài là bình thường)
       RENDERING_URL: http://rendering:8000
       RENDERING_CHECK_TIMEOUT_SECONDS: ${RENDERING_CHECK_TIMEOUT_SECONDS:-2100}
+      LLM_DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASS}@llm-db:5432/llm
     deploy:
       resources:
         limits:
@@ -446,6 +473,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    depends_on:
+      llm-db:
+        condition: service_healthy
     networks:
       - backend
 
@@ -456,6 +486,7 @@ services:
       RABBITMQ_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672/
       ORCHESTRATOR_URL: http://orchestrator:8000
       AUTHORING_SERVICE_URL: http://authoring-service:8000
+      LLM_SERVICE_URL: http://llm-service:8000
       PUBLISHER_URL: http://publisher:8000
       PORT: "8080"
       WEB_GUI_ORIGIN: http://localhost:3000
@@ -570,6 +601,7 @@ volumes:
   video_assembly_db_data:
   publisher_db_data:
   orchestrator_db_data:
+  llm_db_data:
   authoring_db_data:
   loki_data:
   grafana_data:

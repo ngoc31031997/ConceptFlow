@@ -277,8 +277,8 @@ var (
 	ErrBriefNeedsApprovedIdea = errors.New("cần duyệt ý tưởng ở bước 1 trước khi viết brief")
 )
 
-// ParseProjectBriefReply reads the brief out of a model reply: the first JSON
-// object in it, with or without a ```json fence around it. Every field must be
+// ParseProjectBriefReply reads the brief out of the JSON object llm-service
+// returned for the reply. Every field must be
 // there and the brief must pass the machine check for the video's form, so a
 // half-written brief is never stored.
 func ParseProjectBriefReply(reply string, mode VideoOutputMode) (ProjectBrief, error) {

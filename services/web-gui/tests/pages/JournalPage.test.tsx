@@ -91,4 +91,23 @@ describe("eventStepLabel", () => {
   it("falls back to the server's label for a step the web app does not know", () => {
     expect(eventStepLabel(event(99, "Bước lạ"))).toBe("Bước lạ");
   });
+
+  it("opens the AI call log from its own tab, even before any project has run", async () => {
+    global.fetch = vi.fn().mockImplementation(async (url: string) => ({
+      ok: true,
+      status: 200,
+      json: async () => (String(url).includes("/v1/llm/calls") ? { calls: [], next_before: null } : String(url).includes("/v1/projects") ? { projects: [] } : []),
+    })) as unknown as typeof fetch;
+    render(
+      <ThemeProvider>
+        <MemoryRouter>
+          <JournalPage />
+        </MemoryRouter>
+      </ThemeProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId("journal-tab-calls")).toBeInTheDocument());
+    fireEvent.click(screen.getByTestId("journal-tab-calls"));
+    await waitFor(() => expect(screen.getByTestId("llm-calls-panel")).toBeInTheDocument());
+    expect(screen.queryByText("Chưa có hoạt động nào được ghi lại.")).not.toBeInTheDocument();
+  });
 });

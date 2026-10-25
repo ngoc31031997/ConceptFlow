@@ -94,33 +94,10 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/authoring/mode', proxyHandler(authoring, 'authoring-service'));
   // Model Hive cho từng tab 1a/1b/1c — cùng kiểu với mode ở trên.
   router.put('/v1/projects/:id/authoring/models', proxyHandler(authoring, 'authoring-service'));
-  // The code step's segments: list, one segment's prompt for an
-  // outside AI, paste/hand-edit one segment, shots per segment. Short calls
-  // (the prompt and the paste check go to llm-service without a model call);
-  // running segments goes through the chain above.
-  router.get('/v1/projects/:id/authoring/code/segments', proxyHandler(authoring, 'authoring-service'));
-  router.get('/v1/projects/:id/authoring/code/segments/:key/prompt', proxyHandler(authoring, 'authoring-service'));
-  router.put('/v1/projects/:id/authoring/code/segments/:key', proxyHandler(authoring, 'authoring-service'));
-  router.put('/v1/projects/:id/authoring/code/chunk-shots', proxyHandler(authoring, 'authoring-service'));
   // Wizard: settings = bước 2 (Cấu hình), PATCH từng field khi Creator đổi;
   // "Tiếp tục" gửi confirm để sang bước 3.
   router.patch('/v1/projects/:id/settings', proxyHandler(orchestratorClient, 'orchestrator'));
   // Records which wizard screen a draft was left on, so "Chi tiết" reopens there.
-  // Chạy một bước bằng API thay vì copy prompt ra ngoài. Dùng
-  // orchestratorAiClient (timeout dài) như suggest-metadata: bước code có thể
-  // mất vài chục giây. Đường copy tay ở GET .../prompts/:role vẫn nguyên.
-  // Live progress of the run above (streamed reply size + phase), polled by the GUI.
-  router.get('/v1/projects/:id/authoring/:step/progress', proxyHandler(authoring, 'authoring-service'));
-  // Server-side chain of 1a/1b/1c: POST starts it (202, returns at once), GET
-  // reports the running or last-finished chain. Short calls — the run itself
-  // is detached from the request.
-  router.post('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
-  router.get('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
-  router.delete('/v1/projects/:id/authoring/chain', proxyHandler(authoring, 'authoring-service'));
-  router.post(
-    '/v1/projects/:id/authoring/:step/generate',
-    proxyHandler(authoringAi, 'authoring-service'),
-  );
   router.post(
     '/v1/projects/:id/suggest-metadata',
     proxyHandler(authoringAi, 'authoring-service'),

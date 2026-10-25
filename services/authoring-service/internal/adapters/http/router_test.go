@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
-	"time"
 
 	"authoring/internal/application"
 	"authoring/internal/domain"
@@ -23,93 +22,21 @@ func (f *fakeSuggestMetadata) Execute(_ context.Context, _ string) (*application
 	return f.out, f.err
 }
 
-// fakeGenerateAuthoring stands in for the run-a-step-with-AI use case.
-type fakeGenerateAuthoring struct {
-	out       application.GeneratedStep
-	err       error
-	available bool
-	gotStep   string
-}
+// fakeLLMStatus stands in for the llm-service client's view of itself.
+type fakeLLMStatus struct{ ready bool }
 
-func (f *fakeGenerateAuthoring) Execute(_ context.Context, _, step string) (application.GeneratedStep, error) {
-	f.gotStep = step
-	return f.out, f.err
-}
-func (f *fakeGenerateAuthoring) Available() bool  { return f.available }
-func (f *fakeGenerateAuthoring) Provider() string { return "hive" }
+func (f *fakeLLMStatus) Ready() bool  { return f.ready }
+func (f *fakeLLMStatus) Name() string { return "hive" }
 
-func newGenerateRouter(gen generateAuthoringUseCase) *Router {
+func newStatusRouter(status llmStatusSource) *Router {
 	rt := NewRouter(&fakeSuggestMetadata{}, nil)
-	if gen != nil {
-		rt = rt.WithGenerateAuthoring(gen)
+	if status != nil {
+		rt = rt.WithLLMStatus(status)
 	}
 	return rt
 }
 
-func TestHandleGenerateAuthoring_OK(t *testing.T) {
-	gen := &fakeGenerateAuthoring{
-		available: true,
-		out: application.GeneratedStep{
-			Step: "story", Role: "story_architect", Content: "BEAT 1", Provider: "hive",
-		},
-	}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 200 {
-		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
-	}
-	if gen.gotStep != "story" {
-		t.Errorf("step = %q, want story", gen.gotStep)
-	}
-	var out application.GeneratedStep
-	_ = json.Unmarshal(rec.Body.Bytes(), &out)
-	if out.Content != "BEAT 1" {
-		t.Errorf("content = %q, want the generated text", out.Content)
-	}
-}
-
-// Bước duyệt đã bị bỏ, nên "review" không còn là một step hợp lệ:
-// route vẫn khớp, nhưng use case từ chối nó.
-func TestHandleGenerateAuthoring_ForwardsStepVerbatim(t *testing.T) {
-	gen := &fakeGenerateAuthoring{available: true}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/code/generate", nil))
-
-	if gen.gotStep != "code" {
-		t.Errorf("step = %q, want code", gen.gotStep)
-	}
-}
-
-// Unwired means absent, not broken: without a key the route 404s and the
-// Copy-prompt path is the one that works.
-func TestHandleGenerateAuthoring_NotWired(t *testing.T) {
-	rec := httptest.NewRecorder()
-	newGenerateRouter(nil).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 404 {
-		t.Fatalf("expected 404, got %d", rec.Code)
-	}
-}
-
-func TestHandleGenerateAuthoring_BusyIsConflict(t *testing.T) {
-	gen := &fakeGenerateAuthoring{available: true, err: application.ErrGenerateBusy}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(gen).Handler().ServeHTTP(rec,
-		httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
-
-	if rec.Code != 409 {
-		t.Fatalf("expected 409 for a double click, got %d: %s", rec.Code, rec.Body.String())
-	}
-}
-
-// Each provider failure names its own cause AND the copy-out way
-// through. "AI failed" would send a Creator with an empty balance to go
-// rewrite their prompt.
-func TestHandleGenerateAuthoring_ProviderErrorsAreClassified(t *testing.T) {
+func TestDescribeGenerateErrorClassifiesProviderErrors(t *testing.T) {
 	cases := []struct {
 		kind       application.LLMErrorKind
 		wantStatus int
@@ -122,47 +49,55 @@ func TestHandleGenerateAuthoring_ProviderErrorsAreClassified(t *testing.T) {
 		{application.ErrKindTruncated, 502, "HIVE_MAX_OUTPUT_TOKENS"},
 	}
 	for _, tc := range cases {
-		gen := &fakeGenerateAuthoring{
-			available: true,
-			err:       &application.LLMError{Kind: tc.kind, Provider: "hive", Err: errors.New("boom")},
+		status, message := DescribeGenerateError(&application.LLMError{Kind: tc.kind, Provider: "hive", Err: errors.New("boom")})
+		if status != tc.wantStatus {
+			t.Errorf("%s: status = %d, want %d", tc.kind, status, tc.wantStatus)
 		}
-		rec := httptest.NewRecorder()
-		newGenerateRouter(gen).Handler().ServeHTTP(rec,
-			httptest.NewRequest("POST", "/v1/projects/p1/authoring/story/generate", nil))
+		if !strings.Contains(message, tc.wantIn) {
+			t.Errorf("%s: message %q, want it to mention %q", tc.kind, message, tc.wantIn)
+		}
+		if !strings.Contains(message, "Copy prompt") {
+			t.Errorf("%s: message %q, want it to point at the copy-out fallback", tc.kind, message)
+		}
+	}
+}
 
-		if rec.Code != tc.wantStatus {
-			t.Errorf("%s: status = %d, want %d", tc.kind, rec.Code, tc.wantStatus)
-		}
-		body := rec.Body.String()
-		if !strings.Contains(body, tc.wantIn) {
-			t.Errorf("%s: body %q, want it to mention %q", tc.kind, body, tc.wantIn)
-		}
-		if !strings.Contains(body, "Copy prompt") {
-			t.Errorf("%s: body %q, want it to point at the copy-out fallback", tc.kind, body)
-		}
+func TestDescribeGenerateErrorNamesTheLoggedCallOfAnUnreadableAnswer(t *testing.T) {
+	status, message := DescribeGenerateError(&application.LLMError{
+		Kind: application.ErrKindMalformed, Provider: "llm-service", CallID: "c-9",
+		Err: errors.New("khối JSON không đọc được"),
+	})
+	if status != 502 || !strings.Contains(message, "khối JSON không đọc được") || !strings.Contains(message, "c-9") {
+		t.Errorf("status = %d, message = %q, want the cause and the call id", status, message)
 	}
 }
 
 func TestHandleLLMStatus(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newGenerateRouter(&fakeGenerateAuthoring{available: true}).Handler().ServeHTTP(rec,
+	newStatusRouter(&fakeLLMStatus{ready: true}).Handler().ServeHTTP(rec,
 		httptest.NewRequest("GET", "/v1/llm/status", nil))
 	var enabled llmStatusResponse
 	_ = json.Unmarshal(rec.Body.Bytes(), &enabled)
 	if !enabled.Enabled || enabled.Provider != "hive" {
 		t.Errorf("status = %+v, want enabled hive", enabled)
 	}
-
-	rec = httptest.NewRecorder()
-	newGenerateRouter(nil).Handler().ServeHTTP(rec,
-		httptest.NewRequest("GET", "/v1/llm/status", nil))
-	var disabled llmStatusResponse
-	_ = json.Unmarshal(rec.Body.Bytes(), &disabled)
-	if disabled.Enabled {
-		t.Error("want disabled when no provider is wired")
+	for _, m := range enabled.Models {
+		if m.ID == "ollama" && !m.Local {
+			t.Error("ollama must be flagged local so the GUI can warn about it")
+		}
 	}
-	if disabled.Reason == "" {
-		t.Error("want a reason so the GUI can explain the missing button")
+
+	for name, status := range map[string]llmStatusSource{"not wired": nil, "not ready": &fakeLLMStatus{}} {
+		rec = httptest.NewRecorder()
+		newStatusRouter(status).Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/llm/status", nil))
+		var disabled llmStatusResponse
+		_ = json.Unmarshal(rec.Body.Bytes(), &disabled)
+		if disabled.Enabled {
+			t.Errorf("%s: want disabled", name)
+		}
+		if disabled.Reason == "" {
+			t.Errorf("%s: want a reason so the GUI can explain the missing button", name)
+		}
 	}
 }
 
@@ -267,51 +202,5 @@ func TestHandlePromptRenders_RejectsAnUnknownRoleAnd404sWhenUnwired(t *testing.T
 	NewRouter(nil, nil).Handler().ServeHTTP(rec, httptest.NewRequest("POST", "/v1/prompt-renders", strings.NewReader(`{"role":"story_architect"}`)))
 	if rec.Code != 404 {
 		t.Fatalf("unwired: want 404, got %d", rec.Code)
-	}
-}
-
-type fakeUsageStats struct {
-	stats []application.ModelUsageStats
-	err   error
-	step  string
-	phase string
-}
-
-func (f *fakeUsageStats) ModelUsageStats(_ context.Context, step, phase string, _ time.Time) ([]application.ModelUsageStats, error) {
-	f.step, f.phase = step, phase
-	return f.stats, f.err
-}
-
-// The status carries the measured cost of each model's code
-// chunks, and a failed read is reported as such, never as "no data".
-func TestHandleLLMStatusCodeStats(t *testing.T) {
-	stats := &fakeUsageStats{stats: []application.ModelUsageStats{{
-		Model: "zai-org/glm-5.3-flash", Calls: 20, OK: 18, Failures: map[string]int{"budget": 2},
-		AvgCompletionTokens: 97870, AvgDurationMs: 527000,
-	}}}
-	rec := httptest.NewRecorder()
-	newGenerateRouter(&fakeGenerateAuthoring{available: true}).WithUsageStats(stats).Handler().ServeHTTP(rec,
-		httptest.NewRequest("GET", "/v1/llm/status", nil))
-	var got llmStatusResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
-		t.Fatal(err)
-	}
-	glm := got.CodeStats["zai-org/glm-5.3-flash"]
-	if stats.step != "code" || stats.phase != "chunk" || glm.OK != 18 || glm.Failures["budget"] != 2 || got.CodeStatsError != "" {
-		t.Fatalf("status = %+v (queried %s/%s)", got, stats.step, stats.phase)
-	}
-	for _, m := range got.Models {
-		if m.ID == "ollama" && !m.Local {
-			t.Error("ollama must be flagged local so the GUI can warn about it")
-		}
-	}
-
-	rec = httptest.NewRecorder()
-	newGenerateRouter(&fakeGenerateAuthoring{available: true}).WithUsageStats(&fakeUsageStats{err: errors.New("db down")}).
-		Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/v1/llm/status", nil))
-	got = llmStatusResponse{}
-	_ = json.Unmarshal(rec.Body.Bytes(), &got)
-	if rec.Code != 200 || got.CodeStats != nil || got.CodeStatsError == "" {
-		t.Fatalf("failed read: code=%d stats=%v err=%q, want 200 with the error stated", rec.Code, got.CodeStats, got.CodeStatsError)
 	}
 }

@@ -57,18 +57,18 @@ func (uc *ScriptDeskUseCase) requireAI() error {
 
 // chat sends one system prompt and records the usage.
 func (uc *ScriptDeskUseCase) chat(ctx context.Context, projectID, model, system string) (string, error) {
-	started := uc.now()
 	result, err := uc.provider.Chat(ctx, ChatRequest{
 		System: system, User: userTurnNudge, MaxTokens: uc.maxOutputTokens, Temperature: 0.7,
 		Model: model, OnProgress: ProgressFrom(ctx),
+		ProjectID:  projectID,
+		Role:       string(domain.RoleScriptWriter),
+		Step:       domain.UnitKindScriptBeat,
+		ExpectJSON: true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleScriptWriter), domain.UnitKindScriptBeat, projectID, result.Usage, started, err))
-	}
 	if err != nil {
 		return "", err
 	}
-	return result.Content, nil
+	return string(result.JSON), nil
 }
 
 // beatText describes one beat to the model.

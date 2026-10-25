@@ -75,7 +75,7 @@ func newProjectBriefFixture() *projectBriefFixture {
 		project: &briefProject{status: domain.StatusDraft, project: domain.Project{VideoOutputMode: domain.ModeLongOnly}},
 		llm:     &briefLLM{reply: projectBriefReply},
 	}
-	f.uc = NewProjectBriefUseCase(f.store, f.ideas, f.input, f.project, f.models, f.project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewProjectBriefUseCase(f.store, f.ideas, f.input, f.project, f.models, f.project, briefPrompts{}, f.llm, 4000)
 	return f
 }
 

@@ -47,12 +47,17 @@ class Config:
     code_max_reasoning_chars: int
     # /v1/chat (steps 1a/1b legitimately think at length, so off by default).
     chat_max_reasoning_chars: int
+    # The call log's own database (Postgres DSN).
+    database_url: str
 
     @classmethod
     def from_env(cls) -> Config:
         light = os.environ.get("LIGHT_TASKS_PROVIDER", "hive")
         if light not in ("ollama", "hive"):
             raise ValueError(f"LIGHT_TASKS_PROVIDER must be ollama or hive, got {light!r}")
+        database_url = os.environ.get("LLM_DATABASE_URL", "")
+        if not database_url:
+            raise ValueError("LLM_DATABASE_URL is not set: the call log needs its database")
         return cls(
             hive_api_key=os.environ.get("HIVE_API_KEY", ""),
             hive_base_url=os.environ.get("HIVE_BASE_URL", "https://api-cdn.thehive.ai/api/v3"),
@@ -71,4 +76,5 @@ class Config:
             rendering_check_timeout=_int("RENDERING_CHECK_TIMEOUT_SECONDS", 180),
             code_max_reasoning_chars=_non_negative("CODE_MAX_REASONING_CHARS", 100000),
             chat_max_reasoning_chars=_non_negative("CHAT_MAX_REASONING_CHARS", 0),
+            database_url=database_url,
         )

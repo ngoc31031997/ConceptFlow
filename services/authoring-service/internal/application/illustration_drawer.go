@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"time"
 
 	"authoring/internal/domain"
 )
@@ -21,6 +20,8 @@ const (
 	// same folder follow the Hình mẫu (at most domain.MaxExemplars) in the prompt.
 	maxOwnReferences = 2
 	drawerRole       = "illustration_drawer"
+	// StepIllustrations is the step name the planner and the drawer are logged under.
+	StepIllustrations = "illustrations"
 )
 
 //go:embed drawer_prompt_vi.txt
@@ -49,13 +50,12 @@ type DrawRequest struct {
 
 type illustrationDrawer struct {
 	llm       LLMProviderPort
-	recorder  *LLMUsageRecorder
 	maxTokens int
 }
 
 // WithDrawer enables Draw and Redraw.
-func (uc *IllustrationsUseCase) WithDrawer(llm LLMProviderPort, recorder *LLMUsageRecorder, maxTokens int) *IllustrationsUseCase {
-	uc.drawer = &illustrationDrawer{llm: llm, recorder: recorder, maxTokens: maxTokens}
+func (uc *IllustrationsUseCase) WithDrawer(llm LLMProviderPort, maxTokens int) *IllustrationsUseCase {
+	uc.drawer = &illustrationDrawer{llm: llm, maxTokens: maxTokens}
 	return uc
 }
 
@@ -205,10 +205,10 @@ func (uc *IllustrationsUseCase) draw(
 		}
 	}
 	for attempt := 1; attempt <= maxDrawAttempts; attempt++ {
-		started := time.Now()
 		report(domain.DrawProgress{Attempt: attempt, Phase: "waiting"})
 		res, err := uc.drawer.llm.Chat(ctx, ChatRequest{
 			System: system, User: turn, MaxTokens: uc.drawer.maxTokens, Temperature: 0.5, Model: model,
+			Role: drawerRole, Step: StepIllustrations, Phase: fmt.Sprintf("attempt_%d", attempt),
 			OnProgress: func(p ChatProgress) {
 				phase := "reasoning"
 				if p.ContentChars > 0 {
@@ -218,11 +218,6 @@ func (uc *IllustrationsUseCase) draw(
 					ReasoningChars: p.ReasoningChars, ContentChars: p.ContentChars})
 			},
 		})
-		if uc.drawer.recorder != nil {
-			rec := RecordFor(uc.drawer.llm.Name(), drawerRole, "illustration", "", res.Usage, started, err)
-			rec.Phase = fmt.Sprintf("attempt_%d", attempt)
-			uc.drawer.recorder.Record(ctx, rec)
-		}
 		if err != nil {
 			return drawnReply{}, IllustrationPreview{}, err
 		}

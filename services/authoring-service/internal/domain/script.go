@@ -138,10 +138,6 @@ type ScriptLineDraft struct {
 // line needs text and only facts known() knows; a reply that fails any of that
 // stores nothing.
 func ParseScriptReply(reply string, known func(id string) bool) ([]ScriptLineDraft, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return nil, fmt.Errorf("%w: không có khối JSON", ErrScriptReplyUnusable)
-	}
 	var wire struct {
 		Lines []struct {
 			Text   string   `json:"text"`
@@ -149,7 +145,7 @@ func ParseScriptReply(reply string, known func(id string) bool) ([]ScriptLineDra
 			Facts  []string `json:"facts"`
 		} `json:"lines"`
 	}
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return nil, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrScriptReplyUnusable, err)
 	}
 	if len(wire.Lines) == 0 {
@@ -184,14 +180,10 @@ func ParseScriptReply(reply string, known func(id string) bool) ([]ScriptLineDra
 
 // ParseLineSuggestion reads the one replacement sentence out of a model reply {"text":"..."}.
 func ParseLineSuggestion(reply string) (string, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return "", fmt.Errorf("%w: không có khối JSON", ErrScriptReplyUnusable)
-	}
 	var wire struct {
 		Text string `json:"text"`
 	}
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return "", fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrScriptReplyUnusable, err)
 	}
 	text := strings.TrimSpace(wire.Text)

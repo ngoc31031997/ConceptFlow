@@ -18,7 +18,8 @@ def config(**over):
         hive_max_retries=0, hive_rate_per_second=1000, ollama_url="http://ollama.test:11434",
         ollama_model="llama", ollama_timeout=5, light_provider="ollama", code_chunk_shots=10,
         code_chunk_concurrency=2, code_repair_max_rounds=1, rendering_url="http://rendering.test", rendering_check_timeout=5,
-        code_max_reasoning_chars=100000, chat_max_reasoning_chars=0)
+        code_max_reasoning_chars=100000, chat_max_reasoning_chars=0,
+        database_url="postgresql://test/test")
     base.update(over)
     return Config(**base)
 

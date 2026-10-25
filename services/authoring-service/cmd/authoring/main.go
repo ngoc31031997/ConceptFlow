@@ -65,8 +65,6 @@ func main() {
 	llmClient := llm.NewClient(cfg.LLMServiceURL, cfg.LLMServiceTimeout)
 	var llmProvider application.LLMProviderPort = llmClient
 	logger.Info("llm-service configured", "url", cfg.LLMServiceURL, "model", cfg.HiveModel)
-	llmUsageRepo := postgres.NewLLMUsageRepository(pool)
-	llmUsageRecorder := application.NewLLMUsageRecorder(llmUsageRepo, logger)
 
 	suggestPublishMetadata := application.NewSuggestPublishMetadataUseCase(projects, llmClient).WithModels(authoringRepo)
 	defaultModel := application.NewDefaultModelUseCase(authoringRepo)
@@ -91,7 +89,7 @@ func main() {
 		logger.Warn("could not seed the illustration library", "error", err)
 	}
 	illustrations := application.NewIllustrationsUseCase(authoringRepo, renderingClient).
-		WithDrawer(llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
+		WithDrawer(llmProvider, cfg.HiveMaxOutputTokens).
 		// A drawing a video still working uses cannot be deleted.
 		WithProjectStatus(projects).
 		// The rules and the kit a drawing is made under are its language's.
@@ -100,7 +98,7 @@ func main() {
 		WithStepDefaults(authoringRepo)
 	// Each Remotion video's drawings, gated before the code step.
 	projectIllustrations := application.NewProjectIllustrationsUseCase(
-		authoringRepo, illustrations, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens).
+		authoringRepo, illustrations, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens).
 		WithDrawConcurrency(cfg.IllustrationDrawConcurrency)
 
 	prompts := application.NewPromptsUseCase(authoringRepo)
@@ -119,25 +117,25 @@ func main() {
 	// through reviewUnits.
 	idea := application.NewIdeaUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
-		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		llmProvider, cfg.HiveMaxOutputTokens)
 	// The first step's idea: written from the text the Creator typed, which the
 	// orchestrator keeps with the project.
 	projectIdea := application.NewProjectIdeaUseCase(
 		authoringRepo, projects, authoringRepo, projects, authoringRepo,
-		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		llmProvider, cfg.HiveMaxOutputTokens)
 	// The second step's brief: written from the approved idea.
 	projectBrief := application.NewProjectBriefUseCase(
 		authoringRepo, projectIdea, projects, projects, authoringRepo, projects, authoringRepo,
-		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		llmProvider, cfg.HiveMaxOutputTokens)
 	creativeBrief := application.NewCreativeBriefUseCase(
 		authoringRepo, authoringRepo, projects, projects, authoringRepo,
-		llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		llmProvider, cfg.HiveMaxOutputTokens)
 	// The research step: its questions and gate are review units, its facts rows
 	// of project_research, planned from the approved idea and brief.
 	// The pages facts cite are checked in the background, by a fetcher that
 	// reaches only public hosts.
 	research := application.NewResearchDeskUseCase(
-		authoringRepo, projectIdea, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectIdea, projectBrief, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
 	sourceVerifier := application.NewSourceVerifier(authoringRepo, sourcefetch.New())
 	sourceVerifier.Start(ctx)
 	research.WithVerifier(sourceVerifier)
@@ -151,23 +149,23 @@ func main() {
 	// facts and stored in project_story; the research step asks it which work
 	// rests on a fact.
 	story := application.NewStoryDeskUseCase(
-		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
 	// The beat sheet step: the gate is a row of project_beat_sheet and each beat a row of project_beat.
 	beats := application.NewBeatDeskUseCase(
-		authoringRepo, authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
 	// The script step: each beat's dialogue is a review unit stored in project_script; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.
 	script := application.NewScriptDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats).
+		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats).
 		WithVoices(authoringRepo, projects)
 	voiceLines := application.NewVoiceLinesUseCase(authoringRepo)
 	research.RegisterFactDependents(script.FactDependents())
 	// The lock step: the handoff note of each beat is a review unit; the review
 	// and the glossary are units of their own; locking writes a version.
 	scriptLock := application.NewScriptLockDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
+		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
@@ -178,33 +176,11 @@ func main() {
 		Register(domain.UnitKindResearch, research.GateUnitKind())
 
 	renderContext := orchestrator.PromptRenderContext{Projects: projects, Authoring: authoringRepo}
-	// ONE renderer, shared by the Copy button and the generate endpoint.
+	// The renderer behind the Copy button.
 	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).
 		WithArchetypes(authoringRepo).
 		WithBrief(creativeBrief).
 		WithLanguages(visualLanguages)
-	generateAuthoring := application.NewGenerateAuthoringUseCase(
-		renderPrompt, llmProvider, llmUsageRecorder,
-		renderContext,
-		authoringRepo,
-		saveAuthoringStory, saveAuthoringStoryboard, saveAuthoringCode,
-		cfg.HiveMaxInputChars, cfg.HiveMaxOutputTokens,
-	).WithErrorLog(projects).WithEvents(projects).WithPipeline(llmClient, llmClient).
-		WithIllustrations(projectIllustrations).
-		WithLanguages(visualLanguages).
-		// The post-1b length check reads the same format and voice
-		// calibration the outline prompt's beat sheet is built from.
-		WithStoryboardChecks(projects, projects).
-		// The code step stored segment by segment. See ADR-0030.
-		WithSegments(authoringRepo)
-	// NFR-3: nothing can be running yet, so a segment still marked running was
-	// cut off when this service last stopped.
-	if n, err := generateAuthoring.FailInterruptedSegments(ctx); err != nil {
-		logger.Warn("could not mark interrupted code segments failed", "error", err)
-	} else if n > 0 {
-		logger.Warn("marked interrupted code segments failed", "count", n)
-	}
-
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithOperations(application.NewOperations()).
 		WithPrompts(prompts).
@@ -220,8 +196,7 @@ func main() {
 		WithAuthoringMode(saveAuthoringMode).
 		WithAuthoringModels(saveAuthoringModels).
 		WithDefaultModelSetting(defaultModel).
-		WithUsageStats(llmUsageRepo).
-		WithGenerateAuthoring(generateAuthoring).
+		WithLLMStatus(llmClient).
 		WithReviewUnits(reviewUnits).
 		WithIdea(projectIdea).
 		WithCreativeBrief(creativeBrief).
@@ -231,10 +206,6 @@ func main() {
 		WithBeats(beats).
 		WithScript(script, voiceLines).
 		WithScriptLock(scriptLock)
-	router = router.WithAuthoringChain(application.NewAuthoringChainRunner(generateAuthoring, func(err error) string {
-		_, msg := httpadapter.DescribeGenerateError(err)
-		return msg
-	}))
 
 	server := &http.Server{Addr: ":" + cfg.HTTPPort, Handler: router.Handler()}
 	go func() {

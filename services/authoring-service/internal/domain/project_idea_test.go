@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseProjectIdeaReply_ReadsFourFields(t *testing.T) {
-	reply := "Đây:\n```json\n{\"central_question\":\" Người rơi thấy gì? \",\"curiosity_points\":[\"Chân trời sự kiện là gì?\",\" \",\"chân trời sự kiện là gì?\",\"Có bị kéo dài không?\"],\"scope\":\"Trực quan, không toán.\"}\n```"
+	reply := "{\"central_question\":\" Người rơi thấy gì? \",\"curiosity_points\":[\"Chân trời sự kiện là gì?\",\" \",\"chân trời sự kiện là gì?\",\"Có bị kéo dài không?\"],\"scope\":\"Trực quan, không toán.\"}"
 	got, err := ParseProjectIdeaReply(reply)
 	if err != nil {
 		t.Fatal(err)

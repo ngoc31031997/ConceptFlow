@@ -431,10 +431,6 @@ type ReviewReply struct {
 // the script, a beat its handoff names must be a beat, and an earlier finding
 // it repeats that is not one of earlier makes it a new finding. Any other failure stores nothing.
 func ParseReviewReply(reply string, lineKnown, beatKnown, earlierKnown func(string) bool) (ReviewReply, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return ReviewReply{}, fmt.Errorf("%w: không có khối JSON", ErrReviewReplyUnusable)
-	}
 	var wire struct {
 		Findings []struct {
 			Group   string `json:"group"`
@@ -451,7 +447,7 @@ func ParseReviewReply(reply string, lineKnown, beatKnown, earlierKnown func(stri
 		} `json:"findings"`
 		Notes []string `json:"notes"`
 	}
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return ReviewReply{}, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrReviewReplyUnusable, err)
 	}
 	if len(wire.Findings) > MaxReviewFindings {

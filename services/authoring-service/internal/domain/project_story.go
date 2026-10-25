@@ -256,17 +256,13 @@ type storyReplyWire struct {
 	} `json:"narrative_arc"`
 }
 
-// ParseStoryReply reads the story out of a model reply: the first JSON object
-// in it, with or without a ```json fence around it. The story must pass the
+// ParseStoryReply reads the story out of the JSON object llm-service returned
+// for the reply. The story must pass the
 // machine check and every fact code it cites must be one known() accepts, so a
 // half-written or mis-cited story is never stored.
 func ParseStoryReply(reply string, known func(id string) bool) (StoryStructure, error) {
-	obj, ok := jsonObjectIn(reply)
-	if !ok {
-		return StoryStructure{}, fmt.Errorf("%w: không có khối JSON", ErrStoryReplyUnusable)
-	}
 	var wire storyReplyWire
-	if err := json.Unmarshal([]byte(obj), &wire); err != nil {
+	if err := json.Unmarshal([]byte(reply), &wire); err != nil {
 		return StoryStructure{}, fmt.Errorf("%w: khối JSON không đọc được (%v)", ErrStoryReplyUnusable, err)
 	}
 	story := StoryStructure{CentralQuestion: wire.CentralQuestion, CoreAnswer: wire.CoreAnswer}

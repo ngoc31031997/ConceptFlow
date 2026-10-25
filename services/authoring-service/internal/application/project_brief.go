@@ -60,7 +60,6 @@ type ProjectBriefUseCase struct {
 	locks           AuthoringLockPort
 	prompts         PromptActivePort
 	provider        LLMProviderPort
-	recorder        *LLMUsageRecorder
 	maxOutputTokens int
 	now             func() time.Time
 }
@@ -70,11 +69,11 @@ type ProjectBriefUseCase struct {
 func NewProjectBriefUseCase(
 	store ProjectBriefStorePort, ideas ApprovedIdeaPort, input IdeaInputPort, projects ProjectReaderPort,
 	models AuthoringModelsReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
-	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
+	provider LLMProviderPort, maxOutputTokens int,
 ) *ProjectBriefUseCase {
 	return &ProjectBriefUseCase{
 		store: store, ideas: ideas, input: input, projects: projects, models: models, locks: locks,
-		prompts: prompts, provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
+		prompts: prompts, provider: provider, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
@@ -203,7 +202,6 @@ func (uc *ProjectBriefUseCase) Generate(ctx context.Context, projectID, note str
 		"redo_note":      noteText(note),
 	})
 
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -211,14 +209,15 @@ func (uc *ProjectBriefUseCase) Generate(ctx context.Context, projectID, note str
 		Temperature: 0.7,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleProjectBrief),
+		Step:        "brief",
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleProjectBrief), "brief", projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.StoredBrief{}, chatErr
 	}
-	written, err := domain.ParseProjectBriefReply(result.Content, mode)
+	written, err := domain.ParseProjectBriefReply(string(result.JSON), mode)
 	if err != nil {
 		return domain.StoredBrief{}, err
 	}
@@ -475,7 +474,6 @@ func (uc *ProjectBriefUseCase) Review(ctx context.Context, projectID string) (do
 		"brief":          stored.Brief.Section(),
 		"brief_language": briefLanguageName(briefLanguage(in.Language)),
 	})
-	started := uc.now()
 	result, chatErr := uc.provider.Chat(ctx, ChatRequest{
 		System:      system,
 		User:        userTurnNudge,
@@ -483,14 +481,15 @@ func (uc *ProjectBriefUseCase) Review(ctx context.Context, projectID string) (do
 		Temperature: 0.3,
 		Model:       models.ModelFor("brief"),
 		OnProgress:  ProgressFrom(ctx),
+		ProjectID:   projectID,
+		Role:        string(domain.RoleProjectBriefReview),
+		Step:        "brief_review",
+		ExpectJSON:  true,
 	})
-	if uc.recorder != nil {
-		uc.recorder.Record(ctx, RecordFor(uc.provider.Name(), string(domain.RoleProjectBriefReview), "brief_review", projectID, result.Usage, started, chatErr))
-	}
 	if chatErr != nil {
 		return domain.BriefReview{}, chatErr
 	}
-	review, err := domain.ParseBriefReviewReply(result.Content)
+	review, err := domain.ParseBriefReviewReply(string(result.JSON))
 	if err != nil {
 		return domain.BriefReview{}, err
 	}
