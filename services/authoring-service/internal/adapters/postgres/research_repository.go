@@ -98,11 +98,13 @@ func (r *PromptTemplateRepository) SaveResearchFact(ctx context.Context, project
 // SaveFactLink stores the result of checking a fact's link, but only while the
 // fact still has the url and quote the check started from: a Creator who edited
 // them meanwhile keeps the newer fact and the stale result is dropped. It
-// reports whether the result was stored.
+// reports whether the result was stored. A fact whose quote was found on its
+// page becomes a must-say fact; the Creator can untick it afterwards, and
+// only the next successful check ticks it again.
 func (r *PromptTemplateRepository) SaveFactLink(ctx context.Context, projectID, key, expectedURL, expectedQuote string, link domain.FactLink) (bool, error) {
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE project_research
-		SET link_state = $4, link_why = $5, link_nearest = $6, link_checked_at = $7, updated_at = now()
+		SET link_state = $4, link_why = $5, link_nearest = $6, link_checked_at = $7, must = (must OR $4::text = 'ok'), updated_at = now()
 		WHERE project_id = $1 AND fact_id = $2 AND url = $3 AND quote = $8
 	`, projectID, key, expectedURL, string(link.State), link.Why, link.Nearest, link.CheckedAt, expectedQuote)
 	if err != nil {

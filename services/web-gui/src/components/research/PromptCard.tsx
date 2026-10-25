@@ -1,8 +1,7 @@
 import { useEffect, useState } from "react";
 import { getResearchPrompt, type ResearchQuestion } from "../../api/client";
-import { Button, Card, CopyBox } from "../ui";
+import { Card, CopyBox } from "../ui";
 import { errorText } from "./errorText";
-import { PromptModal } from "./PromptModal";
 import styles from "./research.module.css";
 
 interface PromptCardProps {
@@ -13,13 +12,12 @@ interface PromptCardProps {
 /**
  * Section 2 of the research step: the prompt the Creator takes to an outside
  * research tool. It is built from the brief and the questions, so it is read
- * again whenever a question changes. The card shows its start; the whole text
- * opens in a dialog that copies it.
+ * again whenever a question changes. The card renders the whole text in a
+ * scrollable box with a copy button.
  */
 export function PromptCard({ projectId, questions }: PromptCardProps) {
   const [prompt, setPrompt] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
 
   const questionsKey = questions.map((q) => `${q.id}:${q.text}`).join("\n");
   useEffect(() => {
@@ -69,11 +67,6 @@ export function PromptCard({ projectId, questions }: PromptCardProps) {
                 {prompt}
               </pre>
             </CopyBox>
-            <div className={styles.actions}>
-              <Button variant="view" onClick={() => setOpen(true)} data-testid="research-prompt-open">
-                Xem toàn bộ và sao chép
-              </Button>
-            </div>
             <p className={styles.hint}>
               Dán vào công cụ có tra web: ChatGPT (tìm kiếm hoặc Deep Research), Perplexity, Gemini Deep Research. Chép
               toàn bộ câu trả lời rồi dán vào ô ③.
@@ -81,14 +74,6 @@ export function PromptCard({ projectId, questions }: PromptCardProps) {
           </>
         )}
       </div>
-      <PromptModal
-        open={open}
-        onClose={() => setOpen(false)}
-        title="Prompt nghiên cứu"
-        text={prompt}
-        error={error}
-        testId="research-prompt-modal"
-      />
     </Card>
   );
 }

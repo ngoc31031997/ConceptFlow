@@ -163,8 +163,8 @@
 .promptBox {
   margin: 0;
   padding: 10px 12px;
-  max-height: 168px;
-  overflow: hidden;
+  max-height: 420px;
+  overflow-y: auto;
   border: var(--border-w) solid var(--border-color);
   border-radius: var(--radius);
   background: var(--muted);
@@ -240,7 +240,16 @@
   color: var(--accent-ink);
 }
 .facts {
-  min-width: 980px;
+  min-width: 1100px;
+}
+/* The type column holds the longest type name ("Ngộ nhận phổ biến") in a select. */
+.facts th:nth-child(3),
+.facts td:nth-child(3) {
+  width: 190px;
+  min-width: 190px;
+}
+.facts td:nth-child(3) select {
+  width: 100%;
 }
 .dropped td {
   opacity: 0.5;

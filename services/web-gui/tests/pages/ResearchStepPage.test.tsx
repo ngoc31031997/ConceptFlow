@@ -197,25 +197,13 @@ describe("ResearchStepPage", () => {
     expect(screen.getByTestId("research-paste-input")).toHaveValue("chỉ là văn bản");
   });
 
-  it("opens the whole prompt in a dialog that copies it", async () => {
+  it("shows the whole prompt and copies it from the card", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
     await ready();
-    await waitFor(() => expect(screen.getByTestId("research-prompt-open")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("research-prompt-open"));
-    expect(await screen.findByTestId("research-prompt-modal-text")).toHaveTextContent("PROMPT NGHIÊN CỨU");
-    fireEvent.click(screen.getByTestId("research-prompt-modal-copy"));
-    await waitFor(() => expect(screen.getByTestId("research-prompt-modal-copy")).toHaveTextContent("✓ Đã chép"));
-    expect(writeText).toHaveBeenCalledWith("PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?");
-  });
-
-  it("tells the Creator to copy by hand when the browser refuses to copy", async () => {
-    Object.defineProperty(navigator, "clipboard", { value: { writeText: vi.fn().mockRejectedValue(new Error("denied")) }, configurable: true });
-    await ready();
-    await waitFor(() => expect(screen.getByTestId("research-prompt-open")).toBeInTheDocument());
-    fireEvent.click(screen.getByTestId("research-prompt-open"));
-    fireEvent.click(await screen.findByTestId("research-prompt-modal-copy"));
-    expect(await screen.findByText(/Bôi đen đoạn trên rồi chép bằng tay/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("research-prompt-preview")).toHaveTextContent("PROMPT NGHIÊN CỨU"));
+    fireEvent.click(screen.getByTestId("research-prompt-quick-copy"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("PROMPT NGHIÊN CỨU\nQ1. Quả sung có phải là hoa không?"));
   });
 
   it("opens the follow-up prompt for the questions still short of sources", async () => {

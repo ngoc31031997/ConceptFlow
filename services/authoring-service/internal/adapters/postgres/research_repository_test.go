@@ -179,8 +179,8 @@ func TestSaveFactLinkOnlyWhileFactUnchangedInPostgres(t *testing.T) {
 	if err != nil || !stored {
 		t.Fatalf("a check of the unchanged fact must be stored: %v, %v", stored, err)
 	}
-	if got := readFact(t, r, ctx, pid, "F01"); got.Link.State != domain.LinkOK || got.ClaimVI != "Dữ kiện" || !got.Keep {
-		t.Fatalf("only the link may change, got %+v", got)
+	if got := readFact(t, r, ctx, pid, "F01"); got.Link.State != domain.LinkOK || got.ClaimVI != "Dữ kiện" || !got.Keep || !got.Must {
+		t.Fatalf("only the link and the must-say flag may change, got %+v", got)
 	}
 
 	stored, err = r.SaveFactLink(ctx, pid, "F01", "https://old.example/", "đoạn trích gốc", domain.FactLink{State: domain.LinkBad})
@@ -193,6 +193,28 @@ func TestSaveFactLinkOnlyWhileFactUnchangedInPostgres(t *testing.T) {
 	}
 	if got := readFact(t, r, ctx, pid, "F01"); got.Link.State != domain.LinkOK {
 		t.Fatalf("dropped results must leave the link alone, got %+v", got.Link)
+	}
+}
+
+// A failed or unreachable check never makes a fact must-say, and a check never
+// clears the flag.
+func TestSaveFactLinkSetsMustOnlyOnMatchInPostgres(t *testing.T) {
+	const pid = "research-link-must-test"
+	r, ctx := researchRepo(t, pid)
+	saveFact(t, r, ctx, pid, "F01", domain.Fact{ClaimVI: "a", Type: domain.FactTypeFact, URL: "https://a.org/", Quote: "q", Link: domain.FactLink{State: domain.LinkRunning}})
+	saveFact(t, r, ctx, pid, "F02", domain.Fact{ClaimVI: "b", Type: domain.FactTypeFact, URL: "https://b.org/", Quote: "q", Must: true, Link: domain.FactLink{State: domain.LinkRunning}})
+
+	if _, err := r.SaveFactLink(ctx, pid, "F01", "https://a.org/", "q", domain.FactLink{State: domain.LinkBad}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.SaveFactLink(ctx, pid, "F02", "https://b.org/", "q", domain.FactLink{State: domain.LinkBad}); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFact(t, r, ctx, pid, "F01"); got.Must {
+		t.Fatalf("a failed check must not tick must-say, got %+v", got)
+	}
+	if got := readFact(t, r, ctx, pid, "F02"); !got.Must {
+		t.Fatalf("a failed check must not clear must-say, got %+v", got)
 	}
 }
 
