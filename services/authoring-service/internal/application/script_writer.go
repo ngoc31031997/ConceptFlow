@@ -88,7 +88,7 @@ func beatText(b storedBeat, number int, facts []storyFact) string {
 	if next == "" {
 		next = "(beat cuối của video)"
 	}
-	return fmt.Sprintf("%s (B%d) · %s · %s · %d giây (khoảng %d từ)\nmục tiêu: %s\nnội dung: %s\nnối sang beat sau: %s\ndữ kiện của beat:\n- %s",
+	return fmt.Sprintf("%s (B%d) · %s · %s · %d giây (lời dẫn cần khoảng %d từ)\nmục tiêu: %s\ný chính (dàn ý, không phải lời dẫn): %s\nnối sang beat sau: %s\ndữ kiện của beat:\n- %s",
 		b.unit.Key, number, b.Fn, b.Title, b.Dur, beatWords(b.Dur), b.Goal, b.Content, next, strings.Join(used, "\n- "))
 }
 

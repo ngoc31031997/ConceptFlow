@@ -128,6 +128,23 @@ describe("ScriptWriteStepPage", () => {
     expect(screen.getByTestId("step-strip")).toHaveTextContent("Chờ bạn duyệt · 0/3 beat");
   });
 
+  it("shows each beat's length next to the beat sheet's target and warns only when it runs far from it", async () => {
+    state = baseState({
+      beats: [
+        beat("b1", 1, { targetSeconds: 20, seconds: 6.4 }),
+        beat("b2", 2, { targetSeconds: 25, seconds: 69 }),
+        beat("b3", 3, { targetSeconds: 20, seconds: 18.5 }),
+        beat("b4", 4, { targetSeconds: 20, written: false, lines: [], seconds: 0 }),
+      ],
+    });
+    await ready();
+    expect(screen.getByTestId("script-length-b1")).toHaveTextContent("0:06 / mục tiêu 0:20 · ngắn 68%");
+    expect(screen.getByTestId("script-length-b2")).toHaveTextContent("1:09 / mục tiêu 0:25 · dài 176%");
+    expect(screen.getByTestId("script-length-b3")).toHaveTextContent("0:19 / mục tiêu 0:20");
+    expect(screen.getByTestId("script-length-b3")).not.toHaveTextContent("ngắn");
+    expect(screen.getByTestId("script-length-b4")).toHaveTextContent(/^mục tiêu 0:20$/);
+  });
+
   it("says what the step waits for while the beats are not approved", async () => {
     state = baseState({ beatsApproved: false, beats: [], stats: { ...baseState().stats, written: 0, lines: 0, beats: 0 } });
     renderPage();

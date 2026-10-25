@@ -48,6 +48,14 @@ THỜI LƯỢNG MỤC TIÊU CẢ VIDEO: {{target}}
 ## VIỆC CẦN LÀM
 {{task}}
 
+## TỪ DÀN BEAT THÀNH LỜI DẪN
+- “Mục tiêu” và “ý chính” của beat là dàn ý cho bạn, không phải lời dẫn. Không chép lại hay chỉ sửa vài chữ của chúng: triển khai ý đó thành một đoạn lời kể mới.
+- Lời dẫn phải đạt số từ ghi ở beat cần viết. Một câu thường chỉ khoảng 10 đến 20 từ, nên beat dài cần nhiều câu tương ứng. Đếm từ trước khi trả lời.
+
+## GIỌNG KỂ
+- Đây là lời một người kể chuyện nói với người xem, không phải định nghĩa trong sách. Mỗi beat nên có ít nhất một hình ảnh cụ thể, một ví dụ đời thường hoặc một câu hỏi hướng tới người xem.
+- Dẫn dắt từng bước: tình huống hoặc câu hỏi trước, giải thích sau. Mỗi câu thêm một ý, không nhắc lại cùng một ý bằng lời khác.
+
 ## VỊ TRÍ CỦA BEAT TRONG CÂU CHUYỆN
 - Đọc dàn beat để biết beat này đứng ở đâu trong mạch kể. Chỉ nói phần của beat này: không nói trước điều các beat sau sẽ giải thích, không nhắc lại điều beat trước đã nói xong.
 - Beat mở đầu (hook): đặt người xem vào một tình huống hoặc câu hỏi cụ thể gợi tò mò, dẫn tới câu hỏi trung tâm; KHÔNG tiết lộ câu trả lời cốt lõi.
@@ -63,7 +71,7 @@ THỜI LƯỢNG MỤC TIÊU CẢ VIDEO: {{target}}
 
 ## LUẬT VỀ DỮ KIỆN
 - Mọi khẳng định khoa học, con số, tên người, tên hiện tượng phải lấy từ bảng dữ kiện hoặc khung câu chuyện, và câu đó ghi mã dữ kiện ở "facts" để truy được về nghiên cứu. Ưu tiên dữ kiện của beat; dữ kiện “bắt buộc nói” của beat phải được nói.
-- Câu chỉ dẫn dắt, đặt câu hỏi hay chuyển ý (không khẳng định điều gì về thế giới) thì "facts" để [].
+- Câu chỉ dẫn dắt, đặt câu hỏi, gợi hình dung hay chuyển ý (không khẳng định điều gì về thế giới) thì "facts" để []; những câu này được viết tự do.
 - Không bịa dữ kiện, con số hay tên ngoài bảng. Dữ kiện là giả thuyết hoặc chưa có nguồn thì nói thận trọng (“có thể”, “nhiều nhà nghiên cứu cho rằng”); khẳng định chỉ đúng trong một mô hình hay điều kiện thì nói rõ phạm vi đó (ví dụ “theo thuyết tương đối rộng”).
 - Viết bằng {{brief_language}}.
 

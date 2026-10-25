@@ -40,6 +40,20 @@ function readingLabel(line: ScriptLine, playing: boolean, waiting: boolean): str
   return "▶ Nghe";
 }
 
+/** How far a beat's dialogue may run from its target length before the card warns, as a fraction of the target. */
+const LENGTH_TOLERANCE = 0.15;
+
+/**
+ * How far a beat's dialogue runs from the length the beat sheet gave it:
+ * "" within the tolerance, otherwise "ngắn N%" or "dài N%" of the target.
+ */
+function lengthDeviation(seconds: number, targetSeconds: number): string {
+  if (targetSeconds <= 0) return "";
+  const off = (seconds - targetSeconds) / targetSeconds;
+  if (Math.abs(off) <= LENGTH_TOLERANCE) return "";
+  return `${off < 0 ? "ngắn" : "dài"} ${Math.round(Math.abs(off) * 100)}%`;
+}
+
 /**
  * One beat's dialogue: its lines with their length, facts and flags, the
  * join with the beat before, listening to a line or the whole beat, and the
@@ -52,6 +66,7 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
   const [redoing, setRedoing] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const unit = scriptBeatUnit(beat.key);
+  const deviation = lengthDeviation(beat.seconds, beat.targetSeconds);
   const editImpact = useUnitImpact(projectId, unit, editing);
   const redoImpact = useUnitImpact(projectId, unit, redoing);
 
@@ -112,7 +127,10 @@ export function ScriptBeatCard({ projectId, beat, script, aiAvailable, locked, h
           </h3>
           <span className={styles.actions}>
             {writing ? <UnitStatusChip state="running" testId={`script-status-${beat.key}`} /> : beat.written && <UnitStatusChip state={beat.status} testId={`script-status-${beat.key}`} />}
-            {beat.written && <span className={unitStyles.mine}>{formatSeconds(beat.seconds)}</span>}
+            <span className={unitStyles.mine} data-testid={`script-length-${beat.key}`}>
+              {beat.written && `${formatSeconds(beat.seconds)} / `}mục tiêu {formatSeconds(beat.targetSeconds)}
+              {beat.written && deviation && <span className={`${styles.check} ${styles.checkWarn}`}> · {deviation}</span>}
+            </span>
             {beat.mine.length > 0 && (
               <span className={unitStyles.mine} title="AI giữ nguyên phần này khi viết lại" data-testid={`script-mine-${beat.key}`}>
                 ✎ Bạn viết
