@@ -79,7 +79,7 @@ beforeEach(() => {
   vi.spyOn(apiClient, "listProjects").mockResolvedValue([]);
   vi.spyOn(apiClient, "getAuthoringState").mockResolvedValue({ topic: "", story: "", storyboard: "", code: "" });
   vi.spyOn(apiClient, "getBeats").mockImplementation(async () => state);
-  vi.spyOn(apiClient, "getUnitImpact").mockResolvedValue([]);
+  vi.spyOn(apiClient, "getBeatImpact").mockResolvedValue([]);
 });
 
 afterEach(() => {
@@ -217,11 +217,11 @@ describe("BeatsStepPage", () => {
 
   it("gives a beat without content its own run, and a written beat none", async () => {
     state = baseState({ unwritten: 1, beats: [beat("b1", { fn: "Hook" }), beat("b2", { goal: "", content: "" }), beat("b3", { fn: "Payoff", next: "" })] });
-    const redo = vi.spyOn(apiClient, "redoUnit").mockResolvedValue(undefined as never);
+    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
     await ready();
     expect(screen.queryByTestId("beat-write-b1")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("beat-write-b2"));
-    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", expect.anything(), "", expect.anything()));
+    await waitFor(() => expect(redo).toHaveBeenCalledWith("p1", "b2", "", expect.anything()));
   });
 
   it("says how many beats were resized to fit the target", async () => {
@@ -251,42 +251,42 @@ describe("BeatsStepPage", () => {
   });
 
   it("saves the text of a beat from the hand-edit dialog", async () => {
-    const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
+    const edit = vi.spyOn(apiClient, "editBeat").mockResolvedValue(baseState());
     await ready();
     fireEvent.click(screen.getByTestId("beat-review-b2-edit"));
     fireEvent.change(await screen.findByTestId("beat-edit-b2-field-goal"), { target: { value: "Mục tiêu mới" } });
     await waitFor(() => expect(screen.getByTestId("beat-edit-b2-save")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("beat-edit-b2-save"));
     await waitFor(() =>
-      expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "beat", key: "b2" }), { goal: "Mục tiêu mới" }),
+      expect(edit).toHaveBeenCalledWith("p1", "b2", { goal: "Mục tiêu mới" }),
     );
   });
 
   it("moves the target length by five seconds and refuses to go below the minimum", async () => {
-    const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
+    const edit = vi.spyOn(apiClient, "editBeat").mockResolvedValue(baseState());
     state = baseState({ beats: [beat("b1", { dur: 18 }), beat("b2", { dur: 5 })] });
     await ready();
     fireEvent.click(screen.getByTestId("beat-dur-up-b1"));
-    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ key: "b1" }), { dur: "23" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", "b1", { dur: "23" }));
     expect(screen.getByTestId("beat-dur-down-b2")).toBeDisabled();
   });
 
   it("changes the function of a beat", async () => {
-    const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
+    const edit = vi.spyOn(apiClient, "editBeat").mockResolvedValue(baseState());
     await ready();
     fireEvent.click(screen.getByTestId("beat-fn-b2"));
     fireEvent.click(await screen.findByTestId("beat-fn-b2-option-Cao trào"));
-    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ key: "b2" }), { fn: "Cao trào" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", "b2", { fn: "Cao trào" }));
   });
 
   it("attaches and drops facts of a beat", async () => {
-    const edit = vi.spyOn(apiClient, "editUnit").mockResolvedValue({} as never);
+    const edit = vi.spyOn(apiClient, "editBeat").mockResolvedValue(baseState());
     await ready();
     fireEvent.click(screen.getByTestId("beat-fact-drop-b2-F02"));
-    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ key: "b2" }), { facts: "" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", "b2", { facts: "" }));
     fireEvent.click(screen.getByTestId("beat-fact-add-b2"));
     fireEvent.click(await screen.findByTestId("beat-fact-add-b2-option-F03"));
-    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", expect.objectContaining({ key: "b2" }), { facts: "F02, F03" }));
+    await waitFor(() => expect(edit).toHaveBeenCalledWith("p1", "b2", { facts: "F02, F03" }));
   });
 
   it("reorders beats and keeps the first up and the last down disabled", async () => {
@@ -334,14 +334,14 @@ describe("BeatsStepPage", () => {
   });
 
   it("has the AI redo one beat with the Creator's note", async () => {
-    const redo = vi.spyOn(apiClient, "redoUnit").mockResolvedValue({} as never);
+    const redo = vi.spyOn(apiClient, "redoBeat").mockResolvedValue(baseState());
     await ready();
     fireEvent.click(screen.getByTestId("beat-review-b2-redo"));
     fireEvent.change(await screen.findByTestId("beat-redo-b2-note"), { target: { value: "ngắn hơn" } });
     await waitFor(() => expect(screen.getByTestId("beat-redo-b2-send")).not.toBeDisabled());
     fireEvent.click(screen.getByTestId("beat-redo-b2-send"));
     await waitFor(() =>
-      expect(redo).toHaveBeenCalledWith("p1", expect.objectContaining({ kind: "beat", key: "b2" }), "ngắn hơn", expect.anything()),
+      expect(redo).toHaveBeenCalledWith("p1", "b2", "ngắn hơn", expect.anything()),
     );
   });
 
@@ -353,17 +353,16 @@ describe("BeatsStepPage", () => {
   });
 
   it("approves every beat still waiting, then lets the Creator move on", async () => {
-    const approve = vi.spyOn(apiClient, "approveUnit").mockImplementation(async (_p, ref) => {
+    const approve = vi.spyOn(apiClient, "approveBeat").mockImplementation(async () => {
       state = baseState({ status: "approved", beats: state.beats.map((b) => ({ ...b, status: "approved" as const })) });
-      void ref;
-      return {} as never;
+      return state;
     });
     await ready();
     expect(screen.getByTestId("beats-next")).toBeDisabled();
     fireEvent.click(screen.getByTestId("beats-approve-all"));
     await waitFor(() => expect(approve).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByTestId("step-strip")).toHaveTextContent("Beat sheet đã duyệt"));
-    expect(approve.mock.calls.map((c) => (c[1] as { key: string }).key)).toEqual(["b1", "b2", "b3"]);
+    expect(approve.mock.calls.map((c) => c[1])).toEqual(["b1", "b2", "b3"]);
     fireEvent.click(screen.getByTestId("beats-next"));
     expect(screen.getByTestId("where")).toHaveTextContent("/projects/p1/script");
   });

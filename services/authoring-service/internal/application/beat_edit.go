@@ -13,13 +13,6 @@ import (
 // ErrBeatNoGoal is returned when a beat without a goal is approved.
 var ErrBeatNoGoal = errors.New("beat chưa có mục tiêu")
 
-// beatKind makes each beat editable, redoable and approvable through the
-// generic unit API (UnitKind for domain.UnitKindBeat).
-type beatKind struct{ desk *BeatDeskUseCase }
-
-// BeatUnitKind returns the UnitKind of the beats.
-func (uc *BeatDeskUseCase) BeatUnitKind() UnitKind { return beatKind{desk: uc} }
-
 func requireBeatKey(key string) error {
 	if !domain.IsBeatKey(key) {
 		return domain.ErrUnitNotFound
@@ -44,32 +37,48 @@ func parseFactList(text string) ([]string, error) {
 	return ids, nil
 }
 
+// beatPosition finds the beat with key, or says it is not there.
+func beatPosition(beats []storedBeat, key string) (int, error) {
+	if err := requireBeatKey(key); err != nil {
+		return 0, err
+	}
+	at := indexOfBeat(beats, key)
+	if at < 0 {
+		return 0, domain.ErrUnitNotFound
+	}
+	return at, nil
+}
+
 // Edit stores the Creator's hand edit of a beat: any of title, goal, content,
 // next (text), fn (a function of domain.BeatFns), dur (seconds) and facts
 // ("F01, F02"). A field whose value changes becomes the Creator's; a text
 // field emptied goes back to the AI. Editing sends the beat back to review.
-func (k beatKind) Edit(ctx context.Context, projectID, key string, fields map[string]string) (domain.ReviewUnit, error) {
+func (uc *BeatDeskUseCase) Edit(ctx context.Context, projectID, key string, fields map[string]string) error {
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
+	}
 	if err := requireBeatKey(key); err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	if len(fields) == 0 {
-		return domain.ReviewUnit{}, fmt.Errorf("%w: không có gì để sửa", domain.ErrInvalidUnitEdit)
+		return fmt.Errorf("%w: không có gì để sửa", domain.ErrInvalidUnitEdit)
 	}
-	unit, err := k.desk.units.GetUnit(ctx, projectID, domain.UnitKindBeat, key)
+	beats, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
-	beat, err := readBeat(unit)
+	at, err := beatPosition(beats, key)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
-	facts, err := loadKeptFacts(ctx, k.desk.units, projectID)
+	slot, beat := beats[at].unit, beats[at].Beat
+	facts, err := loadKeptFacts(ctx, uc.units, projectID)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	mark := func(field string, changed bool) {
-		if changed && !unit.HasCreatorField(field) {
-			unit.CreatorFields = append(unit.CreatorFields, field)
+		if changed && !slot.HasCreatorField(field) {
+			slot.CreatorFields = append(slot.CreatorFields, field)
 		}
 	}
 	for field, raw := range fields {
@@ -84,7 +93,7 @@ func (k beatKind) Edit(ctx context.Context, projectID, key string, fields map[st
 		case domain.BeatFieldGoal, domain.BeatFieldContent, domain.BeatFieldNext:
 			target := map[string]*string{domain.BeatFieldGoal: &beat.Goal, domain.BeatFieldContent: &beat.Content, domain.BeatFieldNext: &beat.Next}[field]
 			if value == "" {
-				unit.CreatorFields = withoutField(unit.CreatorFields, field)
+				slot.CreatorFields = withoutField(slot.CreatorFields, field)
 			} else {
 				mark(field, value != *target)
 			}
@@ -92,26 +101,27 @@ func (k beatKind) Edit(ctx context.Context, projectID, key string, fields map[st
 		case domain.BeatFieldDur:
 			secs, err := strconv.Atoi(value)
 			if err != nil {
-				return domain.ReviewUnit{}, fmt.Errorf("%w: thời lượng %q không phải số giây", domain.ErrInvalidUnitEdit, raw)
+				return fmt.Errorf("%w: thời lượng %q không phải số giây", domain.ErrInvalidUnitEdit, raw)
 			}
 			mark(field, secs != beat.Dur)
 			beat.Dur = secs
 		case domain.BeatFieldFacts:
 			ids, err := parseFactList(value)
 			if err != nil {
-				return domain.ReviewUnit{}, fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
+				return fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
 			}
 			mark(field, strings.Join(ids, ",") != strings.Join(beat.Facts, ","))
 			beat.Facts = ids
 		default:
-			return domain.ReviewUnit{}, fmt.Errorf("%w: beat không có trường %q để sửa", domain.ErrInvalidUnitEdit, field)
+			return fmt.Errorf("%w: beat không có trường %q để sửa", domain.ErrInvalidUnitEdit, field)
 		}
 	}
 	if err := beat.Validate(factKnownTo(facts)); err != nil {
-		return domain.ReviewUnit{}, fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
+		return fmt.Errorf("%w: %v", domain.ErrInvalidUnitEdit, err)
 	}
-	unit.Status = domain.UnitPending
-	return k.desk.saveBeat(ctx, projectID, key, beat, unit)
+	slot.Status = domain.UnitPending
+	beats[at].unit, beats[at].Beat = slot, beat
+	return uc.saveSheet(ctx, projectID, beats, gate)
 }
 
 // Redo has the AI write this one beat again with the Creator's note, reading
@@ -121,38 +131,34 @@ func (k beatKind) Edit(ctx context.Context, projectID, key string, fields map[st
 // name, so the wording that was the Creator's is released while a length the
 // Creator set is kept. When this beat was the last one without content the
 // lengths of the sheet are brought inside the target.
-func (k beatKind) Redo(ctx context.Context, projectID, key, note string) (domain.ReviewUnit, error) {
+func (uc *BeatDeskUseCase) Redo(ctx context.Context, projectID, key, note string) error {
 	if err := requireBeatKey(key); err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
-	uc := k.desk
 	if err := uc.requireAI(); err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	bc, err := uc.context(ctx, projectID)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
-	work, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	work, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	if !gate.SkeletonApproved {
-		return domain.ReviewUnit{}, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonNeeded)
+		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatSkeletonNeeded)
 	}
-	at := -1
+	at, err := beatPosition(work, key)
+	if err != nil {
+		return err
+	}
 	written := make([]bool, len(work))
 	for i, b := range work {
 		written[i] = b.Written()
-		if b.unit.Key == key {
-			at = i
-		}
-	}
-	if at < 0 {
-		return domain.ReviewUnit{}, domain.ErrUnitNotFound
 	}
 	written[at] = false
 	kept := []string{}
@@ -165,25 +171,51 @@ func (k beatKind) Redo(ctx context.Context, projectID, key, note string) (domain
 	work[at].unit.RedoCount++
 	beat, err := uc.writeOne(ctx, projectID, bc, work, written, at, note)
 	if err != nil {
-		return domain.ReviewUnit{}, err
+		return err
 	}
 	work[at].Beat = beat
 	rewritten := make([]bool, len(work))
 	rewritten[at] = true
-	if err := uc.saveContent(ctx, projectID, bc, work, rewritten, gate, sheetUnit); err != nil {
-		return domain.ReviewUnit{}, err
+	return uc.saveContent(ctx, projectID, bc, work, rewritten, gate)
+}
+
+// Approve marks a beat approved once it has a goal.
+func (uc *BeatDeskUseCase) Approve(ctx context.Context, projectID, key string) error {
+	return uc.setStatus(ctx, projectID, key, domain.UnitApproved)
+}
+
+// Unapprove sends an approved beat back to review.
+func (uc *BeatDeskUseCase) Unapprove(ctx context.Context, projectID, key string) error {
+	return uc.setStatus(ctx, projectID, key, domain.UnitPending)
+}
+
+func (uc *BeatDeskUseCase) setStatus(ctx context.Context, projectID, key string, status domain.UnitStatus) error {
+	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
+		return err
 	}
-	return uc.units.GetUnit(ctx, projectID, domain.UnitKindBeat, key)
+	beats, gate, err := uc.beats(ctx, projectID)
+	if err != nil {
+		return err
+	}
+	at, err := beatPosition(beats, key)
+	if err != nil {
+		return err
+	}
+	if status == domain.UnitApproved && strings.TrimSpace(beats[at].Goal) == "" {
+		return fmt.Errorf("%w: viết mục tiêu của beat trước khi duyệt", ErrBeatNoGoal)
+	}
+	beats[at].unit.Status = status
+	return uc.saveSheet(ctx, projectID, beats, gate)
 }
 
 // Impact lists the dialogue written for the beat: editing the beat marks it
 // as out of date for the Creator to review again.
-func (k beatKind) Impact(ctx context.Context, projectID, key string) ([]string, error) {
+func (uc *BeatDeskUseCase) Impact(ctx context.Context, projectID, key string) ([]string, error) {
 	items := []string{}
 	if err := requireBeatKey(key); err != nil {
 		return items, err
 	}
-	unit, err := k.desk.units.GetUnit(ctx, projectID, domain.UnitKindScriptBeat, key)
+	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindScriptBeat, key)
 	if errors.Is(err, domain.ErrUnitNotFound) {
 		return items, nil
 	}
@@ -198,16 +230,4 @@ func (k beatKind) Impact(ctx context.Context, projectID, key string) ([]string, 
 		items = append(items, fmt.Sprintf("Viết kịch bản: lời thoại của beat này (%d câu) cần xem lại", len(script.Lines)))
 	}
 	return items, nil
-}
-
-// CheckApprovable refuses a beat without a goal.
-func (beatKind) CheckApprovable(_ context.Context, unit domain.ReviewUnit) error {
-	beat, err := readBeat(unit)
-	if err != nil {
-		return err
-	}
-	if strings.TrimSpace(beat.Goal) == "" {
-		return fmt.Errorf("%w: viết mục tiêu của beat trước khi duyệt", ErrBeatNoGoal)
-	}
-	return nil
 }

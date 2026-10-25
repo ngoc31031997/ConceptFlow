@@ -230,7 +230,7 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 	if !approved {
 		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
 	}
-	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	current, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return err
 	}
@@ -267,11 +267,11 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 		return err
 	}
 	known := factKnownTo(facts)
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
+	sha, err := uc.storyHash(ctx, projectID)
 	if err != nil {
 		return err
 	}
-	order := make([]string, 0, len(beats))
+	built := make([]storedBeat, 0, len(beats))
 	for _, b := range beats {
 		kept := b.Facts[:0:0]
 		for _, id := range b.Facts {
@@ -282,22 +282,23 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 		b.Facts = kept
 		key := domain.BeatKey(gate.NextSeq)
 		gate.NextSeq++
-		unit := domain.ReviewUnit{Status: domain.UnitPending, InputRef: beatStoryRef, InputSHA: sha}
-		if _, err := uc.saveBeat(ctx, projectID, key, b, unit); err != nil {
-			return err
-		}
-		order = append(order, key)
+		built = append(built, storedBeat{unit: newBeatSlot(key, sha), Beat: b})
 	}
-	gate.Order, gate.Rebalanced, gate.SkeletonApproved = order, 0, false
-	if err := uc.saveSheet(ctx, sheetUnit, gate); err != nil {
-		return err
+	gate.Rebalanced, gate.SkeletonApproved = 0, false
+	return uc.saveSheet(ctx, projectID, built, gate)
+}
+
+// storyHash is the hash of the approved story, which a beat records as the
+// story it was written from.
+func (uc *BeatDeskUseCase) storyHash(ctx context.Context, projectID string) (string, error) {
+	_, hash, ok, err := uc.stories.ApprovedStory(ctx, projectID)
+	if err != nil {
+		return "", err
 	}
-	for _, old := range current {
-		if err := uc.units.DeleteUnit(ctx, projectID, domain.UnitKindBeat, old.unit.Key); err != nil {
-			return err
-		}
+	if !ok {
+		return "", fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedStory)
 	}
-	return nil
+	return hash, nil
 }
 
 // ApproveSkeleton records that the Creator accepted the functions and facts of
@@ -306,7 +307,7 @@ func (uc *BeatDeskUseCase) ApproveSkeleton(ctx context.Context, projectID string
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
-	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	current, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return err
 	}
@@ -314,7 +315,7 @@ func (uc *BeatDeskUseCase) ApproveSkeleton(ctx context.Context, projectID string
 		return fmt.Errorf("%w: chưa có beat nào để duyệt bộ khung", domain.ErrInvalidUnitEdit)
 	}
 	gate.SkeletonApproved = true
-	return uc.saveSheet(ctx, sheetUnit, gate)
+	return uc.saveSheet(ctx, projectID, current, gate)
 }
 
 // writeOne has the AI write the content of the beat at index at of work, whose
@@ -362,9 +363,9 @@ func (uc *BeatDeskUseCase) writeOne(ctx context.Context, projectID string, bc be
 // beat unwritten, brings the total length inside the target first: the lengths
 // the Creator set and the beats already approved stay as they are and every
 // other beat is resized together. rewritten marks the beats the run wrote; the
-// others are stored again only when their length was resized. It fails, and
-// stores nothing, when no lengths fit.
-func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc beatContext, work []storedBeat, rewritten []bool, gate domain.BeatSheetGate, sheetUnit domain.ReviewUnit) error {
+// others change only when their length was resized. It fails, and stores
+// nothing, when no lengths fit.
+func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc beatContext, work []storedBeat, rewritten []bool, gate domain.BeatSheetGate) error {
 	durs := make([]int, len(work))
 	unwritten := false
 	for i, b := range work {
@@ -383,29 +384,26 @@ func (uc *BeatDeskUseCase) saveContent(ctx context.Context, projectID string, bc
 			return fmt.Errorf("%w: %v", domain.ErrBeatReplyUnusable, err)
 		}
 	}
-	sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
+	sha, err := uc.storyHash(ctx, projectID)
 	if err != nil {
 		return err
 	}
 	gate.Rebalanced = 0
+	saved := make([]storedBeat, len(work))
 	for i, b := range work {
 		resized := durs[i] != b.Dur
 		if resized {
 			gate.Rebalanced++
 		}
-		if !rewritten[i] && !resized {
-			continue
+		if rewritten[i] || resized {
+			b.Dur = durs[i]
 		}
-		b.Dur = durs[i]
-		unit := b.unit
 		if rewritten[i] {
-			unit.Status, unit.InputRef, unit.InputSHA = domain.UnitPending, beatStoryRef, sha
+			b.unit.Status, b.unit.StoryHash = domain.UnitPending, sha
 		}
-		if _, err := uc.saveBeat(ctx, projectID, unit.Key, b.Beat, unit); err != nil {
-			return err
-		}
+		saved[i] = b
 	}
-	return uc.saveSheet(ctx, sheetUnit, gate)
+	return uc.saveSheet(ctx, projectID, saved, gate)
 }
 
 // Generate has the AI write the content of the beats of the approved
@@ -427,7 +425,7 @@ func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string,
 	if err != nil {
 		return err
 	}
-	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	current, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return err
 	}
@@ -459,7 +457,7 @@ func (uc *BeatDeskUseCase) Generate(ctx context.Context, projectID, note string,
 		}
 		work[i].Beat, written[i] = beat, true
 	}
-	return uc.saveContent(ctx, projectID, bc, work, rewritten, gate, sheetUnit)
+	return uc.saveContent(ctx, projectID, bc, work, rewritten, gate)
 }
 
 // Add puts a new beat after the beat with key after (the first place of an
@@ -470,7 +468,7 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return "", err
 	}
-	current, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	current, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return "", err
 	}
@@ -479,14 +477,14 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 	}
 	at := 0
 	if after != "" {
-		if at = indexOf(gate.Order, after) + 1; at == 0 {
+		if at = indexOfBeat(current, after) + 1; at == 0 {
 			return "", domain.ErrUnitNotFound
 		}
 	} else if len(current) > 0 {
 		return "", fmt.Errorf("%w: nêu beat mà beat mới đứng sau", domain.ErrInvalidUnitEdit)
 	}
 	key := domain.BeatKey(gate.NextSeq)
-	unit := domain.ReviewUnit{Status: domain.UnitPending}
+	slot := newBeatSlot(key, "")
 	var beat domain.Beat
 	if blank {
 		beat = domain.Beat{Fn: domain.BeatFns[2], Title: "Beat mới", Facts: []string{}, Dur: 15}
@@ -513,16 +511,11 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 			return "", fmt.Errorf("%w: cần đúng một beat mới", domain.ErrBeatReplyUnusable)
 		}
 		beat = drafts[0].Beat
-		sha, err := uc.units.UnitSHA(ctx, projectID, domain.StoryInputKind, domain.StoryInputKey)
-		if err != nil {
+		if slot.StoryHash, err = uc.storyHash(ctx, projectID); err != nil {
 			return "", err
 		}
-		unit.InputRef, unit.InputSHA = beatStoryRef, sha
-	}
-	if _, err := uc.saveBeat(ctx, projectID, key, beat, unit); err != nil {
-		return "", err
 	}
 	gate.NextSeq++
-	gate.Order = append(append(append([]string{}, gate.Order[:at]...), key), gate.Order[at:]...)
-	return key, uc.saveSheet(ctx, sheetUnit, gate)
+	added := append(append(append([]storedBeat{}, current[:at]...), storedBeat{unit: slot, Beat: beat}), current[at:]...)
+	return key, uc.saveSheet(ctx, projectID, added, gate)
 }

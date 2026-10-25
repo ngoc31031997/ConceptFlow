@@ -53,7 +53,7 @@ type lockContext struct {
 func (uc *ScriptLockDeskUseCase) context(ctx context.Context, projectID string) (lockContext, error) {
 	var lc lockContext
 	var err error
-	if lc.beats, _, _, err = uc.beats.beats(ctx, projectID); err != nil {
+	if lc.beats, _, err = uc.beats.beats(ctx, projectID); err != nil {
 		return lc, err
 	}
 	if lc.beatContext, err = uc.beats.context(ctx, projectID); err != nil {

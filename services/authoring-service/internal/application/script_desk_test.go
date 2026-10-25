@@ -94,9 +94,7 @@ func newScriptFixture(t *testing.T) *scriptFixture {
 	b := newBeatFixture()
 	b.generate(t)
 	for _, key := range []string{"b1", "b2", "b3"} {
-		u, beat := b.beat(t, key)
-		u.Status = domain.UnitApproved
-		b.save(t, domain.UnitKindBeat, key, domain.UnitApproved, beat)
+		b.patchBeat(t, key, func(sb *domain.StoredBeat) { sb.Status = domain.UnitApproved })
 	}
 	project := &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly, VoiceID: "vi-HoaiMy"}, status: domain.StatusDraft}
 	f := &scriptFixture{
@@ -153,8 +151,7 @@ func TestGenerateWritesEachBeatWithoutDialogueReadingItsNeighbours(t *testing.T)
 
 func TestGenerateRefusesBeforeEveryBeatIsApproved(t *testing.T) {
 	f := newScriptFixture(t)
-	_, beat := f.beat.beat(t, "b3")
-	f.beat.save(t, domain.UnitKindBeat, "b3", domain.UnitPending, beat)
+	f.beat.patchBeat(t, "b3", func(sb *domain.StoredBeat) { sb.Status = domain.UnitPending })
 	if err := f.uc.Generate(context.Background(), "p1", "", ""); !errors.Is(err, ErrScriptNeedsBeats) {
 		t.Errorf("err = %v, want the beat sheet to be approved first", err)
 	}

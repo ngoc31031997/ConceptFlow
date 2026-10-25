@@ -221,7 +221,7 @@ func audioOf(l domain.VoiceLine, ok bool, text, voiceID string) ScriptAudio {
 // State returns the whole script screen.
 func (uc *ScriptDeskUseCase) State(ctx context.Context, projectID string) (ScriptState, error) {
 	state := ScriptState{Status: domain.UnitPending, Beats: []ScriptBeatView{}, Checks: []domain.ScriptCheck{}}
-	beats, _, _, err := uc.beats.beats(ctx, projectID)
+	beats, _, err := uc.beats.beats(ctx, projectID)
 	if err != nil {
 		return ScriptState{}, err
 	}
@@ -361,7 +361,7 @@ func joinCheckText(n int) string {
 // FactDependents lists, for the research step, the dialogue that uses a fact.
 func (uc *ScriptDeskUseCase) FactDependents() FactDependentsFinder {
 	return func(ctx context.Context, projectID, factID string) ([]string, error) {
-		beats, _, _, err := uc.beats.beats(ctx, projectID)
+		beats, _, err := uc.beats.beats(ctx, projectID)
 		if err != nil {
 			return nil, err
 		}

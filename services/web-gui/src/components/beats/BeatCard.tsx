@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, beatUnit, type Beat, type BeatFn, type BeatState } from "../../api/client";
+import { BEAT_DURATION_STEP, BEAT_FNS, BEAT_MIN_SECONDS, getBeatImpact, type Beat, type BeatFn, type BeatState } from "../../api/client";
 import type { BeatsControls } from "../../hooks/useBeats";
 import { useUnitImpact } from "../../hooks/useUnitImpact";
 import { AiModelSelect } from "../AiModelSelect";
@@ -64,9 +64,9 @@ export function BeatCard({ projectId, beat, index, state, beats, aiAvailable, lo
   const [deleting, setDeleting] = useState(false);
   // Moving a beat changes how it joins its neighbours, so it asks first once dialogue is approved.
   const [moving, setMoving] = useState<-1 | 1 | null>(null);
-  const unit = beatUnit(beat.key);
-  const editImpact = useUnitImpact(projectId, unit, editing);
-  const redoImpact = useUnitImpact(projectId, unit, redoing);
+  const unit = { kind: "beat", key: beat.key };
+  const editImpact = useUnitImpact(projectId, unit, editing, getBeatImpact);
+  const redoImpact = useUnitImpact(projectId, unit, redoing, getBeatImpact);
 
   const no = index + 1;
   const last = index === state.beats.length - 1;

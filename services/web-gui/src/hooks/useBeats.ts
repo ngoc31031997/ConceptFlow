@@ -4,18 +4,17 @@ import {
   BEAT_DURATION_STEP,
   GENERIC_CONNECTION_ERROR,
   addBeat,
+  approveBeat,
   approveBeatSkeleton,
-  approveUnit,
   buildBeatSkeleton,
-  beatUnit,
   deleteBeat,
-  editUnit,
+  editBeat,
   generateBeats,
   getBeats,
   isRequestCancelled,
-  redoUnit,
+  redoBeat,
   reorderBeats,
-  unapproveUnit,
+  unapproveBeat,
   type Beat,
   type BeatFn,
   type BeatState,
@@ -158,7 +157,7 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
     [run, load],
   );
 
-  const editFields = useCallback((key: string, fields: Record<string, string>) => editUnit(projectId, beatUnit(key), fields), [projectId]);
+  const editFields = useCallback((key: string, fields: Record<string, string>) => editBeat(projectId, key, fields), [projectId]);
 
   const edit = useCallback(
     async (key: string, fields: Record<string, string>) => {
@@ -173,7 +172,7 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
     [editFields, load],
   );
 
-  const approve = useCallback((key: string) => act(() => approveUnit(projectId, beatUnit(key))), [act, projectId]);
+  const approve = useCallback((key: string) => act(() => approveBeat(projectId, key)), [act, projectId]);
 
   return {
     state,
@@ -187,7 +186,7 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
     approveSkeleton: () => act(() => approveBeatSkeleton(projectId)),
     generate: (note, onlyUnwritten = false) => runAI("sheet", note, (op) => generateBeats(projectId, note, op, onlyUnwritten)),
     add: (after, blank, note) => (blank ? act(() => addBeat(projectId, after, true, "")) : runAI("add", note, (op) => addBeat(projectId, after, false, note, op))),
-    redo: (key, note) => runAI({ beat: key }, note, (op) => redoUnit(projectId, beatUnit(key), note, op)),
+    redo: (key, note) => runAI({ beat: key }, note, (op) => redoBeat(projectId, key, note, op)),
     edit,
     setFn: (beat, fn) => act(() => editFields(beat.key, { fn })),
     shiftDuration: (beat, direction) => act(() => editFields(beat.key, { dur: String(beat.dur + direction * BEAT_DURATION_STEP) })),
@@ -203,11 +202,11 @@ export function useBeats(projectId: string, enabled: boolean): BeatsControls {
       }),
     remove: (key) => act(() => deleteBeat(projectId, key)),
     approve,
-    unapprove: (key) => act(() => unapproveUnit(projectId, beatUnit(key))),
+    unapprove: (key) => act(() => unapproveBeat(projectId, key)),
     approveAll: () =>
       act(async () => {
         for (const beat of state?.beats ?? []) {
-          if (beat.status === "pending" && beat.goal.trim() !== "") await approveUnit(projectId, beatUnit(beat.key));
+          if (beat.status === "pending" && beat.goal.trim() !== "") await approveBeat(projectId, beat.key);
         }
       }),
     reload: load,

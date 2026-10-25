@@ -26,6 +26,8 @@ type fakeBeats struct {
 	built         int
 	onlyUnwritten bool
 	okayed        int
+	fields        map[string]string
+	status        string
 }
 
 func (f *fakeBeats) State(context.Context, string) (application.BeatState, error) {
@@ -55,6 +57,27 @@ func (f *fakeBeats) Reorder(_ context.Context, _ string, order []string) error {
 func (f *fakeBeats) Delete(_ context.Context, _, key string) error {
 	f.key = key
 	return f.err
+}
+
+func (f *fakeBeats) Edit(_ context.Context, _, key string, fields map[string]string) error {
+	f.key, f.fields = key, fields
+	return f.err
+}
+func (f *fakeBeats) Redo(_ context.Context, _, key, note string) error {
+	f.key, f.note = key, note
+	return f.err
+}
+func (f *fakeBeats) Approve(_ context.Context, _, key string) error {
+	f.key, f.status = key, "approved"
+	return f.err
+}
+func (f *fakeBeats) Unapprove(_ context.Context, _, key string) error {
+	f.key, f.status = key, "pending"
+	return f.err
+}
+func (f *fakeBeats) Impact(_ context.Context, _, key string) ([]string, error) {
+	f.key = key
+	return []string{"Viết kịch bản: lời thoại của beat này (2 câu) cần xem lại"}, f.err
 }
 
 func serveBeats(f *fakeBeats, method, path, body string) *httptest.ResponseRecorder {
@@ -137,5 +160,43 @@ func TestBeatsRoutesAreAbsentWhenNotWired(t *testing.T) {
 	rt.Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/v1/projects/p1/beats", nil))
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("status = %d, want 404 without the beat sheet step", rec.Code)
+	}
+}
+
+func TestBeatEditRedoApproveAndImpactHaveTheirOwnRoutes(t *testing.T) {
+	f := &fakeBeats{}
+	if rec := serveBeats(f, http.MethodPut, "/v1/projects/p1/beats/b2", `{"fields":{"dur":"25"}}`); rec.Code != http.StatusOK || f.key != "b2" || f.fields["dur"] != "25" {
+		t.Errorf("edit: status %d key %q fields %v", rec.Code, f.key, f.fields)
+	}
+	if rec := serveBeats(f, http.MethodPost, "/v1/projects/p1/beats/b3/redo", `{"note":"ngắn hơn"}`); rec.Code != http.StatusOK || f.key != "b3" || f.note != "ngắn hơn" {
+		t.Errorf("redo: status %d key %q note %q", rec.Code, f.key, f.note)
+	}
+	if rec := serveBeats(f, http.MethodPost, "/v1/projects/p1/beats/b1/approve", ""); rec.Code != http.StatusOK || f.status != "approved" || !strings.Contains(rec.Body.String(), `"key":"b1"`) {
+		t.Errorf("approve: status %d %s, want the state back", rec.Code, rec.Body)
+	}
+	if rec := serveBeats(f, http.MethodPost, "/v1/projects/p1/beats/b1/unapprove", ""); rec.Code != http.StatusOK || f.status != "pending" {
+		t.Errorf("unapprove: status %d", rec.Code)
+	}
+	rec := serveBeats(f, http.MethodGet, "/v1/projects/p1/beats/b2/impact", "")
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "lời thoại của beat này") {
+		t.Errorf("impact: status %d body %s", rec.Code, rec.Body)
+	}
+}
+
+func TestBeatEditAndApproveMapTheirErrors(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want int
+	}{
+		{domain.ErrUnitNotFound, http.StatusNotFound},
+		{fmt.Errorf("%w: x", domain.ErrInvalidUnitEdit), http.StatusBadRequest},
+		{application.ErrBeatNoGoal, http.StatusBadRequest},
+	} {
+		if rec := serveBeats(&fakeBeats{err: tc.err}, http.MethodPost, "/v1/projects/p1/beats/b1/approve", ""); rec.Code != tc.want {
+			t.Errorf("approve with %v: status %d, want %d", tc.err, rec.Code, tc.want)
+		}
+		if rec := serveBeats(&fakeBeats{err: tc.err}, http.MethodPut, "/v1/projects/p1/beats/b1", `{"fields":{"goal":"x"}}`); rec.Code != tc.want {
+			t.Errorf("edit with %v: status %d, want %d", tc.err, rec.Code, tc.want)
+		}
 	}
 }

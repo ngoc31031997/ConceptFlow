@@ -45,7 +45,7 @@ func (k scriptKind) Edit(ctx context.Context, projectID, key string, fields map[
 		return domain.ReviewUnit{}, fmt.Errorf("%w: không có gì để sửa", domain.ErrInvalidUnitEdit)
 	}
 	uc := k.desk
-	beats, _, _, err := uc.beats.beats(ctx, projectID)
+	beats, _, err := uc.beats.beats(ctx, projectID)
 	if err != nil {
 		return domain.ReviewUnit{}, err
 	}

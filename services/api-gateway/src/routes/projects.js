@@ -172,7 +172,7 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.put('/v1/projects/:id/story', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/story/approve', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/story/unapprove', proxyHandler(authoring, 'authoring-service'));
-  // Bước Beat sheet: từng beat đi qua /units/beat/*; ở đây là bộ khung, cả bảng, thứ tự và các lượt AI.
+  // Bước Beat sheet: bộ khung, cả bảng, thứ tự, các lượt AI và từng beat (sửa, làm lại, duyệt, tác động).
   router.get('/v1/projects/:id/beats', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/beats/skeleton', proxyHandler(authoring, 'authoring-service'));
   router.post('/v1/projects/:id/beats/skeleton/approve', proxyHandler(authoring, 'authoring-service'));
@@ -180,6 +180,11 @@ function projectsRouter(orchestratorClient, sharedDir, orchestratorAiClient, aut
   router.post('/v1/projects/:id/beats', proxyHandler(authoringAi, 'authoring-service'));
   router.put('/v1/projects/:id/beats/order', proxyHandler(authoring, 'authoring-service'));
   router.delete('/v1/projects/:id/beats/:key', proxyHandler(authoring, 'authoring-service'));
+  router.put('/v1/projects/:id/beats/:key', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/beats/:key/redo', proxyHandler(authoringAi, 'authoring-service'));
+  router.post('/v1/projects/:id/beats/:key/approve', proxyHandler(authoring, 'authoring-service'));
+  router.post('/v1/projects/:id/beats/:key/unapprove', proxyHandler(authoring, 'authoring-service'));
+  router.get('/v1/projects/:id/beats/:key/impact', proxyHandler(authoring, 'authoring-service'));
   // Bước Viết kịch bản: lời thoại từng beat đi qua /units/script_beat/*; ở đây là
   // cả màn, các lượt AI (viết, gợi ý) và đưa câu đi đọc. Đọc giọng chạy nền qua
   // orchestrator và tts nên lời gọi chỉ xếp câu vào hàng chờ.

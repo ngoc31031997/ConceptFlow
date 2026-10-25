@@ -447,6 +447,19 @@ CREATE TABLE IF NOT EXISTS project_story (
     created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- The beat sheet step, one row per project, which the script step reads.
+-- beats is the ordered list of beats, each with its content under "beat" and
+-- its review state beside it; the other columns are the gate of the step.
+CREATE TABLE IF NOT EXISTS project_beat_sheet (
+    project_id        TEXT PRIMARY KEY,
+    beats             JSONB NOT NULL DEFAULT '[]',
+    next_seq          INTEGER NOT NULL DEFAULT 1,
+    skeleton_approved BOOLEAN NOT NULL DEFAULT FALSE,
+    rebalanced        INTEGER NOT NULL DEFAULT 0,
+    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Beats and their gate were review units once; they live in project_beat_sheet now.
+DELETE FROM review_units WHERE kind IN ('beat', 'beat_sheet');
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

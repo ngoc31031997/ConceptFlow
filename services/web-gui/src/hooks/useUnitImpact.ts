@@ -21,7 +21,12 @@ export function reachesLaterSteps(impact: UnitImpact): boolean {
 }
 
 /** Loads the impact list each time `open` turns on, so the dialog shows today's dependents. */
-export function useUnitImpact(projectId: string, ref: UnitAddress, open: boolean): UnitImpact {
+export function useUnitImpact(
+  projectId: string,
+  ref: UnitAddress,
+  open: boolean,
+  load: (projectId: string, ref: UnitAddress) => Promise<string[]> = getUnitImpact,
+): UnitImpact {
   const [impact, setImpact] = useState<UnitImpact>({ items: null, failed: false });
   const { kind, key } = ref;
 
@@ -29,7 +34,7 @@ export function useUnitImpact(projectId: string, ref: UnitAddress, open: boolean
     if (!open || !projectId) return;
     let cancelled = false;
     setImpact({ items: null, failed: false });
-    getUnitImpact(projectId, { kind, key })
+    load(projectId, { kind, key })
       .then((items) => {
         if (!cancelled) setImpact({ items, failed: false });
       })
@@ -39,7 +44,7 @@ export function useUnitImpact(projectId: string, ref: UnitAddress, open: boolean
     return () => {
       cancelled = true;
     };
-  }, [open, projectId, kind, key]);
+  }, [open, projectId, kind, key, load]);
 
   return impact;
 }

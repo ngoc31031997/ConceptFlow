@@ -2841,11 +2841,6 @@ export const BEAT_MIN_SECONDS = 5;
 /** The fields of a beat the Creator edits as text in the dialog. */
 export type BeatTextField = "title" | "goal" | "content" | "next";
 
-/** The unit one beat is saved, redone and approved through. */
-export function beatUnit(key: string): UnitRef<unknown> {
-  return { kind: "beat", key, parse: (c) => c };
-}
-
 /** One beat of the sheet. `mine` names the fields the Creator wrote; an AI run keeps them. */
 export interface Beat {
   key: string;
@@ -2985,6 +2980,43 @@ export async function generateBeats(projectId: string, note: string, operation?:
       body: JSON.stringify({ note, only_unwritten: onlyUnwritten }),
     }),
   );
+}
+
+const beatPath = (projectId: string, key: string) => `/v1/projects/${projectId}/beats/${key}`;
+
+/** Saves the Creator's edit of some fields of one beat; the beat goes back to review. */
+export async function editBeat(projectId: string, key: string, fields: Record<string, string>): Promise<BeatState> {
+  return fromWireBeats(
+    await apiFetch<beatStateWire>(beatPath(projectId, key), { method: "PUT", headers: JSON_HEADERS, body: JSON.stringify({ fields }) }),
+  );
+}
+
+/** Has the AI write one beat again with the Creator's note (a model call: pass an operation id to follow it). */
+export async function redoBeat(projectId: string, key: string, note: string, operation?: OperationCall): Promise<BeatState> {
+  return fromWireBeats(
+    await apiFetch<beatStateWire>(`${beatPath(projectId, key)}/redo`, {
+      method: "POST",
+      headers: { ...JSON_HEADERS, ...operationInit(operation).headers },
+      signal: operationInit(operation).signal,
+      body: JSON.stringify({ note }),
+    }),
+  );
+}
+
+/** Approves one beat; the server refuses a beat without a goal. */
+export async function approveBeat(projectId: string, key: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`${beatPath(projectId, key)}/approve`, { method: "POST" }));
+}
+
+/** Takes the approval of one beat back; it waits for review again. */
+export async function unapproveBeat(projectId: string, key: string): Promise<BeatState> {
+  return fromWireBeats(await apiFetch<beatStateWire>(`${beatPath(projectId, key)}/unapprove`, { method: "POST" }));
+}
+
+/** What a change to the beat sends back in later steps (the dialogue written for it), one line per item. */
+export async function getBeatImpact(projectId: string, ref: UnitAddress): Promise<string[]> {
+  const res = await apiFetch<{ items: string[] | null }>(`${beatPath(projectId, ref.key)}/impact`);
+  return res.items ?? [];
 }
 
 /**

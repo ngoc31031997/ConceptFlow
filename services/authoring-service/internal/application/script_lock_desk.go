@@ -301,7 +301,7 @@ type lockInputs struct {
 func (uc *ScriptLockDeskUseCase) inputs(ctx context.Context, projectID string) (lockInputs, error) {
 	var in lockInputs
 	var err error
-	if in.lc.beats, _, _, err = uc.beats.beats(ctx, projectID); err != nil {
+	if in.lc.beats, _, err = uc.beats.beats(ctx, projectID); err != nil {
 		return in, err
 	}
 	if in.lc.scripts, err = uc.script.scripts(ctx, projectID); err != nil {

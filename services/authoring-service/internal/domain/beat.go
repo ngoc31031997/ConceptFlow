@@ -8,16 +8,10 @@ import (
 	"strings"
 )
 
-// The kinds of review unit the beat sheet step stores.
-const (
-	// UnitKindBeatSheet is the gate of the step: it holds the order of the beats.
-	UnitKindBeatSheet = "beat_sheet"
-	// BeatSheetUnitKey is the only key of the gate unit.
-	BeatSheetUnitKey = "main"
-	// UnitKindBeat is one beat of the video, keyed b1, b2... The key stays with
-	// the beat when it moves, so later steps can keep pointing at it.
-	UnitKindBeat = "beat"
-)
+// UnitKindBeat names one beat of the video, keyed b1, b2... The key stays with
+// the beat when it moves, so later steps can keep pointing at it. A later
+// step records it as the input of the dialogue it wrote ("beat:b2").
+const UnitKindBeat = "beat"
 
 // Fields of a beat the Creator can write; an AI run keeps the ones marked as
 // the Creator's.
@@ -93,18 +87,16 @@ func (b Beat) Written() bool {
 	return strings.TrimSpace(b.Goal) != "" && strings.TrimSpace(b.Content) != ""
 }
 
-// BeatSheetGate is the content of the gate unit.
+// BeatSheetGate is what the sheet holds besides its beats.
 type BeatSheetGate struct {
-	// Order lists the keys of the beats as the video runs them.
-	Order []string `json:"order"`
 	// NextSeq is the number the next beat key takes; keys are never reused.
-	NextSeq int `json:"next_seq"`
+	NextSeq int
 	// SkeletonApproved is true once the Creator approved the functions and facts
 	// of the beats; only then does the AI write their content.
-	SkeletonApproved bool `json:"skeleton_approved"`
+	SkeletonApproved bool
 	// Rebalanced is how many beats had their length changed by the last run to
 	// bring the total inside the target.
-	Rebalanced int `json:"rebalanced"`
+	Rebalanced int
 }
 
 // BeatKey is the key of the beat with sequence number n.

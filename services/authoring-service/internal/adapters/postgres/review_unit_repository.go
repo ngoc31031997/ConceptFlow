@@ -28,7 +28,8 @@ const storyContentSHA = `(SELECT md5(ps.central_question || E'\n' || ps.core_ans
 // reviewUnitColumns lists a unit's columns for a query that aliases the table
 // as ru. The last column is stale: the unit was built from another unit
 // (input_ref) whose content no longer hashes to what was recorded (input_sha).
-// An input_ref naming the story is hashed from the project's story.
+// An input_ref naming the story is hashed from the project's story, and one
+// naming a beat from that beat in the project's beat sheet.
 const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.content, ru.creator_fields, ru.redo_count, ru.updated_at,
     ru.input_ref, ru.input_sha,
     (ru.input_ref <> '' AND ru.input_sha <> COALESCE((
@@ -37,6 +38,10 @@ const reviewUnitColumns = `ru.project_id, ru.kind, ru.unit_key, ru.status, ru.co
     ), (
         SELECT md5(ps.central_question || E'\n' || ps.core_answer || E'\n' || ps.narrative_arc::text)
         FROM project_story ps WHERE ps.project_id = ru.project_id AND ru.input_ref = '` + domain.StoryInputKind + `:` + domain.StoryInputKey + `'
+    ), (
+        SELECT md5((elem->'beat')::text)
+        FROM project_beat_sheet pbs, jsonb_array_elements(pbs.beats) elem
+        WHERE pbs.project_id = ru.project_id AND ru.input_ref = '` + domain.UnitKindBeat + `:' || (elem->>'key')
     ), ''))`
 
 func scanReviewUnit(row pgx.Row) (domain.ReviewUnit, error) {
@@ -97,8 +102,11 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind, key string) (string, error) {
 	query := `SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`
 	args := []any{projectID, kind, key}
-	if kind == domain.StoryInputKind && key == domain.StoryInputKey {
+	switch {
+	case kind == domain.StoryInputKind && key == domain.StoryInputKey:
 		query, args = `SELECT `+storyContentSHA, []any{projectID}
+	case kind == domain.UnitKindBeat:
+		query, args = `SELECT `+beatContentSHA, []any{projectID, key}
 	}
 	var sha *string
 	err := r.pool.QueryRow(ctx, query, args...).Scan(&sha)

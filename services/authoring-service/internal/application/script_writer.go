@@ -24,7 +24,7 @@ const scriptModelStep = "story"
 func (uc *ScriptDeskUseCase) context(ctx context.Context, projectID string) (scriptContext, error) {
 	var sc scriptContext
 	var err error
-	if sc.beats, _, _, err = uc.beats.beats(ctx, projectID); err != nil {
+	if sc.beats, _, err = uc.beats.beats(ctx, projectID); err != nil {
 		return sc, err
 	}
 	if !beatsApproved(sc.beats) {

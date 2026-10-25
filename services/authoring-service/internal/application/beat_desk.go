@@ -2,7 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -97,10 +96,10 @@ type BeatState struct {
 
 // BeatDeskUseCase backs the beat sheet step: the beats the AI writes from the
 // approved story, their order, and the Creator's review of each. The beats and
-// the gate that holds their order are review units (UnitKind for
-// domain.UnitKindBeat and domain.UnitKindBeatSheet).
+// the gate that holds their order are one row of project_beat_sheet.
 type BeatDeskUseCase struct {
 	units           StepUnitStorePort
+	sheets          BeatSheetStorePort
 	stories         ApprovedStoryPort
 	briefs          ApprovedBriefPort
 	projects        ProjectReaderPort
@@ -115,103 +114,65 @@ type BeatDeskUseCase struct {
 // NewBeatDeskUseCase wires the use case. provider may be nil when no language
 // model is configured: the Creator then adds and writes the beats by hand.
 func NewBeatDeskUseCase(
-	units StepUnitStorePort, stories ApprovedStoryPort, briefs ApprovedBriefPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
+	units StepUnitStorePort, sheets BeatSheetStorePort, stories ApprovedStoryPort, briefs ApprovedBriefPort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, recorder *LLMUsageRecorder, maxOutputTokens int,
 ) *BeatDeskUseCase {
 	return &BeatDeskUseCase{
-		units: units, stories: stories, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
+		units: units, sheets: sheets, stories: stories, briefs: briefs, projects: projects, locks: locks, prompts: prompts,
 		provider: provider, recorder: recorder, maxOutputTokens: maxOutputTokens, now: time.Now,
 	}
 }
 
-// storedBeat is a beat unit with its content read.
+// storedBeat is a beat of the sheet with its content.
 type storedBeat struct {
-	unit domain.ReviewUnit
+	unit domain.BeatSlot
 	domain.Beat
+	// stale is true for a beat the AI wrote from a story that has changed since.
+	stale bool
 }
 
-func readBeat(u domain.ReviewUnit) (domain.Beat, error) {
-	var b domain.Beat
-	if err := json.Unmarshal(u.Content, &b); err != nil {
-		return domain.Beat{}, fmt.Errorf("read stored beat %s: %w", u.Key, err)
-	}
-	if b.Facts == nil {
-		b.Facts = []string{}
-	}
-	return b, nil
-}
-
-// sheet loads the gate unit, or a new empty one when none is stored yet.
-func (uc *BeatDeskUseCase) sheet(ctx context.Context, projectID string) (domain.ReviewUnit, domain.BeatSheetGate, error) {
-	unit, err := uc.units.GetUnit(ctx, projectID, domain.UnitKindBeatSheet, domain.BeatSheetUnitKey)
-	if errors.Is(err, domain.ErrUnitNotFound) {
-		return domain.ReviewUnit{
-			ProjectID: projectID, Kind: domain.UnitKindBeatSheet, Key: domain.BeatSheetUnitKey, Status: domain.UnitPending,
-		}, domain.BeatSheetGate{Order: []string{}, NextSeq: 1}, nil
+// beats loads the beats in the order the sheet holds them, with the gate of
+// the step. A project with no sheet yet has no beats and an open gate.
+func (uc *BeatDeskUseCase) beats(ctx context.Context, projectID string) ([]storedBeat, domain.BeatSheetGate, error) {
+	sheet, err := uc.sheets.GetBeatSheet(ctx, projectID)
+	if errors.Is(err, domain.ErrBeatSheetNotFound) {
+		return []storedBeat{}, domain.BeatSheetGate{NextSeq: 1}, nil
 	}
 	if err != nil {
-		return domain.ReviewUnit{}, domain.BeatSheetGate{}, err
+		return nil, domain.BeatSheetGate{}, err
 	}
-	var gate domain.BeatSheetGate
-	if err := json.Unmarshal(unit.Content, &gate); err != nil {
-		return domain.ReviewUnit{}, domain.BeatSheetGate{}, fmt.Errorf("read stored beat sheet: %w", err)
+	_, storyHash, storyOK, err := uc.stories.ApprovedStory(ctx, projectID)
+	if err != nil {
+		return nil, domain.BeatSheetGate{}, err
 	}
-	if gate.Order == nil {
-		gate.Order = []string{}
-	}
+	gate := sheet.BeatSheetGate
 	if gate.NextSeq < 1 {
 		gate.NextSeq = 1
 	}
-	return unit, gate, nil
-}
-
-func (uc *BeatDeskUseCase) saveSheet(ctx context.Context, unit domain.ReviewUnit, gate domain.BeatSheetGate) error {
-	raw, err := json.Marshal(gate)
-	if err != nil {
-		return err
-	}
-	unit.Content = raw
-	_, err = uc.units.SaveUnit(ctx, unit)
-	return err
-}
-
-// beats loads the beats in the order the sheet holds them. A stored beat the
-// order does not name is left out: it is a leftover of an interrupted change.
-func (uc *BeatDeskUseCase) beats(ctx context.Context, projectID string) ([]storedBeat, domain.BeatSheetGate, domain.ReviewUnit, error) {
-	sheetUnit, gate, err := uc.sheet(ctx, projectID)
-	if err != nil {
-		return nil, gate, sheetUnit, err
-	}
-	units, err := uc.units.ListUnits(ctx, projectID, domain.UnitKindBeat)
-	if err != nil {
-		return nil, gate, sheetUnit, err
-	}
-	byKey := make(map[string]domain.ReviewUnit, len(units))
-	for _, u := range units {
-		byKey[u.Key] = u
-	}
-	out := make([]storedBeat, 0, len(gate.Order))
-	for _, key := range gate.Order {
-		u, ok := byKey[key]
-		if !ok {
-			continue
+	out := make([]storedBeat, 0, len(sheet.Beats))
+	for _, b := range sheet.Beats {
+		if b.Beat.Facts == nil {
+			b.Beat.Facts = []string{}
 		}
-		b, err := readBeat(u)
-		if err != nil {
-			return nil, gate, sheetUnit, err
-		}
-		out = append(out, storedBeat{unit: u, Beat: b})
+		stale := storyOK && b.StoryHash != "" && b.StoryHash != storyHash
+		out = append(out, storedBeat{unit: b.BeatSlot, Beat: b.Beat, stale: stale})
 	}
-	return out, gate, sheetUnit, nil
+	return out, gate, nil
 }
 
-func (uc *BeatDeskUseCase) saveBeat(ctx context.Context, projectID, key string, b domain.Beat, base domain.ReviewUnit) (domain.ReviewUnit, error) {
-	raw, err := json.Marshal(b)
-	if err != nil {
-		return domain.ReviewUnit{}, err
+// saveSheet stores the whole sheet: the beats in the order given and the gate.
+func (uc *BeatDeskUseCase) saveSheet(ctx context.Context, projectID string, beats []storedBeat, gate domain.BeatSheetGate) error {
+	sheet := domain.StoredBeatSheet{ProjectID: projectID, BeatSheetGate: gate, Beats: make([]domain.StoredBeat, 0, len(beats))}
+	for _, b := range beats {
+		sheet.Beats = append(sheet.Beats, domain.StoredBeat{BeatSlot: b.unit, Beat: b.Beat})
 	}
-	base.ProjectID, base.Kind, base.Key, base.Content = projectID, domain.UnitKindBeat, key, raw
-	return uc.units.SaveUnit(ctx, base)
+	return uc.sheets.SaveBeatSheet(ctx, sheet)
+}
+
+// newBeatSlot is the slot of a beat just built: waiting for review, from the
+// story with the given hash ("" for a beat the Creator added).
+func newBeatSlot(key, storyHash string) domain.BeatSlot {
+	return domain.BeatSlot{Key: key, Status: domain.UnitPending, CreatorFields: []string{}, StoryHash: storyHash}
 }
 
 // storyApproved reports whether the story is approved.
@@ -232,7 +193,7 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 			return BeatState{}, err
 		}
 	}
-	stored, gate, _, err := uc.beats(ctx, projectID)
+	stored, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return BeatState{}, err
 	}
@@ -279,7 +240,7 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	}
 	mustSet := toSet(must)
 	for _, b := range stored {
-		view := BeatView{Key: b.unit.Key, Beat: b.Beat, Status: b.unit.Status, Mine: append([]string{}, b.unit.CreatorFields...), Stale: b.unit.Stale, OnlyMust: []string{}, NoFact: b.Fn != domain.BeatFns[0] && len(b.Facts) == 0}
+		view := BeatView{Key: b.unit.Key, Beat: b.Beat, Status: b.unit.Status, Mine: append([]string{}, b.unit.CreatorFields...), Stale: b.stale, OnlyMust: []string{}, NoFact: b.Fn != domain.BeatFns[0] && len(b.Facts) == 0}
 		for _, id := range b.Facts {
 			if mustSet[id] && holders[id] == 1 {
 				view.OnlyMust = append(view.OnlyMust, id)
@@ -316,7 +277,7 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 // that dropping or changing the fact says what it sends back.
 func (uc *BeatDeskUseCase) FactDependents() FactDependentsFinder {
 	return func(ctx context.Context, projectID, factID string) ([]string, error) {
-		stored, _, _, err := uc.beats(ctx, projectID)
+		stored, _, err := uc.beats(ctx, projectID)
 		if err != nil {
 			return nil, err
 		}
@@ -338,25 +299,22 @@ func (uc *BeatDeskUseCase) Delete(ctx context.Context, projectID, key string) er
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
-	_, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	beats, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return err
 	}
-	at := indexOf(gate.Order, key)
+	at := indexOfBeat(beats, key)
 	if at < 0 {
 		return domain.ErrUnitNotFound
 	}
-	gate.Order = append(append([]string{}, gate.Order[:at]...), gate.Order[at+1:]...)
-	if len(gate.Order) == 0 {
+	beats = append(append([]storedBeat{}, beats[:at]...), beats[at+1:]...)
+	if len(beats) == 0 {
 		gate.SkeletonApproved, gate.Rebalanced = false, 0
 	}
-	if err := uc.saveSheet(ctx, sheetUnit, gate); err != nil {
+	if err := uc.saveSheet(ctx, projectID, beats, gate); err != nil {
 		return err
 	}
-	if err := uc.units.DeleteUnit(ctx, projectID, domain.UnitKindScriptBeat, key); err != nil {
-		return err
-	}
-	return uc.units.DeleteUnit(ctx, projectID, domain.UnitKindBeat, key)
+	return uc.units.DeleteUnit(ctx, projectID, domain.UnitKindScriptBeat, key)
 }
 
 // Reorder sets the order of the beats. order must name every beat once.
@@ -364,21 +322,22 @@ func (uc *BeatDeskUseCase) Reorder(ctx context.Context, projectID string, order 
 	if err := checkAuthoringUnlocked(ctx, uc.locks, projectID); err != nil {
 		return err
 	}
-	_, gate, sheetUnit, err := uc.beats(ctx, projectID)
+	beats, gate, err := uc.beats(ctx, projectID)
 	if err != nil {
 		return err
 	}
-	if len(order) != len(gate.Order) || len(toSet(order)) != len(order) {
+	if len(order) != len(beats) || len(toSet(order)) != len(order) {
 		return fmt.Errorf("%w: thứ tự phải nêu mỗi beat đúng một lần", domain.ErrInvalidUnitEdit)
 	}
-	have := toSet(gate.Order)
+	moved := make([]storedBeat, 0, len(beats))
 	for _, key := range order {
-		if !have[key] {
+		at := indexOfBeat(beats, key)
+		if at < 0 {
 			return fmt.Errorf("%w: không có beat %s", domain.ErrInvalidUnitEdit, key)
 		}
+		moved = append(moved, beats[at])
 	}
-	gate.Order = append([]string{}, order...)
-	return uc.saveSheet(ctx, sheetUnit, gate)
+	return uc.saveSheet(ctx, projectID, moved, gate)
 }
 
 func indexOfBeat(beats []storedBeat, key string) int {

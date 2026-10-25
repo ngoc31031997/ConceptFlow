@@ -49,6 +49,7 @@ func (s *fakeStories) ApprovedStory(context.Context, string) (domain.StoryStruct
 type beatFixture struct {
 	units   *briefUnits
 	store   *researchStore
+	sheets  *memBeatSheets
 	stories *fakeStories
 	briefs  *approvedSteps
 	llm     *beatLLM
@@ -61,11 +62,12 @@ func newBeatFixture() *beatFixture {
 	f := &beatFixture{
 		units:   units,
 		store:   &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration4to5},
+		sheets:  &memBeatSheets{},
 		stories: &fakeStories{},
 		briefs:  &approvedSteps{},
 		llm:     &beatLLM{replies: []string{beatReplyHook, beatReplyMiddle, beatReplyPayoff}},
 	}
-	f.uc = NewBeatDeskUseCase(f.store, f.stories, f.briefs, project, project, briefPrompts{}, f.llm, nil, 4000)
+	f.uc = NewBeatDeskUseCase(f.store, f.sheets, f.stories, f.briefs, project, project, briefPrompts{}, f.llm, nil, 4000)
 	return f
 }
 
@@ -107,17 +109,71 @@ func (f *beatFixture) saveFact(t *testing.T, id string, fact domain.Fact) {
 	}
 }
 
-func (f *beatFixture) beat(t *testing.T, key string) (domain.ReviewUnit, domain.Beat) {
+// memBeatSheets keeps the beat sheet in memory.
+type memBeatSheets struct {
+	sheet *domain.StoredBeatSheet
+}
+
+func (m *memBeatSheets) GetBeatSheet(_ context.Context, projectID string) (domain.StoredBeatSheet, error) {
+	if m.sheet == nil || m.sheet.ProjectID != projectID {
+		return domain.StoredBeatSheet{}, domain.ErrBeatSheetNotFound
+	}
+	// A copy, so a caller that changes it does not change what is stored.
+	raw, _ := json.Marshal(m.sheet.Beats)
+	out := *m.sheet
+	out.Beats = nil
+	_ = json.Unmarshal(raw, &out.Beats)
+	return out, nil
+}
+
+func (m *memBeatSheets) SaveBeatSheet(_ context.Context, sheet domain.StoredBeatSheet) error {
+	raw, _ := json.Marshal(sheet.Beats)
+	stored := sheet
+	stored.Beats = nil
+	_ = json.Unmarshal(raw, &stored.Beats)
+	m.sheet = &stored
+	return nil
+}
+
+// beat returns the slot and the content of a stored beat.
+func (f *beatFixture) beat(t *testing.T, key string) (domain.BeatSlot, domain.Beat) {
 	t.Helper()
-	u, err := f.units.GetUnit(context.Background(), "p1", domain.UnitKindBeat, key)
+	sheet, err := f.sheets.GetBeatSheet(context.Background(), "p1")
 	if err != nil {
 		t.Fatalf("beat %s: %v", key, err)
 	}
-	b, err := readBeat(u)
+	for _, b := range sheet.Beats {
+		if b.Key == key {
+			return b.BeatSlot, b.Beat
+		}
+	}
+	t.Fatalf("beat %s: not in the sheet", key)
+	return domain.BeatSlot{}, domain.Beat{}
+}
+
+// patchBeat changes a stored beat in place.
+func (f *beatFixture) patchBeat(t *testing.T, key string, change func(*domain.StoredBeat)) {
+	t.Helper()
+	sheet, err := f.sheets.GetBeatSheet(context.Background(), "p1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	return u, b
+	for i := range sheet.Beats {
+		if sheet.Beats[i].Key == key {
+			change(&sheet.Beats[i])
+			if err := f.sheets.SaveBeatSheet(context.Background(), sheet); err != nil {
+				t.Fatal(err)
+			}
+			return
+		}
+	}
+	t.Fatalf("beat %s: not in the sheet", key)
+}
+
+// putBeat sets the content and review state of a stored beat.
+func (f *beatFixture) putBeat(t *testing.T, key string, status domain.UnitStatus, beat domain.Beat) {
+	t.Helper()
+	f.patchBeat(t, key, func(b *domain.StoredBeat) { b.Status, b.Beat = status, beat })
 }
 
 // skeleton opens the step, builds the skeleton and gives the hook the must fact F01.
@@ -127,7 +183,7 @@ func (f *beatFixture) skeleton(t *testing.T) {
 	if err := f.uc.BuildSkeleton(context.Background(), "p1"); err != nil {
 		t.Fatalf("BuildSkeleton: %v", err)
 	}
-	if _, err := f.uc.BeatUnitKind().Edit(context.Background(), "p1", "b1", map[string]string{"facts": "F01"}); err != nil {
+	if err := f.uc.Edit(context.Background(), "p1", "b1", map[string]string{"facts": "F01"}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -255,9 +311,7 @@ func TestDeletingEveryBeatOpensTheSkeletonAgain(t *testing.T) {
 func TestBuildSkeletonIgnoresAnApprovalLeftOnAnEmptySheet(t *testing.T) {
 	f := newBeatFixture()
 	f.open(t)
-	sheet, gate, _ := f.uc.sheet(context.Background(), "p1")
-	gate.SkeletonApproved = true
-	if err := f.uc.saveSheet(context.Background(), sheet, gate); err != nil {
+	if err := f.sheets.SaveBeatSheet(context.Background(), domain.StoredBeatSheet{ProjectID: "p1", BeatSheetGate: domain.BeatSheetGate{NextSeq: 1, SkeletonApproved: true}}); err != nil {
 		t.Fatal(err)
 	}
 	if err := f.uc.BuildSkeleton(context.Background(), "p1"); err != nil {
@@ -398,11 +452,7 @@ func TestGenerateOnlyUnwrittenLeavesWrittenBeatsAlone(t *testing.T) {
 func TestGenerateOnlyUnwrittenKeepsApprovedLengths(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	u, b := f.beat(t, "b2")
-	u.Status = domain.UnitApproved
-	if _, err := f.uc.saveBeat(context.Background(), "p1", "b2", b, u); err != nil {
-		t.Fatal(err)
-	}
+	f.patchBeat(t, "b2", func(b *domain.StoredBeat) { b.Status = domain.UnitApproved })
 	if _, err := f.uc.Add(context.Background(), "p1", "b1", true, ""); err != nil {
 		t.Fatal(err)
 	}
@@ -425,11 +475,10 @@ func TestRedoWritesABeatOfTheSkeletonThatHasNoContent(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.llm.say(strings.Replace(beatReplyMiddle, `"fn":"Giải thích cơ chế"`, `"fn":"Cao trào"`, 1))
-	unit, err := f.uc.BeatUnitKind().Redo(context.Background(), "p1", "b2", "")
-	if err != nil {
+	if err := f.uc.Redo(context.Background(), "p1", "b2", ""); err != nil {
 		t.Fatalf("Redo: %v", err)
 	}
-	b, _ := readBeat(unit)
+	_, b := f.beat(t, "b2")
 	if !b.Written() || b.Fn != "Giải thích cơ chế" || strings.Join(b.Facts, ",") != "F02" || b.Step != "Ong chui qua cửa hẹp." {
 		t.Errorf("beat = %+v, want the content written with the skeleton's function, facts and step", b)
 	}
@@ -441,7 +490,7 @@ func TestRedoWritesABeatOfTheSkeletonThatHasNoContent(t *testing.T) {
 func TestRedoBeforeTheSkeletonIsApprovedIsRefused(t *testing.T) {
 	f := newBeatFixture()
 	f.skeleton(t)
-	if _, err := f.uc.BeatUnitKind().Redo(context.Background(), "p1", "b2", ""); !errors.Is(err, ErrBeatSkeletonNeeded) {
+	if err := f.uc.Redo(context.Background(), "p1", "b2", ""); !errors.Is(err, ErrBeatSkeletonNeeded) {
 		t.Errorf("err = %v, want the skeleton to be approved first", err)
 	}
 }
@@ -461,7 +510,7 @@ func TestGenerateRefusesBeforeTheStoryIsApproved(t *testing.T) {
 func TestGenerateKeepsWhatTheCreatorWrote(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	if _, err := f.uc.BeatUnitKind().Edit(context.Background(), "p1", "b2", map[string]string{"goal": "Mục tiêu của tôi"}); err != nil {
+	if err := f.uc.Edit(context.Background(), "p1", "b2", map[string]string{"goal": "Mục tiêu của tôi"}); err != nil {
 		t.Fatal(err)
 	}
 	f.llm.say(beatReplyHook, strings.Replace(beatReplyMiddle, `"goal":"Ong mất cánh"`, `"goal":"AI viết lại"`, 1), beatReplyPayoff)
@@ -480,13 +529,11 @@ func TestGenerateKeepsWhatTheCreatorWrote(t *testing.T) {
 func TestEditMarksTheFieldAsTheCreatorsAndSendsTheBeatBackToReview(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	kind := f.uc.BeatUnitKind()
-	f.save(t, domain.UnitKindBeat, "b1", domain.UnitApproved, domain.Beat{Fn: "Hook", Title: "t", Goal: "g", Content: "c", Facts: []string{}, Dur: 18})
-	unit, err := kind.Edit(context.Background(), "p1", "b1", map[string]string{"dur": "23", "facts": "f1, F02", "fn": "Đặt vấn đề"})
-	if err != nil {
+	f.putBeat(t, "b1", domain.UnitApproved, domain.Beat{Fn: "Hook", Title: "t", Goal: "g", Content: "c", Facts: []string{}, Dur: 18})
+	if err := f.uc.Edit(context.Background(), "p1", "b1", map[string]string{"dur": "23", "facts": "f1, F02", "fn": "Đặt vấn đề"}); err != nil {
 		t.Fatalf("Edit: %v", err)
 	}
-	b, _ := readBeat(unit)
+	unit, b := f.beat(t, "b1")
 	if b.Dur != 23 || strings.Join(b.Facts, ",") != "F01,F02" || b.Fn != "Đặt vấn đề" || unit.Status != domain.UnitPending {
 		t.Errorf("beat = %+v status=%s", b, unit.Status)
 	}
@@ -498,12 +545,11 @@ func TestEditMarksTheFieldAsTheCreatorsAndSendsTheBeatBackToReview(t *testing.T)
 func TestEditRefusesWhatABeatCannotHold(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	kind := f.uc.BeatUnitKind()
 	bad := []map[string]string{
 		{"dur": "2"}, {"dur": "abc"}, {"fn": "Mở bài"}, {"facts": "F77"}, {"facts": "xyz"}, {"title": " "}, {"colour": "red"}, {},
 	}
 	for _, fields := range bad {
-		if _, err := kind.Edit(context.Background(), "p1", "b1", fields); !errors.Is(err, domain.ErrInvalidUnitEdit) {
+		if err := f.uc.Edit(context.Background(), "p1", "b1", fields); !errors.Is(err, domain.ErrInvalidUnitEdit) {
 			t.Errorf("Edit(%v) err = %v, want ErrInvalidUnitEdit", fields, err)
 		}
 	}
@@ -515,12 +561,10 @@ func TestEditRefusesWhatABeatCannotHold(t *testing.T) {
 func TestEmptyGoalCannotBeApproved(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	kind := f.uc.BeatUnitKind()
-	if _, err := kind.Edit(context.Background(), "p1", "b1", map[string]string{"goal": ""}); err != nil {
+	if err := f.uc.Edit(context.Background(), "p1", "b1", map[string]string{"goal": ""}); err != nil {
 		t.Fatal(err)
 	}
-	u, _ := f.units.GetUnit(context.Background(), "p1", domain.UnitKindBeat, "b1")
-	if err := kind.CheckApprovable(context.Background(), u); !errors.Is(err, ErrBeatNoGoal) {
+	if err := f.uc.Approve(context.Background(), "p1", "b1"); !errors.Is(err, ErrBeatNoGoal) {
 		t.Errorf("err = %v, want ErrBeatNoGoal", err)
 	}
 }
@@ -528,16 +572,14 @@ func TestEmptyGoalCannotBeApproved(t *testing.T) {
 func TestRedoWritesOnlyThatBeatAndReleasesItsCreatorFields(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	kind := f.uc.BeatUnitKind()
-	if _, err := kind.Edit(context.Background(), "p1", "b2", map[string]string{"title": "Của tôi"}); err != nil {
+	if err := f.uc.Edit(context.Background(), "p1", "b2", map[string]string{"title": "Của tôi"}); err != nil {
 		t.Fatal(err)
 	}
 	f.llm.say(`{"beats":[{"key":"b2","fn":"Cao trào","title":"Viết lại","goal":"G","content":"C","facts":["F02"],"dur":40,"next":"N"}]}`)
-	unit, err := kind.Redo(context.Background(), "p1", "b2", "ngắn hơn")
-	if err != nil {
+	if err := f.uc.Redo(context.Background(), "p1", "b2", "ngắn hơn"); err != nil {
 		t.Fatalf("Redo: %v", err)
 	}
-	b, _ := readBeat(unit)
+	unit, b := f.beat(t, "b2")
 	if b.Title != "Viết lại" || unit.RedoCount != 1 || len(unit.CreatorFields) != 0 || unit.Status != domain.UnitPending {
 		t.Errorf("beat = %+v redo=%d mine=%v", b, unit.RedoCount, unit.CreatorFields)
 	}
@@ -601,7 +643,7 @@ func TestAddNeedsAnAnchorOnceTheSheetHasBeats(t *testing.T) {
 func TestReorderChangesOnlyTheOrder(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
-	f.save(t, domain.UnitKindBeat, "b1", domain.UnitApproved, domain.Beat{Fn: "Hook", Title: "t", Goal: "g", Content: "c", Facts: []string{}, Dur: 18})
+	f.putBeat(t, "b1", domain.UnitApproved, domain.Beat{Fn: "Hook", Title: "t", Goal: "g", Content: "c", Facts: []string{}, Dur: 18})
 	if err := f.uc.Reorder(context.Background(), "p1", []string{"b2", "b1", "b3"}); err != nil {
 		t.Fatalf("Reorder: %v", err)
 	}
@@ -638,20 +680,12 @@ func TestStateIsApprovedOnlyWhenEveryBeatIs(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)
 	for _, key := range []string{"b1", "b2"} {
-		u, b := f.beat(t, key)
-		u.Status = domain.UnitApproved
-		if _, err := f.uc.saveBeat(context.Background(), "p1", key, b, u); err != nil {
-			t.Fatal(err)
-		}
+		f.patchBeat(t, key, func(b *domain.StoredBeat) { b.Status = domain.UnitApproved })
 	}
 	if state, _ := f.uc.State(context.Background(), "p1"); state.Status != domain.UnitPending {
 		t.Error("two of three approved must still wait for review")
 	}
-	u, b := f.beat(t, "b3")
-	u.Status = domain.UnitApproved
-	if _, err := f.uc.saveBeat(context.Background(), "p1", "b3", b, u); err != nil {
-		t.Fatal(err)
-	}
+	f.patchBeat(t, "b3", func(b *domain.StoredBeat) { b.Status = domain.UnitApproved })
 	if state, _ := f.uc.State(context.Background(), "p1"); state.Status != domain.UnitApproved {
 		t.Error("every beat approved must approve the sheet")
 	}

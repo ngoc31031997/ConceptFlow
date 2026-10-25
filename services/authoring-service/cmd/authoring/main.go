@@ -153,9 +153,9 @@ func main() {
 	story := application.NewStoryDeskUseCase(
 		authoringRepo, projectBrief, research, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(story.FactDependents())
-	// The beat sheet step: each beat is a review unit; the gate only holds their order.
+	// The beat sheet step: the beats and their gate are one row of project_beat_sheet.
 	beats := application.NewBeatDeskUseCase(
-		authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
+		authoringRepo, authoringRepo, story, projectBrief, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens)
 	research.RegisterFactDependents(beats.FactDependents())
 	// The script step: each beat's dialogue is a review unit; the voice lines
 	// hold the reading of each line, which the orchestrator gets read.
@@ -169,7 +169,6 @@ func main() {
 	scriptLock := application.NewScriptLockDeskUseCase(
 		authoringRepo, projects, projects, authoringRepo, llmProvider, llmUsageRecorder, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
-		Register(domain.UnitKindBeat, beats.BeatUnitKind()).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
 		Register(domain.UnitKindIdea, idea).

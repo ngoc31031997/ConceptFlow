@@ -1,17 +1,25 @@
 # Beat sheet: API của bước 5 (`/v1`)
 
-Bước Beat sheet (authoring-service) chia câu chuyện đã duyệt thành các beat, giữ thứ tự và thời lượng của chúng, theo hai giai đoạn: **bộ khung** (code dựng từ câu chuyện, không gọi AI: chức năng và dữ kiện của từng beat, Creator duyệt) rồi **nội dung** (AI viết từng beat một, theo thứ tự, từ bộ khung đã duyệt). Mọi đường dẫn nằm dưới `/v1` (ADR-0008) qua api-gateway; chỉ thêm trường thì giữ `/v1`. Mã tương ứng: `services/authoring-service/internal/domain/beat.go` (đọc câu trả lời AI, kiểm cấu trúc), `internal/application/beat_*.go`, `internal/adapters/http/beat.go`.
+Bước Beat sheet (authoring-service) chia câu chuyện đã duyệt thành các beat, giữ thứ tự và thời lượng của chúng, theo hai giai đoạn: **bộ khung** (code dựng từ câu chuyện, không gọi AI: chức năng và dữ kiện của từng beat, Creator duyệt) rồi **nội dung** (AI viết từng beat một, theo thứ tự, từ bộ khung đã duyệt). Mọi đường dẫn nằm dưới `/v1` (ADR-0008) qua api-gateway; chỉ thêm trường thì giữ `/v1`. Mã tương ứng: `services/authoring-service/internal/domain/beat.go` và `beat_sheet_store.go` (kiểu, đọc câu trả lời AI, kiểm cấu trúc), `internal/application/beat_*.go`, `internal/adapters/http/beat.go`, `internal/adapters/postgres/beat_sheet_repository.go`.
 
-## Đơn vị duyệt
+## Bảng `project_beat_sheet`
 
-| Kind | Key | Nội dung (`content`) |
+Một dòng một dự án; các beat nằm trong cột `beats` theo đúng thứ tự video chạy, và mỗi lần đổi là một lệnh ghi cả dòng. Bước này không dùng bảng `review_units` và không đi qua API đơn vị chung `/units/…`.
+
+| Cột | Kiểu | Ý nghĩa |
 |---|---|---|
-| `beat` | `b1`, `b2`… (khoá bền, không dùng lại; đổi thứ tự không đổi khoá) | `{fn, title, goal, content, facts[], dur, next, step}`; `step` là dòng của câu chuyện mà beat dựng từ đó (rỗng với beat Creator tự thêm); beat của bộ khung chưa có `goal` và `content` |
-| `beat_sheet` | `main` | `{order[], next_seq, skeleton_approved, rebalanced}`: thứ tự beat, số của khoá kế tiếp, bộ khung đã duyệt chưa, và số beat bị cân lại thời lượng ở lần viết nội dung gần nhất; không qua API đơn vị chung |
+| `project_id` | text, khoá | |
+| `beats` | jsonb, mảng có thứ tự, tối đa 20 | mỗi phần tử `{key, status, creator_fields[], redo_count, story_hash, beat}` với `beat = {fn, title, goal, content, facts[], dur, next, step}` |
+| `next_seq` | int | số của khoá kế tiếp (`b1`, `b2`…; khoá bền, không dùng lại, đổi thứ tự không đổi khoá) |
+| `skeleton_approved` | bool | bộ khung đã duyệt chưa |
+| `rebalanced` | int | số beat bị cân lại thời lượng ở lần viết nội dung gần nhất |
+| `updated_at` | timestamptz | |
 
-`fn` là một trong `Hook`, `Đặt vấn đề`, `Giải thích cơ chế`, `Cao trào`, `Mở rộng hệ quả`, `Payoff`; `dur` là số giây (5 đến 600). Bước xong khi có beat và mọi beat đã duyệt (`status` của màn).
+`step` là dòng của câu chuyện mà beat dựng từ đó (rỗng với beat Creator tự thêm); beat của bộ khung chưa có `goal` và `content`. `status` là `pending` hoặc `approved`; `creator_fields` là các trường Creator đã viết, AI giữ khi viết lại. `story_hash` là băm của câu chuyện lúc AI viết beat: khác băm của câu chuyện đã duyệt hiện nay thì `stale = true` ở `GET /beats`. `fn` là một trong `Hook`, `Đặt vấn đề`, `Giải thích cơ chế`, `Cao trào`, `Mở rộng hệ quả`, `Payoff`; `dur` là số giây (5 đến 600). Bước xong khi có beat và mọi beat đã duyệt (`status` của màn).
 
-`beat` dựng từ `story:main` (`input_ref`). Sửa, làm lại, duyệt qua API đơn vị chung: `PUT /v1/projects/{id}/units/beat/{key}` với `{"fields":{…}}` gồm một hay nhiều trong `title`, `goal`, `content`, `next` (chữ), `fn`, `dur` (số giây, chuỗi số), `facts` (`"F01, F02"`, mã dữ kiện đang giữ); `POST …/redo` (AI viết riêng beat đó, đọc các beat còn lại và ngân sách thời lượng; dùng cả cho beat của bộ khung chưa có nội dung; chức năng và dữ kiện giữ nguyên, phần chữ Creator đã viết được thả ra, thời lượng Creator đã đặt giữ; cần bộ khung đã duyệt, và nếu đó là beat cuối chưa viết thì tổng thời lượng được đưa vào mục tiêu); `POST …/approve` (cần có mục tiêu). Trường nào đổi giá trị thì thành của Creator (`mine`) và AI giữ khi viết lại cả bảng; beat sửa xong về chờ duyệt.
+Bước Viết kịch bản ghi `input_ref = beat:<key>` và băm `md5(beat::text)` của phần `beat` (không tính `status`) vào mỗi đơn vị lời thoại; lời thoại viết từ một beat mà nội dung đã đổi hiện là cũ.
+
+Sửa, làm lại, duyệt từng beat: `PUT /v1/projects/{id}/beats/{key}` với `{"fields":{…}}` gồm một hay nhiều trong `title`, `goal`, `content`, `next` (chữ), `fn`, `dur` (số giây, chuỗi số), `facts` (`"F01, F02"`, mã dữ kiện đang giữ); `POST …/beats/{key}/redo` (AI viết riêng beat đó, đọc các beat còn lại và ngân sách thời lượng; dùng cả cho beat của bộ khung chưa có nội dung; chức năng và dữ kiện giữ nguyên, phần chữ Creator đã viết được thả ra, thời lượng Creator đã đặt giữ; cần bộ khung đã duyệt, và nếu đó là beat cuối chưa viết thì tổng thời lượng được đưa vào mục tiêu); `POST …/beats/{key}/approve` (cần có mục tiêu) và `…/unapprove`; `GET …/beats/{key}/impact` (lời thoại đã viết cho beat). Mỗi lệnh trả toàn bộ state như `GET /beats`. Trường nào đổi giá trị thì thành của Creator (`mine`) và AI giữ khi viết lại cả bảng; beat sửa xong về chờ duyệt.
 
 ## Đường dẫn
 
