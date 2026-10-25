@@ -98,24 +98,16 @@ export function ScriptWriteStepPage() {
             </div>
           </Card>
         )}
-        {s.beatsApproved && s.stats.written > 0 && (
-          <>
-            <ScriptOverviewCard state={s} player={script.player} disabled={locked} />
-            <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
-              <Button
-                variant="ghost"
-                className={researchStyles.sm}
-                onClick={() => void script.approveAll()}
-                disabled={busy || pending === 0}
-                data-testid="script-approve-all"
-              >
-                Duyệt tất cả beat còn lại
-              </Button>
-            </div>
-          </>
-        )}
+        {s.beatsApproved && s.stats.written > 0 && <ScriptOverviewCard state={s} player={script.player} disabled={locked} />}
         {s.beatsApproved &&
           s.beats.map((beat) => <ScriptBeatCard key={beat.key} projectId={projectId} beat={beat} script={script} aiAvailable={aiAvailable} locked={locked} highlight={highlight} />)}
+        {s.beatsApproved && s.stats.written > 0 && (
+          <div className={`${researchStyles.actions} ${researchStyles.actionsEnd}`}>
+            <Button onClick={() => void script.approveAll()} disabled={busy || pending === 0} data-testid="script-approve-all">
+              Duyệt tất cả beat còn lại
+            </Button>
+          </div>
+        )}
         {script.actionError && (
           <p className={researchStyles.error} role="alert" data-testid="script-error">
             {script.actionError}
