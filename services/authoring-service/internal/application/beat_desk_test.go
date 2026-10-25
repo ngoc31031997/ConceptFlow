@@ -572,6 +572,42 @@ func TestEmptyGoalCannotBeApproved(t *testing.T) {
 	}
 }
 
+func TestRedoDoesNotShowTheModelTheWordingItIsRewriting(t *testing.T) {
+	f := newBeatFixture()
+	f.generate(t)
+	_, b := f.beat(t, "b2")
+	f.llm.say(`{"beats":[{"key":"b2","fn":"Cao trào","title":"Viết lại","goal":"G","content":"C","facts":["F02"],"dur":40,"next":"N"}]}`)
+	if err := f.uc.Redo(context.Background(), "p1", "b2", ""); err != nil {
+		t.Fatalf("Redo: %v", err)
+	}
+	prompt := f.llm.systems[0]
+	if strings.Contains(prompt, "mục tiêu: "+b.Goal) || strings.Contains(prompt, "nội dung: "+b.Content) {
+		t.Errorf("old goal %q / content %q of the beat being rewritten leaked into the prompt:\n%s", b.Goal, b.Content, prompt)
+	}
+	if _, other := f.beat(t, "b1"); !strings.Contains(prompt, "nội dung: "+other.Content) {
+		t.Error("the other beats must stay in the prompt so the story reads on")
+	}
+}
+
+func TestAWrongLanguageReplyIsAskedForAgainAndNeverStored(t *testing.T) {
+	f := newBeatFixture()
+	f.skeleton(t)
+	if err := f.uc.ApproveSkeleton(context.Background(), "p1"); err != nil {
+		t.Fatal(err)
+	}
+	chinese := strings.Replace(beatReplyHook, `"goal":"Gây tò mò"`, `"goal":"回答开场问题"`, 1)
+	f.llm.say(chinese, beatReplyHook, beatReplyMiddle, beatReplyPayoff)
+	if err := f.uc.Generate(context.Background(), "p1", "", false); err != nil {
+		t.Fatalf("Generate: %v", err)
+	}
+	if !strings.Contains(f.llm.systems[1], "LẦN VIẾT TRƯỚC SAI") || !strings.Contains(f.llm.systems[1], "chữ Hán") {
+		t.Error("the second ask must carry what was wrong: the reply left the content language")
+	}
+	if _, b := f.beat(t, "b1"); b.Goal != "Gây tò mò" {
+		t.Errorf("stored goal = %q, want the Vietnamese one", b.Goal)
+	}
+}
+
 func TestRedoWritesOnlyThatBeatAndReleasesItsCreatorFields(t *testing.T) {
 	f := newBeatFixture()
 	f.generate(t)

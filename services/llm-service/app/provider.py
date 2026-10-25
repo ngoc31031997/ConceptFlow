@@ -12,7 +12,7 @@ import logging
 import random
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import httpx
 import openai
@@ -92,6 +92,42 @@ def kind_for_status(status: int) -> str:
     return errors.MALFORMED
 
 
+# Vietnamese with diacritics costs about two characters per token on the small
+# models Ollama runs; counting two keeps the estimate on the cautious side.
+CHARS_PER_TOKEN = 2
+# Share of the window the prompt may take; the rest is left for the reply. A longer prompt is cut
+# in the middle, because Ollama would otherwise drop its beginning without a word.
+PROMPT_SHARE_OF_CONTEXT = 0.85
+
+
+def estimate_prompt_tokens(req: ChatRequest) -> int:
+    return -(-(len(req.system) + len(req.user)) // CHARS_PER_TOKEN)
+
+
+TRIM_MARKER = "\n[... phần giữa bị cắt vì prompt vượt cửa sổ ngữ cảnh ...]\n"
+
+
+def _trim_middle(text: str, max_chars: int) -> str:
+    """Keeps the beginning (role, language) and the end (task, output format) and drops the middle."""
+    if len(text) <= max_chars:
+        return text
+    room = max(max_chars - len(TRIM_MARKER), 0)
+    head = room * 2 // 5
+    return text[:head] + TRIM_MARKER + text[len(text) - (room - head):]
+
+
+def _fit_to_context(req: ChatRequest, num_ctx: int) -> ChatRequest:
+    """The request cut to the share of the window a prompt may take, or `req` itself when it fits."""
+    if num_ctx <= 0 or estimate_prompt_tokens(req) <= int(num_ctx * PROMPT_SHARE_OF_CONTEXT):
+        return req
+    budget = int(num_ctx * PROMPT_SHARE_OF_CONTEXT) * CHARS_PER_TOKEN
+    system = _trim_middle(req.system, max(budget - len(req.user), budget // 2))
+    user = _trim_middle(req.user, max(budget - len(system), 0))
+    logger.warning("prompt of ~%d tokens cut to fit num_ctx=%d (system %d->%d chars, user %d->%d chars)",
+                   estimate_prompt_tokens(req), num_ctx, len(req.system), len(system), len(req.user), len(user))
+    return replace(req, system=system, user=user)
+
+
 def _backoff(attempt: int) -> float:
     return float(1 << (attempt - 1)) + random.random() * 0.25
 
@@ -110,9 +146,12 @@ class Provider:
         extra_headers: dict[str, str] | None = None,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         call_log: CallLogPort | None = None,
+        num_ctx: int = 0,
     ) -> None:
         self.name = name
         self._call_log = call_log
+        # Context window sent with each call; 0 leaves it to the provider.
+        self._num_ctx = num_ctx
         self.default_model = default_model
         self._api_key = api_key
         self._max_retries = max_retries
@@ -130,7 +169,9 @@ class Provider:
         return bool(self._api_key)
 
     async def chat(self, req: ChatRequest, on_progress: ProgressFn | None = None) -> ChatResult:
-        """One call, retries included, logged as one llm_calls row."""
+        """One call, retries included, logged as one llm_calls row. A prompt too long for the context
+        window is cut before it goes out and logged as sent."""
+        req = _fit_to_context(req, self._num_ctx)
         if self._call_log is None:
             return await self._chat_with_retries(req, on_progress)
         call_id, started = new_call_id(), time.monotonic()
@@ -160,6 +201,8 @@ class Provider:
             reasoning_tokens=usage.reasoning_tokens, cached_tokens=usage.cached_tokens,
             reasoning_chars=usage.reasoning_chars, usage_reported=usage.usage_reported,
             duration_ms=int((time.monotonic() - started) * 1000),
+            prompt_chars=len(req.system) + len(req.user), num_ctx=self._num_ctx,
+            system_prompt=req.system, user_prompt=req.user,
         )
         try:
             await self._call_log.record(rec)
@@ -218,6 +261,8 @@ class Provider:
             kwargs["max_tokens"] = req.max_tokens
         if req.json_mode:
             kwargs["response_format"] = {"type": "json_object"}
+        if self._num_ctx > 0:
+            kwargs["extra_body"] = {"options": {"num_ctx": self._num_ctx}}
 
         if self._limiter:
             await self._limiter.acquire()

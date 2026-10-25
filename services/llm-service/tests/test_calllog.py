@@ -36,7 +36,55 @@ async def test_a_call_is_logged_with_its_origin_response_and_cost(no_sleep, call
     assert (row.project_id, row.role, row.step, row.phase) == ("p1", "story_frame", "story", "write")
     assert row.ok and row.response == "hello" and row.model == "m1" and row.provider == "hive"
     assert (row.prompt_tokens, row.completion_tokens) == (7, 3)
+    assert (row.system_prompt, row.user_prompt) == ("SECRET SYSTEM", "SECRET PROMPT")
+    assert row.prompt_chars == len("SECRET SYSTEM") + len("SECRET PROMPT")
     assert "SECRET" not in json.dumps(row.to_dict())
+    assert row.to_dict(with_prompt=True)["system_prompt"] == "SECRET SYSTEM"
+
+
+@respx.mock
+async def test_the_detail_endpoint_returns_the_prompt_the_list_leaves_out(call_log):
+    respx.post(HIVE).mock(return_value=reply("hi"))
+    client = app_client(call_log)
+    await client.post("/v1/chat", json={"system": "SYS", "user": "USR", "step": "beat"})
+    [row] = (await client.get("/v1/llm/calls")).json()["calls"]
+    assert "system_prompt" not in row and row["prompt_chars"] == 6
+    detail = (await client.get(f"/v1/llm/calls/{row['call_id']}")).json()
+    assert (detail["system_prompt"], detail["user_prompt"], detail["response"]) == ("SYS", "USR", "hi")
+    assert (await client.get("/v1/llm/calls/not-a-call")).status_code == 404
+
+
+@respx.mock
+async def test_ollama_gets_its_context_window_and_the_log_records_it(no_sleep, call_log):
+    route = respx.post(URL).mock(return_value=stream_response(chunk("ok", finish="stop"), usage_chunk({})))
+    provider = Provider("ollama", BASE, "ollama", "qwen", timeout=5, max_retries=0, sleep=no_sleep,
+                        call_log=call_log, num_ctx=8192)
+    await provider.chat(ChatRequest(user="u"))
+    assert json.loads(route.calls.last.request.content)["options"] == {"num_ctx": 8192}
+    assert call_log.rows[0].num_ctx == 8192
+
+
+@respx.mock
+async def test_a_prompt_the_window_cannot_hold_is_cut_in_the_middle_and_logged_as_sent(no_sleep, call_log):
+    route = respx.post(URL).mock(return_value=stream_response(chunk("ok", finish="stop"), usage_chunk({})))
+    provider = Provider("ollama", BASE, "ollama", "qwen", timeout=5, max_retries=2, sleep=no_sleep,
+                        call_log=call_log, num_ctx=1000)
+    system = "ROLE " + "m" * 3000 + " TASK"
+    res = await provider.chat(ChatRequest(system=system, user="go"))
+    assert res.content == "ok"
+    sent = json.loads(route.calls.last.request.content)["messages"][0]["content"]
+    assert sent.startswith("ROLE ") and sent.endswith(" TASK") and "bị cắt" in sent
+    assert len(sent) + 2 <= int(1000 * 0.85) * 2
+    [row] = call_log.rows
+    assert row.ok and row.system_prompt == sent and row.prompt_chars == len(sent) + 2
+
+
+@respx.mock
+async def test_a_prompt_that_fits_the_window_goes_out(no_sleep, call_log):
+    respx.post(URL).mock(return_value=stream_response(chunk("ok", finish="stop"), usage_chunk({})))
+    provider = Provider("ollama", BASE, "ollama", "qwen", timeout=5, max_retries=0, sleep=no_sleep,
+                        call_log=call_log, num_ctx=1000)
+    assert (await provider.chat(ChatRequest(user="y" * 1600))).content == "ok"
 
 
 @respx.mock

@@ -1310,7 +1310,7 @@ export function listRecentEvents(limit = 500): Promise<ProjectEvent[]> {
   return apiFetch<ProjectEvent[]>(`/v1/events?limit=${limit}`);
 }
 
-/** Một dòng nhật ký cuộc gọi AI của llm-service: phản hồi thô và chi phí, không có prompt. */
+/** Một dòng nhật ký cuộc gọi AI của llm-service: phản hồi thô, chi phí và cỡ prompt; prompt đầy đủ lấy bằng `getLlmCall`. */
 export interface LlmCall {
   call_id: string;
   created_at: string;
@@ -1331,6 +1331,16 @@ export interface LlmCall {
   reasoning_chars: number;
   usage_reported: boolean;
   duration_ms: number;
+  /** Số ký tự của system + user prompt đã gửi. */
+  prompt_chars: number;
+  /** Cửa sổ ngữ cảnh gửi cho Ollama; 0 khi nhà cung cấp tự đặt. */
+  num_ctx: number;
+}
+
+/** Một cuộc gọi kèm prompt đã gửi. */
+export interface LlmCallDetail extends LlmCall {
+  system_prompt: string;
+  user_prompt: string;
 }
 
 export interface LlmCallsFilter {
@@ -1356,6 +1366,10 @@ export function listLlmCalls(filter: LlmCallsFilter = {}): Promise<LlmCallsPage>
   if (filter.before) q.set("before", filter.before);
   q.set("limit", String(filter.limit ?? 100));
   return apiFetch<LlmCallsPage>(`/v1/llm/calls?${q.toString()}`);
+}
+
+export function getLlmCall(callId: string): Promise<LlmCallDetail> {
+  return apiFetch<LlmCallDetail>(`/v1/llm/calls/${encodeURIComponent(callId)}`);
 }
 
 /** Chọn đúng một cách: các dòng đã chọn, các dòng cũ hơn N ngày, hoặc tất cả. */

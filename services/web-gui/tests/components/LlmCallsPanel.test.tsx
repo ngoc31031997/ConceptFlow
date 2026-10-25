@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { LlmCallsPanel } from "../../src/components/LlmCallsPanel";
-import type { LlmCall, LlmCallsPage } from "../../src/api/client";
+import type { LlmCall, LlmCallDetail, LlmCallsPage } from "../../src/api/client";
 import { ThemeProvider } from "../../src/context/ThemeContext";
 
 function call(over: Partial<LlmCall>): LlmCall {
@@ -9,7 +9,7 @@ function call(over: Partial<LlmCall>): LlmCall {
     call_id: "c1", created_at: "2026-10-25T10:00:00Z", provider: "hive", model: "m1", role: "story_frame",
     step: "story", phase: "", project_id: "aaaaaaaa-1111", response: '{"title":"T"}', ok: true, error_kind: "",
     error_message: "", prompt_tokens: 10, completion_tokens: 5, reasoning_tokens: 0, cached_tokens: 0,
-    reasoning_chars: 0, usage_reported: true, duration_ms: 1500, ...over,
+    reasoning_chars: 0, usage_reported: true, duration_ms: 1500, prompt_chars: 4200, num_ctx: 8192, ...over,
   };
 }
 
@@ -29,6 +29,13 @@ function serve(state: { calls: LlmCall[]; next?: string | null }) {
       if (body.ids) state.calls = state.calls.filter((c) => !body.ids.includes(c.call_id));
       else state.calls = [];
       return { ok: true, status: 200, json: async () => ({ deleted: before - state.calls.length }) };
+    }
+    const one = String(url).match(/\/v1\/llm\/calls\/([^/?]+)$/);
+    if (one) {
+      const row = state.calls.find((c) => c.call_id === decodeURIComponent(one[1]));
+      if (!row) return { ok: false, status: 404, json: async () => ({ error: "no call" }) };
+      const detail: LlmCallDetail = { ...row, system_prompt: `SYS of ${row.call_id}`, user_prompt: `USR of ${row.call_id}` };
+      return { ok: true, status: 200, json: async () => detail };
     }
     const page: LlmCallsPage = { calls: state.calls, next_before: state.next ?? null };
     return { ok: true, status: 200, json: async () => page };
@@ -85,6 +92,37 @@ describe("LlmCallsPanel", () => {
     expect(dialog).toHaveTextContent("c2");
     expect(dialog).toHaveTextContent("cut off");
     expect(within(dialog).getByTestId("llm-response-copy")).toBeInTheDocument();
+  });
+
+  it("shows the system and user prompt that went out, each ready to copy, with the context window", async () => {
+    const requests = serve({ calls: rows });
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId("llm-view-c1")).toBeInTheDocument());
+    expect(screen.getByTestId("llm-call-c1")).toHaveTextContent("4.200");
+    fireEvent.click(screen.getByTestId("llm-view-c1"));
+    const dialog = await screen.findByTestId("llm-response-dialog");
+    await waitFor(() => expect(within(dialog).getByTestId("llm-system-text")).toHaveTextContent("SYS of c1"));
+    expect(within(dialog).getByTestId("llm-user-text")).toHaveTextContent("USR of c1");
+    expect(within(dialog).getByTestId("llm-system-copy")).toBeInTheDocument();
+    expect(within(dialog).getByTestId("llm-user-copy")).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("num_ctx 8192");
+    expect(requests.some((r) => r.url.endsWith("/v1/llm/calls/c1"))).toBe(true);
+  });
+
+  it("still shows the response when the prompt cannot be read, and says why", async () => {
+    serve({ calls: rows });
+    renderPanel();
+    await waitFor(() => expect(screen.getByTestId("llm-view-c1")).toBeInTheDocument());
+    const ok = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    global.fetch = vi.fn().mockImplementation(async (url: string, init?: RequestInit) =>
+      String(url).endsWith("/v1/llm/calls/c1")
+        ? { ok: false, status: 404, json: async () => ({ error: "no call" }) }
+        : ok(url, init),
+    ) as unknown as typeof fetch;
+    fireEvent.click(screen.getByTestId("llm-view-c1"));
+    const dialog = await screen.findByTestId("llm-response-dialog");
+    await waitFor(() => expect(within(dialog).getByTestId("llm-detail-error")).toBeInTheDocument());
+    expect(within(dialog).getByTestId("llm-response-text")).toHaveTextContent("T");
   });
 
   it("selects every shown row at once and deletes them after a confirmation that says what is lost", async () => {

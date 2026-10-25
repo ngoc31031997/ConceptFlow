@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 // UnitKindBeat names one beat of the video, keyed b1, b2... The key stays with
@@ -132,6 +133,20 @@ func (b Beat) Validate(known func(id string) bool) error {
 	return nil
 }
 
+// foreignScriptField names the first wording field written in Han, Kana or
+// Hangul, or "" when none is. The content language is Vietnamese or English,
+// so those scripts mean the model left the language it was asked for.
+func (b Beat) foreignScriptField() string {
+	for _, f := range []struct{ name, text string }{{"title", b.Title}, {"goal", b.Goal}, {"content", b.Content}, {"next", b.Next}} {
+		for _, r := range f.text {
+			if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hiragana, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hangul, r) {
+				return f.name
+			}
+		}
+	}
+	return ""
+}
+
 // BeatDraft is a beat as the AI wrote it. Key names the stored beat it
 // rewrites, or is empty for a new one.
 type BeatDraft struct {
@@ -182,6 +197,9 @@ func ParseBeatsReply(reply string, known func(id string) bool) ([]BeatDraft, err
 		}
 		if d.Goal == "" || d.Content == "" {
 			return nil, fmt.Errorf("%w: beat thứ %d thiếu mục tiêu hoặc nội dung", ErrBeatReplyUnusable, i+1)
+		}
+		if field := d.foreignScriptField(); field != "" {
+			return nil, fmt.Errorf("%w: beat thứ %d viết %q bằng chữ Hán, Nhật hoặc Hàn; phải viết bằng ngôn ngữ của nội dung", ErrBeatReplyUnusable, i+1, field)
 		}
 		for _, raw := range w.Facts {
 			id, ok := NormalizeFactID(raw)

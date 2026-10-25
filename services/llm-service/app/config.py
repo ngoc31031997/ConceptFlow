@@ -33,6 +33,8 @@ class Config:
     ollama_url: str
     ollama_model: str
     ollama_timeout: int
+    # Context window sent with every Ollama call, in tokens.
+    ollama_num_ctx: int
     # Which provider serves the light task (suggest-metadata).
     light_provider: str
     # Code pipeline.
@@ -68,6 +70,7 @@ class Config:
             ollama_url=os.environ.get("OLLAMA_URL", "http://host.docker.internal:11434"),
             ollama_model=os.environ.get("OLLAMA_MODEL", "qwen2.5:7b"),
             ollama_timeout=_int("OLLAMA_TIMEOUT_SECONDS", 120),
+            ollama_num_ctx=_non_negative("OLLAMA_NUM_CTX", 16384),
             light_provider=light,
             code_chunk_shots=_int("CODE_CHUNK_SHOTS", 3),
             code_chunk_concurrency=_int("CODE_CHUNK_CONCURRENCY", 10),

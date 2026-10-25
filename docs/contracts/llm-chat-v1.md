@@ -32,6 +32,10 @@ Sự kiện `error`: `error` gồm `kind`, `provider`, `message`, `usage`, `part
 
 Phía authoring-service, các hàm `Parse…Reply` nhận `json` (chuỗi object sạch), không tự cắt `{`…`}`. Kiểm tra nghiệp vụ (dữ kiện, ô Creator đã điền, `Validate`) vẫn ở authoring-service.
 
+## Prompt quá dài với Ollama
+
+Với Ollama, llm-service gửi `options.num_ctx = OLLAMA_NUM_CTX` kèm mọi cuộc gọi. Trước khi gọi, nó ước lượng số token của prompt (2 ký tự một token); nếu vượt 85% cửa sổ thì **cắt phần giữa** (giữ đầu và đuôi, chèn dòng `[... phần giữa bị cắt ...]`) rồi gọi bình thường, không báo lỗi, và ghi cảnh báo ra log của service. `system_prompt`/`user_prompt` trong `llm_calls` là bản đã cắt, đúng cái model nhận. Hive không bị cắt.
+
 ## Nhật ký `llm_calls` (database `llm` của `llm-db`, `127.0.0.1:5435`)
 
 Một dòng cho mỗi `Provider.chat` (kể cả thử lại, gộp thành một dòng), ghi mọi đường gọi model: `/v1/chat`, `/v1/suggest-metadata`, `/v1/storyboard/finalize`, `/v2/code/generate`.
@@ -42,7 +46,10 @@ Một dòng cho mỗi `Provider.chat` (kể cả thử lại, gộp thành một
 | `provider`, `model` | |
 | `role`, `step`, `phase` | nguồn; `''` khi người gọi không gửi. Pipeline code ghi `step = code`, `phase` = `layout`/`chunk`/`repair`; lượt sửa JSON ghi `phase = json_repair` |
 | `project_id` | không khoá ngoại |
-| `response` | nội dung thô (hoặc phần đã tới khi lỗi); nén lz4. **Không có prompt** |
+| `response` | nội dung thô (hoặc phần đã tới khi lỗi); nén lz4 |
+| `system_prompt`, `user_prompt` | đúng prompt đã gửi cho model; nén lz4; có cả ở lần gọi lỗi và lần bị từ chối vì quá dài ([ADR-0046](../../aidlc-docs/decisions/ADR-0046-call-log-keeps-the-prompt.md)) |
+| `prompt_chars` | số ký tự system + user |
+| `num_ctx` | cửa sổ ngữ cảnh gửi cho Ollama (`OLLAMA_NUM_CTX`, mặc định 16384); `0` với nhà cung cấp tự đặt |
 | `ok`, `error_kind`, `error_message` | |
 | `prompt_tokens`, `completion_tokens`, `reasoning_tokens`, `cached_tokens`, `reasoning_chars`, `usage_reported` | `usage_reported = false`: token không phải số đã bị tính |
 | `duration_ms` | |
@@ -53,7 +60,8 @@ Ghi nhật ký lỗi (DB sập) không làm hỏng cuộc gọi: llm-service ghi
 
 | Route | Ý nghĩa |
 |---|---|
-| `GET /v1/llm/calls?limit&before&project_id&role&ok` | các dòng thô, mới nhất trước; `{calls, next_before}`; `before` = `next_before` của trang trước; `limit` ≤ 500 |
+| `GET /v1/llm/calls?limit&before&project_id&role&ok` | các dòng thô, mới nhất trước, **không kèm prompt**; `{calls, next_before}`; `before` = `next_before` của trang trước; `limit` ≤ 500 |
+| `GET /v1/llm/calls/{call_id}` | một dòng đầy đủ, kèm `system_prompt` và `user_prompt`; 404 khi không có |
 | `POST /v1/llm/calls/delete` | thân đúng một trong `{"ids":[…]}`, `{"older_than_days":N}`, `{"all":true}` (422 nếu không đúng một); trả `{"deleted":n}` |
 | `GET /v1/llm/stats?step&phase&days=30` | theo model: `{calls, ok, failures:{kind:n}, avg_completion_tokens, avg_duration_ms}`; trung bình chỉ tính các cuộc gọi thành công |
 

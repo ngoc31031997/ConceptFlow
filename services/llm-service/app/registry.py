@@ -21,6 +21,7 @@ class Providers:
         self.ollama = Provider(
             "ollama", config.ollama_url.rstrip("/") + "/v1", "ollama", config.ollama_model,
             timeout=config.ollama_timeout or None, max_retries=1, call_log=call_log,
+            num_ctx=config.ollama_num_ctx,
         )
         self.light = self.ollama if config.light_provider == "ollama" else self.hive
 

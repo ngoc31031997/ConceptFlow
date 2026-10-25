@@ -35,6 +35,9 @@ class MemoryCallLog:
         ]
         return sorted(rows, key=lambda r: r.created_at, reverse=True)[: flt.limit]
 
+    async def get(self, call_id: str) -> CallRecord | None:
+        return next((r for r in self.rows if r.call_id == call_id), None)
+
     async def stats(self, step: str, phase: str, since: datetime) -> list[ModelStats]:
         out: dict[str, ModelStats] = {}
         for r in self.rows:

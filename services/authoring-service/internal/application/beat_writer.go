@@ -122,13 +122,18 @@ func storyFieldsText(fields map[string]domain.StoryField) string {
 }
 
 // currentBeatsText lists the stored beats for a prompt, in order, with their keys.
-func currentBeatsText(beats []storedBeat) string {
+func currentBeatsText(beats []storedBeat) string { return beatsTextRewriting(beats, "") }
+
+// beatsTextRewriting is currentBeatsText for the beat with key rewriting being
+// written again: it is listed as not yet written, because the model copies
+// whatever wording it is shown for the beat it must write.
+func beatsTextRewriting(beats []storedBeat, rewriting string) string {
 	if len(beats) == 0 {
 		return "(chưa có beat nào)"
 	}
 	lines := make([]string, 0, len(beats))
 	for i, b := range beats {
-		if !b.Written() {
+		if !b.Written() || b.unit.Key == rewriting {
 			lines = append(lines, fmt.Sprintf("%s (B%d) · %s · dữ kiện %s · CHƯA VIẾT\n  bước câu chuyện: %s", b.unit.Key, i+1, b.Fn, strings.Join(b.Facts, ", "), b.Step))
 			continue
 		}
@@ -153,7 +158,7 @@ func keptBeatsText(beats []storedBeat) string {
 }
 
 // run renders the beat prompt for one task and returns the beats the AI wrote.
-func (uc *BeatDeskUseCase) run(ctx context.Context, projectID string, bc beatContext, current []storedBeat, task, note string) ([]domain.BeatDraft, error) {
+func (uc *BeatDeskUseCase) run(ctx context.Context, projectID string, bc beatContext, current []storedBeat, task, note, rewriting string) ([]domain.BeatDraft, error) {
 	prompt, err := uc.prompts.GetActive(ctx, domain.RoleBeatSheet)
 	if err != nil {
 		return nil, fmt.Errorf("load beat sheet prompt: %w", err)
@@ -165,7 +170,7 @@ func (uc *BeatDeskUseCase) run(ctx context.Context, projectID string, bc beatCon
 		"brief":          bc.brief,
 		"story":          bc.story,
 		"facts":          factsText(bc.facts),
-		"current_beats":  currentBeatsText(current),
+		"current_beats":  beatsTextRewriting(current, rewriting),
 		"kept_beats":     keptBeatsText(current),
 		"redo_note":      noteText(note),
 		"task":           task,
@@ -330,7 +335,7 @@ func (uc *BeatDeskUseCase) writeOne(ctx context.Context, projectID string, bc be
 	task := domain.BeatTaskWrite(old.unit.Key, at+1, len(work), old.Beat, bc.loSeconds, bc.hiSeconds, used, remaining)
 	runNote := note
 	for attempt := 1; ; attempt++ {
-		drafts, err := uc.run(ctx, projectID, bc, work, task, runNote)
+		drafts, err := uc.run(ctx, projectID, bc, work, task, runNote, old.unit.Key)
 		if err == nil && (len(drafts) != 1 || (drafts[0].Key != "" && drafts[0].Key != old.unit.Key)) {
 			err = fmt.Errorf("%w: cần đúng một beat %s", domain.ErrBeatReplyUnusable, old.unit.Key)
 		}
@@ -498,7 +503,7 @@ func (uc *BeatDeskUseCase) Add(ctx context.Context, projectID, after string, bla
 		if at < len(current) {
 			before = current[at].unit.Key
 		}
-		drafts, err := uc.run(ctx, projectID, bc, current, domain.BeatTaskAdd(after, before), note)
+		drafts, err := uc.run(ctx, projectID, bc, current, domain.BeatTaskAdd(after, before), note, "")
 		if err != nil {
 			return "", err
 		}

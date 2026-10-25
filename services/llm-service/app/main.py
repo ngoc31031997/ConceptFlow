@@ -356,6 +356,14 @@ def create_app(
             "next_before": rows[-1].created_at.isoformat() if len(rows) == limit else None,
         }
 
+    @app.get("/v1/llm/calls/{call_id}")
+    async def llm_call(call_id: str):
+        """One row with the system and user prompt that went out."""
+        rec = await call_log.get(call_id)
+        if rec is None:
+            return _error_response(f"no call {call_id!r} in the log", status=404)
+        return rec.to_dict(with_prompt=True)
+
     @app.post("/v1/llm/calls/delete")
     async def llm_calls_delete(body: DeleteCallsBody):
         if body.ids is not None:

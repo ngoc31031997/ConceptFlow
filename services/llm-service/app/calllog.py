@@ -1,7 +1,7 @@
 """The log of every model call, in llm-service's own database.
 
-One row per `Provider.chat`: what came back (never the prompt), what it cost and
-how it ended. The same table feeds the code-step statistics and the Nhật ký
+One row per `Provider.chat`: the prompt that went out, what came back, what it
+cost and how it ended. The same table feeds the code-step statistics and the Nhật ký
 screen, so there is no second ledger to keep in step.
 """
 
@@ -36,7 +36,13 @@ CREATE TABLE IF NOT EXISTS llm_calls (
     usage_reported    BOOLEAN NOT NULL DEFAULT true,
     duration_ms       INTEGER NOT NULL DEFAULT 0
 );
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS system_prompt TEXT NOT NULL DEFAULT '';
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS user_prompt TEXT NOT NULL DEFAULT '';
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS prompt_chars INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE llm_calls ADD COLUMN IF NOT EXISTS num_ctx INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE llm_calls ALTER COLUMN response SET COMPRESSION lz4;
+ALTER TABLE llm_calls ALTER COLUMN system_prompt SET COMPRESSION lz4;
+ALTER TABLE llm_calls ALTER COLUMN user_prompt SET COMPRESSION lz4;
 CREATE INDEX IF NOT EXISTS llm_calls_created_at_idx ON llm_calls (created_at DESC);
 CREATE INDEX IF NOT EXISTS llm_calls_step_phase_idx ON llm_calls (step, phase, created_at);
 CREATE INDEX IF NOT EXISTS llm_calls_project_idx ON llm_calls (project_id);
@@ -45,8 +51,10 @@ CREATE INDEX IF NOT EXISTS llm_calls_project_idx ON llm_calls (project_id);
 _COLUMNS = (
     "call_id, created_at, provider, model, role, step, phase, project_id, response, ok, error_kind, "
     "error_message, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens, reasoning_chars, "
-    "usage_reported, duration_ms"
+    "usage_reported, duration_ms, prompt_chars, num_ctx"
 )
+# The list leaves the prompts out so a page of rows stays light; `get` returns them.
+_DETAIL_COLUMNS = _COLUMNS + ", system_prompt, user_prompt"
 
 
 @dataclass
@@ -70,9 +78,16 @@ class CallRecord:
     reasoning_chars: int = 0
     usage_reported: bool = True
     duration_ms: int = 0
+    prompt_chars: int = 0
+    #: The context window sent to Ollama; 0 when the provider sets its own.
+    num_ctx: int = 0
+    system_prompt: str = ""
+    user_prompt: str = ""
 
-    def to_dict(self) -> dict:
+    def to_dict(self, *, with_prompt: bool = False) -> dict:
         out = {k: getattr(self, k) for k in self.__dataclass_fields__}
+        if not with_prompt:
+            del out["system_prompt"], out["user_prompt"]
         out["created_at"] = self.created_at.isoformat() if self.created_at else None
         return out
 
@@ -106,6 +121,8 @@ class CallLogPort(Protocol):
     async def record(self, rec: CallRecord) -> None: ...
 
     async def list(self, flt: CallFilter) -> list[CallRecord]: ...
+
+    async def get(self, call_id: str) -> CallRecord | None: ...
 
     async def stats(self, step: str, phase: str, since: datetime) -> list[ModelStats]: ...
 
@@ -146,12 +163,14 @@ class PgCallLog:
         await self.pool.execute(
             """INSERT INTO llm_calls (call_id, provider, model, role, step, phase, project_id, response, ok,
                 error_kind, error_message, prompt_tokens, completion_tokens, reasoning_tokens, cached_tokens,
-                reasoning_chars, usage_reported, duration_ms)
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)""",
+                reasoning_chars, usage_reported, duration_ms, prompt_chars, num_ctx, system_prompt, user_prompt)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+                        $19, $20, $21, $22)""",
             uuid.UUID(rec.call_id), rec.provider, rec.model, rec.role, rec.step, rec.phase,
             rec.project_id or None, rec.response, rec.ok, rec.error_kind, rec.error_message,
             rec.prompt_tokens, rec.completion_tokens, rec.reasoning_tokens, rec.cached_tokens,
             rec.reasoning_chars, rec.usage_reported, rec.duration_ms,
+            rec.prompt_chars, rec.num_ctx, rec.system_prompt, rec.user_prompt,
         )
 
     async def list(self, flt: CallFilter) -> list[CallRecord]:
@@ -173,6 +192,14 @@ class PgCallLog:
             f"SELECT {_COLUMNS} FROM llm_calls WHERE {' AND '.join(where)} "
             f"ORDER BY created_at DESC LIMIT ${len(args)}", *args)
         return [_record_of(r) for r in rows]
+
+    async def get(self, call_id: str) -> CallRecord | None:
+        try:
+            key = uuid.UUID(call_id)
+        except ValueError:
+            return None
+        row = await self.pool.fetchrow(f"SELECT {_DETAIL_COLUMNS} FROM llm_calls WHERE call_id = $1", key)
+        return _record_of(row) if row else None
 
     async def stats(self, step: str, phase: str, since: datetime) -> list[ModelStats]:
         """Per model: calls, successes, failures by kind. Averages cover successful calls only: a failed

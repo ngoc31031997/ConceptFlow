@@ -34,6 +34,15 @@ describe('call log routing', () => {
     }));
   });
 
+  test('one call is forwarded by its id', async () => {
+    const client = { request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { system_prompt: 'S' } }) };
+
+    const res = await request(buildApp(client)).get('/v1/llm/calls/abc-123');
+
+    expect(res.body).toEqual({ system_prompt: 'S' });
+    expect(client.request).toHaveBeenCalledWith(expect.objectContaining({ method: 'GET', path: '/v1/llm/calls/abc-123' }));
+  });
+
   test('delete forwards the body and mirrors the answer', async () => {
     const client = { request: jest.fn().mockResolvedValue({ status: 200, headers: new Map(), body: { deleted: 2 } }) };
 

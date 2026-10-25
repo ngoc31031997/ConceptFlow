@@ -31,6 +31,10 @@ func TestParseBeatsReplyRejectsUnusableReplies(t *testing.T) {
 		"bad key":          strings.Replace(beatsReply, `"b7"`, `"x7"`, 1),
 		"missing goal":     strings.Replace(beatsReply, `"goal":"Gây tò mò"`, `"goal":""`, 1),
 		"too short":        strings.Replace(beatsReply, `"dur":18`, `"dur":2`, 1),
+		"chinese goal":     strings.Replace(beatsReply, `"goal":"Gây tò mò"`, `"goal":"回答开场问题"`, 1),
+		"mixed title":      strings.Replace(beatsReply, `"title":"Quả sung"`, `"title":"Kết局"`, 1),
+		"japanese content": strings.Replace(beatsReply, `"content":"Mở từ đĩa sung"`, `"content":"ひらがな"`, 1),
+		"korean next":      strings.Replace(beatsReply, `"next":"Zoom vào"`, `"next":"다음"`, 1),
 	}
 	for name, reply := range cases {
 		if _, err := ParseBeatsReply(reply, knownFacts("F01", "F02")); !errors.Is(err, ErrBeatReplyUnusable) {

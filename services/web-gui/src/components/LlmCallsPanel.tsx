@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { ApiError, deleteLlmCalls, listLlmCalls, type LlmCall, type LlmCallsDeletion } from "../api/client";
+import {
+  ApiError,
+  deleteLlmCalls,
+  getLlmCall,
+  listLlmCalls,
+  type LlmCall,
+  type LlmCallDetail,
+  type LlmCallsDeletion,
+} from "../api/client";
 import { ConfirmModal } from "./ConfirmModal";
-import { Button, Card, CopyButton, Dialog, FormField, Select, TextInput } from "./ui";
+import { Button, Card, CopyBox, Dialog, FormField, Select, TextInput } from "./ui";
 import glass from "../styles/glass.module.css";
 import styles from "./LlmCallsPanel.module.css";
 
@@ -32,8 +40,8 @@ function errorText(err: unknown): string {
 }
 
 /**
- * The raw table of llm-service's call log: what each model call answered and
- * what it cost (never the prompt). Rows can be picked and deleted, or every row
+ * The raw table of llm-service's call log: what each model call answered, what it
+ * cost, and (on "Xem") the system and user prompt that went out. Rows can be picked and deleted, or every row
  * older than 30 days; a deletion also removes those calls from the statistics
  * that are measured over the same rows.
  */
@@ -47,6 +55,8 @@ export function LlmCallsPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [shown, setShown] = useState<LlmCall | null>(null);
+  const [detail, setDetail] = useState<LlmCallDetail | null>(null);
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending>(null);
 
   const query = useCallback(
@@ -90,6 +100,15 @@ export function LlmCallsPanel() {
     }
   };
 
+  const open = (r: LlmCall) => {
+    setShown(r);
+    setDetail(null);
+    setDetailError(null);
+    getLlmCall(r.call_id)
+      .then(setDetail)
+      .catch((err) => setDetailError(errorText(err)));
+  };
+
   const all = rows ?? [];
   const allSelected = all.length > 0 && all.every((r) => selected.has(r.call_id));
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(all.map((r) => r.call_id)));
@@ -118,7 +137,7 @@ export function LlmCallsPanel() {
   return (
     <Card
       title="Cuộc gọi AI"
-      hint="Phản hồi thô và chi phí của từng lượt gọi model, ghi ở llm-service. Prompt không được lưu."
+      hint="Prompt đã gửi, phản hồi thô và chi phí của từng lượt gọi model, ghi ở llm-service."
       data-testid="llm-calls-panel"
     >
       <form
@@ -197,6 +216,7 @@ export function LlmCallsPanel() {
                 <th>Model</th>
                 <th>Kết quả</th>
                 <th>Token vào / ra</th>
+                <th>Prompt (ký tự)</th>
                 <th>Thời gian</th>
                 <th />
               </tr>
@@ -222,9 +242,10 @@ export function LlmCallsPanel() {
                   <td>
                     {r.usage_reported ? `${r.prompt_tokens} / ${r.completion_tokens}` : "không rõ"}
                   </td>
+                  <td>{r.prompt_chars > 0 ? r.prompt_chars.toLocaleString("vi-VN") : "—"}</td>
                   <td>{formatMs(r.duration_ms)}</td>
                   <td>
-                    <Button variant="view" onClick={() => setShown(r)} data-testid={`llm-view-${r.call_id}`}>
+                    <Button variant="view" onClick={() => open(r)} data-testid={`llm-view-${r.call_id}`}>
                       Xem
                     </Button>
                   </td>
@@ -279,27 +300,51 @@ export function LlmCallsPanel() {
       <Dialog
         open={shown !== null}
         onClose={() => setShown(null)}
-        size="lg"
-        title={shown ? `Phản hồi · ${shown.role || "không rõ vai"} · ${formatTime(shown.created_at)}` : ""}
+        size="xl"
+        title={shown ? `Cuộc gọi · ${shown.role || "không rõ vai"} · ${formatTime(shown.created_at)}` : ""}
         testId="llm-response-dialog"
         footer={
-          <>
-            <CopyButton text={shown?.response ?? ""} what="phản hồi" testId="llm-response-copy" />
-            <Button variant="ghost" onClick={() => setShown(null)} data-testid="llm-response-close">
-              Đóng
-            </Button>
-          </>
+          <Button variant="ghost" onClick={() => setShown(null)} data-testid="llm-response-close">
+            Đóng
+          </Button>
         }
       >
         {shown && (
           <>
             <p className={styles.detailMeta}>
               Mã cuộc gọi <span className={styles.mono}>{shown.call_id}</span> · {shown.provider} · {shown.model}
+              {shown.num_ctx > 0 ? ` · num_ctx ${shown.num_ctx}` : ""}
+              {shown.prompt_chars > 0 ? ` · prompt ${shown.prompt_chars.toLocaleString("vi-VN")} ký tự` : ""}
               {shown.ok ? "" : ` · lỗi ${shown.error_kind}: ${shown.error_message}`}
             </p>
-            <pre className={styles.response} data-testid="llm-response-text">
-              {shown.response || "(không có phản hồi)"}
-            </pre>
+            {detailError && (
+              <p role="alert" className={glass.helperText} data-testid="llm-detail-error">
+                Không đọc được prompt: {detailError}
+              </p>
+            )}
+            {!detail && !detailError && <p className={styles.empty}>Đang tải prompt...</p>}
+            {detail && (
+              <>
+                <h4 className={styles.blockTitle}>System prompt</h4>
+                <CopyBox text={detail.system_prompt} what="system prompt" copyTestId="llm-system-copy">
+                  <pre className={styles.response} data-testid="llm-system-text">
+                    {detail.system_prompt || "(không có)"}
+                  </pre>
+                </CopyBox>
+                <h4 className={styles.blockTitle}>User prompt</h4>
+                <CopyBox text={detail.user_prompt} what="user prompt" copyTestId="llm-user-copy">
+                  <pre className={styles.response} data-testid="llm-user-text">
+                    {detail.user_prompt || "(không có)"}
+                  </pre>
+                </CopyBox>
+              </>
+            )}
+            <h4 className={styles.blockTitle}>Phản hồi</h4>
+            <CopyBox text={shown.response} what="phản hồi" copyTestId="llm-response-copy">
+              <pre className={styles.response} data-testid="llm-response-text">
+                {shown.response || "(không có phản hồi)"}
+              </pre>
+            </CopyBox>
           </>
         )}
       </Dialog>

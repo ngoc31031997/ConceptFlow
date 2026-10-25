@@ -39,6 +39,18 @@ async def test_a_row_round_trips(log):
     assert got.project_id == "p1" and got.usage_reported is False and got.created_at is not None
 
 
+async def test_the_prompt_is_kept_but_left_out_of_the_list(log):
+    rec = row(system_prompt="SYS", user_prompt="USR tiếng Việt", prompt_chars=17, num_ctx=8192)
+    await log.record(rec)
+    [listed] = await log.list(CallFilter())
+    assert (listed.system_prompt, listed.user_prompt) == ("", "")
+    assert (listed.prompt_chars, listed.num_ctx) == (17, 8192)
+    got = await log.get(rec.call_id)
+    assert (got.system_prompt, got.user_prompt) == ("SYS", "USR tiếng Việt")
+    assert await log.get(str(uuid.uuid4())) is None
+    assert await log.get("not-a-uuid") is None
+
+
 async def test_a_call_without_a_project_reads_back_as_empty(log):
     await log.record(row(project_id=""))
     assert (await log.list(CallFilter()))[0].project_id == ""

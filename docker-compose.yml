@@ -453,6 +453,7 @@ services:
       HIVE_RATE_PER_SECOND: ${HIVE_RATE_PER_SECOND:-5} # Hive's documented default ceiling
       OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434} # Ollama installed on the host (uses the Mac GPU)
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:7b}
+      OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-16384} # context window sent with every Ollama call, in tokens
       OLLAMA_TIMEOUT_SECONDS: "0" # TEMP: no timeout while debugging chunk 2.5-2.9 stalls; restore to 120 afterward
       LIGHT_TASKS_PROVIDER: ${LIGHT_TASKS_PROVIDER:-hive}
       CODE_CHUNK_SHOTS: ${CODE_CHUNK_SHOTS:-3}
