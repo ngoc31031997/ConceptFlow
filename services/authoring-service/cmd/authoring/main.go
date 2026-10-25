@@ -112,12 +112,6 @@ func main() {
 	saveAuthoringMode := application.NewSaveAuthoringModeUseCase(authoringRepo)
 	saveAuthoringModels := application.NewSaveAuthoringModelsUseCase(authoringRepo)
 
-	// The idea step's idea and the brief step's creative brief, the first kinds
-	// of review unit; every review unit is read, edited, redone and approved
-	// through reviewUnits.
-	idea := application.NewIdeaUseCase(
-		authoringRepo, authoringRepo, projects, projects, authoringRepo,
-		llmProvider, cfg.HiveMaxOutputTokens)
 	// The first step's idea: written from the text the Creator typed, which the
 	// orchestrator keeps with the project.
 	projectIdea := application.NewProjectIdeaUseCase(
@@ -126,9 +120,6 @@ func main() {
 	// The second step's brief: written from the approved idea.
 	projectBrief := application.NewProjectBriefUseCase(
 		authoringRepo, projectIdea, projects, projects, authoringRepo, projects, authoringRepo,
-		llmProvider, cfg.HiveMaxOutputTokens)
-	creativeBrief := application.NewCreativeBriefUseCase(
-		authoringRepo, authoringRepo, projects, projects, authoringRepo,
 		llmProvider, cfg.HiveMaxOutputTokens)
 	// The research step: its questions and gate are review units, its facts rows
 	// of project_research, planned from the approved idea and brief.
@@ -165,12 +156,10 @@ func main() {
 	// The lock step: the handoff note of each beat is a review unit; the review
 	// and the glossary are units of their own; locking writes a version.
 	scriptLock := application.NewScriptLockDeskUseCase(
-		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats, script, authoringRepo)
+		authoringRepo, projects, projects, authoringRepo, llmProvider, cfg.HiveMaxOutputTokens, beats, script, authoringRepo, projectBrief)
 	reviewUnits := application.NewReviewUnitsUseCase(authoringRepo, projects).
 		Register(domain.UnitKindScriptBeat, script.ScriptUnitKind()).
 		Register(domain.UnitKindHandoffBeat, scriptLock.HandoffUnitKind()).
-		Register(domain.UnitKindIdea, idea).
-		Register(domain.UnitKindBrief, creativeBrief).
 		Register(domain.UnitKindResearchQuestion, research.QuestionUnitKind()).
 		Register(domain.UnitKindFact, research.FactUnitKind()).
 		Register(domain.UnitKindResearch, research.GateUnitKind())
@@ -179,7 +168,7 @@ func main() {
 	// The renderer behind the Copy button.
 	renderPrompt := application.NewRenderPromptUseCase(authoringRepo, renderContext, projects, projects).
 		WithArchetypes(authoringRepo).
-		WithBrief(creativeBrief).
+		WithBrief(projectBrief).
 		WithLanguages(visualLanguages)
 	router := httpadapter.NewRouter(suggestPublishMetadata, authoringRepo).
 		WithOperations(application.NewOperations()).
@@ -199,7 +188,6 @@ func main() {
 		WithLLMStatus(llmClient).
 		WithReviewUnits(reviewUnits).
 		WithIdea(projectIdea).
-		WithCreativeBrief(creativeBrief).
 		WithProjectBrief(projectBrief).
 		WithResearch(research).
 		WithStory(story).

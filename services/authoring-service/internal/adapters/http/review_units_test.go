@@ -42,27 +42,8 @@ func (f *fakeUnits) Unapprove(context.Context, string, string, string) (domain.R
 	return f.unit, f.err
 }
 
-// fakeBrief answers the brief API with a fixed state or a fixed error.
-type fakeBrief struct {
-	state application.BriefState
-	err   error
-}
-
-func (f *fakeBrief) State(context.Context, string) (application.BriefState, error) {
-	return f.state, f.err
-}
-func (f *fakeBrief) SetTargetDuration(context.Context, string, domain.TargetDuration) error {
-	return f.err
-}
-func (f *fakeBrief) SetPlatform(context.Context, string, string) error {
-	return f.err
-}
-func (f *fakeBrief) Generate(context.Context, string, string) (domain.ReviewUnit, error) {
-	return domain.ReviewUnit{Kind: domain.UnitKindBrief}, f.err
-}
-
-func serveUnits(units *fakeUnits, brief *fakeBrief, method, path, body string) *httptest.ResponseRecorder {
-	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(units).WithCreativeBrief(brief)
+func serveUnits(units *fakeUnits, method, path, body string) *httptest.ResponseRecorder {
+	rt := NewRouter(&fakeSuggestMetadata{}, nil).WithReviewUnits(units)
 	rec := httptest.NewRecorder()
 	var req *http.Request
 	if body == "" {
@@ -86,13 +67,12 @@ func TestUnitRoutesMapErrorsToStatusCodes(t *testing.T) {
 		{"unknown kind", fmt.Errorf("%w: \"beat\"", domain.ErrUnknownUnitKind), "GET", "/v1/projects/p1/units/beat/1", "", http.StatusNotFound},
 		{"missing unit", domain.ErrUnitNotFound, "GET", "/v1/projects/p1/units/brief/main", "", http.StatusNotFound},
 		{"bad edit", fmt.Errorf("%w: brief không có ô \"x\"", domain.ErrInvalidUnitEdit), "PUT", "/v1/projects/p1/units/brief/main", `{"fields":{"x":"y"}}`, http.StatusBadRequest},
-		{"incomplete brief", fmt.Errorf("%w: feel", application.ErrBriefIncomplete), "POST", "/v1/projects/p1/units/brief/main/approve", "", http.StatusBadRequest},
 		{"locked project", domain.ErrInvalidStatus, "POST", "/v1/projects/p1/units/brief/main/unapprove", "", http.StatusConflict},
-		{"unusable reply", fmt.Errorf("%w: thiếu ô feel", domain.ErrBriefReplyUnusable), "POST", "/v1/projects/p1/units/brief/main/redo", `{"note":"n"}`, http.StatusBadGateway},
+		{"unusable reply", fmt.Errorf("%w: thiếu ô feel", domain.ErrProjectBriefReplyUnusable), "POST", "/v1/projects/p1/units/brief/main/redo", `{"note":"n"}`, http.StatusBadGateway},
 		{"no model", application.ErrLLMNotConfigured, "POST", "/v1/projects/p1/units/brief/main/redo", "", http.StatusServiceUnavailable},
 	}
 	for _, c := range cases {
-		rec := serveUnits(&fakeUnits{err: c.err}, &fakeBrief{}, c.method, c.path, c.body)
+		rec := serveUnits(&fakeUnits{err: c.err}, c.method, c.path, c.body)
 		if rec.Code != c.want {
 			t.Errorf("%s: status %d, want %d (body %s)", c.name, rec.Code, c.want, rec.Body.String())
 		}
@@ -100,14 +80,14 @@ func TestUnitRoutesMapErrorsToStatusCodes(t *testing.T) {
 }
 
 func TestEditAndRedoPassTheBodyThrough(t *testing.T) {
-	units := &fakeUnits{unit: domain.ReviewUnit{Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey}}
-	if rec := serveUnits(units, &fakeBrief{}, "PUT", "/v1/projects/p1/units/brief/main", `{"fields":{"tone":"ấm"}}`); rec.Code != http.StatusOK {
+	units := &fakeUnits{unit: domain.ReviewUnit{Kind: domain.UnitKindResearchQuestion, Key: "Q1"}}
+	if rec := serveUnits(units, "PUT", "/v1/projects/p1/units/brief/main", `{"fields":{"tone":"ấm"}}`); rec.Code != http.StatusOK {
 		t.Fatalf("edit: status %d", rec.Code)
 	}
 	if units.lastFields["tone"] != "ấm" {
 		t.Errorf("edit fields not passed through: %v", units.lastFields)
 	}
-	if rec := serveUnits(units, &fakeBrief{}, "POST", "/v1/projects/p1/units/brief/main/redo", `{"note":"ngắn hơn"}`); rec.Code != http.StatusOK {
+	if rec := serveUnits(units, "POST", "/v1/projects/p1/units/brief/main/redo", `{"note":"ngắn hơn"}`); rec.Code != http.StatusOK {
 		t.Fatalf("redo: status %d", rec.Code)
 	}
 	if units.lastNote != "ngắn hơn" {
@@ -116,37 +96,10 @@ func TestEditAndRedoPassTheBodyThrough(t *testing.T) {
 }
 
 func TestImpactReturnsItsItems(t *testing.T) {
-	rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "GET", "/v1/projects/p1/units/brief/main/impact", "")
+	rec := serveUnits(&fakeUnits{}, "GET", "/v1/projects/p1/units/brief/main/impact", "")
 	var body unitImpactResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil || len(body.Items) != 1 {
 		t.Fatalf("impact body %s, err %v", rec.Body.String(), err)
-	}
-}
-
-func TestBriefRoutes(t *testing.T) {
-	state := application.BriefState{TargetDuration: domain.Duration4to5, StoryStale: true, StoryPromptReadsBrief: true}
-	rec := serveUnits(&fakeUnits{}, &fakeBrief{state: state}, "GET", "/v1/projects/p1/brief", "")
-	var body briefStateResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
-		t.Fatal(err)
-	}
-	if body.Unit != nil || body.TargetDuration != "4-5" || !body.StoryStale || !body.StoryPromptReadsBrief {
-		t.Errorf("brief state body wrong: %+v", body)
-	}
-	if rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "PUT", "/v1/projects/p1/brief/target-duration", `{"target_duration":"5-7"}`); rec.Code != http.StatusNoContent {
-		t.Errorf("target duration: status %d", rec.Code)
-	}
-	if rec := serveUnits(&fakeUnits{}, &fakeBrief{err: domain.ErrInvalidStatus}, "PUT", "/v1/projects/p1/brief/target-duration", `{"target_duration":"5-7"}`); rec.Code != http.StatusConflict {
-		t.Errorf("target duration of a project that is no longer a draft: status %d, want 409", rec.Code)
-	}
-	if rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "PUT", "/v1/projects/p1/brief/platform", `{"platform":"YouTube"}`); rec.Code != http.StatusNoContent {
-		t.Errorf("platform: status %d", rec.Code)
-	}
-	if rec := serveUnits(&fakeUnits{}, &fakeBrief{err: domain.ErrInvalidWizardInput}, "PUT", "/v1/projects/p1/brief/platform", `{"platform":"TikTok"}`); rec.Code != http.StatusBadRequest {
-		t.Errorf("platform outside the list: status %d, want 400", rec.Code)
-	}
-	if rec := serveUnits(&fakeUnits{}, &fakeBrief{}, "POST", "/v1/projects/p1/brief/generate", ""); rec.Code != http.StatusOK {
-		t.Errorf("generate: status %d", rec.Code)
 	}
 }
 

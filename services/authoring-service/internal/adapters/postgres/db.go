@@ -512,6 +512,18 @@ CREATE TABLE IF NOT EXISTS project_research_gate (
     redo_count     INTEGER NOT NULL DEFAULT 0,
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- The questions of the research step, one row per question code.
+CREATE TABLE IF NOT EXISTS project_research_question (
+    project_id     TEXT NOT NULL,
+    question_id    TEXT NOT NULL,
+    text           TEXT NOT NULL DEFAULT '',
+    brief_hash     TEXT NOT NULL DEFAULT '',
+    status         TEXT NOT NULL DEFAULT 'pending',
+    creator_fields TEXT[] NOT NULL DEFAULT '{}',
+    redo_count     INTEGER NOT NULL DEFAULT 0,
+    updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (project_id, question_id)
+);
 -- The lock step. project_script_review holds the review of the whole script
 -- (the AI's findings, the Creator's decisions on them and the notes);
 -- project_handoff the handoff note of each beat, input_ref and input_sha naming
@@ -585,7 +597,12 @@ SELECT ru.project_id, t.ord::int, COALESCE(t.elem->>'term', ''), COALESCE(t.elem
 FROM review_units ru, jsonb_array_elements(COALESCE(ru.content->'terms', '[]')) WITH ORDINALITY AS t(elem, ord)
 WHERE ru.kind = 'glossary' AND ru.unit_key = 'main'
 ON CONFLICT DO NOTHING;
-DELETE FROM review_units WHERE kind IN ('research', 'script_review', 'handoff_beat', 'glossary');
+INSERT INTO project_research_question (project_id, question_id, text, brief_hash, status, creator_fields, redo_count, updated_at)
+SELECT project_id, unit_key, COALESCE(content->>'text', ''), COALESCE(content->>'brief_hash', ''),
+       status, creator_fields, redo_count, updated_at
+FROM review_units WHERE kind = 'research_question'
+ON CONFLICT DO NOTHING;
+DELETE FROM review_units WHERE kind IN ('research', 'script_review', 'handoff_beat', 'glossary', 'research_question', 'idea', 'brief', 'brief_platform');
 UPDATE illustrations SET warnings = COALESCE((
     SELECT jsonb_agg(w) FROM jsonb_array_elements(warnings) w WHERE w->>'message' NOT LIKE '[S9]%'
 ), '[]'::jsonb)

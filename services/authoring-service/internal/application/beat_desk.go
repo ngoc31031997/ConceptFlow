@@ -254,18 +254,13 @@ func (uc *BeatDeskUseCase) State(ctx context.Context, projectID string) (BeatSta
 	if state.Phase == BeatPhaseContent && approved == len(stored) {
 		state.Status = domain.UnitApproved
 	}
-	project, err := uc.projects.Get(ctx, projectID)
-	if err != nil {
-		return BeatState{}, fmt.Errorf("load project: %w", err)
-	}
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
+	target, _, err := approvedTarget(ctx, uc.briefs, projectID)
 	if err != nil {
 		return BeatState{}, err
 	}
-	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
-	state.TargetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, "vi")
+	state.TargetLabel = target.Label("vi")
 	if state.Phase == BeatPhaseContent {
-		state.Checks = domain.CheckBeatSheet(beats, must, lo, hi, state.TargetLabel)
+		state.Checks = domain.CheckBeatSheet(beats, must, target.Lo, target.Hi, state.TargetLabel)
 	} else {
 		state.Checks = domain.CheckSkeleton(beats, must)
 	}

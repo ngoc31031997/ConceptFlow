@@ -9,91 +9,43 @@ describe("api/client", () => {
     vi.restoreAllMocks();
   });
 
-  describe("creative brief and review units", () => {
+  describe("review units", () => {
     const unitWire = {
       project_id: "p1",
-      kind: "brief",
-      key: "main",
+      kind: "research_question",
+      key: "Q1",
       status: "pending",
-      content: { audience: "A", tone: "T" },
+      content: { text: "Câu hỏi?" },
       creator_fields: null,
       redo_count: 2,
       updated_at: "2026-10-18T00:00:00Z",
     };
+    const ref: client.UnitRef<unknown> = { kind: "research_question", key: "Q1", parse: (c) => c };
     const ok = (body: unknown) =>
       vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => body }) as unknown as typeof fetch;
 
-    it("reads the brief state, filling the fields and length the server left out", async () => {
-      global.fetch = ok({ unit: unitWire, target_duration: "", platform: "YouTube", story_stale: true, story_prompt_reads_brief: false });
-
-      const state = await client.getBriefState("p1");
-
-      expect(state.targetDuration).toBe(client.DEFAULT_TARGET_DURATION);
-      expect(state.storyStale).toBe(true);
-      expect(state.storyPromptReadsBrief).toBe(false);
-      expect(state.platform).toBe("YouTube");
-      expect(state.unit?.content).toEqual({
-        audience: "A",
-        know: "",
-        understand: "",
-        feel: "",
-        tone: "T",
-        out_of_scope: "",
-      });
-      expect(state.unit?.creatorFields).toEqual([]);
-      expect(state.unit?.redoCount).toBe(2);
-    });
-
-    it("sends the operation id with the AI runs, so the screen can follow them", async () => {
+    it("sends the operation id with an AI redo, so the screen can follow it", async () => {
       global.fetch = ok(unitWire);
 
-      await client.generateBrief("p1", { id: "op-1", signal: new AbortController().signal });
-      await client.redoUnit("p1", client.BRIEF_UNIT, "ngắn hơn", { id: "op-2", signal: new AbortController().signal });
+      await client.redoUnit("p1", ref, "ngắn hơn", { id: "op-2", signal: new AbortController().signal });
 
       const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls;
-      expect(calls[0][0]).toMatch(/\/v1\/projects\/p1\/brief\/generate$/);
-      expect((calls[0][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-1");
-      expect(calls[1][0]).toMatch(/\/v1\/projects\/p1\/units\/brief\/main\/redo$/);
-      expect((calls[1][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-2");
-      expect(JSON.parse(calls[1][1].body as string)).toEqual({ note: "ngắn hơn" });
-    });
-
-    it("reads the idea state, filling the fields the server left out", async () => {
-      global.fetch = ok({ unit: { ...unitWire, kind: "idea", content: { question: "Q", why: "W" } } });
-
-      const state = await client.getIdeaState("p1");
-
-      expect(state.unit?.content).toEqual({ question: "Q", why: "W", known: "", unknown: "" });
-      expect(state.unit?.stale).toBe(false);
-    });
-
-    it("reads that a brief was written from an idea that has changed since", async () => {
-      global.fetch = ok({ unit: { ...unitWire, stale: true }, target_duration: "4-5", story_stale: false, story_prompt_reads_brief: true });
-
-      expect((await client.getBriefState("p1")).unit?.stale).toBe(true);
-    });
-
-    it("has the AI write the idea through its own route", async () => {
-      global.fetch = ok({ ...unitWire, kind: "idea" });
-
-      await client.generateIdea("p1", { id: "op-3", signal: new AbortController().signal });
-
-      const calls = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls;
-      expect(calls[0][0]).toMatch(/\/v1\/projects\/p1\/idea\/generate$/);
-      expect((calls[0][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-3");
+      expect(calls[0][0]).toMatch(/\/v1\/projects\/p1\/units\/research_question\/Q1\/redo$/);
+      expect((calls[0][1].headers as Record<string, string>)["X-Operation-Id"]).toBe("op-2");
+      expect(JSON.parse(calls[0][1].body as string)).toEqual({ note: "ngắn hơn" });
     });
 
     it("sends a hand edit as the changed fields and reads the impact list", async () => {
       global.fetch = ok(unitWire);
-      await client.editUnit("p1", client.BRIEF_UNIT, { tone: "ấm" });
+      await client.editUnit("p1", ref, { text: "Sửa rồi?" });
       const edit = (global.fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls[0];
       expect(edit[1].method).toBe("PUT");
-      expect(JSON.parse(edit[1].body as string)).toEqual({ fields: { tone: "ấm" } });
+      expect(JSON.parse(edit[1].body as string)).toEqual({ fields: { text: "Sửa rồi?" } });
 
       global.fetch = ok({ items: ["Dàn ý"] });
-      expect(await client.getUnitImpact("p1", client.BRIEF_UNIT)).toEqual(["Dàn ý"]);
+      expect(await client.getUnitImpact("p1", ref)).toEqual(["Dàn ý"]);
       global.fetch = ok({ items: null });
-      expect(await client.getUnitImpact("p1", client.BRIEF_UNIT)).toEqual([]);
+      expect(await client.getUnitImpact("p1", ref)).toEqual([]);
     });
   });
 

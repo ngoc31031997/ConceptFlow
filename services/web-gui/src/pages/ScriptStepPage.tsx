@@ -10,11 +10,9 @@ import { Button, Card, TextArea } from "../components/ui";
 import { ProjectDraftContext, ProjectDraftDispatchContext } from "../context/ProjectDraftContext";
 import { useProjectFlow } from "../context/ProjectFlowContext";
 import {
-  DEFAULT_TARGET_DURATION,
   createProjectDraft,
   patchWizardSettings,
   saveAuthoringModels,
-  setTargetDuration,
   updateProjectTopic,
   type SimilarProject,
 } from "../api/client";
@@ -93,12 +91,10 @@ export function ScriptStepPage() {
       // The idea and the brief run on the model picked for the story step: the
       // last one the Creator used, until the AI settings change it.
       await saveAuthoringModels(projectId, draft.authoringModels);
-      // Video form, length and platform are no longer picked on this step: the
-      // project starts with the defaults.
+      // The video form is picked on the brief step; a short is the one choice
+      // made before it.
       if (draft.videoOutputMode === "short") {
         await patchWizardSettings(projectId, { videoOutputMode: "short" });
-      } else {
-        await setTargetDuration(projectId, DEFAULT_TARGET_DURATION);
       }
       setSimilarProjects(similar);
       setCreatedFor(projectId);

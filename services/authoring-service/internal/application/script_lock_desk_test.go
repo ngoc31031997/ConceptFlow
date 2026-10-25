@@ -2,6 +2,7 @@ package application
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -66,7 +67,7 @@ func newLockFixture(t *testing.T) *lockFixture {
 	}
 	project := &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly, VoiceID: "v"}, status: domain.StatusDraft}
 	v := &memVersions{}
-	uc := NewScriptLockDeskUseCase(sf.beat.store, project, project, briefPrompts{}, sf.llm, 4000, sf.beat.uc, sf.uc, v)
+	uc := NewScriptLockDeskUseCase(sf.beat.store, project, project, briefPrompts{}, sf.llm, 4000, sf.beat.uc, sf.uc, v, sf.beat.briefs)
 	return &lockFixture{scriptFixture: sf, versions: v, uc2: uc}
 }
 
@@ -366,6 +367,33 @@ func TestLockRefusesUntilEveryConditionHoldsThenFreezesV1(t *testing.T) {
 	}
 	if _, err := f.uc2.Lock(ctx, "p1", ""); !errors.Is(err, domain.ErrNothingToLock) {
 		t.Errorf("second lock with no change: err = %v, want ErrNothingToLock", err)
+	}
+}
+
+func TestLockFreezesTheApprovedProjectBrief(t *testing.T) {
+	f := newLockFixture(t)
+	ctx := context.Background()
+	f.beat.briefs.brief = domain.ProjectBrief{Audience: "học sinh", DurationSeconds: 270, Tone: "ấm", Avoid: []string{"chính trị"}}
+	f.beat.briefs.briefOK = true
+	f.reviewClean(t)
+	f.approveAllHandoff(t)
+	if _, err := f.uc2.Lock(ctx, "p1", ""); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := f.versions.LatestScriptVersion(ctx, "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	part, ok := stored.Part(domain.PartBrief)
+	if !ok {
+		t.Fatal("version has no brief part")
+	}
+	var got domain.ProjectBrief
+	if err := json.Unmarshal(part.Content, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got.Audience != "học sinh" || got.Tone != "ấm" || len(got.Avoid) != 1 {
+		t.Errorf("frozen brief = %+v, want the approved project brief", got)
 	}
 }
 

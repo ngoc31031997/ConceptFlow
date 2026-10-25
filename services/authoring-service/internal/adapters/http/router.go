@@ -53,7 +53,6 @@ type Router struct {
 	operations              *application.Operations
 	reviewUnits             reviewUnitsUseCase
 	idea                    ideaUseCase
-	creativeBrief           creativeBriefUseCase
 	projectBrief            projectBriefUseCase
 	research                researchUseCase
 	story                   storyUseCase

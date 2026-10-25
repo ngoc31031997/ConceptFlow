@@ -25,16 +25,19 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	r := NewPromptTemplateRepository(pool)
-	const pid = "review-units-test"
+	const (
+		pid             = "review-units-test"
+		generalUnitKind = "general_unit"
+	)
 	t.Cleanup(func() { _ = r.DeleteAuthoring(ctx, pid) })
 	_ = r.DeleteAuthoring(ctx, pid)
 
-	if _, err := r.GetUnit(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey); !errors.Is(err, domain.ErrUnitNotFound) {
+	if _, err := r.GetUnit(ctx, pid, generalUnitKind, "main"); !errors.Is(err, domain.ErrUnitNotFound) {
 		t.Fatalf("no unit yet must be ErrUnitNotFound, got %v", err)
 	}
-	content, _ := json.Marshal(domain.CreativeBrief{Audience: "Q", Tone: "T"})
+	content, _ := json.Marshal(map[string]string{"audience": "Q", "tone": "T"})
 	saved, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey,
+		ProjectID: pid, Kind: generalUnitKind, Key: "main",
 		Status: domain.UnitPending, Content: content, RedoCount: 2,
 	})
 	if err != nil {
@@ -48,7 +51,7 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 	if _, err := r.SaveUnit(ctx, saved); err != nil {
 		t.Fatal(err)
 	}
-	got, err := r.GetUnit(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey)
+	got, err := r.GetUnit(ctx, pid, generalUnitKind, "main")
 	if err != nil || got.Status != domain.UnitApproved || !got.HasCreatorField("tone") {
 		t.Fatalf("updated unit read back wrong: %+v, %v", got, err)
 	}
@@ -61,35 +64,10 @@ func TestReviewUnitsAgainstPostgres(t *testing.T) {
 		t.Fatalf("the brief's model must round-trip with the others, got %+v, %v", got, err)
 	}
 
-	if err := r.SaveTargetDuration(ctx, pid, domain.Duration5to7); err != nil {
-		t.Fatal(err)
-	}
-	if d, err := r.GetTargetDuration(ctx, pid); err != nil || d != domain.Duration5to7 {
-		t.Fatalf("target duration read back %q, %v", d, err)
-	}
-
-	if link, err := r.StoryBriefLink(ctx, pid); err != nil || link.HasStory {
-		t.Fatalf("no story yet, got %+v, %v", link, err)
-	}
-	if err := r.SaveAuthoringStory(ctx, pid, "dàn ý", ""); err != nil {
-		t.Fatal(err)
-	}
-	if link, err := r.StoryBriefLink(ctx, pid); err != nil || !link.HasStory || !link.FromCurrentBrief {
-		t.Fatalf("a story saved under the approved brief is current, got %+v, %v", link, err)
-	}
-	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Q2", Tone: "T"})
-	got.Content = changed
-	if _, err := r.SaveUnit(ctx, got); err != nil {
-		t.Fatal(err)
-	}
-	if link, err := r.StoryBriefLink(ctx, pid); err != nil || link.FromCurrentBrief {
-		t.Fatalf("changing the approved brief makes the story stale, got %+v, %v", link, err)
-	}
-
 	if err := r.DeleteAuthoring(ctx, pid); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := r.GetUnit(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey); !errors.Is(err, domain.ErrUnitNotFound) {
+	if _, err := r.GetUnit(ctx, pid, generalUnitKind, "main"); !errors.Is(err, domain.ErrUnitNotFound) {
 		t.Fatalf("deleting the project must delete its units, got %v", err)
 	}
 }

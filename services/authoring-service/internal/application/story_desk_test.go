@@ -51,7 +51,7 @@ const storyReplyFull = `{"central_question":"Vì sao ong chết trong quả sung
 func newStoryFixture() *storyFixture {
 	units := newBriefUnits()
 	f := &storyFixture{
-		store:    &storyStore{researchStore: &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration5to7}},
+		store:    &storyStore{researchStore: &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?"}},
 		approved: &approvedSteps{},
 		standing: &standing{},
 		project:  &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly}, status: domain.StatusDraft},

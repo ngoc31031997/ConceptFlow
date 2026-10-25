@@ -52,15 +52,6 @@ func TestBeatKeyFollowsSequence(t *testing.T) {
 	}
 }
 
-func TestTargetSecondsFollowsTheTarget(t *testing.T) {
-	if lo, hi := TargetSeconds(ModeLongOnly, Duration4to5); lo != 240 || hi != 300 {
-		t.Errorf("4-5 phút = %d..%d, want 240..300", lo, hi)
-	}
-	if lo, hi := TargetSeconds(ModeShortOnly, ""); lo != 0 || hi != 60 {
-		t.Errorf("short = %d..%d, want 0..60", lo, hi)
-	}
-}
-
 func TestCheckBeatSheetFlagsWhatIsOff(t *testing.T) {
 	beats := []Beat{
 		{Fn: "Hook", Goal: "a", Dur: 25, Facts: []string{"F01"}},

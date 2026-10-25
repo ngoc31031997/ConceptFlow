@@ -102,14 +102,8 @@ func (uc *RenderPromptUseCase) Render(ctx context.Context, in RenderInput) (Rend
 	brief := creativeBriefPlaceholder
 	if in.Role == domain.RoleStoryArchitect {
 		archetypes = uc.archetypeSection(ctx)
-		if in.ProjectID != "" && uc.brief != nil {
-			project, err := uc.projects.Get(ctx, in.ProjectID)
-			if err != nil {
-				return RenderedPrompt{}, fmt.Errorf("load project: %w", err)
-			}
-			if brief, err = uc.brief.ApprovedBriefSection(ctx, in.ProjectID, project); err != nil {
-				return RenderedPrompt{}, fmt.Errorf("load creative brief: %w", err)
-			}
+		if brief, err = uc.briefSection(ctx, in.ProjectID); err != nil {
+			return RenderedPrompt{}, err
 		}
 	}
 

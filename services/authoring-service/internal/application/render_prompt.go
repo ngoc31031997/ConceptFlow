@@ -50,7 +50,7 @@ type RenderPromptUseCase struct {
 	formats     FormatLookupPort
 	calibration VoiceCalibrationPort
 	archetypes  ArchetypeListPort // optional; nil renders {{video_archetypes}} empty
-	brief       BriefSectionPort  // optional; nil renders {{creative_brief}} as the no-brief placeholder
+	brief       ApprovedBriefPort // optional; nil renders {{creative_brief}} as the no-brief placeholder
 	languages   LanguagePort      // optional; nil refuses a template that needs the visual language
 }
 
@@ -86,16 +86,30 @@ func (uc *RenderPromptUseCase) languageSections(ctx context.Context, projectID, 
 	return l.Name + " — " + l.Description, strings.TrimSpace(l.Rules.Scene), nil
 }
 
-// BriefSectionPort renders the project's approved creative brief for the
-// story prompt.
-type BriefSectionPort interface {
-	ApprovedBriefSection(ctx context.Context, projectID string, project *domain.Project) (string, error)
-}
+// creativeBriefPlaceholder is {{creative_brief}} for a project with no approved brief.
+const creativeBriefPlaceholder = "(chưa có brief đã duyệt: dựng dàn ý từ chủ đề)"
 
-// WithBrief lets the renderer fill {{creative_brief}} from the idea step.
-func (uc *RenderPromptUseCase) WithBrief(p BriefSectionPort) *RenderPromptUseCase {
+// WithBrief lets the renderer fill {{creative_brief}} from the approved brief of
+// the brief step.
+func (uc *RenderPromptUseCase) WithBrief(p ApprovedBriefPort) *RenderPromptUseCase {
 	uc.brief = p
 	return uc
+}
+
+// briefSection is {{creative_brief}}: the approved brief as the later steps read
+// it, or the placeholder when none is approved.
+func (uc *RenderPromptUseCase) briefSection(ctx context.Context, projectID string) (string, error) {
+	if uc.brief == nil || projectID == "" {
+		return creativeBriefPlaceholder, nil
+	}
+	brief, ok, err := uc.brief.ApprovedBrief(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("load creative brief: %w", err)
+	}
+	if !ok {
+		return creativeBriefPlaceholder, nil
+	}
+	return brief.Section(), nil
 }
 
 // ArchetypeListPort is the one read the renderer needs from the archetype table.
@@ -235,14 +249,11 @@ func (uc *RenderPromptUseCase) variablesFor(
 	// nothing reads.
 	if role == domain.RoleStoryArchitect {
 		vars["video_archetypes"] = uc.archetypeSection(ctx)
-		vars["creative_brief"] = creativeBriefPlaceholder
-		if uc.brief != nil {
-			section, err := uc.brief.ApprovedBriefSection(ctx, projectID, project)
-			if err != nil {
-				return nil, fmt.Errorf("load creative brief: %w", err)
-			}
-			vars["creative_brief"] = section
+		section, err := uc.briefSection(ctx, projectID)
+		if err != nil {
+			return nil, err
 		}
+		vars["creative_brief"] = section
 	}
 	if role == domain.RoleStoryArchitect && project.VideoFormatID != "" {
 		format, err := uc.formats.GetVideoFormat(ctx, project.VideoFormatID, project.VideoFormatVersion)

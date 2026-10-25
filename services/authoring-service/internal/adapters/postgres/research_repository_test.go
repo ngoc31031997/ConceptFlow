@@ -85,16 +85,20 @@ func TestResearchFactRoundTripInPostgres(t *testing.T) {
 // A unit built from the brief is stale once the brief's content changes, and a
 // unit built from nothing never is.
 func TestUnitStaleAgainstItsSourceInPostgres(t *testing.T) {
-	const pid = "research-stale-test"
+	const (
+		pid             = "research-stale-test"
+		staleSourceKind = "stale_source"
+		staleProbeKind  = "stale_probe"
+	)
 	r, ctx := researchRepo(t, pid)
 
-	brief, _ := json.Marshal(domain.CreativeBrief{Audience: "Q", Tone: "T"})
+	brief, _ := json.Marshal(map[string]string{"audience": "Q", "tone": "T"})
 	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: domain.UnitApproved, Content: brief,
+		ProjectID: pid, Kind: staleSourceKind, Key: "main", Status: domain.UnitApproved, Content: brief,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	sha, err := r.UnitSHA(ctx, pid, domain.UnitKindBrief, domain.BriefUnitKey)
+	sha, err := r.UnitSHA(ctx, pid, staleSourceKind, "main")
 	if err != nil || sha == "" {
 		t.Fatalf("UnitSHA = %q, %v, want a hash", sha, err)
 	}
@@ -103,33 +107,33 @@ func TestUnitStaleAgainstItsSourceInPostgres(t *testing.T) {
 	}
 	text, _ := json.Marshal(domain.ResearchQuestion{Text: "Một câu hỏi?"})
 	built, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindResearchQuestion, Key: "Q1", Content: text,
-		InputRef: "brief:main", InputSHA: sha,
+		ProjectID: pid, Kind: staleProbeKind, Key: "Q1", Content: text,
+		InputRef: staleSourceKind + ":main", InputSHA: sha,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if built.Stale || built.InputRef != "brief:main" {
+	if built.Stale || built.InputRef != staleSourceKind+":main" {
 		t.Fatalf("a unit built from the current brief is not stale: %+v", built)
 	}
 	handWritten, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindResearchQuestion, Key: "Q2", Content: text,
+		ProjectID: pid, Kind: staleProbeKind, Key: "Q2", Content: text,
 	})
 	if err != nil || handWritten.Stale {
 		t.Fatalf("a unit built from nothing is never stale: %+v, %v", handWritten, err)
 	}
 
-	changed, _ := json.Marshal(domain.CreativeBrief{Audience: "Q2", Tone: "T"})
+	changed, _ := json.Marshal(map[string]string{"audience": "Q2", "tone": "T"})
 	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
-		ProjectID: pid, Kind: domain.UnitKindBrief, Key: domain.BriefUnitKey, Status: domain.UnitApproved, Content: changed,
+		ProjectID: pid, Kind: staleSourceKind, Key: "main", Status: domain.UnitApproved, Content: changed,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := r.GetUnit(ctx, pid, domain.UnitKindResearchQuestion, "Q1")
+	got, err := r.GetUnit(ctx, pid, staleProbeKind, "Q1")
 	if err != nil || !got.Stale {
 		t.Fatalf("a unit whose source changed must be stale: %+v, %v", got, err)
 	}
-	if again, err := r.GetUnit(ctx, pid, domain.UnitKindResearchQuestion, "Q2"); err != nil || again.Stale {
+	if again, err := r.GetUnit(ctx, pid, staleProbeKind, "Q2"); err != nil || again.Stale {
 		t.Fatalf("the hand-written unit stays fresh: %+v, %v", again, err)
 	}
 }
@@ -264,5 +268,44 @@ func TestPasteLogInPostgres(t *testing.T) {
 	}
 	if logs, err := r.ListPastes(ctx, pid); err != nil || len(logs) != 0 {
 		t.Fatalf("deleting the project must delete its paste log, got %+v, %v", logs, err)
+	}
+}
+
+// A research question is stored in project_research_question, reads back whole
+// and never lands in review_units or among the facts.
+func TestResearchQuestionLivesInItsOwnTableInPostgres(t *testing.T) {
+	const pid = "research-question-table-test"
+	r, ctx := researchRepo(t, pid)
+
+	content, _ := json.Marshal(domain.ResearchQuestion{Text: "Một câu hỏi?", BriefHash: "h1"})
+	if _, err := r.SaveUnit(ctx, domain.ReviewUnit{
+		ProjectID: pid, Kind: domain.UnitKindResearchQuestion, Key: "Q1", Status: domain.UnitPending,
+		Content: content, CreatorFields: []string{"text"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err := r.GetUnit(ctx, pid, domain.UnitKindResearchQuestion, "Q1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var q domain.ResearchQuestion
+	if err := json.Unmarshal(got.Content, &q); err != nil || q.Text != "Một câu hỏi?" || q.BriefHash != "h1" || !got.HasCreatorField("text") {
+		t.Fatalf("question read back = %+v (%+v), %v", got, q, err)
+	}
+	var inUnits, inFacts int
+	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM review_units WHERE project_id = $1`, pid).Scan(&inUnits); err != nil {
+		t.Fatal(err)
+	}
+	if err := r.pool.QueryRow(ctx, `SELECT count(*) FROM project_research WHERE project_id = $1`, pid).Scan(&inFacts); err != nil {
+		t.Fatal(err)
+	}
+	if inUnits != 0 || inFacts != 0 {
+		t.Errorf("question rows: review_units %d, project_research %d, want none in either", inUnits, inFacts)
+	}
+	if err := r.DeleteUnit(ctx, pid, domain.UnitKindResearchQuestion, "Q1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := r.GetUnit(ctx, pid, domain.UnitKindResearchQuestion, "Q1"); !errors.Is(err, domain.ErrUnitNotFound) {
+		t.Errorf("deleted question: err = %v, want ErrUnitNotFound", err)
 	}
 }

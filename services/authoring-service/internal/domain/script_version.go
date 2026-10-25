@@ -205,11 +205,11 @@ func HandoffFor(role string, v ScriptVersion) (HandoffPackage, error) {
 		return pkg, err
 	}
 	if r.brief {
-		var b CreativeBrief
+		var b ProjectBrief
 		if err := decode(PartBrief, &b); err != nil {
 			return pkg, err
 		}
-		pkg.Brief = map[string]string{"tone": b.Tone, "out_of_scope": b.OutOfScope}
+		pkg.Brief = map[string]string{"audience": b.Audience, "tone": b.Tone, "avoid": strings.Join(b.Avoid, "\n")}
 	}
 	if r.glossary {
 		var g Glossary

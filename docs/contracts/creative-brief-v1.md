@@ -16,6 +16,8 @@ Brief không dùng khung đơn vị duyệt chung (`/units/...`): nó có API v�
 
 Các trường chữ viết bằng ngôn ngữ nội dung của project. Bước sau chỉ đọc **bản đã duyệt**: hàm `ProjectBriefUseCase.ApprovedBrief(projectID)` trả `(brief, ok)`, `ok` là false khi chưa có brief hoặc brief đang chờ duyệt. Chưa có route HTTP nội bộ cho việc này.
 
+Thời lượng mục tiêu của các bước sau (Beat sheet, Viết kịch bản, Rà soát và chốt) lấy từ `duration_seconds` của brief đã duyệt, với khoảng cho phép lệch 10% mỗi phía (270 giây là 243 đến 297 giây). Brief chưa duyệt thì các bước đó không có thời lượng đích.
+
 Dạng `.md` tương ứng chỉ để đọc, không lưu thành file:
 
 ```

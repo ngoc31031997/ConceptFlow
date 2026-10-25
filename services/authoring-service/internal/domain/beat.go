@@ -204,21 +204,6 @@ type BeatCheck struct {
 	Text string `json:"text"`
 }
 
-// TargetSeconds is the length range, in seconds, a video aims for: the
-// minutes of a long video's target, or up to a minute for a short.
-func TargetSeconds(mode VideoOutputMode, d TargetDuration) (lo, hi int) {
-	if mode == ModeShortOnly {
-		return 0, 60
-	}
-	if !ValidTargetDuration(d) {
-		d = DefaultTargetDuration
-	}
-	parts := strings.SplitN(string(d), "-", 2)
-	a, _ := strconv.Atoi(parts[0])
-	b, _ := strconv.Atoi(parts[1])
-	return a * 60, b * 60
-}
-
 // FormatSeconds writes a length as "4:28".
 func FormatSeconds(s int) string { return fmt.Sprintf("%d:%02d", s/60, s%60) }
 

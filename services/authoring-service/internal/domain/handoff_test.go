@@ -33,7 +33,7 @@ func TestGlossaryMergeKeepsExistingRows(t *testing.T) {
 func lockedFixture(t *testing.T, mutate func(map[string]any)) ScriptVersion {
 	t.Helper()
 	vals := map[string]any{
-		PartBrief:          CreativeBrief{Tone: "ấm", OutOfScope: "chính trị"},
+		PartBrief:          ProjectBrief{Audience: "học sinh", Tone: "ấm", Avoid: []string{"chính trị"}},
 		PartOrder:          []string{"b1", "b2"},
 		PartGlossary:       Glossary{Terms: []GlossaryTerm{{Term: "ficin"}}},
 		PartBeat + "b1":    Beat{Fn: "Hook", Title: "T1", Goal: "G1", Next: "N1"},
@@ -80,8 +80,8 @@ func TestHandoffForGivesEachRoleOnlyItsSections(t *testing.T) {
 		t.Errorf("code reads only 'free': %+v", code.Beats[0])
 	}
 	art, _ := HandoffFor(HandoffRoleArtWorld, v)
-	if art.Brief["tone"] != "ấm" || art.Brief["out_of_scope"] != "chính trị" || len(art.Glossary) != 1 {
-		t.Errorf("art reads tone, scope and glossary: %+v", art)
+	if art.Brief["audience"] != "học sinh" || art.Brief["tone"] != "ấm" || art.Brief["avoid"] != "chính trị" || len(art.Glossary) != 1 {
+		t.Errorf("art reads audience, tone, avoid list and glossary: %+v", art)
 	}
 	color, _ := HandoffFor(HandoffRoleArtColor, v)
 	if color.Beats[1].Fn != "Payoff" || color.Beats[1].Goal != "" {

@@ -64,7 +64,7 @@ func newBeatFixture() *beatFixture {
 	project := &briefProject{project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly}, status: domain.StatusDraft}
 	f := &beatFixture{
 		units:   units,
-		store:   &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration4to5},
+		store:   &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?"},
 		sheets:  &memBeatSheets{},
 		stories: &fakeStories{},
 		briefs:  &approvedSteps{},
@@ -703,5 +703,17 @@ func TestFactDependentsNameTheBeatsThatUseAFact(t *testing.T) {
 	}
 	if items, _ := f.uc.FactDependents()(context.Background(), "p1", "F04"); len(items) != 0 {
 		t.Errorf("items = %v, want none for an unused fact", items)
+	}
+}
+
+func TestBeatSheetTargetsTheApprovedBriefsLength(t *testing.T) {
+	f := newBeatFixture()
+	f.open(t)
+	state, err := f.uc.State(context.Background(), "p1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.TargetLabel != "4:30 phút (khoảng 4:03–4:57)" {
+		t.Errorf("target label = %q, want the brief's 270 seconds with a tenth either side", state.TargetLabel)
 	}
 }

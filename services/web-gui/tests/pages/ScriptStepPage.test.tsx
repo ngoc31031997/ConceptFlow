@@ -37,7 +37,6 @@ const REVIEW: IdeaReview = {
 
 let server: IdeaScreen;
 let createDraft: MockInstance<typeof apiClient.createProjectDraft>;
-let setDuration: MockInstance<typeof apiClient.setTargetDuration>;
 let patchSettings: MockInstance<typeof apiClient.patchWizardSettings>;
 let saveModels: MockInstance<typeof apiClient.saveAuthoringModels>;
 let generate: MockInstance<typeof apiClient.generateProjectIdea>;
@@ -61,7 +60,6 @@ beforeEach(() => {
   vi.spyOn(apiClient, "fetchVideoFormats").mockResolvedValue([]);
   vi.spyOn(apiClient, "getIdeaScreen").mockImplementation(async () => server);
   createDraft = vi.spyOn(apiClient, "createProjectDraft").mockResolvedValue({ similarProjects: [] });
-  setDuration = vi.spyOn(apiClient, "setTargetDuration").mockResolvedValue(undefined);
   patchSettings = vi.spyOn(apiClient, "patchWizardSettings").mockResolvedValue(undefined);
   saveModels = vi.spyOn(apiClient, "saveAuthoringModels").mockResolvedValue(undefined);
   generate = vi.spyOn(apiClient, "generateProjectIdea").mockImplementation(async () => {
@@ -152,7 +150,6 @@ describe("ScriptStepPage (Bước 1 — Ý tưởng)", () => {
 
     await screen.findByTestId("idea-field-central_question");
     expect(createDraft).toHaveBeenCalledWith(expect.any(String), SUBJECT, "vi");
-    expect(setDuration).toHaveBeenCalledWith(expect.any(String), apiClient.DEFAULT_TARGET_DURATION);
     expect(patchSettings).not.toHaveBeenCalled();
     expect(saveModels.mock.invocationCallOrder[0]).toBeLessThan(generate.mock.invocationCallOrder[0]);
     expect(generate).toHaveBeenCalledWith(expect.any(String), "", expect.objectContaining({ id: expect.any(String) }));

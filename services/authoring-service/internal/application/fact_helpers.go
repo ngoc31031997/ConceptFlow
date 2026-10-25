@@ -2,9 +2,6 @@ package application
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
-	"fmt"
 	"strings"
 
 	"authoring/internal/domain"
@@ -45,28 +42,6 @@ func toSet(ids []string) map[string]bool {
 		set[id] = true
 	}
 	return set
-}
-
-// loadApprovedBrief returns the idea and the brief of a project, and reports
-// whether both are approved.
-func loadApprovedBrief(ctx context.Context, units ReviewUnitPort, projectID string) (domain.Idea, domain.CreativeBrief, bool, error) {
-	ideaUnit, idea, ideaExists, err := loadIdea(ctx, units, projectID)
-	if err != nil {
-		return domain.Idea{}, domain.CreativeBrief{}, false, err
-	}
-	unit, err := units.GetUnit(ctx, projectID, domain.UnitKindBrief, domain.BriefUnitKey)
-	if errors.Is(err, domain.ErrUnitNotFound) {
-		return idea, domain.CreativeBrief{}, false, nil
-	}
-	if err != nil {
-		return domain.Idea{}, domain.CreativeBrief{}, false, err
-	}
-	var brief domain.CreativeBrief
-	if err := json.Unmarshal(unit.Content, &brief); err != nil {
-		return domain.Idea{}, domain.CreativeBrief{}, false, fmt.Errorf("read stored brief: %w", err)
-	}
-	approved := ideaExists && ideaUnit.Status == domain.UnitApproved && unit.Status == domain.UnitApproved
-	return idea, brief, approved, nil
 }
 
 // factsText lists the kept facts for a prompt: code, kind, whether it must be

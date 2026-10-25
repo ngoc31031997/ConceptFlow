@@ -77,28 +77,29 @@ func aProject() *domain.Project {
 	}
 }
 
-// stubBrief serves a fixed approved-brief section.
-type stubBrief struct{ section string }
+// stubBrief serves a fixed approved brief.
+type stubBrief struct{ brief domain.ProjectBrief }
 
-func (s stubBrief) ApprovedBriefSection(context.Context, string, *domain.Project) (string, error) {
-	return s.section, nil
+func (s stubBrief) ApprovedBrief(context.Context, string) (domain.ProjectBrief, bool, error) {
+	return s.brief, true, nil
 }
 
 func TestRender_StoryPromptCarriesTheApprovedBrief(t *testing.T) {
 	ctxData := &fakeRenderContext{project: aProject(), topic: "sung"}
-	r := newRenderer("BRIEF={{creative_brief}}", ctxData).WithBrief(stubBrief{section: "Câu hỏi trung tâm: Q"})
+	r := newRenderer("BRIEF={{creative_brief}}", ctxData).WithBrief(stubBrief{brief: domain.ProjectBrief{Audience: "Học sinh", DurationSeconds: 270, Tone: "ấm"}})
 	got, err := r.Execute(context.Background(), "p1", domain.RoleStoryArchitect)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Prompt != "BRIEF=Câu hỏi trung tâm: Q" {
+	want := "BRIEF=" + domain.ProjectBrief{Audience: "Học sinh", DurationSeconds: 270, Tone: "ấm"}.Section()
+	if got.Prompt != want {
 		t.Errorf("the story prompt must carry the approved brief, got %q", got.Prompt)
 	}
 	draft, err := r.Render(context.Background(), application.RenderInput{Role: domain.RoleStoryArchitect, ProjectID: "p1"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if draft.Prompt != "BRIEF=Câu hỏi trung tâm: Q" {
+	if draft.Prompt != want {
 		t.Errorf("the copy-prompt render for a project must carry its brief too, got %q", draft.Prompt)
 	}
 }

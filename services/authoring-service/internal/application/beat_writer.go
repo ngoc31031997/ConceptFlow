@@ -41,13 +41,7 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	if bc.topic, err = uc.units.GetAuthoringTopic(ctx, projectID); err != nil {
 		return bc, fmt.Errorf("load topic: %w", err)
 	}
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
-	if err != nil {
-		return bc, err
-	}
 	bc.language = briefLanguage(project.ContentLanguage)
-	bc.targetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, bc.language)
-	bc.loSeconds, bc.hiSeconds = domain.TargetSeconds(project.VideoOutputMode, duration)
 	brief, briefOK, err := uc.briefs.ApprovedBrief(ctx, projectID)
 	if err != nil {
 		return bc, err
@@ -55,6 +49,9 @@ func (uc *BeatDeskUseCase) context(ctx context.Context, projectID string) (beatC
 	if !briefOK {
 		return bc, fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedBrief)
 	}
+	target := domain.NewTargetLength(brief.DurationSeconds)
+	bc.targetLabel = target.Label(bc.language)
+	bc.loSeconds, bc.hiSeconds = target.Lo, target.Hi
 	bc.brief = brief.Section()
 	if bc.facts, err = loadKeptFacts(ctx, uc.units, projectID); err != nil {
 		return bc, err
@@ -241,16 +238,14 @@ func (uc *BeatDeskUseCase) BuildSkeleton(ctx context.Context, projectID string) 
 	if err != nil {
 		return err
 	}
-	project, err := uc.projects.Get(ctx, projectID)
-	if err != nil {
-		return fmt.Errorf("load project: %w", err)
-	}
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
+	target, briefOK, err := approvedTarget(ctx, uc.briefs, projectID)
 	if err != nil {
 		return err
 	}
-	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
-	outline, err := domain.NewBeatOutline(fields[domain.BeatFieldChain].Text, lo, hi)
+	if !briefOK {
+		return fmt.Errorf("%w: %w", domain.ErrInvalidStatus, ErrBeatsNeedBrief)
+	}
+	outline, err := domain.NewBeatOutline(fields[domain.BeatFieldChain].Text, target.Lo, target.Hi)
 	if err != nil {
 		return fmt.Errorf("read story chain: %w", err)
 	}

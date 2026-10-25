@@ -6,7 +6,6 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"authoring/internal/application"
 	"authoring/internal/domain"
 )
 
@@ -76,6 +75,9 @@ func (r *PromptTemplateRepository) GetUnit(ctx context.Context, projectID, kind,
 	if kind == domain.UnitKindResearch {
 		return r.getResearchGateUnit(ctx, projectID, key)
 	}
+	if kind == domain.UnitKindResearchQuestion {
+		return r.getResearchQuestionUnit(ctx, projectID, key)
+	}
 	return scanReviewUnit(r.pool.QueryRow(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2 AND ru.unit_key = $3`,
 		projectID, kind, key))
@@ -98,6 +100,9 @@ func (r *PromptTemplateRepository) ListUnits(ctx context.Context, projectID, kin
 			return nil, err
 		}
 		return []domain.ReviewUnit{u}, nil
+	}
+	if kind == domain.UnitKindResearchQuestion {
+		return r.listResearchQuestionUnits(ctx, projectID)
 	}
 	rows, err := r.pool.Query(ctx,
 		`SELECT `+reviewUnitColumns+` FROM review_units ru WHERE ru.project_id = $1 AND ru.kind = $2
@@ -130,6 +135,9 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 		_, err := r.pool.Exec(ctx, `DELETE FROM project_research_gate WHERE project_id = $1`, projectID)
 		return err
 	}
+	if kind == domain.UnitKindResearchQuestion {
+		return r.deleteResearchQuestionUnit(ctx, projectID, key)
+	}
 	_, err := r.pool.Exec(ctx,
 		`DELETE FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`, projectID, kind, key)
 	return err
@@ -140,6 +148,9 @@ func (r *PromptTemplateRepository) DeleteUnit(ctx context.Context, projectID, ki
 func (r *PromptTemplateRepository) UnitSHA(ctx context.Context, projectID, kind, key string) (string, error) {
 	if isLockKind(kind) {
 		return r.lockUnitSHA(ctx, projectID, kind, key)
+	}
+	if kind == domain.UnitKindResearchQuestion {
+		return r.researchQuestionSHA(ctx, projectID, key)
 	}
 	query := `SELECT md5(content::text) FROM review_units WHERE project_id = $1 AND kind = $2 AND unit_key = $3`
 	args := []any{projectID, kind, key}
@@ -173,6 +184,9 @@ func (r *PromptTemplateRepository) SaveUnit(ctx context.Context, unit domain.Rev
 	if unit.Kind == domain.UnitKindResearch {
 		return r.saveResearchGateUnit(ctx, unit)
 	}
+	if unit.Kind == domain.UnitKindResearchQuestion {
+		return r.saveResearchQuestionUnit(ctx, unit)
+	}
 	creatorFields := unit.CreatorFields
 	if creatorFields == nil {
 		creatorFields = []string{}
@@ -195,39 +209,4 @@ func (r *PromptTemplateRepository) SaveUnit(ctx context.Context, unit domain.Rev
 		RETURNING `+reviewUnitColumns,
 		unit.ProjectID, unit.Kind, unit.Key, string(unit.Status), content, creatorFields, unit.RedoCount,
 		unit.InputRef, unit.InputSHA))
-}
-
-// GetTargetDuration returns the saved target length, or "" when none is saved.
-func (r *PromptTemplateRepository) GetTargetDuration(ctx context.Context, projectID string) (domain.TargetDuration, error) {
-	var d string
-	err := r.pool.QueryRow(ctx, `SELECT target_duration FROM project_authoring WHERE project_id = $1`, projectID).Scan(&d)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return "", nil
-	}
-	return domain.TargetDuration(d), err
-}
-
-// SaveTargetDuration upserts the target length.
-func (r *PromptTemplateRepository) SaveTargetDuration(ctx context.Context, projectID string, d domain.TargetDuration) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO project_authoring (project_id, target_duration, updated_at)
-		VALUES ($1, $2, now())
-		ON CONFLICT (project_id) DO UPDATE SET
-		    target_duration = EXCLUDED.target_duration, updated_at = now()
-	`, projectID, string(d))
-	return err
-}
-
-// StoryBriefLink reports whether a story outline is saved and whether it was
-// saved under the brief approved now.
-func (r *PromptTemplateRepository) StoryBriefLink(ctx context.Context, projectID string) (application.StoryBriefLink, error) {
-	var link application.StoryBriefLink
-	err := r.pool.QueryRow(ctx, `
-		SELECT story_content <> '', story_brief_sha = `+approvedBriefSHA+`
-		FROM project_authoring WHERE project_id = $1
-	`, projectID).Scan(&link.HasStory, &link.FromCurrentBrief)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return application.StoryBriefLink{}, nil
-	}
-	return link, err
 }

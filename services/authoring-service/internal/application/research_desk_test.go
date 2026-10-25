@@ -14,11 +14,10 @@ import (
 // researchStore is an in-memory ResearchStorePort on top of briefUnits.
 type researchStore struct {
 	*briefUnits
-	topic    string
-	duration domain.TargetDuration
-	models   domain.AuthoringStepModels
-	pastes   []PasteLog
-	facts    map[string]domain.StoredFact
+	topic  string
+	models domain.AuthoringStepModels
+	pastes []PasteLog
+	facts  map[string]domain.StoredFact
 }
 
 func (s *researchStore) GetAuthoringTopic(context.Context, string) (string, error) {
@@ -26,9 +25,6 @@ func (s *researchStore) GetAuthoringTopic(context.Context, string) (string, erro
 }
 func (s *researchStore) GetAuthoringModels(context.Context, string) (domain.AuthoringStepModels, error) {
 	return s.models, nil
-}
-func (s *researchStore) GetTargetDuration(context.Context, string) (domain.TargetDuration, error) {
-	return s.duration, nil
 }
 func (s *researchStore) AddPaste(_ context.Context, _ string, p PasteLog) (PasteLog, error) {
 	p.N = len(s.pastes) + 1
@@ -121,7 +117,7 @@ func newResearchFixture() *researchFixture {
 	units := newBriefUnits()
 	f := &researchFixture{
 		units:    units,
-		store:    &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?", duration: domain.Duration5to7},
+		store:    &researchStore{briefUnits: units, topic: "Vì sao trong quả sung có xác ong?"},
 		approved: &approvedSteps{},
 		project: &briefProject{
 			project: domain.Project{ContentLanguage: domain.LanguageVietnamese, VideoOutputMode: domain.ModeLongOnly},
@@ -425,30 +421,6 @@ func TestStateStartsEmptyAndPending(t *testing.T) {
 	}
 	if len(state.Questions) != 0 || len(state.Facts) != 0 || len(state.Pastes) != 0 || len(state.Coverage) != 0 {
 		t.Errorf("nothing stored yet: %+v", state)
-	}
-}
-
-func TestBriefImpactMentionsAIQuestions(t *testing.T) {
-	f := newResearchFixture()
-	f.seedBrief(t, domain.UnitApproved)
-	brief := NewCreativeBriefUseCase(f.units, &briefStore{}, f.project, f.project, briefPrompts{}, nil, 4000)
-	ctx := context.Background()
-	items, err := brief.Impact(ctx, "p1", domain.BriefUnitKey)
-	if err != nil || len(items) != 0 {
-		t.Fatalf("no questions yet: items = %v, err = %v", items, err)
-	}
-	if _, err := f.uc.AddQuestion(ctx, "p1", "Câu của tôi?"); err != nil {
-		t.Fatal(err)
-	}
-	if items, _ := brief.Impact(ctx, "p1", domain.BriefUnitKey); len(items) != 0 {
-		t.Fatalf("the Creator's own question is not sent back by a brief change: %v", items)
-	}
-	if _, err := f.uc.GenerateQuestions(ctx, "p1", false, ""); err != nil {
-		t.Fatal(err)
-	}
-	items, _ = brief.Impact(ctx, "p1", domain.BriefUnitKey)
-	if len(items) != 1 || !strings.Contains(items[0], "Câu hỏi nghiên cứu") {
-		t.Fatalf("items = %v, want the research questions listed", items)
 	}
 }
 

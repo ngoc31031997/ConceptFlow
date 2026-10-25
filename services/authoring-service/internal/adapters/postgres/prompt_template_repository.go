@@ -401,7 +401,7 @@ func (r *PromptTemplateRepository) DeleteAuthoring(ctx context.Context, projectI
 		return err
 	}
 	// And the research gate, and the lock step's review, handoff notes and glossary.
-	for _, table := range []string{"project_research_gate", "project_script_review", "project_handoff", "project_glossary"} {
+	for _, table := range []string{"project_research_gate", "project_research_question", "project_script_review", "project_handoff", "project_glossary"} {
 		if _, err := r.pool.Exec(ctx, `DELETE FROM `+table+` WHERE project_id = $1`, projectID); err != nil {
 			return err
 		}

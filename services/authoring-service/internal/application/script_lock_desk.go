@@ -47,6 +47,7 @@ type ScriptLockDeskUseCase struct {
 	beats           *BeatDeskUseCase
 	script          *ScriptDeskUseCase
 	versions        ScriptVersionPort
+	briefs          ApprovedBriefPort
 	now             func() time.Time
 }
 
@@ -55,11 +56,11 @@ type ScriptLockDeskUseCase struct {
 func NewScriptLockDeskUseCase(
 	units StepUnitStorePort, projects ProjectReaderPort, locks AuthoringLockPort, prompts PromptActivePort,
 	provider LLMProviderPort, maxOutputTokens int,
-	beats *BeatDeskUseCase, script *ScriptDeskUseCase, versions ScriptVersionPort,
+	beats *BeatDeskUseCase, script *ScriptDeskUseCase, versions ScriptVersionPort, briefs ApprovedBriefPort,
 ) *ScriptLockDeskUseCase {
 	return &ScriptLockDeskUseCase{
 		units: units, projects: projects, locks: locks, prompts: prompts, provider: provider,
-		maxOutputTokens: maxOutputTokens, beats: beats, script: script, versions: versions, now: time.Now,
+		maxOutputTokens: maxOutputTokens, beats: beats, script: script, versions: versions, briefs: briefs, now: time.Now,
 	}
 }
 
@@ -335,21 +336,16 @@ func (uc *ScriptLockDeskUseCase) machine(ctx context.Context, projectID string, 
 	if err != nil {
 		return nil, err
 	}
-	project, err := uc.projects.Get(ctx, projectID)
-	if err != nil {
-		return nil, fmt.Errorf("load project: %w", err)
-	}
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
+	target, _, err := approvedTarget(ctx, uc.briefs, projectID)
 	if err != nil {
 		return nil, err
 	}
-	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
 	facts, err := loadKeptFacts(ctx, uc.units, projectID)
 	if err != nil {
 		return nil, err
 	}
 	ri := domain.ReviewInput{
-		ResearchSkipped: in.skipped, TotalSeconds: st.Stats.TotalSeconds, LoSeconds: lo, HiSeconds: hi,
+		ResearchSkipped: in.skipped, TotalSeconds: st.Stats.TotalSeconds, LoSeconds: target.Lo, HiSeconds: target.Hi,
 		TargetLabel: st.TargetLabel, ScriptSHA: domain.ScriptSHA(in.lc.lineSHAParts()), ReviewedSHA: in.review.ReviewedSHA,
 	}
 	for i, b := range in.lc.beats {
@@ -394,7 +390,7 @@ func (uc *ScriptLockDeskUseCase) currentParts(ctx context.Context, projectID str
 		parts = append(parts, p)
 		return nil
 	}
-	_, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+	brief, _, err := uc.briefs.ApprovedBrief(ctx, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +592,7 @@ func (uc *ScriptLockDeskUseCase) fillPackage(ctx context.Context, projectID stri
 	if err != nil {
 		return fmt.Errorf("load topic: %w", err)
 	}
-	_, brief, _, err := loadApprovedBrief(ctx, uc.units, projectID)
+	brief, _, err := uc.briefs.ApprovedBrief(ctx, projectID)
 	if err != nil {
 		return err
 	}

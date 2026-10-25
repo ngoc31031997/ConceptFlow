@@ -311,18 +311,13 @@ func (uc *ScriptDeskUseCase) State(ctx context.Context, projectID string) (Scrip
 		state.Status = domain.UnitApproved
 	}
 
-	project, err := uc.projects.Get(ctx, projectID)
-	if err != nil {
-		return ScriptState{}, fmt.Errorf("load project: %w", err)
-	}
-	duration, err := uc.units.GetTargetDuration(ctx, projectID)
+	target, _, err := approvedTarget(ctx, uc.beats.briefs, projectID)
 	if err != nil {
 		return ScriptState{}, err
 	}
-	lo, hi := domain.TargetSeconds(project.VideoOutputMode, duration)
-	state.TargetLabel = domain.TargetDurationLabel(project.VideoOutputMode, duration, "vi")
+	state.TargetLabel = target.Label("vi")
 	total := int(state.Stats.TotalSeconds + 0.5)
-	state.InRange = written > 0 && total >= lo && total <= hi
+	state.InRange = written > 0 && total >= target.Lo && total <= target.Hi
 
 	// The opening is the first beat only when that beat is the first of the sheet.
 	var opening []domain.ScriptLine
